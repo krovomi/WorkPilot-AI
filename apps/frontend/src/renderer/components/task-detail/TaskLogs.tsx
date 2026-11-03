@@ -11,19 +11,13 @@ import {
 	Columns2,
 	Cpu,
 	FileCode,
-	FileText,
 	FlaskConical,
-	FolderSearch,
-	Info,
-	Hourglass,
-	Ruler,
 	Loader2,
 	Pencil,
 	RotateCcw,
 	Search,
 	Server,
 	Terminal,
-	Wrench,
 	X,
 	XCircle,
 } from "lucide-react";
@@ -70,7 +64,14 @@ import {
 	resolveLocalModel,
 } from "../../../shared/utils/local-models";
 import { getStaticProviders } from "../../../shared/utils/providers";
-import { entryMatchesQuery } from "../../../shared/utils/task-logs-search";
+import {
+	buildLogMatcher,
+	filterLogEntries,
+	LOG_ENTRY_KINDS,
+	type LogEntryKind,
+	type LogMatcher,
+	NEVER_MATCHER,
+} from "../../../shared/utils/task-logs-search";
 import {
 	groupEntriesByModel,
 	mergeGroupsByModel,
@@ -80,7 +81,7 @@ import { debugError } from "../../../shared/utils/debug-logger";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { useOllamaModelDownload } from "../../hooks/useOllamaModelDownload";
 import { useDownloadStore } from "../../stores/download-store";
-import { Badge, Input } from "../ui";
+import { Badge } from "../ui";
 import { OfficialModelSearch } from "./OfficialModelSearch";
 import {
 	AlertDialog,
@@ -105,10 +106,18 @@ import {
 	SelectValue,
 } from "../ui/select";
 import { ModelDownloadChip } from "./ModelDownloadChip";
+import { LogEntry } from "./TaskLogEntry";
 import { TaskPhaseBar } from "./TaskPhaseBar";
+import {
+	DEFAULT_SEARCH_FLAGS,
+	type LogSearchFlags,
+	TaskLogsSearchBar,
+} from "./TaskLogsSearchBar";
+import {
+	LOG_MATCH_ATTR,
+	useLogMatchNavigation,
+} from "./hooks/useLogMatchNavigation";
 import { buildPhaseSubSteps } from "./task-log-substep";
-import { translateLogMessage } from "./translateLogMessage";
-import { formatAppDateTime } from "@/lib/date-format";
 
 interface TaskLogsProps {
 	task: Task;
@@ -132,42 +141,9 @@ interface TaskLogsProps {
 
 const PHASE_ORDER: TaskLogPhase[] = ["planning", "coding", "validation"];
 
-/**
- * Render `text`, wrapping every (case-insensitive) occurrence of `query` in a
- * <mark> so search hits stand out. Falls back to the raw text when there is no
- * query or no match, so non-searching renders stay allocation-free.
- */
-function HighlightedText({
-	text,
-	query,
-}: {
-	text: string;
-	query: string;
-}): React.ReactNode {
-	if (!query) return text;
-	const lower = text.toLowerCase();
-	let from = lower.indexOf(query);
-	if (from === -1) return text;
-
-	const parts: React.ReactNode[] = [];
-	let cursor = 0;
-	let key = 0;
-	while (from !== -1) {
-		if (from > cursor) parts.push(text.slice(cursor, from));
-		parts.push(
-			<mark
-				key={key++}
-				className="rounded-[2px] bg-warning/50 text-foreground dark:bg-warning/30"
-			>
-				{text.slice(from, from + query.length)}
-			</mark>,
-		);
-		cursor = from + query.length;
-		from = lower.indexOf(query, cursor);
-	}
-	if (cursor < text.length) parts.push(text.slice(cursor));
-	return parts;
-}
+/** Ring + stronger mark on the current search hit (set by useLogMatchNavigation). */
+const ACTIVE_MATCH_CLASSES =
+	"-mx-1 scroll-my-12 rounded-md px-1 data-[active-match]:ring-2 data-[active-match]:ring-primary/60 data-[active-match]:bg-primary/5 [&[data-active-match]_mark]:bg-primary/40";
 
 const PHASE_ICONS: Record<TaskLogPhase, typeof Pencil> = {
 	planning: Pencil,
@@ -301,23 +277,54 @@ export function TaskLogs({
 	const settings = useSettingsStore((s) => s.settings);
 	const profiles = useSettingsStore((s) => s.profiles);
 
-	// Free-text search across all phase log entries. While a query is active,
+	// Search + filters across all phase log entries. While either is active,
 	// each phase only renders its matching entries (and is force-expanded so the
 	// hits are visible); phases with no match are hidden.
 	const [searchQuery, setSearchQuery] = useState("");
-	const normalizedQuery = searchQuery.trim().toLowerCase();
-	const isSearching = normalizedQuery.length > 0;
+	const [searchFlags, setSearchFlags] =
+		useState<LogSearchFlags>(DEFAULT_SEARCH_FLAGS);
+	const [phaseFilter, setPhaseFilter] = useState<ReadonlySet<TaskLogPhase>>(
+		() => new Set(PHASE_ORDER),
+	);
+	const [kindFilter, setKindFilter] = useState<ReadonlySet<LogEntryKind>>(
+		() => new Set(LOG_ENTRY_KINDS),
+	);
+	const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-	const matchCount = useMemo(() => {
-		if (!isSearching || !phaseLogs) return 0;
-		return PHASE_ORDER.reduce((acc, phase) => {
-			const entries = phaseLogs.phases[phase]?.entries ?? [];
-			return (
-				acc +
-				entries.filter((e) => entryMatchesQuery(e, normalizedQuery)).length
-			);
-		}, 0);
-	}, [isSearching, phaseLogs, normalizedQuery]);
+	const { matcher: queryMatcher, error: regexError } = useMemo(
+		() => buildLogMatcher({ query: searchQuery, ...searchFlags }),
+		[searchQuery, searchFlags],
+	);
+	// An invalid regular expression finds nothing (and says so) rather than
+	// silently showing every entry.
+	const matcher = regexError ? NEVER_MATCHER : queryMatcher;
+	const isSearching = matcher !== null;
+	const isKindFiltered = kindFilter.size < LOG_ENTRY_KINDS.length;
+	const isPhaseFiltered = phaseFilter.size < PHASE_ORDER.length;
+	const isFiltering = isSearching || isKindFiltered || isPhaseFiltered;
+	const activeKinds = isKindFiltered ? kindFilter : null;
+
+	// Toggle one value of a filter set, never emptying it: a filter that hides
+	// everything is a dead end, so the last selected value stays on.
+	const toggleIn = <T,>(set: ReadonlySet<T>, value: T): ReadonlySet<T> => {
+		const next = new Set(set);
+		if (next.has(value)) {
+			if (next.size > 1) next.delete(value);
+		} else next.add(value);
+		return next;
+	};
+
+	const navigation = useLogMatchNavigation({
+		containerRef: logsContainerRef,
+		enabled: isFiltering && Boolean(phaseLogs),
+		resetKey: JSON.stringify([
+			searchQuery.trim(),
+			searchFlags,
+			[...phaseFilter].sort(),
+			[...kindFilter].sort(),
+		]),
+		selectFirstOnReset: isSearching,
+	});
 
 	const hasAnyLogs = Boolean(phaseLogs || (task.logs && task.logs.length > 0));
 
@@ -656,7 +663,11 @@ export function TaskLogs({
 		container.setAttribute("aria-label", t("tasks:logs.viewportAria"));
 
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Home") {
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+				e.preventDefault();
+				searchInputRef.current?.focus();
+				searchInputRef.current?.select();
+			} else if (e.key === "Home") {
 				e.preventDefault();
 				scrollToTop();
 			} else if (e.key === "End") {
@@ -785,47 +796,36 @@ export function TaskLogs({
 			onFocus={() => setIsHoveringLogs(true)}
 			onBlur={() => setIsHoveringLogs(false)}
 		>
-			{/* Search bar — filters log entries across all phases */}
+			{/* Search bar — query, previous/next, filters across all phases */}
 			{!isLoadingLogs && hasAnyLogs && (
-				<div className="shrink-0 border-b border-border/50 p-2">
-					<div className="relative">
-						<Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							type="text"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder={t(
-								"tasks:logs.search.placeholder",
-								"Rechercher dans les logs…",
-							)}
-							aria-label={t(
-								"tasks:logs.search.ariaLabel",
-								"Rechercher dans les logs",
-							)}
-							className="h-8 w-full pl-8 pr-24 text-xs"
-						/>
-						{isSearching && (
-							<div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
-								<span className="text-3xs tabular-nums text-muted-foreground">
-									{t("tasks:logs.search.results", "{{count}} résultat(s)", {
-										count: matchCount,
-									})}
-								</span>
-								<button
-									type="button"
-									onClick={() => setSearchQuery("")}
-									aria-label={t(
-										"tasks:logs.search.clear",
-										"Effacer la recherche",
-									)}
-									className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
-								>
-									<X className="h-3.5 w-3.5" />
-								</button>
-							</div>
-						)}
-					</div>
-				</div>
+				<TaskLogsSearchBar
+					inputRef={searchInputRef}
+					query={searchQuery}
+					onQueryChange={setSearchQuery}
+					flags={searchFlags}
+					onFlagsChange={setSearchFlags}
+					regexError={regexError}
+					isActive={isFiltering && Boolean(phaseLogs)}
+					isSearching={isSearching}
+					total={navigation.total}
+					current={navigation.current}
+					onNext={navigation.next}
+					onPrevious={navigation.previous}
+					phases={PHASE_ORDER}
+					phaseFilter={phaseFilter}
+					onTogglePhase={(phase) =>
+						setPhaseFilter((prev) => toggleIn(prev, phase))
+					}
+					kindFilter={kindFilter}
+					onToggleKind={(kind) => setKindFilter((prev) => toggleIn(prev, kind))}
+					activeFilterCount={
+						Number(isPhaseFiltered) + Number(isKindFiltered)
+					}
+					onResetFilters={() => {
+						setPhaseFilter(new Set(PHASE_ORDER));
+						setKindFilter(new Set(LOG_ENTRY_KINDS));
+					}}
+				/>
 			)}
 
 			{/* Barre de phase : nom de la phase, étape courante et sous-étape en
@@ -852,7 +852,7 @@ export function TaskLogs({
 					) : phaseLogs ? (
 						<>
 							{/* Phase-based collapsible logs */}
-							{PHASE_ORDER.map((phase) => (
+							{PHASE_ORDER.filter((phase) => phaseFilter.has(phase)).map((phase) => (
 								<div
 									key={phase}
 									data-phase-section={phase}
@@ -873,7 +873,9 @@ export function TaskLogs({
 										onModelChange={handleModelChange}
 										onProviderChange={handleProviderChange}
 										isSavingPhase={savingPhase === phase}
-										searchQuery={normalizedQuery}
+										matcher={matcher}
+										kinds={activeKinds}
+										isFiltering={isFiltering}
 										subtaskTitles={subtaskTitles}
 										onCompare={handleCompare}
 										onRerunPhase={handleRerunPhase}
@@ -883,16 +885,21 @@ export function TaskLogs({
 									/>
 								</div>
 							))}
-							{isSearching && matchCount === 0 && (
+							{isFiltering && navigation.total === 0 && (
 								<div className="py-8 text-center text-sm text-muted-foreground">
 									<Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
 									<p>{t("tasks:logs.search.noResults", "Aucun résultat")}</p>
 									<p className="mt-1 text-xs">
-										{t(
-											"tasks:logs.search.noResultsHint",
-											"Aucune entrée de log ne correspond à « {{query}} ».",
-											{ query: searchQuery.trim() },
-										)}
+										{isSearching
+											? t(
+													"tasks:logs.search.noResultsHint",
+													"Aucune entrée de log ne correspond à « {{query}} ».",
+													{ query: searchQuery.trim() },
+												)
+											: t(
+													"tasks:logs.search.noResultsFiltered",
+													"Aucune entrée ne correspond aux filtres.",
+												)}
 									</p>
 								</div>
 							)}
@@ -906,9 +913,7 @@ export function TaskLogs({
 								? task.logs
 										.join("")
 										.split("\n")
-										.filter((line) =>
-											line.toLowerCase().includes(normalizedQuery),
-										)
+										.filter((line) => matcher.test(line))
 										.join("\n") ||
 									t("tasks:logs.search.noResults", "Aucun résultat")
 								: task.logs.join("")}
@@ -1048,8 +1053,12 @@ interface PhaseLogSectionProps {
 	onModelChange?: (phase: TaskLogPhase, model: string) => void;
 	onProviderChange?: (phase: TaskLogPhase, provider: string) => void;
 	isSavingPhase?: boolean;
-	/** Active, already-lower-cased search query (empty = no filtering). */
-	searchQuery?: string;
+	/** Active text search (null = none). */
+	matcher?: LogMatcher | null;
+	/** Entry types kept by the "Type" filter (null = all). */
+	kinds?: ReadonlySet<LogEntryKind> | null;
+	/** A search or filter is active: hide when empty, force-expand otherwise. */
+	isFiltering?: boolean;
 	/** Map id → titre de sous-tâche, pour le repli de sous-étape du codage. */
 	subtaskTitles?: Record<string, string>;
 	/** Open the side-by-side comparison for this phase (shown only when ≥2 models). */
@@ -1082,7 +1091,9 @@ function PhaseLogSection({
 	onModelChange,
 	onProviderChange,
 	isSavingPhase,
-	searchQuery = "",
+	matcher = null,
+	kinds = null,
+	isFiltering = false,
 	subtaskTitles,
 	onCompare,
 	onRerunPhase,
@@ -1122,8 +1133,6 @@ function PhaseLogSection({
 	const runningModel = [...(phaseLog?.entries ?? [])]
 		.reverse()
 		.find((entry) => entry.model)?.model;
-	const isSearching = searchQuery.length > 0;
-
 	// Live model catalog for the phase's currently-selected provider. The hook
 	// is always called (provider may be "") so it complies with the rules of
 	// hooks; an empty provider just yields the static fallback list.
@@ -1211,13 +1220,11 @@ function PhaseLogSection({
 			// the compare/per-model view still works.
 			entries = matching.length > 0 ? matching : allEntries;
 		}
-		return isSearching
-			? entries.filter((e) => entryMatchesQuery(e, searchQuery))
-			: entries;
+		return filterLogEntries(entries, kinds, matcher);
 	}, [
 		effectivePhaseLog?.entries,
-		isSearching,
-		searchQuery,
+		kinds,
+		matcher,
 		phaseConfig?.provider,
 		phaseConfig?.modelValue,
 	]);
@@ -1375,10 +1382,10 @@ function PhaseLogSection({
 
 	// While searching, a phase with no matching entry is hidden entirely so the
 	// results read as a flat, focused list. (All hooks above already ran.)
-	if (isSearching && filteredEntries.length === 0) return null;
+	if (isFiltering && filteredEntries.length === 0) return null;
 
 	return (
-		<Collapsible open={isSearching || isExpanded} onOpenChange={onToggle}>
+		<Collapsible open={isFiltering || isExpanded} onOpenChange={onToggle}>
 			<div
 				className={cn(
 					"w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-3 rounded-lg border transition-colors",
@@ -1770,7 +1777,8 @@ function PhaseLogSection({
 									key={`${group.key}-${group.entries[0]?.timestamp}`}
 									group={group}
 									phase={phase}
-									searchQuery={searchQuery}
+									matcher={matcher}
+									markMatches={isFiltering}
 									subStepLabels={subStepLabels}
 									providers={providers}
 								/>
@@ -1779,7 +1787,8 @@ function PhaseLogSection({
 									key={`flat-${group.entries[0]?.timestamp}`}
 									entries={group.entries}
 									phase={phase}
-									searchQuery={searchQuery}
+									matcher={matcher}
+									markMatches={isFiltering}
 									subStepLabels={subStepLabels}
 								/>
 							),
@@ -1797,12 +1806,15 @@ function PhaseLogSection({
 function PhaseEntryList({
 	entries,
 	phase,
-	searchQuery,
+	matcher,
+	markMatches = false,
 	subStepLabels,
 }: {
 	entries: TaskLogEntry[];
 	phase: TaskLogPhase;
-	searchQuery: string;
+	matcher: LogMatcher | null;
+	/** Every entry listed is a search/filter match: tag it for navigation. */
+	markMatches?: boolean;
 	subStepLabels: Map<TaskLogEntry, string>;
 }) {
 	return (
@@ -1810,18 +1822,22 @@ function PhaseEntryList({
 			{entries.map((entry) => {
 				const key = `${entry.timestamp}-${entry.type}-${entry.content.slice(0, 80)}`;
 				const subStepLabel = subStepLabels.get(entry) ?? null;
-				if (subStepLabel) {
+				if (subStepLabel || markMatches) {
 					return (
 						<div
 							key={key}
-							data-substep={subStepLabel}
-							data-substep-phase={phase}
+							data-substep={subStepLabel ?? undefined}
+							data-substep-phase={subStepLabel ? phase : undefined}
+							{...(markMatches
+								? { [LOG_MATCH_ATTR]: `${phase}:${key}` }
+								: undefined)}
+							className={markMatches ? ACTIVE_MATCH_CLASSES : undefined}
 						>
-							<LogEntry entry={entry} query={searchQuery} />
+							<LogEntry entry={entry} matcher={matcher} />
 						</div>
 					);
 				}
-				return <LogEntry key={key} entry={entry} query={searchQuery} />;
+				return <LogEntry key={key} entry={entry} matcher={matcher} />;
 			})}
 		</>
 	);
@@ -1861,18 +1877,22 @@ function formatProviderLabel(
 function ModelLogGroupView({
 	group,
 	phase,
-	searchQuery,
+	matcher,
+	markMatches = false,
 	subStepLabels,
 	providers,
 }: {
 	group: ModelLogGroup;
 	phase: TaskLogPhase;
-	searchQuery: string;
+	matcher: LogMatcher | null;
+	markMatches?: boolean;
 	subStepLabels: Map<TaskLogEntry, string>;
 	providers?: readonly { name: string; label: string }[];
 }) {
 	const { t } = useTranslation(["tasks"]);
-	const [open, setOpen] = useState(true);
+	const [userOpen, setOpen] = useState(true);
+	// A search shows its hits, so a group collapsed by hand opens while it runs.
+	const open = userOpen || markMatches;
 	const modelLabel =
 		group.model || t("tasks:logs.modelGroup.unknownModel", "Unknown model");
 	const providerLabel = formatProviderLabel(group.provider, providers);
@@ -1920,7 +1940,8 @@ function ModelLogGroupView({
 					<PhaseEntryList
 						entries={group.entries}
 						phase={phase}
-						searchQuery={searchQuery}
+						matcher={matcher}
+						markMatches={markMatches}
 						subStepLabels={subStepLabels}
 					/>
 				</div>
@@ -2008,7 +2029,7 @@ function CompareColumn({
 					<PhaseEntryList
 						entries={entries}
 						phase={phase}
-						searchQuery=""
+						matcher={null}
 						subStepLabels={subStepLabels}
 					/>
 				)}
@@ -2141,314 +2162,6 @@ function PhaseCompareView({
 					providers={providers}
 				/>
 			</div>
-		</div>
-	);
-}
-
-// Log Entry Component
-interface LogEntryProps {
-	entry: TaskLogEntry;
-	/** Active, already-lower-cased search query, for match highlighting. */
-	query?: string;
-}
-
-function LogEntry({ entry, query = "" }: LogEntryProps) {
-	const { t } = useTranslation(["tasks"]);
-	const [isExpanded, setIsExpanded] = useState(false);
-	const hasDetail = Boolean(entry.detail);
-
-	// Pre-built highlighted nodes for the searchable fields, reused across the
-	// per-type render branches below. Known backend status lines (QA verdicts,
-	// hot-swap, context switch…) are emitted in stable English and localised here
-	// for display; anything else is shown as-is.
-	const translatedContent = translateLogMessage(t, entry.content);
-	const marker = /^(⏳|🧠|⚠️?|📊|📐)\s*/u.exec(translatedContent);
-	const StatusIcon =
-		marker?.[1] === "⏳"
-			? Hourglass
-			: marker?.[1] === "🧠"
-				? Brain
-				: marker?.[1] === "📐"
-					? Ruler
-					: marker?.[1] === "📊"
-						? Info
-						: AlertTriangle;
-	const content = (
-		<>
-			{marker && (
-				<StatusIcon
-					aria-hidden="true"
-					className="inline-block h-3.5 w-3.5 mr-1 align-text-bottom"
-				/>
-			)}
-			<HighlightedText
-				text={
-					marker ? translatedContent.slice(marker[0].length) : translatedContent
-				}
-				query={query}
-			/>
-		</>
-	);
-	const detail = entry.detail ? (
-		<HighlightedText text={entry.detail} query={query} />
-	) : null;
-	const toolInput = entry.tool_input ? (
-		<HighlightedText text={entry.tool_input} query={query} />
-	) : null;
-
-	const getToolInfo = (toolName: string) => {
-		switch (toolName) {
-			case "Read":
-				return {
-					icon: FileText,
-					label: "Reading",
-					color: "text-blue-500 bg-blue-500/10",
-				};
-			case "Glob":
-				return {
-					icon: FolderSearch,
-					label: "Searching files",
-					color: "text-warning bg-warning/10",
-				};
-			case "Grep":
-				return {
-					icon: Search,
-					label: "Searching code",
-					color: "text-success bg-success/10",
-				};
-			case "Edit":
-				return {
-					icon: Pencil,
-					label: "Editing",
-					color: "text-purple-500 bg-purple-500/10",
-				};
-			case "Write":
-				return {
-					icon: FileCode,
-					label: "Writing",
-					color: "text-cyan-500 bg-cyan-500/10",
-				};
-			case "Bash":
-				return {
-					icon: Terminal,
-					label: "Running",
-					color: "text-orange-500 bg-orange-500/10",
-				};
-			default:
-				return {
-					icon: Wrench,
-					label: toolName,
-					color: "text-muted-foreground bg-muted",
-				};
-		}
-	};
-
-	const formatTime = (timestamp: string) => {
-		try {
-			const date = new Date(timestamp);
-			return formatAppDateTime(date);
-		} catch {
-			return "";
-		}
-	};
-
-	const SubphaseBadge = () => {
-		if (!entry.subphase) return null;
-		return (
-			<Badge
-				variant="outline"
-				className="text-3xs px-1 py-0 ml-1 text-muted-foreground border-muted-foreground/30"
-			>
-				{entry.subphase}
-			</Badge>
-		);
-	};
-
-	if (entry.type === "tool_start" && entry.tool_name) {
-		const { icon: Icon, label, color } = getToolInfo(entry.tool_name);
-		return (
-			<div className="flex flex-col">
-				<div
-					className={cn(
-						"flex items-start gap-2 rounded-md px-2 py-1 text-xs",
-						color,
-					)}
-				>
-					<Icon className="h-3 w-3 mt-0.5 shrink-0 animate-pulse" />
-					<span className="font-medium shrink-0 mt-px">{label}</span>
-					{entry.tool_input && (
-						<span
-							className="text-muted-foreground break-all whitespace-pre-wrap flex-1 min-w-0"
-							title={entry.tool_input as string}
-						>
-							{toolInput}
-						</span>
-					)}
-					<SubphaseBadge />
-				</div>
-			</div>
-		);
-	}
-
-	if (entry.type === "tool_end" && entry.tool_name) {
-		const { icon: Icon, color } = getToolInfo(entry.tool_name);
-		return (
-			<div className="flex flex-col">
-				<div className="flex items-center gap-2">
-					<div
-						className={cn(
-							"inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs",
-							color,
-							"opacity-60",
-						)}
-					>
-						<Icon className="h-3 w-3" />
-						<CheckCircle2 className="h-3 w-3 text-success" />
-						<span className="text-muted-foreground">{t("taskReview:taskPanel.done")}</span>
-					</div>
-					{hasDetail && (
-						<button
-							type="button"
-							onClick={() => setIsExpanded(!isExpanded)}
-							className={cn(
-								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded",
-								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
-								isExpanded && "bg-secondary/50",
-							)}
-						>
-							{isExpanded ? (
-								<>
-									<ChevronDown className="h-2.5 w-2.5" />
-									<span>{t("tasks:logs.hideOutput")}</span>
-								</>
-							) : (
-								<>
-									<ChevronRight className="h-2.5 w-2.5" />
-									<span>{t("tasks:logs.showOutput")}</span>
-								</>
-							)}
-						</button>
-					)}
-				</div>
-				{hasDetail && isExpanded && (
-					<div className="mt-1.5 ml-4 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-						<pre className="text-3xs text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
-							{detail}
-						</pre>
-					</div>
-				)}
-			</div>
-		);
-	}
-
-	if (entry.type === "error") {
-		return (
-			<div className="flex flex-col">
-				<div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded-md px-2 py-1">
-					<XCircle className="h-3 w-3 mt-0.5 shrink-0" />
-					<span className="break-words flex-1">{content}</span>
-					<SubphaseBadge />
-					{hasDetail && (
-						<button
-							type="button"
-							onClick={() => setIsExpanded(!isExpanded)}
-							className={cn(
-								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
-								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
-								isExpanded && "bg-secondary/50",
-							)}
-						>
-							{isExpanded ? (
-								<ChevronDown className="h-2.5 w-2.5" />
-							) : (
-								<ChevronRight className="h-2.5 w-2.5" />
-							)}
-						</button>
-					)}
-				</div>
-				{hasDetail && isExpanded && (
-					<div className="mt-1.5 ml-4 p-2 bg-destructive/5 rounded-md border border-destructive/20 overflow-x-auto">
-						<pre className="text-3xs text-destructive/80 whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
-							{detail}
-						</pre>
-					</div>
-				)}
-			</div>
-		);
-	}
-
-	if (entry.type === "success") {
-		return (
-			<div className="flex items-start gap-2 text-xs text-success bg-success/10 rounded-md px-2 py-1">
-				<CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
-				<span className="break-words flex-1">{content}</span>
-				<SubphaseBadge />
-			</div>
-		);
-	}
-
-	if (entry.type === "warning") {
-		return (
-			<div className="flex items-start gap-2 text-xs text-warning bg-warning/10 rounded-md px-2 py-1">
-				<AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-				<span className="break-words flex-1">{content}</span>
-				<SubphaseBadge />
-			</div>
-		);
-	}
-
-	if (entry.type === "info") {
-		return (
-			<div className="flex items-start gap-2 text-xs text-info bg-info/10 rounded-md px-2 py-1">
-				<Info className="h-3 w-3 mt-0.5 shrink-0" />
-				<span className="break-words flex-1">{content}</span>
-				<SubphaseBadge />
-			</div>
-		);
-	}
-
-	// Default text entry
-	return (
-		<div className="flex flex-col">
-			<div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
-				<span className="text-3xs text-muted-foreground/60 tabular-nums shrink-0">
-					{formatTime(entry.timestamp)}
-				</span>
-				<span className="break-words whitespace-pre-wrap flex-1">
-					{content}
-				</span>
-				<SubphaseBadge />
-				{hasDetail && (
-					<button
-						type="button"
-						onClick={() => setIsExpanded(!isExpanded)}
-						className={cn(
-							"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
-							"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
-							isExpanded && "bg-secondary/50",
-						)}
-					>
-						{isExpanded ? (
-							<>
-								<ChevronDown className="h-2.5 w-2.5" />
-								<span>{t("taskReview:taskPanel.less")}</span>
-							</>
-						) : (
-							<>
-								<ChevronRight className="h-2.5 w-2.5" />
-								<span>{t("taskReview:taskPanel.more")}</span>
-							</>
-						)}
-					</button>
-				)}
-			</div>
-			{hasDetail && isExpanded && (
-				<div className="mt-1.5 ml-12 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-					<pre className="text-3xs text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
-						{detail}
-					</pre>
-				</div>
-			)}
 		</div>
 	);
 }
