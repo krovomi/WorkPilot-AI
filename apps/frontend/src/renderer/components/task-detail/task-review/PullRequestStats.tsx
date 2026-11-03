@@ -75,11 +75,11 @@ export function PullRequestStats({
 
 				{/* Branch info: spec branch → user's current branch (merge target) */}
 				<div className="mt-2 text-xs text-muted-foreground">
-					<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+					<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 						{prData.source_branch}
 					</code>
 					<span className="mx-1.5">→</span>
-					<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+					<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 						{prData.target_branch}
 					</code>
 				</div>

@@ -100,7 +100,7 @@ export function TaskCreationExtras({
 						<ListChecks className="h-4 w-4 text-success" aria-hidden="true" />
 						<span>{t("tasks:metadata.acceptanceCriteria")}</span>
 						{count > 0 && (
-							<Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+							<Badge variant="secondary" className="ml-1 text-3xs h-4 px-1.5">
 								{count}
 							</Badge>
 						)}

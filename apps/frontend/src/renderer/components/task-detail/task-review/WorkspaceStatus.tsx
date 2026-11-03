@@ -498,11 +498,11 @@ export function WorkspaceStatus({
 				{/* Branch info: spec branch → user's current branch (merge target) */}
 				{worktreeStatus.branch && (
 					<div className="mt-2 text-xs text-muted-foreground">
-						<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+						<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 							{worktreeStatus.branch}
 						</code>
 						<span className="mx-1.5">→</span>
-						<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+						<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 							{worktreeStatus.currentProjectBranch ||
 								worktreeStatus.baseBranch ||
 								"main"}
@@ -729,7 +729,7 @@ export function WorkspaceStatus({
 							<div className="flex items-center gap-2">
 								<span
 									className={cn(
-										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										"flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold transition-colors",
 										hasExistingPr
 											? "bg-success text-success-foreground"
 											: "bg-info text-info-foreground ring-2 ring-info/25",
@@ -755,7 +755,7 @@ export function WorkspaceStatus({
 							<div className="flex items-center gap-2">
 								<span
 									className={cn(
-										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										"flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold transition-colors",
 										hasExistingPr
 											? "bg-success text-success-foreground ring-2 ring-success/25"
 											: "bg-muted text-muted-foreground",
@@ -808,14 +808,14 @@ export function WorkspaceStatus({
 									type="button"
 									onClick={onRequestComplete}
 									disabled={actionsBusy}
-									className="mx-auto flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-warning hover:underline disabled:opacity-50"
+									className="mx-auto flex items-center gap-1 text-2xs text-muted-foreground underline-offset-2 transition-colors hover:text-warning hover:underline disabled:opacity-50"
 								>
 									{t("taskReview:close.closeWithoutPr")}
 								</button>
 							</div>
 						)}
 
-						<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+						<div className="flex items-center gap-2 text-2xs text-muted-foreground">
 							<span className="h-px flex-1 bg-border" />
 							{t("taskReview:close.orGitActions")}
 							<span className="h-px flex-1 bg-border" />

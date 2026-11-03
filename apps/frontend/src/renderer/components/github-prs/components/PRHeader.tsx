@@ -70,7 +70,7 @@ export function PRHeader({ pr, isLoadingFiles = false }: PRHeaderProps) {
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0 shrink-0",
+							"text-3xs px-1.5 py-0 shrink-0",
 							getFileStatusStyle(file.status),
 						)}
 					>

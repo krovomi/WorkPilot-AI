@@ -108,7 +108,7 @@ export function ContextGaugeMini({ task }: { task: Task }) {
 						markerClassName="text-foreground/50"
 						ariaLabel={t("tasks:contextManagement.gauge.ariaLabel", { percent })}
 					/>
-					<span className={cn("text-[10px] font-medium", ZONE_CLASS[zone])}>
+					<span className={cn("text-3xs font-medium", ZONE_CLASS[zone])}>
 						{percent}%
 					</span>
 				</span>
@@ -224,7 +224,7 @@ function ActionButton({ action, recommended, disabled, onClick }: ActionButtonPr
 						<Icon className="h-3.5 w-3.5" />
 						{label}
 						{recommended && (
-							<span className="absolute -top-2 right-1 rounded bg-background px-1 text-[9px] font-semibold uppercase tracking-wide text-primary ring-1 ring-primary/40">
+							<span className="absolute -top-2 right-1 rounded bg-background px-1 text-3xs font-semibold uppercase tracking-wide text-primary ring-1 ring-primary/40">
 								{t("tasks:contextManagement.actions.recommended")}
 							</span>
 						)}
@@ -254,7 +254,7 @@ function HistoryLine({ event }: { event: TaskContextActionAppliedEvent }) {
 	}
 	const Icon = event.action === "compact" ? Shrink : MessageSquarePlus;
 	return (
-		<li className="flex items-center gap-2 text-[11px]">
+		<li className="flex items-center gap-2 text-2xs">
 			<Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
 			<span className="flex-1 truncate text-foreground">{text}</span>
 			<span className="text-muted-foreground">
@@ -365,13 +365,13 @@ export function ContextGauge({ task }: { task: Task }) {
 								{percent === null ? "–" : `${percent}%`}
 							</span>
 							{handoffState === "preparing" && (
-								<Badge variant="info" className="gap-1 px-1.5 py-0 text-[10px]">
+								<Badge variant="info" className="gap-1 px-1.5 py-0 text-3xs">
 									<Loader2 className="h-2.5 w-2.5 animate-spin" />
 									{t("tasks:contextManagement.handoff.preparing")}
 								</Badge>
 							)}
 							{handoffState === "ready" && (
-								<Badge variant="success" className="gap-1 px-1.5 py-0 text-[10px]">
+								<Badge variant="success" className="gap-1 px-1.5 py-0 text-3xs">
 									<CheckCircle2 className="h-2.5 w-2.5" />
 									{t("tasks:contextManagement.handoff.ready")}
 								</Badge>
@@ -411,21 +411,21 @@ export function ContextGauge({ task }: { task: Task }) {
 							{t("tasks:contextManagement.title")}
 						</div>
 						{tokensText ? (
-							<div className="text-[11px] tabular-nums text-muted-foreground">
+							<div className="text-2xs tabular-nums text-muted-foreground">
 								{tokensText}
 							</div>
 						) : (
 							// Running without a reading yet: "–" is "not measured",
 							// not 0% (the process is starting, no session has begun).
 							<p
-								className="text-[11px] text-muted-foreground"
+								className="text-2xs text-muted-foreground"
 								data-testid="context-gauge-not-measured"
 							>
 								{t("tasks:contextManagement.gauge.notMeasured")}
 							</p>
 						)}
 						{usage && (
-							<div className="truncate text-[11px] text-muted-foreground">
+							<div className="truncate text-2xs text-muted-foreground">
 								{[usage.provider, usage.model].filter(Boolean).join(" · ")}
 								{usage.phase
 									? ` · ${t("tasks:contextManagement.gauge.phase", { phase: usage.phase })}`
@@ -434,7 +434,7 @@ export function ContextGauge({ task }: { task: Task }) {
 						)}
 						{cacheText && (
 							<div
-								className="text-[11px] tabular-nums text-muted-foreground"
+								className="text-2xs tabular-nums text-muted-foreground"
 								data-testid="context-gauge-cache"
 							>
 								{cacheText}
@@ -450,7 +450,7 @@ export function ContextGauge({ task }: { task: Task }) {
 					dense
 				/>
 				{usage ? (
-					<p className="text-[11px] text-muted-foreground">
+					<p className="text-2xs text-muted-foreground">
 						{t(`tasks:contextManagement.provider.${usage.compactSupport}`, {
 							provider: usage.provider,
 						})}
@@ -475,18 +475,18 @@ export function ContextGauge({ task }: { task: Task }) {
 						/>
 					</div>
 					{pending && (
-						<p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+						<p className="flex items-center gap-1 text-2xs text-muted-foreground">
 							<Loader2 className="h-3 w-3 animate-spin" />
 							{t("tasks:contextManagement.actions.requested")}
 						</p>
 					)}
 					{!active && (
-						<p className="text-[11px] text-muted-foreground">
+						<p className="text-2xs text-muted-foreground">
 							{t("tasks:contextManagement.actions.notRunning")}
 						</p>
 					)}
 					{error !== null && (
-						<p className="text-[11px] text-destructive" role="alert">
+						<p className="text-2xs text-destructive" role="alert">
 							{t("tasks:contextManagement.actions.failed", { error })}
 						</p>
 					)}
@@ -497,7 +497,7 @@ export function ContextGauge({ task }: { task: Task }) {
 						{t("tasks:contextManagement.history.title")}
 					</div>
 					{history.length === 0 ? (
-						<p className="text-[11px] text-muted-foreground">
+						<p className="text-2xs text-muted-foreground">
 							{t("tasks:contextManagement.history.empty")}
 						</p>
 					) : (

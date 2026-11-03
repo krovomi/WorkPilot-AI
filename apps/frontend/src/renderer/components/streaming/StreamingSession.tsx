@@ -764,7 +764,7 @@ export function StreamingSession({
 											>
 												<Code2 className="w-3 h-3 shrink-0 text-muted-foreground" />
 												<span className="truncate flex-1">{file.path}</span>
-												<Badge variant="outline" className="text-[10px]">
+												<Badge variant="outline" className="text-3xs">
 													{file.operation}
 												</Badge>
 											</button>

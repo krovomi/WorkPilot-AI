@@ -80,7 +80,7 @@ function RunsByDay({
 							style={{ height: `${(point.count / max) * 100}%` }}
 							title={`${point.date}: ${point.count}`}
 						/>
-						<span className="text-[10px] text-muted-foreground">
+						<span className="text-3xs text-muted-foreground">
 							{point.date.slice(5)}
 						</span>
 					</div>

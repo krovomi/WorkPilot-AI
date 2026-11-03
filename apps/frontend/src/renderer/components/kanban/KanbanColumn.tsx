@@ -302,7 +302,7 @@ export function WipLimitPopover({ wipLimit, onSetWipLimit }: WipLimitPopoverProp
 			</Tooltip>
 			<PopoverContent align="end" className="w-60 space-y-3 p-3">
 				<div className="space-y-1">
-					<span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+					<span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
 						{t("kanban.wipLimit.label")}
 					</span>
 					<p className="text-xs text-muted-foreground">
@@ -901,7 +901,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 											)}
 										>
 											<Archive className="h-4 w-4" />
-											<span className="absolute -top-1 -right-1 text-[10px] font-medium bg-muted rounded-full min-w-[14px] h-[14px] flex items-center justify-center">
+											<span className="absolute -top-1 -right-1 text-3xs font-medium bg-muted rounded-full min-w-[14px] h-[14px] flex items-center justify-center">
 												{archivedCount}
 											</span>
 										</Button>
@@ -1009,7 +1009,7 @@ export const DroppableColumn = memo(function DroppableColumn({
 													{emptyState.message}
 												</span>
 												{emptyState.subtext && (
-													<span className="mt-0.5 max-w-[22ch] text-[11px] leading-snug text-muted-foreground/50">
+													<span className="mt-0.5 max-w-[22ch] text-2xs leading-snug text-muted-foreground/50">
 														{emptyState.subtext}
 													</span>
 												)}

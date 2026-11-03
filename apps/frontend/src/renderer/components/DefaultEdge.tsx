@@ -103,7 +103,7 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 							onChange={(e) => setDraft(e.target.value)}
 							onBlur={commit}
 							onKeyDown={handleKeyDown}
-							className="w-28 rounded border border-primary bg-background px-1 py-0.5 text-[11px] text-foreground outline-none"
+							className="w-28 rounded border border-primary bg-background px-1 py-0.5 text-2xs text-foreground outline-none"
 							aria-label={data?.label ?? ""}
 						/>
 					) : (
@@ -116,7 +116,7 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 									setEditing(true);
 								}
 							}}
-							className={`max-w-[160px] truncate rounded border bg-card px-1.5 py-0.5 text-[11px] leading-tight text-card-foreground shadow-sm transition-colors hover:border-primary ${
+							className={`max-w-[160px] truncate rounded border bg-card px-1.5 py-0.5 text-2xs leading-tight text-card-foreground shadow-sm transition-colors hover:border-primary ${
 								selected ? "border-primary" : "border-border"
 							} ${data?.label ? "" : "opacity-60"}`}
 						>

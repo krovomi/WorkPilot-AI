@@ -120,17 +120,17 @@ export const EditableNode: React.FC<NodeProps<EditableNodeData>> = ({
 							onChange={(e) => setDraft(e.target.value)}
 							onBlur={commit}
 							onKeyDown={handleKeyDown}
-							className="nodrag w-full rounded border bg-background px-1 py-0.5 text-[13px] font-semibold text-foreground outline-none"
+							className="nodrag w-full rounded border bg-background px-1 py-0.5 text-sm font-semibold text-foreground outline-none"
 							style={{ borderColor: accent }}
 							aria-label={String(data.label ?? "")}
 						/>
 					) : (
-						<p className="truncate text-[13px] font-semibold leading-tight">
+						<p className="truncate text-sm font-semibold leading-tight">
 							{data.label}
 						</p>
 					)}
 					{data.framework ? (
-						<p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+						<p className="mt-0.5 truncate text-3xs leading-tight text-muted-foreground">
 							{data.framework}
 						</p>
 					) : null}

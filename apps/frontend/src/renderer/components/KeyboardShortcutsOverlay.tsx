@@ -80,7 +80,7 @@ function Kbd({ children }: { readonly children: string }) {
 			{parts.map((part, i) => (
 				<span key={part}>
 					{i > 0 && <span className="mx-0.5 text-muted-foreground/50">+</span>}
-					<kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-secondary px-1.5 font-mono text-[11px] font-medium text-foreground shadow-sm">
+					<kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-secondary px-1.5 font-mono text-2xs font-medium text-foreground shadow-sm">
 						{part}
 					</kbd>
 				</span>

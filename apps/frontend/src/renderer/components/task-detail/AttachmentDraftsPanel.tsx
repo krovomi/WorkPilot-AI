@@ -240,10 +240,10 @@ export function AttachmentDraftsPanel({
 									/>
 									<div className="min-w-0 flex-1">
 										<div className="flex items-center gap-1">
-											<Badge variant="outline" className="text-[10px]">
+											<Badge variant="outline" className="text-3xs">
 												{draft.id}
 											</Badge>
-											<span className="text-[10px] text-muted-foreground">
+											<span className="text-3xs text-muted-foreground">
 												{sourceLabel(draft, pageLabel)}
 											</span>
 										</div>
@@ -266,7 +266,7 @@ export function AttachmentDraftsPanel({
 
 					{criteria.length > 0 && (
 						<>
-							<h5 className="mt-3 text-[11px] font-medium text-muted-foreground">
+							<h5 className="mt-3 text-2xs font-medium text-muted-foreground">
 								{t("tasks:docintel.drafts.criteria")}
 							</h5>
 							<ul className="mt-1 space-y-1">
@@ -279,7 +279,7 @@ export function AttachmentDraftsPanel({
 											aria-label={t("tasks:docintel.drafts.selectCriterion")}
 										/>
 										<div className="min-w-0 flex-1">
-											<span className="text-[10px] text-muted-foreground">
+											<span className="text-3xs text-muted-foreground">
 												{sourceLabel(draft, pageLabel)}
 											</span>
 											<Input
@@ -404,7 +404,7 @@ function RuleTableRow({
 				</Button>
 			</div>
 			<div className="mt-1 overflow-x-auto">
-				<table className="text-[11px]">
+				<table className="text-2xs">
 					<thead>
 						<tr>
 							{table.table.headers.map((header, index) => (
@@ -433,7 +433,7 @@ function RuleTableRow({
 					</tbody>
 				</table>
 				{table.table.rows.length > 8 && (
-					<p className="text-[10px] text-muted-foreground">
+					<p className="text-3xs text-muted-foreground">
 						{t("tasks:docintel.rules.moreRows", {
 							count: table.table.rows.length - 8,
 						})}
@@ -448,7 +448,7 @@ function RuleTableRow({
 								key={draft.language}
 								size="sm"
 								variant={draft.language === test.language ? "secondary" : "ghost"}
-								className="h-6 px-2 text-[10px]"
+								className="h-6 px-2 text-3xs"
 								onClick={() => {
 									setLanguage(draft.language);
 									setCopied(false);
@@ -463,19 +463,19 @@ function RuleTableRow({
 						<Button
 							size="sm"
 							variant="ghost"
-							className="ml-auto h-6 px-2 text-[10px]"
+							className="ml-auto h-6 px-2 text-3xs"
 							onClick={() => void copy()}
 						>
 							<ClipboardCopy className="mr-1 h-3 w-3" aria-hidden />
 							{copied ? t("tasks:docintel.rules.copied") : t("tasks:docintel.rules.copy")}
 						</Button>
 					</div>
-					<pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-[10px]">
+					<pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-3xs">
 						{test.code}
 					</pre>
 				</div>
 			) : (
-				<p className="mt-1 text-[10px] text-muted-foreground">
+				<p className="mt-1 text-3xs text-muted-foreground">
 					{t("tasks:docintel.rules.noLanguage")}
 				</p>
 			)}
@@ -502,7 +502,7 @@ function WhiteboardSection({
 	if (!available) {
 		// Dit, sans rien deviner : pas de modèle de vision, pas de schéma.
 		return (
-			<p className="flex items-start gap-1 text-[11px] text-muted-foreground">
+			<p className="flex items-start gap-1 text-2xs text-muted-foreground">
 				<PenTool className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
 				{t("tasks:docintel.whiteboard.unavailable", {
 					reason: t(`tasks:docintel.reason.${reason || "unknown"}`, {
@@ -530,7 +530,7 @@ function WhiteboardSection({
 							<Button
 								size="sm"
 								variant="outline"
-								className="h-6 px-2 text-[10px]"
+								className="h-6 px-2 text-3xs"
 								disabled={busy}
 								onClick={() => onConvert(path)}
 							>

@@ -393,7 +393,7 @@ export function ImageUpload({
 								<p className="text-xs text-white font-medium truncate">
 									{image.filename}
 								</p>
-								<p className="text-[10px] text-white/70">
+								<p className="text-3xs text-white/70">
 									{formatFileSize(image.size)}
 								</p>
 							</div>

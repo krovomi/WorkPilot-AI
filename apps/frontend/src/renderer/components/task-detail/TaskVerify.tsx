@@ -102,19 +102,19 @@ function Targets({ record }: { readonly record: VerifyRecord }) {
 					<li key={target.name} className="rounded border border-border p-2">
 						<div className="flex flex-wrap items-center gap-2">
 							<span className="font-medium">{target.name}</span>
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t(`tasks:verify.kind.${target.kind}`, { defaultValue: target.kind })}
 							</Badge>
 							<Badge
 								variant={target.launch?.status === "ready" || target.launch?.status === "reused" ? "outline" : "destructive"}
-								className="text-[10px]"
+								className="text-3xs"
 							>
 								{t(`tasks:verify.launch.${target.launch?.status ?? "unknown"}`, {
 									defaultValue: target.launch?.status ?? "?",
 								})}
 							</Badge>
 							{target.origin === "recipe" && (
-								<Badge variant="secondary" className="text-[10px]">
+								<Badge variant="secondary" className="text-3xs">
 									{t("tasks:verify.learnedRecipe")}
 								</Badge>
 							)}
@@ -253,7 +253,7 @@ function Metric({ label, value }: { readonly label: string; readonly value: stri
 	const { t } = useTranslation(["tasks"]);
 	return (
 		<div className="rounded border border-border p-2">
-			<div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+			<div className="text-3xs uppercase text-muted-foreground">{label}</div>
 			<div className={value === null ? "text-xs italic text-muted-foreground" : "font-medium"}>
 				{value ?? t("tasks:verify.notMeasured")}
 			</div>
@@ -281,19 +281,19 @@ function Performance({ record }: { readonly record: VerifyRecord }) {
 							<Metric label="FCP" value={measured(perf.fcp_ms) && t("tasks:verify.ms", { value: measured(perf.fcp_ms) })} />
 						</div>
 						{perf.scored_on?.length > 0 && (
-							<p className="mt-1 text-[11px] text-muted-foreground">
+							<p className="mt-1 text-2xs text-muted-foreground">
 								{t("tasks:verify.scoredOn", { metrics: perf.scored_on.join(", ") })}
 							</p>
 						)}
 						{!perf.measured && perf.reason && (
-							<p className="mt-1 text-[11px] text-muted-foreground">{perf.reason}</p>
+							<p className="mt-1 text-2xs text-muted-foreground">{perf.reason}</p>
 						)}
 					</div>
 				))}
 				{lighthouse.length > 0 && (
 					<div className="flex flex-wrap gap-2">
 						{lighthouse.map(([category, score]) => (
-							<Badge key={category} variant="outline" className="text-[10px]">
+							<Badge key={category} variant="outline" className="text-3xs">
 								{t(`tasks:verify.lighthouse.${category}`, { defaultValue: category })}: {score}
 							</Badge>
 						))}
@@ -343,7 +343,7 @@ function Screenshots({
 							className="block w-full bg-background object-contain"
 							loading="lazy"
 						/>
-						<figcaption className="px-2 py-1 text-[11px] text-muted-foreground">{shot.label}</figcaption>
+						<figcaption className="px-2 py-1 text-2xs text-muted-foreground">{shot.label}</figcaption>
 					</figure>
 				))}
 			</div>
@@ -381,7 +381,7 @@ function CardScenario({
 								<span className="flex-1">{step}</span>
 								<Badge
 									variant={item ? STEP_VARIANT[item.outcome] : "outline"}
-									className="text-[10px]"
+									className="text-3xs"
 								>
 									{t(`tasks:verify.step.${item?.outcome ?? "missing"}`)}
 								</Badge>
@@ -447,7 +447,7 @@ function Findings({ record }: { readonly record: VerifyRecord }) {
 			<ul className="space-y-1 text-xs">
 				{record.findings.map((finding) => (
 					<li key={finding.message}>
-						<Badge variant={finding.severity === "high" ? "destructive" : "outline"} className="mr-2 text-[10px]">
+						<Badge variant={finding.severity === "high" ? "destructive" : "outline"} className="mr-2 text-3xs">
 							{finding.severity}
 						</Badge>
 						{finding.message}

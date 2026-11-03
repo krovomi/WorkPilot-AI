@@ -39,15 +39,15 @@ function CopilotContextWindow({ usage }: CopilotUsageContentProps) {
 					<p className="text-xs font-medium text-blue-500">
 						{t("common:usage.copilotContextTitleShort")}
 					</p>
-					<span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+					<span className="text-3xs uppercase tracking-wide text-muted-foreground">
 						{contextUsage.model}
 					</span>
 				</div>
-				<p className="text-[10px] text-muted-foreground leading-relaxed">
+				<p className="text-3xs text-muted-foreground leading-relaxed">
 					{t("common:usage.copilotContextDesc")}
 				</p>
 				<div className="flex items-baseline justify-between gap-2 mt-1">
-					<span className="text-[10px] text-muted-foreground">
+					<span className="text-3xs text-muted-foreground">
 						{t("common:usage.copilotContextPercentLabel")}
 					</span>
 					<span className="font-mono text-xs text-foreground">
@@ -60,7 +60,7 @@ function CopilotContextWindow({ usage }: CopilotUsageContentProps) {
 						style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
 					/>
 				</div>
-				<div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+				<div className="flex justify-between mt-1 text-3xs text-muted-foreground">
 					<span>{t("common:usage.copilotContextUsedLabel")}</span>
 					<span className="font-mono">
 						{nf.format(contextUsage.contextTokens)} /{" "}
@@ -104,11 +104,11 @@ function CopilotInsufficientPermissions({
 				<p className="text-xs font-medium text-orange-500">
 					{t("common:usage.copilotInsuffPermissions")}
 				</p>
-				<p className="text-[10px] text-muted-foreground leading-relaxed">
+				<p className="text-3xs text-muted-foreground leading-relaxed">
 					{usage.errorMessage ||
 						t("common:usage.copilotInsuffPermissionsDesc")}
 				</p>
-				<div className="text-[10px] text-muted-foreground">
+				<div className="text-3xs text-muted-foreground">
 					<strong>{t("common:usage.copilotSuggestionsLabel")}:</strong>
 					<ul className="list-disc list-inside space-y-0.5 mt-1">
 						<li>
@@ -136,7 +136,7 @@ function CopilotBackendUnavailable() {
 				<p className="text-xs font-medium text-yellow-500">
 					{t("common:usage.copilotBackendUnavailable")}
 				</p>
-				<p className="text-[10px] text-muted-foreground leading-relaxed">
+				<p className="text-3xs text-muted-foreground leading-relaxed">
 					{t("common:usage.copilotBackendUnavailableDesc")}
 				</p>
 			</div>
@@ -189,25 +189,25 @@ function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
 						{t("common:usage.copilotPremiumTitle")}
 					</p>
 					{plan && (
-						<span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+						<span className="text-3xs uppercase tracking-wide text-muted-foreground">
 							{plan}
 						</span>
 					)}
 				</div>
-				<p className="text-[10px] text-muted-foreground leading-relaxed">
+				<p className="text-3xs text-muted-foreground leading-relaxed">
 					{plan
 						? t("common:usage.copilotPremiumDescPlan", { plan })
 						: t("common:usage.copilotPremiumDescDefault")}
 				</p>
 
 				{unlimited ? (
-					<div className="text-[10px] text-muted-foreground">
+					<div className="text-3xs text-muted-foreground">
 						<strong>{t("common:usage.copilotPremiumUnlimited")}</strong>
 					</div>
 				) : (
 					<>
 						<div className="flex items-baseline justify-between gap-2 mt-1">
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								{t("common:usage.copilotPremiumPercentLabel")}
 							</span>
 							<span className="font-mono text-xs text-foreground">
@@ -222,7 +222,7 @@ function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
 								}}
 							/>
 						</div>
-						<div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-[10px] text-muted-foreground">
+						<div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-3xs text-muted-foreground">
 							<div className="flex justify-between">
 								<span>{t("common:usage.copilotPremiumUsedLabel")}</span>
 								<span className="font-mono">{used}</span>
@@ -244,7 +244,7 @@ function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
 				)}
 
 				{(org || reset) && (
-					<div className="flex flex-wrap items-center justify-between gap-x-3 pt-1 text-[10px] text-muted-foreground border-t border-blue-500/10">
+					<div className="flex flex-wrap items-center justify-between gap-x-3 pt-1 text-3xs text-muted-foreground border-t border-blue-500/10">
 						{org && <span>{org}</span>}
 						{reset && (
 							<span>
@@ -272,13 +272,13 @@ function CopilotMetrics({ usage }: CopilotMetricsProps) {
 				<p className="text-xs font-medium text-blue-500">
 					{t("common:usage.copilotMetricsTitle")}
 				</p>
-				<p className="text-[10px] text-muted-foreground leading-relaxed">
+				<p className="text-3xs text-muted-foreground leading-relaxed">
 					{t("common:usage.copilotMetricsDesc")}
 				</p>
 				{usage.copilotUsageDetails && (
 					<div className="mt-2 space-y-1">
 						{usage.copilotUsageDetails.suggestionsCount !== undefined && (
-							<div className="flex justify-between text-[10px]">
+							<div className="flex justify-between text-3xs">
 								<span>{t("common:usage.copilotSuggestionsLabel")}:</span>
 								<span className="font-mono">
 									{usage.copilotUsageDetails.suggestionsCount}
@@ -286,7 +286,7 @@ function CopilotMetrics({ usage }: CopilotMetricsProps) {
 							</div>
 						)}
 						{usage.copilotUsageDetails.acceptancesCount !== undefined && (
-							<div className="flex justify-between text-[10px]">
+							<div className="flex justify-between text-3xs">
 								<span>{t("common:usage.copilotAcceptancesLabel")}:</span>
 								<span className="font-mono">
 									{usage.copilotUsageDetails.acceptancesCount}
@@ -294,7 +294,7 @@ function CopilotMetrics({ usage }: CopilotMetricsProps) {
 							</div>
 						)}
 						{usage.copilotUsageDetails.acceptanceRate !== undefined && (
-							<div className="flex justify-between text-[10px]">
+							<div className="flex justify-between text-3xs">
 								<span>{t("common:usage.copilotAcceptanceRateLabel")}:</span>
 								<span className="font-mono">
 									{usage.copilotUsageDetails.acceptanceRate.toFixed(1)}%
@@ -303,7 +303,7 @@ function CopilotMetrics({ usage }: CopilotMetricsProps) {
 						)}
 						{usage.copilotUsageDetails.totalTokens !== undefined &&
 							usage.copilotUsageDetails.totalTokens > 0 && (
-								<div className="flex justify-between text-[10px]">
+								<div className="flex justify-between text-3xs">
 									<span>{t("common:usage.copilotTokensUsedLabel")}:</span>
 									<span className="font-mono">
 										{usage.copilotUsageDetails.totalTokens}

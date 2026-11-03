@@ -806,7 +806,7 @@ export function TaskLogs({
 						/>
 						{isSearching && (
 							<div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
-								<span className="text-[10px] tabular-nums text-muted-foreground">
+								<span className="text-3xs tabular-nums text-muted-foreground">
 									{t("tasks:logs.search.results", "{{count}} résultat(s)", {
 										count: matchCount,
 									})}
@@ -1428,7 +1428,7 @@ function PhaseLogSection({
 				<div className="flex flex-wrap min-w-0 max-w-full items-center gap-2">
 					{/* Provider / model / thinking selectors (per phase) */}
 					{phaseConfig && (
-						<div className="contents text-[10px] text-muted-foreground">
+						<div className="contents text-3xs text-muted-foreground">
 							{/* Provider selector */}
 							{onProviderChange ? (
 								<Select
@@ -1440,7 +1440,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-2xs text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.provider.selectAria",
 											"Fournisseur pour cette phase",
@@ -1479,7 +1479,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-2xs text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.model.selectAria",
 											"Modèle pour cette phase",
@@ -1546,7 +1546,7 @@ function PhaseLogSection({
 															: m.label}
 													</span>
 													{m.installed ? (
-														<span className="text-[10px] text-success">
+														<span className="text-3xs text-success">
 															{t("tasks:logs.model.installed", "✓ installed")}
 														</span>
 													) : isLocal && !isCustomModelSentinel(m.value) ? (
@@ -1556,7 +1556,7 @@ function PhaseLogSection({
 														// label so the list itself shows what is landing.
 														<span
 															className={cn(
-																"text-[10px]",
+																"text-3xs",
 																downloads[m.value]?.status === "starting" ||
 																	downloads[m.value]?.status === "downloading"
 																	? "text-primary"
@@ -1587,7 +1587,7 @@ function PhaseLogSection({
 													) : null}
 													{typeof m.param_b === "number" && m.param_b < 24 ? (
 														<span
-															className="text-[10px] text-amber-500"
+															className="text-3xs text-amber-500"
 															title={t(
 																"tasks:logs.model.smallWarnTip",
 																"Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes.",
@@ -1647,7 +1647,7 @@ function PhaseLogSection({
 									disabled={isSavingPhase}
 								>
 									<SelectTrigger
-										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-[11px] text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
+										className="h-6 w-auto max-w-[min(20rem,100%)] min-w-0 shrink gap-1 whitespace-nowrap border-0 bg-transparent px-1.5 py-0 text-2xs text-muted-foreground hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:min-w-0 [&>span]:truncate [&>span]:whitespace-nowrap [&>svg]:h-3.5 [&>svg]:w-3.5"
 										aria-label={t(
 											"tasks:logs.thinking.selectAria",
 											"Niveau de réflexion pour cette phase",
@@ -1696,7 +1696,7 @@ function PhaseLogSection({
 								"tasks:logs.compare.openTooltip",
 								"Comparer les plans des modèles côte à côte",
 							)}
-							className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+							className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-3xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
 						>
 							<Columns2 className="h-3 w-3" />
 							<span className="hidden sm:inline">
@@ -1718,7 +1718,7 @@ function PhaseLogSection({
 								"tasks:logs.rerun.buttonTooltip",
 								"Relancer cette étape (les étapes suivantes seront refaites)",
 							)}
-							className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+							className="flex shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-3xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							{isRerunning ? (
 								<Loader2 className="h-3 w-3 animate-spin" />
@@ -1733,7 +1733,7 @@ function PhaseLogSection({
 					{isHotSwapPending && (
 						<Badge
 							variant="outline"
-							className="flex items-center gap-1 border-info/30 bg-info/10 text-[10px] text-info"
+							className="flex items-center gap-1 border-info/30 bg-info/10 text-3xs text-info"
 							title={t(
 								"tasks:logs.hotSwap.pendingTip",
 								"Le changement de LLM sera appliqué au prochain tour.",
@@ -1897,16 +1897,16 @@ function ModelLogGroupView({
 				<Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
 				{providerLabel && (
 					<>
-						<span className="text-[11px] font-medium text-foreground/80">
+						<span className="text-2xs font-medium text-foreground/80">
 							{providerLabel}
 						</span>
 						<span className="text-muted-foreground/40">·</span>
 					</>
 				)}
-				<span className="truncate text-[11px] font-medium text-foreground">
+				<span className="truncate text-2xs font-medium text-foreground">
 					{modelLabel}
 				</span>
-				<span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+				<span className="ml-auto shrink-0 text-3xs tabular-nums text-muted-foreground">
 					{count}{" "}
 					{t(
 						count === 1
@@ -1990,7 +1990,7 @@ function CompareColumn({
 						))}
 					</SelectContent>
 				</Select>
-				<span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+				<span className="ml-auto shrink-0 text-3xs tabular-nums text-muted-foreground">
 					{entries.length}{" "}
 					{t(
 						entries.length === 1
@@ -2257,7 +2257,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 		return (
 			<Badge
 				variant="outline"
-				className="text-[9px] px-1 py-0 ml-1 text-muted-foreground border-muted-foreground/30"
+				className="text-3xs px-1 py-0 ml-1 text-muted-foreground border-muted-foreground/30"
 			>
 				{entry.subphase}
 			</Badge>
@@ -2311,7 +2311,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 							type="button"
 							onClick={() => setIsExpanded(!isExpanded)}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded",
+								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 								isExpanded && "bg-secondary/50",
 							)}
@@ -2332,7 +2332,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 				</div>
 				{hasDetail && isExpanded && (
 					<div className="mt-1.5 ml-4 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-						<pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
+						<pre className="text-3xs text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
 							{detail}
 						</pre>
 					</div>
@@ -2353,7 +2353,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 							type="button"
 							onClick={() => setIsExpanded(!isExpanded)}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 								isExpanded && "bg-secondary/50",
 							)}
@@ -2368,7 +2368,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 				</div>
 				{hasDetail && isExpanded && (
 					<div className="mt-1.5 ml-4 p-2 bg-destructive/5 rounded-md border border-destructive/20 overflow-x-auto">
-						<pre className="text-[10px] text-destructive/80 whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
+						<pre className="text-3xs text-destructive/80 whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
 							{detail}
 						</pre>
 					</div>
@@ -2411,7 +2411,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 	return (
 		<div className="flex flex-col">
 			<div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
-				<span className="text-[10px] text-muted-foreground/60 tabular-nums shrink-0">
+				<span className="text-3xs text-muted-foreground/60 tabular-nums shrink-0">
 					{formatTime(entry.timestamp)}
 				</span>
 				<span className="break-words whitespace-pre-wrap flex-1">
@@ -2423,7 +2423,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 						type="button"
 						onClick={() => setIsExpanded(!isExpanded)}
 						className={cn(
-							"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+							"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 							"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 							isExpanded && "bg-secondary/50",
 						)}
@@ -2444,7 +2444,7 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 			</div>
 			{hasDetail && isExpanded && (
 				<div className="mt-1.5 ml-12 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-					<pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
+					<pre className="text-3xs text-muted-foreground whitespace-pre-wrap break-words font-mono max-h-[300px] overflow-y-auto">
 						{detail}
 					</pre>
 				</div>
