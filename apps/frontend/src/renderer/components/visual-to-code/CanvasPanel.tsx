@@ -55,7 +55,7 @@ import ReactFlow, {
 	useEdgesState,
 	useNodesState,
 } from "reactflow";
-import { Button } from "../ui/button";
+import { Button, Input, NativeSelect } from "../ui";
 import "reactflow/dist/style.css";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
@@ -1282,19 +1282,19 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<Copy className="h-3.5 w-3.5" />
 				</Button>
-				<select
+				<NativeSelect
 					value={diagramType}
 					onChange={(e) => setDiagramType(e.target.value as DiagramType)}
 					aria-label={t("diagramType", "Type de diagramme")}
 					title={t("diagramType", "Type de diagramme")}
-					className="h-7 rounded-md border bg-background px-1.5 text-xs text-foreground outline-none focus:border-primary"
+					className="h-7 px-1.5 text-xs"
 				>
 					{DIAGRAM_TYPES.map((type) => (
 						<option key={type} value={type}>
 							{t(`diagramType_${type}`, type)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 
 				<div className="h-5 w-px bg-border mx-0.5" />
 
@@ -1633,14 +1633,14 @@ export const CanvasPanel: React.FC = () => {
 							>
 								{t("blockName", "Nom")}
 							</label>
-							<input
+							<Input
 								id="inspector-name"
 								type="text"
 								value={String(inspected.data?.label ?? "")}
 								onChange={(e) =>
 									handleRenameNode(inspected.id, e.target.value)
 								}
-								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+								className="w-full px-2 py-1 text-xs h-auto"
 							/>
 						</div>
 
@@ -1667,13 +1667,13 @@ export const CanvasPanel: React.FC = () => {
 								>
 									{t("blockStack", "Technologie")}
 								</label>
-								<select
+								<NativeSelect
 									id="inspector-stack"
 									value={String(inspected.data?.framework ?? "")}
 									onChange={(e) =>
 										handleSetFramework(inspected.id, e.target.value)
 									}
-									className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+									className="w-full px-2 py-1 text-xs h-auto"
 								>
 									<option value="">{t("noStack", "Non précisée")}</option>
 									{inspectorStacks.map((fw) => (
@@ -1681,7 +1681,7 @@ export const CanvasPanel: React.FC = () => {
 											{t(fw, fw)}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 							</div>
 						)}
 
@@ -1776,7 +1776,7 @@ export const CanvasPanel: React.FC = () => {
 							{t("otherStack", "Autre technologie")}
 						</label>
 						<div className="flex gap-2">
-							<input
+							<Input
 								id="custom-framework"
 								type="text"
 								value={customFramework}
@@ -1787,7 +1787,7 @@ export const CanvasPanel: React.FC = () => {
 									}
 								}}
 								placeholder={t("otherStackPlaceholder", "ex. Quarkus")}
-								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+								className="w-full px-2 py-1 text-xs h-auto"
 							/>
 							<Button
 								size="sm"
@@ -1842,12 +1842,12 @@ export const CanvasPanel: React.FC = () => {
 							{t("explorerRoot", "Racine de l'explorateur :")}
 						</label>
 						<div className="flex gap-2">
-							<input
+							<Input
 								id="explorer-root-input"
 								type="text"
 								value={explorerRoot}
 								readOnly
-								className="w-full p-2 border rounded"
+								className="w-full p-2 h-auto"
 							/>
 							<Button variant="secondary" onClick={handleChooseExplorerRoot}>
 								{t("chooseFolder")}
@@ -1875,12 +1875,12 @@ export const CanvasPanel: React.FC = () => {
 						>
 							{t("fileNameLabel", "Nom du fichier :")}
 						</label>
-						<input
+						<Input
 							id="save-as-filename"
 							type="text"
 							value={saveAsFileName}
 							onChange={(e) => setSaveAsFileName(e.target.value)}
-							className="w-full mt-1 p-2 border rounded"
+							className="w-full mt-1 p-2 h-auto"
 						/>
 					</div>
 					<DialogFooter>
@@ -1964,12 +1964,12 @@ export const CanvasPanel: React.FC = () => {
 								>
 									{t("projectName", "Nom du projet")}
 								</label>
-								<input
+								<Input
 									id="scaffold-proj-name"
 									type="text"
 									value={newProjectName}
 									onChange={(e) => setNewProjectName(e.target.value)}
-									className="w-full p-2 border rounded text-sm"
+									className="w-full p-2 text-sm h-auto"
 									placeholder="mon-projet"
 								/>
 							</div>
@@ -1981,12 +1981,12 @@ export const CanvasPanel: React.FC = () => {
 									{t("projectLocation", "Emplacement")}
 								</label>
 								<div className="flex gap-2">
-									<input
+									<Input
 										id="scaffold-proj-loc"
 										type="text"
 										value={newProjectLocation}
 										onChange={(e) => setNewProjectLocation(e.target.value)}
-										className="w-full p-2 border rounded text-sm"
+										className="w-full p-2 text-sm h-auto"
 										placeholder={t("visualProgramming:locationPlaceholder")}
 									/>
 									<Button variant="secondary" onClick={handleBrowseLocation}>

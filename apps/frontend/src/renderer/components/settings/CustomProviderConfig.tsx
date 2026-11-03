@@ -11,6 +11,7 @@ import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
 import { SettingsSection } from "./SettingsSection";
 
+import { NativeSelect } from "../ui/native-select";
 function getTierClasses(tier: ProviderModel["tier"]): string {
 	const tierClassMap: Record<ProviderModel["tier"], string> = {
 		flagship: "bg-primary/10 text-primary",
@@ -317,12 +318,12 @@ export function CustomProviderConfig() {
 								>
 									{t("customProvider.modelTier")}
 								</Label>
-								<select
+								<NativeSelect
 									id="model-tier"
 									value={newModelTier}
 									// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 									onChange={(e) => setNewModelTier(e.target.value as any)}
-									className="text-xs px-2 py-1 border border-border rounded bg-background"
+									className="text-xs px-2 py-1 h-auto"
 								>
 									<option value="flagship">
 										{t("customProvider.tierFlagship")}
@@ -331,7 +332,7 @@ export function CustomProviderConfig() {
 										{t("customProvider.tierStandard")}
 									</option>
 									<option value="fast">{t("customProvider.tierFast")}</option>
-								</select>
+								</NativeSelect>
 							</div>
 
 							<div className="flex items-center space-x-2">

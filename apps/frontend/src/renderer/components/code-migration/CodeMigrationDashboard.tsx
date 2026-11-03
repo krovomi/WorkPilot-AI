@@ -10,6 +10,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { Download } from "lucide-react";
 import { PageHeader } from "../ui/page-header";
 
+import { Textarea } from "../ui/textarea";
 const EXAMPLE_KEYS = [
 	"reactHooks",
 	"jsToTs",
@@ -68,13 +69,13 @@ export function CodeMigrationDashboard(): React.ReactElement {
 						<label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
 							{t("codeMigration:config.descriptionLabel")}
 						</label>
-						<textarea
+						<Textarea
 							value={migrationDescription}
 							onChange={(e) => setMigrationDescription(e.target.value)}
 							disabled={isRunning}
 							placeholder={t("codeMigration:config.descriptionPlaceholder")}
 							rows={4}
-							className="w-full rounded-lg bg-card border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+							className="w-full px-3 py-2 text-sm resize-none disabled:opacity-50 min-h-0"
 						/>
 					</div>
 

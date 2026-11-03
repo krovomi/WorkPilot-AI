@@ -11,6 +11,8 @@ import { formatAppDateTime } from "@/lib/date-format";
 import { Workflow } from "lucide-react";
 import { PageHeader } from "../ui/page-header";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 const PROVIDERS: Exclude<CICDProvider, "">[] = [
 	"github",
 	"gitlab",
@@ -102,7 +104,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 							>
 								{t("cicdTriggers:config.provider")}
 							</label>
-							<select
+							<NativeSelect
 								id="cicd-provider"
 								value={provider}
 								onChange={(e) =>
@@ -111,7 +113,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 										provider: e.target.value as CICDProvider,
 									})
 								}
-								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm"
+								className="w-full px-2 py-1.5 text-sm h-auto"
 							>
 								<option value="">{t("cicdTriggers:config.noProvider")}</option>
 								{PROVIDERS.map((p) => (
@@ -119,7 +121,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 										{t(`cicdTriggers:providers.${p}`)}
 									</option>
 								))}
-							</select>
+							</NativeSelect>
 
 							<div className="flex flex-col gap-2 mt-3">
 								<label className="flex items-center gap-2 cursor-pointer">
@@ -179,13 +181,13 @@ export function CICDTriggersDashboard(): React.ReactElement {
 							>
 								{t("cicdTriggers:trigger.branch")}
 							</label>
-							<input
+							<Input
 								id="cicd-branch"
 								type="text"
 								value={branch}
 								onChange={(e) => setBranch(e.target.value)}
 								placeholder={t("cicdTriggers:trigger.branchPlaceholder")}
-								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm mb-2"
+								className="w-full px-2 py-1.5 text-sm mb-2 h-auto"
 							/>
 							<label
 								htmlFor="cicd-pr-url"
@@ -193,13 +195,13 @@ export function CICDTriggersDashboard(): React.ReactElement {
 							>
 								{t("cicdTriggers:trigger.prUrl")}
 							</label>
-							<input
+							<Input
 								id="cicd-pr-url"
 								type="text"
 								value={prUrl}
 								onChange={(e) => setPrUrl(e.target.value)}
 								placeholder={t("cicdTriggers:trigger.prUrlPlaceholder")}
-								className="w-full px-2 py-1.5 rounded-lg bg-card border border-border text-sm mb-3"
+								className="w-full px-2 py-1.5 text-sm mb-3 h-auto"
 							/>
 							<button
 								type="button"

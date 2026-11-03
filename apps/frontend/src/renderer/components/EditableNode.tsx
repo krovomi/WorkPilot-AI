@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Handle, type NodeProps, Position } from "reactflow";
 import { blockMeta } from "../lib/architecture-blocks";
 
+import { Input } from "./ui/input";
 export interface EditableNodeData {
 	label?: string;
 	type?: string;
@@ -114,13 +115,13 @@ export const EditableNode: React.FC<NodeProps<EditableNodeData>> = ({
 				</span>
 				<div className="min-w-0 flex-1">
 					{editing ? (
-						<input
+						<Input
 							ref={inputRef}
 							value={draft}
 							onChange={(e) => setDraft(e.target.value)}
 							onBlur={commit}
 							onKeyDown={handleKeyDown}
-							className="nodrag w-full rounded border bg-background px-1 py-0.5 text-sm font-semibold text-foreground outline-none"
+							className="nodrag w-full px-1 py-0.5 text-sm font-semibold h-auto"
 							style={{ borderColor: accent }}
 							aria-label={String(data.label ?? "")}
 						/>
