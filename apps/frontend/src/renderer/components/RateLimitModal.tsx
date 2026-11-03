@@ -237,8 +237,8 @@ export function RateLimitModal() {
 				<div className="py-4 space-y-4">
 					{/* Auto-switch notification */}
 					{autoSwitchHappened && (
-						<div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-							<Zap className="h-5 w-5 text-green-500 shrink-0" />
+						<div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4">
+							<Zap className="h-5 w-5 text-success shrink-0" />
 							<div>
 								<p className="text-sm font-medium text-foreground">
 									{t("rateLimit.autoSwitching", {
@@ -299,7 +299,7 @@ export function RateLimitModal() {
 															t("rateLimit.selectAccount")}
 														{selectedProfileId ===
 															rateLimitInfo?.suggestedProfileId && (
-															<Star className="h-3 w-3 text-yellow-500" />
+															<Star className="h-3 w-3 text-warning" />
 														)}
 													</span>
 													<ChevronDown className="h-4 w-4 shrink-0 ml-2" />
@@ -320,7 +320,7 @@ export function RateLimitModal() {
 															{profile.id ===
 																rateLimitInfo?.suggestedProfileId && (
 																<Star
-																	className="h-3 w-3 text-yellow-500"
+																	className="h-3 w-3 text-warning"
 																	aria-label={t("common:rateLimit.recommendedAria")}
 																/>
 															)}

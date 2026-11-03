@@ -594,7 +594,7 @@ export function AuthTerminal({
 						<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
 					)}
 					{status === "ready" && (
-						<div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+						<div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
 					)}
 					{status === "onboarding" && (
 						<div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />

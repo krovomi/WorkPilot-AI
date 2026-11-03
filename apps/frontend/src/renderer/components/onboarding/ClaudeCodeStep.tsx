@@ -126,9 +126,9 @@ export function ClaudeCodeStep({
 					<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
 				);
 			case "installed":
-				return <Check className="h-6 w-6 text-green-500" />;
+				return <Check className="h-6 w-6 text-success" />;
 			case "outdated":
-				return <AlertTriangle className="h-6 w-6 text-yellow-500" />;
+				return <AlertTriangle className="h-6 w-6 text-warning" />;
 			case "not-found":
 				return <X className="h-6 w-6 text-destructive" />;
 			case "error":
@@ -159,9 +159,9 @@ export function ClaudeCodeStep({
 	const getStatusColorClass = () => {
 		switch (status) {
 			case "installed":
-				return "text-green-500";
+				return "text-success";
 			case "outdated":
-				return "text-yellow-500";
+				return "text-warning";
 			case "not-found":
 			case "error":
 				return "text-destructive";
@@ -215,7 +215,7 @@ export function ClaudeCodeStep({
 
 					{/* Status card */}
 					<Card
-						className={`border ${status === "installed" ? "border-green-500/30 bg-green-500/5" : status === "outdated" ? "border-yellow-500/30 bg-yellow-500/5" : status === "not-found" || status === "error" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
+						className={`border ${status === "installed" ? "border-success/30 bg-success/5" : status === "outdated" ? "border-warning/30 bg-warning/5" : status === "not-found" || status === "error" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
 					>
 						<CardContent className="p-5">
 							<div className="flex items-center justify-between">
@@ -290,9 +290,9 @@ export function ClaudeCodeStep({
 
 					{/* Install success message */}
 					{installSuccess && (
-						<Card className="border border-green-500/30 bg-green-500/10">
+						<Card className="border border-success/30 bg-success/10">
 							<CardContent className="p-4">
-								<p className="text-sm text-green-700 dark:text-green-400">
+								<p className="text-sm text-success ">
 									{t(
 										"cli.install.success",
 										"Installation command sent to terminal. Please complete the installation there.",

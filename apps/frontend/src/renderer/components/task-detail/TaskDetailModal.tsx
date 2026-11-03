@@ -1116,10 +1116,10 @@ function TaskDetailModalContent({
 												onClick={handleToggleTdd}
 												disabled={tddToggleDisabled}
 												className={cn(
-													"group mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50",
+													"group mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/50 disabled:cursor-not-allowed disabled:opacity-50",
 													tddEnabled
-														? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-[0_0_14px_-3px_rgba(16,185,129,0.7)] hover:bg-emerald-500/20"
-														: "border-border bg-transparent text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-300/80",
+														? "border-success/40 bg-success/15 text-success shadow-[0_0_14px_-3px_rgba(16,185,129,0.7)] hover:bg-success/20"
+														: "border-border bg-transparent text-muted-foreground hover:border-success/30 hover:text-success/80",
 												)}
 											>
 												<FlaskConical
@@ -1135,7 +1135,7 @@ function TaskDetailModalContent({
 													className={cn(
 														"h-1.5 w-1.5 rounded-full transition-all duration-200",
 														tddEnabled
-															? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(16,185,129,0.9)]"
+															? "bg-success shadow-[0_0_6px_1px_rgba(16,185,129,0.9)]"
 															: "bg-muted-foreground/40",
 													)}
 												/>

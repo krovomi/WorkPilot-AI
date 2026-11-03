@@ -91,8 +91,8 @@ export function SelfHealingDashboard() {
 
 			{/* Error banner */}
 			{error && (
-				<div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20">
-					<p className="text-xs text-red-400">{error}</p>
+				<div className="px-6 py-2 bg-destructive/10 border-b border-destructive/20">
+					<p className="text-xs text-destructive">{error}</p>
 				</div>
 			)}
 
@@ -129,8 +129,8 @@ interface StatCardProps {
 function StatCard({ label, value, variant = "default" }: StatCardProps) {
 	const valueColors = {
 		default: "text-foreground",
-		success: "text-green-400",
-		warning: "text-yellow-400",
+		success: "text-success",
+		warning: "text-warning",
 	};
 
 	return (

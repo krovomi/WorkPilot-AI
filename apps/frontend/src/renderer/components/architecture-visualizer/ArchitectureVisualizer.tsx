@@ -97,9 +97,9 @@ export function ArchitectureVisualizer(): React.ReactElement {
 			/>
 
 			{blockers.length > 0 && (
-				<section className="border-b border-amber-500/30 bg-amber-500/5 px-6 py-3">
+				<section className="border-b border-warning/30 bg-warning/5 px-6 py-3">
 					<div className="flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+						<AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
 						<span className="text-sm font-medium">
 							{t("architectureVisualizer:readiness.heading")}
 						</span>
@@ -122,9 +122,9 @@ export function ArchitectureVisualizer(): React.ReactElement {
 			)}
 
 			{error && (
-				<section className="border-b border-red-500/30 bg-red-500/5 px-6 py-3">
+				<section className="border-b border-destructive/30 bg-destructive/5 px-6 py-3">
 					<div className="flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-red-500" aria-hidden />
+						<AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />
 						<span className="text-sm font-medium">
 							{t("architectureVisualizer:error.heading")}
 						</span>

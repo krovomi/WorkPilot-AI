@@ -939,10 +939,10 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 					// Claude busy state indicator (subtle colored border when in Claude mode)
 					showClaudeBusyIndicator &&
 						isClaudeBusy &&
-						"border-red-500/60 ring-1 ring-red-500/20",
+						"border-destructive/60 ring-1 ring-destructive/20",
 					showClaudeBusyIndicator &&
 						!isClaudeBusy &&
-						"border-green-500/60 ring-1 ring-green-500/20",
+						"border-success/60 ring-1 ring-success/20",
 				)}
 				onClick={handleClick}
 				onDragOver={handleNativeDragOver}

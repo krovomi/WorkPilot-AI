@@ -227,9 +227,9 @@ function FileTreeNode({
 							<ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 						)}
 						{expanded ? (
-							<FolderOpen className="h-4 w-4 shrink-0 text-amber-400" />
+							<FolderOpen className="h-4 w-4 shrink-0 text-warning" />
 						) : (
-							<Folder className="h-4 w-4 shrink-0 text-amber-400" />
+							<Folder className="h-4 w-4 shrink-0 text-warning" />
 						)}
 						<span className="text-sm font-medium truncate">{node.name}</span>
 					</div>
@@ -876,7 +876,7 @@ export function DiffViewDialog({
 									>
 										<ChevronRight className="h-4 w-4 rotate-180" />
 									</button>
-									<Plus className="h-5 w-5 text-green-400" />
+									<Plus className="h-5 w-5 text-success" />
 									{t("taskReview:diff.addFile")}
 								</>
 							) : (

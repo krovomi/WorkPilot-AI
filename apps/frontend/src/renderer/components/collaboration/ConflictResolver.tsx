@@ -39,7 +39,7 @@ export function ConflictResolver({
 			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
-						<AlertTriangle className="h-5 w-5 text-amber-500" />
+						<AlertTriangle className="h-5 w-5 text-warning" />
 						{t("conflicts.detected")}
 					</DialogTitle>
 					<DialogDescription>{t("conflicts.description")}</DialogDescription>
@@ -62,7 +62,7 @@ export function ConflictResolver({
 									<h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
 										{t("conflicts.theirVersion")}
 									</h4>
-									<pre className="whitespace-pre-wrap wrap-break-word rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+									<pre className="whitespace-pre-wrap wrap-break-word rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">
 										{conflict.theirs}
 									</pre>
 								</div>

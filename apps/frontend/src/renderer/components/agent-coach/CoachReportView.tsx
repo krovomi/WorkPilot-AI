@@ -6,8 +6,8 @@ import { useAgentCoachStore } from "../../stores/agent-coach-store";
 import type { CoachReport, TipPriority } from "../../../shared/types/agent-coach";
 
 const PRIORITY_STYLES: Record<TipPriority, string> = {
-	high: "text-red-400 bg-red-500/10 border-red-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	high: "text-destructive bg-destructive/10 border-destructive/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -63,7 +63,7 @@ function ReportBody({
 					label={t("stats.successRate")}
 					value={`${(report.successRate * 100).toFixed(0)}%`}
 					color={
-						report.successRate >= 0.8 ? "text-green-400" : "text-yellow-400"
+						report.successRate >= 0.8 ? "text-success" : "text-warning"
 					}
 				/>
 				<StatCard
@@ -74,7 +74,7 @@ function ReportBody({
 				<StatCard
 					label={t("stats.mostFailing")}
 					value={report.mostFailingAgent || t("stats.none")}
-					color="text-red-400"
+					color="text-destructive"
 				/>
 			</div>
 
@@ -100,7 +100,7 @@ function ReportBody({
 							</p>
 						)}
 						{tip.action && (
-							<p className="text-xs mt-1 text-green-400">→ {tip.action}</p>
+							<p className="text-xs mt-1 text-success">→ {tip.action}</p>
 						)}
 					</div>
 				))}
@@ -161,7 +161,7 @@ export function CoachReportView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -191,7 +191,7 @@ export function CoachReportView({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{t("errors.failed", { error })}</p>
+				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
 			)}
 
 			{phase === "complete" && report?.totalRuns === 0 && (

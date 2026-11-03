@@ -14,16 +14,16 @@ const STATUS_ICON: Record<StepStatus, string> = {
 };
 
 const STATUS_COLORS: Record<StepStatus, string> = {
-	success: "text-green-400 bg-green-500/10 border-green-500/20",
-	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-	error: "text-red-400 bg-red-500/10 border-red-500/20",
+	success: "text-success bg-success/10 border-success/20",
+	warning: "text-warning bg-warning/10 border-warning/20",
+	error: "text-destructive bg-destructive/10 border-destructive/20",
 	skipped: "text-gray-400 bg-gray-500/10 border-gray-500/20",
 };
 
 const CHANGE_COLORS: Record<string, string> = {
-	added: "bg-green-500/20 text-green-400",
+	added: "bg-success/20 text-success",
 	modified: "bg-blue-500/20 text-blue-400",
-	deleted: "bg-red-500/20 text-red-400",
+	deleted: "bg-destructive/20 text-destructive",
 	renamed: "bg-purple-500/20 text-purple-400",
 };
 
@@ -95,13 +95,13 @@ function ResultBody({
 					label={t("steps")}
 					value={`${result.successCount}/${result.steps.length}`}
 					sub={t("passed")}
-					color="text-green-400"
+					color="text-success"
 				/>
 				<SummaryCard
 					label={t("warnings")}
 					value={String(result.warningCount)}
 					sub={t("issues")}
-					color="text-yellow-400"
+					color="text-warning"
 				/>
 				<SummaryCard
 					label={t("cost")}
@@ -156,8 +156,8 @@ function ResultBody({
 						>
 							<ChangeTypeTag type={diff.changeType} />
 							<span className="flex-1 font-mono text-xs">{diff.filePath}</span>
-							<span className="text-green-400 text-xs">+{diff.additions}</span>
-							<span className="text-red-400 text-xs">-{diff.deletions}</span>
+							<span className="text-success text-xs">+{diff.additions}</span>
+							<span className="text-destructive text-xs">-{diff.deletions}</span>
 						</div>
 					))}
 				</div>
@@ -205,7 +205,7 @@ export function SimulationReport({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -235,7 +235,7 @@ export function SimulationReport({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{t("errors.failed", { error })}</p>
+				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
 			)}
 
 			{phase === "complete" && result && result.diffs.length === 0 && (

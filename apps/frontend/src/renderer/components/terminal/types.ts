@@ -69,7 +69,7 @@ export const PHASE_CONFIG: Record<
 	},
 	auth_failure_paused: {
 		label: "Auth Required",
-		color: "bg-red-500/20 text-red-400",
+		color: "bg-destructive/20 text-destructive",
 		icon: KeyRound,
 	},
 	qa_review: {

@@ -53,7 +53,7 @@ export function TokenSavingsSettings({
 					{t("rtk:settings.title")}
 				</span>
 				{installed ? (
-					<CircleCheck className="h-3 w-3 text-emerald-500" aria-hidden />
+					<CircleCheck className="h-3 w-3 text-success" aria-hidden />
 				) : (
 					<CircleAlert className="h-3 w-3 text-muted-foreground" aria-hidden />
 				)}

@@ -67,8 +67,8 @@ function classifyLogLevel(keyword: string): string {
 	if (
 		/^(error|err|fatal|critical|crit|panic|exception|severe|fail(ed)?)$/.test(k)
 	)
-		return "text-red-400";
-	if (/^(warn|warning|wrn)$/.test(k)) return "text-amber-400";
+		return "text-destructive";
+	if (/^(warn|warning|wrn)$/.test(k)) return "text-warning";
 	if (/^(info|information|inf|notice)$/.test(k)) return "text-sky-400";
 	if (/^(debug|dbg|dbug|trace|trce|trc|verbose|verb|vrb)$/.test(k))
 		return "text-slate-400";
@@ -115,7 +115,7 @@ function classifyLogLine(line: string): string {
 			line,
 		)
 	) {
-		return "text-green-400";
+		return "text-success";
 	}
 
 	return "";
@@ -328,7 +328,7 @@ export function AppEmulatorDialog() {
 	const tabClass = (isActive: boolean) =>
 		`gap-1 cursor-pointer select-none transition-colors ${
 			isActive
-				? "border-yellow-500 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20"
+				? "border-warning bg-warning/10 text-warning hover:bg-warning/20"
 				: "hover:border-muted-foreground/60"
 		}`;
 
@@ -405,8 +405,8 @@ export function AppEmulatorDialog() {
 									{phase === "detecting" ? (
 										<Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
 									) : (
-										<span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-500/15">
-											<Check className="h-2.5 w-2.5 text-green-500" />
+										<span className="flex h-4 w-4 items-center justify-center rounded-full bg-success/15">
+											<Check className="h-2.5 w-2.5 text-success" />
 										</span>
 									)}
 									<span
@@ -415,7 +415,7 @@ export function AppEmulatorDialog() {
 										{t("appEmulator:steps.detect")}
 									</span>
 									{phase !== "detecting" && config && (
-										<span className="text-xs text-green-600 dark:text-green-400">
+										<span className="text-xs text-success ">
 											· {config.framework}
 										</span>
 									)}
@@ -633,7 +633,7 @@ export function AppEmulatorDialog() {
 						{!showPreview && searchFilteredOutput && (
 							<Button variant="outline" size="sm" onClick={handleCopyLogs}>
 								{copied ? (
-									<Check className="h-4 w-4 mr-1.5 text-green-500" />
+									<Check className="h-4 w-4 mr-1.5 text-success" />
 								) : (
 									<Copy className="h-4 w-4 mr-1.5" />
 								)}

@@ -54,14 +54,14 @@ function selectionName(selection: Selection): string {
 // Get icon for file type
 function getFileIcon(filename: string) {
 	if (filename.endsWith(".json")) {
-		return <FileJson className="h-4 w-4 shrink-0 text-amber-500" />;
+		return <FileJson className="h-4 w-4 shrink-0 text-warning" />;
 	}
 	return <FileText className="h-4 w-4 shrink-0 text-blue-500" />;
 }
 
 const STATUS_STYLE: Record<TaskFileStatus, string> = {
-	added: "text-emerald-500",
-	modified: "text-amber-500",
+	added: "text-success",
+	modified: "text-warning",
 	deleted: "text-destructive",
 	renamed: "text-sky-500",
 	unknown: "text-muted-foreground",
@@ -445,7 +445,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 							className={cn(
 								"block",
 								line.startsWith("+") && !line.startsWith("+++")
-									? "text-emerald-500"
+									? "text-success"
 									: line.startsWith("-") && !line.startsWith("---")
 										? "text-destructive"
 										: "text-muted-foreground",

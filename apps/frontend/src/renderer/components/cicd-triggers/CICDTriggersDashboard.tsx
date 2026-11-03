@@ -21,9 +21,9 @@ const PROVIDERS: Exclude<CICDProvider, "">[] = [
 const STATUS_COLORS: Record<PipelineRunStatus, string> = {
 	pending: "text-muted-foreground bg-card",
 	triggered: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-	running: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-	success: "text-green-400 bg-green-500/10 border-green-500/20",
-	failed: "text-red-400 bg-red-500/10 border-red-500/20",
+	running: "text-warning bg-warning/10 border-warning/20",
+	success: "text-success bg-success/10 border-success/20",
+	failed: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
 export function CICDTriggersDashboard(): React.ReactElement {
@@ -222,7 +222,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 					{/* Right: runs */}
 					<div className="flex-1 flex flex-col overflow-hidden">
 						{error && (
-							<div className="m-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start justify-between gap-3">
+							<div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start justify-between gap-3">
 								<span>{error}</span>
 								<button
 									type="button"
@@ -280,7 +280,7 @@ export function CICDTriggersDashboard(): React.ReactElement {
 												</div>
 											)}
 											{run.error && (
-												<div className="text-xs text-red-400 mt-1">
+												<div className="text-xs text-destructive mt-1">
 													{run.error}
 												</div>
 											)}

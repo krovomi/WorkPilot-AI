@@ -26,7 +26,7 @@ describe("RoadmapGenerationProgress", () => {
 			// - label: 'Analyzing'
 			// - description: 'Analyzing project structure and codebase...'
 			// - icon: Search
-			// - color: 'bg-amber-500'
+			// - color: 'bg-warning'
 			const status = createTestStatus({ phase: "analyzing" });
 			expect(status.phase).toBe("analyzing");
 		});

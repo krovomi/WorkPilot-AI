@@ -667,9 +667,9 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 			case "Read":
 				return "text-blue-500";
 			case "Glob":
-				return "text-amber-500";
+				return "text-warning";
 			case "Grep":
-				return "text-green-500";
+				return "text-success";
 			default:
 				return "text-muted-foreground";
 		}
@@ -754,13 +754,13 @@ function ToolIndicator({ name, input }: ToolIndicatorProps) {
 				return {
 					icon: FolderSearch,
 					label: t("insights:tools.searching"),
-					color: "text-amber-500 bg-amber-500/10",
+					color: "text-warning bg-warning/10",
 				};
 			case "Grep":
 				return {
 					icon: Search,
 					label: t("insights:tools.searchingCode"),
-					color: "text-green-500 bg-green-500/10",
+					color: "text-success bg-success/10",
 				};
 			default:
 				return {

@@ -304,10 +304,10 @@ function ResultView({
 	readonly t: (key: string, options?: Record<string, unknown>) => string;
 }) {
 	const getComplexityColor = (score: number) => {
-		if (score <= 3) return "bg-green-500";
-		if (score <= 7) return "bg-yellow-500";
+		if (score <= 3) return "bg-success";
+		if (score <= 7) return "bg-warning";
 		if (score <= 10) return "bg-orange-500";
-		return "bg-red-500";
+		return "bg-destructive";
 	};
 
 	const getComplexityLabel = (score: number) => {
@@ -318,9 +318,9 @@ function ResultView({
 	};
 
 	const getConfidenceColor = (confidence: number) => {
-		if (confidence >= 0.8) return "text-green-600";
-		if (confidence >= 0.6) return "text-yellow-600";
-		return "text-red-600";
+		if (confidence >= 0.8) return "text-success";
+		if (confidence >= 0.6) return "text-warning";
+		return "text-destructive";
 	};
 
 	return (
