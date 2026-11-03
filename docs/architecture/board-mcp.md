@@ -180,3 +180,64 @@ there is nothing to subscribe to.
 Tests: `pytest tests/board_mcp -q`; the app side, `vitest run src/main/board-mcp
 src/renderer/components/settings/integrations` (from `apps/frontend`), which also
 runs the command written in a config and checks it answers `initialize`.
+
+## On the team server, over HTTP
+
+In server mode the same boards are reachable without a local copy:
+`POST <server>/mcp`, Streamable HTTP (`apps/backend/shared_board/mcp_http.py`).
+Any app that takes a remote MCP server works: Claude Code, Codex, Gemini CLI,
+GitHub Copilot (CLI and VS Code), Cursor, Windsurf, OpenCode and Hermes Agent
+natively (Hermes reads an `mcp_servers` entry with a `url` as Streamable HTTP and
+sends its `headers`), Claude Desktop through the `mcp-remote` bridge.
+
+### Access tokens
+
+Settings → Integrations → **MCP access to the server** makes a personal access
+token (`server/auth/access_tokens.py`, routes `/users/me/access-tokens`):
+
+- `wpat_` and 43 random characters, shown once; the server keeps only its
+  SHA-256 hash and its first characters, to tell it apart in the list.
+- Made for the organization the person acts in, read-only or read and write,
+  for 30, 90 (default) or 365 days at most; 20 live tokens per person.
+- Revocable from the same screen. Creation and revocation are in the audit log.
+- Accepted on `/mcp` only. The middleware (`server/integration.py`) never takes
+  one for the REST API, so a token pasted in an AI app cannot make another token,
+  change a password or call any other route.
+- Not a frozen grant: each request re-reads the person (still active), their
+  membership of the token's organization and their permissions there. Removed
+  from the organization, or a role without `task.read`, and the token reaches
+  nothing.
+
+The screen then shows the entry to paste in each app, with the token in an
+`Authorization: Bearer` header (`apps/frontend/src/shared/utils/board-mcp-http.ts`).
+It is never in the URL.
+
+### Tools
+
+The same as on a desktop, plus `list_projects`, the projects of the
+organization the person can see. Every other tool takes a `project_id` from it,
+resolved as every route resolves a project: one of another organization is
+"no such project", one the person is not a member of is refused.
+
+| Needs | Tools |
+|---|---|
+| `task.read` | `list_projects`, `list_cards`, `get_card`, `get_spec`, `wait_for_card` |
+| `insight.read` | `get_roadmap`, `list_ideas` |
+| `task.write`, a write token and a member's role on the project | `create_card`, `update_card` |
+
+A card created over HTTP records who made it (`createdBy`), lands in the backlog
+and reaches the other members' boards at once, as one made in the app.
+
+### What changes from stdio
+
+- Stateless: one JSON-RPC request per POST, one JSON answer; a notification
+  gets 202. No session id, no server-sent stream: `GET` and `DELETE` answer 405.
+  No batches.
+- `wait_for_card` waits 300 seconds at most (an HTTP request is not held for
+  hours), and no tool comes back as a task: a task in one worker's memory could
+  not be polled from another.
+- No resources yet: an app reads the same content through the tools.
+- A request with an `Origin` of another host is refused (403), so a web page
+  cannot reach the endpoint through a person's browser (DNS rebinding).
+- 240 requests per minute per address.
+- Without server mode, `/mcp` answers 404.
