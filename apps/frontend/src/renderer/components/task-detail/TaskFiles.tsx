@@ -355,7 +355,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 				{selection.kind === "task" ? (
 					<span
 						className={cn(
-							"w-4 shrink-0 text-center font-mono text-[10px] font-semibold",
+							"w-4 shrink-0 text-center font-mono text-3xs font-semibold",
 							STATUS_STYLE[selection.entry.status],
 						)}
 						title={t(`tasks:files.status.${selection.entry.status}`)}
@@ -377,7 +377,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 						{name}
 					</span>
 					{folder && (
-						<span className="block truncate text-[10px] text-muted-foreground">
+						<span className="block truncate text-3xs text-muted-foreground">
 							{folder}
 						</span>
 					)}
@@ -490,10 +490,10 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 
 	const sectionTitle = (label: string, count: number) => (
 		<div className="flex items-center justify-between px-2 pt-2 pb-1">
-			<span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+			<span className="text-3xs font-semibold uppercase tracking-wide text-muted-foreground">
 				{label}
 			</span>
-			<span className="text-[10px] text-muted-foreground">{count}</span>
+			<span className="text-3xs text-muted-foreground">{count}</span>
 		</div>
 	);
 
@@ -560,13 +560,13 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 								taskFiles.files.length,
 							)}
 							{taskFiles.source === "subtasks" && (
-								<p className="px-2 pb-1 text-[10px] text-muted-foreground">
+								<p className="px-2 pb-1 text-3xs text-muted-foreground">
 									{t("tasks:files.fromSubtasks")}
 								</p>
 							)}
 							{taskFiles.error ? (
 								<div className="px-2 py-2">
-									<p className="flex items-start gap-1 text-[11px] text-destructive">
+									<p className="flex items-start gap-1 text-2xs text-destructive">
 										<AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
 										<span>
 											{t("tasks:files.errorLoadingChanges")}
@@ -577,7 +577,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 									</p>
 								</div>
 							) : taskFiles.files.length === 0 ? (
-								<p className="px-2 py-2 text-[11px] text-muted-foreground">
+								<p className="px-2 py-2 text-2xs text-muted-foreground">
 									{t("tasks:files.noTaskChanges")}
 								</p>
 							) : (
@@ -592,7 +592,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 									{sectionTitle(t("tasks:files.specSection"), specFiles.length)}
 									{specError ? (
 										<div className="px-2 py-2">
-											<p className="text-[11px] text-destructive mb-2">
+											<p className="text-2xs text-destructive mb-2">
 												{t("tasks:files.errorLoading")}
 											</p>
 											<Button
@@ -606,7 +606,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 											</Button>
 										</div>
 									) : specFiles.length === 0 ? (
-										<p className="px-2 py-2 text-[11px] text-muted-foreground">
+										<p className="px-2 py-2 text-2xs text-muted-foreground">
 											{t("tasks:files.noFiles")}
 										</p>
 									) : (
