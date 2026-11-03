@@ -435,6 +435,12 @@
 			"qaPass": "Revue QA — passe n°{{n}}",
 			"thinking": "Traitement en cours"
 		},
+		"split": {
+			"legend": "Répartition du temps par phase",
+			"share": "{{share}} %",
+			"segment": "{{phase}} : {{share}} %",
+			"segmentWithDuration": "{{phase}} : {{share}} % du temps ({{duration}})"
+		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",

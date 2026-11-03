@@ -11,6 +11,9 @@ task-detail/
 ├── TaskDetailPanel.tsx           # Main container component (slim, orchestrates children)
 ├── TaskHeader.tsx                # Task title, status badges, and header actions
 ├── TaskProgress.tsx              # Execution phase indicator and progress bars
+├── TaskPhaseProgressBar.tsx      # Header progress bar split by phase (time share), with legend
+├── phase-split.ts                # Pure maths of that split (time-based, band fallback)
+├── TaskDetailTabs.tsx            # Styled tab bar of the panel (active tab underlined + tinted)
 ├── TaskMetadata.tsx              # Classification badges, description, and metadata
 ├── TaskActions.tsx               # Primary action buttons and delete dialog
 ├── TaskWarnings.tsx              # Stuck/incomplete task warning banners
@@ -34,6 +37,17 @@ task-detail/
 - Spec ID badge
 - Status badges (Running, Stuck, Incomplete, etc.)
 - Edit and close buttons
+
+### `TaskPhaseProgressBar`
+- Header bar: filled length = task percentage, coloured by phase (planning yellow,
+  coding blue, validation violet) in proportion to the time each phase took
+- Legend with each phase's share and duration; falls back to the 20/60/20 bands
+  when the logs carry no timestamps
+- Colours are the `--phase-*` tokens of globals.css (same hues in every theme)
+
+### `TaskDetailTabs`
+- One rail under the bar; the selected tab gets a 3px primary underline, a
+  `primary/15` tint and full-contrast text; scrolls sideways when narrow
 
 ### `TaskProgress`
 - Execution phase indicator (Planning, Coding, Validation)
