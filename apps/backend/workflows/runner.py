@@ -80,6 +80,7 @@ __all__ = [
     "run_skill_phases",
     "subagents_allowed",
     "fresh_context",
+    "companion_lines",
 ]
 
 # Phases WorkPilot executes itself, by **phase id** rather than by `impl`.
@@ -672,6 +673,15 @@ def _build_prompt(
             + " — apply these and no other."
         )
         lines += procedures
+    if offered := companion_lines(phase, ctx.repo_root):
+        lines.append(
+            "COMPANION PROCEDURES: open one only when its case applies, and keep "
+            "following the procedure below. A companion may name another "
+            "agent's tools (`terminal`, `read_file`, `search_files`, "
+            "`delegate_task`): use your own equivalents, and skip a step none "
+            "of your tools can do."
+        )
+        lines += offered
     if resolved.degraded_from:
         lines.append(
             f"NOTE: this phase asked for `{resolved.degraded_from}` and was "
@@ -1393,6 +1403,32 @@ def effort_preamble(
                 f"subtasks one at a time; do not attempt to dispatch them."
             )
     return "\n".join(lines)
+
+
+def companion_lines(phase, repo_root: Path) -> list[str]:
+    """One line per declared companion that is on disk: its case, its file.
+
+    The source tree is read before the built output, the reverse of
+    `_locate_skill`: `.agents/skills/` is flat by skill name, so with two packs
+    offering `systematic-debugging` it holds whichever the build preferred, and
+    a companion names its pack. The path is absolute because the session runs
+    in the project being built, not in this repository. A companion missing
+    from disk is left out, like a lens.
+    """
+    out = []
+    for impl, when in getattr(phase, "companions", ()):
+        pack, _, skill = impl.partition("/")
+        for candidate in (
+            repo_root / "skills" / pack / skill / "SKILL.md",
+            repo_root / ".agents" / "skills" / skill / "SKILL.md",
+        ):
+            try:
+                if candidate.is_file():
+                    out.append(f"  - when {when}: `{candidate.resolve()}`")
+                    break
+            except OSError:
+                continue
+    return out
 
 
 def _locate_skill(repo_root: Path, impl: str) -> str | None:

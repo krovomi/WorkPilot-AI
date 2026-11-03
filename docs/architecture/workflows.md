@@ -79,6 +79,19 @@ committed mock runtime never counts as the real one. A fallback of the form
 spec already written is the product document — so it opens no session and
 belongs to no window.
 
+**`companions:`.** A skill phase may offer other procedures, each with the case
+it is for (`companions: {hermes/python-debugpy: "the defect is in Python and …"}`).
+The phase keeps following its `impl`; the prompt lists each companion found on
+disk with its case and its absolute path (`runner.companion_lines`), and the
+model opens one only when the case applies. The source tree `skills/<pack>/` is
+read before `.agents/skills/`, which is flat by name and may hold another pack's
+skill of the same name. This is how the hermes debugging procedures reach
+`reproduce` in `bug-fix` and `hotfix` (`systematic-debugging`, `python-debugpy`,
+`node-inspect-debugger`) and `investigate` (`systematic-debugging` only: it runs
+under the read-only analyzer) without replacing WorkPilot's own procedures. A
+companion never sits on a builtin phase, whose prompt is not built here, and
+`tests/test_workflow_companions.py` fails when a pack sync removes one.
+
 **`irreversible: true`.** The runner stops before such a phase
 (`irreversible_gate`): it writes `workflow/<id>.pause.json`, marks the build
 paused in the one pause store (`foundation/pause_state.py`, which the Kanban reads
