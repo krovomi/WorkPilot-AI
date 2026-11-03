@@ -71,12 +71,12 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 							onClick(event);
 						}}
 						aria-label={t("tasks:engine.chipAria", { engine: label })}
-						className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
+						className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-3xs font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
 					>
 						{content}
 					</button>
 				) : (
-					<span className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-[10px] font-medium">
+					<span className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-3xs font-medium">
 						{content}
 					</span>
 				)}

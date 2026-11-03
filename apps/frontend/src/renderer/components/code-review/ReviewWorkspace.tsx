@@ -405,7 +405,7 @@ export function ReviewWorkspace({
 								<span className="truncate">{entry.path}</span>
 							</button>
 							<span
-								className="shrink-0 font-mono text-[10px] text-amber-500"
+								className="shrink-0 font-mono text-3xs text-amber-500"
 								title={t("workspace.gitStatus")}
 							>
 								{entry.status.trim()}
@@ -536,7 +536,7 @@ export function ReviewWorkspace({
 						)}
 					</div>
 					<div
-						className="truncate border-b px-3 py-2 font-mono text-[11px] text-muted-foreground"
+						className="truncate border-b px-3 py-2 font-mono text-2xs text-muted-foreground"
 						title={active}
 					>
 						{snapshot && (
@@ -705,7 +705,7 @@ export function ReviewWorkspace({
 					)}
 					{t(loading ? "actions.analyzing" : "actions.runReview")}
 				</Button>
-				<p className="text-center text-[10px] text-muted-foreground">
+				<p className="text-center text-3xs text-muted-foreground">
 					{t("workspace.reviewShortcut")}
 				</p>
 			</div>

@@ -341,7 +341,7 @@ export function AgentProfileSettings() {
 								{profile.name}
 							</h3>
 							{isCustomized && (
-								<span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+								<span className="inline-flex items-center rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-medium text-amber-600 dark:text-amber-400">
 									{t("agentProfile.customized")}
 								</span>
 							)}
@@ -350,10 +350,10 @@ export function AgentProfileSettings() {
 							{profile.description}
 						</p>
 						<div className="mt-2 flex flex-wrap gap-1.5">
-							<span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+							<span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-3xs font-medium text-muted-foreground">
 								{getModelLabel(profile.model)}
 							</span>
-							<span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+							<span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-3xs font-medium text-muted-foreground">
 								{getThinkingLabel(profile.thinkingLevel)}{" "}
 								{t("agentProfile.thinking")}
 							</span>
@@ -530,12 +530,12 @@ export function AgentProfileSettings() {
 																	<span className="flex items-center gap-2">
 																		{m.label}
 																		{m.tier === "flagship" && (
-																			<span className="inline-flex items-center rounded bg-primary/10 px-1 py-0.5 text-[9px] font-medium text-primary">
+																			<span className="inline-flex items-center rounded bg-primary/10 px-1 py-0.5 text-3xs font-medium text-primary">
 																				{t("agentProfile.tierFlagship")}
 																			</span>
 																		)}
 																		{m.supportsThinking && (
-																			<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-600 dark:text-violet-400">
+																			<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-3xs font-medium text-violet-600 dark:text-violet-400">
 																				{t("agentProfile.supportsThinking")}
 																			</span>
 																		)}
@@ -604,7 +604,7 @@ export function AgentProfileSettings() {
 							</div>
 
 							{/* Info note */}
-							<p className="text-[10px] text-muted-foreground mt-4 pt-3 border-t border-border">
+							<p className="text-3xs text-muted-foreground mt-4 pt-3 border-t border-border">
 								{isClaude
 									? t("agentProfile.phaseConfigNote")
 									: t("agentProfile.phaseConfigNoteProvider", {

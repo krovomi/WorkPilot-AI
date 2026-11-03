@@ -107,7 +107,7 @@ export function TaskFileExplorerDrawer({
 
 						{/* Drag hint */}
 						<div className="px-3 py-2 bg-muted/30 border-b border-border shrink-0">
-							<p className="text-[10px] text-muted-foreground whitespace-nowrap">
+							<p className="text-3xs text-muted-foreground whitespace-nowrap">
 								{t("common:fileExplorer.dragReferences")}
 							</p>
 						</div>

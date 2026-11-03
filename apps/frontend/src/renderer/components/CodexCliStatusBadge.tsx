@@ -216,12 +216,12 @@ export function CodexCliStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" || status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{t("common:install", "Install")}
 										</span>
 									)}

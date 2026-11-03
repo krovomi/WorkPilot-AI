@@ -426,7 +426,7 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 												<span className="font-mono text-foreground">
 													{sym.name}
 												</span>
-												<Badge variant="outline" className="text-[10px]">
+												<Badge variant="outline" className="text-3xs">
 													{sym.kind}
 												</Badge>
 											</div>

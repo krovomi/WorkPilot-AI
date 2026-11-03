@@ -411,7 +411,7 @@ export function CleanProviderCard({
 								: "N/A"}
 						</div>
 						{Boolean(provider.realUsageData.weeklyPercent) && (
-							<div className="text-gray-400 text-[10px]">
+							<div className="text-gray-400 text-3xs">
 								{t("sections.accounts.providerCard.week")}:{" "}
 								{Math.round(provider.realUsageData.weeklyPercent)}%
 							</div>

@@ -145,7 +145,7 @@ function TreeNode({ node, allNodes, currentNodeId, depth }: TreeNodeProps) {
 						<span className="font-medium truncate">{node.label}</span>
 						<StatusIcon className={cn("h-3 w-3 shrink-0", statusInfo.color)} />
 						{node.duration_ms > 0 && (
-							<span className="text-[10px] text-muted-foreground shrink-0">
+							<span className="text-3xs text-muted-foreground shrink-0">
 								{node.duration_ms.toFixed(0)}ms
 							</span>
 						)}

@@ -240,7 +240,7 @@ function StepDetails({
 					placeholder="my-awesome-plugin"
 					className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
 				/>
-				<p className="text-[10px] text-muted-foreground">
+				<p className="text-3xs text-muted-foreground">
 					{t("common:pluginMarketplace.creator.fieldIdHint")}
 				</p>
 			</div>
@@ -307,7 +307,7 @@ function StepDetails({
 							)}
 							className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
 						/>
-						<p className="text-[10px] text-muted-foreground">
+						<p className="text-3xs text-muted-foreground">
 							{t("common:pluginMarketplace.creator.fieldTriggersHint")}
 						</p>
 					</div>
@@ -468,7 +468,7 @@ function StepPreview({
 				<p className="text-xs text-muted-foreground">
 					{form.description || "—"}
 				</p>
-				<div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+				<div className="flex items-center gap-2 text-3xs text-muted-foreground">
 					<span className="font-mono bg-muted/60 px-1.5 py-0.5 rounded">
 						{form.type}
 					</span>
@@ -483,7 +483,7 @@ function StepPreview({
 				<button
 					type="button"
 					onClick={onCopy}
-					className="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-muted/80 px-2 py-1 text-[10px] font-medium hover:bg-muted transition-colors"
+					className="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-muted/80 px-2 py-1 text-3xs font-medium hover:bg-muted transition-colors"
 				>
 					{copied ? (
 						<Check className="h-3 w-3" />
@@ -638,7 +638,7 @@ export function PluginCreatorWizard({ onClose }: PluginCreatorWizardProps) {
 												: "bg-muted text-muted-foreground",
 									)}
 								>
-									<span className="flex h-4 w-4 items-center justify-center rounded-full text-[10px]">
+									<span className="flex h-4 w-4 items-center justify-center rounded-full text-3xs">
 										{i < step ? <Check className="h-3 w-3" /> : i + 1}
 									</span>
 									{t(s.labelKey)}

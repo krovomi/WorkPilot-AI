@@ -112,34 +112,34 @@ export function DocumentInsightsCard({
 						<FileSearch className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:docintel.title")}</span>
 						{documents.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:docintel.badge.attachments", {
 									count: documents.length,
 								})}
 							</Badge>
 						)}
 						{binding.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:docintel.badge.adrs", { count: binding.length })}
 							</Badge>
 						)}
 						{flagged.length > 0 && (
-							<Badge variant="destructive" className="text-[10px]">
+							<Badge variant="destructive" className="text-3xs">
 								{t("tasks:docintel.badge.flagged", { count: flagged.length })}
 							</Badge>
 						)}
 						{secrets.length > 0 && (
-							<Badge variant="destructive" className="text-[10px]">
+							<Badge variant="destructive" className="text-3xs">
 								{t("tasks:docintel.badge.secrets", { count: secrets.length })}
 							</Badge>
 						)}
 						{diagnosed > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:docintel.badge.diagnosed", { count: diagnosed })}
 							</Badge>
 						)}
 						{codeChecks && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:docintel.badge.codeChecks", {
 									count: (erd ? 1 : 0) + sequences.length + apiTests.length,
 								})}
@@ -208,7 +208,7 @@ export function DocumentInsightsCard({
 										<span className="font-medium text-foreground">{adr.id}</span>{" "}
 										{adr.title}
 										{!adr.binding && (
-											<Badge variant="outline" className="ml-2 text-[10px]">
+											<Badge variant="outline" className="ml-2 text-3xs">
 												{t("tasks:docintel.adrs.proposed")}
 											</Badge>
 										)}
@@ -319,7 +319,7 @@ function DocumentRow({ doc }: { readonly doc: DocintelDocument }) {
 		);
 	} else {
 		marker = (
-			<Badge variant="outline" className="shrink-0 text-[10px]">
+			<Badge variant="outline" className="shrink-0 text-3xs">
 				{t(`tasks:docintel.status.${doc.status}`)}
 			</Badge>
 		);

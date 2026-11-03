@@ -113,10 +113,10 @@ function ChangeNodeCard({ data }: NodeProps<ChangeNodeData>) {
 					{node.name}
 				</span>
 			</div>
-			<div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+			<div className="mt-0.5 truncate text-2xs text-muted-foreground">
 				{data.subject}
 			</div>
-			<div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+			<div className="mt-1 flex items-center gap-2 text-3xs text-muted-foreground">
 				<span>{data.statusLabel}</span>
 				<span className="text-emerald-600 dark:text-emerald-400">+{node.additions}</span>
 				<span className="text-red-600 dark:text-red-400">−{node.deletions}</span>
@@ -385,7 +385,7 @@ function Story({
 			<ol className="space-y-3">
 				{graph.layers.map((layer) => (
 					<li key={layer}>
-						<div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+						<div className="mb-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
 							{t(`tasks:changeGraph.layers.${layer}.name`)}
 						</div>
 						<ul className="space-y-1.5">
@@ -480,7 +480,7 @@ function SelectionDetails({
 						{t("tasks:changeGraph.panel.evidence")}
 					</div>
 					{edge.evidence ? (
-						<pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-[11px]">
+						<pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-2xs">
 							{edge.evidence}
 						</pre>
 					) : (
@@ -631,7 +631,7 @@ function Footnotes({ graph }: { graph: ChangeGraph }) {
 	const { t } = useTranslation(["tasks"]);
 	if (graph.skippedFiles.length === 0 && graph.truncatedFiles.length === 0) return null;
 	return (
-		<div className="space-y-1 border-t border-border pt-3 text-[11px] text-muted-foreground">
+		<div className="space-y-1 border-t border-border pt-3 text-2xs text-muted-foreground">
 			{graph.truncatedFiles.length > 0 && (
 				<p title={graph.truncatedFiles.join("\n")}>
 					{t("tasks:changeGraph.truncated", { count: graph.truncatedFiles.length })}

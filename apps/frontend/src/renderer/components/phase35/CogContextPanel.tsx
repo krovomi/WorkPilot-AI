@@ -196,7 +196,7 @@ export function CogContextPanel() {
 											<div className="flex min-w-0 flex-1 flex-col">
 												<span className="truncate font-medium">{basename(p)}</span>
 												<span
-													className="truncate font-mono text-[10px] text-muted-foreground"
+													className="truncate font-mono text-3xs text-muted-foreground"
 													title={p}
 												>
 													{p}

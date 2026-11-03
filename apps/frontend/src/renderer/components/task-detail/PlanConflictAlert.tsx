@@ -133,7 +133,7 @@ export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 							<span className="text-xs font-medium text-foreground truncate">
 								{conflict.taskTitle}
 							</span>
-							<span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
+							<span className="text-3xs uppercase tracking-wide text-muted-foreground shrink-0">
 								{t(`tasks:${TASK_STATUS_LABELS[conflict.taskStatus]}`, {
 									defaultValue: conflict.taskStatus,
 								})}
@@ -153,7 +153,7 @@ export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 							))}
 						</ul>
 						{conflict.files.length > MAX_FILES_SHOWN && (
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								{t("tasks:modal.plan.conflictsMoreFiles", {
 									count: conflict.files.length - MAX_FILES_SHOWN,
 								})}
@@ -168,7 +168,7 @@ export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 							);
 							if (already || cycles) {
 								return (
-									<p className="mt-1.5 text-[10px] text-muted-foreground">
+									<p className="mt-1.5 text-3xs text-muted-foreground">
 										{already
 											? t("tasks:modal.plan.conflictsDependencyExists")
 											: t("tasks:modal.plan.conflictsDependencyCycle")}
@@ -182,7 +182,7 @@ export function PlanConflictAlert({ task }: PlanConflictAlertProps) {
 										void dependOn(conflict.taskId, conflict.taskTitle)
 									}
 									disabled={savingId !== null}
-									className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-foreground/80 hover:text-foreground underline underline-offset-2 disabled:opacity-50"
+									className="mt-1.5 flex items-center gap-1 text-3xs font-medium text-foreground/80 hover:text-foreground underline underline-offset-2 disabled:opacity-50"
 								>
 									<Lock className="h-2.5 w-2.5" />
 									{t("tasks:modal.plan.conflictsMakeDependency")}

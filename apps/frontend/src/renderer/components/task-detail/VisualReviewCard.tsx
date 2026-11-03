@@ -101,7 +101,7 @@ export function VisualReviewCard({ task, projectPath }: VisualReviewCardProps) {
 					<div className="flex flex-wrap items-center gap-2">
 						<ScanEye className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:visualReview.title")}</span>
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("tasks:visualReview.badge.captures", {
 								count: data.captures.length,
 							})}
@@ -112,7 +112,7 @@ export function VisualReviewCard({ task, projectPath }: VisualReviewCardProps) {
 									<Badge
 										key={severity}
 										variant={SEVERITY_VARIANT[severity]}
-										className="text-[10px]"
+										className="text-3xs"
 									>
 										{t(`tasks:visualReview.badge.${severity}`, {
 											count: counts[severity],
@@ -121,7 +121,7 @@ export function VisualReviewCard({ task, projectPath }: VisualReviewCardProps) {
 								) : null,
 							)}
 						{diffs.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:visualReview.badge.diffs", { count: diffs.length })}
 							</Badge>
 						)}
@@ -216,13 +216,13 @@ function FindingRow({ finding }: { finding: VisualFinding }) {
 		: finding.kind;
 	return (
 		<li className="flex flex-wrap items-baseline gap-2">
-			<Badge variant={SEVERITY_VARIANT[finding.severity] ?? "outline"} className="text-[10px]">
+			<Badge variant={SEVERITY_VARIANT[finding.severity] ?? "outline"} className="text-3xs">
 				{t(`tasks:visualReview.severity.${finding.severity}`)}
 			</Badge>
 			<span>{kind}</span>
 			{finding.text && <code className="rounded bg-muted px-1">{finding.text}</code>}
 			{finding.detail && <span className="text-muted-foreground">({finding.detail})</span>}
-			<span className="truncate font-mono text-[10px] text-muted-foreground">
+			<span className="truncate font-mono text-3xs text-muted-foreground">
 				{finding.capture}
 			</span>
 		</li>

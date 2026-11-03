@@ -288,7 +288,7 @@ export function FormulaLab() {
 								{/* Cost provenance: states whether figures are calibrated on
 								    real project runs or fall back to heuristic volumes. */}
 								<p
-									className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+									className={`mt-2 flex items-center gap-1.5 text-2xs ${
 										(matrix.history_tasks ?? 0) > 0
 											? "text-emerald-600 dark:text-emerald-400"
 											: "text-muted-foreground"
@@ -306,7 +306,7 @@ export function FormulaLab() {
 										: t("formulaLab:costBasis.heuristic")}
 								</p>
 								{(matrix.bench_samples ?? 0) > 0 && (
-									<p className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+									<p className="mt-1 flex items-center gap-1.5 text-2xs text-emerald-600 dark:text-emerald-400">
 										<FlaskConical className="h-3 w-3 shrink-0" />
 										{t("formulaLab:costBasis.bench", {
 											count: matrix.bench_samples,
@@ -314,7 +314,7 @@ export function FormulaLab() {
 									</p>
 								)}
 								{refineError && (
-									<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+									<p className="mt-1.5 text-2xs text-amber-600 dark:text-amber-400">
 										{t("formulaLab:refine.error")}
 									</p>
 								)}
@@ -438,7 +438,7 @@ export function FormulaLab() {
 							{/* Ranked table */}
 							<div className="overflow-hidden rounded-xl border">
 								<table className="w-full text-xs">
-									<thead className="sticky top-0 z-10 bg-muted text-left text-[11px] text-muted-foreground">
+									<thead className="sticky top-0 z-10 bg-muted text-left text-2xs text-muted-foreground">
 										<tr>
 											{sortHeader("formula", "formulaLab:table.formula")}
 											{sortHeader("effort", "formulaLab:table.effort")}
@@ -478,7 +478,7 @@ export function FormulaLab() {
 																(f.installed ? (
 																	<Badge
 																		variant="outline"
-																		className="gap-1 border-emerald-500/40 text-[9px] text-emerald-600 dark:text-emerald-400"
+																		className="gap-1 border-emerald-500/40 text-3xs text-emerald-600 dark:text-emerald-400"
 																		title={t("formulaLab:local.installedTooltip")}
 																	>
 																		<HardDriveDownload className="h-2.5 w-2.5" />
@@ -487,7 +487,7 @@ export function FormulaLab() {
 																) : (
 																	<Badge
 																		variant="outline"
-																		className="gap-1 text-[9px] text-muted-foreground"
+																		className="gap-1 text-3xs text-muted-foreground"
 																		title={t("formulaLab:local.notInstalledTooltip")}
 																	>
 																		<Download className="h-2.5 w-2.5" />
@@ -497,7 +497,7 @@ export function FormulaLab() {
 														</div>
 													</td>
 													<td className="p-2">
-														<Badge variant="outline" className="text-[10px]">
+														<Badge variant="outline" className="text-3xs">
 															{effortLabel(f.effort)}
 														</Badge>
 													</td>
@@ -533,7 +533,7 @@ export function FormulaLab() {
 														<Button
 															size="sm"
 															variant={isSel ? "default" : "ghost"}
-															className="h-7 text-[11px]"
+															className="h-7 text-2xs"
 															disabled={applying}
 															onClick={(e) => {
 																e.stopPropagation();
@@ -549,7 +549,7 @@ export function FormulaLab() {
 									</tbody>
 								</table>
 								{ranked.length > MAX_ROWS && (
-									<div className="border-t bg-muted/30 p-2 text-center text-[11px] text-muted-foreground">
+									<div className="border-t bg-muted/30 p-2 text-center text-2xs text-muted-foreground">
 										{t("formulaLab:table.more", {
 											count: ranked.length - MAX_ROWS,
 										})}

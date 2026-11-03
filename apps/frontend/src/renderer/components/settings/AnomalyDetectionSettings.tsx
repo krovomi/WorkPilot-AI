@@ -194,7 +194,7 @@ export function AnomalyDetectionSettings() {
 								}
 								className="w-full accent-amber-500"
 							/>
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-3xs text-muted-foreground">
 								{t("sections.anomaly-detection.trustScore.pauseDescription")}
 							</p>
 						</div>
@@ -224,7 +224,7 @@ export function AnomalyDetectionSettings() {
 								}
 								className="w-full accent-red-500"
 							/>
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-3xs text-muted-foreground">
 								{t(
 									"sections.anomaly-detection.trustScore.terminateDescription",
 								)}
@@ -312,7 +312,7 @@ export function AnomalyDetectionSettings() {
 									onChange={(e) => handleChange(key, Number(e.target.value))}
 									className="w-full accent-primary"
 								/>
-								<p className="text-[10px] text-muted-foreground">{desc}</p>
+								<p className="text-3xs text-muted-foreground">{desc}</p>
 							</div>
 						))}
 					</div>
@@ -352,7 +352,7 @@ export function AnomalyDetectionSettings() {
 										<td className="px-3 py-1.5">
 											<span
 												className={cn(
-													"rounded-full px-2 py-0.5 text-[10px] font-medium",
+													"rounded-full px-2 py-0.5 text-3xs font-medium",
 													severityColor[a.severity],
 												)}
 											>
