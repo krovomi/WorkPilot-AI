@@ -10,6 +10,7 @@ import { describeError } from "../../i18n";
 import { Button, ErrorBanner, Section } from "../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
 import { ThemeSection } from "../../ui/ThemeSection";
+import { orgRoleLabel } from "../../i18n/labels";
 
 export default function Settings() {
 	const { t } = useTranslation();
@@ -78,7 +79,7 @@ export default function Settings() {
 							>
 								<View style={{ flex: 1 }}>
 									<Text style={{ color: theme.text, fontWeight: "600" }}>{org.name}</Text>
-									{org.my_role ? <Text style={{ color: theme.textMuted }}>{org.my_role}</Text> : null}
+									{org.my_role ? <Text style={{ color: theme.textMuted }}>{orgRoleLabel(org.my_role)}</Text> : null}
 								</View>
 								{selected ? <Text style={{ color: theme.accent }}>✓</Text> : null}
 							</Pressable>

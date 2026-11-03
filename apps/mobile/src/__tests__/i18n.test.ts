@@ -1,6 +1,7 @@
 import en from "../i18n/en.json";
 import fr from "../i18n/fr.json";
-import { describeError, pickLanguage } from "../i18n";
+import i18n, { describeError, pickLanguage } from "../i18n";
+import { orgRoleLabel, phaseLabel, projectRoleLabel, statusLabel } from "../i18n/labels";
 import { ApiError } from "../api/client";
 
 function keys(value: unknown, prefix = ""): string[] {
@@ -35,5 +36,28 @@ describe("i18n", () => {
 		expect(describeError(new ApiError(429, "HTTP 429"))).toBe(en.errors.too_many);
 		expect(describeError(new ApiError(409, "Busy"))).toBe("Something went wrong: Busy");
 		expect(describeError(new Error("feedback_required"))).toBe(en.errors.feedback_required);
+	});
+});
+
+describe("labels for server keys", () => {
+	it("names every board status the dashboard can show", () => {
+		for (const status of ["queue", "build_failed", "pr_created", "in_progress", "done", "backlog"]) {
+			expect(statusLabel(status)).not.toBe(status);
+		}
+	});
+
+	it("names feature jobs, analyses and forge reviews in work sessions", () => {
+		for (const phase of ["build", "roadmap", "ideation", "insights", "context", "analysis-tech-debt", "github-review"]) {
+			expect(phaseLabel(phase)).not.toBe(phase);
+		}
+		expect(phaseLabel("something-new")).toBe("something-new");
+	});
+
+	it("names roles, and keeps a custom role's slug", async () => {
+		await i18n.changeLanguage("fr");
+		expect(projectRoleLabel("owner")).toBe("Propriétaire");
+		expect(orgRoleLabel("contributor")).toBe("Contributeur");
+		expect(orgRoleLabel("release-managers")).toBe("release-managers");
+		await i18n.changeLanguage("en");
 	});
 });

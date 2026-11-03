@@ -144,9 +144,14 @@ export function api(client: ServerClient) {
 					featurePath("workspace", "/sessions", projectId, "&limit=100"),
 				)
 			).sessions,
-		analysisReport: async (kind: AnalysisKind, projectId: string) =>
-			(await client.request<{ report: string | null }>("GET", featurePath("analyses", `/${kind}/report`, projectId)))
-				.report,
+		/** The last saved report, and the run in progress if there is one. */
+		analysisReport: async (kind: AnalysisKind, projectId: string) => {
+			const got = await client.request<{ report: string | null; job?: FeatureJob | null }>(
+				"GET",
+				featurePath("analyses", `/${kind}/report`, projectId),
+			);
+			return { report: got.report, job: got.job ?? null };
+		},
 		startAnalysis: (kind: AnalysisKind, projectId: string) =>
 			client.request<FeatureJob>("POST", featurePath("analyses", `/${kind}/jobs`, projectId), {}),
 		analysisJob: (kind: AnalysisKind, projectId: string, jobId: string) =>
