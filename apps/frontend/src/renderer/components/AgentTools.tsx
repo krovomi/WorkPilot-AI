@@ -70,6 +70,7 @@ import {
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
+import { PageHeader } from "./ui/page-header";
 
 // Agent configuration data - mirrors AGENT_CONFIGS from backend
 // Model and thinking are now dynamically read from user settings
@@ -1571,38 +1572,31 @@ export function AgentTools() {
 
 	return (
 		<div className="h-full flex flex-col">
-			{/* Header */}
-			<div className="border-b border-border p-6">
-				<div className="flex items-center gap-3">
-					<div className="p-2 rounded-lg bg-muted">
-						<Server className="h-5 w-5 text-muted-foreground" />
-					</div>
-					<div className="flex-1">
-						<div className="flex items-center gap-2">
-							<h1 className="text-xl font-semibold text-foreground">
-								{t("settings:mcp.title")}
-							</h1>
-							{selectedProject && (
-								<span className="text-sm text-muted-foreground">
-									{t("agents.forProject", { name: selectedProject.name })}
-								</span>
-							)}
-						</div>
-						<p className="text-sm text-muted-foreground">
-							{selectedProject
-								? t("settings:mcp.description")
-								: t("settings:mcp.descriptionNoProject")}
-						</p>
-					</div>
-					{envConfig && (
-						<div className="text-right">
-							<span className="text-sm text-muted-foreground">
-								{t("settings:mcp.serversEnabled", { count: enabledCount })}
+			<PageHeader
+				icon={Wrench}
+				title={
+					<>
+						{t("settings:mcp.title")}
+						{selectedProject && (
+							<span className="ml-2 text-sm font-normal text-muted-foreground">
+								{t("agents.forProject", { name: selectedProject.name })}
 							</span>
-						</div>
-					)}
-				</div>
-			</div>
+						)}
+					</>
+				}
+				description={
+					selectedProject
+						? t("settings:mcp.description")
+						: t("settings:mcp.descriptionNoProject")
+				}
+				actions={
+					envConfig && (
+						<span className="text-sm text-muted-foreground">
+							{t("settings:mcp.serversEnabled", { count: enabledCount })}
+						</span>
+					)
+				}
+			/>
 
 			{/* Content */}
 			<ScrollArea className="flex-1">

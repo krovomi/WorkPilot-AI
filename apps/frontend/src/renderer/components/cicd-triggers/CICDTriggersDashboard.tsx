@@ -8,6 +8,8 @@ import {
 } from "../../stores/cicd-triggers-store";
 import { useProjectStore } from "../../stores/project-store";
 import { formatAppDateTime } from "@/lib/date-format";
+import { Workflow } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const PROVIDERS: Exclude<CICDProvider, "">[] = [
 	"github",
@@ -64,15 +66,11 @@ export function CICDTriggersDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-xl font-semibold">{t("cicdTriggers:title")}</h1>
-						<p className="text-sm text-muted-foreground mt-0.5">
-							{t("cicdTriggers:subtitle")}
-						</p>
-					</div>
+			<PageHeader
+				icon={Workflow}
+				title={t("cicdTriggers:title")}
+				description={t("cicdTriggers:subtitle")}
+				actions={
 					<button
 						type="button"
 						onClick={() => projectPath && loadRuns(projectPath)}
@@ -81,8 +79,8 @@ export function CICDTriggersDashboard(): React.ReactElement {
 					>
 						{t("cicdTriggers:actions.refresh")}
 					</button>
-				</div>
-			</div>
+				}
+			/>
 
 			{!activeProject ? (
 				<div className="flex-1 flex items-center justify-center text-center p-8">

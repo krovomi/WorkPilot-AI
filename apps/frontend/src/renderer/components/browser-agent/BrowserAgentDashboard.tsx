@@ -16,6 +16,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { BrowserTab } from "./BrowserTab";
 import { TestRunnerTab } from "./TestRunnerTab";
 import { VisualRegressionTab } from "./VisualRegressionTab";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: Array<{
 	id: BrowserAgentTab;
@@ -75,23 +76,11 @@ export function BrowserAgentDashboard() {
 
 	return (
 		<div className="h-full flex flex-col overflow-hidden">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border bg-background">
-				<div className="flex items-center gap-3 mb-4">
-					<div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
-						<Globe className="w-5 h-5 text-blue-400" />
-					</div>
-					<div>
-						<h1 className="text-lg font-semibold text-foreground">
-							{t("browserAgent:title")}
-						</h1>
-						<p className="text-xs text-muted-foreground">
-							{t("browserAgent:subtitle")}
-						</p>
-					</div>
-				</div>
-
-				{/* Stats summary */}
+			<PageHeader
+				icon={Globe}
+				title={t("browserAgent:title")}
+				description={t("browserAgent:subtitle")}
+			>
 				<div className="grid grid-cols-4 gap-3">
 					<StatCard
 						icon={TestTube2}
@@ -124,7 +113,7 @@ export function BrowserAgentDashboard() {
 						color={stats.regressionsDetected > 0 ? "orange" : "orange"}
 					/>
 				</div>
-			</div>
+			</PageHeader>
 
 			{/* Tab bar */}
 			<div className="flex border-b border-border bg-background px-6">
