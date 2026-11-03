@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useHermesStore } from "../stores/hermes-store";
 import { CheckRow } from "./task-detail/HermesLearningCard";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -27,6 +28,8 @@ type BadgeState = "loading" | "ready" | "degraded" | "absent" | "error";
 interface HermesStatusBadgeProps {
 	/** Collapsed sidebar: the icon only. */
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once the doctor answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 /**
@@ -42,7 +45,10 @@ interface HermesStatusBadgeProps {
  * Hidden in server mode, where the backend refuses: the hermes home there is
  * the server's, not the person's.
  */
-export function HermesStatusBadge({ isCollapsed = false }: HermesStatusBadgeProps) {
+export function HermesStatusBadge({
+	isCollapsed = false,
+	onPresenceChange,
+}: HermesStatusBadgeProps) {
 	const { t } = useTranslation(["hermes", "common"]);
 	const [isOpen, setIsOpen] = useState(false);
 	const status = useHermesStore((s) => s.status);
@@ -56,6 +62,18 @@ export function HermesStatusBadge({ isCollapsed = false }: HermesStatusBadgeProp
 	useEffect(() => {
 		void load();
 	}, [load]);
+
+	// A degraded hermes is installed; an unreachable doctor reads as missing,
+	// as the badge itself shows it.
+	const installed = status?.readiness.installed;
+	useReportCliPresence(
+		onPresenceChange,
+		loading || (installed === undefined && !error)
+			? null
+			: installed
+				? "installed"
+				: "missing",
+	);
 
 	if (unavailable) return null;
 
