@@ -9,6 +9,7 @@ import { describeError } from "../../i18n";
 import { ErrorBanner, Loading } from "../../ui/components";
 import { repoLabel } from "../../ui/format";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
+import { projectRoleLabel } from "../../i18n/labels";
 
 export default function Projects() {
 	const { t } = useTranslation();
@@ -60,7 +61,7 @@ export default function Projects() {
 							</Text>
 						</View>
 						{item.my_role ? (
-							<Text style={{ color: theme.textFaint, fontSize: 12 }}>{t("projects.role", { role: item.my_role })}</Text>
+							<Text style={{ color: theme.textFaint, fontSize: 12 }}>{t("projects.role", { role: projectRoleLabel(item.my_role) })}</Text>
 						) : null}
 					</Pressable>
 				)}
