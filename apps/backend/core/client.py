@@ -872,14 +872,9 @@ def _cli_environment(
 
     # Token / context optimisations (docs: code.claude.com/docs/en/agent-sdk).
     # `setdefault` keeps any explicit user override intact.
-    # - Prompt-cache TTL: left to the CLI (code.claude.com/docs/en/prompt-caching,
-    #   "Which TTL each request gets"): one hour on a subscription within its
-    #   plan, five minutes once billed (API key, usage credits, cloud). WorkPilot
-    #   used to force one hour everywhere (`ENABLE_PROMPT_CACHING_1H`), which
-    #   writes every turn's increment at 2x the input price instead of 1.25x,
-    #   for a lifetime a session never uses: its turns are seconds apart, and
-    #   two cards never share a prefix (the CLI's opens with the worktree).
-    #   An exported TTL variable still reaches the CLI.
+    # - Prompt-cache TTL: left to the CLI, which picks 1h on a subscription and
+    #   5 min once billed; forcing 1h wrote every turn at 2x instead of 1.25x
+    #   (docs/architecture/context-harness.md, D3).
     # - tool-search auto:5: defers MCP tool schemas when their combined size
     #   exceeds 5% of the context window. Activates only when there are enough
     #   MCP servers to make deferral worthwhile. Only on Anthropic's own API:
@@ -1671,24 +1666,14 @@ def _add_effort(
     max_thinking_tokens: int | None,
     agent_type: str,
 ) -> None:
-    """Reasoning effort, on every Claude model that takes it.
+    """Reasoning effort, on every Claude model that takes it (`claude_takes_effort`).
 
-    It follows the user's thinking level for the phase, which the caller
-    resolved into `max_thinking_tokens`: on Opus 5.5 a thinking budget is not
-    accepted and effort is the only control, so a fixed table here would
-    silently overrule the selector. The env var still wins, to force a level
-    for debugging.
+    It follows the user's thinking level for the phase (`max_thinking_tokens`):
+    on Opus 5.5 effort is the only control, so a fixed table would overrule
+    the selector. The env var still wins, to force a level for debugging.
     See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
-
-    Sonnet 4.6+, Haiku 5+ and Fable take it as Opus does
-    (`claude_takes_effort`); without it they ran at their own default
-    (`high` on Sonnet 5.5) whatever the card asked, while the task feed said
-    the level was sent. A lower effort is fewer, grouped tool calls and less
-    preamble: the cheapest lever on a light phase.
-
-    Only emit the kwarg when the installed SDK actually supports it: older
-    ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
-    raise "unexpected keyword argument 'effort'", aborting the agent run.
+    Only emitted when the installed SDK has the ``effort`` field (older
+    builds raise "unexpected keyword argument 'effort'").
     """
     from core.llm_optimization import claude_effort, claude_takes_effort
 

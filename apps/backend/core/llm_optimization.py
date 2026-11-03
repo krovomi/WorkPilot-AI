@@ -375,15 +375,12 @@ def claude_takes_effort(model: str | None) -> bool:
     session will resolve it. A name that is not a Claude model id takes no
     effort: a provider without an adapter runs its own model on the SDK.
     """
+    from phase_config import resolve_model_id
+
     name = (model or "").strip().lower()
     if not name:
         return False
-    try:
-        from phase_config import resolve_model_id
-
-        name = resolve_model_id(name).lower()
-    except Exception:  # noqa: BLE001 - an alias we cannot resolve is matched as written
-        pass
+    name = resolve_model_id(name).lower()
     match = _CLAUDE_MODEL_RE.search(name.replace(".", "-"))
     if not match:
         return False
