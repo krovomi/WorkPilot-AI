@@ -38,7 +38,7 @@ from server.services import push
 from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
 from shared_board import attachments as card_images
-from shared_board import listing, review
+from shared_board import listing, review, unblock
 from shared_board import settings as card_settings
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -410,6 +410,12 @@ router.add_api_route("/cards", listing.list_board_cards, methods=["GET"])
 router.add_api_route("/cards/{card_id}/changes", review.card_changes, methods=["GET"])
 router.add_api_route(
     "/cards/{card_id}/request-changes", review.request_changes, methods=["POST"]
+)
+# Answering a blocked subtask (done, not needed, retry, reply): its own module.
+router.add_api_route(
+    "/cards/{card_id}/subtasks/{subtask_id}/unblock",
+    unblock.unblock_subtask,
+    methods=["POST"],
 )
 
 

@@ -23,6 +23,7 @@ import {
 	buildResumeMetadata,
 } from "../../shared/utils/task-lifecycle";
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
+import { subtaskBlockFields } from "../../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
 
 interface TaskState {
@@ -493,7 +494,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 					description,
 					status,
 					files: extractSubtaskFiles(subtask),
-					blockedReason: subtask.blocked_reason,
+					...subtaskBlockFields(subtask as unknown as Record<string, unknown>),
 					verification: subtask.verification as Subtask["verification"],
 					origin: subtask.origin as Subtask["origin"],
 					requestedAt: subtask.requested_at,

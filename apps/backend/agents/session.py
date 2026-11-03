@@ -36,6 +36,7 @@ from foundation.debug import (
     debug_section,
     debug_success,
 )
+from foundation.subtask_unblock import blocked_reason
 from harness.application.budget import BUDGET_ENV
 from insight_extractor import extract_session_insights
 from integrations.linear.updater import (
@@ -57,6 +58,7 @@ from ui import (
 )
 
 from .base import sanitize_error_message
+from .manual_verification import settle_block
 from .memory_manager import save_session_memory
 from .tool_display import (
     extract_streaming_command,
@@ -763,36 +765,10 @@ async def post_session_processing(
     print_key_value("Subtask status", subtask_status)
     print_key_value("New commits", str(new_commits))
 
-    # AUTO-BLOCK: If this is a manual verification task and no commits were made,
-    # automatically mark it as "blocked" without waiting for human input.
-    # This prevents the coder from asking "should I mark this as blocked?" indefinitely.
-    verification = subtask.get("verification", {})
-    is_manual_verification = verification.get("type") == "manual"
-
-    # Force block for manual testing tasks with zero commits
-    # This covers cases where subtask_status is "pending", "in_progress", or anything else
-    if is_manual_verification and new_commits == 0:
-        # Automatically mark as blocked - no commits means no code implementation,
-        # just the agent asking questions
-        old_status = subtask.get("status", "pending")
-
-        # FORCE the status to "blocked" - ignore whatever the LLM set it to
-        subtask["status"] = "blocked"
-        subtask["_blocked_reason"] = "Manual testing required - no code changes"
-
-        # Update implementation plan
-        from qa.criteria import save_implementation_plan
-
-        try:
-            save_implementation_plan(spec_dir, plan)
-            print_status(
-                f"✓ Auto-blocked subtask {subtask_id} (manual verification, {new_commits} commits, was {old_status})",
-                "warning",
-            )
-            subtask_status = "blocked"
-        except Exception as e:
-            logger.error(f"Could not auto-mark as blocked: {e}")
-            print(f"  ✗ Warning: Could not auto-mark as blocked: {e}")
+    # A manual check left open with no commit is blocked with a reason the
+    # panel shows; an agent's own block gets its reason where the app reads it.
+    subtask_status = settle_block(spec_dir, plan, subtask, new_commits)
+    reason = blocked_reason(subtask) or "manual testing required"
 
     if subtask_status == "completed":
         # Success! Record the attempt and good commit
@@ -896,7 +872,7 @@ async def post_session_processing(
     elif subtask_status == "blocked":
         # Subtask marked as blocked (waiting for manual testing/human intervention)
         print_status(
-            f"Subtask {subtask_id} blocked: {subtask.get('_blocked_reason', 'waiting for manual testing')}",
+            f"Subtask {subtask_id} blocked: {reason}",
             "warning",
         )
 
@@ -905,7 +881,7 @@ async def post_session_processing(
             subtask_id=subtask_id,
             session=session_num,
             success=True,  # Blocking is considered success from code perspective
-            approach=f"Marked as blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+            approach=f"Marked as blocked: {reason}",
         )
 
         # Update status file
@@ -924,7 +900,7 @@ async def post_session_processing(
                 spec_dir=spec_dir,
                 subtask_id=subtask_id,
                 attempt=attempt_count,
-                error_summary=f"Blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+                error_summary=f"Blocked: {reason}",
             )
 
         return True  # Blocking is considered success - move to next subtask

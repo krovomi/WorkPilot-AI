@@ -34,6 +34,7 @@ import type {
 import { calculateOverallProgress, isSubtaskDone } from "../shared/progress";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
+import { subtaskBlockFields } from "../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
 import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
@@ -1155,7 +1156,7 @@ export class ProjectStore {
 					description: subtask.description,
 					status: subtask.status,
 					files: extractSubtaskFiles(subtask),
-					blockedReason: subtask.blocked_reason,
+					...subtaskBlockFields(subtask as unknown as Record<string, unknown>),
 					origin: subtask.origin,
 					requestedAt: subtask.requested_at,
 				}));

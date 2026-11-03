@@ -20,6 +20,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from foundation.subtask_unblock import block
+
 
 class FailureType(Enum):
     """Types of failures that can occur during autonomous builds."""
@@ -438,13 +440,17 @@ class RecoveryManager:
             print(f"Error rolling back to {commit_hash}: {e.stderr}")
             return False
 
-    def mark_subtask_stuck(self, subtask_id: str, reason: str) -> None:
+    def mark_subtask_stuck(
+        self, subtask_id: str, reason: str, kind: str = "max_attempts"
+    ) -> None:
         """
         Mark a subtask as needing human intervention.
 
         Args:
             subtask_id: ID of the subtask
             reason: Why it's stuck
+            kind: Why, as the subtask panel reads it
+                (``foundation.subtask_unblock.BLOCKED_KINDS``)
         """
         history = self._load_attempt_history()
 
@@ -477,9 +483,11 @@ class RecoveryManager:
         # "blocked" counts as done for progress/phase purposes and is skipped by
         # get_next_subtask(), so the build moves on to the next subtask / QA while
         # the stuck entry above still flags it for human intervention.
-        self._mark_subtask_blocked_in_plan(subtask_id, reason)
+        self._mark_subtask_blocked_in_plan(subtask_id, reason, kind)
 
-    def _mark_subtask_blocked_in_plan(self, subtask_id: str, reason: str) -> None:
+    def _mark_subtask_blocked_in_plan(
+        self, subtask_id: str, reason: str, kind: str = "max_attempts"
+    ) -> None:
         """Set a subtask's status to "blocked" in implementation_plan.json.
 
         Best-effort: any I/O or JSON error is swallowed so recovery bookkeeping
@@ -499,8 +507,7 @@ class RecoveryManager:
         for phase in plan.get("phases", []):
             for subtask in phase.get("subtasks", phase.get("chunks", [])):
                 if subtask.get("id") == subtask_id:
-                    subtask["status"] = "blocked"
-                    subtask["blocked_reason"] = reason
+                    block(subtask, reason, kind)
                     updated = True
 
         if not updated:

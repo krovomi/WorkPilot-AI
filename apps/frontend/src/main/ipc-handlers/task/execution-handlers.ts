@@ -53,6 +53,7 @@ import {
 import { registerTaskStatusHandlers } from "./execution-status-handlers";
 import { registerTaskResumeHandlers } from "./execution-resume-handlers";
 import { registerTaskRecoveryHandlers } from "./execution-recovery-handlers";
+import { registerSubtaskUnblockHandlers } from "./subtask-unblock-handlers";
 
 /** Starting and stopping a task from the main process, as the board does. */
 export interface TaskControl {
@@ -420,6 +421,7 @@ export function registerTaskExecutionHandlers(
 	registerTaskStatusHandlers(context);
 	registerTaskResumeHandlers(context);
 	registerTaskRecoveryHandlers(context);
+	registerSubtaskUnblockHandlers(context);
 
 	/**
 	 * Check if a task is actually running (has active process)

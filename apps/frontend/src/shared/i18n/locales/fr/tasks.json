@@ -909,8 +909,6 @@
 		"blockedCount_other": "{{count}} bloquées",
 		"failedCount_one": "{{count}} échouée",
 		"failedCount_other": "{{count}} échouées",
-		"blockedReason": "Bloquée : {{reason}}",
-		"blockedGeneric": "Bloquée — intervention manuelle requise",
 		"changeRequest": "Modification demandée",
 		"requestedAt": "Demandée le {{date}}",
 		"filesViewer": {
@@ -940,6 +938,64 @@
 				"modified": "Modifié",
 				"deleted": "Supprimé",
 				"renamed": "Renommé"
+			}
+		},
+		"unblock": {
+			"regionLabel": "Ce que cette sous-tâche attend de vous",
+			"title": {
+				"needs_human": "L'agent a besoin de vous pour finir cette sous-tâche",
+				"manual_verification": "Cette vérification vous attend",
+				"max_attempts": "L'agent a abandonné après plusieurs tentatives",
+				"file_validation": "L'agent n'a pas trouvé les fichiers à modifier",
+				"tool_concurrency": "L'agent a buté plusieurs fois sur une limite d'outils",
+				"agent": "L'agent s'est arrêté sur cette sous-tâche",
+				"failed": "Cette sous-tâche a échoué"
+			},
+			"why": "Pourquoi : {{reason}}",
+			"noReason": "L'agent n'a pas donné de raison.",
+			"manualReason": "la sous-tâche demande une vérification manuelle et l'agent n'a rien modifié.",
+			"hint": {
+				"needs_human": "Faites ce qu'il demande, puis cliquez « C'est fait ». Ou répondez-lui ce qu'il lui faut et il réessaie.",
+				"manual_verification": "Vérifiez vous-même, puis cliquez « C'est fait ». Ou cliquez « Réessayer » et l'agent fait la vérification lui-même.",
+				"max_attempts": "Répondez avec une piste (un fichier, une commande, une approche) et l'agent réessaie depuis le début.",
+				"file_validation": "Répondez avec les bons chemins de fichiers et l'agent réessaie.",
+				"tool_concurrency": "Cliquez « Réessayer » : l'agent reprend cette sous-tâche depuis le début.",
+				"agent": "Marquez-la comme faite si c'est le cas, répondez ce dont l'agent a besoin, ou laissez-le réessayer.",
+				"failed": "Répondez avec une piste et l'agent réessaie, ou marquez-la comme faite si c'est le cas."
+			},
+			"lastReply": "Votre dernière réponse : {{reply}}",
+			"actions": {
+				"complete": "C'est fait",
+				"retry": "Réessayer",
+				"answer": "Répondre à l'agent",
+				"skip": "Pas nécessaire"
+			},
+			"replyLabel": "Votre réponse à l'agent",
+			"replyPlaceholder": "Que doit savoir ou faire l'agent ? Ex. : le fichier est dans src/test.txt, lance les tests avec dotnet test…",
+			"sendReply": "Envoyer et réessayer",
+			"cancel": "Annuler",
+			"done": {
+				"complete": "Sous-tâche marquée comme faite",
+				"skip": "Sous-tâche marquée comme pas nécessaire",
+				"retry": "L'agent réessaie cette sous-tâche",
+				"answer": "Réponse envoyée : l'agent réessaie"
+			},
+			"restarted": "La tâche a redémarré.",
+			"resolved": {
+				"complete": "Marquée comme faite par vous",
+				"skip": "Marquée comme pas nécessaire par vous"
+			},
+			"errorTitle": "Impossible de débloquer la sous-tâche",
+			"errors": {
+				"invalid_action": "Cette action n'est pas disponible.",
+				"reply_required": "Écrivez d'abord une réponse.",
+				"reply_too_long": "La réponse est trop longue (4 000 caractères au plus).",
+				"subtask_not_found": "Cette sous-tâche n'est plus dans le plan. Rafraîchissez le tableau.",
+				"not_blocked": "Cette sous-tâche n'est plus bloquée.",
+				"task_running": "La tâche tourne. Arrêtez-la d'abord, puis réessayez.",
+				"task_not_found": "Tâche introuvable.",
+				"plan_unreadable": "Le plan de la tâche est illisible.",
+				"generic": "Une erreur est survenue. Consultez les logs pour plus de détails."
 			}
 		}
 	},
