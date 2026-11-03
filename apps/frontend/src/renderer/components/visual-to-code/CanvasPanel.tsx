@@ -1391,7 +1391,7 @@ export const CanvasPanel: React.FC = () => {
 						"scaffoldTooltip",
 						"Scaffolder le projet complet (production-ready) via le pipeline agentique, dans le projet actif",
 					)}
-					className="gap-1.5 h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+					className="gap-1.5 h-7 px-3 text-xs bg-success hover:bg-success/90 text-success-foreground"
 				>
 					{isScaffolding ? (
 						<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1482,7 +1482,7 @@ export const CanvasPanel: React.FC = () => {
 					<Save className="h-3.5 w-3.5" />
 					<span className="hidden lg:inline">{t("saveAs", "Enregistrer")}</span>
 					{isDirty && (
-						<span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+						<span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-warning" />
 					)}
 				</Button>
 				<input
@@ -1736,8 +1736,8 @@ export const CanvasPanel: React.FC = () => {
 				</span>
 				<span className="flex-1" />
 				{isDirty ? (
-					<span className="flex items-center gap-1 text-amber-500">
-						<span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+					<span className="flex items-center gap-1 text-warning">
+						<span className="h-1.5 w-1.5 rounded-full bg-warning" />
 						{t("statusUnsaved", "Non enregistré")}
 					</span>
 				) : (
@@ -1921,7 +1921,7 @@ export const CanvasPanel: React.FC = () => {
 							disabled={!activeProject}
 							className={`text-left rounded-md border p-3 text-sm transition-colors disabled:opacity-50 ${
 								scaffoldMode === "active"
-									? "border-emerald-500 bg-emerald-500/10"
+									? "border-success bg-success/10"
 									: "hover:bg-accent/50"
 							}`}
 						>
@@ -1939,7 +1939,7 @@ export const CanvasPanel: React.FC = () => {
 							onClick={() => setScaffoldMode("new")}
 							className={`text-left rounded-md border p-3 text-sm transition-colors ${
 								scaffoldMode === "new"
-									? "border-emerald-500 bg-emerald-500/10"
+									? "border-success bg-success/10"
 									: "hover:bg-accent/50"
 							}`}
 						>

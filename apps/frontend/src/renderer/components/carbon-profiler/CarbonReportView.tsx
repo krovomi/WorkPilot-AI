@@ -30,7 +30,7 @@ export function CarbonReportView({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -68,7 +68,7 @@ export function CarbonReportView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -123,12 +123,12 @@ function ReportBody({
 				<StatCard
 					label={t("totalEnergy")}
 					value={`${report.totalKwh.toFixed(3)} kWh`}
-					color="text-yellow-400"
+					color="text-warning"
 				/>
 				<StatCard
 					label={t("co2Emissions")}
 					value={`${report.totalCo2G.toFixed(1)} g`}
-					color="text-red-400"
+					color="text-destructive"
 				/>
 				<StatCard
 					label={t("records")}
@@ -200,10 +200,10 @@ function ReportBody({
 								<span className="font-mono w-28 shrink-0 truncate">
 									{rec.model || rec.provider}
 								</span>
-								<span className="text-yellow-400 w-20 shrink-0">
+								<span className="text-warning w-20 shrink-0">
 									{rec.kwh.toFixed(4)} kWh
 								</span>
-								<span className="text-red-400 w-16 shrink-0">
+								<span className="text-destructive w-16 shrink-0">
 									{rec.co2G.toFixed(2)} g
 								</span>
 								<span className="text-muted-foreground ml-auto">

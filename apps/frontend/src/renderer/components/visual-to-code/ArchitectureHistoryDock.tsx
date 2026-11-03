@@ -297,7 +297,7 @@ export function ArchitectureHistoryDock({
 								}
 							>
 								{version.pinned ? (
-									<Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+									<Star className="h-3 w-3 fill-warning text-warning" />
 								) : (
 									<Star className="h-3 w-3" />
 								)}

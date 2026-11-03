@@ -136,7 +136,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 
 					<div className="flex-1 flex flex-col overflow-hidden">
 						{error && (
-							<div className="m-4 mb-0 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start justify-between gap-3">
+							<div className="m-4 mb-0 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start justify-between gap-3">
 								<span>{error}</span>
 								<button
 									type="button"
@@ -241,7 +241,7 @@ export function SpecApprovalDashboard(): React.ReactElement {
 											type="button"
 											onClick={() => void decide(true)}
 											disabled={isSubmitting}
-											className="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+											className="px-4 py-2 rounded-lg bg-success/20 text-success hover:bg-success/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
 										>
 											{t("specApproval:decision.approve")}
 										</button>

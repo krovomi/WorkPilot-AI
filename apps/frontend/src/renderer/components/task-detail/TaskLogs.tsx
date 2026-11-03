@@ -157,7 +157,7 @@ function HighlightedText({
 		parts.push(
 			<mark
 				key={key++}
-				className="rounded-[2px] bg-amber-300/50 text-foreground dark:bg-amber-400/30"
+				className="rounded-[2px] bg-warning/50 text-foreground dark:bg-warning/30"
 			>
 				{text.slice(from, from + query.length)}
 			</mark>,
@@ -176,7 +176,7 @@ const PHASE_ICONS: Record<TaskLogPhase, typeof Pencil> = {
 };
 
 const PHASE_COLORS: Record<TaskLogPhase, string> = {
-	planning: "text-amber-500 bg-amber-500/10 border-amber-500/30",
+	planning: "text-warning bg-warning/10 border-warning/30",
 	coding: "text-info bg-info/10 border-info/30",
 	validation: "text-purple-500 bg-purple-500/10 border-purple-500/30",
 };
@@ -1560,7 +1560,7 @@ function PhaseLogSection({
 																downloads[m.value]?.status === "starting" ||
 																	downloads[m.value]?.status === "downloading"
 																	? "text-primary"
-																	: "text-amber-500",
+																	: "text-warning",
 															)}
 															title={t(
 																"tasks:logs.model.downloadTip",
@@ -1587,7 +1587,7 @@ function PhaseLogSection({
 													) : null}
 													{typeof m.param_b === "number" && m.param_b < 24 ? (
 														<span
-															className="text-3xs text-amber-500"
+															className="text-3xs text-warning"
 															title={t(
 																"tasks:logs.model.smallWarnTip",
 																"Petit modèle ({{n}}B) — déconseillé pour la planification (préférez ≥24B ou Claude) ; limité sur les tâches complexes.",
@@ -2208,13 +2208,13 @@ function LogEntry({ entry, query = "" }: LogEntryProps) {
 				return {
 					icon: FolderSearch,
 					label: "Searching files",
-					color: "text-amber-500 bg-amber-500/10",
+					color: "text-warning bg-warning/10",
 				};
 			case "Grep":
 				return {
 					icon: Search,
 					label: "Searching code",
-					color: "text-green-500 bg-green-500/10",
+					color: "text-success bg-success/10",
 				};
 			case "Edit":
 				return {

@@ -131,7 +131,7 @@ export function NaturalLanguageGitDialog() {
 							value={naturalLanguageCommand}
 							onChange={(e) => setNaturalLanguageCommand(e.target.value)}
 							placeholder={t("naturalLanguageGit:command.placeholder")}
-							className="min-h-[100px] border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+							className="min-h-[100px] border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 							style={{
 								border: "2px solid rgb(250, 204, 21)",
 								borderRadius: "0.5rem",
@@ -341,7 +341,7 @@ function ResultView({
 
 			{/* Execution Status */}
 			<div
-				className={`rounded-lg p-3 text-sm ${result.success ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}
+				className={`rounded-lg p-3 text-sm ${result.success ? "bg-success/10 text-success border border-success/30" : "bg-destructive/10 text-destructive border border-destructive/30"}`}
 			>
 				<div className="flex items-center gap-2">
 					{result.success ? (

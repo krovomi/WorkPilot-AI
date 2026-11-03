@@ -81,24 +81,24 @@ const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
 const formatDate = (ts: number) => formatAppDateTime(ts * 1000);
 
 const STEP_COLORS: Record<string, string> = {
-	session_start: "bg-green-500",
-	session_end: "bg-red-500",
+	session_start: "bg-success",
+	session_end: "bg-destructive",
 	agent_thinking: "bg-blue-500",
 	agent_response: "bg-purple-500",
 	tool_call: "bg-orange-500",
-	tool_result: "bg-yellow-500",
+	tool_result: "bg-warning",
 	file_read: "bg-cyan-500",
-	file_create: "bg-emerald-500",
+	file_create: "bg-success",
 	file_update: "bg-indigo-500",
 	file_delete: "bg-rose-500",
-	command_run: "bg-amber-500",
+	command_run: "bg-warning",
 	command_output: "bg-lime-500",
 	test_run: "bg-teal-500",
 	test_result: "bg-violet-500",
 	decision: "bg-pink-500",
-	error: "bg-red-600",
+	error: "bg-destructive",
 	progress: "bg-sky-500",
-	breakpoint_hit: "bg-red-400",
+	breakpoint_hit: "bg-destructive",
 };
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
@@ -406,7 +406,7 @@ const MetricRow: React.FC<{
 		<span className="text-center">{valA}</span>
 		<span className="text-center">{valB}</span>
 		<span
-			className={`text-center font-medium ${positive ? "text-green-500" : "text-red-500"}`}
+			className={`text-center font-medium ${positive ? "text-success" : "text-destructive"}`}
 		>
 			{diff}
 		</span>
@@ -626,7 +626,7 @@ const DebugPanel: React.FC<{
 							className="flex items-center justify-between p-2 rounded border text-sm"
 						>
 							<div className="flex items-center gap-2">
-								<Bug className="h-3.5 w-3.5 text-red-500" />
+								<Bug className="h-3.5 w-3.5 text-destructive" />
 								<Badge variant="outline" className="text-xs">
 									{bp.breakpoint_type}
 								</Badge>
@@ -962,7 +962,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										</span>
 										<span className="font-medium truncate">{step.label}</span>
 										{step.is_breakpoint && (
-											<Bug className="h-3 w-3 text-red-500 shrink-0" />
+											<Bug className="h-3 w-3 text-destructive shrink-0" />
 										)}
 									</div>
 									{step.description && step.description !== step.label && (
@@ -1166,9 +1166,9 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 
 										const getLineClassName = (line: string): string => {
 											if (line.startsWith("+"))
-												return "text-green-600 bg-green-500/10";
+												return "text-success bg-success/10";
 											if (line.startsWith("-"))
-												return "text-red-600 bg-red-500/10";
+												return "text-destructive bg-destructive/10";
 											return "";
 										};
 

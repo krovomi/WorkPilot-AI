@@ -104,7 +104,7 @@ export function EntryCell({
 					"w-full resize-none rounded border bg-background px-2 py-1.5 text-xs",
 					"focus:outline-none focus:ring-1 focus:ring-ring",
 					isDirty && "border-l-2 border-l-primary bg-primary/5",
-					hasMismatch && !isReference && "border-amber-500/60",
+					hasMismatch && !isReference && "border-warning/60",
 				)}
 			/>
 			{isDirty && (

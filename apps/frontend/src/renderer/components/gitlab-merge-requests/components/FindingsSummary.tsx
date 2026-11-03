@@ -31,7 +31,7 @@ export function FindingsSummary({
 				{counts.critical > 0 && (
 					<Badge
 						variant="outline"
-						className="bg-red-500/10 text-red-500 border-red-500/30"
+						className="bg-destructive/10 text-destructive border-destructive/30"
 					>
 						{t("gitlab:findings.counts.critical", { count: counts.critical })}
 					</Badge>
@@ -47,7 +47,7 @@ export function FindingsSummary({
 				{counts.medium > 0 && (
 					<Badge
 						variant="outline"
-						className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+						className="bg-warning/10 text-warning border-warning/30"
 					>
 						{t("gitlab:findings.counts.medium", { count: counts.medium })}
 					</Badge>

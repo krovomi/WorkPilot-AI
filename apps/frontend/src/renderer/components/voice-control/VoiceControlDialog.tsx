@@ -198,7 +198,7 @@ export function VoiceControlDialog({
 						{(isRecording || isProcessing) && (
 							<div className="flex items-center gap-2 text-sm text-muted-foreground">
 								{isRecording ? (
-									<Mic className="h-4 w-4 text-red-500 animate-pulse" />
+									<Mic className="h-4 w-4 text-destructive animate-pulse" />
 								) : (
 									<Loader2 className="h-4 w-4 animate-spin text-primary" />
 								)}
@@ -234,7 +234,7 @@ export function VoiceControlDialog({
 								<Button
 									size="lg"
 									onClick={handleStopRecording}
-									className="h-16 w-16 rounded-full bg-red-500 hover:bg-red-600"
+									className="h-16 w-16 rounded-full bg-destructive hover:bg-destructive/90"
 								>
 									<MicOff className="h-6 w-6" />
 								</Button>

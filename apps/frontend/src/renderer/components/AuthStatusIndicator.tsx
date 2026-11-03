@@ -297,7 +297,7 @@ export function AuthStatusIndicator() {
 											</span>
 										</div>
 										<span
-											className={`text-3xs font-medium ${githubStatus.isAuth ? "text-green-500" : "text-red-500"}`}
+											className={`text-3xs font-medium ${githubStatus.isAuth ? "text-success" : "text-destructive"}`}
 										>
 											{githubStatus.isAuth
 												? t("common:usage.connected")
@@ -322,7 +322,7 @@ export function AuthStatusIndicator() {
 						}
 
 						return (
-							<div className="text-3xs text-red-500">
+							<div className="text-3xs text-destructive">
 								{t("common:usage.githubCliNotAvailable")}{" "}
 								<code className="bg-muted px-1 rounded">gh auth login</code>
 							</div>

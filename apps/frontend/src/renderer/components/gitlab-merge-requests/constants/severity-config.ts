@@ -35,8 +35,8 @@ export const SEVERITY_CONFIG: Record<
 > = {
 	critical: {
 		labelKey: "mrReview.severity.critical",
-		color: "text-red-500",
-		bgColor: "bg-red-500/10 border-red-500/30",
+		color: "text-destructive",
+		bgColor: "bg-destructive/10 border-destructive/30",
 		icon: XCircle,
 		descriptionKey: "mrReview.severity.criticalDesc",
 	},
@@ -49,8 +49,8 @@ export const SEVERITY_CONFIG: Record<
 	},
 	medium: {
 		labelKey: "mrReview.severity.medium",
-		color: "text-yellow-500",
-		bgColor: "bg-yellow-500/10 border-yellow-500/30",
+		color: "text-warning",
+		bgColor: "bg-warning/10 border-warning/30",
 		icon: AlertCircle,
 		descriptionKey: "mrReview.severity.mediumDesc",
 	},

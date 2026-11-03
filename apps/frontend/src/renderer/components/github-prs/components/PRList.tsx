@@ -81,7 +81,7 @@ function PRStatusFlow({
 		// Reviewing - first dot amber and animated
 		if (flowState === "reviewing") {
 			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-amber-400 animate-pulse");
+				return cn(baseClasses, "bg-warning animate-pulse");
 			}
 			return cn(baseClasses, "bg-muted-foreground/30");
 		}
@@ -89,7 +89,7 @@ function PRStatusFlow({
 		// Reviewed - first two dots filled
 		if (flowState === "reviewed") {
 			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-amber-400");
+				return cn(baseClasses, "bg-warning");
 			}
 			if (dotIndex === 1) {
 				return cn(baseClasses, "bg-blue-400");
@@ -100,13 +100,13 @@ function PRStatusFlow({
 		// Posted - all dots filled with final status color
 		if (flowState === "posted") {
 			const statusColors = {
-				success: "bg-emerald-400",
-				warning: "bg-red-400",
+				success: "bg-success",
+				warning: "bg-destructive",
 				followup: "bg-cyan-400",
 			};
 			// First two dots stay with their process colors
 			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-amber-400");
+				return cn(baseClasses, "bg-warning");
 			}
 			if (dotIndex === 1) {
 				return cn(baseClasses, "bg-blue-400");
@@ -124,7 +124,7 @@ function PRStatusFlow({
 			return null; // No label for not started
 		}
 		if (flowState === "reviewing") {
-			return { label: t("prReview.reviewing"), textColor: "text-amber-400" };
+			return { label: t("prReview.reviewing"), textColor: "text-warning" };
 		}
 		if (flowState === "reviewed") {
 			return { label: t("prReview.pendingPost"), textColor: "text-blue-400" };
@@ -133,11 +133,11 @@ function PRStatusFlow({
 			const statusConfig = {
 				success: {
 					label: t("prReview.readyToMerge"),
-					textColor: "text-emerald-400",
+					textColor: "text-success",
 				},
 				warning: {
 					label: t("prReview.changesRequested"),
-					textColor: "text-red-400",
+					textColor: "text-destructive",
 				},
 				followup: {
 					label: t("prReview.readyForFollowup"),

@@ -60,7 +60,7 @@ export function PipelineGenerator(): React.ReactElement {
 						<button
 							type="button"
 							onClick={cancelPipelineGeneration}
-							className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm font-medium"
+							className="px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
 						>
 							{t("pipelineGenerator:actions.cancel")}
 						</button>
@@ -214,7 +214,7 @@ export function PipelineGenerator(): React.ReactElement {
 
 					{/* Error state */}
 					{error && (
-						<div className="m-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+						<div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
 							{error}
 						</div>
 					)}
@@ -244,7 +244,7 @@ export function PipelineGenerator(): React.ReactElement {
 								</button>
 							</div>
 							<div className="bg-card rounded-lg p-4 overflow-auto">
-								<pre className="text-xs font-mono text-green-400 whitespace-pre overflow-x-auto">
+								<pre className="text-xs font-mono text-success whitespace-pre overflow-x-auto">
 									{selectedPipeline}
 								</pre>
 							</div>
@@ -280,7 +280,7 @@ export function PipelineGenerator(): React.ReactElement {
 									{t("pipelineGenerator:emptyState.description")}
 								</p>
 								{!activeProject && (
-									<p className="text-sm text-amber-400 mt-3">
+									<p className="text-sm text-warning mt-3">
 										{t("pipelineGenerator:errors.noProject")}
 									</p>
 								)}

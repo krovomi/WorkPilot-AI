@@ -102,7 +102,7 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 									{label}
 								</span>
 								<span
-									className={`text-xs ${isConnected ? "text-green-400" : "text-muted-foreground"}`}
+									className={`text-xs ${isConnected ? "text-success" : "text-muted-foreground"}`}
 								>
 									{isConnected
 										? t("selfHealing:connected")

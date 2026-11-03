@@ -57,17 +57,17 @@ function QuestionCard({
 							disabled={hasAnswered}
 							className={`w-full text-left px-3 py-2 rounded-md border text-sm flex items-center gap-2 ${
 								hasAnswered && isCorrect
-									? "bg-green-500/10 border-green-500/50"
+									? "bg-success/10 border-success/50"
 									: hasAnswered && isChosen && !isCorrect
-										? "bg-red-500/10 border-red-500/50"
+										? "bg-destructive/10 border-destructive/50"
 										: "hover:bg-accent"
 							}`}
 						>
 							{hasAnswered && isCorrect && (
-								<CircleCheck className="w-4 h-4 text-green-600 shrink-0" />
+								<CircleCheck className="w-4 h-4 text-success shrink-0" />
 							)}
 							{hasAnswered && isChosen && !isCorrect && (
-								<CircleX className="w-4 h-4 text-red-600 shrink-0" />
+								<CircleX className="w-4 h-4 text-destructive shrink-0" />
 							)}
 							<span className="break-all">
 								{generated(question.choices_i18n?.[choiceIdx], choice)}

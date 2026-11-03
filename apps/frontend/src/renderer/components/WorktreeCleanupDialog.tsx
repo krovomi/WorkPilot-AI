@@ -104,7 +104,7 @@ export function WorktreeCleanupDialog({
 								</div>
 							)}
 							{!error && (
-								<p className="text-amber-600 dark:text-amber-500">
+								<p className="text-warning ">
 									{t("dialogs:worktreeCleanup.warning")}
 								</p>
 							)}

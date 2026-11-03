@@ -70,7 +70,7 @@ export function TeamBotSettings() {
 							: t("teamBot:sendTest", "Send test message")}
 					</Button>
 					{lastResult === "ok" && (
-						<span className="text-xs text-green-500 flex items-center gap-1">
+						<span className="text-xs text-success flex items-center gap-1">
 							<Check className="w-3 h-3" />
 							{t("teamBot:ok", "Delivered")}
 						</span>

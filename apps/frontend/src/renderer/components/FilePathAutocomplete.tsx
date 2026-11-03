@@ -248,7 +248,7 @@ export function FilePathAutocomplete({
 								)}
 							>
 								{item.isDirectory ? (
-									<Folder className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+									<Folder className="h-3.5 w-3.5 shrink-0 text-warning" />
 								) : (
 									<FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 								)}

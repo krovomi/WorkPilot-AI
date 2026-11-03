@@ -136,7 +136,7 @@ export function PairProgrammingPanel() {
 						<Badge
 							className={
 								isStreaming
-									? "bg-green-500/20 text-green-700 border-green-500/40"
+									? "bg-success/20 text-success border-success/40"
 									: "bg-muted"
 							}
 						>

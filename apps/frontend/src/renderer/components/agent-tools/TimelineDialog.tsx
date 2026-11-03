@@ -26,8 +26,8 @@ export interface TimelineDialogProps {
 
 const PHASE_COLORS: Record<string, string> = {
 	planning: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-	coding: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-	qa: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+	coding: "bg-success/15 text-success ",
+	qa: "bg-warning/15 text-warning ",
 	documentation: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
 	system: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
@@ -151,7 +151,7 @@ export function TimelineDialog({
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{error}
 					</div>
 				)}
@@ -168,11 +168,11 @@ export function TimelineDialog({
 								})}
 							</Badge>
 							{timeline.integrity.intact ? (
-								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+								<Badge className="bg-success/15 text-success ">
 									{t("agentTools:timeline.chainIntact")}
 								</Badge>
 							) : (
-								<Badge className="bg-red-500/15 text-red-700 dark:text-red-300">
+								<Badge className="bg-destructive/15 text-destructive ">
 									{t("agentTools:timeline.chainBroken", {
 										reason: timeline.integrity.reason,
 									})}

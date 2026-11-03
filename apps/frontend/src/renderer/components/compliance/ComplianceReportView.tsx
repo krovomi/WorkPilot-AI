@@ -15,10 +15,10 @@ import {
 } from "../ui/select";
 
 const STATUS_STYLES: Record<EvidenceStatus, string> = {
-	collected: "text-green-400 bg-green-500/10",
+	collected: "text-success bg-success/10",
 	verified: "text-blue-400 bg-blue-500/10",
-	missing: "text-red-400 bg-red-500/10",
-	expired: "text-yellow-400 bg-yellow-500/10",
+	missing: "text-destructive bg-destructive/10",
+	expired: "text-warning bg-warning/10",
 };
 
 const FRAMEWORK_OPTIONS: ComplianceFramework[] = ["SOC2", "ISO_27001"];
@@ -74,7 +74,7 @@ export function ComplianceReportView({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -112,7 +112,7 @@ export function ComplianceReportView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -137,11 +137,11 @@ function ReportBody({
 	readonly report: ComplianceReport;
 	readonly t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
-	let barColor = "bg-red-500";
+	let barColor = "bg-destructive";
 	if (report.coveragePercent >= 80) {
-		barColor = "bg-green-500";
+		barColor = "bg-success";
 	} else if (report.coveragePercent >= 50) {
-		barColor = "bg-yellow-500";
+		barColor = "bg-warning";
 	}
 
 	return (
@@ -162,15 +162,15 @@ function ReportBody({
 			</div>
 
 			{report.missingControls.length > 0 && (
-				<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-					<p className="text-xs font-medium text-red-400 mb-1">
+				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+					<p className="text-xs font-medium text-destructive mb-1">
 						{t("missingControls")}
 					</p>
 					<div className="flex flex-wrap gap-1">
 						{report.missingControls.map((ctrl) => (
 							<span
 								key={ctrl}
-								className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-300"
+								className="px-2 py-0.5 rounded text-xs bg-destructive/20 text-destructive"
 							>
 								{ctrl}
 							</span>

@@ -13,10 +13,10 @@ import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
 const STATUS_COLOR: Record<string, string> = {
-	healthy: "bg-green-500/20 text-green-700 border-green-500/40",
-	degraded: "bg-amber-500/20 text-amber-700 border-amber-500/40",
+	healthy: "bg-success/20 text-success border-success/40",
+	degraded: "bg-warning/20 text-warning border-warning/40",
 	failing: "bg-orange-500/20 text-orange-700 border-orange-500/40",
-	burned_out: "bg-red-500/20 text-red-700 border-red-500/40",
+	burned_out: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
 export function AgentHealthPanel() {

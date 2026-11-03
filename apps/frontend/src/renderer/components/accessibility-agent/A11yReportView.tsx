@@ -20,9 +20,9 @@ import {
 } from "../ui/select";
 
 const SEVERITY_STYLES: Record<A11ySeverity, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	serious: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	moderate: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	moderate: "text-warning bg-warning/10 border-warning/20",
 	minor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -83,7 +83,7 @@ export function A11yReportView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -150,7 +150,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 				>
 					{t("actions.cancel")}
 				</button>
@@ -240,14 +240,14 @@ function ReportBody({
 				<StatCard
 					label={t("stats.violations")}
 					value={report.violations.length}
-					color="text-red-400"
+					color="text-destructive"
 					isActive={filter === "all"}
 					onClick={() => setFilter("all")}
 				/>
 				<StatCard
 					label={t("stats.critical")}
 					value={criticalCount}
-					color="text-red-400"
+					color="text-destructive"
 					isActive={filter === "critical"}
 					onClick={() => setFilter("critical")}
 				/>
@@ -261,7 +261,7 @@ function ReportBody({
 				<StatCard
 					label={t("stats.rulesPassed")}
 					value={report.passedRules.length}
-					color="text-green-400"
+					color="text-success"
 					isActive={filter === "passed"}
 					onClick={() => setFilter("passed")}
 				/>
@@ -273,7 +273,7 @@ function ReportBody({
 						{filteredPassedRules.map((rule) => (
 							<div
 								key={`passed-${rule}`}
-								className="px-4 py-3 rounded-lg border border-green-500/20 bg-green-500/10 text-green-400"
+								className="px-4 py-3 rounded-lg border border-success/20 bg-success/10 text-success"
 							>
 								<p className="text-sm">{rule}</p>
 							</div>
@@ -296,7 +296,7 @@ function ReportBody({
 								{v.file}:{v.line}
 							</p>
 							{v.suggestion && (
-								<p className="text-xs mt-1 text-green-400">{v.suggestion}</p>
+								<p className="text-xs mt-1 text-success">{v.suggestion}</p>
 							)}
 						</div>
 					))

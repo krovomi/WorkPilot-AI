@@ -68,8 +68,8 @@ export function ExecutionMonitor({ orchestration }: ExecutionMonitorProps) {
 							key={repo}
 							className={cn(
 								"flex items-center gap-3 rounded-lg border p-3 transition-colors",
-								isComplete && "border-green-500/30 bg-green-500/5",
-								needsSomeone && "border-amber-500/40 bg-amber-500/5",
+								isComplete && "border-success/30 bg-success/5",
+								needsSomeone && "border-warning/40 bg-warning/5",
 								!isComplete && !needsSomeone && "border-border bg-card",
 							)}
 						>
@@ -77,7 +77,7 @@ export function ExecutionMonitor({ orchestration }: ExecutionMonitorProps) {
 								aria-hidden="true"
 								className={cn(
 									"w-4 text-center text-base",
-									isComplete ? "text-green-500" : needsSomeone ? "text-amber-500" : "text-muted-foreground",
+									isComplete ? "text-success" : needsSomeone ? "text-warning" : "text-muted-foreground",
 								)}
 							>
 								{STATUS_ICONS[rs.status]}

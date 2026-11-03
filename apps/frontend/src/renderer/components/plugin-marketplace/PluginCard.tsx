@@ -18,7 +18,7 @@ const TYPE_ICONS: Record<CatalogPluginType, React.ElementType> = {
 
 const TYPE_BADGE_CLASSES: Record<CatalogPluginType, string> = {
 	agent: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-	"spec-template": "bg-green-500/10 text-green-500 border-green-500/20",
+	"spec-template": "bg-success/10 text-success border-success/20",
 	"custom-prompt": "bg-pink-500/10 text-pink-500 border-pink-500/20",
 };
 

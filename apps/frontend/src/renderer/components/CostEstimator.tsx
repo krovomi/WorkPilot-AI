@@ -70,9 +70,9 @@ function CostKpiCard({
 }) {
 	const colorClasses = {
 		primary: "text-primary bg-primary/10",
-		green: "text-emerald-500 bg-emerald-500/10",
-		amber: "text-amber-500 bg-amber-500/10",
-		red: "text-red-500 bg-red-500/10",
+		green: "text-success bg-success/10",
+		amber: "text-warning bg-warning/10",
+		red: "text-destructive bg-destructive/10",
 	};
 
 	return (
@@ -114,21 +114,21 @@ function BudgetBar({
 	// Determine bar color based on utilization percentage
 	let barColor: string;
 	if (pct >= 90) {
-		barColor = "bg-red-500";
+		barColor = "bg-destructive";
 	} else if (pct >= 70) {
-		barColor = "bg-amber-500";
+		barColor = "bg-warning";
 	} else {
-		barColor = "bg-emerald-500";
+		barColor = "bg-success";
 	}
 
 	// Determine text color based on utilization percentage
 	let textColor: string;
 	if (pct >= 90) {
-		textColor = "text-red-500";
+		textColor = "text-destructive";
 	} else if (pct >= 70) {
-		textColor = "text-amber-500";
+		textColor = "text-warning";
 	} else {
-		textColor = "text-emerald-500";
+		textColor = "text-success";
 	}
 
 	return (
@@ -174,7 +174,7 @@ function BudgetBar({
 					{budget.forecast_end_of_month > budget.monthly_budget && (
 						<Badge
 							variant="outline"
-							className="text-3xs text-red-500 border-red-500/20"
+							className="text-3xs text-destructive border-destructive/20"
 						>
 							{t("budget.overBudget")}
 						</Badge>
@@ -212,8 +212,8 @@ function ProviderBreakdown({
 	const colors = [
 		"bg-primary",
 		"bg-blue-500",
-		"bg-emerald-500",
-		"bg-amber-500",
+		"bg-success",
+		"bg-warning",
 		"bg-purple-500",
 		"bg-pink-500",
 	];
@@ -498,7 +498,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 									{budget.alerts.map((alert) => (
 										<div
 											key={alert}
-											className="flex items-center gap-2 text-xs text-amber-500"
+											className="flex items-center gap-2 text-xs text-warning"
 										>
 											<Bell className="h-3.5 w-3.5 shrink-0" />
 											<span>{alert}</span>

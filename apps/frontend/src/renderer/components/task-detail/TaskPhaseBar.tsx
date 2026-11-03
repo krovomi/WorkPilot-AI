@@ -37,8 +37,8 @@ const PHASE_STYLES: Record<
 	{ text: string; bg: string }
 > = {
 	planning: {
-		text: "text-amber-600 dark:text-amber-400",
-		bg: "bg-amber-500/10 border-b border-amber-500/30",
+		text: "text-warning ",
+		bg: "bg-warning/10 border-b border-warning/30",
 	},
 	coding: {
 		text: "text-info",
