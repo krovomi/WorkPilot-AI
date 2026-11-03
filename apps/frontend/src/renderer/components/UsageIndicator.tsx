@@ -714,7 +714,7 @@ export function UsageIndicator() {
 								<p className="font-medium">
 									{t("common:usage.dataUnavailable")}
 								</p>
-								<p className="text-muted-foreground text-[10px]">
+								<p className="text-muted-foreground text-3xs">
 									<span>
 										{t("common:usage.openaiHelp.text")}{" "}
 										<a
@@ -728,11 +728,11 @@ export function UsageIndicator() {
 									</span>
 								</p>
 								{openaiError && (
-									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-[10px] text-destructive">
+									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-3xs text-destructive">
 										<b>{t("common:usage.openaiError")}</b> {openaiError}
 									</div>
 								)}
-								<div className="mt-2 p-1 bg-muted/30 rounded text-[10px]">
+								<div className="mt-2 p-1 bg-muted/30 rounded text-3xs">
 									<b>{t("common:usage.debugProfiles")}</b>
 									<ul>
 										{debugProfiles.length > 0 ? (
@@ -784,7 +784,7 @@ export function UsageIndicator() {
 								<p className="font-medium">
 									{t("common:usage.dataUnavailable")}
 								</p>
-								<p className="text-muted-foreground text-[10px]">
+								<p className="text-muted-foreground text-3xs">
 									{t("common:usage.providerNotSupported")}
 								</p>
 							</div>
@@ -815,7 +815,7 @@ export function UsageIndicator() {
 					<TooltipContent side="bottom" className="text-xs w-64">
 						<div className="space-y-1">
 							<p className="font-medium">{t("common:usage.dataUnavailable")}</p>
-							<p className="text-muted-foreground text-[10px]">
+							<p className="text-muted-foreground text-3xs">
 								{selectedProvider === "anthropic"
 									? t("common:usage.dataUnavailableAnthropic")
 									: t("common:usage.dataUnavailableDescription")}
@@ -825,7 +825,7 @@ export function UsageIndicator() {
 									href="https://claude.ai/settings"
 									target="_blank"
 									rel="noopener noreferrer"
-									className="text-[10px] text-primary font-medium underline hover:text-primary/80 block mt-1"
+									className="text-3xs text-primary font-medium underline hover:text-primary/80 block mt-1"
 								>
 									claude.ai/settings
 								</a>
@@ -915,7 +915,7 @@ export function UsageIndicator() {
 
 		if (isUnmeasured) {
 			return (
-				<p className="text-[11px] text-muted-foreground leading-relaxed">
+				<p className="text-2xs text-muted-foreground leading-relaxed">
 					{t("common:usage.notMeasuredDescription")}
 				</p>
 			);
@@ -940,7 +940,7 @@ export function UsageIndicator() {
 					weeklyLabel={weeklyLabel}
 				/>
 				{subscription && (
-					<p className="text-[10px] text-muted-foreground leading-relaxed">
+					<p className="text-3xs text-muted-foreground leading-relaxed">
 						{subscription.source === "codex-session-log"
 							? t("common:usage.chatgptFromCodexLog", {
 									time: formatAppDateTime(subscription.observedAt),
@@ -1038,7 +1038,7 @@ export function UsageIndicator() {
 							})}
 						>
 							{pct.toFixed(0)}
-							<span className="ml-0.5 text-[10px] font-normal opacity-80">
+							<span className="ml-0.5 text-3xs font-normal opacity-80">
 								%
 							</span>
 						</span>
@@ -1056,7 +1056,7 @@ export function UsageIndicator() {
 							title={t("common:usage.copilotPremiumTitle")}
 						>
 							{Math.round(copilotPremiumPercent)}
-							<span className="ml-0.5 text-[10px] font-normal opacity-80">
+							<span className="ml-0.5 text-3xs font-normal opacity-80">
 								%
 							</span>
 						</span>
@@ -1077,7 +1077,7 @@ export function UsageIndicator() {
 						title={t("common:usage.copilotTokensTitle")}
 					>
 						{tokens ?? "0"}
-						<span className="ml-0.5 text-[10px] font-normal opacity-80">
+						<span className="ml-0.5 text-3xs font-normal opacity-80">
 							{t("common:usage.copilotTokensSuffix")}
 						</span>
 					</span>
@@ -1132,7 +1132,7 @@ export function UsageIndicator() {
 							</span>
 						</div>
 						{/* Real-time indicator */}
-						<div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+						<div className="flex items-center gap-1 text-3xs text-muted-foreground">
 							{renderRealTimeIndicator()}
 						</div>
 					</div>
@@ -1176,11 +1176,11 @@ export function UsageIndicator() {
 						{/* Account Info */}
 						<div className="flex-1 min-w-0 text-left">
 							<div className="flex items-center gap-1.5">
-								<span className="text-[10px] text-muted-foreground font-medium">
+								<span className="text-3xs text-muted-foreground font-medium">
 									{t("common:usage.activeAccount")}
 								</span>
 								{usage.needsReauthentication && (
-									<span className="text-[9px] px-1.5 py-0.5 bg-destructive/10 text-destructive rounded font-semibold">
+									<span className="text-3xs px-1.5 py-0.5 bg-destructive/10 text-destructive rounded font-semibold">
 										{t("common:usage.needsReauth")}
 									</span>
 								)}
@@ -1205,7 +1205,7 @@ export function UsageIndicator() {
 					{/* Other profiles section - sorted by availability */}
 					{otherProfiles.length > 0 && (
 						<div className="pt-2 -mx-3 px-3 -mb-3 pb-3 space-y-1">
-							<div className="text-[10px] text-muted-foreground font-medium mb-1.5">
+							<div className="text-3xs text-muted-foreground font-medium mb-1.5">
 								{t("common:usage.otherAccounts")}
 							</div>
 							{otherProfiles.map((profile) => {

@@ -232,7 +232,7 @@ function StatCard({
 		>
 			<Icon className={`w-4.5 h-4.5 ${colors.icon} shrink-0`} />
 			<div className="min-w-0">
-				<p className="text-[11px] text-muted-foreground truncate">
+				<p className="text-2xs text-muted-foreground truncate">
 					{label}
 				</p>
 				<p className={`text-lg font-semibold ${colors.value} leading-tight`}>

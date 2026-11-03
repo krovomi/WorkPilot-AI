@@ -126,11 +126,11 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 							{session.task_title || session.task_id || session.session_id}
 						</span>
 						{session.phase && session.phase !== session.task_title && (
-							<Badge variant="secondary" className="text-[10px]">
+							<Badge variant="secondary" className="text-3xs">
 								{session.phase}
 							</Badge>
 						)}
-						<Badge variant="outline" className="text-[10px] capitalize">
+						<Badge variant="outline" className="text-3xs capitalize">
 							{session.status}
 						</Badge>
 					</div>

@@ -283,7 +283,7 @@ export function TestGenerationDialog({
 										})}
 									</summary>
 									<div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950 p-3">
-										<pre className="whitespace-pre font-mono text-[11.5px] leading-relaxed text-zinc-300">
+										<pre className="whitespace-pre font-mono text-2xs leading-relaxed text-zinc-300">
 											{test.test_code}
 										</pre>
 									</div>

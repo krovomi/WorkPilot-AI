@@ -312,7 +312,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 											</span>
 											<Badge
 												variant={HISTORY_STATUS_VARIANTS[entry.status] ?? "muted"}
-												className="shrink-0 px-1.5 py-0 text-[11px] font-medium"
+												className="shrink-0 px-1.5 py-0 text-2xs font-medium"
 											>
 												{t(
 													`crossLanguageTranslation:historyStatus.${entry.status}`,
@@ -320,7 +320,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 												)}
 											</Badge>
 										</div>
-										<div className="mt-0.5 text-[11px] text-muted-foreground">
+										<div className="mt-0.5 text-2xs text-muted-foreground">
 											{formatDate(entry.started_at)}
 											{entry.lines
 												? ` · ${t("crossLanguageTranslation:history.lines", { count: entry.lines })}`

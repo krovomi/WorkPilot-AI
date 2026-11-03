@@ -77,7 +77,7 @@ export function McpInstalledList() {
 								<div className="flex items-center gap-2">
 									<h3 className="font-medium text-sm">{server.name}</h3>
 									{!catalogInfo && (
-										<Badge variant="outline" className="text-[10px] gap-1">
+										<Badge variant="outline" className="text-3xs gap-1">
 											<Wrench className="h-3 w-3" />
 											{t("mcpMarketplace.installedTab.custom")}
 										</Badge>

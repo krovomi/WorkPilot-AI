@@ -653,7 +653,7 @@ export function DesignImportPanel() {
 																	<ChevronRight className="h-3 w-3 text-muted-foreground" />
 																	<Badge
 																		variant="outline"
-																		className="text-[10px]"
+																		className="text-3xs"
 																	>
 																		{child.type}
 																	</Badge>
@@ -691,7 +691,7 @@ export function DesignImportPanel() {
 															/>
 															<div>
 																<p className="text-xs font-medium">{name}</p>
-																<p className="text-[10px] text-muted-foreground font-mono">
+																<p className="text-3xs text-muted-foreground font-mono">
 																	{value}
 																</p>
 															</div>
@@ -763,11 +763,11 @@ export function DesignImportPanel() {
 													</div>
 													<div className="flex items-center gap-1.5 mt-1 pl-5">
 														<Badge
-															className={`text-[10px] px-1 py-0 ${LANGUAGE_COLORS[file.language] || LANGUAGE_COLORS.text}`}
+															className={`text-3xs px-1 py-0 ${LANGUAGE_COLORS[file.language] || LANGUAGE_COLORS.text}`}
 														>
 															{file.language}
 														</Badge>
-														<span className="text-[10px] text-muted-foreground truncate">
+														<span className="text-3xs text-muted-foreground truncate">
 															{file.description}
 														</span>
 													</div>
@@ -836,7 +836,7 @@ export function DesignImportPanel() {
 											{t("tests.visualRegressionTests")} (
 											{result.visual_tests.length})
 										</span>
-										<Badge variant="secondary" className="text-[10px]">
+										<Badge variant="secondary" className="text-3xs">
 											Playwright
 										</Badge>
 									</div>
@@ -866,7 +866,7 @@ export function DesignImportPanel() {
 													</span>
 												</div>
 												<div className="flex items-center gap-2">
-													<Badge variant="outline" className="text-[10px]">
+													<Badge variant="outline" className="text-3xs">
 														{t("tests.threshold")}:{" "}
 														{(test.threshold * 100).toFixed(0)}%
 													</Badge>

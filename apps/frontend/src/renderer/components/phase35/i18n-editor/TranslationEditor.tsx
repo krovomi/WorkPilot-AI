@@ -190,7 +190,7 @@ export function TranslationEditor() {
 											key={value}
 											size="sm"
 											variant={filter === value ? "secondary" : "ghost"}
-											className="h-7 px-2 text-[11px]"
+											className="h-7 px-2 text-2xs"
 											onClick={() => {
 												setFilter(value);
 												setLimit(PAGE);
@@ -209,7 +209,7 @@ export function TranslationEditor() {
 							<Button
 								size="sm"
 								variant="outline"
-								className="h-7 px-2 text-[11px]"
+								className="h-7 px-2 text-2xs"
 								onClick={() => setAdding(true)}
 								disabled={busy}
 							>
@@ -225,7 +225,7 @@ export function TranslationEditor() {
 								<Button
 									size="sm"
 									variant="outline"
-									className="h-6 px-2 text-[11px]"
+									className="h-6 px-2 text-2xs"
 									onClick={() => void reloadKeepingDraft()}
 								>
 									<RotateCcw className="mr-1 h-3 w-3" />
@@ -301,7 +301,7 @@ export function TranslationEditor() {
 																{row.key}
 															</span>
 															{row.isNew && (
-																<span className="shrink-0 rounded bg-primary/10 px-1 text-[10px] text-primary">
+																<span className="shrink-0 rounded bg-primary/10 px-1 text-3xs text-primary">
 																	{t("i18nEditor.newBadge")}
 																</span>
 															)}
@@ -431,7 +431,7 @@ export function TranslationEditor() {
 									<Button
 										size="sm"
 										variant="outline"
-										className="h-7 px-2 text-[11px]"
+										className="h-7 px-2 text-2xs"
 										onClick={() => setLimit((n) => n + PAGE)}
 									>
 										{t("i18nEditor.showMore")}
@@ -461,7 +461,7 @@ export function TranslationEditor() {
 								<Button
 									size="sm"
 									variant="ghost"
-									className="h-7 px-2 text-[11px]"
+									className="h-7 px-2 text-2xs"
 									onClick={discard}
 									disabled={busy}
 								>
@@ -470,7 +470,7 @@ export function TranslationEditor() {
 							)}
 							<Button
 								size="sm"
-								className="h-7 px-3 text-[11px]"
+								className="h-7 px-3 text-2xs"
 								onClick={() => void save()}
 								disabled={changes === 0 || busy}
 							>

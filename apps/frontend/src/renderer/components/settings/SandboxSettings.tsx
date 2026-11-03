@@ -147,7 +147,7 @@ export function SandboxSettings() {
 								<span className="flex-1 font-mono text-xs">{rule.path}</span>
 								<span
 									className={cn(
-										"rounded-full px-2 py-0.5 text-[10px] font-medium",
+										"rounded-full px-2 py-0.5 text-3xs font-medium",
 										rule.access === "write"
 											? "bg-warning/15 text-warning"
 											: "bg-blue-500/15 text-blue-600",

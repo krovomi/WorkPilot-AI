@@ -33,7 +33,7 @@ interface ModelDownloadChipProps {
 }
 
 const CHIP_BASE =
-	"flex h-6 items-center gap-1 rounded-full border px-2 text-[10px] " +
+	"flex h-6 items-center gap-1 rounded-full border px-2 text-3xs " +
 	"font-medium transition-colors focus-visible:outline-none " +
 	"focus-visible:ring-1 focus-visible:ring-primary/50";
 

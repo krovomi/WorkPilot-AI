@@ -139,7 +139,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 										<span className="text-sm text-foreground truncate">
 											{result.name}
 										</span>
-										<span className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+										<span className="text-2xs text-muted-foreground truncate flex items-center gap-1">
 											<FileText className="w-3 h-3 shrink-0 text-indigo-400/50" />
 											{result.path}
 										</span>
@@ -147,7 +147,7 @@ export function TestRunnerTab({ projectPath }: TestRunnerTabProps) {
 
 									{/* Duration + expand */}
 									<div className="flex items-center gap-2 shrink-0">
-										<span className="text-[11px] text-blue-400/60 font-mono">
+										<span className="text-2xs text-blue-400/60 font-mono">
 											{result.durationMs.toFixed(0)}ms
 										</span>
 										{result.errorMessage &&

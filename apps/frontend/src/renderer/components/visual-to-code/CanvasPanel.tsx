@@ -1629,7 +1629,7 @@ export const CanvasPanel: React.FC = () => {
 						<div>
 							<label
 								htmlFor="inspector-name"
-								className="mb-1 block text-[11px] font-medium text-muted-foreground"
+								className="mb-1 block text-2xs font-medium text-muted-foreground"
 							>
 								{t("blockName", "Nom")}
 							</label>
@@ -1645,7 +1645,7 @@ export const CanvasPanel: React.FC = () => {
 						</div>
 
 						<div>
-							<span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+							<span className="mb-1 block text-2xs font-medium text-muted-foreground">
 								{t("blockRole", "Rôle")}
 							</span>
 							<p className="flex items-center gap-1.5 text-xs text-foreground">
@@ -1663,7 +1663,7 @@ export const CanvasPanel: React.FC = () => {
 							<div>
 								<label
 									htmlFor="inspector-stack"
-									className="mb-1 block text-[11px] font-medium text-muted-foreground"
+									className="mb-1 block text-2xs font-medium text-muted-foreground"
 								>
 									{t("blockStack", "Technologie")}
 								</label>
@@ -1685,7 +1685,7 @@ export const CanvasPanel: React.FC = () => {
 							</div>
 						)}
 
-						<p className="mt-auto text-[10px] leading-snug text-muted-foreground">
+						<p className="mt-auto text-3xs leading-snug text-muted-foreground">
 							{t(
 								"inspectorHint",
 								"Double-cliquez un bloc pour le renommer sur le canvas, ou une connexion pour changer son libellé.",
@@ -1725,7 +1725,7 @@ export const CanvasPanel: React.FC = () => {
 			</div>
 
 			{/* Status bar */}
-			<div className="flex shrink-0 items-center gap-3 border-t bg-background px-3 py-1 text-[11px] text-muted-foreground">
+			<div className="flex shrink-0 items-center gap-3 border-t bg-background px-3 py-1 text-2xs text-muted-foreground">
 				<span className="tabular-nums">
 					{t("statusBlocks", "{{count}} blocs", { count: nodes.length })}
 				</span>

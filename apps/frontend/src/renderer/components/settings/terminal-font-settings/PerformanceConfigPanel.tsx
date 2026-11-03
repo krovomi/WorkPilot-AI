@@ -128,7 +128,7 @@ export function PerformanceConfigPanel({
 								<div className="font-mono text-sm font-medium tabular-nums">
 									{preset.label}
 								</div>
-								<div className="truncate text-[11px] text-muted-foreground">
+								<div className="truncate text-2xs text-muted-foreground">
 									{preset.description}
 								</div>
 							</button>

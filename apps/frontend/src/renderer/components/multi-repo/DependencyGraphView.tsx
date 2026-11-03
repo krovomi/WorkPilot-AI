@@ -188,7 +188,7 @@ export function DependencyGraphView({
 								<text
 									x={node.x + 26}
 									y={node.y + node.height / 2 - 4}
-									className="text-[11px] font-medium"
+									className="text-2xs font-medium"
 									fill="var(--color-foreground)"
 									dominantBaseline="auto"
 								>
@@ -201,7 +201,7 @@ export function DependencyGraphView({
 								<text
 									x={node.x + 26}
 									y={node.y + node.height / 2 + 10}
-									className="text-[9px]"
+									className="text-3xs"
 									fill={color}
 									dominantBaseline="auto"
 								>
@@ -224,7 +224,7 @@ export function DependencyGraphView({
 					</span>
 					{executionOrder.map((repo, i) => (
 						<span key={repo} className="flex items-center gap-1">
-							<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">
+							<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-3xs font-medium text-primary">
 								{i + 1}
 							</span>
 							{repo.split("/").pop()}

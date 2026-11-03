@@ -149,7 +149,7 @@ function BuildCell({
 		<td className="px-2 py-1">
 			<div className={`text-sm font-medium ${tone}`}>{label}</div>
 			{build.state === "judged" && (
-				<div className="text-[11px] text-muted-foreground">
+				<div className="text-2xs text-muted-foreground">
 					{dollars(build.costUsd)} · {minutes(build.durationS)}
 				</div>
 			)}
@@ -222,7 +222,7 @@ function RunCard({
 								{run.engines.map((e) => (
 									<th key={e.id} className="px-2 py-1">
 										{e.model}
-										<span className="ml-1 text-[11px]">
+										<span className="ml-1 text-2xs">
 											{e.provider} · {e.effort}
 										</span>
 									</th>

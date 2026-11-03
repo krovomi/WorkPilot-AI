@@ -382,20 +382,20 @@ function PatternCard({
 					<div className="flex items-center gap-2 mt-1 flex-wrap">
 						<Badge
 							variant="secondary"
-							className={`text-[10px] px-1.5 py-0 ${categoryClass}`}
+							className={`text-3xs px-1.5 py-0 ${categoryClass}`}
 						>
 							{t(`learningLoop:categories.${pattern.category}`)}
 						</Badge>
-						<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+						<Badge variant="outline" className="text-3xs px-1.5 py-0">
 							{pattern.agent_phase}
 						</Badge>
 						<span
-							className={`text-[10px] font-mono ${confidenceColor(pattern.confidence)}`}
+							className={`text-3xs font-mono ${confidenceColor(pattern.confidence)}`}
 						>
 							{(pattern.confidence * 100).toFixed(0)}%
 						</span>
 						{pattern.occurrence_count > 1 && (
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								×{pattern.occurrence_count}
 							</span>
 						)}
@@ -465,7 +465,7 @@ function PatternCard({
 								<Badge
 									key={tag}
 									variant="outline"
-									className="text-[10px] px-1 py-0"
+									className="text-3xs px-1 py-0"
 								>
 									{tag}
 								</Badge>

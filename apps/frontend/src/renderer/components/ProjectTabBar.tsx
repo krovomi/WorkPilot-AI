@@ -337,7 +337,7 @@ export function ProjectTabBar({
 										</span>
 									</div>
 									<div className="h-px bg-border" />
-									<div className="text-[10px] text-muted-foreground">
+									<div className="text-3xs text-muted-foreground">
 										{t("common:usage.accountExceedsThreshold")}
 									</div>
 								</div>

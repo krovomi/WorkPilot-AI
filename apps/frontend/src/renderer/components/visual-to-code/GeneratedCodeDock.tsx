@@ -145,7 +145,7 @@ export function GeneratedCodeDock() {
 							<span className="block truncate text-xs font-medium">
 								{baseName(file.filename)}
 							</span>
-							<span className="block truncate text-[11px] text-muted-foreground">
+							<span className="block truncate text-2xs text-muted-foreground">
 								{file.filename}
 							</span>
 						</span>
@@ -178,7 +178,7 @@ export function GeneratedCodeDock() {
 			<div className="flex min-h-0 flex-1 flex-col">
 				{current ? (
 					<>
-						<p className="truncate border-b px-3 py-1.5 font-mono text-[11px] text-muted-foreground">
+						<p className="truncate border-b px-3 py-1.5 font-mono text-2xs text-muted-foreground">
 							{current.filename}
 						</p>
 						{/* CodeMirror owns its own scrolling at h-full; an

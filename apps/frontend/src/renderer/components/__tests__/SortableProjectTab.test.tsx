@@ -841,11 +841,11 @@ describe("SortableProjectTab", () => {
 		});
 
 		it("should have responsive archived count badge", () => {
-			// From component: 'text-[9px] sm:text-[10px] min-w-[12px] sm:min-w-[14px]'
+			// From component: 'text-3xs sm:text-3xs min-w-[12px] sm:min-w-[14px]'
 			const expectedBadgeClasses = [
-				"text-[9px]",
+				"text-3xs",
 				"min-w-[12px]", // mobile
-				"sm:text-[10px]",
+				"sm:text-3xs",
 				"sm:min-w-[14px]", // 640px+
 			];
 

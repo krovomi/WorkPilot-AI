@@ -215,13 +215,13 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 						onPlanClick={onPlanClick}
 					/>
 				) : (
-					<span className="text-[11px] text-muted-foreground">
+					<span className="text-2xs text-muted-foreground">
 						{progressLabel}
 					</span>
 				)}
 				{/* The steps already name the phase; "interrupted" still needs words. */}
 				{showPhaseSteps && isStuck && (
-					<span className="text-[11px] font-medium text-warning">
+					<span className="text-2xs font-medium text-warning">
 						{progressLabel}
 					</span>
 				)}
@@ -293,14 +293,14 @@ export const PhaseProgressIndicator = memo(function PhaseProgressIndicator({
 							{totalSubtasks > 10 && (
 								<span
 									key="overflow-count"
-									className="text-[10px] text-muted-foreground font-medium"
+									className="text-3xs text-muted-foreground font-medium"
 								>
 									+{totalSubtasks - 10}
 								</span>
 							)}
 						</div>
 					)}
-					<span className="text-[11px] font-medium tabular-nums text-foreground">
+					<span className="text-2xs font-medium tabular-nums text-foreground">
 						{progressValue}
 					</span>
 				</div>
@@ -430,7 +430,7 @@ const PhaseStepsIndicator = memo(function PhaseStepsIndicator({
 					<div key={phase.key} className="flex items-center">
 						<motion.div
 							className={cn(
-								"flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium",
+								"flex items-center gap-0.5 px-1 py-0.5 rounded text-3xs font-medium",
 								state === "complete" && "bg-success/10 text-success",
 								state === "active" && "bg-primary/10 text-primary",
 								state === "stuck" && "bg-warning/10 text-warning",

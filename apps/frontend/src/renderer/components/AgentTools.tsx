@@ -742,10 +742,10 @@ function AgentCard({
 						<h3 className="font-medium text-sm text-foreground">
 							{t(`agents.${id}.label`, { defaultValue: config.label })}
 						</h3>
-						<span className="px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+						<span className="px-2 py-0.5 rounded text-3xs font-medium bg-secondary text-secondary-foreground">
 							{modelLabel}
 						</span>
-						<span className="px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+						<span className="px-2 py-0.5 rounded text-3xs font-medium bg-secondary text-secondary-foreground">
 							{thinkingLabel}
 						</span>
 					</div>
@@ -820,7 +820,7 @@ function AgentCard({
 													{serverInfo?.name || server}
 												</span>
 												{isAdded && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+													<span className="text-3xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
 														{t("mcp.added")}
 													</span>
 												)}
@@ -871,7 +871,7 @@ function AgentCard({
 												<span className="font-medium">
 													{serverInfo?.name || server}
 												</span>
-												<span className="text-[10px] text-muted-foreground no-underline">
+												<span className="text-3xs text-muted-foreground no-underline">
 													({t("mcp.removed")})
 												</span>
 											</div>
@@ -961,7 +961,7 @@ function AgentCard({
 									key={group.labelKey}
 									className={index > 0 ? "pt-2" : ""}
 								>
-									<p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+									<p className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
 										{t(group.labelKey, { defaultValue: group.fallback })}
 									</p>
 									<div className="space-y-1">
@@ -991,7 +991,7 @@ function AgentCard({
 																{server?.name || mcpId}
 															</span>
 															{needsSetup && (
-																<span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
+																<span className="text-3xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
 																	{t("mcp.setupRequired", {
 																		defaultValue: "Setup required",
 																	})}
@@ -1022,7 +1022,7 @@ function AgentCard({
 						{/* Restore removed MCPs */}
 						{removedMcps.length > 0 && !mcpSearch && (
 							<div className="border-t border-border pt-3">
-								<p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+								<p className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
 									{t("mcp.restore")}
 								</p>
 								<div className="space-y-1">
@@ -1868,7 +1868,7 @@ export function AgentTools() {
 																		{server.name}
 																	</span>
 																	{health?.responseTime && (
-																		<span className="text-[10px] text-muted-foreground">
+																		<span className="text-3xs text-muted-foreground">
 																			{health.responseTime}ms
 																		</span>
 																	)}

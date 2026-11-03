@@ -139,7 +139,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 						{t("pixelOffice:queue.title")}
 					</span>
 					<span
-						className="text-[10px] font-mono ml-auto"
+						className="text-3xs font-mono ml-auto"
 						style={{ color: "rgba(167,139,250,0.5)" }}
 					>
 						{t("pixelOffice:queue.count", { count: agents.length })}
@@ -194,7 +194,7 @@ function WaitingQueue({ agents, onAgentClick }: WaitingQueueProps) {
 							/>
 							{/* Name */}
 							<span
-								className="text-[9px] font-mono text-center leading-tight max-w-[52px] truncate"
+								className="text-3xs font-mono text-center leading-tight max-w-[52px] truncate"
 								style={{ color: "rgba(196,181,253,0.65)" }}
 								title={agent.fullName}
 							>

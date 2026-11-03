@@ -242,12 +242,12 @@ function FileTreeItem({
 				{diff && (diff.additions > 0 || diff.deletions > 0) && (
 					<span className="flex items-center gap-1.5 flex-shrink-0">
 						{diff.additions > 0 && (
-							<span className="text-[10px] font-semibold tabular-nums text-success">
+							<span className="text-3xs font-semibold tabular-nums text-success">
 								+{diff.additions}
 							</span>
 						)}
 						{diff.deletions > 0 && (
-							<span className="text-[10px] font-semibold tabular-nums text-rose-500">
+							<span className="text-3xs font-semibold tabular-nums text-rose-500">
 								-{diff.deletions}
 							</span>
 						)}
@@ -508,7 +508,7 @@ export function SubtaskFilesViewer({
 									})}
 								</p>
 								{(totals.additions > 0 || totals.deletions > 0) && (
-									<span className="flex items-center gap-1.5 text-[11px] font-semibold tabular-nums">
+									<span className="flex items-center gap-1.5 text-2xs font-semibold tabular-nums">
 										<span className="text-success">
 											+{totals.additions}
 										</span>

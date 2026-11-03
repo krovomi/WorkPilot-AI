@@ -83,7 +83,7 @@ export function NeedsYouChannels({ settings, onSettingsChange }: NeedsYouChannel
 									{t("needsYou.ntfy.generate")}
 								</Button>
 							</div>
-							<p className="text-[11px] text-muted-foreground">{t("needsYou.ntfy.topicHint")}</p>
+							<p className="text-2xs text-muted-foreground">{t("needsYou.ntfy.topicHint")}</p>
 						</div>
 						<div className="space-y-1">
 							<Label htmlFor="needs-you-ntfy-server" className="text-xs">
@@ -152,12 +152,12 @@ export function NeedsYouChannels({ settings, onSettingsChange }: NeedsYouChannel
 								onChange={(e) => setTelegram({ chatId: e.target.value.trim() })}
 								className="font-mono text-xs"
 							/>
-							<p className="text-[11px] text-muted-foreground">{t("needsYou.telegram.chatIdHint")}</p>
+							<p className="text-2xs text-muted-foreground">{t("needsYou.telegram.chatIdHint")}</p>
 						</div>
 						<div className="flex items-start justify-between gap-3 sm:col-span-2">
 							<div className="space-y-1">
 								<Label className="text-sm">{t("needsYou.telegram.remoteApproval")}</Label>
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-2xs text-muted-foreground">
 									{t("needsYou.telegram.remoteApprovalHint")}
 								</p>
 							</div>
@@ -176,7 +176,7 @@ export function NeedsYouChannels({ settings, onSettingsChange }: NeedsYouChannel
 					<Send className="mr-2 h-3.5 w-3.5" aria-hidden />
 					{t("needsYou.test")}
 				</Button>
-				<p className="text-[11px] text-muted-foreground">
+				<p className="text-2xs text-muted-foreground">
 					<BellRing className="mr-1 inline h-3 w-3" aria-hidden />
 					{t("needsYou.testHint")}
 				</p>

@@ -115,7 +115,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 										{event.type.replaceAll("_", " ")}
 									</span>
 									{agentName && (
-										<Badge variant="outline" className="text-[10px] px-1 py-0">
+										<Badge variant="outline" className="text-3xs px-1 py-0">
 											{agentName}
 										</Badge>
 									)}
@@ -131,7 +131,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 									);
 								})()}
 							</div>
-							<span className="text-[10px] text-muted-foreground shrink-0 tabular-nums">
+							<span className="text-3xs text-muted-foreground shrink-0 tabular-nums">
 								{timeStr}
 							</span>
 						</div>

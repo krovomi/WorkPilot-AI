@@ -33,7 +33,7 @@ export function AcModeToggle({ mode, onChange }: AcModeToggleProps) {
 					aria-pressed={mode === value}
 					title={label}
 					className={cn(
-						"flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors",
+						"flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs transition-colors",
 						mode === value
 							? "bg-muted text-foreground"
 							: "text-muted-foreground hover:text-foreground",

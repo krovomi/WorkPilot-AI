@@ -145,7 +145,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 									<div className="flex items-center gap-2">
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0"
+											className="text-3xs px-1.5 py-0"
 										>
 											{v.severity}
 										</Badge>

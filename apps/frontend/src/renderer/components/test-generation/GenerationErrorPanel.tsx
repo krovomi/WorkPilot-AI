@@ -156,7 +156,7 @@ export function GenerationErrorPanel({
 						className="mt-0.5 h-3.5 w-3.5 flex-none text-primary"
 						aria-hidden="true"
 					/>
-					<p className="text-[12.5px] leading-relaxed text-foreground/90">
+					<p className="text-xs leading-relaxed text-foreground/90">
 						{hint}
 					</p>
 				</div>
@@ -169,10 +169,10 @@ export function GenerationErrorPanel({
 							key={fact.label}
 							className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1"
 						>
-							<dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+							<dt className="text-3xs uppercase tracking-wider text-muted-foreground">
 								{fact.label}
 							</dt>
-							<dd className="max-w-[16rem] truncate font-mono text-[11px] text-foreground">
+							<dd className="max-w-[16rem] truncate font-mono text-2xs text-foreground">
 								{fact.value}
 							</dd>
 						</div>
@@ -187,7 +187,7 @@ export function GenerationErrorPanel({
 							type="button"
 							onClick={() => setDetailsOpen((open) => !open)}
 							aria-expanded={detailsOpen}
-							className="flex flex-1 items-center gap-1.5 rounded text-left text-[11.5px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+							className="flex flex-1 items-center gap-1.5 rounded text-left text-2xs font-medium text-muted-foreground transition-colors hover:text-foreground"
 						>
 							<ChevronRight
 								className={[
@@ -201,7 +201,7 @@ export function GenerationErrorPanel({
 						<button
 							type="button"
 							onClick={handleCopy}
-							className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+							className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-muted"
 						>
 							{copied ? (
 								<Check className="h-3 w-3 text-success" aria-hidden="true" />
@@ -212,7 +212,7 @@ export function GenerationErrorPanel({
 						</button>
 					</div>
 					{detailsOpen && (
-						<pre className="m-0 max-h-52 overflow-auto border-t border-border/60 px-3 py-2.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-muted-foreground">
+						<pre className="m-0 max-h-52 overflow-auto border-t border-border/60 px-3 py-2.5 font-mono text-2xs leading-relaxed whitespace-pre-wrap break-words text-muted-foreground">
 							{failure.details}
 						</pre>
 					)}

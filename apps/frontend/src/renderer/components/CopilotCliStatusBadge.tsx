@@ -447,14 +447,14 @@ export function CopilotCliStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" ||
 										status === "gh-missing" ||
 										status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{status === "gh-missing"
 												? t("navigation:copilotCli.ghMissing")
 												: t("common:install", "Install")}
@@ -541,7 +541,7 @@ export function CopilotCliStatusBadge({
 										{t("navigation:copilotCli.path")}
 									</span>
 									<span
-										className="font-mono text-[10px] truncate max-w-[140px]"
+										className="font-mono text-3xs truncate max-w-[140px]"
 										title={versionInfo.path}
 									>
 										{versionInfo.path}
@@ -658,7 +658,7 @@ export function CopilotCliStatusBadge({
 										>
 											<div className="flex flex-col">
 												<span
-													className="font-mono text-[10px] truncate max-w-[180px]"
+													className="font-mono text-3xs truncate max-w-[180px]"
 													title={installation.path}
 												>
 													{installation.path
@@ -666,7 +666,7 @@ export function CopilotCliStatusBadge({
 														.slice(-2)
 														.join("/") || installation.path}
 												</span>
-												<span className="text-muted-foreground text-[9px]">
+												<span className="text-muted-foreground text-3xs">
 													{installation.version
 														? `copilot v${installation.version}`
 														: t("settings:copilot.versionUnknown", "version unknown")}

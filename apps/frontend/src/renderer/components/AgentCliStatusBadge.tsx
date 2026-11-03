@@ -287,7 +287,7 @@ export function AgentCliStatusBadge({
 										{version ? ` (${version})` : ""}
 									</span>
 									{missing && canInstall && (
-										<span className="ml-auto text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
+										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
 											{isInstalling && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
 											{isInstalling
 												? t("navigation:agentCli.install.installingShort")
@@ -372,7 +372,7 @@ export function AgentCliStatusBadge({
 						</p>
 					)}
 
-					<p className="text-[11px] text-muted-foreground">
+					<p className="text-2xs text-muted-foreground">
 						{t("navigation:agentCli.signInHint")}
 					</p>
 

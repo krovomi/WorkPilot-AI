@@ -303,7 +303,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										placeholder="https://api.example.com"
 									/>
 									<div className="relative">
-										<div className="text-[10px] text-muted-foreground mb-0.5">
+										<div className="text-3xs text-muted-foreground mb-0.5">
 											{t("apiExplorer:environments.token")}
 										</div>
 										<div className="flex gap-1">
@@ -325,7 +325,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											</button>
 										</div>
 									</div>
-									<div className="text-[10px] text-muted-foreground mb-0.5">
+									<div className="text-3xs text-muted-foreground mb-0.5">
 										{t("apiExplorer:environments.headers")}
 									</div>
 									<textarea
@@ -356,7 +356,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 												{env.name}
 											</div>
 											{env.token && (
-												<span className="text-[9px] font-mono bg-warning/10 text-warning border border-warning/20 rounded px-1 py-0.5">
+												<span className="text-3xs font-mono bg-warning/10 text-warning border border-warning/20 rounded px-1 py-0.5">
 													Bearer ••••
 												</span>
 											)}
@@ -400,7 +400,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								<button
 									type="button"
 									onClick={() => setDetectedEnvs([])}
-									className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+									className="text-3xs text-muted-foreground hover:text-foreground transition-colors"
 								>
 									{t("apiExplorer:actions.cancel")}
 								</button>
@@ -431,11 +431,11 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<span className="text-xs font-medium text-foreground">
 												{env.name}
 											</span>
-											<span className="text-[9px] font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
+											<span className="text-3xs font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
 												{env.source}
 											</span>
 										</div>
-										<span className="text-[10px] font-mono text-success/80 truncate block">
+										<span className="text-3xs font-mono text-success/80 truncate block">
 											{env.baseUrl}
 										</span>
 									</div>
@@ -460,7 +460,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 							placeholder="https://api.example.com"
 						/>
 						<div>
-							<div className="text-[10px] text-muted-foreground mb-0.5">
+							<div className="text-3xs text-muted-foreground mb-0.5">
 								{t("apiExplorer:environments.token")}
 							</div>
 							<div className="flex gap-1">
@@ -481,7 +481,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 							</div>
 						</div>
 						<div>
-							<div className="text-[10px] text-muted-foreground mb-0.5">
+							<div className="text-3xs text-muted-foreground mb-0.5">
 								{t("apiExplorer:environments.headers")}
 							</div>
 							<textarea

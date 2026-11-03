@@ -95,7 +95,7 @@ export function RestartDialog({
 						{available && filesCount > 0 && (
 							<div className="text-xs text-muted-foreground mt-2">
 								{t("restartDialog.willDelete", { count: filesCount })}{" "}
-								<code className="text-[10px]">
+								<code className="text-3xs">
 									{plan?.files_to_clean[mode].join(", ")}
 								</code>
 							</div>

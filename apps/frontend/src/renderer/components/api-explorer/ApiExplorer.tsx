@@ -68,7 +68,7 @@ function EndpointDetail({
 						)}
 					</div>
 					{operation.deprecated && (
-						<span className="text-[10px] font-mono border border-warning/30 text-warning bg-warning/10 rounded px-1.5 py-0.5 shrink-0">
+						<span className="text-3xs font-mono border border-warning/30 text-warning bg-warning/10 rounded px-1.5 py-0.5 shrink-0">
 							deprecated
 						</span>
 					)}
@@ -389,7 +389,7 @@ export function ApiExplorer() {
 						) : (
 							<ScanSearch size={13} />
 						)}
-						<span className="text-[11px]">
+						<span className="text-2xs">
 							{isProjectScanning
 								? t("apiExplorer:scan.scanning")
 								: t("apiExplorer:scan.resync")}
@@ -407,7 +407,7 @@ export function ApiExplorer() {
 					>
 						{isEmulatorBusy && <Loader2 size={13} className="animate-spin" />}
 						{!isEmulatorBusy && <Play size={13} />}
-						<span className="text-[11px]">{emulatorBtnLabel}</span>
+						<span className="text-2xs">{emulatorBtnLabel}</span>
 						{isEmulatorRunning && (
 							<span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shrink-0" />
 						)}
@@ -459,7 +459,7 @@ export function ApiExplorer() {
 					<div className="p-3 border-b border-[var(--color-border)]">
 						{/* Scan status banner */}
 						{isProjectScanning && (
-							<div className="flex items-center gap-1.5 mb-2 text-[10px] text-muted-foreground">
+							<div className="flex items-center gap-1.5 mb-2 text-3xs text-muted-foreground">
 								<Loader2 size={10} className="animate-spin shrink-0" />
 								<span>{t("apiExplorer:scan.scanning")}</span>
 							</div>
@@ -472,7 +472,7 @@ export function ApiExplorer() {
 									size={11}
 									className="text-warning shrink-0 mt-0.5"
 								/>
-								<span className="text-[10px] text-warning/80 break-all">
+								<span className="text-3xs text-warning/80 break-all">
 									{projectScanError}
 								</span>
 							</div>
@@ -486,25 +486,25 @@ export function ApiExplorer() {
 									</div>
 									{/* Source badge */}
 									{specSource === "scan" && (
-										<span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">
+										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">
 											{t("apiExplorer:scan.sourceBadge")}
 										</span>
 									)}
 									{specSource === "file" && (
 										<span
-											className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-violet-400/10 text-violet-400 border border-violet-400/20"
+											className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-violet-400/10 text-violet-400 border border-violet-400/20"
 											title={specFilePath ?? undefined}
 										>
 											{t("apiExplorer:scan.fileBadge")}
 										</span>
 									)}
 									{specSource === "url" && (
-										<span className="shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-400/10 text-blue-400 border border-blue-400/20">
+										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-blue-400/10 text-blue-400 border border-blue-400/20">
 											URL
 										</span>
 									)}
 								</div>
-								<div className="text-[10px] text-muted-foreground font-mono">
+								<div className="text-3xs text-muted-foreground font-mono">
 									v{spec.info.version} · {totalEndpoints}{" "}
 									{t("apiExplorer:sidebar.endpoints")}
 									{specSource === "file" && specFilePath && (
@@ -575,7 +575,7 @@ export function ApiExplorer() {
 										<div className="text-xs font-medium text-destructive">
 											{t("apiExplorer:sidebar.loadError")}
 										</div>
-										<div className="text-[10px] text-destructive/70 mt-1 font-mono break-all">
+										<div className="text-3xs text-destructive/70 mt-1 font-mono break-all">
 											{specError}
 										</div>
 									</div>
@@ -614,7 +614,7 @@ export function ApiExplorer() {
 												{group.tag}
 											</span>
 										</div>
-										<span className="text-[10px] text-muted-foreground font-mono shrink-0 ml-1">
+										<span className="text-3xs text-muted-foreground font-mono shrink-0 ml-1">
 											{group.endpoints.length}
 										</span>
 									</button>
@@ -664,7 +664,7 @@ export function ApiExplorer() {
 						<div className="px-3 py-2 border-t border-[var(--color-border)] bg-card">
 							<div className="flex items-center gap-1.5">
 								<div className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
-								<span className="text-[10px] font-mono text-muted-foreground truncate">
+								<span className="text-3xs font-mono text-muted-foreground truncate">
 									{activeEnv.baseUrl}
 								</span>
 							</div>

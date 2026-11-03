@@ -122,7 +122,7 @@ export function AgentPanel({
 						<span className="font-semibold text-sm truncate">{agent.name}</span>
 						<Badge
 							variant="outline"
-							className={cn("text-[10px] px-1.5 py-0", statusColor)}
+							className={cn("text-3xs px-1.5 py-0", statusColor)}
 						>
 							{agent.status}
 						</Badge>
@@ -215,13 +215,13 @@ export function AgentPanel({
 								<Badge
 									key={f}
 									variant="secondary"
-									className="text-[10px] font-mono px-1.5"
+									className="text-3xs font-mono px-1.5"
 								>
 									{f.split("/").pop()}
 								</Badge>
 							))}
 							{agent.active_files.length > 3 && (
-								<Badge variant="secondary" className="text-[10px] px-1.5">
+								<Badge variant="secondary" className="text-3xs px-1.5">
 									+{agent.active_files.length - 3}
 								</Badge>
 							)}

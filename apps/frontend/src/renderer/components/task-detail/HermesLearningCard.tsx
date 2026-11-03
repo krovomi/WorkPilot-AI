@@ -157,11 +157,11 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 							</h3>
 							<Badge
 								variant={readiness.state === "ready" ? "success" : "warning"}
-								className="text-[10px]"
+								className="text-3xs"
 							>
 								{t(`hermes:state.${readiness.state}`)}
 							</Badge>
-							<Badge variant="muted" className="gap-1 text-[10px]">
+							<Badge variant="muted" className="gap-1 text-3xs">
 								<RefreshCw className="h-2.5 w-2.5" aria-hidden />
 								{t("hermes:auto.badge")}
 							</Badge>
@@ -433,7 +433,7 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 								</p>
 								<div className="mt-1.5 flex flex-wrap gap-1">
 									{adopted.map((name) => (
-										<Badge key={name} variant="muted" className="font-mono text-[10px]">
+										<Badge key={name} variant="muted" className="font-mono text-3xs">
 											{name}
 										</Badge>
 									))}
@@ -494,7 +494,7 @@ function PipelineStep({
 			)}
 			title={hint}
 		>
-			<div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+			<div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
 				{icon}
 				<span className="truncate">{label}</span>
 			</div>
@@ -549,12 +549,12 @@ function CandidateRow({
 					<div className="flex flex-wrap items-center gap-1.5">
 						<span className="text-sm font-medium capitalize">{title}</span>
 						{candidate.category && (
-							<Badge variant="muted" className="text-[10px]">
+							<Badge variant="muted" className="text-3xs">
 								{candidate.category}
 							</Badge>
 						)}
 						{candidate.pendingInHermes && (
-							<Badge variant="info" className="text-[10px]">
+							<Badge variant="info" className="text-3xs">
 								{t("hermes:review.pendingInHermes")}
 							</Badge>
 						)}
@@ -569,7 +569,7 @@ function CandidateRow({
 							type="button"
 							onClick={() => setOpen((v) => !v)}
 							aria-expanded={open}
-							className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+							className="mt-1 inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground"
 						>
 							{open ? (
 								<ChevronDown className="h-3 w-3" aria-hidden />
@@ -581,11 +581,11 @@ function CandidateRow({
 					)}
 					{open && (
 						<div className="mt-1.5 space-y-1.5">
-							<pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/40 p-2 font-mono text-[11px] leading-relaxed">
+							<pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/40 p-2 font-mono text-2xs leading-relaxed">
 								{candidate.excerpt}
 							</pre>
 							{candidate.tools.length > 0 && (
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-2xs text-muted-foreground">
 									{t("hermes:review.tools")}{" "}
 									{candidate.tools.map((tool) => (
 										<code key={tool} className="mr-1 rounded bg-muted px-1 py-0.5">
@@ -653,7 +653,7 @@ export function CheckRow({
 				</span>
 				<span className="ml-1">{check.detail}</span>
 				{!check.ok && check.remedy && (
-					<code className="mt-1 block break-all rounded bg-muted px-1.5 py-0.5 text-[10px]">
+					<code className="mt-1 block break-all rounded bg-muted px-1.5 py-0.5 text-3xs">
 						{check.remedy}
 					</code>
 				)}

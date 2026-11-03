@@ -214,13 +214,13 @@ export function McpServerCard({ server }: McpServerCardProps) {
 						</span>
 						<Badge
 							variant={server.official ? "secondary" : "outline"}
-							className="text-[10px] px-1.5 py-0"
+							className="text-3xs px-1.5 py-0"
 						>
 							{server.official
 								? t("mcpMarketplace.official")
 								: t("mcpMarketplace.community")}
 						</Badge>
-						<span className="ml-auto text-[10px] opacity-60 truncate max-w-[45%]">
+						<span className="ml-auto text-3xs opacity-60 truncate max-w-[45%]">
 							{server.package}
 						</span>
 					</div>
@@ -231,13 +231,13 @@ export function McpServerCard({ server }: McpServerCardProps) {
 							<Badge
 								key={tool.name}
 								variant="secondary"
-								className="text-[10px] px-1.5 py-0"
+								className="text-3xs px-1.5 py-0"
 							>
 								{tool.name}
 							</Badge>
 						))}
 						{server.tools.length > 3 && (
-							<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+							<Badge variant="outline" className="text-3xs px-1.5 py-0">
 								+{server.tools.length - 3}
 							</Badge>
 						)}
@@ -272,7 +272,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 								{server.tags.map((tag) => (
 									<span
 										key={tag}
-										className="text-[10px] bg-muted px-1.5 py-0.5 rounded"
+										className="text-3xs bg-muted px-1.5 py-0.5 rounded"
 									>
 										{tag}
 									</span>

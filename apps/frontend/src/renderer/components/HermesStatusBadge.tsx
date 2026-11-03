@@ -138,7 +138,7 @@ export function HermesStatusBadge({
 								<>
 									<span className="truncate">{SHORT_NAME}</span>
 									{pending > 0 && (
-										<span className="ml-auto text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded">
 											{pending}
 										</span>
 									)}
