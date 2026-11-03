@@ -256,7 +256,9 @@ class TestCompatibleCacheRouting:
         spec = tmp_path / "001-task"
         first = compatible_cache_routing("mistral", spec, "coder").body_key
         assert first == compatible_cache_routing("mistral", spec, "coder").body_key
-        assert first != compatible_cache_routing("mistral", spec, "qa_reviewer").body_key
+        assert (
+            first != compatible_cache_routing("mistral", spec, "qa_reviewer").body_key
+        )
 
     @pytest.mark.parametrize("provider", ["deepseek", "other"])
     def test_automatic_caches_get_nothing(self, provider: str, tmp_path: Path):
