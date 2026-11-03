@@ -406,7 +406,7 @@ def rust_repo(tmp_path: Path) -> Path:
 
 def test_a_rust_change_with_its_own_tests_is_targeted(rust_repo):
     calc = rust_repo / "src" / "calc.rs"
-    calc.write_text(calc.read_text().replace("a + b", "b + a"), encoding="utf-8")
+    calc.write_text(calc.read_text(encoding="utf-8").replace("a + b", "b + a"), encoding="utf-8")
     _git(rust_repo, "commit", "-qam", "swap")
 
     scope = change_scope(rust_repo, "main")
@@ -430,7 +430,7 @@ def test_the_targeted_prompt_gives_the_ecosystem_commands(rust_repo):
     from prompts_pkg import get_qa_reviewer_targeted_prompt
 
     calc = rust_repo / "src" / "calc.rs"
-    calc.write_text(calc.read_text().replace("a + b", "b + a"), encoding="utf-8")
+    calc.write_text(calc.read_text(encoding="utf-8").replace("a + b", "b + a"), encoding="utf-8")
     _git(rust_repo, "commit", "-qam", "swap")
     spec_dir = rust_repo / ".workpilot" / "specs" / "001"
     spec_dir.mkdir(parents=True)
