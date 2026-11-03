@@ -440,6 +440,7 @@ environment wins:
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
 | `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only and small code changes included (see *Text-only changes* below). |
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
+| `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
 
 ### Review budget
