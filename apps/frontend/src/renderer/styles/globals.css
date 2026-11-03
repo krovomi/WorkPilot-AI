@@ -50,6 +50,12 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
 
+  /* Task phases (planning / coding / validation): one hue each, the same in
+     every theme so a phase reads the same everywhere; light/dark values below. */
+  --color-phase-planning: var(--phase-planning);
+  --color-phase-coding: var(--phase-coding);
+  --color-phase-validation: var(--phase-validation);
+
   /* Border radius - from design system */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -244,6 +250,21 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.8);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.9);
   --shadow-focus: 0 0 0 2px rgba(214, 216, 118, 0.2);
+}
+
+/* Task phase hues. No data-theme overrides them on purpose: yellow = planning,
+ * blue = coding, violet = validation in every theme (several themes use blue
+ * or violet as --info / --primary, which would make two phases look alike). */
+:root {
+  --phase-planning: #EAB308;
+  --phase-coding: #3B82F6;
+  --phase-validation: #8B5CF6;
+}
+
+.dark {
+  --phase-planning: #FACC15;
+  --phase-coding: #60A5FA;
+  --phase-validation: #A78BFA;
 }
 
 /* ============================================
@@ -1050,9 +1071,14 @@
   --shadow-focus: 0 0 0 3px rgba(74, 222, 128, 0.3);
 }
 
-/* Base styles */
-* {
-  border-color: var(--border);
+/* Base styles. In the base layer so that border-colour utilities
+ * (border-primary, border-transparent, border-warning/30...) win: unlayered,
+ * this rule beat every Tailwind utility and all borders stayed grey (the
+ * selected tab's underline in the task panel never showed). */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 body {
@@ -1407,6 +1433,29 @@ body {
     transparent 100%
   );
   background-size: 200% 100%;
+}
+
+/* Running phase of the task progress bar: a light sweep over the segment's own
+ * colour (the generic .progress-working sweep is tinted with the default
+ * theme's primary, which muddies a yellow/blue/violet segment). */
+.phase-segment-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.phase-segment-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, white 35%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-glow-sweep 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* ============================================
