@@ -10,6 +10,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import { PageHeader } from "../ui/page-header";
 import {
 	Select,
 	SelectContent,
@@ -170,18 +171,12 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<div className="flex items-center justify-between gap-4">
-					<div className="min-w-0">
-						<h1 className="text-xl font-semibold">
-							{t("crossLanguageTranslation:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground mt-0.5">
-							{t("crossLanguageTranslation:subtitle")}
-						</p>
-					</div>
-					{isTranslating ? (
+			<PageHeader
+				icon={Languages}
+				title={t("crossLanguageTranslation:title")}
+				description={t("crossLanguageTranslation:subtitle")}
+				actions={
+					isTranslating ? (
 						<Button
 							type="button"
 							variant="outline"
@@ -201,9 +196,9 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 							<Languages className="h-4 w-4" />
 							{t("crossLanguageTranslation:actions.translate")}
 						</Button>
-					)}
-				</div>
-			</div>
+					)
+				}
+			/>
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left: languages, options, history */}

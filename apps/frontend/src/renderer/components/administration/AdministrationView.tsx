@@ -24,6 +24,7 @@ import { OrganizationsTab } from "./OrganizationsTab";
 import { OverviewTab } from "./OverviewTab";
 import { QuotasTab } from "./QuotasTab";
 import { RolesTab } from "./RolesTab";
+import { PageHeader } from "../ui/page-header";
 
 type TabId =
 	| "overview"
@@ -107,18 +108,13 @@ export function AdministrationView() {
 
 	return (
 		<div className="p-6 space-y-6 overflow-auto h-full">
-			<header className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-semibold flex items-center gap-2">
-						<ShieldCheck className="h-6 w-6" />
-						{t("administration:title")}
-					</h1>
-					<p className="text-sm text-muted-foreground">
-						{t("administration:description")}
-					</p>
-				</div>
-
-				{organizations.length > 1 && (
+			<PageHeader
+				variant="inline"
+				icon={ShieldCheck}
+				title={t("administration:title")}
+				description={t("administration:description")}
+				actions={
+					organizations.length > 1 && (
 					<div className="flex items-center gap-2">
 						<label
 							htmlFor="admin-org"
@@ -139,8 +135,9 @@ export function AdministrationView() {
 							))}
 						</select>
 					</div>
-				)}
-			</header>
+					)
+				}
+			/>
 
 			{error && (
 				<div

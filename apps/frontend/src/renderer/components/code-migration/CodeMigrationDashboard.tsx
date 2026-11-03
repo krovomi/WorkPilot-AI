@@ -7,6 +7,8 @@ import {
 	useCodeMigrationStore,
 } from "../../stores/code-migration-store";
 import { useProjectStore } from "../../stores/project-store";
+import { Download } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const EXAMPLE_KEYS = [
 	"reactHooks",
@@ -52,13 +54,11 @@ export function CodeMigrationDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<h1 className="text-xl font-semibold">{t("codeMigration:title")}</h1>
-				<p className="text-sm text-muted-foreground mt-0.5">
-					{t("codeMigration:subtitle")}
-				</p>
-			</div>
+			<PageHeader
+				icon={Download}
+				title={t("codeMigration:title")}
+				description={t("codeMigration:subtitle")}
+			/>
 
 			<div className="flex flex-1 overflow-hidden gap-0">
 				{/* Left: Config panel */}
