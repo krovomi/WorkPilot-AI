@@ -92,15 +92,12 @@ _FAMILY_RE = re.compile(r"(haiku|sonnet|opus|fable|mythos)")
 
 
 def _claude_tier(model: str | None) -> str | None:
-    name = (model or "").strip().lower()
-    if not name:
-        return None
-    try:
-        from phase_config import resolve_model_id
+    """The family of a Claude model id or alias (``opus``, ``claude-sonnet-5-5``).
 
-        name = resolve_model_id(name).lower()
-    except Exception:  # noqa: BLE001 - an alias we cannot resolve is read as written
-        pass
+    Read from the name alone: `subagents` may not import `phase_config`
+    (tests/test_import_contracts.py), and the caller passes the resolved id.
+    """
+    name = (model or "").strip().lower()
     if "claude" not in name and name not in _TIER_RANK:
         return None
     match = _FAMILY_RE.search(name)
