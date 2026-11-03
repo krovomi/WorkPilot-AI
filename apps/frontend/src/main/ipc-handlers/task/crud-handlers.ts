@@ -412,6 +412,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				subtasks: [],
 				logs: [],
 				metadata: duplicatedMetadata,
+				location: "main",
+				specsPath: newSpecDir,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			};

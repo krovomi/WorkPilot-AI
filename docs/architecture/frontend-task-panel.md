@@ -54,6 +54,15 @@ Les autres onglets du panneau (Sous-tâches, Logs, Fichiers, Graphe, Visual
 proof, Émulateur, Mobile, Vérification, Delta d'architecture) sont des vues
 pleine hauteur, pas des cartes : ils restent des onglets du panneau.
 
+L'onglet **Fichiers** (`TaskFiles.tsx`, liste dans `task-files-model.ts`)
+montre d'abord les fichiers que la tâche a créés, modifiés ou supprimés : le
+diff du worktree (`getWorktreeDiff`, la même liste que « Fichiers modifiés » de
+la revue), lu dans le worktree ; quand ce diff est vide ou absent (branche
+fusionnée, worktree supprimé), les fichiers enregistrés par les sous-tâches,
+lus dans le projet. Le dossier de spécification (`.md`, `.json`) vient
+dessous. Une tâche créée ou dupliquée depuis le tableau porte son `specsPath`
+dès sa création, comme une tâche chargée du disque.
+
 **Les trois panneaux restent montés**, seuls les inactifs sont `hidden` : une
 carte charge ses données une fois, chaque onglet sait ce qu'il montre, et la
 bannière ci-dessous peut amener à une carte de n'importe quel onglet. Les onglets

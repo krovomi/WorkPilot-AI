@@ -232,6 +232,16 @@ describe("TASK_DUPLICATE handler", () => {
 		expect(invalidateTasksCache).toHaveBeenCalledWith("proj-1");
 	});
 
+	it("returns the spec folder, like a task loaded from disk", async () => {
+		// Without it the task detail's "Fichiers" tab stayed empty until the
+		// board was reloaded.
+		const result = await duplicateHandler(null, sourceSpecId);
+
+		expect(result.data.location).toBe("main");
+		expect(result.data.specsPath).toBe(path.join(specsDir, result.data.id));
+		expect(existsSync(result.data.specsPath)).toBe(true);
+	});
+
 	it("appends a default (copy) suffix when no title override is given", async () => {
 		const result = await duplicateHandler(null, sourceSpecId);
 		expect(result.data.title).toBe("Original Feature (copy)");

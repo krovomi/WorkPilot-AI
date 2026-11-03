@@ -1451,7 +1451,11 @@ function TaskDetailModalContent({
 										value="files"
 										className="flex-1 min-h-0 overflow-hidden mt-0"
 									>
-										<TaskFiles task={task} />
+										<TaskFiles
+											key={task.id}
+											task={task}
+											projectPath={taskProject?.path ?? activeProject?.path}
+										/>
 									</TabsContent>
 								)}
 
