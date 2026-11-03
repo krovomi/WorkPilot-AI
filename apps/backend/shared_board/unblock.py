@@ -15,6 +15,7 @@ Mounted on the board's router by ``shared_board.api``
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Literal
@@ -29,6 +30,8 @@ from server.services.events import emit_board_event
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from shared_board.review import _SPECS, _within, _workspace
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # A subtask id as planners write them (``subtask-1-2``, ``change-request-…``).
 SUBTASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -107,8 +110,10 @@ async def unblock_subtask(
     for copy in plans[1:]:
         try:
             _apply(copy, subtask_id, body)
-        except HTTPException:
-            pass
+        except HTTPException as exc:
+            # A workspace made before the subtask was added does not hold it:
+            # the card's plan has the answer, the build copies it at start.
+            logger.info("Workspace plan of %s left as it was: %s", card_id, exc.detail)
     emit_board_event(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )
