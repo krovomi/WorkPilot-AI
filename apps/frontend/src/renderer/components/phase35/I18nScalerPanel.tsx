@@ -28,6 +28,8 @@ import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 import { TranslationEditor } from "./i18n-editor/TranslationEditor";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 const LOCALE_PATTERN = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
 const PATH_MAX_LEN = 1024;
 
@@ -178,13 +180,14 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 							{t("i18nScaler.localesDir")}
 						</label>
 						<div className="flex items-center gap-1">
-							<input
+							<Input
+								spellCheck={false}
 								id="locales-dir-input"
 								value={dir}
 								readOnly
 								aria-invalid={Boolean(dirError) || undefined}
 								aria-describedby={dirError ? "dir-error" : undefined}
-								className="w-full rounded border bg-muted/30 p-2 font-mono text-xs"
+								className="w-full p-2 font-mono text-xs h-auto"
 								placeholder={t("i18nScaler.localesDirPlaceholder")}
 								title={dir || undefined}
 							/>
@@ -222,7 +225,7 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 						{usingCustom ? (
 							<div className="space-y-1">
 								<div className="flex items-center gap-1">
-									<input
+									<Input
 										value={customSource}
 										onChange={(e) =>
 											setCustomSource(e.target.value.slice(0, 12))
@@ -232,8 +235,7 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 										aria-invalid={Boolean(sourceError) || undefined}
 										aria-describedby={sourceError ? "source-error" : undefined}
 										placeholder={t("i18nScaler.sourceLocaleCustomPlaceholder")}
-										className="w-full rounded border bg-background p-2 text-sm"
-										// biome-ignore lint/a11y/noAutofocus: field is revealed by a user action, not focused on page load
+										className="w-full p-2 text-sm h-auto"
 										autoFocus
 									/>
 									<Button
@@ -248,13 +250,13 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								</div>
 							</div>
 						) : (
-							<select
+							<NativeSelect
 								id="source-locale-select"
 								value={source}
 								onChange={(e) => handleSourceChange(e.target.value)}
 								aria-invalid={Boolean(sourceError) || undefined}
 								aria-describedby={sourceError ? "source-error" : undefined}
-								className="w-full rounded border bg-background p-2 text-sm"
+								className="w-full p-2 text-sm h-auto"
 							>
 								{COMMON_LOCALES.map((code) => (
 									<option key={code} value={code}>
@@ -264,7 +266,7 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								<option value={CUSTOM_SENTINEL}>
 									{t("i18nScaler.sourceLocaleCustom")}
 								</option>
-							</select>
+							</NativeSelect>
 						)}
 						{sourceError && (
 							<p id="source-error" className="mt-1 text-xs text-destructive">

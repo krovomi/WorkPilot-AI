@@ -13,6 +13,7 @@ import { Textarea } from "../ui/textarea";
 import { appendDictation, appendTranscript, undoDictation } from "./dictation";
 import { captureDictation } from "./dictation-audio";
 
+import { NativeSelect } from "../ui/native-select";
 const languages = [
 	"auto",
 	"fr-FR",
@@ -265,9 +266,9 @@ export function TaskDictation({
 				<label htmlFor={`${id}-language`} className="sr-only">
 					{t("dictation.language")}
 				</label>
-				<select
+				<NativeSelect
 					id={`${id}-language`}
-					className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+					className="px-2 py-1 text-sm h-auto"
 					value={language}
 					disabled={disabled || busy}
 					onChange={(event) => {
@@ -287,7 +288,7 @@ export function TaskDictation({
 							{lang === "auto" ? t("dictation.auto") : names.of(lang)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 				{busy && (
 					<span role="status" className="text-xs text-muted-foreground">
 						{t(`dictation.${phase}`)}

@@ -12,6 +12,7 @@ import { useDomainAgentsStore } from "../../stores/phase35-stores";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { NativeSelect } from "../ui/native-select";
 const ROLES = [
 	{ value: "coder", labelKey: "domainAgents.roleCoder" },
 	{ value: "planner", labelKey: "domainAgents.rolePlanner" },
@@ -71,14 +72,14 @@ export function DomainAgentsPanel() {
 						<label htmlFor="domain-select" className="block text-sm font-medium mb-1">
 							{t("domainAgents.domain")}
 						</label>
-						<select
+						<NativeSelect
 							id="domain-select"
 							value={selected}
 							onChange={(e) => setSelected(e.target.value)}
 							disabled={domains.length === 0}
 							aria-invalid={Boolean(domainError) || undefined}
 							aria-describedby={domainError ? "domain-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm disabled:opacity-50"
+							className="w-full p-2 text-sm disabled:opacity-50 h-auto"
 						>
 							{domains.length === 0 && <option value="">—</option>}
 							{domains.map((d) => (
@@ -86,7 +87,7 @@ export function DomainAgentsPanel() {
 									{d.label}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 						{domainError && (
 							<p id="domain-error" className="mt-1 text-xs text-destructive">
 								{domainError}
@@ -97,18 +98,18 @@ export function DomainAgentsPanel() {
 						<label htmlFor="role-select" className="block text-sm font-medium mb-1">
 							{t("domainAgents.role")}
 						</label>
-						<select
+						<NativeSelect
 							id="role-select"
 							value={role}
 							onChange={(e) => setRole(e.target.value as Role)}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						>
 							{ROLES.map((r) => (
 								<option key={r.value} value={r.value}>
 									{t(r.labelKey as never)}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
 				</div>
 
