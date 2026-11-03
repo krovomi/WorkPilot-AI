@@ -435,6 +435,12 @@
 			"qaPass": "QA review — pass #{{n}}",
 			"thinking": "Processing in progress"
 		},
+		"split": {
+			"legend": "Time spent per phase",
+			"share": "{{share}}%",
+			"segment": "{{phase}}: {{share}}%",
+			"segmentWithDuration": "{{phase}}: {{share}}% of the time ({{duration}})"
+		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",
