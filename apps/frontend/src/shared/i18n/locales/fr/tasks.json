@@ -480,7 +480,6 @@
 	"files": {
 		"title": "Fichiers",
 		"tab": "Fichiers",
-		"noSpecPath": "Aucun fichier de spécification disponible",
 		"noFiles": "Aucun fichier trouvé",
 		"loading": "Chargement des fichiers...",
 		"loadingContent": "Chargement du contenu...",
@@ -488,7 +487,21 @@
 		"errorLoadingContent": "Échec du chargement du contenu du fichier",
 		"retry": "Réessayer",
 		"selectFile": "Sélectionnez un fichier pour voir son contenu",
-		"openInIDE": "Ouvrir dans l'IDE"
+		"openInIDE": "Ouvrir dans l'IDE",
+		"taskChanges": "Créés ou modifiés par la tâche",
+		"noTaskChanges": "La tâche n'a créé ni modifié aucun fichier",
+		"fromSubtasks": "D'après les fichiers enregistrés par les sous-tâches",
+		"errorLoadingChanges": "Impossible de lister les fichiers de la tâche",
+		"specSection": "Spécification",
+		"emptyFile": "Fichier vide",
+		"refresh": "Actualiser",
+		"status": {
+			"added": "Créé",
+			"modified": "Modifié",
+			"deleted": "Supprimé",
+			"renamed": "Renommé",
+			"unknown": "Touché par une sous-tâche"
+		}
 	},
 	"visualProof": {
 		"apiSmoke": {
