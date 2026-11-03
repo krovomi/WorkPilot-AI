@@ -219,3 +219,29 @@ export async function reviewServerCard(
 	if (!sent.ok) return { success: false, error: sent.error };
 	return startRun(card, "build");
 }
+
+/**
+ * Answer a blocked subtask of a server card. The server applies it to the
+ * card's plans (`shared_board/unblock.py`); a retry or a reply then starts a
+ * `build` run, as a request for changes does.
+ */
+export async function unblockServerSubtask(
+	card: ServerCard,
+	subtaskId: string,
+	action: string,
+	reply?: string,
+): Promise<IPCResult<{ restarted: boolean }>> {
+	const sent = await authedFetch<{ restart?: boolean }>(
+		cardUrl(card, `subtasks/${encodeURIComponent(subtaskId)}/unblock`),
+		"POST",
+		{ action, reply: reply ?? "" },
+	);
+	if (!sent.ok) return { success: false, error: sent.error };
+	if (sent.data?.restart !== true) {
+		return { success: true, data: { restarted: false } };
+	}
+	const run = await startRun(card, "build");
+	return run.success
+		? { success: true, data: { restarted: true } }
+		: { success: false, error: run.error };
+}

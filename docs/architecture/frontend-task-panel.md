@@ -63,6 +63,22 @@ lus dans le projet. Le dossier de spécification (`.md`, `.json`) vient
 dessous. Une tâche créée ou dupliquée depuis le tableau porte son `specsPath`
 dès sa création, comme une tâche chargée du disque.
 
+L'onglet **Sous-tâches** (`TaskSubtasks.tsx`) place sous chaque sous-tâche
+bloquée ou échouée ce qu'elle attend de la personne (`BlockedSubtaskHelp.tsx`) :
+la raison (`blocked_reason`, ou `_blocked_reason` d'un ancien prompt), un conseil
+selon `blocked_kind` (`needs_human`, `manual_verification`, `max_attempts`,
+`file_validation`, `tool_concurrency`, `agent`) et quatre réponses : « C'est
+fait » et « Pas nécessaire » la terminent (`human_resolution`), « Réessayer » et
+« Répondre à l'agent » la rendent à l'agent (`unblocked_at`, `human_reply`) et
+relancent le build par le même chemin que Démarrer, jamais pendant qu'il tourne.
+Les règles sont celles de `foundation/subtask_unblock.py`, appliquées à une
+tâche locale par le main (`TASK_UNBLOCK_SUBTASK`,
+`task/subtask-unblock-handlers.ts`, logique dans `shared/utils/subtask-unblock.ts`)
+et à une carte du serveur par sa route (`shared_board/unblock.py`). Le codeur
+remet à zéro le compte de tentatives d'une sous-tâche renvoyée, exécute une
+vérification `manual` au lieu de la sauter, et met la réponse dans son prompt
+(`agents/manual_verification.py`, `prompts_pkg/prompt_generator.py`).
+
 **Les trois panneaux restent montés**, seuls les inactifs sont `hidden` : une
 carte charge ses données une fois, chaque onglet sait ce qu'il montre, et la
 bannière ci-dessous peut amener à une carte de n'importe quel onglet. Les onglets

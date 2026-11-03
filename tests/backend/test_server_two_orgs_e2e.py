@@ -595,6 +595,7 @@ def _path_values(
         "kind": "i18n",
         "name": "roadmap.json",
         "rule_id": "r-000000000001",
+        "subtask_id": "subtask-1",
     }
 
 

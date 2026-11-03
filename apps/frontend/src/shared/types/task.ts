@@ -2,6 +2,7 @@
  * Task-related types
  */
 
+import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
 import type {
 	CompletablePhase,
 	ExecutionPhase as ExecutionPhaseType,
@@ -102,6 +103,12 @@ export interface Subtask {
 	 * subtask reads as "needs attention" rather than a silent gray state.
 	 */
 	blockedReason?: string;
+	/** Why, from a closed list, so the panel can say what to do. */
+	blockedKind?: BlockedKind;
+	/** What the person answered when they sent it back to the agent. */
+	humanReply?: string;
+	/** Set when the person marked it done or not needed themselves. */
+	humanResolution?: HumanResolution;
 	verification?: {
 		type: "command" | "browser";
 		run?: string;
@@ -738,6 +745,14 @@ export interface PlanSubtask {
 	files_to_create?: string[];
 	/** Backend-emitted reason a subtask was marked "blocked". */
 	blocked_reason?: string;
+	/** Reason written by agents told by an older prompt. */
+	_blocked_reason?: string;
+	/** Why it is blocked (`BLOCKED_KINDS`, shared/utils/subtask-unblock.ts). */
+	blocked_kind?: string;
+	/** The person's reply from the subtask panel, read by the coder. */
+	human_reply?: string;
+	/** The person marked it done or not needed (`complete` / `skip`). */
+	human_resolution?: { action: string; at: string; reason?: string };
 	verification?: {
 		type: string;
 		run?: string;

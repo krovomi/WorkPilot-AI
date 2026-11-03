@@ -915,8 +915,6 @@
 		"blockedCount_other": "{{count}} blocked",
 		"failedCount_one": "{{count}} failed",
 		"failedCount_other": "{{count}} failed",
-		"blockedReason": "Blocked: {{reason}}",
-		"blockedGeneric": "Blocked — needs manual attention",
 		"changeRequest": "Change requested",
 		"requestedAt": "Requested on {{date}}",
 		"filesViewer": {
@@ -946,6 +944,64 @@
 				"modified": "Modified",
 				"deleted": "Deleted",
 				"renamed": "Renamed"
+			}
+		},
+		"unblock": {
+			"regionLabel": "What this subtask needs from you",
+			"title": {
+				"needs_human": "The agent needs you to finish this subtask",
+				"manual_verification": "This check needs you",
+				"max_attempts": "The agent gave up after several attempts",
+				"file_validation": "The agent could not find the files to change",
+				"tool_concurrency": "The agent kept hitting a tool limit",
+				"agent": "The agent stopped on this subtask",
+				"failed": "This subtask failed"
+			},
+			"why": "Why: {{reason}}",
+			"noReason": "The agent did not say why.",
+			"manualReason": "the subtask asks for a manual check and the agent made no change.",
+			"hint": {
+				"needs_human": "Do what it asks, then click « It's done ». Or reply with what it needs and it tries again.",
+				"manual_verification": "Check it yourself, then click « It's done ». Or click « Try again » and the agent runs the check itself.",
+				"max_attempts": "Reply with a hint (a file, a command, an approach) and the agent tries again from scratch.",
+				"file_validation": "Reply with the right file paths and the agent tries again.",
+				"tool_concurrency": "Click « Try again »: the agent starts this subtask over.",
+				"agent": "Mark it done if it is, reply with what the agent needs, or let it try again.",
+				"failed": "Reply with a hint and the agent tries again, or mark it done if it is."
+			},
+			"lastReply": "Your last reply: {{reply}}",
+			"actions": {
+				"complete": "It's done",
+				"retry": "Try again",
+				"answer": "Reply to the agent",
+				"skip": "Not needed"
+			},
+			"replyLabel": "Your reply to the agent",
+			"replyPlaceholder": "What should the agent know or do? E.g. the file is at src/test.txt, run the tests with dotnet test…",
+			"sendReply": "Send and try again",
+			"cancel": "Cancel",
+			"done": {
+				"complete": "Subtask marked as done",
+				"skip": "Subtask marked as not needed",
+				"retry": "The agent tries this subtask again",
+				"answer": "Reply sent: the agent tries again"
+			},
+			"restarted": "The task has restarted.",
+			"resolved": {
+				"complete": "Marked as done by you",
+				"skip": "Marked as not needed by you"
+			},
+			"errorTitle": "Could not unblock the subtask",
+			"errors": {
+				"invalid_action": "This action is not available.",
+				"reply_required": "Write a reply first.",
+				"reply_too_long": "The reply is too long (4,000 characters at most).",
+				"subtask_not_found": "This subtask is no longer in the plan. Refresh the board.",
+				"not_blocked": "This subtask is no longer blocked.",
+				"task_running": "The task is running. Stop it first, then try again.",
+				"task_not_found": "Task not found.",
+				"plan_unreadable": "The task's plan could not be read.",
+				"generic": "Something went wrong. See the logs for details."
 			}
 		}
 	},

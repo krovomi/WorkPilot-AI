@@ -257,6 +257,60 @@ not `git add apps/frontend/src/file.ts`. Prefer staying at the working directory
     return "".join(sections)
 
 
+def _manual_verification_section(verification: dict) -> str:
+    """The verification step of a ``manual`` (or unknown) verification.
+
+    The agent runs the check itself whenever its tools can (read a file, run a
+    command or the tests, in any language or stack). Only a check that needs a
+    person (a device, an account, a judgement on a screen it cannot open)
+    blocks the subtask, with a reason the person can act on: the subtask panel
+    shows it next to the buttons that unblock it.
+    """
+    instructions = (
+        verification.get("instructions")
+        or verification.get("run")
+        or verification.get("scenario")
+        or "Check that the subtask's description is met."
+    )
+    return f"""**Verification:** {instructions}
+
+1. Run this check yourself with your tools whenever you can: read the files,
+   run the command, the build or the tests. Most checks can be run this way.
+2. When it passes, set this subtask's status to "completed" in
+   implementation_plan.json. When it fails, fix the cause, then check again.
+3. Only when the check truly needs a person (a physical device, an account or
+   credentials you do not have, a judgement on a screen you cannot open), set
+   the status to "blocked" and add `"blocked_reason"`: one or two sentences,
+   for that person, saying exactly what to check or provide. Never block a
+   check you could run, and never ask a question and wait: the build goes on.
+"""
+
+
+def _human_reply_section(subtask: dict) -> str:
+    """What the person answered when they sent this subtask back, if anything.
+
+    The reply comes from the subtask panel (``foundation.subtask_unblock``):
+    the person who owns the task wrote it, so it is an instruction, unlike
+    the content of the repository.
+    """
+    reply = subtask.get("human_reply")
+    if not isinstance(reply, str) or not reply.strip():
+        if subtask.get("unblocked_at"):
+            return (
+                "## Sent back by the person\n\nThis subtask was blocked; the "
+                "person asked you to try again. Use a different approach.\n"
+            )
+        return ""
+    return f"""## Reply from the person
+
+This subtask was blocked. The person answered, and sent it back to you:
+
+> {reply.strip().replace(chr(10), chr(10) + "> ")}
+
+Follow this answer. It overrides the earlier reason for the block.
+"""
+
+
 def generate_subtask_prompt(
     spec_dir: Path,
     project_dir: Path,
@@ -335,6 +389,10 @@ You MUST use a DIFFERENT approach than previous attempts.
                 sections.append(f"- {hint}")
             sections.append("")
 
+    reply = _human_reply_section(subtask)
+    if reply:
+        sections.append(reply)
+
     # Files section
     sections.append("## Files\n")
 
@@ -410,30 +468,13 @@ Verify:""")
         for i, step in enumerate(steps, 1):
             sections.append(f"{i}. {step}")
         sections.append("")
+    elif v_type == "none":
+        sections.append(
+            "No separate verification step: once the work in the description is "
+            "done, mark the subtask completed.\n"
+        )
     else:
-        instructions = verification.get("instructions", "Manual verification required")
-        sections.append(f"**Manual Verification (Autonomous Mode):**\n{instructions}\n")
-        sections.append("""
-🚫 **CRITICAL - YOU MUST FOLLOW THESE STEPS EXACTLY:**
-
-This subtask requires MANUAL TESTING. You CANNOT automate it.
-
-**YOUR EXACT ACTIONS (in this order, NO EXCEPTIONS):**
-1. Set this subtask's status to "blocked" in implementation_plan.json
-2. Add "_blocked_reason": "Manual testing required - awaiting QA team" to the subtask
-3. DO NOT ask any questions to the user
-4. DO NOT wait for confirmation
-5. Simply update the file and complete
-
-**YOU MUST NOT:**
-- Ask "should I mark this as blocked?"
-- Request user input or confirmation
-- Leave the status as pending or in_progress
-- Wait for user response
-
-The build system will automatically continue to the next subtask.
-This is not optional - it's a requirement for autonomous operation.
-""")
+        sections.append(_manual_verification_section(verification))
 
     # Instructions — TDD cycle when strict TDD applies, classic flow otherwise
     if tdd_active:

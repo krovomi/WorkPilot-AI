@@ -99,6 +99,13 @@ export interface TaskAPI {
 	) => Promise<IPCResult>;
 	resetTaskConversation: (taskId: string) => Promise<IPCResult>;
 	resetTask: (taskId: string) => Promise<IPCResult<Task>>;
+	/** Answer a blocked subtask (done, not needed, retry, reply). */
+	unblockSubtask: (
+		taskId: string,
+		subtaskId: string,
+		action: import("../../shared/utils/subtask-unblock").UnblockAction,
+		reply?: string,
+	) => Promise<IPCResult<{ restarted: boolean }>>;
 	rerunPhase: (
 		taskId: string,
 		phase: "planning" | "coding" | "validation",
@@ -496,6 +503,20 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	resetTask: (taskId: string): Promise<IPCResult<Task>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_RESET, taskId),
+
+	unblockSubtask: (
+		taskId: string,
+		subtaskId: string,
+		action: import("../../shared/utils/subtask-unblock").UnblockAction,
+		reply?: string,
+	): Promise<IPCResult<{ restarted: boolean }>> =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.TASK_UNBLOCK_SUBTASK,
+			taskId,
+			subtaskId,
+			action,
+			reply,
+		),
 
 	rerunPhase: (
 		taskId: string,

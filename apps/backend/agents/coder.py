@@ -31,7 +31,6 @@ from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
 from foundation.build_signals import BuildHalted, BuildPaused
 from foundation.pause_state import is_paused, read_pause_state
-from qa.criteria import save_implementation_plan
 
 try:
     from core.usage_tracker import (
@@ -87,7 +86,6 @@ from prompts_pkg.prompts import (
 from security.constants import PROJECT_DIR_ENV_VAR
 from services.recovery import RecoveryManager
 from task_logger import (
-    LogEntryType,
     LogPhase,
     get_task_logger,
 )
@@ -120,6 +118,7 @@ from .base import (
     RESUME_FILE,
     sanitize_error_message,
 )
+from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
 from .session import (
     is_prompt_too_long_error,
@@ -863,6 +862,7 @@ async def _on_concurrency_error(
             scope.recovery_manager.mark_subtask_stuck(
                 scope.subtask_id,
                 f"Tool concurrency errors after {retry.concurrency_errors} retries",
+                kind="tool_concurrency",
             )
             print_status(f"Subtask {scope.subtask_id} marked as STUCK", "error")
 
@@ -2486,6 +2486,8 @@ async def run_autonomous_agent(
                     print("No pending subtasks found - build may be complete!")
                     break
 
+            # A subtask a person sent back starts its attempt count over.
+            take_human_unblock(spec_dir, subtask_id, recovery_manager)
             # Validate that all files_to_modify exist before attempting execution
             # This prevents infinite retry loops when implementation plan references non-existent files
             validation_result = validate_subtask_files(next_subtask, project_dir)
@@ -2521,6 +2523,7 @@ async def run_autonomous_agent(
                     recovery_manager.mark_subtask_stuck(
                         subtask_id,
                         f"File validation failed after {attempt_count} attempts: {error_msg}",
+                        kind="file_validation",
                     )
                     print_status(
                         f"Subtask {subtask_id} marked as STUCK after {attempt_count} failed validation attempts",
@@ -2539,50 +2542,11 @@ async def run_autonomous_agent(
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
                 continue  # Skip to next iteration
 
-            # PRE-CHECK: If this is a manual verification task, skip the coder session
-            # and mark it as completed to remove from queue
-            verification = next_subtask.get("verification", {})
-            if verification.get("type") == "manual":
-                print()
-                print_status(
-                    f"Subtask {subtask_id} requires manual verification",
-                    "warning",
-                )
-                print(
-                    muted(
-                        "Skipping coder session - marking as completed for human review"
-                    )
-                )
-
-                # Mark as completed (not blocked) so it's removed from queue
-                # This prevents infinite waiting since no automated testing can run
-                plan = load_implementation_plan(spec_dir)
-                if plan:
-                    subtask = find_subtask_in_plan(plan, subtask_id)
-                    if subtask:
-                        subtask["status"] = "completed"
-                        # Add metadata that this requires manual review
-                        subtask["_manual_review_required"] = True
-
-                        try:
-                            save_implementation_plan(spec_dir, plan)
-                            print_status(
-                                f"✓ Subtask {subtask_id} marked as COMPLETED (manual review needed)",
-                                "warning",
-                            )
-
-                            # Log the decision
-                            if task_logger:
-                                task_logger.log(
-                                    f"Subtask {subtask_id}: Manual verification task - marked completed for human review",
-                                    LogEntryType.TEXT,
-                                    LogPhase.CODING,
-                                )
-                        except Exception as e:
-                            logger.error(f"Failed to mark as completed: {e}")
-                            print(f"  ✗ Warning: Could not mark as completed: {e}")
-
-                # Continue to next subtask without launching coder
+            # A manual check no session can run is completed for the human
+            # review, unless a person sent it back from the panel.
+            if skip_manual_verification(
+                spec_dir, subtask_id, next_subtask, task_logger
+            ):
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
                 continue
 
@@ -2715,8 +2679,8 @@ async def run_autonomous_agent(
                 # The agent asked whether to block the manual testing subtask.
                 # Automatically answer: Yes, mark it as blocked and continue.
                 auto_answer = (
-                    "Yes, please mark this subtask as 'blocked' and continue to the next subtask. "
-                    "The manual testing requires a human tester with Visual Studio access."
+                    "If you can run the check yourself, run it and mark the subtask completed. If only "
+                    "a person can, set it 'blocked' with a blocked_reason saying what they must do."
                 )
 
                 # Send the auto-answer as a new session

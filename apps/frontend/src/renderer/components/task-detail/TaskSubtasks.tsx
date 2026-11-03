@@ -25,6 +25,7 @@ import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskCodeEditor } from "./TaskCodeEditor";
 import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
+import { BlockedSubtaskHelp, HumanResolutionNote } from "./BlockedSubtaskHelp";
 import { formatAppDateTime } from "@/lib/date-format";
 
 import { Input } from "../ui/input";
@@ -397,12 +398,12 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 				) : (
 					// View mode
 					task.subtasks.map((subtask, index) => (
-							// The card holds its own action buttons, so it cannot be a
-							// <button>; role + tabIndex + key handling give keyboard
-							// users the same access as the click.
-							// biome-ignore lint/a11y/useSemanticElements: card holds its own action buttons; a <button> cannot nest one
+						<div key={subtask.id} className="space-y-1.5">
+							{/* The card holds its own action buttons, so it cannot be a
+							<button>; role + tabIndex + key handling give keyboard
+							users the same access as the click. */}
+							{/* biome-ignore lint/a11y/useSemanticElements: card holds its own action buttons; a <button> cannot nest one */}
 							<div
-								key={subtask.id}
 								role="button"
 								tabIndex={0}
 								onClick={() => {
@@ -487,18 +488,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 													})}
 												</p>
 											)}
-										{subtask.status === "blocked" && (
-											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-warning/10 px-2 py-1 text-2xs text-warning ">
-												<AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-												<span>
-													{subtask.blockedReason
-														? t("tasks:subtasks.blockedReason", {
-																reason: subtask.blockedReason,
-															})
-														: t("tasks:subtasks.blockedGeneric")}
-												</span>
-											</div>
-										)}
+										<HumanResolutionNote subtask={subtask} />
 										{subtask.files && subtask.files.length > 0 && (
 											<div className="flex flex-wrap gap-1 items-center">
 												{subtask.files.slice(0, 2).map((file: string) => (
@@ -550,6 +540,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 									</div>
 								</div>
 							</div>
+							{(subtask.status === "blocked" || subtask.status === "failed") && (
+								<BlockedSubtaskHelp taskId={task.id} subtask={subtask} />
+							)}
+						</div>
 						))
 				)}
 			</div>
