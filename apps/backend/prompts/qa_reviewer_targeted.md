@@ -46,18 +46,18 @@ Changed files: {{FILES}}
 
 {{TEST_MAP}}
 
-Run every test file above, by its path, with the project's own runner (read
-`package.json` scripts, `pyproject.toml` / `pytest.ini`, or `project_index.json`
-for the right command and working directory), **with coverage of the touched
-source files**. For example:
+Run every test file above with the project's own runner (read its manifest
+for the right command and working directory: `package.json` scripts,
+`pyproject.toml`, the `.csproj`/`.sln`, `pom.xml`/`build.gradle(.kts)`,
+`go.mod`, `Cargo.toml`, `composer.json`, `Package.swift`, `pubspec.yaml`,
+`Gemfile`, `mix.exs`, `CMakeLists.txt`, or `project_index.json`), **with
+coverage of the touched source files**. Name each test in the command: by its
+path, or, where the runner selects by class, package or target, by its class
+name or its directory. A source listed as its own test holds its tests in the
+same file (a Rust `#[cfg(test)]` module). For example:
 
 ```bash
-# Python (pytest-cov): one --cov per touched source directory or module
-pytest {{PY_TESTS}} --cov=<touched module or directory> --cov-branch --cov-report=term-missing
-# Vitest
-npx vitest run {{TS_TESTS}} --coverage --coverage.include=<touched file>
-# Jest
-npx jest {{TS_TESTS}} --coverage --collectCoverageFrom=<touched file>
+{{RUN_EXAMPLES}}
 ```
 
 - A listed test that fails, does not run, or cannot be found is a **critical**
