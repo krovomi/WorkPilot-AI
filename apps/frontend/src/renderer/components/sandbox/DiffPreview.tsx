@@ -16,9 +16,9 @@ const CHANGE_ICON: Record<string, string> = {
 };
 
 const CHANGE_COLORS: Record<string, string> = {
-	added: "text-green-400",
+	added: "text-success",
 	modified: "text-blue-400",
-	deleted: "text-red-400",
+	deleted: "text-destructive",
 	renamed: "text-purple-400",
 };
 
@@ -50,9 +50,9 @@ export function DiffPreview({
 						{t("sandbox:diffPreview.filesChanged", { count: diffs.length })}
 					</p>
 					<p className="text-xs">
-						<span className="text-green-400">+{totalAdditions}</span>
+						<span className="text-success">+{totalAdditions}</span>
 						{" / "}
-						<span className="text-red-400">-{totalDeletions}</span>
+						<span className="text-destructive">-{totalDeletions}</span>
 					</p>
 				</div>
 				{diffs.map((diff) => (
@@ -74,10 +74,10 @@ export function DiffPreview({
 						<span className="truncate font-mono">
 							{diff.filePath.split("/").pop()}
 						</span>
-						<span className="ml-auto text-green-400">
+						<span className="ml-auto text-success">
 							+{diff.additions}
 						</span>
-						<span className="text-red-400">-{diff.deletions}</span>
+						<span className="text-destructive">-{diff.deletions}</span>
 					</button>
 				))}
 			</div>
@@ -110,9 +110,9 @@ export function DiffPreview({
 										{hunk.content.split("\n").map((line) => {
 											let lineClass: string;
 											if (line.startsWith("+")) {
-												lineClass = "bg-green-500/10 text-green-300";
+												lineClass = "bg-success/10 text-success";
 											} else if (line.startsWith("-")) {
-												lineClass = "bg-red-500/10 text-red-300";
+												lineClass = "bg-destructive/10 text-destructive";
 											} else {
 												lineClass = "text-muted-foreground";
 											}

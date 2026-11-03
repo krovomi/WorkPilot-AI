@@ -38,11 +38,11 @@ export function FeatureDetailPanel({
 	const getSeverityColorClass = (severity: string) => {
 		switch (severity) {
 			case "high":
-				return "text-red-500 border-red-500/50";
+				return "text-destructive border-destructive/50";
 			case "medium":
-				return "text-yellow-500 border-yellow-500/50";
+				return "text-warning border-warning/50";
 			default:
-				return "text-green-500 border-green-500/50";
+				return "text-success border-success/50";
 		}
 	};
 

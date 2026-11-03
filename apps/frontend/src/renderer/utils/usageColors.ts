@@ -13,15 +13,15 @@ import {
  */
 export function getColorClass(percent: number): string {
 	if (percent >= THRESHOLD_CRITICAL) {
-		return "text-red-500";
+		return "text-destructive";
 	}
 	if (percent >= THRESHOLD_WARNING) {
 		return "text-orange-500";
 	}
 	if (percent >= THRESHOLD_ELEVATED) {
-		return "text-yellow-500";
+		return "text-warning";
 	}
-	return "text-green-500";
+	return "text-success";
 }
 
 /**
@@ -45,15 +45,15 @@ export function getGradientClass(percent: number): string {
  */
 export function getUsageBgColorClass(percent: number): string {
 	if (percent >= THRESHOLD_CRITICAL) {
-		return "bg-red-500/10";
+		return "bg-destructive/10";
 	}
 	if (percent >= THRESHOLD_WARNING) {
 		return "bg-orange-500/10";
 	}
 	if (percent >= THRESHOLD_ELEVATED) {
-		return "bg-yellow-500/10";
+		return "bg-warning/10";
 	}
-	return "bg-green-500/10";
+	return "bg-success/10";
 }
 
 /**
@@ -61,15 +61,15 @@ export function getUsageBgColorClass(percent: number): string {
  */
 export function getUsageBorderColorClass(percent: number): string {
 	if (percent >= THRESHOLD_CRITICAL) {
-		return "border-red-500/20";
+		return "border-destructive/20";
 	}
 	if (percent >= THRESHOLD_WARNING) {
 		return "border-orange-500/20";
 	}
 	if (percent >= THRESHOLD_ELEVATED) {
-		return "border-yellow-500/20";
+		return "border-warning/20";
 	}
-	return "border-green-500/20";
+	return "border-success/20";
 }
 
 /**
@@ -85,20 +85,20 @@ export function getUsageTextColorClass(percent: number): string {
  */
 export function getBadgeColorClasses(percent: number): string {
 	if (percent >= THRESHOLD_CRITICAL)
-		return "text-red-500 bg-red-500/10 border-red-500/20";
+		return "text-destructive bg-destructive/10 border-destructive/20";
 	if (percent >= THRESHOLD_WARNING)
 		return "text-orange-500 bg-orange-500/10 border-orange-500/20";
 	if (percent >= THRESHOLD_ELEVATED)
-		return "text-yellow-500 bg-yellow-500/10 border-yellow-500/20";
-	return "text-green-500 bg-green-500/10 border-green-500/20";
+		return "text-warning bg-warning/10 border-warning/20";
+	return "text-success bg-success/10 border-success/20";
 }
 
 /**
  * Get background class for small usage bars based on usage percentage
  */
 export function getBarColorClass(percent: number): string {
-	if (percent >= THRESHOLD_CRITICAL) return "bg-red-500";
+	if (percent >= THRESHOLD_CRITICAL) return "bg-destructive";
 	if (percent >= THRESHOLD_WARNING) return "bg-orange-500";
-	if (percent >= THRESHOLD_ELEVATED) return "bg-yellow-500";
-	return "bg-green-500";
+	if (percent >= THRESHOLD_ELEVATED) return "bg-warning";
+	return "bg-success";
 }

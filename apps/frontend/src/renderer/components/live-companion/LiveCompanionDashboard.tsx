@@ -21,9 +21,9 @@ import { Radio } from "lucide-react";
 import { PageHeader } from "../ui/page-header";
 
 const PRIORITY_COLORS: Record<SuggestionPriority, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 	info: "text-muted-foreground bg-card border-border",
 };
@@ -83,7 +83,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 						<span
 							className={`text-xs px-2 py-1 rounded border font-medium ${
 								companionState.active
-									? "text-green-400 bg-green-500/10 border-green-500/20"
+									? "text-success bg-success/10 border-success/20"
 									: "text-muted-foreground bg-card border-border"
 							}`}
 						>
@@ -97,7 +97,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 							disabled={isLoading || (!companionState.active && !projectPath)}
 							className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 								companionState.active
-									? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+									? "bg-destructive/20 text-destructive hover:bg-destructive/30"
 									: "bg-[var(--accent)] text-white hover:opacity-90"
 							}`}
 						>
@@ -256,7 +256,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 											<button
 												type="button"
 												onClick={() => acceptTakeover(proposal.proposal_id)}
-												className="px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors text-xs font-medium"
+												className="px-3 py-1.5 rounded-lg bg-success/20 text-success hover:bg-success/30 transition-colors text-xs font-medium"
 											>
 												{t("liveCompanion:takeover.accept")}
 											</button>

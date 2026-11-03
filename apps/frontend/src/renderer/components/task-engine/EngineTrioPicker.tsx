@@ -255,7 +255,7 @@ export function EngineTrioPicker({
 					className={cn(
 						"flex items-start gap-1.5 text-xs",
 						note.kind === "notApplied"
-							? "text-amber-600 dark:text-amber-400"
+							? "text-warning "
 							: "text-muted-foreground",
 					)}
 				>
@@ -273,7 +273,7 @@ export function EngineTrioPicker({
 			)}
 
 			{!configured && providers.length > 0 && (
-				<p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+				<p className="flex items-start gap-1.5 text-xs text-warning ">
 					<AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
 					<span>
 						{t("tasks:engine.notConfiguredWarning", {

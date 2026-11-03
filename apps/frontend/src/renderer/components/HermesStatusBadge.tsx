@@ -91,8 +91,8 @@ export function HermesStatusBadge({
 
 	const statusColor = {
 		loading: "bg-muted-foreground",
-		ready: "bg-green-500",
-		degraded: "bg-amber-500",
+		ready: "bg-success",
+		degraded: "bg-warning",
 		absent: "bg-destructive",
 		error: "bg-destructive",
 	}[state];

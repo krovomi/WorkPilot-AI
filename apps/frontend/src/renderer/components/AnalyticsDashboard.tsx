@@ -128,8 +128,8 @@ function BreakdownList({
 	const colors = [
 		"bg-primary",
 		"bg-blue-500",
-		"bg-emerald-500",
-		"bg-amber-500",
+		"bg-success",
+		"bg-warning",
 		"bg-purple-500",
 		"bg-pink-500",
 	];
@@ -179,11 +179,11 @@ function StatusBar({ data }: { readonly data: Record<string, number> }) {
 	}
 
 	const statusColors: Record<string, string> = {
-		completed: "bg-emerald-500",
-		complete: "bg-emerald-500",
+		completed: "bg-success",
+		complete: "bg-success",
 		in_progress: "bg-blue-500",
-		pending: "bg-amber-500",
-		failed: "bg-red-500",
+		pending: "bg-warning",
+		failed: "bg-destructive",
 		cancelled: "bg-gray-400",
 	};
 
@@ -268,11 +268,11 @@ function getTokensByProviderContent(
 
 function getTrendColor(trendPct: number): string {
 	if (trendPct > 20) {
-		return "text-red-500";
+		return "text-destructive";
 	} else if (trendPct > 0) {
-		return "text-amber-500";
+		return "text-warning";
 	} else {
-		return "text-emerald-500";
+		return "text-success";
 	}
 }
 
@@ -416,7 +416,7 @@ export function AnalyticsDashboard({
 						title={t("kpis.successRate.title")}
 						value={`${successRate.toFixed(1)}%`}
 						subtitle={t("kpis.successRate.description")}
-						icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+						icon={<CheckCircle2 className="h-5 w-5 text-success" />}
 					/>
 					<KpiCard
 						title={t("kpis.totalTokens.title")}
@@ -490,7 +490,7 @@ export function AnalyticsDashboard({
 												</div>
 												<div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
 													<div
-														className="h-full rounded-full bg-emerald-500 transition-all"
+														className="h-full rounded-full bg-success transition-all"
 														style={{
 															width: `${Math.min(sn.qa_first_pass_rate, 100)}%`,
 														}}

@@ -9,9 +9,9 @@ import type {
 } from "../../../shared/types/regression-guardian";
 
 const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	error: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	warning: "text-warning bg-warning/10 border-warning/20",
 	info: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -53,14 +53,14 @@ function IncidentRow({
 	let actionContent: React.ReactNode;
 	if (isDuplicate) {
 		actionContent = (
-			<span className="text-xs text-yellow-400">{t("duplicate")}</span>
+			<span className="text-xs text-warning">{t("duplicate")}</span>
 		);
 	} else if (hasTest) {
 		actionContent = (
 			<button
 				type="button"
 				onClick={onView}
-				className="px-3 py-1 text-xs rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+				className="px-3 py-1 text-xs rounded bg-success/20 text-success hover:bg-success/30 transition-colors"
 			>
 				{t("viewTest")}
 			</button>
@@ -132,7 +132,7 @@ export function RegressionGuardianDashboard({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -162,7 +162,7 @@ export function RegressionGuardianDashboard({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{error}</p>
+				<p className="text-sm text-destructive">{error}</p>
 			)}
 
 			{phase === "complete" && results.length === 0 && (
@@ -184,12 +184,12 @@ export function RegressionGuardianDashboard({
 						<StatCard
 							label={t("stats.testsGenerated")}
 							value={generated.length}
-							color="text-green-400"
+							color="text-success"
 						/>
 						<StatCard
 							label={t("stats.duplicatesSkipped")}
 							value={duplicates.length}
-							color="text-yellow-400"
+							color="text-warning"
 						/>
 					</div>
 

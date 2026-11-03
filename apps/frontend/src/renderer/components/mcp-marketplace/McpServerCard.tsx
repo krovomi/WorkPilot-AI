@@ -263,7 +263,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 						<div className="text-xs text-muted-foreground mb-3 space-y-2">
 							<p>{localized(server.description, language)}</p>
 							{server.requires && (
-								<p className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+								<p className="flex items-center gap-1 text-warning ">
 									<Info className="h-3 w-3 shrink-0" />
 									{t(`mcpMarketplace.requires.${server.requires}`)}
 								</p>
@@ -369,7 +369,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 
 					<div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
 						{server.requires && (
-							<p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+							<p className="flex items-center gap-1.5 text-xs text-warning ">
 								<Info className="h-3.5 w-3.5 shrink-0" />
 								{t(`mcpMarketplace.requires.${server.requires}`)}
 							</p>

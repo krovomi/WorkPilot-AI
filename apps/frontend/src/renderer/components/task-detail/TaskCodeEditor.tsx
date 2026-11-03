@@ -114,9 +114,9 @@ function FileTreeNode({
 							<ChevronRight className="h-3.5 w-3.5 shrink-0" />
 						)}
 						{expanded ? (
-							<FolderOpen className="h-4 w-4 shrink-0 text-amber-400" />
+							<FolderOpen className="h-4 w-4 shrink-0 text-warning" />
 						) : (
-							<Folder className="h-4 w-4 shrink-0 text-amber-400" />
+							<Folder className="h-4 w-4 shrink-0 text-warning" />
 						)}
 						<span className="text-sm font-medium truncate">{node.name}</span>
 					</div>

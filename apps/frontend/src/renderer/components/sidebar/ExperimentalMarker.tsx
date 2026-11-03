@@ -24,7 +24,7 @@ export function ExperimentalMarker({ size = "md" }: { size?: "md" | "sm" }) {
 			title={label}
 			data-testid="experimental-marker"
 			className={cn(
-				"absolute flex items-center justify-center rounded-full p-px text-amber-500",
+				"absolute flex items-center justify-center rounded-full p-px text-warning",
 				// The ring matches what sits behind: the sidebar, or the rail's popover.
 				size === "md" ? "-bottom-1.5 -right-1.5 bg-sidebar" : "-bottom-1 -right-1 bg-popover",
 			)}
@@ -76,11 +76,11 @@ export function BetaBanner() {
 		<div
 			role="note"
 			data-testid="beta-banner"
-			className="flex shrink-0 items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs"
+			className="flex shrink-0 items-start gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs"
 		>
-			<FlaskConical aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+			<FlaskConical aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
 			<p>
-				<span className="font-semibold text-amber-500">{t("navigation:experimental.bannerTitle")}</span>
+				<span className="font-semibold text-warning">{t("navigation:experimental.bannerTitle")}</span>
 				<span className="text-muted-foreground"> · {t("navigation:experimental.bannerBody")}</span>
 			</p>
 		</div>

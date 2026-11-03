@@ -207,7 +207,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 				{hasRelatedCode && (
 					<div className="space-y-2">
 						<h4 className="text-sm font-medium flex items-center gap-2">
-							<BookOpen className="h-3.5 w-3.5 text-emerald-500" />
+							<BookOpen className="h-3.5 w-3.5 text-success" />
 							{t("prReview.deepContext.relatedCode")}
 						</h4>
 						<div className="space-y-1">

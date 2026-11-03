@@ -9,9 +9,9 @@ import type {
 } from "../../../shared/types/release-coordinator";
 
 const GATE_STYLES: Record<GateStatus, { color: string; icon: string }> = {
-	passed: { color: "text-green-400", icon: "✅" },
-	failed: { color: "text-red-400", icon: "❌" },
-	pending: { color: "text-yellow-400", icon: "⏳" },
+	passed: { color: "text-success", icon: "✅" },
+	failed: { color: "text-destructive", icon: "❌" },
+	pending: { color: "text-warning", icon: "⏳" },
 	skipped: { color: "text-gray-400", icon: "⏭️" },
 };
 
@@ -42,7 +42,7 @@ export function ReleasePlanView({
 					<button
 						type="button"
 						onClick={() => cancelPlan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -80,7 +80,7 @@ export function ReleasePlanView({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}

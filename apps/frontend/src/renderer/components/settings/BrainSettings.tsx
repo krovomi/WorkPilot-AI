@@ -239,7 +239,7 @@ export function BrainSettings() {
 			</div>
 
 			{saved && !error && (
-				<p className="text-sm text-emerald-600" role="status">
+				<p className="text-sm text-success" role="status">
 					{t("brain:settings.saved")}
 				</p>
 			)}
@@ -318,9 +318,9 @@ function StatusLine({ ok, text }: { ok: boolean; text: string }) {
 	return (
 		<p className="flex items-start gap-2 text-xs text-muted-foreground">
 			{ok ? (
-				<CircleCheck className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" aria-hidden />
+				<CircleCheck className="mt-0.5 h-3 w-3 shrink-0 text-success" aria-hidden />
 			) : (
-				<CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" aria-hidden />
+				<CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-warning" aria-hidden />
 			)}
 			<span className="min-w-0 break-all">{text}</span>
 		</p>

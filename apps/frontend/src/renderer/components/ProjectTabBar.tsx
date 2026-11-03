@@ -319,7 +319,7 @@ export function ProjectTabBar({
 					(usage.sessionPercent >= 90 || (usage.weeklyPercent >= 0 && usage.weeklyPercent >= 90)) && (
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
+								<div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-destructive/10 text-destructive border-destructive/20">
 									<AlertTriangle className="h-3.5 w-3.5 motion-safe:animate-pulse" />
 								</div>
 							</TooltipTrigger>
@@ -329,7 +329,7 @@ export function ProjectTabBar({
 										<span className="text-muted-foreground font-medium">
 											{t("common:usage.usageAlert")}
 										</span>
-										<span className="font-semibold text-red-500">
+										<span className="font-semibold text-destructive">
 											{Math.round(
 												Math.max(usage.sessionPercent, Math.max(usage.weeklyPercent, 0)),
 											)}

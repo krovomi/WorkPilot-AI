@@ -264,8 +264,8 @@ export function MissionControlDashboard() {
 					</Card>
 					<Card className="border-border/50">
 						<CardContent className="p-3 flex items-center gap-3">
-							<div className="bg-green-500/10 rounded-lg p-2">
-								<DollarSign className="h-4 w-4 text-green-500" />
+							<div className="bg-success/10 rounded-lg p-2">
+								<DollarSign className="h-4 w-4 text-success" />
 							</div>
 							<div>
 								<p className="text-xs text-muted-foreground">
