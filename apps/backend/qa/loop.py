@@ -60,6 +60,7 @@ from task_logger import (
     get_task_logger,
 )
 
+from . import recheck
 from .budget import (
     MAX_QA_ITERATIONS,
     qa_iteration_cap,
@@ -440,6 +441,9 @@ async def run_qa_validation_loop(
             LogEntryType.INFO,
             LogPhase.VALIDATION,
         )
+    # A rejection recorded by an earlier QA run is not this run's previous
+    # pass: the first pass here is a complete review.
+    recheck.clear(spec_dir)
     scope = _QaScope(
         project_dir=project_dir,
         spec_dir=spec_dir,
@@ -537,6 +541,7 @@ async def run_qa_validation_loop(
                     return False
                 gate = goal_gate
             if gate is None:
+                recheck.clear(spec_dir)
                 await _on_approved(scope, state.qa_iteration)
                 return True
             status = "rejected"
@@ -844,6 +849,11 @@ async def _run_reviewer(
     qa_provider = get_phase_provider(spec_dir, phase="qa")
     state.review_scope = review_scope = _review_scope(scope)
     state.review_commands = []
+    advice = "\n\n".join(
+        part
+        for part in (advice, _recheck_advice(scope, state.qa_iteration, review_scope))
+        if part
+    )
     debug(
         "qa_loop",
         "Creating client for QA reviewer session...",
@@ -917,6 +927,27 @@ async def _run_reviewer(
         status = "error"
         response = str(e)
     return status, response, client
+
+
+def _recheck_advice(scope: _QaScope, qa_iteration: int, review: ChangeScope) -> str:
+    """The re-review section of a pass after a fix, or "" (`qa.recheck`)."""
+    if review.is_light:
+        return ""  # text only: the light review already reads just the change
+    try:
+        section = recheck.recheck_section(
+            scope.spec_dir, scope.project_dir, qa_iteration
+        )
+    except (OSError, ValueError) as e:  # without the section the pass is full
+        debug_warning("qa_loop", f"QA re-review by delta skipped: {e}")
+        return ""
+    if section and scope.task_logger:
+        scope.task_logger.log(
+            f"QA pass {qa_iteration}: checking the fix of pass {qa_iteration - 1} "
+            "first (re-review by delta), then the complete review if it holds.",
+            LogEntryType.INFO,
+            LogPhase.VALIDATION,
+        )
+    return section
 
 
 def _review_scope(scope: _QaScope) -> ChangeScope:
@@ -1530,6 +1561,8 @@ async def _on_rejected(
     # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
     # les issues de cette passe, jamais celles d'une passe précédente.
     # Un gate a déjà écrit le sien, plus précis : on le garde.
+    # The next pass checks the fixer's delta first (`qa.recheck`).
+    recheck.record_rejection(spec_dir, scope.project_dir, qa_iteration, current_issues)
     return await _run_fixer(
         scope, state, qa_model, current_issues if gate is None else None
     )
