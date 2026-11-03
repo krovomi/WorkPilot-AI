@@ -51,9 +51,11 @@ core/client.py), context management and dynamic tool loading.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -348,6 +350,44 @@ _CLAUDE_EFFORT_BY_LEVEL: dict[str, str] = {
 }
 
 
+# Which Claude models take `effort` (platform.claude.com, effort parameter):
+# Opus 4.5 and later, Sonnet 4.6 and later, Haiku 5 and later, every Fable
+# and Mythos. Sonnet 4.5, Haiku 4.5 and older answer it with an error: the
+# Kanban level reaches them as a thinking budget only. Matched on the dashed
+# id, so the Bedrock (`anthropic.`), Vertex (`@date`) and Copilot (dotted)
+# spellings of one model give one answer.
+_CLAUDE_MODEL_RE = re.compile(
+    r"claude-(?P<family>opus|sonnet|haiku|fable|mythos)-(?P<major>\d+)(?:-(?P<minor>\d{1,2})(?!\d))?"
+)
+_CLAUDE_FIRST_EFFORT: dict[str, tuple[int, int]] = {
+    "opus": (4, 5),
+    "sonnet": (4, 6),
+    "haiku": (5, 0),
+    "fable": (0, 0),
+    "mythos": (0, 0),
+}
+
+
+def claude_takes_effort(model: str | None) -> bool:
+    """Whether a Claude model accepts the `effort` setting.
+
+    A short alias (``opus``, ``sonnet-5``…) is resolved first, as the
+    session will resolve it. A name that is not a Claude model id takes no
+    effort: a provider without an adapter runs its own model on the SDK.
+    """
+    from phase_config import resolve_model_id
+
+    name = (model or "").strip().lower()
+    if not name:
+        return False
+    name = resolve_model_id(name).lower()
+    match = _CLAUDE_MODEL_RE.search(name.replace(".", "-"))
+    if not match:
+        return False
+    version = (int(match.group("major")), int(match.group("minor") or 0))
+    return version >= _CLAUDE_FIRST_EFFORT[match.group("family")]
+
+
 def claude_effort(thinking_budget: int | None) -> str:
     """Translate the Kanban thinking budget to the Claude Agent SDK's `effort`.
 
@@ -577,6 +617,44 @@ def openai_prompt_cache_key(spec_dir: Path | str | None, agent_type: str) -> str
         return None
     task = Path(spec_dir).name or "task"
     return f"workpilot/{task}/{agent_type}"
+
+
+@dataclass(frozen=True)
+class CacheRouting:
+    """How one OpenAI-compatible provider is told which requests share a cache.
+
+    `body_key` goes into the payload as `prompt_cache_key`; `headers` are
+    added to each request. Both empty: the provider caches on its own.
+    """
+
+    body_key: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+def compatible_cache_routing(
+    provider: str, spec_dir: Path | str | None, agent_type: str
+) -> CacheRouting:
+    """The cache routing an OpenAI-compatible provider documents.
+
+    - Mistral (docs.mistral.ai, "Prompt caching"): caching is opt-in through
+      `prompt_cache_key`; cached tokens bill at 10 % of the input price.
+      Without it nothing was cached.
+    - xAI (docs.x.ai, "Maximizing cache hits"): the cache lives per server and
+      the `x-grok-conv-id` header routes one conversation to one server.
+    - DeepSeek caches every prefix on disk with no setting: nothing to send.
+
+    The key is the task/phase key OpenAI receives, hashed: these providers
+    ask for no user data in it, and a task folder is named after the task.
+    """
+    key = openai_prompt_cache_key(spec_dir, agent_type)
+    if key is None:
+        return CacheRouting()
+    opaque = "workpilot-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:32]
+    if provider == "mistral":
+        return CacheRouting(body_key=opaque)
+    if provider == "grok":
+        return CacheRouting(headers={"x-grok-conv-id": opaque})
+    return CacheRouting()
 
 
 # ---------------------------------------------------------------------------

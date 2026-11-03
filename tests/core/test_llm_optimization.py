@@ -11,6 +11,7 @@ from core.llm_optimization import (
     build_base_system_prompt,
     claude_effort,
     compact_messages,
+    compatible_cache_routing,
     copilot_thinking_budget,
     gemini_reasoning_effort,
     openai_prompt_cache_key,
@@ -234,6 +235,39 @@ class TestOpenAIPromptCacheKey:
 
     def test_none_spec_dir(self):
         assert openai_prompt_cache_key(None, "coder") is None
+
+
+class TestCompatibleCacheRouting:
+    """docs.mistral.ai "Prompt caching", docs.x.ai "Maximizing cache hits"."""
+
+    def test_mistral_opts_in_with_an_opaque_body_key(self, tmp_path: Path):
+        routing = compatible_cache_routing("mistral", tmp_path / "001-secret", "coder")
+        assert routing.body_key is not None
+        assert routing.body_key.startswith("workpilot-")
+        assert "secret" not in routing.body_key
+        assert routing.headers == {}
+
+    def test_grok_routes_by_header(self, tmp_path: Path):
+        routing = compatible_cache_routing("grok", tmp_path / "001-task", "coder")
+        assert routing.body_key is None
+        assert set(routing.headers) == {"x-grok-conv-id"}
+
+    def test_one_key_per_task_and_phase(self, tmp_path: Path):
+        spec = tmp_path / "001-task"
+        first = compatible_cache_routing("mistral", spec, "coder").body_key
+        assert first == compatible_cache_routing("mistral", spec, "coder").body_key
+        assert (
+            first != compatible_cache_routing("mistral", spec, "qa_reviewer").body_key
+        )
+
+    @pytest.mark.parametrize("provider", ["deepseek", "other"])
+    def test_automatic_caches_get_nothing(self, provider: str, tmp_path: Path):
+        routing = compatible_cache_routing(provider, tmp_path / "001-task", "coder")
+        assert routing.body_key is None and routing.headers == {}
+
+    def test_no_task_no_routing(self):
+        routing = compatible_cache_routing("mistral", None, "coder")
+        assert routing.body_key is None and routing.headers == {}
 
 
 # ---------------------------------------------------------------------------

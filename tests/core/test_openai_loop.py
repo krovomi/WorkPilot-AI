@@ -248,6 +248,30 @@ async def test_the_openai_only_fields_are_sent_when_set(costs):
 
 
 @pytest.mark.asyncio
+async def test_a_compatible_provider_sends_its_cache_routing(costs):
+    """Mistral's opt-in `prompt_cache_key`, xAI's `x-grok-conv-id` header."""
+    client = CompatibleProviderAgentClient(
+        provider="grok",
+        model="grok-4.3",
+        api_key="xai-test-0000",
+        base_url="https://api.x.ai",
+        prompt_cache_key="workpilot-abc",
+        cache_headers={"x-grok-conv-id": "workpilot-abc"},
+    )
+    client._tool_definitions = []
+    client._tool_executor = _Executor()
+    session = _Session([_choice("Done.")])
+    client._http_client = session
+
+    await _collect(client)
+
+    assert session.payloads[0]["prompt_cache_key"] == "workpilot-abc"
+    headers = session.options[0]["headers"]
+    assert headers["x-grok-conv-id"] == "workpilot-abc"
+    assert headers["Authorization"] == "Bearer xai-test-0000"
+
+
+@pytest.mark.asyncio
 async def test_an_offline_only_client_refuses_redirects(costs):
     client, session = _client([_choice("Done.")])
     client._offline_only = True
