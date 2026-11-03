@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 // GitLab issue state colors and labels
 const GITLAB_ISSUE_STATE_COLORS: Record<string, string> = {
-	opened: "bg-green-500/10 text-green-500 border-green-500/20",
+	opened: "bg-success/10 text-success border-success/20",
 	closed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
 };
 

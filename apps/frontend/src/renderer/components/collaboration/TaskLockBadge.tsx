@@ -48,7 +48,7 @@ export function TaskLockBadge({ taskId, className }: TaskLockBadgeProps) {
 						"inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium",
 						mine
 							? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-							: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+							: "bg-warning/10 text-warning ",
 						className,
 					)}
 					aria-label={label}

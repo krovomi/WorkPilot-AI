@@ -41,8 +41,8 @@ export function VersionWarningModal({
 			<DialogContent className="sm:max-w-md" hideCloseButton>
 				<DialogHeader>
 					<div className="flex items-center gap-3">
-						<div className="rounded-full bg-amber-100 dark:bg-amber-900/30 p-2">
-							<AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+						<div className="rounded-full bg-warning/10 p-2">
+							<AlertTriangle className="h-5 w-5 text-warning " />
 						</div>
 						<div>
 							<DialogTitle className="text-lg">

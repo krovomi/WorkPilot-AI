@@ -7,12 +7,12 @@ import type {
 } from "../../../shared/types/api-watcher";
 
 const CATEGORY_STYLES: Record<string, { color: string; icon: string }> = {
-	breaking: { color: "text-red-400 bg-red-500/10", icon: "🔴" },
+	breaking: { color: "text-destructive bg-destructive/10", icon: "🔴" },
 	potentially_breaking: {
-		color: "text-yellow-400 bg-yellow-500/10",
+		color: "text-warning bg-warning/10",
 		icon: "🟡",
 	},
-	non_breaking: { color: "text-green-400 bg-green-500/10", icon: "🟢" },
+	non_breaking: { color: "text-success bg-success/10", icon: "🟢" },
 };
 
 interface ApiWatcherDashboardProps {
@@ -42,7 +42,7 @@ export function ApiWatcherDashboard({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -90,7 +90,7 @@ export function ApiWatcherDashboard({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -138,25 +138,25 @@ function ReportBody({
 			</div>
 
 			<div className="grid grid-cols-3 gap-3">
-				<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-					<p className="text-xs text-red-400">{t("categories.breaking")}</p>
-					<p className="text-2xl font-bold text-red-400">
+				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+					<p className="text-xs text-destructive">{t("categories.breaking")}</p>
+					<p className="text-2xl font-bold text-destructive">
 						{diff.breakingCount}
 					</p>
 				</div>
-				<div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-					<p className="text-xs text-yellow-400">
+				<div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+					<p className="text-xs text-warning">
 						{t("categories.potentiallyBreaking")}
 					</p>
-					<p className="text-2xl font-bold text-yellow-400">
+					<p className="text-2xl font-bold text-warning">
 						{diff.potentiallyBreakingCount}
 					</p>
 				</div>
-				<div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-					<p className="text-xs text-green-400">
+				<div className="p-3 rounded-lg bg-success/10 border border-success/20">
+					<p className="text-xs text-success">
 						{t("categories.nonBreaking")}
 					</p>
-					<p className="text-2xl font-bold text-green-400">
+					<p className="text-2xl font-bold text-success">
 						{diff.nonBreakingCount}
 					</p>
 				</div>

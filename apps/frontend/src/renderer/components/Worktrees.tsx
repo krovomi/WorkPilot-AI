@@ -882,7 +882,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 														)}
 														<div className="flex-1 min-w-0">
 															<CardTitle className="text-base flex items-center gap-2">
-																<FolderGit className="h-4 w-4 text-amber-500 shrink-0" />
+																<FolderGit className="h-4 w-4 text-warning shrink-0" />
 																<span className="truncate">{wt.name}</span>
 															</CardTitle>
 															{wt.branchName && (
@@ -905,7 +905,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 													<div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 bg-muted/50 rounded-md p-2">
 														<span className="font-mono">{wt.baseBranch}</span>
 														<ChevronRight className="h-3 w-3" />
-														<span className="font-mono text-amber-500">
+														<span className="font-mono text-warning">
 															{wt.branchName}
 														</span>
 													</div>

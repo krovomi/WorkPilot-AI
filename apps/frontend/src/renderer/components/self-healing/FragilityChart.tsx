@@ -7,16 +7,16 @@ interface FragilityChartProps {
 }
 
 function getRiskColor(score: number): string {
-	if (score >= 80) return "bg-red-500";
+	if (score >= 80) return "bg-destructive";
 	if (score >= 60) return "bg-orange-500";
-	if (score >= 40) return "bg-yellow-500";
+	if (score >= 40) return "bg-warning";
 	return "bg-blue-500";
 }
 
 function getRiskBgColor(score: number): string {
-	if (score >= 80) return "bg-red-500/10";
+	if (score >= 80) return "bg-destructive/10";
 	if (score >= 60) return "bg-orange-500/10";
-	if (score >= 40) return "bg-yellow-500/10";
+	if (score >= 40) return "bg-warning/10";
 	return "bg-blue-500/10";
 }
 

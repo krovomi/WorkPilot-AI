@@ -28,7 +28,7 @@ function CopilotContextWindow({ usage }: CopilotUsageContentProps) {
 
 	const pct = contextUsage.percentUsed;
 	const barColor =
-		pct >= 90 ? "bg-red-500" : pct >= 75 ? "bg-orange-500" : "bg-blue-500";
+		pct >= 90 ? "bg-destructive" : pct >= 75 ? "bg-orange-500" : "bg-blue-500";
 	const nf = new Intl.NumberFormat(i18n.language);
 
 	return (
@@ -130,10 +130,10 @@ function CopilotBackendUnavailable() {
 	const { t } = useTranslation(["common"]);
 
 	return (
-		<div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-			<AlertCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+		<div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
+			<AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
 			<div className="space-y-1">
-				<p className="text-xs font-medium text-yellow-500">
+				<p className="text-xs font-medium text-warning">
 					{t("common:usage.copilotBackendUnavailable")}
 				</p>
 				<p className="text-3xs text-muted-foreground leading-relaxed">
@@ -175,7 +175,7 @@ function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
 
 	const barColor =
 		percentUsed >= 90
-			? "bg-red-500"
+			? "bg-destructive"
 			: percentUsed >= 75
 				? "bg-orange-500"
 				: "bg-blue-500";

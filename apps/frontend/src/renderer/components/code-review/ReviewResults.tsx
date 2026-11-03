@@ -37,15 +37,15 @@ function SeverityBadge({ severity }: { severity: string }) {
 		{ className: string; icon: React.ElementType }
 	> = {
 		critical: {
-			className: "bg-red-500/10 text-red-500 border-red-500/20",
+			className: "bg-destructive/10 text-destructive border-destructive/20",
 			icon: XCircle,
 		},
 		high: {
-			className: "bg-red-400/10 text-red-400 border-red-400/20",
+			className: "bg-destructive/10 text-destructive border-destructive/20",
 			icon: XCircle,
 		},
 		medium: {
-			className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+			className: "bg-warning/10 text-warning border-warning/20",
 			icon: AlertTriangle,
 		},
 		low: {
@@ -82,19 +82,19 @@ function ScoreGauge({
 	t: (key: string) => string;
 }) {
 	const color = blocked
-		? "text-red-500"
+		? "text-destructive"
 		: score >= 80
-			? "text-emerald-500"
+			? "text-success"
 			: score >= 60
-				? "text-amber-500"
-				: "text-red-500";
+				? "text-warning"
+				: "text-destructive";
 	const bgColor = blocked
-		? "bg-red-500"
+		? "bg-destructive"
 		: score >= 80
-			? "bg-emerald-500"
+			? "bg-success"
 			: score >= 60
-				? "bg-amber-500"
-				: "bg-red-500";
+				? "bg-warning"
+				: "bg-destructive";
 
 	return (
 		<div className="flex items-center gap-4">
@@ -170,14 +170,14 @@ export function ReviewResults({
 							<CardContent className="p-5">
 								<div className="flex items-center gap-2 mb-3">
 									{result.passed ? (
-										<CheckCircle2 className="h-5 w-5 text-emerald-500" />
+										<CheckCircle2 className="h-5 w-5 text-success" />
 									) : (
-										<XCircle className="h-5 w-5 text-red-500" />
+										<XCircle className="h-5 w-5 text-destructive" />
 									)}
 									<span
 										className={cn(
 											"text-sm font-semibold",
-											result.passed ? "text-emerald-500" : "text-red-500",
+											result.passed ? "text-success" : "text-destructive",
 										)}
 									>
 										{result.passed

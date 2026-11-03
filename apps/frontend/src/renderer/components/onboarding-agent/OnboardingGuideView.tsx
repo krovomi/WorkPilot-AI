@@ -73,7 +73,7 @@ function GuideBody({
 								{step.commands.map((cmd) => (
 									<pre
 										key={`${cmd.slice(0, 20)}`}
-										className="px-3 py-1.5 rounded bg-card text-xs font-mono text-green-400"
+										className="px-3 py-1.5 rounded bg-card text-xs font-mono text-success"
 									>
 										$ {cmd}
 									</pre>
@@ -132,7 +132,7 @@ export function OnboardingGuideView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -162,7 +162,7 @@ export function OnboardingGuideView({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{t("errors.failed", { error })}</p>
+				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
 			)}
 
 			{phase === "complete" && !guide && (

@@ -7,9 +7,9 @@ import type {
 } from "../../../shared/types/consensus-arbiter";
 
 const SEVERITY_STYLES: Record<ConflictSeverity, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -33,11 +33,11 @@ function ResultBody({
 			</p>
 
 			{result.allResolved ? (
-				<div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+				<div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm">
 					✅ {t("allConflictsResolved")}
 				</div>
 			) : (
-				<div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm">
+				<div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning text-sm">
 					⚠️ {result.escalatedCount} {t("conflictsRequireHumanDecision")}
 				</div>
 			)}
@@ -59,8 +59,8 @@ function ResultBody({
 								<span
 									className={`px-2 py-0.5 rounded text-xs font-medium ${
 										conflict.resolved
-											? "bg-green-500/20 text-green-400"
-											: "bg-yellow-500/20 text-yellow-400"
+											? "bg-success/20 text-success"
+											: "bg-warning/20 text-warning"
 									}`}
 								>
 									{conflict.resolved ? t("resolved") : t("pending")}
@@ -87,7 +87,7 @@ function ResultBody({
 						</div>
 
 						{conflict.resolution && (
-							<p className="text-xs mt-1 text-green-400">
+							<p className="text-xs mt-1 text-success">
 								→ {conflict.resolution}
 							</p>
 						)}
@@ -143,7 +143,7 @@ export function ConsensusView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -173,7 +173,7 @@ export function ConsensusView({
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{error}</p>
+				<p className="text-sm text-destructive">{error}</p>
 			)}
 
 			{phase === "complete" && result?.conflicts.length === 0 && (

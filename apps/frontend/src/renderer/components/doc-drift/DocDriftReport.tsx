@@ -6,8 +6,8 @@ import { useDocDriftStore } from "../../stores/doc-drift-store";
 import type { DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
 
 const SEVERITY_STYLES: Record<DriftSeverity, string> = {
-	high: "text-red-400 bg-red-500/10 border-red-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	high: "text-destructive bg-destructive/10 border-destructive/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -41,7 +41,7 @@ export function DocDriftReport({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -81,7 +81,7 @@ export function DocDriftReport({
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -137,7 +137,7 @@ function ReportBody({
 							{issue.docFile}:{issue.docLine} → {issue.referencedSymbol}
 						</p>
 						{issue.suggestion && (
-							<p className="text-xs mt-1 text-green-400">{issue.suggestion}</p>
+							<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
 						)}
 					</div>
 				))}
