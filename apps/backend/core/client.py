@@ -872,9 +872,14 @@ def _cli_environment(
 
     # Token / context optimisations (docs: code.claude.com/docs/en/agent-sdk).
     # `setdefault` keeps any explicit user override intact.
-    # - 1h prompt-cache TTL: Kanban runs many short cards back-to-back against
-    #   the same system prompt + CLAUDE.md; 1h TTL keeps the cache warm between
-    #   cards instead of paying full input price every 5 minutes.
+    # - Prompt-cache TTL: left to the CLI (code.claude.com/docs/en/prompt-caching,
+    #   "Which TTL each request gets"): one hour on a subscription within its
+    #   plan, five minutes once billed (API key, usage credits, cloud). WorkPilot
+    #   used to force one hour everywhere (`ENABLE_PROMPT_CACHING_1H`), which
+    #   writes every turn's increment at 2x the input price instead of 1.25x,
+    #   for a lifetime a session never uses: its turns are seconds apart, and
+    #   two cards never share a prefix (the CLI's opens with the worktree).
+    #   An exported TTL variable still reaches the CLI.
     # - tool-search auto:5: defers MCP tool schemas when their combined size
     #   exceeds 5% of the context window. Activates only when there are enough
     #   MCP servers to make deferral worthwhile. Only on Anthropic's own API:
@@ -883,7 +888,6 @@ def _cli_environment(
     #   deferred tool, and a value here would override that guard. A value the
     #   user exported reaches the CLI untouched (the SDK passes the process
     #   environment, then this dict on top of it).
-    sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
     if "ENABLE_TOOL_SEARCH" not in os.environ and _is_anthropic_api(
         sdk_env.get("ANTHROPIC_BASE_URL")
     ):
@@ -1667,7 +1671,7 @@ def _add_effort(
     max_thinking_tokens: int | None,
     agent_type: str,
 ) -> None:
-    """Reasoning effort, on Opus only.
+    """Reasoning effort, on every Claude model that takes it.
 
     It follows the user's thinking level for the phase, which the caller
     resolved into `max_thinking_tokens`: on Opus 5.5 a thinking budget is not
@@ -1676,18 +1680,25 @@ def _add_effort(
     for debugging.
     See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
 
+    Sonnet 4.6+, Haiku 5+ and Fable take it as Opus does
+    (`claude_takes_effort`); without it they ran at their own default
+    (`high` on Sonnet 5.5) whatever the card asked, while the task feed said
+    the level was sent. A lower effort is fewer, grouped tool calls and less
+    preamble: the cheapest lever on a light phase.
+
     Only emit the kwarg when the installed SDK actually supports it: older
     ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
     raise "unexpected keyword argument 'effort'", aborting the agent run.
     """
-    if "opus" not in (model or "").lower():
+    from core.llm_optimization import claude_effort, claude_takes_effort
+
+    if not claude_takes_effort(model):
         return
-    from core.llm_optimization import claude_effort
 
     _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(max_thinking_tokens)
     if _claude_options_supports("effort"):
         options_kwargs["effort"] = _effort
-        print(f"   - Effort: {_effort} (agent_type={agent_type}, model=opus)")
+        print(f"   - Effort: {_effort} (agent_type={agent_type}, model={model})")
     else:
         logger.info(
             "Skipping 'effort=%s' — installed claude_agent_sdk's "
@@ -2848,7 +2859,7 @@ _COMPATIBLE_PROVIDER_URLS = {
 def _compatible_client(req: _ClientRequest):
     """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
     from core.agent_client import CompatibleProviderAgentClient
-    from core.llm_optimization import compatible_effort_params
+    from core.llm_optimization import compatible_cache_routing, compatible_effort_params
     from provider_models_catalog import _api_key_for
 
     provider = req.provider
@@ -2880,12 +2891,15 @@ def _compatible_client(req: _ClientRequest):
         req.agent_type,
         effort_params,
     )
+    cache = compatible_cache_routing(provider, req.spec_dir, req.agent_type)
     return CompatibleProviderAgentClient(
         provider=provider,
         model=req.model,
         api_key=api_key,
         base_url=base_url,
         effort_params=effort_params,
+        prompt_cache_key=cache.body_key,
+        cache_headers=cache.headers,
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,
