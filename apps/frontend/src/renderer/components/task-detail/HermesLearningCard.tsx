@@ -634,7 +634,7 @@ function CandidateRow({
 	);
 }
 
-function CheckRow({
+export function CheckRow({
 	check,
 }: {
 	readonly check: { name: string; ok: boolean; detail: string; remedy: string };

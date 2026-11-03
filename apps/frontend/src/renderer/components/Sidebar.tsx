@@ -121,10 +121,7 @@ import { AddProjectModal } from "./AddProjectModal";
 import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
-import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
-import { AgentCliStatusBadge } from "./AgentCliStatusBadge";
-import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
-import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
+import { CliToolBadges } from "./CliToolBadges";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
 import { ConflictPredictorDialog } from "./conflict-predictor/ConflictPredictorDialog";
 import { ContextAwareSnippetsDialog } from "./context-aware-snippets/ContextAwareSnippetsDialog";
@@ -2370,31 +2367,10 @@ export function Sidebar({
 						</CollapsibleTrigger>
 
 						<CollapsibleContent className="mt-2 space-y-2">
-							{/* CLI Tools — compact grouped badges */}
-							<div className="rounded-lg bg-white/4 border border-white/8 p-2 space-y-0.5 overflow-hidden">
-								<ClaudeCodeStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<CopilotCliStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<CodexCliStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<AgentCliStatusBadge tool="opencode" isCollapsed={isCollapsed} />
-								<AgentCliStatusBadge
-									tool="antigravity"
-									isCollapsed={isCollapsed}
-								/>
-								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
-								<AgentCliStatusBadge
-									tool="gemini-cli"
-									isCollapsed={isCollapsed}
-								/>
-							</div>
+							<CliToolBadges
+								isCollapsed={isCollapsed}
+								onNavigateToTerminals={() => onViewChange?.("terminals", true)}
+							/>
 						</CollapsibleContent>
 					</Collapsible>
 

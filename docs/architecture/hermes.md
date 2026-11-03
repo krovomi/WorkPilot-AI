@@ -258,6 +258,15 @@ use" is a card nobody reads. Like `workflows/api.py`, the router is refused in s
 mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
 a shared deployment belongs to the server and not to the tenant asking.
 
+**In the sidebar, where a missing hermes is said.** The task card stays silent when hermes
+is absent; the « Outils CLI » panel is where a person looks for the agent CLIs, so
+`HermesStatusBadge` closes that list (`CliToolBadges`). It reads the same status as the
+card: the state, each condition with the command that meets it (the doctor's `remedy`,
+the official install script included), how many candidates wait for review, and the
+persona install. It runs nothing else: installing hermes and `hermes skills trust` stay
+the person's to type. It is not an `AgentCliStatusBadge`, because hermes is not a
+provider WorkPilot hands a task to, and it renders nothing in server mode.
+
 ### Portability of a candidate
 
 The cycle itself runs on any provider — every answer comes from files on disk, and
