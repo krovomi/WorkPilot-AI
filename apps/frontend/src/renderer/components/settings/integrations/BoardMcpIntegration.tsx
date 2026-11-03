@@ -1,26 +1,14 @@
 import { Check, Copy, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-	BoardMcpClientId,
-	BoardMcpClientStatus,
-	BoardMcpStatus,
-} from "../../../../shared/types";
+import {
+	BOARD_MCP_CLIENT_NAMES,
+	type BoardMcpClientId,
+	type BoardMcpClientStatus,
+	type BoardMcpStatus,
+} from "../../../../shared/types/board-mcp";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
-
-/** Product names: the same in every language. */
-const CLIENT_NAMES: Record<BoardMcpClientId, string> = {
-	"claude-code": "Claude Code",
-	codex: "Codex",
-	"gemini-cli": "Gemini CLI",
-	"copilot-cli": "GitHub Copilot CLI",
-	vscode: "VS Code (GitHub Copilot)",
-	cursor: "Cursor",
-	"claude-desktop": "Claude Desktop",
-	windsurf: "Windsurf",
-	opencode: "OpenCode",
-};
 
 interface BoardMcpIntegrationProps {
 	readonly projectId: string;
@@ -112,7 +100,7 @@ export function BoardMcpIntegration({ projectId }: BoardMcpIntegrationProps) {
 					return (
 						<li key={client.id} className="space-y-2 p-3" data-testid={`board-mcp-${client.id}`}>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="font-medium">{CLIENT_NAMES[client.id]}</span>
+								<span className="font-medium">{BOARD_MCP_CLIENT_NAMES[client.id]}</span>
 								<StateBadge client={client} />
 								<span className="ml-auto flex gap-2">
 									{client.writable && client.state !== "current" && (

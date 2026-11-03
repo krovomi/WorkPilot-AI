@@ -43,6 +43,7 @@ import {
 import { McpBuilder } from "./McpBuilder";
 import { McpInstalledList } from "./McpInstalledList";
 import { McpServerCard } from "./McpServerCard";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: { id: McpMarketplaceTab; labelKey: string; icon: typeof Store }[] =
 	[
@@ -117,19 +118,12 @@ export function McpMarketplace() {
 
 	return (
 		<div className="flex flex-col h-full overflow-hidden">
-			{/* Header */}
-			<div className="shrink-0 border-b border-border bg-background px-6 pt-5 pb-4">
-				<div className="flex items-center justify-between mb-4">
-					<div>
-						<h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5">
-							<Store className="h-7 w-7 text-primary" />
-							{t("mcpMarketplace.title")}
-						</h1>
-						<p className="text-sm text-muted-foreground mt-1">
-							{t("mcpMarketplace.subtitle")}
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
+			<PageHeader
+				icon={Store}
+				title={t("mcpMarketplace.title")}
+				description={t("mcpMarketplace.subtitle")}
+				actions={
+					<>
 						<Badge variant="secondary" className="text-xs">
 							{installed.length} {t("mcpMarketplace.installedCount")}
 						</Badge>
@@ -141,10 +135,9 @@ export function McpMarketplace() {
 						>
 							<RefreshCw className="h-4 w-4" />
 						</Button>
-					</div>
-				</div>
-
-				{/* Tabs */}
+					</>
+				}
+			>
 				<div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
 					{TABS.map((tab) => {
 						const Icon = tab.icon;
@@ -166,7 +159,7 @@ export function McpMarketplace() {
 						);
 					})}
 				</div>
-			</div>
+			</PageHeader>
 
 			{/* Catalog tab content */}
 			{activeTab === "catalog" && (

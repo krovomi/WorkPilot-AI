@@ -1250,6 +1250,9 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_STATE_CHANGED: "server-auth:state-changed",
 	// The person's own integration tokens on the server: listed by kind, set,
 	// removed, never read back (main/server-user-secrets.ts).
+	SERVER_AUTH_LIST_ACCESS_TOKENS: "server-auth:list-access-tokens",
+	SERVER_AUTH_CREATE_ACCESS_TOKEN: "server-auth:create-access-token",
+	SERVER_AUTH_REVOKE_ACCESS_TOKEN: "server-auth:revoke-access-token",
 	SERVER_AUTH_LIST_SECRETS: "server-auth:list-secrets",
 	SERVER_AUTH_SET_SECRET: "server-auth:set-secret",
 	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",

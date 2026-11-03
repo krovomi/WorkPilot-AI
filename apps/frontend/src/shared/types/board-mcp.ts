@@ -17,9 +17,24 @@ export const BOARD_MCP_CLIENTS = [
 	"claude-desktop",
 	"windsurf",
 	"opencode",
+	"hermes",
 ] as const;
 
 export type BoardMcpClientId = (typeof BOARD_MCP_CLIENTS)[number];
+
+/** Product names: the same in every language. */
+export const BOARD_MCP_CLIENT_NAMES: Readonly<Record<BoardMcpClientId, string>> = {
+	"claude-code": "Claude Code",
+	codex: "Codex",
+	"gemini-cli": "Gemini CLI",
+	"copilot-cli": "GitHub Copilot CLI",
+	vscode: "VS Code (GitHub Copilot)",
+	cursor: "Cursor",
+	"claude-desktop": "Claude Desktop",
+	windsurf: "Windsurf",
+	opencode: "OpenCode",
+	hermes: "Hermes Agent",
+};
 
 export function isBoardMcpClient(value: unknown): value is BoardMcpClientId {
 	return typeof value === "string" && (BOARD_MCP_CLIENTS as readonly string[]).includes(value);
@@ -56,4 +71,23 @@ export interface BoardMcpStatus {
 	command: string;
 	args: string[];
 	clients: BoardMcpClientStatus[];
+}
+
+/** A personal access token for the team server's `/mcp`, as the server lists it. */
+export interface ServerAccessToken {
+	id: string;
+	name: string;
+	/** The token's first characters, to tell it apart. */
+	prefix: string;
+	scope: "read" | "write";
+	createdAt: string;
+	expiresAt: string;
+	lastUsedAt: string | null;
+}
+
+/** A token just made: the token itself is in this answer only. */
+export interface ServerAccessTokenCreated extends ServerAccessToken {
+	token: string;
+	/** The server's MCP endpoint, `<server>/mcp`. */
+	mcpUrl: string;
 }

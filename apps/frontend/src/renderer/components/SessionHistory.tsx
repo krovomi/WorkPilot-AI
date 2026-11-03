@@ -4,6 +4,7 @@ import {
 	ChevronDown,
 	ChevronRight,
 	Clock,
+	History,
 	FileCode2,
 	Loader2,
 	Pause,
@@ -23,6 +24,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { formatAppDateTime } from "@/lib/date-format";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -319,24 +321,18 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<Clock className="h-6 w-6 text-primary" />
-						<div>
-							<h1 className="text-xl font-bold text-foreground">
-								{t("title")}
-							</h1>
-							<p className="text-sm text-muted-foreground">
-								{serverProjectId ? t("serverSubtitle") : t("subtitle")}
-							</p>
-						</div>
-					</div>
-					<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
-						<RefreshCw className="h-3.5 w-3.5 mr-2" />
-						{t("refresh")}
-					</Button>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={History}
+					title={t("title")}
+					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
+					actions={
+						<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
+							<RefreshCw className="h-3.5 w-3.5 mr-2" />
+							{t("refresh")}
+						</Button>
+					}
+				/>
 
 				{/* Stats */}
 				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

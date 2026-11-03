@@ -11,6 +11,7 @@ import { Button } from "../ui/button";
 import { ResizablePanels } from "../ui/resizable-panels";
 import { PRDetail, PRFilterBar, PRList } from "./components";
 import { useGitHubPRs, usePRFiltering } from "./hooks";
+import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
 interface GitHubPRsProps {
 	onOpenSettings?: () => void;
@@ -27,35 +28,24 @@ function NotConnectedState({
 	t: (key: string) => string;
 }) {
 	return (
-		<div className="flex-1 flex items-center justify-center p-8">
-			<div className="text-center max-w-md">
-				<GitPullRequest className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-				<h3 className="text-lg font-medium mb-2">
-					{t("prReview.notConnected")}
-				</h3>
-				<p className="text-sm text-muted-foreground mb-4">
-					{error || t("prReview.connectPrompt")}
-				</p>
-				{onOpenSettings && (
+		<SharedEmptyState
+			icon={GitPullRequest}
+			title={t("prReview.notConnected")}
+			description={error || t("prReview.connectPrompt")}
+			action={
+				onOpenSettings && (
 					<Button onClick={onOpenSettings} variant="outline">
 						<Settings className="h-4 w-4 mr-2" />
 						{t("prReview.openSettings")}
 					</Button>
-				)}
-			</div>
-		</div>
+				)
+			}
+		/>
 	);
 }
 
 function EmptyState({ message }: { message: string }) {
-	return (
-		<div className="flex-1 flex items-center justify-center">
-			<div className="text-center text-muted-foreground">
-				<GitPullRequest className="h-8 w-8 mx-auto mb-2 opacity-50" />
-				<p>{message}</p>
-			</div>
-		</div>
-	);
+	return <SharedEmptyState icon={GitPullRequest} description={message} />;
 }
 
 export function GitHubPRs({

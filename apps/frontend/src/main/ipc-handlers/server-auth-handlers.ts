@@ -31,6 +31,11 @@ import { leaveAllTeamRooms } from "../server-team-room";
 import { unwatchAllServerCardLogs } from "../server-card-logs";
 import { unwatchAllServerViews } from "../server-live-views";
 import {
+	createAccessToken,
+	listAccessTokens,
+	revokeAccessToken,
+} from "../server-access-tokens";
+import {
 	deleteServerSecret,
 	listServerSecrets,
 	setServerSecret,
@@ -258,6 +263,15 @@ export function registerServerAuthHandlers(
 		async (_e, invitationId: string) => await revokeInvite(invitationId),
 	);
 
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LIST_ACCESS_TOKENS, () => listAccessTokens());
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_AUTH_CREATE_ACCESS_TOKEN,
+		(_e, name: unknown, scope: unknown, ttlDays: unknown) =>
+			createAccessToken(name, scope, ttlDays),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_REVOKE_ACCESS_TOKEN, (_e, id: unknown) =>
+		revokeAccessToken(id),
+	);
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS, () => listServerSecrets());
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, (_e, kind: unknown, value: unknown) =>
 		setServerSecret(kind, value),
