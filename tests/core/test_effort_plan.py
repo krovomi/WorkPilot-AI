@@ -311,7 +311,7 @@ class TestClaudeEffortModels:
             ("claude-fable-5-1", True),
             ("claude-3-5-sonnet-20241022", False),
             ("opus", True),
-            # The bare alias resolves to the current generation (F154): Haiku
+            # The bare alias resolves to the current generation (F156): Haiku
             # 5.5 takes effort; a numbered alias still pins Haiku 4.5.
             ("haiku", True),
             ("haiku-4-5", False),

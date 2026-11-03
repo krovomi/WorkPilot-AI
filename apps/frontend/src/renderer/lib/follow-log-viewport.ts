@@ -1,3 +1,10 @@
+/**
+ * Dispatched on a followed container when code (not the reader) moves the
+ * viewport, e.g. to jump to a search hit: following stops, so the next batch
+ * of output does not pull the viewport back to the edge.
+ */
+export const LOG_VIEWPORT_DETACH_EVENT = "log-viewport:detach";
+
 /** Follow new output unless the reader deliberately moves away from its edge. */
 export function followLogViewport(container: HTMLElement, reverse = false): () => void {
  let following = true;
@@ -23,7 +30,11 @@ export function followLogViewport(container: HTMLElement, reverse = false): () =
   const away = reverse ? ["ArrowDown", "PageDown", "End"] : ["ArrowUp", "PageUp", "Home"];
   if (away.includes(event.key)) following = false;
  };
+ const onDetach = () => {
+  following = false;
+ };
  follow();
+ container.addEventListener(LOG_VIEWPORT_DETACH_EVENT, onDetach);
  container.addEventListener("scroll", onScroll, { passive: true });
  container.addEventListener("wheel", onWheel, { passive: true });
  container.addEventListener("keydown", onKeyDown);
@@ -44,5 +55,6 @@ export function followLogViewport(container: HTMLElement, reverse = false): () =
   container.removeEventListener("scroll", onScroll);
   container.removeEventListener("wheel", onWheel);
   container.removeEventListener("keydown", onKeyDown);
+ container.removeEventListener(LOG_VIEWPORT_DETACH_EVENT, onDetach);
  };
 }

@@ -435,6 +435,12 @@
 			"qaPass": "QA review — pass #{{n}}",
 			"thinking": "Processing in progress"
 		},
+		"split": {
+			"legend": "Time spent per phase",
+			"share": "{{share}}%",
+			"segment": "{{phase}}: {{share}}%",
+			"segmentWithDuration": "{{phase}}: {{share}}% of the time ({{duration}})"
+		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",
@@ -994,7 +1000,28 @@
 			"results_other": "{{count}} results",
 			"clear": "Clear search",
 			"noResults": "No results",
-			"noResultsHint": "No log entry matches “{{query}}”."
+			"noResultsHint": "No log entry matches “{{query}}”.",
+			"entries_one": "{{count}} entry",
+			"entries_other": "{{count}} entries",
+			"position": "{{current}}/{{total}}",
+			"previous": "Previous match (Shift+Enter)",
+			"next": "Next match (Enter)",
+			"caseSensitive": "Match case (Alt+C)",
+			"wholeWord": "Match whole word (Alt+W)",
+			"regex": "Use regular expression (Alt+R)",
+			"invalidRegex": "Invalid expression",
+			"filters": "Filters",
+			"filterPhase": "Phase",
+			"filterKind": "Type",
+			"resetFilters": "Reset",
+			"noResultsFiltered": "No log entry matches the filters.",
+			"kinds": {
+				"text": "Messages",
+				"tool": "Tools",
+				"error": "Errors",
+				"warning": "Warnings",
+				"status": "Status"
+			}
 		},
 		"thinking": {
 			"selectAria": "Thinking effort for this phase",
