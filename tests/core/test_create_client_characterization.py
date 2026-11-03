@@ -374,7 +374,9 @@ def test_the_turn_cap_and_output_format_follow_the_caller(harness, monkeypatch):
 
 def test_the_cli_environment(harness, monkeypatch):
     env = harness.build()["env"]
-    assert env["ENABLE_PROMPT_CACHING_1H"] == "1"
+    # The TTL is the CLI's own choice (5 min when billed, 1 h within a
+    # subscription): forcing one hour paid 2x on every cache write.
+    assert "ENABLE_PROMPT_CACHING_1H" not in env
     assert not any(key.startswith("OTEL_") for key in env)
     assert "CLAUDE_CODE_DISABLE_AUTO_MEMORY" not in env
 

@@ -306,6 +306,9 @@ class OpenAIAgentClient(AgentClient):
         # `thinking`, …); set by the subclasses that have them.
         self._effort_params: dict[str, Any] = {}
         self._prompt_cache_key = prompt_cache_key
+        # Headers a provider documents for cache routing (xAI's
+        # `x-grok-conv-id`); set by the subclasses that have them.
+        self._cache_headers: dict[str, str] = {}
         self._api_key: str = (
             api_key if api_key is not None else _os.environ.get("OPENAI_API_KEY", "")
         )
@@ -483,6 +486,7 @@ class OpenAIAgentClient(AgentClient):
         ]
 
         request_headers = {
+            **self._cache_headers,
             "Authorization": f"Bearer {self._api_key}",
         }
 
