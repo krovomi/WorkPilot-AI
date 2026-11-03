@@ -994,7 +994,28 @@
 			"results_other": "{{count}} résultats",
 			"clear": "Effacer la recherche",
 			"noResults": "Aucun résultat",
-			"noResultsHint": "Aucune entrée de log ne correspond à « {{query}} »."
+			"noResultsHint": "Aucune entrée de log ne correspond à « {{query}} ».",
+			"entries_one": "{{count}} entrée",
+			"entries_other": "{{count}} entrées",
+			"position": "{{current}}/{{total}}",
+			"previous": "Résultat précédent (Maj+Entrée)",
+			"next": "Résultat suivant (Entrée)",
+			"caseSensitive": "Respecter la casse (Alt+C)",
+			"wholeWord": "Mot entier (Alt+W)",
+			"regex": "Expression régulière (Alt+R)",
+			"invalidRegex": "Expression invalide",
+			"filters": "Filtres",
+			"filterPhase": "Phase",
+			"filterKind": "Type",
+			"resetFilters": "Réinitialiser",
+			"noResultsFiltered": "Aucune entrée ne correspond aux filtres.",
+			"kinds": {
+				"text": "Messages",
+				"tool": "Outils",
+				"error": "Erreurs",
+				"warning": "Avertissements",
+				"status": "Statuts"
+			}
 		},
 		"thinking": {
 			"selectAria": "Niveau de réflexion pour cette phase",
