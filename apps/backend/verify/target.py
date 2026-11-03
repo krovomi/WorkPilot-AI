@@ -10,10 +10,10 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-__all__ = ["Target"]
+__all__ = ["SKIP_DIRS", "Target"]
 
 #: Directories never searched for an app: dependencies, build output, VCS.
-_SKIP = {
+SKIP_DIRS = {
     "node_modules",
     ".git",
     "dist",

@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from .target import _SKIP, Target, _read_json, _relative
+from .target import SKIP_DIRS, Target, _read_json, _relative
 
 __all__ = [
     "EXTRA_DETECTORS",
@@ -129,7 +129,7 @@ def serves_pages(directory: Path, depth: int = 5) -> str:
                 continue
             if entry.is_dir():
                 lowered = name.lower()
-                if name in _SKIP or lowered in _NOT_PAGES or _another_app(entry):
+                if name in SKIP_DIRS or lowered in _NOT_PAGES or _another_app(entry):
                     continue
                 found = _visit(entry, level + 1, (*parents, lowered))
                 if found:

@@ -27,7 +27,7 @@ import socket
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .target import _SKIP, Target, _read_json, _relative
+from .target import SKIP_DIRS, Target, _read_json, _relative
 from .web_stacks import EXTRA_DETECTORS, serves_pages, static_target
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ def _candidate_dirs(project_dir: Path) -> list[Path]:
             if (
                 child.is_dir()
                 and not child.is_symlink()
-                and child.name not in _SKIP
+                and child.name not in SKIP_DIRS
                 and not child.name.startswith(".")
             ):
                 out.append(child)
@@ -503,7 +503,7 @@ def _walk(root: Path, pattern: str, depth: int) -> list[Path]:
             if entry.is_symlink():
                 continue
             if entry.is_dir():
-                if entry.name not in _SKIP and not entry.name.startswith("."):
+                if entry.name not in SKIP_DIRS and not entry.name.startswith("."):
                     _visit(entry, level + 1)
             elif entry.match(pattern):
                 out.append(entry)
