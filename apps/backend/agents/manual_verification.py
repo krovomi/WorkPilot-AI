@@ -34,12 +34,12 @@ MANUAL_NO_CHANGE_REASON = (
 def _save(spec_dir: Path, plan: dict[str, Any]) -> bool:
     from qa.criteria import save_implementation_plan
 
-    try:
-        save_implementation_plan(spec_dir, plan)
-        return True
-    except Exception as exc:  # the loop goes on; the plan stays as it was
-        logger.error("Could not save the implementation plan: %s", exc)
-        return False
+    # save_implementation_plan reports a write failure instead of raising:
+    # the loop goes on and the plan on disk stays as it was.
+    saved = save_implementation_plan(spec_dir, plan)
+    if not saved:
+        logger.error("Could not save the implementation plan in %s", spec_dir)
+    return saved
 
 
 def sent_back_by_person(subtask: dict[str, Any]) -> bool:
