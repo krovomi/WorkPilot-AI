@@ -24,6 +24,7 @@ instead of a different set nobody maintains.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,16 +65,62 @@ class AgentSpec:
     tools: list[str] = field(default_factory=list)
     model: str | None = None
 
-    def to_definition(self) -> Any:
+    def to_definition(self, parent_model: str | None = None) -> Any:
         """The SDK object. Caller must have checked `sdk_available()`."""
         kwargs: dict[str, Any] = {
             "description": self.description,
             "prompt": self.prompt,
             "tools": list(self.tools),
         }
-        if self.model:
-            kwargs["model"] = self.model
+        model = subagent_model(self.model, parent_model)
+        if model:
+            kwargs["model"] = model
         return AgentDefinition(**kwargs)
+
+
+# Claude tiers, cheapest first. A spec's `model` is a ceiling, not a floor: a
+# Haiku card whose reviewers were pinned to Sonnet paid more for each
+# delegation than for its own turns.
+_TIER_RANK: dict[str, int] = {
+    "haiku": 0,
+    "sonnet": 1,
+    "opus": 2,
+    "fable": 3,
+    "mythos": 3,
+}
+_FAMILY_RE = re.compile(r"(haiku|sonnet|opus|fable|mythos)")
+
+
+def _claude_tier(model: str | None) -> str | None:
+    """The family of a Claude model id or alias (``opus``, ``claude-sonnet-5-5``).
+
+    Read from the name alone: `subagents` may not import `phase_config`
+    (tests/test_import_contracts.py), and the caller passes the resolved id.
+    """
+    name = (model or "").strip().lower()
+    if "claude" not in name and name not in _TIER_RANK:
+        return None
+    match = _FAMILY_RE.search(name)
+    return match.group(1) if match else None
+
+
+def subagent_model(tier: str | None, parent_model: str | None) -> str | None:
+    """The model one subagent runs on: its tier, never above its parent's.
+
+    A spec names the cheapest tier that does its job (`haiku` for the
+    read-only explorers that grep and list, `sonnet` for the reviewers).
+    When the session itself runs on that tier or a cheaper one, the subagent
+    inherits the session's model instead of being promoted. A parent we
+    cannot place (no model, not a Claude id) keeps the spec's tier.
+    """
+    if not tier or tier == "inherit":
+        return tier
+    parent = _claude_tier(parent_model)
+    if parent is None or tier not in _TIER_RANK:
+        return tier
+    if _TIER_RANK[parent] <= _TIER_RANK[tier]:
+        return "inherit"
+    return tier
 
 
 # agent_type -> phase. Every AGENT_CONFIGS entry but `coder` is listed — the
@@ -259,7 +306,7 @@ SPECS: dict[str, AgentSpec] = {
             "Return a structured list. Never edit anything."
         ),
         tools=["Read", "Grep", "Glob"],
-        model="sonnet",
+        model="haiku",
     ),
     "qa-acceptance-checker": AgentSpec(
         description=(
@@ -350,7 +397,7 @@ SPECS: dict[str, AgentSpec] = {
             "to avoid it. Never modify files."
         ),
         tools=["Read", "Grep", "Glob"],
-        model="sonnet",
+        model="haiku",
     ),
     "prior-art-finder": AgentSpec(
         description=(
@@ -369,7 +416,7 @@ SPECS: dict[str, AgentSpec] = {
             "Never modify files."
         ),
         tools=["Read", "Grep", "Glob"],
-        model="sonnet",
+        model="haiku",
     ),
     "constraint-collector": AgentSpec(
         description=(
@@ -389,7 +436,7 @@ SPECS: dict[str, AgentSpec] = {
             "modify files."
         ),
         tools=["Read", "Grep", "Glob"],
-        model="sonnet",
+        model="haiku",
     ),
 }
 
@@ -467,11 +514,17 @@ def all_specs() -> dict[str, dict[str, AgentSpec]]:
     return {phase: _roster(phase) for phase in ROSTERS}
 
 
-def phase_defaults(agent_type: str, roster: str | None = None) -> dict[str, Any]:
-    """The generic roster for ``agent_type``. Empty when the SDK is absent."""
+def phase_defaults(
+    agent_type: str, roster: str | None = None, parent_model: str | None = None
+) -> dict[str, Any]:
+    """The generic roster for ``agent_type``. Empty when the SDK is absent.
+
+    ``parent_model`` is the session's model: no subagent runs on a tier
+    above it (`subagent_model`).
+    """
     if not sdk_available():
         return {}
     return {
-        name: spec.to_definition()
+        name: spec.to_definition(parent_model)
         for name, spec in phase_specs(agent_type, roster).items()
     }

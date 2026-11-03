@@ -131,8 +131,12 @@ def resolve(
     user_agents: dict[str, Any] | None = None,
     provider: str | None = None,
     roster_name: str | None = None,
+    parent_model: str | None = None,
 ) -> dict[str, Any] | None:
     """The subagent roster for one run, or ``None`` when there should be none.
+
+    ``parent_model`` is the session's model: a subagent never runs on a tier
+    above it (`subagents.phases.subagent_model`).
 
     ``roster_name`` overrides the phase the alias table would pick. It exists so a
     workflow phase can choose its specialists independently of the AGENT_CONFIGS
@@ -155,7 +159,7 @@ def resolve(
         # that passed its own dict still means it.
         return user_agents or None
 
-    roster: dict[str, Any] = phase_defaults(agent_type, roster_name)
+    roster: dict[str, Any] = phase_defaults(agent_type, roster_name, parent_model)
     # Read before any overlay adds to it: an empty phase roster is a decision
     # (`solo`), and an overlay specialises a roster, it does not start one.
     phase_has_roster = bool(roster)

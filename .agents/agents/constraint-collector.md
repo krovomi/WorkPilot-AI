@@ -2,7 +2,7 @@
 name: constraint-collector
 description: Gathers the conventions and constraints a spec must respect. Use before writing acceptance criteria.
 tools: [Read, Grep, Glob]
-model: sonnet
+model: haiku
 metadata:
   workpilot:
     roster: spec

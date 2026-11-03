@@ -2,7 +2,7 @@
 name: evidence-collector
 description: "Confirms or refutes one specific claim about the codebase with file:line evidence. Use before reporting any finding."
 tools: [Read, Grep, Glob]
-model: sonnet
+model: haiku
 metadata:
   workpilot:
     roster: research

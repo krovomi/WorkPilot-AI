@@ -2,7 +2,7 @@
 name: dependency-tracer
 description: Traces how a function, class or file is used across the codebase. Use when the planner needs blast-radius information for a refactor.
 tools: [Read, Grep, Glob]
-model: sonnet
+model: haiku
 metadata:
   workpilot:
     roster: planner
