@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useCliStatus } from "@/contexts/CliStatusContext";
 import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
 import { cn } from "@/lib/utils";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -22,6 +23,8 @@ interface CodexCliStatusBadgeProps {
 	readonly onNavigateToTerminals?: () => void;
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 interface CodexIconProps {
@@ -65,6 +68,7 @@ export function CodexCliStatusBadge({
 	className,
 	onNavigateToTerminals: _onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: CodexCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { data, refreshCodex } = useCliStatus();
@@ -76,6 +80,10 @@ export function CodexCliStatusBadge({
 
 	// Use data from context
 	const status = codex.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = codex.versionInfo;
 	const lastChecked = codex.lastChecked;
 
