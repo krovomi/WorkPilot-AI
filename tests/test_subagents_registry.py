@@ -490,3 +490,55 @@ class TestProviderDegradationReachesTheClient:
         )
         assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
         assert resolve("coder", project_dir=tmp_path, provider="claude") is not None
+
+
+# ---------------------------------------------------------------------------
+# A subagent never runs on a tier above its session's (token audit, lot 2b)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tier", "parent", "expected"),
+    [
+        # A Haiku session's reviewers used to be promoted to Sonnet.
+        ("sonnet", "claude-haiku-5-5", "inherit"),
+        ("sonnet", "haiku", "inherit"),
+        ("sonnet", "claude-sonnet-5-5", "inherit"),
+        ("sonnet", "claude-opus-5-5", "sonnet"),
+        ("sonnet", "claude-fable-5-1", "sonnet"),
+        ("haiku", "claude-opus-5-5", "haiku"),
+        ("haiku", "claude-sonnet-4-6", "haiku"),
+        ("haiku", "claude-haiku-4-5", "inherit"),
+        # Nothing to compare with: the spec's tier stands.
+        ("sonnet", None, "sonnet"),
+        ("sonnet", "gpt-5.5", "sonnet"),
+        (None, "claude-opus-5-5", None),
+        ("inherit", "claude-opus-5-5", "inherit"),
+    ],
+)
+def test_subagent_model_is_capped_by_the_session(tier, parent, expected):
+    from subagents.phases import subagent_model
+
+    assert subagent_model(tier, parent) == expected
+
+
+def test_read_only_explorers_run_on_the_cheapest_tier():
+    """They grep, list and quote: no judgement a Haiku cannot give."""
+    from subagents.phases import SPECS
+
+    for name in (
+        "dependency-tracer",
+        "evidence-collector",
+        "prior-art-finder",
+        "constraint-collector",
+    ):
+        assert SPECS[name].model == "haiku", name
+        assert set(SPECS[name].tools) <= {"Read", "Grep", "Glob"}, name
+
+
+@pytest.mark.skipif(not sdk_available(), reason="claude_agent_sdk not installed")
+def test_the_roster_follows_the_session_model():
+    on_opus = phase_defaults("planner", parent_model="claude-opus-5-5")
+    on_haiku = phase_defaults("planner", parent_model="claude-haiku-5-5")
+    assert {d.model for d in on_haiku.values() if d.model} <= {"inherit"}
+    assert any(d.model in {"sonnet", "haiku"} for d in on_opus.values())

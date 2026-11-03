@@ -819,6 +819,7 @@ def create_client(
         agents=agents,
         use_subagents=use_subagents,
         roster=roster,
+        parent_model=model,
     )
 
     if _resume_id := _resume_session_id(resume, config_dir):
@@ -1559,6 +1560,7 @@ def _add_subagents(
     agents: dict | None,
     use_subagents: bool,
     roster: str | None,
+    parent_model: str | None = None,
 ) -> None:
     """Compose the subagent roster and allow the `Agent` tool that runs it.
 
@@ -1592,6 +1594,7 @@ def _add_subagents(
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
             roster_name=roster,
+            parent_model=parent_model,
         )
     except _NoSubagents:
         logger.debug(
