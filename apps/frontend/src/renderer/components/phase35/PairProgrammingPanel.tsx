@@ -12,6 +12,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 const ROLES = [
 	{ value: "driver", labelKey: "pair.roleDriver" },
 	{ value: "navigator", labelKey: "pair.roleNavigator" },
@@ -193,7 +195,7 @@ export function PairProgrammingPanel() {
 
 					<form className="space-y-1" onSubmit={handleSubmitChat}>
 						<div className="flex gap-2">
-							<input
+							<Input
 								value={chatText}
 								onChange={(e) => {
 									setChatText(e.target.value.slice(0, MESSAGE_MAX_LEN));
@@ -203,7 +205,7 @@ export function PairProgrammingPanel() {
 								aria-invalid={Boolean(chatError) || undefined}
 								aria-describedby={chatError ? "chat-error" : undefined}
 								placeholder={t("pair.chatPlaceholder")}
-								className="flex-1 rounded border bg-background p-2 text-sm"
+								className="flex-1 p-2 text-sm h-auto"
 							/>
 							<Button type="submit" size="sm" disabled={chatText.trim().length === 0}>
 								{t("pair.send")}
@@ -222,14 +224,14 @@ export function PairProgrammingPanel() {
 						<label htmlFor="room-id-input" className="block font-medium mb-1">
 							{t("pair.roomId")}
 						</label>
-						<input
+						<Input
 							id="room-id-input"
 							value={roomId}
 							onChange={(e) => setRoomId(e.target.value.slice(0, 64))}
 							maxLength={64}
 							aria-invalid={Boolean(roomIdError) || undefined}
 							aria-describedby={roomIdError ? "room-id-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						/>
 						{roomIdError && (
 							<p id="room-id-error" className="mt-1 text-xs text-destructive">
@@ -241,7 +243,7 @@ export function PairProgrammingPanel() {
 						<label htmlFor="display-name-input" className="block font-medium mb-1">
 							{t("pair.yourName")}
 						</label>
-						<input
+						<Input
 							id="display-name-input"
 							value={displayName}
 							onChange={(e) => {
@@ -252,7 +254,7 @@ export function PairProgrammingPanel() {
 							maxLength={NAME_MAX_LEN}
 							aria-invalid={Boolean(nameError) || undefined}
 							aria-describedby={nameError ? "display-name-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						/>
 						{nameError && (
 							<p id="display-name-error" className="mt-1 text-xs text-destructive">
@@ -264,18 +266,18 @@ export function PairProgrammingPanel() {
 						<label htmlFor="role-select" className="block font-medium mb-1">
 							{t("pair.role")}
 						</label>
-						<select
+						<NativeSelect
 							id="role-select"
 							value={role}
 							onChange={(e) => setRole(e.target.value as Role)}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						>
 							{ROLES.map((r) => (
 								<option key={r.value} value={r.value}>
 									{t(r.labelKey as never)}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
 				</div>
 			)}

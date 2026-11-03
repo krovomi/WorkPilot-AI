@@ -34,6 +34,7 @@ import {
 } from "./excerpts";
 import { PageHeader } from "../ui/page-header";
 
+import { NativeSelect } from "../ui/native-select";
 interface Props {
 	projectId: string;
 	onReview: (diff: string) => void;
@@ -762,21 +763,21 @@ export function ReviewWorkspace({
 					>
 						{t("workspace.paste")}
 					</Button>
-					<select
+					<NativeSelect
 						aria-label={t("workspace.comparison")}
 						value={scope}
 						onChange={(e) => {
 							setSnapshot(null);
 							setScope(e.target.value as ReviewScope);
 						}}
-						className="h-9 max-w-52 rounded-md border bg-background px-2 text-xs"
+						className="h-9 max-w-52 px-2 text-xs"
 					>
 						{(["all", "staged", "working"] as const).map((value) => (
 							<option key={value} value={value}>
 								{t(`workspace.scope.${value}`)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 					<Button
 						size="icon"
 						variant="outline"

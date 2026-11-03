@@ -19,6 +19,7 @@ import {
 	SelectValue,
 } from "../ui/select";
 
+import { Input } from "../ui/input";
 const SEVERITY_STYLES: Record<A11ySeverity, string> = {
 	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	serious: "text-orange-400 bg-orange-500/10 border-orange-500/20",
@@ -227,12 +228,12 @@ function ReportBody({
 			</div>
 
 			<div>
-				<input
+				<Input
 					type="text"
 					placeholder={t("search.placeholder")}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					className="w-full px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+					className="w-full px-3 py-2 h-auto"
 				/>
 			</div>
 

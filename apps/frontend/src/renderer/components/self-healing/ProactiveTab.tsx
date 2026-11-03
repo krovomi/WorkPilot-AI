@@ -3,6 +3,8 @@ import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { FragilityChart } from "./FragilityChart";
 import { IncidentCard } from "./IncidentCard";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 interface ProactiveTabProps {
 	readonly projectPath: string;
 }
@@ -66,7 +68,7 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 					</label>
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						<span>{t("selfHealing:riskThreshold")}:</span>
-						<input
+						<Input
 							type="number"
 							min={0}
 							max={100}
@@ -76,12 +78,12 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 									riskThreshold: Number(e.target.value),
 								})
 							}
-							className="w-16 px-2 py-0.5 rounded bg-muted border border-border text-foreground text-sm"
+							className="w-16 px-2 py-0.5 text-sm h-auto"
 						/>
 					</div>
 					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						<span>{t("selfHealing:scanFrequency")}:</span>
-						<select
+						<NativeSelect
 							value={proactiveConfig.scanFrequency}
 							onChange={(e) =>
 								setProactiveConfig(projectPath, {
@@ -91,12 +93,12 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 										| "on_push",
 								})
 							}
-							className="px-2 py-0.5 rounded bg-muted border border-border text-foreground text-sm"
+							className="px-2 py-0.5 text-sm h-auto"
 						>
 							<option value="daily">{t("selfHealing:daily")}</option>
 							<option value="weekly">{t("selfHealing:weekly")}</option>
 							<option value="on_push">{t("selfHealing:onPush")}</option>
-						</select>
+						</NativeSelect>
 					</div>
 				</div>
 			</div>

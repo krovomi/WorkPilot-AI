@@ -13,7 +13,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 			<input
 				type={type}
 				spellCheck={spellCheck ?? true}
-				lang={lang ?? i18n.language}
+				lang={lang ?? i18n?.language}
 				className={cn(
 					"flex h-10 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground",
 					"placeholder:text-muted-foreground",

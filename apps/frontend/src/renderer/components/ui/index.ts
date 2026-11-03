@@ -7,6 +7,7 @@ export * from "./combobox";
 export * from "./dialog";
 export * from "./input";
 export * from "./label";
+export * from "./native-select";
 export * from "./progress";
 export * from "./scroll-area";
 export * from "./select";

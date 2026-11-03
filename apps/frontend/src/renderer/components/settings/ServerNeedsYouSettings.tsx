@@ -26,6 +26,7 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { randomTopic } from "./NeedsYouChannels";
 
+import { NativeSelect } from "../ui/native-select";
 type Drafts = Record<NeedsYouChannelKind, Record<string, string>>;
 
 /** Each channel's fields, in order; a secret is a password field, never prefilled. */
@@ -180,9 +181,9 @@ export function ServerNeedsYouSettings() {
 						<Label htmlFor="server-needs-you-locale" className="text-sm font-normal">
 							{t("serverNeedsYou.language")}
 						</Label>
-						<select
+						<NativeSelect
 							id="server-needs-you-locale"
-							className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+							className="px-2 py-1 text-sm h-auto"
 							value={overview.locale}
 							disabled={busy !== null}
 							onChange={(e) =>
@@ -194,7 +195,7 @@ export function ServerNeedsYouSettings() {
 									{lang.nativeLabel}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
 				</div>
 			)}

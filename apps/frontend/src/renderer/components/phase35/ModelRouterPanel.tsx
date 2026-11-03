@@ -16,6 +16,8 @@ import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { PanelShell } from "./_panel-shell";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 const PROVIDER_OPTIONS = [
 	{ value: "anthropic", labelKey: "modelRouter.providerAnthropic" },
 	{ value: "openai", labelKey: "modelRouter.providerOpenai" },
@@ -118,7 +120,8 @@ export function ModelRouterPanel() {
 					<label htmlFor="prompt-input" className="block text-sm font-medium mb-1">
 						{t("modelRouter.prompt")}
 					</label>
-					<textarea
+					<Textarea
+						spellCheck={false}
 						id="prompt-input"
 						value={prompt}
 						onChange={(e) => setPrompt(e.target.value.slice(0, PROMPT_MAX_LEN))}
@@ -126,7 +129,7 @@ export function ModelRouterPanel() {
 						maxLength={PROMPT_MAX_LEN}
 						aria-invalid={Boolean(promptError) || undefined}
 						aria-describedby={promptError ? "prompt-error" : undefined}
-						className="w-full rounded border bg-background p-2 text-sm font-mono"
+						className="w-full p-2 text-sm font-mono min-h-0"
 						placeholder={t("modelRouter.promptPlaceholder")}
 					/>
 					{promptError && (
@@ -140,12 +143,12 @@ export function ModelRouterPanel() {
 						<label htmlFor="hint-input" className="block text-sm font-medium mb-1">
 							{t("modelRouter.hint")}
 						</label>
-						<input
+						<Input
 							id="hint-input"
 							value={hint}
 							onChange={(e) => setHint(e.target.value.slice(0, HINT_MAX_LEN))}
 							maxLength={HINT_MAX_LEN}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 							placeholder={t("modelRouter.hintPlaceholder")}
 						/>
 					</div>

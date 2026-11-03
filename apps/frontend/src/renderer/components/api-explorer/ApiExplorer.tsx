@@ -35,6 +35,7 @@ import { RequestPanel, CustomSelect } from "./RequestPanel";
 import { formatAppTime } from "@/lib/date-format";
 import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
+import { Input } from "../ui/input";
 // ── Endpoint Detail ──────────────────────────────────────────────────────────
 
 interface EndpointDetailProps {
@@ -355,8 +356,9 @@ export function ApiExplorer() {
 						size={16}
 						className="text-muted-foreground shrink-0"
 					/>
-					<input
-						className="flex-1 min-w-0 bg-card border border-[var(--color-border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-[var(--color-accent)]"
+					<Input
+						spellCheck={false}
+						className="flex-1 min-w-0 px-2.5 py-1.5 text-xs font-mono h-auto"
 						value={urlInput}
 						onChange={(e) => setUrlInput(e.target.value)}
 						onKeyDown={(e) => e.key === "Enter" && applySpecUrl()}
@@ -537,8 +539,8 @@ export function ApiExplorer() {
 								size={12}
 								className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
 							/>
-							<input
-								className="w-full pl-7 pr-2 py-1.5 bg-card border border-[var(--color-border)] rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[var(--color-accent)]"
+							<Input
+								className="w-full pl-7 pr-2 py-1.5 text-xs h-auto"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								placeholder={t("apiExplorer:sidebar.search")}
