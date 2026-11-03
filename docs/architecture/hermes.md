@@ -184,7 +184,10 @@ path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-hea
 (the end of an incident cycle, in `incident_responder/orchestrator.py`'s healing
 pipeline — in a `finally`, because a pipeline that failed is not a reason to skip the
 question, and reporting a step only when it filed something, since a "0 proposed" row on
-every incident is a row nobody reads), `github`. `SURFACES` is a closed set on purpose, because the surface is written into a
+every incident is a row nobody reads), `github` (the end of a pull request review, a
+follow-up review or an issue triage, through `runners/github/hermes_observe.py`, after the
+result is saved so the verdict never depends on it, and skipped in server mode for the
+same reason the API is refused there). `SURFACES` is a closed set on purpose, because the surface is written into a
 file a person reviews and a free-text field would fill with whatever string each caller
 happened to pass. The next feature to want the loop adds a line there, not a second
 ingest.
