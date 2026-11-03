@@ -819,6 +819,7 @@ def create_client(
         agents=agents,
         use_subagents=use_subagents,
         roster=roster,
+        parent_model=model,
     )
 
     if _resume_id := _resume_session_id(resume, config_dir):
@@ -1558,22 +1559,21 @@ def _add_subagents(
     agents: dict | None,
     use_subagents: bool,
     roster: str | None,
+    parent_model: str | None = None,
 ) -> None:
     """Compose the subagent roster and allow the `Agent` tool that runs it.
 
     Phase defaults, specialised by the detected language stack, with
-    caller-supplied agents winning on key collision. The phase split means the
-    planner does not carry QA subagents into its context, and vice versa; the
-    language layer means a Rust card and a .NET card no longer get the same
-    generic `test-runner` prompt.
+    caller-supplied agents winning on key collision: the planner carries no
+    QA subagents, and a Rust card and a .NET card get different `test-runner`
+    prompts.
     See: code.claude.com/docs/en/agent-sdk/subagents
 
     `use_subagents=False` is the workflow engine's `sequential-reset`: the
     resolved phase asked for dispatch the run cannot have, so the roster is
     suppressed at the source instead of being handed over to be ignored. It
-    is a separate question from the provider check inside `resolve()` — that
-    one is about capability, this one about what the phase was allowed.
-    Default True, so every existing caller keeps the behaviour it had.
+    is a separate question from the provider check inside `resolve()`
+    (capability, not what the phase was allowed). Default True.
     """
     _merged_agents = None
     try:
@@ -1581,16 +1581,16 @@ def _add_subagents(
             raise _NoSubagents
         from subagents import resolve as _resolve_subagents
 
-        # The provider matters: `resolve` returns no roster at all for one
-        # that cannot run subagents, rather than handing the SDK a list it
-        # will ignore. Omitting it here was why that degradation, though
-        # implemented and tested, never fired in a real run.
+        # The provider matters: `resolve` returns no roster for one that
+        # cannot run subagents (omitted, that degradation never fired).
+        # `parent_model` caps each subagent's tier at the session's model.
         _merged_agents = _resolve_subagents(
             agent_type,
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
             roster_name=roster,
+            parent_model=parent_model,
         )
     except _NoSubagents:
         logger.debug(

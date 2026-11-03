@@ -374,12 +374,12 @@ describe("buildModelSelectOptions", () => {
 	it("aligne un alias court persisté sur l'entrée du catalogue", () => {
 		const { options, value } = buildModelSelectOptions(
 			anthropicCatalog,
-			"opus",
+			"opus-4-6",
 		);
 		expect(options).toHaveLength(anthropicCatalog.length);
-		// "opus" → claude-opus-4-6 (cf. MODEL_ID_MAP), déjà présent.
+		// "opus-4-6" → claude-opus-4-6 (cf. MODEL_ID_MAP), déjà présent.
 		expect(value).toBe("claude-opus-4-6");
-		expect(options.some((o) => o.value === "opus")).toBe(false);
+		expect(options.some((o) => o.value === "opus-4-6")).toBe(false);
 	});
 
 	it("laisse la valeur inchangée si déjà au format catalogue", () => {

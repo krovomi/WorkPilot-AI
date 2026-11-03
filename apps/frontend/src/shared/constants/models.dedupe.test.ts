@@ -7,8 +7,10 @@ import {
 
 describe("getCanonicalModelKey", () => {
 	it("résout les alias courts vers l'id complet", () => {
-		expect(getCanonicalModelKey("opus")).toBe("claude-opus-4-6");
-		expect(getCanonicalModelKey("sonnet")).toBe("claude-sonnet-4-6");
+		expect(getCanonicalModelKey("opus")).toBe("claude-opus-5-5");
+		expect(getCanonicalModelKey("sonnet")).toBe("claude-sonnet-5-5");
+		expect(getCanonicalModelKey("haiku")).toBe("claude-haiku-5-5");
+		expect(getCanonicalModelKey("opus-4-6")).toBe("claude-opus-4-6");
 		expect(getCanonicalModelKey("opus-4-8")).toBe("claude-opus-4-8");
 	});
 
@@ -46,7 +48,7 @@ describe("getCanonicalModelKey", () => {
 describe("dedupeModelCatalog", () => {
 	it("garde l'id explicite versionné et masque alias + snapshot daté", () => {
 		const input = [
-			{ value: "opus", label: "Claude Opus 4.6" },
+			{ value: "opus-4-6", label: "Claude Opus 4.6" },
 			{ value: "claude-opus-4-6", label: "Claude Opus 4.6" },
 			{ value: "opus-4-5", label: "Claude Opus 4.5" },
 			{ value: "claude-opus-4-5-20251101", label: "Claude Opus 4.5" },
@@ -56,7 +58,7 @@ describe("dedupeModelCatalog", () => {
 		// Une seule entrée par version.
 		expect(values).toEqual(["claude-opus-4-6", "claude-opus-4-5-20251101"]);
 		// L'alias court a bien été masqué.
-		expect(values).not.toContain("opus");
+		expect(values).not.toContain("opus-4-6");
 		expect(values).not.toContain("opus-4-5");
 	});
 
@@ -109,7 +111,9 @@ describe("resolveCatalogModelValue", () => {
 	];
 
 	it("mappe un alias persisté vers l'entrée canonique visible", () => {
-		expect(resolveCatalogModelValue("opus", catalog)).toBe("claude-opus-4-6");
+		expect(resolveCatalogModelValue("opus-4-6", catalog)).toBe(
+			"claude-opus-4-6",
+		);
 		expect(resolveCatalogModelValue("opus-4-8", catalog)).toBe(
 			"claude-opus-4-8",
 		);

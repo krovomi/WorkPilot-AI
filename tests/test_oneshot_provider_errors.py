@@ -9,6 +9,7 @@ completion, so the prompt optimizer displayed it as the optimized prompt, with
 """
 
 import asyncio
+import importlib
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -125,7 +126,14 @@ def test_classify_names_an_unknown_model_whichever_provider_said_it():
 def test_the_claude_client_applies_the_chosen_effort(monkeypatch):
     # "none" must reach the SDK as 0: None would mean "the agent type's
     # default", and a page set to no thinking would think anyway.
-    from core import oneshot, simple_client
+    from core import oneshot
+
+    # `_claude_client` reads `create_simple_client` from sys.modules when it
+    # runs. test_qa_loop.py mocks `core.simple_client` while it is collected:
+    # when its tests are in another CI shard, the mock is deleted, and the
+    # `core` package keeps its `simple_client` attribute on the old copy, so
+    # `from core import simple_client` patched a module the call never read.
+    simple_client = importlib.import_module("core.simple_client")
 
     budgets = []
 
