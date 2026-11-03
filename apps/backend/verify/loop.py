@@ -42,6 +42,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .detect import Detection, Target, detect_targets
 from .errors import VerifyError, console_errors, network_errors
@@ -165,17 +166,45 @@ def _fix_request(
 
 async def _browser_errors(toolbox, target: Target, url: str) -> list[VerifyError]:
     """Console errors and failed requests of the landing page, after load."""
-    if target.kind not in ("web-frontend", "desktop") or not url:
+    if not _has_pages(target) or not url or not await _page_answers(target, url):
         return []
     browser = await toolbox.browser(target)
     if not browser.available:
         return []
-    if target.kind == "web-frontend":
+    if target.kind != "desktop":
         await browser.navigate(url)
         await asyncio.sleep(1.0)
     return console_errors(await browser.console()) + network_errors(
         await browser.network()
     )
+
+
+def _same_origin(candidate: str | None, url: str) -> bool:
+    """A URL on ``url``'s app; a bare path is on whichever app is open."""
+    if not candidate:
+        return False
+    a, b = urlsplit(candidate), urlsplit(url)
+    return not a.netloc or (a.scheme, a.netloc) == (b.scheme, b.netloc)
+
+
+async def _page_answers(target: Target, url: str) -> bool:
+    """A backend's landing page is a page, not a 404 or a login wall's error.
+
+    A backend's pages may all live under a path (`/shop/`): its root answering
+    404 is not a defect of the task, so it is neither read for errors nor
+    captured. A front end's root is always its page.
+    """
+    if target.kind != "backend-api":
+        return True
+    from .launch import probe
+
+    status = await asyncio.to_thread(probe, url)
+    return status is not None and status < 400
+
+
+def _has_pages(target: Target) -> bool:
+    """A page to open in the browser: a front end, Electron, or a backend's views."""
+    return target.kind in ("web-frontend", "desktop") or target.pages
 
 
 async def _launch_and_fix(
@@ -282,8 +311,13 @@ def _verifier_prompt(options: LoopOptions, record: dict, endpoints_hint: str) ->
         where = target.get("url") or ""
         if target.get("window"):
             where = f'window "{target["window"].get("title", "")}" (drive it with verify_window)'
+        pages = (
+            ", renders pages: open them with verify_browser"
+            if target.get("pages")
+            else ""
+        )
         lines.append(
-            f"- `{target['name']}` ({target['kind']}, {target.get('framework') or '?'}): "
+            f"- `{target['name']}` ({target['kind']}, {target.get('framework') or '?'}{pages}): "
             f"{launch_info.get('status')} {where} — errors left: {len(target.get('errors') or [])}"
         )
         for error in (target.get("errors") or [])[:5]:
@@ -352,9 +386,15 @@ async def _deterministic_evidence(
         url = toolbox.url_of(target)
         if not url:
             continue
-        if target.kind in ("web-frontend", "desktop"):
+        confirmed = [u for u in confirmed_urls if _same_origin(u, url)]
+        if _has_pages(target) and (confirmed or await _page_answers(target, url)):
+            # The page the verifier confirmed, when it is on this app: with a
+            # front end and a backend's views both open, each keeps its own.
+            current = toolbox._current_url
             page = (
-                confirmed_urls[-1] if confirmed_urls else (toolbox._current_url or url)
+                confirmed[-1]
+                if confirmed
+                else (current if _same_origin(current, url) else url)
             )
             if settings.perf_trace:
                 options.log(f"verify: performance trace of {page}")
@@ -370,14 +410,14 @@ async def _deterministic_evidence(
                 },
             )
             browser = await toolbox.browser(target)
-            if browser.available and target.kind == "web-frontend":
+            if browser.available and target.kind != "desktop":
                 await browser.emulate("mobile")
                 await toolbox.call(
                     "verify_screenshot",
                     {"label": f"{target.name} mobile view", "target": target.name},
                 )
                 await browser.emulate("desktop")
-        elif target.kind == "backend-api":
+        if target.kind == "backend-api":
             if not endpoint_events:
                 await _call_touched_endpoints(toolbox, target, options)
             await _latency_sample(toolbox, target)

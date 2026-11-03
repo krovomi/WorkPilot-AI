@@ -89,7 +89,21 @@ _NODE_FRONTEND = (
     "svelte",
     "vue",
     "astro",
+    "@remix-run/dev",
+    "@remix-run/react",
+    "gatsby",
+    "@builder.io/qwik",
+    "ember-source",
+    "lit",
+    "@docusaurus/core",
+    "@11ty/eleventy",
+    "webpack-dev-server",
+    "parcel",
+    "@stencil/core",
 )
+#: UI libraries with no server of their own: a page only when no API
+#: framework sits beside them (an API may render its e-mails with React).
+_NODE_UI_LIBS = ("react", "preact", "solid-js", "lit")
 
 
 @dataclass
@@ -116,6 +130,9 @@ class Target:
     platforms: list[str] = field(default_factory=list)
     #: A file of the task lives under `root`.
     touched: bool = False
+    #: A backend that renders pages (Razor, Blazor Server, Django, Rails…):
+    #: opened in the browser as well as called (`verify.web_stacks`).
+    pages: bool = False
     #: ``recipe`` when a learned recipe supplied the command, else ``detected``.
     origin: str = "detected"
     notes: list[str] = field(default_factory=list)
@@ -223,6 +240,16 @@ def _read_json(path: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _page_file(directory: Path) -> str:
+    from .web_stacks import serves_pages
+
+    return serves_pages(directory)
+
+
+def _pages(directory: Path) -> bool:
+    return bool(_page_file(directory))
+
+
 # ---------------------------------------------------------------------------
 # Detectors
 # ---------------------------------------------------------------------------
@@ -273,7 +300,9 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
         )
 
     is_api = any(d in deps for d in _NODE_API)
-    is_frontend = any(d in deps for d in _NODE_FRONTEND)
+    is_frontend = any(d in deps for d in _NODE_FRONTEND) or (
+        not is_api and any(d in deps for d in _NODE_UI_LIBS)
+    )
     if is_api and not is_frontend:
         command = _script("start:dev", "dev", "start")
         if not command:
@@ -291,6 +320,7 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
             command=command,
             port=3000,
             port_env=["PORT"],
+            pages=_pages(directory),
         )
     if not is_frontend:
         return None
@@ -377,15 +407,18 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
                 out.append(app)
             continue
         rel = _project_arg(csproj)
-        blazor = "BlazorWebAssembly" in text or (csproj.parent / "Pages").is_dir()
+        wasm = "BlazorWebAssembly" in text
+        # Blazor Server / Web App, Razor Pages, MVC: pages the server renders.
+        page = "" if wasm else _page_file(csproj.parent)
         out.append(
             Target(
-                kind="web-frontend" if "BlazorWebAssembly" in text else "backend-api",
+                kind="web-frontend" if wasm else "backend-api",
                 name=csproj.stem,
                 root=_relative(csproj.parent, project_dir),
                 framework="blazor"
-                if blazor and "BlazorWebAssembly" in text
-                else "aspnetcore",
+                if wasm or page.endswith(".razor")
+                else ("aspnetcore-razor" if page else "aspnetcore"),
+                pages=bool(page),
                 # --no-launch-profile: launchSettings.json's applicationUrl
                 # would override ASPNETCORE_URLS, and the port is ours to pick.
                 command=f"dotnet run --project {rel} --no-launch-profile",
@@ -431,6 +464,7 @@ def _python_target(directory: Path, project_dir: Path) -> Target | None:
         port=int(found.get("port") or 8000),
         port_env=["PORT"],
         env=env,
+        pages=framework != "streamlit" and _pages(directory),
     )
 
 
@@ -468,6 +502,7 @@ def _jvm_target(directory: Path, project_dir: Path) -> Target | None:
         command=command,
         port=8080,
         port_env=["SERVER_PORT"],
+        pages=_pages(directory),
     )
 
 
@@ -488,6 +523,7 @@ def _go_target(directory: Path, project_dir: Path) -> Target | None:
         command="go run .",
         port=8080,
         port_env=["PORT"],
+        pages=_pages(directory),
     )
 
 
@@ -606,6 +642,8 @@ def detect_targets(
     if not root.is_dir():
         return Detection(reason="project directory not found")
 
+    from .web_stacks import EXTRA_DETECTORS, static_target
+
     targets: list[Target] = []
     try:
         targets.extend(_mobile_targets(root))
@@ -617,7 +655,8 @@ def detect_targets(
                 # A Flutter/RN tree carries a package.json or a Gradle build of
                 # its own: it is the phone app, not a second web target.
                 continue
-            for detector in (_node_target, _python_target, _jvm_target, _go_target):
+            detectors = (_node_target, _python_target, _jvm_target, _go_target)
+            for detector in (*detectors, *EXTRA_DETECTORS):
                 try:
                     found = detector(directory, root)
                 except Exception as exc:  # noqa: BLE001 - one detector never sinks the rest
@@ -627,6 +666,10 @@ def detect_targets(
                     t.root == found.root and t.kind == found.kind for t in targets
                 ):
                     targets.append(found)
+            if not any(t.root == rel for t in targets):
+                site = static_target(directory, root)
+                if site is not None:
+                    targets.append(site)
     except Exception as exc:  # noqa: BLE001
         logger.warning("verify: detection failed: %s", exc)
 
