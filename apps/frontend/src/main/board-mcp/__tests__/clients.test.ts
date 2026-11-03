@@ -27,6 +27,7 @@ const writable: Exclude<ClientFormat, "claude-code">[] = [
 	"vscode",
 	"opencode",
 	"codex-toml",
+	"hermes-yaml",
 ];
 
 describe("serverName", () => {
@@ -41,14 +42,19 @@ describe.each(writable)("format %s", (format) => {
 	const existing =
 		format === "codex-toml"
 			? 'model = "o5"\n\n[mcp_servers.other]\ncommand = "x"\nargs = []\n'
-			: JSON.stringify({ theme: "dark", [format === "vscode" ? "servers" : format === "opencode" ? "mcp" : "mcpServers"]: { other: { command: "x" } } });
+			: format === "hermes-yaml"
+				? "# my hermes config\nmodel: o5\nmcp_servers:\n  other:\n    command: x\n"
+				: JSON.stringify({ theme: "dark", [format === "vscode" ? "servers" : format === "opencode" ? "mcp" : "mcpServers"]: { other: { command: "x" } } });
 
 	it("writes the entry and keeps the rest", () => {
 		const text = withEntry(format, existing, "workpilot-app", entry);
 		expect(entryState(format, text, "workpilot-app", entry)).toBe("current");
 		expect(entryState(format, text, "other", entry)).toBe("stale");
 		if (format === "codex-toml") expect(text).toContain('model = "o5"');
-		else expect(JSON.parse(text).theme).toBe("dark");
+		else if (format === "hermes-yaml") {
+			expect(text).toContain("# my hermes config");
+			expect(text).toContain("model: o5");
+		} else expect(JSON.parse(text).theme).toBe("dark");
 	});
 
 	it("sees an entry that runs something else as stale, and rewrites it", () => {
@@ -98,6 +104,19 @@ describe("formats as each client documents them", () => {
 		expect(entryState("codex-toml", text, "w", windows)).toBe("current");
 	});
 
+	it("hermes gets mcp_servers in its YAML config, comments kept", () => {
+		const windows: ServerEntry = { command: "C:\\Py\\python.exe", args: ["C:\\a b\\board_mcp.py"] };
+		const before = "# hermes\nmodel:\n  default: x # inline\n";
+		const text = withEntry("hermes-yaml", before, "w", windows);
+		expect(text).toContain("# hermes");
+		expect(text).toContain("# inline");
+		expect(entryState("hermes-yaml", text, "w", windows)).toBe("current");
+		expect(withEntry("hermes-yaml", before, "w", null)).toBe(before);
+		expect(entryState("hermes-yaml", snippet("hermes-yaml", "w", windows), "w", windows)).toBe(
+			"current",
+		);
+	});
+
 	it("Claude Code is read from ~/.claude.json and written through its CLI", () => {
 		const text = JSON.stringify({ mcpServers: { w: { type: "stdio", ...entry } }, projects: {} });
 		expect(entryState("claude-code", text, "w", entry)).toBe("current");
@@ -118,6 +137,16 @@ describe("unreadable files", () => {
 		);
 		expect(() => withEntry("mcp-servers", "[]", "w", entry)).toThrow(ConfigParseError);
 	});
+
+	it("refuses a hermes config that is not a mapping, or does not parse", () => {
+		expect(() => entryState("hermes-yaml", "- a\n- b\n", "w", entry)).toThrow(ConfigParseError);
+		expect(() => withEntry("hermes-yaml", "mcp_servers: [x]\n", "w", entry)).toThrow(
+			ConfigParseError,
+		);
+		expect(() => entryState("hermes-yaml", "a: [unclosed\n", "w", entry)).toThrow(
+			ConfigParseError,
+		);
+	});
 });
 
 describe("clientDefinitions", () => {
@@ -133,5 +162,10 @@ describe("clientDefinitions", () => {
 		expect(file("claude-desktop")).toBe("/ad/Claude/claude_desktop_config.json");
 		expect(file("windsurf")).toBe("/h/.codeium/windsurf/mcp_config.json");
 		expect(file("opencode")).toBe("/h/.config/opencode/opencode.json");
+		expect(file("hermes")).toBe("/h/.hermes/config.yaml");
+		const custom = clientDefinitions({ home: "/h", appData: "/ad", hermesHome: "/hh" });
+		expect(custom.find((d) => d.id === "hermes")?.file.replaceAll("\\", "/")).toBe(
+			"/hh/config.yaml",
+		);
 	});
 });

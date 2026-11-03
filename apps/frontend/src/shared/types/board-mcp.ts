@@ -17,6 +17,7 @@ export const BOARD_MCP_CLIENTS = [
 	"claude-desktop",
 	"windsurf",
 	"opencode",
+	"hermes",
 ] as const;
 
 export type BoardMcpClientId = (typeof BOARD_MCP_CLIENTS)[number];
@@ -32,6 +33,7 @@ export const BOARD_MCP_CLIENT_NAMES: Readonly<Record<BoardMcpClientId, string>> 
 	"claude-desktop": "Claude Desktop",
 	windsurf: "Windsurf",
 	opencode: "OpenCode",
+	hermes: "Hermes Agent",
 };
 
 export function isBoardMcpClient(value: unknown): value is BoardMcpClientId {

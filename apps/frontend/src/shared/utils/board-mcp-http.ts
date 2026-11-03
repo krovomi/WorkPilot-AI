@@ -5,6 +5,8 @@
  * Streamable HTTP, as each app documents it (November 2026). Claude Desktop
  * takes remote servers only as connectors (OAuth), so its entry goes through
  * the `mcp-remote` bridge, the token in an environment variable of the entry.
+ * Hermes reads YAML (`$HERMES_HOME/config.yaml`): an entry with a `url` is
+ * Streamable HTTP, and its `headers` are sent as configured.
  */
 
 import type { BoardMcpClientId } from "../types/board-mcp";
@@ -65,6 +67,15 @@ export function httpSnippet(client: BoardMcpClientId, url: string, token: string
 				$schema: "https://opencode.ai/config.json",
 				mcp: { [name]: { type: "remote", url, headers, enabled: true } },
 			});
+		case "hermes":
+			return [
+				"mcp_servers:",
+				`  ${name}:`,
+				`    url: ${JSON.stringify(url)}`,
+				"    headers:",
+				`      Authorization: ${JSON.stringify(auth)}`,
+				"",
+			].join("\n");
 		case "claude-desktop":
 			return json({
 				mcpServers: {

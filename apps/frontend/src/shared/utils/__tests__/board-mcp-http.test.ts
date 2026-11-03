@@ -3,6 +3,7 @@
  * each app reads, and the token only where the app sends it as a header.
  */
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { BOARD_MCP_CLIENTS } from "../../types/board-mcp";
 import { httpSnippet, SERVER_MCP_NAME } from "../board-mcp-http";
 
@@ -61,6 +62,14 @@ describe("httpSnippet", () => {
 			url: URL,
 			headers: { Authorization: AUTH },
 			enabled: true,
+		});
+	});
+
+	it("writes Hermes's YAML: a url entry is Streamable HTTP, its headers sent as is", () => {
+		expect(parseYaml(httpSnippet("hermes", URL, TOKEN))).toEqual({
+			mcp_servers: {
+				[SERVER_MCP_NAME]: { url: URL, headers: { Authorization: AUTH } },
+			},
 		});
 	});
 

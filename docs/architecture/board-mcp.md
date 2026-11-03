@@ -29,6 +29,7 @@ detected), a button that writes the entry, and what to paste by hand:
 | Claude Desktop | `<appData>/Claude/claude_desktop_config.json`, `mcpServers` | JSON merge |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`, `mcpServers` | JSON merge |
 | OpenCode | `~/.config/opencode/opencode.json` (`XDG_CONFIG_HOME`), `mcp`, `command` as one array | JSON merge |
+| Hermes Agent | `~/.hermes/config.yaml` (`HERMES_HOME`; `%LOCALAPPDATA%\hermes` on Windows), `mcp_servers` | YAML document edit (`yaml`'s `parseDocument`): the entry alone, the person's comments kept; a file that does not parse or is not a mapping is left alone |
 
 The code is `main/board-mcp/` (formats in `clients.ts`, files in
 `service.ts`) and `main/ipc-handlers/board-mcp-handlers.ts`.
@@ -185,8 +186,9 @@ runs the command written in a config and checks it answers `initialize`.
 In server mode the same boards are reachable without a local copy:
 `POST <server>/mcp`, Streamable HTTP (`apps/backend/shared_board/mcp_http.py`).
 Any app that takes a remote MCP server works: Claude Code, Codex, Gemini CLI,
-GitHub Copilot (CLI and VS Code), Cursor, Windsurf and OpenCode natively,
-Claude Desktop through the `mcp-remote` bridge.
+GitHub Copilot (CLI and VS Code), Cursor, Windsurf, OpenCode and Hermes Agent
+natively (Hermes reads an `mcp_servers` entry with a `url` as Streamable HTTP and
+sends its `headers`), Claude Desktop through the `mcp-remote` bridge.
 
 ### Access tokens
 
