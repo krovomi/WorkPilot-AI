@@ -153,7 +153,7 @@ export function GoalCard({ task, editable = true }: GoalCardProps) {
 						<Target className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:goal.title")}</span>
 						{verdict && goal && (
-							<Badge variant={goalStatusVariant(verdict.status)} className="text-[10px]">
+							<Badge variant={goalStatusVariant(verdict.status)} className="text-3xs">
 								{t(`tasks:goal.status.${verdict.status}`)}
 							</Badge>
 						)}
@@ -225,7 +225,7 @@ export function GoalCard({ task, editable = true }: GoalCardProps) {
 							{t("tasks:goal.fields.command")}
 						</Label>
 						<Input {...field("command")} placeholder="dotnet test" className="font-mono text-xs" />
-						<p className="text-[11px] text-muted-foreground">{t("tasks:goal.fields.commandHint")}</p>
+						<p className="text-2xs text-muted-foreground">{t("tasks:goal.fields.commandHint")}</p>
 					</div>
 					<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
 						{(["expectedExit", "maxRounds", "maxCostUsd", "timeoutSeconds"] as const).map((key) => (
@@ -242,7 +242,7 @@ export function GoalCard({ task, editable = true }: GoalCardProps) {
 							{t("tasks:goal.fields.protected")}
 						</Label>
 						<Textarea {...field("protected")} rows={2} placeholder="tests/**" className="font-mono text-xs" />
-						<p className="text-[11px] text-muted-foreground">{t("tasks:goal.fields.protectedHint")}</p>
+						<p className="text-2xs text-muted-foreground">{t("tasks:goal.fields.protectedHint")}</p>
 					</div>
 					{error && <p className="text-xs text-destructive">{error}</p>}
 					<div className="flex flex-wrap justify-end gap-2">

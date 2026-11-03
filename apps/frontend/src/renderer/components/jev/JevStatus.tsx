@@ -147,7 +147,7 @@ export function JevStatus({
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-center gap-2">
 							<h3 className="text-sm font-semibold">{t("jev.card.title")}</h3>
-							<Badge variant={pill.variant} className="gap-1 text-[10px]">
+							<Badge variant={pill.variant} className="gap-1 text-3xs">
 								<pill.icon className="h-2.5 w-2.5" aria-hidden />
 								{t(`jev.card.state.${reason}`)}
 							</Badge>
@@ -172,7 +172,7 @@ export function JevStatus({
 							/>
 						))}
 					</div>
-					<p className="mt-1.5 text-[11px] text-muted-foreground">
+					<p className="mt-1.5 text-2xs text-muted-foreground">
 						{t("jev.card.historyNote", { revision: latest.revision.slice(0, 12) })}
 					</p>
 				</div>
@@ -210,7 +210,7 @@ export function JevStatus({
 								aria-pressed={mode === m}
 								onClick={() => void setMode(m)}
 								className={cn(
-									"inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
+									"inline-flex items-center gap-1 rounded-md px-2 py-1 text-2xs transition-colors",
 									mode === m
 										? "bg-primary text-primary-foreground shadow-sm"
 										: "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -236,13 +236,13 @@ export function JevStatus({
 				)}
 			</div>
 			{isOffline && (
-				<p className="flex items-center gap-1.5 px-4 pb-2.5 text-[11px] text-muted-foreground">
+				<p className="flex items-center gap-1.5 px-4 pb-2.5 text-2xs text-muted-foreground">
 					<WifiOff className="h-3 w-3" aria-hidden />
 					{t("jev.card.offlineHint")}
 				</p>
 			)}
 			{saveError && (
-				<p className="px-4 pb-2.5 text-[11px] text-destructive" role="alert">
+				<p className="px-4 pb-2.5 text-2xs text-destructive" role="alert">
 					{t("jev.error")}
 				</p>
 			)}
@@ -287,7 +287,7 @@ function AnswerTile({
 
 	return (
 		<div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-			<div className="text-[11px] text-muted-foreground">
+			<div className="text-2xs text-muted-foreground">
 				{t(`jev.answers.${name}`, { defaultValue: name })}
 			</div>
 			{scaled ? (
@@ -311,7 +311,7 @@ function AnswerTile({
 				<div className="mt-0.5 truncate text-sm font-medium">{String(value)}</div>
 			)}
 			{confidence !== undefined && (
-				<div className="text-[10px] text-muted-foreground">
+				<div className="text-3xs text-muted-foreground">
 					{t("jev.confidence", { value: Math.round(confidence * 100) })}
 				</div>
 			)}

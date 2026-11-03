@@ -65,7 +65,7 @@ export function ActivityBadge({
 				className={cn(
 					"block rounded-full",
 					count > 1
-						? "min-w-[14px] px-1 text-center font-mono text-[9px] font-semibold leading-[14px]"
+						? "min-w-[14px] px-1 text-center font-mono text-3xs font-semibold leading-[14px]"
 						: "h-2 w-2",
 					count > 1 ? FILLED_COUNT_BY_STATUS[status] : DOT_BY_STATUS[status],
 					attention && "animate-activity-attention",

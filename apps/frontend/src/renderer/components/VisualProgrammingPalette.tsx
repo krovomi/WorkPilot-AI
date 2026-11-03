@@ -94,7 +94,7 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 			<div className="px-1">
 				<div className="mb-2 flex items-baseline justify-between">
 					<span className="text-sm font-semibold">{t("palette")}</span>
-					<span className="text-[10px] tabular-nums text-muted-foreground">
+					<span className="text-3xs tabular-nums text-muted-foreground">
 						{t("blockCount", "{{count}} blocs", { count: total })}
 					</span>
 				</div>
@@ -137,7 +137,7 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 									type="button"
 									onClick={() => toggle(cat.labelKey)}
 									aria-expanded={isOpen}
-									className="flex w-full items-center gap-1 rounded px-1 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+									className="flex w-full items-center gap-1 rounded px-1 py-1 text-3xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
 								>
 									<ChevronRight
 										className={`h-3 w-3 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
@@ -158,7 +158,7 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 				)}
 			</div>
 
-			<p className="shrink-0 border-t px-1 pt-2 text-[10px] leading-snug text-muted-foreground">
+			<p className="shrink-0 border-t px-1 pt-2 text-3xs leading-snug text-muted-foreground">
 				{t("paletteHint", "Glissez un bloc sur le canvas, ou cliquez-le.")}
 			</p>
 		</div>

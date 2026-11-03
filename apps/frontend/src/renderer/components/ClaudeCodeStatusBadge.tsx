@@ -551,12 +551,12 @@ export function ClaudeCodeStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" || status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{t("common:install", "Install")}
 										</span>
 									)}
@@ -621,7 +621,7 @@ export function ClaudeCodeStatusBadge({
 										{t("navigation:claudeCode.path", "Path")}:
 									</span>
 									<span
-										className="font-mono text-[10px] truncate max-w-[140px]"
+										className="font-mono text-3xs truncate max-w-[140px]"
 										title={versionInfo.path}
 									>
 										{versionInfo.path}
@@ -763,7 +763,7 @@ export function ClaudeCodeStatusBadge({
 										>
 											<div className="flex flex-col">
 												<span
-													className="font-mono text-[10px] truncate max-w-[180px]"
+													className="font-mono text-3xs truncate max-w-[180px]"
 													title={installation.path}
 												>
 													{/* Split on both path separators for cross-platform compatibility */}
@@ -772,7 +772,7 @@ export function ClaudeCodeStatusBadge({
 														.slice(-2)
 														.join("/") || installation.path}
 												</span>
-												<span className="text-muted-foreground text-[9px]">
+												<span className="text-muted-foreground text-3xs">
 													{installation.version
 														? `v${installation.version}`
 														: t(

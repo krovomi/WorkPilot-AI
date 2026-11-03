@@ -124,7 +124,7 @@ export function PromptPreviewDialog({
 									{preview.allowed_tools.map((tool) => (
 										<code
 											key={tool}
-											className="px-1.5 py-0.5 rounded bg-muted text-[10px]"
+											className="px-1.5 py-0.5 rounded bg-muted text-3xs"
 										>
 											{tool}
 										</code>

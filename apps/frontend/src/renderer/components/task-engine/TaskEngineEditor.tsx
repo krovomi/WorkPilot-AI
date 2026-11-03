@@ -135,7 +135,7 @@ export function TaskEngineEditor({
 				)}
 				{t("tasks:engine.perPhase")}
 				{!uniform && (
-					<span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+					<span className="rounded bg-primary/10 px-1.5 py-0.5 text-2xs text-primary">
 						{t("tasks:engine.mixed")}
 					</span>
 				)}

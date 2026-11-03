@@ -6,6 +6,11 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
 
+  /* Small type steps under text-xs, in rem so they follow the UI scale
+     setting (a px size stays the same at 75 % and at 200 %). */
+  --text-3xs: 0.625rem;
+  --text-2xs: 0.6875rem;
+
   /* Colors - using CSS variables for theme switching */
   --color-border: var(--border);
   --color-input: var(--input);

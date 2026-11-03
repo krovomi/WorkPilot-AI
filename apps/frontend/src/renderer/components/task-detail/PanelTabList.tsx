@@ -89,7 +89,7 @@ export function PanelTabList({ taskId, active, onSelect, badges }: PanelTabListP
 						<Icon className="h-3.5 w-3.5" aria-hidden />
 						{t(`tasks:panel.sections.${id}.title`)}
 						{badge > 0 && (
-							<span className="rounded-full bg-warning px-1.5 text-[10px] font-semibold leading-4 text-warning-foreground">
+							<span className="rounded-full bg-warning px-1.5 text-3xs font-semibold leading-4 text-warning-foreground">
 								<span aria-hidden>{badge}</span>
 								<span className="sr-only">
 									{t("tasks:panel.pendingDecisions", { count: badge })}

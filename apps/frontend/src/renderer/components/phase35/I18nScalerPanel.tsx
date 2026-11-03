@@ -144,7 +144,7 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								key={value}
 								size="sm"
 								variant={mode === value ? "secondary" : "ghost"}
-								className="h-6 px-2 text-[11px]"
+								className="h-6 px-2 text-2xs"
 								onClick={() => setMode(value)}
 							>
 								{t(`i18nScaler.mode.${value}`)}
@@ -292,8 +292,8 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 										void editor.loadNamespaces(root.path, effectiveSource);
 									}}
 								>
-									<span className="font-mono text-[11px]">{root.relative}</span>
-									<span className="text-[10px] font-normal text-muted-foreground">
+									<span className="font-mono text-2xs">{root.relative}</span>
+									<span className="text-3xs font-normal text-muted-foreground">
 										{t("i18nScaler.detectedMeta", {
 											locales: root.locales.join(", "),
 											count: root.namespaces,

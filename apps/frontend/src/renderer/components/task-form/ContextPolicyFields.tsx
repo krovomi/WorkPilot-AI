@@ -82,7 +82,7 @@ export function ContextPolicyControls({
 						</RadioGroupPrimitive.Item>
 					))}
 				</RadioGroupPrimitive.Root>
-				<p className="text-[11px] leading-snug text-muted-foreground">
+				<p className="text-2xs leading-snug text-muted-foreground">
 					{t(`tasks:contextManagement.modeHints.${value.mode}`)}
 				</p>
 			</div>
@@ -117,7 +117,7 @@ export function ContextPolicyControls({
 					})}
 					className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-success/60 via-warning/60 to-destructive/60 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
 				/>
-				<div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+				<div className="flex justify-between text-3xs text-muted-foreground tabular-nums">
 					<span>{CONTEXT_THRESHOLD_MIN}%</span>
 					<span>{CONTEXT_THRESHOLD_MAX}%</span>
 				</div>
@@ -129,7 +129,7 @@ export function ContextPolicyControls({
 						{t("tasks:contextManagement.prepareHandoff.label")}
 					</Label>
 					{!dense && (
-						<p className="text-[11px] leading-snug text-muted-foreground">
+						<p className="text-2xs leading-snug text-muted-foreground">
 							{t("tasks:contextManagement.prepareHandoff.hint")}
 						</p>
 					)}
@@ -166,7 +166,7 @@ export function ContextProviderHint({
 	const label = providerRegistry.getProvider(provider)?.label ?? provider;
 	return (
 		<p
-			className={cn("text-[11px] text-muted-foreground", className)}
+			className={cn("text-2xs text-muted-foreground", className)}
 			data-testid="context-provider-hint"
 		>
 			{t(`tasks:contextManagement.provider.${support}`, { provider: label })}

@@ -335,7 +335,7 @@ export function RoadmapKanbanView({
 						<div className="drag-overlay-card">
 							<Card className="p-4 w-80 shadow-2xl">
 								<div className="flex items-center gap-2 mb-1">
-									<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+									<Badge variant="outline" className="text-3xs px-1.5 py-0">
 										{getStatusLabelForFeature(activeFeature)}
 									</Badge>
 								</div>

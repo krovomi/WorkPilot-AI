@@ -57,7 +57,7 @@ function EvidenceRow({ evidence }: { readonly evidence: BountyEvidence }) {
 	});
 
 	return (
-		<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+		<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs">
 			<span className="inline-flex items-center gap-1 text-muted-foreground">
 				<GitCompare className="w-3 h-3" aria-hidden="true" />
 				{diffLabel}
@@ -90,7 +90,7 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 					)}
 				</div>
 				<span
-					className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${statusClass}`}
+					className={`text-3xs uppercase tracking-wider px-2 py-0.5 rounded-full ${statusClass}`}
 				>
 					{t(`bountyBoard:status.${contestant.status}`, contestant.status)}
 				</span>
@@ -100,7 +100,7 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 				{contestant.provider}:{contestant.model}
 			</div>
 
-			<div className="grid grid-cols-3 gap-2 text-[11px]">
+			<div className="grid grid-cols-3 gap-2 text-2xs">
 				<div>
 					<div className="text-muted-foreground">
 						{t("bountyBoard:metrics.score", "Score")}
@@ -128,7 +128,7 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 			{contestant.evidence && <EvidenceRow evidence={contestant.evidence} />}
 
 			{breakdown.length > 0 && (
-				<div className="text-[10px] text-muted-foreground flex flex-wrap gap-2">
+				<div className="text-3xs text-muted-foreground flex flex-wrap gap-2">
 					{breakdown.map(([criterion, points]) => (
 						<span
 							key={criterion}
@@ -155,13 +155,13 @@ export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 			)}
 
 			{rationale && (
-				<div className="text-[11px] text-muted-foreground italic border-t border-border pt-2">
+				<div className="text-2xs text-muted-foreground italic border-t border-border pt-2">
 					{rationale}
 				</div>
 			)}
 
 			{contestant.error && (
-				<div className="text-[11px] text-red-500 border-t border-red-500/30 pt-2">
+				<div className="text-2xs text-red-500 border-t border-red-500/30 pt-2">
 					{contestant.error}
 				</div>
 			)}
