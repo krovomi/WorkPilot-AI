@@ -837,7 +837,7 @@ class TestClaudeEffortFollowsTheUser:
         )
 
     def test_sonnet_5_5_gets_the_effort_too(self, tmp_path, monkeypatch):
-        # F154: Sonnet 4.6+, Haiku 5+ and Fable take effort; only Opus got it.
+        # F153: Sonnet 4.6+, Haiku 5+ and Fable take effort; only Opus got it.
         monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
         assert (
             self._effort(
