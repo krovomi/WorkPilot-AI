@@ -493,15 +493,18 @@ on, a subtask whose files are all text-only is not run as a red-green-refactor c
 ### Small code changes (targeted QA)
 
 When the change set has at most 3 code files and 150 changed lines in them (text files aside),
-all Python or TypeScript/JavaScript, and each has a test by naming convention (`test_x.py`,
-`x_test.py`, `x.test.ts`, `x.spec.tsx`, `__tests__/`), the pass is a **targeted QA** (« QA
+in a language whose test convention is known, and each has a test by that convention
+(`test_x.py`, `x.test.ts`, `Card.spec.ts` for `Card.vue`, `CartTests.cs`, `OrderTest.java`/`.kt`,
+`token_test.go`, `tests/parser.rs` or a `#[cfg(test)]` module, `UserTest.php`,
+`FormatterTests.swift`, `cart_test.dart`, `invoice_spec.rb`… full list in
+[docs/architecture/qa-tiers.md](architecture/qa-tiers.md)), the pass is a **targeted QA** (« QA
 ciblée »): the reviewer gets the spec, the diff and the test files to run
 (`prompts/qa_reviewer_targeted.md`), runs only those, with coverage of the touched files, and
 has no subagents. Its approval stands only if each mapped test is recorded as passed **and**
 named by a command the reviewer ran, and the touched files reach `WORKPILOT_QA_MIN_COVERAGE`
 ([apps/backend/qa/targeted_gate.py](../apps/backend/qa/targeted_gate.py)); this replaces the
 unit + integration coverage gate for that pass. Coverage is per touched file, not per diff line.
-Any doubt gives the full review: a file without a mapped test, another language, a generated,
+Any doubt gives the full review: a file without a mapped test, an unknown language, a generated,
 deleted or renamed file, `security/`, `server/auth*`, CI files, dependency manifests, lockfiles
 and tool configuration (`conftest.py`, `*.config.*`). The task log and `qa_report.md` say
 which tier ran. Details: [architecture/qa-tiers.md](architecture/qa-tiers.md).

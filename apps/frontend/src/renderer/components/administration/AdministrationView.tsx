@@ -26,6 +26,7 @@ import { QuotasTab } from "./QuotasTab";
 import { RolesTab } from "./RolesTab";
 import { PageHeader } from "../ui/page-header";
 
+import { NativeSelect } from "../ui/native-select";
 type TabId =
 	| "overview"
 	| "members"
@@ -122,9 +123,9 @@ export function AdministrationView() {
 						>
 							{t("administration:organizations.current")}
 						</label>
-						<select
+						<NativeSelect
 							id="admin-org"
-							className="bg-background border border-border rounded px-2 py-1 text-sm"
+							className="px-2 py-1 text-sm h-auto"
 							value={orgId ?? ""}
 							onChange={(e) => void switchOrg(e.target.value)}
 						>
@@ -133,7 +134,7 @@ export function AdministrationView() {
 									{org.name}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
 					)
 				}

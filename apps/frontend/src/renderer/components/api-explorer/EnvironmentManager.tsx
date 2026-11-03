@@ -15,6 +15,8 @@ import {
 } from "../../stores/api-explorer-store";
 import { useProjectStore } from "../../stores/project-store";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 // ── Environment Auto-Detection ───────────────────────────────────────────────
 
 export interface DetectedEnvironment {
@@ -290,14 +292,15 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 						>
 							{editId === env.id ? (
 								<div className="space-y-2">
-									<input
-										className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-sm text-foreground"
+									<Input
+										className="w-full px-2 py-1 text-sm h-auto"
 										value={editName}
 										onChange={(e) => setEditName(e.target.value)}
 										placeholder={t("apiExplorer:environments.namePlaceholder")}
 									/>
-									<input
-										className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-sm font-mono text-foreground"
+									<Input
+										spellCheck={false}
+										className="w-full px-2 py-1 text-sm font-mono h-auto"
 										value={editUrl}
 										onChange={(e) => setEditUrl(e.target.value)}
 										placeholder="https://api.example.com"
@@ -328,8 +331,9 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 									<div className="text-3xs text-muted-foreground mb-0.5">
 										{t("apiExplorer:environments.headers")}
 									</div>
-									<textarea
-										className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground resize-none"
+									<Textarea
+										spellCheck={false}
+										className="w-full px-2 py-1 text-xs font-mono resize-none min-h-0"
 										rows={3}
 										value={editHeaders}
 										onChange={(e) => setEditHeaders(e.target.value)}
@@ -447,14 +451,15 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 
 				{isAdding ? (
 					<div className="mt-3 border border-[var(--color-border)] rounded-lg p-3 space-y-2">
-						<input
-							className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-sm text-foreground"
+						<Input
+							className="w-full px-2 py-1 text-sm h-auto"
 							value={newName}
 							onChange={(e) => setNewName(e.target.value)}
 							placeholder={t("apiExplorer:environments.namePlaceholder")}
 						/>
-						<input
-							className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-sm font-mono text-foreground"
+						<Input
+							spellCheck={false}
+							className="w-full px-2 py-1 text-sm font-mono h-auto"
 							value={newUrl}
 							onChange={(e) => setNewUrl(e.target.value)}
 							placeholder="https://api.example.com"
@@ -484,8 +489,9 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 							<div className="text-3xs text-muted-foreground mb-0.5">
 								{t("apiExplorer:environments.headers")}
 							</div>
-							<textarea
-								className="w-full bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground resize-none"
+							<Textarea
+								spellCheck={false}
+								className="w-full px-2 py-1 text-xs font-mono resize-none min-h-0"
 								rows={2}
 								value={newHeaders}
 								onChange={(e) => setNewHeaders(e.target.value)}

@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
+import { Textarea } from "../ui/textarea";
 const SCORE_STYLES: Record<"low" | "medium" | "high", string> = {
 	low: "bg-success/15 text-success border-success/30",
 	medium: "bg-warning/15 text-warning border-warning/30",
@@ -55,8 +56,8 @@ export function BlastRadiusView({ projectRoot }: Props) {
 					<Label className="text-xs">
 						{t("blastRadius:targets", "Target files (comma or newline separated)")}
 					</Label>
-					<textarea
-						className="w-full min-h-[70px] rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+					<Textarea
+						className="w-full min-h-[70px] px-3 py-2 text-sm"
 						value={targetsInput}
 						onChange={(e) => setTargetsInput(e.target.value)}
 						placeholder="src/core/client.ts,src/utils/hash.ts"
