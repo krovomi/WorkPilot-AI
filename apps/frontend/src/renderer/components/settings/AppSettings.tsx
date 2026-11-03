@@ -46,6 +46,7 @@ import { useServerSessionStore } from "@/stores/server-session-store";
 import { useGuidedTourStore } from "../guided-tour/guided-tour-store";
 import { InvitationsAdmin } from "../auth/InvitationsAdmin";
 import { CollaborationSettings } from "../collaboration/CollaborationSettings";
+import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
 import { Button } from "../ui/button";
@@ -142,6 +143,7 @@ export type AppSection =
 	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
 	| "server-tokens"
+	| "server-mcp"
 	| "server-needs-you"
 	| "server-collaboration"
 	// Système & Maintenance
@@ -264,6 +266,12 @@ const createSettingsThemes = (t: {
 				id: "server-tokens",
 				icon: KeyRound,
 				label: t("serverTokens.navLabel"),
+				type: "app",
+			},
+			{
+				id: "server-mcp",
+				icon: Plug,
+				label: t("serverMcp.navLabel"),
 				type: "app",
 			},
 			{
@@ -423,7 +431,12 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	// The person's own tokens on the server: anyone signed in to one.
 	const hidden = new Set([
 		...(isServerAdmin ? [] : ["team-invitations"]),
-		...(serverMode === "server" ? [] : ["server-tokens", "server-needs-you", "server-collaboration"]),
+		...(serverMode === "server" ? [] : [
+					"server-tokens",
+					"server-mcp",
+					"server-needs-you",
+					"server-collaboration",
+				]),
 	]);
 	SETTINGS_THEMES.integrations.sections =
 		SETTINGS_THEMES.integrations.sections.filter((s) => !hidden.has(s.id));
@@ -687,6 +700,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return isServerAdmin ? <InvitationsAdmin /> : null;
 			case "server-tokens":
 				return serverMode === "server" ? <ServerTokensSettings /> : null;
+			case "server-mcp":
+				return serverMode === "server" ? <ServerMcpSettings /> : null;
 			case "server-needs-you":
 				return serverMode === "server" ? <ServerNeedsYouSettings /> : null;
 			case "server-collaboration":

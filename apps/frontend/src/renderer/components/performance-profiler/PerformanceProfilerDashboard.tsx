@@ -7,6 +7,8 @@ import {
 	usePerformanceProfilerStore,
 } from "../../stores/performance-profiler-store";
 import { useProjectStore } from "../../stores/project-store";
+import { Activity } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const SEVERITY_COLORS: Record<string, string> = {
 	critical: "text-red-400 bg-red-500/10 border-red-500/20",
@@ -48,19 +50,11 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-border">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-xl font-semibold">
-							{t("performanceProfiler:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground mt-0.5">
-							{t("performanceProfiler:subtitle")}
-						</p>
-					</div>
-					<div className="flex items-center gap-3">
-						{isRunning ? (
+			<PageHeader
+				icon={Activity}
+				title={t("performanceProfiler:title")}
+				description={t("performanceProfiler:subtitle")}
+				actions={isRunning ? (
 							<button
 								type="button"
 								onClick={cancelPerformanceProfiling}
@@ -80,9 +74,7 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 										: t("performanceProfiler:actions.analyze")}
 							</button>
 						)}
-					</div>
-				</div>
-			</div>
+			/>
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left sidebar */}

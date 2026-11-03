@@ -2017,6 +2017,54 @@
 		"remove": "Remove from the server",
 		"unavailable": "The server could not be reached"
 	},
+	"serverMcp": {
+		"navLabel": "MCP access to the server",
+		"title": "MCP access to the team server",
+		"description": "Claude Code, Codex, Gemini CLI, Copilot, Cursor and other AI apps can read and update this server's boards through its MCP endpoint. Make an access token for each app, then paste the entry shown for that app.",
+		"limits": "A token works for the organization you are in now, on the MCP endpoint only, and never reaches further than your own role. A read token lists and reads; a write token can also create and edit cards that have not started.",
+		"unavailable": "The server could not be reached",
+		"copyToken": "Copy the token",
+		"copySnippet": "Copy the entry",
+		"form": {
+			"name": "Token name",
+			"namePlaceholder": "For example: Codex on my laptop",
+			"scope": "Access",
+			"duration": "Valid for",
+			"days_one": "{{count}} day",
+			"days_other": "{{count}} days",
+			"create": "Create a token"
+		},
+		"scope": {
+			"read": "Read only",
+			"write": "Read and write"
+		},
+		"created": {
+			"title": "Token \"{{name}}\" created",
+			"once": "Copy it now: it is shown only this once. Revoke it below if it leaks.",
+			"endpoint": "MCP endpoint: {{url}}",
+			"pasteIn": "Paste in",
+			"done": "Done, hide the token"
+		},
+		"list": {
+			"title": "My access tokens",
+			"empty": "No access token yet.",
+			"expires": "Expires {{date}}",
+			"lastUsed": "last used {{date}}",
+			"neverUsed": "never used",
+			"revoke": "Revoke {{name}}"
+		},
+		"where": {
+			"claude-code": "Run this command in a terminal.",
+			"codex": "Add it to ~/.codex/config.toml.",
+			"gemini-cli": "Merge it into ~/.gemini/settings.json.",
+			"copilot-cli": "Merge it into ~/.copilot/mcp-config.json.",
+			"vscode": "Merge it into your user mcp.json (Command Palette: MCP: Open User Configuration).",
+			"cursor": "Merge it into ~/.cursor/mcp.json.",
+			"claude-desktop": "Merge it into claude_desktop_config.json (Settings, Developer, Edit Config). It goes through mcp-remote, which needs Node.js.",
+			"windsurf": "Merge it into ~/.codeium/windsurf/mcp_config.json.",
+			"opencode": "Merge it into ~/.config/opencode/opencode.json."
+		}
+	},
 	"serverCollaboration": {
 		"navLabel": "Team collaboration"
 	},
@@ -2846,7 +2894,7 @@
 			"notDetected": "Not detected"
 		},
 		"errors": {
-			"server_project": "A server project is shared through the team server: its MCP access comes with the server's access tokens.",
+			"server_project": "A server project is shared through the team server: connect your AI apps to it in Settings, MCP access to the server.",
 			"python_not_ready": "The app's Python environment is not ready yet. Try again in a moment.",
 			"config_unreadable": "This app's configuration file could not be read (invalid JSON or comments). Nothing was changed: paste the configuration by hand.",
 			"client_not_found": "This app was not found on this computer. Copy the configuration instead.",

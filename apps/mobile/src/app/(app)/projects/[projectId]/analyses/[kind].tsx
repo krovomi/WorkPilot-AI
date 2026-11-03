@@ -21,12 +21,15 @@ export default function Analysis() {
 	const { t, i18n } = useTranslation();
 	const theme = useTheme();
 	const api = useApi();
-	const load = useCallback(
-		async () => (kind ? readSaved(await api.analysisReport(kind, projectId)) : null),
-		[api, kind, projectId],
-	);
-	const { data, error, loading, refreshing, reload } = useLoad(load);
 	const [job, setJob] = useState<FeatureJob | null>(null);
+	const load = useCallback(async () => {
+		if (!kind) return null;
+		const got = await api.analysisReport(kind, projectId);
+		// Opened again while it runs: follow that run, and keep it cancellable.
+		if (got.job && JOB_ACTIVE.has(got.job.status)) setJob(got.job);
+		return readSaved(got.report);
+	}, [api, kind, projectId]);
+	const { data, error, loading, refreshing, reload } = useLoad(load);
 	const [lastLine, setLastLine] = useState<string | null>(null);
 	const active = !!job && JOB_ACTIVE.has(job.status);
 	const jobId = job?.id;

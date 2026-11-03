@@ -240,6 +240,11 @@ as data, which is the standing an unverified procedure deserves. The card also r
 the other half of the loop: whether hermes has the `workpilot-brain` MCP server, i.e.
 whether it reads back what the brain holds — and opens the brain settings when not.
 
+**Hermes can also drive the board.** Project settings → Integrations → *Use from other
+apps* registers this project's `workpilot-board` MCP server in `<HERMES_HOME>/config.yaml`
+(`mcp_servers`), like it does for Claude Code or Cursor ([`board-mcp.md`](board-mcp.md)): the
+cards hermes reads and writes there are the Kanban's own, on every surface hermes runs on.
+
 It renders nothing when hermes is not installed: a permanent card reading "feature not in
 use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
 mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on

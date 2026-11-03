@@ -11,6 +11,8 @@ import {
 } from "../../stores/pipeline-generator-store";
 import { useProjectStore } from "../../stores/project-store";
 import { ProjectSelector } from "../settings/ProjectSelector";
+import { Layers } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 export function PipelineGenerator(): React.ReactElement {
 	const { t } = useTranslation(["pipelineGenerator", "common"]);
@@ -50,18 +52,11 @@ export function PipelineGenerator(): React.ReactElement {
 
 	return (
 		<div className="flex flex-col h-full bg-background text-foreground">
-			{/* Header */}
-			<div className="flex items-center justify-between px-6 py-4 border-b border-border">
-				<div>
-					<h1 className="text-xl font-semibold">
-						{t("pipelineGenerator:title")}
-					</h1>
-					<p className="text-sm text-muted-foreground mt-0.5">
-						{t("pipelineGenerator:description")}
-					</p>
-				</div>
-				<div className="flex gap-2">
-					{isRunning ? (
+			<PageHeader
+				icon={Layers}
+				title={t("pipelineGenerator:title")}
+				description={t("pipelineGenerator:description")}
+				actions={isRunning ? (
 						<button
 							type="button"
 							onClick={cancelPipelineGeneration}
@@ -81,8 +76,7 @@ export function PipelineGenerator(): React.ReactElement {
 								: t("pipelineGenerator:actions.generate")}
 						</button>
 					)}
-				</div>
-			</div>
+			/>
 
 			<div className="flex flex-1 overflow-hidden">
 				{/* Left sidebar */}
