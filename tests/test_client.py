@@ -836,13 +836,27 @@ class TestClaudeEffortFollowsTheUser:
             == "max"
         )
 
-    def test_a_model_other_than_opus_gets_no_effort(self, tmp_path, monkeypatch):
+    def test_sonnet_5_5_gets_the_effort_too(self, tmp_path, monkeypatch):
+        # F153: Sonnet 4.6+, Haiku 5+ and Fable take effort; only Opus got it.
         monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
         assert (
             self._effort(
                 tmp_path,
                 monkeypatch,
                 "claude-sonnet-5-5",
+                "coder",
+                max_thinking_tokens=16384,
+            )
+            == "high"
+        )
+
+    def test_a_model_without_effort_support_gets_none(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("AUTO_CLAUDE_EFFORT", raising=False)
+        assert (
+            self._effort(
+                tmp_path,
+                monkeypatch,
+                "claude-sonnet-4-5-20250929",
                 "coder",
                 max_thinking_tokens=16384,
             )

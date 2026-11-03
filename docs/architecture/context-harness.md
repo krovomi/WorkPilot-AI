@@ -182,12 +182,19 @@ la fenêtre annoncée.
 
 **D3 — Durée de vie du cache, là où elle se règle.** La plupart des providers cachent un préfixe
 sans réglage. Deux exceptions : Anthropic, où l'écriture coûte 1,25× pour 5 minutes et 2× pour
-1 heure (WorkPilot pose `ENABLE_PROMPT_CACHING_1H=1` ; `CLAUDE_CODE_PROMPT_CACHE_TTL` prime sur
-lui, `FORCE_PROMPT_CACHING_5M=1` force 5 minutes), et le cache explicite de Gemini, facturé au
+1 heure, et le cache explicite de Gemini, facturé au
 stockage par heure. Une durée longue ne rapporte que si deux appels qui partagent un préfixe
 démarrent à plus de 5 minutes d'écart (attente humaine, revue) ; entre deux tours d'une session,
 chaque lecture rafraîchit le cache. Le lot 0 mesure ces écarts pour tous les providers ; le
 réglage suit, là où il existe.
+
+*Tranché pour Claude (novembre 2026)* : WorkPilot ne pose plus `ENABLE_PROMPT_CACHING_1H=1` et
+laisse la CLI choisir, comme le documente Claude Code (« Which TTL each request gets ») : une
+heure sur un abonnement dans son forfait, cinq minutes dès que l'usage est facturé (clé d'API,
+crédits d'usage, cloud). Forcer une heure faisait payer 2× chaque écriture de tour, alors que les
+tours d'une session se suivent à quelques secondes et que deux cartes ne partagent jamais de
+préfixe : la conversation de la CLI s'ouvre sur le dossier de travail, propre au worktree.
+`CLAUDE_CODE_PROMPT_CACHE_TTL` ou `FORCE_PROMPT_CACHING_5M`, exportés, atteignent toujours la CLI.
 
 **D4 — Contexte de code : recherche agentique ou injection.** Recommandation : un outil
 `search_code` que le modèle appelle (toujours à jour, il suit les vraies références), hybride

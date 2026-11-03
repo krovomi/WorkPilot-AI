@@ -95,6 +95,7 @@ def effort_plan(provider: str | None, model: str | None, level: str) -> EffortPl
     """What `provider` receives on `model` for the Kanban `level`."""
     from core.llm_optimization import (
         claude_effort,
+        claude_takes_effort,
         compatible_effort_params,
         gemini_reasoning_effort,
         openai_reasoning_effort,
@@ -108,6 +109,10 @@ def effort_plan(provider: str | None, model: str | None, level: str) -> EffortPl
     budget = _budget(level)
 
     if name == "claude" or not name:
+        # A model without `effort` (Sonnet 4.5, Haiku 4.5) still gets the
+        # level, as its thinking budget: native, nothing else sent.
+        if model_id and not claude_takes_effort(model_id):
+            return EffortPlan(NATIVE, None)
         return EffortPlan(NATIVE, claude_effort(budget))
     if name == "openai":
         effort = openai_reasoning_effort(model_id or "gpt-4o", budget)

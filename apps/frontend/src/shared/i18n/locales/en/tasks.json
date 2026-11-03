@@ -480,7 +480,6 @@
 	"files": {
 		"title": "Files",
 		"tab": "Files",
-		"noSpecPath": "No spec files available",
 		"noFiles": "No files found",
 		"loading": "Loading files...",
 		"loadingContent": "Loading content...",
@@ -488,7 +487,21 @@
 		"errorLoadingContent": "Failed to load file content",
 		"retry": "Retry",
 		"selectFile": "Select a file to view its contents",
-		"openInIDE": "Open in IDE"
+		"openInIDE": "Open in IDE",
+		"taskChanges": "Created or changed by the task",
+		"noTaskChanges": "The task created or changed no files",
+		"fromSubtasks": "From the files the subtasks recorded",
+		"errorLoadingChanges": "Could not list the task's files",
+		"specSection": "Specification",
+		"emptyFile": "Empty file",
+		"refresh": "Refresh",
+		"status": {
+			"added": "Created",
+			"modified": "Modified",
+			"deleted": "Deleted",
+			"renamed": "Renamed",
+			"unknown": "Touched by a subtask"
+		}
 	},
 	"visualProof": {
 		"apiSmoke": {

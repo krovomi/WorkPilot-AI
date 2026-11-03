@@ -250,6 +250,11 @@ export function createLocalTask(project: Project, input: NewLocalTask): Task {
 		subtasks: [],
 		logs: [],
 		metadata: taskMetadata,
+		// Same fields as a task the project store loads from disk: without the
+		// spec folder, the task detail's "Fichiers" tab had nothing to read
+		// until the next full reload of the board.
+		location: "main",
+		specsPath: specDir,
 		createdAt: new Date(),
 		updatedAt: new Date(),
 	};
