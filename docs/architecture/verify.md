@@ -21,18 +21,31 @@ screenshot or a score as proof.
 
 | Target | Detected from | Driven to the change by | Proof |
 |---|---|---|---|
-| `web-frontend` | Vite, Next, Angular, Nuxt, SvelteKit… (`AppEmulatorRunner`) | snapshot → click → fill, read back | screenshot (desktop + mobile viewport) + Lighthouse-curve score |
+| `web-frontend` | Vite, Next, Angular, Nuxt, SvelteKit, React/webpack, Remix, Gatsby, Solid, Qwik, Lit… (`AppEmulatorRunner`), Blazor WebAssembly, Leptos, Yew/Trunk, Dioxus, a static `index.html` | snapshot → click → fill, read back | screenshot (desktop + mobile viewport) + Lighthouse-curve score |
 | `desktop` | `electron` in the dependencies | the same, through `--remote-debugging-port` | the same |
 | `windows-app` | an executable `.csproj` with `UseWPF`, `UseWindowsForms` or the Windows App SDK | UI Automation in the one window the card names (`verify_window`) | a capture of that window alone |
 | `mobile` | `mobile.stacks.detect_stack` | emulator / simulator (`mobile/launch.py`) | device frame + launch time |
-| `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go | the touched endpoints, called with payloads built from the OpenAPI schema | status + response validated against the schema + p50/p95 latency |
+| `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go, PHP (Laravel, Symfony), Ruby (Rails, Rack), Rust (Axum, Actix, Rocket…) | the touched endpoints, called with payloads built from the OpenAPI schema | status + response validated against the schema + p50/p95 latency |
 
 A project with no target (a library, a CLI) is `not-applicable` — neither a
 pass nor a failure.
 
+**A backend that renders pages is opened as well as called.** Blazor Server
+and Blazor Web App, Razor Pages, MVC, Django or Flask templates, Express
+views, Thymeleaf, Go templates, Rails views, Blade: the project is a
+`backend-api`, and `verify/web_stacks.py` `serves_pages` finds the templates it
+renders (`.razor`, `.cshtml`, `.erb`, `.blade.php`, `.ejs`, `.gohtml`…, or an
+`.html` under `templates/`, `views/`, `wwwroot/`…; never under tests, docs or a
+coverage report). Such a target has `pages: true`: its landing page goes
+through the same browser pass as a front end (console and network errors fed
+to the fixer, performance trace, desktop and mobile captures), and its
+endpoints are still called. The verifier is told the target renders pages.
+
 ```
 apps/backend/verify/
   detect.py     which targets, their launch command, port and readiness URL (a learned recipe first)
+  target.py     Target, the thing to launch, and the file helpers detectors share
+  web_stacks.py pages a backend renders; PHP, Ruby, Rust and static-site targets
   launch.py     own process group, a free port injected, readiness on loopback, the log captured
   errors.py     stack traces (docintel/stacktrace), build codes (foundation/ci_logs), console and network errors
   devtools.py   chrome-devtools-mcp driven from Python (MCPToolManager); Playwright fallback, same output
