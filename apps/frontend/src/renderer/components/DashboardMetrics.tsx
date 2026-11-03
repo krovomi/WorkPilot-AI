@@ -22,6 +22,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import type { DashboardSnapshot } from "@shared/types";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -354,20 +355,13 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-6xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<BarChart3 className="h-6 w-6 text-primary" />
-						<div>
-							<h1 className="text-xl font-bold text-foreground">
-								{t("title")}
-							</h1>
-							<p className="text-sm text-muted-foreground">
-								{serverProjectId ? t("serverSubtitle") : t("subtitle")}
-							</p>
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
+				<PageHeader
+					variant="inline"
+					icon={BarChart3}
+					title={t("title")}
+					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
+					actions={
+					<>
 						<Button variant="outline" size="sm" onClick={fetchSnapshot}>
 							<RefreshCw className="h-3.5 w-3.5 mr-2" />
 							{t("common:buttons.refresh")}
@@ -388,8 +382,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 							<Download className="h-3.5 w-3.5 mr-2" />
 							CSV
 						</Button>
-					</div>
-				</div>
+					</>
+					}
+				/>
 
 				{/* KPI Cards */}
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

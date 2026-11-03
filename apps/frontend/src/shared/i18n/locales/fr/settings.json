@@ -1482,6 +1482,54 @@
 		"remove": "Retirer du serveur",
 		"unavailable": "Le serveur est injoignable"
 	},
+	"serverMcp": {
+		"navLabel": "Accès MCP au serveur",
+		"title": "Accès MCP au serveur d'équipe",
+		"description": "Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres apps d'IA peuvent lire et modifier les tableaux de ce serveur par son point d'accès MCP. Crée un jeton d'accès pour chaque app, puis colle l'entrée affichée pour cette app.",
+		"limits": "Un jeton vaut pour l'organisation où tu es maintenant, sur le point d'accès MCP seulement, et ne va jamais plus loin que ton propre rôle. Un jeton en lecture liste et lit ; un jeton en écriture peut aussi créer et modifier les cartes pas encore démarrées.",
+		"unavailable": "Le serveur est injoignable",
+		"copyToken": "Copier le jeton",
+		"copySnippet": "Copier l'entrée",
+		"form": {
+			"name": "Nom du jeton",
+			"namePlaceholder": "Par exemple : Codex sur mon portable",
+			"scope": "Accès",
+			"duration": "Valable",
+			"days_one": "{{count}} jour",
+			"days_other": "{{count}} jours",
+			"create": "Créer un jeton"
+		},
+		"scope": {
+			"read": "Lecture seule",
+			"write": "Lecture et écriture"
+		},
+		"created": {
+			"title": "Jeton « {{name}} » créé",
+			"once": "Copie-le maintenant : il ne s'affiche que cette fois. Révoque-le ci-dessous s'il fuite.",
+			"endpoint": "Point d'accès MCP : {{url}}",
+			"pasteIn": "À coller dans",
+			"done": "C'est fait, masquer le jeton"
+		},
+		"list": {
+			"title": "Mes jetons d'accès",
+			"empty": "Aucun jeton d'accès pour l'instant.",
+			"expires": "Expire le {{date}}",
+			"lastUsed": "utilisé le {{date}}",
+			"neverUsed": "jamais utilisé",
+			"revoke": "Révoquer {{name}}"
+		},
+		"where": {
+			"claude-code": "Lance cette commande dans un terminal.",
+			"codex": "Ajoute-la à ~/.codex/config.toml.",
+			"gemini-cli": "Fusionne-la dans ~/.gemini/settings.json.",
+			"copilot-cli": "Fusionne-la dans ~/.copilot/mcp-config.json.",
+			"vscode": "Fusionne-la dans ton mcp.json utilisateur (palette de commandes : MCP: Open User Configuration).",
+			"cursor": "Fusionne-la dans ~/.cursor/mcp.json.",
+			"claude-desktop": "Fusionne-la dans claude_desktop_config.json (Réglages, Développeur, Modifier la config). Elle passe par mcp-remote, qui demande Node.js.",
+			"windsurf": "Fusionne-la dans ~/.codeium/windsurf/mcp_config.json.",
+			"opencode": "Fusionne-la dans ~/.config/opencode/opencode.json."
+		}
+	},
 	"serverCollaboration": {
 		"navLabel": "Collaboration d'équipe"
 	},
@@ -2849,7 +2897,7 @@
 			"notDetected": "Non détectée"
 		},
 		"errors": {
-			"server_project": "Un projet du serveur se partage par le serveur d'équipe : son accès MCP viendra avec les jetons d'accès du serveur.",
+			"server_project": "Un projet du serveur se partage par le serveur d'équipe : connecte tes apps d'IA dans Réglages, Accès MCP au serveur.",
 			"python_not_ready": "L'environnement Python de l'app n'est pas encore prêt. Réessaie dans un instant.",
 			"config_unreadable": "Le fichier de configuration de cette app n'a pas pu être lu (JSON invalide ou commentaires). Rien n'a été modifié : colle la configuration à la main.",
 			"client_not_found": "Cette app n'a pas été trouvée sur cet ordinateur. Copie la configuration à la place.",

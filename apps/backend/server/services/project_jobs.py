@@ -274,6 +274,10 @@ class ProjectJobs:
                         ),
                     )
                     self._active[job_id] = proc
+                    # Cancelled while the process was being set up: ``cancel``
+                    # found nothing to stop yet.
+                    if job_id in self._cancelled:
+                        proc.terminate()
 
                     async def read_stdout() -> None:
                         nonlocal collected_chars

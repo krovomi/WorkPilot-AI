@@ -26,6 +26,7 @@ if str(_BACKEND) not in sys.path:
 
 from tests.backend.test_server_analyses import (  # noqa: E402
     _db,
+    _report,
     _request,
     _scope,
     _wait_final,
@@ -316,7 +317,7 @@ def test_the_runner_builds_the_changelog_of_the_done_cards(tmp_path, capsys):
 @pytest.mark.asyncio
 async def test_a_member_builds_the_changelog_and_every_member_reads_it(server):
     from server.services import project_jobs
-    from shared_features.analyses import get_report, start_analysis
+    from shared_features.analyses import start_analysis
     from shared_features.changelog import ChangelogEdit, save_report
 
     (project_jobs.BACKEND_DIR / "runners" / "changelog_runner.py").write_text(
@@ -343,12 +344,13 @@ async def test_a_member_builds_the_changelog_and_every_member_reads_it(server):
     assert done.status == "succeeded", done.error
     assert done.feature == "analysis-changelog"
 
-    saved = json.loads(
-        (await get_report("changelog", _scope(server, "viewer")))["report"]
-    )
+    saved = json.loads((await _report("changelog", _scope(server, "viewer")))["report"])
     assert saved["report"]["changelog"].startswith("## [1.1.0]")
     assert saved["run_by"] == "u-ada"
-    assert (await get_report("changelog", _scope(server, which=1))) == {"report": None}
+    assert (await _report("changelog", _scope(server, which=1))) == {
+        "report": None,
+        "job": None,
+    }
 
     with pytest.raises(HTTPException) as reader:
         await save_report(
@@ -358,7 +360,7 @@ async def test_a_member_builds_the_changelog_and_every_member_reads_it(server):
     assert await save_report(
         _request(), ChangelogEdit(changelog="## [1.1.0]\n- Cart, fixed"), _scope(server)
     ) == {"saved": True}
-    corrected = json.loads((await get_report("changelog", _scope(server)))["report"])
+    corrected = json.loads((await _report("changelog", _scope(server)))["report"])
     assert corrected["report"]["changelog"] == "## [1.1.0]\n- Cart, fixed"
     assert corrected["report"]["version"] == "1.1.0"
     assert corrected["edited_by"] == "u-ada"

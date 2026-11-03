@@ -23,6 +23,7 @@ try:
     from .bot_detection import BotDetector
     from .context_gatherer import PRContext, PRContextGatherer
     from .gh_client import GHClient
+    from .hermes_observe import observe_with_hermes
     from .models import (
         BRANCH_BEHIND_BLOCKER_MSG,
         BRANCH_BEHIND_REASONING,
@@ -64,6 +65,7 @@ except (ImportError, ValueError, SystemError):
     from runners.github.bot_detection import BotDetector
     from runners.github.context_gatherer import PRContext, PRContextGatherer
     from runners.github.gh_client import GHClient
+    from runners.github.hermes_observe import observe_with_hermes
     from runners.github.models import (
         BRANCH_BEHIND_BLOCKER_MSG,
         BRANCH_BEHIND_REASONING,
@@ -640,6 +642,10 @@ class GitHubOrchestrator:
             if head_sha:
                 self.bot_detector.mark_reviewed(pr_number, head_sha)
 
+            # What hermes learned meanwhile, filed for review. Never changes
+            # the verdict above, which is saved and possibly posted already.
+            await observe_with_hermes(self.project_dir)
+
             self._report_progress(
                 "complete", 100, "Review complete!", pr_number=pr_number
             )
@@ -1047,6 +1053,8 @@ class GitHubOrchestrator:
             # Mark as reviewed with new commit SHA
             if result.reviewed_commit_sha:
                 self.bot_detector.mark_reviewed(pr_number, result.reviewed_commit_sha)
+
+            await observe_with_hermes(self.project_dir)
 
             self._report_progress(
                 "complete", 100, "Follow-up review complete!", pr_number=pr_number
@@ -1545,6 +1553,7 @@ class GitHubOrchestrator:
             # Save result
             await result.save(self.github_dir)
 
+        await observe_with_hermes(self.project_dir)
         self._report_progress("complete", 100, f"Triaged {len(results)} issues")
         return results
 

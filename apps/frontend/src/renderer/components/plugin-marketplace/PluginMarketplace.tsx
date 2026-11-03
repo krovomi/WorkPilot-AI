@@ -12,6 +12,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { InstalledPluginsView } from "./InstalledPluginsView";
 import { PluginCatalogView } from "./PluginCatalogView";
 import { PluginSDKView } from "./PluginSDKView";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: Array<{
 	id: PluginMarketplaceTab;
@@ -49,30 +50,21 @@ export function PluginMarketplace() {
 
 	return (
 		<div className="flex flex-col h-full overflow-hidden bg-background">
-			{/* Header */}
-			<div className="shrink-0 border-b border-border bg-background px-6 pt-5 pb-0">
-				<div className="flex items-center gap-3 mb-4">
-					<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-						<Puzzle className="h-5 w-5 text-primary" />
-					</div>
-					<div>
-						<h1 className="text-xl font-bold">
-							{t("common:pluginMarketplace.title")}
-						</h1>
-						<p className="text-xs text-muted-foreground">
-							{t("common:pluginMarketplace.subtitle")}
-						</p>
-					</div>
-					{installed.length > 0 && (
-						<span className="ml-auto rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+			<PageHeader
+				className="pb-0"
+				icon={Puzzle}
+				title={t("common:pluginMarketplace.title")}
+				description={t("common:pluginMarketplace.subtitle")}
+				actions={
+					installed.length > 0 && (
+						<span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
 							{t("common:pluginMarketplace.installedBadge", {
 								count: installed.length,
 							})}
 						</span>
-					)}
-				</div>
-
-				{/* Tabs */}
+					)
+				}
+			>
 				<div className="flex gap-0">
 					{TABS.map(({ id, labelKey, icon: Icon }) => (
 						<button
@@ -96,7 +88,7 @@ export function PluginMarketplace() {
 						</button>
 					))}
 				</div>
-			</div>
+			</PageHeader>
 
 			{/* Error banner */}
 			{error && (
