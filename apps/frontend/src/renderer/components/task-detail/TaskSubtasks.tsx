@@ -27,6 +27,8 @@ import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
 import { formatAppDateTime } from "@/lib/date-format";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 interface Phase {
 	name: string;
 	subtasks: Array<{
@@ -297,7 +299,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										className="flex gap-2 items-start bg-secondary/30 p-2 rounded"
 									>
 										<div className="flex-1 space-y-1">
-											<input
+											<Input
 												type="text"
 												value={subtask.title || ""}
 												onChange={(e) =>
@@ -309,9 +311,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 													)
 												}
 												placeholder={t("tasks:modal.plan.subtaskTitle")}
-												className="w-full text-sm font-medium bg-background/50 rounded px-2 py-1 border border-border/50"
+												className="w-full text-sm font-medium px-2 py-1 h-auto"
 											/>
-											<textarea
+											<Textarea
 												value={subtask.description || ""}
 												onChange={(e) =>
 													handleUpdateSubtask(
@@ -322,7 +324,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 													)
 												}
 												placeholder={t("tasks:modal.plan.subtaskDescription")}
-												className="w-full text-xs bg-background/50 rounded px-2 py-1 border border-border/50 resize-none"
+												className="w-full text-xs px-2 py-1 resize-none min-h-0"
 												rows={2}
 											/>
 										</div>

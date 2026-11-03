@@ -27,6 +27,7 @@ import {
 	AlertDialogTitle,
 } from "../ui/alert-dialog";
 
+import { Input } from "../ui/input";
 interface ArchitectureTabsProps {
 	architectures: Architecture[];
 	activeId: string | null;
@@ -98,7 +99,7 @@ export function ArchitectureTabs({
 							}`}
 						>
 							{editingId === architecture.id ? (
-								<input
+								<Input
 									ref={inputRef}
 									value={draftName}
 									onChange={(event) => setDraftName(event.target.value)}
@@ -108,7 +109,7 @@ export function ArchitectureTabs({
 										if (event.key === "Escape") setEditingId(null);
 									}}
 									aria-label={t("renameArchitecture", "Renommer l'architecture")}
-									className="w-28 rounded border bg-background px-1 py-0.5 text-xs outline-none focus:border-primary"
+									className="w-28 px-1 py-0.5 text-xs h-auto"
 								/>
 							) : (
 								<button

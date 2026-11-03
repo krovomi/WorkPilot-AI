@@ -12,6 +12,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { NativeSelect } from "../ui/native-select";
 interface LicensePanelProps {
 	readonly projectPath: string;
 }
@@ -50,18 +51,18 @@ export function LicensePanel({ projectPath }: LicensePanelProps) {
 					<label htmlFor="policy-select" className="block text-sm font-medium mb-1">
 						{t("license.policy")}
 					</label>
-					<select
+					<NativeSelect
 						id="policy-select"
 						value={policy}
 						onChange={(e) => setPolicy(e.target.value as typeof policy)}
-						className="w-full rounded border bg-background p-2 text-sm"
+						className="w-full p-2 text-sm h-auto"
 					>
 						{POLICIES.map((p) => (
 							<option key={p.value} value={p.value}>
 								{t(p.labelKey as never)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</div>
 				{!projectPath && (
 					<p className="text-sm text-muted-foreground">

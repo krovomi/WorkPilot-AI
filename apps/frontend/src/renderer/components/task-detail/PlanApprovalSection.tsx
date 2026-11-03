@@ -8,6 +8,7 @@ import { Separator } from "../ui/separator";
 import { PlanConflictAlert } from "./PlanConflictAlert";
 import { TaskResetButton } from "./TaskResetButton";
 
+import { Textarea } from "../ui/textarea";
 interface PlanApprovalSectionProps {
 	readonly task: Task;
 	readonly isSubmitting?: boolean;
@@ -102,12 +103,12 @@ export function PlanApprovalSection({
 						>
 							{t("tasks:modal.plan.rejectionReason")}
 						</label>
-						<textarea
+						<Textarea
 							id="plan-rejection-reason"
 							value={rejectionReason}
 							onChange={(e) => setRejectionReason(e.target.value)}
 							placeholder={t("tasks:modal.plan.rejectionPlaceholder")}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+							className="w-full px-3 py-2 text-sm placeholder-muted-foreground min-h-0"
 							rows={3}
 							disabled={isSubmitting}
 						/>

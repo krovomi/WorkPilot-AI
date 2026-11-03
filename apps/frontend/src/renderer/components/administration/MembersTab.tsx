@@ -9,6 +9,7 @@ import { Badge, Button } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
 import { usePermission } from "@/stores/permissions-store";
 
+import { NativeSelect } from "../ui/native-select";
 export function MembersTab() {
 	const { t } = useTranslation("administration");
 	const members = useAdminStore((s) => s.members);
@@ -70,8 +71,8 @@ export function MembersTab() {
 							</td>
 							<td className="p-3">
 								{canWrite ? (
-									<select
-										className="bg-background border border-border rounded px-2 py-1 text-sm"
+									<NativeSelect
+										className="px-2 py-1 text-sm h-auto"
 										value={member.role_slug}
 										onChange={(e) =>
 											void setMemberRole(member.user_id, e.target.value)
@@ -83,7 +84,7 @@ export function MembersTab() {
 												{role.name}
 											</option>
 										))}
-									</select>
+									</NativeSelect>
 								) : (
 									<Badge variant="secondary">{member.role_name}</Badge>
 								)}

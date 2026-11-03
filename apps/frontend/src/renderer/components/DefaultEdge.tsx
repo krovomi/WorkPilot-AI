@@ -8,6 +8,7 @@ import {
 	getSmoothStepPath,
 } from "reactflow";
 
+import { Input } from "./ui/input";
 export interface DefaultEdgeData {
 	label?: string;
 	onEdgeLabelChange?: (id: string, label: string) => void;
@@ -97,13 +98,13 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 					}}
 				>
 					{editing ? (
-						<input
+						<Input
 							ref={inputRef}
 							value={draft}
 							onChange={(e) => setDraft(e.target.value)}
 							onBlur={commit}
 							onKeyDown={handleKeyDown}
-							className="w-28 rounded border border-primary bg-background px-1 py-0.5 text-2xs text-foreground outline-none"
+							className="w-28 px-1 py-0.5 text-2xs h-auto"
 							aria-label={data?.label ?? ""}
 						/>
 					) : (

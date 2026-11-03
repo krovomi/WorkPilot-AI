@@ -16,6 +16,9 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { NativeSelect } from "../ui/native-select";
 // ============================================
 // Types
 // ============================================
@@ -217,14 +220,14 @@ function StepDetails({
 				<label className="text-xs font-medium">
 					{t("common:pluginMarketplace.creator.fieldName")}
 				</label>
-				<input
+				<Input
 					type="text"
 					value={form.name}
 					onChange={(e) =>
 						onChange({ name: e.target.value, id: slugify(e.target.value) })
 					}
 					placeholder={t("common:pluginMarketplace.creator.namePlaceholder")}
-					className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+					className="w-full px-3 py-2 text-sm h-auto"
 				/>
 			</div>
 
@@ -233,12 +236,13 @@ function StepDetails({
 				<label className="text-xs font-medium">
 					{t("common:pluginMarketplace.creator.fieldId")}
 				</label>
-				<input
+				<Input
+					spellCheck={false}
 					type="text"
 					value={form.id}
 					onChange={(e) => onChange({ id: e.target.value })}
 					placeholder="my-awesome-plugin"
-					className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+					className="w-full px-3 py-2 text-sm font-mono h-auto"
 				/>
 				<p className="text-3xs text-muted-foreground">
 					{t("common:pluginMarketplace.creator.fieldIdHint")}
@@ -250,14 +254,14 @@ function StepDetails({
 				<label className="text-xs font-medium">
 					{t("common:pluginMarketplace.creator.fieldDescription")}
 				</label>
-				<textarea
+				<Textarea
 					value={form.description}
 					onChange={(e) => onChange({ description: e.target.value })}
 					placeholder={t(
 						"common:pluginMarketplace.creator.fieldDescriptionPlaceholder",
 					)}
 					rows={2}
-					className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+					className="w-full px-3 py-2 text-sm resize-none min-h-0"
 				/>
 			</div>
 
@@ -266,12 +270,13 @@ function StepDetails({
 				<label className="text-xs font-medium">
 					{t("common:pluginMarketplace.creator.fieldVersion")}
 				</label>
-				<input
+				<Input
+					spellCheck={false}
 					type="text"
 					value={form.version}
 					onChange={(e) => onChange({ version: e.target.value })}
 					placeholder="1.0.0"
-					className="w-48 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+					className="w-48 px-3 py-2 text-sm font-mono h-auto"
 				/>
 			</div>
 
@@ -283,14 +288,14 @@ function StepDetails({
 						<label className="text-xs font-medium">
 							{t("common:pluginMarketplace.creator.fieldSystemPrompt")}
 						</label>
-						<textarea
+						<Textarea
 							value={form.systemPrompt}
 							onChange={(e) => onChange({ systemPrompt: e.target.value })}
 							placeholder={t(
 								"common:pluginMarketplace.creator.fieldSystemPromptPlaceholder",
 							)}
 							rows={4}
-							className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+							className="w-full px-3 py-2 text-sm resize-none min-h-0"
 						/>
 					</div>
 					<div className="space-y-1.5">
@@ -298,14 +303,14 @@ function StepDetails({
 						<label className="text-xs font-medium">
 							{t("common:pluginMarketplace.creator.fieldTriggers")}
 						</label>
-						<input
+						<Input
 							type="text"
 							value={form.triggerKeywords}
 							onChange={(e) => onChange({ triggerKeywords: e.target.value })}
 							placeholder={t(
 								"common:pluginMarketplace.creator.fieldTriggersPlaceholder",
 							)}
-							className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+							className="w-full px-3 py-2 text-sm h-auto"
 						/>
 						<p className="text-3xs text-muted-foreground">
 							{t("common:pluginMarketplace.creator.fieldTriggersHint")}
@@ -321,14 +326,14 @@ function StepDetails({
 						<label className="text-xs font-medium">
 							{t("common:pluginMarketplace.creator.fieldAuthType")}
 						</label>
-						<select
+						<NativeSelect
 							value={form.authType}
 							onChange={(e) =>
 								onChange({
 									authType: e.target.value as PluginFormData["authType"],
 								})
 							}
-							className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+							className="w-full px-3 py-2 text-sm h-auto"
 						>
 							<option value="none">
 								{t("common:pluginMarketplace.creator.authNone")}
@@ -340,19 +345,20 @@ function StepDetails({
 							<option value="basic">
 								{t("common:pluginMarketplace.creator.authBasic")}
 							</option>
-						</select>
+						</NativeSelect>
 					</div>
 					<div className="space-y-1.5">
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label className="text-xs font-medium">
 							{t("common:pluginMarketplace.creator.fieldApiEndpoint")}
 						</label>
-						<input
+						<Input
+							spellCheck={false}
 							type="text"
 							value={form.apiEndpoint}
 							onChange={(e) => onChange({ apiEndpoint: e.target.value })}
 							placeholder="https://api.example.com"
-							className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+							className="w-full px-3 py-2 text-sm font-mono h-auto"
 						/>
 					</div>
 				</>
@@ -372,11 +378,12 @@ function StepDetails({
 								onChange={(e) => onChange({ primaryColor: e.target.value })}
 								className="h-8 w-8 rounded border border-border cursor-pointer"
 							/>
-							<input
+							<Input
+								spellCheck={false}
 								type="text"
 								value={form.primaryColor}
 								onChange={(e) => onChange({ primaryColor: e.target.value })}
-								className="flex-1 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+								className="flex-1 px-3 py-2 text-sm font-mono h-auto"
 							/>
 						</div>
 					</div>
@@ -392,11 +399,12 @@ function StepDetails({
 								onChange={(e) => onChange({ backgroundColor: e.target.value })}
 								className="h-8 w-8 rounded border border-border cursor-pointer"
 							/>
-							<input
+							<Input
+								spellCheck={false}
 								type="text"
 								value={form.backgroundColor}
 								onChange={(e) => onChange({ backgroundColor: e.target.value })}
-								className="flex-1 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+								className="flex-1 px-3 py-2 text-sm font-mono h-auto"
 							/>
 						</div>
 					</div>
@@ -411,7 +419,8 @@ function StepDetails({
 							? t("common:pluginMarketplace.creator.fieldTemplateContent")
 							: t("common:pluginMarketplace.creator.fieldPromptContent")}
 					</label>
-					<textarea
+					<Textarea
+						spellCheck={false}
 						value={form.templateContent}
 						onChange={(e) => onChange({ templateContent: e.target.value })}
 						placeholder={
@@ -420,7 +429,7 @@ function StepDetails({
 								: "You are an expert at..."
 						}
 						rows={6}
-						className="w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+						className="w-full px-3 py-2 text-sm font-mono resize-none min-h-0"
 					/>
 				</div>
 			)}

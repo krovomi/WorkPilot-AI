@@ -36,6 +36,7 @@ import {
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 
+import { Input } from "../ui/input";
 interface HuggingFaceModelDiscoveryProps {
 	className?: string;
 	/** Optional HF read token (raises rate limits, unlocks gated repos). */
@@ -548,12 +549,12 @@ export function HuggingFaceModelDiscovery({
 			{/* Search-as-you-type (debounced) — no button needed. */}
 			<div className="relative">
 				<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-				<input
+				<Input
 					type="text"
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
 					placeholder={td("searchPlaceholder")}
-					className="w-full pl-8 pr-8 py-1.5 text-sm rounded-md border border-input bg-background text-foreground"
+					className="w-full pl-8 pr-8 py-1.5 text-sm h-auto"
 				/>
 				{isLoading && (
 					<Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
