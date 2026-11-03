@@ -22,6 +22,11 @@ import {
 	type AgentCliTool,
 } from "../../shared/types/agent-cli";
 import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
+import {
+	AGENT_CLI_SHORT_NAMES,
+	type CliPresence,
+	useReportCliPresence,
+} from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -34,13 +39,6 @@ const TOOL_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	antigravity: "Antigravity CLI",
 	pi: "pi (pi.dev)",
 	"gemini-cli": "Gemini CLI",
-};
-
-const SHORT_NAMES: Readonly<Record<AgentCliTool, string>> = {
-	opencode: "OpenCode",
-	antigravity: "Antigravity",
-	pi: "pi",
-	"gemini-cli": "Gemini",
 };
 
 /** The capabilities an ACP agent can declare, in the order they are listed. */
@@ -136,6 +134,8 @@ interface AgentCliStatusBadgeProps {
 	readonly className?: string;
 	/** Collapsed sidebar: the icon only. */
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 function toBadgeStatus(result: AgentCliStatus | null): BadgeStatus {
@@ -154,6 +154,7 @@ export function AgentCliStatusBadge({
 	tool,
 	className,
 	isCollapsed = false,
+	onPresenceChange,
 }: AgentCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const [result, setResult] = useState<AgentCliStatus | null>(null);
@@ -248,6 +249,10 @@ export function AgentCliStatusBadge({
 	}[status];
 
 	const missing = status === "not-found" || status === "error";
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : missing ? "missing" : "installed",
+	);
 	const canInstall = Boolean(globalThis.electronAPI?.installAgentCli);
 
 	return (
@@ -278,7 +283,7 @@ export function AgentCliStatusBadge({
 							{!isCollapsed && (
 								<>
 									<span className="truncate">
-										{SHORT_NAMES[tool]}
+										{AGENT_CLI_SHORT_NAMES[tool]}
 										{version ? ` (${version})` : ""}
 									</span>
 									{missing && canInstall && (

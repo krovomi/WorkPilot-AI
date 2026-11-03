@@ -26,6 +26,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -43,6 +44,8 @@ interface ClaudeCodeStatusBadgeProps {
 	readonly onNavigateToTerminals?: () => void; // Ajout de la prop pour la navigation
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
@@ -61,6 +64,7 @@ export function ClaudeCodeStatusBadge({
 	className,
 	onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: ClaudeCodeStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { data, refreshClaude } = useCliStatus();
@@ -101,6 +105,10 @@ export function ClaudeCodeStatusBadge({
 
 	// Use data from context
 	const status = claude.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = claude.versionInfo;
 	const lastChecked = claude.lastChecked;
 
