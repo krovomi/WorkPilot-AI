@@ -92,11 +92,11 @@ function FilterSection({ title, activeCount, children }: FilterSectionProps) {
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center gap-1.5 px-0.5">
-				<span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+				<span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
 					{title}
 				</span>
 				{activeCount ? (
-					<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-[9px] font-bold text-primary tabular-nums">
+					<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-3xs font-bold text-primary tabular-nums">
 						{activeCount}
 					</span>
 				) : null}
@@ -190,7 +190,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 						<SlidersHorizontal className="h-4 w-4" />
 						{t("kanban.filter.button")}
 						{count > 0 && (
-							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground tabular-nums">
+							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-bold leading-none text-primary-foreground tabular-nums">
 								{count}
 							</span>
 						)}
@@ -320,7 +320,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 						<Bookmark className="h-4 w-4" />
 						{t("kanban.views.button")}
 						{savedViews.length > 0 && (
-							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold leading-none tabular-nums">
+							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-3xs font-bold leading-none tabular-nums">
 								{savedViews.length}
 							</span>
 						)}

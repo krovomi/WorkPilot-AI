@@ -207,7 +207,7 @@ const PipelineBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 			<Badge
 				variant="outline"
 				className={cn(
-					"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+					"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 					pipeline.webUrl && "cursor-pointer hover:opacity-80",
 					badgeClass,
 				)}
@@ -221,7 +221,7 @@ const PipelineBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 				<Button
 					size="sm"
 					variant="outline"
-					className="h-5 px-1.5 text-[10px] text-destructive border-destructive/30 hover:bg-destructive/10"
+					className="h-5 px-1.5 text-3xs text-destructive border-destructive/30 hover:bg-destructive/10"
 					onClick={handleFix}
 					disabled={isFixing || pipeline.autoFixInProgress}
 				>
@@ -278,7 +278,7 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 		<Badge
 			variant="outline"
 			className={cn(
-				"text-[10px] px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
+				"text-3xs px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
 				url && "cursor-pointer hover:bg-muted hover:text-foreground",
 			)}
 			onClick={url ? open : undefined}
@@ -366,7 +366,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<TooltipTrigger asChild>
 						<Badge
 							variant="outline"
-							className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-destructive/10 text-destructive border-destructive/30 cursor-help"
+							className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-destructive/10 text-destructive border-destructive/30 cursor-help"
 						>
 							<GitMerge className="h-2.5 w-2.5" />
 							{t("kanban.conflict.label")} {conflict.titles.length}
@@ -399,7 +399,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<TooltipTrigger asChild>
 						<Badge
 							variant="outline"
-							className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help bg-muted text-muted-foreground border-border"
+							className="text-3xs px-1.5 py-0.5 flex items-center gap-1 cursor-help bg-muted text-muted-foreground border-border"
 						>
 							<Gauge className="h-2.5 w-2.5" />
 							{t("kanban.smartEstimate.label", {
@@ -448,7 +448,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							<Badge
 								variant="outline"
 								className={cn(
-									"text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help",
+									"text-3xs px-1.5 py-0.5 flex items-center gap-1 cursor-help",
 									blockers.pending.length > 0 && task.status === "queue"
 										? "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
 										: "bg-muted text-muted-foreground border-border",
@@ -501,7 +501,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{isStuck && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-warning/10 text-warning border-warning/30 badge-priority-urgent"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-warning/10 text-warning border-warning/30 badge-priority-urgent"
 				>
 					<AlertTriangle className="h-2.5 w-2.5" />
 					{t("labels.stuck")}
@@ -512,7 +512,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{isIncomplete && !isStuck && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-orange-500/10 text-orange-400 border-orange-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-orange-500/10 text-orange-400 border-orange-500/30"
 				>
 					<AlertTriangle className="h-2.5 w-2.5" />
 					{t("labels.incomplete")}
@@ -523,7 +523,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.archivedAt && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-muted text-muted-foreground border-border"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-muted text-muted-foreground border-border"
 				>
 					<Archive className="h-2.5 w-2.5" />
 					{t("status.archived")}
@@ -535,7 +535,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 						EXECUTION_PHASE_BADGE_COLORS[executionPhase],
 					)}
 				>
@@ -549,14 +549,14 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				(task.status === "done" ? (
 					<Badge
 						variant={getStatusBadgeVariant(task.status)}
-						className="text-[10px] px-1.5 py-0.5"
+						className="text-3xs px-1.5 py-0.5"
 					>
 						{getStatusLabel(task.status, t)}
 					</Badge>
 				) : (
 					<Badge
 						variant={statusBadgeVariant}
-						className="text-[10px] px-1.5 py-0.5"
+						className="text-3xs px-1.5 py-0.5"
 					>
 						{statusBadgeLabel}
 					</Badge>
@@ -566,7 +566,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{reviewReasonInfo && !isStuck && !isIncomplete && (
 				<Badge
 					variant={reviewReasonInfo.variant}
-					className="text-[10px] px-1.5 py-0.5"
+					className="text-3xs px-1.5 py-0.5"
 				>
 					{reviewReasonInfo.label}
 				</Badge>
@@ -576,7 +576,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.tddMode && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
 				>
 					<FlaskConical className="h-2.5 w-2.5" />
 					{t("labels.tdd")}
@@ -589,7 +589,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.mobileTargets?.length ? (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30"
 					title={t("mobile:targets.badgeTitle", {
 						platforms: task.metadata.mobileTargets
 							.map((platform: string) => t(`mobile:targets.${platform}`))
@@ -610,7 +610,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 						task.verification.status === "pass"
 							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
 							: "bg-destructive/10 text-destructive border-destructive/30",
@@ -635,7 +635,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 						task.crossReview.verdict === "agree"
 							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
 							: task.crossReview.verdict === "disagree"
@@ -652,14 +652,14 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			) : null}
 
 			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
-			<TaskKindBadge task={task} className="text-[10px] px-1.5 py-0" />
+			<TaskKindBadge task={task} className="text-3xs px-1.5 py-0" />
 
 			{/* Category badge with icon */}
 			{task.metadata?.category && (
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_CATEGORY_COLORS[task.metadata.category],
 					)}
 				>
@@ -679,7 +679,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							TASK_IMPACT_COLORS[task.metadata.impact],
 						)}
 					>
@@ -692,7 +692,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 					)}
 				>
@@ -707,7 +707,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							TASK_PRIORITY_COLORS[task.metadata.priority],
 						)}
 					>
@@ -720,7 +720,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_IMPACT_COLORS[task.metadata.securitySeverity],
 					)}
 				>
@@ -1520,12 +1520,12 @@ export const TaskCard = memo(function TaskCard({
 				{isAbandoned && (
 					<div className="relative z-10 mb-2 flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
 						<Ban className="h-3.5 w-3.5 shrink-0 text-warning" />
-						<span className="text-[11px] font-medium text-warning">
+						<span className="text-2xs font-medium text-warning">
 							{t("tasks:abandon.badge")}
 						</span>
 						<button
 							type="button"
-							className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-info hover:bg-info/10"
+							className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-medium text-info hover:bg-info/10"
 							onClick={(e) => {
 								e.preventDefault();
 								e.stopPropagation();

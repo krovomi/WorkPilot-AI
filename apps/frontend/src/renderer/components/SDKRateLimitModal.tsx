@@ -327,7 +327,7 @@ export function SDKRateLimitModal() {
 												to: swapInfo.swappedTo,
 											})}
 								</p>
-								<p className="mt-2 text-[10px]">
+								<p className="mt-2 text-3xs">
 									{t("rateLimit.sdk.continueWithoutInterruption")}
 								</p>
 							</>

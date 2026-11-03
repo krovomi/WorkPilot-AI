@@ -225,7 +225,7 @@ export function GeneralSettings({
 											<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
 												{t("projectSections.autoBuild.blocker.manual")}
 											</summary>
-											<div className="mt-2 rounded-md bg-muted/60 p-3 font-mono text-[11px] space-y-1 text-muted-foreground">
+											<div className="mt-2 rounded-md bg-muted/60 p-3 font-mono text-2xs space-y-1 text-muted-foreground">
 												{repairableBlocker === "not-a-git-repo" && (
 													<p>git init</p>
 												)}

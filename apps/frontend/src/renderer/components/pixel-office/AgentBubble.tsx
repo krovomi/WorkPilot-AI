@@ -111,7 +111,7 @@ function getAgentColor(agent: PixelAgent): string {
 function CodeChip({ text }: { readonly text: string }) {
 	return (
 		<span
-			className="inline-block font-mono text-[10px] px-1.5 py-0.5 rounded"
+			className="inline-block font-mono text-3xs px-1.5 py-0.5 rounded"
 			style={{ background: "rgba(99,102,241,0.15)", color: "#818CF8" }}
 		>
 			{text}
@@ -242,13 +242,13 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 			<div className="flex items-center justify-between px-4 py-2 shrink-0">
 				<button
 					type="button"
-					className="flex items-center gap-1.5 text-[11px] text-white/50 hover:text-white/80 transition-colors font-mono"
+					className="flex items-center gap-1.5 text-2xs text-white/50 hover:text-white/80 transition-colors font-mono"
 					onClick={() => setOpen((v) => !v)}
 				>
 					<TerminalIcon className="h-3.5 w-3.5" />
 					<span>{t("pixelOffice:bubble.logs")}</span>
 					{visibleLines.length > 0 && (
-						<span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white/50">
+						<span className="px-1.5 py-0.5 rounded text-3xs bg-white/10 text-white/50">
 							{visibleLines.length}
 						</span>
 					)}
@@ -262,7 +262,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 					<button
 						type="button"
 						onClick={copyLogs}
-						className="flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded transition-all"
+						className="flex items-center gap-1 text-3xs font-mono px-2 py-1 rounded transition-all"
 						style={{
 							color: copied ? "#6EE7B7" : "rgba(255,255,255,0.35)",
 							background: copied
@@ -289,7 +289,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 			{!open && lastLine && (
 				<div className="px-4 pb-2.5 shrink-0">
 					<p
-						className="text-[10px] font-mono truncate"
+						className="text-3xs font-mono truncate"
 						style={{ color: logLineColor(lastLine) }}
 					>
 						{lastLine}
@@ -313,7 +313,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 					{visibleLines.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full gap-2 text-white/20">
 							<TerminalIcon className="h-5 w-5" />
-							<p className="text-[10px] font-mono">
+							<p className="text-3xs font-mono">
 								{t("pixelOffice:bubble.waitingForLogs")}
 							</p>
 						</div>
@@ -323,7 +323,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 								<p
 									// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
 									key={`${line}-${i}`}
-									className="text-[11px] font-mono leading-relaxed break-all"
+									className="text-2xs font-mono leading-relaxed break-all"
 									style={{ color: logLineColor(line) }}
 								>
 									{line}
@@ -354,7 +354,7 @@ function PendingTaskPanel({
 					{t("pixelOffice:pending.description")}
 				</p>
 				<div
-					className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-mono"
+					className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg text-2xs font-mono"
 					style={{
 						background: "rgba(139,92,246,0.1)",
 						border: "1px solid rgba(139,92,246,0.25)",
@@ -376,7 +376,7 @@ function PendingTaskPanel({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="h-7 px-2.5 text-[11px] text-white/60 hover:text-white hover:bg-white/10"
+					className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
 					onClick={onGoToTask}
 				>
 					<LayoutDashboard className="h-3 w-3 mr-1" />
@@ -385,7 +385,7 @@ function PendingTaskPanel({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/60 ml-auto"
+					className="h-7 px-2.5 text-2xs text-white/40 hover:text-white/60 ml-auto"
 					onClick={onClose}
 				>
 					<X className="h-3 w-3 mr-1" />
@@ -441,7 +441,7 @@ function TaskPanel({
 			{/* Progress — fixed */}
 			{agent.progress !== undefined && (
 				<div className="px-4 pb-3 shrink-0">
-					<div className="flex justify-between text-[10px] text-white/40 font-mono mb-1.5">
+					<div className="flex justify-between text-3xs text-white/40 font-mono mb-1.5">
 						<span>{t("pixelOffice:bubble.progress")}</span>
 						<span>{Math.round(agent.progress)}%</span>
 					</div>
@@ -464,7 +464,7 @@ function TaskPanel({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="h-7 px-2.5 text-[11px] text-white/60 hover:text-white hover:bg-white/10"
+					className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
 					onClick={onGoToTask}
 				>
 					<LayoutDashboard className="h-3 w-3 mr-1" />
@@ -475,7 +475,7 @@ function TaskPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
+						className="h-7 px-2.5 text-2xs text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
 						onClick={onStopTask}
 					>
 						<Square className="h-3 w-3 mr-1" />
@@ -487,7 +487,7 @@ function TaskPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/60 ml-auto"
+						className="h-7 px-2.5 text-2xs text-white/40 hover:text-white/60 ml-auto"
 						onClick={onClose}
 					>
 						<X className="h-3 w-3 mr-1" />
@@ -568,7 +568,7 @@ function TerminalPanel({
 				)}
 
 				{terminal && (
-					<div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-white/40 font-mono">
+					<div className="mt-2 flex flex-wrap gap-1.5 text-3xs text-white/40 font-mono">
 						{terminal.cwd && (
 							<MetaChip
 								icon={FolderOpen}
@@ -624,7 +624,7 @@ function TerminalPanel({
 						</Button>
 					</div>
 					{isWaiting && (
-						<p className="text-[10px] text-white/30 mt-1 font-mono">
+						<p className="text-3xs text-white/30 mt-1 font-mono">
 							{t("pixelOffice:bubble.sendHint")}
 						</p>
 					)}
@@ -643,7 +643,7 @@ function TerminalPanel({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="h-7 px-2.5 text-[11px] text-white/60 hover:text-white hover:bg-white/10"
+					className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
 					onClick={onGoToTerminal}
 				>
 					<Maximize2 className="h-3 w-3 mr-1" />
@@ -654,7 +654,7 @@ function TerminalPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-amber-400/80 hover:text-amber-300 hover:bg-amber-400/10"
+						className="h-7 px-2.5 text-2xs text-amber-400/80 hover:text-amber-300 hover:bg-amber-400/10"
 						onClick={onInterrupt}
 					>
 						<Square className="h-3 w-3 mr-1" />
@@ -666,7 +666,7 @@ function TerminalPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-orange-400/80 hover:text-orange-300 hover:bg-orange-400/10"
+						className="h-7 px-2.5 text-2xs text-orange-400/80 hover:text-orange-300 hover:bg-orange-400/10"
 						onClick={onResumeClaude}
 					>
 						<Play className="h-3 w-3 mr-1" />
@@ -678,7 +678,7 @@ function TerminalPanel({
 					<Button
 						size="sm"
 						variant="ghost"
-						className="h-7 px-2.5 text-[11px] text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
+						className="h-7 px-2.5 text-2xs text-red-400/70 hover:text-red-300 hover:bg-red-400/10 ml-auto"
 						onClick={onKill}
 					>
 						<X className="h-3 w-3 mr-1" />

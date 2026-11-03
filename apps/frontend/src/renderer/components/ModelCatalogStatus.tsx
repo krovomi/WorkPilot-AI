@@ -42,7 +42,7 @@ export function ModelCatalogStatus({
 	return (
 		<div
 			className={cn(
-				"flex items-center gap-1.5 text-[10px] text-muted-foreground",
+				"flex items-center gap-1.5 text-3xs text-muted-foreground",
 				className,
 			)}
 			title={

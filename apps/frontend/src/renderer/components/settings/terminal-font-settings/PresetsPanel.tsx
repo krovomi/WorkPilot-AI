@@ -314,7 +314,7 @@ export function PresetsPanel({
 									<div className="truncate text-sm font-medium">
 										{t(preset.nameKey)}
 									</div>
-									<div className="truncate text-[11px] text-muted-foreground">
+									<div className="truncate text-2xs text-muted-foreground">
 										{t(preset.description)}
 									</div>
 								</div>
@@ -329,7 +329,7 @@ export function PresetsPanel({
 								defaultValue: "Reset to Defaults",
 							})}
 						</Label>
-						<p className="text-[11px] leading-relaxed text-muted-foreground">
+						<p className="text-2xs leading-relaxed text-muted-foreground">
 							{t("settings:terminalFonts.presets.resetDescription", {
 								defaultValue:
 									"Restore the default settings for your operating system",
@@ -439,7 +439,7 @@ export function PresetsPanel({
 										<div className="truncate text-sm font-medium text-foreground">
 											{preset.name}
 										</div>
-										<div className="truncate text-[11px] text-muted-foreground">
+										<div className="truncate text-2xs text-muted-foreground">
 											{t("settings:terminalFonts.presets.summary", {
 												font:
 													preset.settings.fontFamily[0] ??

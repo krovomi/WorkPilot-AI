@@ -147,7 +147,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 							);
 						})}
 					</div>
-					<span className="text-[11px] text-muted-foreground">
+					<span className="text-2xs text-muted-foreground">
 						{t(`envSnapshot:${activeFormat.descriptionKey}`)}
 					</span>
 				</div>

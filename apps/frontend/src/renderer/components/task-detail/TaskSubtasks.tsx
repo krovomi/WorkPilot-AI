@@ -436,14 +436,14 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										<div className="flex items-center gap-2 min-w-0 w-full">
 											<span
 												className={cn(
-													"text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+													"text-3xs font-medium px-1.5 py-0.5 rounded-full",
 													getStatusBadgeClass(subtask.status),
 												)}
 											>
 												#{index + 1}
 											</span>
 											{subtask.origin === "change_request" && (
-												<span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 flex-shrink-0">
+												<span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 flex-shrink-0">
 													<MessageSquarePlus className="h-2.5 w-2.5" />
 													{t("tasks:subtasks.changeRequest")}
 												</span>
@@ -479,14 +479,14 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										</div>
 										{subtask.origin === "change_request" &&
 											subtask.requestedAt && (
-												<p className="mt-0.5 text-[10px] text-violet-600/70 dark:text-violet-400/70">
+												<p className="mt-0.5 text-3xs text-violet-600/70 dark:text-violet-400/70">
 													{t("tasks:subtasks.requestedAt", {
 														date: formatAppDateTime(subtask.requestedAt),
 													})}
 												</p>
 											)}
 										{subtask.status === "blocked" && (
-											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-400">
+											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-2xs text-amber-700 dark:text-amber-400">
 												<AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
 												<span>
 													{subtask.blockedReason

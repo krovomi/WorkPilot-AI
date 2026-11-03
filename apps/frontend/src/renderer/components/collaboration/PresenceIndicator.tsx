@@ -29,7 +29,7 @@ function UserAvatar({ user, isMe }: { user: TeamMember; isMe: boolean }) {
 		<Tooltip>
 			<TooltipTrigger asChild>
 				<span
-					className="flex h-7 w-7 cursor-default items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 ring-background"
+					className="flex h-7 w-7 cursor-default items-center justify-center rounded-full text-2xs font-semibold text-white ring-2 ring-background"
 					style={{ backgroundColor: avatarColor(user.id) }}
 					role="img"
 					aria-label={user.name}
@@ -69,7 +69,7 @@ export function PresenceIndicator() {
 					{overflow > 0 && (
 						<span
 							className={cn(
-								"flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[11px] font-medium",
+								"flex h-7 w-7 items-center justify-center rounded-full bg-muted text-2xs font-medium",
 								"text-muted-foreground ring-2 ring-background",
 							)}
 						>

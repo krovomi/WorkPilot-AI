@@ -366,7 +366,7 @@ export function QuickCommandBar({
 							>
 								<div className="flex w-full items-center justify-between gap-2">
 									<code className="font-mono">/{cmd.name}</code>
-									<span className="text-[10px] uppercase text-muted-foreground">
+									<span className="text-3xs uppercase text-muted-foreground">
 										{cmd.source === "project"
 											? t("tasks:kanban.quickCommand.sourceProject")
 											: cmd.source === "user"

@@ -700,7 +700,7 @@ export function TerminalGrid({
 						>
 							<Plus className="h-3 w-3" />
 							{t("terminalGrid.newTerminal")}
-							<kbd className="ml-1 text-[10px] text-muted-foreground">
+							<kbd className="ml-1 text-3xs text-muted-foreground">
 								{navigator.platform.includes("Mac") ? "⌘" : "Ctrl"}+T
 							</kbd>
 						</Button>
