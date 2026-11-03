@@ -86,7 +86,7 @@ export function NamespaceList({
 							key={value}
 							size="sm"
 							variant={sort === value ? "secondary" : "ghost"}
-							className="h-6 flex-1 px-2 text-[11px]"
+							className="h-6 flex-1 px-2 text-2xs"
 							onClick={() => setSort(value)}
 						>
 							{t(`i18nEditor.sort.${value}`)}
@@ -123,7 +123,7 @@ export function NamespaceList({
 											aria-label={t("i18nEditor.complete")}
 										/>
 									) : (
-										<span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+										<span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
 											{todo}
 										</span>
 									)}

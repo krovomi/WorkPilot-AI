@@ -54,7 +54,7 @@ export function CiPipelineCard({ task }: { readonly task: Task }) {
 					<div className="flex flex-wrap items-center gap-2">
 						<Workflow className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:ciPipeline.title")}</span>
-						<Badge variant={VARIANT[pipeline.state]} className="text-[10px]">
+						<Badge variant={VARIANT[pipeline.state]} className="text-3xs">
 							{t(`tasks:ciPipeline.state.${pipeline.state}`)}
 						</Badge>
 					</div>

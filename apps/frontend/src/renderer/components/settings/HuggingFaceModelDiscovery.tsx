@@ -662,7 +662,7 @@ export function HuggingFaceModelDiscovery({
 			</label>
 
 			{/* Explicit colour legend (what each model is good for). */}
-			<div className="space-y-0.5 text-[11px] text-muted-foreground">
+			<div className="space-y-0.5 text-2xs text-muted-foreground">
 				<div>
 					<span className="font-medium text-success">{t("settings:sections.accounts.modelDiscovery.legend.recommended")}</span> {t("settings:sections.accounts.modelDiscovery.legend.recommendedDetail")}
 				</div>
@@ -740,7 +740,7 @@ export function HuggingFaceModelDiscovery({
 									)}
 									{m.id}
 									{isSelected && (
-										<span className="text-[10px] font-normal text-primary">
+										<span className="text-3xs font-normal text-primary">
 											{td("default")}
 										</span>
 									)}
@@ -748,7 +748,7 @@ export function HuggingFaceModelDiscovery({
 								<div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
 									<span
 										className={cn(
-											"px-1.5 py-0.5 rounded text-[10px] font-medium",
+											"px-1.5 py-0.5 rounded text-3xs font-medium",
 											VERDICT_BADGE[assessment.verdict],
 										)}
 										title={assessment.reason}
@@ -770,12 +770,12 @@ export function HuggingFaceModelDiscovery({
 										{formatCount(m.likes)}
 									</span>
 									{m.pipelineTag && (
-										<span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">
+										<span className="px-1.5 py-0.5 rounded bg-muted text-3xs">
 											{m.pipelineTag}
 										</span>
 									)}
 									{m.library && (
-										<span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">
+										<span className="px-1.5 py-0.5 rounded bg-muted text-3xs">
 											{m.library}
 										</span>
 									)}

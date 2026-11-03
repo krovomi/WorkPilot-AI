@@ -96,13 +96,13 @@ export function PrFollowupCard({ task }: PrFollowupCardProps) {
 						<GitPullRequest className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:prFollowup.title")}</span>
 						{status.running && (
-							<Badge variant="outline" className="gap-1 text-[10px]">
+							<Badge variant="outline" className="gap-1 text-3xs">
 								<Loader2 className="h-3 w-3 animate-spin" aria-hidden />
 								{t("tasks:prFollowup.running")}
 							</Badge>
 						)}
 						{round && (
-							<Badge variant={decisionVariant(round.decision)} className="text-[10px]">
+							<Badge variant={decisionVariant(round.decision)} className="text-3xs">
 								{t(`tasks:prFollowup.decision.${round.decision}`)}
 							</Badge>
 						)}

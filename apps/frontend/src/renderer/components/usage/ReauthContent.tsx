@@ -17,7 +17,7 @@ export function ReauthContent({ onOpenAccounts }: ReauthContentProps) {
 					<p className="text-xs font-medium text-destructive">
 						{t("common:usage.reauthRequired")}
 					</p>
-					<p className="text-[10px] text-muted-foreground leading-relaxed">
+					<p className="text-3xs text-muted-foreground leading-relaxed">
 						{t("common:usage.reauthRequiredDescription")}
 					</p>
 				</div>

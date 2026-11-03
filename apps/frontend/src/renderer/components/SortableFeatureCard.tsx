@@ -83,7 +83,7 @@ export function SortableFeatureCard({
 							<Badge
 								variant="outline"
 								className={cn(
-									"text-[10px] px-1.5 py-0",
+									"text-3xs px-1.5 py-0",
 									ROADMAP_PRIORITY_COLORS[feature.priority],
 								)}
 							>
@@ -94,7 +94,7 @@ export function SortableFeatureCard({
 									<TooltipTrigger asChild>
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0 text-muted-foreground border-muted-foreground/30"
+											className="text-3xs px-1.5 py-0 text-muted-foreground border-muted-foreground/30"
 										>
 											<Layers className="h-2.5 w-2.5 mr-0.5" />
 											{phaseName.length > 12
@@ -112,7 +112,7 @@ export function SortableFeatureCard({
 									<TooltipTrigger asChild>
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0 text-primary border-primary/50"
+											className="text-3xs px-1.5 py-0 text-primary border-primary/50"
 										>
 											<TrendingUp className="h-2.5 w-2.5" />
 										</Badge>
@@ -172,7 +172,7 @@ export function SortableFeatureCard({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							ROADMAP_COMPLEXITY_COLORS[feature.complexity],
 						)}
 					>
@@ -181,7 +181,7 @@ export function SortableFeatureCard({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							ROADMAP_IMPACT_COLORS[feature.impact],
 						)}
 					>
@@ -193,7 +193,7 @@ export function SortableFeatureCard({
 							<TooltipTrigger asChild>
 								<Badge
 									variant="outline"
-									className="text-[10px] px-1.5 py-0 text-muted-foreground"
+									className="text-3xs px-1.5 py-0 text-muted-foreground"
 								>
 									<ThumbsUp className="h-2.5 w-2.5 mr-0.5" />
 									{feature.votes}
@@ -210,7 +210,7 @@ export function SortableFeatureCard({
 							<TooltipTrigger asChild>
 								<Badge
 									variant="outline"
-									className="text-[10px] px-1.5 py-0 text-orange-500 border-orange-500/30"
+									className="text-3xs px-1.5 py-0 text-orange-500 border-orange-500/30"
 								>
 									{feature.source?.provider === "canny" ? "Canny" : t("roadmap:featureCard.external")}
 								</Badge>

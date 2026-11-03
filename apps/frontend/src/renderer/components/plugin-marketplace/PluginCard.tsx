@@ -85,7 +85,7 @@ export function PluginCard({
 			<div className="mt-3 flex items-center gap-2">
 				<span
 					className={cn(
-						"inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+						"inline-flex items-center rounded-full border px-2 py-0.5 text-3xs font-medium",
 						TYPE_BADGE_CLASSES[plugin.type],
 					)}
 				>
@@ -109,7 +109,7 @@ export function PluginCard({
 				<button
 					type="button"
 					onClick={() => setShowFullDesc(!showFullDesc)}
-					className="mt-1 text-[10px] text-primary hover:underline text-left"
+					className="mt-1 text-3xs text-primary hover:underline text-left"
 				>
 					{showFullDesc
 						? t("common:buttons.showLess")
@@ -121,19 +121,19 @@ export function PluginCard({
 			<button
 				type="button"
 				onClick={() => setShowSkill(!showSkill)}
-				className="mt-3 text-[10px] text-primary hover:underline text-left"
+				className="mt-3 text-3xs text-primary hover:underline text-left"
 			>
 				{showSkill
 					? t("common:pluginMarketplace.hideSkill")
 					: t("common:pluginMarketplace.showSkill")}
 			</button>
 			{showSkill && (
-				<pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-2 text-[10px] leading-relaxed whitespace-pre-wrap">
+				<pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-2 text-3xs leading-relaxed whitespace-pre-wrap">
 					{plugin.skill.body}
 				</pre>
 			)}
 			{isInstalled && (
-				<p className="mt-2 text-[10px] text-muted-foreground">
+				<p className="mt-2 text-3xs text-muted-foreground">
 					{t("common:pluginMarketplace.howToUse", { id: plugin.id })}
 				</p>
 			)}
@@ -144,13 +144,13 @@ export function PluginCard({
 					<Badge
 						key={tag}
 						variant="secondary"
-						className="text-[10px] px-1.5 py-0 h-4"
+						className="text-3xs px-1.5 py-0 h-4"
 					>
 						{tag}
 					</Badge>
 				))}
 				{plugin.tags.length > 3 && (
-					<Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+					<Badge variant="secondary" className="text-3xs px-1.5 py-0 h-4">
 						+{plugin.tags.length - 3}
 					</Badge>
 				)}

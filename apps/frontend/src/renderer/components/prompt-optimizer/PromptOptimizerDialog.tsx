@@ -420,7 +420,7 @@ function EngineChip({
 		<div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
 			<Cpu className="h-3.5 w-3.5" />
 			<span>{label}</span>
-			<span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground/80">
+			<span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-2xs text-foreground/80">
 				{text}
 			</span>
 		</div>

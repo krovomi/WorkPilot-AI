@@ -268,7 +268,7 @@ export function LiveGenerationSurface() {
 							</div>
 							<span
 								className={[
-									"min-h-[14px] truncate font-mono text-[10.5px]",
+									"min-h-[14px] truncate font-mono text-3xs",
 									isFailed ? "text-destructive" : "text-muted-foreground",
 								].join(" ")}
 							>
@@ -296,7 +296,7 @@ export function LiveGenerationSurface() {
 						{fileName ?? "…"}
 					</span>
 					{isGenerating && (
-						<span className="ml-auto flex items-center gap-1.5 text-[10.5px] tracking-wide text-primary">
+						<span className="ml-auto flex items-center gap-1.5 text-3xs tracking-wide text-primary">
 							<span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
 							{t("live.badgeLive")}
 						</span>
@@ -304,7 +304,7 @@ export function LiveGenerationSurface() {
 				</div>
 				<div ref={scrollRef} className="max-h-[300px] overflow-auto">
 					{revealed ? (
-						<pre className="m-0 font-mono text-[12px] leading-[1.6]">
+						<pre className="m-0 font-mono text-xs leading-[1.6]">
 							{lines.map((ln, i) => (
 								<div
 									// biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
@@ -393,7 +393,7 @@ export function LiveGenerationSurface() {
 								type="button"
 								onClick={handleCopyPath}
 								title={t("live.copyPath")}
-								className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+								className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-muted"
 							>
 								{pathCopied ? (
 									<Check className="h-3 w-3 text-emerald-400" />
@@ -429,7 +429,7 @@ function Stat({
 			>
 				{children}
 			</span>
-			<span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+			<span className="text-3xs uppercase tracking-wider text-muted-foreground">
 				{label}
 			</span>
 		</div>

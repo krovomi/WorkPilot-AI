@@ -121,7 +121,7 @@ export function TerminalHeader({
 				</div>
 				{isClaudeMode && (
 					<span
-						className="flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded"
+						className="flex items-center gap-1 text-3xs font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded"
 						title="Claude"
 					>
 						<Sparkles className="h-2.5 w-2.5" />
@@ -130,7 +130,7 @@ export function TerminalHeader({
 				)}
 				{pendingClaudeResume && (
 					<span
-						className="flex items-center gap-1 text-[10px] font-medium text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded animate-pulse"
+						className="flex items-center gap-1 text-3xs font-medium text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded animate-pulse"
 						title={t("terminal:resume.pendingTooltip")}
 					>
 						<RotateCcw className="h-2.5 w-2.5" />
@@ -151,7 +151,7 @@ export function TerminalHeader({
 				{worktreeConfig ? (
 					<span
 						className={cn(
-							"flex items-center gap-1 text-[10px] font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded",
+							"flex items-center gap-1 text-3xs font-medium text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded",
 							terminalCount >= 6
 								? "max-w-20"
 								: terminalCount >= 4

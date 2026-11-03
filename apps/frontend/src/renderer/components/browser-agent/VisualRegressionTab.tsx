@@ -93,7 +93,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 												{screenshot.name}
 											</span>
 										</div>
-										<span className="text-[11px] text-muted-foreground font-mono shrink-0 ml-2">
+										<span className="text-2xs text-muted-foreground font-mono shrink-0 ml-2">
 											{screenshot.width}x{screenshot.height}
 										</span>
 									</div>
@@ -160,7 +160,7 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 										<p className="text-sm font-medium text-foreground truncate">
 											{baseline.name}
 										</p>
-										<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+										<div className="flex items-center gap-2 text-2xs text-muted-foreground">
 											<span className="font-mono">
 												{baseline.width}x{baseline.height}
 											</span>

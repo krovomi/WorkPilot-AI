@@ -443,13 +443,13 @@ export function AgentProfileSelector({
 										<Label className="text-xs font-medium text-foreground">
 											{t(PHASE_LABEL_KEYS[phase].label)}
 										</Label>
-										<span className="text-[10px] text-muted-foreground">
+										<span className="text-3xs text-muted-foreground">
 											{t(PHASE_LABEL_KEYS[phase].description)}
 										</span>
 									</div>
 									<div className="grid grid-cols-2 gap-2">
 										<div className="space-y-1">
-											<Label className="text-[10px] text-muted-foreground">
+											<Label className="text-3xs text-muted-foreground">
 												{t("agentProfile.model")}
 											</Label>
 											<Select
@@ -472,7 +472,7 @@ export function AgentProfileSelector({
 											</Select>
 										</div>
 										<div className="space-y-1">
-											<Label className="text-[10px] text-muted-foreground">
+											<Label className="text-3xs text-muted-foreground">
 												{t("agentProfile.thinking")}
 											</Label>
 											<Select

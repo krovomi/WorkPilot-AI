@@ -1572,7 +1572,7 @@ export function Sidebar({
 							{item.shortcut && (
 								<kbd
 									className={cn(
-										"pointer-events-none hidden h-5 select-none items-center gap-1 rounded-md border border-border bg-secondary px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex",
+										"pointer-events-none hidden h-5 select-none items-center gap-1 rounded-md border border-border bg-secondary px-1.5 font-mono text-3xs font-medium text-muted-foreground sm:flex",
 										"transition-opacity duration-200",
 										context !== "favorites" &&
 											"group-hover/nav-item:opacity-0",
@@ -1606,7 +1606,7 @@ export function Sidebar({
 							<span className="ml-2 text-amber-500">{t("navigation:experimental.badge")}</span>
 						)}
 						{item.shortcut && (
-							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
 								{item.shortcut}
 							</kbd>
 						)}
@@ -1653,7 +1653,7 @@ export function Sidebar({
 				<span className="flex-1 truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>{t(item.labelKey)}</span>
 				<ActivityBadge badge={badge} />
 				{item.shortcut && (
-					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">
+					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
 						{item.shortcut}
 					</kbd>
 				)}
@@ -1678,7 +1678,7 @@ export function Sidebar({
 				)}
 			>
 				{sg.key && (
-					<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
+					<div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
 						{t(sg.key)}
 					</div>
 				)}
@@ -1753,7 +1753,7 @@ export function Sidebar({
 				)}
 			>
 				{sg.key && (
-					<div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+					<div className="px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground/70">
 						{t(sg.key)}
 					</div>
 				)}
@@ -2146,7 +2146,7 @@ export function Sidebar({
 									</TooltipTrigger>
 									<TooltipContent side="bottom">
 										{t("search.placeholder")}
-										<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+										<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
 											/
 										</kbd>
 									</TooltipContent>

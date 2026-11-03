@@ -110,7 +110,7 @@ export function SliderField({
 				className={cn(...SLIDER_INPUT_CLASSES)}
 			/>
 
-			<div className="flex justify-between text-[11px] text-muted-foreground">
+			<div className="flex justify-between text-2xs text-muted-foreground">
 				<span>{minLabel}</span>
 				<span>{maxLabel}</span>
 			</div>

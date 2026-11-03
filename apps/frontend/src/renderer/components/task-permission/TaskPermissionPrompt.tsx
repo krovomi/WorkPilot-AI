@@ -67,7 +67,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 					<p className="font-medium">{t("tasks:permission.asks", { agent: request.agent })}</p>
 					<p className="break-words">{request.title}</p>
 					{request.locations.slice(0, 3).map((location) => (
-						<p key={location} className="font-mono text-[11px] text-muted-foreground break-all">
+						<p key={location} className="font-mono text-2xs text-muted-foreground break-all">
 							{location}
 						</p>
 					))}
@@ -79,7 +79,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 						key={option.optionId}
 						size="sm"
 						variant={option.kind.startsWith("allow") ? "default" : "outline"}
-						className={cn("h-6 px-2 text-[11px]")}
+						className={cn("h-6 px-2 text-2xs")}
 						disabled={sending !== null}
 						onClick={() => void choose(option.optionId)}
 					>
@@ -87,7 +87,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 					</Button>
 				))}
 			</div>
-			<p className="text-[11px] text-muted-foreground">
+			<p className="text-2xs text-muted-foreground">
 				{t("tasks:permission.expires", {
 					time: formatAppTime(request.expiresAt, {
 						hour: "2-digit",
@@ -95,7 +95,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 					}),
 				})}
 			</p>
-			{failure && <p className="text-[11px] text-destructive">{failure}</p>}
+			{failure && <p className="text-2xs text-destructive">{failure}</p>}
 		</fieldset>
 	);
 }

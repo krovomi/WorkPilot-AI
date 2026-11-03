@@ -70,7 +70,7 @@ export function InstalledPluginsView() {
 								<span className="font-medium text-sm">{plugin.name}</span>
 								<span
 									className={cn(
-										"rounded-full px-2 py-0.5 text-[10px] font-medium",
+										"rounded-full px-2 py-0.5 text-3xs font-medium",
 										TYPE_COLORS[plugin.type],
 									)}
 								>
@@ -82,7 +82,7 @@ export function InstalledPluginsView() {
 									paths: plugin.paths.join(", "),
 								})}
 							</p>
-							<p className="text-[10px] text-muted-foreground mt-0.5">
+							<p className="text-3xs text-muted-foreground mt-0.5">
 								{t("common:pluginMarketplace.howToUse", { id: plugin.pluginId })}
 							</p>
 						</div>

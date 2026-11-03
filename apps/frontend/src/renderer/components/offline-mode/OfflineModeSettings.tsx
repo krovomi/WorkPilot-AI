@@ -439,7 +439,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						</Button>
 					</div>
 					{catalog && (
-						<p className="text-[11px] text-muted-foreground">
+						<p className="text-2xs text-muted-foreground">
 							{t(
 								"offlineMode:catalogMeta",
 								"{{total}} models detected across {{providers}} providers · cached {{age}} ago",
