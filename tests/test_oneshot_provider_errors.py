@@ -210,3 +210,30 @@ def test_a_notice_beside_a_real_answer_stays_out_of_it(monkeypatch):
     assert text == "Hello!"
     assert deltas == ["Hello!"]
     assert errors == []
+
+
+def test_a_comparison_keeps_copilot_on_the_model_it_named(monkeypatch):
+    """`require_provider` (the Arena) also forbids Copilot's model swap."""
+    import core.agent_client as agent_client
+    from core import oneshot
+
+    built = []
+
+    class Recorder:
+        def __init__(self, **kwargs):
+            built.append(kwargs)
+
+    monkeypatch.setattr(agent_client, "CopilotAgentClient", Recorder)
+    for require in (True, False):
+        oneshot._build_client(
+            "copilot",
+            "claude-opus-4.8",
+            None,
+            None,
+            None,
+            1,
+            chosen=True,
+            exact_model=require,
+        )
+
+    assert [kw["allow_model_fallback"] for kw in built] == [False, True]

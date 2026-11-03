@@ -223,3 +223,77 @@ async def test_a_model_swap_drops_the_old_models_budget():
     assert session.payloads[0]["thinking_budget"] == 16384
     assert session.payloads[1]["model"] != "claude-opus-4.8"
     assert "thinking_budget" not in session.payloads[1]
+
+
+# ── A model Copilot does not serve (400 model_not_supported) ─────────────────
+
+NOT_SUPPORTED = _Response(
+    400,
+    body='{"error": {"message": "The requested model is not supported.", '
+    '"code": "model_not_supported"}}',
+)
+
+
+def _served(*ids: str) -> _Response:
+    return _Response(
+        200,
+        {
+            "data": [
+                {
+                    "id": mid,
+                    "model_picker_enabled": True,
+                    "capabilities": {"type": "chat", "supports": {}},
+                }
+                for mid in ids
+            ]
+        },
+    )
+
+
+async def _texts(client) -> list[str]:
+    await client.query("fix it")
+    return [
+        block.text
+        for msg in [m async for m in client.receive_response()]
+        for block in msg.content
+        if getattr(block, "text", None)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_retry_goes_to_a_model_this_account_is_served():
+    """The fixed fallback (claude-sonnet-4.5) was refused too: Leub got
+    `model_not_supported` from the retry, not an answer."""
+    client, session = _client(
+        [NOT_SUPPORTED, _done()],
+        _served("gpt-4.1", "claude-opus-4.8"),
+        model="claude-opus-4.8",
+        thinking_budget=None,
+    )
+
+    texts = await _texts(client)
+
+    assert [p["model"] for p in session.payloads] == ["claude-opus-4.8", "gpt-4.1"]
+    assert "Done." in texts
+
+
+@pytest.mark.asyncio
+async def test_a_comparison_gets_the_refusal_not_another_models_answer():
+    """The Arena names each answer by its model: a swap would credit
+    claude-opus-4.8 with gpt-4.1's answer."""
+    client, session = _client(
+        [NOT_SUPPORTED, _done()],
+        _served("gpt-4.1"),
+        model="claude-opus-4.8",
+        thinking_budget=None,
+    )
+    client.allow_model_fallback = False
+
+    texts = await _texts(client)
+
+    assert [p["model"] for p in session.payloads] == ["claude-opus-4.8"]
+    assert "Done." not in texts
+    assert any(
+        "does not serve 'claude-opus-4.8'" in t and "settings/copilot" in t
+        for t in texts
+    )

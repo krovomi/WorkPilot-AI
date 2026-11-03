@@ -14,6 +14,8 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
 from typing import Any
 
+from copilot_models import EXCHANGE_REFUSED_STATUSES as _EXCHANGE_REFUSED_STATUSES
+from copilot_models import IDE_HEADERS
 from harness.application.loop import run_turns
 from harness.application.subagents import (
     launch_staggered,
@@ -112,6 +114,13 @@ def _normalize_copilot_model_id(model: str | None) -> str | None:
     return model
 
 
+def _model_not_served(model: str) -> str:
+    return (
+        f"Copilot does not serve '{model}' to this account: the model is not "
+        "in its plan, or not enabled at https://github.com/settings/copilot/features."
+    )
+
+
 def _copilot_fallback_model(model: str) -> str:
     """Retourne un modèle Copilot de repli quand ``model`` est rejeté (400).
 
@@ -174,9 +183,6 @@ _COPILOT_REQUEST_RETRY_BACKOFF = 2.0
 #   * 500/502/503/529 — momentary server-side hiccups that usually clear on the
 #     next request.
 _COPILOT_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 529})
-# Statuses with which copilot_internal/v2/token refuses a GitHub token that
-# api.githubcopilot.com still accepts directly (see `_get_copilot_token`).
-_EXCHANGE_REFUSED_STATUSES = frozenset({403, 404})
 # How many times to retry a transient/rate-limited response before giving up.
 # Generous because a per-minute window can need several short waits to clear.
 _COPILOT_RATE_LIMIT_MAX_RETRIES = int(_env_float("COPILOT_RATE_LIMIT_MAX_RETRIES", 6))
@@ -477,7 +483,16 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         # and retry the turn instead of failing the phase.
                         error_text = await resp.text()
                         if "model_not_supported" in error_text:
-                            fallback = _copilot_fallback_model(client.model)
+                            if not client.allow_model_fallback:
+                                # A caller comparing models (the Arena) wants
+                                # this model's answer or a failure, never
+                                # another model's answer under its name.
+                                yield self.notice(_model_not_served(client.model))
+                                yield Outcome.HALT
+                                return
+                            fallback = await client._served_fallback(
+                                session, request_headers
+                            )
                             self.model_fallback_attempted = True
                             logger.warning(
                                 "[CopilotAgentClient] Model "
@@ -774,12 +789,7 @@ class CopilotAgentClient(AgentClient):
     # IDE impersonation headers — required by the Copilot API gateway.
     # Omitting any of these causes 400 / 421 errors on Copilot Enterprise.
     # Versions verified against working open-source implementations (2025).
-    _IDE_HEADERS = {
-        "editor-version": "vscode/1.104.3",
-        "editor-plugin-version": "copilot-chat/0.26.7",
-        "user-agent": "GitHubCopilotChat/0.26.7",
-        "x-vscode-user-agent-library-version": "electron-fetch",
-    }
+    _IDE_HEADERS = IDE_HEADERS
 
     def __init__(
         self,
@@ -793,10 +803,14 @@ class CopilotAgentClient(AgentClient):
         agent_type: str = "coder",
         spec_dir: str | None = None,
         thinking_budget: int | None = None,
+        allow_model_fallback: bool = True,
     ):
         import os
 
         self.model = _normalize_copilot_model_id(model) or "gpt-4o"
+        # When Copilot refuses the model: run on another one (a build that
+        # must finish) or fail (a comparison that must not substitute).
+        self.allow_model_fallback = allow_model_fallback
         # The user's thinking budget for the phase. What reaches the API is
         # `_session_thinking_budget`: kept inside the bounds Copilot's
         # `/models` gives this model, or None when it takes no budget.
@@ -1059,6 +1073,42 @@ class CopilotAgentClient(AgentClient):
                     raise ValueError(
                         f"Copilot token exchange failed ({resp.status}): {error_text}{token_hint}"
                     )
+
+    async def _served_fallback(self, session: Any, headers: dict[str, str]) -> str:
+        """The model to retry with once Copilot refused ``self.model``.
+
+        The id's normalised spelling first (it keeps the intent), else the
+        default fallback when this account's ``/models`` serves it, else the
+        first model it does serve. Without an answer from ``/models``, the
+        default fallback, as before.
+        """
+        from copilot_models import is_served, usable_chat_models
+
+        fallback = _copilot_fallback_model(self.model)
+        if fallback != _COPILOT_DEFAULT_FALLBACK_MODEL:
+            return fallback
+        try:
+            token = await self._get_copilot_token()
+            async with session.get(
+                self._models_url,
+                headers={**headers, "Authorization": f"Bearer {token}"},
+            ) as resp:
+                if resp.status != 200:
+                    await resp.text()
+                    return fallback
+                data = await resp.json()
+        except (OSError, ValueError, TimeoutError) as error:
+            logger.info("[CopilotAgentClient] /models unavailable (%s)", error)
+            return fallback
+        entries = data.get("data") if isinstance(data, dict) else None
+        if is_served(fallback, entries):
+            return fallback
+        served = [
+            entry["id"]
+            for entry in usable_chat_models(entries)
+            if entry["id"] != self.model
+        ]
+        return served[0] if served else fallback
 
     async def _resolve_thinking_budget(
         self, session: Any, headers: dict[str, str]
