@@ -319,7 +319,7 @@ jobs:
           path: |
             apps/frontend/test-results/
             apps/frontend/playwright-report/
-          retention-days: 7
+          retention-days: 3
 
   # --------------------------------------------------------------------------
   # Server image - build it, migrate a real database with it, serve /health
@@ -471,7 +471,7 @@ jobs:
           path: |
             apps/frontend/test-results/
             apps/frontend/playwright-report/
-          retention-days: 7
+          retention-days: 3
 
   # --------------------------------------------------------------------------
   # Gate Job - Single check for branch protection

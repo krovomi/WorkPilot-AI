@@ -107,6 +107,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-intel-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.dmg
             apps/frontend/dist/*.zip
@@ -189,6 +190,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-arm64-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.dmg
             apps/frontend/dist/*.zip
@@ -367,6 +369,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.exe
             apps/frontend/dist/*.yml
@@ -436,6 +439,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.AppImage
             apps/frontend/dist/*.deb
@@ -477,12 +481,14 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-intel-stapled
+          retention-days: 1
           path: intel/*.dmg
 
       - name: Upload stapled ARM64 DMG
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-arm64-stapled
+          retention-days: 1
           path: arm64/*.dmg
 
   create-release:
