@@ -134,7 +134,7 @@ jobs:
         with:
           name: mobile-server-e2e-results
           path: apps/mobile/test-results/
-          retention-days: 7
+          retention-days: 3
 
   android:
     name: Mobile — Android APK
@@ -187,7 +187,7 @@ jobs:
           name: workpilot-android-apk
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
 
   ios:
     name: Mobile — iOS Simulator app
@@ -244,4 +244,4 @@ jobs:
           name: workpilot-ios-simulator
           path: apps/mobile/workpilot-ios-simulator.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
