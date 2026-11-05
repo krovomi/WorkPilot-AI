@@ -28,7 +28,7 @@ secretstorage>=3.5.0; sys_platform == "linux"
 pywin32>=312; sys_platform == "win32"
 
 # Pydantic for structured output schemas
-pydantic>=2.14.1
+pydantic>=2.14.2
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
