@@ -6,7 +6,8 @@
 	"author": "WorkPilot AI Team",
 	"workspaces": [
 		"apps/*",
-		"libs/*"
+		"libs/*",
+		"!apps/mobile"
 	],
 	"scripts": {
 		"prepare": "git config core.hooksPath .husky",
