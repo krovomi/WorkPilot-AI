@@ -45,12 +45,13 @@ GATE_NAME = "tests-bite"
 
 def _declared(spec_dir: Path) -> bool:
     """Whether the task's workflow declares the hard gate ``tests-bite``."""
-    try:
-        from workflows.hard_gates import gate_names
-        from workflows.registry import load_workflow_for_spec
+    from workflows.hard_gates import gate_names
+    from workflows.registry import load_workflow_for_spec
+    from workflows.spec import WorkflowError
 
+    try:
         workflow = load_workflow_for_spec(spec_dir)
-    except Exception:  # noqa: BLE001 - an unreadable workflow declares nothing
+    except (OSError, WorkflowError):  # an unreadable workflow declares nothing
         return False
     return any(
         GATE_NAME in gate_names(getattr(phase, "hard_gate", None))

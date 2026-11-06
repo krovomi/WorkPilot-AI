@@ -221,11 +221,12 @@ def test_native_reports_are_read_and_the_plan_falls_back(tmp_path):
     ]
     # No Stryker in the project: the generic engine.
     (tmp_path / "package.json").write_text(
-        json.dumps({"devDependencies": {"vitest": "1"}})
+        json.dumps({"devDependencies": {"vitest": "1"}}), encoding="utf-8"
     )
     assert native_plan(tmp_path, {"src/a.ts": {3}}, None) is None
     (tmp_path / "package.json").write_text(
-        json.dumps({"devDependencies": {"@stryker-mutator/core": "9"}})
+        json.dumps({"devDependencies": {"@stryker-mutator/core": "9"}}),
+        encoding="utf-8",
     )
     plan = native_plan(tmp_path, {"src/a.ts": {3, 8}}, None)
     assert plan.engine == "stryker" and "src/a.ts:3-8" in plan.argv
@@ -252,12 +253,14 @@ def test_a_native_tool_without_a_report_falls_back_to_the_generic_engine(
 
 
 def test_commands_per_stack(tmp_path):
-    (tmp_path / "go.mod").write_text("module x\n")
+    (tmp_path / "go.mod").write_text("module x\n", encoding="utf-8")
     argv, cwd = commands.command_for_tests(tmp_path, "pkg/calc/calc.go", [])
     assert argv[-1] == "./pkg/calc/" and cwd == tmp_path
     web = tmp_path / "web"
     web.mkdir()
-    (web / "package.json").write_text(json.dumps({"devDependencies": {"vitest": "3"}}))
+    (web / "package.json").write_text(
+        json.dumps({"devDependencies": {"vitest": "3"}}), encoding="utf-8"
+    )
     argv, cwd = commands.command_for_tests(
         tmp_path, "web/src/a.ts", ["web/src/a.test.ts"]
     )
@@ -267,7 +270,7 @@ def test_commands_per_stack(tmp_path):
         tmp_path, "web/src/a.ts", ["web/src/a&b.test.ts"]
     )
     assert not any("a&b" in part for part in argv)
-    (tmp_path / "Shop.csproj").write_text("<Project/>")
+    (tmp_path / "Shop.csproj").write_text("<Project/>", encoding="utf-8")
     argv, _ = commands.command_for_tests(tmp_path, "Order.cs", ["OrderTests.cs"])
     assert "test" in argv and "Shop.csproj" in argv
     assert commands.command_for_tests(tmp_path, "notes.swift", []) is None
