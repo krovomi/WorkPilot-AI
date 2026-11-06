@@ -2259,5 +2259,45 @@
 			"disagree": "Revue croisée : désaccord",
 			"inconclusive": "Revue croisée : sans verdict"
 		}
+	},
+	"stack": {
+		"title": "Empilée sur un prérequis",
+		"description": "Faites partir cette tâche de la branche d'un prérequis au lieu du tronc : son code s'appuie sur celui du prérequis avant sa fusion.",
+		"stackOn": "Empiler sur « {{title}} »",
+		"stackedNote": "Empilée sur « {{title}} » : le worktree partira de sa branche.",
+		"stackedOn": "Empilée sur « {{title}} » ({{branch}})",
+		"upToDate": "À jour avec son parent.",
+		"parentMoved": "Le parent a de nouveaux commits : mettez à jour pour rebaser dessus.",
+		"parentMerged": "Le parent est fusionné : cette tâche peut passer sur {{base}}.",
+		"runningHint": "Un agent tourne sur cette tâche : mettez à jour une fois qu'il s'arrête.",
+		"update": "Mettre à jour",
+		"moveToBase": "Passer sur {{base}}",
+		"outcome": {
+			"rebased": "Rebasée sur le dernier commit du parent.",
+			"metadata_only": "La tâche partira du dernier commit du parent.",
+			"moved_to_base": "Passée sur la base du parent.",
+			"up_to_date": "Déjà à jour."
+		},
+		"errors": {
+			"same_task": "Une tâche ne peut pas être empilée sur elle-même.",
+			"already_stacked": "Cette tâche est déjà empilée.",
+			"not_blocker": "Seul un prérequis de cette tâche peut être son parent.",
+			"parent_done": "Ce prérequis est déjà terminé : partez du tronc.",
+			"cycle": "Empiler ici créerait une boucle.",
+			"child_started": "Cette tâche a déjà un worktree : sa base ne peut plus changer.",
+			"parent_no_worktree": "Le prérequis n'a pas encore de worktree ni de branche.",
+			"parent_no_commits": "Le prérequis n'a encore aucun commit : rien sur quoi s'appuyer.",
+			"metadata_unwritable": "Les métadonnées de la tâche n'ont pas pu être écrites.",
+			"task_not_found": "Tâche introuvable.",
+			"not_stacked": "Cette tâche n'est pas empilée.",
+			"running": "Un agent tourne sur cette tâche : réessayez une fois qu'il s'arrête.",
+			"dirty": "Le worktree de la tâche a des modifications non commitées : commitez-les ou annulez-les d'abord.",
+			"no_recorded_commit": "Le commit du parent n'a pas été enregistré : empilez à nouveau.",
+			"no_base": "La branche de base du parent est introuvable.",
+			"conflict": "Le rebase s'est arrêté sur un conflit et a été annulé. Fichiers en conflit :",
+			"pr_not_retargeted": "La pull request n'a pas pu être reciblée : changez sa base sur la forge.",
+			"pr_url_unreadable": "Le lien de la pull request est illisible : changez sa base sur la forge.",
+			"unknown": "L'opération a échoué."
+		}
 	}
 }
