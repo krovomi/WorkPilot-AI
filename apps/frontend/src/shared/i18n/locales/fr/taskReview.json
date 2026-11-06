@@ -155,6 +155,8 @@
 			"changes": "Modifications",
 			"prTitle": "Titre de la PR (optionnel)",
 			"draftPR": "Créer comme brouillon",
+			"includeWalkthrough": "Joindre le parcours du scénario (GIF) à la preuve visuelle",
+			"includeWalkthroughHint": "Le GIF montre l'application telle que la vérification l'a filmée, avec ses données : tous les lecteurs du dépôt le verront.",
 			"unknown": "Inconnu"
 		},
 		"hints": {

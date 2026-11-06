@@ -1577,6 +1577,11 @@ export interface VerifyRecord {
 	scenario_steps?: VerifyScenarioStep[];
 	/** Whether a Playwright trace of the scenario can be downloaded (`verifyTraceUrl`). */
 	trace?: boolean;
+	/** Whether the scenario was filmed (`verifyMediaUrl(query, "video")`), and why not. */
+	video?: boolean;
+	video_note?: string;
+	/** Whether the step captures make a GIF (`verifyMediaUrl(query, "walkthrough")`). */
+	walkthrough?: boolean;
 	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
 	endpoints: VerifyEndpoint[];
 	perf: VerifyPerf[];
@@ -1647,4 +1652,10 @@ export function verifyScreenshotUrl(
 export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
 	return `${backendUrl()}/api/verify/trace?${qs}`;
+}
+
+/** The scenario's video or GIF, served by the record, never by path. */
+export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
+	const qs = new URLSearchParams(specAddress(query)).toString();
+	return `${backendUrl()}/api/verify/${kind}?${qs}`;
 }
