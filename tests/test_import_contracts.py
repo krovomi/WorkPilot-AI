@@ -46,6 +46,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "offline_policy": {"ollama_model_detector", "phase_config"},
     # The preview's project detector, read by verify and the Kanban runner.
     "app_detection": set(),
+    # The dependency guard (docs/architecture/dependency-guard.md): manifests,
+    # registries and its record; git through foundation. The QA gate that
+    # calls it, and offline_policy, live in qa. A leaf.
+    "dependency_guard": {"foundation"},
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),
