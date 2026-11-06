@@ -2015,6 +2015,12 @@
 			"download": "Télécharger la trace Playwright",
 			"hint": "et l'ouvrir sur trace.playwright.dev ou avec npx playwright show-trace.",
 			"none": "Pas de trace Playwright : Playwright n'a pas piloté cette session."
+		},
+		"walkthrough": {
+			"video": "Vidéo du scénario",
+			"gif": "Le parcours du scénario : la capture de chaque étape, dans l'ordre",
+			"gifHint": "Ce GIF peut être joint à la preuve visuelle de la PR depuis la boîte de création de PR.",
+			"noVideo": "Pas de vidéo du scénario ({{reason}}) : la trace et les captures font la preuve."
 		}
 	},
 	"qaUnverified": {
@@ -2258,6 +2264,26 @@
 			"agree": "Revue croisée OK",
 			"disagree": "Revue croisée : désaccord",
 			"inconclusive": "Revue croisée : sans verdict"
+		}
+	},
+	"steering": {
+		"title": "Guider l'agent",
+		"description": "Envoyez un message pendant que la tâche travaille : la prochaine session concernée le reçoit dans son prompt. WorkPilot le marque comme remis dès que cette session a démarré.",
+		"placeholder": "Par exemple : utilise le UserRepository existant au lieu d'en créer un",
+		"target": "Destinataire",
+		"nextSession": "La prochaine session",
+		"send": "Envoyer",
+		"queued": "En attente de la prochaine session",
+		"queuedForSubtask": "En attente de la session de {{subtask}}",
+		"delivered": "Remis à la session {{session}} ({{date}})",
+		"deliveredToSubtask": "Remis à la session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "Le message n'a pas pu être envoyé.",
+			"empty_message": "Le message est vide.",
+			"message_too_long": "Le message est trop long.",
+			"invalid_subtask": "Cette sous-tâche n'existe pas.",
+			"task_not_found": "La tâche est introuvable.",
+			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
 		}
 	}
 }

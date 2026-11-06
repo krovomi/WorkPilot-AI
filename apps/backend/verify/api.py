@@ -16,6 +16,8 @@ which server mode refuses outright — a desktop feature until a
 `GET /api/verify/screenshot` serves one screenshot the record names — never a
 path from the request. `GET /api/verify/trace` serves the Playwright trace of
 the card's scenario the same way: the one the record names, inside the spec.
+`GET /api/verify/walkthrough` and `GET /api/verify/video` serve the scenario's
+GIF and video by the same rules (`walkthrough.py`).
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from pydantic import BaseModel
 from .record import load_record
 from .scenario import TRACE_FILE
 from .settings import load_settings
+from .walkthrough import VIDEO_FILE, WALKTHROUGH_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +128,9 @@ def _public(record: dict, where: Path) -> dict:
         for step in record.get("scenario_steps") or []
         if isinstance(step, dict)
     ]
-    # Whether there is a trace to download, not where it lives.
-    out["trace"] = bool(record.get("trace"))
+    # Whether there is a trace, a video, a GIF to fetch, not where they live.
+    for key in ("trace", "video", "walkthrough"):
+        out[key] = bool(record.get(key))
     out["screenshots"] = [
         {
             "index": i,
@@ -201,35 +205,66 @@ def verify_screenshot(
     )
 
 
+def _named_file(spec_dir, project_dir, spec_id, key: str, name: str):
+    """The file the record names under ``key``, inside the spec, called ``name``."""
+    resolved, error = _resolve(spec_dir, project_dir, spec_id)
+    if error:
+        return None, JSONResponse(error, status_code=400)
+    record, _where = _latest(resolved)
+    path = Path(str((record or {}).get(key) or ""))
+    try:
+        if not (record or {}).get(key):
+            raise ValueError(f"no {key}")
+        real = path.resolve(strict=True)
+        allowed = [copy.resolve() for copy in _spec_copies(resolved)]
+        if not any(real.is_relative_to(root) for root in allowed) or path.is_symlink():
+            raise ValueError("outside the spec")
+        if real.name != name:
+            raise ValueError(f"not the scenario's {key}")
+    except (OSError, ValueError):
+        return None, JSONResponse(
+            {"success": False, "error": f"{key} unavailable"}, status_code=404
+        )
+    return (real, resolved), None
+
+
 @router.get("/trace")
 def verify_trace(
     spec_dir: str | None = Query(None),
     project_dir: str | None = Query(None),
     spec_id: str | None = Query(None),
 ):
-    resolved, error = _resolve(spec_dir, project_dir, spec_id)
+    found, error = _named_file(spec_dir, project_dir, spec_id, "trace", TRACE_FILE)
     if error:
-        return JSONResponse(error, status_code=400)
-    record, _where = _latest(resolved)
-    path = Path(str((record or {}).get("trace") or ""))
-    try:
-        if not (record or {}).get("trace"):
-            raise ValueError("no trace")
-        real = path.resolve(strict=True)
-        allowed = [copy.resolve() for copy in _spec_copies(resolved)]
-        if not any(real.is_relative_to(root) for root in allowed) or path.is_symlink():
-            raise ValueError("outside the spec")
-        if real.name != TRACE_FILE:
-            raise ValueError("not the scenario's trace")
-    except (OSError, ValueError):
-        return JSONResponse(
-            {"success": False, "error": "trace unavailable"}, status_code=404
-        )
+        return error
+    real, resolved = found
     return FileResponse(
         real,
         media_type="application/zip",
         filename=f"{resolved.name}-{TRACE_FILE}",
     )
+
+
+@router.get("/walkthrough")
+def verify_walkthrough(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    found, error = _named_file(
+        spec_dir, project_dir, spec_id, "walkthrough", WALKTHROUGH_FILE
+    )
+    return error or FileResponse(found[0], media_type="image/gif")
+
+
+@router.get("/video")
+def verify_video(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    found, error = _named_file(spec_dir, project_dir, spec_id, "video", VIDEO_FILE)
+    return error or FileResponse(found[0], media_type="video/webm")
 
 
 @router.post("/run")

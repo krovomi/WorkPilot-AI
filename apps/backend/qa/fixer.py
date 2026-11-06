@@ -104,6 +104,7 @@ except ImportError:
     _get_replay_recorder = None  # type: ignore[assignment]
 
 from agents.agent_audit import audit_event
+from foundation.steering import load_messages, mark_delivered, pending, steering_section
 
 from .criteria import get_qa_signoff_status
 
@@ -240,6 +241,12 @@ async def run_qa_fixer_session(
         print("✓ Memory context loaded for QA fixer")
         debug_success("qa_fixer", "Memory context loaded for fixer")
 
+    # What the person sent while the task ran, not aimed at one subtask
+    # (`foundation.steering`): marked delivered once the prompt is sent.
+    steering = pending(load_messages(spec_dir), None)
+    if steering:
+        prompt += "\n\n" + steering_section(steering)
+
     # Learning Loop: inject patterns learned from previous builds (qa_fixing phase)
     try:
         from learning_loop.prompt_injection import get_learning_context
@@ -261,7 +268,7 @@ async def run_qa_fixer_session(
 
     # ── Provider-agnostic path (OpenAI, Windsurf, Copilot, Google, etc.) ──
     if AgentClient is not None and isinstance(client, AgentClient):
-        return await _run_qa_fixer_agent_client_session(
+        result = await _run_qa_fixer_agent_client_session(
             client,
             spec_dir,
             fix_session,
@@ -274,11 +281,15 @@ async def run_qa_fixer_session(
             _rr,
             _rs_id,
         )
+        if result[0] != "error":
+            mark_delivered(steering, spec_dir, session=fix_session, subtask_id=None)
+        return result
 
     # ── Claude SDK path (backward compatible) ──
     try:
         debug("qa_fixer", "Sending query to Claude SDK...")
         await client.query(prompt)
+        mark_delivered(steering, spec_dir, session=fix_session, subtask_id=None)
         debug_success("qa_fixer", "Query sent successfully")
 
         response_text = ""

@@ -117,6 +117,9 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # agent that could write it would hand the next session a fake human
     # instruction, planted by whatever content it read (rule S2).
     "HUMAN_INPUT.md",
+    # Same reason for the messages the person sends while the task runs, and
+    # for their delivery marks (`foundation/steering.py`).
+    "steering.jsonl",
 )
 
 #: Why a protected file that is not security configuration is refused.
@@ -125,6 +128,11 @@ _REFUSAL_REASONS: dict[str, str] = {
         "it holds the person's instructions for the next session, and only the "
         "person writes them. If you need to tell the person something, say it "
         "in your output."
+    ),
+    "steering.jsonl": (
+        "it holds the messages the person sends while the task runs, and only "
+        "the person and WorkPilot write it. If you need to tell the person "
+        "something, say it in your output."
     ),
 }
 
