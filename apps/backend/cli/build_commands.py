@@ -1267,6 +1267,7 @@ def handle_build_command(
     except KeyboardInterrupt:
         _handle_build_interrupt(
             spec_dir=spec_dir,
+            source_spec_dir=source_spec_dir,
             project_dir=project_dir,
             worktree_manager=worktree_manager,
             working_dir=working_dir,
@@ -1295,12 +1296,13 @@ def _handle_build_interrupt(
     verbose: bool,
     profile=None,
     jev_run=None,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
 
     Args:
-        spec_dir: Spec directory path
+        spec_dir: Spec directory path (the worktree's copy in isolated mode)
         project_dir: Project root directory
         worktree_manager: Worktree manager instance (if using isolated mode)
         working_dir: Current working directory
@@ -1312,6 +1314,8 @@ def _handle_build_interrupt(
             started with. Resuming into a differently-shaped pipeline than the
             one that was announced is the kind of surprise this whole refactor
             exists to remove.
+        source_spec_dir: The project's copy of the spec in isolated mode, which
+            the resumed build copies over the worktree's; ``None`` otherwise.
     """
     from core.agent import run_autonomous_agent
 
@@ -1387,9 +1391,12 @@ def _handle_build_interrupt(
                 sys.exit(0)
 
         if human_input:
-            # Save to HUMAN_INPUT.md
-            input_file = spec_dir / "HUMAN_INPUT.md"
-            input_file.write_text(human_input, encoding="utf-8")
+            # Every copy of the spec: the resumed build replaces the worktree's
+            # copy from the project's one (`foundation.human_input`).
+            from foundation.human_input import HUMAN_INPUT_FILE, write_human_input
+
+            write_human_input(human_input, spec_dir, source_spec_dir)
+            input_file = spec_dir / HUMAN_INPUT_FILE
 
             content = [
                 success(f"{icon(Icons.SUCCESS)} INSTRUCTIONS SAVED"),
@@ -1418,6 +1425,7 @@ def _handle_build_interrupt(
                     model=model,
                     max_iterations=max_iterations,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
                     streaming_session_id=streaming_session_id,  # noqa: F821
                     profile=profile,
                     jev_run=jev_run,
