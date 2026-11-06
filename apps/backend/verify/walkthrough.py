@@ -78,6 +78,8 @@ async def finish_video(page, base: Path, *, keep: bool) -> tuple[Path | None, st
     video = getattr(page, "video", None)
     if video is None:
         return None, "the page recorded no video"
+    from playwright.async_api import Error as PlaywrightError
+
     dest = base / VIDEO_FILE
     try:
         await page.close()
@@ -86,7 +88,7 @@ async def finish_video(page, base: Path, *, keep: bool) -> tuple[Path | None, st
             return None, ""
         await video.save_as(str(dest))
         await video.delete()
-    except Exception as exc:  # noqa: BLE001 - the video is proof, not the session
+    except (PlaywrightError, OSError) as exc:  # the video is proof, not the session
         return None, f"the video could not be written ({exc})"
     try:
         size = dest.stat().st_size

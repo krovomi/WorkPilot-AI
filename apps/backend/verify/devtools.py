@@ -326,9 +326,11 @@ class BrowserSession:
 
             video = video_context_options(self.base)
             context = await self._browser.new_context(viewport=viewport, **video)
+            from playwright.async_api import Error as PlaywrightError
+
             try:
                 self._page = await context.new_page()
-            except Exception as exc:  # noqa: BLE001
+            except (PlaywrightError, OSError) as exc:
                 self.video_note = "no video: " + str(exc).strip().splitlines()[0][:200]
                 self.reasons.append(f"playwright: {self.video_note}")
                 with contextlib.suppress(Exception):
@@ -383,11 +385,13 @@ class BrowserSession:
             self.reasons.append(f"playwright: {why}")
         self._page = None
         if reopen and self._context is not None:
+            from playwright.async_api import Error as PlaywrightError
+
             try:
                 self._page = await self._context.new_page()
                 self._wire_page(self._page)
                 self._uids_ready = False
-            except Exception as exc:  # noqa: BLE001
+            except (PlaywrightError, OSError) as exc:
                 self.reasons.append(f"playwright: no page after the video ({exc})")
         return path
 

@@ -79,7 +79,9 @@ class _FakeContext:
     async def new_page(self) -> _FakePage:
         filming = "record_video_dir" in self.kwargs
         if filming and self.no_ffmpeg:
-            raise RuntimeError(
+            from playwright.async_api import Error as PlaywrightError
+
+            raise PlaywrightError(
                 "BrowserContext.new_page: Executable doesn't exist at /pw/ffmpeg\n╔══╗"
             )
         page = _FakePage(_FakeVideo() if filming else None)
