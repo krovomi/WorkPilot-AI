@@ -250,7 +250,13 @@
 			"modified": "modifié",
 			"renamed": "renommé"
 		},
-		"selectedSuffix": " ({{count}} sélectionné(s))"
+		"selectedSuffix": " ({{count}} sélectionné(s))",
+		"attribution": {
+			"fileBadge": "IA {{ai}} %",
+			"fileTitle": "Des lignes ajoutées à ce fichier : {{ai}} % écrites par l'agent, {{human}} % par vous, {{unknown}} % non enregistrées (Agent Trace)",
+			"task": "{{ai}} % des {{added}} lignes ajoutées ont été écrites par l'agent, {{human}} % par vous (Agent Trace)",
+			"taskWithModels": "{{ai}} % des {{added}} lignes ajoutées ont été écrites par l'agent ({{models}}), {{human}} % par vous (Agent Trace)"
+		}
 	},
 	"bulkPR": {
 		"title": "Créer des Pull Requests",

@@ -15,9 +15,16 @@ import type {
 import { getToolPath } from "../../cli-tool-manager";
 import { findServerCard } from "../../server-board-actions";
 import { serverFileDiff, serverWorktreeDiff } from "../../server-board-review";
+import {
+	TRACE_SUMMARY_FILE,
+	type TraceSummary,
+	applyTraceSummary,
+	parseTraceSummary,
+} from "../../../shared/utils/agent-trace";
 import { isBuildOutputPath } from "../../../shared/utils/build-output-paths";
 import { findTaskWorktree } from "../../worktree-paths";
 import { collectWorktreeDiffFiles } from "./worktree-diff-files";
+import { getSpecPaths } from "./resume-task";
 import { findTaskAndProject } from "./shared";
 import {
 	getEffectiveBaseBranch,
@@ -32,6 +39,27 @@ function isWorkpilotArtifact(p: string): boolean {
 		normalized.startsWith(".workpilot/") ||
 		normalized.startsWith(".workpilot-")
 	);
+}
+
+/**
+ * The task's Agent Trace summary (F3), from the worktree's spec copy first:
+ * the build writes it there after each session. Null when there is none.
+ */
+async function readTraceSummary(
+	...located: Parameters<typeof getSpecPaths>
+): Promise<TraceSummary | null> {
+	const { worktreeSpecDir, mainSpecDir } = getSpecPaths(...located);
+	for (const dir of [worktreeSpecDir, mainSpecDir]) {
+		if (!dir) continue;
+		try {
+			return parseTraceSummary(
+				await fsPromises.readFile(path.join(dir, TRACE_SUMMARY_FILE), "utf-8"),
+			);
+		} catch {
+			// no summary in this copy: the build recorded none yet
+		}
+	}
+	return null;
 }
 
 export function registerWorktreeDiffHandlers(): void {
@@ -157,9 +185,14 @@ export function registerWorktreeDiffHandlers(): void {
 				);
 				const summary = `${filteredFiles.length} files changed, ${totalAdditions} insertions(+), ${totalDeletions} deletions(-)`;
 
+				// Who wrote the added lines (Agent Trace, F3), when the build recorded it.
+				const traced = applyTraceSummary(
+					filteredFiles,
+					await readTraceSummary(task, project),
+				);
 				return {
 					success: true,
-					data: { files: filteredFiles, summary },
+					data: { files: traced.files, summary, attribution: traced.attribution },
 				};
 			} catch (error) {
 				console.error("Failed to get worktree diff:", error);

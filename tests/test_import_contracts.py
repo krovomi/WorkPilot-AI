@@ -50,6 +50,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # Agent Trace attribution (docs/architecture/agent-trace.md): git through
+    # foundation, the records in the spec directory. A leaf the coder session,
+    # the write hooks and the PR body read.
+    "agent_trace": {"foundation"},
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).

@@ -35,6 +35,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from agent_trace import note_tool_write
+
 from .clean import Cleaning, clean_generated
 from .ledger import record
 
@@ -153,11 +155,13 @@ def make_watermarks_hook(spec_dir: Path | str | None):
                 # own message. Answering here would race it with a worse one.
                 return {}
 
+            file_path = tool_input.get("file_path") or tool_input.get("notebook_path")
+            # Which files the session's tools wrote, for the Agent Trace record.
+            note_tool_write(spec_dir, str(tool_name), str(file_path or ""))
             updated, cleaning = _clean_tool_input(tool_name, tool_input, None)
             if updated is None or cleaning is None:
                 return {}
 
-            file_path = tool_input.get("file_path") or tool_input.get("notebook_path")
             record(
                 spec_dir,
                 file_path=str(file_path) if file_path else "",

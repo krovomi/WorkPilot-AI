@@ -17,6 +17,7 @@ try:
 except ImportError:
     ClaudeSDKClient = None  # type: ignore[assignment,misc]
 
+from agent_trace import after_session
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -716,6 +717,7 @@ async def post_session_processing(
     linear_enabled: bool = False,
     status_manager: StatusManager | None = None,
     source_spec_dir: Path | None = None,
+    model_id: str | None = None,
 ) -> bool:
     """
     Process session results and update memory automatically.
@@ -761,6 +763,10 @@ async def post_session_processing(
     commit_after = get_latest_commit(project_dir)
     commit_count_after = get_commit_count(project_dir)
     new_commits = commit_count_after - commit_count_before
+    # Who wrote which line of the session's commits (Agent Trace, F3).
+    after_session(
+        project_dir, spec_dir, commit_before, commit_after, model_id, source_spec_dir
+    )
 
     print_key_value("Subtask status", subtask_status)
     print_key_value("New commits", str(new_commits))
