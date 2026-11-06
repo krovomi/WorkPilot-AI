@@ -19,6 +19,7 @@ from pathlib import Path
 
 from foundation.change_scope import is_text_only_path
 from foundation.dotnet_tools import generate_dotnet_env_section
+from foundation.human_input import human_input_section, read_human_input
 
 # Stack-aware automatic test planning (API contract / WinForms UI / web E2E
 # tests derived from the touched files + installed libraries). Optional: the
@@ -318,6 +319,7 @@ def generate_subtask_prompt(
     phase: dict,
     attempt_count: int = 0,
     recovery_hints: list[str] | None = None,
+    human_input: str | None = None,
 ) -> str:
     """
     Generate a minimal, focused prompt for implementing a single subtask.
@@ -329,6 +331,9 @@ def generate_subtask_prompt(
         phase: The phase containing this subtask
         attempt_count: Number of previous attempts (for retry context)
         recovery_hints: Hints from previous failed attempts
+        human_input: What the person wrote in ``HUMAN_INPUT.md``, as the
+            orchestrator read it (it archives what it delivered); ``None``
+            reads ``spec_dir``'s copy
 
     Returns:
         A focused prompt string (~100 lines instead of 900)
@@ -365,6 +370,14 @@ def generate_subtask_prompt(
 
 {description}
 """)
+
+    # What the person wrote after stopping the build (`foundation.human_input`).
+    # First after the description: it is the most recent word on the task.
+    instructions = human_input_section(
+        read_human_input(spec_dir) if human_input is None else human_input
+    )
+    if instructions:
+        sections.append(instructions)
 
     # TDD banner (only when strict TDD applies to this subtask)
     if tdd_active:
