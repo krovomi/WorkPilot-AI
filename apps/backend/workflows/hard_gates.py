@@ -39,6 +39,7 @@ __all__ = [
     "TESTS_PASS",
     "APP_VERIFIED",
     "TESTS_UNCHANGED",
+    "DEPS_EXIST",
     "is_test_file",
 ]
 
@@ -56,6 +57,12 @@ APP_VERIFIED = "app-verified"
 # touches no test file; unknown when the change set is not known. Deterministic
 # and free, so it runs on every provider.
 TESTS_UNCHANGED = "tests-unchanged"
+
+# Every package the task added exists on its registry: the dependency guard's
+# record (`<spec_dir>/dependency_guard.json`, written by the QA gate). Unknown
+# when the guard did not run, could not ask a registry or a private feed may
+# serve the package; a 404 from the public registry is the only failure.
+DEPS_EXIST = "deps-exist"
 
 _TEST_DIRS = ("tests", "test", "__tests__", "spec", "specs", "e2e")
 # `test_x.py`, `x_test.go`, `x.test.ts`, `x.spec.ts`, `x_spec.rb`, `x-test.js`:
@@ -116,6 +123,39 @@ def _app_verified(spec_dir: Path) -> tuple[bool | None, str]:
     if status == "fail":
         return False, reason or "the verification failed"
     return None, f"{status}" + (f" — {reason}" if reason else "")
+
+
+def _deps_exist(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from dependency_guard import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the dependency guard is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no dependency record — the QA dependency check did not run"
+    findings = [f for f in record.get("findings") or [] if isinstance(f, dict)]
+
+    def names(verdict: str) -> str:
+        return ", ".join(
+            str(f.get("name")) for f in findings if f.get("verdict") == verdict
+        )
+
+    status = record.get("status")
+    if status == "blocked":
+        return False, f"not on their registry: {names('blocked')}"
+    if status == "pass":
+        checked = sum(1 for f in findings if f.get("verdict") in ("ok", "warn"))
+        return True, (
+            f"{checked} new package(s) found on their registry"
+            if checked
+            else "no new dependency"
+        )
+    detail = (
+        record.get("unchecked")
+        or names("unknown")
+        or ", ".join(record.get("unreadable") or [])
+    )
+    return None, f"unknown — {detail}" if detail else "unknown"
 
 
 @dataclass(frozen=True)
@@ -205,6 +245,11 @@ def _evaluate_one(
         )
     elif gate == TESTS_UNCHANGED:
         held, detail = _tests_unchanged(changed_files)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
+    elif gate == DEPS_EXIST:
+        held, detail = _deps_exist(spec_dir)
         report.results.append(
             HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
         )
