@@ -2259,5 +2259,25 @@
 			"disagree": "Cross review: disagrees",
 			"inconclusive": "Cross review: no verdict"
 		}
+	},
+	"steering": {
+		"title": "Guide the agent",
+		"description": "Send a message while the task works: the next session it applies to receives it in its prompt. WorkPilot marks it delivered once that session has started.",
+		"placeholder": "For example: use the existing UserRepository instead of a new one",
+		"target": "Who receives it",
+		"nextSession": "The next session",
+		"send": "Send",
+		"queued": "Waiting for the next session",
+		"queuedForSubtask": "Waiting for the session of {{subtask}}",
+		"delivered": "Delivered to session {{session}} ({{date}})",
+		"deliveredToSubtask": "Delivered to session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "The message could not be sent.",
+			"empty_message": "The message is empty.",
+			"message_too_long": "The message is too long.",
+			"invalid_subtask": "This subtask does not exist.",
+			"task_not_found": "The task was not found.",
+			"queue_unwritable": "The task's folder could not be written."
+		}
 	}
 }
