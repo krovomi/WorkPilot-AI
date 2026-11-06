@@ -155,6 +155,8 @@
 			"changes": "Changes",
 			"prTitle": "PR Title (optional)",
 			"draftPR": "Create as draft PR",
+			"includeWalkthrough": "Attach the scenario walkthrough (GIF) to the visual proof",
+			"includeWalkthroughHint": "The GIF shows the app as the verification filmed it, with its data: every reader of the repository will see it.",
 			"unknown": "Unknown"
 		},
 		"hints": {

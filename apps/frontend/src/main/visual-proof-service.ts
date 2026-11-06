@@ -54,6 +54,7 @@ import {
 	type NavUiElement,
 	visualProofNavigationService,
 } from "./visual-proof-navigation-service";
+import { copyWalkthrough, normalizePathForMarkdown, proofImageUrl, walkthroughSection } from "./visual-proof-walkthrough";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_VIEWPORT = { width: 1440, height: 1000 };
@@ -173,10 +174,6 @@ export function parseGitHubPrUrl(prUrl: string): GitHubPrRef | null {
 		repo: match[2].replace(/\.git$/i, ""),
 		pullNumber: match[3],
 	};
-}
-
-function normalizePathForMarkdown(filePath: string): string {
-	return filePath.replaceAll("\\", "/");
 }
 
 function normalizeEnvProvider(
@@ -461,18 +458,11 @@ export function buildProofComment(run: VisualProofRun, branch?: string): string 
 		);
 	}
 
+	lines.push(...walkthroughSection(run.walkthrough, branch));
 	if (run.screenshots.length > 0) {
 		lines.push("### Screenshots", "");
 		for (const screenshot of run.screenshots) {
-			const imageUrl =
-				screenshot.url ??
-				(branch
-					? `blob/${branch}/${normalizePathForMarkdown(
-							screenshot.relativePath,
-						)}?raw=1`
-					: normalizePathForMarkdown(screenshot.relativePath));
-			lines.push(`![${screenshot.label}](${imageUrl})`);
-			lines.push("");
+			lines.push(`![${screenshot.label}](${proofImageUrl(screenshot, branch)})`, "");
 		}
 	} else {
 		lines.push("No screenshot was captured.", "");
@@ -2568,9 +2558,10 @@ export class VisualProofService extends EventEmitter {
 		const branch = worktreePath ? await getCurrentBranch(worktreePath) : null;
 		// Clone the screenshots so URL attachment doesn't mutate the caller's copy.
 		const screenshots = run.screenshots.map((screenshot) => ({ ...screenshot }));
-		attachGitHubUrls(screenshots, prUrl, branch);
+		const walkthrough = run.walkthrough && { ...run.walkthrough };
+		attachGitHubUrls(walkthrough ? [...screenshots, walkthrough] : screenshots, prUrl, branch);
 
-		const published: VisualProofRun = { ...run, prUrl, screenshots };
+		const published: VisualProofRun = { ...run, prUrl, screenshots, walkthrough };
 		try {
 			const commentUrl = await postGitHubComment(
 				prUrl,
@@ -2634,7 +2625,10 @@ export class VisualProofService extends EventEmitter {
 			let branch: string | null = null;
 			let commitSha: string | undefined;
 			let publishError: string | undefined;
-			if (options.worktreePath && providerResult.screenshots.length > 0) {
+			// The scenario's GIF, only when the person asked for it in the PR dialog.
+			const walkthrough = options.includeWalkthrough === true ? copyWalkthrough({ ...context, ...options, specsBaseDir }) : undefined;
+			const published = walkthrough ? [...providerResult.screenshots, walkthrough] : providerResult.screenshots;
+			if (options.worktreePath && published.length > 0) {
 				branch = await getCurrentBranch(options.worktreePath);
 				try {
 					commitSha = await commitAndPushArtifacts(
@@ -2642,7 +2636,7 @@ export class VisualProofService extends EventEmitter {
 						relativeArtifactDir,
 						options.specId,
 					);
-					attachGitHubUrls(providerResult.screenshots, options.prUrl, branch);
+					attachGitHubUrls(published, options.prUrl, branch);
 				} catch (error) {
 					// Publier est la dernière étape, pas la preuve. Des captures prises
 					// et écrites sur le disque répondent à la question posée, que git
@@ -2671,6 +2665,7 @@ export class VisualProofService extends EventEmitter {
 				commitSha,
 				publishError,
 				screenshots: providerResult.screenshots,
+				walkthrough,
 				apiSmoke: providerResult.apiSmoke,
 				error: providerResult.error,
 				completedAt: new Date().toISOString(),

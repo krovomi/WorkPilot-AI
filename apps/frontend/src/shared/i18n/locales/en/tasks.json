@@ -2015,6 +2015,12 @@
 			"download": "Download the Playwright trace",
 			"hint": "and open it at trace.playwright.dev or with npx playwright show-trace.",
 			"none": "No Playwright trace: Playwright did not drive this session."
+		},
+		"walkthrough": {
+			"video": "Video of the scenario",
+			"gif": "The scenario's walkthrough: the capture of each step, in order",
+			"gifHint": "This GIF can be attached to the pull request's visual proof from the PR dialog.",
+			"noVideo": "No video of the scenario ({{reason}}): the trace and the captures are the proof."
 		}
 	},
 	"qaUnverified": {

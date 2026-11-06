@@ -31,6 +31,7 @@ business reaching Google's CrUX API.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import glob
 import os
 import re
@@ -155,10 +156,17 @@ class BrowserSession:
         browser_url: str = "",
         prefer: str = "auto",
         trace_path: Path | None = None,
+        record_video: bool = False,
     ):
         self.base = base
         self.trace_path = trace_path
         self._tracing = False
+        #: Record the scenario's page (``launch`` mode only, see walkthrough.py).
+        self.record_video = record_video
+        self._video_dir: Path | None = None
+        self._filming = False
+        #: Why a video was asked for and there is none, for the card.
+        self.video_note = ""
         self.project_dir = project_dir
         self.chrome_path = chrome_path
         self.browser_url = browser_url
@@ -276,6 +284,9 @@ class BrowserSession:
                 )
                 pages = self._context.pages
                 self._page = pages[0] if pages else await self._context.new_page()
+                if self.record_video:
+                    # The app's own context was not created to record.
+                    self.video_note = "no video when attached to a running app over CDP"
             else:
                 kwargs: dict = {"headless": True}
                 executable = chrome_executable(self.chrome_path)
@@ -284,10 +295,7 @@ class BrowserSession:
                 if _is_root():
                     kwargs["args"] = ["--no-sandbox"]
                 self._browser = await self._pw.chromium.launch(**kwargs)
-                self._context = await self._browser.new_context(
-                    viewport={"width": 1280, "height": 800}
-                )
-                self._page = await self._context.new_page()
+                await self._open_context()
         except Exception as exc:  # noqa: BLE001
             self.reasons.append(f"playwright: {exc}")
             await self._pw.stop()
@@ -305,6 +313,34 @@ class BrowserSession:
             except PlaywrightError as exc:  # the trace is proof, not the session
                 self.reasons.append(f"playwright: no trace ({exc})")
         return True
+
+    async def _open_context(self) -> None:
+        """The session's context and page, filming the scenario when asked.
+
+        Playwright films with its own ffmpeg: one missing (a system Chrome, a
+        partial install) costs the video, never the session.
+        """
+        viewport = {"width": 1280, "height": 800}
+        if self.record_video:
+            from .walkthrough import video_context_options
+
+            video = video_context_options(self.base)
+            context = await self._browser.new_context(viewport=viewport, **video)
+            try:
+                self._page = await context.new_page()
+            except Exception as exc:  # noqa: BLE001
+                self.video_note = "no video: " + str(exc).strip().splitlines()[0][:200]
+                self.reasons.append(f"playwright: {self.video_note}")
+                with contextlib.suppress(Exception):
+                    await context.close()
+                shutil.rmtree(video["record_video_dir"], ignore_errors=True)
+            else:
+                self._context = context
+                self._video_dir = Path(video["record_video_dir"])
+                self._filming = True
+                return
+        self._context = await self._browser.new_context(viewport=viewport)
+        self._page = await self._context.new_page()
 
     async def save_trace(self, keep: bool = True) -> Path | None:
         """Stop the scenario's trace and write it (or drop it, ``keep=False``).
@@ -326,6 +362,34 @@ class BrowserSession:
             self.reasons.append(f"playwright: the trace could not be written ({exc})")
             return None
         return self.trace_path if self.trace_path.is_file() else None
+
+    async def save_video(
+        self, keep: bool = True, *, reopen: bool = True
+    ) -> Path | None:
+        """Write the scenario page's video (or drop it, ``keep=False``).
+
+        Playwright writes a video when its page closes: the page is closed,
+        and a fresh one (same context, same cookies) takes its place for the
+        evidence gathered after the scenario. None when nothing was recorded.
+        """
+        if not self._filming or self._page is None:
+            return None
+        from .walkthrough import finish_video
+
+        self._filming = False
+        path, why = await finish_video(self._page, self.base, keep=keep)
+        if why:
+            self.video_note = why
+            self.reasons.append(f"playwright: {why}")
+        self._page = None
+        if reopen and self._context is not None:
+            try:
+                self._page = await self._context.new_page()
+                self._wire_page(self._page)
+                self._uids_ready = False
+            except Exception as exc:  # noqa: BLE001
+                self.reasons.append(f"playwright: no page after the video ({exc})")
+        return path
 
     def _wire_page(self, page) -> None:
         page.on("console", lambda msg: self._console.append((msg.type, msg.text)))
@@ -352,6 +416,7 @@ class BrowserSession:
         if self._pw is not None:
             # A session closed before its verdict still leaves its trace.
             await self.save_trace()
+            await self.save_video(reopen=False)
             try:
                 if self._browser is not None and not self.browser_url:
                     await self._browser.close()
@@ -359,6 +424,10 @@ class BrowserSession:
                 pass
             await self._pw.stop()
             self._pw = None
+            if self._video_dir is not None:
+                # The pages opened after the scenario recorded too: never kept.
+                shutil.rmtree(self._video_dir, ignore_errors=True)
+                self._video_dir = None
 
     # -- MCP plumbing --------------------------------------------------------
 
