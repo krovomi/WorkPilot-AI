@@ -36,6 +36,22 @@
 #                          reported  per-turn prompt tokens are reported
 #                          estimated only characters can be counted
 #               "clear" (a fresh thread seeded with a handoff) works everywhere.
+#   standards   which open formats reach this provider, checked against the code
+#               by tests/test_provider_standards.py (docs/architecture/standards.md):
+#                 mcp           native     the configured MCP servers are handed
+#                                          to the provider's SDK
+#                               bridged    WorkPilot connects to them and offers
+#                                          their tools in its own loop
+#                               own        WorkPilot hands none: the CLI loads
+#                                          what its own config declares
+#                               none       no MCP tool reaches the model
+#                 instructions  agents_md  the agent reads the project's AGENTS.md
+#                               claude_md  it reads CLAUDE.md (which may @import it)
+#                               injected   WorkPilot puts AGENTS.md (else CLAUDE.md)
+#                                          in the system prompt
+#                 `unverified` for either: not checked yet, never read as support.
+#               A provider without an adapter declares none: it runs as
+#               `degrades_to`.
 #   sandbox     a CLI that runs its own commands is started whole inside the OS
 #               sandbox (os_sandbox/, docs/architecture/os-sandbox.md):
 #                 state    its login and session directories (~/… or $VAR/…),
@@ -59,6 +75,9 @@ claude:
   context:
     compact: native
     usage: exact
+  standards:
+    mcp: native
+    instructions: claude_md
 
 copilot:
   adapter: CopilotAgentClient
@@ -68,6 +87,9 @@ copilot:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: none
+    instructions: agents_md
   note: Was declared native while nothing reached the model; see `emulated`.
 
 windsurf:
@@ -78,6 +100,9 @@ windsurf:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: none
+    instructions: injected
   note: >-
     Dual-mode (gRPC to the local IDE language server, or REST with
     OpenAI-compatible function calling). Sub-agents are emulated in both: a
@@ -91,10 +116,15 @@ openai:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
   note: >-
     With OPENAI_AUTH_MODE=codex-cli the task runs on CodexCliAgentClient, whose
     threads compact natively (model_auto_compact_token_limit); context_mgmt
-    resolves that from the client, not from this entry.
+    resolves that from the client, not from this entry. The Codex CLI also loads the
+    MCP servers of its own config (.codex/config.toml) and reads AGENTS.md
+    itself, on top of the prompt WorkPilot injects.
 
 google:
   adapter: GoogleAgentClient
@@ -104,6 +134,9 @@ google:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 
 ollama:
   adapter: LocalAgentClient
@@ -113,6 +146,9 @@ ollama:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 local:
   adapter: LocalAgentClient
   subagents: emulated
@@ -121,6 +157,9 @@ local:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 lmstudio:
   adapter: LocalAgentClient
   subagents: emulated
@@ -129,6 +168,9 @@ lmstudio:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 
 # ---------------------------------------------------------------------------
 # OpenAI-compatible endpoints, driven by CompatibleProviderAgentClient.
@@ -142,6 +184,9 @@ mistral:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 
 deepseek:
   adapter: CompatibleProviderAgentClient
@@ -151,6 +196,9 @@ deepseek:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 
 grok:
   adapter: CompatibleProviderAgentClient
@@ -160,6 +208,9 @@ grok:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: bridged
+    instructions: injected
 
 # ---------------------------------------------------------------------------
 # Coding-agent CLIs driven as subprocesses (core/agent_clients/cli_subprocess.py).
@@ -175,6 +226,9 @@ opencode:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: own
+    instructions: agents_md
   note: >-
     `opencode run --format json`. A type declaring none of Write/Edit/Bash runs
     the built-in `plan` agent. OpenCode also compacts a session on its own when
@@ -218,6 +272,9 @@ antigravity:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: unverified
+    instructions: unverified
   note: >-
     Google Antigravity CLI (`agy`) in stream-json print mode; --effort
     low|medium|high. It cannot be restricted to read-only, so a type declaring
@@ -232,6 +289,9 @@ pi:
   context:
     compact: emulated
     usage: reported
+  standards:
+    mcp: own
+    instructions: agents_md
   note: >-
     `pi --mode json` (pi.dev) with the prompt on stdin. Rights are an
     allowlist: the agent type's declaration, translated through
@@ -285,6 +345,9 @@ gemini-cli:
   context:
     compact: emulated
     usage: exact
+  standards:
+    mcp: own
+    instructions: unverified
   acp:
     label: Gemini CLI
     command: [gemini, --acp]
