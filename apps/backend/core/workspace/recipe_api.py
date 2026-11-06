@@ -70,8 +70,12 @@ def approve(request: RecipeRequest) -> dict:
         return {"success": False, "error": "project_dir is required"}
     try:
         approve_recipe(project)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc)}
+    except ValueError:
+        # The errors themselves are in the state the section already shows.
+        return {
+            "success": False,
+            "error": "the recipe is invalid and cannot be approved",
+        }
     return _state(project)
 
 

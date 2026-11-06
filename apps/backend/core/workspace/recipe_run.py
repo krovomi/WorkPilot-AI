@@ -21,6 +21,7 @@ own and needs no approval.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -47,6 +48,8 @@ __all__ = [
     "setup_prompt_section",
     "teardown_worktree",
 ]
+
+logger = logging.getLogger(__name__)
 
 APPROVAL_FILE = "worktree-approved.json"
 RECORD_FILE = "worktree-setup.json"
@@ -297,8 +300,9 @@ def prepare_worktree(
         _execute(recipe, project_dir, worktree, spec_name, report)
     try:
         _write_record(worktree, report)
-    except OSError:
-        pass
+    except OSError as exc:
+        # The worktree is still usable; only the prompt section is lost.
+        logger.warning("[worktree-recipe] could not write the setup record: %s", exc)
     return report
 
 
@@ -368,8 +372,9 @@ def teardown_worktree(
                 steps.append(_run(expanded, worktree, env, _TEARDOWN_TIMEOUT, sink))
     try:
         release_ports(project_dir, spec_name)
-    except (OSError, TimeoutError):
-        pass
+    except (OSError, TimeoutError) as exc:
+        # Removal goes on: a block left reserved only narrows the range.
+        logger.warning("[worktree-recipe] could not release the task's ports: %s", exc)
     return steps
 
 
