@@ -733,6 +733,10 @@ export const IPC_CHANNELS = {
 	LEARNING_LOOP_ADOPT_LESSON: "learningLoop:adoptLesson",
 	LEARNING_LOOP_DISMISS_LESSON: "learningLoop:dismissLesson",
 
+	// MCP tool pins (the custom servers' approved tools)
+	MCP_PINS_LIST: "mcpPins:list",
+	MCP_PINS_APPROVE: "mcpPins:approve",
+
 	// Learning Loop events (main -> renderer)
 	LEARNING_LOOP_STATUS: "learningLoop:status",
 	LEARNING_LOOP_STREAM_CHUNK: "learningLoop:streamChunk",

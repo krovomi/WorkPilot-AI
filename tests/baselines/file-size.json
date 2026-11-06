@@ -1,9 +1,9 @@
 {
-  "apps/backend/agents/coder.py": 2911,
+  "apps/backend/agents/coder.py": 2790,
   "apps/backend/agents/session.py": 2431,
-  "apps/backend/core/client.py": 3057,
+  "apps/backend/core/client.py": 3033,
   "apps/backend/core/workspace.py": 2249,
-  "apps/backend/provider_api.py": 2078,
+  "apps/backend/provider_api.py": 2077,
   "apps/frontend/src/main/app-emulator-service.ts": 3253,
   "apps/frontend/src/main/claude-profile/credential-utils.ts": 2998,
   "apps/frontend/src/main/claude-profile/usage-monitor.ts": 4629,

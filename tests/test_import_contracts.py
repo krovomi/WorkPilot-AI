@@ -50,6 +50,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
+    # poisoning scan and the project's pins file; the desktop route reads the
+    # API helpers of foundation. Probing a server is core's (mcp_pinning).
+    "mcp_pins": {"foundation", "injection_guard"},
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),

@@ -76,6 +76,8 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"learningLoop:getLessons": [0],
 	"learningLoop:adoptLesson": [0],
 	"learningLoop:dismissLesson": [0],
+	"mcpPins:list": [0],
+	"mcpPins:approve": [0],
 	"liveCompanion:start": [0],
 	"selfHealing:cancelOperation": [0],
 	"selfHealing:cicd:config": [0],
