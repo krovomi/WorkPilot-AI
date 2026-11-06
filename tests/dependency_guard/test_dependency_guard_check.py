@@ -194,7 +194,11 @@ def test_a_private_npm_registry_turns_a_404_into_unknown(tmp_path):
     )
     finding = report.findings[0]
     assert finding.verdict == UNKNOWN
-    assert "pkgs.dev.azure.com" in finding.reason
+    # Exact text, not a substring check: the reason names the feed's host only.
+    assert finding.reason == (
+        "not on the public registry, and the project also gets "
+        "npm packages from .npmrc: pkgs.dev.azure.com"
+    )
     assert "NPM_TOKEN" not in finding.reason
 
 
@@ -210,7 +214,10 @@ def test_a_company_nuget_feed_turns_a_404_into_unknown(tmp_path):
         tmp_path, added(("nuget", "Acme.Billing")), fetch=lambda u: (404, b"")
     )
     assert report.findings[0].verdict == UNKNOWN
-    assert "nexus.acme.internal" in report.findings[0].reason
+    assert report.findings[0].reason == (
+        "not on the public registry, and the project also gets "
+        "nuget packages from NuGet.Config: nexus.acme.internal"
+    )
 
 
 def test_a_package_already_installed_is_unknown_not_blocked(tmp_path):
