@@ -132,7 +132,14 @@ _REFUSAL_REASONS: dict[str, str] = {
 #: `.workpilot/guardrails.yaml` is the user's policy, `config/guardrails.yaml`
 #: is the project's own business. Names are `fnmatch` patterns.
 PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
-    ".workpilot": ("guardrails.yaml", "guardrails.yml", "guardrails.json"),
+    # `mcp-pins.json`: the MCP tools the person approved (`mcp_pins`); an
+    # agent that could write it would approve its own server.
+    ".workpilot": (
+        "guardrails.yaml",
+        "guardrails.yml",
+        "guardrails.json",
+        "mcp-pins.json",
+    ),
     ".claude": ("settings*.json",),
 }
 

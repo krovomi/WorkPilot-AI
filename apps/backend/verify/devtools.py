@@ -228,8 +228,9 @@ class BrowserSession:
             return False
         from core.mcp_tools import MCPToolManager
 
+        # WorkPilot's own server: not pinned like a custom one.
         manager = MCPToolManager(
-            str(self.project_dir) if self.project_dir else None, [config]
+            str(self.project_dir) if self.project_dir else None, [config], pin=False
         )
         try:
             await asyncio.wait_for(manager.connect(), timeout=_CONNECT_TIMEOUT)
