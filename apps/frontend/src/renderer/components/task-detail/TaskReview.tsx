@@ -14,6 +14,7 @@ import {
 	ConflictDetailsDialog,
 	CreatePRDialog,
 	DiffViewDialog,
+	GuidedReviewDialog,
 	DiscardDialog,
 	LoadingMessage,
 	NoWorkspaceMessage,
@@ -136,6 +137,7 @@ export function TaskReview({
 	// Local: the "Close task" Definition-of-Done confirmation. Kept here so both
 	// the workspace view and the no-workspace view can trigger the same dialog.
 	const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+	const [showGuidedReview, setShowGuidedReview] = useState(false);
 
 	// Extract nested ternary into a clear variable
 	const workspaceStatusComponent = (() => {
@@ -176,6 +178,7 @@ export function TaskReview({
 					isCreatingPR={isCreatingPR}
 					existingPrUrl={task.prUrl ?? task.metadata?.prUrl}
 					onShowDiffDialog={onShowDiffDialog}
+					onShowGuidedReview={() => setShowGuidedReview(true)}
 					onShowDiscardDialog={onShowDiscardDialog}
 					onShowConflictDialog={onShowConflictDialog}
 					onLoadMergePreview={onLoadMergePreview}
@@ -254,6 +257,17 @@ export function TaskReview({
 				onOpenChange={onShowDiffDialog}
 				worktreePath={worktreeStatus?.worktreePath}
 				onRefresh={onRefreshDiff}
+			/>
+
+			{/* Guided review: the diff in the order of the plan */}
+			<GuidedReviewDialog
+				open={showGuidedReview}
+				taskId={task.id}
+				onOpenChange={setShowGuidedReview}
+				onShowFinalDiff={() => {
+					setShowGuidedReview(false);
+					onShowDiffDialog(true);
+				}}
 			/>
 
 			{/* Conflict Details Dialog */}

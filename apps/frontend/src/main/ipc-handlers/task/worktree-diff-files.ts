@@ -187,3 +187,45 @@ export function collectWorktreeDiffFiles(
 	}
 	return files;
 }
+
+/**
+ * What the worktree holds that no commit has yet: staged and unstaged
+ * changes against `HEAD`, and untracked files. The guided review shows them
+ * as a group of their own.
+ *
+ * @throws when git cannot compute the diff.
+ */
+export function collectUncommittedFiles(
+	gitPath: string,
+	worktreePath: string,
+	isHidden: (filePath: string) => boolean = () => false,
+): WorktreeDiffFile[] {
+	const files = parseDiffSections(git(gitPath, worktreePath, ["diff", "HEAD"]));
+	const known = new Set(files.map((f) => f.path));
+	const untracked = git(gitPath, worktreePath, [
+		"ls-files",
+		"-z",
+		"--others",
+		"--exclude-standard",
+	])
+		.split("\0")
+		.filter((p) => p && !known.has(p) && !isHidden(p))
+		.slice(0, MAX_UNTRACKED_FILES);
+	for (const filePath of untracked) {
+		files.push(untrackedFile(worktreePath, filePath));
+	}
+	return files.filter((f) => !isHidden(f.path));
+}
+
+/** One commit range's files (`from..to`), for a group of the guided review. */
+export function collectRangeFiles(
+	gitPath: string,
+	worktreePath: string,
+	from: string,
+	to: string,
+	isHidden: (filePath: string) => boolean = () => false,
+): WorktreeDiffFile[] {
+	return parseDiffSections(
+		git(gitPath, worktreePath, ["diff", "--find-renames", from, to, "--"]),
+	).filter((f) => !isHidden(f.path));
+}

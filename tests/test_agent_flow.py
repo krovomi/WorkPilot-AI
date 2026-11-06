@@ -269,6 +269,50 @@ class TestPostSessionProcessing:
         assert history["attempts"][0]["success"] is True, "Attempt should be successful"
         assert history["status"] == "completed", "Status should be completed"
 
+    def test_completed_subtask_records_its_commit_range(self, test_env):
+        """The good commit carries the session's start, for the guided review."""
+        from agents.session import post_session_processing
+        from services.recovery import RecoveryManager
+
+        _, spec_dir, project_dir = test_env
+        create_implementation_plan(
+            spec_dir,
+            [{"id": "subtask-1", "description": "Test task", "status": "completed"}],
+        )
+        recovery_manager = RecoveryManager(spec_dir, project_dir)
+        commit_before = get_latest_commit(project_dir)
+        (project_dir / "feature.txt").write_text("new", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=project_dir, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "subtask-1"], cwd=project_dir, capture_output=True
+        )
+        commit_after = get_latest_commit(project_dir)
+        assert commit_after != commit_before
+
+        with (
+            patch("agents.session.extract_session_insights", new_callable=AsyncMock),
+            patch(
+                "agents.session.save_session_memory", new_callable=AsyncMock
+            ) as mock_memory,
+        ):
+            mock_memory.return_value = (True, "file")
+            asyncio.run(
+                post_session_processing(
+                    spec_dir=spec_dir,
+                    project_dir=project_dir,
+                    subtask_id="subtask-1",
+                    session_num=1,
+                    commit_before=commit_before,
+                    commit_count_before=1,
+                    recovery_manager=recovery_manager,
+                    linear_enabled=False,
+                )
+            )
+
+        commits = recovery_manager._load_build_commits()["commits"]
+        assert commits[-1]["hash"] == commit_after
+        assert commits[-1]["commit_before"] == commit_before
+
     def test_in_progress_subtask_records_failure(self, test_env):
         """Test that in_progress subtask is recorded as incomplete."""
         from agents.session import post_session_processing
