@@ -2015,6 +2015,12 @@
 			"download": "Télécharger la trace Playwright",
 			"hint": "et l'ouvrir sur trace.playwright.dev ou avec npx playwright show-trace.",
 			"none": "Pas de trace Playwright : Playwright n'a pas piloté cette session."
+		},
+		"walkthrough": {
+			"video": "Vidéo du scénario",
+			"gif": "Le parcours du scénario : la capture de chaque étape, dans l'ordre",
+			"gifHint": "Ce GIF peut être joint à la preuve visuelle de la PR depuis la boîte de création de PR.",
+			"noVideo": "Pas de vidéo du scénario ({{reason}}) : la trace et les captures font la preuve."
 		}
 	},
 	"qaUnverified": {
