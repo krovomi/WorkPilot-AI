@@ -62,7 +62,7 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass,app-verified,tests-unchanged
+    hard_gate: tests-pass,app-verified,tests-unchanged,deps-exist
     description: >-
       The application launched after the refactoring, the same state
       reached. Three gates: the suite is green, the app verified, and the
