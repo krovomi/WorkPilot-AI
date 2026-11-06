@@ -78,7 +78,7 @@ function save(dirs: string[], comments: ReviewComment[]): boolean {
 		const file = path.join(dir, REVIEW_COMMENTS_FILE);
 		const tmp = `${file}.${process.pid}.tmp`;
 		try {
-			writeFileSync(tmp, payload, "utf-8");
+			writeFileSync(tmp, payload, { encoding: "utf-8", mode: 0o600 });
 			renameSync(tmp, file);
 			written++;
 		} catch (error) {
