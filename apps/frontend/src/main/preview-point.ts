@@ -14,7 +14,7 @@
  */
 
 import { type WebContents, webContents } from "electron";
-import { type PointedNode, STYLE_PROPERTIES, selectorOf } from "../shared/utils/element-sources";
+import { type PointedNode, pickStyles, selectorOf } from "../shared/utils/element-sources";
 
 /** The overlay waits this long for a click, then lets the page go. */
 export const PICK_TIMEOUT_MS = 120_000;
@@ -190,12 +190,9 @@ async function computedStyles(send: Send, nodeId: number): Promise<Record<string
 		const { computedStyle } = await send<{
 			computedStyle: Array<{ name: string; value: string }>;
 		}>("CSS.getComputedStyleForNode", { nodeId });
-		const wanted = new Set(STYLE_PROPERTIES);
-		const out: Record<string, string> = {};
-		for (const { name, value } of computedStyle ?? []) {
-			if (wanted.has(name) && value) out[name] = String(value).slice(0, 120);
-		}
-		return out;
+		const all: Record<string, string> = {};
+		for (const { name, value } of computedStyle ?? []) if (value) all[name] = String(value);
+		return pickStyles(all);
 	} catch {
 		return {}; // a text node or an SVG part has no computed style to give
 	}

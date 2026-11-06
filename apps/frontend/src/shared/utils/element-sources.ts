@@ -140,6 +140,32 @@ export const STYLE_PROPERTIES: readonly string[] = [
 	"z-index",
 ];
 
+const SIDES = ["top", "right", "bottom", "left"] as const;
+
+/**
+ * The styles worth a line, from Chromium's computed list. It only gives
+ * longhands (`margin-top`, `border-top-width`…): the shorthands a remark uses
+ * are put back together, shortened when the sides agree.
+ */
+export function pickStyles(computed: Readonly<Record<string, string>>): Record<string, string> {
+	const all: Record<string, string> = { ...computed };
+	for (const box of ["margin", "padding"]) {
+		const sides = SIDES.map((side) => all[`${box}-${side}`]);
+		if (sides.every(Boolean)) {
+			all[box] = sides.every((v) => v === sides[0]) ? sides[0] : sides.join(" ");
+		}
+	}
+	const border = ["width", "style", "color"].map((part) => all[`border-top-${part}`]);
+	if (border.every(Boolean) && border[1] !== "none") all.border = border.join(" ");
+	if (all["border-top-left-radius"]) all["border-radius"] = all["border-top-left-radius"];
+	if (all["row-gap"] && all["row-gap"] !== "normal") all.gap = all["row-gap"];
+	const out: Record<string, string> = {};
+	for (const name of STYLE_PROPERTIES) {
+		if (all[name]) out[name] = all[name].slice(0, 120);
+	}
+	return out;
+}
+
 export function isTemplateFile(relPath: string): boolean {
 	const normalized = relPath.replaceAll("\\", "/");
 	const parts = normalized.split("/");

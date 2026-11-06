@@ -9,6 +9,7 @@ import {
 	composeContext,
 	isTemplateFile,
 	markersOf,
+	pickStyles,
 	rankCandidates,
 	selectorOf,
 	textOf,
@@ -150,5 +151,28 @@ describe("element sources", () => {
 		expect(long.length).toBeLessThan(2000); // the HTML is cut, with a mark
 		expect(long.endsWith("…")).toBe(true);
 		expect(composeContext(node({}), [], null, 50)).toHaveLength(50);
+	});
+
+	it("puts the shorthands a remark uses back together", () => {
+		const styles = pickStyles({
+			"margin-top": "8px",
+			"margin-right": "8px",
+			"margin-bottom": "8px",
+			"margin-left": "8px",
+			"padding-top": "4px",
+			"padding-right": "12px",
+			"padding-bottom": "4px",
+			"padding-left": "12px",
+			"border-top-width": "1px",
+			"border-top-style": "solid",
+			"border-top-color": "rgb(0, 0, 0)",
+			"row-gap": "normal",
+			cursor: "pointer",
+		});
+		expect(styles).toEqual({
+			margin: "8px",
+			padding: "4px 12px 4px 12px",
+			border: "1px solid rgb(0, 0, 0)",
+		});
 	});
 });
