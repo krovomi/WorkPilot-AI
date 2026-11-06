@@ -147,6 +147,7 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerSteeringHandlers } from "./task/steering-handlers";
 import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 import {
 	registerVoiceControlHandlers,
@@ -256,6 +257,7 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerSteeringHandlers } from "./task/steering-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 export { registerVoiceControlHandlers } from "./voice-control-handlers";
@@ -500,6 +502,7 @@ export function setupIpcHandlers(
 	setupVisualProgrammingEventForwarding(getMainWindow);
 	registerVisualToCodeHistoryHandlers();
 	registerWorktreeRecipeHandlers();
+	registerSteeringHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();
