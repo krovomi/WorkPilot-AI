@@ -1922,6 +1922,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import brain router: {e}")
 
+# --- MCP tool pins (the custom servers' tools the person approved) ---
+try:
+    from mcp_pins.api import router as mcp_pins_router
+
+    _mount(mcp_pins_router, "mcp_pins")
+except ImportError as e:
+    print(f"Warning: Could not import mcp_pins router: {e}")
+
 # --- rtk API (is the output-condensing proxy working here, and what it saved) ---
 try:
     from rtk.api import router as rtk_router

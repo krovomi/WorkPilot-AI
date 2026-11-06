@@ -178,6 +178,10 @@ touch specs/001-name/PAUSE
 echo "Focus on fixing the login bug first" > specs/001-name/HUMAN_INPUT.md
 ```
 
+The next subtask session receives the instructions first in its prompt. Once that session has run,
+WorkPilot archives the file as `HUMAN_INPUT.<UTC timestamp>.md`: an instruction applies once, and
+the archive keeps its trace. Agents cannot write `HUMAN_INPUT.md`; only you do.
+
 ## Spec Validation
 
 ```bash

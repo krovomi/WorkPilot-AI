@@ -180,6 +180,8 @@ import {
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import type { McpPinsAPI } from "./modules/mcp-pins-api";
+import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
 import type { MultiRepoAPI } from "./modules/multi-repo-api";
 import { createMultiRepoAPI } from "./modules/multi-repo-api";
@@ -273,6 +275,7 @@ export interface ElectronAPI
 		AppEmulatorAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
 		CodeMigrationAPI,
@@ -421,6 +424,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAppEmulatorAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
 		...createCodeMigrationAPI(),

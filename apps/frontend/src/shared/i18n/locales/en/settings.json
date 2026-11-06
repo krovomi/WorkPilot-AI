@@ -1502,6 +1502,32 @@
 			"requirementMissing": "This server needs its own configuration before it can be enabled.",
 			"alwaysOn": "WorkPilot AI's own tools are always available to the agents that declare them — there is nothing to configure.",
 			"configuredInIntegrations": "This server authenticates with a token set in Settings → Integrations. Configure it there and it becomes available to the agents that declare it."
+		},
+		"pins": {
+			"title": "Approved MCP tools",
+			"description": "A custom MCP server reaches your agents only with the tools you approved. A tool's description is read by the model and never shown elsewhere: check it here before approving.",
+			"pending": "New server: none of its tools reaches an agent until you approve them.",
+			"changed": "Changed since your approval: the tools below are held back until you approve the change.",
+			"programChanged": "Its command or URL changed since your approval: the server is held back until you approve it again.",
+			"approve": "Approve",
+			"confirmApprove": "Approve anyway",
+			"suspicious": "Some descriptions look like hidden instructions to the model. Read them before approving.",
+			"toolAdded": "new tool",
+			"toolChanged": "description changed",
+			"noDescription": "(no description)",
+			"removed": "No longer listed: {{tools}}",
+			"finding": {
+				"invisible": "invisible characters",
+				"private-use": "private-use characters",
+				"model-tag": "a tag addressed to the model",
+				"secrecy": "asks to keep something from you",
+				"secret-file": "names a credential or configuration file",
+				"precondition": "asks for a step before the tool is used",
+				"other-tools": "gives orders about other tools",
+				"shadowing": "names another server's tool: {{detail}}",
+				"long": "unusually long ({{detail}} characters)",
+				"injection": "prompt injection: {{detail}}"
+			}
 		}
 	},
 	"terminalFonts": {

@@ -59,6 +59,7 @@ import { CustomMcpDialog } from "./CustomMcpDialog";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
 import { UiUxSettings } from "./settings/UiUxSettings";
+import { McpPinsSection } from "./settings/McpPinsSection";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -1804,16 +1805,14 @@ export function AgentTools() {
 									<Switch checked={true} disabled />
 								</div>
 
-								{/* rtk — la condensation de sortie. Toujours visible :
-								    c'est ici qu'on découvre qu'elle existe. */}
+								{/* rtk — la condensation de sortie, toujours visible : on la découvre ici. */}
 								<TokenSavingsSettings
 									tokenSavings={envConfig?.tokenSavings}
 									projectPath={selectedProject?.path}
 									onUpdate={updateTokenSavings}
 								/>
 
-								{/* ui-ux-pro-max — le design system des tâches qui touchent
-								    l'interface. Toujours visible, comme rtk. */}
+								{/* ui-ux-pro-max — le design system des tâches d'interface, toujours visible. */}
 								<UiUxSettings uiux={envConfig?.uiux} onUpdate={updateUiux} />
 
 								{/* Custom MCP Servers Section */}
@@ -1933,6 +1932,7 @@ export function AgentTools() {
 										</p>
 									)}
 								</div>
+								<McpPinsSection projectPath={selectedProject?.path} />
 							</div>
 						</div>
 					)}
