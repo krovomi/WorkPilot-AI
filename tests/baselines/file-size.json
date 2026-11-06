@@ -1,5 +1,5 @@
 {
-  "apps/backend/agents/coder.py": 2911,
+  "apps/backend/agents/coder.py": 2790,
   "apps/backend/agents/session.py": 2431,
   "apps/backend/core/client.py": 3033,
   "apps/backend/core/workspace.py": 2249,
