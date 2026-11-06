@@ -906,6 +906,12 @@ class WorktreeManager(WorktreePRMixin):
             )
             raise RuntimeError(error_msg)
 
+        # The recipe's teardown (containers, databases) runs while the
+        # worktree is still there, and the task's ports go back.
+        from core.workspace.recipe_run import teardown_worktree
+
+        teardown_worktree(self.project_dir, worktree_path, spec_name)
+
         if worktree_path.exists():
             result = self._run_git(
                 ["worktree", "remove", "--force", str(worktree_path)]
@@ -1297,6 +1303,9 @@ class WorktreeManager(WorktreePRMixin):
         for item in self.worktrees_dir.iterdir():
             if item.is_dir() and item not in registered_paths:
                 print(f"Removing stale worktree directory: {item.name}")
+                from core.workspace.recipe_run import teardown_worktree
+
+                teardown_worktree(self.project_dir, item, item.name)
                 shutil.rmtree(item, ignore_errors=True)
 
         self._run_git(["worktree", "prune"])

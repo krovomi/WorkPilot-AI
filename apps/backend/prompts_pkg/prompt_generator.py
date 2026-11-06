@@ -393,6 +393,13 @@ You MUST use a DIFFERENT approach than previous attempts.
     if reply:
         sections.append(reply)
 
+    # What the worktree's recipe left undone, and the task's ports: read
+    # before the first build, not discovered by it (core/workspace/recipe_run.py).
+    from core.workspace.recipe_run import setup_prompt_section
+
+    if setup := setup_prompt_section(project_dir):
+        sections.append(setup)
+
     # Files section
     sections.append("## Files\n")
 

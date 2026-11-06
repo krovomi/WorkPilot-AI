@@ -119,7 +119,17 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
 #: `.workpilot/guardrails.yaml` is the user's policy, `config/guardrails.yaml`
 #: is the project's own business. Names are `fnmatch` patterns.
 PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
-    ".workpilot": ("guardrails.yaml", "guardrails.yml", "guardrails.json"),
+    # `worktree.toml` runs commands in every new worktree and
+    # `worktree-approved.json` says the person approved it
+    # (`core/workspace/recipe_run.py`): an agent that wrote either would run
+    # its commands in the next task's worktree.
+    ".workpilot": (
+        "guardrails.yaml",
+        "guardrails.yml",
+        "guardrails.json",
+        "worktree.toml",
+        "worktree-approved.json",
+    ),
     ".claude": ("settings*.json",),
 }
 

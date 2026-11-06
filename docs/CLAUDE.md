@@ -85,6 +85,7 @@ fichier-ci reste l'autorité sur les règles.
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |
 | Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées depuis le commit d'avant, par moteur, dans des copies sans la réponse ; jugées par les tests du commit d'arrivée, calibrés (F2P/P2P) ; le tableau nourrit Formula Lab et le routeur, et recommande par type de carte le moteur le moins cher proche du meilleur taux, proposé sur l'étape moteur, jamais appliqué seul. |
+| Recette de worktree | [worktree-recipe.md](architecture/worktree-recipe.md) | Chaque worktree de tâche est préparé avant la première session : la recette détectée d'après la stack (toutes stacks), ou `.workpilot/worktree.toml` approuvé par empreinte ; commandes en liste d'arguments sans shell ; seuls les fichiers ignorés par git sont copiés ; un bloc de ports par tâche ; une étape en échec n'arrête pas la tâche et arrive dans le prompt ; le dépôt de WorkPilot garde son lien de `node_modules`. |
 | Outils de développement | [dev-tools.md](architecture/dev-tools.md) | MCP Electron pour l'E2E, Chrome DevTools MCP, grepai. |
 | Dépannage | [troubleshooting.md](architecture/troubleshooting.md) | Problèmes courants et où regarder. |
 

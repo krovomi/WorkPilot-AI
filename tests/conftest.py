@@ -1274,6 +1274,18 @@ def _os_sandbox_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
 
 
+# A worktree's recipe (`core/workspace/recipe_run.py`) runs the package
+# managers its project's lockfiles name: a test that creates a worktree with a
+# `package.json` would run `npm install`. The recipe's own tests
+# (`tests/workspace/`) turn it back on, and keep the port registry in a
+# temporary directory.
+
+
+@pytest.fixture(autouse=True)
+def _worktree_setup_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_WORKTREE_SETUP", "0")
+
+
 # ── Ambient state is not input ─────────────────────────────────────────
 #
 # These two lived in a repository-root `conftest.py` while some tests still

@@ -2901,5 +2901,22 @@
 			"claude_not_found": "The claude command could not be run from here. Paste the command in a terminal instead.",
 			"generic": "Could not do it: {{detail}}"
 		}
+	},
+	"worktreeRecipe": {
+		"title": "Worktree preparation",
+		"description": "What WorkPilot runs in each new task worktree before the first session: restore the stack's dependencies, copy ignored local files, reserve ports for the task. A failed step does not stop the task; the agent is told about it.",
+		"sourceFile": "From .workpilot/worktree.toml",
+		"sourceDetected": "Detected from the project's files (no .workpilot/worktree.toml)",
+		"noCommands": "No package manager recognised: nothing runs.",
+		"copies": "Copies: {{files}}",
+		"ports_one": "Reserves {{count}} port per task",
+		"ports_other": "Reserves {{count}} ports per task",
+		"teardown": "When the worktree is removed: {{commands}}",
+		"invalid": "Invalid, nothing runs: {{errors}}",
+		"approved": "Approved: runs in new worktrees.",
+		"awaiting": "This recipe runs commands on your machine. It runs only once you approve it as it is now.",
+		"approve": "Approve",
+		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
+		"saveDetected": "Save as worktree.toml"
 	}
 }
