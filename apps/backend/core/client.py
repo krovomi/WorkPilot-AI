@@ -260,6 +260,8 @@ except ImportError:
 from core.custom_mcp_validation import (
     validate_custom_mcp_server as _validate_custom_mcp_server,
 )
+from core.mcp_pinning import custom_servers as _custom_servers
+from core.mcp_pinning import pinned_servers
 from docintel.read_guard import make_read_guard_hook
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
@@ -1183,7 +1185,11 @@ def _mcp_servers(
             workpilot_tools_enabled=workpilot_tools_enabled,
         )
     )
-    mcp_servers.update(_custom_servers(required_servers, mcp_config))
+    mcp_servers.update(
+        pinned_servers(
+            project_dir, _custom_servers(required_servers, mcp_config), mcp_config
+        )
+    )
     return mcp_servers
 
 
@@ -1323,36 +1329,6 @@ def _workpilot_servers(
         auto_claude_mcp_server = create_auto_claude_mcp_server(spec_dir, project_dir)
         if auto_claude_mcp_server:
             mcp_servers["workpilot"] = auto_claude_mcp_server
-    return mcp_servers
-
-
-def _custom_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
-    """The project's CUSTOM_MCP_SERVERS that this type requires."""
-    mcp_servers: dict[str, dict] = {}
-    custom_servers = mcp_config.get("CUSTOM_MCP_SERVERS", [])
-    for custom in custom_servers:
-        server_id = custom.get("id")
-        if not server_id:
-            continue
-        # Only include if agent has it in their effective server list
-        if server_id not in required_servers:
-            continue
-        server_type = custom.get("type", "command")
-        if server_type == "command":
-            mcp_servers[server_id] = {
-                "command": custom.get("command", "npx"),
-                "args": custom.get("args", []),
-            }
-            if custom.get("env"):
-                mcp_servers[server_id]["env"] = dict(custom["env"])
-        elif server_type == "http":
-            server_config = {
-                "type": "http",
-                "url": custom.get("url", ""),
-            }
-            if custom.get("headers"):
-                server_config["headers"] = custom["headers"]
-            mcp_servers[server_id] = server_config
     return mcp_servers
 
 
