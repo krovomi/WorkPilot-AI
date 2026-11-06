@@ -515,6 +515,42 @@ async def test_human_feedback_runs_the_fixer_first(harness):
     ]
 
 
+async def test_human_feedback_marks_comments_from_the_session_diff(
+    harness, monkeypatch
+):
+    """The orchestrator, not the model, says which line comments were addressed."""
+    marked = []
+    monkeypatch.setattr(
+        harness.loop,
+        "run_git",
+        lambda args, cwd=None: types.SimpleNamespace(returncode=0, stdout="abc1234\n"),
+    )
+    monkeypatch.setattr(
+        harness.loop,
+        "mark_addressed",
+        lambda spec, project, before, session=None: marked.append((before, session)),
+    )
+    _sign_off(harness.spec_dir, "approved", [])
+    (harness.spec_dir / "QA_FIX_REQUEST.md").write_text("# Fix", encoding="utf-8")
+    harness.reviews = [("approved", [])]
+
+    assert await harness.run() is True
+
+    assert marked == [("abc1234", 0)]
+
+
+async def test_a_failed_human_feedback_fix_marks_no_comment(harness, monkeypatch):
+    marked = []
+    monkeypatch.setattr(
+        harness.loop, "mark_addressed", lambda *a, **k: marked.append(a)
+    )
+    (harness.spec_dir / "QA_FIX_REQUEST.md").write_text("# Fix", encoding="utf-8")
+    harness.fixes = [("error", "could not apply")]
+
+    assert await harness.run() is False
+    assert marked == []
+
+
 async def test_human_feedback_opens_a_new_budget(harness):
     # Three passes already spent: the reviewer's sign-off counts them.
     for _ in range(3):

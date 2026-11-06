@@ -443,5 +443,34 @@
 			"task_not_found": "This task cannot be found.",
 			"git_failed": "Git could not compute the changes. The final diff may still open."
 		}
+	},
+	"comments": {
+		"where": "line {{line}}",
+		"removedLine": "(removed line)",
+		"composerLabel": "Comment on line {{line}}",
+		"placeholder": "What should change here?",
+		"add": "Add the comment",
+		"cancel": "Cancel",
+		"resolve": "Resolve",
+		"reopen": "Reopen",
+		"delete": "Delete the comment",
+		"willBeSent_one": "{{count}} open line comment will be sent with the request:",
+		"willBeSent_other": "{{count}} open line comments will be sent with the request:",
+		"status": {
+			"open": "Open",
+			"addressed": "Addressed by the fixer",
+			"resolved": "Resolved",
+			"stale": "Lines changed"
+		},
+		"errors": {
+			"invalid_path": "This file is not in the task's workspace.",
+			"invalid_line": "This line is not in the file.",
+			"empty_comment": "Write the comment first.",
+			"invalid_commit": "This version of the file cannot be found.",
+			"too_many_comments": "This task already has 500 comments.",
+			"not_writable": "The comment could not be saved.",
+			"local_only": "Line comments are available for local tasks.",
+			"no_worktree": "This task has no workspace any more."
+		}
 	}
 }

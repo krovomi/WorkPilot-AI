@@ -443,5 +443,34 @@
 			"task_not_found": "Cette tâche est introuvable.",
 			"git_failed": "Git n'a pas pu calculer les changements. Le diff final peut encore s'ouvrir."
 		}
+	},
+	"comments": {
+		"where": "ligne {{line}}",
+		"removedLine": "(ligne supprimée)",
+		"composerLabel": "Commenter la ligne {{line}}",
+		"placeholder": "Que faut-il changer ici ?",
+		"add": "Ajouter le commentaire",
+		"cancel": "Annuler",
+		"resolve": "Résoudre",
+		"reopen": "Rouvrir",
+		"delete": "Supprimer le commentaire",
+		"willBeSent_one": "{{count}} commentaire de ligne ouvert partira avec la demande :",
+		"willBeSent_other": "{{count}} commentaires de ligne ouverts partiront avec la demande :",
+		"status": {
+			"open": "Ouvert",
+			"addressed": "Traité par le fixer",
+			"resolved": "Résolu",
+			"stale": "Lignes modifiées"
+		},
+		"errors": {
+			"invalid_path": "Ce fichier n'est pas dans l'espace de travail de la tâche.",
+			"invalid_line": "Cette ligne n'existe pas dans le fichier.",
+			"empty_comment": "Écrivez d'abord le commentaire.",
+			"invalid_commit": "Cette version du fichier est introuvable.",
+			"too_many_comments": "Cette tâche a déjà 500 commentaires.",
+			"not_writable": "Le commentaire n'a pas pu être enregistré.",
+			"local_only": "Les commentaires de ligne sont disponibles pour les tâches locales.",
+			"no_worktree": "Cette tâche n'a plus d'espace de travail."
+		}
 	}
 }
