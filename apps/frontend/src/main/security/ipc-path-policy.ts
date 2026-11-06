@@ -112,6 +112,9 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"terminal:worktreeList": [0],
 	"terminal:worktreeListOther": [0],
 	"terminal:worktreeRemove": [0],
+	"worktreeRecipe:approve": [0],
+	"worktreeRecipe:get": [0],
+	"worktreeRecipe:saveDetected": [0],
 };
 
 /** Keys of an object argument that name a project directory. */
