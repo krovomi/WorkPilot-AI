@@ -26,6 +26,7 @@ import { TaskCodeEditor } from "./TaskCodeEditor";
 import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
 import { BlockedSubtaskHelp, HumanResolutionNote } from "./BlockedSubtaskHelp";
+import { TaskSteeringPanel } from "./TaskSteeringPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
 import { Input } from "../ui/input";
@@ -237,6 +238,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 							{t("taskReview:taskPanel.noSubtasksHint")}
 						</p>
 					</div>
+					{task.status !== "done" && task.status !== "pr_created" && (
+						<TaskSteeringPanel task={task} />
+					)}
 				</div>
 			</ScrollArea>
 		);
@@ -247,6 +251,11 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 			<div className="p-4 space-y-3">
 				{/* Plan validation - approve/reject the proposed subtasks before coding */}
 				<PlanApprovalSection task={task} />
+
+				{/* Messages to the agent while it works (steering.jsonl) */}
+				{task.status !== "done" && task.status !== "pr_created" && (
+					<TaskSteeringPanel task={task} />
+				)}
 
 				{/* Header with edit/reset buttons */}
 				<div className="flex items-center justify-between mb-3">

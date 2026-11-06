@@ -20,6 +20,7 @@ import { LogsSection } from "../../../../../card/LogsSection";
 import { canEditCard, EditCard } from "../../../../../card/EditCard";
 import { LongText } from "../../../../../card/LongText";
 import { SettingsSection } from "../../../../../card/SettingsSection";
+import { SteeringSection } from "../../../../../card/SteeringSection";
 import { useCard } from "../../../../../board/useCard";
 import { describeError } from "../../../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../../../ui/components";
@@ -244,6 +245,15 @@ export default function CardScreen() {
 			) : null}
 
 			<ChangesSection changes={changes} />
+
+			{data.card.column !== "done" ? (
+				<SteeringSection
+					projectId={projectId}
+					cardId={cardId}
+					canSend={can("agent.execute")}
+					working={working}
+				/>
+			) : null}
 
 			<LogsSection logs={logs} />
 

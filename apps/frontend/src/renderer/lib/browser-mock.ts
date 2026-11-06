@@ -617,6 +617,8 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	}),
 	getMcpPins: async () => ({ success: true, data: [] }),
 	approveMcpServer: async () => ({ success: true, data: [] }),
+	listTaskSteering: async () => ({ success: true, data: [] }),
+	sendTaskSteering: async () => ({ success: false, error: "Not available in browser mode" }),
 	adoptReviewLesson: async () => ({
 		success: false,
 		error: "Not available in browser mode",

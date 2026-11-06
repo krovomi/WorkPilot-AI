@@ -157,6 +157,18 @@ python run.py --spec 001 --merge
 python run.py --spec 001 --discard
 ```
 
+## Steering a Running Task
+
+Send the agent a message without pausing it. It reaches the prompt of the next
+coding or QA fixer session, and the task shows which session received it:
+
+```bash
+python run.py --spec 001 --steer "Keep the old route, add the new one beside it"
+
+# Only for one subtask's next session
+python run.py --spec 001 --steer "Log the retries" --steer-subtask subtask-2-1
+```
+
 ## Interactive Controls
 
 While the agent is running:

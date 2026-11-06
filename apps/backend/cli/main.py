@@ -180,6 +180,19 @@ Environment Variables:
         help="Discard an existing build (requires confirmation)",
     )
     build_group.add_argument(
+        "--steer",
+        metavar="TEXT",
+        default=None,
+        help="Send a message to the task while it runs: the next session receives it",
+    )
+    # Outside the exclusive group: it goes with --steer.
+    parser.add_argument(
+        "--steer-subtask",
+        metavar="SUBTASK_ID",
+        default=None,
+        help="With --steer: deliver the message only to this subtask's session",
+    )
+    build_group.add_argument(
         "--create-pr",
         action="store_true",
         help="Push branch and create a GitHub Pull Request",
@@ -807,6 +820,15 @@ def _run_cli(argv=None, jev_run=None) -> None:
 
     if args.discard:
         handle_discard_command(project_dir, spec_dir.name)
+        return
+
+    if args.steer is not None:
+        from .steer_command import handle_steer_command
+
+        if not handle_steer_command(
+            project_dir, spec_dir, args.steer, args.steer_subtask
+        ):
+            sys.exit(1)
         return
 
     if args.analyze_impact:
