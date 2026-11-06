@@ -71,6 +71,7 @@ from .criteria import (
     get_qa_signoff_status,
     is_qa_approved,
 )
+from .dependency_gate import dependency_gate
 from .fixer import run_qa_fixer_session
 from .report import (
     create_manual_test_plan,
@@ -530,10 +531,21 @@ async def run_qa_validation_loop(
             record_iteration(
                 spec_dir, state.qa_iteration, "approved", [], iteration_duration
             )
-            gate = await _architecture_gate(
-                scope, state.qa_iteration, qa_model
-            ) or _coverage_gate(
-                spec_dir, state.qa_iteration, state.review_scope, state.review_commands
+            gate = (
+                dependency_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or await _architecture_gate(scope, state.qa_iteration, qa_model)
+                or _coverage_gate(
+                    spec_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    state.review_commands,
+                )
             )
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
