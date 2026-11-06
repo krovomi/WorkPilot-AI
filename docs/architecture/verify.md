@@ -59,9 +59,10 @@ apps/backend/verify/
   loop.py       launch -> errors -> fixer, bounded by progress; then the verifier session; then evidence
   replay.py     the verify-replay phase: the recorded scenario and endpoints, without a model
   scenario.py   the card's own scenario (verifyScenario): steps, verifier instructions, verdict
+  walkthrough.py the scenario filmed (WebM, launch mode) and its step captures as a GIF for the PR
   record.py     <spec_dir>/verify/verify.json, report.md, events.jsonl; the computed status
   learn.py      launch recipe, perf baseline, brain note, gotchas
-  api.py        GET /api/verify/, GET /api/verify/screenshot, GET /api/verify/trace, POST /api/verify/run
+  api.py        GET /api/verify/, /screenshot, /trace, /walkthrough, /video; POST /api/verify/run
 ```
 
 **Python does the deterministic half, for every provider.** Launching,
@@ -158,6 +159,25 @@ says which steps prove the change.
   errors, evidence) drops its trace instead of overwriting that one. Chrome
   DevTools MCP has no such trace: when only it can start, the record says
   there is none.
+- *The walkthrough (F5).* The trace needs a download and a viewer; two files
+  are readable in seconds. `verify/scenario-video.webm` is Playwright's
+  recording of the scenario's page (`record_video_dir`), written when the
+  trace is: the page is closed so the video lands, and a fresh page of the
+  same context carries the evidence after it. Attached over CDP to a running
+  desktop app, the session reuses a context it did not create, which films
+  nothing: the record says so (`video_note`) rather than show an empty
+  player. Playwright films with its own ffmpeg; one missing costs the video,
+  never the session. Over 25 MB the video is dropped. The same toolbox rule as
+  the trace decides which browser's video stands.
+  `verify/scenario-walkthrough.gif` is made with Pillow from the captures
+  reported with the steps, in step order (the last report of a step wins),
+  960 px wide: a GIF shows inline in a GitHub comment, a video does not. Over
+  6 MB it keeps the first and the last frame. The *Verification* tab plays
+  the video and shows the GIF; the PR dialog attaches the GIF to the visual
+  proof only when the person ticks it, after reading that every reader of the
+  repository will see it (the app it films is served on loopback with
+  whatever data it holds). It is copied into the visual proof's run folder
+  and pushed with the captures, under a *Walkthrough* section.
 - *The verdict.* A failed step fails the verification. A scenario not carried
   out in full (a step blocked or never reported, no verifier session at effort
   `low`) cannot pass: it is `unknown`, with the count of steps that passed.

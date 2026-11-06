@@ -132,6 +132,19 @@ export interface ChangedFile {
 }
 
 /** `GET /api/board/cards/{id}/changes`. */
+/** A message sent to a card's running task (`foundation/steering.py`). */
+export interface SteeringMessage {
+	id: string;
+	text: string;
+	createdAt: string;
+	source: string;
+	targetSubtaskId: string | null;
+	/** Written by WorkPilot once a session received it. */
+	deliveredAt: string | null;
+	deliveredSession: number | null;
+	deliveredSubtaskId: string | null;
+}
+
 export interface CardChanges {
 	exists: boolean;
 	branch?: string;

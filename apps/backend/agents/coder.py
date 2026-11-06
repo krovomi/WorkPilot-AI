@@ -31,8 +31,8 @@ from core.progress import interrupted_subtask_directive, reopen_interrupted_subt
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
 from foundation.build_signals import BuildHalted, BuildPaused
-from foundation.human_input import archive_human_input, read_human_input
 from foundation.pause_state import is_paused, read_pause_state
+from foundation.steering import PersonNotes, deliver_notes, person_notes
 
 try:
     from core.usage_tracker import (
@@ -1150,7 +1150,7 @@ async def _coding_prompt(
     current_phase: str,
     phase_thinking_budget,
     retry: _RetryState,
-    human_input: str = "",
+    human_input: str | PersonNotes = "",
 ) -> str:
     """One subtask's prompt: what the task shares first, then the subtask."""
     recovery_hints = (
@@ -2425,7 +2425,7 @@ async def run_autonomous_agent(
             # Get attempt count for recovery context
             attempt_count = recovery_manager.get_attempt_count(subtask_id)
             # Read here, not in the prompt: what was delivered is archived below.
-            human_note = read_human_input(spec_dir, source_spec_dir)
+            human_note = person_notes(spec_dir, source_spec_dir, subtask_id)
             prompt = await _coding_prompt(
                 spec_dir,
                 project_dir,
@@ -2497,9 +2497,9 @@ async def run_autonomous_agent(
                 context_monitor_only=context_resets.monitor_only(context_unit),
             )
             # A session that ran has received the person's instructions: they
-            # apply once (`foundation.human_input`), the orchestrator says so.
+            # apply once (`foundation.steering`), the orchestrator says so.
             if subtask_id and status in ("complete", "continue"):
-                archive_human_input(human_note, spec_dir, source_spec_dir)
+                deliver_notes(human_note, spec_dir, source_spec_dir, session=iteration)
             if context_resets.record(context_unit, status):
                 notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
                 if task_logger:

@@ -488,16 +488,17 @@ class VerifyToolbox:
                     browser_url = self.url_of(target)
                 from .scenario import TRACE_FILE, card_scenario
 
+                scenario = bool(card_scenario(self.spec_dir))
                 session = BrowserSession(
                     self.base,
                     project_dir=self.project_dir,
                     chrome_path=self.settings.chrome_path,
                     browser_url=browser_url,
                     prefer=self.settings.browser,
-                    # The card's scenario is kept as a replayable trace.
-                    trace_path=(
-                        self.base / TRACE_FILE if card_scenario(self.spec_dir) else None
-                    ),
+                    # The card's scenario is kept as a replayable trace, and
+                    # filmed (walkthrough.py).
+                    trace_path=self.base / TRACE_FILE if scenario else None,
+                    record_video=scenario,
                 )
                 await session.start()
                 self._browser = session
@@ -507,11 +508,13 @@ class VerifyToolbox:
         """Write the scenario's trace now; its path, or "" when there is none.
 
         Only a toolbox through which scenario steps were reported keeps its
-        trace: another one's is dropped.
+        trace: another one's is dropped. The scenario's video goes the same way.
         """
         if self._browser is None:
             return ""
-        path = await self._browser.save_trace(keep=self._scenario_steps > 0)
+        keep = self._scenario_steps > 0
+        path = await self._browser.save_trace(keep=keep)
+        await self._browser.save_video(keep=keep)
         return str(path) if path else ""
 
     async def aclose(self) -> None:

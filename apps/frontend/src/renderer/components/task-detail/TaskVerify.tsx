@@ -4,6 +4,7 @@ import type { Task } from "../../../shared/types";
 import {
 	type VerifyRecord,
 	verifyScreenshotUrl,
+	verifyMediaUrl,
 	verifyTraceUrl,
 } from "../../lib/agent-tools-api";
 import { useVerifyStore } from "../../stores/verify-store";
@@ -399,6 +400,7 @@ function CardScenario({
 					);
 				})}
 			</ol>
+			<Walkthrough record={record} query={query} />
 			<p className="mt-2 text-xs text-muted-foreground">
 				{record.trace ? (
 					<>
@@ -418,6 +420,51 @@ function CardScenario({
 				)}
 			</p>
 		</Section>
+	);
+}
+
+/** The scenario filmed (launch mode), and its step captures as the GIF the PR can show. */
+function Walkthrough({
+	record,
+	query,
+}: {
+	readonly record: VerifyRecord;
+	readonly query: { projectDir: string; specId: string };
+}) {
+	const { t } = useTranslation(["tasks"]);
+	return (
+		<div className="mt-3 space-y-2">
+			{record.video ? (
+				<video
+					src={verifyMediaUrl(query, "video")}
+					controls
+					preload="metadata"
+					aria-label={t("tasks:verify.walkthrough.video")}
+					className="block w-full max-w-2xl rounded border border-border bg-background"
+				>
+					<track kind="captions" />
+				</video>
+			) : (
+				record.video_note && (
+					<p className="text-xs text-muted-foreground">
+						{t("tasks:verify.walkthrough.noVideo", { reason: record.video_note })}
+					</p>
+				)
+			)}
+			{record.walkthrough && (
+				<figure className="max-w-2xl overflow-hidden rounded border border-border">
+					<img
+						src={verifyMediaUrl(query, "walkthrough")}
+						alt={t("tasks:verify.walkthrough.gif")}
+						className="block w-full bg-background object-contain"
+						loading="lazy"
+					/>
+					<figcaption className="px-2 py-1 text-2xs text-muted-foreground">
+						{t("tasks:verify.walkthrough.gifHint")}
+					</figcaption>
+				</figure>
+			)}
+		</div>
 	);
 }
 

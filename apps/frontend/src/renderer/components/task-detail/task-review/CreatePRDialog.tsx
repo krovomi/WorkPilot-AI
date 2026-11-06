@@ -52,6 +52,8 @@ export function CreatePRDialog({
 	const [targetBranch, setTargetBranch] = useState("");
 	const [prTitle, setPrTitle] = useState("");
 	const [isDraft, setIsDraft] = useState(false);
+	// Off until ticked: the GIF films the app with its data (rule 5).
+	const [includeWalkthrough, setIncludeWalkthrough] = useState(false);
 	const [isCreating, setIsCreating] = useState(false);
 	const [result, setResult] = useState<WorktreeCreatePRResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -188,6 +190,7 @@ export function CreatePRDialog({
 				title: prTitle || undefined,
 				draft: isDraft,
 				customBody,
+				...(includeWalkthrough && { includeWalkthrough: true }),
 				...(allowCrossReviewDisagreement && {
 					allowCrossReviewDisagreement: true,
 				}),
@@ -572,6 +575,23 @@ export function CreatePRDialog({
 							>
 								{t("taskReview:pr.labels.draftPR")}
 							</label>
+						</div>
+
+						<div className="flex items-start gap-2">
+							<Checkbox
+								id="walkthrough-pr-checkbox"
+								checked={includeWalkthrough}
+								onCheckedChange={(checked) => setIncludeWalkthrough(checked === true)}
+								aria-describedby="walkthrough-pr-hint"
+							/>
+							<div className="space-y-0.5">
+								<label htmlFor="walkthrough-pr-checkbox" className="text-sm cursor-pointer">
+									{t("taskReview:pr.labels.includeWalkthrough")}
+								</label>
+								<p id="walkthrough-pr-hint" className="text-xs text-muted-foreground">
+									{t("taskReview:pr.labels.includeWalkthroughHint")}
+								</p>
+							</div>
 						</div>
 
 						<DialogFooter>
