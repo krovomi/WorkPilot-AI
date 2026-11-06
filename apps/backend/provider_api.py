@@ -2058,6 +2058,11 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import notifications router: {e}")
 
+# --- Worktree recipe (how a task's worktree is prepared, per stack) ---
+from core.workspace.recipe_api import router as worktree_recipe_router  # noqa: E402
+
+_mount(worktree_recipe_router, "worktree_recipe")
+
 if __name__ == "__main__":
     import uvicorn
 

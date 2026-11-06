@@ -319,6 +319,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         "agent_endpoints": "agent",
         "event_hooks": "ops",
         "notifications": "integration",
+        # How a task's worktree is prepared (setup commands, ports) is the
+        # project's machine-local tooling; the router is desktop-only.
+        "worktree_recipe": "settings",
         "providers": "settings",
     }
 )
@@ -396,6 +399,7 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "agent_endpoints",
         "event_hooks",
         "notifications",
+        "worktree_recipe",
     }
 )
 

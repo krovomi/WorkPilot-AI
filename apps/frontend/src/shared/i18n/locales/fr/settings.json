@@ -2930,5 +2930,22 @@
 			"claude_not_found": "La commande claude n'a pas pu être lancée d'ici. Colle la commande dans un terminal à la place.",
 			"generic": "Impossible : {{detail}}"
 		}
+	},
+	"worktreeRecipe": {
+		"title": "Préparation du worktree",
+		"description": "Ce que WorkPilot lance dans chaque nouveau worktree de tâche avant la première session : restaurer les dépendances de la stack, copier les fichiers locaux ignorés, réserver des ports pour la tâche. Une étape en échec n'arrête pas la tâche ; l'agent en est informé.",
+		"sourceFile": "Depuis .workpilot/worktree.toml",
+		"sourceDetected": "Détectée d'après les fichiers du projet (pas de .workpilot/worktree.toml)",
+		"noCommands": "Aucun gestionnaire de paquets reconnu : rien ne s'exécute.",
+		"copies": "Copie : {{files}}",
+		"ports_one": "Réserve {{count}} port par tâche",
+		"ports_other": "Réserve {{count}} ports par tâche",
+		"teardown": "À la suppression du worktree : {{commands}}",
+		"invalid": "Invalide, rien ne s'exécute : {{errors}}",
+		"approved": "Approuvée : s'exécute dans les nouveaux worktrees.",
+		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
+		"approve": "Approuver",
+		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
+		"saveDetected": "Enregistrer en worktree.toml"
 	}
 }

@@ -1353,4 +1353,8 @@ export const IPC_CHANNELS = {
 	VOICE_CONTROL_STATUS: "voice-control:status",
 	VOICE_CONTROL_STOP_RECORDING: "voice-control:stopRecording",
 	VOICE_CONTROL_STREAM_CHUNK: "voice-control:stream-chunk",
+	// Worktree recipe (what a new task worktree runs before the first session)
+	WORKTREE_RECIPE_APPROVE: "worktreeRecipe:approve",
+	WORKTREE_RECIPE_GET: "worktreeRecipe:get",
+	WORKTREE_RECIPE_SAVE_DETECTED: "worktreeRecipe:saveDetected",
 } as const;

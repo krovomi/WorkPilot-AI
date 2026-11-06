@@ -132,12 +132,18 @@ _REFUSAL_REASONS: dict[str, str] = {
 #: `.workpilot/guardrails.yaml` is the user's policy, `config/guardrails.yaml`
 #: is the project's own business. Names are `fnmatch` patterns.
 PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
+    # `worktree.toml` runs commands in every new worktree and
+    # `worktree-approved.json` says the person approved it
+    # (`core/workspace/recipe_run.py`): an agent that wrote either would run
+    # its commands in the next task's worktree.
     # `mcp-pins.json`: the MCP tools the person approved (`mcp_pins`); an
     # agent that could write it would approve its own server.
     ".workpilot": (
         "guardrails.yaml",
         "guardrails.yml",
         "guardrails.json",
+        "worktree.toml",
+        "worktree-approved.json",
         "mcp-pins.json",
     ),
     ".claude": ("settings*.json",),

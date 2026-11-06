@@ -208,6 +208,8 @@ import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
 import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+import type { WorktreeRecipeAPI } from "./modules/worktree-recipe-api";
+import { createWorktreeRecipeAPI } from "./modules/worktree-recipe-api";
 import {
 	createVoiceControlAPI,
 	type VoiceControlAPI,
@@ -318,6 +320,7 @@ export interface ElectronAPI
 		OfflineModeAPI,
 		VisualProgrammingAPI,
 		VisualToCodeHistoryAPI,
+		WorktreeRecipeAPI,
 		AutoRefactorAPI,
 		GenericIpcAPI,
 		DesignToCodeAPI {
@@ -466,6 +469,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
 		...createVisualToCodeHistoryAPI(),
+		...createWorktreeRecipeAPI(),
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),

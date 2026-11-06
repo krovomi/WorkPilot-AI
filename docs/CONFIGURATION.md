@@ -783,6 +783,16 @@ providers on WorkPilot's own loop wait for it, see
 | --- | ---: | --- |
 | `WORKPILOT_MCP_TASK_TIMEOUT` | 1800 | Seconds a tool call returned as a task may run before WorkPilot cancels it (`tasks/cancel`) and gives the agent an error that says so. A value that is not a positive number keeps the default. |
 
+## Worktree preparation
+
+A task's worktree is prepared before the first session, see
+[architecture/worktree-recipe.md](architecture/worktree-recipe.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_WORKTREE_SETUP` | `1` | `0`: no recipe runs in new worktrees (neither `.workpilot/worktree.toml` nor the one detected from the stack). Teardown and port release still run on removal. |
+| `WORKPILOT_DATA_DIR` | `~/.workpilot` | Holds `ports.json`, the machine's port blocks (one per task, 10 ports wide from 20000). |
+
 ## Agent features
 
 Opt-in features. Those marked *API* are read by the local API: put them in

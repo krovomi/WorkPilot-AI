@@ -152,6 +152,7 @@ import {
 	registerVoiceControlHandlers,
 	setupVoiceControlEvents,
 } from "./voice-control-handlers";
+import { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 
 export { registerAccessibilityHandlers } from "./accessibility-handlers";
 export { registerAgenteventsHandlers } from "./agent-events-handlers";
@@ -256,6 +257,7 @@ export {
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
+export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 export { registerVoiceControlHandlers } from "./voice-control-handlers";
 
 /**
@@ -497,6 +499,7 @@ export function setupIpcHandlers(
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
 	registerVisualToCodeHistoryHandlers();
+	registerWorktreeRecipeHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();
