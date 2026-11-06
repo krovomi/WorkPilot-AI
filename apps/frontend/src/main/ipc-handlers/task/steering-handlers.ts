@@ -119,7 +119,7 @@ export async function sendSteering(
 	let written = 0;
 	for (const dir of dirs) {
 		try {
-			appendFileSync(path.join(dir, STEERING_FILE), line, "utf-8");
+			appendFileSync(path.join(dir, STEERING_FILE), line, { encoding: "utf-8", mode: 0o600 });
 			written += 1;
 		} catch (error) {
 			appLog.warn(

@@ -150,7 +150,7 @@ def _append(events: list[dict], spec_dirs: tuple[Path | str | None, ...]) -> int
             fd = os.open(
                 spec_dir / STEERING_FILE,
                 os.O_WRONLY | os.O_CREAT | os.O_APPEND,
-                0o644,
+                0o600,  # the person's messages: the owner only
             )
             try:
                 os.write(fd, payload.encode("utf-8"))
