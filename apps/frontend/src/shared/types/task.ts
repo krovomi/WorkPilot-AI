@@ -1034,6 +1034,8 @@ export interface WorktreeCreatePROptions {
 	 * Defaults to true.
 	 */
 	runVisualProof?: boolean;
+	/** Attach the scenario walkthrough (GIF) to the visual proof; off unless ticked. */
+	includeWalkthrough?: boolean;
 	/**
 	 * Create the PR although the cross review disagrees with this code. Set
 	 * only by the person's "create anyway" in the PR dialog.
@@ -1133,6 +1135,8 @@ export interface VisualProofRun {
 	 */
 	publishError?: string;
 	screenshots: VisualProofScreenshot[];
+	/** The card scenario's GIF (`visual-proof-walkthrough.ts`), when the person attached it. */
+	walkthrough?: VisualProofScreenshot;
 	/** API smoke proof, present when an OpenAPI document was discovered. */
 	apiSmoke?: VisualProofApiSmoke;
 	error?: string;
@@ -1153,6 +1157,12 @@ export interface VisualProofRunOptions {
 	worktreePath?: string;
 	autoBuildPath?: string;
 	provider?: VisualProofProviderId | "auto";
+	/**
+	 * Attach the verification's scenario walkthrough (a GIF) to the proof.
+	 * Only the person's tick in the PR dialog sets it: the GIF films the app
+	 * with its data, and every reader of the repository will see it.
+	 */
+	includeWalkthrough?: boolean;
 }
 
 /**

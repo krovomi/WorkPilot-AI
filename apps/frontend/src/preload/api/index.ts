@@ -207,6 +207,8 @@ import type { DesignToCodeAPI } from "./modules/design-to-code-api";
 import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+import type { SteeringAPI } from "./modules/steering-api";
+import { createSteeringAPI } from "./modules/steering-api";
 import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import type { WorktreeRecipeAPI } from "./modules/worktree-recipe-api";
@@ -321,6 +323,7 @@ export interface ElectronAPI
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		SteeringAPI,
 		VisualToCodeHistoryAPI,
 		WorktreeRecipeAPI,
 		AutoRefactorAPI,
@@ -470,6 +473,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createSteeringAPI(),
 		...createVisualToCodeHistoryAPI(),
 		...createWorktreeRecipeAPI(),
 		...createDesignToCodeAPI(),

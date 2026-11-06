@@ -52,6 +52,8 @@ export const IPC_CHANNELS = {
 	TASK_RESUME_SESSION: "task:resumeSession", // Resume a Claude SDK session (uses .session.json)
 	TASK_RESUME_WITH_PROVIDER: "task:resumeWithProvider", // Resume a paused task under a different LLM provider (Niveau 3b)
 	TASK_RESET_CONVERSATION: "task:resetConversation", // Clear conversation.jsonl + PROMPT_TOO_LONG_HALT marker so the task can restart with a fresh context
+	TASK_STEERING_LIST: "task:steeringList", // Messages sent to a running task, with the session each was delivered to
+	TASK_STEERING_SEND: "task:steeringSend", // Queue a message for the next session of a running task (steering.jsonl)
 	TASK_UNBLOCK_SUBTASK: "task:unblockSubtask", // Answer a blocked subtask from its panel: done, not needed, retry, or retry with a reply (restarts the build)
 	TASK_STACK_ON: "task:stackOn", // Stack a task on one of its blockers: it starts from that task's branch (F6)
 	TASK_STACK_STATUS: "task:stackStatus", // A stacked task's parent: moved, merged, or up to date

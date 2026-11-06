@@ -2015,6 +2015,12 @@
 			"download": "Download the Playwright trace",
 			"hint": "and open it at trace.playwright.dev or with npx playwright show-trace.",
 			"none": "No Playwright trace: Playwright did not drive this session."
+		},
+		"walkthrough": {
+			"video": "Video of the scenario",
+			"gif": "The scenario's walkthrough: the capture of each step, in order",
+			"gifHint": "This GIF can be attached to the pull request's visual proof from the PR dialog.",
+			"noVideo": "No video of the scenario ({{reason}}): the trace and the captures are the proof."
 		}
 	},
 	"qaUnverified": {
@@ -2258,6 +2264,26 @@
 			"agree": "Cross review OK",
 			"disagree": "Cross review: disagrees",
 			"inconclusive": "Cross review: no verdict"
+		}
+	},
+	"steering": {
+		"title": "Guide the agent",
+		"description": "Send a message while the task works: the next session it applies to receives it in its prompt. WorkPilot marks it delivered once that session has started.",
+		"placeholder": "For example: use the existing UserRepository instead of a new one",
+		"target": "Who receives it",
+		"nextSession": "The next session",
+		"send": "Send",
+		"queued": "Waiting for the next session",
+		"queuedForSubtask": "Waiting for the session of {{subtask}}",
+		"delivered": "Delivered to session {{session}} ({{date}})",
+		"deliveredToSubtask": "Delivered to session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "The message could not be sent.",
+			"empty_message": "The message is empty.",
+			"message_too_long": "The message is too long.",
+			"invalid_subtask": "This subtask does not exist.",
+			"task_not_found": "The task was not found.",
+			"queue_unwritable": "The task's folder could not be written."
 		}
 	},
 	"stack": {

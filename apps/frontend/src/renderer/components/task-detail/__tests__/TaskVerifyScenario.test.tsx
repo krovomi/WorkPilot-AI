@@ -21,6 +21,7 @@ vi.mock("../../../lib/agent-tools-api", () => ({
 	runVerify: vi.fn(),
 	verifyScreenshotUrl: (_query: unknown, index: number) => `shot://${index}`,
 	verifyTraceUrl: () => "trace://zip",
+	verifyMediaUrl: (_query: unknown, kind: string) => `media://${kind}`,
 }));
 
 vi.mock("react-i18next", () => ({
@@ -92,5 +93,25 @@ describe("TaskVerify — card scenario", () => {
 		withRecord({});
 		render(<TaskVerify task={task} projectPath="/p" />);
 		expect(screen.queryByText("tasks:verify.sections.cardScenario")).toBeNull();
+	});
+
+	it("plays the scenario's video and shows its GIF, served by the record", () => {
+		withRecord({ scenario_requested: ["Open"], video: true, walkthrough: true });
+		const { container } = render(<TaskVerify task={task} projectPath="/p" />);
+		const video = container.querySelector("video");
+		expect(video).toHaveAttribute("src", "media://video");
+		expect(video).toHaveAttribute("controls");
+		expect(screen.getByAltText("tasks:verify.walkthrough.gif")).toHaveAttribute("src", "media://walkthrough");
+	});
+
+	it("says why there is no video rather than show an empty player", () => {
+		withRecord({
+			scenario_requested: ["Open"],
+			video_note: "no video when attached to a running app over CDP",
+		});
+		const { container } = render(<TaskVerify task={task} projectPath="/p" />);
+		expect(container.querySelector("video")).toBeNull();
+		expect(screen.getByText(/tasks:verify.walkthrough.noVideo.*over CDP/)).toBeInTheDocument();
+		expect(screen.queryByAltText("tasks:verify.walkthrough.gif")).toBeNull();
 	});
 });
