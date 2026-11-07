@@ -32,7 +32,7 @@ from foundation.subtask_unblock import blocked_reason
 
 from .channels import _get_app_language, build_text_payload, post_json
 from .models import ChannelResult, NotificationChannel
-from .service import NotificationService, _parse_env_file
+from .service import NotificationService, project_env_vars
 
 logger = logging.getLogger(__name__)
 
@@ -199,9 +199,7 @@ def digest_interval_seconds(project_dir: Path | str | None = None) -> float | No
     """
     raw = os.environ.get(DIGEST_ENV, "").strip()
     if not raw and project_dir is not None:
-        env_file = Path(project_dir) / ".workpilot" / ".env"
-        if env_file.is_file():
-            raw = _parse_env_file(env_file).get(DIGEST_ENV, "").strip()
+        raw = project_env_vars(project_dir).get(DIGEST_ENV, "").strip()
     if not raw:
         return None
     try:
