@@ -58,7 +58,9 @@
 		"adoptedToBrain_one": "{{count}} skill kept and filed in the shared brain.",
 		"adoptedToBrain_other": "{{count}} skills kept and filed in the shared brain.",
 		"declined_one": "{{count}} skill turned down — it will not be proposed again.",
-		"declined_other": "{{count}} skills turned down — they will not be proposed again."
+		"declined_other": "{{count}} skills turned down — they will not be proposed again.",
+		"lockHint_one": "To stop hermes from rewriting the version you just reviewed, lock it in hermes:",
+		"lockHint_other": "To stop hermes from rewriting the versions you just reviewed, lock them in hermes:"
 	},
 	"details": {
 		"toggle": "How it works",
@@ -84,13 +86,19 @@
 		"soul": "Persona",
 		"trust": "Trust",
 		"skills": "Skills",
-		"agents": "Project context"
+		"agents": "Project context",
+		"version": "Version"
 	},
 	"soul": {
 		"title": "Persona (SOUL.md)",
 		"description": "Hermes reads SOUL.md from its own home and injects it as the identity of every session. This repository offers one; installing it is a copy you can undo — the persona it replaces is kept with a timestamp.",
 		"install": "Install SOUL.md",
-		"replace": "Replace the installed persona"
+		"replace": "Replace the installed persona",
+		"sessions": {
+			"requested": "Persona installed: running hermes sessions will pick it up on their next turn.",
+			"needs-update": "Persona installed for new sessions. To apply it to running sessions, update hermes (0.23 or later), then ask them to reload their prompt:",
+			"unavailable": "Persona installed for new sessions. To apply it to running sessions:"
+		}
 	},
 	"triage": {
 		"title": "Decided without you",

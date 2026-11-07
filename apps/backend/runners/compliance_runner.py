@@ -158,7 +158,51 @@ def _collect_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, An
             for p in deploys
         ]
 
+    for evidence_type, items in _dossier_sources(project_path).items():
+        sources.setdefault(evidence_type, []).extend(items)
     return sources
+
+
+#: The most recent provenance dossiers read into one report.
+MAX_DOSSIERS = 20
+
+
+def _dossier_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, Any]]]:
+    """Evidence from the tasks' provenance dossiers (P5), newest first."""
+    from provenance import DOSSIER_DIR, DOSSIER_FILE, evidence_sources
+
+    specs = project_path / ".workpilot" / "specs"
+    if not specs.is_dir() or specs.is_symlink():
+        return {}
+    found = []
+    for path in specs.glob(f"*/{DOSSIER_DIR}/{DOSSIER_FILE}"):
+        if path.is_symlink() or path.parent.is_symlink():
+            continue
+        try:
+            found.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    merged: dict[EvidenceType, list[dict[str, Any]]] = {}
+    for _mtime, path in sorted(found, reverse=True)[:MAX_DOSSIERS]:
+        try:
+            dossier = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(dossier, dict):
+            continue
+        try:
+            sources = evidence_sources(dossier)
+        except (KeyError, TypeError, AttributeError):
+            continue  # a dossier written by hand or by another version
+        for evidence_type, items in sources.items():
+            merged.setdefault(evidence_type, []).extend(
+                {
+                    "source": item.get("source", ""),
+                    "description": item.get("description", ""),
+                }
+                for item in items
+            )
+    return merged
 
 
 def _normalize_evidence_type(raw: str) -> str:

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
-import { BOARD_MCP_CLIENTS } from "../../types/board-mcp";
+import { BOARD_MCP_CLIENTS, HERMES_MCP_TIMEOUT_SECONDS } from "../../types/board-mcp";
 import { httpSnippet, SERVER_MCP_NAME } from "../board-mcp-http";
 
 const URL = "https://team.example.com/mcp";
@@ -68,7 +68,12 @@ describe("httpSnippet", () => {
 	it("writes Hermes's YAML: a url entry is Streamable HTTP, its headers sent as is", () => {
 		expect(parseYaml(httpSnippet("hermes", URL, TOKEN))).toEqual({
 			mcp_servers: {
-				[SERVER_MCP_NAME]: { url: URL, headers: { Authorization: AUTH } },
+				[SERVER_MCP_NAME]: {
+					url: URL,
+					headers: { Authorization: AUTH },
+					// hermes cuts a call at 300 s otherwise; wait_for_card waits hours.
+					timeout: HERMES_MCP_TIMEOUT_SECONDS,
+				},
 			},
 		});
 	});

@@ -13,14 +13,19 @@
  * - OpenCode: `mcp`, `type: "local"`, `command` as one array;
  * - Codex: a `[mcp_servers.<name>]` table of `~/.codex/config.toml`;
  * - hermes-agent: `mcp_servers.<name>` in `<HERMES_HOME>/config.yaml`,
- *   edited as a YAML document so the comments a person wrote there stay;
+ *   edited as a YAML document so the comments a person wrote there stay,
+ *   with a `timeout` long enough for `wait_for_card` (hermes's default is
+ *   300 s); an entry written before that is reported stale so it is redone;
  * - Claude Code: `~/.claude.json`, which Claude Code itself rewrites while it
  *   runs, so the app only reads it and writes through `claude mcp add-json`.
  */
 
 import path from "node:path";
 import { isMap, parseDocument } from "yaml";
-import type { BoardMcpClientId } from "../../shared/types/board-mcp";
+import {
+	type BoardMcpClientId,
+	HERMES_MCP_TIMEOUT_SECONDS,
+} from "../../shared/types/board-mcp";
 
 export interface ServerEntry {
 	command: string;
@@ -257,17 +262,27 @@ function parseYamlConfig(text: string) {
 	return doc;
 }
 
-function readYaml(text: string, name: string): string[] | null | undefined {
+function readYaml(
+	text: string,
+	name: string,
+): { command: string[] | null; timeout: unknown } | undefined {
 	const doc = parseYamlConfig(text);
 	if (!doc.hasIn([HERMES_KEY, name])) return undefined;
 	const value: unknown = doc.toJS()?.[HERMES_KEY]?.[name];
-	return storedCommand("hermes-yaml", value);
+	const timeout =
+		value && typeof value === "object" ? (value as Record<string, unknown>).timeout : undefined;
+	return { command: storedCommand("hermes-yaml", value), timeout };
 }
 
 function writeYaml(text: string, name: string, entry: ServerEntry | null): string {
 	const doc = parseYamlConfig(text);
-	if (entry) doc.setIn([HERMES_KEY, name], { command: entry.command, args: entry.args });
-	else if (doc.hasIn([HERMES_KEY, name])) doc.deleteIn([HERMES_KEY, name]);
+	if (entry) {
+		doc.setIn([HERMES_KEY, name], {
+			command: entry.command,
+			args: entry.args,
+			timeout: HERMES_MCP_TIMEOUT_SECONDS,
+		});
+	} else if (doc.hasIn([HERMES_KEY, name])) doc.deleteIn([HERMES_KEY, name]);
 	else return text;
 	return doc.toString();
 }
@@ -279,6 +294,7 @@ function yamlBlock(name: string, entry: ServerEntry): string {
 		`    command: ${JSON.stringify(entry.command)}`,
 		"    args:",
 		...entry.args.map((arg) => `      - ${JSON.stringify(arg)}`),
+		`    timeout: ${HERMES_MCP_TIMEOUT_SECONDS}`,
 		"",
 	].join("\n");
 }
@@ -300,7 +316,10 @@ export function entryState(
 	if (format === "hermes-yaml") {
 		const stored = readYaml(text, name);
 		if (stored === undefined) return "absent";
-		return sameCommand(stored, entry) ? "current" : "stale";
+		return sameCommand(stored.command, entry) &&
+			stored.timeout === HERMES_MCP_TIMEOUT_SECONDS
+			? "current"
+			: "stale";
 	}
 	const section = jsonSection(parseJsonObject(text), JSON_KEY[format]);
 	if (!(name in section)) return "absent";
