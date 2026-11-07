@@ -68,20 +68,34 @@
 
 	/* ── Cards ─────────────────────────────────────────────────────────── */
 
+	/*
+	 * A block is solid, framed and carries a rail of its colour; the text on
+	 * a connector has none of that (see `.vtc-edge-label`), so the eye never
+	 * takes a sentence for a block.
+	 */
 	.vtc-card {
 		position: relative;
 		min-width: 196px;
 		max-width: 280px;
 		border-radius: 14px;
 		border: 1px solid var(--vtc-card-border);
-		background: var(--vtc-card);
+		background: var(--vtc-card-solid);
 		box-shadow: var(--vtc-shadow);
-		backdrop-filter: blur(6px);
-		padding: 12px 16px 14px;
+		padding: 12px 16px 14px 19px;
+		overflow: hidden;
 		transition:
 			border-color 160ms ease,
 			box-shadow 160ms ease,
 			background-color 160ms ease;
+	}
+
+	.vtc-card::before {
+		content: "";
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 3px;
+		background: var(--vtc-accent);
+		box-shadow: 0 0 12px color-mix(in srgb, var(--vtc-accent) 70%, transparent);
 	}
 
 	.vtc-card:hover {
@@ -189,26 +203,46 @@
 		border-color: var(--vtc-flow);
 	}
 
-	/* The sentence written on a connector. */
+	/*
+	 * What is written on a connector belongs to the wire, not to a block: no
+	 * frame, no surface, no shadow. The relation is a small tag in the wire's
+	 * colour sitting on it; the sentence is loose italic text under it, kept
+	 * readable over the grid by a halo of the canvas' own background.
+	 */
 	.vtc-edge-label {
-		max-width: 240px;
-		border-radius: 10px;
-		border: 1px solid color-mix(in srgb, var(--vtc-flow) 30%, var(--vtc-card-border));
-		background: var(--vtc-card);
-		box-shadow: var(--vtc-shadow);
-		backdrop-filter: blur(6px);
-		padding: 5px 9px 6px;
-		text-align: left;
-		transition: border-color 140ms ease;
+		display: flex;
+		max-width: 220px;
+		flex-direction: column;
+		align-items: center;
+		gap: 3px;
+		border: 0;
+		background: none;
+		padding: 0;
+		text-align: center;
+		cursor: text;
 	}
 
-	.vtc-edge-label:hover,
-	.vtc-edge-label[data-selected="true"] {
+	.vtc-edge-tag {
+		max-width: 100%;
+		border-radius: 9999px;
+		border: 1px solid color-mix(in srgb, var(--vtc-flow) 55%, transparent);
+		background: var(--vtc-bg);
+		padding: 1px 8px;
+		color: var(--vtc-flow-core);
+		transition:
+			border-color 140ms ease,
+			box-shadow 140ms ease;
+	}
+
+	.vtc-edge-label:hover .vtc-edge-tag,
+	.vtc-edge-label:focus-visible .vtc-edge-tag,
+	.vtc-edge-label[data-selected="true"] .vtc-edge-tag {
 		border-color: var(--vtc-flow);
+		box-shadow: 0 0 14px -2px color-mix(in srgb, var(--vtc-flow) 60%, transparent);
 	}
 
-	.vtc-edge-label .vtc-kicker {
-		--vtc-accent: var(--vtc-flow-core);
+	.vtc-edge-label:focus-visible {
+		outline: none;
 	}
 
 	.vtc-edge-text {
@@ -218,7 +252,31 @@
 		overflow: hidden;
 		color: var(--vtc-muted);
 		font-size: var(--text-2xs, 0.6875rem);
+		font-style: italic;
 		line-height: 1.35;
+		text-shadow:
+			0 0 2px var(--vtc-bg),
+			0 0 4px var(--vtc-bg),
+			0 0 8px var(--vtc-bg),
+			0 0 14px var(--vtc-bg);
+		text-decoration: underline dotted transparent;
+		text-underline-offset: 3px;
+		transition: text-decoration-color 140ms ease;
+	}
+
+	.vtc-edge-label:hover .vtc-edge-text,
+	.vtc-edge-label[data-selected="true"] .vtc-edge-text {
+		color: var(--vtc-title);
+		text-decoration-color: color-mix(in srgb, var(--vtc-flow) 70%, transparent);
+	}
+
+	/* The editor is a form, so it is framed: it only exists while editing. */
+	.vtc-edge-editor {
+		border-radius: 10px;
+		border: 1px solid var(--vtc-flow);
+		background: var(--vtc-card-solid);
+		box-shadow: var(--vtc-shadow);
+		padding: 6px 8px 7px;
 	}
 }
 

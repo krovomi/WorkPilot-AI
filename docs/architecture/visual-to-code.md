@@ -84,6 +84,13 @@ Le canvas se dessine comme un graphe de nœuds : chaque bloc est une carte
 son nom ; les connexions sont des courbes (Bézier, plus des marches) avec un
 halo, un trait et une lumière qui court dans le sens de l'interaction.
 
+**Un bloc et un texte ne se ressemblent pas.** Un bloc est une surface pleine,
+cadrée, avec un liseré de sa couleur à gauche. Ce qui est écrit sur un fil n'a
+ni cadre ni surface : la relation est une étiquette ronde posée sur le fil, la
+phrase est en italique libre, suspendue sous le fil, lisible sur la grille
+grâce à un halo de la couleur du fond. Avec un cadre, les phrases se lisaient
+comme des blocs de plus.
+
 **Des jetons, pas le thème de l'app.** Tout se dessine depuis quelques
 variables `--vtc-*` posées sur `.vtc-flow`. Le reste (cœur du trait, lumière,
 lueur d'angle, texte secondaire) en est *dérivé* par `color-mix` dans la feuille :

@@ -148,15 +148,15 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 					className="vtc-tint nodrag nopan group absolute"
 					style={{
 						...tint,
-						transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+						// The tag sits on the wire and the sentence hangs below it, off the line.
+						transform: `translate(-50%, -9px) translate(${labelX}px, ${labelY}px)`,
 						pointerEvents: "all",
 					}}
 				>
 					{editing ? (
 						<form
 							ref={formRef}
-							className="vtc-edge-label flex w-60 flex-col gap-1.5"
-							data-selected="true"
+							className="vtc-edge-editor flex w-60 flex-col gap-1.5"
 							onSubmit={(e) => {
 								e.preventDefault();
 								commit();
@@ -197,10 +197,10 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 								}
 							}}
 							title={t("edgeEditTooltip", "Double-cliquez pour modifier l'interaction")}
-							className="vtc-edge-label block"
+							className="vtc-edge-label"
 							data-selected={selected ? "true" : "false"}
 						>
-							<span className="vtc-kicker block truncate">
+							<span className="vtc-kicker vtc-edge-tag truncate">
 								{data?.label || t("edgeNoRelation", "Interaction")}
 							</span>
 							{showText && data?.explanation ? (
