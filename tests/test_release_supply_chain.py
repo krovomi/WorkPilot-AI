@@ -45,6 +45,20 @@ def test_the_sbom_is_written_from_the_checkout_into_the_release_files():
     assert steps[publish]["with"]["files"] == "release-assets/*"
 
 
+def test_the_sbom_folder_exists_before_the_sbom_is_written():
+    # sbom-action does not create the folder of its output file: without this
+    # step the 1.3.4 release stopped on ENOENT after every build had passed.
+    steps = _job()["steps"]
+    sbom = _index(steps, _uses("anchore/sbom-action"))
+    folder = SBOM.rsplit("/", 1)[0]
+    created = [
+        i
+        for i, step in enumerate(steps)
+        if re.search(rf"mkdir -p {re.escape(folder)}\b", str(step.get("run", "")))
+    ]
+    assert created and created[0] < sbom
+
+
 def test_every_published_file_is_attested_before_it_is_published():
     job = _job()
     steps = job["steps"]
