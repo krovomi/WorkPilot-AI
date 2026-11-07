@@ -308,6 +308,7 @@ function DraftsColumn() {
 	const status = useDocumentationStore((s) => s.status);
 	const selected = useDocumentationStore((s) => s.selectedSymbol);
 	const isReadme = view === "readme";
+	const readmeFile = readme ? [readme.source_path, "README.md"].join("/") : "";
 	const busy: DocumentationAction | null = running === "docstrings" || running === "readme" ? running : null;
 	const docs = drafts?.generated_docs ?? [];
 
@@ -378,7 +379,7 @@ function DraftsColumn() {
 			{isReadme && readme && (
 				<Panel>
 					<div className="mb-2 flex items-center justify-between gap-2">
-						<span className="wp-mono text-xs">{readme.source_path}/README.md</span>
+						<span className="wp-mono text-xs">{readmeFile}</span>
 						<CopyButton text={readme.readme_content} />
 					</div>
 					<pre className="wp-code">{readme.readme_content}</pre>

@@ -254,7 +254,7 @@ def main() -> None:
         else:
             result = folder_readme(project, args.path)
         _emit("DOCUMENTATION_RESULT", result)
-    except Exception as exc:  # noqa: BLE001 - reported to the UI as the error line
+    except (OSError, ValueError, SyntaxError, RecursionError) as exc:
         _error(str(exc))
         sys.exit(1)
 
