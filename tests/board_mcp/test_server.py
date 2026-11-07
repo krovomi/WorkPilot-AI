@@ -405,3 +405,96 @@ class TestProtocol:
         listed = json.loads(replies[1]["result"]["content"][0]["text"])
         assert [c["id"] for c in listed] == ["001-a"]
         assert len(replies) == 2
+
+
+class TestProgress:
+    """``notifications/progress`` while ``wait_for_card`` waits (hermes >= 0.23)."""
+
+    @staticmethod
+    def _wait_line(token=None, *, timeout_seconds=1) -> str:
+        params: dict = {
+            "name": "wait_for_card",
+            "arguments": {
+                "card_id": "001-a",
+                "columns": ["done"],
+                "timeout_seconds": timeout_seconds,
+            },
+        }
+        if token is not None:
+            params["_meta"] = {"progressToken": token}
+        return (
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": params}
+            )
+            + "\n"
+        )
+
+    def test_a_client_that_asks_hears_where_the_card_is(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(server, "POLL_SECONDS", 0.01)
+        _card(
+            tmp_path,
+            "001-a",
+            "coding",
+            phases=[{"subtasks": [{"status": "completed"}, {"status": "pending"}]}],
+        )
+        stdout = io.StringIO()
+
+        serve(tmp_path, io.StringIO(self._wait_line("tok-1")), stdout)
+
+        messages = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        notes = [m for m in messages if m.get("method") == "notifications/progress"]
+        reply = messages[-1]
+        # Every notification precedes the answer, each one whole on its line.
+        assert reply["id"] == 7 and "result" in reply
+        assert notes, "a client that sent a progressToken hears progress"
+        first = notes[0]["params"]
+        assert first["progressToken"] == "tok-1"
+        assert first["total"] == 1.0
+        assert first["message"] == "001-a: in_progress, 1/2 subtasks"
+        values = [n["params"]["progress"] for n in notes]
+        assert values == sorted(values) and len(set(values)) == len(values)
+
+    def test_a_client_that_does_not_ask_hears_nothing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(server, "POLL_SECONDS", 0.01)
+        _card(tmp_path, "001-a", "coding")
+        stdout = io.StringIO()
+
+        serve(tmp_path, io.StringIO(self._wait_line()), stdout)
+
+        messages = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        assert [m.get("id") for m in messages] == [7]
+
+    def test_a_change_is_reported_without_waiting_for_the_heartbeat(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(server, "POLL_SECONDS", 0.01)
+        directory = _card(tmp_path, "001-a", "planning")
+        sent: list[dict] = []
+
+        async def run():
+            from mcp_tasks import bind_progress
+
+            with bind_progress(sent.append, 5):
+                waiting = asyncio.create_task(
+                    server.wait_for_card(tmp_path, "001-a", ("done",), 2)
+                )
+                await asyncio.sleep(0.05)
+                plan = json.loads(
+                    (directory / "implementation_plan.json").read_text("utf-8")
+                )
+                plan["status"] = "ai_review"
+                (directory / "implementation_plan.json").write_text(
+                    json.dumps(plan), encoding="utf-8"
+                )
+                await asyncio.sleep(0.05)
+                plan["status"] = "done"
+                (directory / "implementation_plan.json").write_text(
+                    json.dumps(plan), encoding="utf-8"
+                )
+                return await asyncio.wait_for(waiting, 5)
+
+        result = asyncio.run(run())
+        assert result["reached"] is True
+        columns = [n["params"]["message"].split(": ")[1] for n in sent]
+        # One line per column the card went through, no repeats in between.
+        assert columns == ["in_progress", "ai_review"]

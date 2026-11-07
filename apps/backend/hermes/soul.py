@@ -29,15 +29,31 @@ and it keeps a timestamped backup when it does.
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from .home import hermes_home
+from .version import MIN_VERSION, installed_version, satisfies
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["SoulStatus", "repo_soul_path", "soul_status", "install_soul"]
+__all__ = [
+    "REFRESH_COMMAND",
+    "SoulStatus",
+    "install_soul",
+    "refresh_prompts",
+    "repo_soul_path",
+    "soul_status",
+]
+
+#: What makes a running hermes pick up a new persona (hermes >= 0.23.0).
+REFRESH_COMMAND = "hermes sessions refresh-prompts"
+
+_REFRESH_TIMEOUT_S = 20.0
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -144,3 +160,50 @@ def install_soul(
         logger.warning("could not install SOUL.md: %s", exc)
         return False, "could not write SOUL.md into the hermes home"
     return True, "installed"
+
+
+def refresh_prompts(home: Path | None = None) -> str:
+    """Ask hermes's continuing sessions to rebuild their prompt from SOUL.md.
+
+    A persona copied into the hermes home is read when a session builds its
+    system prompt — and a session that is already running (the Telegram bot,
+    the gateway every client attaches to since hermes 0.23) built it long ago.
+    Before 0.23 the only way to get the new persona in was to restart them.
+    ``hermes sessions refresh-prompts`` records a refresh request in the
+    profile's own state: each continuing session rebuilds once, on its next
+    turn, history kept. It is called right after the install a person asked
+    for, because a persona that only applies to sessions not yet started is
+    not what they pressed the button for.
+
+    Returns ``requested``, ``needs-update`` (hermes older than the command),
+    or ``unavailable`` (no binary, or the command failed). Never raises.
+    """
+    binary = shutil.which("hermes")
+    if not binary:
+        return "unavailable"
+    if satisfies(installed_version(binary), MIN_VERSION) is False:
+        return "needs-update"
+    env = dict(os.environ)
+    if home is not None:
+        # The same home the persona was written into, not whichever profile
+        # the variable of this process happens to name.
+        env["HERMES_HOME"] = str(home)
+    try:
+        result = subprocess.run(
+            [binary, *REFRESH_COMMAND.split()[1:], "--json"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=_REFRESH_TIMEOUT_S,
+            stdin=subprocess.DEVNULL,
+            env=env,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.info("hermes sessions refresh-prompts did not run: %s", exc)
+        return "unavailable"
+    if result.returncode != 0:
+        logger.info("hermes sessions refresh-prompts exited %s", result.returncode)
+        return "unavailable"
+    return "requested"

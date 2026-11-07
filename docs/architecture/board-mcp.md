@@ -167,6 +167,22 @@ MCP Tasks extension it comes back as a task, polled and cancellable
 ends, as before. It reads the card every 5 seconds; the card is files on disk,
 there is nothing to subscribe to.
 
+A client that puts a `progressToken` in the call's `_meta` also hears where the
+card is while it waits: one `notifications/progress` per change of column or of
+subtasks done, and one a minute otherwise (`001-demo: ai_review, 1/2 subtasks`;
+progress is the seconds waited, out of the timeout). hermes-agent shows them to
+the person since v0.23.0, Claude Code and the MCP Inspector too. A client
+without a token gets none, as the protocol requires. The binding is
+`mcp_tasks/progress.py`, so the other servers built on `ToolServer` can report
+the same way; only stdio carries them today (the team server's `/mcp` answers
+one JSON body per request).
+
+hermes cuts any MCP call at 300 seconds unless its entry says otherwise, so the
+entry the app writes for it carries `timeout: 14460` (four hours and a minute,
+`HERMES_MCP_TIMEOUT_SECONDS`; `tests/test_board_mcp_hermes_timeout.py` keeps it
+above `MAX_WAIT_SECONDS`). An entry written before that reads as stale in the
+settings, so « Mettre à jour » rewrites it.
+
 ## Limits
 
 - One project per server process. A person with several projects adds one
