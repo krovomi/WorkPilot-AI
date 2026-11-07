@@ -12,9 +12,13 @@ import {
 	Trash2,
 	Wand2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useContextStore } from "../stores/context-store";
+import type {
+	CodeLanguage,
+	CodeSmell,
+	RefactoringProposal,
+} from "../../shared/types/code-insights";
 import {
 	CharterButton,
 	Chip,
@@ -29,33 +33,14 @@ import {
 	StepCard,
 	type Tone,
 } from "./charter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface CodeSmell {
-	smell_type: string;
-	severity: string;
-	message: string;
-	line?: number;
-	symbol?: string;
-	metric_value?: number;
-	threshold?: number;
-}
-
-interface RefactoringProposal {
-	pattern: string;
-	description: string;
-	risk_level: string;
-	symbol?: string;
-	impact?: string;
-}
 
 interface RefactoringViewProps {
 	readonly projectId: string;
 }
+
+const AUTO = "auto";
 
 const SEVERITY_TONE: Record<string, Tone> = {
 	critical: "red",
@@ -82,19 +67,29 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	const [error, setError] = useState<string | null>(null);
 	const [expandedSmells, setExpandedSmells] = useState<Set<string>>(new Set());
 	const [detected, setDetected] = useState(false);
+	// Every stack the backend reads; "auto" lets it guess from the pasted code.
+	const [languages, setLanguages] = useState<CodeLanguage[]>([]);
+	const [language, setLanguage] = useState(AUTO);
+	const [readAs, setReadAs] = useState<string | null>(null);
 
-	const projectIndex = useContextStore((s) => s.projectIndex);
-	const detectedLanguages = useMemo(() => {
-		if (!projectIndex?.services) return [];
-		return [
-			...new Set(
-				Object.values(projectIndex.services)
-					.map((s) => s.language)
-					.filter((l): l is string => Boolean(l)),
-			),
-		];
-	}, [projectIndex]);
-	const primaryLanguage = detectedLanguages[0] ?? null;
+	useEffect(() => {
+		let alive = true;
+		window.electronAPI
+			.runCodeInsights({ action: "languages" })
+			.then((result) => {
+				if (alive) setLanguages(result.languages);
+			})
+			.catch(() => {
+				/* without the list the picker keeps "auto", which still works */
+			});
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	const labelOf = (id: string | null) =>
+		languages.find((lang) => lang.id === id)?.label ?? id ?? "";
+	const chosen = language === AUTO ? null : language;
 
 	const toggleSmell = (key: string) => {
 		setExpandedSmells((prev) => {
@@ -113,53 +108,39 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		setProposals([]);
 		setDetected(false);
 		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(`${backendUrl}/api/refactoring/detect-smells`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ source, language: primaryLanguage }),
+			const result = await window.electronAPI.runCodeInsights({
+				action: "smells",
+				text: source,
+				language: chosen ?? undefined,
 			});
-			const data = await res.json();
-			if (data.success) {
-				setSmells(data.smells || []);
-				setDetected(true);
-			} else {
-				setError(data.error || t("refactoring:errors.detectionFailed"));
-			}
+			setSmells(result.smells);
+			setReadAs(result.language);
+			setDetected(true);
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("refactoring:errors.networkError"),
-			);
+			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.detectionFailed"));
 		} finally {
 			setLoading(false);
 		}
-	}, [source, primaryLanguage, t]);
+	}, [source, chosen, t]);
 
 	const handleProposeRefactoring = useCallback(async () => {
 		if (!source.trim()) return;
 		setLoadingProposals(true);
 		setError(null);
 		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(`${backendUrl}/api/refactoring/propose`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ source, language: primaryLanguage }),
+			const result = await window.electronAPI.runCodeInsights({
+				action: "propose",
+				text: source,
+				language: chosen ?? undefined,
 			});
-			const data = await res.json();
-			if (data.success) {
-				setProposals(data.proposals || []);
-			} else {
-				setError(data.error || t("refactoring:errors.proposalFailed"));
-			}
+			setProposals(result.proposals);
+			setReadAs(result.language);
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("refactoring:errors.networkError"),
-			);
+			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.proposalFailed"));
 		} finally {
 			setLoadingProposals(false);
 		}
-	}, [source, primaryLanguage, t]);
+	}, [source, chosen, t]);
 
 	const handlePaste = useCallback(async () => {
 		try {
@@ -176,6 +157,7 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		setProposals([]);
 		setError(null);
 		setDetected(false);
+		setReadAs(null);
 	};
 
 	const severityCounts = smells.reduce<Record<string, number>>((acc, smell) => {
@@ -183,8 +165,9 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		acc[sev] = (acc[sev] || 0) + 1;
 		return acc;
 	}, {});
-	const sourceLabel = primaryLanguage
-		? t("refactoring:input.labelWithLanguage", { language: primaryLanguage })
+	const shownLanguage = chosen ?? readAs;
+	const sourceLabel = shownLanguage
+		? t("refactoring:input.labelWithLanguage", { language: labelOf(shownLanguage) })
 		: t("refactoring:input.label");
 	const busy = loading || loadingProposals;
 
@@ -208,14 +191,10 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 						</>
 					}
 				>
-					{detectedLanguages.length > 1 && (
+					{language === AUTO && readAs && (
 						<div className="mb-2">
 							<Chips>
-								{detectedLanguages.map((lang) => (
-									<Chip key={lang} tone="blue">
-										{lang}
-									</Chip>
-								))}
+								<Chip tone="blue">{t("refactoring:input.readAs", { language: labelOf(readAs) })}</Chip>
 							</Chips>
 						</div>
 					)}
@@ -224,8 +203,8 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 						onChange={(e) => setSource(e.target.value)}
 						aria-label={sourceLabel}
 						placeholder={
-							primaryLanguage
-								? t("refactoring:input.placeholderWithLanguage", { language: primaryLanguage })
+							chosen
+								? t("refactoring:input.placeholderWithLanguage", { language: labelOf(chosen) })
 								: t("refactoring:input.placeholder")
 						}
 						className="wp-code min-h-[16rem] flex-1 resize-none"
@@ -340,12 +319,33 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 			)}
 			<Composer
 				prompt={
-					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
-						<Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-						<span className="truncate">{t("refactoring:description")}</span>
+					<span className="flex min-w-0 flex-wrap items-center gap-3">
+						<span className="wp-field">
+							<label htmlFor="refactoring-language">{t("refactoring:input.language")}</label>
+							<Select value={language} onValueChange={setLanguage} disabled={busy}>
+								<SelectTrigger
+									id="refactoring-language"
+									className="h-7 w-auto min-w-[8rem] border-0 bg-transparent px-1 text-xs font-medium shadow-none"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value={AUTO}>{t("refactoring:input.auto")}</SelectItem>
+									{languages.map((lang) => (
+										<SelectItem key={lang.id} value={lang.id}>
+											{lang.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</span>
+						<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+							<Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+							<span className="truncate">{t("refactoring:description")}</span>
+						</span>
 					</span>
 				}
-				hint={detectedLanguages.join(" · ") || sourceLabel}
+				hint={sourceLabel}
 				actions={
 					<>
 						<CharterButton

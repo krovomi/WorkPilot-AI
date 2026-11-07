@@ -248,16 +248,32 @@ class SmellDetector:
         self,
         source: str,
         file_path: str = "<unknown>",
+        language: str | None = None,
     ) -> list[CodeSmell]:
-        """Detect code smells in Python source code.
+        """Detect code smells in source code.
+
+        Python is read with ``ast``; any other language WorkPilot supports
+        (``language`` given, or guessed from a non-Python ``file_path``) goes
+        through the line-based reader of ``refactorer_polyglot``.
 
         Args:
-            source: Python source code string.
+            source: Source code string.
             file_path: Path for reporting.
+            language: Language id (``csharp``, ``go``...); None = Python.
 
         Returns:
             List of detected CodeSmell objects.
         """
+        if language is None and file_path and not file_path.endswith((".py", ">")):
+            from .refactorer_polyglot import language_for
+
+            detected = language_for(file_path)
+            language = detected.id if detected else None
+        if language and language != "python":
+            from .refactorer_polyglot import detect_polyglot_smells
+
+            return detect_polyglot_smells(source, language, self)
+
         smells: list[CodeSmell] = []
         lines = source.splitlines()
 
@@ -641,17 +657,19 @@ class RefactoringAgent:
         self,
         source: str,
         file_path: str = "<source>",
+        language: str | None = None,
     ) -> list[CodeSmell]:
         """Detect code smells from source code string.
 
         Args:
-            source: Python source code.
+            source: Source code, in any supported language.
             file_path: Display path for reporting.
+            language: Language id; None = Python (or the path's extension).
 
         Returns:
             List of detected code smells.
         """
-        return self.detector.detect_from_source(source, file_path)
+        return self.detector.detect_from_source(source, file_path, language)
 
     # -- Refactoring proposals -----------------------------------------------
 
@@ -660,6 +678,7 @@ class RefactoringAgent:
         file_path: str | None = None,
         source: str | None = None,
         smells: list[CodeSmell] | None = None,
+        language: str | None = None,
     ) -> list[RefactoringProposal]:
         """Propose refactoring actions based on detected smells.
 
@@ -674,7 +693,7 @@ class RefactoringAgent:
         if smells is None:
             if source:
                 smells = self.detector.detect_from_source(
-                    source, file_path or "<source>"
+                    source, file_path or "<source>", language
                 )
             elif file_path:
                 smells = self.detector.detect_from_file(file_path)

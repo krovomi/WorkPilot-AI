@@ -5,7 +5,10 @@
 		"label": "Code source",
 		"labelWithLanguage": "Code source {{language}}",
 		"placeholder": "Collez le code source ici à analyser...",
-		"placeholderWithLanguage": "Collez le code source {{language}} ici à analyser..."
+		"placeholderWithLanguage": "Collez le code source {{language}} ici à analyser...",
+		"language": "Langage",
+		"auto": "Détection automatique",
+		"readAs": "Lu comme du {{language}}"
 	},
 	"actions": {
 		"paste": "Coller",
@@ -17,8 +20,7 @@
 	},
 	"errors": {
 		"detectionFailed": "La détection a échoué",
-		"proposalFailed": "La génération de proposition a échoué",
-		"networkError": "Erreur réseau"
+		"proposalFailed": "La génération de proposition a échoué"
 	},
 	"smells": {
 		"title": "Code Smells ({{count}})",

@@ -5,7 +5,10 @@
 		"label": "Source code",
 		"labelWithLanguage": "{{language}} source code",
 		"placeholder": "Paste source code here to analyze...",
-		"placeholderWithLanguage": "Paste {{language}} source code here to analyze..."
+		"placeholderWithLanguage": "Paste {{language}} source code here to analyze...",
+		"language": "Language",
+		"auto": "Auto-detect",
+		"readAs": "Read as {{language}}"
 	},
 	"actions": {
 		"paste": "Paste",
@@ -17,8 +20,7 @@
 	},
 	"errors": {
 		"detectionFailed": "Detection failed",
-		"proposalFailed": "Proposal generation failed",
-		"networkError": "Network error"
+		"proposalFailed": "Proposal generation failed"
 	},
 	"smells": {
 		"title": "Code Smells ({{count}})",
