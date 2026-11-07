@@ -27,7 +27,11 @@ export function Toaster() {
 					{/* biome-ignore lint/a11y/noStaticElementInteractions: clickable toast body */}
 					{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled by Toast component */}
 					<div
-						className={onClick ? "grid gap-1 cursor-pointer" : "grid gap-1"}
+						className={
+							onClick
+								? "grid min-w-0 flex-1 cursor-pointer gap-1"
+								: "grid min-w-0 flex-1 gap-1"
+						}
 						onClick={
 							onClick
 								? () => {
@@ -41,7 +45,7 @@ export function Toaster() {
 						{description && <ToastDescription>{description}</ToastDescription>}
 					</div>
 					{action && (
-						<div className="flex items-center gap-2">
+						<div className="flex shrink-0 items-center gap-2">
 							{action}
 							<ToastClose />
 						</div>

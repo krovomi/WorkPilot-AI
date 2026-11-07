@@ -160,6 +160,58 @@ describe("CanvasInspector", () => {
 		expect(onEdgeChange).toHaveBeenCalledWith("e1", { color: "#10b981" });
 	});
 
+	it("offers the relations of the pair in a drop-down, then a free-text entry", () => {
+		const onEdgeChange = vi.fn();
+		render(
+			<CanvasInspector
+				node={null}
+				edge={{ id: "e1", source: "a", target: "b", data: { label: "HTTP / REST" } }}
+				edgeEnds={["BackEnd DotNet", "Worker DotNet"]}
+				defaultExplanation=""
+				relationOptions={["HTTP / REST", "gRPC", "MassTransit"]}
+				onNodeChange={noop}
+				onDeleteNode={noop}
+				onEdgeChange={onEdgeChange}
+				onDeleteEdge={noop}
+			/>,
+		);
+		const select = screen.getByLabelText("Relation") as HTMLSelectElement;
+		expect(select.tagName).toBe("SELECT");
+		expect([...select.options].map((o) => o.textContent)).toEqual([
+			"HTTP / REST",
+			"gRPC",
+			"MassTransit",
+			"Autre (saisie libre)…",
+		]);
+		fireEvent.change(select, { target: { value: "gRPC" } });
+		expect(onEdgeChange).toHaveBeenLastCalledWith("e1", { label: "gRPC" });
+		expect(screen.queryByLabelText("Relation personnalisée")).toBeNull();
+
+		fireEvent.change(select, { target: { value: select.options[3].value } });
+		expect(onEdgeChange).toHaveBeenLastCalledWith("e1", { label: "" });
+		const own = screen.getByLabelText("Relation personnalisée");
+		fireEvent.change(own, { target: { value: "Webhook signé" } });
+		expect(onEdgeChange).toHaveBeenLastCalledWith("e1", { label: "Webhook signé" });
+	});
+
+	it("keeps a relation the list does not know in the free-text entry", () => {
+		render(
+			<CanvasInspector
+				node={null}
+				edge={{ id: "e1", source: "a", target: "b", data: { label: "MCP", forced: true } }}
+				edgeEnds={["Orders DB", "Web"]}
+				defaultExplanation=""
+				relationOptions={["relié à", "HTTP / REST"]}
+				onNodeChange={noop}
+				onDeleteNode={noop}
+				onEdgeChange={noop}
+				onDeleteEdge={noop}
+			/>,
+		);
+		expect(screen.getByLabelText("Relation personnalisée")).toHaveValue("MCP");
+		expect(screen.getByText(/hors des règles d'architecture/)).toBeInTheDocument();
+	});
+
 	it("leaves a brick's role to the brick", () => {
 		render(
 			<CanvasInspector
