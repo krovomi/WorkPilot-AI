@@ -184,6 +184,10 @@
 				"to": "backend/skills_registry/bundled/convert-documents-to-markdown"
 			},
 			{
+				"from": "../../.agents/skills/migrate-dotnet10-to-dotnet11",
+				"to": "backend/skills_registry/bundled/migrate-dotnet10-to-dotnet11"
+			},
+			{
 				"from": "../../.agents/skills/ui-ux-pro-max",
 				"to": "backend/skills_registry/bundled/ui-ux-pro-max",
 				"filter": [

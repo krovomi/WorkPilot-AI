@@ -10,8 +10,8 @@ paths:
 metadata:
   workpilot:
     pack: dotnet
-    version: 1.0.0
-    content_sha256: 5a02491af54e8b7480c2a068d818710fa37b03d0ed4af67c9d4b9f9d980883c3
+    version: 1.1.0
+    content_sha256: 9a66d4a20e4701b714bfeb4a274a1fe780026201b4242f1b35bcb7132901f942
     targets:
       dotnet: '>=10.0'
 ---
@@ -23,6 +23,7 @@ Développer des applications .NET robustes, scalables et maintenables.
 ## Stack de référence
 
 - **Runtime** : .NET 10, C# 14 (params spans, extension types, pattern matching amélioré)
+- **.NET 11 / C# 15** (unions, hiérarchies `closed`, arguments d'expressions de collection) : migration et adoption via le skill `migrate-dotnet10-to-dotnet11`
 - **Web/API** : ASP.NET Core 10 (minimal APIs), EF Core 10, Blazor
 - **Architecture** : Clean Architecture, DDD, CQRS (MediatR), Repository + Specification, Circuit Breaker (Polly)
 - **Données** : SQL Server, PostgreSQL, SQLite, Redis, Cosmos DB
