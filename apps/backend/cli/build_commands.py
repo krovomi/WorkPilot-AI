@@ -28,6 +28,7 @@ from core.workspace import (
 )
 from foundation.build_signals import BuildHalted, BuildPaused
 from review import ReviewState
+from services.notifications.digest import start_digest_heartbeat
 from ui import (
     BuildState,
     Icons,
@@ -958,6 +959,8 @@ def handle_build_command(
         # What the person attached to the task — screenshots, mockups, draw.io
         # and Excalidraw diagrams — read once, before the plan is written.
         _run_attachments_preflight(spec_dir, project_dir)
+        # Long tasks: a digest on the notification channels, when asked (P1).
+        start_digest_heartbeat(spec_dir, project_dir)
 
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there
