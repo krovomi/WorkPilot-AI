@@ -1,13 +1,14 @@
-"""What a .NET project is on, which areas it uses, and whether a task asks for .NET 11.
+"""What a .NET project is on, which areas it uses, and which .NET a task asks for.
 
 Read from the files on disk only, in a few hundred milliseconds at worst: the
 project's TargetFramework through `skills_registry.project` (the same reading
 that decides which skills a project gets, `.workpilot/skills.toml` first), and
 the SDK attributes and package references of its MSBuild files for the areas.
 
-The areas name the skill's reference files. Four apply to every project; the
-others are chosen from what the project files say, so a console app is not
-handed the EF Core and Blazor notes. What only the code reveals (cryptography
+The areas name the skills' reference files (``references/<area>-dotnetAtoB.md``);
+each hop has its own subset, and an area a hop has no file for is skipped there.
+The general ones apply to every project; the others are chosen from what the
+project files say, so a console app is not handed the EF Core and Blazor notes. What only the code reveals (cryptography
 calls, `BackgroundService`) is left to the procedure's own Step 1.
 """
 
@@ -23,11 +24,19 @@ __all__ = [
     "dotnet_major",
     "project_areas",
     "project_dotnet_version",
+    "requested_target",
     "task_asks_for_dotnet11",
     "task_text",
 ]
 
-ALWAYS_AREAS = ("csharp-compiler", "core-libraries", "sdk-msbuild", "extensions")
+ALWAYS_AREAS = (
+    "csharp-compiler",
+    "core-libraries",
+    "sdk-msbuild",
+    "extensions",
+    "serialization-networking",
+    "deployment-runtime",
+)
 
 # Area -> what in a project file says the project uses it. `Include="…"` covers a
 # PackageReference and, under Central Package Management, a PackageVersion.
@@ -68,16 +77,33 @@ _AREA_SIGNALS: tuple[tuple[str, re.Pattern[str]], ...] = (
             re.IGNORECASE,
         ),
     ),
+    (
+        "winforms-wpf",
+        re.compile(
+            r"<Use(?:WPF|WindowsForms)>\s*true|Sdk=\"Microsoft\.NET\.Sdk\.WindowsDesktop",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "containers-interop",
+        re.compile(
+            r"<(?:PublishSingleFile|EnableSdkContainerSupport)>\s*true"
+            r"|<Container(?:Repository|ImageName|BaseImage)>",
+            re.IGNORECASE,
+        ),
+    ),
 )
 
 KNOWN_AREAS = frozenset((*ALWAYS_AREAS, *(area for area, _ in _AREA_SIGNALS)))
 
-# ".NET 11", "dotnet 11", "net11.0", "C# 15" — in a task's words, French or English.
-# The look-behind keeps "planet 11" and "Kubernetes 11" out.
-_ASKS_RE = re.compile(
-    r"(?<![a-z])(?:\.?net|dotnet)\s?-?11(?:\.0)?(?![\d.]*\d)|\bc#\s?15\b|\bcsharp\s?15\b",
+# ".NET 10", "dotnet 11", "net9.0", "C# 14" — in a task's words, French or English.
+# Only the releases a skill migrates to; the look-behind keeps "planet 11" out.
+_TARGET_RE = re.compile(
+    r"(?<![a-z])(?:\.?net|dotnet)\s?-?(?P<net>9|10|11)(?:\.0)?(?![\d.]*\d)"
+    r"|\b(?:c#|csharp)\s?(?P<cs>13|14|15)\b",
     re.IGNORECASE,
 )
+_CSHARP_TO_NET = {"13": 9, "14": 10, "15": 11}
 
 _MAX_TASK_CHARS = 8000
 _MAX_FILE_CHARS = 200_000
@@ -114,6 +140,11 @@ def project_areas(project_dir: Path | str) -> list[str]:
         files.append(packages)
 
     found: set[str] = set()
+    # A Dockerfile is the containers signal no project file carries.
+    if any(root.glob("Dockerfile*")) or any(
+        any(f.parent.glob("Dockerfile*")) for f in files[:50]
+    ):
+        found.add("containers-interop")
     for path in files:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")[:_MAX_FILE_CHARS]
@@ -145,6 +176,18 @@ def task_text(spec_dir: Path | str | None) -> str:
     return "\n".join(parts)[:_MAX_TASK_CHARS]
 
 
+def requested_target(text: str) -> int | None:
+    """The newest .NET release (9, 10 or 11) a task's words name, None if none.
+
+    "Migrer de .NET 9 vers .NET 10" -> 10: the newest one named is the goal.
+    """
+    found = [
+        int(m["net"]) if m["net"] else _CSHARP_TO_NET[m["cs"]]
+        for m in _TARGET_RE.finditer(text or "")
+    ]
+    return max(found, default=None)
+
+
 def task_asks_for_dotnet11(text: str) -> bool:
     """Whether a task's words name .NET 11 or C# 15."""
-    return bool(text) and _ASKS_RE.search(text) is not None
+    return requested_target(text) == 11
