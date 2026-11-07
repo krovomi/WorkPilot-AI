@@ -102,6 +102,13 @@ def _dirty_lines(project_dir: Path) -> dict[str, list[str]]:
     return {p: sorted(s) for p, s in human.items()}
 
 
+def model_id_of(client: object, model: str | None) -> str:
+    """``provider/model`` for the record; a client that cannot say is ``unknown``."""
+    name = getattr(client, "provider_name", None)
+    provider = name() if callable(name) else None
+    return f"{provider or 'unknown'}/{model or 'unknown'}"
+
+
 def session_start(
     spec_dir: Path | str | None,
     project_dir: Path,

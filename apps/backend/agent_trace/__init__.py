@@ -7,7 +7,7 @@ a new tool, git is the source of truth, and nothing here can fail a build.
 from __future__ import annotations
 
 from .record import SPEC_VERSION, TRACE_FILE, build_record, read_records, record_session
-from .session import note_tool_write, session_start
+from .session import model_id_of, note_tool_write, session_start
 from .summary import SUMMARY_FILE, attribution_line, summarize, write_summary
 
 
@@ -42,6 +42,7 @@ __all__ = [
     "after_session",
     "attribution_line",
     "build_record",
+    "model_id_of",
     "note_tool_write",
     "read_records",
     "record_session",

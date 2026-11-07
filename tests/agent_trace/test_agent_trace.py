@@ -19,6 +19,7 @@ from agent_trace import (
     TRACE_FILE,
     after_session,
     attribution_line,
+    model_id_of,
     note_tool_write,
     read_records,
     record_session,
@@ -213,3 +214,12 @@ def test_the_pr_body_gets_the_attribution_line(repo):
     assert "100% of the 1 added lines" in body and MODEL in body
     # No record: the body is left as it was.
     assert Manager()._with_attribution("002-y", "## Summary\n") == "## Summary\n"
+
+
+def test_the_model_id_never_fails_a_build():
+    class Client:
+        def provider_name(self):
+            return "claude"
+
+    assert model_id_of(Client(), "claude-sonnet-5-5") == "claude/claude-sonnet-5-5"
+    assert model_id_of(object(), None) == "unknown/unknown"
