@@ -45,10 +45,12 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass
+    hard_gate: tests-pass,tests-bite
     description: >-
-      The suite, run. `tests-pass` is the one gate a test task has;
-      `app-verified` is not asked, nothing in the application changed.
+      The suite, run. `tests-pass` says it is green; `tests-bite` that the
+      new tests fail when a bug is planted in the code they test (the QA
+      mutation gate, `qa/mutation_gate.py`). `app-verified` is not asked,
+      nothing in the application changed.
 
   - id: qa
     impl: workpilot/qa-loop

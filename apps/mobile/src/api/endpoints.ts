@@ -14,6 +14,7 @@ import type {
 	MyPermissions,
 	RunPhase,
 	ServerProject,
+	SteeringMessage,
 	TaskLogs,
 	UiPreferences,
 } from "./types";
@@ -91,6 +92,16 @@ export function api(client: ServerClient) {
 			client.request<CardChanges>("GET", cardsPath(projectId, cardId, "changes")),
 		logs: async (projectId: string, cardId: string) =>
 			(await client.request<{ logs: TaskLogs | null }>("GET", cardsPath(projectId, cardId, "logs"))).logs,
+		steering: async (projectId: string, cardId: string) =>
+			(await client.request<{ messages: SteeringMessage[] }>("GET", cardsPath(projectId, cardId, "steering")))
+				.messages,
+		steer: async (projectId: string, cardId: string, text: string) =>
+			(
+				await client.request<{ messages: SteeringMessage[] }>("POST", cardsPath(projectId, cardId, "steering"), {
+					text,
+					source: "mobile",
+				})
+			).messages,
 		requestChanges: (projectId: string, cardId: string, feedback: string) =>
 			client.request("POST", cardsPath(projectId, cardId, "request-changes"), { feedback }),
 		runs: (projectId: string, specId: string) => client.request<AgentRun[]>("GET", runsPath(projectId, specId)),

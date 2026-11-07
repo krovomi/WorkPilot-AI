@@ -90,6 +90,7 @@ import { registerInsightsHandlers } from "./insights-handlers";
 import { registerFigmaHandlers } from "./figma-handlers";
 import { registerJiraHandlers } from "./jira-handlers";
 import { registerLearningLoopHandlers } from "./learning-loop-handlers";
+import { registerMcpPinsHandlers } from "./mcp-pins-handlers";
 import { registerLinearHandlers } from "./linear-handlers";
 import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
@@ -146,11 +147,14 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerPreviewPointHandlers } from "./task/preview-point-handlers";
+import { registerSteeringHandlers } from "./task/steering-handlers";
 import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 import {
 	registerVoiceControlHandlers,
 	setupVoiceControlEvents,
 } from "./voice-control-handlers";
+import { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 
 export { registerAccessibilityHandlers } from "./accessibility-handlers";
 export { registerAgenteventsHandlers } from "./agent-events-handlers";
@@ -207,6 +211,7 @@ export { registerIdeationHandlers } from "./ideation-handlers";
 export { registerInsightsHandlers } from "./insights-handlers";
 export { registerJiraHandlers } from "./jira-handlers";
 export { registerLearningLoopHandlers } from "./learning-loop-handlers";
+export { registerMcpPinsHandlers } from "./mcp-pins-handlers";
 export { registerLinearHandlers } from "./linear-handlers";
 export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
@@ -253,7 +258,10 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerPreviewPointHandlers } from "./task/preview-point-handlers";
+export { registerSteeringHandlers } from "./task/steering-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
+export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 export { registerVoiceControlHandlers } from "./voice-control-handlers";
 
 /**
@@ -434,6 +442,7 @@ export function setupIpcHandlers(
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
 	registerLearningLoopHandlers(getMainWindow);
+	registerMcpPinsHandlers();
 
 	// MCP Marketplace handlers (catalog, install, builder)
 	registerMcpMarketplaceHandlers();
@@ -494,6 +503,9 @@ export function setupIpcHandlers(
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
 	registerVisualToCodeHistoryHandlers();
+	registerWorktreeRecipeHandlers();
+	registerSteeringHandlers();
+	registerPreviewPointHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();

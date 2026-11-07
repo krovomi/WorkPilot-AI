@@ -183,6 +183,40 @@ def copy_env_files_to_worktree(project_dir: Path, worktree_path: Path) -> list[s
     return copied
 
 
+def is_workpilot_repo(project_dir: Path) -> bool:
+    """Whether ``project_dir`` is WorkPilot's own monorepo (its root package name)."""
+    try:
+        data = json.loads((project_dir / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("name") == "workpilot-ai"
+
+
+def _prepare(project_dir: Path, worktree: Path, spec_name: str) -> None:
+    """Run the worktree's recipe and say how it went. Never stops the build."""
+    from .recipe_run import prepare_worktree
+
+    if os.environ.get("WORKPILOT_WORKTREE_SETUP", "1").strip() == "0":
+        return
+    report = prepare_worktree(project_dir, worktree, spec_name)
+    if report.status == "awaiting-approval":
+        print_status(
+            "Worktree recipe .workpilot/worktree.toml changed: approve it in the "
+            "project settings to run it",
+            "warning",
+        )
+    elif report.status == "invalid":
+        print_status(f"Worktree recipe invalid: {'; '.join(report.errors)}", "warning")
+    elif report.steps or report.copied:
+        done = sum(1 for s in report.steps if s.status == "ok")
+        level = "success" if report.status == "ready" else "warning"
+        print_status(
+            f"Worktree prepared ({report.source}): {done}/{len(report.steps)} step(s) ok"
+            + (f", ports {report.port}+" if report.port else ""),
+            level,
+        )
+
+
 def symlink_node_modules_to_worktree(
     project_dir: Path, worktree_path: Path
 ) -> list[str]:
@@ -378,13 +412,21 @@ def setup_workspace(
             f"Environment files copied: {', '.join(copied_env_files)}", "success"
         )
 
-    # Symlink node_modules to worktree for TypeScript and tooling support
-    # This allows pre-commit hooks to run typecheck without npm install in worktree
-    symlinked_modules = symlink_node_modules_to_worktree(
-        project_dir, worktree_info.path
-    )
-    if symlinked_modules:
-        print_status(f"Dependencies linked: {', '.join(symlinked_modules)}", "success")
+    # WorkPilot's own monorepo links its two node_modules (its pre-commit
+    # hooks typecheck in the worktree). Any other project gets its recipe:
+    # `.workpilot/worktree.toml`, or what its stack implies
+    # (`core/workspace/recipe.py`); linking dependencies into a worktree can
+    # break the main checkout, so it is never the default elsewhere.
+    if is_workpilot_repo(project_dir):
+        symlinked_modules = symlink_node_modules_to_worktree(
+            project_dir, worktree_info.path
+        )
+        if symlinked_modules:
+            print_status(
+                f"Dependencies linked: {', '.join(symlinked_modules)}", "success"
+            )
+    else:
+        _prepare(project_dir, worktree_info.path, spec_name)
 
     # Copy security configuration files if they exist
     # Note: Unlike env files, security files always overwrite to ensure

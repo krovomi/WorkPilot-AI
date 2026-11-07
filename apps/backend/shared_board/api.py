@@ -38,7 +38,7 @@ from server.services import push
 from server.services.events import emit_board_event
 from server.services.needs_you import set_approval_check
 from shared_board import attachments as card_images
-from shared_board import listing, review, unblock
+from shared_board import listing, review, steering, unblock
 from shared_board import settings as card_settings
 from shared_board.cards import _card_or_404, _index_row, _require_writer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -417,6 +417,11 @@ router.add_api_route(
     unblock.unblock_subtask,
     methods=["POST"],
 )
+# Messages to a card's task while it runs (`foundation.steering`).
+router.add_api_route(
+    "/cards/{card_id}/steering", steering.card_steering, methods=["GET"]
+)
+router.add_api_route("/cards/{card_id}/steering", steering.steer_card, methods=["POST"])
 
 
 # The same check rings its person's "needs you" channels as a plan to

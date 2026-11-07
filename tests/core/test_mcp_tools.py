@@ -151,7 +151,7 @@ async def test_manager_bridges_and_routes(monkeypatch):
     monkeypatch.setattr(MCPToolManager, "_open_session", _fake_open)
 
     servers = [{"id": "hf", "type": "http", "url": "https://huggingface.co/mcp"}]
-    async with MCPToolManager(project_dir=None, servers=servers) as mcp:
+    async with MCPToolManager(project_dir=None, servers=servers, pin=False) as mcp:
         defs = mcp.tool_definitions()
         names = {d["name"] for d in defs}
         assert f"{MCP_TOOL_PREFIX}hf__model_search" in names

@@ -313,6 +313,8 @@ export function registerWorktreeCreatePRHandlers(
 											prUrl: result.prUrl,
 											worktreePath,
 											autoBuildPath: project.autoBuildPath,
+											// The renderer is not trusted: a tick, nothing else.
+											includeWalkthrough: options?.includeWalkthrough === true,
 										});
 										updateVisualProofMetadata(
 											specDir,

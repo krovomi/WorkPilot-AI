@@ -10,6 +10,8 @@ export interface BenchEngine {
 	provider: string;
 	model: string;
 	effort: string;
+	/** A candidate rule the copy is built with: the arm measures the rule. */
+	rule?: string;
 }
 
 export interface BenchSuite {
