@@ -222,6 +222,21 @@ def mobile_section(project_dir: Path) -> str:
         return ""
 
 
+def dotnet_section(
+    project_dir: Path, spec_dir: Path | None, *, role: str = "coder"
+) -> str:
+    """.NET 11 / C# 15: the migration skill staged for a task that needs it, or nothing.
+
+    Public and single like the sections around it: the planner, every coding
+    subtask, the QA reviewer and the workflow's skill phases point at the same
+    staged files (`dotnet_upgrade`). Empty for every project that is not on
+    .NET 10 or 11, and for a .NET 10 task that does not ask for .NET 11.
+    """
+    from dotnet_upgrade import dotnet_section as _section
+
+    return _section(project_dir, spec_dir, role=role)
+
+
 def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
     """The project's accepted ADRs, and what the task's attachments say.
 
@@ -403,6 +418,11 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # that does not know which is which reports "could not verify" as a defect.
     if mobile := mobile_section(project_dir):
         spec_context += mobile + "\n\n---\n\n"
+
+    # A .NET 11 migration is judged against its procedure: what was retargeted,
+    # and which behavioral changes were handled or ruled out. Empty otherwise.
+    if dotnet := dotnet_section(project_dir, spec_dir, role="qa"):
+        spec_context += dotnet + "\n\n---\n\n"
 
     # The decisions the project wrote down, and the mockup or diagram the
     # person attached to the task: the two things a reviewer judging only the
