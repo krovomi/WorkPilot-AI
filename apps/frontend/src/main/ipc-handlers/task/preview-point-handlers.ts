@@ -16,7 +16,8 @@
 
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdir, open, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { ipcMain } from "electron";
@@ -103,15 +104,34 @@ export async function readSourceFiles(root: string): Promise<SourceFile[]> {
 	for (const rel of listed.split("\0").filter(isTemplateFile).slice(0, MAX_SOURCE_FILES)) {
 		const absolute = path.resolve(realRoot, rel);
 		if (!absolute.startsWith(realRoot + path.sep)) continue;
-		try {
-			const stat = await lstat(absolute);
-			if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) continue;
-			files.push({ path: rel.replaceAll("\\", "/"), text: await readFile(absolute, "utf-8") });
-		} catch {
-			// deleted since the listing: not a candidate
-		}
+		const text = await readPlainFile(absolute);
+		if (text !== null) files.push({ path: rel.replaceAll("\\", "/"), text });
 	}
 	return files;
+}
+
+/**
+ * A plain file of the worktree, never what a link points to: the file read
+ * is the one measured, even if the name is swapped for a link in between.
+ * O_NOFOLLOW refuses a link where it exists; Windows has none, so the name
+ * must still be a plain file and the very file that was opened.
+ */
+async function readPlainFile(absolute: string): Promise<string | null> {
+	let handle: Awaited<ReturnType<typeof open>> | null = null;
+	try {
+		handle = await open(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+		const stat = await handle.stat();
+		if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) return null;
+		const named = await lstat(absolute);
+		if (!named.isFile() || named.ino !== stat.ino || named.dev !== stat.dev) return null;
+		const buffer = Buffer.alloc(stat.size);
+		const { bytesRead } = await handle.read(buffer, 0, stat.size, 0);
+		return buffer.subarray(0, bytesRead).toString("utf-8");
+	} catch {
+		return null; // deleted since the listing, or a link: not a candidate
+	} finally {
+		await handle?.close();
+	}
 }
 
 function summaryOf(id: string, element: Kept): PointedElementSummary {
