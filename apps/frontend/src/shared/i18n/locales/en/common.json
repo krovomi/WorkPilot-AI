@@ -1234,6 +1234,10 @@
 				"label": "Search Tasks",
 				"description": "Search and filter tasks"
 			},
+			"voice_assistant": {
+				"label": "Voice Assistant",
+				"description": "Say a command: open a feature, create a task…"
+			},
 			"go_kanban": {
 				"label": "Go to Kanban",
 				"description": "Navigate to the Kanban board"

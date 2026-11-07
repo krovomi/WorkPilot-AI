@@ -95,7 +95,7 @@ import enTerminal from "./locales/en/terminal.json";
 import enTestGeneration from "./locales/en/testGeneration.json";
 import enVisualProgramming from "./locales/en/visualProgramming.json";
 import enVisualToCode from "./locales/en/visualToCode.json";
-import enVoiceControl from "./locales/en/voiceContol.json";
+import enVoiceAssistant from "./locales/en/voiceAssistant.json";
 import enWelcome from "./locales/en/welcome.json";
 import frAccessibility from "./locales/fr/accessibility.json";
 import frAdministration from "./locales/fr/administration.json";
@@ -192,7 +192,7 @@ import frTerminal from "./locales/fr/terminal.json";
 import frTestGeneration from "./locales/fr/testGeneration.json";
 import frVisualProgramming from "./locales/fr/visualProgramming.json";
 import frVisualToCode from "./locales/fr/visualToCode.json";
-import frVoiceControl from "./locales/fr/voiceContol.json";
+import frVoiceAssistant from "./locales/fr/voiceAssistant.json";
 import frWelcome from "./locales/fr/welcome.json";
 
 export const defaultNS = "common";
@@ -265,7 +265,7 @@ export const resources = {
 		selfHealing: enSelfHealing,
 		sessionHistory: enSessionHistory,
 		smartEstimation: enSmartEstimation,
-		voiceControl: enVoiceControl,
+		voiceAssistant: enVoiceAssistant,
 		ideation: enIdeation,
 		costEstimator: enCostEstimator,
 		formulaLab: enFormulaLab,
@@ -362,7 +362,7 @@ export const resources = {
 		selfHealing: frSelfHealing,
 		sessionHistory: frSessionHistory,
 		smartEstimation: frSmartEstimation,
-		voiceControl: frVoiceControl,
+		voiceAssistant: frVoiceAssistant,
 		ideation: frIdeation,
 		costEstimator: frCostEstimator,
 		formulaLab: frFormulaLab,
@@ -466,7 +466,7 @@ i18n.use(initReactI18next).init({
 		"selfHealing",
 		"sessionHistory",
 		"smartEstimation",
-		"voiceControl",
+		"voiceAssistant",
 		"ideation",
 		"costEstimator",
 		"formulaLab",

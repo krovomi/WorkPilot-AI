@@ -738,25 +738,12 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		/* noop */
 	},
 
-	// Voice Control API
-	onVoiceControlStatus: () => () => {
+	// Voice assistant API
+	onVoiceAssistantToggle: () => () => {
 		/* noop */
 	},
-	onVoiceControlStreamChunk: () => () => {
-		/* noop */
-	},
-	onVoiceControlError: () => () => {
-		/* noop */
-	},
-	onVoiceControlComplete: () => () => {
-		/* noop */
-	},
-	onVoiceControlAudioLevel: () => () => {
-		/* noop */
-	},
-	onVoiceControlDuration: () => () => {
-		/* noop */
-	},
+	getVoiceShortcutStatus: async () => "off" as const,
+	interpretVoiceCommand: async () => ({ success: false as const, error: "unavailable" as const }),
 
 	// App Emulator API
 	onAppEmulatorStatus: () => () => {

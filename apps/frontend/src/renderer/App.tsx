@@ -407,7 +407,6 @@ import { PageLlmSelector } from "./components/PageLlmSelector";
 import { RateLimitModal } from "./components/RateLimitModal";
 import { SDKRateLimitModal } from "./components/SDKRateLimitModal";
 import { VersionWarningModal } from "./components/VersionWarningModal";
-import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
 import { useGlobalTerminalListeners } from "./hooks/useGlobalTerminalListeners";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -2291,8 +2290,6 @@ export function App() {
 
 						{/* AI Prompt Optimizer Dialog (Feature 9) */}
 
-						{/* Voice Control Dialog (Feature 23) */}
-						<VoiceControlDialog />
 					</TooltipProvider>
 
 					{/* Onboarding wizard - shown only once at app start */}

@@ -53,7 +53,7 @@ import { setupSecureStorageListeners } from "./secure-storage-store";
 import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
-import { setupVoiceControlListeners } from "./voice-control-store";
+import { setupVoiceAssistantListeners } from "./voice-assistant-store";
 
 /**
  * Every feature's IPC listeners, registered once for the lifetime of the
@@ -134,7 +134,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// An ACP agent's question waits on its card whether or not the board is open.
 	["TaskPermissions", setupTaskPermissionListeners],
 	["VisualToCode", setupVisualToCodeListeners],
-	["VoiceControl", setupVoiceControlListeners],
+	["VoiceAssistant", setupVoiceAssistantListeners],
 ];
 
 let teardown: (() => void) | null = null;

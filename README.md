@@ -194,7 +194,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pipeline Generator** | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
-| **Voice Control** | Hands-free task and terminal control via speech-to-text |
+| **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally; a task is created only once you confirm it, locally or on a server project's board. See [docs/architecture/voice-assistant.md](docs/architecture/voice-assistant.md) |
 | **Multi-Repo Orchestration** | The Kanban's "Multi-repo" button runs one change across several repositories: WorkPilot orders them (libraries and APIs first), opens one card per repository and starts each once the previous one passed QA, telling it what the earlier repositories changed. See [docs/architecture/multi-repo.md](docs/architecture/multi-repo.md) |
 | **Code Playground** | Sandbox environment for testing code snippets in isolation |
 | **Prompt Optimizer** | Analyzes and rewrites prompts for better AI output |

@@ -49,6 +49,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 			{ keys: "Ctrl+N", label: "New Task" },
 			{ keys: "Ctrl+,", label: "Open Settings" },
 			{ keys: "Ctrl+T", label: "Add Project" },
+			// The default; Settings → Voice assistant changes it.
+			{ keys: "Ctrl+Shift+Space", label: "Voice Assistant" },
 			{ keys: "Escape", label: "Close dialog / overlay" },
 		],
 	},

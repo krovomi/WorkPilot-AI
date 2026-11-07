@@ -53,6 +53,8 @@ export const PAGE_LLM_FEATURES = {
 	"gitlab-merge-requests": "githubPrs",
 	"prompt-optimizer": "promptOptimizer",
 	"natural-language-git": "natural-language-git",
+	// The voice assistant's reading of a free sentence (`voice-assistant-handlers.ts`).
+	"voice-control": "voiceControl",
 } as const satisfies Record<string, PageLlmFeature>;
 
 /** Une page qui accepte une formule propre. */

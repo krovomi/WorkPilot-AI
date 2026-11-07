@@ -1234,6 +1234,10 @@
 				"label": "Rechercher des tâches",
 				"description": "Rechercher et filtrer les tâches"
 			},
+			"voice_assistant": {
+				"label": "Assistant vocal",
+				"description": "Dites une commande : ouvrir une fonctionnalité, créer une tâche…"
+			},
 			"go_kanban": {
 				"label": "Aller au Kanban",
 				"description": "Ouvrir le tableau Kanban"
