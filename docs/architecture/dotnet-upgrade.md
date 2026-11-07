@@ -1,6 +1,7 @@
-# .NET 11 and C# 15 (migrate-dotnet10-to-dotnet11)
+# .NET migrations 8 → 9 → 10 → 11 and C# 15
 
-> Rationale for the `dotnet_upgrade` package and the `migrate-dotnet10-to-dotnet11` skill.
+> Rationale for the `dotnet_upgrade` package and the `migrate-dotnet8-to-dotnet9`,
+> `migrate-dotnet9-to-dotnet10` and `migrate-dotnet10-to-dotnet11` skills.
 > [`docs/CLAUDE.md`](../CLAUDE.md) stays the normative file: where the two disagree, it wins.
 
 ## What it is
@@ -35,36 +36,70 @@ collection-expression arguments, extension indexers, labeled `break`/`continue`)
 the migration. The references are a dated snapshot; the procedure names the official
 list as the authority for anything newer, as data and never as instructions.
 
+## The earlier hops (8 → 9, 9 → 10)
+
+dotnet/skills publishes one skill per release; WorkPilot carries the two before 10 → 11,
+adapted the same way (same upstream commit, same license, same triage-index shape), so a
+project on .NET 8 or 9 is migrated one release at a time. Audited on 2026-11-07 against
+the official lists (`core/compatibility/9` and `/10`, EF Core 9 and 10, ASP.NET Core 9 and
+10, the Roslyn breaking-change files):
+
+- nothing unsafe: no script, `dotnet` commands and file edits only, links to
+  learn.microsoft.com and github.com; the mitigations that silence a check (EF Core
+  pending-model warnings, BinaryFormatter compatibility package) are already labelled
+  temporary or refused;
+- written after GA, so far more complete than the 10 → 11 one was, but missing what the
+  lists gained since: six C# 14 compiler changes (record pointer members, partial
+  interface members now `public virtual`, `EmbeddedAttribute` validation…), `DefineConstants`
+  no longer usable in project-file conditions, insecure HTTP NuGet and audit sources as
+  errors, the SqlClient broker dependency, five EF Core 9 entries (all migrations in one
+  transaction — reverted in EF Core 10 —, primitive-collection APIs, `IndexOf` nulls,
+  `EF.Constant` in compiled queries, JSON identity resolution), and the named-mutex scope
+  change that servicing releases 8.0.32, 9.0.21 and 10.0.13 brought;
+- the same `dotnet --version` check and duplicated reference tables as 10 → 11;
+- no word on support: .NET 8 (LTS) and .NET 9 (STS) both end on 10 November 2026. The
+  adapted procedures say so, and treat 8 → 9 as a first hop towards .NET 10 (LTS to
+  November 2028) unless the task says otherwise.
+
+Reference files share one vocabulary of areas across the three skills (`aspnetcore`,
+`extensions`… renamed from upstream's `aspnet-core`, `extensions-hosting`), so the
+detection names an area once and each hop keeps the files it has.
+
 ## Where it reaches a task
 
 | Where | What | When |
 |---|---|---|
-| `.agents/skills/` (and every harness mirror) | the skill, emitted by `skills-cli build` | always in this repository (`dotnet` pack, `targets: dotnet >=10.0 <12.0`) |
-| Kanban palette | `/migrate-dotnet10-to-dotnet11`, as a bundled command | only for a project on .NET 10 or 11 (`slash_commands.api._bundled_applies`) |
-| `dotnet_upgrade.preflight` (before planning) | the skill copied to `<spec_dir>/dotnet11/`, plus `result.json` | see below |
-| `dotnet_upgrade.prompt` | a short section: the staged procedure and the references this project needs | planner, every coding subtask, QA reviewer, workflow skill phases |
+| `.agents/skills/` (and every harness mirror) | the skills, emitted by `skills-cli build` | always in this repository (`dotnet` pack; targets `>=8.0 <10.0`, `>=9.0 <11.0`, `>=10.0 <12.0`) |
+| Kanban palette | each skill as a bundled command | only for a project on its source or target release (`slash_commands.api._bundled_applies`) |
+| `dotnet_upgrade.preflight` (before planning) | each hop's skill copied to `<spec_dir>/dotnet-upgrade/<skill>/`, plus `result.json` | see below |
+| `dotnet_upgrade.prompt` | a short section: the staged procedures in order and the references this project needs from each | planner, every coding subtask, QA reviewer, workflow skill phases |
 
-The preflight decides, from the worktree and the task's words:
+The preflight decides, from the worktree and the task's words. The target is the newest
+release the task names (".NET 10", "net11.0", "C# 14"…; "de .NET 9 vers .NET 10" → 10):
 
-| Project | Task | Mode |
-|---|---|---|
-| .NET 10 | names .NET 11 or C# 15 | `migrate` |
-| .NET 5–9 | names .NET 11 or C# 15 | `chain`: the releases in between first, with their official lists |
-| .NET 11 | anything | `adopt`: C# 15 and the breaking-change notes at hand |
-| .NET Framework, `netstandard` only, no .NET, .NET 10 task about something else | — | `skipped`: the section is empty, nothing is copied |
+| Project | Task names | Mode | Staged |
+|---|---|---|---|
+| .NET 8, 9 or 10 | the next release | `migrate` | that hop |
+| .NET 8 or 9 | a release two or three ahead | `chain` | every hop, in order |
+| .NET 5–7 | .NET 9, 10 or 11 | `chain` | the hops from 8, after the official lists up to 8 |
+| .NET 11 | anything | `adopt` | 10 → 11, for C# 15 and its notes |
+| .NET Framework, `netstandard` only, no .NET, or no newer release named | — | `skipped` | nothing: the section is empty |
 
-**Why a copy next to the spec.** The bundled skill lives outside the project. A Claude
+A project on .NET 8 or 9 whose task names no release is not migrated behind its back,
+end of support or not: that is the person's call.
+
+**Why a copy next to the spec.** The bundled skills live outside the project. A Claude
 session could read it there; the providers that go through `core.runtimes.tool_executor`
 (OpenAI and compatibles, Gemini, Ollama…) refuse any path outside the project directory.
 `<spec_dir>` is inside the project and git-ignored (`.workpilot/`), so the copy is
 readable by every provider and never lands in the diff — the same reason libdocs and
 docintel stage their material there.
 
-**Why a pointer, not the text.** The procedure is about 9 KB and the references 40 KB.
-The section names the procedure and the two to five references the project files select
-(the four general ones, then ASP.NET Core, EF Core, cryptography, runtime/AOT, MAUI from
-the SDK attribute and package references); the procedure's Step 1 adds what only the code
-reveals. The section reads one JSON file, so it is identical for every subtask and
+**Why a pointer, not the text.** A procedure is about 9 KB and its references 40 KB.
+The section names each procedure and the references the project files select (the
+general ones each hop has, then ASP.NET Core, EF Core, cryptography, runtime/AOT, MAUI,
+WinForms/WPF, containers from the SDK attribute, package references and a Dockerfile);
+each procedure's Step 1 adds what only the code reveals. The section reads one JSON file, so it is identical for every subtask and
 caches.
 
 ## Detection fixes that came with it (F158)
@@ -81,5 +116,8 @@ and skips `bin/` and `obj/`.
 When .NET 11 ships or a servicing release adds breaking changes: compare each reference
 with its official page (the URLs are in each file), keep the Step 3 and Step 4 tables in
 `SKILL.md` in step, rebuild (`pnpm run skills:build`). `tests/test_dotnet_upgrade.py`
-fails when the procedure names a reference that does not exist. For .NET 12, add a new
-skill beside this one rather than rewriting it: projects still on 10 keep needing it.
+fails when a procedure names a reference that does not exist. For .NET 12, add a
+`migrate-dotnet11-to-dotnet12` skill beside these, register it in
+`dotnet_upgrade.preflight.HOPS` and in the bundle (`skills_registry.bundled`,
+`apps/frontend/package.json`), and teach `detect.requested_target` the new release:
+projects still on 10 keep needing the older hops.

@@ -12,6 +12,8 @@ from .frontmatter import parse_frontmatter
 BUNDLED_SKILLS = (
     "convert-documents-to-markdown",
     "migrate-dotnet10-to-dotnet11",
+    "migrate-dotnet8-to-dotnet9",
+    "migrate-dotnet9-to-dotnet10",
     "ui-ux-pro-max",
 )
 
@@ -25,9 +27,14 @@ def bundled_skill_dirs(name: str) -> tuple[Path, ...]:
     if name not in BUNDLED_SKILLS:
         return ()
     module = Path(__file__).resolve()
+    root = module.parents[3]
+    # The source last: a skill whose targets this repository's own toolchain
+    # rejects (`migrate-dotnet8-to-dotnet9` here, on dotnet 10) is never
+    # emitted into .agents/skills, and the release ships it from skills/.
     return (
         module.parent / "bundled" / name,
-        module.parents[3] / ".agents" / "skills" / name,
+        root / ".agents" / "skills" / name,
+        *sorted(root.glob(f"skills/*/{name}")),
     )
 
 

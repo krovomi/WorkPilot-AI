@@ -27,7 +27,7 @@ skills/
 
 | Pack | What it is |
 |---|---|
-| `dotnet` | .NET: modern stack (C# 14 / ASP.NET Core 10), the .NET 10 → 11 / C# 15 migration (`migrate-dotnet10-to-dotnet11`, adapted from dotnet/skills and bundled with the app, see [docs/architecture/dotnet-upgrade.md](../docs/architecture/dotnet-upgrade.md)), plus a .NET Framework 4.8 specialist |
+| `dotnet` | .NET: modern stack (C# 14 / ASP.NET Core 10), the .NET 8 → 9 → 10 → 11 / C# 15 migrations (`migrate-dotnet8-to-dotnet9`, `migrate-dotnet9-to-dotnet10`, `migrate-dotnet10-to-dotnet11`, adapted from dotnet/skills and bundled with the app, see [docs/architecture/dotnet-upgrade.md](../docs/architecture/dotnet-upgrade.md)), plus a .NET Framework 4.8 specialist |
 | `mobile` | smartphone applications: Android (Kotlin/Compose), Apple (Swift/SwiftUI), the cross-platform stacks, device testing and store readiness |
 | `tooling` | toolchain-agnostic: building MCP servers, driving web apps under test, and the methodology of the build phases (`tdd-cycle`, `brainstorm-approaches`, `review-lenses`, `spec-analyze`, `verify`) |
 | `comms` | business communication and brand guidelines |

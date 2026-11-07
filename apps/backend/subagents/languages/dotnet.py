@@ -19,6 +19,7 @@ OVERLAY = LanguageOverlay(
         "Build before testing: `dotnet test` reports a compile error as a run "
         "failure, which reads like a broken test. Check the TargetFramework in "
         "the .csproj — guidance for .NET 10 does not apply to .NET Framework 4.8. "
-        "Moving to .NET 11 / C# 15 follows the migrate-dotnet10-to-dotnet11 skill."
+        "Upgrades go one release at a time: migrate-dotnet8-to-dotnet9, "
+        "migrate-dotnet9-to-dotnet10, migrate-dotnet10-to-dotnet11 (C# 15)."
     ),
 )

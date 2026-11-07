@@ -19,8 +19,8 @@
 		{
 			"name": "workpilot-dotnet",
 			"source": "./skills/dotnet",
-			"version": "1.1.0",
-			"description": ".NET development: modern stack (C# 14, ASP.NET Core 10, EF Core 10), the .NET 10 to .NET 11 / C# 15 migration, plus distributed-systems, performance and integration-testing specialists."
+			"version": "1.2.0",
+			"description": ".NET development: modern stack (C# 14, ASP.NET Core 10, EF Core 10), the .NET 8 → 9 → 10 → 11 / C# 15 migrations, plus distributed-systems, performance and integration-testing specialists."
 		},
 		{
 			"name": "workpilot-hermes",
