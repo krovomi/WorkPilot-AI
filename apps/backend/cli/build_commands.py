@@ -668,11 +668,12 @@ def _report_hard_gates(
     if profile is None:
         return
     try:
-        from workflows import evaluate_hard_gates
+        from workflows.hard_gates import evaluate_hard_gates, write_gate_record
 
         report = evaluate_hard_gates(
             profile, spec_dir, tests_passed=tests_passed, changed_files=changed_files
         )
+        write_gate_record(spec_dir, report)
         if summary := report.describe():
             print("\n" + summary)
         if report.blocking:

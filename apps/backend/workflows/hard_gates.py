@@ -24,9 +24,11 @@ such, loudly enough that someone notices the evidence is missing.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-from dataclasses import dataclass, field
+import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,14 @@ __all__ = [
     "DEPS_EXIST",
     "TESTS_BITE",
     "is_test_file",
+    "GATE_RECORD",
+    "load_gate_record",
+    "write_gate_record",
 ]
+
+#: What the gates said at the end of the build, for the provenance dossier
+#: (`provenance/`): written by the build, never by an agent.
+GATE_RECORD = "hard_gates.json"
 
 TESTS_PASS = "tests-pass"  # pragma: allowlist secret
 
@@ -235,6 +244,27 @@ class HardGateReport:
         if self.blocking:
             head = "Hard gates — NOT MET:"
         return "\n".join([head, *(r.describe() for r in self.results)])
+
+
+def write_gate_record(spec_dir: Path, report: HardGateReport) -> None:
+    """Keep the report next to the spec. Never raises: a gate reports."""
+    data = {
+        "at": time.time(),
+        "blocking": report.blocking,
+        "results": [asdict(r) for r in report.results],
+    }
+    try:
+        (Path(spec_dir) / GATE_RECORD).write_text(json.dumps(data), encoding="utf-8")
+    except OSError as exc:
+        logger.debug("hard gate record not written: %s", exc)
+
+
+def load_gate_record(spec_dir: Path) -> dict | None:
+    try:
+        data = json.loads((Path(spec_dir) / GATE_RECORD).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def evaluate_hard_gates(
