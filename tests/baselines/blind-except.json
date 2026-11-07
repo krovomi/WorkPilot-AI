@@ -356,7 +356,6 @@
   "apps/backend/runners/team_bot_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/tech_debt_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/test_generation_runner.py": {"blind": 7, "silent": 2},
-  "apps/backend/runners/voice_control_runner.py": {"blind": 3, "silent": 0},
   "apps/backend/scheduling/auto_detector.py": {"blind": 1, "silent": 0},
   "apps/backend/scheduling/scheduler.py": {"blind": 2, "silent": 0},
   "apps/backend/scheduling/task_templates.py": {"blind": 1, "silent": 0},

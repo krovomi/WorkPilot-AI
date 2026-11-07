@@ -23,7 +23,6 @@ vi.mock("../performance-profiler-service", () => mockService("performanceProfile
 vi.mock("../pipeline-generator-service", () => mockService("pipelineGeneratorService"));
 vi.mock("../spec-interview-service", () => mockService("specInterviewService"));
 vi.mock("../visual-programming-service", () => mockService("visualProgrammingService"));
-vi.mock("../voice-control-service", () => mockService("voiceControlService"));
 
 import { configurePythonFeatureServices } from "../python-feature-services";
 
@@ -34,7 +33,7 @@ describe("configurePythonFeatureServices", () => {
 
 	it("gives every feature service the managed Python and backend", () => {
 		configurePythonFeatureServices("/venv/bin/python", "/app/backend");
-		expect(configures.size).toBe(14);
+		expect(configures.size).toBe(13);
 		for (const [name, configure] of configures) {
 			expect(configure, name).toHaveBeenCalledWith(
 				"/venv/bin/python",
