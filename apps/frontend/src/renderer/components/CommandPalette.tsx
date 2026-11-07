@@ -18,6 +18,7 @@ import {
 	type LucideIcon,
 	// biome-ignore lint/suspicious/noShadowRestrictedNames: shadow name is intentional
 	Map,
+	Mic,
 	PlusCircle,
 	Router,
 	Search,
@@ -34,6 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
+import { openVoiceAssistant } from "../stores/voice-assistant-store";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -156,6 +158,16 @@ function getBuiltinCommands(
 			shortcut: "/",
 			keywords: ["find", "filter", "search"],
 			handler: () => onNavigate("kanban"),
+		},
+		{
+			id: "voice_assistant",
+			label: t("commandPalette.commands.voice_assistant.label"),
+			description: t("commandPalette.commands.voice_assistant.description"),
+			category: "tasks",
+			icon: Mic,
+			shortcut: "Ctrl+Shift+Space",
+			keywords: ["voice", "speech", "dictate", "vocal", "voix", "micro"],
+			handler: openVoiceAssistant,
 		},
 		{
 			id: "go_kanban",

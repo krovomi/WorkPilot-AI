@@ -1137,8 +1137,8 @@
 				"description": "Revue de code et analyse de qualité assistées par IA"
 			},
 			"voiceControl": {
-				"label": "Commande vocale",
-				"description": "Commandes de développement à la voix"
+				"label": "Assistant vocal",
+				"description": "Lit les commandes vocales que l'assistant ne comprend pas seul"
 			}
 		},
 		"thinkingLevels": {
