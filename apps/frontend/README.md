@@ -4,9 +4,11 @@ A modern Electron + React desktop application for the WorkPilot AI autonomous co
 
 ## Prerequisites
 
-### Node.js v24.12.0 LTS (Required)
+### Node.js 22.12+
 
-This project requires **Node.js v24.12.0 LTS** (Latest LTS version as of December 2024).
+CI builds and tests on **Node.js 22**. Vitest 5 needs 22.12+ (or 24), Vite 8 at least 20.19, so
+Node 20 no longer runs the tests even though `package.json` still accepts it. The package manager is
+**pnpm**, pinned to 12.16.1 by `packageManager` in the root `package.json`.
 
 **Download:** https://nodejs.org/en/download/
 
@@ -19,12 +21,12 @@ winget install OpenJS.NodeJS.LTS
 
 **macOS:**
 ```bash
-brew install node@24
+brew install node@22
 ```
 
 **Linux (Ubuntu/Debian):**
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
@@ -39,8 +41,8 @@ sudo dnf install nodejs npm
 
 **Verify installation:**
 ```bash
-node --version  # Should output: v24.12.0
-npm --version   # Should output: 11.x.x or higher
+node --version  # v22.12.0 or later
+pnpm --version  # 12.16.1 (else: npm i -g pnpm@12.16.1)
 ```
 
 > **Note:** npm is included with Node.js. If `npm` is not found after installing Node.js, you need to reinstall Node.js properly.
@@ -60,12 +62,9 @@ pnpm run dev
 
 ## Security
 
-This project maintains **0 vulnerabilities**. Run `pnpm audit` to verify.
-
-```bash
-pnpm audit
-# Expected output: found 0 vulnerabilities
-```
+Run `pnpm audit` to list known vulnerabilities in the dependencies; Dependabot opens the
+updates. Security rules for the main process and IPC are in
+[`docs/rules/security.md`](../../docs/rules/security.md).
 
 ## Architecture
 
@@ -80,8 +79,7 @@ src/
 │   ├── claude-profile/      # Multi-account provider profile management
 │   ├── claude-code-settings/# Claude Code settings bridge
 │   ├── insights/            # Code analysis
-│   ├── integrations/        # Integration handlers
-│   ├── ipc-handlers/        # IPC communication handlers (110+ modules; task/ holds PR follow-through, goal, best-of-N)
+│   ├── ipc-handlers/        # IPC communication handlers (200+ modules; task/ holds PR follow-through, goal, best-of-N)
 │   ├── mcp-apps/            # MCP Apps views, served on workpilot-mcp-app:// to the task panel
 │   ├── needs-you/           # "Needs you" notifications: desktop, ntfy, Telegram plan approval
 │   ├── platform/            # Cross-platform abstraction

@@ -8,7 +8,7 @@ Flatpak packages are available for Linux users who prefer sandboxed applications
 
 ### Download Flatpak
 
-See the [main README](../README.md#beta-release) for Flatpak download links in the Beta Release section.
+Each release ships a `.flatpak`: see the download table of the [main README](../README.md#download), or the [GitHub releases](https://github.com/krovomi/WorkPilot-AI/releases).
 
 ### Building Flatpak from Source
 

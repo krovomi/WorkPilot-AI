@@ -71,8 +71,9 @@ what to sign.
 Before contributing, ensure you have the following installed:
 
 - **Python 3.12+** - For the backend framework
-- **Node.js 24+** - For the Electron frontend
-- **npm 10+** - Package manager for the frontend (comes with Node.js)
+- **Node.js 22.12+** - For the Electron frontend (CI builds on Node 22; Vitest 5 refuses older versions)
+- **pnpm** - The repository pins pnpm 12.16.1 (`packageManager` in `package.json`); `corepack enable`,
+  or `npm i -g pnpm@12.16.1` if Corepack fails. The `npm run …` commands below work too: they call pnpm scripts
 - **uv** (recommended) or **pip** - Python package manager
 - **CMake** - Required for building some native dependencies
 - **Git** - Version control
@@ -99,7 +100,7 @@ sudo apt install python3.12 python3.12-venv
 sudo dnf install python3.12
 ```
 
-### Installing Node.js 24+
+### Installing Node.js 22
 
 **Windows:**
 ```bash
@@ -108,12 +109,12 @@ winget install OpenJS.NodeJS.LTS
 
 **macOS:**
 ```bash
-brew install node@24
+brew install node@22
 ```
 
 **Linux (Ubuntu/Debian):**
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
@@ -188,16 +189,18 @@ npm run dev
 `npm run install:all` automatically:
 - Detects Python 3.12+ on your system
 - Creates a virtual environment (`apps/backend/.venv`)
-- Installs backend runtime and test dependencies
-- Copies `.env-files/.env.example` to `.env-files/.env` (if not already present)
-- Installs frontend npm dependencies
+- Installs the backend's pinned dependencies (`apps/backend/requirements.lock`) and the test
+  dependencies (`tests/requirements-test.txt`)
+- Installs the frontend dependencies
 
-After install, configure your credentials in `.env-files/.env`:
+It does not write any credentials file. `npm run dev` then creates a second venv at the repository
+root (`.venv`) for the local API on port 9000. Credentials are entered in the app (Settings →
+Accounts); for the CLI, put them in `.env-files/.env` at the repository root:
 ```bash
-# Get your Claude Code OAuth token
+# Claude: sign in once with `claude` then `/login`, or get a long-lived token
 claude setup-token
 
-# Then edit .env-files/.env with your token and any other provider keys
+# Then add CLAUDE_CODE_OAUTH_TOKEN=… and any other provider key to .env-files/.env
 ```
 
 ### Other Useful Commands
@@ -372,25 +375,21 @@ No hook checks this: run `python scripts/check_encoding.py` before pushing Pytho
 # Run all tests (from repository root)
 npm run test:backend
 
-# Or manually with pytest
-cd apps/backend
-.venv/Scripts/pytest.exe ../tests -v          # Windows
-.venv/bin/pytest ../tests -v                   # macOS/Linux
+# Or manually with pytest, from the repository root
+apps/backend/.venv/Scripts/pytest.exe tests -q   # Windows
+apps/backend/.venv/bin/pytest tests -q            # macOS/Linux
 
-# Run a specific test file
-npm run test:backend -- tests/test_security.py -v
+# Run a specific test file (npm run test:backend always adds the whole tests/ folder)
+apps/backend/.venv/bin/pytest tests/test_security.py -v
 
 # Run a specific test
-npm run test:backend -- tests/test_security.py::test_bash_command_validation -v
-
-# Skip slow tests
-npm run test:backend -- -m "not slow"
+apps/backend/.venv/bin/pytest "tests/test_security.py::TestCommandExtraction::test_simple_command" -v
 
 # Run with coverage
-pytest tests/ --cov=apps/backend --cov-report=html
+apps/backend/.venv/bin/pytest tests --cov=apps/backend --cov-report=html
 ```
 
-Test configuration is in `tests/pytest.ini`.
+Test configuration is in `pytest.ini` at the repository root, the only one: run pytest from there.
 
 ### Frontend Tests
 
@@ -435,7 +434,7 @@ whatever they touch: only `LICENSE` and the issue/PR templates are skipped.
 
 | Workflow | Trigger | What it checks |
 |----------|---------|----------------|
-| **CI** | Push to `develop`/`main`, PRs | Python tests (3.12 on Linux, Windows, macOS, split into shards, coverage on Linux; 3.13 on Linux after merge), frontend typecheck, tests and build, server image build + migration |
+| **CI** | Push to `develop`/`main`, PRs | Python tests (3.12 on Linux, Windows, macOS, split into shards, coverage on Linux; 3.13 on Linux after merge), frontend typecheck, tests, build and app start (smoke test) on the three OS, Playwright E2E on Linux, server image build + migration, server-mode E2E |
 | **Lint** | Push to `develop`/`main`, PRs | Ruff (Python, `scripts/` included), pyright (packages of `apps/backend/pyrightconfig.json`), Biome (frontend), Python lockfile freshness, vendored trees, skills |
 
 ### PR Requirements
