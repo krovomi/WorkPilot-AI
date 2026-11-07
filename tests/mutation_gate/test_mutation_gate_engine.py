@@ -149,10 +149,17 @@ def test_the_scratch_copy_is_removed_after_an_exception(repo):
     (root / "node_modules").mkdir()
     (root / "node_modules" / "keep.js").write_text("x", encoding="utf-8")
     seen: list[Path] = []
-    with pytest.raises(RuntimeError), scratch_copy(root) as copy:
-        seen.append(copy)
-        assert (copy / "node_modules" / "keep.js").is_file()  # linked, not installed
-        raise RuntimeError("boom")
+
+    def crash_inside_the_copy() -> None:
+        with scratch_copy(root) as copy:
+            seen.append(copy)
+            assert (
+                copy / "node_modules" / "keep.js"
+            ).is_file()  # linked, not installed
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        crash_inside_the_copy()
     assert not seen[0].exists() and _worktrees(root) == 1
     # The link went, never what it pointed to.
     assert (root / "node_modules" / "keep.js").is_file()
