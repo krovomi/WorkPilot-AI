@@ -293,3 +293,6 @@ apps/mobile/**/*.keystore
 apps/mobile/**/*.p8
 apps/mobile/**/*.p12
 apps/mobile/**/*.mobileprovision
+
+# Python wheels downloaded by hand (e.g. a pinned tool): never committed
+*.whl

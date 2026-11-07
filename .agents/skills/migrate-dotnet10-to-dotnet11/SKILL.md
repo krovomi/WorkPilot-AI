@@ -17,8 +17,8 @@ metadata:
     targets:
       dotnet: '>=10.0 <12.0'
     pack: dotnet
-    version: 1.1.0
-    content_sha256: 66daf7358164c34842dfba1d65a7e96b47f70f9118b01b479739a6d0993c8cf7
+    version: 1.2.0
+    content_sha256: c2d261ed0997ce9935d3c7a2ef63eadb75721d5158fb7cc6c1da88e0c4362adb
 ---
 
 # .NET 10 → .NET 11 migration
@@ -40,8 +40,8 @@ improvements, not a longer support window. Say so when the task's goal is suppor
 - Updating `global.json`, Dockerfiles and CI for .NET 11.
 - A project already on `net11.0` adopting C# 15: read `references/csharp15-adoption.md`.
 
-Not for: .NET Framework (separate porting effort), or a project below `net10.0` — pass
-the 8 → 9 and 9 → 10 breaking changes first, then come back here.
+Not for: .NET Framework (separate porting effort), or a project below `net10.0` — run
+`migrate-dotnet8-to-dotnet9` and `migrate-dotnet9-to-dotnet10` first, then come back here.
 
 ## Ground rules
 
