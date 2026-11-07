@@ -40,6 +40,7 @@ __all__ = [
     "APP_VERIFIED",
     "TESTS_UNCHANGED",
     "DEPS_EXIST",
+    "TESTS_BITE",
     "is_test_file",
 ]
 
@@ -63,6 +64,12 @@ TESTS_UNCHANGED = "tests-unchanged"
 # when the guard did not run, could not ask a registry or a private feed may
 # serve the package; a 404 from the public registry is the only failure.
 DEPS_EXIST = "deps-exist"
+
+# The tests catch a bug planted in the lines the task wrote: the mutation
+# gate's record (`<spec_dir>/mutation_gate.json`, written by the QA gate,
+# `qa/mutation_gate.py`). Unknown when the gate did not run, was switched off,
+# or could not measure (no test command, a red suite, the time budget).
+TESTS_BITE = "tests-bite"
 
 _TEST_DIRS = ("tests", "test", "__tests__", "spec", "specs", "e2e")
 # `test_x.py`, `x_test.go`, `x.test.ts`, `x.spec.ts`, `x_spec.rb`, `x-test.js`:
@@ -158,6 +165,30 @@ def _deps_exist(spec_dir: Path) -> tuple[bool | None, str]:
     return None, f"unknown — {detail}" if detail else "unknown"
 
 
+def _tests_bite(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from mutation_gate import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the mutation gate is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no mutation record — the QA mutation gate did not run"
+    status = record.get("status")
+    reason = str(record.get("reason") or "")
+    score = record.get("score")
+    measured = f"score {score}% (threshold {record.get('threshold')}%)"
+    if status == "pass":
+        return True, measured if score is not None else reason
+    if status == "fail":
+        survivors = [
+            f"{r.get('path')}:{r.get('line')}"
+            for r in record.get("results") or []
+            if isinstance(r, dict) and r.get("outcome") == "survived"
+        ]
+        return False, f"{measured}; survived: {', '.join(survivors[:5])}"
+    return None, f"unknown — {reason}" if reason else "unknown"
+
+
 @dataclass(frozen=True)
 class HardGateResult:
     phase_id: str
@@ -250,6 +281,11 @@ def _evaluate_one(
         )
     elif gate == DEPS_EXIST:
         held, detail = _deps_exist(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
+    elif gate == TESTS_BITE:
+        held, detail = _tests_bite(spec_dir)
         report.results.append(
             HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
         )

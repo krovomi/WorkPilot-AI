@@ -313,6 +313,15 @@ Follow this answer. It overrides the earlier reason for the block.
 """
 
 
+def _preview_quote(spec_dir):
+    """Quote a steering message's preview element (F10) as untrusted data."""
+    from security.untrusted import quote_untrusted
+
+    return lambda context: quote_untrusted(
+        context, kind="preview_element", source="task preview", spec_dir=spec_dir
+    )
+
+
 def generate_subtask_prompt(
     spec_dir: Path,
     project_dir: Path,
@@ -377,7 +386,7 @@ def generate_subtask_prompt(
     # First after the description: it is the most recent word on the task.
     # Then what the person sent while it ran (`foundation.steering`).
     if isinstance(human_input, PersonNotes):
-        sections.extend(human_input.sections())
+        sections.extend(human_input.sections(_preview_quote(spec_dir)))
     elif instructions := human_input_section(
         read_human_input(spec_dir) if human_input is None else human_input
     ):
