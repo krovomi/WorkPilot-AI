@@ -15,7 +15,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
@@ -26,8 +26,7 @@ function resolveBackendPath(): string {
 }
 
 async function runRunner(args: string[]): Promise<unknown> {
-	const pythonExe = pythonEnvManager.getPythonPath();
-	if (!pythonExe) throw new Error("Python environment not ready");
+	const pythonExe = await requirePythonPath();
 
 	const backendPath = resolveBackendPath();
 	const runnerPath = path.resolve(

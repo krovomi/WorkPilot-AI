@@ -18,7 +18,7 @@
 import { type ChildProcess, execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	FLAKY_COMMAND_IDS,
@@ -123,10 +123,7 @@ async function spawnRunner(args: string[]): Promise<ChildProcess> {
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
 	const runnerPath = path.resolve(backendPath, "runners", "flaky_tests_runner.py");
-	const pythonExe = pythonEnvManager.getPythonPath();
-	if (!pythonExe) {
-		throw new Error("Python environment not ready");
-	}
+	const pythonExe = await requirePythonPath();
 	return spawn(pythonExe, [runnerPath, ...args], {
 		cwd: backendPath,
 		env: await pythonRunnerEnv(backendPath),

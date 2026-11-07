@@ -7,7 +7,9 @@ export type DriftType =
 	| "missing_function"
 	| "outdated_example"
 	| "broken_link"
-	| "version_mismatch";
+	| "version_mismatch"
+	| "missing_docs"
+	| "config_mismatch";
 
 export type DriftSeverity = "high" | "medium" | "low";
 
@@ -24,6 +26,12 @@ export interface DriftIssue {
 export interface DriftReport {
 	docsScanned: number;
 	codeFilesIndexed: number;
+	/** Symbols indexed across every language (absent in older reports). */
+	symbolsIndexed?: number;
+	/** Source files per language, most first. */
+	languages?: { label: string; files: number }[];
+	/** The documents compared (project-relative). */
+	docFiles?: string[];
 	issues: DriftIssue[];
 	summary: string;
 }

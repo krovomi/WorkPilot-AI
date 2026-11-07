@@ -97,6 +97,8 @@ fichier-ci reste l'autorité sur les règles.
 | Panneau de tâche | [frontend-task-panel.md](architecture/frontend-task-panel.md) | Progression (`shared/progress.ts`), onglets Avancement / Qualité / Coûts et contexte, bannière « ce qui vous attend », critères d'acceptation, graphe des changements. |
 | Moteur de tâche et LLM de page | [task-engine.md](architecture/task-engine.md) | Une tâche possède son provider × LLM × effort par phase ; une page résout le sien par `page-llm.ts`. |
 | Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque. |
+| Charte UI | [ui-charter.md](architecture/ui-charter.md) | `components/charter/` : scène, colonnes, cartes à rail, un seul bouton principal, pour tous les modules et Réglages. |
+| Docs et dérive | [docs-and-drift.md](architecture/docs-and-drift.md) | `doc_languages/` : symboles et commentaires de doc de tous les langages ; dérive sans faux positifs. |
 | Assistant vocal | [voice-assistant.md](architecture/voice-assistant.md) | Raccourci global configurable (Ctrl+Shift+Espace ; les raccourcis existants et AltGr sont refusés), dictée Whisper locale de la dictée Kanban, lecture locale des commandes simples puis modèle « Assistant vocal » ; liste fermée d'actions (ouvrir une vue offerte par la barre latérale, créer une tâche après confirmation, formulaire, réglages), réponse du modèle revalidée dans le main ; mode serveur par `createTask`. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |

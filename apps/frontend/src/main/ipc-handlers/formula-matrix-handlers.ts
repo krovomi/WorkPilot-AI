@@ -15,7 +15,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
@@ -72,8 +72,7 @@ export function registerFormulaMatrixHandlers(): void {
 				"formula_matrix_runner.py",
 			);
 
-			const pythonExe = pythonEnvManager.getPythonPath();
-			if (!pythonExe) throw new Error("Python environment not ready");
+			const pythonExe = await requirePythonPath();
 
 			const args = [runnerPath, "--ticket-id", req.ticketId];
 			if (req.description) {
@@ -160,8 +159,7 @@ export function registerFormulaMatrixHandlers(): void {
 				"formula_refine_runner.py",
 			);
 
-			const pythonExe = pythonEnvManager.getPythonPath();
-			if (!pythonExe) throw new Error("Python environment not ready");
+			const pythonExe = await requirePythonPath();
 
 			const payload = JSON.stringify({
 				description: req.description ?? "",

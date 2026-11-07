@@ -52,6 +52,7 @@ import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
 import { pythonEnvManager } from "../python-env-manager";
 import { envWithoutCredentials } from "../utils/child-env";
+import { readyPythonPath } from "../utils/ensure-python";
 
 const RUNNER = "bench_runner.py";
 export const MAX_CASES = 20;
@@ -262,7 +263,7 @@ async function runRunner(
 	project: Project,
 	extra: string[],
 ): Promise<{ data?: unknown; error?: string }> {
-	const pythonPath = pythonEnvManager.getPythonPath();
+	const pythonPath = await readyPythonPath();
 	if (!pythonPath) return { error: "Python environment not ready" };
 	const backend = backendPath();
 	const [exe, baseArgs] = parsePythonCommand(pythonPath);

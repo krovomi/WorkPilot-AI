@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -83,8 +84,20 @@ class DriftScanner:
         doc_files: dict[str, str],
         source_symbols: set[str],
         source_files: set[str] | None = None,
+        *,
+        code_words: set[str] | None = None,
+        file_exists: Callable[[str, str], bool] | None = None,
     ) -> DriftReport:
-        """Scan doc files for references to symbols/files that no longer exist."""
+        """Scan doc files for references to symbols/files that no longer exist.
+
+        ``code_words``: every identifier written anywhere in the code. A name
+        the docs call that the code still mentions (a library function the
+        project uses, a method declared in a way the symbol index misses) is
+        not reported: only names the code no longer contains at all are.
+        ``file_exists(doc_path, ref)``: how a cited path is resolved (next to
+        the document, from the project root...); without it the cited path
+        must be one of ``source_files``.
+        """
         report = DriftReport(
             docs_scanned=len(doc_files),
             source_files_scanned=len(source_files or set()),
@@ -92,41 +105,62 @@ class DriftScanner:
 
         for doc_path, content in doc_files.items():
             report.issues.extend(
-                self._check_code_references(doc_path, content, source_symbols)
+                self._check_code_references(
+                    doc_path, content, source_symbols, code_words or set()
+                )
             )
-            if source_files:
+            if source_files or file_exists:
                 report.issues.extend(
-                    self._check_file_references(doc_path, content, source_files)
+                    self._check_file_references(
+                        doc_path, content, source_files or set(), file_exists
+                    )
                 )
 
         return report
 
     def _check_code_references(
-        self, doc_path: str, content: str, symbols: set[str]
+        self,
+        doc_path: str,
+        content: str,
+        symbols: set[str],
+        code_words: set[str] | None = None,
     ) -> list[DriftIssue]:
         issues: list[DriftIssue] = []
         lines = content.splitlines()
+        words = code_words or set()
 
         for i, line in enumerate(lines, 1):
             for match in _CODE_REF_PATTERN.finditer(line):
                 ref = match.group(1)
-                if ref not in symbols and not _is_common_builtin(ref):
-                    issues.append(
-                        DriftIssue(
-                            drift_type=DriftType.MISSING_FUNCTION,
-                            severity=DriftSeverity.HIGH,
-                            doc_file=doc_path,
-                            doc_line=i,
-                            referenced_symbol=ref,
-                            message=f"Function '{ref}' referenced in docs not found in codebase",
-                            suggestion=f"Update or remove reference to '{ref}'",
-                        )
+                last = ref.rsplit(".", 1)[-1]
+                if (
+                    ref in symbols
+                    or last in symbols
+                    or last in words
+                    or _is_common_builtin(ref)
+                    or _is_common_builtin(last)
+                ):
+                    continue
+                issues.append(
+                    DriftIssue(
+                        drift_type=DriftType.MISSING_FUNCTION,
+                        severity=DriftSeverity.HIGH,
+                        doc_file=doc_path,
+                        doc_line=i,
+                        referenced_symbol=ref,
+                        message=f"Function '{ref}' referenced in docs not found in codebase",
+                        suggestion=f"Update or remove reference to '{ref}'",
                     )
+                )
 
         return issues
 
     def _check_file_references(
-        self, doc_path: str, content: str, files: set[str]
+        self,
+        doc_path: str,
+        content: str,
+        files: set[str],
+        file_exists: Callable[[str, str], bool] | None = None,
     ) -> list[DriftIssue]:
         issues: list[DriftIssue] = []
         lines = content.splitlines()
@@ -134,9 +168,16 @@ class DriftScanner:
         for i, line in enumerate(lines, 1):
             for match in _FILE_REF_PATTERN.finditer(line):
                 ref = match.group(1)
+                if _is_url_or_extension(ref) or _is_not_a_project_path(ref):
+                    continue
                 # Normalise path separators
                 normalised = ref.replace("\\", "/")
-                if normalised not in files and not _is_url_or_extension(ref):
+                found = (
+                    file_exists(doc_path, normalised)
+                    if file_exists
+                    else normalised in files
+                )
+                if not found:
                     issues.append(
                         DriftIssue(
                             drift_type=DriftType.STALE_REFERENCE,
@@ -181,3 +222,25 @@ def _is_common_builtin(name: str) -> bool:
 
 def _is_url_or_extension(ref: str) -> bool:
     return ref.startswith("http") or ref.startswith(".") or "/" not in ref
+
+
+# Folders whose files are generated or installed, never written by hand: a
+# README citing dist/app.js or node_modules/x is not stale when the folder
+# is absent from a clean checkout.
+_GENERATED_ROOTS = frozenset(
+    {
+        "dist", "build", "out", "node_modules", "target", "bin", "obj", "coverage",
+        ".next", ".nuxt", "vendor", "Pods", ".venv", "venv", "__pycache__",
+    }
+)  # fmt: skip
+
+
+def _is_not_a_project_path(ref: str) -> bool:
+    """Absolute, home, glob or generated paths: not something to check."""
+    normalised = ref.replace("\\", "/")
+    first = normalised.lstrip("./").split("/", 1)[0]
+    return (
+        normalised.startswith(("/", "~"))
+        or "*" in normalised
+        or first in _GENERATED_ROOTS
+    )
