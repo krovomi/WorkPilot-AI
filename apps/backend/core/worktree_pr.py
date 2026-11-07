@@ -1178,7 +1178,22 @@ class WorktreePRMixin:
             return body
 
         analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)
-        return append_impact_block(body, analysis)
+        return self._with_attribution(spec_name, append_impact_block(body, analysis))
+
+    def _with_attribution(self, spec_name: str, body: str) -> str:
+        """Append the Agent Trace summary line (F3) when the task has records."""
+        try:
+            from agent_trace import attribution_line, summarize
+
+            worktree = self.get_worktree_path(spec_name)
+            spec_dir = worktree / ".workpilot" / "specs" / spec_name
+            if not spec_dir.is_dir():
+                spec_dir = self.project_dir / ".workpilot" / "specs" / spec_name
+            line = attribution_line(summarize(worktree, spec_dir))
+        except (ImportError, OSError, ValueError) as exc:
+            logger.debug(f"Agent Trace summary skipped: {exc}")
+            return body
+        return f"{body.rstrip()}\n\n{line}\n" if line else body
 
     def preview_pr_body(
         self,
@@ -1231,6 +1246,7 @@ class WorktreePRMixin:
         body_with_block = body
         if include_impact and append_impact_block is not None:
             body_with_block = append_impact_block(body, analysis)
+        body_with_block = self._with_attribution(spec_name, body_with_block)
 
         return {
             "body": body_with_block,
