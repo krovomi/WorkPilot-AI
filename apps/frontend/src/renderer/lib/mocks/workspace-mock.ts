@@ -18,6 +18,11 @@ export const workspaceMock = {
 		},
 	}),
 
+	getReviewGroups: async () => ({
+		success: true,
+		data: { groups: [], outOfPlan: [], unanchoredQa: [], approximate: false },
+	}),
+
 	getFileDiff: async (_taskId: string, filePath: string) => ({
 		success: true,
 		data: {
