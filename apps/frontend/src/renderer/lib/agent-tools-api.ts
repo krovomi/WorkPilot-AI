@@ -446,11 +446,42 @@ export interface TraceabilityCoverage {
 	summary: string;
 }
 
+/** One requirement and what the build made of it (`requirement-links.json`). */
+export interface RequirementLink {
+	id: string;
+	title: string;
+	subtasks: string[];
+	files: string[];
+	tests: string[];
+	/** Files a test convention maps, for which none was found. */
+	untested: string[];
+}
+
+/** A requirement of another task, from the project's ledger, on the same files. */
+export interface EarlierRequirement {
+	spec: string;
+	id: string;
+	title: string;
+	files: string[];
+	tests: string[];
+}
+
+export interface TraceabilityLinks {
+	spec: string;
+	head: string;
+	/** `agent-trace`: the files the sessions wrote; `plan`: the files the plan declared. */
+	source: "agent-trace" | "plan";
+	requirements: RequirementLink[];
+	earlier: EarlierRequirement[];
+}
+
 export interface TraceabilityPayload {
 	spec: string;
 	requirements: TraceabilityRequirement[];
 	openQuestions: TraceabilityOpenQuestion[];
 	coverage: TraceabilityCoverage;
+	/** Null until a build linked the requirements to their files and tests. */
+	links: TraceabilityLinks | null;
 }
 
 export interface SpecTraceabilityQuery {
@@ -467,6 +498,7 @@ interface RawTraceability {
 	coverage: Omit<TraceabilityCoverage, "unknownRefs"> & {
 		unknown_refs: Record<string, string[]>;
 	};
+	links?: TraceabilityLinks | null;
 }
 
 export async function fetchSpecTraceability(
@@ -494,6 +526,7 @@ export async function fetchSpecTraceability(
 			requirements: raw.requirements,
 			openQuestions: raw.open_questions,
 			coverage: { ...coverage, unknownRefs: unknown_refs },
+			links: raw.links ?? null,
 		},
 	};
 }

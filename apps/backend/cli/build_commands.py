@@ -652,6 +652,32 @@ def _run_convention_pass(
         debug_warning("run.py", f"Convention pass skipped: {exc}")
 
 
+def _write_requirement_links(
+    working_dir: Path,
+    spec_dir: Path,
+    source_spec_dir: Path | None,
+    project_dir: Path,
+    changed_files: list[str] | None,
+) -> None:
+    """Link each requirement to its files and tests. Never fails a build."""
+    try:
+        from requirement_trace import write_links
+
+        links = write_links(
+            working_dir, [spec_dir, source_spec_dir], project_dir, changed_files
+        )
+        if links:
+            untested = [r["id"] for r in links["requirements"] if r["untested"]]
+            print(
+                f"\n  requirements: {len(links['requirements'])} linked to their files"
+                + (f", without a test for: {', '.join(untested)}" if untested else "")
+            )
+    except ImportError as exc:
+        from foundation.debug import debug_warning
+
+        debug_warning("run.py", f"Requirement links skipped: {exc}")
+
+
 def _report_hard_gates(
     profile,
     spec_dir: Path,
@@ -1194,6 +1220,12 @@ def handle_build_command(
         # observe phase records, so the two cannot disagree.
         _tests_green = _tests_went_green(spec_dir)
         _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green, _changed)
+
+        # Requirement → subtask → files → tests (P3), kept in the project's
+        # ledger so it outlives the worktree and the task.
+        _write_requirement_links(
+            working_dir, spec_dir, source_spec_dir, project_dir, _changed
+        )
 
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what

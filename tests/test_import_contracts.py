@@ -58,6 +58,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
     "mutation_gate": {"foundation", "security"},
+    # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
+    # the plan's references, the Agent Trace records and the test conventions.
+    # The build and the traceability route read it.
+    "requirement_trace": {"foundation", "agent_trace"},
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).
