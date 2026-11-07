@@ -2021,6 +2021,34 @@
 			"gif": "The scenario's walkthrough: the capture of each step, in order",
 			"gifHint": "This GIF can be attached to the pull request's visual proof from the PR dialog.",
 			"noVideo": "No video of the scenario ({{reason}}): the trace and the captures are the proof."
+		},
+		"compare": {
+			"title": "Compared with the base branch",
+			"run": "Compare with the base branch",
+			"again": "Compare again",
+			"hint": "Replays the same scenario and calls, without a model, on the code this task started from and on the task, and lists what behaves differently.",
+			"skipped": "No comparison: {{reason}}",
+			"against": "Base branch at {{base}}, then this task.",
+			"same": "Nothing behaves differently.",
+			"status": "{{base}} on the base branch, {{task}} with the task",
+			"data": "Each side starts from its own data: a difference can come from the data rather than the code.",
+			"change": {
+				"broken": "Broken by the task",
+				"fixed": "Works thanks to the task",
+				"added": "New",
+				"removed": "Gone",
+				"changed": "Changed"
+			},
+			"kind": {
+				"scenario": "Scenario",
+				"console": "Console",
+				"network": "Network request",
+				"endpoint": "Endpoint call"
+			},
+			"side": {
+				"base": "Base branch, end of the scenario",
+				"task": "This task, end of the scenario"
+			}
 		}
 	},
 	"qaUnverified": {

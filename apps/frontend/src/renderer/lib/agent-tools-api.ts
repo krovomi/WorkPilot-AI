@@ -1592,6 +1592,31 @@ export interface VerifyRecord {
 	findings: Array<{ severity: string; kind?: string; message: string }>;
 	browser?: { engine: string; reasons: string[] };
 	replay?: { status: string; problems?: string[]; reason?: string };
+	/** The same scenario replayed on the base branch and on the task (`POST /api/verify/compare`). */
+	compare?: VerifyCompare;
+}
+
+/** One behaviour that differs between the base branch and the task. */
+export interface VerifyDifference {
+	kind: "scenario" | "console" | "network" | "endpoint";
+	/** `broken`: worked on the base, not on the task; `fixed`: the reverse. */
+	change: "broken" | "fixed" | "added" | "removed" | "changed";
+	what: string;
+	base?: string | null;
+	task?: string | null;
+}
+
+export interface VerifyCompare {
+	status: "done" | "skipped";
+	reason?: string;
+	base?: string;
+	head?: string;
+	at?: number;
+	differences?: VerifyDifference[];
+	base_problems?: string[];
+	task_problems?: string[];
+	/** Indices in `screenshots` of the page at the end of the scenario, per side. */
+	screenshots?: { base: number | null; task: number | null };
 }
 
 export interface VerifyScenarioStep {
@@ -1634,6 +1659,14 @@ export function runVerify(
 		{ ...specAddress(query), ...(options.effort ? { effort: options.effort } : {}) },
 		signal,
 	);
+}
+
+/** Replay the verification on the base branch and on the task, and list what differs. */
+export function compareVerify(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _post<VerifyPayload>("/api/verify/compare", specAddress(query), signal);
 }
 
 /** The URL of one screenshot the record names — by index, never by path. */
