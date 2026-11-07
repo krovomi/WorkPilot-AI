@@ -176,17 +176,22 @@ export function isTemplateFile(relPath: string): boolean {
 	return TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
+const ENTITIES: Readonly<Record<string, string>> = {
+	nbsp: " ",
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	"#39": "'",
+};
+
 /** The visible text of an outer HTML fragment, whitespace collapsed. */
 export function textOf(outerHtml: string): string {
 	return outerHtml
 		.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
 		.replace(/<[^>]*>/g, " ")
-		.replace(/&nbsp;/g, " ")
-		.replace(/&amp;/g, "&")
-		.replace(/&lt;/g, "<")
-		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
+		// One pass, so `&amp;lt;` stays the text `&lt;` and is not decoded twice.
+		.replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (_, name: string) => ENTITIES[name])
 		.replace(/\s+/g, " ")
 		.trim();
 }

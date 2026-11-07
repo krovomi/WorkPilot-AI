@@ -130,6 +130,7 @@ describe("element sources", () => {
 		expect(textOf('<button class="a">Pay <b>now</b> &amp; save<script>x()</script></button>')).toBe(
 			"Pay now & save",
 		);
+		expect(textOf("<p>Write &amp;lt;b&amp;gt; for bold</p>")).toBe("Write &lt;b&gt; for bold");
 		expect(selectorOf("BUTTON", { id: "pay", class: "px-4 pay-cta" })).toBe("button#pay.pay-cta");
 	});
 
