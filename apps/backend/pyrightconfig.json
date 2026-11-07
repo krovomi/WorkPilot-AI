@@ -2,6 +2,7 @@
   "include": [
     "best_of_n",
     "bench",
+    "dotnet_upgrade",
     "genai_trace",
     "goal",
     "mcp_tasks",
