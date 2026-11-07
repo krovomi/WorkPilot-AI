@@ -14,6 +14,9 @@ export interface WorktreeRecipe {
 	timeoutSeconds: number;
 	ports: number;
 	teardown: string[][];
+	/** The project's proof checkers, run by the QA gate `proof-checks` (absent before P2). */
+	proofs?: string[][];
+	proofTimeoutSeconds?: number;
 	errors: string[];
 	notes: string[];
 	digest: string;

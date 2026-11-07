@@ -2938,6 +2938,7 @@
 		"ports_one": "Reserves {{count}} port per task",
 		"ports_other": "Reserves {{count}} ports per task",
 		"teardown": "When the worktree is removed: {{commands}}",
+		"proofs": "After QA approves, proof checkers: {{commands}}",
 		"invalid": "Invalid, nothing runs: {{errors}}",
 		"approved": "Approved: runs in new worktrees.",
 		"awaiting": "This recipe runs commands on your machine. It runs only once you approve it as it is now.",

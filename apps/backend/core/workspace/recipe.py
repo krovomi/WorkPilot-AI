@@ -54,6 +54,7 @@ __all__ = [
 RECIPE_FILE = "worktree.toml"
 DEFAULT_TIMEOUT = 900
 MAX_TIMEOUT = 3600
+DEFAULT_PROOF_TIMEOUT = 600
 MAX_PORTS = 20
 MAX_COMMANDS = 20
 
@@ -91,6 +92,10 @@ class Recipe:
     timeout_seconds: int = DEFAULT_TIMEOUT
     ports: int = 0
     teardown: tuple[tuple[str, ...], ...] = ()
+    #: The project's verifiers (Dafny, Lean, Verus, F*…), run by the QA gate
+    #: `proof-checks` once the reviewer approves (`core/workspace/proofs.py`).
+    proofs: tuple[tuple[str, ...], ...] = ()
+    proof_timeout_seconds: int = DEFAULT_PROOF_TIMEOUT
     errors: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
 
@@ -106,6 +111,10 @@ class Recipe:
             "ports": self.ports,
             "teardown": self.teardown,
         }
+        if self.proofs:
+            # Only when declared: approvals given before proofs existed stay valid.
+            payload["proofs"] = self.proofs
+            payload["proof_timeout"] = self.proof_timeout_seconds
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True).encode("utf-8")
         ).hexdigest()
@@ -124,6 +133,8 @@ class Recipe:
             "timeoutSeconds": self.timeout_seconds,
             "ports": self.ports,
             "teardown": [list(c) for c in self.teardown],
+            "proofs": [list(c) for c in self.proofs],
+            "proofTimeoutSeconds": self.proof_timeout_seconds,
             "errors": list(self.errors),
             "notes": list(self.notes),
             "digest": self.digest,
@@ -224,19 +235,27 @@ def parse_recipe(text: str) -> Recipe:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
         return Recipe("file", errors=(f"not valid TOML: {exc}",))
-    unknown = sorted(set(data) - {"setup", "ports", "teardown"})
+    unknown = sorted(set(data) - {"setup", "ports", "teardown", "proofs"})
     if unknown:
         errors.append(f"unknown section(s): {', '.join(unknown)}")
     setup = data.get("setup") or {}
     ports = data.get("ports") or {}
     teardown = data.get("teardown") or {}
-    for name, table in (("setup", setup), ("ports", ports), ("teardown", teardown)):
+    proofs = data.get("proofs") or {}
+    for name, table in (
+        ("setup", setup),
+        ("ports", ports),
+        ("teardown", teardown),
+        ("proofs", proofs),
+    ):
         if not isinstance(table, dict):
             errors.append(f"[{name}] must be a table")
     if errors:
         return Recipe("file", errors=tuple(errors))
     commands = _commands(setup.get("commands"), "setup.commands", errors)
     windows = _commands(setup.get("windows"), "setup.windows", errors)
+    proof_commands = _commands(proofs.get("commands"), "proofs.commands", errors)
+    proof_windows = _commands(proofs.get("windows"), "proofs.windows", errors)
     recipe = Recipe(
         "file",
         setup=windows if windows and is_windows() else commands,
@@ -253,6 +272,15 @@ def parse_recipe(text: str) -> Recipe:
         ),
         ports=_int(ports.get("count"), "ports.count", 0, MAX_PORTS, 0, errors),
         teardown=_commands(teardown.get("commands"), "teardown.commands", errors),
+        proofs=proof_windows if proof_windows and is_windows() else proof_commands,
+        proof_timeout_seconds=_int(
+            proofs.get("timeout_seconds"),
+            "proofs.timeout_seconds",
+            10,
+            MAX_TIMEOUT,
+            DEFAULT_PROOF_TIMEOUT,
+            errors,
+        ),
     )
     if errors:
         return Recipe("file", errors=tuple(errors))

@@ -120,6 +120,13 @@ export function WorktreeRecipeSection({
 							})}
 						</p>
 					)}
+					{(recipe.proofs?.length ?? 0) > 0 && (
+						<p className="text-xs text-muted-foreground">
+							{t("settings:worktreeRecipe.proofs", {
+								commands: (recipe.proofs ?? []).map((c) => c.join(" ")).join(" ; "),
+							})}
+						</p>
+					)}
 					{recipe.errors.length > 0 && (
 						<div className="flex items-start gap-2 text-xs text-destructive" role="alert">
 							<AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden />
