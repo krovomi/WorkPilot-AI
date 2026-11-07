@@ -99,6 +99,37 @@
 			"task": "Captured for the review (task)",
 			"base": "Captured for the review (base branch)"
 		},
-		"captureFailed": "The capture could not be saved: {{error}}"
+		"captureFailed": "The capture could not be saved: {{error}}",
+		"point": {
+			"start": "Point an element of the page and say what to change",
+			"cancel": "Stop pointing"
+		}
+	},
+	"pointPanel": {
+		"title": "Pointed elements",
+		"description": "Say what to change about each element. Each one goes to the task as a message: its next session gets the element, its place in the page and the files that probably render it.",
+		"placeholder": "For example: this button should be disabled while the cart is empty",
+		"instruction": "What to change about {{selector}}",
+		"imageAlt": "Image of {{selector}}",
+		"remove": "Remove {{selector}}",
+		"noSource": "No file of the task contains this element: the agent will search for it",
+		"send_one": "Send to the agent",
+		"send_other": "Send the {{count}} elements to the agent",
+		"sent_one": "Sent: the next session of the task gets it.",
+		"sent_other": "{{count}} elements sent: the next session of the task gets them.",
+		"errors": {
+			"generic": "The element could not be pointed.",
+			"no_preview": "The preview is not ready yet: wait for the page to load.",
+			"devtools_open": "Close the preview's DevTools first: they hold the page.",
+			"pick_in_progress": "An element is already being pointed in this preview.",
+			"pick_failed": "The page did not answer: reload it and point again.",
+			"local_only": "Pointing works on tasks of this computer only.",
+			"task_not_found": "The task is not found.",
+			"task_done": "The task is finished: there is no next session to send to.",
+			"element_not_found": "This element is no longer kept: point it again.",
+			"empty_message": "Say what to change about each element.",
+			"message_too_long": "A message is too long.",
+			"queue_unwritable": "The task's folder could not be written."
+		}
 	}
 }

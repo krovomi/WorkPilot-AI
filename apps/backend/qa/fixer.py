@@ -245,7 +245,17 @@ async def run_qa_fixer_session(
     # (`foundation.steering`): marked delivered once the prompt is sent.
     steering = pending(load_messages(spec_dir), None)
     if steering:
-        prompt += "\n\n" + steering_section(steering)
+        from security.untrusted import quote_untrusted
+
+        prompt += "\n\n" + steering_section(
+            steering,
+            lambda context: quote_untrusted(
+                context,
+                kind="preview_element",
+                source="task preview",
+                spec_dir=spec_dir,
+            ),
+        )
 
     # Learning Loop: inject patterns learned from previous builds (qa_fixing phase)
     try:

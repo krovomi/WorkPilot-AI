@@ -28,7 +28,16 @@
 		"summary": "{{cards}} carte(s) × {{engines}} moteur(s) = {{builds}} build(s) complet(s)",
 		"start": "Lancer le passage",
 		"oneAtATime": "Un passage est en cours pour ce projet : un seul à la fois.",
-		"costWarning": "Chaque build est une tâche complète (plan, code, QA) facturée par son provider. Le juge lance d'abord trois fois les tests de chaque carte, pour ne garder que ceux qui distinguent le travail de la carte de son absence."
+		"costWarning": "Chaque build est une tâche complète (plan, code, QA) facturée par son provider. Le juge lance d'abord trois fois les tests de chaque carte, pour ne garder que ceux qui distinguent le travail de la carte de son absence.",
+		"rule": {
+			"title": "Règle candidate (facultatif)",
+			"help": "Mesurez une règle avant de l'adopter : chaque moteur est rejoué sans la règle et avec, la règle n'étant adoptée que dans la copie. Rien n'est adopté d'après le score.",
+			"fromLessons": "Partir d'une règle apprise des revues",
+			"pick": "Choisir une candidate…",
+			"placeholder": "Par exemple : écrire le test avant le code qu'il vérifie.",
+			"tooManyEngines": "Avec une règle, chaque moteur est rejoué deux fois : gardez au plus {{max}} moteurs."
+		},
+		"summaryRule": "{{cards}} carte(s) × {{engines}} moteur(s) × 2 (sans et avec la règle) = {{builds}} build(s) complet(s)"
 	},
 	"source": {
 		"merge": "son merge",
@@ -83,7 +92,16 @@
 		"notResolved": "échoué",
 		"notCounted": "non compté",
 		"building": "build en cours…",
-		"waiting": "en attente"
+		"waiting": "en attente",
+		"withRule": "avec la règle",
+		"rule": {
+			"title": "Règle candidate",
+			"summary": "Sans la règle : {{without}}/{{pairs}} réussies. Avec : {{with}}/{{pairs}}. Régressions : {{regressions}}.",
+			"better": "Meilleure sur ces cartes, sans régression. L'adopter reste votre décision, dans la Learning Loop.",
+			"worse": "Elle fait échouer une carte que le moteur réussissait sans elle : ne l'adoptez pas telle quelle.",
+			"same": "Aucune différence mesurée sur ces cartes.",
+			"unmeasured": "Pas encore mesurée : aucune carte n'a été jugée dans les deux variantes."
+		}
 	},
 	"errors": {
 		"candidates": "Impossible de lister les cartes terminées.",

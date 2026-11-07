@@ -140,6 +140,7 @@ import {
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
+import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
 	createTaskPermissionAPI,
 	type TaskPermissionAPI,
@@ -262,6 +263,7 @@ export interface ElectronAPI
 		CopilotCliAPI,
 		AgentCliAPI,
 		TaskSandboxAPI,
+		StackAPI,
 		TaskPermissionAPI,
 		CopilotOAuthAPI,
 		McpAPI,
@@ -478,6 +480,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
 		...createTaskSandboxAPI(),
+		...createStackAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		automations: createAutomationsAPI(),

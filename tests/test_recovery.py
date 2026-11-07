@@ -242,6 +242,48 @@ def test_good_commit_tracking(test_env):
     assert last_good == commit_hash2, "Last good commit not updated"
 
 
+def test_good_commit_records_the_session_start(test_env):
+    """The review needs each subtask's exact range: commit_before..hash."""
+    _, spec_dir, project_dir = test_env
+    manager = RecoveryManager(spec_dir, project_dir)
+
+    manager.record_good_commit("b" * 40, "subtask-1", "a" * 40)
+    manager.record_good_commit("c" * 40, "subtask-2")
+
+    saved = json.loads(
+        (spec_dir / "memory" / "build_commits.json").read_text(encoding="utf-8")
+    )
+    first, second = saved["commits"]
+    assert first["commit_before"] == "a" * 40
+    assert first["hash"] == "b" * 40
+    # Without the start, the record keeps the format older builds wrote.
+    assert "commit_before" not in second
+    assert manager.get_last_good_commit() == "c" * 40
+
+
+def test_good_commits_written_before_commit_before_still_load(test_env):
+    _, spec_dir, project_dir = test_env
+    memory = spec_dir / "memory"
+    memory.mkdir(parents=True, exist_ok=True)
+    (memory / "build_commits.json").write_text(
+        json.dumps(
+            {
+                "commits": [{"hash": "d" * 40, "subtask_id": "subtask-1"}],
+                "last_good_commit": "d" * 40,
+                "metadata": {"created_at": "2026-01-01T00:00:00"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager = RecoveryManager(spec_dir, project_dir)
+
+    manager.record_good_commit("e" * 40, "subtask-2", "d" * 40)
+
+    saved = json.loads((memory / "build_commits.json").read_text(encoding="utf-8"))
+    assert [c["hash"] for c in saved["commits"]] == ["d" * 40, "e" * 40]
+    assert saved["commits"][1]["commit_before"] == "d" * 40
+
+
 def test_mark_subtask_stuck(test_env):
     """Test marking chunks as stuck."""
     temp_dir, spec_dir, project_dir = test_env
