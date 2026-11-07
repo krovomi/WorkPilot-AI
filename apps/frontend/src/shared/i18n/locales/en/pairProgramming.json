@@ -74,5 +74,11 @@
 	},
 	"session": {
 		"goal": "Goal"
+	},
+	"steps": {
+		"goal": "Goal",
+		"you": "You",
+		"ai": "AI",
+		"how": "How it works"
 	}
 }

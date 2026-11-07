@@ -42,5 +42,10 @@
 		"cancel": "Annuler",
 		"dismiss": "Masquer",
 		"copy": "Copier le résultat"
+	},
+	"kickers": {
+		"history": "Historique",
+		"source": "Source",
+		"result": "Résultat"
 	}
 }

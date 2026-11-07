@@ -9,7 +9,7 @@ export function DebtTrendChart({ trend }: Props) {
 	const { t } = useTranslation(["techDebt"]);
 	if (!trend.length) {
 		return (
-			<p className="text-sm text-muted-foreground py-4 text-center">
+			<p className="wp-meta py-4 text-center">
 				{t("techDebt:noTrend")}
 			</p>
 		);
@@ -32,7 +32,7 @@ export function DebtTrendChart({ trend }: Props) {
 		<div>
 			<svg
 				viewBox={`0 0 ${width} ${height}`}
-				className="w-full h-32"
+				className="h-32 w-full text-primary"
 				aria-label={t("techDebt:trendAria")}
 				role="img"
 			>
@@ -43,7 +43,7 @@ export function DebtTrendChart({ trend }: Props) {
 					strokeWidth={2}
 				/>
 			</svg>
-			<div className="flex justify-between text-xs text-muted-foreground mt-1">
+			<div className="wp-meta mt-1 flex justify-between">
 				<span>
 					{t("techDebt:trendFrom", {
 						count: first.total_items,

@@ -79,5 +79,11 @@
 		"no_results": "La commande de test n'a écrit aucun rapport : elle a sans doute échoué avant de lancer les tests (erreur de compilation, outil manquant). Sa sortie :",
 		"start_failed": "La commande de test n'a pas pu démarrer. L'outil est-il installé et dans le PATH ?",
 		"details": "Détails"
-	}
+	},
+	"kickers": {
+		"run": "Exécution",
+		"report": "Rapport"
+	},
+	"reportTitle": "Tests instables trouvés",
+	"emptyReportTitle": "Aucun rapport pour l'instant"
 }

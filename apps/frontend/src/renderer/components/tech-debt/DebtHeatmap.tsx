@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
+import { Bar } from "../charter";
 
 interface Props {
 	readonly items: DebtItem[];
@@ -16,28 +17,23 @@ export function DebtHeatmap({ items }: Props) {
 		.slice(0, 20);
 	if (!entries.length) {
 		return (
-			<p className="text-sm text-muted-foreground py-4 text-center">
+			<p className="wp-meta py-4 text-center">
 				{t("techDebt:empty")}
 			</p>
 		);
 	}
 	const max = entries[0][1];
 	return (
-		<ul className="space-y-1">
+		<ul className="space-y-2">
 			{entries.map(([file, score]) => {
 				const pct = Math.max(4, Math.round((score / max) * 100));
 				return (
 					<li key={file} className="text-xs">
-						<div className="flex justify-between">
-							<span className="font-mono truncate">{file}</span>
-							<span>{score.toFixed(1)}</span>
+						<div className="mb-1 flex justify-between gap-2">
+							<span className="wp-mono truncate">{file}</span>
+							<span className="wp-meta">{score.toFixed(1)}</span>
 						</div>
-						<div className="h-2 bg-muted rounded">
-							<div
-								className="h-2 rounded bg-orange-500"
-								style={{ width: `${pct}%` }}
-							/>
-						</div>
+						<Bar value={pct} tone="orange" />
 					</li>
 				);
 			})}

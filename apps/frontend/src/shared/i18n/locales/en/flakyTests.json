@@ -79,5 +79,11 @@
 		"no_results": "The test command wrote no test report: it probably failed before running the tests (build error, missing tool). Its output:",
 		"start_failed": "The test command could not start. Is the tool installed and on the PATH?",
 		"details": "Details"
-	}
+	},
+	"kickers": {
+		"run": "Runs",
+		"report": "Report"
+	},
+	"reportTitle": "Flaky tests found",
+	"emptyReportTitle": "No report yet"
 }

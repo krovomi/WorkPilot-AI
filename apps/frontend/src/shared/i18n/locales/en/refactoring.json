@@ -30,5 +30,29 @@
 		"title": "Refactoring Proposals ({{count}})",
 		"risk": "Risk",
 		"impact": "Impact"
-	}
+	},
+	"kickers": {
+		"source": "Source",
+		"smells": "Smells",
+		"proposals": "Proposals"
+	},
+	"severity": {
+		"critical": "Critical",
+		"high": "High",
+		"medium": "Medium",
+		"low": "Low",
+		"info": "Info"
+	},
+	"riskLevel": {
+		"high": "high",
+		"medium": "medium",
+		"low": "low"
+	},
+	"empty": {
+		"smellsTitle": "No smells yet",
+		"smellsHint": "Paste some code, then run the detection: long functions, too many parameters, deep nesting, duplicates…",
+		"proposalsTitle": "No proposals",
+		"proposalsHint": "The refactorings proposed for this code (with their risk) show up here."
+	},
+	"clean": "No smell found in this code."
 }

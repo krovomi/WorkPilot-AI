@@ -30,5 +30,29 @@
 		"title": "Propositions de Refactoring ({{count}})",
 		"risk": "Risque",
 		"impact": "Impact"
-	}
+	},
+	"kickers": {
+		"source": "Source",
+		"smells": "Problèmes",
+		"proposals": "Propositions"
+	},
+	"severity": {
+		"critical": "Critique",
+		"high": "Élevée",
+		"medium": "Moyenne",
+		"low": "Faible",
+		"info": "Info"
+	},
+	"riskLevel": {
+		"high": "élevé",
+		"medium": "moyen",
+		"low": "faible"
+	},
+	"empty": {
+		"smellsTitle": "Aucun problème pour l'instant",
+		"smellsHint": "Collez du code puis lancez la détection : fonctions trop longues, trop de paramètres, imbrication profonde, doublons…",
+		"proposalsTitle": "Aucune proposition",
+		"proposalsHint": "Les refactorings proposés pour ce code (avec leur risque) s'affichent ici."
+	},
+	"clean": "Aucun problème détecté dans ce code."
 }

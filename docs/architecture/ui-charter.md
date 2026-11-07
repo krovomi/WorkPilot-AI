@@ -56,7 +56,40 @@ rails, bars and gauges of that element follow it.
 5. Errors: `Notice tone="red"` with the cause, the IPC prefix
    (`Error invoking remote method …`) stripped.
 
+## The shared ui/ components inside a stage
+
+A view does not have to drop `Button`, `Card`, `Badge` or `PageHeader` to
+match. Inside a `ModuleStage` (or any element with the class `wp-scope`):
+
+- the Tailwind colour tokens are remapped: `primary` and `ring` become the
+  charter accent, `destructive` / `success` / `warning` / `info` the red,
+  green, amber and blue tones. `bg-primary`, `text-primary`, the default
+  `Button` and the `Badge` variants follow without a change in the view;
+- `ui/card`, `ui/button`, `ui/badge` and `ui/page-header` mark themselves with
+  `data-slot` (and `data-variant`); charter.css restyles their surface (border,
+  background, radius, shadow), never their size or layout. These rules are
+  unlayered so they win over the utilities the components carry;
+- `PageHeader` takes an optional `kicker`, and inside a stage drops its band
+  for the dashed rule and the glowing icon tile.
+
+`wp-scope` is for surfaces outside a stage: a dialog or popover portaled to
+`body` (example: the Code playground dialog). It sets the colours, not the
+stage layout.
+
+Still to replace by hand in a view: hard-coded palette classes
+(`text-blue-500`, `bg-orange-500`...), raw red/green text for errors and
+successes (use `Notice`), and hand-written empty states (use `EmptyStage`).
+
 ## Migration
 
-Done: Docs et dérive (Documentation, Détecteur de dérive). The other modules
-and the Settings pages move lot by lot; each lot lists its views in its PR.
+Done:
+
+- Docs et dérive (Documentation, Détecteur de dérive).
+- Développement: Pair Programming IA, Revue de code, Dette et refactoring
+  (Dette technique, Refactoring), Intégration (Guide, Kit d'intégration),
+  Détective de tests instables, Profileur de performance, Traduction
+  inter-langages, Bac à sable de code (dialog, `wp-scope`).
+
+The other groups (Espace de travail, Agents, Explorer, Git & Intégrations,
+Planification, Boîte à outils) and the Settings pages move lot by lot; each
+lot lists its views in its PR.

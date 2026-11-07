@@ -81,7 +81,7 @@ export function SectionTitle({
 }): React.ReactElement {
 	return (
 		<div className="flex items-center justify-between gap-3 mb-2">
-			<h3 className="text-sm font-semibold flex items-center gap-2">
+			<h3 className="wp-kicker flex items-center gap-2 [&>svg]:h-3.5 [&>svg]:w-3.5">
 				{icon}
 				{children}
 			</h3>
@@ -96,7 +96,7 @@ export function EmptyState({
 	readonly message: string;
 }): React.ReactElement {
 	return (
-		<p className="text-sm text-muted-foreground py-6 text-center">{message}</p>
+		<p className="wp-meta whitespace-normal py-6 text-center">{message}</p>
 	);
 }
 
@@ -115,9 +115,9 @@ export function CommandLine({
 			type="button"
 			title={copyLabel}
 			onClick={() => onCopy(command)}
-			className="w-full text-left px-3 py-1.5 rounded bg-muted/60 hover:bg-muted text-xs font-mono text-foreground/90 truncate"
+			className="wp-code w-full truncate !py-1.5 text-left transition-colors hover:border-primary/50"
 		>
-			<span className="text-muted-foreground select-none">$ </span>
+			<span className="select-none text-primary">$ </span>
 			{command}
 		</button>
 	);
