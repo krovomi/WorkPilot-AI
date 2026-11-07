@@ -174,6 +174,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "hermes": {"brain", "foundation", "learning_loop"},
     "memory": {"brain"},
     "uiux": {"brain", "foundation", "injection_guard", "project", "skills_registry"},
+    # .NET 11 / C# 15 for the projects WorkPilot builds: the project's toolchain
+    # and the bundled skill through skills_registry, nothing that runs an agent
+    # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
+    "dotnet_upgrade": {"skills_registry"},
 }
 
 # The largest set of units that all import one another, directly or not. It
