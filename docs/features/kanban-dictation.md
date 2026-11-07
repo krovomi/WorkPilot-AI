@@ -37,3 +37,9 @@ l'annulation, les sessions IPC, les limites audio et le nettoyage du microphone.
 Le runner a aussi été exercé avec le modèle réel, hors ligne, sur trois WAV de
 synthèse en français, anglais et espagnol. Cela ne constitue pas une validation
 sur microphone physique ni une mesure de précision pour chaque accent.
+
+## Assistant vocal
+
+L'assistant vocal (Ctrl+Shift+Espace, [voice-assistant.md](../architecture/voice-assistant.md))
+utilise ce même moteur et ce même modèle : un modèle téléchargé pour l'un sert à l'autre. Une
+seule dictée tourne à la fois dans l'app.

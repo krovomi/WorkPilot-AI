@@ -53,6 +53,7 @@ import {
 	secretFieldValues,
 } from "../secret-storage";
 import { configurePythonFeatureServices } from "../python-feature-services";
+import { syncVoiceGlobalShortcut } from "../voice-assistant/global-shortcut";
 import { rememberUserChosenPath } from "../security/renderer-path";
 import {
 	maskSettingsSecrets,
@@ -812,6 +813,14 @@ export function registerSettingsHandlers(
 							);
 						});
 					}
+				}
+
+				// The voice assistant's system-wide shortcut follows its switch.
+				if (
+					settings.voiceAssistantShortcut !== undefined ||
+					settings.voiceAssistantSystemWide !== undefined
+				) {
+					syncVoiceGlobalShortcut(getMainWindow, newSettings);
 				}
 
 				// The renderer's copy of the dates is stale once a key changed.
