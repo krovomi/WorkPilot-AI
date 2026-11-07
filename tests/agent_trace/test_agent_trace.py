@@ -212,6 +212,9 @@ def test_the_pr_body_gets_the_attribution_line(repo):
     body = Manager()._with_attribution("001-x", "## Summary\n")
     assert body.startswith("## Summary\n\n**AI attribution**")
     assert "100% of the 1 added lines" in body and MODEL in body
+    # And the provenance dossier (P5), kept in the project's spec.
+    assert "<details><summary>Provenance dossier</summary>" in body
+    assert (spec / "provenance" / "dossier.json").is_file()
     # No record: the body is left as it was.
     assert Manager()._with_attribution("002-y", "## Summary\n") == "## Summary\n"
 

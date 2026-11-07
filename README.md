@@ -184,7 +184,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pipeline Generator** | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
-| **Voice Control** | Hands-free task and terminal control via speech-to-text |
+| **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally |
 | **Multi-Repo Orchestration** | Coordinate changes across multiple repositories simultaneously |
 | **Code Playground** | Sandbox environment for testing code snippets in isolation |
 | **Prompt Optimizer** | Analyzes and rewrites prompts for better AI output |
@@ -196,7 +196,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Memory System (shared brain)** | One Obsidian vault + `graph.json`, served over MCP — agents retain insights across sessions |
 | **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini); read natively by hermes and [pi](https://pi.dev) |
 | **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
-| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted |
+| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) (0.23.0 or later) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted; the vendored hermes pack follows hermes releases, and the Kanban MCP server reports `wait_for_card` progress to it |
 | **pi** | [pi](https://pi.dev) reads `AGENTS.md` and `.agents/skills/` natively and joins the shared brain (`~/.pi/agent/mcp.json`); project resources stay behind its own `/trust`, which WorkPilot never grants — see [docs/architecture/pi.md](docs/architecture/pi.md) |
 | **Context Management** | Intelligent context building with file relevance ranking and dependency graph analysis |
 | **Session History** | Browse and replay past agent sessions with full statistics |

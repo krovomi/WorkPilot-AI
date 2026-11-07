@@ -3,13 +3,13 @@
 The same shape as `mobile/readiness.py`, for the same reason. A learning loop
 that silently does nothing is worse than one that is off: the candidates never
 appear, nobody notices, and the conclusion drawn six weeks later is "hermes
-doesn't work here". Every one of the conditions below is answerable from files
-on disk in milliseconds — no model, no network, no subprocess that can hang —
-so the honest design is to answer *before* the phase runs and say which step is
+doesn't work here". Every one of the conditions below but ``version`` is
+answerable from files on disk in milliseconds — no model, no network, no
+subprocess that can hang — so the honest design is to answer *before* the phase runs and say which step is
 missing, rather than to discover it from an empty report.
 
-The five conditions, and why each is separate
----------------------------------------------
+The conditions, and why each is separate
+----------------------------------------
 ``install``   hermes on PATH or a hermes home on disk. Absent means the whole
               feature is simply not in use here, which is not a defect and must
               not be reported as one.
@@ -26,6 +26,13 @@ The five conditions, and why each is separate
               hermes is misconfigured.
 ``agents``    ``AGENTS.md`` at the git root — the project-context file hermes
               injects. Committed here, so it fails only in a broken checkout.
+``version``   hermes at least ``hermes.version.MIN_VERSION``, the release whose
+              features WorkPilot wires. The one condition that is not a file:
+              it runs ``hermes --version`` (bounded, cached per binary), so it
+              is read only when the caller asks (``probe_version``) — the
+              status a person opens, never a build's observe phase. A version
+              that cannot be read is not reported at all: "unknown" is not
+              "too old", and a warning nobody can act on is a false alarm.
 
 ``install`` is the only blocker. The rest degrade: the loop still ingests what
 hermes authored elsewhere, which is exactly the experience from outside this
@@ -40,6 +47,7 @@ from pathlib import Path
 
 from .home import hermes_config_path, hermes_home, is_trusted
 from .soul import soul_status
+from .version import MIN_VERSION, UPDATE_COMMAND, installed_version, satisfies
 
 __all__ = ["Check", "HermesReport", "doctor"]
 
@@ -74,6 +82,8 @@ class HermesReport:
     installed: bool
     home: Path
     checks: tuple[Check, ...]
+    version: str | None = None
+    """The installed release (``0.23.0``), when it was asked for and read."""
 
     @property
     def blockers(self) -> tuple[Check, ...]:
@@ -108,6 +118,8 @@ class HermesReport:
             # and the remedies are useless without it; it is never a path a
             # caller supplied, so echoing it confines nothing.
             "home": str(self.home),
+            "version": self.version,
+            "minVersion": MIN_VERSION,
             "checks": [c.to_dict() for c in self.checks],
         }
 
@@ -127,8 +139,10 @@ def _executable() -> str | None:
     return shutil.which("hermes")
 
 
-def doctor(project_root: Path, home: Path | None = None) -> HermesReport:
-    """Read the five conditions. Never raises, never blocks."""
+def doctor(
+    project_root: Path, home: Path | None = None, *, probe_version: bool = False
+) -> HermesReport:
+    """Read the conditions. Never raises; blocks only for a bounded version probe."""
     resolved_home = home or hermes_home()
     binary = _executable()
     home_exists = resolved_home.is_dir()
@@ -224,4 +238,22 @@ def doctor(project_root: Path, home: Path | None = None) -> HermesReport:
         )
     )
 
-    return HermesReport(installed=True, home=resolved_home, checks=tuple(checks))
+    version = installed_version(binary) if probe_version and binary else None
+    recent = satisfies(version)
+    if recent is not None:
+        checks.append(
+            Check(
+                name="version",
+                ok=recent,
+                detail=(
+                    f"hermes {version}"
+                    if recent
+                    else f"hermes {version}; WorkPilot wires {MIN_VERSION} features"
+                ),
+                remedy="" if recent else UPDATE_COMMAND,
+            )
+        )
+
+    return HermesReport(
+        installed=True, home=resolved_home, checks=tuple(checks), version=version
+    )

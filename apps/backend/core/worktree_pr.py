@@ -1193,7 +1193,26 @@ class WorktreePRMixin:
         except (ImportError, OSError, ValueError) as exc:
             logger.debug(f"Agent Trace summary skipped: {exc}")
             return body
-        return f"{body.rstrip()}\n\n{line}\n" if line else body
+        body = f"{body.rstrip()}\n\n{line}\n" if line else body
+        return self._with_provenance(worktree, spec_dir, spec_name, body)
+
+    def _with_provenance(self, worktree, spec_dir, spec_name: str, body: str) -> str:
+        """Write the provenance dossier (P5) and append its short block."""
+        try:
+            from provenance import pr_block, write_dossier
+
+            # Read the worktree's copy first, keep the dossier in the project's:
+            # the worktree is deleted at merge.
+            kept = self.project_dir / ".workpilot" / "specs" / spec_name
+            copies = [c for c in dict.fromkeys([spec_dir, kept]) if c.is_dir()]
+            if not copies:
+                return body
+            target = kept if kept.is_dir() else copies[0]
+            block = pr_block(write_dossier(worktree, copies, target))
+        except ImportError as exc:
+            logger.debug(f"Provenance dossier skipped: {exc}")
+            return body
+        return f"{body.rstrip()}\n\n{block}\n" if block else body
 
     def preview_pr_body(
         self,

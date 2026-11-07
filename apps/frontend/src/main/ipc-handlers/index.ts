@@ -150,10 +150,7 @@ import {
 import { registerPreviewPointHandlers } from "./task/preview-point-handlers";
 import { registerSteeringHandlers } from "./task/steering-handlers";
 import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
-import {
-	registerVoiceControlHandlers,
-	setupVoiceControlEvents,
-} from "./voice-control-handlers";
+import { registerVoiceAssistantHandlers } from "./voice-assistant-handlers";
 import { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 
 export { registerAccessibilityHandlers } from "./accessibility-handlers";
@@ -262,7 +259,7 @@ export { registerPreviewPointHandlers } from "./task/preview-point-handlers";
 export { registerSteeringHandlers } from "./task/steering-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
-export { registerVoiceControlHandlers } from "./voice-control-handlers";
+export { registerVoiceAssistantHandlers } from "./voice-assistant-handlers";
 
 /**
  * Setup all IPC handlers across all domains
@@ -426,15 +423,14 @@ export function setupIpcHandlers(
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
 
-	// Voice Control handlers
-	registerVoiceControlHandlers();
+	// Voice assistant: local dictation, then the sentence read into an app action
+	registerVoiceAssistantHandlers(getMainWindow);
 	registerDictationHandlers(
 		() => pythonEnvManager.getPythonPath(),
 		getBackendSourcePath,
 		getMainWindow,
 		() => pythonEnvManager.getPythonEnv(),
 	);
-	setupVoiceControlEvents();
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);

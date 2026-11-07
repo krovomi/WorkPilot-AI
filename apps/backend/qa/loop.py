@@ -28,8 +28,10 @@ from foundation.debug import (
     debug_success,
     debug_warning,
 )
+from foundation.git_executable import run_git
 from foundation.pause_state import is_paused, read_pause_state
 from foundation.phase_event import ExecutionPhase, emit_phase
+from foundation.review_comments import mark_addressed
 from goal import (
     GoalSpec,
     GoalVerdict,
@@ -644,6 +646,9 @@ async def _apply_human_feedback(
         )
         return False
 
+    # Where the session starts: its diff says which review comments it
+    # addressed (foundation.review_comments), not the model.
+    commit_before = run_git(["rev-parse", "HEAD"], cwd=project_dir).stdout.strip()
     try:
         async with fix_client:
             fix_status, fix_response = await run_qa_fixer_session(
@@ -663,6 +668,7 @@ async def _apply_human_feedback(
         return False
 
     debug_success("qa_loop", "Human feedback fixes applied")
+    mark_addressed(spec_dir, project_dir, commit_before, session=0)
     task_event_emitter.emit(
         "QA_FIXING_COMPLETE",
         {"iteration": 0},

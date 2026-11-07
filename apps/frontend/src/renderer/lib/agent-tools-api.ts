@@ -446,11 +446,42 @@ export interface TraceabilityCoverage {
 	summary: string;
 }
 
+/** One requirement and what the build made of it (`requirement-links.json`). */
+export interface RequirementLink {
+	id: string;
+	title: string;
+	subtasks: string[];
+	files: string[];
+	tests: string[];
+	/** Files a test convention maps, for which none was found. */
+	untested: string[];
+}
+
+/** A requirement of another task, from the project's ledger, on the same files. */
+export interface EarlierRequirement {
+	spec: string;
+	id: string;
+	title: string;
+	files: string[];
+	tests: string[];
+}
+
+export interface TraceabilityLinks {
+	spec: string;
+	head: string;
+	/** `agent-trace`: the files the sessions wrote; `plan`: the files the plan declared. */
+	source: "agent-trace" | "plan";
+	requirements: RequirementLink[];
+	earlier: EarlierRequirement[];
+}
+
 export interface TraceabilityPayload {
 	spec: string;
 	requirements: TraceabilityRequirement[];
 	openQuestions: TraceabilityOpenQuestion[];
 	coverage: TraceabilityCoverage;
+	/** Null until a build linked the requirements to their files and tests. */
+	links: TraceabilityLinks | null;
 }
 
 export interface SpecTraceabilityQuery {
@@ -467,6 +498,7 @@ interface RawTraceability {
 	coverage: Omit<TraceabilityCoverage, "unknownRefs"> & {
 		unknown_refs: Record<string, string[]>;
 	};
+	links?: TraceabilityLinks | null;
 }
 
 export async function fetchSpecTraceability(
@@ -494,6 +526,7 @@ export async function fetchSpecTraceability(
 			requirements: raw.requirements,
 			openQuestions: raw.open_questions,
 			coverage: { ...coverage, unknownRefs: unknown_refs },
+			links: raw.links ?? null,
 		},
 	};
 }
@@ -1044,6 +1077,10 @@ export interface HermesReadiness {
 	readonly ready: boolean;
 	readonly degraded: boolean;
 	readonly home: string;
+	/** Release named by `hermes --version` (`0.23.0`); null when unread. */
+	readonly version?: string | null;
+	/** The release whose features WorkPilot wires. */
+	readonly minVersion?: string;
 	readonly checks: readonly HermesCheck[];
 }
 
@@ -1185,11 +1222,28 @@ export async function reviewHermesCandidates(
 	);
 }
 
+/**
+ * What happened to the hermes sessions already running when a persona was
+ * installed: asked to rebuild their prompt on their next turn (hermes ≥ 0.23),
+ * or not — with the command a person can type instead.
+ */
+export type HermesSessionsRefresh = "requested" | "needs-update" | "unavailable";
+
+export interface HermesSoulInstall {
+	readonly changed: boolean;
+	readonly message: string;
+	/** Null when nothing was written (already installed, or refused). */
+	readonly sessions?: HermesSessionsRefresh | null;
+	readonly refreshCommand?: string;
+	readonly updateCommand?: string;
+	readonly soul: HermesSoul;
+}
+
 export async function installHermesSoul(
 	overwrite: boolean,
 	signal?: AbortSignal,
-): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
-	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+): Promise<ApiResult<HermesSoulInstall>> {
+	return _post<HermesSoulInstall>(
 		"/api/hermes/soul/install",
 		{ overwrite },
 		signal,
