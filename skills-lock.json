@@ -26,7 +26,7 @@
 			"version": "0.1.0",
 			"source": "NousResearch/hermes-agent",
 			"path": "skills/hermes",
-			"upstreamTreeSha": "c1046bf7ec05264f81cbec520b58b64e47cf1a8b"
+			"upstreamTreeSha": "675b4cea2d2aef80460f07235b0e27e6c6922743"
 		},
 		"impeccable": {
 			"version": "0.0.3",
