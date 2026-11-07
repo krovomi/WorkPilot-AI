@@ -99,6 +99,37 @@
 			"task": "Capturé pour la revue (tâche)",
 			"base": "Capturé pour la revue (branche de base)"
 		},
-		"captureFailed": "La capture n'a pas pu être enregistrée : {{error}}"
+		"captureFailed": "La capture n'a pas pu être enregistrée : {{error}}",
+		"point": {
+			"start": "Pointer un élément de la page et dire quoi changer",
+			"cancel": "Arrêter de pointer"
+		}
+	},
+	"pointPanel": {
+		"title": "Éléments pointés",
+		"description": "Dites ce qu'il faut changer sur chaque élément. Chacun part à la tâche comme un message : sa prochaine session reçoit l'élément, sa place dans la page et les fichiers qui le rendent probablement.",
+		"placeholder": "Par exemple : ce bouton doit être désactivé tant que le panier est vide",
+		"instruction": "Ce qu'il faut changer sur {{selector}}",
+		"imageAlt": "Image de {{selector}}",
+		"remove": "Retirer {{selector}}",
+		"noSource": "Aucun fichier de la tâche ne contient cet élément : l'agent le cherchera",
+		"send_one": "Envoyer à l'agent",
+		"send_other": "Envoyer les {{count}} éléments à l'agent",
+		"sent_one": "Envoyé : la prochaine session de la tâche le reçoit.",
+		"sent_other": "{{count}} éléments envoyés : la prochaine session de la tâche les reçoit.",
+		"errors": {
+			"generic": "L'élément n'a pas pu être pointé.",
+			"no_preview": "L'aperçu n'est pas encore prêt : attendez que la page soit chargée.",
+			"devtools_open": "Fermez d'abord les DevTools de l'aperçu : ils tiennent la page.",
+			"pick_in_progress": "Un élément est déjà en cours de pointage dans cet aperçu.",
+			"pick_failed": "La page n'a pas répondu : rechargez-la et pointez de nouveau.",
+			"local_only": "Le pointage ne fonctionne que pour les tâches de cet ordinateur.",
+			"task_not_found": "La tâche est introuvable.",
+			"task_done": "La tâche est terminée : aucune session ne recevrait le message.",
+			"element_not_found": "Cet élément n'est plus gardé : pointez-le de nouveau.",
+			"empty_message": "Dites ce qu'il faut changer sur chaque élément.",
+			"message_too_long": "Un message est trop long.",
+			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
+		}
 	}
 }

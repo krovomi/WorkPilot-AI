@@ -279,7 +279,12 @@ def test_a_server_that_needs_a_credential_waits_for_it(harness, monkeypatch):
     }
 
 
-def test_custom_servers_start_only_when_the_type_requires_them(harness):
+def test_custom_servers_start_only_when_the_type_requires_them(harness, monkeypatch):
+    # Which servers a type gets; whether their tools are approved is
+    # `mcp_pins`'s question (tests/mcp_pins/).
+    monkeypatch.setattr(
+        "core.client.pinned_servers", lambda _project, servers, _config: servers
+    )
     harness.mcp_config = {
         "CUSTOM_MCP_SERVERS": [
             {"id": "local-tool", "command": "node", "args": ["server.js"]},

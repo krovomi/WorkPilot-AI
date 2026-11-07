@@ -1815,6 +1815,32 @@
 			"requirementMissing": "Ce serveur attend sa propre configuration avant de pouvoir être activé.",
 			"alwaysOn": "Les outils propres à WorkPilot AI sont toujours disponibles pour les agents qui les déclarent : il n'y a rien à configurer.",
 			"configuredInIntegrations": "Ce serveur s'authentifie avec un jeton défini dans Réglages → Intégrations. Configurez-le là-bas et il devient disponible pour les agents qui le déclarent."
+		},
+		"pins": {
+			"title": "Outils MCP approuvés",
+			"description": "Un serveur MCP personnalisé n'atteint vos agents qu'avec les outils que vous avez approuvés. La description d'un outil est lue par le modèle et n'est montrée nulle part ailleurs : vérifiez-la ici avant d'approuver.",
+			"pending": "Nouveau serveur : aucun de ses outils n'atteint un agent tant que vous ne les avez pas approuvés.",
+			"changed": "Modifié depuis votre approbation : les outils ci-dessous sont retenus tant que vous n'avez pas approuvé le changement.",
+			"programChanged": "Sa commande ou son URL a changé depuis votre approbation : le serveur est retenu tant que vous ne l'avez pas approuvé à nouveau.",
+			"approve": "Approuver",
+			"confirmApprove": "Approuver quand même",
+			"suspicious": "Certaines descriptions ressemblent à des instructions cachées adressées au modèle. Lisez-les avant d'approuver.",
+			"toolAdded": "nouvel outil",
+			"toolChanged": "description modifiée",
+			"noDescription": "(aucune description)",
+			"removed": "Plus proposés : {{tools}}",
+			"finding": {
+				"invisible": "caractères invisibles",
+				"private-use": "caractères à usage privé",
+				"model-tag": "une balise adressée au modèle",
+				"secrecy": "demande de vous cacher quelque chose",
+				"secret-file": "nomme un fichier d'identifiants ou de configuration",
+				"precondition": "demande une étape avant d'utiliser l'outil",
+				"other-tools": "donne des ordres sur d'autres outils",
+				"shadowing": "nomme l'outil d'un autre serveur : {{detail}}",
+				"long": "anormalement longue ({{detail}} caractères)",
+				"injection": "injection de prompt : {{detail}}"
+			}
 		}
 	},
 	"modelSelect": {
@@ -2904,5 +2930,22 @@
 			"claude_not_found": "La commande claude n'a pas pu être lancée d'ici. Colle la commande dans un terminal à la place.",
 			"generic": "Impossible : {{detail}}"
 		}
+	},
+	"worktreeRecipe": {
+		"title": "Préparation du worktree",
+		"description": "Ce que WorkPilot lance dans chaque nouveau worktree de tâche avant la première session : restaurer les dépendances de la stack, copier les fichiers locaux ignorés, réserver des ports pour la tâche. Une étape en échec n'arrête pas la tâche ; l'agent en est informé.",
+		"sourceFile": "Depuis .workpilot/worktree.toml",
+		"sourceDetected": "Détectée d'après les fichiers du projet (pas de .workpilot/worktree.toml)",
+		"noCommands": "Aucun gestionnaire de paquets reconnu : rien ne s'exécute.",
+		"copies": "Copie : {{files}}",
+		"ports_one": "Réserve {{count}} port par tâche",
+		"ports_other": "Réserve {{count}} ports par tâche",
+		"teardown": "À la suppression du worktree : {{commands}}",
+		"invalid": "Invalide, rien ne s'exécute : {{errors}}",
+		"approved": "Approuvée : s'exécute dans les nouveaux worktrees.",
+		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
+		"approve": "Approuver",
+		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
+		"saveDetected": "Enregistrer en worktree.toml"
 	}
 }
