@@ -47,8 +47,13 @@ def _profile(effort="medium"):
 def test_the_workflow_declares_a_hard_gate():
     """If this stops being true, the rest of the file tests nothing."""
     gates = [p.hard_gate for p in WORKFLOW.phases if p.hard_gate]
-    assert gates == ["tests-pass,app-verified,deps-exist"]
-    assert gate_names(gates[0]) == ["tests-pass", "app-verified", "deps-exist"]
+    assert gates == ["tests-pass,app-verified,deps-exist,proof-checks"]
+    assert gate_names(gates[0]) == [
+        "tests-pass",
+        "app-verified",
+        "deps-exist",
+        "proof-checks",
+    ]
 
 
 @pytest.mark.parametrize("effort", ["none", "low", "medium", "high", "ultrathink"])
@@ -58,6 +63,7 @@ def test_the_gate_is_evaluated_at_every_effort_level(tmp_path: Path, effort: str
         ("verify", "tests-pass"),
         ("verify", "app-verified"),
         ("verify", "deps-exist"),
+        ("verify", "proof-checks"),
     ], effort
 
 

@@ -82,6 +82,13 @@ Le dépôt de WorkPilot lui-même garde son lien des deux `node_modules` (ses ho
 typecheckent dans le worktree) ; ailleurs, lier les dépendances peut casser le checkout principal,
 ce n'est jamais le défaut.
 
+## Preuves
+
+La table `[proofs]` déclare les vérificateurs de preuves du projet (Dafny, Lean, Verus, F*…).
+Ils ne tournent pas à la création du worktree mais après l'approbation de la QA, par la porte
+`proof-checks` : voir [proof-checks.md](proof-checks.md). L'empreinte de la recette les couvre ;
+une recette sans `[proofs]` garde l'empreinte qu'elle avait, et son approbation reste valable.
+
 ## Ports
 
 `<WORKPILOT_DATA_DIR>/ports.json` (par défaut `~/.workpilot/ports.json`) associe chaque tâche

@@ -42,6 +42,7 @@ __all__ = [
     "APP_VERIFIED",
     "TESTS_UNCHANGED",
     "DEPS_EXIST",
+    "PROOF_CHECKS",
     "TESTS_BITE",
     "is_test_file",
     "GATE_RECORD",
@@ -73,6 +74,12 @@ TESTS_UNCHANGED = "tests-unchanged"
 # when the guard did not run, could not ask a registry or a private feed may
 # serve the package; a 404 from the public registry is the only failure.
 DEPS_EXIST = "deps-exist"
+
+# The project's proof checkers (Dafny, Lean, Verus, F*…) accept the proofs
+# with the task's changes: `<spec_dir>/proof_checks.json`, written by the QA
+# gate. A project that declares no checker is not concerned and gets no line;
+# a checker missing, a time out or an unapproved recipe is unknown.
+PROOF_CHECKS = "proof-checks"
 
 # The tests catch a bug planted in the lines the task wrote: the mutation
 # gate's record (`<spec_dir>/mutation_gate.json`, written by the QA gate,
@@ -172,6 +179,26 @@ def _deps_exist(spec_dir: Path) -> tuple[bool | None, str]:
         or ", ".join(record.get("unreadable") or [])
     )
     return None, f"unknown — {detail}" if detail else "unknown"
+
+
+def _proof_checks(spec_dir: Path) -> tuple[bool | None, str] | None:
+    """The proof record's verdict; None when the project declares no proof."""
+    try:
+        from core.workspace.proofs import load_proof_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the proof checks are unavailable: {exc}"
+    record = load_proof_record(spec_dir)
+    if record is None:
+        return None, "no proof record — the QA proof check did not run"
+    status = record.get("status")
+    reason = str(record.get("reason") or "")
+    if status == "none":
+        return None
+    if status == "pass":
+        return True, reason
+    if status == "fail":
+        return False, reason or "a proof checker rejected the proofs"
+    return None, f"unknown — {reason}" if reason else "unknown"
 
 
 def _tests_bite(spec_dir: Path) -> tuple[bool | None, str]:
@@ -314,6 +341,15 @@ def _evaluate_one(
         report.results.append(
             HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
         )
+    elif gate == PROOF_CHECKS:
+        verdict = _proof_checks(spec_dir)
+        if verdict is not None:
+            held, detail = verdict
+            report.results.append(
+                HardGateResult(
+                    phase_id=resolved.id, gate=gate, held=held, detail=detail
+                )
+            )
     elif gate == TESTS_BITE:
         held, detail = _tests_bite(spec_dir)
         report.results.append(
