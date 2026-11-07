@@ -115,7 +115,7 @@ import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 import { openTestGenerationDialog } from "@/stores/test-generation-store";
-import { openVoiceControlDialog } from "@/stores/voice-control-store";
+import { openVoiceAssistant } from "@/stores/voice-assistant-store";
 // Modals & Components
 import { AddProjectModal } from "./AddProjectModal";
 import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
@@ -169,7 +169,7 @@ import {
 } from "./sidebar/hubs";
 import { serverForge, showsView, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
-import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
+import { VoiceAssistant } from "./voice-assistant/VoiceAssistant";
 
 export type SidebarView =
 	| "kanban"
@@ -1358,7 +1358,7 @@ export function Sidebar({
 			return;
 		}
 		if (view === "voice-control") {
-			openVoiceControlDialog();
+			openVoiceAssistant();
 			return;
 		}
 		if (view === "app-emulator") {
@@ -2540,12 +2540,11 @@ export function Sidebar({
 			<ConflictPredictorDialog />
 			<DependencySentinelDialog />
 			<NaturalLanguageGitDialog />
-			<VoiceControlDialog
-				onExecuteCommand={(result) => {
-					if (result.action === "navigate" && result.parameters?.destination) {
-						onViewChange?.(result.parameters.destination as SidebarView);
-					}
-				}}
+			<VoiceAssistant
+				destinations={visibleNavItems.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
+				onNavigate={(view) => handleNavClick(view as SidebarView)}
+				onNewTask={onNewTaskClick}
+				onOpenSettings={onSettingsClick}
 			/>
 			<AppEmulatorDialog />
 			<LearningLoopDialog />

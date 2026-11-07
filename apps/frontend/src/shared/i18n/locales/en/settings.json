@@ -685,8 +685,8 @@
 				"description": "AI-powered code review and quality analysis"
 			},
 			"voiceControl": {
-				"label": "Voice Control",
-				"description": "Voice-activated development commands"
+				"label": "Voice assistant",
+				"description": "Reads spoken commands the assistant cannot place by itself"
 			}
 		},
 		"thinkingLevels": {

@@ -5,6 +5,7 @@ import type { Task } from "../../../shared/types";
 import { useSpecTraceabilityStore } from "../../stores/spec-traceability-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { linkSignals, RequirementLinksSection } from "./RequirementLinksSection";
 
 export interface SpecTraceabilityCardProps {
 	readonly task: Task;
@@ -60,9 +61,20 @@ export function SpecTraceabilityCard({
 	const uncovered = coverage.applicable ? coverage.uncovered : [];
 	const unknown = coverage.applicable ? Object.keys(coverage.unknownRefs) : [];
 
-	// Nothing open and nothing unclaimed: the spec and the plan agree, and a
-	// card saying so is a card in the way.
-	if (questions.length === 0 && uncovered.length === 0 && unknown.length === 0) {
+	// What the build linked (P3): a requirement with a file and no test, an
+	// earlier requirement on the same files. Both are worth the card.
+	const links = data.links ?? null;
+	const signals = linkSignals(links);
+
+	// Nothing open, nothing unclaimed, nothing untested or overlapping: the
+	// spec, the plan and the code agree, and a card saying so is in the way.
+	if (
+		questions.length === 0 &&
+		uncovered.length === 0 &&
+		unknown.length === 0 &&
+		signals.untested === 0 &&
+		signals.earlier === 0
+	) {
 		return null;
 	}
 
@@ -90,6 +102,16 @@ export function SpecTraceabilityCard({
 								{t("traceability:badge.uncovered", {
 									count: uncovered.length,
 								})}
+							</Badge>
+						)}
+						{signals.untested > 0 && (
+							<Badge variant="outline" className="text-3xs">
+								{t("traceability:badge.untested", { count: signals.untested })}
+							</Badge>
+						)}
+						{signals.earlier > 0 && (
+							<Badge variant="outline" className="text-3xs">
+								{t("traceability:badge.earlier", { count: signals.earlier })}
 							</Badge>
 						)}
 					</div>
@@ -162,6 +184,8 @@ export function SpecTraceabilityCard({
 							</div>
 						</section>
 					)}
+
+					{links && <RequirementLinksSection links={links} />}
 
 					{unknown.length > 0 && (
 						<section>

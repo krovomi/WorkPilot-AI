@@ -2,14 +2,14 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.174
+claude-agent-sdk>=0.2.176
 python-dotenv>=1.2.4
 
 # Local multilingual Kanban dictation (explicit model download from the UI).
 faster-whisper>=1.2.1
 
 # WebSocket support for streaming development mode
-websockets>=17.3
+websockets>=17.4
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
@@ -28,7 +28,7 @@ secretstorage>=3.5.0; sys_platform == "linux"
 pywin32>=312; sys_platform == "win32"
 
 # Pydantic for structured output schemas
-pydantic>=2.14.1
+pydantic>=2.14.2
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0

@@ -7,7 +7,11 @@
 		"questions": "{{count}} open question",
 		"questions_other": "{{count}} open questions",
 		"uncovered": "{{count}} unclaimed requirement",
-		"uncovered_other": "{{count}} unclaimed requirements"
+		"uncovered_other": "{{count}} unclaimed requirements",
+		"untested": "{{count}} requirement without a test",
+		"untested_other": "{{count}} requirements without a test",
+		"earlier": "{{count}} earlier requirement on the same files",
+		"earlier_other": "{{count}} earlier requirements on the same files"
 	},
 	"coverage": {
 		"summary": "{{covered}} of {{total}} requirements claimed by a subtask ({{percent}}%)"
@@ -23,5 +27,22 @@
 	"unknown": {
 		"title": "Referenced but not declared",
 		"body": "A subtask cites a requirement spec.md does not declare: the two documents have drifted."
+	},
+	"links": {
+		"title": "What each requirement became",
+		"source": {
+			"agent-trace": "Files written by the sessions of each subtask.",
+			"plan": "Files the plan declared: no session record to confirm them."
+		},
+		"files": "{{count}} file",
+		"files_other": "{{count}} files",
+		"tests": "Tests: {{tests}}",
+		"noTest": "No test found for: {{files}}",
+		"none": "No file linked",
+		"earlier": {
+			"title": "Earlier requirements on the same files",
+			"body": "These requirements of other tasks touched files this task changes: check they still hold.",
+			"item": "{{spec}} · {{id}}"
+		}
 	}
 }

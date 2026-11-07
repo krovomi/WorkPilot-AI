@@ -11,7 +11,6 @@ import { performanceProfilerService } from "./performance-profiler-service";
 import { pipelineGeneratorService } from "./pipeline-generator-service";
 import { specInterviewService } from "./spec-interview-service";
 import { visualProgrammingService } from "./visual-programming-service";
-import { voiceControlService } from "./voice-control-service";
 
 /**
  * Point the feature services that spawn a backend runner at the managed Python
@@ -43,7 +42,6 @@ export function configurePythonFeatureServices(
 		pipelineGeneratorService,
 		specInterviewService,
 		visualProgrammingService,
-		voiceControlService,
 	]) {
 		service.configure(pythonPath, autoBuildPath);
 	}

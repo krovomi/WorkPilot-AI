@@ -184,7 +184,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Pipeline Generator** | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
-| **Voice Control** | Hands-free task and terminal control via speech-to-text |
+| **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally |
 | **Multi-Repo Orchestration** | Coordinate changes across multiple repositories simultaneously |
 | **Code Playground** | Sandbox environment for testing code snippets in isolation |
 | **Prompt Optimizer** | Analyzes and rewrites prompts for better AI output |
