@@ -179,6 +179,12 @@ export interface TaskAPI {
 		taskId: string,
 		filePath: string,
 	) => Promise<IPCResult<import("../../shared/types").WorktreeDiffFile>>;
+	/** The guided review: the diff grouped by the plan's subtasks. */
+	getReviewGroups: (
+		taskId: string,
+	) => Promise<
+		IPCResult<import("../../shared/types/review-groups").ReviewGroups>
+	>;
 	mergeWorktree: (
 		taskId: string,
 		options?: { noCommit?: boolean },
@@ -642,6 +648,12 @@ export const createTaskAPI = (): TaskAPI => ({
 		filePath: string,
 	): Promise<IPCResult<import("../../shared/types").WorktreeDiffFile>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_FILE_DIFF, taskId, filePath),
+
+	getReviewGroups: (
+		taskId: string,
+	): Promise<
+		IPCResult<import("../../shared/types/review-groups").ReviewGroups>
+	> => ipcRenderer.invoke(IPC_CHANNELS.TASK_REVIEW_GROUPS, taskId),
 
 	mergeWorktree: (
 		taskId: string,

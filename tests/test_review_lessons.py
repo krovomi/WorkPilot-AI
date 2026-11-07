@@ -183,6 +183,14 @@ class TestOnlyAdoptedRulesReachAPrompt:
         assert project_root(worktree) == project
         assert "- Keep EF out of Domain." in get_learning_context(worktree, "coding")
 
+    def test_a_bench_copy_is_a_project_of_its_own(self, tmp_path):
+        """Copies live in ``~/.workpilot/bench/…``: not the home folder's rules."""
+        copy = tmp_path / ".workpilot" / "bench" / "k" / "run" / "builds" / "b1"
+        assert project_root(copy) == copy
+        nested = copy / ".workpilot" / "worktrees" / "tasks" / "001"
+        assert project_root(nested) == copy
+        assert project_root(tmp_path / ".worktrees" / "001") == tmp_path
+
     def test_a_withdrawn_rule_leaves_the_prompts(self, project):
         record_plan_feedback(project, "004", "Keep EF out of Domain.")
         (lesson,) = load_lessons(project)

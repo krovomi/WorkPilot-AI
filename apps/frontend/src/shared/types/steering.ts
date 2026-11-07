@@ -13,4 +13,6 @@ export interface SteeringMessage {
 	deliveredAt: string | null;
 	deliveredSession: number | null;
 	deliveredSubtaskId: string | null;
+	/** An element of the preview is attached (F10): read from the page, quoted as data. */
+	hasContext?: boolean;
 }
