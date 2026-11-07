@@ -298,10 +298,16 @@ Rules:
 
 
 def _call_claude_cli(claude: str, model: str, prompt: str) -> str:
-    """Invoke `claude -p` in print mode, capturing stdout as the reply."""
-    cmd = [claude, "-p", "--model", model, "--output-format", "text", prompt]
+    """Invoke `claude -p` in print mode, capturing stdout as the reply.
+
+    The prompt goes on stdin, not on the command line: one argument is capped
+    at 128 KiB on Linux, and the 1.3.4 changelog folded into the narrative
+    prompt went past it (``OSError: [Errno 7] Argument list too long``).
+    """
+    cmd = [claude, "-p", "--model", model, "--output-format", "text"]
     result = subprocess.run(
         cmd,
+        input=prompt,
         capture_output=True,
         text=True,
         encoding="utf-8",

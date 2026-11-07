@@ -134,3 +134,24 @@ class TestModelChoice:
         """A dated variant is not a valid model string."""
         value = getattr(un, model)
         assert not value[-8:].isdigit(), f"{model} carries a date suffix: {value}"
+
+
+def test_the_prompt_goes_on_stdin_not_on_the_command_line(un, monkeypatch):
+    # One argv entry is capped at 128 KiB on Linux: the 1.3.4 release's
+    # narrative prompt went past it and the wiki refresh died on E2BIG.
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = " prose \n"
+        stderr = ""
+
+    def run(cmd, **kwargs):
+        seen["cmd"], seen["input"] = cmd, kwargs.get("input")
+        return Done()
+
+    monkeypatch.setattr(un.subprocess, "run", run)
+    prompt = "x" * 300_000
+    assert un._call_claude_cli("claude", "model", prompt) == "prose"
+    assert seen["input"] == prompt
+    assert all(len(arg) < 1000 for arg in seen["cmd"])
