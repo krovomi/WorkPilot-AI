@@ -788,6 +788,17 @@ export interface WorktreeStatus {
 export interface WorktreeDiff {
 	files: WorktreeDiffFile[];
 	summary: string;
+	/** Agent Trace (F3): who wrote the task's added lines, when recorded. */
+	attribution?: WorktreeDiffAttribution;
+}
+
+export interface WorktreeDiffAttribution {
+	added: number;
+	ai: number;
+	human: number;
+	unknown: number;
+	/** Lines per `provider/model`. */
+	models: Record<string, number>;
 }
 
 export interface WorktreeDiffFile {
@@ -796,6 +807,8 @@ export interface WorktreeDiffFile {
 	additions: number;
 	deletions: number;
 	patch?: string; // Git patch/diff content for the file
+	/** Agent Trace (F3): of the file's added lines, the agent's and the person's. */
+	attribution?: { added: number; ai: number; human: number; unknown: number };
 }
 
 // ============================================
