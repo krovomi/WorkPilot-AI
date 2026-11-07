@@ -188,6 +188,19 @@ describe("IPC Bridge Integration", () => {
 				undefined,
 			);
 		});
+
+		it("passes the line comments to send by id only", async () => {
+			const submitReview = electronAPI.submitReview as (
+				id: string,
+				approved: boolean,
+				feedback?: string,
+				images?: unknown[],
+				commentIds?: string[],
+			) => Promise<unknown>;
+			await submitReview("task-id", false, "", [], ["c1"]);
+
+			expect(ipcRenderer.invoke).toHaveBeenCalledWith("task:review", "task-id", false, "", [], ["c1"]);
+		});
 	});
 
 	describe("Event listeners", () => {

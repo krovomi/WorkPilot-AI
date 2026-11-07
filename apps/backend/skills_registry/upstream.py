@@ -36,6 +36,10 @@ __all__ = [
     "SourceSpec",
     "parse_source",
     "fetch_tree_sha",
+    "LATEST_RELEASE",
+    "bootstrap_ref",
+    "latest_release_tag",
+    "resolve_ref",
     "recorded_shas",
     "record_shas",
     "forget_pack",
@@ -105,6 +109,86 @@ def parse_source(raw: str) -> SourceSpec:
             return SourceSpec(raw, f"{match.group(1)}/{match.group(2)}", ref)
 
     return SourceSpec(raw, None, ref)
+
+
+#: The ``--ref`` that follows an upstream's stable releases rather than its
+#: default branch. hermes-agent tags a canary build every day and a release
+#: every week or two; a pack that tracked ``HEAD`` would vendor whatever the
+#: last canary carried, and "the hermes version WorkPilot ships with" would
+#: have no answer. With this ref the pack moves when upstream publishes a
+#: release, and the receipt names the tag.
+LATEST_RELEASE = "latest-release"
+
+# ``vMAJOR.MINOR.PATCH`` and nothing after it: a canary (``+canary.<date>``) or
+# a pre-release (``-rc.1``) is not a release. The major is capped at three
+# digits so a calendar tag such as hermes's old ``v2026.9.24`` cannot outrank
+# ``v0.23.0`` — hermes's own `update_channel` draws the same line.
+_STABLE_TAG = re.compile(r"^v(0|[1-9]\d{0,2})\.(\d+)\.(\d+)$")
+
+
+def bootstrap_ref(bootstrap: dict | None) -> str:
+    """The ``--ref`` a pack's bootstrap command passes to `vendor_pack.py`."""
+    command = (bootstrap or {}).get("command") or []
+    if not isinstance(command, list):
+        return "HEAD"
+    for i, word in enumerate(command):
+        if word == "--ref" and i + 1 < len(command):
+            return str(command[i + 1]) or "HEAD"
+        if isinstance(word, str) and word.startswith("--ref="):
+            return word.split("=", 1)[1] or "HEAD"
+    return "HEAD"
+
+
+def _clone_url(source: str) -> str:
+    return (
+        source
+        if "://" in source or source.startswith("git@")
+        else f"https://github.com/{source}.git"
+    )
+
+
+def latest_release_tag(source: str) -> str | None:
+    """The highest stable ``vX.Y.Z`` tag of an upstream, or None.
+
+    Read with ``git ls-remote`` rather than the GitHub API: the bootstrap runs
+    on machines without `gh` (a contributor's laptop, the pre-push hook), and
+    the tag list is the same answer either way.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", _clone_url(source)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+            check=True,
+        ).stdout
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        FileNotFoundError,
+        OSError,
+    ) as exc:
+        logger.debug("could not list the tags of %s: %s", source, exc)
+        return None
+    best: tuple[tuple[int, int, int], str] | None = None
+    for line in out.splitlines():
+        _, _, ref = line.partition("\t")
+        tag = ref.removeprefix("refs/tags/").strip()
+        match = _STABLE_TAG.match(tag)
+        if not match:
+            continue
+        key = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        if best is None or key > best[0]:
+            best = (key, tag)
+    return best[1] if best else None
+
+
+def resolve_ref(source: str, ref: str) -> str | None:
+    """A concrete git ref for *ref*; None when ``latest-release`` has no answer."""
+    if ref == LATEST_RELEASE:
+        return latest_release_tag(source)
+    return ref or "HEAD"
 
 
 def fetch_tree_sha(source: str, ref: str = "HEAD") -> str | None:

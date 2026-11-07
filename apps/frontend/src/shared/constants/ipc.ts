@@ -90,7 +90,10 @@ export const IPC_CHANNELS = {
 	// Per-spec architecture: Each spec has its own worktree at .worktrees/{spec-name}/
 	TASK_WORKTREE_STATUS: "task:worktreeStatus",
 	TASK_WORKTREE_DIFF: "task:worktreeDiff",
-	TASK_REVIEW_GROUPS: "task:reviewGroups", // Revue guidée : le diff regroupé par sous-tâche du plan
+	TASK_REVIEW_GROUPS: "task:reviewGroups",
+	TASK_REVIEW_COMMENTS_LIST: "task:reviewCommentsList", // Commentaires ancrés à la ligne (F9)
+	TASK_REVIEW_COMMENT_ADD: "task:reviewCommentAdd",
+	TASK_REVIEW_COMMENT_UPDATE: "task:reviewCommentUpdate", // Revue guidée : le diff regroupé par sous-tâche du plan
 	TASK_FILE_DIFF: "task:fileDiff", // Diff à la demande d'un fichier impacté (inclut les changements non commités)
 	TASK_WORKTREE_MERGE: "task:worktreeMerge",
 	TASK_WORKTREE_MERGE_PREVIEW: "task:worktreeMergePreview", // Preview merge conflicts before merging
