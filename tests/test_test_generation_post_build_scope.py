@@ -35,9 +35,9 @@ class _Agent:
 
 def _run(monkeypatch, project: Path, files: list[Path]) -> list[str]:
     agent = _Agent()
-    module = types.ModuleType("agents.test_generator")
+    module = types.ModuleType("test_generation.generator")
     module.TestGeneratorAgent = lambda: agent
-    monkeypatch.setitem(sys.modules, "agents.test_generator", module)
+    monkeypatch.setitem(sys.modules, "test_generation.generator", module)
     api.run_post_build_test_generation(str(project), [str(f) for f in files])
     return agent.seen
 

@@ -6,6 +6,8 @@ import type {
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
+import { useTranslation } from "react-i18next";
+import { formatAppDate } from "@/lib/date-format";
 
 interface TaskCardProps {
 	readonly task: ChangelogTask;
@@ -14,7 +16,8 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, isSelected, onToggle }: TaskCardProps) {
-	const completedDate = new Date(task.completedAt).toLocaleDateString();
+	const { t } = useTranslation();
+	const completedDate = formatAppDate(task.completedAt);
 
 	return (
 		<label
@@ -43,7 +46,7 @@ export function TaskCard({ task, isSelected, onToggle }: TaskCardProps) {
 					<div className="flex items-center gap-2 mt-3">
 						{task.hasSpecs && (
 							<Badge variant="secondary" className="text-xs">
-								Has Specs
+								{t("changelog:entry.hasSpecs")}
 							</Badge>
 						)}
 						<span className="text-xs text-muted-foreground">
@@ -61,7 +64,8 @@ interface CommitCardProps {
 }
 
 export function CommitCard({ commit }: CommitCardProps) {
-	const commitDate = new Date(commit.date).toLocaleDateString();
+	const { t } = useTranslation();
+	const commitDate = formatAppDate(commit.date);
 
 	return (
 		<div className="flex items-start gap-3 rounded-lg border border-border p-3 bg-background">
@@ -82,7 +86,7 @@ export function CommitCard({ commit }: CommitCardProps) {
 					<span>{commitDate}</span>
 					{commit.filesChanged !== undefined && (
 						<span>
-							{commit.filesChanged} file{commit.filesChanged === 1 ? "" : "s"}
+							{t("changelog:entry.files", { count: commit.filesChanged })}
 						</span>
 					)}
 				</div>

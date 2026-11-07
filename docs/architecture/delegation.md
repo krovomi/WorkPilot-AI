@@ -4,7 +4,7 @@
 
 ## Le problème
 
-Le registre `apps/backend/agents/subagents/` compose un roster pour chaque session
+Le registre `apps/backend/subagents/` compose un roster pour chaque session
 (`resolve()` : défauts de phase, overlays de langage et mobile, agents de l'appelant, plafond).
 Jusqu'ici ce roster n'atteignait le modèle que sur Claude : `create_client` le passe en
 `agents=` au SDK, qui expose son outil `Agent`. La branche Copilot de `create_agent_client`

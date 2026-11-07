@@ -11,6 +11,27 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# The GitHub CLI, which the AI review of a server project's pull requests
+# runs (runners/github, as a job on the clone, with the GitHub token of whoever
+# started it). A release pinned by version and by the SHA-256 GitHub publishes
+# for it, for the image's architecture; any other architecture stops the build.
+RUN set -eu; \
+    version=2.83.0; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) sum=a5cf6cdb40fc67751adf561126b3314044779cea81ba4f254fbe8e9a69f1676f ;; \
+      arm64) sum=12311e320d4cfdb54d7fa2d58cd1e3a2ccb4c12e1c3abb32b0a2e48bd0f991bf ;; \
+      *) echo "No pinned GitHub CLI for $arch" >&2; exit 1 ;; \
+    esac; \
+    name="gh_${version}_linux_${arch}"; \
+    curl -fsSL -o "/tmp/$name.tar.gz" \
+      "https://github.com/cli/cli/releases/download/v${version}/$name.tar.gz"; \
+    echo "$sum  /tmp/$name.tar.gz" | sha256sum -c -; \
+    tar -xzf "/tmp/$name.tar.gz" -C /tmp "$name/bin/gh"; \
+    install -m 0755 "/tmp/$name/bin/gh" /usr/local/bin/gh; \
+    rm -rf "/tmp/$name.tar.gz" "/tmp/$name"; \
+    gh --version
+
 # The server clones and builds other people's repositories: it does not need
 # root for that, and should not have it.
 RUN useradd --create-home --uid 10001 workpilot \

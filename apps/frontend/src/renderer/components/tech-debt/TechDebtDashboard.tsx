@@ -11,6 +11,8 @@ import { Label } from "../ui/label";
 import { DebtHeatmap } from "./DebtHeatmap";
 import { DebtItemsTable } from "./DebtItemsTable";
 import { DebtTrendChart } from "./DebtTrendChart";
+import { formatAppDateTime } from "@/lib/date-format";
+import { PageHeader } from "../ui/page-header";
 
 interface Props {
 	readonly projectPath?: string;
@@ -111,23 +113,20 @@ export function TechDebtDashboard({ projectPath }: Props) {
 
 	return (
 		<div className="p-6 space-y-6">
-			<header className="flex items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-semibold flex items-center gap-2">
-						<Gauge className="h-6 w-6" />
-						{t("techDebt:title")}
-					</h1>
-					<p className="text-sm text-muted-foreground">
-						{t("techDebt:description")}
-					</p>
-				</div>
-				<Button onClick={handleScan} disabled={!canScan}>
-					<RefreshCw
-						className={`h-4 w-4 mr-2 ${scanning ? "animate-spin" : ""}`}
-					/>
-					{t("techDebt:actions.scan")}
-				</Button>
-			</header>
+			<PageHeader
+				variant="inline"
+				icon={Gauge}
+				title={t("techDebt:title")}
+				description={t("techDebt:description")}
+				actions={
+					<Button onClick={handleScan} disabled={!canScan}>
+						<RefreshCw
+							className={`h-4 w-4 mr-2 ${scanning ? "animate-spin" : ""}`}
+						/>
+						{t("techDebt:actions.scan")}
+					</Button>
+				}
+			/>
 
 			<section className="grid grid-cols-1 md:grid-cols-3 gap-3">
 				<div>
@@ -213,7 +212,7 @@ export function TechDebtDashboard({ projectPath }: Props) {
 					{lastScannedAt && (
 						<span className="text-xs text-muted-foreground">
 							{t("techDebt:lastScanned", {
-								when: new Date(lastScannedAt * 1000).toLocaleString(),
+								when: formatAppDateTime(lastScannedAt * 1000),
 							})}
 						</span>
 					)}

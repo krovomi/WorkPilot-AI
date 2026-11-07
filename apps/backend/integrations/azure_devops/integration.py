@@ -19,10 +19,10 @@ if str(project_root) not in sys.path:
 
 # Try different import paths for git_provider
 try:
-    from src.core.git_provider import extract_azure_devops_project
+    from src.foundation.git_provider import extract_azure_devops_project
 except ImportError:
     try:
-        from core.git_provider import extract_azure_devops_project
+        from foundation.git_provider import extract_azure_devops_project
     except ImportError:
         # Fallback: define a dummy function
         def extract_azure_devops_project(path):

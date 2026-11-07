@@ -2,6 +2,8 @@
  * Project-related types
  */
 
+import type { EngineTrio } from "./task";
+
 export interface Project {
 	id: string;
 	name: string;
@@ -10,6 +12,41 @@ export interface Project {
 	settings: ProjectSettings;
 	createdAt: Date;
 	updatedAt: Date;
+	/**
+	 * Set on a project that lives on the WorkPilot server (server mode): its
+	 * board is the server's, shared with the other members; `path` is only the
+	 * app's read-only mirror of it. Absent on a project of this computer.
+	 */
+	remote?: RemoteProjectInfo;
+}
+
+/** What the app knows of a server project, as `/projects` lists it. */
+export interface RemoteProjectInfo {
+	repoUrl: string;
+	defaultBranch: string;
+	/** The caller's role on the project: viewer, member or owner. */
+	role: "viewer" | "member" | "owner";
+	/**
+	 * The forge whose views the server relays for this project, as the server
+	 * says (`server/forges.py`); absent from an older server.
+	 */
+	forge?: "github" | "gitlab" | null;
+}
+
+/** A shared view of a server project that follows the project's live stream. */
+export type ServerLiveView = "roadmap" | "ideation" | "insights" | "context";
+
+/**
+ * What a teammate changed in a shared view of a server project: the view
+ * reads itself again (`main/server-live-views.ts`).
+ */
+export interface ServerViewChange {
+	projectId: string;
+	view: ServerLiveView;
+	/** Insights: the conversation that changed. */
+	sessionId?: string;
+	/** Context: only its memories may have changed (a run of the project ended). */
+	memoriesOnly?: boolean;
 }
 
 export interface ProjectSettings {
@@ -25,6 +62,17 @@ export interface ProjectSettings {
 	tddMode?: boolean;
 	/** Run the verification loop after coding (launch, fix, drive, measure) (default: true) */
 	verifyLoop?: boolean;
+	/**
+	 * The second engine that reads a finished task before its pull request
+	 * (`cross_review/`). Absent means off; it must not be the build's provider.
+	 */
+	crossReview?: EngineTrio;
+	/**
+	 * ASP.NET Core Web APIs: write the spec's acceptance criteria as integration
+	 * tests before any code, and make `dotnet test` the task's goal when they
+	 * fail (`workflows/spec_by_example_phase.py`). Default: false.
+	 */
+	specByExample?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
 	/** Description utilisateur du projet (optionnel) */
@@ -167,6 +215,8 @@ export interface MemoryStatus {
 	database?: string;
 	dbPath?: string;
 	reason?: string;
+	/** A server project's memory: its own brain, kept on the server. */
+	onServer?: boolean;
 }
 
 export interface MemoryState {
@@ -391,6 +441,12 @@ export interface CustomMcpServer {
 	command?: string;
 	/** Arguments for the command (for type: 'command'). e.g., ['-y', 'my-mcp-server'] */
 	args?: string[];
+	/**
+	 * Environment of the process (for type: 'command'), e.g. the API key a
+	 * catalog server reads. The backend refuses loader variables (PATH,
+	 * NODE_OPTIONS, LD_*…): see `core.client._valid_mcp_server_env`.
+	 */
+	env?: Record<string, string>;
 	/** HTTP URL (for type: 'http'). e.g., 'https://mcp.example.com/mcp' */
 	url?: string;
 	/** HTTP headers (for type: 'http'). e.g., { "Authorization": "Bearer ..." } */

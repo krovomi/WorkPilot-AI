@@ -66,7 +66,7 @@ export function TaskHeader({
 							className="text-xs flex items-center gap-1 animate-pulse"
 						>
 							<AlertTriangle className="h-3 w-3" />
-							Stuck
+							{t("taskReview:taskPanel.stuck")}
 						</Badge>
 					) : isIncomplete ? (
 						<>
@@ -75,10 +75,13 @@ export function TaskHeader({
 								className="text-xs flex items-center gap-1"
 							>
 								<AlertTriangle className="h-3 w-3" />
-								Incomplete
+								{t("taskReview:taskPanel.incomplete")}
 							</Badge>
 							<Badge variant="outline" className="text-xs text-orange-400">
-								{taskProgress.completed}/{taskProgress.total} subtasks
+								{t("taskReview:taskPanel.subtasksProgress", {
+									completed: taskProgress.completed,
+									total: taskProgress.total,
+								})}
 							</Badge>
 						</>
 					) : (

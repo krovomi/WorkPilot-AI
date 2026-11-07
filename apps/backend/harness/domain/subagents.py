@@ -30,7 +30,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .paging import page_lines
+from foundation.paging import page_lines
 
 # The rule of thumb the context gauge uses too (``context_mgmt/guard.py``).
 CHARS_PER_TOKEN = 4

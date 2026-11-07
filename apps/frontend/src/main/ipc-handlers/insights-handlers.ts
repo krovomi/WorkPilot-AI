@@ -22,8 +22,20 @@ import type {
 	TaskMetadata,
 } from "../../shared/types";
 import { slugifySpecTitle } from "../../shared/utils/spec-slug";
+import {
+	askServer,
+	clearServerSession,
+	deleteServerSession,
+	getServerSession,
+	listServerSessions,
+	newServerSession,
+	renameServerSession,
+	switchServerSession,
+	updateServerModelConfig,
+} from "../insights/server-insights";
 import { insightsService } from "../insights-service";
-import { projectStore } from "../project-store";
+import { createServerCard } from "../server-board-actions";
+import { featureProject } from "./server-feature-files";
 import { getPageFeatureSettings } from "../services/page-llm-config";
 import { safeSendToRenderer } from "./utils";
 
@@ -71,10 +83,11 @@ export function registerInsightsHandlers(
 			_,
 			projectId: string,
 		): Promise<IPCResult<InsightsSession | null>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (project.remote) return getServerSession(project);
 
 			const session = insightsService.loadSession(projectId, project.path);
 			return { success: true, data: session };
@@ -89,7 +102,7 @@ export function registerInsightsHandlers(
 			message: string,
 			modelConfig?: InsightsModelConfig,
 		) => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				safeSendToRenderer(
 					getMainWindow,
@@ -108,6 +121,40 @@ export function registerInsightsHandlers(
 				// Override with any explicitly provided config
 				...modelConfig,
 			};
+
+			if (project.remote) {
+				await askServer(project, message, configWithSettings, {
+					chunk: (chunk) =>
+						safeSendToRenderer(
+							getMainWindow,
+							IPC_CHANNELS.INSIGHTS_STREAM_CHUNK,
+							projectId,
+							chunk,
+						),
+					status: (status) =>
+						safeSendToRenderer(
+							getMainWindow,
+							IPC_CHANNELS.INSIGHTS_STATUS,
+							projectId,
+							status,
+						),
+					error: (error) =>
+						safeSendToRenderer(
+							getMainWindow,
+							IPC_CHANNELS.INSIGHTS_ERROR,
+							projectId,
+							error,
+						),
+					sessionUpdated: (session) =>
+						safeSendToRenderer(
+							getMainWindow,
+							IPC_CHANNELS.INSIGHTS_SESSION_UPDATED,
+							projectId,
+							session,
+						),
+				});
+				return;
+			}
 
 			// Await the async sendMessage to ensure proper error handling and
 			// that all async operations (like getProcessEnv) complete before
@@ -140,10 +187,11 @@ export function registerInsightsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.INSIGHTS_CLEAR_SESSION,
 		async (_, projectId: string): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (project.remote) return clearServerSession(project);
 
 			insightsService.clearSession(projectId, project.path);
 			return { success: true };
@@ -159,9 +207,16 @@ export function registerInsightsHandlers(
 			description: string,
 			metadata?: TaskMetadata,
 		): Promise<IPCResult<Task>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
+			}
+			if (project.remote) {
+				// Server mode: a card of the shared board, made by the server.
+				return createServerCard(project, title, description, {
+					sourceType: "insights",
+					...metadata,
+				});
 			}
 
 			if (!project.autoBuildPath) {
@@ -273,10 +328,11 @@ export function registerInsightsHandlers(
 			_,
 			projectId: string,
 		): Promise<IPCResult<InsightsSessionSummary[]>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (project.remote) return listServerSessions(project);
 
 			const sessions = insightsService.listSessions(project.path);
 			return { success: true, data: sessions };
@@ -287,9 +343,12 @@ export function registerInsightsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.INSIGHTS_NEW_SESSION,
 		async (_, projectId: string): Promise<IPCResult<InsightsSession>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
+			}
+			if (project.remote) {
+				return newServerSession(project, getInsightsFeatureSettings());
 			}
 
 			const session = insightsService.createNewSession(projectId, project.path);
@@ -305,10 +364,12 @@ export function registerInsightsHandlers(
 			projectId: string,
 			sessionId: string,
 		): Promise<IPCResult<InsightsSession | null>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+
+			if (project.remote) return switchServerSession(project, sessionId);
 
 			const session = insightsService.switchSession(
 				projectId,
@@ -323,10 +384,12 @@ export function registerInsightsHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.INSIGHTS_DELETE_SESSION,
 		async (_, projectId: string, sessionId: string): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+
+			if (project.remote) return deleteServerSession(project, sessionId);
 
 			const success = insightsService.deleteSession(
 				projectId,
@@ -349,9 +412,13 @@ export function registerInsightsHandlers(
 			sessionId: string,
 			newTitle: string,
 		): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
+			}
+
+			if (project.remote) {
+				return renameServerSession(project, sessionId, newTitle);
 			}
 
 			const success = insightsService.renameSession(
@@ -375,9 +442,13 @@ export function registerInsightsHandlers(
 			sessionId: string,
 			modelConfig: InsightsModelConfig,
 		): Promise<IPCResult> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
+			}
+
+			if (project.remote) {
+				return updateServerModelConfig(project, sessionId, modelConfig);
 			}
 
 			const success = insightsService.updateSessionModelConfig(

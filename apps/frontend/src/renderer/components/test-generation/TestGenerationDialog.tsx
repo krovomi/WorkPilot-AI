@@ -224,14 +224,16 @@ export function TestGenerationDialog({
 						<div className="flex items-center justify-between mb-2">
 							<h4 className="font-mono text-sm">{gap.function.full_name}</h4>
 							<Badge className={PRIORITY_COLORS[gap.priority]}>
-								{gap.priority} priority
+								{t("testGeneration:gap.priority", { priority: gap.priority })}
 							</Badge>
 						</div>
 						<p className="mb-2 text-sm text-muted-foreground">{gap.reason}</p>
 						<div className="text-xs text-muted-foreground">
-							Line: {gap.function.line_number} | Complexity:{" "}
-							{gap.function.complexity} | Tests needed:{" "}
-							{gap.suggested_test_count}
+							{t("testGeneration:gap.details", {
+									line: gap.function.line_number,
+									complexity: gap.function.complexity,
+									tests: gap.suggested_test_count,
+								})}
 						</div>
 					</CardContent>
 				</Card>
@@ -248,7 +250,7 @@ export function TestGenerationDialog({
 					<Card key={test.test_name} className="overflow-hidden">
 						<CardContent className="flex flex-col gap-2 pt-4">
 							<div className="flex items-center gap-2">
-								<span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-emerald-500/15 text-emerald-400">
+								<span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-success/15 text-success">
 									<Check className="h-3 w-3" />
 								</span>
 								<span className="flex-1 break-all font-mono text-sm font-medium">
@@ -281,7 +283,7 @@ export function TestGenerationDialog({
 										})}
 									</summary>
 									<div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950 p-3">
-										<pre className="whitespace-pre font-mono text-[11.5px] leading-relaxed text-zinc-300">
+										<pre className="whitespace-pre font-mono text-2xs leading-relaxed text-zinc-300">
 											{test.test_code}
 										</pre>
 									</div>
@@ -547,7 +549,7 @@ export function TestGenerationDialog({
 										defaultValue: "Describe the user story or scenario...",
 									})}
 									rows={4}
-									className="border-2 border-yellow-400 focus:border-yellow-500 focus-visible:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200"
+									className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
 									style={{
 										border: "2px solid rgb(250, 204, 21)",
 										borderRadius: "0.5rem",
@@ -723,7 +725,7 @@ export function TestGenerationDialog({
 									})}
 								</Button>
 								<Button variant="outline" onClick={closeDialog}>
-									{t("common:buttons:close", { defaultValue: "Close" })}
+									{t("common:buttons.close", { defaultValue: "Close" })}
 								</Button>
 							</div>
 
@@ -788,7 +790,7 @@ export function TestGenerationDialog({
 
 				<DialogFooter>
 					<Button variant="outline" onClick={closeDialog}>
-						{t("common:buttons:close", { defaultValue: "Close" })}
+						{t("common:buttons.close", { defaultValue: "Close" })}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

@@ -15,6 +15,7 @@ import { ScrollArea } from "../../ui/scroll-area";
 import type { GitHubAPIComment } from "../../../../main/ipc-handlers/github/types";
 import type { InvestigationDialogProps } from "../types";
 import { formatDate } from "../utils";
+import { useTranslation } from "react-i18next";
 
 // Le pont expose la forme que le handler renvoie ; la redeclarer ici en faisait
 // une troisieme copie de la meme interface.
@@ -28,14 +29,17 @@ const CommentsLoadingState = () => (
 );
 
 // Helper component for error state
-const CommentsErrorState = ({ error }: { error: string }) => (
-	<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4">
-		<p className="text-sm text-destructive font-medium">
-			Failed to load comments
-		</p>
-		<p className="text-xs text-destructive/80 mt-1">{error}</p>
-	</div>
-);
+const CommentsErrorState = ({ error }: { error: string }) => {
+	const { t } = useTranslation();
+	return (
+		<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4">
+			<p className="text-sm text-destructive font-medium">
+				{t("common:githubIssues.investigation.loadCommentsFailed")}
+			</p>
+			<p className="text-xs text-destructive/80 mt-1">{error}</p>
+		</div>
+	);
+};
 
 // Helper component for comments list
 const CommentsList = ({
@@ -48,13 +52,17 @@ const CommentsList = ({
 	selectedCommentIds: number[];
 	toggleComment: (id: number) => void;
 	toggleAllComments: () => void;
-}) => (
+}) => {
+	const { t } = useTranslation();
+	return (
 	<div className="space-y-2 flex-1 min-h-0 flex flex-col">
 		<div className="flex items-center justify-between">
 			<h4 className="text-sm font-medium flex items-center gap-2">
 				<MessageCircle className="h-4 w-4" />
-				Select Comments to Include ({selectedCommentIds.length}/
-				{comments.length})
+				{t("common:githubIssues.investigation.selectComments", {
+					selected: selectedCommentIds.length,
+					total: comments.length,
+				})}
 			</h4>
 			<Button
 				variant="ghost"
@@ -63,8 +71,8 @@ const CommentsList = ({
 				className="text-xs"
 			>
 				{selectedCommentIds.length === comments.length
-					? "Deselect All"
-					: "Select All"}
+					? t("common:githubIssues.batch.deselectAll")
+					: t("common:prReview.selectAll")}
 			</Button>
 		</div>
 		<ScrollArea
@@ -90,7 +98,7 @@ const CommentsList = ({
 							<div className="flex-1 space-y-1 min-w-0">
 								<div className="flex items-center gap-2 text-xs text-muted-foreground">
 									<span className="font-medium">{comment.user.login}</span>
-									<span>�</span>
+									<span>·</span>
 									<span>{formatDate(comment.created_at)}</span>
 								</div>
 								<p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word line-clamp-3">
@@ -103,20 +111,24 @@ const CommentsList = ({
 			</div>
 		</ScrollArea>
 	</div>
-);
+	);
+};
 
 // Helper component for no comments state
-const NoCommentsState = () => (
+const NoCommentsState = () => {
+	const { t } = useTranslation();
+	return (
 	<div className="rounded-lg border border-border bg-muted/30 p-4">
-		<h4 className="text-sm font-medium mb-2">The task will include:</h4>
+		<h4 className="text-sm font-medium mb-2">{t("common:githubIssues.investigation.willInclude")}</h4>
 		<ul className="text-sm text-muted-foreground space-y-1">
-			<li>� Issue title and description</li>
-			<li>� Link back to the GitHub issue</li>
-			<li>� Labels and metadata from the issue</li>
-			<li>� No comments (this issue has no comments)</li>
+			<li>{t("common:githubIssues.investigation.includeTitle")}</li>
+			<li>{t("common:githubIssues.investigation.includeLink")}</li>
+			<li>{t("common:githubIssues.investigation.includeLabels")}</li>
+			<li>{t("common:githubIssues.investigation.includeNoComments")}</li>
 		</ul>
 	</div>
-);
+	);
+};
 
 export function InvestigationDialog({
 	open,
@@ -127,6 +139,7 @@ export function InvestigationDialog({
 	onClose,
 	projectId,
 }: InvestigationDialogProps) {
+	const { t } = useTranslation();
 	const [comments, setComments] = useState<GitHubComment[]>([]);
 	const [selectedCommentIds, setSelectedCommentIds] = useState<number[]>([]);
 	const [loadingComments, setLoadingComments] = useState(false);
@@ -199,12 +212,15 @@ export function InvestigationDialog({
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Sparkles className="h-5 w-5 text-info" />
-						Create Task from Issue
+						{t("common:githubIssues.investigation.title")}
 					</DialogTitle>
 					<DialogDescription>
 						{selectedIssue && (
 							<span>
-								Issue #{selectedIssue.number}: {selectedIssue.title}
+								{t("common:githubIssues.investigation.issueTitle", {
+									number: selectedIssue.number,
+									title: selectedIssue.title,
+								})}
 							</span>
 						)}
 					</DialogDescription>
@@ -213,8 +229,7 @@ export function InvestigationDialog({
 				{investigationStatus.phase === "idle" ? (
 					<div className="space-y-4 flex-1 min-h-0 flex flex-col">
 						<p className="text-sm text-muted-foreground">
-							Create a task from this GitHub issue. The task will be added to
-							your Kanban board in the Backlog column.
+							{t("common:githubIssues.investigation.description")}
 						</p>
 
 						{/* Comments section */}
@@ -243,17 +258,19 @@ export function InvestigationDialog({
 					</div>
 				) : (
 					<div className="space-y-4">
-						<div className="space-y-2">
-							<div className="flex items-center justify-between text-sm">
-								<span className="text-muted-foreground">
-									{investigationStatus.message}
-								</span>
-								<span className="text-foreground">
-									{investigationStatus.progress}%
-								</span>
+						{investigationStatus.phase !== "error" && (
+							<div className="space-y-2">
+								<div className="flex items-center justify-between text-sm">
+									<span className="text-muted-foreground">
+										{investigationStatus.message}
+									</span>
+									<span className="text-foreground">
+										{investigationStatus.progress}%
+									</span>
+								</div>
+								<Progress value={investigationStatus.progress} className="h-2" />
 							</div>
-							<Progress value={investigationStatus.progress} className="h-2" />
-						</div>
+						)}
 
 						{investigationStatus.phase === "error" && (
 							<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
@@ -264,7 +281,7 @@ export function InvestigationDialog({
 						{investigationStatus.phase === "complete" && (
 							<div className="rounded-lg bg-success/10 border border-success/30 p-3 flex items-center gap-2 text-sm text-success">
 								<CheckCircle2 className="h-4 w-4" />
-								Task created! View it in your Kanban board.
+								{t("common:githubIssues.investigation.created")}
 							</div>
 						)}
 					</div>
@@ -274,23 +291,29 @@ export function InvestigationDialog({
 					{investigationStatus.phase === "idle" && (
 						<>
 							<Button variant="outline" onClick={() => onOpenChange(false)}>
-								Cancel
+								{t("common:buttons.cancel")}
 							</Button>
 							<Button onClick={handleStartInvestigation}>
 								<Sparkles className="h-4 w-4 mr-2" />
-								Create Task
+								{t("common:githubIssues.createTask")}
 							</Button>
 						</>
 					)}
 					{investigationStatus.phase !== "idle" &&
-						investigationStatus.phase !== "complete" && (
+						investigationStatus.phase !== "complete" &&
+						investigationStatus.phase !== "error" && (
 							<Button variant="outline" disabled>
 								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								Creating...
+								{t("common:buttons.creating")}
 							</Button>
 						)}
+					{investigationStatus.phase === "error" && (
+						<Button variant="outline" onClick={onClose}>
+							{t("common:buttons.close")}
+						</Button>
+					)}
 					{investigationStatus.phase === "complete" && (
-						<Button onClick={onClose}>Done</Button>
+						<Button onClick={onClose}>{t("common:githubIssues.done")}</Button>
 					)}
 				</DialogFooter>
 			</DialogContent>

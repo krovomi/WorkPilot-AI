@@ -48,6 +48,7 @@ import {
 	type RowFilter,
 } from "./drafts";
 
+import { Input } from "../../ui/input";
 const PAGE = 150;
 
 export function TranslationEditor() {
@@ -172,7 +173,7 @@ export function TranslationEditor() {
 						<header className="flex flex-wrap items-center gap-2 border-b p-2">
 							<div className="relative min-w-40 flex-1">
 								<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-								<input
+								<Input
 									value={query}
 									onChange={(e) => {
 										setQuery(e.target.value);
@@ -180,7 +181,7 @@ export function TranslationEditor() {
 									}}
 									placeholder={t("i18nEditor.searchKeys")}
 									aria-label={t("i18nEditor.searchKeys")}
-									className="w-full rounded border bg-background py-1.5 pl-7 pr-2 text-xs"
+									className="w-full py-1.5 pl-7 pr-2 text-xs h-auto"
 								/>
 							</div>
 							<div className="flex gap-1">
@@ -190,7 +191,7 @@ export function TranslationEditor() {
 											key={value}
 											size="sm"
 											variant={filter === value ? "secondary" : "ghost"}
-											className="h-7 px-2 text-[11px]"
+											className="h-7 px-2 text-2xs"
 											onClick={() => {
 												setFilter(value);
 												setLimit(PAGE);
@@ -209,7 +210,7 @@ export function TranslationEditor() {
 							<Button
 								size="sm"
 								variant="outline"
-								className="h-7 px-2 text-[11px]"
+								className="h-7 px-2 text-2xs"
 								onClick={() => setAdding(true)}
 								disabled={busy}
 							>
@@ -219,13 +220,13 @@ export function TranslationEditor() {
 						</header>
 
 						{stale && (
-							<div className="flex items-center gap-2 border-b bg-amber-500/10 px-3 py-2 text-xs">
-								<AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+							<div className="flex items-center gap-2 border-b bg-warning/10 px-3 py-2 text-xs">
+								<AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
 								<span className="flex-1">{t("i18nEditor.staleNotice")}</span>
 								<Button
 									size="sm"
 									variant="outline"
-									className="h-6 px-2 text-[11px]"
+									className="h-6 px-2 text-2xs"
 									onClick={() => void reloadKeepingDraft()}
 								>
 									<RotateCcw className="mr-1 h-3 w-3" />
@@ -276,7 +277,8 @@ export function TranslationEditor() {
 											>
 												<td className="px-2 py-1.5">
 													{renaming === row.originalKey ? (
-														<input
+														<Input
+															spellCheck={false}
 															value={renameDraft}
 															onChange={(e) => setRenameDraft(e.target.value)}
 															onBlur={() => commitRename(row.originalKey)}
@@ -285,8 +287,7 @@ export function TranslationEditor() {
 																if (e.key === "Escape") setRenaming(null);
 															}}
 															aria-label={t("i18nEditor.renameKey")}
-															className="w-full rounded border bg-background px-1.5 py-1 font-mono text-xs"
-															// biome-ignore lint/a11y/noAutofocus: replaces the cell the user just clicked to rename
+															className="w-full px-1.5 py-1 font-mono text-xs h-auto"
 															autoFocus
 														/>
 													) : (
@@ -301,7 +302,7 @@ export function TranslationEditor() {
 																{row.key}
 															</span>
 															{row.isNew && (
-																<span className="shrink-0 rounded bg-primary/10 px-1 text-[10px] text-primary">
+																<span className="shrink-0 rounded bg-primary/10 px-1 text-3xs text-primary">
 																	{t("i18nEditor.newBadge")}
 																</span>
 															)}
@@ -317,7 +318,7 @@ export function TranslationEditor() {
 															)}
 															{row.placeholderMismatch && (
 																<span
-																	className="shrink-0 text-amber-600"
+																	className="shrink-0 text-warning"
 																	title={t("i18nEditor.mismatchHint", {
 																		vars: placeholdersOf(
 																			row.values[referenceLocale] ?? "",
@@ -431,7 +432,7 @@ export function TranslationEditor() {
 									<Button
 										size="sm"
 										variant="outline"
-										className="h-7 px-2 text-[11px]"
+										className="h-7 px-2 text-2xs"
 										onClick={() => setLimit((n) => n + PAGE)}
 									>
 										{t("i18nEditor.showMore")}
@@ -461,7 +462,7 @@ export function TranslationEditor() {
 								<Button
 									size="sm"
 									variant="ghost"
-									className="h-7 px-2 text-[11px]"
+									className="h-7 px-2 text-2xs"
 									onClick={discard}
 									disabled={busy}
 								>
@@ -470,7 +471,7 @@ export function TranslationEditor() {
 							)}
 							<Button
 								size="sm"
-								className="h-7 px-3 text-[11px]"
+								className="h-7 px-3 text-2xs"
 								onClick={() => void save()}
 								disabled={changes === 0 || busy}
 							>

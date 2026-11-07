@@ -295,69 +295,6 @@ export async function fetchPromotionDecision(
 }
 
 // ---------------------------------------------------------------------------
-// Parallel variations (item 9)
-
-export interface VariationDescriptor {
-	label: string;
-	path: string;
-	spec_id: string;
-	seed: number;
-}
-
-export interface VariationManifest {
-	spec_id: string;
-	parent_path: string;
-	variations: VariationDescriptor[];
-}
-
-export interface VariationComparison {
-	spec_id: string;
-	rows: Array<{
-		label: string;
-		subtasks_completed: number;
-		subtasks_total: number;
-		qa_status: string;
-		qa_report_chars: number;
-		has_self_review: boolean;
-	}>;
-	suggested_winner: string | null;
-}
-
-export async function listVariations(
-	specDir: string,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ manifest: VariationManifest }>> {
-	return _get<{ manifest: VariationManifest }>(
-		"/api/parallel-variations/list",
-		{ spec_dir: specDir },
-		signal,
-	);
-}
-
-export async function createVariations(
-	specDir: string,
-	count: number,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ manifest: VariationManifest }>> {
-	return _post<{ manifest: VariationManifest }>(
-		"/api/parallel-variations/create",
-		{ spec_dir: specDir, count },
-		signal,
-	);
-}
-
-export async function compareVariations(
-	specDir: string,
-	signal?: AbortSignal,
-): Promise<ApiResult<{ comparison: VariationComparison }>> {
-	return _get<{ comparison: VariationComparison }>(
-		"/api/parallel-variations/compare",
-		{ spec_dir: specDir },
-		signal,
-	);
-}
-
-// ---------------------------------------------------------------------------
 // Virtual reviewer (item 10)
 
 export interface VirtualReviewSummaryPayload {
@@ -509,11 +446,42 @@ export interface TraceabilityCoverage {
 	summary: string;
 }
 
+/** One requirement and what the build made of it (`requirement-links.json`). */
+export interface RequirementLink {
+	id: string;
+	title: string;
+	subtasks: string[];
+	files: string[];
+	tests: string[];
+	/** Files a test convention maps, for which none was found. */
+	untested: string[];
+}
+
+/** A requirement of another task, from the project's ledger, on the same files. */
+export interface EarlierRequirement {
+	spec: string;
+	id: string;
+	title: string;
+	files: string[];
+	tests: string[];
+}
+
+export interface TraceabilityLinks {
+	spec: string;
+	head: string;
+	/** `agent-trace`: the files the sessions wrote; `plan`: the files the plan declared. */
+	source: "agent-trace" | "plan";
+	requirements: RequirementLink[];
+	earlier: EarlierRequirement[];
+}
+
 export interface TraceabilityPayload {
 	spec: string;
 	requirements: TraceabilityRequirement[];
 	openQuestions: TraceabilityOpenQuestion[];
 	coverage: TraceabilityCoverage;
+	/** Null until a build linked the requirements to their files and tests. */
+	links: TraceabilityLinks | null;
 }
 
 export interface SpecTraceabilityQuery {
@@ -530,6 +498,7 @@ interface RawTraceability {
 	coverage: Omit<TraceabilityCoverage, "unknownRefs"> & {
 		unknown_refs: Record<string, string[]>;
 	};
+	links?: TraceabilityLinks | null;
 }
 
 export async function fetchSpecTraceability(
@@ -557,6 +526,7 @@ export async function fetchSpecTraceability(
 			requirements: raw.requirements,
 			openQuestions: raw.open_questions,
 			coverage: { ...coverage, unknownRefs: unknown_refs },
+			links: raw.links ?? null,
 		},
 	};
 }
@@ -1107,6 +1077,10 @@ export interface HermesReadiness {
 	readonly ready: boolean;
 	readonly degraded: boolean;
 	readonly home: string;
+	/** Release named by `hermes --version` (`0.23.0`); null when unread. */
+	readonly version?: string | null;
+	/** The release whose features WorkPilot wires. */
+	readonly minVersion?: string;
 	readonly checks: readonly HermesCheck[];
 }
 
@@ -1248,11 +1222,28 @@ export async function reviewHermesCandidates(
 	);
 }
 
+/**
+ * What happened to the hermes sessions already running when a persona was
+ * installed: asked to rebuild their prompt on their next turn (hermes ≥ 0.23),
+ * or not — with the command a person can type instead.
+ */
+export type HermesSessionsRefresh = "requested" | "needs-update" | "unavailable";
+
+export interface HermesSoulInstall {
+	readonly changed: boolean;
+	readonly message: string;
+	/** Null when nothing was written (already installed, or refused). */
+	readonly sessions?: HermesSessionsRefresh | null;
+	readonly refreshCommand?: string;
+	readonly updateCommand?: string;
+	readonly soul: HermesSoul;
+}
+
 export async function installHermesSoul(
 	overwrite: boolean,
 	signal?: AbortSignal,
-): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
-	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+): Promise<ApiResult<HermesSoulInstall>> {
+	return _post<HermesSoulInstall>(
 		"/api/hermes/soul/install",
 		{ overwrite },
 		signal,
@@ -1635,6 +1626,16 @@ export interface VerifyRecord {
 	targets: VerifyTarget[];
 	rounds: VerifyRound[];
 	scenario: Array<{ action: string; url?: string; text?: string; value?: string; note?: string }>;
+	/** The steps the card asked for (`verifyScenario`), and what the verifier saw for each. */
+	scenario_requested?: string[];
+	scenario_steps?: VerifyScenarioStep[];
+	/** Whether a Playwright trace of the scenario can be downloaded (`verifyTraceUrl`). */
+	trace?: boolean;
+	/** Whether the scenario was filmed (`verifyMediaUrl(query, "video")`), and why not. */
+	video?: boolean;
+	video_note?: string;
+	/** Whether the step captures make a GIF (`verifyMediaUrl(query, "walkthrough")`). */
+	walkthrough?: boolean;
 	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
 	endpoints: VerifyEndpoint[];
 	perf: VerifyPerf[];
@@ -1645,6 +1646,40 @@ export interface VerifyRecord {
 	findings: Array<{ severity: string; kind?: string; message: string }>;
 	browser?: { engine: string; reasons: string[] };
 	replay?: { status: string; problems?: string[]; reason?: string };
+	/** The same scenario replayed on the base branch and on the task (`POST /api/verify/compare`). */
+	compare?: VerifyCompare;
+}
+
+/** One behaviour that differs between the base branch and the task. */
+export interface VerifyDifference {
+	kind: "scenario" | "console" | "network" | "endpoint";
+	/** `broken`: worked on the base, not on the task; `fixed`: the reverse. */
+	change: "broken" | "fixed" | "added" | "removed" | "changed";
+	what: string;
+	base?: string | null;
+	task?: string | null;
+}
+
+export interface VerifyCompare {
+	status: "done" | "skipped";
+	reason?: string;
+	base?: string;
+	head?: string;
+	at?: number;
+	differences?: VerifyDifference[];
+	base_problems?: string[];
+	task_problems?: string[];
+	/** Indices in `screenshots` of the page at the end of the scenario, per side. */
+	screenshots?: { base: number | null; task: number | null };
+}
+
+export interface VerifyScenarioStep {
+	step: number;
+	outcome: "pass" | "fail" | "blocked";
+	note?: string;
+	url?: string;
+	/** Index in `screenshots` of the capture taken after the step. */
+	screenshotIndex?: number;
 }
 
 export interface VerifySettings {
@@ -1680,6 +1715,14 @@ export function runVerify(
 	);
 }
 
+/** Replay the verification on the base branch and on the task, and list what differs. */
+export function compareVerify(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _post<VerifyPayload>("/api/verify/compare", specAddress(query), signal);
+}
+
 /** The URL of one screenshot the record names — by index, never by path. */
 export function verifyScreenshotUrl(
 	query: SpecTraceabilityQuery,
@@ -1690,4 +1733,16 @@ export function verifyScreenshotUrl(
 		index: String(index),
 	}).toString();
 	return `${backendUrl()}/api/verify/screenshot?${qs}`;
+}
+
+/** The Playwright trace of the card's scenario, served by the record, never by path. */
+export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
+	const qs = new URLSearchParams(specAddress(query)).toString();
+	return `${backendUrl()}/api/verify/trace?${qs}`;
+}
+
+/** The scenario's video or GIF, served by the record, never by path. */
+export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
+	const qs = new URLSearchParams(specAddress(query)).toString();
+	return `${backendUrl()}/api/verify/${kind}?${qs}`;
 }

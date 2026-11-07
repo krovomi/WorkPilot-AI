@@ -151,3 +151,57 @@ describe("PhaseProgressIndicator — progression en mode tile", () => {
 		expect(screen.queryByText("50%")).not.toBeInTheDocument();
 	});
 });
+
+describe("PhaseProgressIndicator — mise en page compacte de la carte", () => {
+	it("n'affiche plus le libellé « Progression » quand les étapes de phase sont visibles", () => {
+		render(
+			<PhaseProgressIndicator
+				phase="complete"
+				subtasks={makeSubtasks(1, 1)}
+				isComplete={true}
+			/>,
+		);
+
+		// Les étapes Plan / Code / QA et le pourcentage portent l'information.
+		expect(screen.getByText("execution.shortPhases.plan")).toBeInTheDocument();
+		expect(screen.getByText("execution.shortPhases.qa")).toBeInTheDocument();
+		expect(screen.getByText("100%")).toBeInTheDocument();
+		expect(
+			screen.queryByText("execution.labels.progress"),
+		).not.toBeInTheDocument();
+	});
+
+	it("garde le libellé quand aucune étape n'est affichée (tâche au repos)", () => {
+		render(
+			<PhaseProgressIndicator phase="idle" subtasks={makeSubtasks(0, 2)} />,
+		);
+
+		expect(screen.getByText("execution.labels.progress")).toBeInTheDocument();
+		expect(
+			screen.queryByText("execution.shortPhases.plan"),
+		).not.toBeInTheDocument();
+	});
+
+	it("signale toujours une tâche interrompue en toutes lettres", () => {
+		render(
+			<PhaseProgressIndicator
+				phase="coding"
+				subtasks={makeSubtasks(1, 2)}
+				isStuck={true}
+				isRunning={true}
+			/>,
+		);
+
+		expect(screen.getByText("execution.labels.interrupted")).toBeInTheDocument();
+		expect(screen.getByText("execution.shortPhases.code")).toBeInTheDocument();
+	});
+
+	it("garde un point par sous-tâche (10 max, puis +N)", () => {
+		const { container } = render(
+			<PhaseProgressIndicator phase="coding" subtasks={makeSubtasks(3, 12)} />,
+		);
+
+		expect(container.querySelectorAll("[title^='Subtask']")).toHaveLength(10);
+		expect(screen.getByText("+2")).toBeInTheDocument();
+	});
+});

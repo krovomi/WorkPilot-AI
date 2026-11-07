@@ -24,7 +24,9 @@ import { useDocintelVisualStore } from "../../stores/docintel-visual-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
+import { NativeSelect } from "../ui/native-select";
 interface TaskMobilePreviewProps {
 	taskId: string;
 	project?: Project;
@@ -218,10 +220,14 @@ export function TaskMobilePreview({
 				)}
 
 				<div className="flex flex-wrap items-end gap-2">
-					<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+					<label
+						htmlFor="mobile-preview-device"
+						className="flex flex-col gap-1 text-xs text-muted-foreground"
+					>
 						{t("mobile:preview.device")}
-						<select
-							className="min-w-56 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+						<NativeSelect
+							id="mobile-preview-device"
+							className="min-w-56 px-2 py-1.5 text-sm h-auto"
 							value={device?.id ?? ""}
 							disabled={devices.length === 0 || isBusy}
 							onChange={(event) =>
@@ -238,7 +244,7 @@ export function TaskMobilePreview({
 									{deviceLabel(entry, t("mobile:preview.booted"))}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 
 					<Button
@@ -358,13 +364,12 @@ function EmptyState({
 	description: string;
 }) {
 	return (
-		<div className="flex h-full items-center justify-center p-8 text-center">
-			<div className="space-y-3">
-				<Smartphone className="mx-auto h-10 w-10 text-muted-foreground/40" />
-				<h3 className="text-base font-semibold">{title}</h3>
-				<p className="max-w-md text-sm text-muted-foreground">{description}</p>
-			</div>
-		</div>
+		<SharedEmptyState
+			className="h-full"
+			icon={Smartphone}
+			title={title}
+			description={description}
+		/>
 	);
 }
 

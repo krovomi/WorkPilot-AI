@@ -1,0 +1,17 @@
+{
+  "include": [
+    "best_of_n",
+    "bench",
+    "dotnet_upgrade",
+    "genai_trace",
+    "goal",
+    "mcp_tasks",
+    "os_sandbox",
+    "security"
+  ],
+  "exclude": ["**/__pycache__", ".venv"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic"
+}

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # A second entry point, so the same start as provider_api: redaction first
 # (docs/rules/security.md, S1), then error reporting. Neither blocks boot.
 try:
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
 except Exception as _e:  # noqa: BLE001

@@ -4,7 +4,9 @@
 	"languages": {
 		"heading": "Langages",
 		"source": "Depuis",
-		"target": "Vers"
+		"target": "Vers",
+		"swap": "Inverser les langages",
+		"same": "Choisissez deux langages différents."
 	},
 	"options": {
 		"heading": "Options",
@@ -16,21 +18,29 @@
 		"result": "Résultat ({{language}})",
 		"placeholder": "Collez ici le code à traduire.",
 		"resultEmpty": "La traduction s'affiche ici une fois lancée.",
-		"translating": "Traduction en cours…"
+		"translating": "Traduction en cours…",
+		"tabs": {
+			"code": "Traduction",
+			"tests": "Tests"
+		}
 	},
 	"history": {
 		"heading": "Historique",
 		"clear": "Vider",
-		"empty": "Aucune traduction pour ce projet."
+		"empty": "Aucune traduction pour ce projet.",
+		"lines_one": "{{count}} ligne",
+		"lines_other": "{{count}} lignes"
 	},
 	"historyStatus": {
 		"pending": "En cours",
 		"complete": "Terminée",
-		"failed": "Échouée"
+		"failed": "Échouée",
+		"cancelled": "Annulée"
 	},
 	"actions": {
 		"translate": "Traduire",
 		"cancel": "Annuler",
-		"dismiss": "Masquer"
+		"dismiss": "Masquer",
+		"copy": "Copier le résultat"
 	}
 }

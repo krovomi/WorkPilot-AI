@@ -23,6 +23,11 @@ import {
 	readWindsurfCachedPlanInfo,
 } from "../services/credential-manager";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import {
+	createLatestVersionSource,
+	fetchJsonWithRetry,
+	npmVersionOf,
+} from "../utils/latest-version-source";
 
 /**
  * Extract version from command output using regex
@@ -54,7 +59,9 @@ async function tryDirectCodexVersion(): Promise<string | undefined> {
  */
 async function tryShellCodexVersion(): Promise<string | undefined> {
 	try {
-		const result = await execFileAsync("codex", ["--version"], {
+		// One fixed command line: with shell:true, Node deprecates an args
+		// array (DEP0190) since it is concatenated, not escaped.
+		const result = await execFileAsync("codex --version", {
 			encoding: "utf-8",
 			timeout: 5000,
 			windowsHide: true,
@@ -131,45 +138,19 @@ async function getCodexVersion(): Promise<string | undefined> {
 	return await tryDirectCodexVersion();
 }
 
-/**
- * Cache for the latest @openai/codex version from the npm registry (1 hour TTL).
- */
-let cachedCodexLatest: { version: string; timestamp: number } | null = null;
-const CODEX_LATEST_CACHE_MS = 60 * 60 * 1000;
-
-async function fetchLatestCodexVersion(): Promise<string | undefined> {
-	if (
-		cachedCodexLatest &&
-		Date.now() - cachedCodexLatest.timestamp < CODEX_LATEST_CACHE_MS
-	) {
-		return cachedCodexLatest.version;
-	}
-
-	try {
-		const response = await fetch(
-			"https://registry.npmjs.org/@openai/codex/latest",
-			{
-				headers: {
-					Accept: "application/json",
-					"User-Agent": "WorkPilot-AI/1.0",
-				},
-				signal: AbortSignal.timeout(15000),
-			},
-		);
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-		}
-		const data = (await response.json()) as { version?: unknown };
-		if (typeof data.version !== "string") {
-			throw new TypeError("Invalid version format from npm registry");
-		}
-		cachedCodexLatest = { version: data.version, timestamp: Date.now() };
-		return data.version;
-	} catch (error) {
-		console.warn("[Codex CLI] Failed to fetch latest version from npm:", error);
-		return cachedCodexLatest?.version;
-	}
-}
+/** Latest @openai/codex on the npm registry (1 hour TTL). */
+const codexLatest = createLatestVersionSource({
+	label: "[Codex CLI]",
+	what: "the latest version on npm",
+	ttlMs: 60 * 60 * 1000,
+	load: async () =>
+		npmVersionOf(
+			await fetchJsonWithRetry(
+				"https://registry.npmjs.org/@openai/codex/latest",
+				{ "User-Agent": "WorkPilot-AI/1.0" },
+			),
+		),
+});
 
 /**
  * Spawn a command, drain its streams, and resolve on exit. 5-minute timeout.
@@ -580,7 +561,7 @@ export function registerCredentialHandlers(): void {
 				await credentialManager.checkOpenAICodexOAuthStatusPublic();
 
 			const version = await getCodexVersion();
-			const latest = version ? await fetchLatestCodexVersion() : undefined;
+			const latest = version ? await codexLatest.get() : undefined;
 			const isOutdated =
 				version && latest ? isCodexOutdated(version, latest) : false;
 
@@ -614,9 +595,9 @@ export function registerCredentialHandlers(): void {
 				});
 
 				// Invalidate caches so the next check sees the fresh version.
-				cachedCodexLatest = null;
+				codexLatest.invalidate();
 				const version = await getCodexVersion();
-				const latest = await fetchLatestCodexVersion();
+				const latest = await codexLatest.get();
 				const isOutdated =
 					version && latest ? isCodexOutdated(version, latest) : false;
 

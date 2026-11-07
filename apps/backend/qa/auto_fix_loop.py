@@ -62,7 +62,7 @@ except ImportError:
     TaskEventEmitter = None
 
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_error,
         debug_section,

@@ -18,7 +18,7 @@ _BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from spec.traceability import (  # noqa: E402
+from foundation.traceability import (  # noqa: E402
     compute_coverage,
     parse_open_questions,
     parse_requirements,

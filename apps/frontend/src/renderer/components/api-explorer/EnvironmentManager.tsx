@@ -15,6 +15,8 @@ import {
 } from "../../stores/api-explorer-store";
 import { useProjectStore } from "../../stores/project-store";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 // ── Environment Auto-Detection ───────────────────────────────────────────────
 
 export interface DetectedEnvironment {
@@ -270,13 +272,13 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
 			<div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-xl p-6">
 				<div className="flex items-center justify-between mb-5">
-					<h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+					<h2 className="text-base font-semibold text-foreground">
 						{t("apiExplorer:environments.title")}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
-						className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+						className="text-muted-foreground hover:text-foreground transition-colors"
 					>
 						<X size={18} />
 					</button>
@@ -290,26 +292,27 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 						>
 							{editId === env.id ? (
 								<div className="space-y-2">
-									<input
-										className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm text-[var(--color-text-primary)]"
+									<Input
+										className="w-full px-2 py-1 text-sm h-auto"
 										value={editName}
 										onChange={(e) => setEditName(e.target.value)}
 										placeholder={t("apiExplorer:environments.namePlaceholder")}
 									/>
-									<input
-										className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm font-mono text-[var(--color-text-primary)]"
+									<Input
+										spellCheck={false}
+										className="w-full px-2 py-1 text-sm font-mono h-auto"
 										value={editUrl}
 										onChange={(e) => setEditUrl(e.target.value)}
 										placeholder="https://api.example.com"
 									/>
 									<div className="relative">
-										<div className="text-[10px] text-[var(--color-text-muted)] mb-0.5">
+										<div className="text-3xs text-muted-foreground mb-0.5">
 											{t("apiExplorer:environments.token")}
 										</div>
 										<div className="flex gap-1">
 											<input
 												type={editTokenVisible ? "text" : "password"}
-												className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)]"
+												className="flex-1 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground"
 												value={editToken}
 												onChange={(e) => setEditToken(e.target.value)}
 												placeholder={t(
@@ -319,17 +322,18 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<button
 												type="button"
 												onClick={() => setEditTokenVisible((v) => !v)}
-												className="px-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] transition-colors"
+												className="px-2 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded bg-card transition-colors"
 											>
 												{editTokenVisible ? "🙈" : "👁"}
 											</button>
 										</div>
 									</div>
-									<div className="text-[10px] text-[var(--color-text-muted)] mb-0.5">
+									<div className="text-3xs text-muted-foreground mb-0.5">
 										{t("apiExplorer:environments.headers")}
 									</div>
-									<textarea
-										className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)] resize-none"
+									<Textarea
+										spellCheck={false}
+										className="w-full px-2 py-1 text-xs font-mono resize-none min-h-0"
 										rows={3}
 										value={editHeaders}
 										onChange={(e) => setEditHeaders(e.target.value)}
@@ -352,16 +356,16 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								<div className="flex items-center justify-between">
 									<div>
 										<div className="flex items-center gap-2">
-											<div className="text-sm font-medium text-(--color-text-primary)">
+											<div className="text-sm font-medium text-foreground">
 												{env.name}
 											</div>
 											{env.token && (
-												<span className="text-[9px] font-mono bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded px-1 py-0.5">
+												<span className="text-3xs font-mono bg-warning/10 text-warning border border-warning/20 rounded px-1 py-0.5">
 													Bearer ••••
 												</span>
 											)}
 										</div>
-										<div className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
+										<div className="text-xs font-mono text-muted-foreground mt-0.5">
 											{env.baseUrl}
 										</div>
 									</div>
@@ -369,7 +373,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										<button
 											type="button"
 											onClick={() => startEdit(env)}
-											className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] p-1 rounded transition-colors"
+											className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
 										>
 											<Settings size={14} />
 										</button>
@@ -377,7 +381,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<button
 												type="button"
 												onClick={() => removeEnvironment(env.id)}
-												className="text-[var(--color-text-muted)] hover:text-red-400 p-1 rounded transition-colors"
+												className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
 											>
 												<Trash2 size={14} />
 											</button>
@@ -391,16 +395,16 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 
 				{/* Auto-detected environments */}
 				{detectedEnvs.length > 0 && (
-					<div className="mt-3 border border-emerald-400/20 bg-emerald-400/5 rounded-lg p-3">
+					<div className="mt-3 border border-success/20 bg-success/5 rounded-lg p-3">
 						<div className="flex items-center justify-between mb-2.5">
-							<span className="text-xs font-semibold text-emerald-400">
+							<span className="text-xs font-semibold text-success">
 								{t("apiExplorer:environments.detected")} ({detectedEnvs.length})
 							</span>
 							<div className="flex gap-1.5">
 								<button
 									type="button"
 									onClick={() => setDetectedEnvs([])}
-									className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+									className="text-3xs text-muted-foreground hover:text-foreground transition-colors"
 								>
 									{t("apiExplorer:actions.cancel")}
 								</button>
@@ -424,18 +428,18 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										type="checkbox"
 										checked={selectedDetected.has(idx)}
 										onChange={() => toggleDetected(idx)}
-										className="accent-emerald-400 shrink-0"
+										className="accent-success shrink-0"
 									/>
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center gap-2">
-											<span className="text-xs font-medium text-[var(--color-text-primary)]">
+											<span className="text-xs font-medium text-foreground">
 												{env.name}
 											</span>
-											<span className="text-[9px] font-mono text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1">
+											<span className="text-3xs font-mono text-muted-foreground border border-[var(--color-border)] rounded px-1">
 												{env.source}
 											</span>
 										</div>
-										<span className="text-[10px] font-mono text-emerald-400/80 truncate block">
+										<span className="text-3xs font-mono text-success/80 truncate block">
 											{env.baseUrl}
 										</span>
 									</div>
@@ -447,26 +451,27 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 
 				{isAdding ? (
 					<div className="mt-3 border border-[var(--color-border)] rounded-lg p-3 space-y-2">
-						<input
-							className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm text-[var(--color-text-primary)]"
+						<Input
+							className="w-full px-2 py-1 text-sm h-auto"
 							value={newName}
 							onChange={(e) => setNewName(e.target.value)}
 							placeholder={t("apiExplorer:environments.namePlaceholder")}
 						/>
-						<input
-							className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm font-mono text-[var(--color-text-primary)]"
+						<Input
+							spellCheck={false}
+							className="w-full px-2 py-1 text-sm font-mono h-auto"
 							value={newUrl}
 							onChange={(e) => setNewUrl(e.target.value)}
 							placeholder="https://api.example.com"
 						/>
 						<div>
-							<div className="text-[10px] text-[var(--color-text-muted)] mb-0.5">
+							<div className="text-3xs text-muted-foreground mb-0.5">
 								{t("apiExplorer:environments.token")}
 							</div>
 							<div className="flex gap-1">
 								<input
 									type={newTokenVisible ? "text" : "password"}
-									className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)]"
+									className="flex-1 bg-card border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-foreground"
 									value={newToken}
 									onChange={(e) => setNewToken(e.target.value)}
 									placeholder={t("apiExplorer:environments.tokenPlaceholder")}
@@ -474,18 +479,19 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								<button
 									type="button"
 									onClick={() => setNewTokenVisible((v) => !v)}
-									className="px-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] border border-[var(--color-border)] rounded bg-[var(--color-bg-secondary)] transition-colors"
+									className="px-2 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded bg-card transition-colors"
 								>
 									{newTokenVisible ? "🙈" : "👁"}
 								</button>
 							</div>
 						</div>
 						<div>
-							<div className="text-[10px] text-[var(--color-text-muted)] mb-0.5">
+							<div className="text-3xs text-muted-foreground mb-0.5">
 								{t("apiExplorer:environments.headers")}
 							</div>
-							<textarea
-								className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono text-[var(--color-text-primary)] resize-none"
+							<Textarea
+								spellCheck={false}
+								className="w-full px-2 py-1 text-xs font-mono resize-none min-h-0"
 								rows={2}
 								value={newHeaders}
 								onChange={(e) => setNewHeaders(e.target.value)}
@@ -512,7 +518,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								type="button"
 								onClick={runDetection}
 								disabled={isDetecting}
-								className="flex-1 border border-dashed border-emerald-400/30 rounded-lg py-2 text-sm text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-400/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+								className="flex-1 border border-dashed border-success/30 rounded-lg py-2 text-sm text-success/70 hover:text-success hover:border-success/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
 							>
 								{isDetecting ? (
 									<Loader2 size={13} className="animate-spin" />
@@ -527,7 +533,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 						<button
 							type="button"
 							onClick={() => setIsAdding(true)}
-							className="flex-1 border border-dashed border-[var(--color-border)] rounded-lg py-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] transition-colors flex items-center justify-center gap-2"
+							className="flex-1 border border-dashed border-[var(--color-border)] rounded-lg py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors flex items-center justify-center gap-2"
 						>
 							<Plus size={14} />
 							{t("apiExplorer:environments.addNew")}

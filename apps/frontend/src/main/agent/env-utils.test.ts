@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	applyVerifyLoop,
+	crossReviewEnv,
+	specByExampleEnv,
 	applyMobileTargets,
 	applyTddOverride,
 	getOAuthModeClearVars,
@@ -210,5 +212,31 @@ describe("applyVerifyLoop", () => {
 
 	it("inherits the project default when the card says nothing", () => {
 		expect(applyVerifyLoop({ A: "1", WORKPILOT_VERIFY_LOOP: "true" }, undefined)).toEqual({ A: "1" });
+	});
+});
+
+describe("crossReviewEnv", () => {
+	it("names the second engine for the backend", () => {
+		expect(
+			crossReviewEnv({ provider: "openai", model: "gpt-5.5", effort: "high" }),
+		).toEqual({
+			WORKPILOT_CROSS_REVIEW_PROVIDER: "openai",
+			WORKPILOT_CROSS_REVIEW_MODEL: "gpt-5.5",
+			WORKPILOT_CROSS_REVIEW_EFFORT: "high",
+		});
+	});
+
+	it("says nothing without a provider and a model", () => {
+		expect(crossReviewEnv(undefined)).toEqual({});
+		expect(crossReviewEnv({ provider: "openai", model: "  " })).toEqual({});
+		expect(crossReviewEnv({ provider: "", model: "gpt-5.5" })).toEqual({});
+	});
+});
+
+describe("specByExampleEnv", () => {
+	it("sends the switch only when the project turns it on", () => {
+		expect(specByExampleEnv(true)).toEqual({ WORKPILOT_SPEC_BY_EXAMPLE: "1" });
+		expect(specByExampleEnv(false)).toEqual({});
+		expect(specByExampleEnv(undefined)).toEqual({});
 	});
 });

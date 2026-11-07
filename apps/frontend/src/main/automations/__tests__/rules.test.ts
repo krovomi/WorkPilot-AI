@@ -64,6 +64,28 @@ describe("parseRule", () => {
 		}
 	});
 
+	it("keeps a PR rule's review a draft, with no card kind or engine", () => {
+		const pr = {
+			name: "Others' PRs",
+			trigger: { type: "pr_opened", base: "develop" },
+			draft: false,
+			kind: "bug_fix",
+			engine: { provider: "anthropic", model: "m", effort: "high" },
+		};
+		const rule = parseRule(pr) as AutomationRule;
+		expect(rule.trigger).toEqual({ type: "pr_opened", base: "develop" });
+		// The review is never posted by a rule, whatever the renderer sent.
+		expect(rule.draft).toBe(true);
+		expect(rule.kind).toBeUndefined();
+		expect(rule.engine).toBeUndefined();
+		expect((parseRule({ ...pr, trigger: { type: "pr_opened", base: "" } }) as AutomationRule).trigger).toEqual({
+			type: "pr_opened",
+		});
+		for (const base of ["../main", "a b", "x&state=closed", 7]) {
+			expect(parseRule({ ...pr, trigger: { type: "pr_opened", base } })).toMatch(/branch/);
+		}
+	});
+
 	it("checks a schedule's time, days and card text", () => {
 		const schedule = {
 			name: "Weekly audit",

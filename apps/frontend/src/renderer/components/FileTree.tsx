@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useVirtualizedTree } from "../hooks/useVirtualizedTree";
 import { useFileExplorerStore } from "../stores/file-explorer-store";
 import { FileTreeItem } from "./FileTreeItem";
+import { useTranslation } from "react-i18next";
 
 interface FileTreeProps {
 	rootPath: string;
@@ -22,6 +23,7 @@ export function FileTree({
 	onSelectFolder?: (path: string) => void;
 	selectedFolder?: string;
 }) {
+	const { t } = useTranslation();
 	const parentRef = useRef<HTMLDivElement>(null);
 
 	const { loadDirectory, isLoadingDir, error } = useFileExplorerStore();
@@ -74,7 +76,7 @@ export function FileTree({
 						onSelectFolder?.(parentPath);
 					}}
 				>
-					⬆ Parent
+					{t("common:fileExplorer.parent")}
 				</button>
 				{/* The large inner element to hold all of the items */}
 				<div
@@ -142,11 +144,11 @@ export function FileTree({
 			<div className="flex flex-col items-center justify-center py-8 px-4 text-center">
 				<FolderOpen className="h-6 w-6 text-muted-foreground mb-2" />
 				<p className="text-xs text-muted-foreground">
-					Aucun dossier trouvé.
+					{t("common:fileExplorer.noFolders")}
 					<br />
-					Vérifiez le chemin ou vos droits d'accès.
+					{t("common:fileExplorer.checkPath")}
 					<br />
-					Racine actuelle : {rootPath}
+					{t("common:fileExplorer.currentRoot", { path: rootPath })}
 				</p>
 			</div>
 		);

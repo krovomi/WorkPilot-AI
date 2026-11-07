@@ -70,5 +70,8 @@
 		"appliedDesc": "{{model}} · {{effort}} will be used for every phase of this task.",
 		"failedTitle": "Could not apply formula",
 		"failedDesc": "The task configuration was not saved. Please try again."
+	},
+	"frontier": {
+		"success": "success"
 	}
 }

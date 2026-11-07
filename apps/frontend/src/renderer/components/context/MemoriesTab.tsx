@@ -174,7 +174,11 @@ export function MemoriesTab({
 									/>
 									<InfoItem
 										label={t("context:memories.path")}
-										value={memoryStatus.dbPath || "~/.workpilot/brain"}
+										value={
+											memoryStatus.onServer
+												? t("context:memories.onServer")
+												: memoryStatus.dbPath || "~/.workpilot/brain"
+										}
 									/>
 								</div>
 
@@ -198,8 +202,8 @@ export function MemoriesTab({
 													{t("context:memories.prReviews")}
 												</div>
 											</div>
-											<div className="text-center p-2 rounded-lg bg-amber-500/10">
-												<div className="text-lg font-semibold text-amber-400">
+											<div className="text-center p-2 rounded-lg bg-warning/10">
+												<div className="text-lg font-semibold text-warning">
 													{memoryCounts.sessions}
 												</div>
 												<div className="text-xs text-muted-foreground">
@@ -222,8 +226,8 @@ export function MemoriesTab({
 													{t("context:memories.patterns")}
 												</div>
 											</div>
-											<div className="text-center p-2 rounded-lg bg-red-500/10">
-												<div className="text-lg font-semibold text-red-400">
+											<div className="text-center p-2 rounded-lg bg-destructive/10">
+												<div className="text-lg font-semibold text-destructive">
 													{memoryCounts.gotchas}
 												</div>
 												<div className="text-xs text-muted-foreground">
@@ -244,7 +248,9 @@ export function MemoriesTab({
 										: t("context:memories.notConfigured")}
 								</p>
 								<p className="mt-2 text-xs">
-									{t("context:memories.brainHint")}
+									{memoryStatus?.onServer
+										? t("context:memories.serverBrainHint")
+										: t("context:memories.brainHint")}
 								</p>
 							</div>
 						)}
@@ -289,7 +295,7 @@ export function MemoriesTab({
 												{result.type.replace("_", " ")}
 											</Badge>
 											<span className="text-xs text-muted-foreground">
-												Score: {result.score.toFixed(2)}
+												{t("context:memories.score", { score: result.score.toFixed(2) })}
 											</span>
 										</div>
 										<pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-auto">

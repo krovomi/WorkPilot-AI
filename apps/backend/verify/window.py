@@ -68,6 +68,11 @@ ACTIONS = ("click", "fill", "toggle", "select", "expand", "collapse")
 _REF = re.compile(r"^e\d{1,5}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _START_SECONDS = 60.0
+#: Loading UI Automation and compiling the helper's C# the first time on a
+#: machine (driver.ps1 caches the assembly afterwards). A cold Windows machine
+#: took more than the start budget: the helper says it is starting, then
+#: compiling, and the start waits this long after each of those lines.
+_COMPILE_SECONDS = 240.0
 _REQUEST_SECONDS = 30.0
 
 # What PowerShell needs to start and compile its C#, and nothing that could
@@ -168,11 +173,13 @@ class UiaDriver:
         env: dict[str, str] | None = None,
         *,
         start_timeout: float = _START_SECONDS,
+        compile_timeout: float = _COMPILE_SECONDS,
         timeout: float = _REQUEST_SECONDS,
     ):
         self.command = command if command is not None else driver_command()
         self.env = env if env is not None else _driver_env()
         self.start_timeout = start_timeout
+        self.compile_timeout = compile_timeout
         self.timeout = timeout
         self._process: subprocess.Popen | None = None
         self._lines: queue.Queue[str | None] = queue.Queue()
@@ -230,6 +237,12 @@ class UiaDriver:
         self._process = process
         try:
             ready = json.loads(self._wait_line(self.start_timeout))
+            # The helper says it is alive, then that it is compiling: each
+            # sign of life gives the rest of the start the compile budget.
+            while isinstance(ready, dict) and (
+                ready.get("starting") or ready.get("compiling")
+            ):
+                ready = json.loads(self._wait_line(self.compile_timeout))
         except (DriverError, ValueError) as exc:
             self.close()
             raise HelperUnavailable(

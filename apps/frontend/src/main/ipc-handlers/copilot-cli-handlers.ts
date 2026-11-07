@@ -12,6 +12,7 @@
  * - Version registry: GitHub releases (github/copilot-cli), not npm
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import {
 	type ChildProcessWithoutNullStreams,
 	execFile,
@@ -21,6 +22,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { ipcMain } from "electron";
+import semver from "semver";
 import { DEFAULT_APP_SETTINGS, IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
 import type {
@@ -30,21 +32,24 @@ import type {
 } from "../../shared/types/cli";
 import {
 	clearToolCache,
-	configureTools,
+	updateToolConfig,
 	getToolInfo,
 	getToolPath,
 } from "../cli-tool-manager";
 import { getAugmentedEnv } from "../env-utils";
 import { isMacOS, isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { coalesceInFlight } from "../utils/coalesce-in-flight";
+import {
+	createLatestVersionSource,
+	describeNetworkError,
+	fetchJsonWithRetry,
+	LATEST_VERSION_TIMEOUT_MS,
+} from "../utils/latest-version-source";
 import { isSecurePath } from "../utils/windows-paths";
 
 const execFileAsync = promisify(execFile);
 
-// Cache for latest copilot version
-let cachedLatestCopilotVersion: { version: string; timestamp: number } | null =
-	null;
-const COPILOT_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * GitHub API release object structure
@@ -197,104 +202,61 @@ async function scanCopilotInstallations(
 	return installations;
 }
 
-/**
- * Fetch the latest copilot extension version from GitHub API (stable releases only)
- */
-async function fetchLatestCopilotVersion(): Promise<string> {
-	// Check cache
-	if (
-		cachedLatestCopilotVersion &&
-		Date.now() - cachedLatestCopilotVersion.timestamp <
-			COPILOT_CACHE_DURATION_MS
-	) {
-		return cachedLatestCopilotVersion.version;
-	}
+const COPILOT_RELEASES = "repos/github/copilot-cli/releases";
 
+/** Latest stable copilot-cli release, by `gh api` (its auth, no rate limit) or plain HTTPS. */
+async function loadLatestCopilotVersion(): Promise<string> {
+	let ghReason: string;
 	try {
-		// Try using gh api if available - get all releases and filter for stable ones
-		const ghPath = getToolPath("gh");
-		const env = getAugmentedEnv();
-
 		const { stdout } = await execFileAsync(
-			ghPath,
+			getToolPath("gh"),
 			[
 				"api",
-				"repos/github/copilot-cli/releases",
+				COPILOT_RELEASES,
 				"--jq",
 				"[.[] | select(.prerelease == false) | .tag_name] | .[0]",
 			],
 			{
 				encoding: "utf-8",
-				timeout: 15000,
+				timeout: LATEST_VERSION_TIMEOUT_MS,
 				windowsHide: true,
-				env,
+				env: getAugmentedEnv(),
 			},
 		);
-
-		const version = stdout
-			.trim()
-			.replace(/^v/, "")
-			.replace(/^"/, "")
-			.replace(/"$/, "");
-		if (version && version !== "null") {
-			cachedLatestCopilotVersion = { version, timestamp: Date.now() };
-			return version;
-		}
+		const version = stdout.trim().replace(/^"|"$/g, "").replace(/^v/, "");
+		if (version && version !== "null") return version;
+		ghReason = "no stable release";
 	} catch (error) {
-		console.warn(
-			"[Copilot CLI] Failed to fetch latest stable version via gh api:",
-			error instanceof Error ? error.message : error,
-		);
+		ghReason = describeNetworkError(error);
 	}
 
-	// Fallback: fetch from GitHub API directly - get all releases and filter for stable ones
 	try {
-		const https = await import("node:https");
-		const data = await new Promise<string>((resolve, reject) => {
-			const req = https.get(
-				"https://api.github.com/repos/github/copilot-cli/releases",
-				{
-					headers: {
-						"User-Agent": "WorkPilot-AI",
-						Accept: "application/vnd.github.v3+json",
-					},
-					timeout: 10000,
-				},
-				(res) => {
-					let body = "";
-					res.on("data", (chunk: Buffer | string) => (body += chunk));
-					res.on("end", () => resolve(body));
-				},
-			);
-			req.on("error", reject);
-			req.on("timeout", () => {
-				req.destroy();
-				reject(new Error("Request timed out"));
-			});
-		});
-
-		const releases = JSON.parse(data);
-		// Find the first non-prerelease release
-		const stableRelease = releases.find(
-			(release: GitHubRelease) => !release.prerelease,
+		const releases = await fetchJsonWithRetry(
+			`https://api.github.com/${COPILOT_RELEASES}`,
+			{
+				"User-Agent": "WorkPilot-AI",
+				Accept: "application/vnd.github.v3+json",
+			},
 		);
-		const version = stableRelease
-			? (stableRelease.tag_name || "").replace(/^v/, "")
-			: "";
-
-		if (version) {
-			cachedLatestCopilotVersion = { version, timestamp: Date.now() };
-			return version;
-		}
+		const stable = Array.isArray(releases)
+			? (releases as GitHubRelease[]).find((release) => !release.prerelease)
+			: undefined;
+		const version = (stable?.tag_name ?? "").replace(/^v/, "");
+		if (version) return version;
+		throw new TypeError("no stable release");
 	} catch (error) {
-		console.warn(
-			"[Copilot CLI] Failed to fetch latest stable version via HTTPS:",
-			error instanceof Error ? error.message : error,
+		throw new Error(
+			`gh api: ${ghReason}; HTTPS: ${describeNetworkError(error)}`,
 		);
 	}
-
-	return "unknown";
 }
+
+const copilotLatest = createLatestVersionSource({
+	label: "[Copilot CLI]",
+	what: "the latest stable release",
+	ttlMs: 24 * 60 * 60 * 1000,
+	load: loadLatestCopilotVersion,
+});
 
 /**
  * Get the install command for Copilot CLI extension
@@ -454,16 +416,16 @@ export function registerCopilotCliHandlers(): void {
 	// Check Copilot CLI version
 	ipcMain.handle(
 		IPC_CHANNELS.COPILOT_CLI_CHECK_VERSION,
-		async (): Promise<IPCResult<CopilotCliVersionInfo>> => {
+		coalesceInFlight(async (): Promise<IPCResult<CopilotCliVersionInfo>> => {
 			try {
-				console.warn("[Copilot CLI] Checking version...");
+				debugLog("[Copilot CLI] Checking version...");
 
 				// Get installed version via cli-tool-manager
 				// biome-ignore lint/suspicious/noImplicitAnyLet: type inferred from assignment
 				let detectionResult;
 				try {
 					detectionResult = getToolInfo("copilot");
-					console.warn(
+					debugLog(
 						"[Copilot CLI] Detection result:",
 						JSON.stringify(detectionResult, null, 2),
 					);
@@ -488,27 +450,21 @@ export function registerCopilotCliHandlers(): void {
 				}
 
 				// Fetch latest version from GitHub
-				let latest: string;
-				try {
-					latest = await fetchLatestCopilotVersion();
-				} catch {
-					latest = "unknown";
-				}
+				const latest = (await copilotLatest.get()) ?? "unknown";
 
 				// Compare versions
 				let isOutdated = false;
 				if (installed && latest !== "unknown") {
 					try {
-						const semver = await import("semver");
 						const cleanInstalled = installed.replace(/^v/, "");
 						const cleanLatest = latest.replace(/^v/, "");
-						isOutdated = semver.default.lt(cleanInstalled, cleanLatest);
+						isOutdated = semver.lt(cleanInstalled, cleanLatest);
 					} catch {
 						isOutdated = false;
 					}
 				}
 
-				console.warn("[Copilot CLI] Check complete:", {
+				debugLog("[Copilot CLI] Check complete:", {
 					installed,
 					ghVersion,
 					latest,
@@ -533,7 +489,7 @@ export function registerCopilotCliHandlers(): void {
 					error: `Failed to check Copilot CLI version: ${errorMsg}`,
 				};
 			}
-		},
+		}),
 	);
 
 	// Install Copilot CLI extension (open terminal with install command)
@@ -692,7 +648,7 @@ export function registerCopilotCliHandlers(): void {
 					await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
 				}
 
-				cachedLatestCopilotVersion = null;
+				copilotLatest.invalidate();
 				// Invalidate the cli-tool-manager cache so the next getToolInfo
 				// re-detects the freshly-installed copilot extension version.
 				clearToolCache();
@@ -815,7 +771,7 @@ export function registerCopilotCliHandlers(): void {
 				writeSettingsFile(mergedSettings);
 
 				// Update CLI tool manager cache
-				configureTools({ copilotPath: normalizedPath });
+				updateToolConfig({ copilotPath: normalizedPath });
 
 				return {
 					success: true,
@@ -925,5 +881,5 @@ export function registerCopilotCliHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] Copilot CLI handlers registered");
+	debugLog("[IPC] Copilot CLI handlers registered");
 }

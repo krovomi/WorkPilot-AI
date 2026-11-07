@@ -1,3 +1,4 @@
+import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
 import { execFileSync, spawn } from "node:child_process";
 import {
@@ -38,7 +39,7 @@ import {
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import {
-	configureTools,
+	configureToolsFromSettings,
 	getToolInfo,
 	getToolPath,
 	isPathFromWrongPlatform,
@@ -46,14 +47,24 @@ import {
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
 import { openExternalUrl } from "../open-external";
-import { decryptSecret } from "../secret-storage";
+import {
+	decryptSecret,
+	prepareSecrets,
+	secretFieldValues,
+} from "../secret-storage";
 import { configurePythonFeatureServices } from "../python-feature-services";
+import { syncVoiceGlobalShortcut } from "../voice-assistant/global-shortcut";
 import { rememberUserChosenPath } from "../security/renderer-path";
 import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
 } from "../settings-secrets";
-import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { pushThemeIfChanged } from "../server-ui-preferences";
+import {
+	isSecretSettingsKey,
+	readSettingsFile,
+	writeSettingsFile,
+} from "../settings-utils";
 import {
 	getPackagedSourceEnvPath,
 	SOURCE_ENV_TOKEN_KEY,
@@ -424,7 +435,7 @@ const detectAutoBuildSourcePath = (): string | null => {
 		}
 
 		if (exists) {
-			console.warn(
+			debugLog(
 				`[detectAutoBuildSourcePath] Auto-detected source path: ${p}`,
 			);
 			return p;
@@ -644,19 +655,12 @@ export function registerSettingsHandlers(
 				}
 			}
 
-			// Configure CLI tools with current settings
-			configureTools({
-				pythonPath: settings.pythonPath,
-				gitPath: settings.gitPath,
-				githubCLIPath: settings.githubCLIPath,
-				gitlabCLIPath: settings.gitlabCLIPath,
-				claudePath: settings.claudePath,
-			});
-
-			// Re-warm cache asynchronously after configuring (non-blocking)
-			preWarmToolCache(["claude"]).catch((error) => {
-				console.warn("[SETTINGS_GET] Failed to re-warm CLI cache:", error);
-			});
+			// Configure CLI tools with current settings; re-warm only on a change
+			if (configureToolsFromSettings(settings)) {
+				preWarmToolCache(["claude"]).catch((error) => {
+					console.warn("[SETTINGS_GET] Failed to re-warm CLI cache:", error);
+				});
+			}
 
 			// The renderer learns which credentials are set, never their value (S6)
 			return { success: true, data: maskSettingsSecrets(settings) };
@@ -748,7 +752,12 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				writeSettingsFile(newSettings);
+				await prepareSecrets(
+					secretFieldValues(newSettings, isSecretSettingsKey),
+				);
+				const credentialsSetAt = writeSettingsFile(newSettings);
+				// Server mode: the theme follows the person to their other devices.
+				pushThemeIfChanged(settings, newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {
@@ -774,18 +783,14 @@ export function registerSettingsHandlers(
 					settings.gitlabCLIPath !== undefined ||
 					settings.claudePath !== undefined
 				) {
-					configureTools({
-						pythonPath: newSettings.pythonPath,
-						gitPath: newSettings.gitPath,
-						githubCLIPath: newSettings.githubCLIPath,
-						gitlabCLIPath: newSettings.gitlabCLIPath,
-						claudePath: newSettings.claudePath,
-					});
+					const changed = configureToolsFromSettings(newSettings);
 
 					// Re-warm cache asynchronously after configuring (non-blocking)
-					preWarmToolCache(["claude"]).catch((error) => {
-						console.warn("[SETTINGS_SAVE] Failed to re-warm CLI cache:", error);
-					});
+					if (changed) {
+						preWarmToolCache(["claude"]).catch((error) => {
+							console.warn("[SETTINGS_SAVE] Failed to re-warm CLI cache:", error);
+						});
+					}
 				}
 
 				// The Telegram approval poller follows the saved channel settings.
@@ -810,7 +815,16 @@ export function registerSettingsHandlers(
 					}
 				}
 
-				return { success: true };
+				// The voice assistant's system-wide shortcut follows its switch.
+				if (
+					settings.voiceAssistantShortcut !== undefined ||
+					settings.voiceAssistantSystemWide !== undefined
+				) {
+					syncVoiceGlobalShortcut(getMainWindow, newSettings);
+				}
+
+				// The renderer's copy of the dates is stale once a key changed.
+				return { success: true, data: { credentialsSetAt } };
 			} catch (error) {
 				return {
 					success: false,

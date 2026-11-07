@@ -10,6 +10,8 @@ import {
 	ciFailedEvents,
 	issueKey,
 	issueLabeledEvents,
+	prKey,
+	prOpenedEvents,
 	SourceError,
 	scheduleEvents,
 } from "../sources";
@@ -100,6 +102,69 @@ function adapter(run: PipelineRun | null, errors: string[] = []): PipelineProvid
 		fetchRunErrors: vi.fn(async () => errors),
 	} as unknown as PipelineProviderAdapter;
 }
+
+describe("prOpenedEvents", () => {
+	const trigger = { type: "pr_opened" } as const;
+	const pull = (number: number, login: string, extra: object = {}) => ({
+		number,
+		html_url: `https://github.com/acme/app/pull/${number}`,
+		created_at: "2026-10-21T00:00:00Z",
+		user: { login, type: "User" },
+		...extra,
+	});
+
+	it("turns another person's PR opened after the rule into a review, oldest first", async () => {
+		const source = github({
+			"/repos/acme/app/pulls?": [
+				pull(9, "bob"),
+				pull(8, "Leub"),
+				pull(7, "dependabot[bot]", { user: { login: "dependabot[bot]", type: "Bot" } }),
+				pull(6, "carol", { draft: true }),
+				pull(5, "dave", { created_at: "2026-10-19T00:00:00Z" }),
+				pull(4, "erin"),
+			],
+			"/user": { login: "leub" },
+		});
+		const result = await prOpenedEvents(rule(trigger), source, () => false);
+		expect(result.events.map((e) => e.pr?.number)).toEqual([4, 9]);
+		expect(result.events[1]).toMatchObject({
+			key: prKey("acme/app", 9),
+			subject: "PR #9",
+			url: "https://github.com/acme/app/pull/9",
+			// Nothing of the PR's own text goes through the rule.
+			description: "",
+		});
+		expect(result.ignored).toEqual([
+			{ key: prKey("acme/app", 7), subject: "PR #7", reason: "bot_author" },
+			{ key: prKey("acme/app", 8), subject: "PR #8", reason: "own_pr" },
+		]);
+	});
+
+	it("asks GitHub for the rule's base branch only, and skips what was already seen", async () => {
+		const source = github({ "/repos/acme/app/pulls?": [pull(3, "bob")], "/user": { login: "leub" } });
+		const seen = await prOpenedEvents(rule({ type: "pr_opened", base: "release/2.0" }), source, () => true);
+		expect(seen.events).toEqual([]);
+		expect(source.fetch.mock.calls[0][0]).toContain("&base=release%2F2.0&");
+		// Nothing left to check: who the token belongs to is not asked.
+		expect(source.fetch).toHaveBeenCalledTimes(1);
+	});
+
+	it("fails rather than review the person's own PRs when GitHub does not say who they are", async () => {
+		const source = github({ "/repos/acme/app/pulls?": [pull(3, "bob")], "/user": {} });
+		await expect(prOpenedEvents(rule(trigger), source, () => false)).rejects.toThrow(/whose token/);
+	});
+
+	it("refuses an answer that is not a list, and a PR number that is not one", async () => {
+		await expect(
+			prOpenedEvents(rule(trigger), github({ "/repos/acme/app/pulls?": { message: "Not Found" } }), () => false),
+		).rejects.toThrow(/list/);
+		const odd = github({
+			"/repos/acme/app/pulls?": [pull(-1, "bob"), { ...pull(2, "bob"), number: "2; rm" }],
+			"/user": { login: "leub" },
+		});
+		expect((await prOpenedEvents(rule(trigger), odd, () => false)).events).toEqual([]);
+	});
+});
 
 describe("ciFailedEvents", () => {
 	const trigger = { type: "ci_failed" } as const;

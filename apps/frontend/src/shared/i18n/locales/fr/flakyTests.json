@@ -1,18 +1,83 @@
 {
 	"title": "Détective de tests instables",
-	"noData": "Aucun scan effectué. Cliquez sur « Lancer le scan » pour démarrer.",
-	"summary": "{{flaky}} instables sur {{total}} tests au total",
-	"confidence": "confiance {{level}}",
+	"description": "Un test instable passe puis échoue sur le même code. Le détective exécute votre suite de tests plusieurs fois et signale les tests dont le résultat change d'une exécution à l'autre.",
+	"noData": "Aucune analyse pour l'instant. Exécutez vos tests plusieurs fois, ou analysez les rapports de tests déjà présents dans le projet.",
+	"summary": "{{flaky}} instables sur {{total}} tests",
+	"summaryRun": "{{flaky}} instables sur {{total}} tests, sur {{runs}} exécutions de {{command}}",
+	"summaryScan": "{{flaky}} instables sur {{total}} tests, d'après {{reports}} rapports de tests",
+	"confidenceLevel": {
+		"high": "Confiance élevée",
+		"medium": "Confiance moyenne",
+		"low": "Confiance faible"
+	},
 	"cause": "Cause :",
-	"failures": "échecs",
+	"failedRuns": "en échec {{failures}} fois sur {{total}} exécutions ({{rate}} %)",
+	"errorSample": "Dernière erreur",
+	"causes": {
+		"timing": "délais",
+		"test_order": "ordre des tests",
+		"shared_state": "état partagé",
+		"network": "réseau",
+		"randomness": "aléatoire",
+		"resource_leak": "fuite de ressources",
+		"concurrency": "concurrence",
+		"environment": "environnement",
+		"unknown": "inconnue"
+	},
+	"fixes": {
+		"timing": "Remplacer les pauses et délais fixes par des attentes explicites ou du polling, ou augmenter le délai.",
+		"test_order": "Faire préparer et nettoyer son propre état à chaque test, pour ne plus dépendre de l'ordre d'exécution.",
+		"shared_state": "Isoler l'état partagé par test : une transaction de base de données neuve ou un stockage en mémoire par test.",
+		"network": "Simuler les appels réseau externes (WireMock, nock, responses…) au lieu de joindre les vrais services.",
+		"randomness": "Fixer la graine des générateurs aléatoires et utiliser des GUID, UUID et dates fixes dans les tests.",
+		"resource_leak": "Fermer fichiers, connexions et handles dans le nettoyage (Dispose, afterEach, tearDown).",
+		"concurrency": "Synchroniser les accès partagés et utiliser des assertions sûres en multithread.",
+		"environment": "Figer les variables d'environnement et dépendances système, par exemple en lançant les tests dans un conteneur.",
+		"unknown": "Lancer le test seul plusieurs fois pour le confirmer, et ajouter des logs autour de l'assertion qui échoue."
+	},
+	"run": {
+		"title": "Exécuter les tests plusieurs fois",
+		"command": "Commande de test",
+		"runs": "Nombre d'exécutions",
+		"detecting": "Détection de la commande de test du projet…",
+		"remote": "Projet serveur : les tests s'exécutent sur le serveur, avec la commande de test détectée là-bas.",
+		"noCommand": "Aucune commande de test prise en charge n'a été trouvée dans ce projet. Pris en charge : .NET (dotnet test), pytest, Vitest, Jest avec jest-junit, Maven, Gradle et Go.",
+		"help": "Chaque exécution lance toute la suite et écrit son rapport dans .workpilot/flaky-tests/ : les analyses suivantes en tiennent compte aussi. .NET compile une fois, puis réutilise ce build.",
+		"start": "Exécuter {{count}} fois"
+	},
 	"actions": {
-		"runScan": "Lancer le scan",
+		"runScan": "Analyser les rapports existants",
 		"cancel": "Annuler",
-		"scanning": "Scan en cours...",
+		"scanning": "Analyse en cours...",
 		"reset": "Réinitialiser"
+	},
+	"progress": {
+		"discovering": "Recherche des rapports de tests…",
+		"parsing": "Lecture de {{count}} rapports de tests…",
+		"starting": "Démarrage de {{command}}…",
+		"run": "Exécution {{run}} sur {{runs}} : {{command}}",
+		"analysing": "Analyse des résultats…",
+		"runResult": "Exécution {{run}} : {{passed}} réussis, {{failed}} en échec ({{duration}} s)",
+		"timedOut": "délai dépassé",
+		"noReport": "Exécution {{run}} : aucun rapport de tests écrit"
+	},
+	"empty": {
+		"noReports": "Aucun rapport de tests trouvé dans ce projet.",
+		"noReportsHint": "Exécutez les tests plusieurs fois ci-dessus : le détective lancera {{command}} et gardera le rapport de chaque exécution.",
+		"noReportsHintGeneric": "Exécutez les tests plusieurs fois ci-dessus, ou configurez votre outil de test pour écrire des rapports JUnit XML ou TRX.",
+		"noFlaky": "Aucun test instable : chaque test a donné le même résultat à chaque exécution.",
+		"fewRuns": "Seulement {{runs}} exécution(s) analysée(s) : il en faut au moins {{min}} pour révéler un test instable. Exécutez les tests plus de fois."
+	},
+	"alwaysFailing": {
+		"title": "{{count}} test(s) en échec à chaque exécution",
+		"description": "Ces tests sont cassés plutôt qu'instables : ils n'ont jamais réussi."
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
-		"failed": "Échec du scan : {{error}}"
+		"failed": "Échec du scan : {{error}}",
+		"no_command": "Aucune commande de test prise en charge n'a été trouvée dans ce projet.",
+		"no_results": "La commande de test n'a écrit aucun rapport : elle a sans doute échoué avant de lancer les tests (erreur de compilation, outil manquant). Sa sortie :",
+		"start_failed": "La commande de test n'a pas pu démarrer. L'outil est-il installé et dans le PATH ?",
+		"details": "Détails"
 	}
 }

@@ -31,7 +31,9 @@ import { Card } from "../ui/card";
 import { Progress } from "../ui/progress";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
+import { Input } from "../ui/input";
 interface StreamingEvent {
 	event_type: string;
 	timestamp: number;
@@ -104,7 +106,7 @@ export function StreamingSession({
 		const { event_type, data, timestamp } = event;
 
 		let content = `Event Type: ${event_type}\n`;
-		content += `Timestamp: ${new Date(timestamp * 1000).toLocaleString()}\n\n`;
+		content += `Timestamp: ${formatAppDateTime(timestamp * 1000)}\n\n`;
 		content += `Data:\n${JSON.stringify(data, null, 2)}`;
 
 		return content;
@@ -485,7 +487,7 @@ export function StreamingSession({
 		if (isConnected) {
 			return (
 				<>
-					<div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2" />
+					<div className="w-2 h-2 bg-success rounded-full animate-pulse mr-2" />
 					{t("streaming:status.live")}
 				</>
 			);
@@ -592,7 +594,10 @@ export function StreamingSession({
 					<div className="px-4 py-2 border-b bg-muted/20">
 						<p className="text-sm font-mono text-muted-foreground truncate">
 							{selectedEvent
-								? `Event: ${selectedEvent.event_type} - ${new Date(selectedEvent.timestamp * 1000).toLocaleTimeString()}`
+								? t("streaming:eventLabel", {
+										type: selectedEvent.event_type,
+										time: formatAppTime(selectedEvent.timestamp * 1000),
+									})
 								: currentFile || t("streaming:codeView.noFile")}
 						</p>
 					</div>
@@ -654,9 +659,7 @@ export function StreamingSession({
 														{msg.author}
 													</span>
 													<span className="text-xs text-muted-foreground">
-														{new Date(
-															msg.timestamp * 1000,
-														).toLocaleTimeString()}
+														{formatAppTime(msg.timestamp * 1000)}
 													</span>
 												</div>
 												<p className="text-sm">{msg.message}</p>
@@ -668,13 +671,13 @@ export function StreamingSession({
 
 							<div className="p-4 border-t">
 								<div className="flex gap-2">
-									<input
+									<Input
 										type="text"
 										value={chatInput}
 										onChange={(e) => setChatInput(e.target.value)}
 										onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
 										placeholder={t("streaming:chat.placeholder")}
-										className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+										className="flex-1 px-3 py-2 text-sm h-auto"
 									/>
 									<Button size="sm" onClick={sendChatMessage}>
 										{t("streaming:chat.send")}
@@ -710,15 +713,13 @@ export function StreamingSession({
 															{event.event_type}
 														</Badge>
 														<span className="text-xs text-muted-foreground">
-															{new Date(
-																event.timestamp * 1000,
-															).toLocaleTimeString()}
+															{formatAppTime(event.timestamp * 1000)}
 														</span>
 														{selectedEvent?.timestamp === event.timestamp &&
 															selectedEvent?.event_type ===
 																event.event_type && (
 																<Badge variant="default" className="text-xs">
-																	Selected
+																	{t("streaming:selectedBadge")}
 																</Badge>
 															)}
 													</div>
@@ -764,7 +765,7 @@ export function StreamingSession({
 											>
 												<Code2 className="w-3 h-3 shrink-0 text-muted-foreground" />
 												<span className="truncate flex-1">{file.path}</span>
-												<Badge variant="outline" className="text-[10px]">
+												<Badge variant="outline" className="text-3xs">
 													{file.operation}
 												</Badge>
 											</button>

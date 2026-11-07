@@ -2,7 +2,7 @@
  * Tests for profile-service.ts
  */
 
-import type { ProfilesFile } from "@shared/types/profile";
+import type { APIProfile, ProfilesFile } from "@shared/types/profile";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createProfile,
@@ -287,6 +287,7 @@ describe("profile-service", () => {
 			});
 			expect(result.createdAt).toBeGreaterThan(0);
 			expect(result.updatedAt).toBeGreaterThan(0);
+			expect(result.apiKeySetAt).toBe(result.createdAt);
 			expect(saveProfilesFile).toHaveBeenCalled();
 		});
 
@@ -394,6 +395,59 @@ describe("profile-service", () => {
 			expect(result.models).toEqual({ default: "claude-sonnet-4-5-20250929" });
 			expect(result.updatedAt).toBeGreaterThan(1000000);
 			expect(result.createdAt).toBe(1000000);
+			expect(result.apiKeySetAt).toBe(result.updatedAt);
+		});
+
+		describe("the key's date (S5)", () => {
+			async function update(stored: Partial<APIProfile>, apiKey: string) {
+				const { loadProfilesFile, saveProfilesFile } = await import(
+					"./profile-manager"
+				);
+				vi.mocked(loadProfilesFile).mockResolvedValue({
+					profiles: [
+						{
+							id: "existing-id",
+							name: "Work",
+							baseUrl: "https://api.example.com",
+							apiKey: "sk-kept-api-key-123",
+							createdAt: 1000000,
+							updatedAt: 1000000,
+							...stored,
+						},
+					],
+					activeProfileId: null,
+					version: 1,
+				});
+				vi.mocked(saveProfilesFile).mockResolvedValue(undefined);
+				return updateProfile({
+					id: "existing-id",
+					name: "Renamed",
+					baseUrl: "https://api.example.com",
+					apiKey,
+				});
+			}
+
+			it("is kept when only the name changes", async () => {
+				const result = await update(
+					{ apiKeySetAt: 2000000 },
+					" sk-kept-api-key-123 ",
+				);
+				expect(result.apiKeySetAt).toBe(2000000);
+			});
+
+			it("stays unknown for an undated key that did not change", async () => {
+				const result = await update({}, "sk-kept-api-key-123");
+				expect(result.apiKeySetAt).toBeUndefined();
+			});
+
+			it("is renewed when the key changes", async () => {
+				const result = await update(
+					{ apiKeySetAt: 2000000 },
+					"sk-rotated-api-key-456",
+				);
+				expect(result.apiKeySetAt).toBe(result.updatedAt);
+				expect(result.apiKeySetAt).toBeGreaterThan(2000000);
+			});
 		});
 
 		it("should allow updating profile with same name (case-insensitive)", async () => {

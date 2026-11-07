@@ -62,8 +62,8 @@ const STATUS_OPTIONS: Array<{
 		value: "reviewing",
 		labelKey: "prReview.reviewing",
 		icon: Loader2,
-		color: "text-amber-400",
-		bgColor: "bg-amber-500/20",
+		color: "text-warning",
+		bgColor: "bg-warning/20",
 	},
 	{
 		value: "not_reviewed",
@@ -90,15 +90,15 @@ const STATUS_OPTIONS: Array<{
 		value: "changes_requested",
 		labelKey: "prReview.changesRequested",
 		icon: AlertCircle,
-		color: "text-red-400",
-		bgColor: "bg-red-500/20",
+		color: "text-destructive",
+		bgColor: "bg-destructive/20",
 	},
 	{
 		value: "ready_to_merge",
 		labelKey: "prReview.readyToMerge",
 		icon: CheckCheck,
-		color: "text-emerald-400",
-		bgColor: "bg-emerald-500/20",
+		color: "text-success",
+		bgColor: "bg-success/20",
 	},
 	{
 		value: "ready_for_followup",
@@ -556,7 +556,7 @@ export function PRFilterBar({
 						renderItem={(contributor) => (
 							<div className="flex items-center gap-2 min-w-0">
 								<div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-									<span className="text-[10px] font-medium text-primary">
+									<span className="text-3xs font-medium text-primary">
 										{contributor.slice(0, 2).toUpperCase()}
 									</span>
 								</div>

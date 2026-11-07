@@ -20,8 +20,25 @@ jobs:
   discord-notification:
     runs-on: ubuntu-latest
     steps:
+      # Without the webhook secret the action fails on an empty URL and the
+      # run turns red after every release. Nothing to announce to: say so and
+      # stop green. Set DISCORD_WEBHOOK_URL in the repository secrets to
+      # announce releases on Discord.
+      - name: Check the webhook
+        id: webhook
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::notice title=Discord::DISCORD_WEBHOOK_URL is not set: release not announced."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Read the release
         id: release
+        if: steps.webhook.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
@@ -36,6 +53,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Send to Discord
+        if: steps.webhook.outputs.configured == 'true'
         uses: SethCohen/github-releases-to-discord@24d166886aee4646d448c8a389ff9e1ebcab3682 # v1.20.0
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}

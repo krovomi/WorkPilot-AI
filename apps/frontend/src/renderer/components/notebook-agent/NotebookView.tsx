@@ -25,13 +25,13 @@ export function NotebookView({
 	const hasResults = notebooks.length > 0;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -40,7 +40,7 @@ export function NotebookView({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -49,7 +49,7 @@ export function NotebookView({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -57,19 +57,19 @@ export function NotebookView({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -82,7 +82,7 @@ export function NotebookView({
 				</div>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -102,7 +102,7 @@ function NotebookReport({
 		<div className="flex flex-col gap-3">
 			<div>
 				<h3 className="text-base font-semibold">{notebook.path}</h3>
-				<p className="text-xs text-(--text-secondary)">
+				<p className="text-xs text-muted-foreground">
 					{notebook.kernel} · {notebook.language}
 				</p>
 			</div>
@@ -116,7 +116,7 @@ function NotebookReport({
 				<StatCard
 					label={t("codeCells")}
 					value={notebook.codeCells}
-					color="text-green-400"
+					color="text-success"
 				/>
 				<StatCard
 					label={t("markdown")}
@@ -126,7 +126,7 @@ function NotebookReport({
 				<StatCard
 					label={t("issues")}
 					value={notebook.issues.length}
-					color="text-red-400"
+					color="text-destructive"
 				/>
 			</div>
 
@@ -136,10 +136,10 @@ function NotebookReport({
 						let severityClass: string;
 						if (issue.severity === "error") {
 							severityClass =
-								"border-red-500/20 bg-red-500/10 text-red-400";
+								"border-destructive/20 bg-destructive/10 text-destructive";
 						} else if (issue.severity === "warning") {
 							severityClass =
-								"border-yellow-500/20 bg-yellow-500/10 text-yellow-400";
+								"border-warning/20 bg-warning/10 text-warning";
 						} else {
 							severityClass =
 								"border-blue-500/20 bg-blue-500/10 text-blue-400";
@@ -160,7 +160,7 @@ function NotebookReport({
 								</div>
 								<p className="text-sm">{issue.message}</p>
 								{issue.suggestion && (
-									<p className="text-xs mt-1 text-green-400">
+									<p className="text-xs mt-1 text-success">
 										💡 {t("suggestion")}: {issue.suggestion}
 									</p>
 								)}
@@ -183,8 +183,8 @@ function StatCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-2xl font-bold ${color}`}>{value}</p>
 		</div>
 	);

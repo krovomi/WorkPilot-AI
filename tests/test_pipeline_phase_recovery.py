@@ -38,7 +38,7 @@ def pipeline(monkeypatch, temp_git_repo):
 @pytest.mark.parametrize("error_type", ["generic", "rate_limit", "authentication"])
 async def test_planning_retries_stay_in_planning(pipeline, monkeypatch, error_type):
     coder, project, spec, _ = pipeline
-    from core.build_signals import BuildHalted
+    from foundation.build_signals import BuildHalted
     from task_logger import LogPhase
 
     phases = []
@@ -82,7 +82,7 @@ async def test_planning_retries_stay_in_planning(pipeline, monkeypatch, error_ty
 )
 async def test_incomplete_build_cannot_return_success(pipeline, monkeypatch, plan):
     coder, project, spec, failure = pipeline
-    from core.build_signals import BuildHalted
+    from foundation.build_signals import BuildHalted
 
     if plan is not None:
         (spec / "implementation_plan.json").write_text(
@@ -162,7 +162,7 @@ async def test_transient_failure_recovers_then_runs_coding(
 async def test_loop_detector_pause_does_not_authorize_qa(pipeline, monkeypatch):
     coder, project, spec, _ = pipeline
     from agents import loop_detection
-    from core.build_signals import BuildPaused
+    from foundation.build_signals import BuildPaused
 
     monkeypatch.setattr(loop_detection, "loop_detection_enabled", lambda: True)
     detector = Mock()
@@ -190,7 +190,7 @@ async def test_repeated_planning_error_preserves_terminal_failure(
     pipeline, monkeypatch
 ):
     coder, project, spec, failure = pipeline
-    from core.build_signals import BuildHalted
+    from foundation.build_signals import BuildHalted
 
     session = AsyncMock(
         return_value=(

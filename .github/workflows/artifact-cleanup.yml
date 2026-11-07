@@ -1,0 +1,97 @@
+name: Artifact cleanup
+
+# The Actions storage quota of the free plan is shared by every artifact the
+# repository keeps. Release builds (DMG, EXE, AppImage, deb, flatpak) used to
+# stay the default 90 days, and the quota ran out: new runs could no longer
+# upload anything, pull requests included.
+#
+# Two halves keep it from coming back:
+# - every `actions/upload-artifact` step sets `retention-days` (at most 3),
+#   which tests/test_artifact_retention.py holds;
+# - this job deletes whatever is older than that anyway: the artifacts
+#   uploaded before the limit existed, and any upload that slips through.
+#
+# A published release does not need them: its files live on the release page,
+# not in Actions storage. GitHub recomputes the used storage every 6 to 12
+# hours, so the quota frees up some hours after a sweep, not at once.
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # every day, off the hour
+  workflow_dispatch:
+    inputs:
+      max-age-hours:
+        description: Delete artifacts older than this many hours (0 = all)
+        required: false
+        default: '72'
+
+concurrency:
+  group: artifact-cleanup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: Delete old artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write # list and delete artifacts, nothing else
+    steps:
+      - name: Delete artifacts older than the limit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          # The input is read from the environment, never interpolated into
+          # the script (S2: a dispatch input is data).
+          MAX_AGE_HOURS: ${{ inputs.max-age-hours || '72' }}
+        with:
+          retries: 3
+          script: |
+            const raw = process.env.MAX_AGE_HOURS ?? '72';
+            if (!/^\d{1,4}$/.test(raw)) {
+              core.setFailed(`max-age-hours must be a whole number of hours, got "${raw}"`);
+              return;
+            }
+            const maxAgeMs = Number(raw) * 3600 * 1000;
+            const now = Date.now();
+            const { owner, repo } = context.repo;
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner, repo, per_page: 100 },
+            );
+
+            let deleted = 0;
+            let freed = 0;
+            let kept = 0;
+            for (const artifact of artifacts) {
+              if (artifact.expired) continue;
+              // Never pull an artifact out from under the run that uploads it.
+              if (artifact.workflow_run?.id === context.runId) continue;
+              const age = now - new Date(artifact.created_at).getTime();
+              if (age < maxAgeMs) {
+                kept += 1;
+                continue;
+              }
+              try {
+                await github.rest.actions.deleteArtifact({
+                  owner,
+                  repo,
+                  artifact_id: artifact.id,
+                });
+                deleted += 1;
+                freed += artifact.size_in_bytes;
+              } catch (error) {
+                // Already gone (another sweep, its own retention): not a failure.
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            const mb = (freed / 1024 / 1024).toFixed(1);
+            core.info(`Deleted ${deleted} artifact(s), ${mb} MB; kept ${kept} younger than ${raw} h.`);
+            await core.summary
+              .addHeading('Artifact cleanup')
+              .addRaw(`Deleted ${deleted} artifact(s) (${mb} MB), kept ${kept} younger than ${raw} h.`)
+              .write();

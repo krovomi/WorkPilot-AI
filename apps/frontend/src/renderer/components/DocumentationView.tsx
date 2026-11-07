@@ -1,6 +1,6 @@
 import {
 	AlertTriangle,
-	BookOpen,
+	BookOpenCheck,
 	Check,
 	CheckCircle2,
 	Copy,
@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { FilePathAutocomplete } from "./FilePathAutocomplete";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,19 +64,19 @@ function CoverageGauge({
 }) {
 	let color: string;
 	if (pct >= 80) {
-		color = "text-emerald-500";
+		color = "text-success";
 	} else if (pct >= 50) {
-		color = "text-amber-500";
+		color = "text-warning";
 	} else {
-		color = "text-red-500";
+		color = "text-destructive";
 	}
 	let bgColor: string;
 	if (pct >= 80) {
-		bgColor = "bg-emerald-500";
+		bgColor = "bg-success";
 	} else if (pct >= 50) {
-		bgColor = "bg-amber-500";
+		bgColor = "bg-warning";
 	} else {
-		bgColor = "bg-red-500";
+		bgColor = "bg-destructive";
 	}
 
 	let coverageText: string;
@@ -268,18 +269,12 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center gap-3">
-					<BookOpen className="h-6 w-6 text-primary" />
-					<div>
-						<h1 className="text-xl font-bold text-foreground">
-							{t("documentation:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							{t("documentation:description")}
-						</p>
-					</div>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={BookOpenCheck}
+					title={t("documentation:title")}
+					description={t("documentation:description")}
+				/>
 
 				{/* Coverage check */}
 				<Card>
@@ -357,8 +352,8 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 
 				{/* Error */}
 				{error && (
-					<Card className="border-red-500/30">
-						<CardContent className="p-4 flex items-center gap-3 text-red-500">
+					<Card className="border-destructive/30">
+						<CardContent className="p-4 flex items-center gap-3 text-destructive">
 							<AlertTriangle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">{error}</p>
 						</CardContent>
@@ -381,7 +376,7 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 										</p>
 									</div>
 									<div>
-										<p className="text-lg font-bold text-amber-500">
+										<p className="text-lg font-bold text-warning">
 											{coverage.partial}
 										</p>
 										<p className="text-xs text-muted-foreground">
@@ -389,7 +384,7 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 										</p>
 									</div>
 									<div>
-										<p className="text-lg font-bold text-red-500">
+										<p className="text-lg font-bold text-destructive">
 											{coverage.missing}
 										</p>
 										<p className="text-xs text-muted-foreground">
@@ -411,15 +406,15 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 											let statusIcon: React.ReactElement;
 											if (sym.status === "documented") {
 												statusIcon = (
-													<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+													<CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
 												);
 											} else if (sym.status === "partial") {
 												statusIcon = (
-													<AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+													<AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
 												);
 											} else {
 												statusIcon = (
-													<XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+													<XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
 												);
 											}
 											return (
@@ -431,7 +426,7 @@ export function DocumentationView({ projectId }: DocumentationViewProps) {
 												<span className="font-mono text-foreground">
 													{sym.name}
 												</span>
-												<Badge variant="outline" className="text-[10px]">
+												<Badge variant="outline" className="text-3xs">
 													{sym.kind}
 												</Badge>
 											</div>

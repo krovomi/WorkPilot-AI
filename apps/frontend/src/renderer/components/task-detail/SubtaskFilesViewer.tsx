@@ -73,13 +73,13 @@ function getFileIcon(path: string, isFolder: boolean) {
 
 	switch (ext) {
 		case "json":
-			return <FileJson className={cn(iconClass, "text-amber-500")} />;
+			return <FileJson className={cn(iconClass, "text-warning")} />;
 		case "ts":
 		case "tsx":
 			return <FileCode className={cn(iconClass, "text-blue-500")} />;
 		case "js":
 		case "jsx":
-			return <FileCode className={cn(iconClass, "text-yellow-500")} />;
+			return <FileCode className={cn(iconClass, "text-warning")} />;
 		case "css":
 		case "scss":
 			return <FileCode className={cn(iconClass, "text-pink-500")} />;
@@ -88,7 +88,7 @@ function getFileIcon(path: string, isFolder: boolean) {
 		case "html":
 			return <FileCode className={cn(iconClass, "text-orange-500")} />;
 		case "py":
-			return <FileCode className={cn(iconClass, "text-green-500")} />;
+			return <FileCode className={cn(iconClass, "text-success")} />;
 		case "xml":
 		case "yaml":
 		case "yml":
@@ -100,10 +100,10 @@ function getFileIcon(path: string, isFolder: boolean) {
 }
 
 const STATUS_DOT: Record<DiffStatus, string> = {
-	added: "bg-emerald-500",
+	added: "bg-success",
 	modified: "bg-sky-500",
 	deleted: "bg-rose-500",
-	renamed: "bg-amber-500",
+	renamed: "bg-warning",
 };
 
 export function buildFileTree(
@@ -227,9 +227,9 @@ function FileTreeItem({
 
 				{node.isFolder ? (
 					isExpanded ? (
-						<FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
+						<FolderOpen className="h-4 w-4 text-warning flex-shrink-0" />
 					) : (
-						<Folder className="h-4 w-4 text-amber-500 flex-shrink-0" />
+						<Folder className="h-4 w-4 text-warning flex-shrink-0" />
 					)
 				) : (
 					getFileIcon(node.path, false)
@@ -242,12 +242,12 @@ function FileTreeItem({
 				{diff && (diff.additions > 0 || diff.deletions > 0) && (
 					<span className="flex items-center gap-1.5 flex-shrink-0">
 						{diff.additions > 0 && (
-							<span className="text-[10px] font-semibold tabular-nums text-emerald-500">
+							<span className="text-3xs font-semibold tabular-nums text-success">
 								+{diff.additions}
 							</span>
 						)}
 						{diff.deletions > 0 && (
-							<span className="text-[10px] font-semibold tabular-nums text-rose-500">
+							<span className="text-3xs font-semibold tabular-nums text-rose-500">
 								-{diff.deletions}
 							</span>
 						)}
@@ -508,8 +508,8 @@ export function SubtaskFilesViewer({
 									})}
 								</p>
 								{(totals.additions > 0 || totals.deletions > 0) && (
-									<span className="flex items-center gap-1.5 text-[11px] font-semibold tabular-nums">
-										<span className="text-emerald-500">
+									<span className="flex items-center gap-1.5 text-2xs font-semibold tabular-nums">
+										<span className="text-success">
 											+{totals.additions}
 										</span>
 										<span className="text-rose-500">-{totals.deletions}</span>
@@ -649,7 +649,7 @@ export function SubtaskFilesViewer({
 							</p>
 						</div>
 						<div>
-							<p className="font-semibold text-emerald-500 tabular-nums">
+							<p className="font-semibold text-success tabular-nums">
 								+{totals.additions}
 							</p>
 							<p className="text-muted-foreground">

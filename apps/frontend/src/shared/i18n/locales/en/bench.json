@@ -12,7 +12,7 @@
 		"cost": "Avg. cost",
 		"duration": "Avg. duration",
 		"cards": "Cards",
-		"readers": "Formula Lab counts these replays in its success estimates, and the model router passes over a model that resolved less than half of at least three cards."
+		"readers": "Formula Lab counts these replays in its success estimates, and the model router passes over a model that resolved less than half of at least three cards (of the task's kind, when there are enough)."
 	},
 	"new": {
 		"title": "New run",
@@ -28,7 +28,16 @@
 		"summary": "{{cards}} card(s) × {{engines}} engine(s) = {{builds}} full build(s)",
 		"start": "Start the run",
 		"oneAtATime": "A run is in progress for this project: one at a time.",
-		"costWarning": "Each build is a complete task (planning, coding, QA) billed by its provider. The judge runs each card's tests three times first, to keep only the tests that tell the card's work from its absence."
+		"costWarning": "Each build is a complete task (planning, coding, QA) billed by its provider. The judge runs each card's tests three times first, to keep only the tests that tell the card's work from its absence.",
+		"rule": {
+			"title": "Candidate rule (optional)",
+			"help": "Measure a rule before adopting it: each engine is replayed without the rule and with it, the rule adopted in the copy only. Nothing is adopted from the score.",
+			"fromLessons": "Start from a rule learned from reviews",
+			"pick": "Choose a candidate…",
+			"placeholder": "For example: write the test before the code it checks.",
+			"tooManyEngines": "With a rule, each engine is replayed twice: keep at most {{max}} engines."
+		},
+		"summaryRule": "{{cards}} card(s) × {{engines}} engine(s) × 2 (without and with the rule) = {{builds}} full build(s)"
 	},
 	"source": {
 		"merge": "its merge",
@@ -83,11 +92,33 @@
 		"notResolved": "not resolved",
 		"notCounted": "not counted",
 		"building": "building…",
-		"waiting": "waiting"
+		"waiting": "waiting",
+		"withRule": "with the rule",
+		"rule": {
+			"title": "Candidate rule",
+			"summary": "Without the rule: {{without}}/{{pairs}} resolved. With it: {{with}}/{{pairs}}. Regressions: {{regressions}}.",
+			"better": "Better on these cards, with no regression. Adopting it stays your call, in the Learning Loop.",
+			"worse": "It breaks a card the engine resolved without it: do not adopt it as it is.",
+			"same": "No difference measured on these cards.",
+			"unmeasured": "Not measured yet: no card was judged in both arms."
+		}
 	},
 	"errors": {
 		"candidates": "Could not list the finished cards.",
 		"start": "The run could not start.",
 		"discard": "The run could not be discarded."
+	},
+	"recommend": {
+		"title": "Recommended engine per kind of card",
+		"allKinds": "All cards",
+		"evidence": "{{rate}} resolved ({{resolved}} of {{judged}}) on {{cases}} cards",
+		"cost": "avg. {{cost}}",
+		"costUnknown": "cost not measured",
+		"rule": "Among the engines that resolved at least half of at least three cards of a kind, the cheapest within ten points of the best rate. A kind with less evidence has no recommendation of its own. On a card's engine step the recommendation is offered, never applied for you.",
+		"empty": "Not enough replays yet: an engine needs at least three judged cards.",
+		"hintKind": "On this project's cards of kind “{{kind}}”, the bench recommends",
+		"hintAll": "On this project's cards, the bench recommends",
+		"use": "Use it",
+		"inUse": "In use"
 	}
 }

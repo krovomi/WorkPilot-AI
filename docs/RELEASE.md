@@ -48,11 +48,38 @@ WorkPilot AI uses an automated release pipeline that ensures releases are only p
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Branch Model
+
+- **`develop`** holds the most recent sources. Every pull request targets it; squash merges are
+  fine there.
+- **`main`** holds released code only. It receives `develop` through a pull request **merged with
+  a merge commit**, and each such merge that bumps the version is tagged `vX.Y.Z`.
+
+Why a merge commit and never a squash or a rebase: both write new commits on `main` that `develop`
+never had. The two branches then stop sharing history, GitHub reports `main` hundreds of commits
+"behind" `develop`, and the next `develop` → `main` pull request conflicts on files both sides
+changed the same way (`package.json`, `CHANGELOG.md`). Releases 1.3.0 to 1.3.3 went to `main` as
+squashes and each needed a reconciliation pull request (#529, #540, #548, #549). With merge commits
+`develop` is always an ancestor of `main` after a release, so no reconciliation is ever needed.
+
+### Repository settings (one-time)
+
+The `main` ruleset enforces this. In **Settings → Rules → Rulesets → `main`**:
+
+- **Require a pull request before merging** → **Allowed merge methods**: **Merge** only (untick
+  Squash and Rebase).
+- Keep **Block force pushes** and **Restrict deletions**.
+
+Leave the repository-wide merge buttons as they are: squash stays available for pull requests into
+`develop`. `main-history-guard.yml` turns a push to `main` red when its head commit has a single
+parent, which is how a squash or a rebase that slipped through shows up.
+
 ## For Maintainers: Creating a Release
 
 ### Step 1: Bump the Version
 
-On your development branch (typically `develop` or a feature branch):
+On a branch cut from `develop` (for example `chore/release-1.1.0`), merged into `develop` by a
+normal pull request:
 
 ```bash
 # Navigate to project root
@@ -76,43 +103,40 @@ This will:
 
 **IMPORTANT: The release will fail if CHANGELOG.md doesn't have an entry for the new version.**
 
-Add release notes to `CHANGELOG.md` at the top of the file:
+Unreleased changes live as fragments in `changelog.d/` (one file per PR, see
+[`changelog.d/README.md`](../changelog.d/README.md)). Fold them into the version's section:
 
-```markdown
-## 1.1.0 - Your Release Title
-
-### ✨ New Features
-- Feature description
-
-### 🛠️ Improvements
-- Improvement description
-
-### 🐛 Bug Fixes
-- Fix description
-
----
+```bash
+python scripts/changelog.py preview                      # what the notes will say
+python scripts/changelog.py release 1.1.0 "Your Release Title"
 ```
+
+This writes `## 1.1.0 - Your Release Title` at the top of `CHANGELOG.md`, with the fragments
+grouped by section, and removes them. Replace the intro comment it leaves with one or two
+sentences on what the version changes for the user.
 
 Then amend the version bump commit:
 
 ```bash
-git add CHANGELOG.md
+git add CHANGELOG.md changelog.d
 git commit --amend --no-edit
 ```
 
 ### Step 3: Push and Create PR
 
 ```bash
-# Push your branch
-git push origin your-branch
+# Push your branch, open its PR into develop and merge it
+git push origin chore/release-1.1.0
+gh pr create --base develop --title "chore(release): prepare 1.1.0"
 
-# Create PR to main (via GitHub UI or gh CLI)
-gh pr create --base main --title "Release v1.1.0"
+# Then open the release PR straight from develop: no release branch, no merge of main first
+gh pr create --base main --head develop --title "Release v1.1.0"
 ```
 
-### Step 4: Merge to Main
+### Step 4: Merge to Main (merge commit)
 
-Once the PR is approved and merged to `main`, GitHub Actions will automatically:
+Merge the `develop` → `main` pull request with **Create a merge commit** (`gh pr merge --merge`).
+The `main` ruleset refuses the other methods. Once merged, GitHub Actions will automatically:
 
 1. **Detect the version bump** (`prepare-release.yml`)
 2. **Validate CHANGELOG.md** has an entry for the new version (FAILS if missing)
@@ -127,10 +151,13 @@ Once the PR is approved and merged to `main`, GitHub Actions will automatically:
 7. **Create GitHub release** with release notes from CHANGELOG.md
 8. **Dispatch the follow-ups** by name, with the tag: `virustotal-scan.yml` (adds the scan
    results to the release notes when `VIRUSTOTAL_API_KEY` is set, and says it skipped otherwise),
-   `discord-release.yml` (needs `DISCORD_WEBHOOK_URL`), `wiki-narrative.yml`. A release published
+   `discord-release.yml` (needs `DISCORD_WEBHOOK_URL`; without it the run ends green with a
+   notice that the release was not announced), `wiki-narrative.yml`. A release published
    with `GITHUB_TOKEN` raises no event other workflows can listen to, so `release: published`
    alone would never start them.
-9. **Update README** with new version badge and download links
+9. **Update README** with new version badge and download links: one commit, built on `main`,
+   merged into `develop` and carried to `main` by a pull request that auto-merges with a merge
+   commit (`chore/readme-vX.Y.Z`). Both branches get the same commit, so neither drifts.
 
 ### Step 5: Verify
 
@@ -149,7 +176,9 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ## Changelog Management
 
-Release notes are managed in `CHANGELOG.md` and used for GitHub releases.
+Release notes are managed in `CHANGELOG.md` and used for GitHub releases. Between releases,
+each PR adds a fragment to `changelog.d/` instead of editing `CHANGELOG.md`, so open PRs do
+not conflict; `scripts/changelog.py release` folds them in (Step 2).
 
 ### Changelog Format
 
@@ -190,7 +219,8 @@ The release workflow **validates** that `CHANGELOG.md` has an entry for the vers
 |----------|---------|---------|
 | `prepare-release.yml` | Push to `main` | Detects version bump, **validates CHANGELOG.md**, creates tag |
 | `release.yml` | Tag `v*` pushed | Builds binaries, extracts changelog, creates release |
-| `update-readme` (in release.yml) | After release | Updates README with new version |
+| `update-readme` (in release.yml) | After release | Updates README with new version, on `develop` and `main` through one shared commit |
+| `main-history-guard.yml` | Push to `main` | Fails when `main` moved by a commit with a single parent (squash or rebase) |
 
 ## Troubleshooting
 
@@ -212,16 +242,42 @@ The release workflow **validates** that `CHANGELOG.md` has an entry for the vers
 If you see "CHANGELOG VALIDATION FAILED" in the workflow:
 
 1. The `prepare-release.yml` workflow validated that `CHANGELOG.md` doesn't have an entry for the new version
-2. **Fix**: Add an entry to `CHANGELOG.md` with the format `## X.Y.Z - Title`
-3. Commit and push the changelog update
-4. The workflow will automatically retry when the changes are pushed to `main`
+2. **Fix**: Add an entry to `CHANGELOG.md` with the format `## X.Y.Z - Title`, on a branch from
+   `develop`, through a pull request into `develop` (`main` takes no direct push)
+3. Open a new `develop` → `main` pull request and merge it with a merge commit
+4. `prepare-release.yml` only starts on its own when `package.json` changes, so start it by hand:
 
 ```bash
-# Add changelog entry, then:
-git add CHANGELOG.md
-git commit -m "docs: add changelog for vX.Y.Z"
-git push origin main
+gh workflow run prepare-release.yml --ref main
 ```
+
+### main and develop have diverged
+
+Symptoms: GitHub shows `main` many commits behind `develop` while their files are the same, the
+`develop` → `main` pull request conflicts on `package.json` or `CHANGELOG.md`, or
+`main-history-guard.yml` failed. Cause: something reached `main` by squash or rebase.
+
+Repair once, with no file change, then merge the pull request **with a merge commit**:
+
+```bash
+git fetch origin main develop --depth=500   # shallow clones produce bogus conflicts
+git checkout -b sync/main-history origin/develop
+git merge -s ours origin/main -m "chore(release): record main's history in develop"
+git diff origin/develop HEAD                  # must be empty
+git push -u origin sync/main-history
+gh pr create --base main --head sync/main-history --title "chore(release): realign main's history with develop"
+gh pr merge --merge <number>
+```
+
+`-s ours` keeps `develop`'s files and only records `main`'s commits as merged. If `main` carries a
+fix `develop` lacks (a hotfix), bring that fix into `develop` by a normal pull request first.
+
+### Hotfix
+
+Fix on `develop` and release `develop` → `main` as usual (1.3.2 did this). Only when `develop`
+holds work that must not ship yet: branch `hotfix/x` from `main`, open its PR into `main`, merge
+with a merge commit, then open a PR `hotfix/x` → `develop` and merge it **with a merge commit**
+too, so `develop` gets the very same commit.
 
 ### Build failed after tag was created
 
@@ -256,3 +312,9 @@ git push origin v1.1.0
 - Windows binaries are code signed
 - Binaries are scanned with VirusTotal after publication, when `VIRUSTOTAL_API_KEY` is configured
 - SHA256 checksums are generated for all artifacts
+- A CycloneDX SBOM (`workpilot-sbom.cdx.json`) lists the npm and Python packages of the release; it
+  is read from the checkout by `anchore/sbom-action` before the binaries are downloaded
+- Every published file (binaries, manifests, SBOM, checksums) has a build provenance attestation
+  (`actions/attest-build-provenance`); verify one with
+  `gh attestation verify <file> --repo krovomi/WorkPilot-AI`. Dry runs attest nothing.
+  `tests/test_release_supply_chain.py` keeps both steps in place

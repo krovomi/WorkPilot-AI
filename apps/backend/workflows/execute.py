@@ -11,7 +11,7 @@ this module plays them one by one, deterministically, on every provider:
   `run_command` goes through — and a refused command stops the run;
 * each step's command, exit code and output land in the journal
   (`<spec_dir>/workflow/run.md`), output cut to a page and secrets masked
-  (`core.log_redaction.redact_text`);
+  (`foundation.log_redaction.redact_text`);
 * a step that fails stops the rest and leaves the state written
   (`run-state.json`), so what was and was not done is never a guess;
 * a declared environment's health commands run first, and its named
@@ -167,7 +167,7 @@ class _Journal:
             fh.write(text)
 
     def step(self, record: StepRecord, output: str) -> None:
-        from core.log_redaction import redact_text
+        from foundation.log_redaction import redact_text
 
         shown = _page(redact_text(output))
         self.append(
@@ -184,7 +184,7 @@ def _page(text: str) -> str:
     if len(text) <= OUTPUT_CHARS:
         return text.rstrip()
     try:
-        from harness.domain.paging import spill_excerpt
+        from foundation.paging import spill_excerpt
 
         return spill_excerpt(
             text, max_chars=OUTPUT_CHARS, location="(the step's full output)"

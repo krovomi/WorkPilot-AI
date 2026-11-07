@@ -32,7 +32,7 @@ except ImportError:
 
 
 try:
-    from core.debug import debug, debug_error, debug_section, debug_success
+    from foundation.debug import debug, debug_error, debug_section, debug_success
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):

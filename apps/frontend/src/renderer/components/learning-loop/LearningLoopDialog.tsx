@@ -22,6 +22,7 @@ import {
 	deleteLearningPattern,
 	loadLearningPatterns,
 	loadLearningSummary,
+	loadReviewLessons,
 	startLearningAnalysis,
 	toggleLearningPattern,
 	useLearningLoopStore,
@@ -38,13 +39,14 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import { ScrollArea } from "../ui/scroll-area";
+import { ReviewLessonsSection } from "./ReviewLessonsSection";
 
 const CATEGORY_COLORS: Record<string, string> = {
 	tool_sequence: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 	prompt_strategy: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-	error_resolution: "bg-red-500/10 text-red-700 dark:text-red-400",
-	qa_pattern: "bg-green-500/10 text-green-700 dark:text-green-400",
-	code_structure: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+	error_resolution: "bg-destructive/10 text-destructive ",
+	qa_pattern: "bg-success/10 text-success ",
+	code_structure: "bg-warning/10 text-warning ",
 };
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
@@ -88,6 +90,7 @@ export function LearningLoopDialog() {
 		if (isOpen && selectedProject?.path) {
 			loadLearningPatterns(selectedProject.path);
 			loadLearningSummary(selectedProject.path);
+			loadReviewLessons(selectedProject.path);
 		}
 	}, [isOpen, selectedProject?.path]);
 
@@ -148,9 +151,9 @@ export function LearningLoopDialog() {
 	const canStart = selectedProjectId && !isAnalyzing;
 
 	const confidenceColor = (confidence: number) => {
-		if (confidence >= 0.8) return "text-green-600 dark:text-green-400";
-		if (confidence >= 0.6) return "text-amber-600 dark:text-amber-400";
-		return "text-red-600 dark:text-red-400";
+		if (confidence >= 0.8) return "text-success ";
+		if (confidence >= 0.6) return "text-warning ";
+		return "text-destructive ";
 	};
 
 	return (
@@ -240,10 +243,15 @@ export function LearningLoopDialog() {
 
 					{/* Complete state */}
 					{isComplete && (
-						<div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+						<div className="flex items-center gap-2 text-sm text-success ">
 							<Check className="h-4 w-4" />
 							<span>{t("learningLoop:status.complete")}</span>
 						</div>
+					)}
+
+					{/* Rules learned from reviews: candidates to adopt, adopted rules */}
+					{!isAnalyzing && selectedProject?.path && (
+						<ReviewLessonsSection projectDir={selectedProject.path} />
 					)}
 
 					{/* Patterns List */}
@@ -374,20 +382,20 @@ function PatternCard({
 					<div className="flex items-center gap-2 mt-1 flex-wrap">
 						<Badge
 							variant="secondary"
-							className={`text-[10px] px-1.5 py-0 ${categoryClass}`}
+							className={`text-3xs px-1.5 py-0 ${categoryClass}`}
 						>
 							{t(`learningLoop:categories.${pattern.category}`)}
 						</Badge>
-						<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+						<Badge variant="outline" className="text-3xs px-1.5 py-0">
 							{pattern.agent_phase}
 						</Badge>
 						<span
-							className={`text-[10px] font-mono ${confidenceColor(pattern.confidence)}`}
+							className={`text-3xs font-mono ${confidenceColor(pattern.confidence)}`}
 						>
 							{(pattern.confidence * 100).toFixed(0)}%
 						</span>
 						{pattern.occurrence_count > 1 && (
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								×{pattern.occurrence_count}
 							</span>
 						)}
@@ -407,7 +415,7 @@ function PatternCard({
 						}
 					>
 						{pattern.enabled ? (
-							<ToggleRight className="h-4 w-4 text-green-600 dark:text-green-400" />
+							<ToggleRight className="h-4 w-4 text-success " />
 						) : (
 							<ToggleLeft className="h-4 w-4" />
 						)}
@@ -457,7 +465,7 @@ function PatternCard({
 								<Badge
 									key={tag}
 									variant="outline"
-									className="text-[10px] px-1 py-0"
+									className="text-3xs px-1 py-0"
 								>
 									{tag}
 								</Badge>

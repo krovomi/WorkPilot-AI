@@ -15,10 +15,10 @@ import {
 } from "../ui/select";
 
 const STATUS_STYLES: Record<EvidenceStatus, string> = {
-	collected: "text-green-400 bg-green-500/10",
+	collected: "text-success bg-success/10",
 	verified: "text-blue-400 bg-blue-500/10",
-	missing: "text-red-400 bg-red-500/10",
-	expired: "text-yellow-400 bg-yellow-500/10",
+	missing: "text-destructive bg-destructive/10",
+	expired: "text-warning bg-warning/10",
 };
 
 const FRAMEWORK_OPTIONS: ComplianceFramework[] = ["SOC2", "ISO_27001"];
@@ -46,10 +46,10 @@ export function ComplianceReportView({
 	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				<div className="flex items-center gap-2">
-					<span className="text-sm text-(--text-secondary)">
+					<span className="text-sm text-muted-foreground">
 						{t("framework")}
 					</span>
 					<Select
@@ -74,7 +74,7 @@ export function ComplianceReportView({
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -83,7 +83,7 @@ export function ComplianceReportView({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -92,7 +92,7 @@ export function ComplianceReportView({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -100,19 +100,19 @@ export function ComplianceReportView({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -121,7 +121,7 @@ export function ComplianceReportView({
 				<ReportBody report={report} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -137,24 +137,24 @@ function ReportBody({
 	readonly report: ComplianceReport;
 	readonly t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
-	let barColor = "bg-red-500";
+	let barColor = "bg-destructive";
 	if (report.coveragePercent >= 80) {
-		barColor = "bg-green-500";
+		barColor = "bg-success";
 	} else if (report.coveragePercent >= 50) {
-		barColor = "bg-yellow-500";
+		barColor = "bg-warning";
 	}
 
 	return (
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{report.framework} · {report.collectedCount} {t("evidenceItems")} ·{" "}
 					{report.coveragePercent}% {t("coverage")}
 				</p>
 			</div>
 
-			<div className="w-full h-3 rounded-full bg-(--bg-secondary) overflow-hidden">
+			<div className="w-full h-3 rounded-full bg-card overflow-hidden">
 				<div
 					className={`h-full rounded-full transition-all ${barColor}`}
 					style={{ width: `${report.coveragePercent}%` }}
@@ -162,15 +162,15 @@ function ReportBody({
 			</div>
 
 			{report.missingControls.length > 0 && (
-				<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-					<p className="text-xs font-medium text-red-400 mb-1">
+				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+					<p className="text-xs font-medium text-destructive mb-1">
 						{t("missingControls")}
 					</p>
 					<div className="flex flex-wrap gap-1">
 						{report.missingControls.map((ctrl) => (
 							<span
 								key={ctrl}
-								className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-300"
+								className="px-2 py-0.5 rounded text-xs bg-destructive/20 text-destructive"
 							>
 								{ctrl}
 							</span>
@@ -183,7 +183,7 @@ function ReportBody({
 				{report.evidence.map((item) => (
 					<div
 						key={item.id}
-						className="flex items-center gap-3 px-4 py-3 rounded-lg border border-(--border-color) hover:bg-(--bg-secondary) transition-colors"
+						className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
 					>
 						<span
 							className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[item.status]}`}
@@ -192,7 +192,7 @@ function ReportBody({
 						</span>
 						<div className="flex-1 min-w-0">
 							<p className="text-sm font-medium truncate">{item.title}</p>
-							<p className="text-xs text-(--text-secondary)">
+							<p className="text-xs text-muted-foreground">
 								{item.controlId} · {item.evidenceType.replaceAll("_", " ")}
 								{item.source ? ` · ${item.source}` : ""}
 							</p>
@@ -202,7 +202,7 @@ function ReportBody({
 			</div>
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}

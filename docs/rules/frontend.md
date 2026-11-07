@@ -53,6 +53,32 @@ const { t } = useTranslation(['navigation', 'common']);
 <span>{t('errors:task.parseError', { error })}</span>
 ```
 
+Les dates suivent la langue de l'app, pas la région du système : `fr` écrit `02/11/2026 16:30`,
+`en` écrit `11/2/2026, 4:30 PM`. Dans le renderer, une date s'affiche avec `formatAppDate`,
+`formatAppDateTime`, `formatAppTime` ou `formatAppDayLabel` de `src/renderer/lib/date-format.ts`
+(hors renderer : `formatDateIn(value, language)` de `src/shared/utils/date-format.ts`). Appeler
+`toLocaleDateString`, `toLocaleTimeString`, `new Date(…).toLocaleString` ou `Intl.DateTimeFormat`
+sans `dateLocale(…)` est refusé par `src/renderer/lib/__tests__/date-format.test.ts`.
+
+La règle est vérifiée par `src/renderer/__tests__/jsx-literal-text.test.ts`. Il parse chaque `.tsx`
+du renderer (hors tests, mocks, stories) avec `parseAst` de Vite et refuse trois choses : un texte
+entre balises qui contient une lettre, une chaîne ou un gabarit rendu en enfant (directement ou
+dans une branche `?:`, `||`, `??`, `&&`), et un littéral dans `title`, `placeholder`, `alt`,
+`aria-label`, `label` ou `description`. `style/noJsxLiterals` de Biome a été écarté : il signale
+aussi la ponctuation, et sa seule exemption est un `biome-ignore`, que le plafond interdit.
+
+Ce qui reste littéral est déclaré dans `src/renderer/__tests__/jsx-literal-allowlist.ts` :
+
+- texte sous `<code>`, `<pre>`, `<kbd>`, `<samp>` (commande, chemin, touche) ;
+- un nom de produit (`NAMES`), ou un texte dont chaque mot est une marque, une unité, un sigle ou
+  une touche jamais traduits (`TERMS`), ou une adresse ;
+- un `placeholder` d'un seul jeton qui montre une valeur (`main`, `owner/repo`) ;
+- `FILE_EXEMPTIONS` : un littéral précis dans un fichier précis, **avec sa raison**. Une exemption
+  qui ne correspond plus à rien fait échouer le test.
+
+`PENDING` n'est pas une exemption : c'est la dette laissée dans des fichiers qu'une autre branche
+réécrit, comptée par fichier. Le compte ne peut que baisser ; une entrée à 0 se supprime.
+
 ## Multiplateforme
 
 Windows, macOS et Linux sont testés en CI. **Jamais `process.platform` en direct** : importer de
@@ -71,7 +97,9 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 ## État, style, imports
 
 - **Zustand** : un store par domaine sous `src/renderer/stores/`, sélecteurs granulaires
-  `useX((s) => s.champ)`, jamais le store entier (tout re-rendrait).
+  `useX((s) => s.champ)`, `useShallow` pour plusieurs champs, jamais le store entier (tout
+  re-rendrait). `useSettingsStore()` sans sélecteur est refusé par
+  `stores/__tests__/settings-store-selectors.test.ts`.
 - **Style** : Tailwind v4 ; 7 thèmes clair/sombre dans `src/shared/constants/themes.ts` ;
   `cn()` (`clsx` + `tailwind-merge`) depuis `src/renderer/lib/utils.ts` ; variantes en CVA.
 - **Alias** : `@/*` → `src/renderer/*`, `@shared/*` → `src/shared/*`, `@preload/*` → `src/preload/*`,
@@ -87,3 +115,10 @@ Aucun chemin en dur. Notes Windows : [`docs/windows-development.md`](../windows-
 | E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
 | Types | — | `pnpm run typecheck` |
 | Lint / format | — | `pnpm run lint` / `pnpm run lint:fix` (Biome) |
+
+Un `biome-ignore` de plus dans un fichier est refusé : `tests/baselines/biome-ignore.json` plafonne
+chaque fichier à son compte du 30 octobre 2026 (`python scripts/quality_baselines.py`, depuis la
+racine ; `update` ne fait que baisser). Typer la valeur plutôt que taire la règle. De même, un
+fichier de plus de 2 000 lignes ne grossit plus (`tests/baselines/file-size.json`, voir
+[`backend.md`](backend.md)) : `KanbanBoard.tsx` ou `usage-monitor.ts` reçoivent un import,
+pas une fonction de plus.

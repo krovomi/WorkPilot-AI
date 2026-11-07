@@ -2,6 +2,7 @@ import { Check, Code, Info, Loader2, RefreshCw, Terminal } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { SupportedIDE, SupportedTerminal } from "../../../shared/types";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -13,6 +14,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { useTranslation } from "react-i18next";
 
 interface DevToolsStepProps {
 	onNext: () => void;
@@ -86,7 +88,13 @@ const TERMINAL_NAMES: Partial<Record<SupportedTerminal, string>> = {
  * their preferred tools for opening worktrees.
  */
 export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
-	const { settings, updateSettings } = useSettingsStore();
+	const { t } = useTranslation();
+	const { settings, updateSettings } = useSettingsStore(
+		useShallow((s) => ({
+			settings: s.settings,
+			updateSettings: s.updateSettings,
+		})),
+	);
 	const [preferredIDE, setPreferredIDE] = useState<SupportedIDE>(
 		settings.preferredIDE || "vscode",
 	);
@@ -261,11 +269,10 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 						</div>
 					</div>
 					<h1 className="text-2xl font-bold text-foreground tracking-tight">
-						Developer Tools
+						{t("onboarding:devtools.title")}
 					</h1>
 					<p className="mt-2 text-muted-foreground">
-						Choose your preferred IDE and terminal for working with WorkPilot AI
-						worktrees
+						{t("onboarding:devtools.description")}
 					</p>
 				</div>
 
@@ -274,7 +281,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 					<div className="flex items-center justify-center py-12">
 						<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
 						<span className="ml-3 text-muted-foreground">
-							Detecting installed tools...
+							{t("onboarding:devtools.detecting")}
 						</span>
 					</div>
 				)}
@@ -298,12 +305,10 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 									<Info className="h-5 w-5 text-info shrink-0 mt-0.5" />
 									<div className="flex-1 space-y-3">
 										<p className="text-sm font-medium text-foreground">
-											Why configure these?
+											{t("onboarding:devtools.whyConfigure")}
 										</p>
 										<p className="text-sm text-muted-foreground">
-											When WorkPilot AI builds features in isolated worktrees,
-											you can open them directly in your preferred IDE or
-											terminal to test and review changes.
+											{t("onboarding:devtools.whyConfigureDescription")}
 										</p>
 									</div>
 								</div>
@@ -319,7 +324,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 								disabled={isDetecting}
 							>
 								<RefreshCw className="h-4 w-4 mr-2" />
-								Detect Again
+								{t("onboarding:devtools.detectAgain")}
 							</Button>
 						</div>
 
@@ -327,7 +332,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 						<div className="space-y-3">
 							<Label className="text-sm font-medium text-foreground flex items-center gap-2">
 								<Code className="h-4 w-4" />
-								Preferred IDE
+								{t("onboarding:devtools.ide.label")}
 							</Label>
 							<Select
 								value={preferredIDE}
@@ -335,7 +340,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 								disabled={isSaving}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select IDE..." />
+									<SelectValue placeholder={t("onboarding:devtools.ide.placeholder")} />
 								</SelectTrigger>
 								<SelectContent>
 									{ideOptions.map((option) => (
@@ -343,7 +348,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 											<div className="flex items-center gap-2">
 												<span>{option.label}</span>
 												{option.detected && (
-													<Check className="h-3 w-3 text-green-500" />
+													<Check className="h-3 w-3 text-success" />
 												)}
 											</div>
 										</SelectItem>
@@ -351,7 +356,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 								</SelectContent>
 							</Select>
 							<p className="text-xs text-muted-foreground">
-								WorkPilot AI will open worktrees in this editor
+								{t("onboarding:devtools.ide.description")}
 							</p>
 
 							{/* Custom IDE Path */}
@@ -361,7 +366,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 										htmlFor="custom-ide-path"
 										className="text-xs text-muted-foreground"
 									>
-										Custom IDE Path
+										{t("onboarding:devtools.ide.customPath")}
 									</Label>
 									<Input
 										id="custom-ide-path"
@@ -379,7 +384,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 						<div className="space-y-3">
 							<Label className="text-sm font-medium text-foreground flex items-center gap-2">
 								<Terminal className="h-4 w-4" />
-								Preferred Terminal
+								{t("onboarding:devtools.terminal.label")}
 							</Label>
 							<Select
 								value={preferredTerminal}
@@ -389,7 +394,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 								disabled={isSaving}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select terminal..." />
+									<SelectValue placeholder={t("onboarding:devtools.terminal.placeholder")} />
 								</SelectTrigger>
 								<SelectContent>
 									{terminalOptions.map((option) => (
@@ -397,7 +402,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 											<div className="flex items-center gap-2">
 												<span>{option.label}</span>
 												{option.detected && (
-													<Check className="h-3 w-3 text-green-500" />
+													<Check className="h-3 w-3 text-success" />
 												)}
 											</div>
 										</SelectItem>
@@ -405,7 +410,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 								</SelectContent>
 							</Select>
 							<p className="text-xs text-muted-foreground">
-								WorkPilot AI will open terminal sessions here
+								{t("onboarding:devtools.terminal.description")}
 							</p>
 
 							{/* Custom Terminal Path */}
@@ -415,7 +420,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 										htmlFor="custom-terminal-path"
 										className="text-xs text-muted-foreground"
 									>
-										Custom Terminal Path
+										{t("onboarding:devtools.terminal.customPath")}
 									</Label>
 									<Input
 										id="custom-terminal-path"
@@ -432,7 +437,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 						{/* Detection Summary */}
 						{detectedTools && (
 							<div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-								<p className="font-medium mb-1">Detected on your system:</p>
+								<p className="font-medium mb-1">{t("onboarding:devtools.detectedSummary")}</p>
 								<ul className="list-disc list-inside space-y-0.5">
 									{detectedTools.ides.map((ide) => (
 										<li key={ide.id}>{ide.name}</li>
@@ -446,8 +451,7 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 										detectedTools.terminals.filter((t) => t.id !== "system")
 											.length === 0 && (
 											<li>
-												No additional tools detected (VS Code and system
-												terminal will be used)
+												{t("onboarding:devtools.noToolsDetected")}
 											</li>
 										)}
 								</ul>
@@ -463,16 +467,16 @@ export function DevToolsStep({ onNext, onBack }: DevToolsStepProps) {
 						onClick={onBack}
 						className="text-muted-foreground hover:text-foreground"
 					>
-						Back
+						{t("common:buttons.back")}
 					</Button>
 					<Button onClick={handleSave} disabled={isDetecting || isSaving}>
 						{isSaving ? (
 							<>
 								<Loader2 className="h-4 w-4 animate-spin mr-2" />
-								Saving...
+								{t("common:buttons.saving")}
 							</>
 						) : (
-							"Save & Continue"
+							t("onboarding:devtools.saveAndContinue")
 						)}
 					</Button>
 				</div>

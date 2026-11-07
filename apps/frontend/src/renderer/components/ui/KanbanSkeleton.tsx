@@ -1,5 +1,6 @@
 import { cn } from "../../lib/utils";
 import { Skeleton, SkeletonCard } from "./skeleton";
+import { useTranslation } from "react-i18next";
 
 interface KanbanSkeletonProps {
 	readonly columns?: number;
@@ -18,6 +19,7 @@ export function KanbanSkeleton({
 	className,
 	showRefreshText = false,
 }: KanbanSkeletonProps) {
+	const { t } = useTranslation();
 	return (
 		<output
 			aria-label={
@@ -30,7 +32,7 @@ export function KanbanSkeleton({
 			{showRefreshText && (
 				<div className="absolute top-4 right-4 flex items-center gap-2 text-sm text-muted-foreground">
 					<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
-					<span>Actualisation...</span>
+					<span>{t("common:buttons.refreshing")}</span>
 				</div>
 			)}
 			{Array.from({ length: columns }).map((_, colIdx) => (

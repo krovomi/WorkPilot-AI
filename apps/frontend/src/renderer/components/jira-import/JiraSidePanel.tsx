@@ -543,11 +543,11 @@ export function JiraSidePanel({
 	const getTypeColor = (type: string): string => {
 		switch (type.toLowerCase()) {
 			case "bug":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "task":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "story":
-				return "bg-green-500/10 text-green-500 border-green-500/20";
+				return "bg-success/10 text-success border-success/20";
 			case "epic":
 				return "bg-orange-500/10 text-orange-500 border-orange-500/20";
 			case "sub-task":
@@ -562,11 +562,11 @@ export function JiraSidePanel({
 		switch (priority?.toLowerCase()) {
 			case "highest":
 			case "critical":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "high":
 				return "bg-orange-500/10 text-orange-500 border-orange-500/20";
 			case "medium":
-				return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+				return "bg-warning/10 text-warning border-warning/20";
 			case "low":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "lowest":
@@ -599,11 +599,11 @@ export function JiraSidePanel({
 						</div>
 					) : (
 						<>
-							<p>No Jira issues found</p>
+							<p>{t("settings:jiraImport.noJiraIssues")}</p>
 							{(searchQuery ||
 								filters.workItemType !== "all" ||
 								filters.state !== "all") && (
-								<p className="text-sm mt-2">Try adjusting your filters</p>
+								<p className="text-sm mt-2">{t("settings:jiraImport.emptySubtitle")}</p>
 							)}
 						</>
 					)}
@@ -685,7 +685,7 @@ export function JiraSidePanel({
 							)}
 							{item.assignedTo && (
 								<p className="text-xs text-muted-foreground mt-1 select-none">
-									Assignee: {item.assignedTo}
+									{t("settings:jiraImport.assignee", { name: item.assignedTo })}
 								</p>
 							)}
 							{item.tags.length > 0 && (
@@ -768,7 +768,7 @@ export function JiraSidePanel({
 				{syncStatus?.projectKey && (
 					<div className="px-4 py-2 bg-muted/50 border-b border-border">
 						<p className="text-sm text-foreground/70">
-							<strong>Project:</strong> {syncStatus.projectKey}
+							<strong>{t("settings:jiraImport.projectLabel")}</strong> {syncStatus.projectKey}
 							{syncStatus.instanceUrl && (
 								<span className="ml-2 text-xs text-muted-foreground">
 									({syncStatus.instanceUrl})
@@ -780,8 +780,8 @@ export function JiraSidePanel({
 
 				{/* Error Banner */}
 				{error && (
-					<div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-						<p className="text-sm text-red-500 mb-3">{error}</p>
+					<div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+						<p className="text-sm text-destructive mb-3">{error}</p>
 						{onOpenSettings && (
 							<Button
 								variant="outline"
@@ -803,7 +803,7 @@ export function JiraSidePanel({
 						<div className="relative">
 							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 							<Input
-								placeholder="Search issues..."
+								placeholder={t("settings:jiraImport.searchPlaceholder")}
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								className="pl-10"
@@ -814,7 +814,7 @@ export function JiraSidePanel({
 						<div className="grid grid-cols-2 gap-3">
 							<div>
 								<Label className="text-xs text-foreground/70 mb-1 block">
-									Type
+									{t("settings:jiraImport.typeLabel")}
 								</Label>
 								<Select
 									value={filters.workItemType}
@@ -826,7 +826,7 @@ export function JiraSidePanel({
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="all">All Types</SelectItem>
+										<SelectItem value="all">{t("settings:jiraImport.filterTypeAll")}</SelectItem>
 										{uniqueTypes.map((type) => (
 											<SelectItem key={type} value={type}>
 												{type}
@@ -838,7 +838,7 @@ export function JiraSidePanel({
 
 							<div>
 								<Label className="text-xs text-foreground/70 mb-1 block">
-									Status
+									{t("settings:jiraImport.statusLabel")}
 								</Label>
 								<Select
 									value={filters.state}
@@ -850,7 +850,7 @@ export function JiraSidePanel({
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="all">All Statuses</SelectItem>
+										<SelectItem value="all">{t("settings:jiraImport.allStatuses")}</SelectItem>
 										{uniqueStates.map((state) => (
 											<SelectItem key={state} value={state}>
 												{state}
@@ -879,7 +879,10 @@ export function JiraSidePanel({
 										}
 									/>
 									<span className="text-sm text-foreground/70">
-										{selectedIds.size} / {filteredItems.length} selected
+										{t("settings:jiraImport.selectedOfTotal", {
+									selected: selectedIds.size,
+									total: filteredItems.length,
+								})}
 									</span>
 								</div>
 								<Button
@@ -916,7 +919,7 @@ export function JiraSidePanel({
 					<div className="p-4 border-t border-border space-y-3">
 						<div className="flex items-center gap-2 text-sm text-foreground/70">
 							<Download className="h-4 w-4" />
-							<span>Drag selected issues to a Kanban column to import</span>
+							<span>{t("settings:jiraImport.dragHint")}</span>
 						</div>
 
 						<div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
@@ -948,7 +951,7 @@ export function JiraSidePanel({
 				<div
 					className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 transition-colors"
 					onMouseDown={handleResizeStart}
-					title="Resize"
+					title={t("settings:jiraImport.resize")}
 				>
 					<div className="absolute inset-y-0 -left-2 -right-2" />
 				</div>

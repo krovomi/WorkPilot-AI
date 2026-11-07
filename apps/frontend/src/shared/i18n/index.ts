@@ -22,7 +22,6 @@ import enDocDrift from "./locales/en/docDrift.json";
 import enGitSurgeon from "./locales/en/gitSurgeon.json";
 import enNotebookAgent from "./locales/en/notebookAgent.json";
 import enReleaseCoordinator from "./locales/en/releaseCoordinator.json";
-import enSpecRefinement from "./locales/en/specRefinement.json";
 import enSandbox from "./locales/en/sandbox.json";
 import enRegressionGuardian from "./locales/en/regressionGuardian.json";
 import enInjectionGuard from "./locales/en/injectionGuard.json";
@@ -85,6 +84,7 @@ import enReplay from "./locales/en/replay.json";
 import enRoadmap from "./locales/en/roadmap.json";
 import enSelfHealing from "./locales/en/selfHealing.json";
 import enSessionHistory from "./locales/en/sessionHistory.json";
+import enSmartEstimation from "./locales/en/smartEstimation.json";
 import enSettings from "./locales/en/settings.json";
 import enSetupHub from "./locales/en/setupHub.json";
 import enStreaming from "./locales/en/streaming.json";
@@ -95,7 +95,7 @@ import enTerminal from "./locales/en/terminal.json";
 import enTestGeneration from "./locales/en/testGeneration.json";
 import enVisualProgramming from "./locales/en/visualProgramming.json";
 import enVisualToCode from "./locales/en/visualToCode.json";
-import enVoiceControl from "./locales/en/voiceContol.json";
+import enVoiceAssistant from "./locales/en/voiceAssistant.json";
 import enWelcome from "./locales/en/welcome.json";
 import frAccessibility from "./locales/fr/accessibility.json";
 import frAdministration from "./locales/fr/administration.json";
@@ -119,7 +119,6 @@ import frDocDrift from "./locales/fr/docDrift.json";
 import frGitSurgeon from "./locales/fr/gitSurgeon.json";
 import frNotebookAgent from "./locales/fr/notebookAgent.json";
 import frReleaseCoordinator from "./locales/fr/releaseCoordinator.json";
-import frSpecRefinement from "./locales/fr/specRefinement.json";
 import frSandbox from "./locales/fr/sandbox.json";
 import frRegressionGuardian from "./locales/fr/regressionGuardian.json";
 import frInjectionGuard from "./locales/fr/injectionGuard.json";
@@ -182,6 +181,7 @@ import frReplay from "./locales/fr/replay.json";
 import frRoadmap from "./locales/fr/roadmap.json";
 import frSelfHealing from "./locales/fr/selfHealing.json";
 import frSessionHistory from "./locales/fr/sessionHistory.json";
+import frSmartEstimation from "./locales/fr/smartEstimation.json";
 import frSettings from "./locales/fr/settings.json";
 import frSetupHub from "./locales/fr/setupHub.json";
 import frStreaming from "./locales/fr/streaming.json";
@@ -192,7 +192,7 @@ import frTerminal from "./locales/fr/terminal.json";
 import frTestGeneration from "./locales/fr/testGeneration.json";
 import frVisualProgramming from "./locales/fr/visualProgramming.json";
 import frVisualToCode from "./locales/fr/visualToCode.json";
-import frVoiceControl from "./locales/fr/voiceContol.json";
+import frVoiceAssistant from "./locales/fr/voiceAssistant.json";
 import frWelcome from "./locales/fr/welcome.json";
 
 export const defaultNS = "common";
@@ -224,7 +224,6 @@ export const resources = {
 		gitSurgeon: enGitSurgeon,
 		notebookAgent: enNotebookAgent,
 		releaseCoordinator: enReleaseCoordinator,
-		specRefinement: enSpecRefinement,
 		sandbox: enSandbox,
 		regressionGuardian: enRegressionGuardian,
 		injectionGuard: enInjectionGuard,
@@ -265,7 +264,8 @@ export const resources = {
 		pixelOffice: enPixelOffice,
 		selfHealing: enSelfHealing,
 		sessionHistory: enSessionHistory,
-		voiceControl: enVoiceControl,
+		smartEstimation: enSmartEstimation,
+		voiceAssistant: enVoiceAssistant,
 		ideation: enIdeation,
 		costEstimator: enCostEstimator,
 		formulaLab: enFormulaLab,
@@ -321,7 +321,6 @@ export const resources = {
 		gitSurgeon: frGitSurgeon,
 		notebookAgent: frNotebookAgent,
 		releaseCoordinator: frReleaseCoordinator,
-		specRefinement: frSpecRefinement,
 		sandbox: frSandbox,
 		regressionGuardian: frRegressionGuardian,
 		injectionGuard: frInjectionGuard,
@@ -362,7 +361,8 @@ export const resources = {
 		pixelOffice: frPixelOffice,
 		selfHealing: frSelfHealing,
 		sessionHistory: frSessionHistory,
-		voiceControl: frVoiceControl,
+		smartEstimation: frSmartEstimation,
+		voiceAssistant: frVoiceAssistant,
 		ideation: frIdeation,
 		costEstimator: frCostEstimator,
 		formulaLab: frFormulaLab,
@@ -425,7 +425,6 @@ i18n.use(initReactI18next).init({
 		"gitSurgeon",
 		"notebookAgent",
 		"releaseCoordinator",
-		"specRefinement",
 		"sandbox",
 		"regressionGuardian",
 		"injectionGuard",
@@ -466,7 +465,8 @@ i18n.use(initReactI18next).init({
 		"pixelOffice",
 		"selfHealing",
 		"sessionHistory",
-		"voiceControl",
+		"smartEstimation",
+		"voiceAssistant",
 		"ideation",
 		"costEstimator",
 		"formulaLab",

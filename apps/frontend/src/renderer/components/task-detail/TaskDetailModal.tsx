@@ -72,8 +72,9 @@ import {
 	DialogMaximizeButton,
 	useDialogMaximize,
 } from "../ui/dialog-maximize";
-import { Progress } from "../ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tabs, TabsContent } from "../ui/tabs";
+import { TaskDetailTab, TaskDetailTabsList } from "./TaskDetailTabs";
+import { TaskPhaseProgressBar } from "./TaskPhaseProgressBar";
 import {
 	Tooltip,
 	TooltipContent,
@@ -88,7 +89,7 @@ import { TaskStatusMoveBadge } from "./TaskStatusMoveBadge";
 import { TaskFiles } from "./TaskFiles";
 import { TaskLogs } from "./TaskLogs";
 import { TaskPauseControls } from "./TaskPauseControls";
-import { TaskFailureBanner } from "./TaskFailureBanner";
+import { TaskWaitingBanner } from "./TaskWaitingBanner";
 import { TaskRunControls } from "./TaskRunControls";
 import { translateActivityMessage } from "./translateActivityMessage";
 import { pauseTask, resumeTask } from "../../stores/task-store";
@@ -398,11 +399,21 @@ function useTaskDetailHandlers(
 	};
 
 	const handleReject = async () => {
-		if (!state.feedback.trim() && state.feedbackImages.length === 0) {
+		// The open line comments go with the request (F9); the main reads them from disk.
+		let commentIds: string[] = [];
+		try {
+			const listed = await window.electronAPI.listReviewComments(task.id);
+			if (listed.success && listed.data) {
+				commentIds = listed.data.filter((c) => c.status === "open").map((c) => c.id);
+			}
+		} catch {
+			// no comment can be read: the request goes with its text
+		}
+		if (!state.feedback.trim() && state.feedbackImages.length === 0 && commentIds.length === 0) {
 			return;
 		}
 		state.setIsSubmitting(true);
-		await submitReview(task.id, false, state.feedback, state.feedbackImages);
+		await submitReview(task.id, false, state.feedback, state.feedbackImages, commentIds);
 		state.setIsSubmitting(false);
 		state.setFeedback("");
 		state.setFeedbackImages([]);
@@ -825,6 +836,7 @@ function TaskDetailModalContent({
 				error: result.error,
 				prUrl: undefined,
 				alreadyExists: false,
+				crossReviewBlocked: result.data?.crossReviewBlocked === true,
 			};
 		} catch (error) {
 			// Propagate actual error message; let CreatePRDialog handle i18n fallback for undefined
@@ -1115,10 +1127,10 @@ function TaskDetailModalContent({
 												onClick={handleToggleTdd}
 												disabled={tddToggleDisabled}
 												className={cn(
-													"group mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50",
+													"group mr-1 inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/50 disabled:cursor-not-allowed disabled:opacity-50",
 													tddEnabled
-														? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 shadow-[0_0_14px_-3px_rgba(16,185,129,0.7)] hover:bg-emerald-500/20"
-														: "border-border bg-transparent text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-300/80",
+														? "border-success/40 bg-success/15 text-success shadow-[0_0_14px_-3px_rgba(16,185,129,0.7)] hover:bg-success/20"
+														: "border-border bg-transparent text-muted-foreground hover:border-success/30 hover:text-success/80",
 												)}
 											>
 												<FlaskConical
@@ -1134,7 +1146,7 @@ function TaskDetailModalContent({
 													className={cn(
 														"h-1.5 w-1.5 rounded-full transition-all duration-200",
 														tddEnabled
-															? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(16,185,129,0.9)]"
+															? "bg-success shadow-[0_0_6px_1px_rgba(16,185,129,0.9)]"
 															: "bg-muted-foreground/40",
 													)}
 												/>
@@ -1223,12 +1235,15 @@ function TaskDetailModalContent({
 							    unless the task runs or reported its context usage. */}
 							{(state.isRunning || completedSubtasks > 0) &&
 							(totalSubtasks > 0 || state.hasActiveExecution) ? (
-								<div className="mt-3 flex items-center gap-3">
-									<Progress
-										value={headerProgressPercent}
-										className="h-1.5 flex-1"
+								<div className="mt-3 flex items-start gap-3">
+									{/* Coloured by phase: each phase's share of the time. */}
+									<TaskPhaseProgressBar
+										progress={headerProgressPercent}
+										phaseLogs={state.phaseLogs}
+										isRunning={!!state.hasActiveExecution}
+										className="flex-1 pt-1"
 									/>
-									<span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+									<span className="text-sm font-semibold text-foreground tabular-nums w-11 text-right leading-4">
 										{headerProgressPercent}%
 									</span>
 									<ContextGauge task={task} />
@@ -1256,11 +1271,14 @@ function TaskDetailModalContent({
 							)}
 						</div>
 
-						{/* Why the task failed — above the tabs, because a user who
-						    finds a card in review with a red badge is looking for
-						    this sentence before anything else. Renders nothing when
-						    the task did not fail. */}
-						<TaskFailureBanner task={task} />
+						{/* What is waiting for the person (plan, CI, question, goal,
+						    failure, review), each leading to its card; then why the
+						    task failed. Both above the tabs, both render nothing
+						    when there is nothing to say. */}
+						<TaskWaitingBanner
+							task={task}
+							onShowOverview={() => state.setActiveTab("overview")}
+						/>
 
 						{/* Body - Single Column with Tabs */}
 						<div className="flex-1 min-h-0 overflow-hidden">
@@ -1269,86 +1287,54 @@ function TaskDetailModalContent({
 								onValueChange={state.setActiveTab}
 								className="flex flex-col h-full"
 							>
-								<TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent px-5 h-auto shrink-0">
-									<TabsTrigger
-										value="overview"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+								<TaskDetailTabsList>
+									<TaskDetailTab value="overview">
 										{t("tasks:modal.tabs.overview")}
-									</TabsTrigger>
-									<TabsTrigger
-										value="subtasks"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									</TaskDetailTab>
+									<TaskDetailTab value="subtasks">
 										{t("tasks:modal.tabs.subtasks", {
 											count: task.subtasks.length,
 										})}
-									</TabsTrigger>
-									<TabsTrigger
-										value="logs"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									</TaskDetailTab>
+									<TaskDetailTab value="logs">
 										{t("tasks:modal.tabs.logs")}
-									</TabsTrigger>
+									</TaskDetailTab>
 									{showFilesTab && (
-										<TabsTrigger
-											value="files"
-											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-										>
+										<TaskDetailTab value="files">
 											{t("tasks:files.tab")}
-										</TabsTrigger>
+										</TaskDetailTab>
 									)}
-									<TabsTrigger
-										value="changeGraph"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									<TaskDetailTab value="changeGraph">
 										{t("tasks:changeGraph.tab")}
-									</TabsTrigger>
-									<TabsTrigger
-										value="visualProof"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									</TaskDetailTab>
+									<TaskDetailTab value="visualProof">
 										{t("tasks:visualProof.tab")}
-									</TabsTrigger>
-									<TabsTrigger
-										value="emulator"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									</TaskDetailTab>
+									<TaskDetailTab value="emulator">
 										{t("tasks:emulator.tab")}
-									</TabsTrigger>
-									<TabsTrigger
-										value="mobile"
-										className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-									>
+									</TaskDetailTab>
+									<TaskDetailTab value="mobile">
 										{t("mobile:preview.tab")}
-									</TabsTrigger>
+									</TaskDetailTab>
 									{showVerifyTab && (
-										<TabsTrigger
-											value="verify"
-											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-										>
+										<TaskDetailTab value="verify">
 											{t("tasks:verify.tab")}
-										</TabsTrigger>
+										</TaskDetailTab>
 									)}
 									{showArchitectureTab && (
-										<TabsTrigger
-											value="architecture"
-											className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-sm"
-										>
+										<TaskDetailTab value="architecture">
 											{t("architectureVisualizer:delta.tab")}
-										</TabsTrigger>
+										</TaskDetailTab>
 									)}
-								</TabsList>
+								</TaskDetailTabsList>
 
 								{/* Overview Tab */}
 								<TabsContent
 									value="overview"
 									className="flex-1 min-h-0 overflow-hidden mt-0"
 								>
-									{/* La vue d'ensemble possède sa zone de défilement : sa barre de
-									    raccourcis reste au-dessus, immobile. */}
-									{/* Rangée par la question que se pose la personne :
-									    à traiter, la tâche, le plan, la mémoire. */}
+									{/* Trois onglets : avancement, qualité, coûts et contexte
+									    (panel-sections.ts). La barre reste au-dessus du défilement. */}
 									<TaskOverview
 										task={task}
 										projectPath={taskProject?.path ?? activeProject?.path}
@@ -1449,7 +1435,11 @@ function TaskDetailModalContent({
 										value="files"
 										className="flex-1 min-h-0 overflow-hidden mt-0"
 									>
-										<TaskFiles task={task} />
+										<TaskFiles
+											key={task.id}
+											task={task}
+											projectPath={taskProject?.path ?? activeProject?.path}
+										/>
 									</TabsContent>
 								)}
 

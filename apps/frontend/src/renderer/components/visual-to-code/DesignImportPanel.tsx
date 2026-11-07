@@ -41,6 +41,8 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 // Phase metadata for UI display
 const PHASE_CONFIG: Record<
 	PipelinePhase,
@@ -60,12 +62,12 @@ const PHASE_CONFIG: Record<
 	code_generation: {
 		icon: Code,
 		labelKey: "phases.code_generation",
-		color: "text-green-500",
+		color: "text-success",
 	},
 	design_token_integration: {
 		icon: Palette,
 		labelKey: "phases.design_token_integration",
-		color: "text-amber-500",
+		color: "text-warning",
 	},
 	visual_test_generation: {
 		icon: TestTube,
@@ -80,12 +82,12 @@ const PHASE_CONFIG: Record<
 	complete: {
 		icon: Check,
 		labelKey: "phases.complete",
-		color: "text-green-600",
+		color: "text-success",
 	},
 	error: {
 		icon: AlertTriangle,
 		labelKey: "phases.error",
-		color: "text-red-500",
+		color: "text-destructive",
 	},
 };
 
@@ -118,12 +120,12 @@ const LANGUAGE_COLORS: Record<string, string> = {
 	tsx: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 	jsx: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 	ts: "bg-blue-600/10 text-blue-800 dark:text-blue-300",
-	js: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+	js: "bg-warning/10 text-warning ",
 	css: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
 	scss: "bg-pink-500/10 text-pink-700 dark:text-pink-400",
-	vue: "bg-green-500/10 text-green-700 dark:text-green-400",
+	vue: "bg-success/10 text-success ",
 	svelte: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-	html: "bg-red-500/10 text-red-700 dark:text-red-400",
+	html: "bg-destructive/10 text-destructive ",
 	text: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
 };
 
@@ -300,7 +302,7 @@ export function DesignImportPanel() {
 						if (isActive) {
 							phaseStatusClass = `${config.color} bg-current/5 ring-1 ring-current/20`;
 						} else if (isDone) {
-							phaseStatusClass = "text-green-600 bg-green-500/5";
+							phaseStatusClass = "text-success bg-success/5";
 						} else {
 							phaseStatusClass = "text-muted-foreground/50";
 						}
@@ -314,7 +316,7 @@ export function DesignImportPanel() {
 							phaseIconElement = <Icon className="h-3 w-3" />;
 						}
 
-						const connectorClass = isDone ? "bg-green-500/40" : "bg-border";
+						const connectorClass = isDone ? "bg-success/40" : "bg-border";
 
 						return (
 							<div key={p} className="flex items-center flex-1">
@@ -394,7 +396,7 @@ export function DesignImportPanel() {
 										isDragging
 											? "border-violet-500 bg-violet-500/5"
 											: imagePreview
-												? "border-green-500/50 bg-green-500/5"
+												? "border-success/50 bg-success/5"
 												: "border-border hover:border-violet-500/50 hover:bg-accent/50"
 									}`}
 									onDrop={handleDrop}
@@ -415,7 +417,7 @@ export function DesignImportPanel() {
 											<div className="relative inline-block">
 												<img
 													src={imagePreview}
-													alt="Design preview"
+													alt={t("designToCode:previewAlt")}
 													className="max-h-48 rounded-lg shadow-md mx-auto"
 												/>
 												<button
@@ -424,7 +426,7 @@ export function DesignImportPanel() {
 														e.stopPropagation();
 														clearImage();
 													}}
-													className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+													className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition-colors"
 												>
 													<X className="h-3 w-3" />
 												</button>
@@ -462,13 +464,13 @@ export function DesignImportPanel() {
 										<Palette className="h-4 w-4" />
 										{t("upload.figmaUrl")}
 									</label>
-									<input
+									<Input
 										id="figma-url-input"
 										type="text"
 										placeholder={t("upload.figmaUrlPlaceholder")}
 										value={figmaUrl}
 										onChange={(e) => setFigmaUrl(e.target.value)}
-										className="w-full px-3 py-2 text-sm rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+										className="w-full px-3 py-2 text-sm h-auto"
 									/>
 									<p className="text-xs text-muted-foreground">
 										{t("upload.figmaUrlHelp")}
@@ -545,12 +547,12 @@ export function DesignImportPanel() {
 												<label className="text-xs font-medium">
 													{t("upload.designSystemPath")}
 												</label>
-												<input
+												<Input
 													type="text"
 													placeholder={t("upload.designSystemPathPlaceholder")}
 													value={designSystemPath}
 													onChange={(e) => setDesignSystemPath(e.target.value)}
-													className="w-full px-3 py-1.5 text-sm rounded-md border bg-background focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+													className="w-full px-3 py-1.5 text-sm h-auto"
 												/>
 											</div>
 
@@ -585,7 +587,7 @@ export function DesignImportPanel() {
 												<label className="text-xs font-medium">
 													{t("upload.customInstructions")}
 												</label>
-												<textarea
+												<Textarea
 													placeholder={t(
 														"upload.customInstructionsPlaceholder",
 													)}
@@ -594,7 +596,7 @@ export function DesignImportPanel() {
 														setCustomInstructions(e.target.value)
 													}
 													rows={3}
-													className="w-full px-3 py-1.5 text-sm rounded-md border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+													className="w-full px-3 py-1.5 text-sm resize-none min-h-0"
 												/>
 											</div>
 										</div>
@@ -603,7 +605,7 @@ export function DesignImportPanel() {
 
 								{/* Error display */}
 								{error && (
-									<div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 text-red-700 dark:text-red-400 text-sm">
+									<div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
 										<AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
 										<p>{error}</p>
 									</div>
@@ -653,7 +655,7 @@ export function DesignImportPanel() {
 																	<ChevronRight className="h-3 w-3 text-muted-foreground" />
 																	<Badge
 																		variant="outline"
-																		className="text-[10px]"
+																		className="text-3xs"
 																	>
 																		{child.type}
 																	</Badge>
@@ -671,7 +673,7 @@ export function DesignImportPanel() {
 									{Object.keys(result.design_spec.color_palette).length > 0 && (
 										<div>
 											<h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-												<Palette className="h-4 w-4 text-amber-500" />
+												<Palette className="h-4 w-4 text-warning" />
 												{t("spec.colorPalette")}
 											</h3>
 											<div className="flex flex-wrap gap-2">
@@ -691,7 +693,7 @@ export function DesignImportPanel() {
 															/>
 															<div>
 																<p className="text-xs font-medium">{name}</p>
-																<p className="text-[10px] text-muted-foreground font-mono">
+																<p className="text-3xs text-muted-foreground font-mono">
 																	{value}
 																</p>
 															</div>
@@ -763,11 +765,11 @@ export function DesignImportPanel() {
 													</div>
 													<div className="flex items-center gap-1.5 mt-1 pl-5">
 														<Badge
-															className={`text-[10px] px-1 py-0 ${LANGUAGE_COLORS[file.language] || LANGUAGE_COLORS.text}`}
+															className={`text-3xs px-1 py-0 ${LANGUAGE_COLORS[file.language] || LANGUAGE_COLORS.text}`}
 														>
 															{file.language}
 														</Badge>
-														<span className="text-[10px] text-muted-foreground truncate">
+														<span className="text-3xs text-muted-foreground truncate">
 															{file.description}
 														</span>
 													</div>
@@ -836,7 +838,7 @@ export function DesignImportPanel() {
 											{t("tests.visualRegressionTests")} (
 											{result.visual_tests.length})
 										</span>
-										<Badge variant="secondary" className="text-[10px]">
+										<Badge variant="secondary" className="text-3xs">
 											Playwright
 										</Badge>
 									</div>
@@ -866,7 +868,7 @@ export function DesignImportPanel() {
 													</span>
 												</div>
 												<div className="flex items-center gap-2">
-													<Badge variant="outline" className="text-[10px]">
+													<Badge variant="outline" className="text-3xs">
 														{t("tests.threshold")}:{" "}
 														{(test.threshold * 100).toFixed(0)}%
 													</Badge>
@@ -912,7 +914,7 @@ export function DesignImportPanel() {
 							{result?.design_tokens_used?.length ? (
 								<div className="space-y-3 pr-4">
 									<div className="flex items-center gap-2 mb-2">
-										<Palette className="h-4 w-4 text-amber-500" />
+										<Palette className="h-4 w-4 text-warning" />
 										<span className="text-sm font-semibold">
 											{t("tokens.designTokensIntegrated")} (
 											{result.design_tokens_used.length})
@@ -975,7 +977,7 @@ export function DesignImportPanel() {
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
 					{phase === "complete" && result && (
 						<>
-							<Check className="h-3.5 w-3.5 text-green-500" />
+							<Check className="h-3.5 w-3.5 text-success" />
 							<span>
 								{result.generated_files.length} {t("footer.files")} •{" "}
 								{result.visual_tests.length} {t("footer.tests")} •{" "}

@@ -53,6 +53,10 @@ MAX_CASES = 20
 # Cards looked at to offer candidates: discovery runs git only.
 MAX_CANDIDATES = 60
 MAX_VARIANTS = 4
+# A candidate rule is as long as an adopted one (`learning_loop.review_lessons`).
+MAX_RULE_CHARS = 500
+# Where a build's prompts read the project's adopted rules (`rules_block`).
+LESSONS_FILE = Path(".workpilot") / "learning" / "review-lessons.json"
 VARIANT_DEPTH = 50
 ENGINE_PHASES = ("spec", "planning", "coding", "qa")
 # What the spec pipeline wrote before any build. The plan, the QA reports, the
@@ -67,6 +71,7 @@ SPEC_FILES = (
 # Task metadata a replay keeps: what kind of task it is, never where it went.
 METADATA_KEYS = ("kind", "kindSource", "category", "priority", "complexity", "impact")
 
+_KIND = re.compile(r"^[a-z][a-z_]{0,31}$")
 _PROVIDER = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _EFFORT = re.compile(r"^[a-z][a-z_-]{0,31}$")
 
@@ -76,6 +81,8 @@ class Engine:
     provider: str
     model: str
     effort: str
+    rule: str = ""
+    """A candidate rule the copy is built with, or "" (see ``write_rule``)."""
 
     def metadata(self) -> dict:
         """The keys ``buildEngineMetadata`` writes in the renderer."""
@@ -114,7 +121,17 @@ def parse_engines(raw) -> list[Engine]:
             raise BenchError(f"engine {index} has no valid model")
         if not isinstance(effort, str) or not _EFFORT.match(effort):
             raise BenchError(f"engine {index} has no valid effort")
-        engine = Engine(provider, model.strip(), effort)
+        rule = item.get("rule") or ""
+        if not isinstance(rule, str) or any(
+            ord(c) < 32 and c not in "\n\t" for c in rule
+        ):
+            raise BenchError(f"engine {index} has an invalid rule")
+        rule = " ".join(rule.split())
+        if len(rule) > MAX_RULE_CHARS:
+            raise BenchError(
+                f"engine {index} has a rule over {MAX_RULE_CHARS} characters"
+            )
+        engine = Engine(provider, model.strip(), effort, rule)
         if engine in engines:
             raise BenchError(f"engine {index} is listed twice")
         engines.append(engine)
@@ -166,6 +183,10 @@ def discover_case(project_dir: Path, spec_id: str, given: str | None) -> dict:
     except BenchError as error:
         _refuse(case, "no-card", str(error))
         return case
+    # The card's kind, so the table can be read per kind (bug fix, feature…).
+    kind = (read_json(folder / "task_metadata.json") or {}).get("kind")
+    if isinstance(kind, str) and _KIND.match(kind):
+        case["kind"] = kind
     target, source, note = None, "", ""
     if given:
         target = repo.resolve_commit(project_dir, given)
@@ -329,6 +350,41 @@ def copy_spec(
     metadata["requireReviewBeforeCoding"] = False
     metadata["bench"] = marker
     write_json(dest / "task_metadata.json", metadata)
+    if engine.rule:
+        write_rule(copy_dir, engine.rule)
+
+
+def write_rule(copy_dir: Path, rule: str) -> None:
+    """Build the copy with ``rule`` as an adopted project rule.
+
+    Every phase of every provider reads the adopted rules (`rules_block`), so
+    the arm with the rule and the arm without differ by that rule only. The
+    rules the copy already tracks stay; nothing is written in the project.
+    """
+    path = copy_dir / LESSONS_FILE
+    folder = copy_dir
+    for part in LESSONS_FILE.parts:
+        folder = folder / part
+        if folder.is_symlink():
+            raise BenchError(f"{LESSONS_FILE.as_posix()} goes through a symbolic link")
+    lessons = (read_json(path) or {}).get("lessons")
+    lessons = (
+        [x for x in lessons if isinstance(x, dict)] if isinstance(lessons, list) else []
+    )
+    lessons.append(
+        {
+            "id": "bench-candidate",
+            "source": "bench",
+            "status": "adopted",
+            "text": rule,
+            "rule": rule,
+            "flags": [],
+            "origin": {},
+            "seen_at": now(),
+            "decided_at": now(),
+        }
+    )
+    write_json(path, {"version": 1, "lessons": lessons})
 
 
 def prepare(
@@ -353,6 +409,7 @@ def prepare(
                 "provider": e.provider,
                 "model": e.model,
                 "effort": e.effort,
+                **({"rule": e.rule} if e.rule else {}),
             }
             for i, e in enumerate(engines, start=1)
         ],
@@ -495,9 +552,11 @@ def judge_build(
                     "runId": run_id,
                     "buildId": build_id,
                     "caseId": case["caseId"],
+                    "kind": case.get("kind"),
                     "provider": engine["provider"],
                     "model": engine["model"],
                     "effort": engine["effort"],
+                    "rule": engine.get("rule") or None,
                     "resolved": build["resolved"],
                     "f2pPassed": build["f2pPassed"],
                     "f2pTotal": len(case["f2p"]),

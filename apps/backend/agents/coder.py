@@ -11,26 +11,28 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from agent_trace import model_id_of, session_start
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
+    card_kind,
     cognitive_context_enabled,
     load_domain_addendum,
     suggest_routed_model,
 )
 from context_mgmt.reset_limit import ResetLimit
-from core.build_signals import BuildHalted, BuildPaused
 from core.client import create_agent_client
 from core.llm_optimization import should_inline_file_context
-from core.pause_state import is_paused, read_pause_state
 from core.progress import interrupted_subtask_directive, reopen_interrupted_subtasks
 from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
-from qa.criteria import save_implementation_plan
+from foundation.build_signals import BuildHalted, BuildPaused
+from foundation.pause_state import is_paused, read_pause_state
+from foundation.steering import PersonNotes, deliver_notes, person_notes
 
 try:
     from core.usage_tracker import (
@@ -78,6 +80,7 @@ from prompts_pkg.prompt_generator import (
 from prompts_pkg.prompts import (
     constitution_section,
     docintel_section,
+    dotnet_section,
     is_first_run,
     mobile_section,
     uiux_section,
@@ -86,7 +89,6 @@ from prompts_pkg.prompts import (
 from security.constants import PROJECT_DIR_ENV_VAR
 from services.recovery import RecoveryManager
 from task_logger import (
-    LogEntryType,
     LogPhase,
     get_task_logger,
 )
@@ -119,7 +121,9 @@ from .base import (
     RESUME_FILE,
     sanitize_error_message,
 )
+from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
+from .rate_limit_time import parse_rate_limit_reset_time
 from .session import (
     is_prompt_too_long_error,
     post_session_processing,
@@ -129,7 +133,6 @@ from .utils import (
     find_phase_for_subtask,
     find_subtask_in_plan,
     get_commit_count,
-    get_latest_commit,
     load_implementation_plan,
     sync_spec_to_source,
 )
@@ -383,139 +386,6 @@ async def wait_for_auth_resume(
         logger.debug(f"Error cleaning up pause file {pause_file} after timeout: {e}")
 
 
-def _parse_relative_time(message: str) -> int | None:
-    """Parse 'in X minutes/hours' pattern from message."""
-    in_time_match = re.search(r"in\s+(\d+)\s*(minute|hour|min|hr)s?", message, re.I)
-    if not in_time_match:
-        return None
-
-    amount = int(in_time_match.group(1))
-    unit = in_time_match.group(2).lower()
-
-    if unit.startswith("hour") or unit.startswith("hr"):
-        delta = timedelta(hours=amount)
-    else:
-        delta = timedelta(minutes=amount)
-
-    return int((datetime.now() + delta).timestamp())
-
-
-def _validate_time_values(hour: int, minute: int) -> bool:
-    """Validate hour and minute ranges."""
-    return 0 <= hour <= 23 and 0 <= minute <= 59
-
-
-def _convert_meridiem_to_24h(hour: int, meridiem: str) -> int:
-    """Convert 12-hour format with meridiem to 24-hour format."""
-    if meridiem.lower() == "pm" and hour < 12:
-        return hour + 12
-    elif meridiem.lower() == "am" and hour == 12:
-        return 0
-    return hour
-
-
-def _validate_meridiem_hour(hour: int, meridiem: str) -> bool:
-    """Validate hour range when meridiem is present (should be 1-12)."""
-    return 1 <= hour <= 12
-
-
-def _parse_absolute_time(message: str) -> int | None:
-    """Parse absolute clock times from CLI messages.
-
-    Handles both shapes the Claude CLI emits:
-      - ``"resets at 10:30 pm"`` / ``"resets at 22:30"`` (legacy)
-      - ``"resets 3:20pm (Europe/Paris)"`` / ``"resets 10am"`` (newer session-limit
-        and weekly-limit banners — no ``at`` prefix, minute portion sometimes
-        omitted)
-
-    Missing the no-``at`` variant let the rate-limit shield fail to compute a
-    reset timestamp, so the caller fell back to its retry loop and the
-    conversation summary kept re-injecting until the prompt overflowed.
-    """
-    # Try minute-precision first (HH:MM with optional meridiem).
-    at_time_match = re.search(
-        r"(?:at|resets)\s+(\d{1,2}):(\d{2})\s*(am|pm)?", message, re.I
-    )
-    if not at_time_match:
-        # Fall back to hour-only ("resets 10am" / "resets 3pm").
-        hour_only = re.search(r"(?:at|resets)\s+(\d{1,2})\s*(am|pm)", message, re.I)
-        if not hour_only:
-            return None
-        # Synthesise a zero-minute match so the rest of the function stays one branch.
-        try:
-            hour = int(hour_only.group(1))
-        except ValueError:
-            return None
-        minute = 0
-        meridiem = hour_only.group(2)
-    else:
-        try:
-            hour = int(at_time_match.group(1))
-            minute = int(at_time_match.group(2))
-        except ValueError:
-            return None
-        meridiem = at_time_match.group(3)
-
-    try:
-        # Validate hour range when meridiem is present
-        if meridiem and not _validate_meridiem_hour(hour, meridiem):
-            return None
-
-        if meridiem:
-            hour = _convert_meridiem_to_24h(hour, meridiem)
-
-        # Validate final hour and minute ranges
-        if not _validate_time_values(hour, minute):
-            return None
-
-        now = datetime.now()
-        reset_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if reset_time <= now:
-            reset_time += timedelta(days=1)
-        return int(reset_time.timestamp())
-    except ValueError:
-        return None
-
-
-def parse_rate_limit_reset_time(error_info: dict | None) -> int | None:
-    """
-    Parse rate limit reset time from error info.
-
-    Attempts to extract reset time from various formats in error messages.
-
-    TIMEZONE ASSUMPTIONS:
-    - "in X minutes/hours" patterns are timezone-safe (relative time)
-    - "at HH:MM" patterns assume LOCAL timezone, which is reasonable since:
-      1. The user sees timestamps in their local timezone
-      2. The wait calculation happens locally using datetime.now()
-      3. If the API returns UTC "at" times, this would need adjustment
-        (but Claude API typically returns relative times like "in X minutes")
-
-    Args:
-        error_info: Error info dict with 'message' key
-
-    Returns:
-        Unix timestamp of reset time, or None if not parseable
-    """
-    if not error_info:
-        return None
-
-    message = error_info.get("message", "")
-
-    # Try relative time pattern first
-    reset_time = _parse_relative_time(message)
-    if reset_time:
-        return reset_time
-
-    # Try absolute time pattern
-    reset_time = _parse_absolute_time(message)
-    if reset_time:
-        return reset_time
-
-    # No pattern matched
-    return None
-
-
 def _cleanup_stray_root_plan(project_dir: Path, spec_dir: Path) -> str | None:
     """Remove a bogus implementation_plan.json a model wrote to the project ROOT
     instead of the spec dir.
@@ -643,9 +513,9 @@ def _coding_task_segments(
         # The constitution applies to every subtask, not to the one that
         # happens to mention a library — so it goes in whole, each time.
         section("constitution", constitution_section(project_dir), Stability.PROJECT),
-        # Same reasoning: the platform rules apply to every subtask, not to
-        # the one that happens to mention a device.
+        # Same reasoning: the platform rules apply to every subtask, not one.
         section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("dotnet", dotnet_section(project_dir, spec_dir), Stability.TASK),
         section("effort", effort, Stability.TASK),
         # The ADRs bind every subtask too; the attachments come with them
         # because a subtask implementing a screen is the one that needs the
@@ -862,6 +732,7 @@ async def _on_concurrency_error(
             scope.recovery_manager.mark_subtask_stuck(
                 scope.subtask_id,
                 f"Tool concurrency errors after {retry.concurrency_errors} retries",
+                kind="tool_concurrency",
             )
             print_status(f"Subtask {scope.subtask_id} marked as STUCK", "error")
 
@@ -1231,37 +1102,36 @@ async def _planning_prompt(
         prompt += "\n\n" + planner_docs
         print_status("Library documentation available to planner", "success")
 
-    # A spec-kit project states its own rules; a plan written without
-    # them is one its own tooling would reject.
+    # A spec-kit project's rules: a plan without them is one its tooling rejects.
     planner_rules = constitution_section(project_dir)
     if planner_rules:
         prompt += "\n\n" + planner_rules
         print_status("spec-kit constitution applied to planning", "success")
 
-    # The ADRs bind the plan the way the constitution does, and the
-    # diagram or mockup attached to the task is where the person said
-    # what they meant when the description did not.
+    # The ADRs bind the plan like the constitution; the attached mockup or
+    # diagram says what the person meant when the description did not.
     planner_documents = docintel_section(project_dir, spec_dir)
     if planner_documents:
         prompt += "\n\n" + planner_documents
         print_status("ADRs and task attachments applied to planning", "success")
 
-    # The approaches `brainstorm` compared before planning. Its report
-    # was written to the spec's workflow/ directory and read by nobody
-    # until handed over here (`workflows.handoff`).
+    # The approaches `brainstorm` compared, from the spec's workflow/
+    # directory, read by nobody until handed over here (`workflows.handoff`).
     planner_reports = workflow_reports_section(spec_dir, "planning")
     if planner_reports:
         prompt += "\n\n" + planner_reports
         print_status("Earlier phase reports handed to the planner", "success")
 
-    # A phone application has no dev server and no URL: the plan has to
-    # say which platform each subtask is verified on, and on a machine
-    # without the toolchain for one of them, that it is not. A planner
-    # told this after the fact writes subtasks nobody can execute.
+    # A phone app has no URL: the plan says which platform verifies each
+    # subtask, and which one this machine cannot build.
     planner_mobile = mobile_section(project_dir)
     if planner_mobile:
         prompt += "\n\n" + planner_mobile
         print_status("Mobile stack and device toolchain applied to planning", "success")
+    # A .NET 11 migration is planned along its procedure (`dotnet_upgrade`).
+    if planner_dotnet := dotnet_section(project_dir, spec_dir, role="planner"):
+        prompt += "\n\n" + planner_dotnet
+        print_status(".NET 11 migration procedure applied to planning", "success")
     return prompt
 
 
@@ -1280,6 +1150,7 @@ async def _coding_prompt(
     current_phase: str,
     phase_thinking_budget,
     retry: _RetryState,
+    human_input: str | PersonNotes = "",
 ) -> str:
     """One subtask's prompt: what the task shares first, then the subtask."""
     recovery_hints = (
@@ -1298,6 +1169,7 @@ async def _coding_prompt(
         phase=phase or {},
         attempt_count=attempt_count,
         recovery_hints=recovery_hints,
+        human_input=human_input,
     )
     effort = (
         effort_preamble(workflow_plan, "coding", workflow_repo_root)
@@ -1325,9 +1197,8 @@ async def _coding_prompt(
     # (provider, effort) pair benefits from inlining. Claude agents
     # and high-effort runs re-read files via tools anyway, so inline
     # content there is duplicated input paid on every turn.
-    # Provider resolved WITHOUT side effects (get_phase_provider) —
-    # _get_active_provider would consume the RESUME_WITH_PROVIDER
-    # marker before create_agent_client gets to read it.
+    # Provider of this phase (get_phase_provider), which a per-phase
+    # override can set apart from the task-wide one.
     inline_provider = phase_provider or get_phase_provider(
         spec_dir, phase=current_phase
     )
@@ -1598,7 +1469,7 @@ def _report_traceability(spec_dir: Path) -> None:
     Never raises: this reports on the build, it is not part of it.
     """
     try:
-        from spec.traceability import write_record
+        from foundation.traceability import write_record
 
         record = write_record(spec_dir)
     except Exception as exc:  # noqa: BLE001 - a report never fails a build
@@ -1639,6 +1510,7 @@ async def _run_post_planning_phases(
     workflow_repo_root: Path,
     jev_run,
     verbose: bool,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """The workflow phases declared between `planning` and `coding`.
 
@@ -1651,8 +1523,8 @@ async def _run_post_planning_phases(
     if profile is None:
         return
     try:
+        from foundation.plan_forecast import planned_files
         from workflows.engine import narrow_to_forecast
-        from workflows.forecast import planned_files
 
         from workflows import PhaseContext, phases_between, run_skill_phases
 
@@ -1683,6 +1555,9 @@ async def _run_post_planning_phases(
             jev_run=jev_run,
             effort=getattr(profile, "effort", "medium"),
             verbose=verbose,
+            # The card reads the main spec directory: a goal written by
+            # `spec-by-example` must reach it (`goal.spec.load_goal`).
+            source_spec_dir=source_spec_dir,
         )
         run = await run_skill_phases(
             window_profile, ctx, after="planning", before="coding"
@@ -1894,6 +1769,7 @@ async def run_autonomous_agent(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
                 project_dir=project_dir,
+                kind=card_kind(spec_dir),
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(
@@ -2234,10 +2110,11 @@ async def run_autonomous_agent(
                     success=True,
                     message=f"Paused by user during {paused_phase}",
                 )
-            # A provider switch made while paused is applied by the
-            # RESUME_WITH_PROVIDER marker that `core.client` consumes on the
-            # next session, not here: this branch stops the build, so anything
-            # it assigned to `model` was read by nobody.
+            # A provider switch made while paused is applied by
+            # TASK_RESUME_WITH_PROVIDER, which records the engine in
+            # task_metadata.json for the next session, not here: this branch
+            # stops the build, so anything it assigned to `model` was read by
+            # nobody.
             #
             # Unwinds to handle_build_command, which skips QA and finalization.
             # A bare `return` here let the build carry on to QA and finalize a
@@ -2271,6 +2148,7 @@ async def run_autonomous_agent(
         # Get the next subtask to work on (planner sessions shouldn't bind to a subtask)
         next_subtask = None if first_run else get_next_subtask(spec_dir)
         subtask_id = next_subtask.get("id") if next_subtask else None
+        human_note = ""  # read with the subtask prompt below
         phase_name = next_subtask.get("phase_name") if next_subtask else None
 
         # Update status for this session
@@ -2298,7 +2176,7 @@ async def run_autonomous_agent(
         )
 
         # Capture state before session for post-processing
-        commit_before = get_latest_commit(project_dir)
+        commit_before = session_start(spec_dir, project_dir, subtask_id, iteration)
         commit_count_before = get_commit_count(project_dir)
 
         # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
@@ -2480,6 +2358,8 @@ async def run_autonomous_agent(
                     print("No pending subtasks found - build may be complete!")
                     break
 
+            # A subtask a person sent back starts its attempt count over.
+            take_human_unblock(spec_dir, subtask_id, recovery_manager)
             # Validate that all files_to_modify exist before attempting execution
             # This prevents infinite retry loops when implementation plan references non-existent files
             validation_result = validate_subtask_files(next_subtask, project_dir)
@@ -2515,6 +2395,7 @@ async def run_autonomous_agent(
                     recovery_manager.mark_subtask_stuck(
                         subtask_id,
                         f"File validation failed after {attempt_count} attempts: {error_msg}",
+                        kind="file_validation",
                     )
                     print_status(
                         f"Subtask {subtask_id} marked as STUCK after {attempt_count} failed validation attempts",
@@ -2533,55 +2414,18 @@ async def run_autonomous_agent(
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
                 continue  # Skip to next iteration
 
-            # PRE-CHECK: If this is a manual verification task, skip the coder session
-            # and mark it as completed to remove from queue
-            verification = next_subtask.get("verification", {})
-            if verification.get("type") == "manual":
-                print()
-                print_status(
-                    f"Subtask {subtask_id} requires manual verification",
-                    "warning",
-                )
-                print(
-                    muted(
-                        "Skipping coder session - marking as completed for human review"
-                    )
-                )
-
-                # Mark as completed (not blocked) so it's removed from queue
-                # This prevents infinite waiting since no automated testing can run
-                plan = load_implementation_plan(spec_dir)
-                if plan:
-                    subtask = find_subtask_in_plan(plan, subtask_id)
-                    if subtask:
-                        subtask["status"] = "completed"
-                        # Add metadata that this requires manual review
-                        subtask["_manual_review_required"] = True
-
-                        try:
-                            save_implementation_plan(spec_dir, plan)
-                            print_status(
-                                f"✓ Subtask {subtask_id} marked as COMPLETED (manual review needed)",
-                                "warning",
-                            )
-
-                            # Log the decision
-                            if task_logger:
-                                task_logger.log(
-                                    f"Subtask {subtask_id}: Manual verification task - marked completed for human review",
-                                    LogEntryType.TEXT,
-                                    LogPhase.CODING,
-                                )
-                        except Exception as e:
-                            logger.error(f"Failed to mark as completed: {e}")
-                            print(f"  ✗ Warning: Could not mark as completed: {e}")
-
-                # Continue to next subtask without launching coder
+            # A manual check no session can run is completed for the human
+            # review, unless a person sent it back from the panel.
+            if skip_manual_verification(
+                spec_dir, subtask_id, next_subtask, task_logger
+            ):
                 await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
                 continue
 
             # Get attempt count for recovery context
             attempt_count = recovery_manager.get_attempt_count(subtask_id)
+            # Read here, not in the prompt: what was delivered is archived below.
+            human_note = person_notes(spec_dir, source_spec_dir, subtask_id)
             prompt = await _coding_prompt(
                 spec_dir,
                 project_dir,
@@ -2596,6 +2440,7 @@ async def run_autonomous_agent(
                 current_phase=current_phase,
                 phase_thinking_budget=phase_thinking_budget,
                 retry=retry,
+                human_input=human_note,
             )
 
             # Show what we're working on
@@ -2651,6 +2496,10 @@ async def run_autonomous_agent(
                 context_managed=True,
                 context_monitor_only=context_resets.monitor_only(context_unit),
             )
+            # A session that ran has received the person's instructions: they
+            # apply once (`foundation.steering`), the orchestrator says so.
+            if subtask_id and status in ("complete", "continue"):
+                deliver_notes(human_note, spec_dir, source_spec_dir, session=iteration)
             if context_resets.record(context_unit, status):
                 notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
                 if task_logger:
@@ -2709,8 +2558,8 @@ async def run_autonomous_agent(
                 # The agent asked whether to block the manual testing subtask.
                 # Automatically answer: Yes, mark it as blocked and continue.
                 auto_answer = (
-                    "Yes, please mark this subtask as 'blocked' and continue to the next subtask. "
-                    "The manual testing requires a human tester with Visual Studio access."
+                    "If you can run the check yourself, run it and mark the subtask completed. If only "
+                    "a person can, set it 'blocked' with a blocked_reason saying what they must do."
                 )
 
                 # Send the auto-answer as a new session
@@ -2798,6 +2647,7 @@ async def run_autonomous_agent(
                     workflow_repo_root=_workflow_repo_root,
                     jev_run=jev_run,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
                 )
             else:
                 planning_retry_context = _on_invalid_plan(
@@ -2829,6 +2679,7 @@ async def run_autonomous_agent(
                 linear_enabled=linear_is_enabled,
                 status_manager=status_manager,
                 source_spec_dir=source_spec_dir,
+                model_id=model_id_of(client, phase_model),
             )
 
             # Check for stuck subtasks

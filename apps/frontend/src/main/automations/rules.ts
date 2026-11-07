@@ -87,6 +87,15 @@ function parseTrigger(raw: unknown): AutomationTrigger | string {
 			const days = [...new Set(trigger.days as number[])].sort();
 			return { type: "schedule", time: trigger.time, days, title, prompt };
 		}
+		case "pr_opened": {
+			if (trigger.base === undefined || trigger.base === "") {
+				return { type: "pr_opened" };
+			}
+			if (typeof trigger.base !== "string" || !BRANCH.test(trigger.base)) {
+				return "The trigger's base branch is not a branch name";
+			}
+			return { type: "pr_opened", base: trigger.base };
+		}
 		default:
 			return "Unknown trigger";
 	}
@@ -138,15 +147,18 @@ export function parseRule(
 		// A new kind of event is a new rule: its history says nothing about it.
 		return "A rule keeps its trigger type; create another rule instead";
 	}
+	// A PR rule makes no card: it starts the GitHub PRs review, with that
+	// page's engine, and its result is a draft nothing here can turn off.
+	const review = trigger.type === "pr_opened";
 	return {
 		id: existing?.id ?? newRuleId(),
 		name,
 		enabled: rule.enabled !== false,
 		trigger,
-		...(kind && { kind }),
-		...(engine && { engine }),
+		...(kind && !review && { kind }),
+		...(engine && !review && { engine }),
 		// Draft unless the person turned it off, explicitly.
-		draft: rule.draft !== false,
+		draft: review || rule.draft !== false,
 		dailyCap: cap as number,
 		createdAt: existing?.createdAt ?? now.toISOString(),
 	};

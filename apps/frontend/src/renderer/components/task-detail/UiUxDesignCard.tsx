@@ -111,11 +111,11 @@ export function UiUxDesignCard({ task, projectPath }: UiUxDesignCardProps) {
 					<div className="flex flex-wrap items-center gap-2">
 						<Palette className="h-4 w-4 shrink-0 text-violet-500" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:uiux.title")}</span>
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t(`tasks:uiux.state.${state}`)}
 						</Badge>
 						{record?.guide && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("tasks:uiux.guide", { guide: record.guide })}
 							</Badge>
 						)}
@@ -164,7 +164,7 @@ export function UiUxDesignCard({ task, projectPath }: UiUxDesignCardProps) {
 			)}
 
 			{record?.status === "withheld" && (
-				<p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+				<p className="mt-2 text-xs text-warning ">
 					{t("tasks:uiux.withheld")}
 				</p>
 			)}
@@ -178,7 +178,7 @@ export function UiUxDesignCard({ task, projectPath }: UiUxDesignCardProps) {
 								style={{ backgroundColor: c.hex }}
 								aria-hidden
 							/>
-							<span className="text-[11px] text-muted-foreground">
+							<span className="text-2xs text-muted-foreground">
 								{c.role} <code>{c.hex}</code>
 							</span>
 						</div>

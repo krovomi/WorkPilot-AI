@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from core.debug import debug
+    from foundation.debug import debug
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):

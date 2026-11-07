@@ -208,7 +208,7 @@ def resolve_offline_route(
     )
     requested_provider, requested_model = provider, model
     honour_route = bool(route) and not selected_local_model and (strict or not chosen)
-    if honour_route:
+    if honour_route and route:
         provider, model = route["provider"], route["model"]
 
     provider = _ALIASES.get(provider, provider)

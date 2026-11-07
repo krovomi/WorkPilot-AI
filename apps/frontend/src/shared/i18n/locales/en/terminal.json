@@ -46,5 +46,17 @@
 		"detached": "(detached)",
 		"remotePushFailed": "Remote Tracking Not Set Up",
 		"remotePushFailedDescription": "Worktree created but the branch could not be pushed to remote. You may need to run git push -u manually."
-	}
+	},
+	"dropToInsertPath": "Drop to insert path",
+	"taskSelector": {
+		"current": "Current task",
+		"switchTo": "Switch to...",
+		"clear": "Clear task",
+		"select": "Select task...",
+		"available": "Available tasks",
+		"add": "Add new task",
+		"empty": "No tasks available",
+		"emptyHint": "Create tasks in the Kanban board"
+	},
+	"doubleClickToRename": "Double-click to rename"
 }

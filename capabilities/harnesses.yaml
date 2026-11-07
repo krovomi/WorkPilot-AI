@@ -24,7 +24,7 @@
 #
 # The canonical vocabulary is Claude Code's (Read, Write, Edit, Bash, Grep,
 # Glob), because that is what the subagent registry in
-# apps/backend/agents/subagents/ is written in. Emitting an agent definition
+# apps/backend/subagents/ is written in. Emitting an agent definition
 # into another harness means translating those names, or the harness ignores
 # the whole list and hands the agent every tool it has.
 #
@@ -124,7 +124,10 @@ gemini:
   default: true
   note: >-
     Gemini CLI reads the agnostic skills path, but its slash commands are TOML
-    files. Those are generated here, never hand-edited.
+    files. Those are generated here, never hand-edited. It reads GEMINI.md by
+    default; the committed `.gemini/settings.json` (`context.fileName`) makes
+    it read AGENTS.md, at the root and just-in-time in each folder it touches,
+    so no GEMINI.md duplicates the rules.
 
 hermes:
   skills_path: .agents/skills

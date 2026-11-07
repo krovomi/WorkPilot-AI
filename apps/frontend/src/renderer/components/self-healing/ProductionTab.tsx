@@ -35,12 +35,12 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 	return (
 		<div className="space-y-4">
 			{/* Config panel */}
-			<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
-				<h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+			<div className="rounded-lg border border-border bg-card p-4">
+				<h3 className="text-sm font-medium text-foreground mb-3">
 					{t("selfHealing:productionConfig")}
 				</h3>
 				<div className="grid grid-cols-2 gap-4 mb-4">
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={productionConfig.enabled}
@@ -51,7 +51,7 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 						/>
 						{t("selfHealing:productionEnabled")}
 					</label>
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={productionConfig.autoAnalyze}
@@ -64,7 +64,7 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 						/>
 						{t("selfHealing:autoAnalyze")}
 					</label>
-					<label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+					<label className="flex items-center gap-2 text-sm text-muted-foreground">
 						<input
 							type="checkbox"
 							checked={productionConfig.autoFix}
@@ -79,8 +79,8 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 			</div>
 
 			{/* Connected sources panel */}
-			<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-4">
-				<h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+			<div className="rounded-lg border border-border bg-card p-4">
+				<h3 className="text-sm font-medium text-foreground mb-3">
 					{t("selfHealing:connectedSources")}
 				</h3>
 				<div className="grid grid-cols-5 gap-2">
@@ -93,16 +93,16 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 								type="button"
 								className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${
 									isConnected
-										? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
-										: "border-[var(--border-primary)] bg-[var(--bg-tertiary)] hover:border-[var(--accent-primary)]/50"
+										? "border-primary bg-primary/10"
+										: "border-border bg-muted hover:border-primary/50"
 								}`}
 							>
 								<span className="text-xl">{icon}</span>
-								<span className="text-xs text-[var(--text-secondary)]">
+								<span className="text-xs text-muted-foreground">
 									{label}
 								</span>
 								<span
-									className={`text-xs ${isConnected ? "text-green-400" : "text-[var(--text-tertiary)]"}`}
+									className={`text-xs ${isConnected ? "text-success" : "text-muted-foreground"}`}
 								>
 									{isConnected
 										? t("selfHealing:connected")
@@ -112,19 +112,19 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 						);
 					})}
 				</div>
-				<p className="text-xs text-[var(--text-tertiary)] mt-3">
+				<p className="text-xs text-muted-foreground mt-3">
 					{t("selfHealing:productionDescription")}
 				</p>
 			</div>
 
 			{/* Live incidents */}
 			<div>
-				<h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">
+				<h3 className="text-sm font-medium text-foreground mb-2">
 					{t("selfHealing:liveIncidents")} ({productionIncidents.length})
 				</h3>
 				{productionIncidents.length === 0 ? (
-					<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-6 text-center">
-						<p className="text-sm text-[var(--text-secondary)]">
+					<div className="rounded-lg border border-border bg-card p-6 text-center">
+						<p className="text-sm text-muted-foreground">
 							{t("selfHealing:noProductionIncidents")}
 						</p>
 					</div>

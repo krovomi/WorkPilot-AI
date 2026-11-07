@@ -209,7 +209,7 @@ export interface FeatureModelConfig {
 	promptOptimizer: string; // AI Prompt Optimizer
 	testGenerator: string; // Test Generation Agent
 	codeReview: string; // Code Review Agent
-	voiceControl: string; // Voice Control feature
+	voiceControl: string; // Voice assistant: reads a spoken command
 }
 
 // Feature-specific thinking level configuration
@@ -224,7 +224,7 @@ export interface FeatureThinkingConfig {
 	promptOptimizer: ThinkingLevel; // AI Prompt Optimizer
 	testGenerator: ThinkingLevel; // Test Generation Agent
 	codeReview: ThinkingLevel; // Code Review Agent
-	voiceControl: ThinkingLevel; // Voice Control feature
+	voiceControl: ThinkingLevel; // Voice assistant
 }
 
 // Agent profile for preset model/thinking configurations
@@ -352,6 +352,11 @@ export interface AppSettings {
 	_migratedDefaultModelSync?: boolean;
 	// Language preference for UI (i18n)
 	language?: SupportedLanguage;
+	// Voice assistant: its shortcut (Electron accelerator, default
+	// `CommandOrControl+Shift+Space`) and whether it also works while the app
+	// is in the background (registered with the OS; off by default).
+	voiceAssistantShortcut?: string;
+	voiceAssistantSystemWide?: boolean;
 	// Developer tools preferences
 	preferredIDE?: SupportedIDE;
 	customIDEPath?: string; // For 'custom' IDE
@@ -379,6 +384,11 @@ export interface AppSettings {
 	// Configuration pour providers custom/enterprise
 	customProviderUrl?: string;
 	customProviderApiKey?: string;
+	/**
+	 * When each secret key above got its current value (ISO 8601). Written by
+	 * the main process only (settings-utils), never from what the renderer sends.
+	 */
+	credentialsSetAt?: import("../utils/secret-age").SecretDates;
 	customProviderModels?: import("../constants/models").ProviderModel[];
 	// Auto-switching settings
 	autoSwitchEnabled?: boolean;

@@ -89,17 +89,64 @@ Un appui approuve seulement si chacune de ces conditions tient :
 - **Après l'appui.** Le bouton est retiré dans tous les cas.
 - **Sans fenêtre ouverte**, rien n'est approuvé.
 
+## En mode serveur
+
+Une carte d'un projet serveur n'a pas de machine XState qui la regarde : ses runs tournent sur le
+serveur, et l'app peut être fermée. Le serveur annonce donc lui-même la fin d'un run à la personne
+qui l'a lancé, sur les canaux qu'elle a configurés pour son compte (Réglages, « Mes notifications
+du serveur »). Le push Expo de l'app mobile reste à part (`server/services/push.py`).
+
+```
+apps/backend/server/services/needs_you.py       les moments, les réglages de chacun, l'envoi en arrière-plan
+apps/backend/server/services/needs_you_send.py  ntfy, Telegram, Teams : validation et envoi
+apps/backend/server/routers/needs_you.py        /users/me/needs-you (server-mode.md)
+apps/frontend/src/main/server-needs-you.ts      les appels, arguments revérifiés dans le main
+apps/frontend/src/renderer/components/settings/ServerNeedsYouSettings.tsx
+```
+
+| Fin de run | Moment |
+|---|---|
+| `spec` réussie, plan pas encore approuvé | Un plan t'attend |
+| `spec` réussie sur une carte sans revue (le build a suivi), `build` ou `qa` réussi | Prête pour ta revue |
+| toute phase en échec | Tâche arrêtée sur une erreur |
+| annulée, `merge` ou `pr` réussi | rien |
+
+- **Le plan en attente.** C'est la réponse du tableau (`review.state`), que `shared_board/api.py`
+  installe par `needs_you.set_approval_check` : `server` n'importe aucune unité de feature.
+- **Ce qui part.** Le nom du projet et le numéro de la carte, comme le push : ni le titre, ni le
+  texte, ni l'erreur d'une carte, qui sont ceux de l'équipe.
+- **Les formats.** Ceux du bureau : ntfy reçoit le texte avec le titre en paramètre, Telegram
+  un `sendMessage` en texte brut. Teams, absent du bureau, reçoit une Adaptive Card minimale par
+  webhook entrant ou URL Workflows.
+- **Les secrets.** Le topic ntfy, son jeton d'accès, le jeton du bot et l'URL du webhook sont
+  chiffrés avec la clé maîtresse du serveur (`secrets.py`). Une route ne les rend jamais, seulement
+  un masque ; renvoyer le masque, ou rien, garde la valeur enregistrée. Sans clé maîtresse, rien
+  ne s'enregistre. Aucun log ne contient une URL, un en-tête ou le texte d'une exception.
+- **Les destinations.** Vérifiées à l'enregistrement : `https` seulement, port 443, pas
+  d'identifiants dans l'URL, un nom d'hôte et pas une adresse ; Teams seulement sur les hôtes de
+  Microsoft (`*.webhook.office.com`, `*.logic.azure.com`, `*.api.powerplatform.com`), Telegram
+  seulement sur `api.telegram.org`, et les règles de topic du bureau. Puis à l'envoi : l'hôte est
+  résolu une fois, chacune de ses adresses doit être publique, et la requête part vers cette
+  adresse (TLS vérifie toujours le nom). Une réponse DNS qui change entre les deux n'atteint rien
+  de nouveau. Une redirection est un échec, jamais suivie.
+- **L'envoi.** En tâche de fond, après le run : il ne le bloque ni ne le fait échouer. Il est
+  coupé tant que l'opérateur ne pose pas `WORKPILOT_NEEDS_YOU_ENABLED`, comme le push.
+- **Pas d'approbation à distance.** Le bouton Telegram du bureau n'existe pas ici : un appui
+  demanderait au serveur d'écouter Telegram. On approuve dans l'app ou sur le téléphone.
+
 ## Limites connues
 
 - Le polling Telegram (`getUpdates`) prend la main sur le bot : un bot déjà
   branché sur un webhook ailleurs ne reçoit pas les appuis. Il faut un bot
   dédié.
 - ntfy n'a pas de bouton d'approbation, par construction.
-- Une app fermée ne notifie pas : les événements viennent de la machine d'état
-  du main.
+- Une app fermée ne notifie pas pour une tâche locale : les événements viennent
+  de la machine d'état du main. Une carte serveur, elle, est annoncée par le
+  serveur (ci-dessus).
 
 ## Vérifier
 
 ```
-cd apps/frontend && pnpm test -- needs-you notification-service task-state-manager NeedsYouChannels useNeedsYou
+cd apps/frontend && pnpm test -- needs-you notification-service task-state-manager NeedsYouChannels useNeedsYou ServerNeedsYouSettings
+pytest tests/backend/test_needs_you_server.py -q
 ```

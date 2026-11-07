@@ -38,7 +38,7 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | Phase | Who runs it |
 |---|---|
 | `brainstorm`, `analyze`, `review` | the engine (`workflows/runner.py`), as one-shot skill sessions |
-| `verify`, `verify-replay`, `architecture-map` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `architecture_visualizer/archify/phase.py` |
+| `verify`, `verify-replay`, `architecture-map`, `spec-by-example`, `cross-review` | the engine, through a dedicated executor (`CUSTOM_EXECUTORS`): Python drives the deterministic steps and opens a session only where a model is needed — `verify/phase.py`, `verify/replay.py` (no model at all), `workflows/architecture_map_phase.py`, `workflows/spec_by_example_phase.py` (one session writes the tests, Python checks and runs them, [spec-by-example.md](spec-by-example.md)), `workflows/cross_review_phase.py` (one session on a second provider, [cross-review.md](cross-review.md)) |
 | `planning` and `coding` | `run_autonomous_agent`, **driven by the profile** — it decides the dispatch and injects the effort and the declared methodology |
 | `design-check` and any deterministic gate | the engine (`workflows/gates.py`) |
 | `mobile-design` | the engine (`workflows/runner.py`), when the task touches mobile files |
@@ -48,6 +48,8 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | `docs` | the preflight (`libdocs.run_preflight`), before planning — no API call, never pruned |
 | `reproduce`, `investigate`, `procedure`, `proofread`, `verdict` | the engine, as one-shot skill sessions of the per-kind workflows (`skills/tooling/`) |
 | the `tests-unchanged` hard gate | the engine (`workflows/hard_gates.py`), from the task's real diff |
+| the `deps-exist` hard gate | the engine (`workflows/hard_gates.py`), from the dependency guard's record ([dependency-guard.md](dependency-guard.md)) |
+| the `proof-checks` hard gate | the engine (`workflows/hard_gates.py`), from the record of the project's proof checkers ([proof-checks.md](proof-checks.md)); no line for a project without `[proofs]` |
 | `execute` (a RUN's procedure) | the engine, through a dedicated executor (`workflows/execute.py`): no model, behind the irreversible gate and the command allowlist |
 
 **One workflow per task kind.** The workflow a build loads is the card's kind's
@@ -79,9 +81,22 @@ committed mock runtime never counts as the real one. A fallback of the form
 spec already written is the product document — so it opens no session and
 belongs to no window.
 
+**`companions:`.** A skill phase may offer other procedures, each with the case
+it is for (`companions: {hermes/python-debugpy: "the defect is in Python and …"}`).
+The phase keeps following its `impl`; the prompt lists each companion found on
+disk with its case and its absolute path (`runner.companion_lines`), and the
+model opens one only when the case applies. The source tree `skills/<pack>/` is
+read before `.agents/skills/`, which is flat by name and may hold another pack's
+skill of the same name. This is how the hermes debugging procedures reach
+`reproduce` in `bug-fix` and `hotfix` (`systematic-debugging`, `python-debugpy`,
+`node-inspect-debugger`) and `investigate` (`systematic-debugging` only: it runs
+under the read-only analyzer) without replacing WorkPilot's own procedures. A
+companion never sits on a builtin phase, whose prompt is not built here, and
+`tests/test_workflow_companions.py` fails when a pack sync removes one.
+
 **`irreversible: true`.** The runner stops before such a phase
 (`irreversible_gate`): it writes `workflow/<id>.pause.json`, marks the build
-paused in the one pause store (`core/pause_state.py`, which the Kanban reads
+paused in the one pause store (`foundation/pause_state.py`, which the Kanban reads
 to offer Resume), prints the steps that would run and raises `BuildPaused`.
 Resuming lifts the flag and restarts the build; the window re-enters the
 phase, consumes the marker and lets it through once. A RUN's `execute` phase
@@ -219,7 +234,7 @@ cost the right specialists, not the build.
 
 This matters beyond tidiness — the roster is context the parent pays for on **every
 turn**, so a mismatched roster is not merely unhelpful, it is billed. Hence three
-rules in `agents.subagents.resolve`:
+rules in `subagents.resolve`:
 
 - **Every `AGENT_CONFIGS` entry but `coder` names its roster** in `PHASE_ALIASES`
   (`test_every_agent_config_names_its_roster`). The PR orchestrators fell through to

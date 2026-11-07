@@ -8,7 +8,8 @@ Validates spec.md document structure and required sections.
 import re
 from pathlib import Path
 
-from ...traceability import parse_open_questions, parse_requirements
+from foundation.traceability import parse_open_questions, parse_requirements
+
 from ..models import ValidationResult
 from ..schemas import SPEC_RECOMMENDED_SECTIONS, SPEC_REQUIRED_SECTIONS
 

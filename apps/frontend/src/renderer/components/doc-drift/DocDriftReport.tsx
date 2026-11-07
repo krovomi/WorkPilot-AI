@@ -1,11 +1,13 @@
 import type React from "react";
 import { useTranslation } from "react-i18next";
+import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
+import { SharedReportNote } from "../analyses/SharedReportNote";
 import { useDocDriftStore } from "../../stores/doc-drift-store";
 import type { DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
 
 const SEVERITY_STYLES: Record<DriftSeverity, string> = {
-	high: "text-red-400 bg-red-500/10 border-red-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	high: "text-destructive bg-destructive/10 border-destructive/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -28,15 +30,18 @@ export function DocDriftReport({
 
 	const isScanning = phase === "scanning";
 	const canRun = !!projectPath && !isScanning;
+	const setReport = useDocDriftStore((s) => s.setReport);
+	// A server project's last report, saved on the server by any member.
+	const shared = useSharedAnalysisReport("doc-drift", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -45,7 +50,7 @@ export function DocDriftReport({
 						type="button"
 						onClick={() => projectPath && startScan(projectPath)}
 						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 					>
 						{t("actions.runScan")}
 					</button>
@@ -54,27 +59,29 @@ export function DocDriftReport({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
 				)}
 			</div>
 
+			{!isScanning && <SharedReportNote saved={shared} />}
+
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -83,7 +90,7 @@ export function DocDriftReport({
 				<ReportBody report={report} t={t} />
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -103,7 +110,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("info", {
 						docs: report.docsScanned,
 						files: report.codeFilesIndexed,
@@ -130,19 +137,19 @@ function ReportBody({
 							{issue.docFile}:{issue.docLine} → {issue.referencedSymbol}
 						</p>
 						{issue.suggestion && (
-							<p className="text-xs mt-1 text-green-400">{issue.suggestion}</p>
+							<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
 						)}
 					</div>
 				))}
 			</div>
 
 			{report.issues.length === 0 ? (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{t("noDriftDetected")}
 				</p>
 			) : (
 				report.summary && (
-					<p className="text-sm text-(--text-secondary) italic mt-2">
+					<p className="text-sm text-muted-foreground italic mt-2">
 						{report.summary}
 					</p>
 				)

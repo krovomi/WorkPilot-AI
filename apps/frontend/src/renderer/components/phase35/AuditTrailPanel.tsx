@@ -12,6 +12,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { Input } from "../ui/input";
 interface AuditTrailPanelProps {
 	/** The open project. Its trail directory is what this panel is for. */
 	projectPath?: string;
@@ -96,13 +97,14 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<label htmlFor="storage-dir-input" className="block font-medium mb-1">
 							{t("audit.storageDir")}
 						</label>
-						<input
+						<Input
+							spellCheck={false}
 							id="storage-dir-input"
 							value={storageDir}
 							onChange={(e) => setStorageDir(e.target.value)}
 							aria-invalid={Boolean(storageDirError) || undefined}
 							aria-describedby={storageDirError ? "storage-dir-error" : undefined}
-							className="w-full rounded border bg-background p-2 font-mono text-xs"
+							className="w-full p-2 font-mono text-xs h-auto"
 							placeholder={t("audit.storageDirPlaceholder")}
 						/>
 						{storageDirError && (
@@ -115,14 +117,14 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<label htmlFor="trail-name-input" className="block font-medium mb-1">
 							{t("audit.trailName")}
 						</label>
-						<input
+						<Input
 							id="trail-name-input"
 							value={trailName}
 							onChange={(e) => setTrailName(e.target.value.slice(0, 64))}
 							maxLength={64}
 							aria-invalid={Boolean(trailNameError) || undefined}
 							aria-describedby={trailNameError ? "trail-name-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						/>
 						{trailNameError && (
 							<p id="trail-name-error" className="mt-1 text-xs text-destructive">
@@ -137,14 +139,14 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<label htmlFor="correlation-id-input" className="block font-medium mb-1">
 							{t("audit.correlationId")}
 						</label>
-						<input
+						<Input
 							id="correlation-id-input"
 							value={correlationId}
 							onChange={(e) => setCorrelationId(e.target.value.slice(0, 128))}
 							maxLength={128}
 							aria-invalid={Boolean(correlationIdError) || undefined}
 							aria-describedby={correlationIdError ? "correlation-id-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 							placeholder={t("audit.correlationIdPlaceholder")}
 						/>
 						{correlationIdError && (
@@ -169,8 +171,8 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 						<Badge
 							className={
 								integrity.is_intact
-									? "bg-green-500/20 text-green-700 border-green-500/40"
-									: "bg-red-500/20 text-red-700 border-red-500/40"
+									? "bg-success/20 text-success border-success/40"
+									: "bg-destructive/20 text-destructive border-destructive/40"
 							}
 						>
 							{integrity.is_intact ? t("audit.intact") : t("audit.tampered")}

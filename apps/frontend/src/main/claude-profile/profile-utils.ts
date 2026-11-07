@@ -64,6 +64,31 @@ export async function createProfileDirectory(
 	return profileDir;
 }
 
+/** The fields of a profile that a sign-in leaves behind. */
+export type SignInRecord = Pick<
+	ClaudeProfile,
+	"email" | "subscriptionType" | "rateLimitTier" | "oauthToken" | "tokenCreatedAt"
+>;
+
+/**
+ * Whether this profile has ever been signed in. A sign-in records the
+ * account's email (login) and its subscription (login, and every start-up
+ * that finds credentials); a direct OAuth token is a sign-in too.
+ *
+ * Missing credentials on such a profile are a lost sign-in to report. On a
+ * profile never signed in (the default "Primary" of a fresh install, a user
+ * of another provider) they are the normal state, not an expiry.
+ */
+export function hasSignedInBefore(profile: SignInRecord): boolean {
+	return Boolean(
+		profile.email ||
+			profile.subscriptionType ||
+			profile.rateLimitTier ||
+			profile.oauthToken ||
+			profile.tokenCreatedAt,
+	);
+}
+
 /**
  * Check if a profile has valid authentication
  * (checks for OAuth token or config directory credential files)

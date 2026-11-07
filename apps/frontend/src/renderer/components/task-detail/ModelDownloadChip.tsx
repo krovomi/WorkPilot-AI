@@ -33,7 +33,7 @@ interface ModelDownloadChipProps {
 }
 
 const CHIP_BASE =
-	"flex h-6 items-center gap-1 rounded-full border px-2 text-[10px] " +
+	"flex h-6 items-center gap-1 rounded-full border px-2 text-3xs " +
 	"font-medium transition-colors focus-visible:outline-none " +
 	"focus-visible:ring-1 focus-visible:ring-primary/50";
 
@@ -153,7 +153,7 @@ export function ModelDownloadChip({
 			onClick={onDownload}
 			className={cn(
 				CHIP_BASE,
-				"border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20",
+				"border-warning/40 bg-warning/10 text-warning hover:bg-warning/20",
 				className,
 			)}
 			title={t(

@@ -1,6 +1,8 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
+import { SharedReportNote } from "../analyses/SharedReportNote";
 import {
 	setupI18nAgentListeners,
 	useI18nAgentStore,
@@ -10,9 +12,10 @@ import type {
 	I18nSeverity,
 } from "../../../shared/types/i18n-agent";
 
+import { Input } from "../ui/input";
 const SEVERITY_STYLES: Record<I18nSeverity, string> = {
-	error: "text-red-400 bg-red-500/10 border-red-500/20",
-	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	error: "text-destructive bg-destructive/10 border-destructive/20",
+	warning: "text-warning bg-warning/10 border-warning/20",
 	info: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -41,9 +44,12 @@ export function I18nReportView({
 
 	const isScanning = phase === "scanning";
 	const canRun = !!projectPath && !isScanning;
+	const setReport = useI18nAgentStore((s) => s.setReport);
+	// A server project's last report, saved on the server by any member.
+	const shared = useSharedAnalysisReport("i18n", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<Toolbar
 				canRun={canRun}
 				isScanning={isScanning}
@@ -55,29 +61,31 @@ export function I18nReportView({
 			/>
 
 			{report && !isScanning && (
-				<input
+				<Input
 					type="text"
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					placeholder={t("search.placeholder")}
-					className="px-3 py-2 rounded bg-(--bg-secondary) border border-(--border-color) text-(--text-primary) text-sm focus:outline-none focus:ring-2 focus:ring-(--accent-color)"
+					className="px-3 py-2 text-sm h-auto w-auto"
 				/>
 			)}
 
+			{!isScanning && <SharedReportNote saved={shared} />}
+
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -86,7 +94,7 @@ export function I18nReportView({
 				<ReportBody report={report} t={t} searchQuery={searchQuery} />
 			) : (
 				phase === "idle" && (
-					<div className="flex flex-col items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
@@ -95,7 +103,7 @@ export function I18nReportView({
 							stroke="currentColor"
 							className="w-16 h-16 mb-4 opacity-50"
 						>
-							<title>Global network icon</title>
+							<title>{t("i18nAgent:report.globeIconTitle")}</title>
 							<path
 								strokeLinecap="round"
 								strokeLinejoin="round"
@@ -133,7 +141,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 				>
 					{t("actions.cancel")}
 				</button>
@@ -142,7 +150,7 @@ function Toolbar({
 					type="button"
 					onClick={onRun}
 					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 				>
 					{t("actions.runScan")}
 				</button>
@@ -152,7 +160,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 				>
 					{t("actions.reset")}
 				</button>
@@ -184,7 +192,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("filesInfo", {
 						count: report.filesScanned,
 						locales: report.localesCompared.join(", ") || "—",
@@ -197,18 +205,18 @@ function ReportBody({
 					{Object.entries(report.coverageByLocale).map(([locale, pct]) => {
 						let coverageColor: string;
 						if (pct >= 90) {
-							coverageColor = "text-green-400";
+							coverageColor = "text-success";
 						} else if (pct >= 70) {
-							coverageColor = "text-yellow-400";
+							coverageColor = "text-warning";
 						} else {
-							coverageColor = "text-red-400";
+							coverageColor = "text-destructive";
 						}
 						return (
 							<div
 								key={locale}
-								className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)"
+								className="p-3 rounded-lg bg-card border border-border"
 							>
-								<p className="text-xs text-(--text-secondary)">
+								<p className="text-xs text-muted-foreground">
 									{t("locale")}: {locale}
 								</p>
 								<p className={`text-xl font-bold ${coverageColor}`}>{pct}%</p>
@@ -220,7 +228,7 @@ function ReportBody({
 
 			<div className="space-y-2">
 				{filteredIssues.length === 0 && searchQuery ? (
-					<div className="text-sm text-(--text-secondary) text-center py-4">
+					<div className="text-sm text-muted-foreground text-center py-4">
 						{t("search.noResults")}
 					</div>
 				) : (
@@ -244,7 +252,7 @@ function ReportBody({
 								{issue.locale ? ` · ${t("localeLabel")}: ${issue.locale}` : ""}
 							</p>
 							{issue.suggestion && (
-								<p className="text-xs mt-1 text-green-400">{issue.suggestion}</p>
+								<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
 							)}
 						</div>
 					))
@@ -252,7 +260,7 @@ function ReportBody({
 			</div>
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}

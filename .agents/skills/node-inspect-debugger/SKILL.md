@@ -23,8 +23,8 @@ metadata:
     - python-debugpy
   workpilot:
     pack: hermes
-    version: 0.0.1
-    content_sha256: 94d8e01c5d810236988100cb8563056c6118473c7b87218e5f4c44e1e54e68b1
+    version: 0.1.0
+    content_sha256: 301eb7cd5c180bb2cf86c5dad402c3ef0a3a2200d69d5c246570186f05ca4851
 ---
 
 # Node.js Inspect Debugger
@@ -127,7 +127,7 @@ npm i -g chrome-remote-interface        # or project-local
 node --inspect-brk=9229 target.js &
 ```
 
-Driver script (save as `/tmp/cdp-debug.js`):
+Driver script (save as `~/.hermes/cache/scratch/cdp-debug.js`):
 
 ```javascript
 const CDP = require('chrome-remote-interface');
@@ -180,14 +180,14 @@ const CDP = require('chrome-remote-interface');
 Run it:
 
 ```bash
-node /tmp/cdp-debug.js
+node ~/.hermes/cache/scratch/cdp-debug.js
 ```
 
 Hermes-specific note: `chrome-remote-interface` is NOT in `ui-tui/package.json`. Install it to a throwaway location if you don't want to dirty the project:
 
 ```bash
-mkdir -p /tmp/cdp-tools && cd /tmp/cdp-tools && npm i chrome-remote-interface
-NODE_PATH=/tmp/cdp-tools/node_modules node /tmp/cdp-debug.js
+mkdir -p ~/.hermes/cache/scratch/cdp-tools && cd ~/.hermes/cache/scratch/cdp-tools && npm i chrome-remote-interface
+NODE_PATH=~/.hermes/cache/scratch/cdp-tools/node_modules node ~/.hermes/cache/scratch/cdp-debug.js
 ```
 
 ## Debugging Hermes ui-tui
@@ -262,8 +262,8 @@ await client.Profiler.enable();
 await client.Profiler.start();
 await new Promise(r => setTimeout(r, 5000));
 const { profile } = await client.Profiler.stop();
-require('fs').writeFileSync('/tmp/cpu.cpuprofile', JSON.stringify(profile));
-// Open /tmp/cpu.cpuprofile in Chrome DevTools → Performance tab
+require('fs').writeFileSync('~/.hermes/cache/scratch/cpu.cpuprofile', JSON.stringify(profile));
+// Open ~/.hermes/cache/scratch/cpu.cpuprofile in Chrome DevTools → Performance tab
 ```
 
 ```javascript
@@ -272,7 +272,7 @@ await client.HeapProfiler.enable();
 const chunks = [];
 client.HeapProfiler.addHeapSnapshotChunk(({ chunk }) => chunks.push(chunk));
 await client.HeapProfiler.takeHeapSnapshot({ reportProgress: false });
-require('fs').writeFileSync('/tmp/heap.heapsnapshot', chunks.join(''));
+require('fs').writeFileSync('~/.hermes/cache/scratch/heap.heapsnapshot', chunks.join(''));
 ```
 
 ## Common Pitfalls

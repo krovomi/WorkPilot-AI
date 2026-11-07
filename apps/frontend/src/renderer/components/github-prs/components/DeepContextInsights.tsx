@@ -73,7 +73,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 						variant="outline"
 						className="text-xs bg-indigo-500/10 text-indigo-500 border-indigo-500/30"
 					>
-						{sectionCount} {sectionCount === 1 ? "section" : "sections"}
+						{t("common:prReview.deepContextSections", { count: sectionCount })}
 					</Badge>
 					<span className="text-xs text-muted-foreground">
 						<Clock className="h-3 w-3 inline mr-1" />
@@ -145,7 +145,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 									<div className="flex items-center gap-2">
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0"
+											className="text-3xs px-1.5 py-0"
 										>
 											{v.severity}
 										</Badge>
@@ -207,7 +207,7 @@ export function DeepContextInsights({ deepContext }: DeepContextInsightsProps) {
 				{hasRelatedCode && (
 					<div className="space-y-2">
 						<h4 className="text-sm font-medium flex items-center gap-2">
-							<BookOpen className="h-3.5 w-3.5 text-emerald-500" />
+							<BookOpen className="h-3.5 w-3.5 text-success" />
 							{t("prReview.deepContext.relatedCode")}
 						</h4>
 						<div className="space-y-1">

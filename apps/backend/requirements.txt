@@ -2,14 +2,14 @@
 # SDK 0.1.25+ required for improved tool use concurrency handling
 # Earlier versions had 400 errors when tool_use blocks had partial failures
 # Utiliser le nom correct du package (tiret) pour l'installation via pip
-claude-agent-sdk>=0.2.170
+claude-agent-sdk>=0.2.176
 python-dotenv>=1.2.4
 
 # Local multilingual Kanban dictation (explicit model download from the UI).
 faster-whisper>=1.2.1
 
 # WebSocket support for streaming development mode
-websockets>=17.3
+websockets>=17.4
 
 # YAML parsing. Imported behind try/except by api_watcher/contract_parser.py,
 # analysis/ci_discovery.py, environment/capturer.py and
@@ -28,13 +28,13 @@ secretstorage>=3.5.0; sys_platform == "linux"
 pywin32>=312; sys_platform == "win32"
 
 # Pydantic for structured output schemas
-pydantic>=2.14.1
+pydantic>=2.14.2
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
-sentry-sdk>=2.72.0
+sentry-sdk>=2.73.0
 
 # Security-First Features
 # Basic secret scanning is built-in, these enhance capabilities
@@ -45,12 +45,12 @@ bandit>=1.9.4
 # pip-audit for dependency vulnerability scanning (optional but recommended)
 # Install separately: pip install pip-audit
 
-fastapi>=0.156.8
+fastapi>=0.162.0
 uvicorn[standard]>=0.54.0
 slowapi>=0.1.10
 
 # Multi-user server mode (central deployment)
-alembic>=1.20.0          # DB schema migrations
+alembic>=1.20.1          # DB schema migrations
 asyncpg>=0.32.0          # PostgreSQL async driver (server mode)
 aiosqlite>=0.22.1        # SQLite async driver (dev/tests fallback)
 argon2-cffi>=25.1.0      # Password hashing for local accounts
@@ -67,7 +67,7 @@ aiohttp>=3.14.5
 h2>=4.4.1  # HTTP/2 support for Windsurf gRPC proxy
 # [asyncio] brings greenlet, without which every async engine (the server
 # database, its Alembic migrations) fails at its first query.
-sqlalchemy[asyncio]>=2.1.5
+sqlalchemy[asyncio]>=2.1.6
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
@@ -81,7 +81,12 @@ defusedxml>=0.7.1
 # Browser Agent (Feature #20) — headless Chromium for screenshots/E2E.
 # After install, the Chromium binary must be fetched once:
 #   playwright install chromium
-playwright>=1.64.0
+playwright>=1.64.1
+
+# The verification's scenario walkthrough (verify/walkthrough.py): the GIF of
+# the step captures shown in the PR. Pillow (MIT-CMU licence) was only a test
+# dependency until now.
+pillow>=13.0.0
 
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.
@@ -90,4 +95,4 @@ playwright>=1.64.0
 # OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
 # installed through mcp; the SDK and the exporter make the spans leave.
 opentelemetry-sdk>=1.45.1
-opentelemetry-exporter-otlp-proto-http>=1.45.1
+opentelemetry-exporter-otlp-proto-http>=1.45.2

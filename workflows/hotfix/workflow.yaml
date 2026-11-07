@@ -15,6 +15,16 @@ phases:
     roster: verify
     dispatch: fresh-context
     always: true
+    companions:
+      hermes/systematic-debugging: >-
+        the cause is not visible from reading the code path, or a first
+        hypothesis turned out wrong
+      hermes/python-debugpy: >-
+        the defect is in Python and only its runtime state (locals, the call
+        stack at the failure) shows it
+      hermes/node-inspect-debugger: >-
+        the defect is in Node.js or Electron main-process code and only its
+        runtime state shows it
     description: >-
       The failing test or the command that shows the incident, the probable
       cause, the perimeter. Under pressure this is the phase most tempting
@@ -51,7 +61,7 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass,app-verified
+    hard_gate: tests-pass,app-verified,deps-exist,proof-checks
     description: >-
       The application launched with the fix, the incident gone. The gates
       are the proof the merge is made on.
@@ -62,6 +72,23 @@ phases:
     description: >-
       The QA loop. A one-pass cap is not expressible here yet; until it is,
       the loop runs as on every build.
+
+  - id: cross-review
+    impl: tooling/review-lenses
+    always: true
+    dispatch: fresh-context
+    description: >-
+      A second engine — another provider, the model the project names — reads
+      the corrected diff against the spec and the goal and answers agree,
+      disagree or inconclusive (`cross_review/`). Read-only. A disagreement
+      that names a blocking problem holds the pull request back until the
+      code changes or the person overrides it; an answer that cannot be read
+      is inconclusive, never agree. After QA because it judges the code that
+      will be pushed; its reader is the pull request step, not a fixer.
+
+      Never pruned by effort: the switch is the project's setting. Without a
+      second engine configured, or with one equal to the build's, the phase
+      opens no session, costs nothing and says why.
 
   - id: observe
     impl: workpilot/observe

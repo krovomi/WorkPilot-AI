@@ -8,15 +8,15 @@ import type {
 } from "../../../shared/types/injection-guard";
 
 const THREAT_STYLES: Record<ThreatLevel, string> = {
-	safe: "text-green-400 bg-green-500/10 border-green-500/20",
-	suspect: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-	blocked: "text-red-400 bg-red-500/10 border-red-500/20",
+	safe: "text-success bg-success/10 border-success/20",
+	suspect: "text-warning bg-warning/10 border-warning/20",
+	blocked: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-red-400",
+	critical: "text-destructive",
 	high: "text-orange-400",
-	medium: "text-yellow-400",
+	medium: "text-warning",
 	low: "text-blue-400",
 };
 
@@ -100,7 +100,7 @@ export function InjectionGuardView({
 	const safe = results.filter((r) => r.threatLevel === "safe").length;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -118,7 +118,7 @@ export function InjectionGuardView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -127,7 +127,7 @@ export function InjectionGuardView({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -136,45 +136,45 @@ export function InjectionGuardView({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{error}</p>
+				<p className="text-sm text-destructive">{error}</p>
 			)}
 
 			{phase === "complete" && results.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{results.length > 0 && (
 				<>
 					<div className="grid grid-cols-3 gap-3">
-						<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-							<p className="text-xs text-(--text-secondary)">
+						<div className="p-3 rounded-lg bg-card border border-border">
+							<p className="text-xs text-muted-foreground">
 								{t("stats.blocked")}
 							</p>
-							<p className="text-2xl font-bold text-red-400">{blocked}</p>
+							<p className="text-2xl font-bold text-destructive">{blocked}</p>
 						</div>
-						<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-							<p className="text-xs text-(--text-secondary)">
+						<div className="p-3 rounded-lg bg-card border border-border">
+							<p className="text-xs text-muted-foreground">
 								{t("stats.suspect")}
 							</p>
-							<p className="text-2xl font-bold text-yellow-400">{suspect}</p>
+							<p className="text-2xl font-bold text-warning">{suspect}</p>
 						</div>
-						<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-							<p className="text-xs text-(--text-secondary)">
+						<div className="p-3 rounded-lg bg-card border border-border">
+							<p className="text-xs text-muted-foreground">
 								{t("stats.safe")}
 							</p>
-							<p className="text-2xl font-bold text-green-400">{safe}</p>
+							<p className="text-2xl font-bold text-success">{safe}</p>
 						</div>
 					</div>
 

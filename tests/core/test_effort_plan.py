@@ -283,3 +283,53 @@ def test_the_live_catalogue_keeps_deepseek_flash():
 
     assert _DEEPSEEK_KEEP.match("deepseek-flash")
     assert _supports_thinking("deepseek", "deepseek-flash")
+
+
+class TestClaudeEffortModels:
+    """platform.claude.com "Effort": Opus 4.5+, Sonnet 4.6+, Haiku 5+, Fable.
+
+    Sonnet 4.5 and Haiku 4.5 refuse the setting: the level reaches them as a
+    thinking budget, and the plan says nothing else is sent.
+    """
+
+    @pytest.mark.parametrize(
+        ("model", "takes"),
+        [
+            ("claude-opus-5-5", True),
+            ("claude-opus-4-5", True),
+            ("claude-opus-4-5-20251101", True),
+            ("claude-opus-4-20250514", False),
+            ("claude-sonnet-5-5", True),
+            ("claude-sonnet-5", True),
+            ("claude-sonnet-4-6", True),
+            ("claude-sonnet-4.6", True),
+            ("anthropic.claude-sonnet-5-5", True),
+            ("claude-sonnet-4-5", False),
+            ("claude-sonnet-4-5-20250929", False),
+            ("claude-haiku-5-5", True),
+            ("claude-haiku-4-5", False),
+            ("claude-fable-5-1", True),
+            ("claude-3-5-sonnet-20241022", False),
+            ("opus", True),
+            # The bare alias resolves to the current generation (F156): Haiku
+            # 5.5 takes effort; a numbered alias still pins Haiku 4.5.
+            ("haiku", True),
+            ("haiku-4-5", False),
+            ("gpt-5.5", False),
+            ("", False),
+        ],
+    )
+    def test_which_models_take_effort(self, model: str, takes: bool) -> None:
+        from core.llm_optimization import claude_takes_effort
+
+        assert claude_takes_effort(model) is takes
+
+    def test_sonnet_5_5_receives_the_level(self) -> None:
+        assert effort_plan("claude", "claude-sonnet-5-5", "low").sent == "low"
+        assert effort_plan("claude", "claude-haiku-5-5", "none").sent == "low"
+
+    def test_a_model_without_effort_is_sent_nothing_but_its_budget(self) -> None:
+        plan = effort_plan("claude", "claude-haiku-4-5", "high")
+        assert plan.control == "native"
+        assert plan.sent is None
+        assert effort_trace_label("claude", "claude-haiku-4-5", "high") == "high"

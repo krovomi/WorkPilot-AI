@@ -5,6 +5,10 @@ Extracted from provider_api.py. Mounted via app.include_router(router).
 Frontend traffic: GET /api/sessions/{projectId} is called by
 SessionHistory.tsx. Path/method/response shape are preserved verbatim
 to avoid breaking that caller.
+
+These routes read the computer's own files (a project folder, the replay
+store of the home directory): they answer only in local mode. A server
+project's workspace views are ``shared_features.workspace``, by project.
 """
 
 from __future__ import annotations
@@ -15,14 +19,21 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from foundation.api_safety import server_mode_roots
 
 try:
     from provider_api import _safe_error_message
 except ImportError:
     from apps.backend.provider_api import _safe_error_message  # type: ignore[no-redef]
 
-router = APIRouter()
+
+def _desktop_only() -> None:
+    if server_mode_roots() is not None:
+        raise HTTPException(status_code=404, detail="Not served in server mode")
+
+
+router = APIRouter(dependencies=[Depends(_desktop_only)])
 
 
 def _load_dashboard_snapshot(project_id: str) -> dict:

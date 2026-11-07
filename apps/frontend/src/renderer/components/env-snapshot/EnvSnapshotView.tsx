@@ -16,6 +16,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { formatAppDateTime } from "@/lib/date-format";
 
 const FORMAT_OPTIONS: {
 	value: EnvSnapshotFormat;
@@ -146,7 +147,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 							);
 						})}
 					</div>
-					<span className="text-[11px] text-muted-foreground">
+					<span className="text-2xs text-muted-foreground">
 						{t(`envSnapshot:${activeFormat.descriptionKey}`)}
 					</span>
 				</div>
@@ -197,7 +198,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 									>
 										<div className="font-medium">{s.label || s.id}</div>
 										<div className="text-xs text-muted-foreground">
-											{new Date(s.createdAt).toLocaleString()}
+											{formatAppDateTime(s.createdAt)}
 										</div>
 										<div className="text-xs text-muted-foreground truncate">
 											{s.git.branch} @ {s.git.commit.slice(0, 8) || "—"}
@@ -219,7 +220,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 										{selected.label || selected.id}
 									</h4>
 									<p className="text-xs text-muted-foreground">
-										{new Date(selected.createdAt).toLocaleString()} — {selected.id}
+										{formatAppDateTime(selected.createdAt)} — {selected.id}
 									</p>
 								</div>
 								<div className="flex gap-2">
@@ -301,7 +302,7 @@ export function EnvSnapshotView({ projectPath }: Props) {
 							</div>
 
 							{lastExportedPath && (
-								<p className="text-xs text-green-600">
+								<p className="text-xs text-success">
 									{t("envSnapshot:exportedTo", "Exported to")}{" "}
 									<span className="font-mono">{lastExportedPath}</span>
 								</p>

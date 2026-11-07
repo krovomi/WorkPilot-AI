@@ -144,6 +144,7 @@ from agents.tools_pkg import (
     get_allowed_tools,
     get_required_mcp_servers,
     is_tools_available,
+    setting_sources_for,
     undeclared_builtin_tools,
 )
 from skills_registry.providers import acp_provider_names, get_provider_capabilities
@@ -256,6 +257,11 @@ except ImportError:
         return {}
 
 
+from core.custom_mcp_validation import (
+    validate_custom_mcp_server as _validate_custom_mcp_server,
+)
+from core.mcp_pinning import custom_servers as _custom_servers
+from core.mcp_pinning import pinned_servers
 from docintel.read_guard import make_read_guard_hook
 from harness.application.budget import session_budget_usd
 from harness.application.subagents import (
@@ -356,167 +362,6 @@ def _make_stop_hook(spec_dir: Path):
         return {}
 
     return _hook
-
-
-def _validate_custom_mcp_server(server: dict) -> bool:
-    """
-    Validate a custom MCP server configuration for security.
-
-    Ensures only expected fields with valid types are present.
-    Rejects configurations that could lead to command injection.
-
-    Args:
-        server: Dict representing a custom MCP server configuration
-
-    Returns:
-        True if valid, False otherwise
-    """
-    if not isinstance(server, dict):
-        return False
-
-    # Required fields
-    required_fields = {"id", "name", "type"}
-    if not all(field in server for field in required_fields):
-        logger.warning(
-            f"Custom MCP server missing required fields: {required_fields - server.keys()}"
-        )
-        return False
-
-    # Validate field types
-    if not isinstance(server.get("id"), str) or not server["id"]:
-        return False
-    if not isinstance(server.get("name"), str) or not server["name"]:
-        return False
-    # FIX: Changed from ('command', 'url') to ('command', 'http') to match actual usage
-    if server.get("type") not in ("command", "http"):
-        logger.warning(f"Invalid MCP server type: {server.get('type')}")
-        return False
-
-    # Allowlist of safe executable commands for MCP servers
-    # Only allow known package managers and interpreters - NO shell commands
-    SAFE_COMMANDS = {
-        "npx",
-        "npm",
-        "node",
-        "python",
-        "python3",
-        "uv",
-        "uvx",
-    }
-
-    # Blocklist of dangerous shell commands that should never be allowed
-    DANGEROUS_COMMANDS = {
-        "bash",
-        "sh",
-        "cmd",
-        "powershell",
-        "pwsh",  # PowerShell Core
-        "/bin/bash",
-        "/bin/sh",
-        "/bin/zsh",
-        "/usr/bin/bash",
-        "/usr/bin/sh",
-        "zsh",
-        "fish",
-    }
-
-    # Dangerous interpreter flags that allow arbitrary code execution
-    # Covers Python (-e, -c, -m, -p), Node.js (--eval, --print, loaders), and general
-    DANGEROUS_FLAGS = {
-        "--eval",
-        "-e",
-        "-c",
-        "--exec",
-        "-m",  # Python module execution
-        "-p",  # Python eval+print
-        "--print",  # Node.js print
-        "--input-type=module",  # Node.js ES module mode
-        "--experimental-loader",  # Node.js custom loaders
-        "--require",  # Node.js require injection
-        "-r",  # Node.js require shorthand
-    }
-
-    # Type-specific validation
-    if server["type"] == "command":
-        if not isinstance(server.get("command"), str) or not server["command"]:
-            logger.warning("Command-type MCP server missing 'command' field")
-            return False
-
-        # SECURITY FIX: Validate command is in safe list and not in dangerous list
-        command = server.get("command", "")
-
-        # Reject paths - commands must be bare names only (no / or \)
-        # This prevents path traversal like '/custom/malicious' or './evil'
-        if "/" in command or "\\" in command:
-            logger.warning(
-                f"Rejected command with path in MCP server: {command}. "
-                f"Commands must be bare names without path separators."
-            )
-            return False
-
-        if command in DANGEROUS_COMMANDS:
-            logger.warning(
-                f"Rejected dangerous command in MCP server: {command}. "
-                f"Shell commands are not allowed for security reasons."
-            )
-            return False
-
-        if command not in SAFE_COMMANDS:
-            logger.warning(
-                f"Rejected unknown command in MCP server: {command}. "
-                f"Only allowed commands: {', '.join(sorted(SAFE_COMMANDS))}"
-            )
-            return False
-
-        # Validate args is a list of strings if present
-        if "args" in server:
-            if not isinstance(server["args"], list):
-                return False
-            if not all(isinstance(arg, str) for arg in server["args"]):
-                return False
-            # Check for dangerous interpreter flags that allow code execution
-            for arg in server["args"]:
-                if arg in DANGEROUS_FLAGS:
-                    logger.warning(
-                        f"Rejected dangerous flag '{arg}' in MCP server args. "
-                        f"Interpreter code execution flags are not allowed."
-                    )
-                    return False
-    elif server["type"] == "http":
-        if not isinstance(server.get("url"), str) or not server["url"]:
-            logger.warning("HTTP-type MCP server missing 'url' field")
-            return False
-        # Validate headers is a dict of strings if present
-        if "headers" in server:
-            if not isinstance(server["headers"], dict):
-                return False
-            if not all(
-                isinstance(k, str) and isinstance(v, str)
-                for k, v in server["headers"].items()
-            ):
-                return False
-
-    # Optional description must be string if present
-    if "description" in server and not isinstance(server.get("description"), str):
-        return False
-
-    # Reject any unexpected fields that could be exploited
-    allowed_fields = {
-        "id",
-        "name",
-        "type",
-        "command",
-        "args",
-        "url",
-        "headers",
-        "description",
-    }
-    unexpected_fields = set(server.keys()) - allowed_fields
-    if unexpected_fields:
-        logger.warning(f"Custom MCP server has unexpected fields: {unexpected_fields}")
-        return False
-
-    return True
 
 
 def load_project_mcp_config(project_dir: Path) -> dict:
@@ -822,7 +667,7 @@ def create_client(
         use_subagents: Whether this call may compose a subagent roster at all.
         roster: Which subagent roster to compose, when it is not the one
             agent_type implies. A workflow phase sets this; see
-            `agents.subagents.phases.phase_specs`.
+            `subagents.phases.phase_specs`.
                       False is the workflow engine's `sequential-reset`: same
                       isolation, no parallel dispatch. Defaults to True, which
                       is the behaviour every existing caller already had.
@@ -925,7 +770,10 @@ def create_client(
         "allowed_tools": allowed_tools_list,
         "mcp_servers": mcp_servers,
         "hooks": _session_hooks(
-            project_dir, spec_dir, _debugger_hooks(project_dir, spec_dir, agent_type)
+            project_dir,
+            spec_dir,
+            _debugger_hooks(project_dir, spec_dir, agent_type),
+            app_view_servers=_app_view_servers(mcp_servers, mcp_config),
         ),
         "max_turns": int(os.environ.get("AUTO_CLAUDE_MAX_TURNS", "1000")),
         # Budget cap as a meaningful runaway guard, the same per-session cap
@@ -937,13 +785,12 @@ def create_client(
         "cwd": str(project_dir.resolve()),
         "settings": str(settings_file.resolve()),
         # setting_sources auto-loads CLAUDE.md, project rules, skills, and
-        # filesystem-defined hooks from ~/.claude (user), <cwd>/.claude (project),
-        # and .claude/settings.local.json (local). The SDK handles prompt-cache
-        # prefixing automatically for these sources. CLAUDE.md and the rules
-        # files follow the project's `useClaudeMd` setting; skills and hooks
+        # filesystem-defined hooks from <cwd>/.claude (project) and, for the
+        # types that declare them, ~/.claude (user) and settings.local.json
+        # (local): the coder only, by default (`setting_sources_for`).
+        # CLAUDE.md and the rules files follow `useClaudeMd`; skills and hooks
         # do not (`apply_claude_md_setting`).
-        # See: code.claude.com/docs/en/agent-sdk/claude-code-features
-        "setting_sources": ["project", "user", "local"],
+        "setting_sources": setting_sources_for(agent_type),
         "env": sdk_env,  # Pass ANTHROPIC_BASE_URL etc. to subprocess
         "max_thinking_tokens": max_thinking_tokens,  # Extended thinking budget
         "max_buffer_size": 10
@@ -974,6 +821,7 @@ def create_client(
         agents=agents,
         use_subagents=use_subagents,
         roster=roster,
+        parent_model=model,
     )
 
     if _resume_id := _resume_session_id(resume, config_dir):
@@ -1027,9 +875,9 @@ def _cli_environment(
 
     # Token / context optimisations (docs: code.claude.com/docs/en/agent-sdk).
     # `setdefault` keeps any explicit user override intact.
-    # - 1h prompt-cache TTL: Kanban runs many short cards back-to-back against
-    #   the same system prompt + CLAUDE.md; 1h TTL keeps the cache warm between
-    #   cards instead of paying full input price every 5 minutes.
+    # - Prompt-cache TTL: left to the CLI, which picks 1h on a subscription and
+    #   5 min once billed; forcing 1h wrote every turn at 2x instead of 1.25x
+    #   (docs/architecture/context-harness.md, D3).
     # - tool-search auto:5: defers MCP tool schemas when their combined size
     #   exceeds 5% of the context window. Activates only when there are enough
     #   MCP servers to make deferral worthwhile. Only on Anthropic's own API:
@@ -1038,7 +886,6 @@ def _cli_environment(
     #   deferred tool, and a value here would override that guard. A value the
     #   user exported reaches the CLI untouched (the SDK passes the process
     #   environment, then this dict on top of it).
-    sdk_env.setdefault("ENABLE_PROMPT_CACHING_1H", "1")
     if "ENABLE_TOOL_SEARCH" not in os.environ and _is_anthropic_api(
         sdk_env.get("ANTHROPIC_BASE_URL")
     ):
@@ -1338,7 +1185,11 @@ def _mcp_servers(
             workpilot_tools_enabled=workpilot_tools_enabled,
         )
     )
-    mcp_servers.update(_custom_servers(required_servers, mcp_config))
+    mcp_servers.update(
+        pinned_servers(
+            project_dir, _custom_servers(required_servers, mcp_config), mcp_config
+        )
+    )
     return mcp_servers
 
 
@@ -1481,32 +1332,18 @@ def _workpilot_servers(
     return mcp_servers
 
 
-def _custom_servers(required_servers, mcp_config: dict) -> dict[str, dict]:
-    """The project's CUSTOM_MCP_SERVERS that this type requires."""
-    mcp_servers: dict[str, dict] = {}
-    custom_servers = mcp_config.get("CUSTOM_MCP_SERVERS", [])
-    for custom in custom_servers:
-        server_id = custom.get("id")
-        if not server_id:
-            continue
-        # Only include if agent has it in their effective server list
-        if server_id not in required_servers:
-            continue
-        server_type = custom.get("type", "command")
-        if server_type == "command":
-            mcp_servers[server_id] = {
-                "command": custom.get("command", "npx"),
-                "args": custom.get("args", []),
-            }
-        elif server_type == "http":
-            server_config = {
-                "type": "http",
-                "url": custom.get("url", ""),
-            }
-            if custom.get("headers"):
-                server_config["headers"] = custom["headers"]
-            mcp_servers[server_id] = server_config
-    return mcp_servers
+def _app_view_servers(mcp_servers: dict[str, dict], mcp_config: dict) -> list[dict]:
+    """The CUSTOM_MCP_SERVERS this session starts, whose views the hook keeps.
+
+    Only those: WorkPilot's own servers and the built-in third-party ones name
+    no MCP App view, and a server the session does not start is never started
+    to read one (`core.mcp_tools.make_app_view_hook`).
+    """
+    return [
+        custom
+        for custom in mcp_config.get("CUSTOM_MCP_SERVERS", [])
+        if isinstance(custom, dict) and custom.get("id") in mcp_servers
+    ]
 
 
 def _system_prompt(
@@ -1578,7 +1415,13 @@ def _debugger_hooks(project_dir: Path, spec_dir: Path, agent_type: str) -> list:
     return _debugger_hooks
 
 
-def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> dict:
+def _session_hooks(
+    project_dir: Path,
+    spec_dir: Path,
+    debugger_hooks: list,
+    *,
+    app_view_servers: list[dict] | None = None,
+) -> dict:
     """Every hook the session runs, in the order the CLI calls them."""
     # One hook instance for the four write tools rather than four: the
     # factory closes over the spec directory so the ledger has somewhere to
@@ -1598,6 +1441,8 @@ def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> d
     # The CLI runs the sub-agent; its tool's PostToolUse is where WorkPilot
     # sees the result first.
     _subagent_result_hook = make_subagent_result_hook(spec_dir)
+    if app_view_servers:
+        from core.mcp_tools import make_app_view_hook
 
     return {
         "PreToolUse": [
@@ -1657,8 +1502,24 @@ def _session_hooks(project_dir: Path, spec_dir: Path, debugger_hooks: list) -> d
             *debugger_hooks,
         ],
         "PostToolUse": [
-            HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
-            for tool in SUBAGENT_TOOLS
+            *(
+                HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
+                for tool in SUBAGENT_TOOLS
+            ),
+            # MCP Apps (IA4): Claude Code calls the tool and shows no view;
+            # this keeps it for the task panel, as the WorkPilot loop does.
+            # Only when a custom server is started; the hook never changes
+            # the result.
+            *(
+                [
+                    HookMatcher(
+                        matcher="mcp__.*",
+                        hooks=[make_app_view_hook(spec_dir, app_view_servers)],
+                    )
+                ]
+                if app_view_servers
+                else []
+            ),
         ],
         "PreCompact": [HookMatcher(hooks=[_make_pre_compact_hook(spec_dir)])],
         "Stop": [HookMatcher(hooks=[_make_stop_hook(spec_dir)])],
@@ -1674,39 +1535,38 @@ def _add_subagents(
     agents: dict | None,
     use_subagents: bool,
     roster: str | None,
+    parent_model: str | None = None,
 ) -> None:
     """Compose the subagent roster and allow the `Agent` tool that runs it.
 
     Phase defaults, specialised by the detected language stack, with
-    caller-supplied agents winning on key collision. The phase split means the
-    planner does not carry QA subagents into its context, and vice versa; the
-    language layer means a Rust card and a .NET card no longer get the same
-    generic `test-runner` prompt.
+    caller-supplied agents winning on key collision: the planner carries no
+    QA subagents, and a Rust card and a .NET card get different `test-runner`
+    prompts.
     See: code.claude.com/docs/en/agent-sdk/subagents
 
     `use_subagents=False` is the workflow engine's `sequential-reset`: the
     resolved phase asked for dispatch the run cannot have, so the roster is
     suppressed at the source instead of being handed over to be ignored. It
-    is a separate question from the provider check inside `resolve()` — that
-    one is about capability, this one about what the phase was allowed.
-    Default True, so every existing caller keeps the behaviour it had.
+    is a separate question from the provider check inside `resolve()`
+    (capability, not what the phase was allowed). Default True.
     """
     _merged_agents = None
     try:
         if not use_subagents:
             raise _NoSubagents
-        from agents.subagents import resolve as _resolve_subagents
+        from subagents import resolve as _resolve_subagents
 
-        # The provider matters: `resolve` returns no roster at all for one
-        # that cannot run subagents, rather than handing the SDK a list it
-        # will ignore. Omitting it here was why that degradation, though
-        # implemented and tested, never fired in a real run.
+        # The provider matters: `resolve` returns no roster for one that
+        # cannot run subagents (omitted, that degradation never fired).
+        # `parent_model` caps each subagent's tier at the session's model.
         _merged_agents = _resolve_subagents(
             agent_type,
             project_dir=project_dir,
             user_agents=agents,
             provider=_get_active_provider(spec_dir),
             roster_name=roster,
+            parent_model=parent_model,
         )
     except _NoSubagents:
         logger.debug(
@@ -1782,27 +1642,24 @@ def _add_effort(
     max_thinking_tokens: int | None,
     agent_type: str,
 ) -> None:
-    """Reasoning effort, on Opus only.
+    """Reasoning effort, on every Claude model that takes it (`claude_takes_effort`).
 
-    It follows the user's thinking level for the phase, which the caller
-    resolved into `max_thinking_tokens`: on Opus 5.5 a thinking budget is not
-    accepted and effort is the only control, so a fixed table here would
-    silently overrule the selector. The env var still wins, to force a level
-    for debugging.
+    It follows the user's thinking level for the phase (`max_thinking_tokens`):
+    on Opus 5.5 effort is the only control, so a fixed table would overrule
+    the selector. The env var still wins, to force a level for debugging.
     See: code.claude.com/docs/en/agent-sdk/agent-loop#effort-level
-
-    Only emit the kwarg when the installed SDK actually supports it: older
-    ``claude_agent_sdk`` builds lack the ``effort`` field and would otherwise
-    raise "unexpected keyword argument 'effort'", aborting the agent run.
+    Only emitted when the installed SDK has the ``effort`` field (older
+    builds raise "unexpected keyword argument 'effort'").
     """
-    if "opus" not in (model or "").lower():
+    from core.llm_optimization import claude_effort, claude_takes_effort
+
+    if not claude_takes_effort(model):
         return
-    from core.llm_optimization import claude_effort
 
     _effort = os.environ.get("AUTO_CLAUDE_EFFORT") or claude_effort(max_thinking_tokens)
     if _claude_options_supports("effort"):
         options_kwargs["effort"] = _effort
-        print(f"   - Effort: {_effort} (agent_type={agent_type}, model=opus)")
+        print(f"   - Effort: {_effort} (agent_type={agent_type}, model={model})")
     else:
         logger.info(
             "Skipping 'effort=%s' — installed claude_agent_sdk's "
@@ -1820,81 +1677,14 @@ def _add_effort(
 # =============================================================================
 
 
-# Filename for the single-shot "resume task X under provider Y" marker.
-# _get_active_provider() consumes it on the very next session start and
-# deletes the file so it doesn't keep overriding.
-#
-# TO REMOVE after the first release that follows 1.2.1 (audit F25, lot L9).
-# Nothing writes the marker since #290: TASK_RESUME_WITH_PROVIDER records the
-# engine in task_metadata.json and deletes the marker. The read stays for one
-# version so a task paused under 1.2.1, whose marker is still on disk, resumes
-# with the provider the user picked. No release has shipped since #290 (the
-# last is v1.2.1, 2026-08-27). Remove then: this constant,
-# _consume_resume_with_provider_marker, the `consume` parameter of
-# _get_active_provider and the comments that cite the marker (agents/coder.py,
-# workflows/api.py, cli/build_commands.py, cli/utils.py), and adapt
-# core/test_resume_with_provider.py and test_e2e_provider_switch_resume.py;
-# peek_active_provider can then become an alias of _get_active_provider.
-RESUME_WITH_PROVIDER_FILE = "RESUME_WITH_PROVIDER"
-
-
-def _consume_resume_with_provider_marker(
-    spec_dir: Path, *, consume: bool = True
-) -> str | None:
-    """Read the RESUME_WITH_PROVIDER marker, returning the provider the user
-    picked (or None if no marker exists).
-
-    The file can be either plain text containing the provider id
-    (``copilot``) or JSON ``{"provider": "copilot"}``. Anything else is
-    treated as no override and the file is left in place for inspection.
-
-    ``consume=False`` leaves the marker on disk. It exists because the marker
-    is single-shot and destructive to read: anything that only wants to *know*
-    which provider a run will use — the workflow resolver deciding whether to
-    degrade a dispatch, an endpoint showing the user their resolved profile —
-    would otherwise eat the user's "resume with X" choice before the session
-    that was supposed to honour it ever started.
-
-    Failures here must NEVER prevent session startup — log and return None.
-    """
-    marker = spec_dir / RESUME_WITH_PROVIDER_FILE
-    if not marker.exists():
-        return None
-    try:
-        raw = marker.read_text(encoding="utf-8").strip()
-        if not raw:
-            if consume:
-                marker.unlink(missing_ok=True)
-            return None
-        # Try JSON first, fall back to plain text.
-        provider: str | None
-        try:
-            import json as _json
-
-            data = _json.loads(raw)
-            provider = (
-                str(data.get("provider", "")).strip()
-                if isinstance(data, dict)
-                else None
-            )
-        except Exception:
-            provider = raw
-        if consume:
-            marker.unlink(missing_ok=True)  # single-shot
-        return provider or None
-    except Exception as e:
-        logger.warning("[_get_active_provider] could not read %s: %s", marker, e)
-        return None
-
-
 def peek_active_provider(spec_dir: Path | None = None) -> str:
-    """Which provider a run would use, without consuming anything.
+    """Which provider a run would use.
 
-    Same resolution as `_get_active_provider`, minus the single-shot side
-    effect on the RESUME_WITH_PROVIDER marker. Callers that are *deciding*
-    rather than *starting* must use this one.
+    Resolution has no side effect since the single-shot RESUME_WITH_PROVIDER
+    marker was retired (audit F25): this is `_get_active_provider` under the
+    name the deciding callers (workflow resolver, slash commands, CLI) use.
     """
-    return _get_active_provider(spec_dir, consume=False)
+    return _get_active_provider(spec_dir)
 
 
 # Le fournisseur retenu quand personne n'en nomme un. C'est un defaut, pas un
@@ -1903,14 +1693,14 @@ def peek_active_provider(spec_dir: Path | None = None) -> str:
 _DEFAULT_PROVIDER = "claude"
 
 
-def _get_active_provider(spec_dir: Path | None = None, *, consume: bool = True) -> str:
+def _get_active_provider(spec_dir: Path | None = None) -> str:
     """The active provider, without saying where it came from.
 
     Thin wrapper over `_resolve_active_provider` — see there for the
     resolution order. Callers that must tell a *choice* from the fallback
     default use that one instead.
     """
-    return _resolve_active_provider(spec_dir, consume=consume)[0]
+    return _resolve_active_provider(spec_dir)[0]
 
 
 # Every spelling a provider arrives under, mapped to the name the client
@@ -2009,9 +1799,7 @@ def _normalize_provider_name(provider: str) -> str:
     return "claude" if name == "anthropic" else name
 
 
-def _resolve_active_provider(
-    spec_dir: Path | None = None, *, consume: bool = True
-) -> tuple[str, bool]:
+def _resolve_active_provider(spec_dir: Path | None = None) -> tuple[str, bool]:
     """
     Determine the active AI provider from IPC selection, environment or project settings.
 
@@ -2025,7 +1813,6 @@ def _resolve_active_provider(
     Resolution order:
     -1. task_metadata.json `provider` when the task's engine is locked
         (`engineLocked`): the task owns its provider, nothing global wins
-    0. RESUME_WITH_PROVIDER marker file (single-shot, "Reprendre avec X")
     1. Provider selected via IPC (from frontend UI selection)
     1.5. SELECTED_LLM_PROVIDER environment variable
     1.7. task_metadata.json `provider` (unlocked, legacy tasks)
@@ -2045,13 +1832,11 @@ def _resolve_active_provider(
 
     # A task that owns its engine answers before anything else: the provider
     # was chosen for this task, at creation or on a resume, and neither the
-    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor a
-    # leftover marker from an older resume path may replace it.
+    # default provider (SELECTED_LLM_PROVIDER, inherited from the app) nor
+    # the app-wide IPC selection may replace it.
     if spec_dir:
         locked = _locked_task_provider(Path(spec_dir))
         if locked:
-            if consume:
-                (Path(spec_dir) / RESUME_WITH_PROVIDER_FILE).unlink(missing_ok=True)
             mapped_locked = provider_mapping.get(locked, locked)
             logger.info(
                 "[_get_active_provider] Resolved from the task's own engine: "
@@ -2060,22 +1845,6 @@ def _resolve_active_provider(
                 mapped_locked,
             )
             return mapped_locked, True
-
-    # 0. Highest priority: explicit "resume with X" marker written by the
-    # frontend when the user picked a different provider from the paused-task
-    # modal (Niveau 3b). Consumed once and removed so subsequent sessions
-    # for the same spec don't keep overriding.
-    if spec_dir:
-        override = _consume_resume_with_provider_marker(Path(spec_dir), consume=consume)
-        if override:
-            mapped_override = provider_mapping.get(override.lower(), override.lower())
-            logger.info(
-                "[_get_active_provider] Resolved from RESUME_WITH_PROVIDER marker: "
-                "'%s' -> '%s'",
-                override,
-                mapped_override,
-            )
-            return mapped_override, True
 
     # 1. Check provider selected via IPC (from frontend UI)
     try:
@@ -2400,7 +2169,7 @@ _ANTHROPIC_TIER_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 def _portable_subagent_model(model: str | None) -> str:
     """Translate a roster's model hint for a non-Anthropic provider.
 
-    The registry in `agents/subagents/` is provider-agnostic by design, but its
+    The registry in `subagents/` is provider-agnostic by design, but its
     specs name a tier the way the Claude SDK does. Handing "sonnet" to Copilot
     costs a `400 model_not_supported` round-trip per subagent before the
     fallback rescues it, so the alias is resolved to "inherit" here: the
@@ -2465,7 +2234,7 @@ def create_agent_client(
     """A provider-agnostic agent client, with its sub-agent roster attached.
 
     The client comes from ``_build_agent_client`` (one branch per provider).
-    The roster is the same for every provider — ``agents.subagents.resolve``:
+    The roster is the same for every provider — ``subagents.resolve``:
     phase defaults, the detected stack's overlays, the caller's ``agents``
     winning, capped — and it is attached here, once, rather than in each
     branch: the Copilot branch used to convert the caller's dict and nobody
@@ -2497,7 +2266,7 @@ def create_agent_client(
     if not use_subagents or not client.delegates():
         return client
     try:
-        from agents.subagents import resolve as _resolve_subagents
+        from subagents import resolve as _resolve_subagents
 
         composed = _resolve_subagents(
             agent_type,
@@ -2631,7 +2400,7 @@ def _build_agent_client(
                  implies. Separate from `agent_type` on purpose: that decides
                  the tool allowlist and whether the phase may write, this
                  decides which specialists it may dispatch to. See
-                 `agents.subagents.phases.phase_specs`.
+                 `subagents.phases.phase_specs`.
         system_prompt: Optional system-prompt override. When provided, it
                  replaces the default coding base prompt for the
                  copilot/openai/windsurf clients (used by utilities that need
@@ -2766,10 +2535,10 @@ class _ClientRequest:
             return self.system_prompt
         from core.llm_optimization import build_base_system_prompt
 
-        if tool_use_hint:
-            base_prompt = build_base_system_prompt(self.project_dir, tool_use_hint=True)
-        else:
-            base_prompt = build_base_system_prompt(self.project_dir)
+        hint = tool_use_hint  # loop clients also get AGENTS.md (project_instructions)
+        base_prompt = build_base_system_prompt(
+            self.project_dir, tool_use_hint=hint, project_instructions=hint
+        )
         return _inject_domain_addendum(base_prompt, self.agent_type, self.spec_dir)
 
 
@@ -3051,7 +2820,7 @@ _COMPATIBLE_PROVIDER_URLS = {
 def _compatible_client(req: _ClientRequest):
     """Mistral, DeepSeek and Grok: OpenAI-compatible APIs with their own key."""
     from core.agent_client import CompatibleProviderAgentClient
-    from core.llm_optimization import compatible_effort_params
+    from core.llm_optimization import compatible_cache_routing, compatible_effort_params
     from provider_models_catalog import _api_key_for
 
     provider = req.provider
@@ -3083,12 +2852,15 @@ def _compatible_client(req: _ClientRequest):
         req.agent_type,
         effort_params,
     )
+    cache = compatible_cache_routing(provider, req.spec_dir, req.agent_type)
     return CompatibleProviderAgentClient(
         provider=provider,
         model=req.model,
         api_key=api_key,
         base_url=base_url,
         effort_params=effort_params,
+        prompt_cache_key=cache.body_key,
+        cache_headers=cache.headers,
         system_prompt=req.prompt(tool_use_hint=True),
         project_dir=str(req.project_dir),
         agent_type=req.agent_type,

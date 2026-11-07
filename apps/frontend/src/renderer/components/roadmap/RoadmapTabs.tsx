@@ -15,6 +15,7 @@ import { FeatureCard } from "./FeatureCard";
 import { PhaseCard } from "./PhaseCard";
 import type { RoadmapTabsProps } from "./types";
 import { hasCompetitorInsight } from "./utils";
+import { useTranslation } from "react-i18next";
 
 export function RoadmapTabs({
 	roadmap,
@@ -25,6 +26,7 @@ export function RoadmapTabs({
 	onGoToTask,
 	onSave,
 }: Readonly<RoadmapTabsProps>) {
+	const { t } = useTranslation();
 	return (
 		<Tabs
 			value={activeTab}
@@ -33,9 +35,9 @@ export function RoadmapTabs({
 		>
 			<TabsList className="shrink-0 mx-4 mt-4">
 				<TabsTrigger value="kanban">Kanban</TabsTrigger>
-				<TabsTrigger value="phases">Phases</TabsTrigger>
-				<TabsTrigger value="features">All Features</TabsTrigger>
-				<TabsTrigger value="priorities">By Priority</TabsTrigger>
+				<TabsTrigger value="phases">{t("roadmap:phases.title")}</TabsTrigger>
+				<TabsTrigger value="features">{t("roadmap:tabs.allFeatures")}</TabsTrigger>
+				<TabsTrigger value="priorities">{t("roadmap:tabs.byPriority")}</TabsTrigger>
 			</TabsList>
 
 			{/* Kanban View */}
@@ -106,7 +108,7 @@ export function RoadmapTabs({
 										{ROADMAP_PRIORITY_LABELS[priority]}
 									</Badge>
 									<span className="text-sm text-muted-foreground">
-										{features.length} features
+										{t("roadmap:tabs.featuresCount", { count: features.length })}
 									</span>
 								</div>
 								<div className="space-y-2">
@@ -131,7 +133,7 @@ export function RoadmapTabs({
 													variant="outline"
 													className={`text-xs ${ROADMAP_IMPACT_COLORS[feature.impact]}`}
 												>
-													{feature.impact} impact
+													{t("roadmap:featureCard.impact", { impact: feature.impact })}
 												</Badge>
 												{hasCompetitorInsight(feature) && (
 													<Badge
@@ -139,7 +141,7 @@ export function RoadmapTabs({
 														className="text-xs text-primary border-primary/50"
 													>
 														<TrendingUp className="h-3 w-3 mr-1" />
-														Insight
+														{t("roadmap:tabs.insight")}
 													</Badge>
 												)}
 											</div>

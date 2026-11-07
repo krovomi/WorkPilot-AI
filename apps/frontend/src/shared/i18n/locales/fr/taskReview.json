@@ -155,6 +155,8 @@
 			"changes": "Modifications",
 			"prTitle": "Titre de la PR (optionnel)",
 			"draftPR": "Créer comme brouillon",
+			"includeWalkthrough": "Joindre le parcours du scénario (GIF) à la preuve visuelle",
+			"includeWalkthroughHint": "Le GIF montre l'application telle que la vérification l'a filmée, avec ses données : tous les lecteurs du dépôt le verront.",
 			"unknown": "Inconnu"
 		},
 		"hints": {
@@ -177,6 +179,17 @@
 		},
 		"warnings": {
 			"emptyBranch": "Aucun commit à pousser : la branche est identique à « {{base}} ». La PR serait vide. Vérifiez que l'agent a bien commité ses changements ou qu'il ne s'agit pas d'une tâche dupliquée déjà fusionnée."
+		},
+		"crossReview": {
+			"blockedTitle": "La revue croisée n'est pas d'accord avec ce changement",
+			"blockedHint": "Corriger le code et relancer le build déclenche une nouvelle revue. Si tu as lu les problèmes et veux quand même la pull request, crée-la quand même.",
+			"createAnyway": "Créer quand même",
+			"verdict": {
+				"agree": "Revue croisée par {{engine}} : aucun problème bloquant.",
+				"disagree_one": "Revue croisée par {{engine}} : 1 problème bloquant. La pull request est retenue jusqu'à ce que le code change ou que tu la crées quand même.",
+				"disagree_other": "Revue croisée par {{engine}} : {{count}} problèmes bloquants. La pull request est retenue jusqu'à ce que le code change ou que tu la crées quand même.",
+				"inconclusive": "Revue croisée par {{engine}} : pas de verdict exploitable. Elle ne retient pas la pull request, et ce n'est pas une approbation."
+			}
 		}
 	},
 	"mergeProgress": {
@@ -238,6 +251,13 @@
 			"deleted": "supprimé",
 			"modified": "modifié",
 			"renamed": "renommé"
+		},
+		"selectedSuffix": " ({{count}} sélectionné(s))",
+		"attribution": {
+			"fileBadge": "IA {{ai}} %",
+			"fileTitle": "Des lignes ajoutées à ce fichier : {{ai}} % écrites par l'agent, {{human}} % par vous, {{unknown}} % non enregistrées (Agent Trace)",
+			"task": "{{ai}} % des {{added}} lignes ajoutées ont été écrites par l'agent, {{human}} % par vous (Agent Trace)",
+			"taskWithModels": "{{ai}} % des {{added}} lignes ajoutées ont été écrites par l'agent ({{models}}), {{human}} % par vous (Agent Trace)"
 		}
 	},
 	"bulkPR": {
@@ -281,6 +301,182 @@
 		"moreConflicts": "+ {{count}} autres",
 		"errors": {
 			"unknown": "Une erreur inattendue s'est produite lors de la synchronisation"
+		},
+		"local": "Locale",
+		"remote": "Distante"
+	},
+	"prFiles": {
+		"renamedFrom": "(anciennement : {{name}})",
+		"loadingTitle": "Chargement des fichiers de la PR",
+		"loading": "Chargement des fichiers de la pull request..."
+	},
+	"taskPanel": {
+		"noFilesInSubtask": "Aucun fichier dans cette sous-tâche",
+		"subtasksProgress": "{{completed}}/{{total}} sous-tâches",
+		"stuck": "Bloquée",
+		"incomplete": "Incomplète",
+		"done": "Terminé",
+		"less": "Moins",
+		"more": "Plus",
+		"subtaskLabel": "Sous-tâche : {{name}}",
+		"progress": "Avancement",
+		"phasePlanning": "Planification (0-20 %)",
+		"phaseCoding": "Code (20-80 %)",
+		"phaseReview": "Revue IA (80-95 %)",
+		"phaseComplete": "Terminé (95-100 %)",
+		"editFilesTitle": "Modifier les fichiers : {{name}}",
+		"moreFiles": "+{{count}} de plus",
+		"noSubtasks": "Aucune sous-tâche définie",
+		"noSubtasksHint": "Les sous-tâches d'implémentation apparaîtront ici après la planification",
+		"editFiles": "Modifier les fichiers",
+		"filesDeleted": "{{count}} fichier(s) supprimé(s)",
+		"filesModified": "{{count}} fichier(s) modifié(s)",
+		"saveChanges": "Enregistrer les modifications",
+		"subtasksCompleted": "{{completed}}/{{total}} sous-tâches terminées",
+		"noSubtasksYet": "Aucune sous-tâche pour l'instant"
+	},
+	"conflicts": {
+		"detected_one": "{{count}} conflit potentiel détecté.",
+		"detected_other": "{{count}} conflits potentiels détectés.",
+		"autoMergeable": "{{count}} fusionnable(s) automatiquement.",
+		"title": "Aperçu des conflits de fusion",
+		"autoMerge": "fusion auto",
+		"location": "Emplacement :",
+		"reason": "Raison :",
+		"strategy": "Stratégie :",
+		"none": "Aucun conflit détecté",
+		"stageWithAi": "Indexer avec fusion IA",
+		"mergeWithAi": "Fusionner avec l'IA"
+	},
+	"discard": {
+		"title": "Abandonner le build",
+		"confirmBefore": "Voulez-vous vraiment abandonner toutes les modifications de",
+		"warning": "L'espace de travail isolé et toutes les modifications non commitées seront supprimés définitivement. La tâche repassera au statut Planification.",
+		"filesChanged": "Fichiers modifiés :",
+		"lines": "Lignes :",
+		"discarding": "Abandon en cours..."
+	},
+	"mergePreview": {
+		"conflictsFound_one": "{{count}} conflit trouvé",
+		"conflictsFound_other": "{{count}} conflits trouvés",
+		"filesToMerge": "Fichiers à fusionner : {{count}}",
+		"autoMergeable": "Fusionnables automatiquement : {{count}}",
+		"aiResolved": "Résolus par l'IA : {{count}}",
+		"manualReview": "Revue manuelle : {{count}}",
+		"divergedTitle": "Branche divergente : l'IA résoudra",
+		"noConflicts": "Aucun conflit détecté",
+		"viewDetails": "Voir le détail",
+		"diverged": "La branche a divergé : l'IA résoudra",
+		"aiWillMerge": "L'IA fusionnera automatiquement ces conflits quand vous cliquerez sur Indexer les modifications.",
+		"aiWillResolve": "L'IA résoudra les conflits",
+		"ready": "Prêt à fusionner"
+	},
+	"staged": {
+		"title": "Modifications indexées",
+		"aiMessage": "Message de commit généré par l'IA",
+		"copied": "Copié !",
+		"copy": "Copier",
+		"commitPlaceholder": "Message de commit...",
+		"editHint": "Modifiez au besoin, puis copiez et utilisez avec",
+		"nextSteps": "Étapes suivantes :",
+		"stepOpen": "Ouvrez votre projet dans votre IDE ou votre terminal",
+		"stepReview": "Relisez les modifications indexées avec",
+		"and": "et",
+		"stepCommit": "Commitez quand c'est prêt :"
+	},
+	"workspace": {
+		"updating": "Mise à jour...",
+		"markDone": "Marquer comme terminée",
+		"loadingPr": "Chargement des informations de la PR...",
+		"proceedToCoding": "Passer au code",
+		"stagedTitle": "Modifications indexées dans le projet",
+		"stagedDescription": "Les modifications de cette tâche ont été indexées dans votre projet principal",
+		"stepReview": "Relisez les modifications indexées avec",
+		"stepPush": "Poussez vers le dépôt distant quand tout vous convient",
+		"cleaningUp": "Nettoyage...",
+		"deleteAndDone": "Supprimer le worktree et terminer",
+		"markingDone": "Passage à terminée...",
+		"markDoneOnly": "Terminer seulement",
+		"resetting": "Réinitialisation...",
+		"reviewAgain": "Relire de nouveau",
+		"doneHint": "« Supprimer le worktree et terminer » nettoie l'espace de travail isolé. « Terminer seulement » le garde pour référence.",
+		"openIn": "Ouvrir dans {{app}}",
+		"uncommitted_one": "{{count}} modification non commitée dans le projet principal",
+		"uncommitted_other": "{{count}} modifications non commitées dans le projet principal",
+		"commitOrStash": "Commitez-les ou mettez-les de côté (stash) dans votre terminal avant d'indexer, pour éviter les conflits.",
+		"stagedOn": " le {{date}}",
+		"humanReviewTitle": "Revue humaine requise",
+		"noWorkspaceTitle": "Aucun espace de travail trouvé",
+		"humanReviewDescription": "Une revue humaine est requise avant le code. Relisez votre spec.md pour y apporter les modifications nécessaires.",
+		"noWorkspaceDescription": "Aucun espace de travail isolé n'a été trouvé pour cette tâche. Les modifications ont peut-être été faites directement dans votre projet.",
+		"commitsCount": "{{count}} commits"
+	},
+	"guided": {
+		"button": "Revue guidée",
+		"buttonHint": "Les changements dans l'ordre du plan, sous-tâche par sous-tâche",
+		"title": "Revue guidée",
+		"description": "Les changements dans l'ordre du plan. Chaque sous-tâche montre ce qu'elle a changé elle-même, expliqué par la description qu'a écrite le planner. Viennent ensuite les commits qu'aucune sous-tâche n'a enregistrés, puis ce qui n'est pas encore commité.",
+		"loading": "Regroupement des changements…",
+		"empty": "La tâche n'a encore rien changé.",
+		"groups": "Groupes de changements",
+		"approximate": "Cette tâche a été construite avant que WorkPilot n'enregistre le début de chaque sous-tâche : une sous-tâche peut inclure un commit fait juste avant elle.",
+		"viewedCount": "{{done}}/{{total}} vus",
+		"outOfPlanCount_one": "{{count}} hors plan",
+		"outOfPlanCount_other": "{{count}} hors plan",
+		"qaCount_one": "{{count}} remarque QA",
+		"qaCount_other": "{{count}} remarques QA",
+		"uncommitted": "Pas encore commité",
+		"part": "{{title}} (partie {{part}} sur {{parts}})",
+		"unrecordedCommit": "Un commit qu'aucune sous-tâche n'a enregistré : une correction QA, un commit fait à la main ou une synchronisation avec la branche de base.",
+		"outOfPlan": "Hors plan",
+		"outOfPlanHint": "Aucune sous-tâche n'annonçait ce fichier. Ce n'est pas une faute, mais c'est là qu'il faut regarder en premier.",
+		"viewed": "Vu",
+		"touchedLater": "Modifié de nouveau plus loin par : {{groups}}.",
+		"seeFinal": "Voir le diff final",
+		"movedFrom_one": "{{count}} ligne déplacée ici depuis {{path}}",
+		"movedFrom_other": "{{count}} lignes déplacées ici depuis {{path}}",
+		"movedTo_one": "{{count}} ligne déplacée vers {{path}}",
+		"movedTo_other": "{{count}} lignes déplacées vers {{path}}",
+		"line": "ligne {{line}}",
+		"noPatch": "Pas de diff texte pour ce fichier (binaire ou trop volumineux).",
+		"unanchoredQa": "Remarques QA sur des fichiers que la tâche n'a pas modifiés",
+		"openFinalDiff": "Diff final, tous les fichiers",
+		"close": "Fermer",
+		"errors": {
+			"local_only": "La revue guidée est disponible pour les tâches locales. Pour une carte du serveur, utilisez le diff final.",
+			"no_worktree": "Cette tâche n'a plus d'espace de travail.",
+			"no_merge_base": "La branche de la tâche ne partage aucun historique avec sa branche de base.",
+			"task_not_found": "Cette tâche est introuvable.",
+			"git_failed": "Git n'a pas pu calculer les changements. Le diff final peut encore s'ouvrir."
+		}
+	},
+	"comments": {
+		"where": "ligne {{line}}",
+		"removedLine": "(ligne supprimée)",
+		"composerLabel": "Commenter la ligne {{line}}",
+		"placeholder": "Que faut-il changer ici ?",
+		"add": "Ajouter le commentaire",
+		"cancel": "Annuler",
+		"resolve": "Résoudre",
+		"reopen": "Rouvrir",
+		"delete": "Supprimer le commentaire",
+		"willBeSent_one": "{{count}} commentaire de ligne ouvert partira avec la demande :",
+		"willBeSent_other": "{{count}} commentaires de ligne ouverts partiront avec la demande :",
+		"status": {
+			"open": "Ouvert",
+			"addressed": "Traité par le fixer",
+			"resolved": "Résolu",
+			"stale": "Lignes modifiées"
+		},
+		"errors": {
+			"invalid_path": "Ce fichier n'est pas dans l'espace de travail de la tâche.",
+			"invalid_line": "Cette ligne n'existe pas dans le fichier.",
+			"empty_comment": "Écrivez d'abord le commentaire.",
+			"invalid_commit": "Cette version du fichier est introuvable.",
+			"too_many_comments": "Cette tâche a déjà 500 commentaires.",
+			"not_writable": "Le commentaire n'a pas pu être enregistré.",
+			"local_only": "Les commentaires de ligne sont disponibles pour les tâches locales.",
+			"no_worktree": "Cette tâche n'a plus d'espace de travail."
 		}
 	}
 }

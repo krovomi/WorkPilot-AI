@@ -35,7 +35,7 @@ def discover_models() -> list[dict[str, Any]]:
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NO_WINDOW if is_windows() else 0,
+        creationflags=subprocess.CREATE_NO_WINDOW if is_windows() else 0,  # type: ignore[attr-defined]
         start_new_session=not is_windows(),
     )
     messages: queue.Queue[bytes | None] = queue.Queue(maxsize=32)
@@ -155,7 +155,7 @@ def discover_models() -> list[dict[str, Any]]:
                     stderr=subprocess.DEVNULL,
                     timeout=2,
                     check=False,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
                 )
             else:
                 os.killpg(process.pid, signal.SIGKILL)

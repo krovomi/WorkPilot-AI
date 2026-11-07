@@ -8,7 +8,7 @@ twice* and gets two sets of module-level globals.
 For `models_registry`, which is static catalogues, that costs memory and
 nothing else. It stops being harmless the moment the pattern reaches a module
 holding mutable state: `HookService._instance`, the hook scheduler's
-`_scheduler`, `agents.subagents._STACK_CACHE` and `core.client`'s project cache
+`_scheduler`, `subagents._STACK_CACHE` and `core.client`'s project cache
 are all module-level singletons, and two of any of them is a bug that presents
 as "the thing I registered isn't there" with no traceback to follow.
 
@@ -33,7 +33,7 @@ BACKEND = REPO_ROOT / "apps" / "backend"
 STATEFUL_SINGLETONS = (
     "services.hooks.hook_service",
     "services.hooks.scheduler",
-    "agents.subagents",
+    "subagents",
     "core.client",
 )
 

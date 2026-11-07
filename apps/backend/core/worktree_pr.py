@@ -16,16 +16,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents.impact_analyzer import ImpactAnalysis
-from core.debug import debug_warning
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
-from core.git_provider import (
-    detect_git_provider,
-    extract_azure_devops_org,
-    extract_azure_devops_project,
-    extract_azure_devops_repository,
-)
 from core.glab_executable import get_glab_executable, invalidate_glab_cache
-from core.model_config import get_utility_model_config
 from core.worktree_common import (
     PullRequestResult,
     PushAndCreatePRResult,
@@ -35,7 +27,15 @@ from core.worktree_common import (
     _with_retry,
     _wt,
 )
+from foundation.debug import debug_warning
 from foundation.git_executable import get_git_executable, get_isolated_git_env
+from foundation.git_provider import (
+    detect_git_provider,
+    extract_azure_devops_org,
+    extract_azure_devops_project,
+    extract_azure_devops_repository,
+)
+from foundation.model_config import get_utility_model_config
 
 # The name the monolith logged under (`core.worktree`), kept so logging
 # configuration and log filters keyed on it still match.
@@ -1178,7 +1178,41 @@ class WorktreePRMixin:
             return body
 
         analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)
-        return append_impact_block(body, analysis)
+        return self._with_attribution(spec_name, append_impact_block(body, analysis))
+
+    def _with_attribution(self, spec_name: str, body: str) -> str:
+        """Append the Agent Trace summary line (F3) when the task has records."""
+        try:
+            from agent_trace import attribution_line, summarize
+
+            worktree = self.get_worktree_path(spec_name)
+            spec_dir = worktree / ".workpilot" / "specs" / spec_name
+            if not spec_dir.is_dir():
+                spec_dir = self.project_dir / ".workpilot" / "specs" / spec_name
+            line = attribution_line(summarize(worktree, spec_dir))
+        except (ImportError, OSError, ValueError) as exc:
+            logger.debug(f"Agent Trace summary skipped: {exc}")
+            return body
+        body = f"{body.rstrip()}\n\n{line}\n" if line else body
+        return self._with_provenance(worktree, spec_dir, spec_name, body)
+
+    def _with_provenance(self, worktree, spec_dir, spec_name: str, body: str) -> str:
+        """Write the provenance dossier (P5) and append its short block."""
+        try:
+            from provenance import pr_block, write_dossier
+
+            # Read the worktree's copy first, keep the dossier in the project's:
+            # the worktree is deleted at merge.
+            kept = self.project_dir / ".workpilot" / "specs" / spec_name
+            copies = [c for c in dict.fromkeys([spec_dir, kept]) if c.is_dir()]
+            if not copies:
+                return body
+            target = kept if kept.is_dir() else copies[0]
+            block = pr_block(write_dossier(worktree, copies, target))
+        except ImportError as exc:
+            logger.debug(f"Provenance dossier skipped: {exc}")
+            return body
+        return f"{body.rstrip()}\n\n{block}\n" if block else body
 
     def preview_pr_body(
         self,
@@ -1231,6 +1265,7 @@ class WorktreePRMixin:
         body_with_block = body
         if include_impact and append_impact_block is not None:
             body_with_block = append_impact_block(body, analysis)
+        body_with_block = self._with_attribution(spec_name, body_with_block)
 
         return {
             "body": body_with_block,
@@ -1597,6 +1632,37 @@ class WorktreePRMixin:
 
         return reverted
 
+    def _cross_review_hold(self, spec_name: str) -> PushAndCreatePRResult | None:
+        """The refusal when the cross review disagrees with the worktree's code."""
+        try:
+            from cross_review import blocking_verdict, refusal_message
+
+            worktree = self.get_worktree_path(spec_name)
+            spec_dirs = [
+                self.project_dir / ".workpilot" / "specs" / spec_name,
+                worktree / ".workpilot" / "specs" / spec_name,
+            ]
+            record = blocking_verdict(spec_dirs, worktree)
+        except (ImportError, OSError, ValueError) as exc:
+            logger.warning("[push_and_create_pr] cross review unreadable: %s", exc)
+            return None
+        if record is None:
+            return None
+        logger.warning(
+            "[push_and_create_pr] Holding back the PR for '%s': the cross review "
+            "by %s disagrees.",
+            spec_name,
+            record.get("provider"),
+        )
+        return PushAndCreatePRResult(
+            success=False,
+            pushed=False,
+            branch="",
+            remote="",
+            error=refusal_message(record),
+            cross_review_blocked=True,
+        )
+
     def push_and_create_pr(
         self,
         spec_name: str,
@@ -1605,6 +1671,7 @@ class WorktreePRMixin:
         draft: bool = False,
         force_push: bool = False,
         body: str | None = None,
+        allow_cross_review_disagreement: bool = False,
     ) -> PushAndCreatePRResult:
         """
         Push branch and create a pull request/merge request in one operation.
@@ -1619,6 +1686,9 @@ class WorktreePRMixin:
             body: Optional PR/MR body. If provided, used verbatim (no AI
                   generation, no impact block injection) - the caller is
                   responsible for the full content including any impact block.
+            allow_cross_review_disagreement: Create the PR even though the
+                  cross review (`cross_review/`) disagrees with this exact
+                  code. Only a person's explicit choice sets it.
 
         Returns:
             PushAndCreatePRResult with keys:
@@ -1629,6 +1699,14 @@ class WorktreePRMixin:
                 - already_exists: bool (if PR/MR already exists)
                 - error: str (if failed)
         """
+        # Step -1: A second engine that disagrees with this exact code holds
+        # the PR back, before anything is committed or pushed. Stale or
+        # inconclusive verdicts block nothing (`cross_review.blocking_verdict`).
+        if not allow_cross_review_disagreement:
+            held = self._cross_review_hold(spec_name)
+            if held is not None:
+                return held
+
         # Step 0: Commit any uncommitted changes before pushing
         has_changes, changed_files = self._has_uncommitted_changes(spec_name)
         if has_changes:
@@ -1664,6 +1742,8 @@ class WorktreePRMixin:
                 len(stripped),
                 spec_name,
             )
+        # Same for the project's build and test outputs (bin/, obj/...).
+        self.strip_build_artifacts(spec_name)
 
         # Step 0.5: Garde-fou contre la création d'une PR vide.
         # Si la branche du worktree n'a aucun commit en avance de la cible,
@@ -1702,6 +1782,19 @@ class WorktreePRMixin:
                 branch=push_result.get("branch", ""),
                 remote=push_result.get("remote", ""),
                 error=push_result.get("error", "Push failed"),
+            )
+
+        # Step 1.5: a task stacked on another (F6) targets its parent's
+        # branch, which must exist on the remote for the PR to be created.
+        from core.stacked_pr import link_after_pr, push_parent, spec_dir_of, stack_info
+
+        stack = stack_info(spec_dir_of(self, spec_name), effective_target)
+        if stack is not None and (refused := push_parent(self, stack)):
+            return PushAndCreatePRResult(
+                success=False,
+                pushed=True,
+                branch=push_result.get("branch", ""),
+                error=refused,
             )
 
         # Step 2: Detect git provider (use the remote that was pushed to)
@@ -1745,8 +1838,16 @@ class WorktreePRMixin:
                 error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
             )
 
+        # A stacked PR on GitHub joins its parent's stack when `gh stack` is
+        # installed; failing to link never undoes the PR.
+        stack_fields: dict = {}
+        if stack is not None and provider == "github" and pr_result.get("success"):
+            linked, note = link_after_pr(self, stack, spec_name, get_gh_executable())
+            stack_fields = {"stack_linked": linked, "stack_note": note}
+
         # Combine results
         return PushAndCreatePRResult(
+            **stack_fields,
             success=pr_result.get("success", False),
             pushed=True,
             remote=push_result.get("remote"),

@@ -18,6 +18,9 @@ import type {
 	ProjectEnvConfig,
 	ProjectSettings,
 	RepoProviderDetectionResult,
+	ServerLiveView,
+	ServerViewChange,
+	TeamRoomUpdate,
 } from "../../shared/types";
 
 // Tab state interface (persisted in main process)
@@ -32,6 +35,36 @@ export interface ProjectAPI {
 	addProject: (projectPath: string) => Promise<IPCResult<Project>>;
 	removeProject: (projectId: string) => Promise<IPCResult>;
 	getProjects: () => Promise<IPCResult<Project[]>>;
+	/** Server mode: register a repository on the server for the team. */
+	createServerProject: (input: {
+		name: string;
+		repoUrl: string;
+		defaultBranch?: string;
+	}) => Promise<IPCResult<Project>>;
+	/** Server mode: delete a server project for everyone (owner only). */
+	deleteServerProject: (projectId: string) => Promise<IPCResult>;
+	/** Server mode: follow a shown server board's changes live. */
+	watchServerBoard: (projectId: string) => Promise<IPCResult>;
+	unwatchServerBoard: (projectId: string) => Promise<IPCResult>;
+	onServerBoardLive: (
+		callback: (update: { projectId: string; live: boolean; changed: boolean }) => void,
+	) => () => void;
+	/**
+	 * Server mode: the team room of a shown server board: who is on it, the
+	 * cards' claims, the team chat (`main/server-team-room.ts`).
+	 */
+	joinTeamRoom: (projectId: string) => Promise<IPCResult>;
+	leaveTeamRoom: (projectId: string) => Promise<IPCResult>;
+	sendTeamChat: (projectId: string, message: string, replyTo?: string) => Promise<IPCResult>;
+	releaseCardClaim: (taskId: string) => Promise<IPCResult>;
+	onTeamRoomUpdate: (callback: (update: TeamRoomUpdate) => void) => () => void;
+	/**
+	 * Server mode: follow a shown shared view of a server project on its live
+	 * stream (one reference per call, released by `unwatchServerView`).
+	 */
+	watchServerView: (projectId: string, view: ServerLiveView) => Promise<IPCResult>;
+	unwatchServerView: (projectId: string, view: ServerLiveView) => Promise<IPCResult>;
+	onServerViewChanged: (callback: (change: ServerViewChange) => void) => () => void;
 	updateProjectSettings: (
 		projectId: string,
 		settings: Partial<ProjectSettings>,
@@ -313,6 +346,62 @@ export const createProjectAPI = (): ProjectAPI => ({
 
 	getProjects: (): Promise<IPCResult<Project[]>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.PROJECT_LIST),
+
+	createServerProject: (input: {
+		name: string;
+		repoUrl: string;
+		defaultBranch?: string;
+	}): Promise<IPCResult<Project>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_PROJECT_CREATE, input),
+
+	deleteServerProject: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_PROJECT_DELETE, projectId),
+
+	watchServerBoard: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_BOARD_WATCH, projectId),
+
+	unwatchServerBoard: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_BOARD_UNWATCH, projectId),
+
+	onServerBoardLive: (
+		callback: (update: { projectId: string; live: boolean; changed: boolean }) => void,
+	) => {
+		type Update = Parameters<typeof callback>[0];
+		const listener = (_event: IpcRendererEvent, update: Update) => callback(update);
+		ipcRenderer.on(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
+		return () => ipcRenderer.off(IPC_CHANNELS.SERVER_BOARD_LIVE, listener);
+	},
+
+	joinTeamRoom: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TEAM_ROOM_JOIN, projectId),
+
+	leaveTeamRoom: (projectId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TEAM_ROOM_LEAVE, projectId),
+
+	sendTeamChat: (projectId: string, message: string, replyTo?: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TEAM_CHAT_SEND, projectId, message, replyTo ?? ""),
+
+	releaseCardClaim: (taskId: string): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TEAM_LOCK_RELEASE, taskId),
+
+	onTeamRoomUpdate: (callback: (update: TeamRoomUpdate) => void) => {
+		const listener = (_event: IpcRendererEvent, update: TeamRoomUpdate) => callback(update);
+		ipcRenderer.on(IPC_CHANNELS.TEAM_ROOM_UPDATE, listener);
+		return () => ipcRenderer.off(IPC_CHANNELS.TEAM_ROOM_UPDATE, listener);
+	},
+
+	watchServerView: (projectId: string, view: ServerLiveView): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_VIEW_WATCH, projectId, view),
+
+	unwatchServerView: (projectId: string, view: ServerLiveView): Promise<IPCResult> =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_VIEW_UNWATCH, projectId, view),
+
+	onServerViewChanged: (callback: (change: ServerViewChange) => void) => {
+		const listener = (_event: IpcRendererEvent, change: ServerViewChange) =>
+			callback(change);
+		ipcRenderer.on(IPC_CHANNELS.SERVER_VIEW_CHANGED, listener);
+		return () => ipcRenderer.off(IPC_CHANNELS.SERVER_VIEW_CHANGED, listener);
+	},
 
 	updateProjectSettings: (
 		projectId: string,

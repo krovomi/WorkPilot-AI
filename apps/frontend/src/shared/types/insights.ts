@@ -248,6 +248,9 @@ export interface InsightsSession {
 	explanations?: LearningExplanation[]; // Collected explanations during session
 	createdAt: Date;
 	updatedAt: Date;
+	// Server mode: a teammate's conversation, read but not written
+	ownerName?: string;
+	readOnly?: boolean;
 }
 
 // Summary of a session for the history list (without full messages)
@@ -259,6 +262,9 @@ export interface InsightsSessionSummary {
 	modelConfig?: InsightsModelConfig; // For displaying model indicator in sidebar
 	createdAt: Date;
 	updatedAt: Date;
+	// Server mode: a teammate's conversation, read but not written
+	ownerName?: string;
+	readOnly?: boolean;
 }
 
 export interface InsightsChatStatus {

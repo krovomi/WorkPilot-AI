@@ -15,7 +15,10 @@
  * le sujet.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({
 	ipcMain: { handle: () => undefined },
@@ -39,7 +42,7 @@ vi.mock("../github/utils/runner-env.js", () => ({
 	getRunnerEnv: (...args: unknown[]) => getRunnerEnv(...args),
 }));
 
-import { buildContestantEnv } from "../bounty-board-handlers";
+import { buildContestantEnv, findSpecDir } from "../bounty-board-handlers";
 
 const CONTESTANTS = [
 	{ provider: "anthropic", model: "claude-sonnet-4-6" },
@@ -121,5 +124,43 @@ describe("buildContestantEnv", () => {
 
 		expect(env.GOOGLE_API_KEY).toBe("goog");
 		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe("oauth-token");
+	});
+});
+
+describe("findSpecDir", () => {
+	const roots: string[] = [];
+	afterEach(() => {
+		for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true });
+	});
+
+	function project(): string {
+		const root = mkdtempSync(path.join(tmpdir(), "bounty-spec-"));
+		roots.push(root);
+		mkdirSync(path.join(root, ".workpilot", "specs", "001-setup"), {
+			recursive: true,
+		});
+		mkdirSync(path.join(root, ".autonomousbuild", "specs", "002-legacy"), {
+			recursive: true,
+		});
+		return root;
+	}
+
+	it("trouve une spec existante, sous l'une ou l'autre racine", () => {
+		const root = project();
+		expect(findSpecDir(root, "001-setup")).toBe(
+			path.join(root, ".workpilot", "specs", "001-setup"),
+		);
+		expect(findSpecDir(root, "002-legacy")).toBe(
+			path.join(root, ".autonomousbuild", "specs", "002-legacy"),
+		);
+	});
+
+	it("refuse un identifiant qui ne désigne aucune spec", () => {
+		const root = project();
+		expect(findSpecDir(root, "001-my-feature")).toBeNull();
+		expect(findSpecDir(root, "")).toBeNull();
+		expect(findSpecDir(root, "..")).toBeNull();
+		expect(findSpecDir(root, "../specs/001-setup")).toBeNull();
+		expect(findSpecDir(root, "sub\\001-setup")).toBeNull();
 	});
 });

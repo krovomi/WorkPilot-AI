@@ -9,6 +9,7 @@ import {
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { PHASE_CONFIG } from "./types";
+import { useTranslation } from "react-i18next";
 
 interface TaskSelectorProps {
 	terminalId: string;
@@ -27,6 +28,7 @@ export function TaskSelector({
 	onClearTask,
 	onNewTaskClick,
 }: TaskSelectorProps) {
+	const { t } = useTranslation();
 	const executionPhase = associatedTask?.executionProgress?.phase || "idle";
 	const phaseConfig = PHASE_CONFIG[executionPhase];
 	const PhaseIcon = phaseConfig.icon;
@@ -38,7 +40,7 @@ export function TaskSelector({
 					<button
 						type="button"
 						className={cn(
-							"flex items-center gap-1.5 h-6 px-2 rounded text-[10px] font-medium transition-colors",
+							"flex items-center gap-1.5 h-6 px-2 rounded text-3xs font-medium transition-colors",
 							phaseConfig.color,
 							"hover:opacity-80 cursor-pointer",
 						)}
@@ -58,7 +60,7 @@ export function TaskSelector({
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="start" className="w-56">
 					<div className="px-2 py-1.5 text-xs text-muted-foreground">
-						Current task
+						{t("terminal:taskSelector.current")}
 					</div>
 					<div className="px-2 py-1 text-sm font-medium truncate">
 						{associatedTask.title}
@@ -72,7 +74,7 @@ export function TaskSelector({
 					{backlogTasks.length > 0 && (
 						<>
 							<div className="px-2 py-1.5 text-xs text-muted-foreground">
-								Switch to...
+								{t("terminal:taskSelector.switchTo")}
 							</div>
 							{backlogTasks
 								.filter((t) => t.id !== associatedTask.id)
@@ -95,7 +97,7 @@ export function TaskSelector({
 						className="text-xs text-muted-foreground"
 					>
 						<X className="h-3 w-3 mr-2" />
-						Clear task
+						{t("terminal:taskSelector.clear")}
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -107,11 +109,11 @@ export function TaskSelector({
 			<DropdownMenuTrigger asChild>
 				<button
 					type="button"
-					className="flex items-center gap-1.5 h-6 px-2 rounded text-[10px] font-medium transition-colors border border-border/50 bg-card/50 hover:bg-card hover:border-border text-muted-foreground hover:text-foreground"
+					className="flex items-center gap-1.5 h-6 px-2 rounded text-3xs font-medium transition-colors border border-border/50 bg-card/50 hover:bg-card hover:border-border text-muted-foreground hover:text-foreground"
 					onClick={(e) => e.stopPropagation()}
 				>
 					<ListTodo className="h-3 w-3" />
-					<span>Select task...</span>
+					<span>{t("terminal:taskSelector.select")}</span>
 					<ChevronDown className="h-2.5 w-2.5 opacity-60" />
 				</button>
 			</DropdownMenuTrigger>
@@ -119,7 +121,7 @@ export function TaskSelector({
 				{backlogTasks.length > 0 ? (
 					<>
 						<div className="px-2 py-1.5 text-xs text-muted-foreground">
-							Available tasks
+							{t("terminal:taskSelector.available")}
 						</div>
 						{backlogTasks.slice(0, 8).map((task) => (
 							<DropdownMenuItem
@@ -142,7 +144,7 @@ export function TaskSelector({
 									className="text-xs text-primary"
 								>
 									<Plus className="h-3 w-3 mr-2" />
-									Add new task
+									{t("terminal:taskSelector.add")}
 								</DropdownMenuItem>
 							</>
 						)}
@@ -150,7 +152,7 @@ export function TaskSelector({
 				) : (
 					<>
 						<div className="px-2 py-1.5 text-xs text-muted-foreground">
-							No tasks available
+							{t("terminal:taskSelector.empty")}
 						</div>
 						{onNewTaskClick ? (
 							<DropdownMenuItem
@@ -161,11 +163,11 @@ export function TaskSelector({
 								className="text-xs text-primary"
 							>
 								<Plus className="h-3 w-3 mr-2" />
-								Add new task
+								{t("terminal:taskSelector.add")}
 							</DropdownMenuItem>
 						) : (
 							<div className="px-2 py-1.5 text-xs text-muted-foreground italic">
-								Create tasks in the Kanban board
+								{t("terminal:taskSelector.emptyHint")}
 							</div>
 						)}
 					</>

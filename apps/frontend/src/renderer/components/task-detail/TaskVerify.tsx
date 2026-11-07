@@ -1,10 +1,16 @@
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
-import { type VerifyRecord, verifyScreenshotUrl } from "../../lib/agent-tools-api";
+import {
+	type VerifyRecord,
+	verifyScreenshotUrl,
+	verifyMediaUrl,
+	verifyTraceUrl,
+} from "../../lib/agent-tools-api";
 import { useVerifyStore } from "../../stores/verify-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { compareShotIndices, VerifyCompare } from "./VerifyCompare";
 import { measured, statusVariant } from "./verify-view";
 
 export interface TaskVerifyProps {
@@ -34,6 +40,8 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 	}
 	const query = { projectDir: projectPath, specId: task.specId };
 	const running = entry?.busy === "running";
+	// A comparison launches the app too: no run on top of it.
+	const busy = running || entry?.busy === "comparing";
 
 	return (
 		<div className="space-y-5 p-4 text-sm">
@@ -50,10 +58,10 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 					{record.reason && <span className="text-muted-foreground">{record.reason}</span>}
 				</div>
 				<div className="flex gap-2">
-					<Button size="sm" variant="outline" disabled={running} onClick={() => void run(task.id, query, "low")}>
+					<Button size="sm" variant="outline" disabled={busy} onClick={() => void run(task.id, query, "low")}>
 						{t("tasks:verify.rerunQuick")}
 					</Button>
-					<Button size="sm" disabled={running} onClick={() => void run(task.id, query)}>
+					<Button size="sm" disabled={busy} onClick={() => void run(task.id, query)}>
 						{running && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
 						{t("tasks:verify.rerun")}
 					</Button>
@@ -66,8 +74,10 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 			<Endpoints record={record} />
 			<Performance record={record} />
 			<Mobile record={record} />
+			<CardScenario record={record} query={query} />
 			<Screenshots record={record} query={query} />
 			<Scenario record={record} />
+			<VerifyCompare taskId={task.id} record={record} query={query} />
 			<Findings record={record} />
 			{record.browser?.reasons && record.browser.reasons.length > 0 && !record.browser.engine && (
 				<p className="text-xs text-muted-foreground">
@@ -97,19 +107,19 @@ function Targets({ record }: { readonly record: VerifyRecord }) {
 					<li key={target.name} className="rounded border border-border p-2">
 						<div className="flex flex-wrap items-center gap-2">
 							<span className="font-medium">{target.name}</span>
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t(`tasks:verify.kind.${target.kind}`, { defaultValue: target.kind })}
 							</Badge>
 							<Badge
 								variant={target.launch?.status === "ready" || target.launch?.status === "reused" ? "outline" : "destructive"}
-								className="text-[10px]"
+								className="text-3xs"
 							>
 								{t(`tasks:verify.launch.${target.launch?.status ?? "unknown"}`, {
 									defaultValue: target.launch?.status ?? "?",
 								})}
 							</Badge>
 							{target.origin === "recipe" && (
-								<Badge variant="secondary" className="text-[10px]">
+								<Badge variant="secondary" className="text-3xs">
 									{t("tasks:verify.learnedRecipe")}
 								</Badge>
 							)}
@@ -248,7 +258,7 @@ function Metric({ label, value }: { readonly label: string; readonly value: stri
 	const { t } = useTranslation(["tasks"]);
 	return (
 		<div className="rounded border border-border p-2">
-			<div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+			<div className="text-3xs uppercase text-muted-foreground">{label}</div>
 			<div className={value === null ? "text-xs italic text-muted-foreground" : "font-medium"}>
 				{value ?? t("tasks:verify.notMeasured")}
 			</div>
@@ -276,19 +286,19 @@ function Performance({ record }: { readonly record: VerifyRecord }) {
 							<Metric label="FCP" value={measured(perf.fcp_ms) && t("tasks:verify.ms", { value: measured(perf.fcp_ms) })} />
 						</div>
 						{perf.scored_on?.length > 0 && (
-							<p className="mt-1 text-[11px] text-muted-foreground">
+							<p className="mt-1 text-2xs text-muted-foreground">
 								{t("tasks:verify.scoredOn", { metrics: perf.scored_on.join(", ") })}
 							</p>
 						)}
 						{!perf.measured && perf.reason && (
-							<p className="mt-1 text-[11px] text-muted-foreground">{perf.reason}</p>
+							<p className="mt-1 text-2xs text-muted-foreground">{perf.reason}</p>
 						)}
 					</div>
 				))}
 				{lighthouse.length > 0 && (
 					<div className="flex flex-wrap gap-2">
 						{lighthouse.map(([category, score]) => (
-							<Badge key={category} variant="outline" className="text-[10px]">
+							<Badge key={category} variant="outline" className="text-3xs">
 								{t(`tasks:verify.lighthouse.${category}`, { defaultValue: category })}: {score}
 							</Badge>
 						))}
@@ -326,11 +336,13 @@ function Screenshots({
 	readonly query: { projectDir: string; specId: string };
 }) {
 	const { t } = useTranslation(["tasks"]);
-	if (record.screenshots.length === 0) return null;
+	const compared = compareShotIndices(record);
+	const shots = record.screenshots.filter((shot) => !compared.has(shot.index));
+	if (shots.length === 0) return null;
 	return (
 		<Section title={t("tasks:verify.sections.screenshots")}>
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				{record.screenshots.map((shot) => (
+				{shots.map((shot) => (
 					<figure key={shot.index} className="overflow-hidden rounded border border-border">
 						<img
 							src={verifyScreenshotUrl(query, shot.index)}
@@ -338,11 +350,127 @@ function Screenshots({
 							className="block w-full bg-background object-contain"
 							loading="lazy"
 						/>
-						<figcaption className="px-2 py-1 text-[11px] text-muted-foreground">{shot.label}</figcaption>
+						<figcaption className="px-2 py-1 text-2xs text-muted-foreground">{shot.label}</figcaption>
 					</figure>
 				))}
 			</div>
 		</Section>
+	);
+}
+
+const STEP_VARIANT = { pass: "outline", fail: "destructive", blocked: "secondary" } as const;
+
+/**
+ * The scenario written on the card: each step with what the verifier saw,
+ * its capture, and the Playwright trace to replay the whole session.
+ */
+function CardScenario({
+	record,
+	query,
+}: {
+	readonly record: VerifyRecord;
+	readonly query: { projectDir: string; specId: string };
+}) {
+	const { t } = useTranslation(["tasks"]);
+	const requested = record.scenario_requested ?? [];
+	if (requested.length === 0) return null;
+	const reported = new Map((record.scenario_steps ?? []).map((item) => [item.step, item]));
+	return (
+		<Section title={t("tasks:verify.sections.cardScenario")}>
+			<ol className="space-y-2">
+				{requested.map((step, index) => {
+					const number = index + 1;
+					const item = reported.get(number);
+					return (
+						<li key={number} className="rounded border border-border p-2">
+							<div className="flex flex-wrap items-start gap-2">
+								<span className="text-muted-foreground">{number}.</span>
+								<span className="flex-1">{step}</span>
+								<Badge
+									variant={item ? STEP_VARIANT[item.outcome] : "outline"}
+									className="text-3xs"
+								>
+									{t(`tasks:verify.step.${item?.outcome ?? "missing"}`)}
+								</Badge>
+							</div>
+							{item?.note && <p className="mt-1 text-xs text-muted-foreground">{item.note}</p>}
+							{item?.screenshotIndex !== undefined && (
+								<img
+									src={verifyScreenshotUrl(query, item.screenshotIndex)}
+									alt={t("tasks:verify.stepCapture", { number })}
+									className="mt-2 block max-h-48 rounded border border-border bg-background object-contain"
+									loading="lazy"
+								/>
+							)}
+						</li>
+					);
+				})}
+			</ol>
+			<Walkthrough record={record} query={query} />
+			<p className="mt-2 text-xs text-muted-foreground">
+				{record.trace ? (
+					<>
+						{/* Opened by the OS browser (the window's open handler), which saves the zip. */}
+						<a
+							href={verifyTraceUrl(query)}
+							target="_blank"
+							rel="noreferrer"
+							className="font-medium text-primary underline"
+						>
+							{t("tasks:verify.trace.download")}
+						</a>{" "}
+						{t("tasks:verify.trace.hint")}
+					</>
+				) : (
+					t("tasks:verify.trace.none")
+				)}
+			</p>
+		</Section>
+	);
+}
+
+/** The scenario filmed (launch mode), and its step captures as the GIF the PR can show. */
+function Walkthrough({
+	record,
+	query,
+}: {
+	readonly record: VerifyRecord;
+	readonly query: { projectDir: string; specId: string };
+}) {
+	const { t } = useTranslation(["tasks"]);
+	return (
+		<div className="mt-3 space-y-2">
+			{record.video ? (
+				<video
+					src={verifyMediaUrl(query, "video")}
+					controls
+					preload="metadata"
+					aria-label={t("tasks:verify.walkthrough.video")}
+					className="block w-full max-w-2xl rounded border border-border bg-background"
+				>
+					<track kind="captions" />
+				</video>
+			) : (
+				record.video_note && (
+					<p className="text-xs text-muted-foreground">
+						{t("tasks:verify.walkthrough.noVideo", { reason: record.video_note })}
+					</p>
+				)
+			)}
+			{record.walkthrough && (
+				<figure className="max-w-2xl overflow-hidden rounded border border-border">
+					<img
+						src={verifyMediaUrl(query, "walkthrough")}
+						alt={t("tasks:verify.walkthrough.gif")}
+						className="block w-full bg-background object-contain"
+						loading="lazy"
+					/>
+					<figcaption className="px-2 py-1 text-2xs text-muted-foreground">
+						{t("tasks:verify.walkthrough.gifHint")}
+					</figcaption>
+				</figure>
+			)}
+		</div>
 	);
 }
 
@@ -372,7 +500,7 @@ function Findings({ record }: { readonly record: VerifyRecord }) {
 			<ul className="space-y-1 text-xs">
 				{record.findings.map((finding) => (
 					<li key={finding.message}>
-						<Badge variant={finding.severity === "high" ? "destructive" : "outline"} className="mr-2 text-[10px]">
+						<Badge variant={finding.severity === "high" ? "destructive" : "outline"} className="mr-2 text-3xs">
 							{finding.severity}
 						</Badge>
 						{finding.message}

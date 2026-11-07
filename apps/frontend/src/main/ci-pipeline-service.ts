@@ -8,7 +8,15 @@
  *  - when a build goes red, moves the task to the `build_failed` column,
  *    writes the pipeline errors into `BUILD_FAILURE.md` in the spec dir, and
  *    (unless disabled) launches the agent to repair the build automatically
- *    by appending a "fix the CI build" subtask to the implementation plan.
+ *    by appending a "fix the CI build" subtask to the implementation plan;
+ *  - when the next run on that branch is green, takes the task back out of
+ *    the column (to the status it had before the red build).
+ *
+ * The run already handled is written to the plan (`ciHandledFailedRun`), so a
+ * restart of the app does not handle the same red run a second time. A task
+ * that is `done` only gets the badge: its work is already merged. The
+ * automatic repair stops after MAX_AUTO_FIX_ATTEMPTS runs on the same task;
+ * the card's repair button still works after that.
  *
  * Configuration comes from the project's `.env` files (root and
  * {autoBuildPath}/.env): provider credentials (see ci-pipeline-providers.ts),
@@ -28,6 +36,7 @@ import type {
 	TaskPipelineStatus,
 	TaskStatus,
 } from "../shared/types";
+import type { TaskEvent } from "../shared/state-machines/task-machine";
 import type { AgentManager } from "./agent";
 import {
 	type MergedEnv,
@@ -35,19 +44,48 @@ import {
 	type PipelineRun,
 	resolvePipelineProvider,
 } from "./ci-pipeline-providers";
+import { determineStartEvent } from "./ipc-handlers/task/execution-utils";
 import {
 	getPlanPath,
-	persistPlanStatus,
+	mapStatusToPlanStatus,
 	updatePlanFile,
 } from "./ipc-handlers/task/plan-file-utils";
 import { parseEnvFile } from "./ipc-handlers/utils";
 import { learningLoopService } from "./learning-loop-service";
 import { readProjectEnvFile } from "./project-env-file";
 import { projectStore } from "./project-store";
+import { taskStateManager } from "./task-state-manager";
 
 const DEFAULT_POLL_SECONDS = 60;
 /** Re-resolve provider credentials at most every 5 minutes per project. */
 const PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
+/** Automatic repairs per task before the loop leaves it to the user. */
+export const MAX_AUTO_FIX_ATTEMPTS = 3;
+
+/** Statuses a green build can send a task back to (anything else: human_review). */
+const RESTORABLE_STATUSES: ReadonlySet<TaskStatus> = new Set([
+	"human_review",
+	"pr_created",
+	"done",
+]);
+
+type PlanJson = Record<string, unknown>;
+
+function readPlan(planPath: string): PlanJson | null {
+	try {
+		return JSON.parse(readFileSync(planPath, "utf-8")) as PlanJson;
+	} catch {
+		return null;
+	}
+}
+
+/** How many automatic repair phases the plan already holds. */
+export function countBuildFixPhases(plan: PlanJson | null): number {
+	const phases = Array.isArray(plan?.phases) ? plan.phases : [];
+	return phases.filter(
+		(phase) => (phase as PlanJson | null)?.type === "build_fix",
+	).length;
+}
 
 /** Statuses whose branch has (or may have) pushed commits worth monitoring. */
 const MONITORED_STATUSES: ReadonlySet<TaskStatus> = new Set([
@@ -144,7 +182,7 @@ class CiPipelineService {
 	private polling = false;
 	private statuses = new Map<string, TaskPipelineStatus>();
 	/** taskId -> run id whose failure has already been handled. */
-	private handledFailedRuns = new Map<string, number | string>();
+	private handledFailedRuns = new Map<string, string>();
 	private autoFixInFlight = new Set<string>();
 	/** projectId -> resolved provider (TTL'd: credentials can use CLIs). */
 	private providerCache = new Map<string, CachedProvider>();
@@ -320,13 +358,71 @@ class CiPipelineService {
 			this.emitStatus(status);
 		}
 
-		if (
-			status.state === "failed" &&
-			this.handledFailedRuns.get(task.id) !== run.runId
-		) {
-			this.handledFailedRuns.set(task.id, run.runId);
-			await this.handleRedBuild(project, cached, adapter, task, status, run);
+		if (status.state === "failed") {
+			await this.onFailedRun(project, cached, adapter, task, status, run);
+		} else if (status.state === "succeeded" && task.status === "build_failed") {
+			await this.restoreAfterGreenBuild(project, task);
 		}
+	}
+
+	/** Handle a red run once, across app restarts too. */
+	private async onFailedRun(
+		project: Project,
+		cached: CachedProvider,
+		adapter: PipelineProviderAdapter,
+		task: Task,
+		status: TaskPipelineStatus,
+		run: PipelineRun,
+	): Promise<void> {
+		const runKey = String(run.runId);
+		if (this.handledFailedRuns.get(task.id) === runKey) return;
+		this.handledFailedRuns.set(task.id, runKey);
+		const planPath = getPlanPath(project, task);
+		if (String(readPlan(planPath)?.ciHandledFailedRun ?? "") === runKey) {
+			return;
+		}
+		if (task.status === "done") {
+			// Already merged: the badge shows the red run, nothing else to do.
+			await updatePlanFile<PlanJson>(planPath, (plan) => {
+				plan.ciHandledFailedRun = runKey;
+				return plan;
+			});
+			return;
+		}
+		await this.handleRedBuild(project, cached, adapter, task, status, run);
+	}
+
+	/**
+	 * The branch is green again (fixed by hand, or the repair was pushed):
+	 * the task leaves « Build rouge » for the status it had before.
+	 */
+	private async restoreAfterGreenBuild(
+		project: Project,
+		task: Task,
+	): Promise<void> {
+		const planPath = getPlanPath(project, task);
+		const previous = readPlan(planPath)?.statusBeforeBuildFailed as
+			| TaskStatus
+			| undefined;
+		const target: TaskStatus =
+			previous && RESTORABLE_STATUSES.has(previous) ? previous : "human_review";
+		const updated = await updatePlanFile<PlanJson>(planPath, (plan) => {
+			plan.status = target;
+			plan.planStatus = mapStatusToPlanStatus(target);
+			if (target === "human_review" && !plan.reviewReason) {
+				plan.reviewReason = "completed";
+			}
+			delete plan.statusBeforeBuildFailed;
+			return plan;
+		});
+		if (!updated) return;
+		projectStore.invalidateTasksCache(project.id);
+		this.getMainWindow?.()?.webContents.send(
+			IPC_CHANNELS.TASK_STATUS_CHANGE,
+			task.id,
+			target,
+			project.id,
+		);
 	}
 
 	private emitStatus(status: TaskPipelineStatus): void {
@@ -374,11 +470,23 @@ class CiPipelineService {
 				: `CI build ${status.buildNumber ?? ""} failed on ${status.branch ?? ""}`,
 		);
 
-		// If the agent is already repairing (or the user moved the task back to
-		// work), don't yank the task out of its column.
-		if (task.status !== "in_progress" && task.status !== "build_failed") {
-			const planPath = getPlanPath(project, task);
-			await persistPlanStatus(planPath, "build_failed", project.id);
+		// If the agent is already working on the task (or the user moved it back
+		// to work), don't yank it out of its column. The handled run is written
+		// either way, so a restart does not handle it again.
+		const planPath = getPlanPath(project, task);
+		const agentBusy = task.status === "in_progress";
+		const moveToColumn = !agentBusy && task.status !== "build_failed";
+		const plan = await updatePlanFile<PlanJson>(planPath, (current) => {
+			current.ciHandledFailedRun = String(run.runId);
+			if (moveToColumn) {
+				current.statusBeforeBuildFailed = task.status;
+				current.status = "build_failed";
+				current.planStatus = mapStatusToPlanStatus("build_failed");
+			}
+			return current;
+		});
+		if (moveToColumn && plan) {
+			projectStore.invalidateTasksCache(project.id);
 			this.getMainWindow?.()?.webContents.send(
 				IPC_CHANNELS.TASK_STATUS_CHANGE,
 				task.id,
@@ -387,7 +495,20 @@ class CiPipelineService {
 			);
 		}
 
-		if (isAutoFixEnabled(cached.env)) {
+		// No automatic repair while the agent already runs on the task, nor
+		// once it failed MAX_AUTO_FIX_ATTEMPTS times: a red build it cannot
+		// fix would otherwise relaunch it on every new run.
+		const attempts = countBuildFixPhases(plan);
+		if (attempts >= MAX_AUTO_FIX_ATTEMPTS) {
+			console.warn(
+				`[CiPipeline] ${task.specId}: ${attempts} automatic repairs already, leaving the red build to the user`,
+			);
+		}
+		if (
+			isAutoFixEnabled(cached.env) &&
+			!agentBusy &&
+			attempts < MAX_AUTO_FIX_ATTEMPTS
+		) {
 			const result = await this.fixRedBuild(task.id);
 			if (!result.success) {
 				console.warn(
@@ -471,6 +592,16 @@ class CiPipelineService {
 		projectStore.invalidateTasksCache(project.id);
 
 		this.autoFixInFlight.add(task.id);
+		// Same state-machine step as a start from the board: without it the
+		// machine stays in review/pr_created and ignores the run's events.
+		const startEvent = determineStartEvent(task.id, task);
+		taskStateManager.handleUiEvent(
+			task.id,
+			{ type: startEvent.type } as TaskEvent,
+			startEvent.resetTask ?? task,
+			project,
+		);
+		taskStateManager.resetForNewRun(task.id);
 		this.getMainWindow?.()?.webContents.send(
 			IPC_CHANNELS.TASK_STATUS_CHANGE,
 			task.id,

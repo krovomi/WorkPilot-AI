@@ -43,6 +43,17 @@ class EventType(str, Enum):
     SPEC_CLAIMED = "spec_claimed"
     SPEC_RELEASED = "spec_released"
     SPEC_STATUS_CHANGED = "spec_status_changed"
+    # The shared board's cards (``shared_board``): without these the stream
+    # dropped them as unknown and nobody saw the change live.
+    SPEC_UPDATED = "spec_updated"
+    SPEC_DELETED = "spec_deleted"
+    SPEC_APPROVED = "spec_approved"
+    # A shared feature of the project (``shared_features``): a file a member
+    # rewrote, and a job's status as it starts and ends.
+    FEATURE_UPDATED = "feature_updated"
+    FEATURE_JOB = "feature_job"
+    # An Insights conversation created, answered, renamed or deleted.
+    INSIGHTS_UPDATED = "insights_updated"
     MEMBER_PRESENCE = "member_presence"
 
 

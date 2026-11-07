@@ -20,6 +20,7 @@ import {
 	saveSettings as saveSettingsToDisk,
 	useSettingsStore,
 } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "../ProviderContext";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -53,6 +54,8 @@ interface Provider {
 		provider?: string;
 		isOAuth?: boolean;
 		authMethod?: AuthMethod;
+		/** When the stored key got its value; undefined when unknown. */
+		setAt?: string | number;
 	};
 }
 
@@ -143,7 +146,12 @@ export function CleanProviderSection({
 	>(new Map());
 
 	// Use store directly for real-time updates (like ProviderSelector)
-	const { profiles, settings: storeSettings } = useSettingsStore();
+	const { profiles, settings: storeSettings } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			settings: s.settings,
+		})),
+	);
 	const { setSelectedProvider: setContextProvider } = useProviderContext();
 
 	// Create a unified settings object and onSettingsChange that updates both props and store
@@ -444,6 +452,7 @@ export function CleanProviderSection({
 			provider?: string;
 			isOAuth?: boolean;
 			authMethod?: AuthMethod;
+			setAt?: string | number;
 		} => {
 			// Determine auth method from registry
 			const authMethod = getProviderAuthMethod(providerId);
@@ -495,6 +504,7 @@ export function CleanProviderSection({
 					provider: profile.name,
 					isOAuth: false,
 					authMethod: "api-key",
+					setAt: profile.apiKeySetAt,
 				};
 			}
 
@@ -506,6 +516,7 @@ export function CleanProviderSection({
 					keyPreview: (settings as AppSettings & Record<string, unknown>)[apiKeyField] as string,
 					isOAuth: false,
 					authMethod: "api-key",
+					setAt: settings.credentialsSetAt?.[apiKeyField],
 				};
 			}
 
@@ -935,9 +946,9 @@ export function CleanProviderSection({
 				description={t("accounts.multiConnector.description")}
 			>
 				<div className="space-y-4">
-					<Alert className="border-red-200 bg-red-50">
-						<AlertCircle className="h-4 w-4 text-red-600" />
-						<AlertDescription className="text-red-700">
+					<Alert className="border-destructive/30 bg-destructive/10">
+						<AlertCircle className="h-4 w-4 text-destructive" />
+						<AlertDescription className="text-destructive">
 							{error}
 						</AlertDescription>
 					</Alert>
@@ -956,10 +967,10 @@ export function CleanProviderSection({
 		>
 			<div className="space-y-6">
 				{error && (
-					<div className="mb-6 p-4 bg-red-50/50 border border-red-100 rounded-lg">
+					<div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
 						<div className="flex items-center gap-2">
-							<AlertCircle className="w-4 h-4 text-red-500" />
-							<span className="text-sm text-red-700">{error}</span>
+							<AlertCircle className="w-4 h-4 text-destructive" />
+							<span className="text-sm text-destructive">{error}</span>
 						</div>
 					</div>
 				)}

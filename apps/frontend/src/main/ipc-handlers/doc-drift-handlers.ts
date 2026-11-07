@@ -20,6 +20,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	cancelServerAnalysis,
+	relayServerAnalysis,
+	serverProjectAtPath,
+} from "./server-analyses";
 
 interface RunRequest {
 	projectPath: string;
@@ -39,6 +44,7 @@ export function registerDocDriftHandlers(): void {
 	let currentProcess: ChildProcess | null = null;
 
 	const killExisting = (): void => {
+		cancelServerAnalysis("doc-drift");
 		if (currentProcess) {
 			currentProcess.kill("SIGTERM");
 			currentProcess = null;
@@ -54,6 +60,16 @@ export function registerDocDriftHandlers(): void {
 				const message = "projectPath is required";
 				broadcast(IPC_CHANNELS.DOC_DRIFT_ERROR, message);
 				throw new Error(message);
+			}
+
+			// A server project's analysis runs on the server (`server-analyses.ts`).
+			const remote = serverProjectAtPath(projectPath);
+			if (remote) {
+				return relayServerAnalysis(remote, "doc-drift", {}, {
+					event: IPC_CHANNELS.DOC_DRIFT_EVENT,
+					result: IPC_CHANNELS.DOC_DRIFT_RESULT,
+					error: IPC_CHANNELS.DOC_DRIFT_ERROR,
+				});
 			}
 
 			const backendPath = app.isPackaged

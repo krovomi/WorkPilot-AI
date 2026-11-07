@@ -13,8 +13,16 @@ app and may run agent sessions, so in server mode it answers to
 which server mode refuses outright — a desktop feature until a
 `project_id`-addressed endpoint exists.
 
+`POST /api/verify/compare` replays the verification on the branch the task
+forked from and on the task, without a model, and records what behaves
+differently (`compare.py`). It launches the app twice: `agent.execute`, like
+the run.
+
 `GET /api/verify/screenshot` serves one screenshot the record names — never a
-path from the request.
+path from the request. `GET /api/verify/trace` serves the Playwright trace of
+the card's scenario the same way: the one the record names, inside the spec.
+`GET /api/verify/walkthrough` and `GET /api/verify/video` serve the scenario's
+GIF and video by the same rules (`walkthrough.py`).
 """
 
 from __future__ import annotations
@@ -32,7 +40,9 @@ from foundation.api_safety import (
 from pydantic import BaseModel
 
 from .record import load_record
+from .scenario import TRACE_FILE
 from .settings import load_settings
+from .walkthrough import VIDEO_FILE, WALKTHROUGH_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +117,25 @@ def _latest(spec_dir: Path) -> tuple[dict | None, Path]:
 def _public(record: dict, where: Path) -> dict:
     """The record without filesystem paths: screenshots become indices."""
     out = {k: v for k, v in record.items() if k not in ("agent",)}
+    shot_index = {
+        str(s.get("path") or ""): i
+        for i, s in enumerate(record.get("screenshots") or [])
+    }
+    out["scenario_steps"] = [
+        {
+            **{k: v for k, v in step.items() if k != "screenshot"},
+            **(
+                {"screenshotIndex": shot_index[str(step["screenshot"])]}
+                if str(step.get("screenshot") or "") in shot_index
+                else {}
+            ),
+        }
+        for step in record.get("scenario_steps") or []
+        if isinstance(step, dict)
+    ]
+    # Whether there is a trace, a video, a GIF to fetch, not where they live.
+    for key in ("trace", "video", "walkthrough"):
+        out[key] = bool(record.get(key))
     out["screenshots"] = [
         {
             "index": i,
@@ -181,21 +210,115 @@ def verify_screenshot(
     )
 
 
-@router.post("/run")
-async def verify_run(body: VerifyRunRequest):
-    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
+def _named_file(spec_dir, project_dir, spec_id, key: str, name: str):
+    """The file the record names under ``key``, inside the spec, called ``name``."""
+    resolved, error = _resolve(spec_dir, project_dir, spec_id)
+    if error:
+        return None, JSONResponse(error, status_code=400)
+    record, _where = _latest(resolved)
+    path = Path(str((record or {}).get(key) or ""))
+    try:
+        if not (record or {}).get(key):
+            raise ValueError(f"no {key}")
+        real = path.resolve(strict=True)
+        allowed = [copy.resolve() for copy in _spec_copies(resolved)]
+        if not any(real.is_relative_to(root) for root in allowed) or path.is_symlink():
+            raise ValueError("outside the spec")
+        if real.name != name:
+            raise ValueError(f"not the scenario's {key}")
+    except (OSError, ValueError):
+        return None, JSONResponse(
+            {"success": False, "error": f"{key} unavailable"}, status_code=404
+        )
+    return (real, resolved), None
+
+
+@router.get("/trace")
+def verify_trace(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    found, error = _named_file(spec_dir, project_dir, spec_id, "trace", TRACE_FILE)
     if error:
         return error
+    real, resolved = found
+    return FileResponse(
+        real,
+        media_type="application/zip",
+        filename=f"{resolved.name}-{TRACE_FILE}",
+    )
+
+
+@router.get("/walkthrough")
+def verify_walkthrough(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    found, error = _named_file(
+        spec_dir, project_dir, spec_id, "walkthrough", WALKTHROUGH_FILE
+    )
+    return error or FileResponse(found[0], media_type="image/gif")
+
+
+@router.get("/video")
+def verify_video(
+    spec_dir: str | None = Query(None),
+    project_dir: str | None = Query(None),
+    spec_id: str | None = Query(None),
+):
+    found, error = _named_file(spec_dir, project_dir, spec_id, "video", VIDEO_FILE)
+    return error or FileResponse(found[0], media_type="video/webm")
+
+
+def _task_code(resolved: Path) -> tuple[Path, Path] | None:
+    """The task's code (its worktree when it exists) and the spec copy beside it."""
     project = _project_of(resolved)
     if project is None:
-        return {"success": False, "error": "the spec is not inside a project"}
+        return None
     worktree = _worktree(project, resolved.name)
     code_dir = worktree or project
     spec_dir = (
         (worktree / ".workpilot" / "specs" / resolved.name) if worktree else resolved
     )
-    if not spec_dir.is_dir():
-        spec_dir = resolved
+    return code_dir, (spec_dir if spec_dir.is_dir() else resolved)
+
+
+@router.post("/compare")
+async def verify_compare(body: VerifyRunRequest):
+    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
+    if error:
+        return error
+    found = _task_code(resolved)
+    if found is None:
+        return {"success": False, "error": "the spec is not inside a project"}
+    code_dir, spec_dir = found
+    try:
+        from .compare import run_base_comparison
+
+        entry = await run_base_comparison(code_dir, spec_dir)
+        record, where = _latest(resolved)
+        return {
+            "success": True,
+            "compare": entry,
+            "record": _public(record, where) if record else None,
+        }
+    except (OSError, RuntimeError, ValueError, TimeoutError):
+        # A git, launch or browser failure; a replay problem is in the entry.
+        logger.exception("verify compare failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/run")
+async def verify_run(body: VerifyRunRequest):
+    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
+    if error:
+        return error
+    found = _task_code(resolved)
+    if found is None:
+        return {"success": False, "error": "the spec is not inside a project"}
+    code_dir, spec_dir = found
     try:
         from verify.git import changed_files
         from workflows.runner import find_skill_body, phase_provider

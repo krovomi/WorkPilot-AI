@@ -1,6 +1,6 @@
 {
 	"title": "Arena Mode",
-	"subtitle": "Blind A/B model comparison — let the data speak",
+	"subtitle": "A/B model comparison — let the data speak",
 	"tabs": {
 		"battle": "Battle",
 		"history": "History",
@@ -24,7 +24,7 @@
 		"startBattle": "Start Battle",
 		"model": "Model",
 		"voteForThis": "Vote for this",
-		"votePrompt": "Both models have finished — which response is better? Your vote is anonymous.",
+		"votePrompt": "The models have finished — which response is better?",
 		"winner": "Winner",
 		"newBattle": "New Battle",
 		"statusRunning": "Running…",
@@ -45,15 +45,16 @@
 		"removeModel": "Remove this model",
 		"tokensEstimatedHint": "Estimated: this provider reported no usage",
 		"costUnknownHint": "This provider reported no cost — no amount is invented",
-		"providersDegrade": "No adapter of their own, so out of the Arena (another vendor's model would answer for them): {{providers}}"
+		"providersDegrade": "No adapter of their own, so out of the Arena (another vendor's model would answer for them): {{providers}}",
+		"failed": "Failed: this response cannot be voted for",
+		"notEnoughAnswers": "Fewer than two models answered: this battle cannot be voted on."
 	},
 	"history": {
 		"loading": "Loading history…",
 		"empty": "No battles yet",
 		"battles": "battles",
 		"clearAll": "Clear All",
-		"awaitingVote": "Awaiting vote",
-		"hiddenUntilVote": "Identity hidden until the vote"
+		"awaitingVote": "Awaiting vote"
 	},
 	"analytics": {
 		"loading": "Computing analytics…",
@@ -84,5 +85,7 @@
 	"errors": {
 		"startFailed": "Failed to start battle",
 		"voteFailed": "Failed to submit vote"
-	}
+	},
+	"tokensUsed": "{{value}} tokens",
+	"modelFallback": "Model {{label}}"
 }

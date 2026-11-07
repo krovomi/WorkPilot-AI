@@ -46,6 +46,8 @@ import {
 } from "./formula-utils";
 import { SuccessRing } from "./SuccessRing";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 // Generous cap: the full catalog is ~275 formulas, all renderable in the
 // scrollable table. The "+N more" hint only triggers for pathological sets.
 const MAX_ROWS = 500;
@@ -288,9 +290,9 @@ export function FormulaLab() {
 								{/* Cost provenance: states whether figures are calibrated on
 								    real project runs or fall back to heuristic volumes. */}
 								<p
-									className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+									className={`mt-2 flex items-center gap-1.5 text-2xs ${
 										(matrix.history_tasks ?? 0) > 0
-											? "text-emerald-600 dark:text-emerald-400"
+											? "text-success dark:text-success"
 											: "text-muted-foreground"
 									}`}
 								>
@@ -306,7 +308,7 @@ export function FormulaLab() {
 										: t("formulaLab:costBasis.heuristic")}
 								</p>
 								{(matrix.bench_samples ?? 0) > 0 && (
-									<p className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+									<p className="mt-1 flex items-center gap-1.5 text-2xs text-success ">
 										<FlaskConical className="h-3 w-3 shrink-0" />
 										{t("formulaLab:costBasis.bench", {
 											count: matrix.bench_samples,
@@ -314,7 +316,7 @@ export function FormulaLab() {
 									</p>
 								)}
 								{refineError && (
-									<p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+									<p className="mt-1.5 text-2xs text-warning ">
 										{t("formulaLab:refine.error")}
 									</p>
 								)}
@@ -386,18 +388,18 @@ export function FormulaLab() {
 							<div className="flex flex-wrap items-center gap-2 text-xs">
 								<div className="relative">
 									<Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-									<input
+									<Input
 										type="search"
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
 										placeholder={t("formulaLab:filters.searchPlaceholder")}
-										className="h-8 w-44 rounded-md border border-border bg-card pl-7 pr-2 text-xs"
+										className="h-8 w-44 pl-7 pr-2 text-xs"
 									/>
 								</div>
-								<select
+								<NativeSelect
 									value={providerFilter}
 									onChange={(e) => setProviderFilter(e.target.value)}
-									className="h-8 rounded-md border border-border bg-card px-2 text-xs"
+									className="h-8 px-2 text-xs"
 								>
 									<option value="all">{t("formulaLab:filters.allProviders")}</option>
 									{providers.map((p) => (
@@ -405,7 +407,7 @@ export function FormulaLab() {
 											{p}
 										</option>
 									))}
-								</select>
+								</NativeSelect>
 								<div className="flex items-center gap-1">
 									{EFFORT_ORDER.map((effort) => (
 										<button
@@ -438,7 +440,7 @@ export function FormulaLab() {
 							{/* Ranked table */}
 							<div className="overflow-hidden rounded-xl border">
 								<table className="w-full text-xs">
-									<thead className="sticky top-0 z-10 bg-muted text-left text-[11px] text-muted-foreground">
+									<thead className="sticky top-0 z-10 bg-muted text-left text-2xs text-muted-foreground">
 										<tr>
 											{sortHeader("formula", "formulaLab:table.formula")}
 											{sortHeader("effort", "formulaLab:table.effort")}
@@ -478,7 +480,7 @@ export function FormulaLab() {
 																(f.installed ? (
 																	<Badge
 																		variant="outline"
-																		className="gap-1 border-emerald-500/40 text-[9px] text-emerald-600 dark:text-emerald-400"
+																		className="gap-1 border-success/40 text-3xs text-success "
 																		title={t("formulaLab:local.installedTooltip")}
 																	>
 																		<HardDriveDownload className="h-2.5 w-2.5" />
@@ -487,7 +489,7 @@ export function FormulaLab() {
 																) : (
 																	<Badge
 																		variant="outline"
-																		className="gap-1 text-[9px] text-muted-foreground"
+																		className="gap-1 text-3xs text-muted-foreground"
 																		title={t("formulaLab:local.notInstalledTooltip")}
 																	>
 																		<Download className="h-2.5 w-2.5" />
@@ -497,7 +499,7 @@ export function FormulaLab() {
 														</div>
 													</td>
 													<td className="p-2">
-														<Badge variant="outline" className="text-[10px]">
+														<Badge variant="outline" className="text-3xs">
 															{effortLabel(f.effort)}
 														</Badge>
 													</td>
@@ -509,7 +511,7 @@ export function FormulaLab() {
 															{f.cost_basis === "measured" && (
 																<span
 																	title={t("formulaLab:costBasis.measuredTooltip")}
-																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+																	className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-success"
 																/>
 															)}
 															{formatCostBand(f)}
@@ -533,7 +535,7 @@ export function FormulaLab() {
 														<Button
 															size="sm"
 															variant={isSel ? "default" : "ghost"}
-															className="h-7 text-[11px]"
+															className="h-7 text-2xs"
 															disabled={applying}
 															onClick={(e) => {
 																e.stopPropagation();
@@ -549,7 +551,7 @@ export function FormulaLab() {
 									</tbody>
 								</table>
 								{ranked.length > MAX_ROWS && (
-									<div className="border-t bg-muted/30 p-2 text-center text-[11px] text-muted-foreground">
+									<div className="border-t bg-muted/30 p-2 text-center text-2xs text-muted-foreground">
 										{t("formulaLab:table.more", {
 											count: ranked.length - MAX_ROWS,
 										})}

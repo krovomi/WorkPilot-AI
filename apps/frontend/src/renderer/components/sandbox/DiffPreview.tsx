@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import type { FileDiff } from "../../../shared/types/sandbox";
+import { useTranslation } from "react-i18next";
 
 interface DiffPreviewProps {
 	readonly diffs: FileDiff[];
@@ -15,9 +16,9 @@ const CHANGE_ICON: Record<string, string> = {
 };
 
 const CHANGE_COLORS: Record<string, string> = {
-	added: "text-green-400",
+	added: "text-success",
 	modified: "text-blue-400",
-	deleted: "text-red-400",
+	deleted: "text-destructive",
 	renamed: "text-purple-400",
 };
 
@@ -25,6 +26,7 @@ export function DiffPreview({
 	diffs,
 	onFileSelect,
 }: DiffPreviewProps): React.ReactElement {
+	const { t } = useTranslation();
 	const [selectedFile, setSelectedFile] = useState<string | null>(
 		diffs[0]?.filePath ?? null,
 	);
@@ -40,17 +42,17 @@ export function DiffPreview({
 	}
 
 	return (
-		<div className="flex h-full bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex h-full bg-background text-foreground">
 			{/* File list sidebar */}
-			<div className="w-64 border-r border-(--border-color) overflow-y-auto">
-				<div className="px-3 py-2 border-b border-(--border-color)">
-					<p className="text-xs text-(--text-secondary)">
-						{diffs.length} files changed
+			<div className="w-64 border-r border-border overflow-y-auto">
+				<div className="px-3 py-2 border-b border-border">
+					<p className="text-xs text-muted-foreground">
+						{t("sandbox:diffPreview.filesChanged", { count: diffs.length })}
 					</p>
 					<p className="text-xs">
-						<span className="text-green-400">+{totalAdditions}</span>
+						<span className="text-success">+{totalAdditions}</span>
 						{" / "}
-						<span className="text-red-400">-{totalDeletions}</span>
+						<span className="text-destructive">-{totalDeletions}</span>
 					</p>
 				</div>
 				{diffs.map((diff) => (
@@ -58,9 +60,9 @@ export function DiffPreview({
 						key={diff.filePath}
 						type="button"
 						onClick={() => handleSelect(diff.filePath)}
-						className={`w-full text-left px-3 py-2 text-xs hover:bg-(--bg-secondary) flex items-center gap-2 transition-colors ${
+						className={`w-full text-left px-3 py-2 text-xs hover:bg-card flex items-center gap-2 transition-colors ${
 							diff.filePath === selectedFile
-								? "bg-(--bg-secondary)"
+								? "bg-card"
 								: ""
 						}`}
 					>
@@ -72,10 +74,10 @@ export function DiffPreview({
 						<span className="truncate font-mono">
 							{diff.filePath.split("/").pop()}
 						</span>
-						<span className="ml-auto text-green-400">
+						<span className="ml-auto text-success">
 							+{diff.additions}
 						</span>
-						<span className="text-red-400">-{diff.deletions}</span>
+						<span className="text-destructive">-{diff.deletions}</span>
 					</button>
 				))}
 			</div>
@@ -98,9 +100,9 @@ export function DiffPreview({
 							{activeDiff.hunks.map((hunk, _idx) => (
 								<div
 									key={`${activeDiff.filePath}-hunk-${hunk.oldStart}-${hunk.oldCount}-${hunk.newStart}-${hunk.newCount}`}
-									className="rounded-lg border border-(--border-color) overflow-hidden"
+									className="rounded-lg border border-border overflow-hidden"
 								>
-									<div className="px-3 py-1 text-xs bg-(--bg-secondary) text-(--text-secondary) font-mono">
+									<div className="px-3 py-1 text-xs bg-card text-muted-foreground font-mono">
 										@@ -{hunk.oldStart},{hunk.oldCount} +
 										{hunk.newStart},{hunk.newCount} @@
 									</div>
@@ -108,11 +110,11 @@ export function DiffPreview({
 										{hunk.content.split("\n").map((line) => {
 											let lineClass: string;
 											if (line.startsWith("+")) {
-												lineClass = "bg-green-500/10 text-green-300";
+												lineClass = "bg-success/10 text-success";
 											} else if (line.startsWith("-")) {
-												lineClass = "bg-red-500/10 text-red-300";
+												lineClass = "bg-destructive/10 text-destructive";
 											} else {
-												lineClass = "text-[var(--text-secondary)]";
+												lineClass = "text-muted-foreground";
 											}
 											return (
 												<div
@@ -129,8 +131,8 @@ export function DiffPreview({
 						</div>
 					</div>
 				) : (
-					<div className="flex items-center justify-center h-full text-(--text-secondary)">
-						Select a file to view the diff
+					<div className="flex items-center justify-center h-full text-muted-foreground">
+						{t("sandbox:diffPreview.selectFile")}
 					</div>
 				)}
 			</div>

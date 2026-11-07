@@ -53,7 +53,16 @@ export interface NeedsYouListener {
 	left(taskId: string): void;
 }
 
+/** Hears every status the board is told about (`TASK_STATUS_CHANGE`). */
+export type TaskStatusListener = (
+	taskId: string,
+	status: TaskStatus,
+	reviewReason: ReviewReason | undefined,
+	projectId: string | undefined,
+) => void;
+
 export class TaskStateManager {
+	private statusListeners = new Set<TaskStatusListener>();
 	private actors = new Map<string, TaskActor>();
 	private lastSequenceByTask = new Map<string, number>();
 	private lastStateByTask = new Map<string, string>();
@@ -254,6 +263,12 @@ export class TaskStateManager {
 	/** Who hears about the states a person has to act on (`needs-you/`). */
 	setNeedsYouListener(listener: NeedsYouListener | null): void {
 		this.needsYouListener = listener;
+	}
+
+	/** Answers the unsubscribe. A throwing listener never breaks the board. */
+	addStatusListener(listener: TaskStatusListener): () => void {
+		this.statusListeners.add(listener);
+		return () => this.statusListeners.delete(listener);
 	}
 
 	isInPlanReview(taskId: string): boolean {
@@ -460,6 +475,13 @@ export class TaskStateManager {
 		projectId?: string,
 		errorMessage?: string,
 	): void {
+		for (const listener of this.statusListeners) {
+			try {
+				listener(taskId, status, reviewReason, projectId);
+			} catch (error) {
+				console.error("[TaskStateManager] status listener failed:", error);
+			}
+		}
 		if (!this.getMainWindow) {
 			console.warn(
 				`[TaskStateManager] emitStatus: No main window, cannot emit status ${status} for ${taskId}`,
@@ -557,6 +579,12 @@ export class TaskStateManager {
 				stateValue =
 					reviewReason === "plan_review" ? "plan_review" : "human_review";
 				contextReviewReason = reviewReason;
+				break;
+			case "build_failed":
+				// Code finished, CI red: a review state the user or the repair
+				// loop resumes from (USER_RESUMED), not a fresh backlog task.
+				stateValue = "human_review";
+				contextReviewReason = reviewReason ?? "completed";
 				break;
 			case "pr_created":
 				stateValue = "pr_created";

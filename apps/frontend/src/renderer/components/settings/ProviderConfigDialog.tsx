@@ -11,8 +11,11 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
+import { confirmAction } from "../ui/confirm-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { VisuallyHidden } from "../ui/visually-hidden";
+import { isAgentCliTool } from "../../../shared/types/agent-cli";
+import { AgentCliConfigContent } from "./AgentCliConfigContent";
 import { ApiKeyConfigContent } from "./ApiKeyConfigContent";
 import { DialogFooterActions } from "./DialogFooterActions";
 import { GitHubCopilotConfig } from "./GitHubCopilotConfig";
@@ -545,15 +548,16 @@ export function ProviderConfigDialog({
 		}
 	};
 
-	const handleDelete = () => {
+	const handleDelete = async () => {
 		if (!provider || !providerConfig) return;
 
 		if (
-			confirm(
-				t("sections.accounts.providerCard.deleteConfirm", {
+			await confirmAction({
+				title: t("sections.accounts.providerCard.deleteConfirm", {
 					providerName: provider.name,
 				}),
-			)
+				destructive: true,
+			})
 		) {
 			const newSettings = { ...settings };
 
@@ -582,6 +586,28 @@ export function ProviderConfigDialog({
 			onOpenChange(false);
 		}
 	};
+
+	// Coding-agent CLIs (OpenCode, Antigravity, pi, Gemini CLI) have no key
+	// field: they sign in inside the CLI, so they get their own panel.
+	if (provider && isAgentCliTool(provider.id)) {
+		const cliContent = (
+			<AgentCliConfigContent
+				tool={provider.id}
+				providerName={provider.name}
+				description={provider.description}
+				onActivate={onProviderActivated}
+				onClose={() => onOpenChange(false)}
+			/>
+		);
+		if (useSheet) {
+			return <div className="max-h-[93vh] overflow-y-auto pr-1">{cliContent}</div>;
+		}
+		return (
+			<Dialog open={isOpen} onOpenChange={onOpenChange}>
+				<DialogContent className="max-w-[860px]">{cliContent}</DialogContent>
+			</Dialog>
+		);
+	}
 
 	if (!provider || !providerConfig) return null;
 
@@ -700,8 +726,8 @@ export function ProviderConfigDialog({
 											className={cn(
 												"p-3 rounded-lg border",
 												testResult.success
-													? "border-green-200 bg-green-50 text-green-800"
-													: "border-red-200 bg-red-50 text-red-800",
+													? "border-success/30 bg-success/10 text-success"
+													: "border-destructive/30 bg-destructive/10 text-destructive",
 											)}
 										>
 											<div className="flex items-center gap-2">

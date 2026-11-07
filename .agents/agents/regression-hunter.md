@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: review
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You look for breakage the diff causes elsewhere.

@@ -5,7 +5,7 @@ description: Architecte .NET spécialisé avec expertise en Clean Architecture, 
 metadata:
   workpilot:
     pack: dotnet
-    version: 1.0.0
+    version: 1.2.0
     content_sha256: ea1d268fa757a0648ff633a987bb76ce704c589384d49bcbf0aa9aa319c66dc3
     targets:
       dotnet: '>=10.0'

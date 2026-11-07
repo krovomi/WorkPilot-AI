@@ -78,6 +78,7 @@ class TestPhaseWindows:
             "analyze",
             "ui-design-system",
             "mobile-design",
+            "spec-by-example",
         ]
         # `design-check` sits between `coding` and `qa` in the file and is
         # absent here on purpose: `gates.run_deterministic_gates` runs it.
@@ -85,6 +86,7 @@ class TestPhaseWindows:
         assert [r.id for r in post] == [
             "architecture-map",
             "verify-replay",
+            "cross-review",
         ]
 
     def test_the_detector_is_run_by_the_gates_not_by_a_window(self, workflow):
@@ -177,6 +179,7 @@ class TestPhaseWindows:
         assert [r.id for r in post] == [
             "architecture-map",
             "verify-replay",
+            "cross-review",
         ]
 
     def test_phases_owned_by_another_executor_are_stepped_over(self, workflow):
@@ -207,13 +210,15 @@ class TestPhaseWindows:
         post = phases_between(profile, after="qa", before=None)
         assert pre == []
         # `analyze` is bought at medium; `ui-design-system` runs no model, so
-        # no effort level has anything to save by dropping it.
-        assert [r.id for r in planned] == ["ui-design-system"]
+        # no effort level has anything to save by dropping it. The tests
+        # written first are switched on by the project, not by the effort.
+        assert [r.id for r in planned] == ["ui-design-system", "spec-by-example"]
         # `verify` is a hard gate: never pruned, at any level. It runs before
         # QA so the reviewer judges code already seen running.
         assert [r.id for r in mid] == ["verify"]
-        # Its replay costs no token, so no level drops it either.
-        assert [r.id for r in post] == ["verify-replay"]
+        # Its replay costs no token, so no level drops it either; the cross
+        # review is switched on by the project's setting, not by the effort.
+        assert [r.id for r in post] == ["verify-replay", "cross-review"]
 
     def test_every_builtin_phase_named_here_exists_in_the_workflow(self, workflow):
         declared = {p.id for p in workflow.phases}
@@ -560,7 +565,7 @@ class TestAnalyzePhase:
 
     Everything here is about *when* and *how* it runs. What it looks for is in
     the skill body; what a parser can already answer is in
-    `spec.traceability`, and the skill is told to read that rather than
+    `foundation.traceability`, and the skill is told to read that rather than
     recompute it.
     """
 

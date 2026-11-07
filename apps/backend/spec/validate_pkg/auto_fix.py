@@ -12,8 +12,9 @@ from pathlib import Path
 
 from core.plan_normalization import normalize_subtask_aliases
 from foundation.file_utils import write_json_atomic
+from foundation.json_document import extract_json_document
 
-from ..plan_recovery import extract_json_document, normalize_plan_shape
+from ..plan_recovery import normalize_plan_shape
 
 
 def _repair_json_syntax(content: str) -> str | None:

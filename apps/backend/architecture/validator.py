@@ -13,7 +13,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_section,
+    debug_success,
+    debug_warning,
+)
 
 from .config import infer_architecture_config, load_architecture_config
 from .models import ArchitectureViolation
@@ -205,7 +211,7 @@ def _get_changed_files(project_dir: Path, spec_dir: Path) -> list[str] | None:
 
 
 def _detect_base_branch(spec_dir: Path, project_dir: Path) -> str:
-    """Detect the base branch for git diff. Reuses prompts_pkg logic.
+    """Detect the base branch for git diff (``foundation.base_branch``).
 
     Hard-coded `main` fallback was wrong for repos using `master`/`develop`
     (this very repo's main branch is `develop`!). When the import fails we
@@ -214,7 +220,7 @@ def _detect_base_branch(spec_dir: Path, project_dir: Path) -> str:
     the previous behavior on totally fresh repos.
     """
     try:
-        from prompts_pkg.prompts import _detect_base_branch as _detect
+        from foundation.base_branch import detect_base_branch as _detect
 
         return _detect(spec_dir, project_dir)
     except ImportError:

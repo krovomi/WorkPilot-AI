@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: kanban
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are a senior code reviewer focused on quality, security, and maintainability.

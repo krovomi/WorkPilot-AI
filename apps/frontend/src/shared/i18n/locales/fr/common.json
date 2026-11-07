@@ -1,4 +1,7 @@
 {
+	"sharedAnalysis": {
+		"lastReport": "Rapport partagé sur le serveur, lancé le {{date}}"
+	},
 	"selectSearch": {
 		"placeholder": "Saisir pour filtrer…",
 		"empty": "Aucun résultat"
@@ -19,7 +22,9 @@
 		"missingPathDescription": "Le projet a peut-être été déplacé ou supprimé. Sélectionnez le nouveau dossier pour le récupérer, ou retirez-le de l'application.",
 		"missingPathFix": "Réparer ce projet",
 		"missingPathFixAction": "Re-pointer…",
-		"missingPathRemove": "Retirer"
+		"missingPathRemove": "Retirer",
+		"scrollLeft": "Défiler vers la gauche",
+		"scrollRight": "Défiler vers la droite"
 	},
 	"accessibility": {
 		"deleteFeatureAriaLabel": "Supprimer la fonctionnalité",
@@ -68,7 +73,8 @@
 	},
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
-		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible"
+		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible",
+		"commentLine": "Commenter la ligne {{line}}"
 	},
 	"buttons": {
 		"save": "Enregistrer",
@@ -157,7 +163,9 @@
 		"selectAll": "Tout sélectionner",
 		"clearSelection": "Effacer la sélection",
 		"deleteSelected": "Supprimer la sélection",
-		"selectedOfTotal": "{{selected}} sur {{total}} sélectionné(s)"
+		"selectedOfTotal": "{{selected}} sur {{total}} sélectionné(s)",
+		"tasksCount_one": "{{count}} tâche",
+		"tasksCount_other": "{{count}} tâches"
 	},
 	"errors": {
 		"generic": "Une erreur s'est produite",
@@ -245,8 +253,15 @@
 			"whatHappenedDesc": "L'opération {{source}} a été arrêtée parce que votre compte Claude ({{account}}) a atteint sa limite d'utilisation.",
 			"switchRetryOrAdd": "Vous pouvez basculer vers un autre compte et réessayer, ou ajouter plus de comptes ci-dessus.",
 			"addOrWait": "Ajoutez un autre compte Claude ci-dessus pour continuer à travailler, ou attendez la réinitialisation de la limite.",
-			"close": "Fermer"
-		}
+			"close": "Fermer",
+			"recommendedBefore": "Recommandé :",
+			"recommendedAfter": "dispose de plus de capacité.",
+			"addClaudeSubscription": "Ajoutez un autre abonnement Claude pour basculer automatiquement quand vous atteignez la limite.",
+			"willOpenClaudeLogin": "La connexion Claude va s'ouvrir pour authentifier le nouveau compte.",
+			"switchClaudeRetry": "Passez à un autre compte Claude et relancez l'opération :",
+			"connectClaude": "Connectez un compte Claude :"
+		},
+		"recommendedAria": "Recommandé"
 	},
 	"prReview": {
 		"reviewing": "Révision en cours",
@@ -449,7 +464,11 @@
 			"gatheringTime": "Contexte collecté en {{ms}}ms",
 			"noContext": "Pas de contexte profond disponible",
 			"canImportFrom": "Peut importer depuis : {{imports}}"
-		}
+		},
+		"deepContextSections_one": "{{count}} section",
+		"deepContextSections_other": "{{count}} sections",
+		"verdictOutdated": "Le verdict de l'IA est peut-être dépassé",
+		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés."
 	},
 	"downloads": {
 		"toggleExpand": "Basculer les détails de téléchargement",
@@ -639,7 +658,12 @@
 		"lensAuto": "Automatique",
 		"lensAutoWith": "Automatique ({{provider}})",
 		"lensRunning": "{{provider}} — en cours",
-		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche."
+		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche.",
+		"debugProvider": "fournisseur :",
+		"needsReauthTitle": "Nouvelle authentification nécessaire",
+		"sessionUsage": "Utilisation de la session",
+		"weeklyUsage": "Utilisation hebdomadaire",
+		"inOut": "{{model}} : {{input}} en entrée, {{output}} en sortie"
 	},
 	"oauth": {
 		"enterCode": "Saisie de code manuelle (Fallback)",
@@ -856,7 +880,9 @@
 		"hoursAgo_other": "il y a {{count}} h",
 		"daysAgo": "il y a {{count}} j",
 		"daysAgo_one": "il y a {{count}} j",
-		"daysAgo_other": "il y a {{count}} j"
+		"daysAgo_other": "il y a {{count}} j",
+		"today": "Aujourd'hui",
+		"yesterday": "Hier"
 	},
 	"test": "Test",
 	"refresh": "Actualiser",
@@ -883,7 +909,7 @@
 	"delete": "Supprimer",
 	"mcpMarketplace": {
 		"title": "Marketplace MCP",
-		"subtitle": "L'écosystème d'intégrations universel. Découvrez, installez et créez des serveurs MCP.",
+		"subtitle": "Branchez vos agents sur vos outils : chaque serveur du catalogue a été vérifié auprès de son paquet ou de la doc de l'éditeur. Installer l'ajoute au projet sélectionné.",
 		"installedCount": "installé(s)",
 		"refresh": "Actualiser",
 		"tabs": {
@@ -903,16 +929,15 @@
 			"cloud": "Cloud",
 			"security": "Sécurité",
 			"analytics": "Analytique",
-			"ai": "IA & ML"
+			"ai": "IA & ML",
+			"testing": "Navigateur et tests",
+			"web": "Recherche web"
 		},
 		"sort": {
-			"popular": "Les plus populaires",
-			"rating": "Les mieux notés",
-			"newest": "Les plus récents",
+			"featured": "À la une",
 			"name": "Nom A-Z"
 		},
 		"searchPlaceholder": "Rechercher des serveurs MCP...",
-		"verifiedOnly": "Vérifiés",
 		"noResults": "Aucun serveur trouvé",
 		"noResultsHint": "Essayez d'ajuster votre recherche ou vos filtres.",
 		"install": "Installer",
@@ -925,16 +950,18 @@
 		"homepage": "Page d'accueil",
 		"installDialog": {
 			"title": "Installer {{name}}",
-			"description": "Configurez les variables d'environnement requises pour finaliser l'installation.",
-			"optional": "Optionnel"
+			"description": "Le serveur est ajouté au projet {{project}}. Les valeurs sont enregistrées dans le .workpilot/.env du projet.",
+			"optional": "Facultatif",
+			"agents": "Agents qui l'utilisent",
+			"agentsHint": "Modifiable plus tard dans Outils des agents.",
+			"noAgent": "Choisissez au moins un agent."
 		},
 		"installedTab": {
-			"empty": "Aucun serveur installé",
-			"emptyHint": "Parcourez le catalogue pour découvrir et installer des serveurs MCP.",
-			"custom": "Personnalisé",
-			"since": "Installé le {{date}}",
-			"enable": "Activer le serveur",
-			"disable": "Désactiver le serveur"
+			"empty": "Aucun serveur MCP dans ce projet",
+			"emptyHint": "Installez-en un depuis le catalogue, ou ajoutez le vôtre dans Outils des agents.",
+			"custom": "Ajouté à la main",
+			"usedBy": "Utilisé par : {{agents}}",
+			"notUsed": "Aucun agent ne l'utilise encore : assignez-le dans Outils des agents."
 		},
 		"builder": {
 			"newProject": "Nouveau serveur",
@@ -959,7 +986,29 @@
 			"noParams": "Aucun paramètre défini.",
 			"selectTool": "Sélectionnez un outil pour modifier sa configuration.",
 			"welcome": "Constructeur de serveurs MCP",
-			"welcomeHint": "Créez des serveurs MCP personnalisés visuellement. Définissez des outils, des paramètres et des actions HTTP sans écrire de code."
+			"welcomeHint": "Créez des serveurs MCP personnalisés visuellement. Définissez des outils, des paramètres et des actions HTTP sans écrire de code.",
+			"namePlaceholder": "Mon serveur personnalisé",
+			"descriptionPlaceholder": "Que fait ce serveur ?",
+			"toolDescriptionPlaceholder": "Récupérer une liste d'utilisateurs",
+			"httpRequest": "Requête HTTP",
+			"transform": "Transformation",
+			"httpConfiguration": "Configuration HTTP",
+			"transformTemplate": "Modèle de transformation",
+			"transformPlaceholder": "Modèle de transformation des données d'entrée...",
+			"paramDescriptionPlaceholder": "Description"
+		},
+		"officialOnly": "Officiels",
+		"official": "Officiel",
+		"community": "Communauté",
+		"noProject": "Sélectionnez un projet : les serveurs s'installent par projet.",
+		"requires": {
+			"uv": "Nécessite uv (uvx) sur cette machine.",
+			"az": "Nécessite Azure CLI, connecté avec az login."
+		},
+		"agents": {
+			"planner": "Planificateur",
+			"coder": "Codeur",
+			"qa_reviewer": "Relecteur QA"
 		}
 	},
 	"terminalGrid": {
@@ -970,22 +1019,26 @@
 		"files": "Fichiers",
 		"agentTerminals": "Terminaux agents",
 		"emptyDescription": "Lancez plusieurs terminaux pour exécuter des agents Claude en parallèle. Utilisez Ctrl+T pour créer un nouveau terminal.",
-		"count": "{{count}} / 12 terminaux"
+		"count": "{{count}} / 12 terminaux",
+		"sessionCount_one": "{{count}} session",
+		"sessionCount_other": "{{count}} sessions",
+		"emptyAria": "Grille de terminaux vide",
+		"loadingAria": "Chargement des terminaux...",
+		"defaultTitle": "Terminal"
 	},
 	"agnosticUsage": {
 		"genericError": "Une erreur s'est produite"
 	},
 	"pluginMarketplace": {
 		"title": "Marketplace de Plugins",
-		"subtitle": "Étendez WorkPilot avec des agents, intégrations et plus créés par la communauté",
+		"subtitle": "Des skills prêts à l'emploi pour vos agents : installé, un plugin arrive dans le .agents/skills du projet (et .claude/skills), utilisable en commande / dans le Kanban et par Codex, Claude Code et pi.",
 		"installedBadge": "{{count}} installé(s)",
 		"searchPlaceholder": "Rechercher des plugins...",
 		"noResults": "Aucun plugin ne correspond à votre recherche",
 		"resultsCount": "{{count}} plugins",
 		"noInstalledPlugins": "Aucun plugin installé",
-		"browseToInstall": "Parcourez le catalogue pour installer votre premier plugin",
+		"browseToInstall": "Parcourez le catalogue pour installer votre premier plugin dans ce projet",
 		"installedCount": "{{count}} plugins installés",
-		"installedOn": "Installé le {{date}}",
 		"tabs": {
 			"catalog": "Catalogue",
 			"installed": "Installés",
@@ -999,13 +1052,10 @@
 			"customPrompt": "Prompt Personnalisé"
 		},
 		"filters": {
-			"all": "Tous",
-			"verified": "Vérifiés uniquement"
+			"all": "Tous"
 		},
 		"sort": {
-			"popular": "Les plus populaires",
-			"rating": "Mieux notés",
-			"newest": "Les plus récents",
+			"featured": "À la une",
 			"name": "A–Z"
 		},
 		"actions": {
@@ -1082,11 +1132,20 @@
 			"successDesc": "Votre plugin « {{name}} » a été généré avec succès.",
 			"openFolder": "Ouvrir le dossier",
 			"openFolderFailed": "Impossible d’ouvrir le dossier du plugin",
-			"done": "Terminé"
-		}
+			"done": "Terminé",
+			"namePlaceholder": "Mon super plugin",
+			"untitled": "Sans titre"
+		},
+		"byAuthor": "par {{author}}",
+		"noProject": "Sélectionnez un projet : les plugins s'installent dans les skills d'un projet.",
+		"installedIn": "Dans {{paths}}",
+		"howToUse": "Lancez-le avec /{{id}} dans la barre de commandes du Kanban, ou laissez l'agent s'en servir.",
+		"showSkill": "Voir le skill",
+		"hideSkill": "Masquer le skill"
 	},
 	"chatHistory": {
 		"title": "Historique des conversations",
+		"byTeammate": "Par {{name}}, en lecture seule",
 		"noConversations": "Aucune conversation pour le moment",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier",
@@ -1174,6 +1233,10 @@
 			"search_tasks": {
 				"label": "Rechercher des tâches",
 				"description": "Rechercher et filtrer les tâches"
+			},
+			"voice_assistant": {
+				"label": "Assistant vocal",
+				"description": "Dites une commande : ouvrir une fonctionnalité, créer une tâche…"
 			},
 			"go_kanban": {
 				"label": "Aller au Kanban",
@@ -1295,6 +1358,183 @@
 				"label": "Exporter un rapport",
 				"description": "Exporter le rapport du projet en JSON ou CSV"
 			}
+		}
+	},
+	"serverLogin": {
+		"title": "Connexion au serveur WorkPilot",
+		"description": "Connectez-vous à un serveur partagé, ou continuez en mode local.",
+		"serverUrl": "URL du serveur",
+		"entraButton": "Se connecter avec Microsoft",
+		"email": "Email",
+		"password": "Mot de passe",
+		"localAccountButton": "Connexion",
+		"localModeButton": "Mode local",
+		"haveInvite": "J'ai une invitation"
+	},
+	"acceptInvite": {
+		"title": "Créer votre compte",
+		"description": "Utilisez le lien d'invitation reçu pour définir votre mot de passe.",
+		"tokenLabel": "Lien ou code d'invitation",
+		"displayName": "Nom affiché",
+		"passwordHint": "Au moins 12 caractères. Évitez un mot de passe déjà utilisé ailleurs.",
+		"strength0": "Très faible",
+		"strength1": "Faible",
+		"strength2": "Moyen",
+		"strength3": "Bon",
+		"strength4": "Fort",
+		"confirm": "Confirmer le mot de passe",
+		"mismatch": "Les mots de passe ne correspondent pas",
+		"invalidToken": "Invitation introuvable ou expirée",
+		"failed": "Impossible de créer le compte",
+		"submit": "Créer mon compte",
+		"back": "Retour"
+	},
+	"fileExplorer": {
+		"title": "Fichiers du projet",
+		"dragHint": "Glissez des fichiers dans un terminal pour y insérer leur chemin",
+		"currentRoot": "Racine actuelle : {{path}}",
+		"parent": "⬆ Dossier parent",
+		"noFolders": "Aucun dossier trouvé.",
+		"checkPath": "Vérifiez le chemin ou vos droits d'accès.",
+		"dragReferences": "Glissez des fichiers pour les ajouter en référence"
+	},
+	"imageUpload": {
+		"largeFile": "Fichier volumineux : pensez à le compresser",
+		"limits": "{{types}}, 10 Mo max. chacune ({{count}}/{{max}})",
+		"maxImages": "{{max}} images au maximum",
+		"dropOrBrowse": "Déposez des images ici ou cliquez pour parcourir",
+		"maxReached": "Nombre maximal d'images atteint"
+	},
+	"shortcutsOverlay": {
+		"title": "Raccourcis clavier",
+		"pressBefore": "Appuyez sur",
+		"escapeKey": "Échap",
+		"pressAfter": "pour fermer · Les raccourcis à une touche marchent hors d'un champ de saisie"
+	},
+	"learningMode": {
+		"level": "Niveau : {{level}}",
+		"whyNot": "Pourquoi pas retenu : {{reason}}",
+		"codeExample": "Exemple de code :",
+		"diagram": "Diagramme :",
+		"alternatives": "Approches alternatives :",
+		"learnMore": "Pour en savoir plus :",
+		"title": "Mode apprentissage",
+		"explanationLevel": "Niveau d'explication",
+		"active": "Actif"
+	},
+	"qualityScore": {
+		"scoreLine": "{{score}}/100 (note : {{grade}})",
+		"title": "Score de qualité du code",
+		"passing": "✅ Réussi",
+		"failed": "❌ Échoué"
+	},
+	"githubIssues": {
+		"autoFix": {
+			"specCreated": "Spec créée à partir de l'issue",
+			"retry": "Relancer la correction auto",
+			"button": "Correction auto",
+			"processing_one": "Traitement de {{count}} issue...",
+			"processing_other": "Traitement de {{count}} issues...",
+			"newIssues": "Corriger auto. les nouvelles",
+			"newIssuesDescription": "Corriger automatiquement les nouvelles issues dès leur arrivée.",
+			"failed": "La correction auto a échoué",
+			"processingShort": "Traitement..."
+		},
+		"batch": {
+			"percentComplete": "{{percent}} % effectués",
+			"andMore": "...et {{count}} de plus",
+			"selectedBatches_one": "{{count}} lot sélectionné ({{issues}} issues)",
+			"selectedBatches_other": "{{count}} lots sélectionnés ({{issues}} issues)",
+			"plusSingle_one": "+ {{count}} issue isolée",
+			"plusSingle_other": "+ {{count}} issues isolées",
+			"approveCreate": "Approuver et créer ({{count}})",
+			"issueCount": "{{count}} issues",
+			"similar": "{{percent}} % similaire",
+			"title": "Analyser et regrouper les issues",
+			"intro": "Jusqu'à 200 issues ouvertes seront analysées et les similaires regroupées ; vous relirez les lots proposés avant toute création de tâche.",
+			"start": "Lancer l'analyse",
+			"analyzing": "Analyse des issues...",
+			"issuesAnalyzed": "issues analysées",
+			"batchesProposed": "lots proposés",
+			"singleIssues": "issues isolées",
+			"deselectAll": "Tout désélectionner",
+			"singleIssuesTitle": "Issues isolées (non regroupées)",
+			"creating": "Création des lots...",
+			"creatingDescription": "Préparation des lots d'issues approuvés pour leur traitement.",
+			"created": "Lots créés",
+			"createdDescription": "Les lots d'issues sélectionnés sont prêts à être traités.",
+			"tooltip": "Analyser jusqu'à 200 issues ouvertes, regrouper les similaires et relire les lots proposés avant de créer des tâches.",
+			"approveCreateCount_one": "Approuver et créer ({{count}} lot)",
+			"approveCreateCount_other": "Approuver et créer ({{count}} lots)",
+			"defaultName": "Lot {{number}}",
+			"computing": "Calcul des similarités et validation des lots...",
+			"stepIntro": "Analyser les issues ouvertes et regrouper les similaires pour un traitement par lots.",
+			"stepAnalyzing": "Analyse de la similarité sémantique des issues...",
+			"stepReview": "Relisez et approuvez les lots d'issues proposés.",
+			"stepCreating": "Création des lots approuvés...",
+			"stepDone": "Les lots ont été créés."
+		},
+		"notConnected": "GitHub non connecté",
+		"investigation": {
+			"selectComments": "Commentaires à inclure ({{selected}}/{{total}})",
+			"issueTitle": "Issue #{{number}} : {{title}}",
+			"loadCommentsFailed": "Impossible de charger les commentaires",
+			"willInclude": "La tâche contiendra :",
+			"includeTitle": "• Titre et description de l'issue",
+			"includeLink": "• Lien vers l'issue GitHub",
+			"includeLabels": "• Labels et métadonnées de l'issue",
+			"includeNoComments": "• Aucun commentaire (cette issue n'en a pas)",
+			"title": "Créer une tâche depuis l'issue",
+			"description": "Créer une tâche à partir de cette issue GitHub. Elle sera ajoutée à la colonne Backlog de votre tableau Kanban.",
+			"created": "Tâche créée ! Retrouvez-la sur votre tableau Kanban."
+		},
+		"createTask": "Créer la tâche",
+		"done": "Terminé",
+		"commentsCount": "{{count}} commentaires",
+		"taskId": "ID de tâche : {{id}}",
+		"viewTask": "Voir la tâche",
+		"taskLinked": "Tâche liée",
+		"assignees": "Assignés",
+		"milestone": "Jalon",
+		"openCount": "{{count}} ouvertes",
+		"searchPlaceholder": "Rechercher des issues...",
+		"filters": {
+			"open": "Ouvertes",
+			"closed": "Fermées",
+			"all": "Toutes"
+		},
+		"noMatch": "Aucune issue ne correspond à votre recherche",
+		"notConnectedDescription": "Configurez votre jeton GitHub et votre dépôt dans les paramètres du projet pour synchroniser les issues."
+	},
+	"prLogs": {
+		"entries": "({{count}} entrées)",
+		"live": "En direct",
+		"pending": "En attente",
+		"complete": "Terminé",
+		"failed": "Échec",
+		"empty": "Aucun journal pour l'instant",
+		"less": "Moins",
+		"more": "Plus",
+		"streaming": "Diffusion",
+		"running": "En cours"
+	},
+	"githubCopilot": {
+		"authTerminal": {
+			"failedToCreate": "Échec de la création du terminal",
+			"unknownError": "Erreur inconnue",
+			"instructionTitle": "Authentification GitHub Copilot",
+			"step1": "Appuyez sur Entrée pour lancer gh auth login",
+			"step2": "Terminez la connexion dans votre navigateur",
+			"step3": "Revenez ici : la connexion est détectée seule",
+			"authFailed": "Échec de l'authentification",
+			"connecting": "Connexion…",
+			"authenticate": "Authentifier : {{profileName}}",
+			"completeSetup": "Configurer : {{profileName}}",
+			"authenticatedAs": "Authentifié en tant que {{username}}",
+			"authenticated": "Authentifié !",
+			"authError": "Erreur d'authentification",
+			"authenticatingMessage": "Terminez la connexion dans votre navigateur…",
+			"successMessage": "Authentification réussie ! Fermeture…"
 		}
 	}
 }

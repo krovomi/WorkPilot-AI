@@ -17,7 +17,10 @@ import os
 import re
 from pathlib import Path
 
+from foundation.change_scope import is_text_only_path
 from foundation.dotnet_tools import generate_dotnet_env_section
+from foundation.human_input import human_input_section, read_human_input
+from foundation.steering import PersonNotes
 
 # Stack-aware automatic test planning (API contract / WinForms UI / web E2E
 # tests derived from the touched files + installed libraries). Optional: the
@@ -57,8 +60,18 @@ def subtask_is_tdd_eligible(subtask: dict, phase: dict) -> bool:
 
     Eligible when its verification can be proven by an automated test/command
     and the phase actually produces production code. Manual/none/browser
-    verifications and investigation/setup/cleanup phases keep the classic flow.
+    verifications and investigation/setup/cleanup phases keep the classic flow,
+    and so does a subtask whose files are all plain text or documentation
+    (`foundation.change_scope.is_text_only_path`): there is no behaviour to
+    drive with a test, and a test asserting a `.txt` holds "OK" restates the
+    file at the price of a full red-green-refactor session.
     """
+    files = [
+        *(subtask.get("files_to_create") or []),
+        *(subtask.get("files_to_modify") or []),
+    ]
+    if files and all(isinstance(f, str) and is_text_only_path(f) for f in files):
+        return False
     verification = subtask.get("verification") or {}
     v_type = (verification.get("type") or "manual").lower()
     phase_type = (phase.get("type") or "").lower()
@@ -246,6 +259,69 @@ not `git add apps/frontend/src/file.ts`. Prefer staying at the working directory
     return "".join(sections)
 
 
+def _manual_verification_section(verification: dict) -> str:
+    """The verification step of a ``manual`` (or unknown) verification.
+
+    The agent runs the check itself whenever its tools can (read a file, run a
+    command or the tests, in any language or stack). Only a check that needs a
+    person (a device, an account, a judgement on a screen it cannot open)
+    blocks the subtask, with a reason the person can act on: the subtask panel
+    shows it next to the buttons that unblock it.
+    """
+    instructions = (
+        verification.get("instructions")
+        or verification.get("run")
+        or verification.get("scenario")
+        or "Check that the subtask's description is met."
+    )
+    return f"""**Verification:** {instructions}
+
+1. Run this check yourself with your tools whenever you can: read the files,
+   run the command, the build or the tests. Most checks can be run this way.
+2. When it passes, set this subtask's status to "completed" in
+   implementation_plan.json. When it fails, fix the cause, then check again.
+3. Only when the check truly needs a person (a physical device, an account or
+   credentials you do not have, a judgement on a screen you cannot open), set
+   the status to "blocked" and add `"blocked_reason"`: one or two sentences,
+   for that person, saying exactly what to check or provide. Never block a
+   check you could run, and never ask a question and wait: the build goes on.
+"""
+
+
+def _human_reply_section(subtask: dict) -> str:
+    """What the person answered when they sent this subtask back, if anything.
+
+    The reply comes from the subtask panel (``foundation.subtask_unblock``):
+    the person who owns the task wrote it, so it is an instruction, unlike
+    the content of the repository.
+    """
+    reply = subtask.get("human_reply")
+    if not isinstance(reply, str) or not reply.strip():
+        if subtask.get("unblocked_at"):
+            return (
+                "## Sent back by the person\n\nThis subtask was blocked; the "
+                "person asked you to try again. Use a different approach.\n"
+            )
+        return ""
+    return f"""## Reply from the person
+
+This subtask was blocked. The person answered, and sent it back to you:
+
+> {reply.strip().replace(chr(10), chr(10) + "> ")}
+
+Follow this answer. It overrides the earlier reason for the block.
+"""
+
+
+def _preview_quote(spec_dir):
+    """Quote a steering message's preview element (F10) as untrusted data."""
+    from security.untrusted import quote_untrusted
+
+    return lambda context: quote_untrusted(
+        context, kind="preview_element", source="task preview", spec_dir=spec_dir
+    )
+
+
 def generate_subtask_prompt(
     spec_dir: Path,
     project_dir: Path,
@@ -253,6 +329,7 @@ def generate_subtask_prompt(
     phase: dict,
     attempt_count: int = 0,
     recovery_hints: list[str] | None = None,
+    human_input: str | PersonNotes | None = None,
 ) -> str:
     """
     Generate a minimal, focused prompt for implementing a single subtask.
@@ -264,6 +341,10 @@ def generate_subtask_prompt(
         phase: The phase containing this subtask
         attempt_count: Number of previous attempts (for retry context)
         recovery_hints: Hints from previous failed attempts
+        human_input: What the person said, as the orchestrator read it (it
+            marks what it delivered): the ``PersonNotes`` of
+            ``HUMAN_INPUT.md`` and the steering queue, or the text of
+            ``HUMAN_INPUT.md`` alone; ``None`` reads ``spec_dir``'s copy
 
     Returns:
         A focused prompt string (~100 lines instead of 900)
@@ -301,6 +382,16 @@ def generate_subtask_prompt(
 {description}
 """)
 
+    # What the person wrote after stopping the build (`foundation.human_input`).
+    # First after the description: it is the most recent word on the task.
+    # Then what the person sent while it ran (`foundation.steering`).
+    if isinstance(human_input, PersonNotes):
+        sections.extend(human_input.sections(_preview_quote(spec_dir)))
+    elif instructions := human_input_section(
+        read_human_input(spec_dir) if human_input is None else human_input
+    ):
+        sections.append(instructions)
+
     # TDD banner (only when strict TDD applies to this subtask)
     if tdd_active:
         sections.append("""
@@ -323,6 +414,17 @@ You MUST use a DIFFERENT approach than previous attempts.
             for hint in recovery_hints:
                 sections.append(f"- {hint}")
             sections.append("")
+
+    reply = _human_reply_section(subtask)
+    if reply:
+        sections.append(reply)
+
+    # What the worktree's recipe left undone, and the task's ports: read
+    # before the first build, not discovered by it (core/workspace/recipe_run.py).
+    from core.workspace.recipe_run import setup_prompt_section
+
+    if setup := setup_prompt_section(project_dir):
+        sections.append(setup)
 
     # Files section
     sections.append("## Files\n")
@@ -399,30 +501,13 @@ Verify:""")
         for i, step in enumerate(steps, 1):
             sections.append(f"{i}. {step}")
         sections.append("")
+    elif v_type == "none":
+        sections.append(
+            "No separate verification step: once the work in the description is "
+            "done, mark the subtask completed.\n"
+        )
     else:
-        instructions = verification.get("instructions", "Manual verification required")
-        sections.append(f"**Manual Verification (Autonomous Mode):**\n{instructions}\n")
-        sections.append("""
-🚫 **CRITICAL - YOU MUST FOLLOW THESE STEPS EXACTLY:**
-
-This subtask requires MANUAL TESTING. You CANNOT automate it.
-
-**YOUR EXACT ACTIONS (in this order, NO EXCEPTIONS):**
-1. Set this subtask's status to "blocked" in implementation_plan.json
-2. Add "_blocked_reason": "Manual testing required - awaiting QA team" to the subtask
-3. DO NOT ask any questions to the user
-4. DO NOT wait for confirmation
-5. Simply update the file and complete
-
-**YOU MUST NOT:**
-- Ask "should I mark this as blocked?"
-- Request user input or confirmation
-- Leave the status as pending or in_progress
-- Wait for user response
-
-The build system will automatically continue to the next subtask.
-This is not optional - it's a requirement for autonomous operation.
-""")
+        sections.append(_manual_verification_section(verification))
 
     # Instructions — TDD cycle when strict TDD applies, classic flow otherwise
     if tdd_active:
@@ -635,7 +720,9 @@ produce so the coding agent can work test-first:
    the coder knows to enforce the red-green-refactor cycle.
 
 Setup, investigation, cleanup, and purely manual/visual subtasks are exempt and keep
-their normal verification.
+their normal verification. So is a subtask that only creates or edits plain text or
+documentation (`.txt`, `.md`, `.rst`, README, LICENSE…): no test file, no `"tdd"`
+flag — give it a one-line `command` verification that reads the file instead.
 """
 
 

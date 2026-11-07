@@ -1,6 +1,8 @@
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
+import { SharedReportNote } from "../analyses/SharedReportNote";
 import {
 	useAccessibilityStore,
 	type WcagTargetLevel,
@@ -17,10 +19,11 @@ import {
 	SelectValue,
 } from "../ui/select";
 
+import { Input } from "../ui/input";
 const SEVERITY_STYLES: Record<A11ySeverity, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	serious: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	moderate: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	moderate: "text-warning bg-warning/10 border-warning/20",
 	minor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -47,9 +50,12 @@ export function A11yReportView({
 
 	const isScanning = phase === "scanning";
 	const canRun = !!projectPath && !isScanning;
+	const setReport = useAccessibilityStore((s) => s.setReport);
+	// A server project's last report, saved on the server by any member.
+	const shared = useSharedAnalysisReport("accessibility", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<Toolbar
 				targetLevel={targetLevel}
 				onTargetLevelChange={setTargetLevel}
@@ -63,20 +69,22 @@ export function A11yReportView({
 				t={t}
 			/>
 
+			{!isScanning && <SharedReportNote saved={shared} />}
+
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -87,7 +95,7 @@ export function A11yReportView({
 				</div>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -122,7 +130,7 @@ function Toolbar({
 	return (
 		<div className="flex items-center gap-3 flex-wrap">
 			<div className="flex items-center gap-2">
-				<span className="text-sm text-(--text-secondary)">{t("levels.label")}</span>
+				<span className="text-sm text-muted-foreground">{t("levels.label")}</span>
 				<Select
 					value={targetLevel}
 					disabled={disabled}
@@ -143,7 +151,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 				>
 					{t("actions.cancel")}
 				</button>
@@ -152,7 +160,7 @@ function Toolbar({
 					type="button"
 					onClick={onRun}
 					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 				>
 					{t("actions.runScan")}
 				</button>
@@ -162,7 +170,7 @@ function Toolbar({
 				<button
 					type="button"
 					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 				>
 					{t("actions.reset")}
 				</button>
@@ -211,7 +219,7 @@ function ReportBody({
 		<div className="flex flex-col flex-1 gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("targetInfo", {
 						targetLevel: report.targetLevel,
 						filesScanned: report.filesScanned,
@@ -220,12 +228,12 @@ function ReportBody({
 			</div>
 
 			<div>
-				<input
+				<Input
 					type="text"
 					placeholder={t("search.placeholder")}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					className="w-full px-3 py-2 rounded-lg bg-(--bg-secondary) border border-(--border-color) text-(--text-primary) placeholder:text-(--text-secondary) focus:outline-none focus:ring-2 focus:ring-(--accent-color)"
+					className="w-full px-3 py-2 h-auto"
 				/>
 			</div>
 
@@ -233,14 +241,14 @@ function ReportBody({
 				<StatCard
 					label={t("stats.violations")}
 					value={report.violations.length}
-					color="text-red-400"
+					color="text-destructive"
 					isActive={filter === "all"}
 					onClick={() => setFilter("all")}
 				/>
 				<StatCard
 					label={t("stats.critical")}
 					value={criticalCount}
-					color="text-red-400"
+					color="text-destructive"
 					isActive={filter === "critical"}
 					onClick={() => setFilter("critical")}
 				/>
@@ -254,7 +262,7 @@ function ReportBody({
 				<StatCard
 					label={t("stats.rulesPassed")}
 					value={report.passedRules.length}
-					color="text-green-400"
+					color="text-success"
 					isActive={filter === "passed"}
 					onClick={() => setFilter("passed")}
 				/>
@@ -266,7 +274,7 @@ function ReportBody({
 						{filteredPassedRules.map((rule) => (
 							<div
 								key={`passed-${rule}`}
-								className="px-4 py-3 rounded-lg border border-green-500/20 bg-green-500/10 text-green-400"
+								className="px-4 py-3 rounded-lg border border-success/20 bg-success/10 text-success"
 							>
 								<p className="text-sm">{rule}</p>
 							</div>
@@ -289,7 +297,7 @@ function ReportBody({
 								{v.file}:{v.line}
 							</p>
 							{v.suggestion && (
-								<p className="text-xs mt-1 text-green-400">{v.suggestion}</p>
+								<p className="text-xs mt-1 text-success">{v.suggestion}</p>
 							)}
 						</div>
 					))
@@ -297,7 +305,7 @@ function ReportBody({
 			</div>
 
 			{report.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{report.summary}
 				</p>
 			)}
@@ -321,12 +329,12 @@ function StatCard({
 	return (
 		<button
 			type="button"
-			className={`p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color) cursor-pointer transition-colors hover:bg-(--bg-tertiary) text-left ${
-				isActive ? "ring-2 ring-(--accent-color)" : ""
+			className={`p-3 rounded-lg bg-card border border-border cursor-pointer transition-colors hover:bg-muted text-left ${
+				isActive ? "ring-2 ring-primary" : ""
 			}`}
 			onClick={onClick}
 		>
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-2xl font-bold ${color}`}>{value}</p>
 		</button>
 	);

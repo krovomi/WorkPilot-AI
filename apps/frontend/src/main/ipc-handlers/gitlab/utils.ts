@@ -11,6 +11,12 @@ import {
 	readProjectEnvFileAsync,
 } from "../../project-env-file";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
+import { isServerHandle } from "../github/server-relay";
+import {
+	relayGitLabFetch,
+	relayGitLabFetchWithCount,
+	serverGitLabConfig,
+} from "./server-relay";
 import type { GitLabConfig } from "./types";
 
 const DEFAULT_GITLAB_URL = "https://gitlab.com";
@@ -134,6 +140,8 @@ async function fileExists(filePath: string): Promise<boolean> {
 export async function getGitLabConfig(
 	project: Project,
 ): Promise<GitLabConfig | null> {
+	// A server project's calls go through the server (`server-relay.ts`).
+	if (project.remote) return serverGitLabConfig(project);
 	const envPath = getProjectEnvPath(project);
 	if (!envPath || !(await fileExists(envPath))) return null;
 
@@ -239,6 +247,7 @@ export async function gitlabFetch(
 	endpoint: string,
 	options: RequestInit = {},
 ): Promise<unknown> {
+	if (isServerHandle(token)) return relayGitLabFetch(token, endpoint, options);
 	// Ensure instanceUrl doesn't have trailing slash
 	const baseUrl = parseInstanceUrl(instanceUrl);
 	if (!baseUrl) {
@@ -298,6 +307,9 @@ export async function gitlabFetchWithCount(
 	endpoint: string,
 	options: RequestInit = {},
 ): Promise<{ data: unknown; totalCount: number }> {
+	if (isServerHandle(token)) {
+		return relayGitLabFetchWithCount(token, endpoint, options);
+	}
 	// Ensure instanceUrl doesn't have trailing slash
 	const baseUrl = parseInstanceUrl(instanceUrl);
 	if (!baseUrl) {

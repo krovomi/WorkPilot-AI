@@ -10,6 +10,7 @@ import type {
 	IPCResult,
 } from "../../../shared/types";
 import { projectStore } from "../../project-store";
+import { featureProject } from "../server-feature-files";
 import type { GitHubAPIRepository } from "./types";
 import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
 
@@ -20,7 +21,7 @@ export function registerCheckConnection(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.GITHUB_CHECK_CONNECTION,
 		async (_, projectId: string): Promise<IPCResult<GitHubSyncStatus>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

@@ -29,6 +29,8 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
         agent_type: str = "coder",
         spec_dir: str | None = None,
         effort_params: dict[str, Any] | None = None,
+        prompt_cache_key: str | None = None,
+        cache_headers: dict[str, str] | None = None,
     ):
         endpoint = base_url.rstrip("/")
         if not endpoint.endswith("/chat/completions"):
@@ -47,7 +49,11 @@ class CompatibleProviderAgentClient(OpenAIAgentClient):
             api_key=api_key,
             api_base=endpoint,
             provider=provider,
+            prompt_cache_key=prompt_cache_key,
         )
         # The provider's own effort fields (`compatible_effort_params`):
         # Grok and Mistral take `reasoning_effort`, DeepSeek also `thinking`.
         self._effort_params = dict(effort_params or {})
+        # Cache routing the provider documents (`compatible_cache_routing`):
+        # Mistral's opt-in key, xAI's sticky-server header.
+        self._cache_headers = dict(cache_headers or {})

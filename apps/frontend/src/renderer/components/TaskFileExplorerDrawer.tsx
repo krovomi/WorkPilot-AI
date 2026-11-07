@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useFileExplorerStore } from "../stores/file-explorer-store";
 import { FileTree } from "./FileTree";
 import { Button } from "./ui/button";
+import { useTranslation } from "react-i18next";
 
 interface TaskFileExplorerDrawerProps {
 	readonly isOpen: boolean;
@@ -39,6 +40,7 @@ export function TaskFileExplorerDrawer({
 	onClose,
 	projectPath,
 }: TaskFileExplorerDrawerProps) {
+	const { t } = useTranslation();
 	const { clearCache, loadDirectory } = useFileExplorerStore();
 
 	const handleRefresh = () => {
@@ -78,7 +80,7 @@ export function TaskFileExplorerDrawer({
 							<div className="flex items-center gap-2">
 								<FolderTree className="h-4 w-4 text-primary" />
 								<span className="text-sm font-medium whitespace-nowrap">
-									Project Files
+									{t("common:fileExplorer.title")}
 								</span>
 							</div>
 							<div className="flex items-center gap-1">
@@ -87,7 +89,7 @@ export function TaskFileExplorerDrawer({
 									size="icon"
 									className="h-6 w-6"
 									onClick={handleRefresh}
-									title="Refresh"
+									title={t("common:buttons.refresh")}
 								>
 									<RefreshCw className="h-3.5 w-3.5" />
 								</Button>
@@ -96,7 +98,7 @@ export function TaskFileExplorerDrawer({
 									size="icon"
 									className="h-6 w-6"
 									onClick={onClose}
-									title="Close"
+									title={t("common:buttons.close")}
 								>
 									<X className="h-3.5 w-3.5" />
 								</Button>
@@ -105,8 +107,8 @@ export function TaskFileExplorerDrawer({
 
 						{/* Drag hint */}
 						<div className="px-3 py-2 bg-muted/30 border-b border-border shrink-0">
-							<p className="text-[10px] text-muted-foreground whitespace-nowrap">
-								Drag files to add as references
+							<p className="text-3xs text-muted-foreground whitespace-nowrap">
+								{t("common:fileExplorer.dragReferences")}
 							</p>
 						</div>
 

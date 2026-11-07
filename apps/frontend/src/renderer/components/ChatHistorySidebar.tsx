@@ -32,6 +32,7 @@ import {
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppDate } from "@/lib/date-format";
 
 interface ChatHistorySidebarProps {
 	readonly sessions: InsightsSessionSummary[];
@@ -98,7 +99,7 @@ export function ChatHistorySidebar({
 		} else if (diffDays < 7) {
 			return t("chatHistory.daysAgo", { count: diffDays });
 		} else {
-			return d.toLocaleDateString(undefined, {
+			return formatAppDate(d, {
 				month: "short",
 				day: "numeric",
 			});
@@ -151,7 +152,7 @@ export function ChatHistorySidebar({
 			<div className="py-2">
 				{Object.entries(groupedSessions).map(([dateLabel, dateSessions]) => (
 					<div key={dateLabel} className="mb-2">
-						<div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+						<div className="px-3 py-1 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
 							{dateLabel}
 						</div>
 						{dateSessions.map((session) => (
@@ -326,9 +327,14 @@ function SessionItem({
 					>
 						{session.title}
 					</p>
-					<p className="text-[11px] text-muted-foreground mt-0.5">
+					<p className="text-2xs text-muted-foreground mt-0.5">
 						{t("chatHistory.messageCount", { count: session.messageCount })}
 					</p>
+					{session.readOnly && session.ownerName && (
+						<p className="text-2xs text-muted-foreground">
+							{t("chatHistory.byTeammate", { name: session.ownerName })}
+						</p>
+					)}
 				</div>
 			</div>
 

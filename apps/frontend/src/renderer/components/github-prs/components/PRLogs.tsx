@@ -27,6 +27,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
 interface PRLogsProps {
 	readonly prNumber: number;
@@ -50,7 +51,7 @@ const PHASE_ICONS: Record<PRLogPhase, typeof FolderOpen> = {
 const PHASE_COLORS: Record<PRLogPhase, string> = {
 	context: "text-blue-500 bg-blue-500/10 border-blue-500/30",
 	analysis: "text-purple-500 bg-purple-500/10 border-purple-500/30",
-	synthesis: "text-green-500 bg-green-500/10 border-green-500/30",
+	synthesis: "text-success bg-success/10 border-success/30",
 };
 
 // Source colors for different log sources
@@ -61,24 +62,24 @@ const SOURCE_COLORS: Record<string, string> = {
 	ParallelOrchestrator: "bg-orange-500/20 text-orange-400",
 	Followup: "bg-cyan-500/20 text-cyan-400",
 	ParallelFollowup: "bg-cyan-500/20 text-cyan-400",
-	BotDetector: "bg-amber-500/20 text-amber-400",
-	Progress: "bg-green-500/20 text-green-400",
+	BotDetector: "bg-warning/20 text-warning",
+	Progress: "bg-success/20 text-success",
 	"PR Review Engine": "bg-indigo-500/20 text-indigo-400",
-	Summary: "bg-emerald-500/20 text-emerald-400",
+	Summary: "bg-success/20 text-success",
 	// Specialist agents (from parallel orchestrator - old Task tool approach)
 	"Agent:logic-reviewer": "bg-blue-600/20 text-blue-400",
 	"Agent:quality-reviewer": "bg-indigo-600/20 text-indigo-400",
-	"Agent:security-reviewer": "bg-red-600/20 text-red-400",
+	"Agent:security-reviewer": "bg-destructive/20 text-destructive",
 	"Agent:ai-triage-reviewer": "bg-slate-500/20 text-slate-400",
 	// Specialist agents (from parallel followup reviewer)
 	"Agent:resolution-verifier": "bg-teal-600/20 text-teal-400",
 	"Agent:new-code-reviewer": "bg-cyan-600/20 text-cyan-400",
 	"Agent:comment-analyzer": "bg-gray-500/20 text-gray-400",
 	// Parallel SDK specialists (new approach using parallel SDK sessions)
-	"Specialist:security": "bg-red-600/20 text-red-400",
+	"Specialist:security": "bg-destructive/20 text-destructive",
 	"Specialist:quality": "bg-indigo-600/20 text-indigo-400",
 	"Specialist:logic": "bg-blue-600/20 text-blue-400",
-	"Specialist:codebase-fit": "bg-emerald-600/20 text-emerald-400",
+	"Specialist:codebase-fit": "bg-success/20 text-success",
 	default: "bg-muted text-muted-foreground",
 };
 
@@ -205,7 +206,7 @@ export function PRLogs({
 							PR #{prNumber}
 							{logs.is_followup && (
 								<Badge variant="outline" className="text-xs">
-									Follow-up
+									{t("common:prReview.followup")}
 								</Badge>
 							)}
 							{isStreaming && (
@@ -214,13 +215,13 @@ export function PRLogs({
 									className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30 flex items-center gap-1"
 								>
 									<Loader2 className="h-2.5 w-2.5 animate-spin" />
-									Live
+									{t("common:prLogs.live")}
 								</Badge>
 							)}
 						</div>
 						<div className="text-xs text-muted-foreground flex items-center gap-1">
 							<Clock className="h-3 w-3" />
-							{new Date(logs.updated_at).toLocaleString()}
+							{formatAppDateTime(logs.updated_at)}
 						</div>
 					</div>
 
@@ -288,6 +289,7 @@ function PhaseLogSection({
 	expandedAgents,
 	onToggleAgent,
 }: PhaseLogSectionProps) {
+	const { t } = useTranslation();
 	const Icon = PHASE_ICONS[phase];
 	const status = phaseLog?.status || "pending";
 	const hasEntries = (phaseLog?.entries.length || 0) > 0;
@@ -301,7 +303,7 @@ function PhaseLogSection({
 					className="text-xs bg-info/10 text-info border-info/30 flex items-center gap-1"
 				>
 					<Loader2 className="h-3 w-3 animate-spin" />
-					{isStreaming ? "Streaming" : "Running"}
+					{isStreaming ? t("common:prLogs.streaming") : t("common:prLogs.running")}
 				</Badge>
 			);
 		}
@@ -311,7 +313,7 @@ function PhaseLogSection({
 		if (isStreaming && status === "completed" && !hasEntries) {
 			return (
 				<Badge variant="secondary" className="text-xs text-muted-foreground">
-					Pending
+					{t("common:prLogs.pending")}
 				</Badge>
 			);
 		}
@@ -324,7 +326,7 @@ function PhaseLogSection({
 						className="text-xs bg-success/10 text-success border-success/30 flex items-center gap-1"
 					>
 						<CheckCircle2 className="h-3 w-3" />
-						Complete
+						{t("common:prLogs.complete")}
 					</Badge>
 				);
 			case "failed":
@@ -334,13 +336,13 @@ function PhaseLogSection({
 						className="text-xs bg-destructive/10 text-destructive border-destructive/30 flex items-center gap-1"
 					>
 						<XCircle className="h-3 w-3" />
-						Failed
+						{t("common:prLogs.failed")}
 					</Badge>
 				);
 			default:
 				return (
 					<Badge variant="secondary" className="text-xs text-muted-foreground">
-						Pending
+						{t("common:prLogs.pending")}
 					</Badge>
 				);
 		}
@@ -377,7 +379,7 @@ function PhaseLogSection({
 						<span className="font-medium text-sm">{PHASE_LABELS[phase]}</span>
 						{hasEntries && (
 							<span className="text-xs text-muted-foreground">
-								({phaseLog?.entries.length} entries)
+								{t("common:prLogs.entries", { count: phaseLog?.entries.length })}
 							</span>
 						)}
 					</div>
@@ -394,7 +396,7 @@ function PhaseLogSection({
 							onToggleAgent={onToggleAgent}
 						/>
 					) : (
-						<p className="text-xs text-muted-foreground italic">No logs yet</p>
+						<p className="text-xs text-muted-foreground italic">{t("common:prLogs.empty")}</p>
 					)}
 				</div>
 			</CollapsibleContent>
@@ -508,7 +510,7 @@ function OrchestratorActivitySection({
 				</div>
 				<Badge
 					variant="outline"
-					className="text-[9px] px-1.5 py-0 bg-orange-500/10 text-orange-400 border-orange-500/30"
+					className="text-3xs px-1.5 py-0 bg-orange-500/10 text-orange-400 border-orange-500/30"
 				>
 					{summary}
 				</Badge>
@@ -519,10 +521,10 @@ function OrchestratorActivitySection({
 					{entries.map((entry) => (
 						<div
 							key={`activity-${entry.timestamp}`}
-							className="flex items-start gap-2 text-[10px] text-muted-foreground/80 py-0.5"
+							className="flex items-start gap-2 text-3xs text-muted-foreground/80 py-0.5"
 						>
 							<span className="text-muted-foreground/50 tabular-nums shrink-0">
-								{new Date(entry.timestamp).toLocaleTimeString("en-US", {
+								{formatAppTime(entry.timestamp, {
 									hour: "2-digit",
 									minute: "2-digit",
 									second: "2-digit",
@@ -626,7 +628,7 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0.5",
+							"text-3xs px-1.5 py-0.5",
 							getSourceColor(agentName),
 						)}
 					>
@@ -637,7 +639,7 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 							type="button"
 							onClick={onToggle}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-2 py-0.5 rounded transition-colors",
+								"flex items-center gap-1 text-3xs px-2 py-0.5 rounded transition-colors",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50",
 								isExpanded && "bg-secondary/50 text-foreground",
 							)}
@@ -692,13 +694,14 @@ interface LogEntryProps {
 }
 
 function LogEntry({ entry }: LogEntryProps) {
+	const { t } = useTranslation();
 	const [isExpanded, setIsExpanded] = useState(false);
 	const hasDetail = Boolean(entry.detail);
 
 	const formatTime = (timestamp: string) => {
 		try {
 			const date = new Date(timestamp);
-			return date.toLocaleTimeString("en-US", {
+			return formatAppTime(date, {
 				hour: "2-digit",
 				minute: "2-digit",
 				second: "2-digit",
@@ -724,7 +727,7 @@ function LogEntry({ entry }: LogEntryProps) {
 							type="button"
 							onClick={() => setIsExpanded(!isExpanded)}
 							className={cn(
-								"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 								isExpanded && "bg-secondary/50",
 							)}
@@ -739,7 +742,7 @@ function LogEntry({ entry }: LogEntryProps) {
 				</div>
 				{hasDetail && isExpanded && (
 					<div className="mt-1.5 ml-4 p-2 bg-destructive/5 rounded-md border border-destructive/20 overflow-x-auto">
-						<pre className="text-[10px] text-destructive/80 whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
+						<pre className="text-3xs text-destructive/80 whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
 							{entry.detail}
 						</pre>
 					</div>
@@ -770,14 +773,14 @@ function LogEntry({ entry }: LogEntryProps) {
 	return (
 		<div className="flex flex-col">
 			<div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
-				<span className="text-[10px] text-muted-foreground/60 tabular-nums shrink-0">
+				<span className="text-3xs text-muted-foreground/60 tabular-nums shrink-0">
 					{formatTime(entry.timestamp)}
 				</span>
 				{entry.source && (
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[9px] px-1 py-0 shrink-0",
+							"text-3xs px-1 py-0 shrink-0",
 							getSourceColor(entry.source),
 						)}
 					>
@@ -792,7 +795,7 @@ function LogEntry({ entry }: LogEntryProps) {
 						type="button"
 						onClick={() => setIsExpanded(!isExpanded)}
 						className={cn(
-							"flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0",
+							"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 							"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
 							isExpanded && "bg-secondary/50",
 						)}
@@ -800,12 +803,12 @@ function LogEntry({ entry }: LogEntryProps) {
 						{isExpanded ? (
 							<>
 								<ChevronDown className="h-2.5 w-2.5" />
-								<span>Less</span>
+								<span>{t("common:prLogs.less")}</span>
 							</>
 						) : (
 							<>
 								<ChevronRight className="h-2.5 w-2.5" />
-								<span>More</span>
+								<span>{t("common:prLogs.more")}</span>
 							</>
 						)}
 					</button>
@@ -813,7 +816,7 @@ function LogEntry({ entry }: LogEntryProps) {
 			</div>
 			{hasDetail && isExpanded && (
 				<div className="mt-1.5 ml-12 p-2 bg-secondary/30 rounded-md border border-border/50 overflow-x-auto">
-					<pre className="text-[10px] text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
+					<pre className="text-3xs text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono max-h-[300px] overflow-y-auto">
 						{entry.detail}
 					</pre>
 				</div>

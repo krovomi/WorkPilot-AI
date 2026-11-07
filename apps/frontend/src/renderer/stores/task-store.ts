@@ -1,6 +1,7 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import { create } from "zustand";
 import type {
+	CardEditConflict,
 	ExecutionPhase,
 	ExecutionProgress,
 	ImageAttachment,
@@ -14,6 +15,7 @@ import type {
 	TaskPipelineStatus,
 	TaskStatus,
 } from "../../shared/types";
+import { CARD_EDIT_CONFLICT } from "../../shared/types/team-room";
 import { isSubtaskDone } from "../../shared/progress";
 import { debugLog, debugWarn } from "../../shared/utils/debug-logger";
 import {
@@ -21,6 +23,7 @@ import {
 	buildResumeMetadata,
 } from "../../shared/utils/task-lifecycle";
 import { extractSubtaskFiles } from "../../shared/utils/subtask-files";
+import { subtaskBlockFields } from "../../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../../shared/utils/task-title";
 
 interface TaskState {
@@ -491,7 +494,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 					description,
 					status,
 					files: extractSubtaskFiles(subtask),
-					blockedReason: subtask.blocked_reason,
+					...subtaskBlockFields(subtask as unknown as Record<string, unknown>),
 					verification: subtask.verification as Subtask["verification"],
 					origin: subtask.origin as Subtask["origin"],
 					requestedAt: subtask.requested_at,
@@ -1084,6 +1087,7 @@ export async function submitReview(
 	approved: boolean,
 	feedback?: string,
 	images?: ImageAttachment[],
+	commentIds?: string[],
 ): Promise<boolean> {
 	try {
 		const result = await globalThis.electronAPI.submitReview(
@@ -1091,6 +1095,7 @@ export async function submitReview(
 			approved,
 			feedback,
 			images,
+			commentIds,
 		);
 		if (result.success) {
 			return true;
@@ -1164,17 +1169,26 @@ export async function forceCompleteTask(
 	return persistTaskStatus(taskId, "done", { forceCleanup: true });
 }
 
+/** What saving a task edit came to: saved, or the fields a teammate changed meanwhile. */
+export interface TaskEditOutcome {
+	saved: boolean;
+	conflicts?: CardEditConflict[];
+}
+
 /**
- * Update task title/description/metadata and persist to file
+ * Update task title/description/metadata and persist it. With `base` (the
+ * card as the edit began), a server card answers with the fields a teammate
+ * changed meanwhile instead of overwriting them.
  */
-export async function persistUpdateTask(
+export async function saveTaskEdit(
 	taskId: string,
 	updates: {
 		title?: string;
 		description?: string;
 		metadata?: Partial<TaskMetadata>;
+		base?: { title: string; description: string };
 	},
-): Promise<boolean> {
+): Promise<TaskEditOutcome> {
 	const store = useTaskStore.getState();
 
 	try {
@@ -1189,15 +1203,30 @@ export async function persistUpdateTask(
 				metadata: result.data.metadata,
 				updatedAt: new Date(),
 			});
-			return true;
+			return { saved: true };
+		}
+		if (result.error === CARD_EDIT_CONFLICT && result.conflicts?.length) {
+			return { saved: false, conflicts: result.conflicts };
 		}
 
 		console.error("Failed to persist task update:", result.error);
-		return false;
+		return { saved: false };
 	} catch (error) {
 		console.error("Error persisting task update:", error);
-		return false;
+		return { saved: false };
 	}
+}
+
+/** Update task title/description/metadata and persist to file. */
+export async function persistUpdateTask(
+	taskId: string,
+	updates: {
+		title?: string;
+		description?: string;
+		metadata?: Partial<TaskMetadata>;
+	},
+): Promise<boolean> {
+	return (await saveTaskEdit(taskId, updates)).saved;
 }
 
 /**

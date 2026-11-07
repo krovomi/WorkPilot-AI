@@ -32,8 +32,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, probe, sandboxed
+from .launch import ISOLATED, UNAVAILABLE, SandboxStatus, install_hint, probe, sandboxed
 from .policy import SandboxPolicy, build_policy
+from .proxy import FilteringProxy
 
 __all__ = [
     "DELEGATED",
@@ -74,7 +75,7 @@ class SessionSandbox:
     reason: str | None = None
     policy: SandboxPolicy | None = None
     _started: float = field(default_factory=time.time)
-    _proxy: object | None = None
+    _proxy: FilteringProxy | None = None
 
     @property
     def isolated(self) -> bool:
@@ -84,9 +85,9 @@ class SessionSandbox:
         self, argv: list[str], env: dict[str, str], *, cwd: Path | str | None = None
     ) -> tuple[list[str], dict[str, str]]:
         """`argv` and `env` as launched: under the sandbox when it is on."""
-        if not self.isolated:
-            return list(argv), dict(env)
         policy = self.policy
+        if not self.isolated or policy is None:
+            return list(argv), dict(env)
         if cwd is not None:
             policy = replace(policy, cwd=Path(cwd).resolve())
         command = sandboxed(list(argv), policy, env)
@@ -212,7 +213,8 @@ def claude_code_status() -> SessionSandbox:
             and not (find_executable("socat") or shutil.which("socat"))
         ):
             reason = (
-                "Claude Code's sandbox needs socat on Linux, which is not installed"
+                "Claude Code's sandbox needs socat on Linux, which is not installed: "
+                + install_hint("socat")
             )
     if reason is None:
         return delegated_status("Claude Code")

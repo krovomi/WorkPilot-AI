@@ -144,26 +144,26 @@ export function ProjectIndexTab({
 						{Object.keys(projectIndex.infrastructure).length > 0 && (
 							<div className="space-y-4">
 								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-									Infrastructure
+									{t("context:projectIndex.infrastructure")}
 								</h3>
 								<Card>
 									<CardContent className="pt-6">
 										<div className="grid gap-4 sm:grid-cols-2">
 											{projectIndex.infrastructure.docker_compose && (
 												<InfoItem
-													label="Docker Compose"
+													label={t("context:infrastructure.dockerCompose")}
 													value={projectIndex.infrastructure.docker_compose}
 												/>
 											)}
 											{projectIndex.infrastructure.ci && (
 												<InfoItem
-													label="CI/CD"
+													label={t("context:infrastructure.cicd")}
 													value={projectIndex.infrastructure.ci}
 												/>
 											)}
 											{projectIndex.infrastructure.deployment && (
 												<InfoItem
-													label="Deployment"
+													label={t("context:infrastructure.deployment")}
 													value={projectIndex.infrastructure.deployment}
 												/>
 											)}
@@ -172,7 +172,7 @@ export function ProjectIndexTab({
 													0 && (
 													<div className="sm:col-span-2">
 														<span className="text-xs text-muted-foreground">
-															Docker Services
+															{t("context:infrastructure.dockerServices")}
 														</span>
 														<div className="flex flex-wrap gap-1 mt-1">
 															{projectIndex.infrastructure.docker_services.map(
@@ -199,7 +199,7 @@ export function ProjectIndexTab({
 						{Object.keys(projectIndex.conventions).length > 0 && (
 							<div className="space-y-4">
 								<h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-									Conventions
+									{t("context:projectIndex.conventions")}
 								</h3>
 								<Card>
 									<CardContent className="pt-6">

@@ -57,6 +57,7 @@ import {
 } from "./acceptance-criteria-draft";
 import { extractAcceptanceCriteriaFromDescription } from "../../../shared/utils/acceptance-criteria";
 import { TaskBlockers } from "./TaskBlockers";
+import { TaskStack } from "./TaskStack";
 import { TaskKindBadge } from "./TaskKindBadge";
 
 // Schéma de sanitization personnalisé permettant les styles inline
@@ -808,7 +809,7 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 						</div>
 					) : null}
 
-					<div className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
+					<div className="ml-auto flex items-center gap-1.5 text-2xs text-muted-foreground">
 						<Clock className="h-3 w-3" aria-hidden />
 						<span>
 							{t("tasks:metadata.created")} {formatRelativeTime(task.createdAt)}
@@ -865,6 +866,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 
 					{/* Blocked by — the typed dependencies the queue gate reads. */}
 					<TaskBlockers task={task} />
+
+					{/* Stacked on a blocker (F6): start from its branch, keep up with it. */}
+					<TaskStack task={task} />
 
 					{/* Dependencies */}
 					{task.metadata.dependencies &&
@@ -1318,12 +1322,12 @@ function AcceptanceCriteriaSection({ task, editable }: AcceptanceCriteriaSection
 					<ListChecks className="h-3 w-3 text-success" />
 					<span>{t("tasks:metadata.acceptanceCriteria")}</span>
 					{initialCriteria.length > 0 && (
-						<Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+						<Badge variant="secondary" className="ml-1 text-3xs h-4 px-1.5">
 							{initialCriteria.length}
 						</Badge>
 					)}
 					{fromDescription && (
-						<span className="ml-1 normal-case tracking-normal text-[11px] font-normal text-info">
+						<span className="ml-1 normal-case tracking-normal text-2xs font-normal text-info">
 							{t("tasks:metadata.acFromDescription")}
 						</span>
 					)}

@@ -108,8 +108,8 @@ export function FavoritesDropZone({
 			ref={setNodeRef}
 			className={cn(
 				"relative transition-all duration-200 rounded-lg",
-				isDragging && active && "ring-2 ring-amber-400/40",
-				isOver && "ring-2 ring-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.5)] scale-[1.01]",
+				isDragging && active && "ring-2 ring-warning/40",
+				isOver && "ring-2 ring-warning shadow-[0_0_24px_-4px_rgba(251,191,36,0.5)] scale-[1.01]",
 			)}
 		>
 			{children}
@@ -134,14 +134,14 @@ export function FavoritesDropZoneEmpty({
 			className={cn(
 				"flex items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-4 text-xs transition-all duration-200",
 				isOver
-					? "border-amber-400 bg-amber-400/10 text-amber-400 shadow-[0_0_24px_-4px_rgba(251,191,36,0.5)]"
-					: "border-amber-400/30 text-muted-foreground/70 bg-amber-400/5",
+					? "border-warning bg-warning/10 text-warning shadow-[0_0_24px_-4px_rgba(251,191,36,0.5)]"
+					: "border-warning/30 text-muted-foreground/70 bg-warning/5",
 			)}
 		>
 			<Star
 				className={cn(
 					"h-3.5 w-3.5",
-					isOver ? "fill-amber-400 text-amber-400" : "text-amber-400/60",
+					isOver ? "fill-warning text-warning" : "text-warning/60",
 				)}
 			/>
 			<span>{label}</span>
@@ -175,9 +175,9 @@ export function PinStar({
 				"transition-all duration-200",
 				"hover:bg-accent/60 hover:scale-110",
 				isPinned
-					? "text-amber-400 opacity-100"
+					? "text-warning opacity-100"
 					: cn(
-							"text-muted-foreground/60 hover:text-amber-400",
+							"text-muted-foreground/60 hover:text-warning",
 							alwaysVisible
 								? "opacity-100"
 								: "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
@@ -185,7 +185,7 @@ export function PinStar({
 			)}
 		>
 			<Star
-				className={cn("h-3.5 w-3.5", isPinned && "fill-amber-400")}
+				className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
 			/>
 		</button>
 	);

@@ -33,7 +33,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from harness.domain.paging import FOOTER_RESERVE, page_lines, render_page
+from foundation.paging import FOOTER_RESERVE, page_lines, render_page
 
 from .home import digest_path
 from .memories import instructions as list_instructions
@@ -58,7 +58,7 @@ SERVER_INSTRUCTIONS = (
 _STR = {"type": "string"}
 
 #: The most of a note or a skill one call returns. A longer one comes a page at
-#: a time, followed by the offset that reads on (`harness.domain.paging`): an
+#: a time, followed by the offset that reads on (`foundation.paging`): an
 #: MCP client caps what it keeps of a tool result (Claude Code at 25,000 tokens,
 #: WorkPilot's own loops at their result cap), and its cut loses the middle.
 READ_MAX_CHARS = 40_000

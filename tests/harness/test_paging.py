@@ -1,9 +1,9 @@
-"""harness.domain.paging: a page and the way to the next one, never a cut middle."""
+"""foundation.paging: a page and the way to the next one, never a cut middle."""
 
 from __future__ import annotations
 
 import pytest
-from harness.domain.paging import (
+from foundation.paging import (
     LinePage,
     page_items,
     page_lines,

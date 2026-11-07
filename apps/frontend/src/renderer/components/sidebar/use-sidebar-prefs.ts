@@ -56,6 +56,20 @@ export function useSidebarPrefs() {
 		[update],
 	);
 
+	// One write for several ids: a hub's entry can carry pins left on its tabs
+	// from before they were tabs, and two toggles would race on the save.
+	const unpinItems = useCallback(
+		(itemIds: readonly string[]) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			update({
+				pinnedItems: current.pinnedItems.filter((id) => !itemIds.includes(id)),
+			});
+		},
+		[update],
+	);
+
 	const toggleGroupPin = useCallback(
 		(groupId: string) => {
 			const current =
@@ -137,6 +151,7 @@ export function useSidebarPrefs() {
 		() => ({
 			prefs,
 			toggleItemPin,
+			unpinItems,
 			toggleGroupPin,
 			reorderGroups,
 			reorderItems,
@@ -150,6 +165,7 @@ export function useSidebarPrefs() {
 		[
 			prefs,
 			toggleItemPin,
+			unpinItems,
 			toggleGroupPin,
 			reorderGroups,
 			reorderItems,

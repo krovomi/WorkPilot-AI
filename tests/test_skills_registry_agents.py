@@ -128,7 +128,7 @@ def test_the_rendered_file_says_where_it_came_from():
     """Editing a build output by hand is a mistake worth making obvious."""
     body, _ = render_agent(READ_ONLY, MATRIX["agnostic"])
     assert "roster: kanban" in body
-    assert "source: apps/backend/agents/subagents/" in body
+    assert "source: apps/backend/subagents/" in body
 
 
 def test_a_description_with_a_colon_is_quoted():

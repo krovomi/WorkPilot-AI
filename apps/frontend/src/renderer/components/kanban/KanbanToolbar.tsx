@@ -26,12 +26,16 @@ import {
 	type TaskSource,
 } from "../../lib/kanban-filter";
 import { cn } from "../../lib/utils";
+import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useProjectStore } from "../../stores/project-store";
+import { MultiRepoButton } from "../multi-repo/MultiRepoButton";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { QuickCommandBar } from "./QuickCommandBar";
+import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
 const CATEGORY_OPTIONS = Object.keys(TASK_CATEGORY_LABELS) as TaskCategory[];
 const PRIORITY_OPTIONS = Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[];
@@ -88,11 +92,11 @@ function FilterSection({ title, activeCount, children }: FilterSectionProps) {
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center gap-1.5 px-0.5">
-				<span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+				<span className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
 					{title}
 				</span>
 				{activeCount ? (
-					<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-[9px] font-bold text-primary tabular-nums">
+					<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/15 px-1 text-3xs font-bold text-primary tabular-nums">
 						{activeCount}
 					</span>
 				) : null}
@@ -127,6 +131,8 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const applyView = useKanbanFilterStore((s) => s.applyView);
 	const deleteView = useKanbanFilterStore((s) => s.deleteView);
 	const [viewName, setViewName] = useState("");
+	const serverProject = useSelectedServerProject();
+	const projectId = useProjectStore((s) => s.selectedProjectId);
 
 	const count = activeFilterCount(filters);
 	const filtersActive = hasActiveFilters(filters);
@@ -184,7 +190,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 						<SlidersHorizontal className="h-4 w-4" />
 						{t("kanban.filter.button")}
 						{count > 0 && (
-							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground tabular-nums">
+							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-bold leading-none text-primary-foreground tabular-nums">
 								{count}
 							</span>
 						)}
@@ -314,7 +320,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 						<Bookmark className="h-4 w-4" />
 						{t("kanban.views.button")}
 						{savedViews.length > 0 && (
-							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-bold leading-none tabular-nums">
+							<span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-3xs font-bold leading-none tabular-nums">
 								{savedViews.length}
 							</span>
 						)}
@@ -387,12 +393,30 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 
 			<Separator orientation="vertical" className="h-5" />
 
-			{/* Quick Commands */}
-			<QuickCommandBar
-				projectPath={projectPath}
-				className="h-8"
-				variant="compact"
-			/>
+			{/* A change across several repositories: one card per repository,
+			    run on this computer, so not on a server board. */}
+			{!serverProject && projectId && (
+				<>
+					<MultiRepoButton projectId={projectId} />
+					<Separator orientation="vertical" className="h-5" />
+				</>
+			)}
+
+			{/* Quick Commands run on this computer: a server board has its notice
+			    instead, until commands run on the server. */}
+			{serverProject ? (
+				<>
+					<ServerBoardNotice project={serverProject} />
+					<Separator orientation="vertical" className="h-5" />
+					<TeamRoomBar projectId={serverProject.id} />
+				</>
+			) : (
+				<QuickCommandBar
+					projectPath={projectPath}
+					className="h-8"
+					variant="compact"
+				/>
+			)}
 		</div>
 	);
 }

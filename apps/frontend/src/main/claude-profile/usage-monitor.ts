@@ -9,6 +9,7 @@
  * 2. Fallback: CLI /usage command parsing
  */
 
+import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
 import type {
@@ -27,7 +28,15 @@ import {
 	getClaudeProfileManager,
 	initializeClaudeProfileManager,
 } from "../claude-profile-manager";
+import {
+	detectWindsurfLocalToken,
+	readWindsurfCachedPlanInfo,
+	type WindsurfCachedPlanInfo,
+} from "../services/credential-manager";
+import { getSpawnCommand, getSpawnOptions } from "../env-utils";
 import { loadProfilesFile } from "../services/profile";
+import { setActiveAPIProfile } from "../services/profile/profile-manager";
+import { readSettingsFile, writeSettingsFile } from "../settings-utils";
 import { codexLimitsToSnapshot, fetchCodexRateLimits } from "./codex-usage";
 import {
 	clearKeychainCache,
@@ -36,6 +45,7 @@ import {
 import { getOperationRegistry } from "./operation-registry";
 import { calculateProfileScore } from "./profile-scorer";
 import { getProfileSelectionLock } from "./profile-selection-lock";
+import { hasSignedInBefore, type SignInRecord } from "./profile-utils";
 import { isProfileRateLimited } from "./rate-limit-manager";
 import { ensureValidToken, reactiveTokenRefresh } from "./token-refresh";
 import { parseUsageOutput } from "./usage-parser";
@@ -617,8 +627,8 @@ export class UsageMonitor extends EventEmitter {
 						: profile.configDir;
 					const creds = getCredentialsFromKeychain(expandedConfigDir);
 					if (!creds.token) {
-						// Credentials are missing - mark for re-auth
-						this.needsReauthProfiles.add(profile.id);
+						// Credentials are missing - mark for re-auth if it was signed in
+						this.flagMissingCredentials(profile);
 						this.debugLog(
 							"[UsageMonitor:getAllProfilesUsage] Profile needs re-auth (no credentials): " +
 								profile.name,
@@ -942,7 +952,7 @@ export class UsageMonitor extends EventEmitter {
 							"[UsageMonitor] Profile needs authentication (no credentials found): " +
 								profile.name,
 						);
-						this.needsReauthProfiles.add(profile.id);
+						this.flagMissingCredentials(profile);
 					}
 				}
 			} catch (error) {
@@ -964,7 +974,7 @@ export class UsageMonitor extends EventEmitter {
 							profile.name,
 					);
 					// Mark profile as needing re-authentication since credentials are missing
-					this.needsReauthProfiles.add(profile.id);
+					this.flagMissingCredentials(profile);
 					return null;
 				}
 			}
@@ -1173,7 +1183,7 @@ export class UsageMonitor extends EventEmitter {
 							"[UsageMonitor] Profile needs authentication (no credentials found): " +
 								activeProfile.name,
 						);
-						this.needsReauthProfiles.add(activeProfile.id);
+						this.flagMissingCredentials(activeProfile);
 					}
 				}
 			} catch (error) {
@@ -1208,7 +1218,7 @@ export class UsageMonitor extends EventEmitter {
 			}
 
 			// Mark profile as needing re-authentication since credentials are missing
-			this.needsReauthProfiles.add(activeProfile.id);
+			this.flagMissingCredentials(activeProfile);
 		}
 
 		// No credential available
@@ -1219,17 +1229,34 @@ export class UsageMonitor extends EventEmitter {
 	}
 
 	/**
+	 * Missing credentials: a profile that was signed in has lost its sign-in
+	 * and gets the re-auth flag (and its toast); one never signed in is simply
+	 * not connected, which the Accounts settings already show, so it does not.
+	 */
+	private flagMissingCredentials(
+		profile: { id: string } & Partial<SignInRecord>,
+	): void {
+		if (hasSignedInBefore(profile)) {
+			this.needsReauthProfiles.add(profile.id);
+		} else {
+			this.needsReauthProfiles.delete(profile.id);
+		}
+	}
+
+	/**
 	 * Get credential for a specific OAuth profile.
 	 *
 	 * Unlike getCredential() which uses getActiveProfile() (which may return a different
 	 * profile than the one we want), this method directly targets the specified profile's
 	 * configDir for token retrieval.
 	 */
-	private async getCredentialForProfile(profile: {
-		id: string;
-		name: string;
-		configDir?: string;
-	}): Promise<string | undefined> {
+	private async getCredentialForProfile(
+		profile: {
+			id: string;
+			name: string;
+			configDir?: string;
+		} & Partial<SignInRecord>,
+	): Promise<string | undefined> {
 		if (!profile.configDir) {
 			console.warn(
 				"[UsageMonitor:getCredentialForProfile] Profile has no configDir:",
@@ -1269,11 +1296,10 @@ export class UsageMonitor extends EventEmitter {
 					":",
 					tokenResult.error,
 				);
-				if (
-					tokenResult.errorCode === "invalid_grant" ||
-					tokenResult.errorCode === "missing_credentials"
-				) {
+				if (tokenResult.errorCode === "invalid_grant") {
 					this.needsReauthProfiles.add(profile.id);
+				} else if (tokenResult.errorCode === "missing_credentials") {
+					this.flagMissingCredentials(profile);
 				}
 			}
 		} catch (error) {
@@ -1301,7 +1327,7 @@ export class UsageMonitor extends EventEmitter {
 		}
 
 		// Mark as needing re-authentication
-		this.needsReauthProfiles.add(profile.id);
+		this.flagMissingCredentials(profile);
 		console.warn(
 			"[UsageMonitor:getCredentialForProfile] No credential found for:",
 			profile.name,
@@ -1671,7 +1697,6 @@ export class UsageMonitor extends EventEmitter {
 		// 2. globalWindsurfApiKey in settings.json (user configured Windsurf key in settings)
 		// 3. CredentialManager's active credential is windsurf-type
 		try {
-			const { readSettingsFile } = await import("../settings-utils");
 			const appSettings = readSettingsFile();
 			const selectedProvider = appSettings?.selectedProvider as
 				| string
@@ -1703,7 +1728,6 @@ export class UsageMonitor extends EventEmitter {
 				// so future checks are faster and the CredentialManager also picks it up
 				if (!selectedProvider && globalWindsurfKey && appSettings) {
 					try {
-						const { writeSettingsFile } = await import("../settings-utils");
 						appSettings.selectedProvider = "windsurf";
 						writeSettingsFile(appSettings);
 						this.debugLog(
@@ -2992,7 +3016,7 @@ export class UsageMonitor extends EventEmitter {
 	 *   - weeklyPercent  → % of billing cycle elapsed (time-based)
 	 */
 	private normalizeWindsurfCachedPlanInfo(
-		planInfo: import("../services/credential-manager").WindsurfCachedPlanInfo,
+		planInfo: WindsurfCachedPlanInfo,
 		profileId: string,
 		profileName: string,
 	): UsageSnapshot {
@@ -3423,10 +3447,6 @@ export class UsageMonitor extends EventEmitter {
 		);
 
 		try {
-			const { spawn } = await import("node:child_process");
-			const { getSpawnCommand, getSpawnOptions } = await import(
-				"../env-utils"
-			);
 
 			const result = await new Promise<{
 				stdout: string;
@@ -3736,9 +3756,6 @@ export class UsageMonitor extends EventEmitter {
 		} else {
 			// Switch API profile via profile-manager service
 			try {
-				const { setActiveAPIProfile } = await import(
-					"../services/profile/profile-manager"
-				);
 				await setActiveAPIProfile(bestAccount.id);
 			} catch (error) {
 				console.error(
@@ -3848,7 +3865,6 @@ export class UsageMonitor extends EventEmitter {
 		let authMode: string | undefined;
 		let hasApiKey = !!process.env.OPENAI_API_KEY?.trim();
 		try {
-			const { readSettingsFile } = await import("../settings-utils");
 			const settings = readSettingsFile();
 			authMode = settings?.globalOpenAIAuthMode as string | undefined;
 			const globalKey = settings?.globalOpenAIApiKey;
@@ -4051,9 +4067,6 @@ export class UsageMonitor extends EventEmitter {
 
 			// Strategy 1: Read local IDE cached plan info (primary source)
 			try {
-				const { readWindsurfCachedPlanInfo } = await import(
-					"../services/credential-manager"
-				);
 				const cached = await readWindsurfCachedPlanInfo();
 				if (cached.success && cached.planInfo) {
 					const rawMsgs = cached.planInfo.usage;
@@ -4133,7 +4146,6 @@ export class UsageMonitor extends EventEmitter {
 				// Fallback to global settings (globalWindsurfApiKey) for SSO users
 				if (!serviceKey) {
 					try {
-						const { readSettingsFile } = await import("../settings-utils");
 						const settings = readSettingsFile();
 						const globalKey = settings?.globalWindsurfApiKey as
 							| string
@@ -4164,9 +4176,6 @@ export class UsageMonitor extends EventEmitter {
 				// Fallback to auto-detection from local Windsurf IDE (SSO enterprise users)
 				if (!serviceKey) {
 					try {
-						const { detectWindsurfLocalToken } = await import(
-							"../services/credential-manager"
-						);
 						const detected = await detectWindsurfLocalToken();
 						if (detected.success && detected.apiKey) {
 							serviceKey = detected.apiKey;

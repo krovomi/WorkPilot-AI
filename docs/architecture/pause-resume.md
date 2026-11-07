@@ -13,7 +13,7 @@ frame. The caller could not tell "finished" from "gave up", so a build whose
 planning had failed went on to run QA, the hard gates and `finalize_workspace`
 over a worktree with no implementation plan in it.
 
-`core/build_signals.py` holds the two exceptions that unwind to the entry point:
+`foundation/build_signals.py` holds the two exceptions that unwind to the entry point:
 `BuildPaused` (not a failure — nothing is finalized, the card keeps its column)
 and `BuildHalted` (which carries the sentence the user will read).
 
@@ -24,7 +24,7 @@ may return normally only with a nonempty, completed plan and no session error;
 an empty plan, exhausted budget or unfinished subtasks halt before QA. The loop
 detector propagates `BuildPaused` too, rather than returning as if coding finished.
 
-**The pause has one store.** `core/pause_state.py` owns `pause_state.json`,
+**The pause has one store.** `foundation/pause_state.py` owns `pause_state.json`,
 which lives in the spec directory. That is the whole point: the flag used to
 live inside `implementation_plan.json`, a file that does not exist during spec
 creation or planning, so pressing Pause on a task that was visibly running

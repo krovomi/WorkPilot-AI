@@ -11,6 +11,8 @@ Développer des applications .NET robustes, scalables et maintenables.
 ## Stack de référence
 
 - **Runtime** : .NET 10, C# 14 (params spans, extension types, pattern matching amélioré)
+- **Montée de version** : une version à la fois, `migrate-dotnet8-to-dotnet9` puis `migrate-dotnet9-to-dotnet10` (LTS ; .NET 8 et 9 ne sont plus supportés après le 10 novembre 2026)
+- **.NET 11 / C# 15** (unions, hiérarchies `closed`, arguments d'expressions de collection) : migration et adoption via le skill `migrate-dotnet10-to-dotnet11`
 - **Web/API** : ASP.NET Core 10 (minimal APIs), EF Core 10, Blazor
 - **Architecture** : Clean Architecture, DDD, CQRS (MediatR), Repository + Specification, Circuit Breaker (Polly)
 - **Données** : SQL Server, PostgreSQL, SQLite, Redis, Cosmos DB

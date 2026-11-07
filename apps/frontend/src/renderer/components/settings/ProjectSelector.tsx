@@ -11,6 +11,7 @@ import {
 	SelectValue,
 } from "../ui/select";
 import { Separator } from "../ui/separator";
+import { useTranslation } from "react-i18next";
 
 interface ProjectSelectorProps {
 	readonly selectedProjectId: string | null;
@@ -23,6 +24,7 @@ export function ProjectSelector({
 	onProjectChange,
 	onProjectAdded,
 }: ProjectSelectorProps) {
+	const { t } = useTranslation();
 	const projects = useProjectStore((state) => state.projects);
 	const [showAddModal, setShowAddModal] = useState(false);
 	const [open, setOpen] = useState(false);
@@ -61,7 +63,7 @@ export function ProjectSelector({
 					<div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
 						<FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
 						<SelectValue
-							placeholder="Select a project..."
+							placeholder={t("settings:projectSelector.placeholder")}
 							className="truncate min-w-0 flex-1"
 						/>
 					</div>
@@ -75,7 +77,7 @@ export function ProjectSelector({
 				>
 					{projects.length === 0 ? (
 						<div className="px-2 py-4 text-center text-sm text-muted-foreground">
-							<p>No projects yet</p>
+							<p>{t("settings:projectSelector.empty")}</p>
 						</div>
 					) : (
 						projects.map((project) => (
@@ -105,7 +107,7 @@ export function ProjectSelector({
 					<SelectItem value="__add_new__">
 						<div className="flex items-center gap-2">
 							<Plus className="h-4 w-4 shrink-0" />
-							<span>Add Project...</span>
+							<span>{t("settings:projectSelector.add")}</span>
 						</div>
 					</SelectItem>
 				</SelectContent>

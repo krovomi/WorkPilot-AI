@@ -13,6 +13,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 interface SortableFeatureCardProps {
 	readonly feature: RoadmapFeature;
@@ -29,6 +30,7 @@ export function SortableFeatureCard({
 	onConvertToSpec,
 	onGoToTask,
 }: SortableFeatureCardProps) {
+	const { t } = useTranslation();
 	const {
 		attributes,
 		listeners,
@@ -81,7 +83,7 @@ export function SortableFeatureCard({
 							<Badge
 								variant="outline"
 								className={cn(
-									"text-[10px] px-1.5 py-0",
+									"text-3xs px-1.5 py-0",
 									ROADMAP_PRIORITY_COLORS[feature.priority],
 								)}
 							>
@@ -92,7 +94,7 @@ export function SortableFeatureCard({
 									<TooltipTrigger asChild>
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0 text-muted-foreground border-muted-foreground/30"
+											className="text-3xs px-1.5 py-0 text-muted-foreground border-muted-foreground/30"
 										>
 											<Layers className="h-2.5 w-2.5 mr-0.5" />
 											{phaseName.length > 12
@@ -100,7 +102,9 @@ export function SortableFeatureCard({
 												: phaseName}
 										</Badge>
 									</TooltipTrigger>
-									<TooltipContent>Phase: {phaseName}</TooltipContent>
+									<TooltipContent>
+								{t("roadmap:featureCard.phase", { name: phaseName })}
+							</TooltipContent>
 								</Tooltip>
 							)}
 							{hasCompetitorInsight && (
@@ -108,13 +112,13 @@ export function SortableFeatureCard({
 									<TooltipTrigger asChild>
 										<Badge
 											variant="outline"
-											className="text-[10px] px-1.5 py-0 text-primary border-primary/50"
+											className="text-3xs px-1.5 py-0 text-primary border-primary/50"
 										>
 											<TrendingUp className="h-2.5 w-2.5" />
 										</Badge>
 									</TooltipTrigger>
 									<TooltipContent>
-										This feature addresses competitor pain points
+										{t("roadmap:featureCard.competitorInsight")}
 									</TooltipContent>
 								</Tooltip>
 							)}
@@ -136,7 +140,7 @@ export function SortableFeatureCard({
 								}}
 							>
 								<ExternalLink className="h-3 w-3 mr-1" />
-								Task
+								{t("roadmap:featureCard.task")}
 							</Button>
 						) : (
 							feature.status !== "done" &&
@@ -151,7 +155,7 @@ export function SortableFeatureCard({
 									}}
 								>
 									<Play className="h-3 w-3 mr-1" />
-									Build
+									{t("roadmap:featureCard.build")}
 								</Button>
 							)
 						)}
@@ -168,7 +172,7 @@ export function SortableFeatureCard({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							ROADMAP_COMPLEXITY_COLORS[feature.complexity],
 						)}
 					>
@@ -177,7 +181,7 @@ export function SortableFeatureCard({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							ROADMAP_IMPACT_COLORS[feature.impact],
 						)}
 					>
@@ -189,14 +193,14 @@ export function SortableFeatureCard({
 							<TooltipTrigger asChild>
 								<Badge
 									variant="outline"
-									className="text-[10px] px-1.5 py-0 text-muted-foreground"
+									className="text-3xs px-1.5 py-0 text-muted-foreground"
 								>
 									<ThumbsUp className="h-2.5 w-2.5 mr-0.5" />
 									{feature.votes}
 								</Badge>
 							</TooltipTrigger>
 							<TooltipContent>
-								{feature.votes} votes from user feedback
+								{t("roadmap:featureCard.votes", { count: feature.votes })}
 							</TooltipContent>
 						</Tooltip>
 					)}
@@ -206,13 +210,15 @@ export function SortableFeatureCard({
 							<TooltipTrigger asChild>
 								<Badge
 									variant="outline"
-									className="text-[10px] px-1.5 py-0 text-orange-500 border-orange-500/30"
+									className="text-3xs px-1.5 py-0 text-orange-500 border-orange-500/30"
 								>
-									{feature.source?.provider === "canny" ? "Canny" : "External"}
+									{feature.source?.provider === "canny" ? "Canny" : t("roadmap:featureCard.external")}
 								</Badge>
 							</TooltipTrigger>
 							<TooltipContent>
-								Imported from {feature.source?.provider}
+								{t("roadmap:featureCard.importedFrom", {
+									provider: feature.source?.provider,
+								})}
 							</TooltipContent>
 						</Tooltip>
 					)}

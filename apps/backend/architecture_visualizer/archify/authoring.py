@@ -24,6 +24,11 @@ from typing import Any
 from . import cli
 from . import evidence as evidence_module
 from . import ir as ir_module
+from .prompts import (
+    architecture_delta_section,
+    architecture_map_prompt,
+    architecture_repair_prompt,
+)
 from .runtime import archify_root, check
 
 logger = logging.getLogger(__name__)
@@ -79,11 +84,6 @@ def build_prompt(
     changed_files: list[str] | None = None,
 ) -> str:
     """The authoring prompt: measured evidence, plus the base model when there is one."""
-    from prompts_pkg.prompts import (
-        get_architecture_delta_section,
-        get_architecture_map_prompt,
-    )
-
     root = archify_root()
     if root is None:
         raise cli.ArchifyUnavailable(check())
@@ -99,13 +99,13 @@ def build_prompt(
             # Compact rather than truncate: half a JSON object is not a model,
             # and the id list is the part that must survive intact.
             rendered = json.dumps(baseline, separators=(",", ":"))
-        baseline_section = get_architecture_delta_section(
+        baseline_section = architecture_delta_section(
             baseline_json=rendered,
             task_summary=task_summary,
             changed_files=changed_files or [],
         )
 
-    return get_architecture_map_prompt(
+    return architecture_map_prompt(
         archify_root=root,
         output_path=output_path,
         evidence_section=section,
@@ -125,7 +125,6 @@ async def author(
     progress: ProgressFn | None = None,
 ) -> AuthoringResult:
     """Write a model, validate it, repair while repairing helps, then deliver."""
-    from prompts_pkg.prompts import get_architecture_repair_prompt
 
     def say(message: str) -> None:
         logger.info("architecture-map: %s", message)
@@ -206,7 +205,7 @@ async def author(
         if round_index == MAX_ROUNDS:
             break
 
-        prompt = get_architecture_repair_prompt(spec_path, last.diagnostics)
+        prompt = architecture_repair_prompt(spec_path, last.diagnostics)
 
     diagnostics = last.diagnostics if last else []
     return AuthoringResult(

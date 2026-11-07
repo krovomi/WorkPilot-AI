@@ -25,6 +25,8 @@ import {
 } from "../../ui/dialog";
 import { keyError } from "./drafts";
 
+import { Input } from "../../ui/input";
+import { Textarea } from "../../ui/textarea";
 interface AddKeyDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -96,7 +98,8 @@ export function AddKeyDialog({
 						<label htmlFor="new-key-input" className="mb-1 block text-xs font-medium">
 							{t("i18nEditor.keyLabel")}
 						</label>
-						<input
+						<Input
+							spellCheck={false}
 							id="new-key-input"
 							value={key}
 							onChange={(e) => setKey(e.target.value)}
@@ -106,7 +109,7 @@ export function AddKeyDialog({
 							placeholder={t("i18nEditor.keyPlaceholder")}
 							aria-invalid={Boolean(error) || undefined}
 							aria-describedby={error ? "new-key-error" : undefined}
-							className="w-full rounded border bg-background p-2 font-mono text-xs"
+							className="w-full p-2 font-mono text-xs h-auto"
 							autoFocus
 						/>
 						{error && (
@@ -127,14 +130,14 @@ export function AddKeyDialog({
 									{t("i18nEditor.optional")}
 								</span>
 							</label>
-							<textarea
+							<Textarea
 								id={`new-key-${locale}`}
 								rows={2}
 								value={values[locale] ?? ""}
 								onChange={(e) =>
 									setValues((v) => ({ ...v, [locale]: e.target.value }))
 								}
-								className="w-full resize-none rounded border bg-background p-2 text-xs"
+								className="w-full resize-none p-2 text-xs min-h-0"
 							/>
 						</div>
 					))}
@@ -145,7 +148,7 @@ export function AddKeyDialog({
 
 				<DialogFooter>
 					<Button variant="ghost" size="sm" onClick={close}>
-						{t("common.cancel")}
+						{t("common:buttons.cancel")}
 					</Button>
 					<Button size="sm" onClick={submit} disabled={!canSubmit}>
 						{t("i18nEditor.addKeyConfirm")}

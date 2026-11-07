@@ -134,7 +134,7 @@ class TestSelectionReachesThePrompt:
     """The choice is only worth making if the model is told about it."""
 
     def test_the_prompt_names_the_chosen_libraries(self, tmp_path: Path):
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         source = _solution(tmp_path)
         agent = TestGeneratorAgent()
@@ -159,7 +159,7 @@ class TestSelectionReachesThePrompt:
     def test_without_a_choice_the_project_still_reaches_the_prompt(
         self, tmp_path: Path
     ):
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         _solution(tmp_path)
         framework_info = {
@@ -177,7 +177,7 @@ class TestSelectionReachesThePrompt:
         assert "FluentAssertions" not in section
 
     def test_an_unreadable_project_costs_the_hint_not_the_generation(self):
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         section = TestGeneratorAgent()._libraries_section(
             "/nope/does/not/exist",

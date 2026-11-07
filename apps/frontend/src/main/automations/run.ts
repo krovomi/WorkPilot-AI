@@ -1,7 +1,8 @@
 /**
  * One pass over a project's rules: read each rule's source, drop what was
  * already answered, hold back what the daily cap does not allow, create the
- * rest as cards. The ledger is written once, at the end.
+ * rest as cards (or, for a PR, start its unposted review). The ledger is
+ * written once, at the end.
  */
 
 import type {
@@ -26,11 +27,16 @@ export interface RunDeps {
 	startCard(project: Project, card: AutomationCard): Promise<void> | void;
 	/** Whether the board still has the card open (not done, not archived). */
 	isCardOpen(project: Project, specId: string): boolean;
-	issueNumbersOnBoard(project: Project): Set<number>;
+	issueNumbersOnBoard(project: Project, forge?: "github" | "gitlab"): Set<number>;
+	/** Whether the PR already has a review, saved or running. */
+	hasPRReview(project: Project, prNumber: number): Promise<boolean>;
+	/** Starts the PR's review, never posted; resolves once launched. */
+	startPRReview(project: Project, prNumber: number): Promise<void>;
 }
 
 export interface RunSummary {
 	created: number;
+	reviews: number;
 	errors: number;
 }
 
@@ -46,13 +52,22 @@ export async function runProjectAutomations(
 	deps: RunDeps,
 ): Promise<RunSummary> {
 	const rules = readRules(project).filter((rule) => rule.enabled);
-	const summary: RunSummary = { created: 0, errors: 0 };
+	const summary: RunSummary = { created: 0, reviews: 0, errors: 0 };
 	if (rules.length === 0) return summary;
 
 	const ledger = readLedger(project);
 	const now = deps.now();
 	const today = localDate(now);
-	let boardIssues: Set<number> | null = null;
+	// The board's issue cards, per forge, read once per pass.
+	const boardIssues = new Map<"github" | "gitlab", Set<number>>();
+	const issuesOf = (forge: "github" | "gitlab"): Set<number> => {
+		let numbers = boardIssues.get(forge);
+		if (!numbers) {
+			numbers = deps.issueNumbersOnBoard(project, forge);
+			boardIssues.set(forge, numbers);
+		}
+		return numbers;
+	};
 
 	for (const rule of rules) {
 		const previous = ledger.statuses[rule.id];
@@ -118,8 +133,7 @@ export async function runProjectAutomations(
 		for (const event of source.events) {
 			if (ledger.seen[event.key]) continue;
 			if (event.issue) {
-				boardIssues ??= deps.issueNumbersOnBoard(project);
-				if (boardIssues.has(event.issue.number)) {
+				if (issuesOf(event.issue.forge ?? "github").has(event.issue.number)) {
 					remember(event.key, "duplicate");
 					log("duplicate", event.subject, {
 						url: event.url,
@@ -127,6 +141,12 @@ export async function runProjectAutomations(
 					});
 					continue;
 				}
+			}
+			if (event.pr && (await deps.hasPRReview(project, event.pr.number))) {
+				// Reviewed by hand, or by another rule: one draft per PR.
+				remember(event.key, "duplicate");
+				log("duplicate", event.subject, { url: event.url, reason: "already_reviewed" });
+				continue;
 			}
 			const streak = ledger.openCi[rule.id];
 			if (rule.trigger.type === "ci_failed" && streak && deps.isCardOpen(project, streak)) {
@@ -145,6 +165,22 @@ export async function runProjectAutomations(
 				continue;
 			}
 
+			if (event.pr) {
+				try {
+					await deps.startPRReview(project, event.pr.number);
+				} catch (error) {
+					// Not remembered: the next pass tries again, and logs the same failure once.
+					fail("review_failed", message(error), event.subject);
+					continue;
+				}
+				status.createdToday += 1;
+				created[today] = status.createdToday;
+				summary.reviews += 1;
+				remember(event.key, "review_started");
+				log("review_started", event.subject, { url: event.url });
+				continue;
+			}
+
 			let card: AutomationCard;
 			try {
 				card = await deps.createCard(project, rule, event);
@@ -155,7 +191,7 @@ export async function runProjectAutomations(
 			status.createdToday += 1;
 			created[today] = status.createdToday;
 			summary.created += 1;
-			if (event.issue) boardIssues?.add(event.issue.number);
+			if (event.issue) issuesOf(event.issue.forge ?? "github").add(event.issue.number);
 			if (rule.trigger.type === "ci_failed") ledger.openCi[rule.id] = card.specId;
 
 			let outcome: AutomationOutcome = "created";

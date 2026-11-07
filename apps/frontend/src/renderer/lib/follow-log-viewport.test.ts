@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from "vitest";
-import { followLogViewport } from "./follow-log-viewport";
+import { followLogViewport, LOG_VIEWPORT_DETACH_EVENT } from "./follow-log-viewport";
 afterEach(() => vi.unstubAllGlobals());
 it.each([true, false])("pauses reading and resumes at bottom (scroll event delivered: %s)", (delivered) => {
  let resize = () => { /* assigned by the observer constructor */ };
@@ -29,3 +29,25 @@ it.each([true, false])("pauses reading and resumes at bottom (scroll event deliv
  stop();
 });
 
+it("stops following when code jumps the viewport (search hit)", () => {
+ let resize = () => { /* assigned by the observer constructor */ };
+ vi.stubGlobal("ResizeObserver", class {
+  constructor(cb: () => void) { resize = cb; }
+  observe() { /* simulated layout */ }
+  disconnect() { /* simulated layout */ }
+ });
+ const el = document.createElement("div");
+ let height = 1000;
+ Object.defineProperty(el, "scrollHeight", { get: () => height });
+ Object.defineProperty(el, "clientHeight", { value: 200 });
+ el.scrollTo = vi.fn((options: ScrollToOptions) => { el.scrollTop = Math.min(options.top ?? 0, height - 200); }) as typeof el.scrollTo;
+ const stop = followLogViewport(el);
+ expect(el.scrollTop).toBe(800);
+ // The jump lands before the browser delivers its scroll event.
+ el.dispatchEvent(new Event(LOG_VIEWPORT_DETACH_EVENT));
+ el.scrollTop = 300;
+ height = 1200;
+ resize();
+ expect(el.scrollTop).toBe(300);
+ stop();
+});

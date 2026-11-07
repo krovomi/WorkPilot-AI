@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from apps.backend.agents.test_generator import (
+from apps.backend.test_generation.generator import (
     CodeAnalyzer,
     CoverageGap,
     FunctionInfo,

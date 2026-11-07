@@ -31,5 +31,8 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
+	},
+	"report": {
+		"globeIconTitle": "Icône de réseau mondial"
 	}
 }

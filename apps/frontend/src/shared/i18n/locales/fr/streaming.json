@@ -47,5 +47,7 @@
 	"controls": {
 		"resume": "Reprendre la session",
 		"pause": "Mettre en pause la session"
-	}
+	},
+	"selectedBadge": "Sélectionné",
+	"eventLabel": "Événement : {{type}} - {{time}}"
 }

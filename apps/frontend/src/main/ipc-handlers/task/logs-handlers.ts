@@ -9,6 +9,12 @@ import type {
 } from "../../../shared/types";
 import { debugLog, debugWarn } from "../../../shared/utils/debug-logger";
 import { projectStore } from "../../project-store";
+import {
+	serverCardLogs,
+	unwatchServerCardLogs,
+	watchServerCardLogs,
+} from "../../server-card-logs";
+import { getServerProject } from "../../server-projects";
 import { type PerLlmLog, taskLogService } from "../../task-log-service";
 import { ensureAbsolutePath } from "../../utils/path-helpers";
 import { isValidTaskId } from "../../utils/spec-path-helpers";
@@ -35,6 +41,9 @@ export function registerTaskLogsHandlers(
 					return { success: false, error: "Invalid spec ID" };
 				}
 
+				// A server card's log lives in the server's clone, not here.
+				const serverProject = getServerProject(projectId);
+				if (serverProject) return await serverCardLogs(serverProject, specId);
 				const project = projectStore.getProject(projectId);
 				if (!project) {
 					console.error("[TASK_LOGS_GET] Project not found:", projectId);
@@ -106,6 +115,8 @@ export function registerTaskLogsHandlers(
 				if (!isValidTaskId(specId)) {
 					return { success: false, error: "Invalid spec ID" };
 				}
+				// The server sends one merged log, not the per-LLM files.
+				if (getServerProject(projectId)) return { success: true, data: [] };
 				const project = projectStore.getProject(projectId);
 				if (!project) {
 					return { success: false, error: "Project not found" };
@@ -143,6 +154,18 @@ export function registerTaskLogsHandlers(
 			try {
 				if (!isValidTaskId(specId)) {
 					return { success: false, error: "Invalid spec ID" };
+				}
+
+				const serverProject = getServerProject(projectId);
+				if (serverProject) {
+					watchServerCardLogs(serverProject, specId, (cardId, logs) => {
+						getMainWindow()?.webContents.send(
+							IPC_CHANNELS.TASK_LOGS_CHANGED,
+							cardId,
+							logs,
+						);
+					});
+					return { success: true };
 				}
 
 				const project = projectStore.getProject(projectId);
@@ -200,6 +223,7 @@ export function registerTaskLogsHandlers(
 				}
 
 				taskLogService.stopWatching(specId);
+				unwatchServerCardLogs(specId);
 				return { success: true };
 			} catch (error) {
 				console.error("Failed to stop watching task logs:", error);

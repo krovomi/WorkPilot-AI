@@ -608,6 +608,29 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		success: false,
 		error: "Not available in browser mode",
 	}),
+	getReviewLessons: async () => ({ success: true, data: [] }),
+	getWorktreeRecipe: async () => ({ success: false, error: "Not available in browser mode" }),
+	approveWorktreeRecipe: async () => ({ success: false, error: "Not available in browser mode" }),
+	saveDetectedWorktreeRecipe: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
+	getMcpPins: async () => ({ success: true, data: [] }),
+	approveMcpServer: async () => ({ success: true, data: [] }),
+	listTaskSteering: async () => ({ success: true, data: [] }),
+	sendTaskSteering: async () => ({ success: false, error: "Not available in browser mode" }),
+	startPreviewPoint: async () => ({ success: false, error: "Not available in browser mode" }),
+	cancelPreviewPoint: async () => ({ success: true, data: false }),
+	discardPreviewPoint: async () => ({ success: true, data: false }),
+	sendPreviewPoints: async () => ({ success: false, error: "Not available in browser mode" }),
+	adoptReviewLesson: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
+	dismissReviewLesson: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
 	onLearningLoopStatus: () => () => {
 		/* noop */
 	},
@@ -658,6 +681,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	checkOpenAICodexOAuth: async () => ({ isAuthenticated: false }),
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	probeAcpAgent: async (tool) => ({ tool, error: "not_installed" }),
+	installAgentCli: async (tool) => ({ tool, success: false, error: "node_required" }),
 	listTaskPermissions: async () => [],
 	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
 	onTaskPermissionRequest: () => () => {
@@ -714,25 +738,12 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		/* noop */
 	},
 
-	// Voice Control API
-	onVoiceControlStatus: () => () => {
+	// Voice assistant API
+	onVoiceAssistantToggle: () => () => {
 		/* noop */
 	},
-	onVoiceControlStreamChunk: () => () => {
-		/* noop */
-	},
-	onVoiceControlError: () => () => {
-		/* noop */
-	},
-	onVoiceControlComplete: () => () => {
-		/* noop */
-	},
-	onVoiceControlAudioLevel: () => () => {
-		/* noop */
-	},
-	onVoiceControlDuration: () => () => {
-		/* noop */
-	},
+	getVoiceShortcutStatus: async () => "off" as const,
+	interpretVoiceCommand: async () => ({ success: false as const, error: "unavailable" as const }),
 
 	// App Emulator API
 	onAppEmulatorStatus: () => () => {
@@ -783,6 +794,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	},
 	// Context-window management: registered at startup by global-listeners.
 	// No backend in the preview, so the commands report unavailable.
+	// Stacked tasks (F6): git runs in the main process only.
+	stackTaskOn: async () => ({ success: false, error: "Not available in browser mode" }),
+	getTaskStackStatus: async () => ({ success: true, data: { stacked: false } }),
+	updateTaskStack: async () => ({ success: false, error: "Not available in browser mode" }),
 	listTaskSandboxes: async () => [],
 	onTaskSandboxStatus: () => () => {
 		/* nothing to remove in the browser mock */

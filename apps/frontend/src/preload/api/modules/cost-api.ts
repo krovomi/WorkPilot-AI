@@ -5,18 +5,14 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type {
+	CostSummary,
+	DashboardSnapshot,
+	IPCResult,
+	WorkspaceSession,
+} from "../../../shared/types";
 
-export interface CostSummary {
-	total_cost: number;
-	cost_by_provider: Record<string, number>;
-	cost_by_model: Record<string, number>;
-	total_tokens: number;
-	tokens_input: number;
-	tokens_output: number;
-	period_days: number;
-	daily_avg: number;
-	trend_pct: number;
-}
+export type { CostSummary, DashboardSnapshot };
 
 export interface BudgetInfo {
 	monthly_budget: number;
@@ -25,19 +21,6 @@ export interface BudgetInfo {
 	utilization_pct: number;
 	alerts: string[];
 	forecast_end_of_month: number;
-}
-
-export interface DashboardSnapshot {
-	tasks_by_status: Record<string, number>;
-	avg_completion_by_complexity: Record<string, number>;
-	qa_first_pass_rate: number;
-	qa_avg_score: number;
-	total_tokens: number;
-	tokens_by_provider: Record<string, number>;
-	total_cost: number;
-	cost_by_model: Record<string, number>;
-	merge_auto_count: number;
-	merge_manual_count: number;
 }
 
 export interface ContextUsage {
@@ -78,6 +61,12 @@ export interface CostAPI {
 	onDashboardSnapshotUpdated(
 		callback: (projectPath: string) => void,
 	): () => void;
+	/** A server project's views, computed by the server: by id, never a path. */
+	getServerCostSummary(projectId: string): Promise<IPCResult<CostSummary>>;
+	getServerDashboardSnapshot(
+		projectId: string,
+	): Promise<IPCResult<DashboardSnapshot>>;
+	getServerSessions(projectId: string): Promise<IPCResult<WorkspaceSession[]>>;
 }
 
 export const createCostAPI = (): CostAPI => ({
@@ -95,6 +84,15 @@ export const createCostAPI = (): CostAPI => ({
 
 	getDashboardSnapshot: (projectPath: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, projectPath),
+
+	getServerCostSummary: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_COSTS, projectId),
+
+	getServerDashboardSnapshot: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_DASHBOARD, projectId),
+
+	getServerSessions: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SERVER_WORKSPACE_SESSIONS, projectId),
 
 	onCostsUpdated: (callback: (projectPath: string) => void) => {
 		const handler = (_event: Electron.IpcRendererEvent, projectPath: string) =>

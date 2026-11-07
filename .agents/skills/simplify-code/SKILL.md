@@ -24,7 +24,7 @@ metadata:
     - test-driven-development
   workpilot:
     pack: hermes
-    version: 0.0.1
+    version: 0.1.0
     content_sha256: a5961afd328e8e44128e9d00a37796c1a9008717e5ac72e4faeacff2265c2d0a
 ---
 

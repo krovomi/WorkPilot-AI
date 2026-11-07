@@ -67,7 +67,7 @@
 	},
 	"auth": {
 		"title": "Claude Authentication Required",
-		"description": "A Claude Code OAuth token is required to generate AI-powered feature ideas."
+		"description": "This page generates ideas with Claude, which needs a Claude Code OAuth token or an active API profile. Sign in, or pick another provider for this page."
 	},
 	"noIdeas": "No ideas to display",
 	"performanceDetails": {
@@ -79,5 +79,35 @@
 		"implementation": "Implementation",
 		"affectedAreas": "Affected Areas",
 		"tradeoffs": "Tradeoffs"
+	},
+	"details": {
+		"impactLevel": "{{level}} impact",
+		"files": "Files",
+		"buildsUpon": "Builds Upon",
+		"implementationApproach": "Implementation Approach",
+		"patternsToFollow": "Patterns to Follow",
+		"severity": "Severity",
+		"breakingChange": "Breaking Change",
+		"breakingChangeDescription": "This refactoring may break existing code or tests.",
+		"proposedChange": "Proposed Change",
+		"codeExample": "Code Example",
+		"metrics": "Metrics",
+		"lines": "Lines",
+		"complexity": "Complexity",
+		"duplicateLines": "Duplicate Lines",
+		"testCoverage": "Test Coverage",
+		"bestPractice": "Best Practice",
+		"prerequisites": "Prerequisites",
+		"targetAudience": "Target Audience",
+		"currentDocumentation": "Current Documentation",
+		"proposedContent": "Proposed Content",
+		"priority": "Priority",
+		"vulnerability": "Vulnerability",
+		"currentRisk": "Current Risk",
+		"remediation": "Remediation",
+		"references": "References",
+		"compliance": "Compliance",
+		"userBenefit": "User Benefit",
+		"affectedComponents": "Affected Components"
 	}
 }

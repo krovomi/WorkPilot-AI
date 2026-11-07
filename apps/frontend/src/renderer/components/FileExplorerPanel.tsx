@@ -75,7 +75,7 @@ export function FileExplorerPanel({ projectPath }: FileExplorerPanelProps) {
 							<div className="flex items-center gap-2">
 								<FolderTree className="h-4 w-4 text-primary" />
 								<span className="text-sm font-medium whitespace-nowrap">
-									Project Files
+									{t("common:fileExplorer.title")}
 								</span>
 							</div>
 							<div className="flex items-center gap-1">
@@ -102,8 +102,8 @@ export function FileExplorerPanel({ projectPath }: FileExplorerPanelProps) {
 
 						{/* Drag hint */}
 						<div className="px-3 py-2 bg-muted/30 border-b border-border shrink-0">
-							<p className="text-[10px] text-muted-foreground whitespace-nowrap">
-								Drag files into a terminal to insert the path
+							<p className="text-3xs text-muted-foreground whitespace-nowrap">
+								{t("common:fileExplorer.dragHint")}
 							</p>
 						</div>
 

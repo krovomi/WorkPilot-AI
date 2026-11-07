@@ -30,8 +30,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from core.build_signals import BuildPaused  # noqa: E402
-from core.pause_state import (  # noqa: E402
+from foundation.build_signals import BuildPaused  # noqa: E402
+from foundation.pause_state import (  # noqa: E402
     clear_pause_state,
     is_paused,
     read_pause_state,

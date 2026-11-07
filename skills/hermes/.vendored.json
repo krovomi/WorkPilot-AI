@@ -1,9 +1,13 @@
 {
 	"source": "NousResearch/hermes-agent",
-	"ref": "HEAD",
-	"commit": "d49e2ebbaed42718659c13f82c04cde7d8ab10bd",
+	"ref": "v0.23.0",
+	"commit": "2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19",
 	"skills": 12,
+	"follows": "latest-release",
 	"subdirs": [
+		"optional-skills/autonomous-ai-agents/opencode",
+		"optional-skills/software-development/node-inspect-debugger",
+		"optional-skills/software-development/python-debugpy",
 		"skills/autonomous-ai-agents",
 		"skills/devops",
 		"skills/software-development"

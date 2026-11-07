@@ -11,11 +11,12 @@ import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
 import { SettingsSection } from "./SettingsSection";
 
+import { NativeSelect } from "../ui/native-select";
 function getTierClasses(tier: ProviderModel["tier"]): string {
 	const tierClassMap: Record<ProviderModel["tier"], string> = {
 		flagship: "bg-primary/10 text-primary",
 		standard: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-		fast: "bg-green-500/10 text-green-600 dark:text-green-400",
+		fast: "bg-success/10 text-success ",
 		local: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
 	};
 	return tierClassMap[tier];
@@ -286,7 +287,7 @@ export function CustomProviderConfig() {
 								</Label>
 								<Input
 									id="model-name"
-									placeholder="Custom Model Name"
+									placeholder={t("settings:customProvider.modelNamePlaceholder")}
 									value={newModelName}
 									onChange={(e) => setNewModelName(e.target.value)}
 									className="mt-1 h-8"
@@ -317,12 +318,12 @@ export function CustomProviderConfig() {
 								>
 									{t("customProvider.modelTier")}
 								</Label>
-								<select
+								<NativeSelect
 									id="model-tier"
 									value={newModelTier}
 									// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 									onChange={(e) => setNewModelTier(e.target.value as any)}
-									className="text-xs px-2 py-1 border border-border rounded bg-background"
+									className="text-xs px-2 py-1 h-auto"
 								>
 									<option value="flagship">
 										{t("customProvider.tierFlagship")}
@@ -331,7 +332,7 @@ export function CustomProviderConfig() {
 										{t("customProvider.tierStandard")}
 									</option>
 									<option value="fast">{t("customProvider.tierFast")}</option>
-								</select>
+								</NativeSelect>
 							</div>
 
 							<div className="flex items-center space-x-2">
@@ -386,14 +387,14 @@ export function CustomProviderConfig() {
 													({model.value})
 												</span>
 												<span
-													className={`inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium ${tierClasses}`}
+													className={`inline-flex items-center rounded px-1.5 py-0.5 text-3xs font-medium ${tierClasses}`}
 												>
 													{t(
 														`customProvider.tier${model.tier.charAt(0).toUpperCase() + model.tier.slice(1)}`,
 													)}
 												</span>
 												{model.supportsThinking && (
-													<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-[9px] font-medium text-violet-600 dark:text-violet-400">
+													<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-3xs font-medium text-violet-600 dark:text-violet-400">
 														{t("agentProfile.supportsThinking")}
 													</span>
 												)}

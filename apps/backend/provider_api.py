@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 # Install the global log redaction filter as early as possible — before
 # any module logs anything sensitive at import time. Idempotent.
 try:
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
 except Exception as _e:  # noqa: BLE001 — never block boot on this
@@ -109,22 +109,13 @@ def deny_in_server_mode() -> None:
 
 
 def _safe_error_message(e: Exception) -> str:
-    """Return a safe error message without exposing internal stack traces."""
-    logger.error("Operation failed: %s: %s", type(e).__name__, e)
-    # Map known exception types to safe user-facing messages
-    _SAFE_MESSAGES: dict[type, str] = {
-        TimeoutError: "Request timed out",
-        ConnectionError: "Connection failed",
-        PermissionError: "Permission denied",
-        FileNotFoundError: "Resource not found",
-        ValueError: "Invalid input",
-        KeyError: "Missing required field",
-        OSError: "System error",
-    }
-    for exc_type, msg in _SAFE_MESSAGES.items():
-        if isinstance(e, exc_type):
-            return msg
-    return "An unexpected error occurred"
+    """Return a safe error message without exposing internal stack traces.
+
+    The one mapping of `foundation.api_safety.safe_error`, which this used to copy.
+    """
+    from foundation.api_safety import safe_error
+
+    return safe_error(e, logger, "Operation")
 
 
 # SSRF Protection - Authorized URLs list
@@ -213,7 +204,7 @@ async def lifespan(app: FastAPI):
         from analytics import init_database
 
         init_database()
-        logging.getLogger(__name__).info("Analytics database initialized")
+        logging.getLogger(__name__).debug("Analytics database initialized")
     except Exception as e:
         logging.getLogger(__name__).warning(
             f"Could not initialize analytics database: {e}"
@@ -285,12 +276,12 @@ except Exception as e:
 def _mount(router, feature: str) -> None:
     """Mount a feature router with its permission attached.
 
-    In server mode the router's whole surface is gated by the permission its
-    feature maps onto (``server.authz.catalog.FEATURE_DOMAINS``): ``<domain>.read``
-    for GET, ``<domain>.write`` otherwise, with ``ROUTE_OVERRIDES`` raising the
-    bar for the routes that execute agents. In local mode the router mounts
-    untouched, so the desktop app pays nothing for a check that would always
-    pass.
+    In server mode only what an organization's projects own is mounted
+    (``server.authz.catalog.SERVER_FEATURES``); machine-local tools stay with
+    the desktop app's local backend. A served router's whole surface is gated
+    by its feature's domain (``FEATURE_DOMAINS``): ``<domain>.read`` for GET,
+    ``<domain>.write`` otherwise, ``ROUTE_OVERRIDES`` raising the bar for the
+    routes that execute agents. In local mode every router mounts untouched.
 
     Attaching the guard here rather than editing ~150 endpoint signatures is
     deliberate, and so is doing it at the mount rather than from a table keyed
@@ -300,9 +291,9 @@ def _mount(router, feature: str) -> None:
     if not _SERVER_MODE_ACTIVE:
         app.include_router(router)
         return
-    from server.authz.mounting import mount_guarded
+    from server.authz.mounting import mount_served
 
-    mount_guarded(app, router, feature)
+    mount_served(app, router, feature)
 
 
 # Single shared limiter instance (also imported by server.routers.* so all
@@ -327,11 +318,10 @@ _ALLOWED_ORIGINS = [
 
 # There used to be an `allow_origin_regex` of
 # ``^https?://(localhost|127\.0\.0\.1)(:\d+)?$`` here. Combined with
-# ``allow_credentials=True`` that trusted *any* page served from *any* local
-# port — so any other local dev server, or a page a user happened to open from
-# a local static server, could make credentialed calls to this API. The
-# explicit list above already covers the ports WorkPilot itself uses; anything
-# else must be opted into deliberately.
+# ``allow_credentials=True`` that trusted *any* page served from *any* local port — so
+# any other local dev server, or a page a user happened to open from a local static
+# server, could make credentialed calls to this API. The explicit list above already
+# covers the ports WorkPilot itself uses; anything else must be opted into deliberately.
 _EXTRA_ORIGINS = [
     origin.strip()
     for origin in os.environ.get("WORKPILOT_EXTRA_CORS_ORIGINS", "").split(",")
@@ -357,6 +347,7 @@ app.add_middleware(
         "Content-Language",
         "X-Requested-With",
         "X-Provider",
+        "X-WorkPilot-Org",  # server mode: the org a request acts in, checked server-side
     ],
 )
 
@@ -1715,20 +1706,6 @@ async def get_provider_usage(provider: str):
 # ---------------------------------------------------------------------------
 
 
-# Dashboard + Session History endpoints moved to dashboard/api.py
-
-
-# Refactoring + documentation + feedback + templates + code-review
-# endpoints moved to agent_endpoints/api.py
-# System status endpoints moved to system_status/api.py
-# GitHub PR Details endpoint moved to runners/github/api.py
-# Test Generation Agent API moved to test_generation/api.py
-# Both mounted below alongside the other feature routers.
-
-
-# Event-Driven Hooks System API moved to event_hooks/api.py
-
-
 # Every route of `providers_router` is declared above this line.
 _mount(providers_router, "providers")
 
@@ -1945,6 +1922,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import brain router: {e}")
 
+# --- MCP tool pins (the custom servers' tools the person approved) ---
+try:
+    from mcp_pins.api import router as mcp_pins_router
+
+    _mount(mcp_pins_router, "mcp_pins")
+except ImportError as e:
+    print(f"Warning: Could not import mcp_pins router: {e}")
+
 # --- rtk API (is the output-condensing proxy working here, and what it saved) ---
 try:
     from rtk.api import router as rtk_router
@@ -1960,6 +1945,14 @@ try:
     _mount(watermarks_router, "watermarks")
 except ImportError as e:
     print(f"Warning: Could not import watermarks router: {e}")
+
+# --- Shared board and features (server mode: cards, roadmap..., by project_id) ---
+try:
+    from shared_features import mount_all as mount_shared_project_routers
+
+    mount_shared_project_routers(_mount)
+except ImportError as e:
+    print(f"Warning: Could not import shared board routers: {e}")
 
 # --- Spec Traceability API (open questions + requirement coverage for a spec) ---
 try:
@@ -2000,14 +1993,6 @@ try:
     _mount(slash_commands_router, "slash_commands")
 except ImportError as e:
     print(f"Warning: Could not import slash_commands router: {e}")
-
-# --- Parallel Variations API (local Arena: scaffold + compare, never auto-merge) ---
-try:
-    from parallel_variations.api import router as parallel_variations_router
-
-    _mount(parallel_variations_router, "parallel_variations")
-except ImportError as e:
-    print(f"Warning: Could not import parallel_variations router: {e}")
 
 # --- Virtual Reviewer API (advisory only, no signature, no PR) ---
 try:
@@ -2072,6 +2057,11 @@ try:
     _mount(notifications_router, "notifications")
 except ImportError as e:
     print(f"Warning: Could not import notifications router: {e}")
+
+# --- Worktree recipe (how a task's worktree is prepared, per stack) ---
+from core.workspace.recipe_api import router as worktree_recipe_router  # noqa: E402
+
+_mount(worktree_recipe_router, "worktree_recipe")
 
 if __name__ == "__main__":
     import uvicorn

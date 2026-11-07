@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from stat import S_ISREG
 
+from foundation.paging import page_items
 from harness.domain.code_chunks import SYMBOL_KINDS, Chunk, chunk_file
 from harness.domain.code_ranking import (
     Bm25Index,
@@ -53,7 +54,6 @@ from harness.domain.code_ranking import (
     rrf,
     term_counts,
 )
-from harness.domain.paging import page_items
 
 logger = logging.getLogger(__name__)
 

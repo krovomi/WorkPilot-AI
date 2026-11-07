@@ -188,7 +188,7 @@ def sync_plan_to_source(spec_dir: Path, source_spec_dir: Path | None) -> bool:
 
 
 # The pause flag used to live in `implementation_plan.json`, read and written
-# through three helpers here. It now lives in `core.pause_state`, whose store is
+# through three helpers here. It now lives in `foundation.pause_state`, whose store is
 # `pause_state.json` — a file that exists from the moment the spec does, so the
 # pause also works during planning, the one phase where there is no plan yet.
 # Keeping these as a second writer would have meant two answers to "is this task

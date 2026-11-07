@@ -8,19 +8,30 @@ approval or max iterations.
 
 import asyncio
 import os
+import subprocess
 import time as time_module
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from core.build_signals import BuildPaused
 from core.client import create_agent_client
-from core.debug import debug, debug_error, debug_section, debug_success, debug_warning
-from core.pause_state import is_paused, read_pause_state
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from foundation.base_branch import detect_base_branch
+from foundation.build_signals import BuildPaused
+from foundation.change_scope import ChangeScope, change_scope
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_section,
+    debug_success,
+    debug_warning,
+)
+from foundation.git_executable import run_git
+from foundation.pause_state import is_paused, read_pause_state
 from foundation.phase_event import ExecutionPhase, emit_phase
+from foundation.review_comments import mark_addressed
 from goal import (
     GoalSpec,
     GoalVerdict,
@@ -51,6 +62,7 @@ from task_logger import (
     get_task_logger,
 )
 
+from . import recheck
 from .budget import (
     MAX_QA_ITERATIONS,
     qa_iteration_cap,
@@ -61,7 +73,10 @@ from .criteria import (
     get_qa_signoff_status,
     is_qa_approved,
 )
+from .dependency_gate import dependency_gate
 from .fixer import run_qa_fixer_session
+from .mutation_gate import guard_start, guard_test_only, mutation_gate
+from .proof_gate import proof_gate
 from .report import (
     create_manual_test_plan,
     escalate_to_human,
@@ -281,6 +296,12 @@ class _QaState:
     # The last reviewer error, fed back to the next pass for self-correction.
     last_error_context: dict | None = None
     max_iterations_emitted: bool = False
+    # The change set the last reviewer pass judged (`foundation.change_scope`).
+    # Read by the coverage gate: a text-only change has no coverage to measure.
+    review_scope: ChangeScope | None = None
+    # The shell commands the last reviewer pass ran: the targeted gate's
+    # evidence that the mapped tests were run, not only declared passed.
+    review_commands: list[str] = field(default_factory=list)
 
     def reset_errors(self) -> None:
         self.consecutive_errors = 0
@@ -425,6 +446,9 @@ async def run_qa_validation_loop(
             LogEntryType.INFO,
             LogPhase.VALIDATION,
         )
+    # A rejection recorded by an earlier QA run is not this run's previous
+    # pass: the first pass here is a complete review.
+    recheck.clear(spec_dir)
     scope = _QaScope(
         project_dir=project_dir,
         spec_dir=spec_dir,
@@ -511,15 +535,42 @@ async def run_qa_validation_loop(
             record_iteration(
                 spec_dir, state.qa_iteration, "approved", [], iteration_duration
             )
-            gate = await _architecture_gate(
-                scope, state.qa_iteration, qa_model
-            ) or _coverage_gate(spec_dir, state.qa_iteration)
+            gate = (
+                dependency_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or proof_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    task_logger=scope.task_logger,
+                )
+                or await _architecture_gate(scope, state.qa_iteration, qa_model)
+                or _coverage_gate(
+                    spec_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    state.review_commands,
+                )
+                or mutation_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+            )
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
                 if goal_gate is _Next.FAILED:
                     return False
                 gate = goal_gate
             if gate is None:
+                recheck.clear(spec_dir)
                 await _on_approved(scope, state.qa_iteration)
                 return True
             status = "rejected"
@@ -595,6 +646,9 @@ async def _apply_human_feedback(
         )
         return False
 
+    # Where the session starts: its diff says which review comments it
+    # addressed (foundation.review_comments), not the model.
+    commit_before = run_git(["rev-parse", "HEAD"], cwd=project_dir).stdout.strip()
     try:
         async with fix_client:
             fix_status, fix_response = await run_qa_fixer_session(
@@ -614,6 +668,7 @@ async def _apply_human_feedback(
         return False
 
     debug_success("qa_loop", "Human feedback fixes applied")
+    mark_addressed(spec_dir, project_dir, commit_before, session=0)
     task_event_emitter.emit(
         "QA_FIXING_COMPLETE",
         {"iteration": 0},
@@ -805,11 +860,11 @@ async def _jev_review_advice(
     if jev_run is None:
         jev_run = JevRun.from_env(JevContext("feature-build", project_dir, spec_dir))
     if not hasattr(jev_run, "base_revision") and not jev_run.eligibility():
+        from foundation.base_branch import detect_base_branch
         from integrations.jev.adapters import capture_base
-        from prompts_pkg.prompts import _detect_base_branch
 
         try:
-            capture_base(jev_run, _detect_base_branch(spec_dir, project_dir))
+            capture_base(jev_run, detect_base_branch(spec_dir, project_dir))
         except (OSError, ValueError):
             jev_run.base_revision = None
     jev_advice = advice_text(
@@ -825,6 +880,13 @@ async def _run_reviewer(
     spec_dir = scope.spec_dir
     qa_thinking_budget = get_phase_thinking_budget(spec_dir, "qa")
     qa_provider = get_phase_provider(spec_dir, phase="qa")
+    state.review_scope = review_scope = _review_scope(scope)
+    state.review_commands = []
+    advice = "\n\n".join(
+        part
+        for part in (advice, _recheck_advice(scope, state.qa_iteration, review_scope))
+        if part
+    )
     debug(
         "qa_loop",
         "Creating client for QA reviewer session...",
@@ -839,6 +901,10 @@ async def _run_reviewer(
             agent_type="qa_reviewer",
             max_thinking_tokens=qa_thinking_budget,
             provider=qa_provider,
+            # A text-only change has nothing for a test-runner subagent to
+            # run, and a targeted one names its few tests: in both the roster
+            # would be context billed on every turn.
+            use_subagents=review_scope.is_full,
         )
     except Exception as e:
         debug_error("qa_loop", f"Failed to create QA reviewer client: {e}")
@@ -865,6 +931,8 @@ async def _run_reviewer(
                 scope.verbose,
                 jev_advice=advice,
                 previous_error=state.last_error_context,  # Pass error context for self-correction
+                review_scope=review_scope,
+                commands_seen=state.review_commands,
             )
     except Exception as e:
         # Prompt-too-long errors are not retryable — the conversation
@@ -892,6 +960,67 @@ async def _run_reviewer(
         status = "error"
         response = str(e)
     return status, response, client
+
+
+def _recheck_advice(scope: _QaScope, qa_iteration: int, review: ChangeScope) -> str:
+    """The re-review section of a pass after a fix, or "" (`qa.recheck`)."""
+    if review.is_light:
+        return ""  # text only: the light review already reads just the change
+    try:
+        section = recheck.recheck_section(
+            scope.spec_dir, scope.project_dir, qa_iteration
+        )
+    except (OSError, ValueError) as e:  # without the section the pass is full
+        debug_warning("qa_loop", f"QA re-review by delta skipped: {e}")
+        return ""
+    if section and scope.task_logger:
+        scope.task_logger.log(
+            f"QA pass {qa_iteration}: checking the fix of pass {qa_iteration - 1} "
+            "first (re-review by delta), then the complete review if it holds.",
+            LogEntryType.INFO,
+            LogPhase.VALIDATION,
+        )
+    return section
+
+
+def _review_scope(scope: _QaScope) -> ChangeScope:
+    """How much review this pass's change set calls for, written to the task log.
+
+    Read again on every pass: a fixer that touched code after a text-only
+    first pass turns the next review into a full one.
+    """
+    try:
+        review_scope = change_scope(
+            scope.project_dir, detect_base_branch(scope.spec_dir, scope.project_dir)
+        )
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        # Unknown is never light.
+        debug_warning("qa_loop", f"Change scope unavailable, full review: {exc}")
+        return ChangeScope("full", "change scope unavailable")
+    if review_scope.is_light and not review_scope.files:
+        message = (
+            f"QA scope: light ({review_scope.reason} against the base branch) — "
+            "the reviewer checks whether the repository already meets the spec; "
+            "no test suite, coverage or repository scan."
+        )
+    elif review_scope.is_light:
+        message = (
+            f"QA scope: light ({review_scope.reason}: "
+            f"{', '.join(review_scope.files)}) — the reviewer checks the change "
+            "against the spec; no test suite, coverage or repository scan."
+        )
+    elif review_scope.is_targeted:
+        message = (
+            f"QA scope: targeted — QA ciblée ({review_scope.reason}) — the "
+            f"reviewer runs only {', '.join(review_scope.tests)}, with coverage "
+            "of the touched files; no full suite, no subagent."
+        )
+    else:
+        message = f"QA scope: full ({review_scope.reason})."
+    print(f"\n🔎 {message}")
+    if scope.task_logger:
+        scope.task_logger.log(message, LogEntryType.INFO, LogPhase.VALIDATION)
+    return review_scope
 
 
 def _halted_on_prompt_too_long(
@@ -1062,7 +1191,12 @@ async def _architecture_gate(
     return None
 
 
-def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] | None:
+def _coverage_gate(
+    spec_dir: Path,
+    qa_iteration: int,
+    review_scope: ChangeScope | None = None,
+    review_commands: list[str] | None = None,
+) -> tuple[list[dict], str] | None:
     """Coverage Enforcement Gate, run once QA and architecture approve.
 
     Enforces the minimum test coverage threshold (default 100% for unit +
@@ -1070,7 +1204,22 @@ def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] 
     numbers recorded by the QA reviewer in qa_signoff.coverage. Controlled by
     WORKPILOT_QA_MIN_COVERAGE (0 = disabled). Returns the issues and the
     verdict of a rejection, or None.
+
+    Not applicable when git showed no file a program reads in the change
+    set (text only, however large, or no change at all): coverage cannot have
+    moved, and demanding a measurement is what sent the reviewer to run every
+    suite of the repository with coverage for a `.txt`, then the fixer to
+    invent placeholder test projects to produce a number. Decided from
+    `review_scope` (git), never from what the reviewer wrote in its sign-off.
+
+    A targeted pass is judged by `qa.targeted_gate` instead: its mapped tests
+    ran and passed, and the touched files reach the threshold.
     """
+    if review_scope is not None and not review_scope.touches_code:
+        debug("qa_loop", "Coverage gate not applicable: no code in the change set")
+        return None
+    if review_scope is not None and review_scope.is_targeted:
+        return _targeted_gate(spec_dir, qa_iteration, review_scope, review_commands)
     try:
         from .coverage_gate import (
             build_coverage_issues,
@@ -1129,6 +1278,35 @@ def _coverage_gate(spec_dir: Path, qa_iteration: int) -> tuple[list[dict], str] 
             f"Coverage gate error (non-blocking): {e}",
         )
     return None
+
+
+def _targeted_gate(
+    spec_dir: Path,
+    qa_iteration: int,
+    review_scope: ChangeScope,
+    review_commands: list[str] | None,
+) -> tuple[list[dict], str] | None:
+    """The targeted tier's gate. Unlike the coverage gate, an error rejects:
+    the tier never approves without having seen its tests run."""
+    try:
+        from .targeted_gate import run_targeted_gate
+
+        issues = run_targeted_gate(spec_dir, review_scope, review_commands)
+    except (ImportError, OSError, ValueError, TypeError, KeyError, AttributeError) as e:
+        # Anything else propagates: a crash is not an approval either.
+        debug_warning("qa_loop", f"Targeted QA gate error, rejecting: {e}")
+        issues = [
+            {
+                "title": "QA ciblée : vérification impossible",
+                "description": f"Le contrôle des tests ciblés a échoué : {e}",
+                "type": "targeted_qa_gap",
+                "severity": "critical",
+            }
+        ]
+    if not issues:
+        return None
+    print(f"\n🎯 Targeted QA (QA ciblée): {len(issues)} requirement(s) not met")
+    return issues, f"QA pass #{qa_iteration} rejected by the targeted QA gate"
 
 
 def _goal_still_met(
@@ -1416,9 +1594,15 @@ async def _on_rejected(
     # QA_FIX_REQUEST.md est rendu depuis issues_found : le fixer lit
     # les issues de cette passe, jamais celles d'une passe précédente.
     # Un gate a déjà écrit le sien, plus précis : on le garde.
-    return await _run_fixer(
+    # The next pass checks the fixer's delta first (`qa.recheck`).
+    recheck.record_rejection(spec_dir, scope.project_dir, qa_iteration, current_issues)
+    # Missing tests are answered with tests: other files the fixer touches are restored.
+    head = guard_start(scope.project_dir, gate)
+    nxt = await _run_fixer(
         scope, state, qa_model, current_issues if gate is None else None
     )
+    guard_test_only(scope.project_dir, spec_dir, head)
+    return nxt
 
 
 async def _escalate_recurring(

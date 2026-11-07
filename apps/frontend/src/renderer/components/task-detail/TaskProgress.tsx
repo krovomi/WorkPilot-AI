@@ -6,6 +6,7 @@ import {
 import type { ExecutionPhase, Task } from "../../../shared/types";
 import { calculateProgress, cn } from "../../lib/utils";
 import { Progress } from "../ui/progress";
+import { useTranslation } from "react-i18next";
 
 interface TaskProgressProps {
 	task: Task;
@@ -22,6 +23,7 @@ export function TaskProgress({
 	executionPhase,
 	isStuck,
 }: TaskProgressProps) {
+	const { t } = useTranslation();
 	const progress = calculateProgress(task.subtasks);
 
 	return (
@@ -51,7 +53,9 @@ export function TaskProgress({
 						)}
 						{task.executionProgress?.currentSubtask && (
 							<p className="text-xs mt-0.5 opacity-70">
-								Subtask: {task.executionProgress.currentSubtask}
+								{t("taskReview:taskPanel.subtaskLabel", {
+								name: task.executionProgress.currentSubtask,
+							})}
 							</p>
 						)}
 					</div>
@@ -61,15 +65,18 @@ export function TaskProgress({
 			{/* Progress Bar */}
 			<div className="section-divider mb-3">
 				<Zap className="h-3 w-3" />
-				Progress
+				{t("taskReview:taskPanel.progress")}
 			</div>
 			<div className="flex items-center justify-between mb-2">
 				<span className="text-xs text-muted-foreground">
 					{hasActiveExecution && task.executionProgress?.message
 						? task.executionProgress.message
 						: task.subtasks.length > 0
-							? `${task.subtasks.filter((c) => c.status === "completed").length}/${task.subtasks.length} subtasks completed`
-							: "No subtasks yet"}
+							? t("taskReview:taskPanel.subtasksCompleted", {
+									completed: task.subtasks.filter((c) => c.status === "completed").length,
+									total: task.subtasks.length,
+								})
+							: t("taskReview:taskPanel.noSubtasksYet")}
 				</span>
 				<span
 					className={cn(
@@ -106,11 +113,11 @@ export function TaskProgress({
 						className={cn(
 							"transition-all duration-300",
 							executionPhase === "planning"
-								? "bg-amber-500"
-								: "bg-amber-500/30",
+								? "bg-warning"
+								: "bg-warning/30",
 						)}
 						style={{ width: "20%" }}
-						title="Planning (0-20%)"
+						title={t("taskReview:taskPanel.phasePlanning")}
 					/>
 					<div
 						className={cn(
@@ -118,7 +125,7 @@ export function TaskProgress({
 							executionPhase === "coding" ? "bg-info" : "bg-info/30",
 						)}
 						style={{ width: "60%" }}
-						title="Coding (20-80%)"
+						title={t("taskReview:taskPanel.phaseCoding")}
 					/>
 					<div
 						className={cn(
@@ -128,12 +135,12 @@ export function TaskProgress({
 								: "bg-purple-500/30",
 						)}
 						style={{ width: "15%" }}
-						title="AI Review (80-95%)"
+						title={t("taskReview:taskPanel.phaseReview")}
 					/>
 					<div
 						className="transition-all duration-300 bg-success/30"
 						style={{ width: "5%" }}
-						title="Complete (95-100%)"
+						title={t("taskReview:taskPanel.phaseComplete")}
 					/>
 				</div>
 			)}

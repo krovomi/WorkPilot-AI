@@ -165,6 +165,11 @@ npm start
 
 ## Development Setup
 
+**Dev container.** `.devcontainer/` gives the toolchain CI uses (Python 3.13, uv, Node 22, pnpm,
+and Electron's libraries with xvfb for the E2E suite) and runs `pnpm run install:all` on creation:
+open the repository with VS Code's "Reopen in Container", or in Codespaces. Run the desktop app
+itself on your machine; inside the container, use the tests and `xvfb-run -a`.
+
 The project consists of two main components:
 
 1. **Python Backend** (`apps/backend/`) - The core autonomous coding framework
@@ -228,9 +233,9 @@ Python package. `pnpm install` at the root runs `prepare`, which points git at t
 |------|-----------|--------------|
 | `pre-commit` | On **staged files only**: `ruff format` + `ruff check --fix` (Python), `biome check --write` (frontend), re-stage, secret scan (blocks the commit), then `scripts/staged-tests.js` | `PRE_COMMIT_SKIP_TESTS=1` skips the tests, not the formatters or the secret scan |
 | `commit-msg` | Conventional Commits: `type(scope)!?: description`, first line ≤ 100 characters | — |
-| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, Biome lint | `PRE_PUSH_FULL=1` adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
+| `pre-push` | `scripts/pre-push.js`: ruff check + format check, `skills_cli build --check`, audit cards and changelog fragments, per-file ceilings of blind excepts, `biome-ignore` and the size of files over 2 000 lines (`scripts/quality_baselines.py`), Biome lint | `PRE_PUSH_FULL=1` (or `pnpm verify`, without pushing) adds pytest, `tsc` and vitest; `PRE_PUSH_SKIP=1` skips everything |
 
-The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`): any other version produces a diff
+The tool versions are pinned (ruff `0.15.7`, Biome `2.5.11`, pyright `1.1.408`): any other version produces a diff
 CI rejects. `git commit --no-verify` exists, but CI runs the same checks — it only moves the
 failure later.
 
@@ -401,7 +406,7 @@ npm run test:watch
 # Run with coverage
 npm run test:coverage
 
-# Run E2E tests (requires built app)
+# Run E2E tests (requires built app; on Linux without a display, prefix with xvfb-run -a)
 npm run build
 npm run test:e2e
 
@@ -424,21 +429,21 @@ Before submitting a PR:
 ## Continuous Integration
 
 All pull requests and pushes to `develop` and `main` trigger automated CI checks via GitHub Actions,
-whatever they touch: only `CHANGELOG.md`, `LICENSE` and the issue/PR templates are skipped.
+whatever they touch: only `LICENSE` and the issue/PR templates are skipped.
 
 ### Workflows
 
 | Workflow | Trigger | What it checks |
 |----------|---------|----------------|
-| **CI** | Push to `develop`/`main`, PRs | Python tests (3.13 on Linux, Windows, macOS; 3.12 on Linux), frontend typecheck, tests and build, server image build + migration |
-| **Lint** | Push to `develop`/`main`, PRs | Ruff (Python, `scripts/` included), Biome (frontend), Python lockfile freshness, vendored trees, skills |
+| **CI** | Push to `develop`/`main`, PRs | Python tests (3.12 on Linux, Windows, macOS, split into shards, coverage on Linux; 3.13 on Linux after merge), frontend typecheck, tests and build, server image build + migration |
+| **Lint** | Push to `develop`/`main`, PRs | Ruff (Python, `scripts/` included), pyright (packages of `apps/backend/pyrightconfig.json`), Biome (frontend), Python lockfile freshness, vendored trees, skills |
 
 ### PR Requirements
 
 Before a PR can be merged:
 
 1. All CI checks must pass (green checkmarks)
-2. Python tests pass on Python 3.12 and 3.13
+2. Python tests pass on Python 3.12 (3.13 is checked once the PR lands on develop)
 3. Frontend tests pass
 4. Linting passes (no ruff or Biome errors)
 5. TypeScript type checking passes
@@ -541,15 +546,14 @@ develop                ← Integration branch - all PRs merge here first
   │
 ├── feature/xxx        ← New features
 ├── fix/xxx            ← Bug fixes
-├── release/vX.Y.Z     ← Release preparation
-└── hotfix/xxx         ← Emergency production fixes
+└── hotfix/xxx         ← Emergency production fixes (rare)
 ```
 
 ### Main Branches
 
 | Branch | Purpose | Protected |
 |--------|---------|-----------|
-| `main` | Production-ready code. Only receives merges from `release/*` or `hotfix/*` branches. Every merge is tagged (v2.7.0, v2.8.0, etc.) | ✅ Yes |
+| `main` | Released code. Receives `develop` through a pull request merged with a **merge commit** (never squash or rebase); every version bump is tagged (v1.3.3, v1.4.0, etc.) | ✅ Yes |
 | `develop` | Integration branch where all features and fixes are combined. This is the default target for all PRs. | ✅ Yes |
 
 ### Supporting Branches
@@ -558,8 +562,7 @@ develop                ← Integration branch - all PRs merge here first
 |-------------|-------------|----------|---------|
 | `feature/*` | `develop` | `develop` | New features and enhancements |
 | `fix/*` | `develop` | `develop` | Bug fixes (non-critical) |
-| `release/*` | `develop` | `main` + `develop` | Release preparation and final testing |
-| `hotfix/*` | `main` | `main` + `develop` | Critical production bug fixes |
+| `hotfix/*` | `main` | `main` + `develop`, both by merge commit | Critical fix when `develop` holds work that must not ship yet |
 
 ### Branch Naming
 
@@ -574,7 +577,6 @@ Use descriptive branch names with a prefix indicating the type of change:
 | `refactor/` | Code refactoring | `refactor/simplify-auth-flow` |
 | `test/` | Test additions/fixes | `test/add-integration-tests` |
 | `chore/` | Maintenance tasks | `chore/update-dependencies` |
-| `release/` | Release preparation | `release/v2.8.0` |
 | `hotfix/` | Emergency fixes | `hotfix/critical-auth-bug` |
 
 ### Where to Branch From
@@ -604,36 +606,23 @@ git checkout -b hotfix/critical-fix
 | `test/*` | `develop` |
 | `chore/*` | `develop` |
 | `hotfix/*` | `main` (maintainers only) |
-| `release/*` | `main` (maintainers only) |
+| `develop` (release PR) | `main` (maintainers only, merge commit) |
 
 ### Release Process (Maintainers)
 
 When ready to release a new version:
 
-```bash
-# 1. Create release branch from develop
-git checkout develop
-git pull origin develop
-git checkout -b release/v2.8.0
+1. On a branch from `develop`, run `node scripts/bump-version.js X.Y.Z`, then
+   `python scripts/changelog.py release X.Y.Z "Title"`: the fragments of `changelog.d/` become the
+   `## X.Y.Z - Title` section of `CHANGELOG.md` (write its intro). Merge it into `develop` by pull
+   request.
+2. Open a pull request from `develop` to `main` and merge it with **Create a merge commit**.
+   The `main` ruleset refuses squash and rebase: both would give `main` commits `develop` never
+   had, and the next release would conflict.
+3. `prepare-release.yml` tags `vX.Y.Z`, `release.yml` builds and publishes, then commits the README
+   once and merges that commit into both branches. No merge back from `main` to `develop` is needed.
 
-# 2. Update version numbers, CHANGELOG, final fixes only
-# No new features allowed in release branches!
-
-# 3. Merge to main and tag
-git checkout main
-git merge release/v2.8.0
-git tag v2.8.0
-git push origin main --tags
-
-# 4. Merge back to develop (important!)
-git checkout develop
-git merge release/v2.8.0
-git push origin develop
-
-# 5. Delete release branch
-git branch -d release/v2.8.0
-git push origin --delete release/v2.8.0
-```
+Details and the repair procedure if the branches ever diverge: [docs/RELEASE.md](RELEASE.md).
 
 ### Beta Release Process (Maintainers)
 
@@ -800,6 +789,9 @@ cd apps/frontend && npm test && npm run lint && npm run typecheck
    - Public APIs
    - Configuration options
    - User-facing behavior
+
+   A user-facing change also adds a fragment to [`changelog.d/`](../changelog.d/README.md)
+   instead of editing `CHANGELOG.md`, so open PRs do not conflict on the same lines.
 
 5. **Create the Pull Request**:
    - Use a clear, descriptive title

@@ -1,6 +1,7 @@
 {
 	"title": "Analytiques de Build",
 	"subtitle": "Surveillez les performances des agents, l'utilisation des tokens et les métriques de build",
+	"serverSubtitle": "Calculé par le serveur à partir des runs de ce projet, pour toute l'équipe",
 	"periodSelector": {
 		"last7Days": "Derniers 7 jours",
 		"last30Days": "Derniers 30 jours",

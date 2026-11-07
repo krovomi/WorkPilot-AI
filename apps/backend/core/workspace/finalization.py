@@ -65,6 +65,11 @@ def finalize_workspace(
         print(box(content, width=60, style="heavy"))
         return WorkspaceChoice.MERGE  # Already merged
 
+    # The review diff, the PR and the merge all read the branch: commit what
+    # QA or the agent left uncommitted, then take out the build and test
+    # outputs they may have committed.
+    manager.settle_branch(spec_name)
+
     # In auto_continue mode (UI), skip interactive prompts
     # The worktree stays for the UI to manage
     if auto_continue:

@@ -69,7 +69,7 @@ export const SessionCompactionBadge = memo(
 						onClick={(e) => e.stopPropagation()}
 						title={t("labels.sessionCompactionHint", { count: totalPhases })}
 						className={cn(
-							"group inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+							"group inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-3xs font-medium transition-colors",
 							"border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground",
 							lastFailure && "border-destructive/30 text-destructive/90",
 						)}
@@ -104,7 +104,7 @@ export const SessionCompactionBadge = memo(
 									{t("labels.sessionCompaction")}
 								</span>
 							</div>
-							<span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums">
+							<span className="rounded-full bg-muted px-2 py-0.5 text-3xs font-medium tabular-nums">
 								{handoff.completedPhases}/{totalPhases}
 							</span>
 						</div>
@@ -125,7 +125,7 @@ export const SessionCompactionBadge = memo(
 
 					{/* Critical phases */}
 					<div className="px-2 py-2">
-						<p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+						<p className="px-2 pb-1.5 text-3xs font-semibold uppercase tracking-wide text-muted-foreground">
 							{t("labels.criticalPhases")} · {criticalPhases.length}/
 							{totalPhases}
 						</p>
@@ -147,13 +147,13 @@ export const SessionCompactionBadge = memo(
 											{phase.title}
 										</span>
 										{phase.failureReason && (
-											<span className="mt-0.5 block truncate font-mono text-[10px] text-destructive/80">
+											<span className="mt-0.5 block truncate font-mono text-3xs text-destructive/80">
 												{phase.failureReason}
 											</span>
 										)}
 									</div>
 									{phase.critical && (
-										<span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/80" />
+										<span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning/80" />
 									)}
 								</div>
 							))}
@@ -162,7 +162,7 @@ export const SessionCompactionBadge = memo(
 
 					{/* Footer: current phase / last failure */}
 					{(currentPhase || lastFailure) && (
-						<div className="border-t border-border/60 px-4 py-2 text-[10px]">
+						<div className="border-t border-border/60 px-4 py-2 text-3xs">
 							{lastFailure ? (
 								<div className="flex items-center gap-1.5 text-destructive">
 									<AlertTriangle className="h-3 w-3" />

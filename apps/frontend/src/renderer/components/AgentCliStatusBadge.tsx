@@ -1,6 +1,7 @@
 import {
 	AlertTriangle,
 	Check,
+	Download,
 	ExternalLink,
 	Loader2,
 	RefreshCw,
@@ -15,9 +16,17 @@ import {
 	type AcpAgentDeclaration,
 	AGENT_CLI_DOCS,
 	AGENT_CLI_EXECUTABLES,
+	AGENT_CLI_INSTALL,
+	type AgentCliInstallResult,
 	type AgentCliStatus,
 	type AgentCliTool,
 } from "../../shared/types/agent-cli";
+import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
+import {
+	AGENT_CLI_SHORT_NAMES,
+	type CliPresence,
+	useReportCliPresence,
+} from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -30,13 +39,6 @@ const TOOL_NAMES: Readonly<Record<AgentCliTool, string>> = {
 	antigravity: "Antigravity CLI",
 	pi: "pi (pi.dev)",
 	"gemini-cli": "Gemini CLI",
-};
-
-const SHORT_NAMES: Readonly<Record<AgentCliTool, string>> = {
-	opencode: "OpenCode",
-	antigravity: "Antigravity",
-	pi: "pi",
-	"gemini-cli": "Gemini",
 };
 
 /** The capabilities an ACP agent can declare, in the order they are listed. */
@@ -114,11 +116,26 @@ function AcpDeclarationList({ tool }: { readonly tool: AgentCliTool }) {
 	);
 }
 
+/** The command the install button runs first, shown before it runs. */
+function installCommandHint(tool: AgentCliTool): string {
+	const recipe = AGENT_CLI_INSTALL[tool];
+	if (recipe.npmPackage) {
+		return ["npm install -g", ...(recipe.npmArgs ?? []), recipe.npmPackage].join(" ");
+	}
+	const isWindows = globalThis.navigator?.userAgent?.includes("Windows") ?? false;
+	if (isWindows && recipe.windowsScript) return `irm ${recipe.windowsScript} | iex`;
+	return recipe.unixScript
+		? `curl -fsSL ${recipe.unixScript.url} | ${recipe.unixScript.shell}`
+		: "";
+}
+
 interface AgentCliStatusBadgeProps {
 	readonly tool: AgentCliTool;
 	readonly className?: string;
 	/** Collapsed sidebar: the icon only. */
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 function toBadgeStatus(result: AgentCliStatus | null): BadgeStatus {
@@ -137,10 +154,13 @@ export function AgentCliStatusBadge({
 	tool,
 	className,
 	isCollapsed = false,
+	onPresenceChange,
 }: AgentCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const [result, setResult] = useState<AgentCliStatus | null>(null);
 	const [isOpen, setIsOpen] = useState(false);
+	const [isInstalling, setIsInstalling] = useState(false);
+	const [installError, setInstallError] = useState<string | null>(null);
 	const name = TOOL_NAMES[tool];
 
 	const refresh = useCallback(async () => {
@@ -165,12 +185,42 @@ export function AgentCliStatusBadge({
 		void refresh();
 	}, [refresh]);
 
+	const install = useCallback(async () => {
+		const run = globalThis.electronAPI?.installAgentCli;
+		if (!run) return;
+		setIsInstalling(true);
+		setInstallError(null);
+		let answer: AgentCliInstallResult;
+		try {
+			answer = await run(tool);
+		} catch (err) {
+			answer = {
+				tool,
+				success: false,
+				error: "failed",
+				detail: err instanceof Error ? err.message : String(err),
+			};
+		} finally {
+			setIsInstalling(false);
+		}
+		if (answer.status) setResult(answer.status);
+		if (answer.success) {
+			refreshProviderModelCatalog(tool);
+			return;
+		}
+		const message = t(`navigation:agentCli.install.error.${answer.error ?? "failed"}`, {
+			name,
+		});
+		setInstallError(answer.detail ? `${message}\n${answer.detail}` : message);
+		if (!answer.status) void refresh();
+	}, [tool, name, t, refresh]);
+
 	const status = toBadgeStatus(result);
 	const version = result?.version;
 
 	const statusColor = {
 		loading: "bg-muted-foreground",
-		installed: "bg-green-500",
+		installed: "bg-success",
 		"not-found": "bg-destructive",
 		error: "bg-destructive",
 	}[status];
@@ -199,6 +249,11 @@ export function AgentCliStatusBadge({
 	}[status];
 
 	const missing = status === "not-found" || status === "error";
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : missing ? "missing" : "installed",
+	);
+	const canInstall = Boolean(globalThis.electronAPI?.installAgentCli);
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -226,10 +281,20 @@ export function AgentCliStatusBadge({
 								/>
 							</div>
 							{!isCollapsed && (
-								<span className="truncate">
-									{SHORT_NAMES[tool]}
-									{version ? ` (${version})` : ""}
-								</span>
+								<>
+									<span className="truncate">
+										{AGENT_CLI_SHORT_NAMES[tool]}
+										{version ? ` (${version})` : ""}
+									</span>
+									{missing && canInstall && (
+										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
+											{isInstalling && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+											{isInstalling
+												? t("navigation:agentCli.install.installingShort")
+												: t("common:install")}
+										</span>
+									)}
+								</>
 							)}
 						</Button>
 					</PopoverTrigger>
@@ -267,14 +332,47 @@ export function AgentCliStatusBadge({
 
 					{missing && (
 						<div className="text-xs p-2 bg-muted/50 rounded-md text-muted-foreground space-y-1">
-							<p>{t("navigation:agentCli.notInstalledDescription", { name })}</p>
+							<p>
+								{canInstall
+									? t("navigation:agentCli.install.description", { name })
+									: t("navigation:agentCli.notInstalledDescription", { name })}
+							</p>
 							<p className="font-mono bg-muted px-1 rounded break-all">
-								{AGENT_CLI_EXECUTABLES[tool]}
+								{canInstall ? installCommandHint(tool) : AGENT_CLI_EXECUTABLES[tool]}
 							</p>
 						</div>
 					)}
 
-					<p className="text-[11px] text-muted-foreground">
+					{missing && canInstall && (
+						<Button
+							size="sm"
+							className="w-full gap-1"
+							onClick={() => {
+								void install();
+							}}
+							disabled={isInstalling}
+						>
+							{isInstalling ? (
+								<Loader2 className="h-3 w-3 animate-spin" />
+							) : (
+								<Download className="h-3 w-3" />
+							)}
+							{isInstalling
+								? t("navigation:agentCli.install.installing")
+								: t("navigation:agentCli.install.button", { name })}
+						</Button>
+					)}
+
+					{installError && (
+						<p
+							role="alert"
+							className="text-xs text-destructive whitespace-pre-wrap break-words max-h-32 overflow-auto"
+						>
+							{installError}
+						</p>
+					)}
+
+					<p className="text-2xs text-muted-foreground">
 						{t("navigation:agentCli.signInHint")}
 					</p>
 
@@ -285,7 +383,7 @@ export function AgentCliStatusBadge({
 						onClick={() => {
 							void refresh();
 						}}
-						disabled={status === "loading"}
+						disabled={status === "loading" || isInstalling}
 					>
 						<RefreshCw
 							className={cn("h-3 w-3", status === "loading" && "animate-spin")}

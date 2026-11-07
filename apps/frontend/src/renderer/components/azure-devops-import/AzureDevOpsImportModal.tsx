@@ -32,6 +32,7 @@ import {
 } from "../ui/select";
 import type { AzureDevOpsFilters, AzureDevOpsImportModalProps } from "./types";
 
+import { Input } from "../ui/input";
 export function AzureDevOpsImportModal({
 	projectId,
 	open,
@@ -374,11 +375,11 @@ export function AzureDevOpsImportModal({
 	const getTypeColor = (type: string): string => {
 		switch (type.toLowerCase()) {
 			case "bug":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "task":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "user story":
-				return "bg-green-500/10 text-green-500 border-green-500/20";
+				return "bg-success/10 text-success border-success/20";
 			case "feature":
 				return "bg-purple-500/10 text-purple-500 border-purple-500/20";
 			case "epic":
@@ -408,8 +409,8 @@ export function AzureDevOpsImportModal({
 				>
 					{/* Import Success Banner */}
 					{importResult?.success && (
-						<div className="bg-green-500/10 border border-green-500/20 rounded-md p-4 shrink-0">
-							<h4 className="font-semibold text-green-500 mb-2">
+						<div className="bg-success/10 border border-success/20 rounded-md p-4 shrink-0">
+							<h4 className="font-semibold text-success mb-2">
 								{t("settings:azureDevOpsImport.successTitle")}
 							</h4>
 							<p className="text-sm text-foreground/70">
@@ -420,8 +421,8 @@ export function AzureDevOpsImportModal({
 
 					{/* Error Banner */}
 					{error && (
-						<div className="bg-red-500/10 border border-red-500/20 rounded-md p-4 shrink-0">
-							<p className="text-sm text-red-500">{error}</p>
+						<div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 shrink-0">
+							<p className="text-sm text-destructive">{error}</p>
 						</div>
 					)}
 
@@ -441,14 +442,14 @@ export function AzureDevOpsImportModal({
 							{/* Search Bar */}
 							<div className="relative shrink-0">
 								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-								<input
+								<Input
 									type="text"
 									placeholder={t(
 										"settings:azureDevOpsImport.searchPlaceholder",
 									)}
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
-									className="pl-10 pr-3 py-2 w-full rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 transition-colors"
+									className="pl-10 pr-3 py-2 w-full text-sm h-auto"
 									style={
 										{
 											"--tw-focus-border-color": "#facc15",

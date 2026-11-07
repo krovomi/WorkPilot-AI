@@ -28,6 +28,7 @@ import {
 	Square,
 	Target,
 	Undo2,
+	Users,
 	Wrench,
 	X,
 	XCircle,
@@ -35,6 +36,8 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AutomationBadge } from "./kanban/AutomationBadge";
+import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
 import JiraLogo from "../assets/logos/jira.svg";
@@ -204,7 +207,7 @@ const PipelineBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 			<Badge
 				variant="outline"
 				className={cn(
-					"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+					"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 					pipeline.webUrl && "cursor-pointer hover:opacity-80",
 					badgeClass,
 				)}
@@ -218,7 +221,7 @@ const PipelineBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 				<Button
 					size="sm"
 					variant="outline"
-					className="h-5 px-1.5 text-[10px] text-destructive border-destructive/30 hover:bg-destructive/10"
+					className="h-5 px-1.5 text-3xs text-destructive border-destructive/30 hover:bg-destructive/10"
 					onClick={handleFix}
 					disabled={isFixing || pipeline.autoFixInProgress}
 				>
@@ -275,7 +278,7 @@ const TrackerBadge: React.FC<{ task: Task; t: TFunction }> = ({ task, t }) => {
 		<Badge
 			variant="outline"
 			className={cn(
-				"text-[10px] px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
+				"text-3xs px-1.5 py-0.5 flex w-fit items-center gap-1 bg-muted/40 text-muted-foreground border-border font-mono",
 				url && "cursor-pointer hover:bg-muted hover:text-foreground",
 			)}
 			onClick={url ? open : undefined}
@@ -363,7 +366,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<TooltipTrigger asChild>
 						<Badge
 							variant="outline"
-							className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-destructive/10 text-destructive border-destructive/30 cursor-help"
+							className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-destructive/10 text-destructive border-destructive/30 cursor-help"
 						>
 							<GitMerge className="h-2.5 w-2.5" />
 							{t("kanban.conflict.label")} {conflict.titles.length}
@@ -396,7 +399,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<TooltipTrigger asChild>
 						<Badge
 							variant="outline"
-							className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help bg-muted text-muted-foreground border-border"
+							className="text-3xs px-1.5 py-0.5 flex items-center gap-1 cursor-help bg-muted text-muted-foreground border-border"
 						>
 							<Gauge className="h-2.5 w-2.5" />
 							{t("kanban.smartEstimate.label", {
@@ -445,9 +448,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							<Badge
 								variant="outline"
 								className={cn(
-									"text-[10px] px-1.5 py-0.5 flex items-center gap-1 cursor-help",
+									"text-3xs px-1.5 py-0.5 flex items-center gap-1 cursor-help",
 									blockers.pending.length > 0 && task.status === "queue"
-										? "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+										? "bg-warning/10 text-warning border-warning/30 "
 										: "bg-muted text-muted-foreground border-border",
 								)}
 							>
@@ -484,7 +487,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 								</p>
 							)}
 							{blockers.missing.length > 0 && (
-								<p className="text-xs text-amber-600 dark:text-amber-400">
+								<p className="text-xs text-warning ">
 									{t("kanban.blockers.missing", {
 										count: blockers.missing.length,
 									})}
@@ -498,7 +501,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{isStuck && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-warning/10 text-warning border-warning/30 badge-priority-urgent"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-warning/10 text-warning border-warning/30 badge-priority-urgent"
 				>
 					<AlertTriangle className="h-2.5 w-2.5" />
 					{t("labels.stuck")}
@@ -509,7 +512,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{isIncomplete && !isStuck && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-orange-500/10 text-orange-400 border-orange-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-orange-500/10 text-orange-400 border-orange-500/30"
 				>
 					<AlertTriangle className="h-2.5 w-2.5" />
 					{t("labels.incomplete")}
@@ -520,7 +523,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.archivedAt && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-muted text-muted-foreground border-border"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-muted text-muted-foreground border-border"
 				>
 					<Archive className="h-2.5 w-2.5" />
 					{t("status.archived")}
@@ -532,7 +535,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 						EXECUTION_PHASE_BADGE_COLORS[executionPhase],
 					)}
 				>
@@ -546,14 +549,14 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				(task.status === "done" ? (
 					<Badge
 						variant={getStatusBadgeVariant(task.status)}
-						className="text-[10px] px-1.5 py-0.5"
+						className="text-3xs px-1.5 py-0.5"
 					>
 						{getStatusLabel(task.status, t)}
 					</Badge>
 				) : (
 					<Badge
 						variant={statusBadgeVariant}
-						className="text-[10px] px-1.5 py-0.5"
+						className="text-3xs px-1.5 py-0.5"
 					>
 						{statusBadgeLabel}
 					</Badge>
@@ -563,7 +566,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{reviewReasonInfo && !isStuck && !isIncomplete && (
 				<Badge
 					variant={reviewReasonInfo.variant}
-					className="text-[10px] px-1.5 py-0.5"
+					className="text-3xs px-1.5 py-0.5"
 				>
 					{reviewReasonInfo.label}
 				</Badge>
@@ -573,7 +576,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.tddMode && (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-success/10 text-success border-success/30"
 				>
 					<FlaskConical className="h-2.5 w-2.5" />
 					{t("labels.tdd")}
@@ -586,7 +589,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 			{task.metadata?.mobileTargets?.length ? (
 				<Badge
 					variant="outline"
-					className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30"
+					className="text-3xs px-1.5 py-0.5 flex items-center gap-1 bg-sky-500/10 text-sky-400 border-sky-500/30"
 					title={t("mobile:targets.badgeTitle", {
 						platforms: task.metadata.mobileTargets
 							.map((platform: string) => t(`mobile:targets.${platform}`))
@@ -607,9 +610,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 flex items-center gap-1",
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
 						task.verification.status === "pass"
-							? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+							? "bg-success/10 text-success border-success/30"
 							: "bg-destructive/10 text-destructive border-destructive/30",
 					)}
 					title={task.verification.reason || undefined}
@@ -626,15 +629,37 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				</Badge>
 			) : null}
 
+			{/* The second engine's verdict on the finished task. Inconclusive
+			    is shown too: it is not an agreement, and must not read as one. */}
+			{task.crossReview ? (
+				<Badge
+					variant="outline"
+					className={cn(
+						"text-3xs px-1.5 py-0.5 flex items-center gap-1",
+						task.crossReview.verdict === "agree"
+							? "bg-success/10 text-success border-success/30"
+							: task.crossReview.verdict === "disagree"
+								? "bg-destructive/10 text-destructive border-destructive/30"
+								: "bg-muted text-muted-foreground border-border",
+					)}
+					title={`${task.crossReview.provider} / ${task.crossReview.model}${
+						task.crossReview.summary ? ` — ${task.crossReview.summary}` : ""
+					}`}
+				>
+					<Users className="h-2.5 w-2.5" />
+					{t(`tasks:crossReview.cardBadge.${task.crossReview.verdict}`)}
+				</Badge>
+			) : null}
+
 			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
-			<TaskKindBadge task={task} className="text-[10px] px-1.5 py-0" />
+			<TaskKindBadge task={task} className="text-3xs px-1.5 py-0" />
 
 			{/* Category badge with icon */}
 			{task.metadata?.category && (
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_CATEGORY_COLORS[task.metadata.category],
 					)}
 				>
@@ -654,7 +679,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							TASK_IMPACT_COLORS[task.metadata.impact],
 						)}
 					>
@@ -667,7 +692,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 					)}
 				>
@@ -682,7 +707,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					<Badge
 						variant="outline"
 						className={cn(
-							"text-[10px] px-1.5 py-0",
+							"text-3xs px-1.5 py-0",
 							TASK_PRIORITY_COLORS[task.metadata.priority],
 						)}
 					>
@@ -695,7 +720,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 				<Badge
 					variant="outline"
 					className={cn(
-						"text-[10px] px-1.5 py-0",
+						"text-3xs px-1.5 py-0",
 						TASK_IMPACT_COLORS[task.metadata.securitySeverity],
 					)}
 				>
@@ -808,7 +833,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -822,7 +847,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={handleViewPR}
 						title={t("tooltips.viewPR")}
 					>
@@ -833,22 +858,22 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="outline"
 						size="sm"
-						className="h-7 px-2 hover:bg-primary/10 transition-colors"
+						className="h-7 w-7 p-0 hover:bg-primary/10 transition-colors"
 						onClick={() =>
 							task.metadata?.prUrl &&
 							onViewPRFiles(task.metadata.prUrl, task.id)
 						}
 						title={t("tooltips.viewPRFiles")}
+						aria-label={t("tooltips.viewPRFiles")}
 					>
-						<FileText className="h-3 w-3 mr-1" />
-						{t("tasks:prFiles.short")}
+						<FileText className="h-3 w-3" />
 					</Button>
 				)}
 				{!task.metadata?.archivedAt && (
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={handleArchive}
 						title={t("tooltips.archiveTask")}
 					>
@@ -866,7 +891,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -879,12 +904,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 				<Button
 					variant="ghost"
 					size="sm"
-					className="h-7 px-2.5 hover:bg-muted-foreground/10"
+					className="h-7 w-7 p-0 hover:bg-muted-foreground/10"
 					onClick={handleArchive}
 					title={t("tooltips.archiveTask")}
+					aria-label={t("actions.archive")}
 				>
-					<Archive className="mr-1.5 h-3 w-3" />
-					{t("actions.archive")}
+					<Archive className="h-3 w-3" />
 				</Button>
 			</div>
 		);
@@ -898,7 +923,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -922,7 +947,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 					<Button
 						variant="ghost"
 						size="sm"
-						className="h-7 px-2 cursor-pointer"
+						className="h-7 w-7 p-0 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
 							onPreviewApp();
@@ -1161,6 +1186,8 @@ function taskCardPropsAreEqual(
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		prevTask.verification?.status === nextTask.verification?.status &&
+		prevTask.crossReview?.verdict === nextTask.crossReview?.verdict &&
+		prevTask.crossReview?.at === nextTask.crossReview?.at &&
 		prevTask.verification?.score === nextTask.verification?.score &&
 		// Check if any subtask statuses changed (compare all subtasks)
 		prevTask.subtasks.every(
@@ -1460,7 +1487,7 @@ export const TaskCard = memo(function TaskCard({
 			}}
 			ref={cardRef}
 			className={cn(
-				"card-surface task-card-enhanced cursor-pointer relative group",
+				"card-surface task-card-enhanced kanban-card cursor-pointer relative group",
 				isRunning &&
 					!isStuck &&
 					"ring-2 ring-primary border-primary task-running-pulse",
@@ -1486,19 +1513,19 @@ export const TaskCard = memo(function TaskCard({
 				}
 			}}
 		>
-			<CardContent className="p-3">
+			<CardContent className="py-2.5 pr-3 pl-3.5">
 				{/* Abandoned banner — reversible "set aside" state. Kept ungreyed
 				    (relative + not affected by the card's grayscale) so "Reprendre"
 				    stays actionable. */}
 				{isAbandoned && (
 					<div className="relative z-10 mb-2 flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
 						<Ban className="h-3.5 w-3.5 shrink-0 text-warning" />
-						<span className="text-[11px] font-medium text-warning">
+						<span className="text-2xs font-medium text-warning">
 							{t("tasks:abandon.badge")}
 						</span>
 						<button
 							type="button"
-							className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-info hover:bg-info/10"
+							className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-medium text-info hover:bg-info/10"
 							onClick={(e) => {
 								e.preventDefault();
 								e.stopPropagation();
@@ -1546,10 +1573,18 @@ export const TaskCard = memo(function TaskCard({
 					<div className={cn("flex-1 min-w-0", !isSelectable && "w-full")}>
 						{/* Tracker reference (Azure DevOps / Jira work-item number) */}
 						<TrackerBadge task={task} t={t} />
+						{/* Created by an automation rule (on a server: the Automations account) */}
+						<AutomationBadge task={task} />
+						{/* Server card: whose claim holds it (server mode) */}
+						<TaskLockBadge taskId={task.id} className="ml-1" />
 
 						{/* Title - full width, no wrapper */}
 						<h3
-							className="mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug"
+							className={cn(
+								"mt-1 font-semibold text-sm text-foreground line-clamp-2 leading-snug",
+								// Leave room for the hover-only delete cross.
+								onDelete && "pr-5",
+							)}
 							title={displayTitle}
 						>
 							{displayTitle}
@@ -1557,7 +1592,10 @@ export const TaskCard = memo(function TaskCard({
 
 						{/* Description - sanitized to handle markdown content (memoized) */}
 						{sanitizedDescription && (
-							<p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+							<p
+								className="mt-1 text-xs text-muted-foreground line-clamp-2"
+								title={sanitizedDescription}
+							>
 								{sanitizedDescription}
 							</p>
 						)}
@@ -1586,7 +1624,7 @@ export const TaskCard = memo(function TaskCard({
 							hasActiveExecution ||
 							isRunning ||
 							isStuck) && (
-							<div className="mt-3 space-y-2">
+							<div className="mt-2.5 space-y-1.5">
 								<PhaseProgressIndicator
 									phase={executionPhase}
 									subtasks={task.subtasks}
@@ -1608,24 +1646,38 @@ export const TaskCard = memo(function TaskCard({
 							</div>
 						)}
 
-						{/* Footer */}
-						<div className="mt-3 flex items-center justify-between">
-							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-								<Clock className="h-3 w-3" />
-								<span>{relativeTime}</span>
+						{/* Footer — meta (time, engine, formula) then actions. Wraps onto
+						    two lines in a narrow column instead of squeezing the time
+						    label into a two-line stack. */}
+						<div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+							<div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+								<span className="flex items-center gap-1 whitespace-nowrap">
+									<Clock className="h-3 w-3 shrink-0" />
+									{relativeTime}
+								</span>
 								{!task.metadata?.appliedFormula && (
 									<TaskEngineChip task={task} />
 								)}
 								{/* Context-window fill of the running session (renders
 								    nothing until the backend reports it). */}
 								<ContextGaugeMini task={task} />
-								<FormulaBadge
-									task={task}
-									projectPath={currentProject?.path}
-								/>
+								{/* An applied formula is information (model, odds, cost)… */}
+								{task.metadata?.appliedFormula && (
+									<FormulaBadge
+										task={task}
+										projectPath={currentProject?.path}
+									/>
+								)}
 							</div>
 
-							<div className="flex items-center gap-1.5">
+							<div className="ml-auto flex shrink-0 items-center gap-1">
+								{/* …while "estimate" is an action, so it sits with the others. */}
+								{!task.metadata?.appliedFormula && (
+									<FormulaBadge
+										task={task}
+										projectPath={currentProject?.path}
+									/>
+								)}
 								<ActionButtons
 									isStuck={isStuck}
 									isRecovering={isRecovering}

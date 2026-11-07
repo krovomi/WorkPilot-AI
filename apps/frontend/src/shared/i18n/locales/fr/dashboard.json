@@ -1,6 +1,7 @@
 {
 	"title": "Tableau de bord",
 	"subtitle": "Métriques du projet & KPIs",
+	"serverSubtitle": "Calculé par le serveur à partir des cartes et des runs de ce projet",
 	"kpi": {
 		"totalTasks": {
 			"title": "Total tâches",

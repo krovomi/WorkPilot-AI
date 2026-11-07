@@ -34,6 +34,7 @@ import type {
 import { calculateOverallProgress, isSubtaskDone } from "../shared/progress";
 import { stripAcceptanceCriteriaSection } from "../shared/utils/acceptance-criteria";
 import { extractSubtaskFiles } from "../shared/utils/subtask-files";
+import { subtaskBlockFields } from "../shared/utils/subtask-unblock";
 import { isMeaningfulFeatureTitle } from "../shared/utils/task-title";
 import { stripHtml } from "./ipc-handlers/shared/sanitize";
 import { getAutoBuildPath, isInitialized } from "./project-initializer";
@@ -427,6 +428,15 @@ export class ProjectStore {
 	}
 
 	/**
+	 * Tasks of a project that is not in this store: a server project's board,
+	 * mirrored on disk (`remote-board.ts`). Read the way a local project's are,
+	 * never cached, never registered, so no local handler finds it.
+	 */
+	getMirrorTasks(project: Project): Task[] {
+		return this.deduplicateTasks(this.loadAllTasks(project));
+	}
+
+	/**
 	 * Get cached tasks if valid
 	 * @param projectId - Project ID
 	 * @returns Cached tasks or null if expired/not found
@@ -812,6 +822,11 @@ export class ProjectStore {
 					typeof plan.goal.status === "string" && {
 						goal: plan.goal,
 					}),
+				// The second engine's verdict (cross review), for the card.
+				...(plan?.crossReview &&
+					typeof plan.crossReview.verdict === "string" && {
+						crossReview: plan.crossReview,
+					}),
 				...(executionProgress && { executionProgress }),
 				stagedInMainProject,
 				stagedAt,
@@ -1141,7 +1156,7 @@ export class ProjectStore {
 					description: subtask.description,
 					status: subtask.status,
 					files: extractSubtaskFiles(subtask),
-					blockedReason: subtask.blocked_reason,
+					...subtaskBlockFields(subtask as unknown as Record<string, unknown>),
 					origin: subtask.origin,
 					requestedAt: subtask.requested_at,
 				}));
@@ -1421,11 +1436,13 @@ export class ProjectStore {
 
 		// Only auto-correct if all subtasks are done and status is in a stale state.
 		// Preserve in_progress (task is actively running — auto-correction would race with XState),
-		// ai_review (QA in progress), error (needs investigation), human_review, done, pr_created.
+		// ai_review (QA in progress), error (needs investigation), human_review,
+		// build_failed (all subtasks are done there: the CI is what is red), done, pr_created.
 		if (
 			!allCompleted ||
 			finalStatus === "in_progress" ||
 			finalStatus === "human_review" ||
+			finalStatus === "build_failed" ||
 			finalStatus === "done" ||
 			finalStatus === "pr_created" ||
 			finalStatus === "ai_review" ||

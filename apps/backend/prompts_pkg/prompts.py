@@ -7,172 +7,20 @@ Supports dynamic prompt assembly based on project type for context optimization.
 """
 
 import json
-import os
 import re
-import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+from foundation.base_branch import detect_base_branch
+
+if TYPE_CHECKING:
+    from foundation.change_scope import ChangeScope
 
 from .project_context import (
     detect_project_capabilities,
     get_mcp_tools_for_project,
     load_project_index,
 )
-
-
-def _validate_branch_name(branch: str | None) -> str | None:
-    """
-    Validate a git branch name for safety and correctness.
-
-    Args:
-        branch: The branch name to validate
-
-    Returns:
-        The validated branch name, or None if invalid
-    """
-    if not branch or not isinstance(branch, str):
-        return None
-
-    # Trim whitespace
-    branch = branch.strip()
-
-    # Reject empty or whitespace-only strings
-    if not branch:
-        return None
-
-    # Enforce maximum length (git refs can be long, but 255 is reasonable)
-    if len(branch) > 255:
-        return None
-
-    # Require at least one alphanumeric character
-    if not any(c.isalnum() for c in branch):
-        return None
-
-    # Only allow common git-ref characters: letters, numbers, ., _, -, /
-    # This prevents prompt injection and other security issues
-    if not re.match(r"^[A-Za-z0-9._/-]+$", branch):
-        return None
-
-    # Reject suspicious patterns that could be prompt injection attempts
-    # (newlines, control characters are already blocked by the regex above)
-
-    return branch
-
-
-def get_base_branch_from_metadata(spec_dir: Path) -> str | None:
-    """
-    Read baseBranch from task_metadata.json if it exists.
-
-    Args:
-        spec_dir: Directory containing the spec files
-
-    Returns:
-        The baseBranch from metadata, or None if not found or invalid
-    """
-    metadata_path = spec_dir / "task_metadata.json"
-    if metadata_path.exists():
-        try:
-            with open(metadata_path, encoding="utf-8") as f:
-                metadata = json.load(f)
-                base_branch = metadata.get("baseBranch")
-                # Validate the branch name before returning
-                return _validate_branch_name(base_branch)
-        except (json.JSONDecodeError, OSError):
-            pass
-    return None
-
-
-def get_use_local_branch_from_metadata(spec_dir: Path) -> bool:
-    """
-    Read useLocalBranch from task_metadata.json if it exists.
-
-    When True, the worktree should be created from the local branch directly
-    instead of preferring origin/branch. This preserves gitignored files
-    (.env, configs) that may not exist on the remote.
-
-    Args:
-        spec_dir: Directory containing the spec files
-
-    Returns:
-        True if useLocalBranch is set in metadata, False otherwise
-    """
-    metadata_path = spec_dir / "task_metadata.json"
-    if metadata_path.exists():
-        try:
-            with open(metadata_path, encoding="utf-8") as f:
-                metadata = json.load(f)
-                return bool(metadata.get("useLocalBranch", False))
-        except (json.JSONDecodeError, OSError):
-            pass
-    return False
-
-
-# Alias for backwards compatibility (internal use)
-_get_base_branch_from_metadata = get_base_branch_from_metadata
-
-
-def _detect_base_branch(spec_dir: Path, project_dir: Path) -> str:
-    """
-    Detect the base branch for a project/task.
-
-    Priority order:
-    1. baseBranch from task_metadata.json (task-level override)
-    2. DEFAULT_BRANCH environment variable
-    3. Auto-detect main/master/develop (if they exist in git)
-    4. Fall back to "main"
-
-    Args:
-        spec_dir: Directory containing the spec files
-        project_dir: Project root directory
-
-    Returns:
-        The detected base branch name
-    """
-    # 1. Check task_metadata.json for task-specific baseBranch
-    metadata_branch = _get_base_branch_from_metadata(spec_dir)
-    if metadata_branch:
-        return metadata_branch
-
-    # 2. Check for DEFAULT_BRANCH env var
-    env_branch = _validate_branch_name(os.getenv("DEFAULT_BRANCH"))
-    if env_branch:
-        # Verify the branch exists (with timeout to prevent hanging)
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--verify", env_branch],
-                cwd=project_dir,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=3,
-            )
-            if result.returncode == 0:
-                return env_branch
-        except subprocess.TimeoutExpired:
-            # Treat timeout as branch verification failure
-            pass
-
-    # 3. Auto-detect main/master/develop
-    for branch in ["main", "master", "develop"]:
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--verify", branch],
-                cwd=project_dir,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=3,
-            )
-            if result.returncode == 0:
-                return branch
-        except subprocess.TimeoutExpired:
-            # Treat timeout as branch verification failure, try next branch
-            continue
-
-    # 4. Fall back to "main"
-    return "main"
-
 
 # Directory containing prompt files
 # prompts/ is a sibling directory of prompts_pkg/, so go up one level first
@@ -374,6 +222,21 @@ def mobile_section(project_dir: Path) -> str:
         return ""
 
 
+def dotnet_section(
+    project_dir: Path, spec_dir: Path | None, *, role: str = "coder"
+) -> str:
+    """.NET 11 / C# 15: the migration skill staged for a task that needs it, or nothing.
+
+    Public and single like the sections around it: the planner, every coding
+    subtask, the QA reviewer and the workflow's skill phases point at the same
+    staged files (`dotnet_upgrade`). Empty for every project that is not on
+    .NET 10 or 11, and for a .NET 10 task that does not ask for .NET 11.
+    """
+    from dotnet_upgrade import dotnet_section as _section
+
+    return _section(project_dir, spec_dir, role=role)
+
+
 def docintel_section(project_dir: Path, spec_dir: Path | None = None) -> str:
     """The project's accepted ADRs, and what the task's attachments say.
 
@@ -461,7 +324,7 @@ def get_qa_reviewer_prompt(spec_dir: Path, project_dir: Path) -> str:
         The QA reviewer prompt with project-specific tools injected
     """
     # Detect the base branch for this task (from task_metadata.json or auto-detect)
-    base_branch = _detect_base_branch(spec_dir, project_dir)
+    base_branch = detect_base_branch(spec_dir, project_dir)
 
     # Load base QA reviewer prompt
     base_prompt = _load_prompt_file("qa_reviewer.md")
@@ -556,6 +419,11 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     if mobile := mobile_section(project_dir):
         spec_context += mobile + "\n\n---\n\n"
 
+    # A .NET 11 migration is judged against its procedure: what was retargeted,
+    # and which behavioral changes were handled or ruled out. Empty otherwise.
+    if dotnet := dotnet_section(project_dir, spec_dir, role="qa"):
+        spec_context += dotnet + "\n\n---\n\n"
+
     # The decisions the project wrote down, and the mockup or diagram the
     # person attached to the task: the two things a reviewer judging only the
     # diff against the spec text cannot see.
@@ -603,6 +471,182 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     return spec_context + base_prompt
 
 
+#: What the light review inlines, so the reviewer reads the evidence from its
+#: prompt instead of spending turns (and context) fetching it.
+LIGHT_QA_SPEC_MAX_CHARS = 8_000
+LIGHT_QA_DIFF_MAX_CHARS = 12_000
+
+
+#: The light review's instructions when git shows no change at all: the spec
+#: may already hold on the base branch. Only that pass pays for them.
+LIGHT_QA_EMPTY_CHANGE = """
+### If the change is empty
+
+No file differs from the base branch: the coder changed nothing. The spec may
+already hold there (for example the file it asks for was merged by an earlier
+task, with the right content). Open the files the spec names, as they are now:
+
+- every criterion holds → `approved` (the repository already met the spec);
+- otherwise → `rejected`, one issue per criterion not met, naming the file
+  and the content the spec asks for.
+
+Never ask for tests, a test project, coverage or documentation the spec does
+not name: nothing a program reads changed, so there is nothing to test.
+"""
+
+
+def _inline_spec(spec_dir: Path) -> str:
+    try:
+        spec = (spec_dir / "spec.md").read_text(encoding="utf-8")
+    except OSError:
+        spec = f"(spec.md not readable — read `{spec_dir}/spec.md`)"
+    if len(spec) > LIGHT_QA_SPEC_MAX_CHARS:
+        spec = (
+            spec[:LIGHT_QA_SPEC_MAX_CHARS]
+            + f"\n\n[... truncated: read `{spec_dir}/spec.md` for the rest ...]"
+        )
+    return spec
+
+
+def _user_request(spec_dir: Path) -> str:
+    """The user's own words (`requirements.json`), or "" when unreadable."""
+    try:
+        req = json.loads((spec_dir / "requirements.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    value = req.get("task_description") if isinstance(req, dict) else None
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:LIGHT_QA_SPEC_MAX_CHARS]
+
+
+def _fill_scoped_prompt(
+    filename: str,
+    spec_dir: Path,
+    project_dir: Path,
+    replacements: dict[str, str],
+    diff: str,
+) -> str:
+    """A scoped QA prompt with its placeholders, the spec and the diff."""
+    prompt = _load_prompt_file(filename)
+    for key, value in {
+        "{{BASE_BRANCH}}": detect_base_branch(spec_dir, project_dir),
+        "{{SPEC_DIR}}": str(spec_dir),
+        **replacements,
+    }.items():
+        prompt = prompt.replace(key, value)
+    # Spec and diff last: they are data, and must not be scanned for
+    # placeholders themselves.
+    spec = _inline_spec(spec_dir)
+    prompt = prompt.replace("{{SPEC}}", spec.replace("{{", "{ {"), 1)
+    request = _user_request(spec_dir) or "(not recorded)"
+    prompt = prompt.replace(
+        "{{USER_REQUEST}}", request.replace("{{", "{ {").replace("```", "``\u200b`"), 1
+    )
+    prompt = prompt.replace("{{DIFF}}", diff.replace("```", "``\u200b`"), 1)
+    header = (
+        "## SPEC LOCATION\n\n"
+        f"- Spec: `{spec_dir}/spec.md`\n"
+        f"- Implementation plan: `{spec_dir}/implementation_plan.json`\n\n"
+        f"The project root is: `{project_dir}`\n\n---\n\n"
+    )
+    return header + prompt
+
+
+def get_qa_reviewer_light_prompt(
+    spec_dir: Path, project_dir: Path, scope: "ChangeScope"
+) -> str:
+    """The QA reviewer prompt for a change set of text files only.
+
+    `foundation.change_scope` decided from git that nothing a program reads
+    changed. The full prompt would still send the reviewer to start the dev
+    environment, run every suite with coverage and grep the whole repository;
+    this one inlines the spec and the diff and asks the one question left:
+    is this the change the spec asked for. Same sign-off contract, same
+    verdict line, so the loop reads it like any other pass.
+    """
+    from foundation.change_scope import change_diff
+
+    empty_change = ""
+    if scope.files:
+        diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
+            "(diff unavailable — read the changed files)"
+        )
+        files = ", ".join(f"`{f}`" for f in scope.files)
+    else:
+        diff = "(empty: no file differs from the base branch)"
+        files = "none — see « If the change is empty » below"
+        empty_change = LIGHT_QA_EMPTY_CHANGE
+    return _fill_scoped_prompt(
+        "qa_reviewer_light.md",
+        spec_dir,
+        project_dir,
+        {"{{FILES}}": files, "{{EMPTY_CHANGE}}": empty_change},
+        diff,
+    )
+
+
+def get_qa_reviewer_targeted_prompt(
+    spec_dir: Path, project_dir: Path, scope: "ChangeScope"
+) -> str:
+    """The QA reviewer prompt for a small code change with mapped tests.
+
+    `foundation.change_scope` found at most a few code files, each with tests
+    the naming conventions point to. The reviewer gets the spec, the diff and
+    the exact test files to run with coverage of the touched files, and no
+    instruction to run whole suites, start the environment or scan the
+    repository. Same sign-off contract plus `targeted_tests`, which the
+    loop's targeted gate (`qa.targeted_gate`) checks against `scope.tests`.
+    """
+    from foundation.change_scope import (
+        TARGETED_MAX_CHANGED_LINES,
+        TARGETED_MAX_CODE_FILES,
+        change_diff,
+    )
+    from foundation.test_conventions import run_examples
+    from foundation.touched_tests import PYTHON_EXTENSIONS, SCRIPT_EXTENSIONS
+
+    diff = change_diff(project_dir, scope, LIGHT_QA_DIFF_MAX_CHARS) or (
+        "(diff unavailable — read the changed files)"
+    )
+    test_map = "\n".join(
+        f"- `{src}` → " + ", ".join(f"`{t}`" for t in tests)
+        for src, tests in scope.test_map
+    )
+    py = [t for t in scope.tests if Path(t).suffix.lower() in PYTHON_EXTENSIONS]
+    ts = [t for t in scope.tests if Path(t).suffix.lower() in SCRIPT_EXTENSIONS]
+    examples = []
+    if py:
+        examples.append(
+            "# Python (pytest-cov): one --cov per touched source directory or "
+            f"module\npytest {' '.join(py)} --cov=<touched module or directory> "
+            "--cov-branch --cov-report=term-missing"
+        )
+    if ts:
+        examples.append(
+            "# Vitest (React, Vue/Nuxt, Svelte, Next.js...)\n"
+            f"npx vitest run {' '.join(ts)} --coverage "
+            "--coverage.include=<touched file>\n"
+            "# Jest (or Angular's ng test / Karma with --code-coverage)\n"
+            f"npx jest {' '.join(ts)} --coverage --collectCoverageFrom=<touched file>"
+        )
+    examples += run_examples([t for t in scope.tests if t not in py and t not in ts])
+    return _fill_scoped_prompt(
+        "qa_reviewer_targeted.md",
+        spec_dir,
+        project_dir,
+        {
+            "{{FILES}}": ", ".join(f"`{f}`" for f in scope.files),
+            "{{TEST_MAP}}": test_map,
+            "{{RUN_EXAMPLES}}": "\n".join(examples) or "<the project's runner> <tests>",
+            "{{MAX_FILES}}": str(TARGETED_MAX_CODE_FILES),
+            "{{MAX_LINES}}": str(TARGETED_MAX_CHANGED_LINES),
+            "{{MIN_COVERAGE}}": str(_min_coverage()),
+        },
+        diff,
+    )
+
+
 def get_qa_fixer_prompt(spec_dir: Path, project_dir: Path) -> str:
     """
     Load the QA fixer prompt with spec paths injected.
@@ -638,86 +682,3 @@ The project root is: `{project_dir}`
     if verification := verify_section(spec_dir):
         spec_context += verification + "\n\n---\n\n"
     return spec_context + base_prompt
-
-
-def get_architecture_map_prompt(
-    archify_root: Path,
-    output_path: Path,
-    evidence_section: str,
-    baseline_section: str = "",
-) -> str:
-    """The prompt that authors an archify architecture model.
-
-    `baseline_section` is empty for a project's first model and carries the
-    delta contract — the base model plus the keep-every-id rule — when the model
-    being written is the "after" side of a comparison. Two prompts would drift;
-    one prompt with a section that is sometimes empty cannot.
-    """
-    prompt = _load_prompt_file("architecture_visualizer.md")
-    prompt = prompt.replace("{{ARCHIFY_ROOT}}", str(archify_root))
-    prompt = prompt.replace("{{OUTPUT_PATH}}", str(output_path))
-    prompt = prompt.replace("{{EVIDENCE}}", evidence_section)
-    prompt = prompt.replace("{{BASELINE}}", baseline_section)
-    return prompt
-
-
-def get_architecture_delta_section(
-    baseline_json: str,
-    task_summary: str,
-    changed_files: list[str],
-) -> str:
-    """The "you are updating an existing model" half of the authoring prompt."""
-    listing = (
-        "\n".join(f"- `{path}`" for path in changed_files[:200])
-        or "_The set of changed files could not be determined._"
-    )
-    section = _load_prompt_file("architecture_map_delta.md")
-    section = section.replace("{{BASELINE_JSON}}", baseline_json)
-    section = section.replace(
-        "{{TASK_SUMMARY}}", task_summary.strip() or "_No summary available._"
-    )
-    section = section.replace("{{CHANGED_FILES}}", listing)
-    return section
-
-
-def get_architecture_repair_prompt(
-    output_path: Path,
-    diagnostics: list[dict],
-) -> str:
-    """The follow-up pass after `archify validate` refused a candidate."""
-    prompt = _load_prompt_file("architecture_map_repair.md")
-    prompt = prompt.replace("{{OUTPUT_PATH}}", str(output_path))
-    prompt = prompt.replace(
-        "{{DIAGNOSTICS}}", json.dumps(diagnostics, indent=2, default=str)
-    )
-    return prompt
-
-
-def get_architecture_reviewer_prompt(
-    spec_dir: Path,
-    project_dir: Path,
-    architecture_rules: str,
-    deterministic_report: str,
-) -> str:
-    """
-    Load the architecture reviewer prompt with context injected.
-
-    Args:
-        spec_dir: Directory containing the spec files
-        project_dir: Root directory of the project
-        architecture_rules: Serialized architecture rules string
-        deterministic_report: Serialized deterministic analysis results
-
-    Returns:
-        The architecture reviewer prompt with context injected
-    """
-    base_prompt = _load_prompt_file("architecture_reviewer.md")
-    base_branch = _detect_base_branch(spec_dir, project_dir)
-
-    base_prompt = base_prompt.replace("{{SPEC_DIR}}", str(spec_dir))
-    base_prompt = base_prompt.replace("{{BASE_BRANCH}}", base_branch)
-    base_prompt = base_prompt.replace("{{PROJECT_DIR}}", str(project_dir))
-    base_prompt = base_prompt.replace("{{ARCHITECTURE_RULES}}", architecture_rules)
-    base_prompt = base_prompt.replace("{{DETERMINISTIC_REPORT}}", deterministic_report)
-
-    return base_prompt

@@ -1,0 +1,26 @@
+{
+	"name": "WorkPilot AI",
+	"build": { "dockerfile": "Dockerfile" },
+	"remoteUser": "vscode",
+	// The repository is bind-mounted from the host, so a host-made .venv (other Python,
+	// symlinks to host paths, possibly no pip) would shadow the container's. A named
+	// volume gives the container its own .venv and leaves the host's untouched.
+	"mounts": [
+		"source=workpilot-venv-${devcontainerId},target=${containerWorkspaceFolder}/.venv,type=volume"
+	],
+	// Docker creates the volume owned by root: hand it to remoteUser first. Then the backend
+	// and frontend dependencies, as on a workstation (README, "Installation").
+	"postCreateCommand": "sudo chown vscode:vscode \"${containerWorkspaceFolder}/.venv\" && pnpm run install:all",
+	// FastAPI and the WebSocket server; both listen on 127.0.0.1 inside the container.
+	"forwardPorts": [9000, 8765],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"charliermarsh.ruff",
+				"biomejs.biome",
+				"ms-playwright.playwright"
+			]
+		}
+	}
+}

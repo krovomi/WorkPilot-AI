@@ -296,15 +296,21 @@ export function PRDetail({
 		}
 	}, [isReviewing]);
 
-	// Analyze code quality after review completes
+	// Analyze code quality once per reviewed PR and file list. The effect used
+	// to depend on the whole hook object, recreated on every render, and the
+	// analysis itself re-renders: each run started another Python process.
+	const { analyzePR } = qualityScore;
+	const qualityAnalyzedRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (reviewResult?.success && pr.files && pr.files.length > 0) {
-			const fileNames = pr.files.map((f) => f.path);
-			qualityScore.analyzePR(pr.number, fileNames, projectId).catch((err) => {
-				console.error("Failed to analyze quality:", err);
-			});
-		}
-	}, [reviewResult?.success, pr.number, pr.files, projectId, qualityScore]);
+		if (!reviewResult?.success || !pr.files || pr.files.length === 0) return;
+		const fileNames = pr.files.map((f) => f.path);
+		const key = `${projectId}:${pr.number}:${fileNames.join("\n")}`;
+		if (qualityAnalyzedRef.current === key) return;
+		qualityAnalyzedRef.current = key;
+		analyzePR(pr.number, fileNames, projectId).catch((err) => {
+			console.error("Failed to analyze quality:", err);
+		});
+	}, [reviewResult?.success, pr.number, pr.files, projectId, analyzePR]);
 
 	// Load logs when logs section is expanded or when reviewing (for live logs)
 	useEffect(() => {
@@ -1161,7 +1167,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 									onClick={handleAutoApprove}
 									disabled={isPosting || isPostingCleanReview}
 									variant="default"
-									className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
+									className="flex-1 sm:flex-none bg-success hover:bg-success/90 text-success-foreground"
 								>
 									{isPosting ? (
 										<>
@@ -1191,7 +1197,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 								onClick={handleApprove}
 								disabled={isPosting}
 								variant="default"
-								className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
+								className="flex-1 sm:flex-none bg-success hover:bg-success/90 text-success-foreground"
 							>
 								{isPosting ? (
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1224,14 +1230,14 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 						)}
 
 						{postSuccess && (
-							<div className="ml-auto flex items-center gap-2 text-emerald-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-success text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.postedFindings", { count: postSuccess.count })}
 							</div>
 						)}
 
 						{cleanReviewPosted && !postSuccess && (
-							<div className="ml-auto flex items-center gap-2 text-emerald-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-success text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.cleanReviewPosted")}
 							</div>
@@ -1281,7 +1287,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 
 						{/* Blocked status posted success message */}
 						{blockedStatusPosted && !postSuccess && !cleanReviewPosted && (
-							<div className="ml-auto flex items-center gap-2 text-amber-600 text-sm font-medium animate-pulse">
+							<div className="ml-auto flex items-center gap-2 text-warning text-sm font-medium animate-pulse">
 								<CheckCircle className="h-4 w-4" />
 								{t("prReview.blockedStatusPosted")}
 							</div>

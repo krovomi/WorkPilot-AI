@@ -25,7 +25,12 @@ import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskCodeEditor } from "./TaskCodeEditor";
 import { TaskResetButton } from "./TaskResetButton";
 import { SubtaskFilesViewer } from "./SubtaskFilesViewer";
+import { BlockedSubtaskHelp, HumanResolutionNote } from "./BlockedSubtaskHelp";
+import { TaskSteeringPanel } from "./TaskSteeringPanel";
+import { formatAppDateTime } from "@/lib/date-format";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 interface Phase {
 	name: string;
 	subtasks: Array<{
@@ -57,7 +62,7 @@ function getSubtaskStatusIcon(status: string) {
 		case "blocked":
 			// Counts as "done" for progress, but the agent gave up — flag it amber
 			// so it reads as "needs attention", never as a clean (green) pass.
-			return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+			return <AlertTriangle className="h-4 w-4 text-warning" />;
 		case "failed":
 			return <XCircle className="h-4 w-4 text-[var(--error)]" />;
 		default:
@@ -72,7 +77,7 @@ function getStatusBadgeClass(status: string): string {
 		case "in_progress":
 			return "bg-info/20 text-info";
 		case "blocked":
-			return "bg-amber-500/20 text-amber-600 dark:text-amber-400";
+			return "bg-warning/20 text-warning ";
 		case "failed":
 			return "bg-destructive/20 text-destructive";
 		default:
@@ -196,7 +201,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 					<div className="flex items-center gap-2">
 						<Code2 className="h-4 w-4" />
 						<span className="text-sm font-medium">
-							Edit Files: {selectedSubtaskForCodeEdit.title}
+							{t("taskReview:taskPanel.editFilesTitle", {
+									name: selectedSubtaskForCodeEdit.title,
+								})}
 						</span>
 					</div>
 					<Button
@@ -205,7 +212,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 						onClick={() => setSelectedSubtaskForCodeEdit(null)}
 						className="h-6"
 					>
-						Back
+						{t("common:buttons.back")}
 					</Button>
 				</div>
 				<div className="flex-1 overflow-hidden">
@@ -225,12 +232,15 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 					<div className="text-center py-12">
 						<ListChecks className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
 						<p className="text-sm font-medium text-muted-foreground mb-1">
-							No subtasks defined
+							{t("taskReview:taskPanel.noSubtasks")}
 						</p>
 						<p className="text-xs text-muted-foreground/70">
-							Implementation subtasks will appear here after planning
+							{t("taskReview:taskPanel.noSubtasksHint")}
 						</p>
 					</div>
+					{task.status !== "done" && task.status !== "pr_created" && (
+						<TaskSteeringPanel task={task} />
+					)}
 				</div>
 			</ScrollArea>
 		);
@@ -241,6 +251,11 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 			<div className="p-4 space-y-3">
 				{/* Plan validation - approve/reject the proposed subtasks before coding */}
 				<PlanApprovalSection task={task} />
+
+				{/* Messages to the agent while it works (steering.jsonl) */}
+				{task.status !== "done" && task.status !== "pr_created" && (
+					<TaskSteeringPanel task={task} />
+				)}
 
 				{/* Header with edit/reset buttons */}
 				<div className="flex items-center justify-between mb-3">
@@ -253,7 +268,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 								})}
 							</span>
 							{blockedCount > 0 && (
-								<span className="text-amber-600 dark:text-amber-400">
+								<span className="text-warning ">
 									· {t("tasks:subtasks.blockedCount", { count: blockedCount })}
 								</span>
 							)}
@@ -294,7 +309,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										className="flex gap-2 items-start bg-secondary/30 p-2 rounded"
 									>
 										<div className="flex-1 space-y-1">
-											<input
+											<Input
 												type="text"
 												value={subtask.title || ""}
 												onChange={(e) =>
@@ -306,9 +321,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 													)
 												}
 												placeholder={t("tasks:modal.plan.subtaskTitle")}
-												className="w-full text-sm font-medium bg-background/50 rounded px-2 py-1 border border-border/50"
+												className="w-full text-sm font-medium px-2 py-1 h-auto"
 											/>
-											<textarea
+											<Textarea
 												value={subtask.description || ""}
 												onChange={(e) =>
 													handleUpdateSubtask(
@@ -319,7 +334,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 													)
 												}
 												placeholder={t("tasks:modal.plan.subtaskDescription")}
-												className="w-full text-xs bg-background/50 rounded px-2 py-1 border border-border/50 resize-none"
+												className="w-full text-xs px-2 py-1 resize-none min-h-0"
 												rows={2}
 											/>
 										</div>
@@ -392,12 +407,12 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 				) : (
 					// View mode
 					task.subtasks.map((subtask, index) => (
-							// The card holds its own action buttons, so it cannot be a
-							// <button>; role + tabIndex + key handling give keyboard
-							// users the same access as the click.
-							// biome-ignore lint/a11y/useSemanticElements: card holds its own action buttons; a <button> cannot nest one
+						<div key={subtask.id} className="space-y-1.5">
+							{/* The card holds its own action buttons, so it cannot be a
+							<button>; role + tabIndex + key handling give keyboard
+							users the same access as the click. */}
+							{/* biome-ignore lint/a11y/useSemanticElements: card holds its own action buttons; a <button> cannot nest one */}
 							<div
-								key={subtask.id}
 								role="button"
 								tabIndex={0}
 								onClick={() => {
@@ -417,7 +432,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 									subtask.status === "completed" &&
 										"border-[var(--success)]/50 bg-[var(--success-light)]",
 									subtask.status === "blocked" &&
-										"border-amber-500/50 bg-amber-500/10",
+										"border-warning/50 bg-warning/10",
 									subtask.status === "failed" &&
 										"border-[var(--error)]/50 bg-[var(--error-light)]",
 									// User-requested changes get a distinct violet treatment so they
@@ -433,14 +448,14 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										<div className="flex items-center gap-2 min-w-0 w-full">
 											<span
 												className={cn(
-													"text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+													"text-3xs font-medium px-1.5 py-0.5 rounded-full",
 													getStatusBadgeClass(subtask.status),
 												)}
 											>
 												#{index + 1}
 											</span>
 											{subtask.origin === "change_request" && (
-												<span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 flex-shrink-0">
+												<span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 flex-shrink-0">
 													<MessageSquarePlus className="h-2.5 w-2.5" />
 													{t("tasks:subtasks.changeRequest")}
 												</span>
@@ -476,26 +491,13 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 										</div>
 										{subtask.origin === "change_request" &&
 											subtask.requestedAt && (
-												<p className="mt-0.5 text-[10px] text-violet-600/70 dark:text-violet-400/70">
+												<p className="mt-0.5 text-3xs text-violet-600/70 dark:text-violet-400/70">
 													{t("tasks:subtasks.requestedAt", {
-														date: new Date(
-															subtask.requestedAt,
-														).toLocaleString(),
+														date: formatAppDateTime(subtask.requestedAt),
 													})}
 												</p>
 											)}
-										{subtask.status === "blocked" && (
-											<div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-400">
-												<AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-												<span>
-													{subtask.blockedReason
-														? t("tasks:subtasks.blockedReason", {
-																reason: subtask.blockedReason,
-															})
-														: t("tasks:subtasks.blockedGeneric")}
-												</span>
-											</div>
-										)}
+										<HumanResolutionNote subtask={subtask} />
 										{subtask.files && subtask.files.length > 0 && (
 											<div className="flex flex-wrap gap-1 items-center">
 												{subtask.files.slice(0, 2).map((file: string) => (
@@ -519,7 +521,9 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 												))}
 												{subtask.files.length > 2 && (
 													<Badge variant="outline" className="text-xs">
-														+{subtask.files.length - 2} more
+														{t("taskReview:taskPanel.moreFiles", {
+											count: subtask.files.length - 2,
+										})}
 													</Badge>
 												)}
 												{subtask.status === "pending" && (
@@ -537,7 +541,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 																<Edit3 className="h-3 w-3" />
 															</Button>
 														</TooltipTrigger>
-														<TooltipContent>Edit files</TooltipContent>
+														<TooltipContent>{t("taskReview:taskPanel.editFiles")}</TooltipContent>
 													</Tooltip>
 												)}
 											</div>
@@ -545,6 +549,10 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 									</div>
 								</div>
 							</div>
+							{(subtask.status === "blocked" || subtask.status === "failed") && (
+								<BlockedSubtaskHelp taskId={task.id} subtask={subtask} />
+							)}
+						</div>
 						))
 				)}
 			</div>

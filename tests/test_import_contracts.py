@@ -8,7 +8,13 @@ any unit wanting ``safe_error`` sat in the agents' cycle. Lot M10 took the
 toolbox out (``foundation``, ``offline_policy``, ``app_detection``, the stack
 detectors into ``project``) and the cycle down to 26 units: the agent runtime
 itself (``core.client`` and ``agents.session`` with the phases built on them).
-This test keeps it from growing back, and the units taken out of it that way.
+The plan of 29 October (A1) took the logging toolbox, the base branch and the
+build signals to ``foundation`` too, which let ``task_logger`` and
+``consensus_arbiter`` out (24 units), then the ``agent_runtime`` port, through
+which ``merge``, ``integrations``, ``analysis`` and ``architecture`` start a
+session without importing ``core`` or ``agents`` (20 units), and the subagent
+registry and test generation out of ``agents`` (18 units). This test keeps
+it from growing back, and the units taken out of it that way.
 
 The graph is read from the source with ``ast``, every ``import`` of the file
 counted, including the ones inside a function: a lazy import is still a
@@ -40,9 +46,46 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "offline_policy": {"ollama_model_detector", "phase_config"},
     # The preview's project detector, read by verify and the Kanban runner.
     "app_detection": set(),
+    # The dependency guard (docs/architecture/dependency-guard.md): manifests,
+    # registries and its record; git through foundation. The QA gate that
+    # calls it, and offline_policy, live in qa. A leaf.
+    "dependency_guard": {"foundation"},
+    # Agent Trace attribution (docs/architecture/agent-trace.md): git through
+    # foundation, the records in the spec directory. A leaf the coder session,
+    # the write hooks and the PR body read.
+    "agent_trace": {"foundation"},
+    # The mutation gate (docs/architecture/mutation-gate.md): git, the test
+    # conventions and the platform through foundation; the child environment
+    # without credentials from security. The QA gate that calls it is in qa.
+    "mutation_gate": {"foundation", "security"},
+    # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
+    # the plan's references, the Agent Trace records and the test conventions.
+    # The build and the traceability route read it.
+    "requirement_trace": {"foundation", "agent_trace"},
+    # The provenance dossier of a PR (docs/architecture/provenance.md): it
+    # reads what Agent Trace, the dependency guard and the build recorded, and
+    # hands it to the compliance collector. The PR body (core) reads it.
+    "provenance": {
+        "foundation",
+        "agent_trace",
+        "dependency_guard",
+        "compliance_collector",
+    },
+    # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
+    # poisoning scan and the project's pins file; the desktop route reads the
+    # API helpers of foundation. Probing a server is core's (mcp_pinning).
+    "mcp_pins": {"foundation", "injection_guard"},
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),
+    # The board as an MCP server: the spec numbering lock and the MCP layer,
+    # nothing that runs an agent (docs/architecture/board-mcp.md).
+    "board_mcp": {"core", "mcp_tasks"},
+    # The changelog's prompts, git history and done cards, shared by its
+    # runner and the server's routes: the board, git and the untrusted-content
+    # fence, nothing that runs an agent (its model call is the runner's,
+    # through core.oneshot).
+    "changelog_generator": {"board_mcp", "foundation", "security"},
     # Stack detection, including the UI and test stacks moved here in M10.
     "project": {"mobile"},
     "mobile": {"foundation"},
@@ -83,11 +126,72 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # clients) and by the provider registry: a leaf, or it joins the cycle.
     # The card and the feed are written by core (`_report_sandbox`).
     "os_sandbox": {"foundation", "security"},
+    # The cross review's verdict, read by the pull request step in core: a
+    # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
+    "cross_review": {"foundation"},
+    # The agent runtime as a port (docs/architecture/agent-runtime.md): core
+    # installs it, the units below reach a session through it. A leaf.
+    "agent_runtime": set(),
+    # Taken out of the agents' cycle by the port (plan of 29 October, A1):
+    # each starts its session through agent_runtime, never core or agents.
+    "merge": {"agent_runtime", "foundation"},
+    "integrations": {
+        "agent_runtime",
+        "foundation",
+        "offline_policy",
+        "phase_config",
+        "server",
+    },
+    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    # The subagent registry, out of agents (it never imported it): read by
+    # core, the skills emitter and the learning loop.
+    "subagents": {"mobile", "project", "skills_registry"},
+    # Test generation, the generator included; its model call goes through
+    # the agent_runtime port.
+    "test_generation": {"agent_runtime", "foundation", "project"},
+    # The QA loop's architecture gate; its reviewer's prompt is built here.
+    "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
+    # Out of the agents' cycle since A1's third step. The archify map builds its
+    # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
+    "architecture_visualizer": {"foundation"},
+    # Attachments and diagnostics: the CI parsers and the traceability record
+    # are read from foundation, not from self_healing or spec.
+    "docintel": {
+        "brain",
+        "foundation",
+        "injection_guard",
+        "offline_policy",
+        "project",
+        "provider_models_catalog",
+        "security",
+        "test_generation",
+        "watermarks",
+    },
+    # The shared brain and what sits on it: with docintel, a cycle of five of
+    # their own below the agents' one; none of them imports core, agents or a
+    # phase.
+    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    "learning_loop": {
+        "brain",
+        "foundation",
+        "hermes",
+        "memory",
+        "security",
+        "skills_registry",
+        "subagents",
+    },
+    "hermes": {"brain", "foundation", "learning_loop"},
+    "memory": {"brain"},
+    "uiux": {"brain", "foundation", "injection_guard", "project", "skills_registry"},
+    # .NET 11 / C# 15 for the projects WorkPilot builds: the project's toolchain
+    # and the bundled skill through skills_registry, nothing that runs an agent
+    # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
+    "dotnet_upgrade": {"skills_registry"},
 }
 
 # The largest set of units that all import one another, directly or not. It
 # may only shrink: lower the number when a change breaks a part of it.
-MAX_CYCLE = 26
+MAX_CYCLE = 10
 
 
 def _units() -> dict[str, Path]:

@@ -19,6 +19,8 @@ import { cn } from "../../lib/utils";
 import type { AgentSlot, MCEvent } from "../../stores/mission-control-store";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
+import { useTranslation } from "react-i18next";
+import { formatAppTime } from "@/lib/date-format";
 
 interface AgentEventLogProps {
 	readonly events: MCEvent[];
@@ -36,10 +38,10 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 };
 
 const EVENT_COLORS: Record<string, string> = {
-	agent_created: "text-green-500",
-	agent_removed: "text-red-500",
+	agent_created: "text-success",
+	agent_removed: "text-destructive",
 	agent_started: "text-blue-500",
-	agent_paused: "text-yellow-500",
+	agent_paused: "text-warning",
 	agent_resumed: "text-cyan-500",
 	agent_stopped: "text-gray-500",
 	agent_config_updated: "text-purple-500",
@@ -67,6 +69,7 @@ function formatTaskDisplay(task: unknown): string {
 }
 
 export function AgentEventLog({ events, agents }: AgentEventLogProps) {
+	const { t } = useTranslation();
 	const agentMap = useMemo(() => {
 		const map = new Map<string, string>();
 		for (const a of agents) {
@@ -80,7 +83,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 	if (reversedEvents.length === 0) {
 		return (
 			<div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-				No events yet
+				{t("missionControl:noEvents")}
 			</div>
 		);
 	}
@@ -94,7 +97,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 					const agentId = event.data?.agent_id as string | undefined;
 					const agentName = agentId ? (agentMap.get(agentId) ?? agentId) : null;
 					const ts = new Date(event.timestamp * 1000);
-					const timeStr = ts.toLocaleTimeString([], {
+					const timeStr = formatAppTime(ts, {
 						hour: "2-digit",
 						minute: "2-digit",
 						second: "2-digit",
@@ -112,7 +115,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 										{event.type.replaceAll("_", " ")}
 									</span>
 									{agentName && (
-										<Badge variant="outline" className="text-[10px] px-1 py-0">
+										<Badge variant="outline" className="text-3xs px-1 py-0">
 											{agentName}
 										</Badge>
 									)}
@@ -128,7 +131,7 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 									);
 								})()}
 							</div>
-							<span className="text-[10px] text-muted-foreground shrink-0 tabular-nums">
+							<span className="text-3xs text-muted-foreground shrink-0 tabular-nums">
 								{timeStr}
 							</span>
 						</div>

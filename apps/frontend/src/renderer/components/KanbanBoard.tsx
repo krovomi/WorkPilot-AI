@@ -54,6 +54,7 @@ import JiraLogo from "../assets/logos/jira.svg";
 import { useViewState } from "../contexts/ViewStateContext";
 import { useKanbanAccessibility } from "../hooks/useKanbanAccessibility";
 import { useToast } from "../hooks/use-toast";
+import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
@@ -235,15 +236,14 @@ export function KanbanBoard({
 	const projects = useProjectStore((state) => state.projects);
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const activeProjectId = useProjectStore((state) => state.activeProjectId);
-
 	// Project environment store for Azure DevOps configuration.
 	const envConfig = useProjectEnvStore((state) => state.envConfig);
-
-	// Kanban settings store for column preferences (collapse state, width, lock state, order)
+	// Kanban settings: column preferences (collapse, width, lock) and order
+	// (minus « Build rouge » on a project without CI, see the hook).
 	const columnPreferences = useKanbanSettingsStore(
 		(state) => state.columnPreferences,
 	);
-	const columnOrder = useKanbanSettingsStore((state) => state.columnOrder);
+	const columnOrder = useVisibleKanbanColumns(tasks);
 	const loadKanbanPreferences = useKanbanSettingsStore(
 		(state) => state.loadPreferences,
 	);
@@ -2405,7 +2405,7 @@ export function KanbanBoard({
 										"flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
 										stuckCount > 0
 											? "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15"
-											: "border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15 dark:text-amber-500",
+											: "border-warning/40 bg-warning/10 text-warning hover:bg-warning/15 ",
 									)}
 								>
 									{stuckCount > 0 ? (
@@ -2422,7 +2422,7 @@ export function KanbanBoard({
 							>
 								<div className="border-b border-border/60 bg-linear-to-br from-amber-500/5 to-transparent px-4 py-2.5">
 									<div className="flex items-center gap-2">
-										<Timer className="h-4 w-4 text-amber-500" />
+										<Timer className="h-4 w-4 text-warning" />
 										<h3 className="text-sm font-semibold">
 											{t("kanban.stale.title")}
 										</h3>
@@ -2448,7 +2448,7 @@ export function KanbanBoard({
 														"mt-1 h-2 w-2 shrink-0 rounded-full",
 														level === "stuck"
 															? "bg-destructive"
-															: "bg-amber-500",
+															: "bg-warning",
 													)}
 												/>
 												<span className="min-w-0 flex-1">
@@ -2502,7 +2502,7 @@ export function KanbanBoard({
 									role="status"
 									className="flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-xs font-medium tabular-nums"
 								>
-									<Coins className="h-3.5 w-3.5 text-emerald-500" />
+									<Coins className="h-3.5 w-3.5 text-success" />
 									{formatCost(costForecast.totalUsd)}
 								</div>
 							</TooltipTrigger>
@@ -2565,10 +2565,10 @@ export function KanbanBoard({
 							/>
 							{envConfig?.azureDevOpsRepository || "Azure DevOps"}
 							{azureDevOpsConnected === true && (
-								<span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+								<span className="h-2 w-2 rounded-full bg-success shrink-0" />
 							)}
 							{azureDevOpsConnected === false && (
-								<span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+								<span className="h-2 w-2 rounded-full bg-destructive shrink-0" />
 							)}
 						</Button>
 					)}
@@ -2599,10 +2599,10 @@ export function KanbanBoard({
 							<img src={JiraLogo} alt="Jira" className="h-4 w-4" />
 							{envConfig?.jiraProjectKey || "Jira"}
 							{jiraConnected === true && (
-								<span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+								<span className="h-2 w-2 rounded-full bg-success shrink-0" />
 							)}
 							{jiraConnected === false && (
-								<span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+								<span className="h-2 w-2 rounded-full bg-destructive shrink-0" />
 							)}
 						</Button>
 					)}
@@ -2892,7 +2892,7 @@ export function KanbanBoard({
 							<AlertDialogHeader className="text-center space-y-4">
 								<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-emerald-500/20 to-emerald-600/30 p-px">
 									<div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900/90">
-										<CheckCheck className="h-8 w-8 text-emerald-400" />
+										<CheckCheck className="h-8 w-8 text-success" />
 									</div>
 								</div>
 								<AlertDialogTitle className="text-2xl font-bold text-white">
@@ -2911,9 +2911,8 @@ export function KanbanBoard({
 									<span className="text-sm font-semibold text-slate-200">
 										{t("kanban.tasksToComplete")}
 									</span>
-									<span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-300">
-										{selectedTaskIds.size}{" "}
-										{selectedTaskIds.size === 1 ? "tâche" : "tâches"}
+									<span className="rounded-full bg-success/20 px-3 py-1 text-xs font-medium text-success">
+										{t("common:selection.tasksCount", { count: selectedTaskIds.size })}
 									</span>
 								</div>
 								<ScrollArea className="h-32 rounded-xl border border-slate-700/50 bg-slate-800/50 p-3 backdrop-blur-sm">
@@ -2923,13 +2922,13 @@ export function KanbanBoard({
 												key={task.id}
 												className="group flex items-center gap-3 rounded-lg bg-slate-700/30 px-3 py-2.5 text-sm transition-all hover:bg-slate-700/50"
 											>
-												<div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600/30 text-xs font-medium text-emerald-300">
+												<div className="flex h-6 w-6 items-center justify-center rounded-full bg-success/30 text-xs font-medium text-success">
 													{selectedTasks.indexOf(task) + 1}
 												</div>
 												<span className="flex-1 truncate text-slate-200">
 													{task.title}
 												</span>
-												<CheckCheck className="h-4 w-4 text-emerald-400/60 opacity-0 transition-opacity group-hover:opacity-100" />
+												<CheckCheck className="h-4 w-4 text-success/60 opacity-0 transition-opacity group-hover:opacity-100" />
 											</div>
 										))}
 									</div>
@@ -2937,12 +2936,12 @@ export function KanbanBoard({
 							</div>
 
 							{/* Info message */}
-							<div className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 backdrop-blur-sm">
+							<div className="mt-6 rounded-xl border border-success/20 bg-success/5 p-4 backdrop-blur-sm">
 								<div className="flex items-start gap-3">
-									<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
-										<GitPullRequest className="h-3 w-3 text-emerald-400" />
+									<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/20">
+										<GitPullRequest className="h-3 w-3 text-success" />
 									</div>
-									<p className="text-sm font-medium text-emerald-300 leading-relaxed">
+									<p className="text-sm font-medium text-success leading-relaxed">
 										{t("kanban.markAsDoneConfirmInfo")}
 									</p>
 								</div>
@@ -2978,7 +2977,7 @@ export function KanbanBoard({
 								{/* Icon with animated background */}
 								<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-linear-to-br from-red-500/20 to-red-600/30 p-px">
 									<div className="flex h-full w-full items-center justify-center rounded-full bg-slate-900/90">
-										<Trash2 className="h-8 w-8 text-red-400" />
+										<Trash2 className="h-8 w-8 text-destructive" />
 									</div>
 								</div>
 
@@ -2998,9 +2997,8 @@ export function KanbanBoard({
 									<label className="text-sm font-semibold text-slate-200">
 										{t("kanban.tasksToDelete")}
 									</label>
-									<span className="rounded-full bg-red-500/20 px-3 py-1 text-xs font-medium text-red-300">
-										{selectedTaskIds.size}{" "}
-										{selectedTaskIds.size === 1 ? "tâche" : "tâches"}
+									<span className="rounded-full bg-destructive/20 px-3 py-1 text-xs font-medium text-destructive">
+										{t("common:selection.tasksCount", { count: selectedTaskIds.size })}
 									</span>
 								</div>
 								<ScrollArea className="h-32 rounded-xl border border-slate-700/50 bg-slate-800/50 p-3 backdrop-blur-sm">
@@ -3016,7 +3014,7 @@ export function KanbanBoard({
 												<span className="flex-1 truncate text-slate-200">
 													{task.title}
 												</span>
-												<Trash2 className="h-4 w-4 text-red-400/60 opacity-0 transition-opacity group-hover:opacity-100" />
+												<Trash2 className="h-4 w-4 text-destructive/60 opacity-0 transition-opacity group-hover:opacity-100" />
 											</div>
 										))}
 									</div>
@@ -3024,12 +3022,12 @@ export function KanbanBoard({
 							</div>
 
 							{/* Enhanced Warning message */}
-							<div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/5 p-4 backdrop-blur-sm">
+							<div className="mt-6 rounded-xl border border-destructive/20 bg-destructive/5 p-4 backdrop-blur-sm">
 								<div className="flex items-start gap-3">
-									<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500/20">
-										<span className="text-xs font-bold text-red-400">!</span>
+									<div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive/20">
+										<span className="text-xs font-bold text-destructive">!</span>
 									</div>
-									<p className="text-sm font-medium text-red-300 leading-relaxed">
+									<p className="text-sm font-medium text-destructive leading-relaxed">
 										{t("kanban.deleteWarning")}
 									</p>
 								</div>

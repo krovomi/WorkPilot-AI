@@ -11,8 +11,8 @@ import type {
 } from "../../../shared/types";
 import { debugLog } from "../../../shared/utils/debug-logger";
 import type { AgentManager } from "../../agent";
-import { projectStore } from "../../project-store";
 import { getPageFeatureSettings } from "../../services/page-llm-config";
+import { featureProject } from "../server-feature-files";
 import { safeSendToRenderer } from "../utils";
 
 /**
@@ -43,7 +43,7 @@ export function startIdeationGeneration(
 
 	const getMainWindow = () => mainWindow;
 
-	const project = projectStore.getProject(projectId);
+	const project = featureProject(projectId);
 	if (!project) {
 		debugLog("[Ideation Handler] Project not found:", projectId);
 		safeSendToRenderer(
@@ -104,7 +104,7 @@ export function refreshIdeationSession(
 
 	const getMainWindow = () => mainWindow;
 
-	const project = projectStore.getProject(projectId);
+	const project = featureProject(projectId);
 	if (!project) {
 		safeSendToRenderer(
 			getMainWindow,

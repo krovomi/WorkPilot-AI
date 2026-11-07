@@ -5,6 +5,27 @@
 
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type {
+	IPCResult,
+	ServerAccessToken,
+	ServerAccessTokenCreated,
+} from "../../../shared/types";
+import type { ColorTheme } from "../../../shared/types/settings";
+import type {
+	NeedsYouChannelKind,
+	NeedsYouEventKind,
+	ServerNeedsYouChannelInput,
+	ServerNeedsYouOverview,
+	ServerNeedsYouTestResult,
+} from "../../../shared/types/server-needs-you";
+
+/** The person's integration tokens the server can hold (never read back). */
+export type ServerSecretKind =
+	| "github_token"
+	| "gitlab_token"
+	| "jira_token"
+	| "linear_api_key"
+	| "azure_pat";
 
 export interface ServerUser {
 	id: string;
@@ -92,9 +113,39 @@ export interface ServerAuthAPI {
 	revokeInvite: (
 		invitationId: string,
 	) => Promise<DataResult<{ revoked: boolean }>>;
+	listAccessTokens: () => Promise<IPCResult<ServerAccessToken[]>>;
+	createAccessToken: (
+		name: string,
+		scope: "read" | "write",
+		ttlDays: number,
+	) => Promise<IPCResult<ServerAccessTokenCreated>>;
+	revokeAccessToken: (id: string) => Promise<IPCResult>;
+	listSecrets: () => Promise<IPCResult<ServerSecretKind[]>>;
+	setSecret: (kind: ServerSecretKind, value: string) => Promise<IPCResult>;
+	deleteSecret: (kind: ServerSecretKind) => Promise<IPCResult>;
+	getNeedsYou: () => Promise<IPCResult<ServerNeedsYouOverview>>;
+	saveNeedsYouChannel: (
+		channel: NeedsYouChannelKind,
+		input: ServerNeedsYouChannelInput,
+	) => Promise<IPCResult>;
+	deleteNeedsYouChannel: (channel: NeedsYouChannelKind) => Promise<IPCResult>;
+	testNeedsYouChannel: (
+		channel: NeedsYouChannelKind,
+	) => Promise<IPCResult<ServerNeedsYouTestResult>>;
+	saveNeedsYouPreferences: (prefs: {
+		events: Record<NeedsYouEventKind, boolean>;
+		locale: "en" | "fr";
+	}) => Promise<IPCResult>;
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
+	/** The person's theme from the server, already kept in the settings; null when none. */
+	pullUiPreferences: () => Promise<ServerUiPreferences | null>;
+}
+
+export interface ServerUiPreferences {
+	theme: "light" | "dark" | "system";
+	colorTheme: ColorTheme;
 }
 
 export const createServerAuthAPI = (): ServerAuthAPI => ({
@@ -137,8 +188,40 @@ export const createServerAuthAPI = (): ServerAuthAPI => ({
 			IPC_CHANNELS.SERVER_AUTH_REVOKE_INVITE,
 			invitationId,
 		),
+	listAccessTokens: () =>
+		invokeIpc<IPCResult<ServerAccessToken[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_ACCESS_TOKENS),
+	createAccessToken: (name, scope, ttlDays) =>
+		invokeIpc<IPCResult<ServerAccessTokenCreated>>(
+			IPC_CHANNELS.SERVER_AUTH_CREATE_ACCESS_TOKEN,
+			name,
+			scope,
+			ttlDays,
+		),
+	revokeAccessToken: (id) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_REVOKE_ACCESS_TOKEN, id),
+	listSecrets: () =>
+		invokeIpc<IPCResult<ServerSecretKind[]>>(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS),
+	setSecret: (kind, value) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, kind, value),
+	deleteSecret: (kind) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, kind),
+	getNeedsYou: () =>
+		invokeIpc<IPCResult<ServerNeedsYouOverview>>(IPC_CHANNELS.SERVER_NEEDS_YOU_GET),
+	saveNeedsYouChannel: (channel, input) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_CHANNEL, channel, input),
+	deleteNeedsYouChannel: (channel) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_DELETE_CHANNEL, channel),
+	testNeedsYouChannel: (channel) =>
+		invokeIpc<IPCResult<ServerNeedsYouTestResult>>(
+			IPC_CHANNELS.SERVER_NEEDS_YOU_TEST_CHANNEL,
+			channel,
+		),
+	saveNeedsYouPreferences: (prefs) =>
+		invokeIpc<IPCResult>(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_PREFERENCES, prefs),
 	logout: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_LOGOUT),
 	restore: () => invokeIpc<ServerAuthState>(IPC_CHANNELS.SERVER_AUTH_RESTORE),
+	pullUiPreferences: () =>
+		invokeIpc<ServerUiPreferences | null>(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES),
 	onStateChanged: (callback) =>
 		createIpcListener<[ServerAuthState]>(IPC_CHANNELS.SERVER_AUTH_STATE_CHANGED, (state) =>
 			callback(state),

@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui";
 import { useAdminStore } from "@/stores/admin-store";
+import { formatAppDateTime } from "@/lib/date-format";
 
 function StatCard({
 	icon: Icon,
@@ -79,7 +80,7 @@ function RunsByDay({
 							style={{ height: `${(point.count / max) * 100}%` }}
 							title={`${point.date}: ${point.count}`}
 						/>
-						<span className="text-[10px] text-muted-foreground">
+						<span className="text-3xs text-muted-foreground">
 							{point.date.slice(5)}
 						</span>
 					</div>
@@ -236,7 +237,7 @@ export function OverviewTab() {
 								<div className="flex justify-between">
 									<span className="font-medium">{failure.phase}</span>
 									<span className="text-xs text-muted-foreground">
-										{new Date(failure.finished_at).toLocaleString()}
+										{formatAppDateTime(failure.finished_at)}
 									</span>
 								</div>
 								{failure.error ? (

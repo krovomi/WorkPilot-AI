@@ -377,7 +377,7 @@ export function TaskTestGenerator({
 							<Badge
 								variant="secondary"
 								className={cn(
-									"text-[10px]",
+									"text-3xs",
 									STRATEGY_BADGE_CLASSES[
 										plan.strategy as Exclude<TestStrategy, "skip">
 									],

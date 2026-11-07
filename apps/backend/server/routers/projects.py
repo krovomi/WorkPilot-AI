@@ -16,10 +16,11 @@ from server.auth.deps import (
     get_project_role,
     require_project_role,
 )
-from server.authz.principal import get_principal
+from server.authz.principal import Principal, get_principal
 from server.db.engine import get_db
 from server.db.models import (
     AuditLog,
+    OrgMember,
     Project,
     ProjectMember,
     ProjectRole,
@@ -42,28 +43,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-@router.get("", response_model=list[ProjectPublic])
-async def list_projects(
-    request: Request,
-    user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> list[ProjectPublic]:
-    """Projects the caller can see, **within the organization they act in**.
+async def visible_projects(
+    db: AsyncSession, principal: Principal
+) -> list[tuple[Project, str | None]]:
+    """Projects the principal can see, **within the organization they act in**,
+    each with their role on it.
 
     An organization admin sees every project of their own tenant and none of
     anyone else's. Before multi-tenancy this returned every project on the
     deployment to any admin, which under a shared server would list other
-    customers' repositories by name and URL.
+    customers' repositories by name and URL. The MCP endpoint lists with this
+    too (``shared_board/mcp_http.py``).
     """
-    principal = get_principal(request)
     org_id = principal.org_id
 
     if principal.is_platform_admin and org_id is None:
         # Operating the deployment without having picked a tenant: the listing
         # is genuinely global, and only the platform role reaches here.
         projects = list(await db.scalars(select(Project).order_by(Project.created_at)))
-        roles = {p.id: ProjectRole.OWNER.value for p in projects}
-    elif principal.has("org.member.write") or user.is_admin:
+        roles: dict[str, str | None] = {p.id: ProjectRole.OWNER.value for p in projects}
+    elif principal.has("org.member.write") or principal.is_platform_admin:
         # Admin *of this organization*: every project it owns.
         projects = list(
             await db.scalars(
@@ -77,17 +76,43 @@ async def list_projects(
         result = await db.execute(
             select(Project, ProjectMember.role)
             .join(ProjectMember, ProjectMember.project_id == Project.id)
-            .where(ProjectMember.user_id == user.id, Project.org_id == org_id)
+            .where(ProjectMember.user_id == principal.id, Project.org_id == org_id)
             .order_by(Project.created_at)
         )
         rows = result.all()
         projects = [p for p, _ in rows]
         roles = {p.id: role for p, role in rows}
+        # Projects the person reaches through a group, at the highest role.
+        from server.authz.groups import group_project_roles, highest_role
 
+        via_groups = await group_project_roles(db, principal.id, org_id)
+        missing = [pid for pid in via_groups if pid not in roles]
+        if missing:
+            projects += list(
+                await db.scalars(
+                    select(Project).where(
+                        Project.id.in_(missing), Project.org_id == org_id
+                    )
+                )
+            )
+            projects.sort(key=lambda p: p.created_at)
+        for pid, role in via_groups.items():
+            roles[pid] = highest_role(roles.get(pid), role) or role
+    return [(p, roles.get(p.id)) for p in projects]
+
+
+@router.get("", response_model=list[ProjectPublic])
+async def list_projects(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ProjectPublic]:
+    """Projects the caller can see in the organization they act in
+    (:func:`visible_projects`)."""
     out = []
-    for p in projects:
-        item = ProjectPublic.model_validate(p)
-        item.my_role = roles.get(p.id)
+    for project, role in await visible_projects(db, get_principal(request)):
+        item = ProjectPublic.model_validate(project)
+        item.my_role = role
         out.append(item)
     return out
 
@@ -109,6 +134,10 @@ async def create_project(
                 "X-WorkPilot-Org header or call POST /auth/switch-org first."
             ),
         )
+    # Whoever may add to the board may register a project; a reader, a
+    # reviewer, or anyone of a suspended organization may not.
+    if not principal.has_any("task.write", "project.write"):
+        raise HTTPException(status_code=403, detail="Missing permission: task.write")
 
     await enforce_project_quota(db, org_id)
 
@@ -193,6 +222,7 @@ async def delete_project(
     db.add(
         AuditLog(
             user_id=user.id,
+            org_id=project.org_id,
             project_id=project_id,
             action="project.deleted",
             payload={"name": project.name},
@@ -248,6 +278,17 @@ async def add_member(
         raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}")
     target = await db.get(User, body.user_id)
     if target is None or not target.is_active:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Only someone of the project's own organization can join it.
+    project_org = await db.scalar(
+        select(Project.org_id).where(Project.id == project_id)
+    )
+    in_org = await db.scalar(
+        select(OrgMember.id).where(
+            OrgMember.org_id == project_org, OrgMember.user_id == body.user_id
+        )
+    )
+    if in_org is None:
         raise HTTPException(status_code=404, detail="User not found")
     existing = await db.scalar(
         select(ProjectMember).where(

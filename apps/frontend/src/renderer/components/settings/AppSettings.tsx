@@ -12,11 +12,14 @@ import {
 	Compass,
 	FolderOpen,
 	Globe,
+	KeyRound,
 	Loader2,
 	MessageSquare,
+	Mic,
 	Monitor,
 	Package,
 	Palette,
+	Plug,
 	Repeat,
 	Save,
 	Search,
@@ -43,6 +46,10 @@ import { useProjectStore } from "@/stores/project-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { useGuidedTourStore } from "../guided-tour/guided-tour-store";
 import { InvitationsAdmin } from "../auth/InvitationsAdmin";
+import { CollaborationSettings } from "../collaboration/CollaborationSettings";
+import { ServerMcpSettings } from "./ServerMcpSettings";
+import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
+import { ServerTokensSettings } from "./ServerTokensSettings";
 import { Button } from "../ui/button";
 import {
 	FullScreenDialog,
@@ -62,6 +69,7 @@ import { DisplaySettings } from "./DisplaySettings";
 import { GeneralSettings } from "./GeneralSettings";
 import { useSettings } from "./hooks/useSettings";
 import { LanguageSettings } from "./LanguageSettings";
+import { VoiceAssistantSettings } from "./VoiceAssistantSettings";
 import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
@@ -125,6 +133,7 @@ export type AppSection =
 	| "appearance"
 	| "display"
 	| "language"
+	| "voice-assistant"
 	| "terminal-fonts"
 	// Développement & Outils
 	| "devtools"
@@ -134,8 +143,12 @@ export type AppSection =
 	| "sandbox"
 	| "guardrails"
 	| "anomaly-detection"
-	// Multi-utilisateurs (serveur, admin uniquement)
+	// Multi-utilisateurs (serveur ; les invitations pour les admins seulement)
 	| "team-invitations"
+	| "server-tokens"
+	| "server-mcp"
+	| "server-needs-you"
+	| "server-collaboration"
 	// Système & Maintenance
 	| "updates"
 	| "notifications"
@@ -150,6 +163,7 @@ export type ProjectSettingsSection =
 	| "figma"
 	| "cicd"
 	| "automations"
+	| "board-mcp"
 	| "github"
 	| "gitlab"
 	| "linear"
@@ -231,6 +245,12 @@ const createSettingsThemes = (t: {
 				type: "project",
 			},
 			{
+				id: "board-mcp",
+				icon: Plug,
+				label: t("boardMcp.navLabel"),
+				type: "project",
+			},
+			{
 				id: "teams",
 				icon: MessageSquare,
 				label: t(
@@ -243,6 +263,30 @@ const createSettingsThemes = (t: {
 				id: "team-invitations",
 				icon: UserPlus,
 				label: t("invitationsAdmin.navLabel", "Invitations (équipe)"),
+				type: "app",
+			},
+			{
+				id: "server-tokens",
+				icon: KeyRound,
+				label: t("serverTokens.navLabel"),
+				type: "app",
+			},
+			{
+				id: "server-mcp",
+				icon: Plug,
+				label: t("serverMcp.navLabel"),
+				type: "app",
+			},
+			{
+				id: "server-needs-you",
+				icon: Bell,
+				label: t("serverNeedsYou.navLabel"),
+				type: "app",
+			},
+			{
+				id: "server-collaboration",
+				icon: Users,
+				label: t("serverCollaboration.navLabel"),
 				type: "app",
 			},
 		],
@@ -258,6 +302,12 @@ const createSettingsThemes = (t: {
 			{ id: "display", icon: Monitor, label: "Affichage", type: "app" },
 			{ id: "language", icon: Globe, label: "Langue", type: "app" },
 			{
+				id: "voice-assistant",
+				icon: Mic,
+				label: t("voiceAssistant:settings.title"),
+				type: "app",
+			},
+			{
 				id: "terminal-fonts",
 				icon: Terminal,
 				label: "Polices terminal",
@@ -270,7 +320,7 @@ const createSettingsThemes = (t: {
 	development: {
 		title: "Développement & Outils",
 		icon: Code,
-		color: "text-green-600",
+		color: "text-success",
 		sections: [
 			{
 				id: "devtools",
@@ -387,12 +437,18 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 	const serverMode = useServerSessionStore((state) => state.mode);
 	const serverUserRole = useServerSessionStore((state) => state.user?.role);
 	const isServerAdmin = serverMode === "server" && serverUserRole === "admin";
-	if (!isServerAdmin) {
-		SETTINGS_THEMES.integrations.sections =
-			SETTINGS_THEMES.integrations.sections.filter(
-				(s) => s.id !== "team-invitations",
-			);
-	}
+	// The person's own tokens on the server: anyone signed in to one.
+	const hidden = new Set([
+		...(isServerAdmin ? [] : ["team-invitations"]),
+		...(serverMode === "server" ? [] : [
+					"server-tokens",
+					"server-mcp",
+					"server-needs-you",
+					"server-collaboration",
+				]),
+	]);
+	SETTINGS_THEMES.integrations.sections =
+		SETTINGS_THEMES.integrations.sections.filter((s) => !hidden.has(s.id));
 
 	// Project state (déclaré avant tout usage)
 	const projects = useProjectStore((state) => state.projects);
@@ -584,6 +640,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						onSettingsChange={setSettings}
 					/>
 				);
+			case "voice-assistant":
+				return (
+					<VoiceAssistantSettings
+						settings={settings}
+						onSettingsChange={setSettings}
+					/>
+				);
 			case "devtools":
 				return (
 					<DevToolsSettings
@@ -651,6 +714,14 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 				return <SwarmModeSettings />;
 			case "team-invitations":
 				return isServerAdmin ? <InvitationsAdmin /> : null;
+			case "server-tokens":
+				return serverMode === "server" ? <ServerTokensSettings /> : null;
+			case "server-mcp":
+				return serverMode === "server" ? <ServerMcpSettings /> : null;
+			case "server-needs-you":
+				return serverMode === "server" ? <ServerNeedsYouSettings /> : null;
+			case "server-collaboration":
+				return serverMode === "server" ? <CollaborationSettings /> : null;
 			default:
 				return null;
 		}

@@ -16,7 +16,14 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
-from server.db.models import AgentRun, OrgMember, OrgQuota, Project, SpecIndex
+from server.db.models import (
+    AgentRun,
+    OrgMember,
+    OrgQuota,
+    Project,
+    ProjectJob,
+    SpecIndex,
+)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,18 +49,21 @@ async def count_projects(db: AsyncSession, org_id: str) -> int:
 
 
 async def count_active_runs(db: AsyncSession, org_id: str) -> int:
-    """Runs currently queued or executing for this organization."""
-    return (
-        await db.scalar(
-            select(func.count(AgentRun.id))
-            .join(SpecIndex, SpecIndex.id == AgentRun.spec_id)
-            .join(Project, Project.id == SpecIndex.project_id)
-            .where(
-                Project.org_id == org_id,
-                AgentRun.status.in_(("queued", "running")),
-            )
-        )
-    ) or 0
+    """Runs and project jobs currently queued or executing for this
+    organization: both start an agent on the server."""
+    active = ("queued", "running")
+    runs = await db.scalar(
+        select(func.count(AgentRun.id))
+        .join(SpecIndex, SpecIndex.id == AgentRun.spec_id)
+        .join(Project, Project.id == SpecIndex.project_id)
+        .where(Project.org_id == org_id, AgentRun.status.in_(active))
+    )
+    jobs = await db.scalar(
+        select(func.count(ProjectJob.id))
+        .join(Project, Project.id == ProjectJob.project_id)
+        .where(Project.org_id == org_id, ProjectJob.status.in_(active))
+    )
+    return (runs or 0) + (jobs or 0)
 
 
 async def tokens_used_this_month(db: AsyncSession, org_id: str) -> int:

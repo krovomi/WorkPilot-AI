@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: qa
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are a QA acceptance auditor.

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 interface InitializationGuardProps {
 	initialized: boolean;
@@ -17,10 +18,13 @@ export function InitializationGuard({
 	description: _description,
 	children,
 }: InitializationGuardProps) {
+	const { t } = useTranslation();
 	if (!initialized) {
 		return (
 			<div className="rounded-lg border border-border bg-muted/50 p-4 text-center text-sm text-muted-foreground">
-				Initialize WorkPilot AI first to configure {title.toLowerCase()}
+				{t("settings:projectSelector.initializeFirst", {
+					section: title.toLowerCase(),
+				})}
 			</div>
 		);
 	}

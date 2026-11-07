@@ -14,6 +14,7 @@ import { setupBenchListeners } from "./bench-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
+import { setupCollaborationListeners } from "./collaboration-store";
 import { setupComplianceListeners } from "./compliance-store";
 import { setupConflictPredictorListeners } from "./conflict-predictor-store";
 import { setupConsensusArbiterListeners } from "./consensus-arbiter-store";
@@ -39,18 +40,20 @@ import { setupPairProgrammingListeners } from "./pair-programming-store";
 import {
 	setupPerformanceProfilerListeners,
 } from "./performance-profiler-store";
+import { setupMultiRepoListeners } from "./multi-repo-store";
 import { setupPairRealtimeListeners } from "./phase35-stores";
 import { setupPipelineGeneratorListeners } from "./pipeline-generator-store";
+import { setupPrFollowupListeners } from "./pr-followup-store";
 import { setupPromptOptimizerListeners } from "./prompt-optimizer-store";
 import { setupRegressionGuardianListeners } from "./regression-guardian-store";
 import { setupReleaseCoordinatorListeners } from "./release-coordinator-store";
 import { setupSandboxListeners } from "./sandbox-store";
 import { setupTaskSandboxListeners } from "./task-sandbox-store";
 import { setupSecureStorageListeners } from "./secure-storage-store";
+import { setupServerViewListeners } from "./server-live-views";
 import { setupSmartEstimationListeners } from "./smart-estimation-store";
-import { setupSpecRefinementListeners } from "./spec-refinement-store";
 import { setupVisualToCodeListeners } from "./visual-to-code-store";
-import { setupVoiceControlListeners } from "./voice-control-store";
+import { setupVoiceAssistantListeners } from "./voice-assistant-store";
 
 /**
  * Every feature's IPC listeners, registered once for the lifetime of the
@@ -87,6 +90,7 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
+	["Collaboration", setupCollaborationListeners],
 	["Compliance", setupComplianceListeners],
 	["ConflictPredictor", setupConflictPredictorListeners],
 	["ConsensusArbiter", setupConsensusArbiterListeners],
@@ -104,6 +108,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Insights", setupInsightsListeners],
 	["LearningLoop", setupLearningLoopListeners],
 	["Mobile", setupMobileListeners],
+	// A multi-repo run goes on in the main process with the dialog closed.
+	["MultiRepo", setupMultiRepoListeners],
 	["NaturalLanguageGit", setupNaturalLanguageGitListeners],
 	["NotebookAgent", setupNotebookAgentListeners],
 	["OnboardingAgent", setupOnboardingAgentListeners],
@@ -111,6 +117,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["PairRealtime", setupPairRealtimeListeners],
 	["PerformanceProfiler", setupPerformanceProfilerListeners],
 	["PipelineGenerator", setupPipelineGeneratorListeners],
+	// A task's PR follow-through, for its card and the panel's banner.
+	["PrFollowup", setupPrFollowupListeners],
 	["PromptOptimizer", setupPromptOptimizerListeners],
 	["RegressionGuardian", setupRegressionGuardianListeners],
 	["ReleaseCoordinator", setupReleaseCoordinatorListeners],
@@ -120,12 +128,13 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Not a page's feature: the sidebar's warning that stored API keys are
 	// not protected by the OS keyring.
 	["SecureStorage", setupSecureStorageListeners],
+	// A shared view of a server project read again when a teammate changes it.
+	["ServerViews", setupServerViewListeners],
 	["SmartEstimation", setupSmartEstimationListeners],
-	["SpecRefinement", setupSpecRefinementListeners],
 	// An ACP agent's question waits on its card whether or not the board is open.
 	["TaskPermissions", setupTaskPermissionListeners],
 	["VisualToCode", setupVisualToCodeListeners],
-	["VoiceControl", setupVoiceControlListeners],
+	["VoiceAssistant", setupVoiceAssistantListeners],
 ];
 
 let teardown: (() => void) | null = null;

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notifySentryStateChanged } from "../../lib/sentry";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Label } from "../ui/label";
@@ -20,7 +21,12 @@ interface PrivacyStepProps {
  */
 export function PrivacyStep({ onNext, onBack }: PrivacyStepProps) {
 	const { t } = useTranslation(["onboarding", "common"]);
-	const { settings, updateSettings } = useSettingsStore();
+	const { settings, updateSettings } = useSettingsStore(
+		useShallow((s) => ({
+			settings: s.settings,
+			updateSettings: s.updateSettings,
+		})),
+	);
 	const [sentryEnabled, setSentryEnabled] = useState(
 		settings.sentryEnabled ?? true,
 	);

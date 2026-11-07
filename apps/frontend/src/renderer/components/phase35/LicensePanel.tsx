@@ -12,6 +12,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { NativeSelect } from "../ui/native-select";
 interface LicensePanelProps {
 	readonly projectPath: string;
 }
@@ -50,18 +51,18 @@ export function LicensePanel({ projectPath }: LicensePanelProps) {
 					<label htmlFor="policy-select" className="block text-sm font-medium mb-1">
 						{t("license.policy")}
 					</label>
-					<select
+					<NativeSelect
 						id="policy-select"
 						value={policy}
 						onChange={(e) => setPolicy(e.target.value as typeof policy)}
-						className="w-full rounded border bg-background p-2 text-sm"
+						className="w-full p-2 text-sm h-auto"
 					>
 						{POLICIES.map((p) => (
 							<option key={p.value} value={p.value}>
 								{t(p.labelKey as never)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 				</div>
 				{!projectPath && (
 					<p className="text-sm text-muted-foreground">
@@ -74,8 +75,8 @@ export function LicensePanel({ projectPath }: LicensePanelProps) {
 							<Badge
 								className={
 									report.passed
-										? "bg-green-500/20 text-green-700 border-green-500/40"
-										: "bg-red-500/20 text-red-700 border-red-500/40"
+										? "bg-success/20 text-success border-success/40"
+										: "bg-destructive/20 text-destructive border-destructive/40"
 								}
 							>
 								{report.passed ? t("license.passed") : t("license.failed")}

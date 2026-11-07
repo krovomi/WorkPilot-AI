@@ -60,3 +60,24 @@ def test_downgrade_to_base_then_upgrade_again(alembic_config):
 
     command.upgrade(config, "head")
     assert "invitations" in _tables(db)
+
+
+def test_a_database_from_before_task_tokens_gains_their_columns(alembic_config):
+    config, db = alembic_config
+    command.upgrade(config, "head")
+    command.downgrade(config, "0013_access_tokens")
+    engine = sa.create_engine(f"sqlite:///{db}")
+    try:
+        columns = {c["name"] for c in sa.inspect(engine).get_columns("access_tokens")}
+        assert "project_id" not in columns and "card_id" not in columns
+        engine.dispose()
+        command.upgrade(config, "head")
+        inspector = sa.inspect(engine)
+        columns = {c["name"] for c in inspector.get_columns("access_tokens")}
+        assert {"project_id", "card_id"} <= columns
+        assert any(
+            fk["referred_table"] == "projects"
+            for fk in inspector.get_foreign_keys("access_tokens")
+        )
+    finally:
+        engine.dispose()

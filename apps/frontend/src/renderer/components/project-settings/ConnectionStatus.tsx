@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ConnectionStatusProps {
 	isChecking: boolean;
@@ -17,6 +18,7 @@ export function ConnectionStatus({
 	errorMessage,
 	additionalInfo,
 }: ConnectionStatusProps) {
+	const { t } = useTranslation();
 	return (
 		<div className="rounded-lg border border-border bg-muted/30 p-3">
 			<div className="flex items-center justify-between">
@@ -24,7 +26,7 @@ export function ConnectionStatus({
 					<p className="text-sm font-medium text-foreground">{title}</p>
 					<p className="text-xs text-muted-foreground">
 						{isChecking
-							? "Checking..."
+							? t("settings:projectSections.github.checking")
 							: isConnected
 								? successMessage
 								: errorMessage}

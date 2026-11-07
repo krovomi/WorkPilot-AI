@@ -19,14 +19,14 @@ import { formatDate } from "../utils";
 
 // GitLab issue state colors
 const GITLAB_ISSUE_STATE_COLORS: Record<string, string> = {
-	opened: "bg-green-500/10 text-green-500 border-green-500/20",
+	opened: "bg-success/10 text-success border-success/20",
 	closed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
 };
 
 const GITLAB_COMPLEXITY_COLORS: Record<string, string> = {
-	simple: "bg-green-500/10 text-green-500",
-	standard: "bg-yellow-500/10 text-yellow-500",
-	complex: "bg-red-500/10 text-red-500",
+	simple: "bg-success/10 text-success",
+	standard: "bg-warning/10 text-warning",
+	complex: "bg-destructive/10 text-destructive",
 };
 
 export function IssueDetail({

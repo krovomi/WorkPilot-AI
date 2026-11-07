@@ -71,8 +71,6 @@ export interface ForkRequest {
 	fork_provider: string;
 	/** Target model name (e.g. claude-sonnet-4-5-20250514, gpt-4o, gemini-2.0-flash) */
 	fork_model: string;
-	/** API key for the provider (optional, uses app settings if empty) */
-	fork_api_key: string;
 	/** Custom base URL (for ollama, custom endpoints) */
 	fork_base_url: string;
 }
@@ -104,7 +102,6 @@ export interface ForkContext {
 	additional_instructions: string;
 	provider: string;
 	model: string;
-	api_key: string;
 	base_url: string;
 }
 

@@ -61,6 +61,7 @@ import { buildBranchOptions } from "../lib/branch-utils";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import {
 	clearDraft,
 	createTask,
@@ -99,7 +100,7 @@ export function TaskCreationWizard({
 	onOpenChange,
 }: TaskCreationWizardProps) {
 	const { t } = useTranslation(["tasks", "common"]);
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,
@@ -208,6 +209,7 @@ export function TaskCreationWizard({
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
 	const [verifyWindow, setVerifyWindow] = useState("");
+	const [verifyScenario, setVerifyScenario] = useState("");
 	// Context-window management (compact / new thread at a threshold).
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() => ({
 		...DEFAULT_CONTEXT_POLICY,
@@ -276,6 +278,7 @@ export function TaskCreationWizard({
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
 				setVerifyWindow(draft.verifyWindow ?? "");
+				setVerifyScenario(draft.verifyScenario ?? "");
 				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
 				setMobileTargets(draft.mobileTargets ?? []);
 				setAcceptanceCriteria(
@@ -414,6 +417,7 @@ export function TaskCreationWizard({
 			tddMode,
 			verifyLoop,
 			verifyWindow,
+			verifyScenario,
 			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria: toCriteria(acceptanceCriteria),
@@ -440,6 +444,7 @@ export function TaskCreationWizard({
 			tddMode,
 			verifyLoop,
 			verifyWindow,
+			verifyScenario,
 			contextPolicy,
 			mobileTargets,
 			acceptanceCriteria,
@@ -643,6 +648,7 @@ export function TaskCreationWizard({
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
 			if (verifyLoop && verifyWindow.trim()) metadata.verifyWindow = verifyWindow.trim();
+			if (verifyLoop && verifyScenario.trim()) metadata.verifyScenario = verifyScenario.trim();
 			// Absent means the defaults (auto, 50%, handoff prepared): only a
 			// policy that differs is written.
 			if (!isDefaultContextPolicy(contextPolicy)) {
@@ -928,6 +934,8 @@ export function TaskCreationWizard({
 					onVerifyLoopChange={setVerifyLoop}
 					verifyWindow={verifyWindow}
 					onVerifyWindowChange={setVerifyWindow}
+					verifyScenario={verifyScenario}
+					onVerifyScenarioChange={setVerifyScenario}
 					contextPolicy={contextPolicy}
 					onContextPolicyChange={setContextPolicy}
 					contextProvider={engine.coding?.provider}

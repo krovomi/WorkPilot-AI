@@ -26,7 +26,8 @@ Your job is to catch ALL of these before sign-off.
 `{{SPEC_DIR}}/`
 
 ```bash
-# 1. Read the spec (your source of truth for requirements)
+# 1. Read the user's request, then the spec written from it
+cat {{SPEC_DIR}}/requirements.json   # task_description = the user's own words
 cat {{SPEC_DIR}}/spec.md
 
 # 2. Read the implementation plan (see what was built)
@@ -44,6 +45,13 @@ git diff {{BASE_BRANCH}}...HEAD --name-status
 # 6. Read QA acceptance criteria from spec
 grep -A 100 "## QA Acceptance Criteria" {{SPEC_DIR}}/spec.md
 ```
+
+**The user's request outranks the spec.** The spec was written from the
+user's own words, kept in `{{SPEC_DIR}}/requirements.json` as
+`task_description`. If the spec contradicts that request (a different file
+name, value or behaviour), the spec is stale or wrong there: judge against the
+request, never ask to delete, rename or revert something the request names,
+and note the contradiction in your sign-off.
 
 ---
 
@@ -89,7 +97,10 @@ cat project_index.json | jq '.services[].test_command'
 # [Execute test commands based on project_index]
 ```
 
-Note pass/fail counts for `tests_passed`.
+Note pass/fail counts for `tests_passed`. Run suites in their quiet or
+summary mode (`pytest -q`, `vitest run --reporter=dot`, `dotnet test -v q`) and
+keep the tail of the output (`2>&1 | tail -n 60`): a full log costs context on
+every later turn of this session, and the counts are all the sign-off needs.
 
 ### 3.2: Integration Tests
 
@@ -140,6 +151,10 @@ Rules:
 - **e2e**: best-effort — record it if measurable; a shortfall is a warning, not a blocker.
 - If coverage **cannot be measured** for unit/integration, treat it as a blocking
   issue (REJECT) and request the Coder Agent to add the missing tests/tooling.
+- Coverage is about the code **this task changed**. When the change set holds
+  no source file (only text or documentation), record
+  `"coverage": {"measured": false, "not_applicable": true}` and do not reject
+  for coverage: never ask for tests or a test project the spec does not need.
 
 Note pass/fail counts for `tests_passed`.
 
@@ -270,18 +285,19 @@ Add any mismatch with the documented usage to `issues_found` (Phase 8).
 
 ### 6.1: Security Review
 
-Check for common vulnerabilities:
+Check the files this task changed — not the whole repository: a repository-wide
+`grep -r` also walks `node_modules`, `bin/`, `obj/` and virtualenvs, returns
+hundreds of kilobytes of other people's code and judges nothing this task did.
 
 ```bash
-# Look for security issues
-grep -r "eval(" --include="*.js" --include="*.ts" .
-grep -r "innerHTML" --include="*.js" --include="*.ts" .
-grep -r "dangerouslySetInnerHTML" --include="*.tsx" --include="*.jsx" .
-grep -r "exec(" --include="*.py" .
-grep -r "shell=True" --include="*.py" .
+# The task's own files (three-dot diff: only the spec branch's changes)
+CHANGED=$(git diff {{BASE_BRANCH}}...HEAD --name-only --diff-filter=ACMR)
+
+# Look for security issues in them
+echo "$CHANGED" | xargs -r grep -nE "eval\(|innerHTML|dangerouslySetInnerHTML|exec\(|shell=True" --
 
 # Check for hardcoded secrets
-grep -rE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" --include="*.py" --include="*.js" --include="*.ts" .
+echo "$CHANGED" | xargs -r grep -nE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" --
 ```
 
 ### 6.2: Pattern Compliance

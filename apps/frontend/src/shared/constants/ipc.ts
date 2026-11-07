@@ -52,6 +52,16 @@ export const IPC_CHANNELS = {
 	TASK_RESUME_SESSION: "task:resumeSession", // Resume a Claude SDK session (uses .session.json)
 	TASK_RESUME_WITH_PROVIDER: "task:resumeWithProvider", // Resume a paused task under a different LLM provider (Niveau 3b)
 	TASK_RESET_CONVERSATION: "task:resetConversation", // Clear conversation.jsonl + PROMPT_TOO_LONG_HALT marker so the task can restart with a fresh context
+	TASK_STEERING_LIST: "task:steeringList", // Messages sent to a running task, with the session each was delivered to
+	TASK_STEERING_SEND: "task:steeringSend", // Queue a message for the next session of a running task (steering.jsonl)
+	TASK_PREVIEW_POINT_START: "task:previewPointStart", // Turn on the DevTools element picker in the task preview and describe the element clicked (F10)
+	TASK_PREVIEW_POINT_CANCEL: "task:previewPointCancel", // Turn the preview's element picker off
+	TASK_PREVIEW_POINT_DISCARD: "task:previewPointDiscard", // Forget a pointed element before it is sent
+	TASK_PREVIEW_POINT_SEND: "task:previewPointSend", // Send each pointed element, with what to change, as a steering message
+	TASK_UNBLOCK_SUBTASK: "task:unblockSubtask", // Answer a blocked subtask from its panel: done, not needed, retry, or retry with a reply (restarts the build)
+	TASK_STACK_ON: "task:stackOn", // Stack a task on one of its blockers: it starts from that task's branch (F6)
+	TASK_STACK_STATUS: "task:stackStatus", // A stacked task's parent: moved, merged, or up to date
+	TASK_STACK_UPDATE: "task:stackUpdate", // Rebase a stacked task onto its parent's new commit, or onto the trunk once the parent is merged
 	TASK_RESET: "task:reset", // Full reset: discard plan/subtasks, worktree and runtime artifacts; keep the spec and go back to backlog
 	TASK_RERUN_PHASE: "task:rerunPhase", // Re-run one execution phase on demand (planning/coding/validation); cascade-invalidates downstream phases and restarts
 	TASK_HOT_SWAP: "task:hotSwap", // Live provider/model/effort change during a running phase (applied at the next turn, context replayed)
@@ -80,6 +90,10 @@ export const IPC_CHANNELS = {
 	// Per-spec architecture: Each spec has its own worktree at .worktrees/{spec-name}/
 	TASK_WORKTREE_STATUS: "task:worktreeStatus",
 	TASK_WORKTREE_DIFF: "task:worktreeDiff",
+	TASK_REVIEW_GROUPS: "task:reviewGroups",
+	TASK_REVIEW_COMMENTS_LIST: "task:reviewCommentsList", // Commentaires ancrés à la ligne (F9)
+	TASK_REVIEW_COMMENT_ADD: "task:reviewCommentAdd",
+	TASK_REVIEW_COMMENT_UPDATE: "task:reviewCommentUpdate", // Revue guidée : le diff regroupé par sous-tâche du plan
 	TASK_FILE_DIFF: "task:fileDiff", // Diff à la demande d'un fichier impacté (inclut les changements non commités)
 	TASK_WORKTREE_MERGE: "task:worktreeMerge",
 	TASK_WORKTREE_MERGE_PREVIEW: "task:worktreeMergePreview", // Preview merge conflicts before merging
@@ -132,11 +146,6 @@ export const IPC_CHANNELS = {
 	TASK_LOGS_CHANGED: "task:logsChanged", // Event: logs changed (main -> renderer)
 	TASK_LOGS_STREAM: "task:logsStream", // Event: streaming log chunk (main -> renderer)
 	TASK_MERGE_PROGRESS: "task:mergeProgress", // Event: merge progress update (main -> renderer)
-
-	// Agent Decision Logger (Feature 30)
-	AGENT_DECISION_LOG_GET: "agentDecision:getLog", // Renderer → Main: load persisted log
-	AGENT_DECISION_LOG_CLEAR: "agentDecision:clearLog", // Renderer → Main: clear log file
-	AGENT_DECISION_LOG_ENTRY: "agentDecision:entry", // Main → Renderer: live entry stream
 
 	// Terminal operations
 	TERMINAL_CREATE: "terminal:create",
@@ -679,17 +688,9 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
-	MCP_MARKETPLACE_INSTALL: "mcpMarketplace:install", // Install a server
-	MCP_MARKETPLACE_UNINSTALL: "mcpMarketplace:uninstall", // Uninstall a server
-	MCP_MARKETPLACE_GET_INSTALLED: "mcpMarketplace:getInstalled", // Get installed servers
-	MCP_MARKETPLACE_UPDATE_SERVER: "mcpMarketplace:updateServer", // Update server config
-	MCP_MARKETPLACE_TOGGLE_SERVER: "mcpMarketplace:toggleServer", // Enable/disable server
-	MCP_MARKETPLACE_HEALTH_CHECK: "mcpMarketplace:healthCheck", // Health check installed server
-	MCP_MARKETPLACE_HEALTH_CHECK_ALL: "mcpMarketplace:healthCheckAll", // Health check all installed
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
-	MCP_MARKETPLACE_EXPORT_BUILDER: "mcpMarketplace:exportBuilder", // Export builder as MCP server
 
 	// Hugging Face Hub discovery (via the official HF MCP server)
 	HUGGINGFACE_SEARCH_MODELS: "huggingface:searchModels", // Live model search on the Hub
@@ -741,6 +742,13 @@ export const IPC_CHANNELS = {
 	LEARNING_LOOP_STOP_ANALYSIS: "learningLoop:stopAnalysis",
 	LEARNING_LOOP_DELETE_PATTERN: "learningLoop:deletePattern",
 	LEARNING_LOOP_TOGGLE_PATTERN: "learningLoop:togglePattern",
+	LEARNING_LOOP_GET_LESSONS: "learningLoop:getLessons",
+	LEARNING_LOOP_ADOPT_LESSON: "learningLoop:adoptLesson",
+	LEARNING_LOOP_DISMISS_LESSON: "learningLoop:dismissLesson",
+
+	// MCP tool pins (the custom servers' approved tools)
+	MCP_PINS_LIST: "mcpPins:list",
+	MCP_PINS_APPROVE: "mcpPins:approve",
 
 	// Learning Loop events (main -> renderer)
 	LEARNING_LOOP_STATUS: "learningLoop:status",
@@ -754,16 +762,9 @@ export const IPC_CHANNELS = {
 	MULTI_REPO_LIST: "multiRepo:list",
 	MULTI_REPO_START: "multiRepo:start",
 	MULTI_REPO_STOP: "multiRepo:stop",
-	MULTI_REPO_GET_STATUS: "multiRepo:getStatus",
 
-	// Multi-Repo events (main -> renderer)
-	MULTI_REPO_PROGRESS: "multiRepo:progress",
-	MULTI_REPO_REPO_START: "multiRepo:repoStart",
-	MULTI_REPO_REPO_COMPLETE: "multiRepo:repoComplete",
-	MULTI_REPO_COMPLETE: "multiRepo:complete",
-	MULTI_REPO_ERROR: "multiRepo:error",
-	MULTI_REPO_BREAKING_CHANGE: "multiRepo:breakingChange",
-	MULTI_REPO_GRAPH: "multiRepo:graph",
+	// Multi-Repo event (main -> renderer): the whole orchestration, as it now is
+	MULTI_REPO_UPDATED: "multiRepo:updated",
 
 	// Self-Healing Codebase + Incident Responder
 	SELF_HEALING_GET_DASHBOARD: "selfHealing:getDashboard",
@@ -832,15 +833,6 @@ export const IPC_CHANNELS = {
 	PERFORMANCE_PROFILER_COMPLETE: "performanceProfiler:complete",
 	PERFORMANCE_PROFILER_IMPLEMENTATION_COMPLETE:
 		"performanceProfiler:implementationComplete",
-
-	// Documentation Agent
-	DOCUMENTATION_AGENT_GENERATE: "documentationAgent:generate",
-	DOCUMENTATION_AGENT_CANCEL: "documentationAgent:cancel",
-	// Documentation Agent events (main -> renderer)
-	DOCUMENTATION_AGENT_STATUS: "documentationAgent:status",
-	DOCUMENTATION_AGENT_STREAM_CHUNK: "documentationAgent:streamChunk",
-	DOCUMENTATION_AGENT_ERROR: "documentationAgent:error",
-	DOCUMENTATION_AGENT_COMPLETE: "documentationAgent:complete",
 
 	// Pipeline Generator (Feature 23) — AI-powered CI/CD pipeline generation
 	PIPELINE_GENERATOR_GENERATE: "pipelineGenerator:generate",
@@ -1014,6 +1006,7 @@ export const IPC_CHANNELS = {
 	ACCESSIBILITY_RUN: "accessibility:run",
 	AGENT_CLI_CHECK: "agentCli:check",
 	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
+	AGENT_CLI_INSTALL: "agentCli:install",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",
@@ -1028,6 +1021,8 @@ export const IPC_CHANNELS = {
 	AGENT_DEBUGGER_REMOVE_BREAKPOINT: "agentDebugger:removeBreakpoint",
 	AGENT_DEBUGGER_RESUME: "agentDebugger:resume",
 	AGENT_DEBUGGER_SET_BREAKPOINT: "agentDebugger:setBreakpoint",
+	// The last report a member saved of an analysis of a server project
+	ANALYSIS_SHARED_REPORT: "analyses:sharedReport",
 	API_WATCHER_CANCEL: "apiWatcher:cancel",
 	API_WATCHER_ERROR: "api-watcher-error",
 	API_WATCHER_EVENT: "api-watcher-event",
@@ -1070,6 +1065,8 @@ export const IPC_CHANNELS = {
 	BENCH_START: "bench:start",
 	BENCH_STATUS: "bench:status",
 	BLAST_RADIUS_ANALYZE: "blastRadius:analyze",
+	BOARD_MCP_APPLY: "boardMcp:apply",
+	BOARD_MCP_STATUS: "boardMcp:status",
 	BOUNTY_BOARD_LIST_ARCHIVES: "bountyBoard:listArchives",
 	BOUNTY_BOARD_START: "bountyBoard:start",
 	CANCEL_CONFLICT_PREDICTION: "cancel-conflict-prediction",
@@ -1139,6 +1136,7 @@ export const IPC_CHANNELS = {
 	ENV_SNAPSHOT_REPLAY: "envSnapshot:replay",
 	EXECUTE_NATURAL_LANGUAGE_GIT: "execute-natural-language-git",
 	FLAKY_TESTS_CANCEL: "flakyTests:cancel",
+	FLAKY_TESTS_DETECT: "flakyTests:detect",
 	FLAKY_TESTS_ERROR: "flaky-tests-error",
 	FLAKY_TESTS_EVENT: "flaky-tests-event",
 	FLAKY_TESTS_RESULT: "flaky-tests-result",
@@ -1198,7 +1196,6 @@ export const IPC_CHANNELS = {
 	PLUGIN_MARKETPLACE_GET_INSTALLED: "pluginMarketplace:getInstalled",
 	PLUGIN_MARKETPLACE_INSTALL: "pluginMarketplace:install",
 	PLUGIN_MARKETPLACE_OPEN_LOCAL_FOLDER: "pluginMarketplace:openLocalFolder",
-	PLUGIN_MARKETPLACE_TOGGLE: "pluginMarketplace:toggle",
 	PLUGIN_MARKETPLACE_UNINSTALL: "pluginMarketplace:uninstall",
 	PROJECT_HAS_LOCAL_SOURCE: "project:has-local-source",
 	PROVIDERS_GET_CONFIGURED_PROVIDERS: "providers:getConfiguredProviders",
@@ -1232,6 +1229,13 @@ export const IPC_CHANNELS = {
 	SERVER_ADMIN_DELETE_ORG: "server-admin:delete-org",
 	SERVER_ADMIN_DELETE_ROLE: "server-admin:delete-role",
 	SERVER_ADMIN_GET_QUOTAS: "server-admin:get-quotas",
+	SERVER_ADMIN_GROUPS_LIST: "server-admin:groups-list",
+	SERVER_ADMIN_GROUPS_PROJECTS: "server-admin:groups-projects",
+	SERVER_ADMIN_GROUP_CREATE: "server-admin:group-create",
+	SERVER_ADMIN_GROUP_UPDATE: "server-admin:group-update",
+	SERVER_ADMIN_GROUP_DELETE: "server-admin:group-delete",
+	SERVER_ADMIN_GROUP_SET_MEMBER: "server-admin:group-set-member",
+	SERVER_ADMIN_GROUP_SET_PROJECT_ROLE: "server-admin:group-set-project-role",
 	SERVER_ADMIN_LIST_AUDIT: "server-admin:list-audit",
 	SERVER_ADMIN_LIST_MEMBERS: "server-admin:list-members",
 	SERVER_ADMIN_LIST_ORGS: "server-admin:list-orgs",
@@ -1262,20 +1266,51 @@ export const IPC_CHANNELS = {
 	SERVER_AUTH_REVOKE_INVITE: "server-auth:revoke-invite",
 	SERVER_AUTH_SET_MODE: "server-auth:set-mode",
 	SERVER_AUTH_STATE_CHANGED: "server-auth:state-changed",
+	// The person's own integration tokens on the server: listed by kind, set,
+	// removed, never read back (main/server-user-secrets.ts).
+	SERVER_AUTH_LIST_ACCESS_TOKENS: "server-auth:list-access-tokens",
+	SERVER_AUTH_CREATE_ACCESS_TOKEN: "server-auth:create-access-token",
+	SERVER_AUTH_REVOKE_ACCESS_TOKEN: "server-auth:revoke-access-token",
+	SERVER_AUTH_LIST_SECRETS: "server-auth:list-secrets",
+	SERVER_AUTH_SET_SECRET: "server-auth:set-secret",
+	SERVER_AUTH_DELETE_SECRET: "server-auth:delete-secret",
+	// The person's theme on the server, read at connection (main/server-ui-preferences.ts).
+	SERVER_AUTH_PULL_UI_PREFERENCES: "server-auth:pull-ui-preferences",
+	// The person's own "needs you" channels on the server (ntfy, Telegram,
+	// Teams): secrets set, masked, never read back (main/server-needs-you.ts).
+	SERVER_NEEDS_YOU_GET: "server-needs-you:get",
+	SERVER_NEEDS_YOU_SAVE_CHANNEL: "server-needs-you:save-channel",
+	SERVER_NEEDS_YOU_DELETE_CHANNEL: "server-needs-you:delete-channel",
+	SERVER_NEEDS_YOU_TEST_CHANNEL: "server-needs-you:test-channel",
+	SERVER_NEEDS_YOU_SAVE_PREFERENCES: "server-needs-you:save-preferences",
+	// Server mode: register or delete a project on the server, for the team
+	SERVER_PROJECT_CREATE: "server-project:create",
+	SERVER_PROJECT_DELETE: "server-project:delete",
+	// Server mode: follow a shown server board's changes live (main → renderer)
+	SERVER_BOARD_WATCH: "server-board:watch",
+	SERVER_BOARD_UNWATCH: "server-board:unwatch",
+	SERVER_BOARD_LIVE: "server-board:live",
+	// Server mode: the team room of a shown server board: who is on it, the
+	// cards' claims, the team chat (main/server-team-room.ts; main → renderer)
+	TEAM_ROOM_JOIN: "team-room:join",
+	TEAM_ROOM_LEAVE: "team-room:leave",
+	TEAM_ROOM_UPDATE: "team-room:update",
+	TEAM_CHAT_SEND: "team-room:chat-send",
+	TEAM_LOCK_RELEASE: "team-room:lock-release",
+	// Server mode: follow a shown shared view of a server project (roadmap,
+	// ideation, Insights, context) on the project's stream (main → renderer)
+	SERVER_VIEW_WATCH: "server-view:watch",
+	SERVER_VIEW_UNWATCH: "server-view:unwatch",
+	SERVER_VIEW_CHANGED: "server-view:changed",
+	// Server mode: a server project's dashboard, analytics, costs and session
+	// history, computed by the server (main/server-workspace.ts)
+	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
+	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
+	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
-	SPEC_APPROVAL_APPROVE: "specApproval:approve",
-	SPEC_APPROVAL_GET_HISTORY: "specApproval:getHistory",
-	SPEC_APPROVAL_GET_PENDING_SPECS: "specApproval:getPendingSpecs",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
-	SPEC_APPROVAL_REJECT: "specApproval:reject",
-	SPEC_APPROVAL_REQUEST_CHANGES: "specApproval:requestChanges",
-	SPEC_REFINEMENT_CANCEL: "specRefinement:cancel",
-	SPEC_REFINEMENT_ERROR: "spec-refinement-error",
-	SPEC_REFINEMENT_EVENT: "spec-refinement-event",
-	SPEC_REFINEMENT_RESULT: "spec-refinement-result",
-	SPEC_REFINEMENT_RUN: "specRefinement:run",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
 	SWARM_EVENT: "swarm:event",
@@ -1321,14 +1356,12 @@ export const IPC_CHANNELS = {
 	VISUAL_TO_CODE_HISTORY_GET: "visualToCodeHistory:get",
 	VISUAL_TO_CODE_HISTORY_LABEL: "visualToCodeHistory:label",
 	VISUAL_TO_CODE_HISTORY_LIST: "visualToCodeHistory:list",
-	VOICE_CONTROL_AUDIO_LEVEL: "voice-control:audio-level",
-	VOICE_CONTROL_CANCEL: "voice-control:cancel",
-	VOICE_CONTROL_COMPLETE: "voice-control:complete",
-	VOICE_CONTROL_DURATION: "voice-control:duration",
-	VOICE_CONTROL_ERROR: "voice-control:error",
-	VOICE_CONTROL_IS_ACTIVE: "voice-control:isActive",
-	VOICE_CONTROL_START_RECORDING: "voice-control:startRecording",
-	VOICE_CONTROL_STATUS: "voice-control:status",
-	VOICE_CONTROL_STOP_RECORDING: "voice-control:stopRecording",
-	VOICE_CONTROL_STREAM_CHUNK: "voice-control:stream-chunk",
+	// Voice assistant (global shortcut, speech → app action)
+	VOICE_ASSISTANT_INTERPRET: "voiceAssistant:interpret",
+	VOICE_ASSISTANT_SHORTCUT_STATUS: "voiceAssistant:shortcutStatus",
+	VOICE_ASSISTANT_TOGGLE: "voiceAssistant:toggle",
+	// Worktree recipe (what a new task worktree runs before the first session)
+	WORKTREE_RECIPE_APPROVE: "worktreeRecipe:approve",
+	WORKTREE_RECIPE_GET: "worktreeRecipe:get",
+	WORKTREE_RECIPE_SAVE_DETECTED: "worktreeRecipe:saveDetected",
 } as const;

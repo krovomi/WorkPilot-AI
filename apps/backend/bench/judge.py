@@ -444,11 +444,7 @@ def _end_tree(process: subprocess.Popen) -> None:
 def _run(
     argv: list[str], cwd: Path, env: dict[str, str], log: Path
 ) -> tuple[bytes, bool]:
-    options: dict = {}
-    if is_windows():
-        options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        options["start_new_session"] = True
+    windows = is_windows()
     process = subprocess.Popen(
         argv,
         cwd=cwd,
@@ -456,7 +452,9 @@ def _run(
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        **options,
+        # Its own process group, so a timeout kills the whole tree (_end_tree).
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if windows else 0,  # type: ignore[attr-defined]
+        start_new_session=not windows,
     )
     timed_out = False
     try:

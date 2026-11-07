@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { IdeationConfig } from "../../shared/types";
+import type { IdeationConfig, Project } from "../../shared/types";
 import { getOperationRegistry } from "../claude-profile/operation-registry";
 import type { ClaudeProfileManager } from "../claude-profile-manager";
 import {
@@ -87,10 +87,18 @@ export class AgentManager extends EventEmitter {
 		const project = projectStore
 			.getProjects()
 			.find((p) => p.path === location.projectPath);
-		return planTaskProviders(
+		const plan = planTaskProviders(
 			taskEngineFromMetadata(metadata, undefined, project?.settings?.provider),
 			startPhase,
 		);
+		// The cross review opens a session on its own provider: its
+		// credentials go to the build too. Claude's are not added here; they
+		// follow the task's own OAuth chain, as `buildTaskProviderEnv` says.
+		const reviewer = project?.settings?.crossReview?.provider?.trim();
+		if (reviewer && !plan.providers.includes(reviewer)) {
+			plan.providers = [...plan.providers, reviewer];
+		}
+		return plan;
 	}
 
 	/**
@@ -739,6 +747,16 @@ export class AgentManager extends EventEmitter {
 	 */
 	isRoadmapRunning(projectId: string): boolean {
 		return this.queueManager.isRoadmapRunning(projectId);
+	}
+
+	/** Follow a teammate's roadmap job on the server (server mode). */
+	followServerRoadmap(project: Project, jobId: string): void {
+		void this.queueManager.followServerRoadmap(project, { jobId });
+	}
+
+	/** Follow a teammate's ideation job on the server (server mode). */
+	followServerIdeation(project: Project, jobId: string): void {
+		void this.queueManager.followServerIdeation(project, { jobId });
 	}
 
 	/**

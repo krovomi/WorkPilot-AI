@@ -2,10 +2,11 @@ import { MessageCircle, Sparkles, Tag, User } from "lucide-react";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import type { IssueListItemProps } from "../types";
+import { useTranslation } from "react-i18next";
 
 // GitLab issue state colors and labels
 const GITLAB_ISSUE_STATE_COLORS: Record<string, string> = {
-	opened: "bg-green-500/10 text-green-500 border-green-500/20",
+	opened: "bg-success/10 text-success border-success/20",
 	closed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
 };
 
@@ -15,6 +16,7 @@ const GITLAB_ISSUE_STATE_LABELS: Record<string, string> = {
 };
 
 export function IssueListItem(props: Readonly<IssueListItemProps>) {
+	const { t } = useTranslation();
 	const { issue, isSelected, onClick, onInvestigate } = props;
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: custom element maintains accessibility
@@ -75,7 +77,7 @@ export function IssueListItem(props: Readonly<IssueListItemProps>) {
 						e.stopPropagation();
 						onInvestigate();
 					}}
-					aria-label="Investigate issue"
+					aria-label={t("gitlab:investigation.investigateAria")}
 				>
 					<Sparkles className="h-4 w-4" />
 				</Button>

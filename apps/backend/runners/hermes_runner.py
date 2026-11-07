@@ -26,6 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hermes import doctor, install_soul, run_cycle, soul_status  # noqa: E402
 from hermes.loop import SURFACES  # noqa: E402
+from hermes.soul import REFRESH_COMMAND, refresh_prompts  # noqa: E402
+from hermes.version import UPDATE_COMMAND  # noqa: E402
 
 RESULT_MARKER = "__HERMES_RESULT__:"
 
@@ -45,7 +47,10 @@ def _pending(repo_root: Path) -> tuple[list[str], int]:
 
 
 def _doctor(repo_root: Path) -> dict:
-    return {"success": True, "readiness": doctor(repo_root).to_dict()}
+    return {
+        "success": True,
+        "readiness": doctor(repo_root, probe_version=True).to_dict(),
+    }
 
 
 def _status(repo_root: Path) -> dict:
@@ -56,7 +61,7 @@ def _status(repo_root: Path) -> dict:
         "success": True,
         "adopted": adopted_names(repo_root),
         "adoptedPack": ADOPTED_PACK,
-        "readiness": doctor(repo_root).to_dict(),
+        "readiness": doctor(repo_root, probe_version=True).to_dict(),
         "soul": soul_status(repo_root).to_dict(),
         "pending": pending,
         "stale": stale,
@@ -73,6 +78,14 @@ def _cycle(repo_root: Path, surface: str, dry_run: bool) -> dict:
 
 def _install_soul(repo_root: Path, overwrite: bool) -> dict:
     changed, message = install_soul(repo_root, overwrite=overwrite)
+    if changed:
+        sessions = refresh_prompts()
+        if sessions == "requested":
+            message += "; running hermes sessions pick it up on their next turn"
+        elif sessions == "needs-update":
+            message += f"; run `{UPDATE_COMMAND}` then `{REFRESH_COMMAND}` for running sessions"
+        else:
+            message += f"; run `{REFRESH_COMMAND}` for running sessions"
     return {
         "success": True,
         "changed": changed,
@@ -170,7 +183,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     raise SystemExit(main())

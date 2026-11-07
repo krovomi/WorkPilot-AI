@@ -5,7 +5,7 @@ Three tiers, each read only when the one above did not settle it:
 1. **A person decided.** `<spec_dir>/uiux/override.json` — written by the
    Kanban card's "apply" / "skip" buttons — wins over everything below.
 2. **The plan says.** The files the plan's subtasks declare
-   (`workflows.forecast.planned_files`). Any of them on the UI surface
+   (`foundation.plan_forecast.planned_files`). Any of them on the UI surface
    (`uiux.surface`) makes the task a UI task; a plan that names files and none
    of them UI makes it a backend task, whatever its description says.
 3. **The description says — on a project that has an interface.** Before a
@@ -240,7 +240,7 @@ def task_description(spec_dir: Path | str | None) -> str:
 
 def _planned(spec_dir: Path | str | None) -> list[str] | None:
     try:
-        from workflows.forecast import planned_files
+        from foundation.plan_forecast import planned_files
     except Exception:  # noqa: BLE001 - the forecast is optional evidence
         return None
     return planned_files(spec_dir)

@@ -21,20 +21,33 @@ screenshot or a score as proof.
 
 | Target | Detected from | Driven to the change by | Proof |
 |---|---|---|---|
-| `web-frontend` | Vite, Next, Angular, Nuxt, SvelteKit… (`AppEmulatorRunner`) | snapshot → click → fill, read back | screenshot (desktop + mobile viewport) + Lighthouse-curve score |
+| `web-frontend` | Vite, Next, Angular, Nuxt, SvelteKit, React/webpack, Remix, Gatsby, Solid, Qwik, Lit… (`AppEmulatorRunner`), Blazor WebAssembly, Leptos, Yew/Trunk, Dioxus, a static `index.html` | snapshot → click → fill, read back | screenshot (desktop + mobile viewport) + Lighthouse-curve score |
 | `desktop` | `electron` in the dependencies | the same, through `--remote-debugging-port` | the same |
 | `windows-app` | an executable `.csproj` with `UseWPF`, `UseWindowsForms` or the Windows App SDK | UI Automation in the one window the card names (`verify_window`) | a capture of that window alone |
 | `mobile` | `mobile.stacks.detect_stack` | emulator / simulator (`mobile/launch.py`) | device frame + launch time |
-| `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go | the touched endpoints, called with payloads built from the OpenAPI schema | status + response validated against the schema + p50/p95 latency |
+| `backend-api` | ASP.NET Core, FastAPI/Flask/Django, Express/Nest, Spring, Go, PHP (Laravel, Symfony), Ruby (Rails, Rack), Rust (Axum, Actix, Rocket…) | the touched endpoints, called with payloads built from the OpenAPI schema | status + response validated against the schema + p50/p95 latency |
 
 A project with no target (a library, a CLI) is `not-applicable` — neither a
 pass nor a failure.
 
+**A backend that renders pages is opened as well as called.** Blazor Server
+and Blazor Web App, Razor Pages, MVC, Django or Flask templates, Express
+views, Thymeleaf, Go templates, Rails views, Blade: the project is a
+`backend-api`, and `verify/web_stacks.py` `serves_pages` finds the templates it
+renders (`.razor`, `.cshtml`, `.erb`, `.blade.php`, `.ejs`, `.gohtml`…, or an
+`.html` under `templates/`, `views/`, `wwwroot/`…; never under tests, docs or a
+coverage report). Such a target has `pages: true`: its landing page goes
+through the same browser pass as a front end (console and network errors fed
+to the fixer, performance trace, desktop and mobile captures), and its
+endpoints are still called. The verifier is told the target renders pages.
+
 ```
 apps/backend/verify/
   detect.py     which targets, their launch command, port and readiness URL (a learned recipe first)
+  target.py     Target, the thing to launch, and the file helpers detectors share
+  web_stacks.py pages a backend renders; PHP, Ruby, Rust and static-site targets
   launch.py     own process group, a free port injected, readiness on loopback, the log captured
-  errors.py     stack traces (docintel/stacktrace), build codes (cicd_mode), console and network errors
+  errors.py     stack traces (docintel/stacktrace), build codes (foundation/ci_logs), console and network errors
   devtools.py   chrome-devtools-mcp driven from Python (MCPToolManager); Playwright fallback, same output
   perf.py       LCP / CLS / TBT / FCP -> Lighthouse log-normal score; latency stats
   endpoints.py  the running app's OpenAPI, filtered by docintel.api_tests.find_handler on the diff
@@ -45,9 +58,12 @@ apps/backend/verify/
   mcp_server.py the same tools over stdio MCP (runners/verify_mcp.py)
   loop.py       launch -> errors -> fixer, bounded by progress; then the verifier session; then evidence
   replay.py     the verify-replay phase: the recorded scenario and endpoints, without a model
+  compare.py    the same replay on the base branch and on the task: what behaves differently
+  scenario.py   the card's own scenario (verifyScenario): steps, verifier instructions, verdict
+  walkthrough.py the scenario filmed (WebM, launch mode) and its step captures as a GIF for the PR
   record.py     <spec_dir>/verify/verify.json, report.md, events.jsonl; the computed status
   learn.py      launch recipe, perf baseline, brain note, gotchas
-  api.py        GET /api/verify/, GET /api/verify/screenshot, POST /api/verify/run
+  api.py        GET /api/verify/, /screenshot, /trace, /walkthrough, /video; POST /api/verify/run, /compare
 ```
 
 **Python does the deterministic half, for every provider.** Launching,
@@ -118,6 +134,61 @@ drives them through the accessibility tree Windows keeps for every window.
   browser steps: the element is found again by its AutomationId, else by its
   type and name.
 
+**A web change can be verified by the card's own scenario.** Plan of 29
+October, IA8, the web counterpart of the Windows window above. Without it the
+verifier picks its own clicks to reach the changed state; with it, the person
+says which steps prove the change.
+
+- *Where it is written.* `verifyScenario` in `task_metadata.json`, set in the
+  card's form under the verification loop: plain language, one step per line
+  (`1.`, `-`, `[ ]` markers are dropped). `verify/scenario.py` reads it,
+  bounded (20 steps of 300 characters), control characters removed.
+- *How it is followed.* The verifier's prompt lists the steps and asks, after
+  each, for a capture (`verify_screenshot`) and a report
+  (`verify_record kind=scenario_step`, `step`, `outcome` pass | fail |
+  blocked, `note`). The step number and the outcome are checked against the
+  card's scenario and a closed list; a capture is kept only if this
+  verification took it, under its own `screenshots/`. The steps say what to
+  check, never what the tools may do: URLs stay on the launched app.
+- *Playwright, and its trace.* A card with a scenario puts Playwright first
+  (`VERIFY_BROWSER=auto`), with its trace recording captures and DOM
+  snapshots per action. The trace is written when the verifier records its
+  verdict (the session may be stopped without a goodbye), else when the
+  browser closes, as `verify/scenario-trace.zip`. Only the toolbox through
+  which steps were reported keeps it: on the Claude path the verifier drives
+  the `workpilot-verify` server's browser, and the loop's own browser (launch
+  errors, evidence) drops its trace instead of overwriting that one. Chrome
+  DevTools MCP has no such trace: when only it can start, the record says
+  there is none.
+- *The walkthrough (F5).* The trace needs a download and a viewer; two files
+  are readable in seconds. `verify/scenario-video.webm` is Playwright's
+  recording of the scenario's page (`record_video_dir`), written when the
+  trace is: the page is closed so the video lands, and a fresh page of the
+  same context carries the evidence after it. Attached over CDP to a running
+  desktop app, the session reuses a context it did not create, which films
+  nothing: the record says so (`video_note`) rather than show an empty
+  player. Playwright films with its own ffmpeg; one missing costs the video,
+  never the session. Over 25 MB the video is dropped. The same toolbox rule as
+  the trace decides which browser's video stands.
+  `verify/scenario-walkthrough.gif` is made with Pillow from the captures
+  reported with the steps, in step order (the last report of a step wins),
+  960 px wide: a GIF shows inline in a GitHub comment, a video does not. Over
+  6 MB it keeps the first and the last frame. The *Verification* tab plays
+  the video and shows the GIF; the PR dialog attaches the GIF to the visual
+  proof only when the person ticks it, after reading that every reader of the
+  repository will see it (the app it films is served on loopback with
+  whatever data it holds). It is copied into the visual proof's run folder
+  and pushed with the captures, under a *Walkthrough* section.
+- *The verdict.* A failed step fails the verification. A scenario not carried
+  out in full (a step blocked or never reported, no verifier session at effort
+  `low`) cannot pass: it is `unknown`, with the count of steps that passed.
+  When a step is reported twice, the last report stands.
+- *Where it shows.* `report.md` and QA's `verify_section` list each step with
+  its outcome; the *Verification* tab shows each step with its note and
+  capture, and a link to the trace (`GET /api/verify/trace`, the one the
+  record names, inside the spec, opened by the OS browser), to open at
+  trace.playwright.dev or with `npx playwright show-trace`.
+
 **The loop is bounded by progress, not by a round count.** Errors after a
 launch are written to `VERIFY_FIX_REQUEST.md` and handed to a fixer session on
 the same provider; the app is relaunched. Two rounds without fewer errors and
@@ -136,6 +207,27 @@ deterministic phase after QA: when QA changed the working tree since the
 verification, it replays the recorded endpoints and scenario without a model,
 and turns a pass into "regressed after QA" when they no longer hold; an
 unchanged fingerprint costs nothing.
+
+**Compared with the base branch (prospective P8).** A reviewer wants to know
+what the change *does*, not only that it works. *Compare with the base branch*
+in the *Verification* tab (`POST /api/verify/compare`, `agent.execute` in
+server mode; `verify_runner.py --action compare`) replays the recorded scenario
+and endpoint calls twice, without a model: on the branch's merge base, checked
+out apart in `.workpilot/verify-base/<spec>` and prepared by the same worktree
+recipe as the task (dependencies linked, its own port block), then on the task.
+The sides run one after the other, each with a spec folder of its own, so the
+verification's trace and video stay untouched. `compare.py` lists what differs:
+a step or confirmed state that works on one side only (*broken by the task*
+first, then *works thanks to the task*), console errors and warnings that
+appear or disappear, network requests and endpoint calls that appear, vanish
+or answer another status, and the page at the end of the scenario on each side.
+What two launches of the same code print differently is dropped first: a
+loopback origin and its port, the query string, a bundler's content hash, a
+line and column; a pending request is never compared. The comparison is
+evidence, never a gate: it does not change the record's status. Each side
+starts from its own data, which the panel says. The checkout's dependency
+links are removed before the checkout is deleted, so deleting it never walks
+into the project's folders.
 
 **It never decides alone that a build failed.** A missing Chrome, no `npx`, no
 OpenAPI document: the step is recorded `unknown` with its reason, and a metric

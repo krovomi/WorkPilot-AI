@@ -30,6 +30,8 @@ _ENV_TO_CLEAR = (
     "AUTO_CLAUDE_MAX_TURNS",
     "AUTO_CLAUDE_EFFORT",
     "AUTO_CLAUDE_AGENT_DEBUGGER",
+    "AUTO_CLAUDE_SETTING_SOURCES",
+    "AUTO_CLAUDE_CODER_USER_SETTINGS",
     "CLAUDE_CLI_PATH",
     "CONTEXT7_API_KEY",
     "CHROME_DEVTOOLS_PORT",
@@ -116,8 +118,8 @@ def harness(tmp_path: Path, monkeypatch):
     for name, value in patches.items():
         monkeypatch.setattr(module, name, value)
 
-    import agents.subagents as subagents
     import core.llm_optimization as llm_optimization
+    import subagents as subagents
 
     monkeypatch.setattr(subagents, "resolve", resolve)
     monkeypatch.setattr(
@@ -277,7 +279,12 @@ def test_a_server_that_needs_a_credential_waits_for_it(harness, monkeypatch):
     }
 
 
-def test_custom_servers_start_only_when_the_type_requires_them(harness):
+def test_custom_servers_start_only_when_the_type_requires_them(harness, monkeypatch):
+    # Which servers a type gets; whether their tools are approved is
+    # `mcp_pins`'s question (tests/mcp_pins/).
+    monkeypatch.setattr(
+        "core.client.pinned_servers", lambda _project, servers, _config: servers
+    )
     harness.mcp_config = {
         "CUSTOM_MCP_SERVERS": [
             {"id": "local-tool", "command": "node", "args": ["server.js"]},
@@ -353,6 +360,13 @@ def test_the_session_defaults(harness):
         assert absent not in options
 
 
+@pytest.mark.parametrize("agent_type", ["planner", "qa_reviewer", "qa_fixer"])
+def test_the_phases_around_the_coder_load_the_project_settings_only(
+    harness, agent_type
+):
+    assert harness.build(agent_type=agent_type)["setting_sources"] == ["project"]
+
+
 def test_the_turn_cap_and_output_format_follow_the_caller(harness, monkeypatch):
     monkeypatch.setenv("AUTO_CLAUDE_MAX_TURNS", "7")
     schema = {"type": "json_schema", "schema": {"type": "object"}}
@@ -365,7 +379,9 @@ def test_the_turn_cap_and_output_format_follow_the_caller(harness, monkeypatch):
 
 def test_the_cli_environment(harness, monkeypatch):
     env = harness.build()["env"]
-    assert env["ENABLE_PROMPT_CACHING_1H"] == "1"
+    # The TTL is the CLI's own choice (5 min when billed, 1 h within a
+    # subscription): forcing one hour paid 2x on every cache write.
+    assert "ENABLE_PROMPT_CACHING_1H" not in env
     assert not any(key.startswith("OTEL_") for key in env)
     assert "CLAUDE_CODE_DISABLE_AUTO_MEMORY" not in env
 

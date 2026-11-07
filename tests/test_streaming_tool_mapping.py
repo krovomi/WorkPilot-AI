@@ -18,15 +18,15 @@ import pytest
 # Add backend to path for imports (même convention que tests/test_streaming.py)
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from agents.session import (  # noqa: E402
-    _extract_streaming_command,
-    _extract_streaming_file_change,
-    _is_command_tool,
+from agents.tool_display import (  # noqa: E402
+    extract_streaming_command,
+    extract_streaming_file_change,
+    is_command_tool,
 )
 
 
 class TestExtractStreamingFileChange:
-    """_extract_streaming_file_change doit être agnostique au provider."""
+    """extract_streaming_file_change doit être agnostique au provider."""
 
     @pytest.mark.parametrize(
         ("tool_name", "inp", "expected"),
@@ -47,10 +47,10 @@ class TestExtractStreamingFileChange:
         ],
     )
     def test_recognises_file_write_tools(self, tool_name, inp, expected):
-        assert _extract_streaming_file_change(tool_name, inp) == expected
+        assert extract_streaming_file_change(tool_name, inp) == expected
 
     def test_path_without_content_returns_none_content(self):
-        result = _extract_streaming_file_change("write_file", {"path": "a.py"})
+        result = extract_streaming_file_change("write_file", {"path": "a.py"})
         assert result == ("a.py", None)
 
     @pytest.mark.parametrize(
@@ -66,11 +66,11 @@ class TestExtractStreamingFileChange:
         ],
     )
     def test_ignores_non_file_write_tools(self, tool_name, inp):
-        assert _extract_streaming_file_change(tool_name, inp) is None
+        assert extract_streaming_file_change(tool_name, inp) is None
 
 
 class TestExtractStreamingCommand:
-    """_extract_streaming_command doit reconnaître tous les outils commande."""
+    """extract_streaming_command doit reconnaître tous les outils commande."""
 
     @pytest.mark.parametrize(
         ("tool_name", "inp", "expected"),
@@ -82,7 +82,7 @@ class TestExtractStreamingCommand:
         ],
     )
     def test_recognises_command_tools(self, tool_name, inp, expected):
-        assert _extract_streaming_command(tool_name, inp) == expected
+        assert extract_streaming_command(tool_name, inp) == expected
 
     @pytest.mark.parametrize(
         ("tool_name", "inp"),
@@ -95,7 +95,7 @@ class TestExtractStreamingCommand:
         ],
     )
     def test_ignores_non_command_tools(self, tool_name, inp):
-        assert _extract_streaming_command(tool_name, inp) is None
+        assert extract_streaming_command(tool_name, inp) is None
 
 
 class TestIsCommandTool:
@@ -114,4 +114,4 @@ class TestIsCommandTool:
         ],
     )
     def test_is_command_tool(self, tool_name, expected):
-        assert _is_command_tool(tool_name) is expected
+        assert is_command_tool(tool_name) is expected

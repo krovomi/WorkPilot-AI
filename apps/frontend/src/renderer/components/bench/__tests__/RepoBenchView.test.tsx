@@ -57,6 +57,20 @@ const STATUS: BenchStatus = {
 			avgDurationS: 600,
 		},
 	],
+	recommendations: {
+		bug_fix: {
+			provider: "openai",
+			model: "gpt-mini",
+			effort: "low",
+			judged: 3,
+			resolved: 3,
+			rate: 1,
+			cases: 3,
+			avgCostUsd: 0.5,
+			bestRate: 1,
+			considered: 2,
+		},
+	},
 };
 
 const CANDIDATES: BenchCandidate[] = [
@@ -82,6 +96,7 @@ const api = {
 	getBenchCandidates: vi.fn(),
 	startBench: vi.fn(),
 	discardBench: vi.fn(),
+	getReviewLessons: vi.fn(),
 	onBenchEvent: vi.fn(
 		(_listener: (projectId: string, status: BenchStatus) => void) => () => undefined,
 	),
@@ -93,6 +108,13 @@ beforeEach(() => {
 	api.getBenchStatus.mockResolvedValue({ success: true, data: STATUS });
 	api.getBenchCandidates.mockResolvedValue({ success: true, data: CANDIDATES });
 	api.startBench.mockResolvedValue({ success: true, data: { ...STATUS, activeRunId: "r" } });
+	api.getReviewLessons.mockResolvedValue({
+		success: true,
+		data: [
+			{ id: "l1", status: "pending", text: "Use the async EF Core overloads.", rule: "" },
+			{ id: "l2", status: "adopted", text: "Already adopted.", rule: "Already adopted." },
+		],
+	});
 	(window as unknown as { electronAPI: typeof api }).electronAPI = api;
 	useBenchStore.setState({ statusByProject: {} });
 });
@@ -106,6 +128,13 @@ describe("RepoBenchView", () => {
 		expect(screen.getByText("10 min")).toBeInTheDocument();
 	});
 
+	it("lists the engine recommended per kind of card", async () => {
+		render(<RepoBenchView projectId="p1" />);
+		expect(await screen.findByText("gpt-mini")).toBeInTheDocument();
+		expect(screen.getByText("tasks:kind.values.bug_fix")).toBeInTheDocument();
+		expect(screen.queryByText("bench:recommend.empty")).not.toBeInTheDocument();
+	});
+
 	it("offers only cards that can be judged, and says why the others cannot", async () => {
 		render(<RepoBenchView projectId="p1" />);
 		await screen.findByText("Add mul");
@@ -115,14 +144,14 @@ describe("RepoBenchView", () => {
 		expect(screen.getByText("reasons.no-judge")).toBeInTheDocument();
 		// A card whose landing commit was not found becomes selectable once given one.
 		expect(boxes[2]).toBeDisabled();
-		await userEvent.type(screen.getByRole("textbox"), "abcdef1");
+		await userEvent.type(screen.getByRole("textbox", { name: "bench:new.commitPlaceholder" }), "abcdef1");
 		expect(screen.getAllByRole("checkbox")[2]).toBeEnabled();
 	});
 
 	it("starts with card ids, engines and the commits given, nothing else", async () => {
 		render(<RepoBenchView projectId="p1" />);
 		await screen.findByText("Add mul");
-		await userEvent.type(screen.getByRole("textbox"), "ABCDEF1");
+		await userEvent.type(screen.getByRole("textbox", { name: "bench:new.commitPlaceholder" }), "ABCDEF1");
 		const boxes = screen.getAllByRole("checkbox");
 		await userEvent.click(boxes[0]);
 		await userEvent.click(boxes[2]);
@@ -134,6 +163,69 @@ describe("RepoBenchView", () => {
 			[{ provider: "anthropic", model: "claude-sonnet-4-6", effort: "medium" }],
 			{ "003-c": "ABCDEF1" },
 		);
+	});
+
+	it("measures a candidate rule: each engine without it, then with it", async () => {
+		render(<RepoBenchView projectId="p1" />);
+		await screen.findByText("Add mul");
+		await userEvent.click(screen.getAllByRole("checkbox")[0]);
+		const pick = await screen.findByRole("combobox", { name: "bench:new.rule.fromLessons" });
+		expect(screen.queryByRole("option", { name: "Already adopted." })).not.toBeInTheDocument();
+		await userEvent.selectOptions(pick, "l1");
+		expect(screen.getByRole("textbox", { name: "bench:new.rule.title" })).toHaveValue(
+			"Use the async EF Core overloads.",
+		);
+		await userEvent.click(screen.getByRole("button", { name: "bench:new.start" }));
+		await waitFor(() => expect(api.startBench).toHaveBeenCalled());
+		const engine = { provider: "anthropic", model: "claude-sonnet-4-6", effort: "medium" };
+		expect(api.startBench.mock.calls[0][2]).toEqual([
+			engine,
+			{ ...engine, rule: "Use the async EF Core overloads." },
+		]);
+	});
+
+	it("says what the rule changed in a run, and never adopts it", async () => {
+		const engine = { provider: "anthropic", model: "m", effort: "high" };
+		const judged = (id: string, caseId: string, engineId: string, resolved: boolean) => ({
+			id,
+			caseId,
+			engineId,
+			taskId: `bench-r-${id}`,
+			copy: "",
+			state: "judged" as const,
+			resolved,
+		});
+		api.getBenchStatus.mockResolvedValue({
+			success: true,
+			data: {
+				...STATUS,
+				runs: [
+					{
+						runId: "r1",
+						createdAt: "",
+						phase: "done",
+						engines: [
+							{ ...engine, id: "v1" },
+							{ ...engine, id: "v2", rule: "Test first." },
+						],
+						cases: [
+							{ caseId: "001-a", status: "ready" },
+							{ caseId: "002-b", status: "ready" },
+						],
+						builds: [
+							judged("b1", "001-a", "v1", true),
+							judged("b2", "001-a", "v2", false),
+							judged("b3", "002-b", "v1", false),
+							judged("b4", "002-b", "v2", true),
+						],
+					},
+				],
+			},
+		});
+		render(<RepoBenchView projectId="p1" />);
+		expect(await screen.findByText("run.rule.worse")).toBeInTheDocument();
+		expect(screen.getByText("Test first.")).toBeInTheDocument();
+		expect(screen.getAllByText("run.withRule")[0]).toBeInTheDocument();
 	});
 
 	it("shows an event that arrived while the page was closed", async () => {

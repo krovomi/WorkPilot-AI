@@ -109,15 +109,16 @@ def test_per_model_logs_are_isolated(tmp_path: Path) -> None:
 def test_log_slug_is_filesystem_safe(tmp_path: Path) -> None:
     """Model ids with ':' and '/' become safe filenames; very long ids are
     truncated with a hash so they stay under filesystem limits."""
-    from core.conversation_log import _log_slug, conversation_log_path
+    from core.conversation_log import conversation_log_path
+    from foundation.llm_slug import llm_slug
 
-    assert _log_slug("ollama", "qwen2.5-coder:latest") == "ollama-qwen2.5-coder-latest"
+    assert llm_slug("ollama", "qwen2.5-coder:latest") == "ollama-qwen2.5-coder-latest"
     p = conversation_log_path(tmp_path, "ollama", "hf.co/Qwen/Qwen2.5-Coder-7B:latest")
     assert "/" not in p.name and ":" not in p.name
     assert p.name.startswith("conversation.") and p.name.endswith(".jsonl")
 
     long_model = "x" * 200
-    slug = _log_slug("ollama", long_model)
+    slug = llm_slug("ollama", long_model)
     assert len(slug) <= 80
 
 

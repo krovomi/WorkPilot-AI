@@ -44,7 +44,14 @@ export function registerIdeationHandlers(
 	getMainWindow: () => BrowserWindow | null,
 ): () => void {
 	// Session management
-	ipcMain.handle(IPC_CHANNELS.IDEATION_GET, getIdeationSession);
+	ipcMain.handle(IPC_CHANNELS.IDEATION_GET, (event, projectId) =>
+		getIdeationSession(event, projectId, (project, jobId) => {
+			// A teammate's job on the server: followed like one started here.
+			if (!agentManager.isIdeationRunning(project.id)) {
+				agentManager.followServerIdeation(project, jobId);
+			}
+		}),
+	);
 
 	// Idea operations
 	ipcMain.handle(IPC_CHANNELS.IDEATION_UPDATE_IDEA, updateIdeaStatus);

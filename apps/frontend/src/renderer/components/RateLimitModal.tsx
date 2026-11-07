@@ -143,14 +143,20 @@ export function RateLimitModal() {
 				hideRateLimitModal();
 
 				// Direct user to Settings to complete authentication
-				alert(
-					`${t("profileCreated.title", { profileName })}\n\n` +
-						`${t("profileCreated.instructions")}\n` +
-						`1. ${t("profileCreated.step1")}\n` +
-						`2. ${t("profileCreated.step2")}\n` +
-						`3. ${t("profileCreated.step3")}\n\n` +
-						`${t("profileCreated.footer")}`,
-				);
+				toast({
+					variant: "success",
+					title: t("profileCreated.title", { profileName }),
+					description: (
+						<span className="whitespace-pre-line">
+							{`${t("profileCreated.instructions")}\n` +
+								`1. ${t("profileCreated.step1")}\n` +
+								`2. ${t("profileCreated.step2")}\n` +
+								`3. ${t("profileCreated.step3")}\n\n` +
+								t("profileCreated.footer")}
+						</span>
+					),
+					duration: 15000,
+				});
 			}
 		} catch (err) {
 			debugError("[RateLimitModal] Failed to add profile:", err);
@@ -231,8 +237,8 @@ export function RateLimitModal() {
 				<div className="py-4 space-y-4">
 					{/* Auto-switch notification */}
 					{autoSwitchHappened && (
-						<div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-							<Zap className="h-5 w-5 text-green-500 shrink-0" />
+						<div className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4">
+							<Zap className="h-5 w-5 text-success shrink-0" />
 							<div>
 								<p className="text-sm font-medium text-foreground">
 									{t("rateLimit.autoSwitching", {
@@ -293,7 +299,7 @@ export function RateLimitModal() {
 															t("rateLimit.selectAccount")}
 														{selectedProfileId ===
 															rateLimitInfo?.suggestedProfileId && (
-															<Star className="h-3 w-3 text-yellow-500" />
+															<Star className="h-3 w-3 text-warning" />
 														)}
 													</span>
 													<ChevronDown className="h-4 w-4 shrink-0 ml-2" />
@@ -314,8 +320,8 @@ export function RateLimitModal() {
 															{profile.id ===
 																rateLimitInfo?.suggestedProfileId && (
 																<Star
-																	className="h-3 w-3 text-yellow-500"
-																	aria-label="Recommended"
+																	className="h-3 w-3 text-warning"
+																	aria-label={t("common:rateLimit.recommendedAria")}
 																/>
 															)}
 														</span>

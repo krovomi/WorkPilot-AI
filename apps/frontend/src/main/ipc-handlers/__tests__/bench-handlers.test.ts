@@ -116,13 +116,15 @@ const ENGINES = [
 	{ provider: "openai", model: "model-b", effort: "medium" },
 ];
 
+/** Finished cards, all updated at the same instant: the clock can tick between two cards. */
 function finished(...ids: string[]) {
+	const updatedAt = new Date().toISOString();
 	state.tasks = ids.map((specId) => ({
 		id: specId,
 		specId,
 		title: `Card ${specId}`,
 		status: "done",
-		updatedAt: new Date().toISOString(),
+		updatedAt,
 	}));
 }
 
@@ -205,6 +207,16 @@ describe("requests from the renderer", () => {
 		expect(sanitizeEngines([ENGINES[0], ENGINES[0]])).toMatch(/twice/);
 		expect(sanitizeEngines([{ ...ENGINES[0], provider: "Bad One" }])).toMatch(/provider/);
 		expect(sanitizeEngines([{ ...ENGINES[0], model: "a\nb" }])).toMatch(/model/);
+		// A candidate rule makes another arm of the same engine.
+		const ruled = { ...ENGINES[0], rule: " Test\n first. " };
+		expect(sanitizeEngines([ENGINES[0], ruled])).toEqual([
+			ENGINES[0],
+			{ ...ENGINES[0], rule: "Test first." },
+		]);
+		expect(sanitizeEngines([ruled, { ...ruled, rule: "Test first." }])).toMatch(/twice/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: "x".repeat(501) }])).toMatch(/500/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: "a\u0000b" }])).toMatch(/rule/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: 42 }])).toMatch(/rule/);
 	});
 
 	it("takes only finished cards of the project", () => {
@@ -379,5 +391,13 @@ describe("a run", () => {
 			["001-a", "Card 001-a", "candidate"],
 			["002-b", "Card 002-b", "candidate"],
 		]);
+	});
+
+	it("lists the most recently finished cards first", async () => {
+		finished("001-a", "002-b");
+		(state.tasks[1] as { updatedAt: string }).updatedAt = new Date(Date.now() + 60_000).toISOString();
+		state.reply = backend(0);
+		const result = await call<Array<{ specId: string }>>(IPC_CHANNELS.BENCH_CANDIDATES, "p1");
+		expect(result.data?.map((c) => c.specId)).toEqual(["002-b", "001-a"]);
 	});
 });

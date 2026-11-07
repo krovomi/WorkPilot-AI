@@ -62,7 +62,7 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass,app-verified,tests-unchanged
+    hard_gate: tests-pass,app-verified,tests-unchanged,deps-exist,proof-checks
     description: >-
       The application launched after the refactoring, the same state
       reached. Three gates: the suite is green, the app verified, and the
@@ -85,6 +85,23 @@ phases:
       What the refactoring changed in the system's topology — a refactoring
       is the kind of task that moves a boundary without changing a feature,
       which is exactly what a diff does not show.
+
+  - id: cross-review
+    impl: tooling/review-lenses
+    always: true
+    dispatch: fresh-context
+    description: >-
+      A second engine — another provider, the model the project names — reads
+      the corrected diff against the spec and the goal and answers agree,
+      disagree or inconclusive (`cross_review/`). Read-only. A disagreement
+      that names a blocking problem holds the pull request back until the
+      code changes or the person overrides it; an answer that cannot be read
+      is inconclusive, never agree. After QA because it judges the code that
+      will be pushed; its reader is the pull request step, not a fixer.
+
+      Never pruned by effort: the switch is the project's setting. Without a
+      second engine configured, or with one equal to the build's, the phase
+      opens no session, costs nothing and says why.
 
   - id: observe
     impl: workpilot/observe

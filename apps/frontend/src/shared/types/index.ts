@@ -7,6 +7,8 @@ export * from "./app-update";
 export * from "./automations";
 // Repo bench (finished cards replayed and judged by their own tests)
 export * from "./bench";
+// workpilot-board MCP server registered with other AI apps
+export * from "./board-mcp";
 export * from "./changelog";
 export * from "./cli";
 // Common types
@@ -38,6 +40,7 @@ export * from "./roadmap";
 export * from "./settings";
 export * from "./smart-estimation";
 export * from "./task";
+export * from "./team-room";
 export * from "./task-sandbox";
 export * from "./task-permission";
 export * from "./test-generation";
@@ -47,3 +50,5 @@ export * from "./time-travel";
 // Goal mode (a command decides when the task is done)
 export * from "./goal";
 export * from "./best-of-n";
+// Dashboard, analytics, costs and session history (local or server project)
+export * from "./workspace";

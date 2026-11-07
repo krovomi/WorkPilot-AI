@@ -1,3 +1,4 @@
+import { debugLog } from "../../../shared/utils/debug-logger";
 import {
 	cpSync,
 	type Dirent,
@@ -27,16 +28,30 @@ import type { AgentManager } from "../../agent";
 import { getAppLanguage } from "../../app-language";
 import { readProjectEnv } from "../../project-env-file";
 import { projectStore } from "../../project-store";
+import { getRemoteTasks } from "../../remote-board";
+import {
+	createServerCard,
+	deleteServerCard,
+	findServerCard,
+	updateServerCard,
+} from "../../server-board-actions";
+import { getServerProject } from "../../server-projects";
 import { specInterviewService } from "../../spec-interview-service";
 import { taskStateManager } from "../../task-state-manager";
 import { titleGenerator } from "../../title-generator";
 import { computePlanConflicts } from "../../utils/plan-conflicts";
 import { findAllSpecPaths, isValidTaskId } from "../../utils/spec-path-helpers";
 import { cleanupWorktree } from "../../utils/worktree-cleanup";
+import { createLocalTask } from "./create-local-task";
 import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import { inlineAzureDevOpsImages } from "../shared/azure-attachments";
 import { stripHtml } from "../shared/sanitize";
 import { findTaskAndProject } from "./shared";
+import {
+	copySpecSource,
+	discardDescriptionDerivedFiles,
+	specIsStale,
+} from "./stale-spec";
 import { resolveUnder } from "../../security/renderer-path";
 
 /** Charge le PAT et l'URL d'organisation Azure DevOps depuis le `.env` projet. */
@@ -68,7 +83,7 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			projectId: string,
 			options?: { forceRefresh?: boolean },
 		): Promise<IPCResult<Task[]>> => {
-			console.warn(
+			debugLog(
 				"[IPC] TASK_LIST called with projectId:",
 				projectId,
 				"options:",
@@ -86,8 +101,12 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				);
 			}
 
+			// A server project's cards come from the server, every time.
+			const serverProject = getServerProject(projectId);
+			if (serverProject) return getRemoteTasks(serverProject);
+
 			const tasks = projectStore.getTasks(projectId);
-			console.warn("[IPC] TASK_LIST returning", tasks.length, "tasks");
+			debugLog("[IPC] TASK_LIST returning", tasks.length, "tasks");
 			return { success: true, data: tasks };
 		},
 	);
@@ -104,6 +123,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			description: string,
 			metadata?: TaskMetadata,
 		): Promise<IPCResult<Task>> => {
+			// A server project's card is created by the server, for the team.
+			const serverProject = getServerProject(projectId);
+			if (serverProject) {
+				return createServerCard(serverProject, title, description, metadata);
+			}
 			const project = projectStore.getProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -173,236 +197,13 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				}
 			}
 
-			// Generate a unique spec ID based on existing specs
-			const specsBaseDir = getSpecsDir(project.autoBuildPath);
-			const specsDir = path.join(project.path, specsBaseDir);
-
-			// Find next available spec number
-			let specNumber = 1;
-			if (existsSync(specsDir)) {
-				const existingDirs = readdirSync(specsDir, { withFileTypes: true })
-					.filter((d: Dirent | string) => {
-						// Handle both Dirent objects and string fallbacks
-						if (typeof d === "string") {
-							// If it's a string, check if it's a directory by using statSync
-							const fullPath = path.join(specsDir, d);
-							try {
-								return statSync(fullPath).isDirectory();
-							} catch {
-								return false;
-							}
-						}
-						// If it's a Dirent object, use isDirectory method
-						return typeof d.isDirectory === "function" && d.isDirectory();
-					})
-					.map((d: Dirent | string) => (typeof d === "string" ? d : d.name));
-
-				// Extract numbers from spec directory names (e.g., "001-feature" -> 1)
-				const existingNumbers = existingDirs
-					.map((name: string) => {
-						const match = name.match(/^(\d+)/);
-						return match ? parseInt(match[1], 10) : 0;
-					})
-					.filter((n: number) => n > 0);
-
-				if (existingNumbers.length > 0) {
-					specNumber = Math.max(...existingNumbers) + 1;
-				}
-			}
-
-			// Create spec ID with zero-padded number and slugified title
-			const slugifiedTitle = slugifySpecTitle(finalTitle);
-			const specId = `${String(specNumber).padStart(3, "0")}-${slugifiedTitle}`;
-
-			// Create spec directory
-			const specDir = path.join(specsDir, specId);
-			mkdirSync(specDir, { recursive: true });
-
-			// Build metadata with source type
-			const taskMetadata: TaskMetadata = {
-				sourceType: "manual",
-				...metadata,
-			};
-
-			// Process and save attached images
-			if (
-				taskMetadata.attachedImages &&
-				taskMetadata.attachedImages.length > 0
-			) {
-				const attachmentsDir = path.join(specDir, "attachments");
-				mkdirSync(attachmentsDir, { recursive: true });
-				const resolvedAttachmentsDir = path.resolve(attachmentsDir);
-
-				// MIME type allowlist (defense in depth - frontend also validates)
-				const ALLOWED_MIME_TYPES = [
-					"image/png",
-					"image/jpeg",
-					"image/jpg",
-					"image/gif",
-					"image/webp",
-					"image/svg+xml",
-				];
-
-				const savedImages: typeof taskMetadata.attachedImages = [];
-
-				for (const image of taskMetadata.attachedImages) {
-					if (image.data) {
-						// Validate MIME type
-						if (
-							!image.mimeType ||
-							!ALLOWED_MIME_TYPES.includes(image.mimeType)
-						) {
-							console.warn(
-								`[TASK_CREATE] Skipping image with missing or disallowed MIME type: ${image.mimeType}`,
-							);
-							continue;
-						}
-
-						// Sanitize filename to prevent path traversal attacks
-						const sanitizedFilename = path.basename(image.filename);
-						if (
-							!sanitizedFilename ||
-							sanitizedFilename === "." ||
-							sanitizedFilename === ".."
-						) {
-							console.warn(
-								`[TASK_CREATE] Skipping image with invalid filename: ${image.filename}`,
-							);
-							continue;
-						}
-
-						// Validate resolved path stays within attachments directory
-						const imagePath = path.join(attachmentsDir, sanitizedFilename);
-						const resolvedPath = path.resolve(imagePath);
-						if (!resolvedPath.startsWith(resolvedAttachmentsDir + path.sep)) {
-							console.warn(
-								`[TASK_CREATE] Skipping image with path traversal attempt: ${image.filename}`,
-							);
-							continue;
-						}
-
-						try {
-							// Decode base64 and save to file
-							const buffer = Buffer.from(image.data, "base64");
-							writeFileSync(imagePath, buffer);
-
-							// Store relative path instead of base64 data
-							savedImages.push({
-								id: image.id,
-								filename: sanitizedFilename,
-								mimeType: image.mimeType,
-								size: image.size,
-								path: `attachments/${sanitizedFilename}`,
-								// Don't include data or thumbnail to save space
-							});
-						} catch (err) {
-							console.error(`Failed to save image ${sanitizedFilename}:`, err);
-						}
-					}
-				}
-
-				// Update metadata with saved image paths (without base64 data)
-				taskMetadata.attachedImages = savedImages;
-			}
-
-			// Create initial implementation_plan.json (task is created but not started)
-			const now = new Date().toISOString();
-			const implementationPlan = {
-				feature: finalTitle,
-				description: aiDescription,
-				created_at: now,
-				updated_at: now,
-				status: "pending",
-				phases: [],
-			};
-
-			const planPath = path.join(specDir, AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN);
-			writeFileSync(
-				planPath,
-				JSON.stringify(implementationPlan, null, 2),
-				"utf-8",
-			);
-
-			// Save task metadata if provided
-			if (taskMetadata) {
-				const metadataPath = path.join(specDir, "task_metadata.json");
-				writeFileSync(
-					metadataPath,
-					JSON.stringify(taskMetadata, null, 2),
-					"utf-8",
-				);
-			}
-
-			// Create requirements.json with attached images
-			const requirements: Record<string, unknown> = {
-				task_description: aiDescription,
-				workflow_type: taskMetadata.category || "feature",
-			};
-
-			// Conserver le HTML enrichi (images inlinées comprises) pour l'UI sans
-			// polluer `task_description` consommé par l'IA. project-store privilégie
-			// ce champ pour l'affichage de la description.
-			if (descriptionIsHtml && displayDescription !== aiDescription) {
-				requirements.display_description = displayDescription;
-			}
-
-			// Propagate acceptance criteria so they reach every pipeline phase
-			// (planner, spec_writer, qa_reviewer all read this from requirements.json).
-			if (
-				taskMetadata.acceptanceCriteria &&
-				taskMetadata.acceptanceCriteria.length > 0
-			) {
-				requirements.acceptance_criteria = taskMetadata.acceptanceCriteria;
-			}
-
-			// Propagate free-form extra note as `additional_context` so it gets
-			// surfaced to the orchestrator (see _load_requirements_context).
-			if (taskMetadata.extraNote?.trim()) {
-				requirements.additional_context = taskMetadata.extraNote.trim();
-			}
-
-			// Add attached images to requirements if present
-			if (
-				taskMetadata.attachedImages &&
-				taskMetadata.attachedImages.length > 0
-			) {
-				requirements.attached_images = taskMetadata.attachedImages.map(
-					(img) => ({
-						filename: img.filename,
-						path: img.path,
-						description: "", // User can add descriptions later
-					}),
-				);
-			}
-
-			const requirementsPath = path.join(
-				specDir,
-				AUTO_BUILD_PATHS.REQUIREMENTS,
-			);
-			writeFileSync(
-				requirementsPath,
-				JSON.stringify(requirements, null, 2),
-				"utf-8",
-			);
-
-			// Create the task object
-			const task: Task = {
-				id: specId,
-				specId: specId,
-				projectId,
+			const task = createLocalTask(project, {
 				title: finalTitle,
-				description: displayDescription,
-				status: "backlog",
-				subtasks: [],
-				logs: [],
-				metadata: taskMetadata,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			};
-
-			// Invalidate cache since a new task was created
-			projectStore.invalidateTasksCache(projectId);
-
+				aiDescription,
+				displayDescription,
+				descriptionIsHtml,
+				metadata,
+			});
 			return { success: true, data: task };
 		},
 	);
@@ -524,6 +325,10 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				}
 			}
 
+			// The copied spec answers the source's description: record it, so
+			// editing the copy regenerates its spec at the next start.
+			copySpecSource(sourceSpecDir, newSpecDir);
+
 			// 3. task_metadata.json — copy classification/config but drop fields
 			// that must not carry over to an independent clone (tracker links,
 			// PR/worktree state, archive flags, pause state).
@@ -607,6 +412,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				subtasks: [],
 				logs: [],
 				metadata: duplicatedMetadata,
+				location: "main",
+				specsPath: newSpecDir,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			};
@@ -634,6 +441,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_DELETE,
 		async (_, taskId: string): Promise<IPCResult> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return deleteServerCard(serverCard);
 			const { rm } = await import("node:fs/promises");
 
 			// Find task and project
@@ -956,6 +765,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 				metadata?: Partial<TaskMetadata>;
 			},
 		): Promise<IPCResult<Task>> => {
+			const serverCard = findServerCard(taskId);
+			if (serverCard) return updateServerCard(serverCard, updates);
 			try {
 				// Find task and project
 				const { task, project } = findTaskAndProject(taskId);
@@ -1048,9 +859,13 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					specDir,
 					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
 				);
+				let previousDescription: string | undefined = task.description;
 				try {
 					const planContent = readFileSync(planPath, "utf-8");
 					const plan = JSON.parse(planContent);
+					if (typeof plan.description === "string") {
+						previousDescription = plan.description;
+					}
 
 					if (finalTitle !== undefined) {
 						plan.feature = finalTitle;
@@ -1069,6 +884,15 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 							planErr,
 						);
 					}
+				}
+
+				// A new description on a task that has not run yet: the spec
+				// written for the old one would still drive it (stale-spec.ts).
+				if (
+					descriptionProvided &&
+					specIsStale(task.status, previousDescription, aiDescription ?? "")
+				) {
+					discardDescriptionDerivedFiles(specDir);
 				}
 
 				// Update spec.md if it exists

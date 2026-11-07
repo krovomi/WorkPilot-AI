@@ -22,8 +22,8 @@ metadata:
     - hermes-agent
   workpilot:
     pack: hermes
-    version: 0.0.1
-    content_sha256: 987cb4f26abe19c3205da3488494cad352ce095fe8fcd471abb898d501efd159
+    version: 0.1.0
+    content_sha256: e42f2d1d5467039020039d4a6818016880226d0ae9f95312378d355c9cfbd971
 ---
 
 # Codex CLI
@@ -123,22 +123,22 @@ terminal(command="REVIEW=$(mktemp -d) && git clone https://github.com/user/repo.
 
 ```
 # Create worktrees
-terminal(command="git worktree add -b fix/issue-78 /tmp/issue-78 main", workdir="~/project")
-terminal(command="git worktree add -b fix/issue-99 /tmp/issue-99 main", workdir="~/project")
+terminal(command="git worktree add -b fix/issue-78 ~/.hermes/cache/scratch/issue-78 main", workdir="~/project")
+terminal(command="git worktree add -b fix/issue-99 ~/.hermes/cache/scratch/issue-99 main", workdir="~/project")
 
 # Launch Codex in each
-terminal(command="codex --sandbox workspace-write exec 'Fix issue #78: <description>. Commit when done.'", workdir="/tmp/issue-78", background=true, pty=true)
-terminal(command="codex --sandbox workspace-write exec 'Fix issue #99: <description>. Commit when done.'", workdir="/tmp/issue-99", background=true, pty=true)
+terminal(command="codex --sandbox workspace-write exec 'Fix issue #78: <description>. Commit when done.'", workdir="~/.hermes/cache/scratch/issue-78", background=true, pty=true)
+terminal(command="codex --sandbox workspace-write exec 'Fix issue #99: <description>. Commit when done.'", workdir="~/.hermes/cache/scratch/issue-99", background=true, pty=true)
 
 # Monitor
 process(action="list")
 
 # After completion, push and create PRs
-terminal(command="cd /tmp/issue-78 && git push -u origin fix/issue-78")
+terminal(command="cd ~/.hermes/cache/scratch/issue-78 && git push -u origin fix/issue-78")
 terminal(command="gh pr create --repo user/repo --head fix/issue-78 --title 'fix: ...' --body '...'")
 
 # Cleanup
-terminal(command="git worktree remove /tmp/issue-78", workdir="~/project")
+terminal(command="git worktree remove ~/.hermes/cache/scratch/issue-78", workdir="~/project")
 ```
 
 ## Batch PR Reviews

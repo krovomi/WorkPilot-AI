@@ -26,6 +26,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -36,12 +37,15 @@ import {
 	SelectValue,
 } from "./ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface CopilotCliStatusBadgeProps {
 	readonly className?: string;
 	readonly onNavigateToTerminals?: () => void;
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 interface CopilotIconProps {
@@ -95,6 +99,7 @@ export function CopilotCliStatusBadge({
 	className,
 	onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: CopilotCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation", "settings"]);
 	const { data, refreshCopilot } = useCliStatus();
@@ -128,6 +133,10 @@ export function CopilotCliStatusBadge({
 
 	// Use data from context
 	const status = copilot.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "gh-missing" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = copilot.versionInfo;
 	const authStatus = copilot.authStatus;
 	const lastChecked = copilot.lastChecked;
@@ -324,9 +333,9 @@ export function CopilotCliStatusBadge({
 	const getStatusColor = () => {
 		switch (status) {
 			case "installed":
-				return "bg-green-500";
+				return "bg-success";
 			case "outdated":
-				return "bg-yellow-500";
+				return "bg-warning";
 			case "not-found":
 			case "gh-missing":
 			case "error":
@@ -362,22 +371,22 @@ export function CopilotCliStatusBadge({
 				return t("settings:copilot.copilotCliUpToDate", "Copilot CLI is up to date");
 			case "outdated":
 				return t(
-					"copilot:copilotCliUpdateAvailable",
+					"settings:copilot.copilotCliUpdateAvailable",
 					"Copilot CLI update available",
 				);
 			case "not-found":
 				return t(
-					"copilot:copilotCliExtensionNotInstalled",
+					"settings:copilot.copilotCliExtensionNotInstalled",
 					"Copilot CLI extension not installed",
 				);
 			case "gh-missing":
 				return t(
-					"copilot:gitHubCliNotFound",
+					"settings:copilot.gitHubCliNotFound",
 					"GitHub CLI (gh) not found — required for Copilot",
 				);
 			case "error":
 				return t(
-					"copilot:errorCheckingCopilotCli",
+					"settings:copilot.errorCheckingCopilotCli",
 					"Error checking Copilot CLI",
 				);
 		}
@@ -390,7 +399,7 @@ export function CopilotCliStatusBadge({
 		}
 		if (installationsError) {
 			return t(
-				"copilot:failedToLoadInstallations",
+				"settings:copilot.failedToLoadInstallations",
 				"Failed to load installations",
 			);
 		}
@@ -415,7 +424,7 @@ export function CopilotCliStatusBadge({
 									? "text-destructive"
 									: "",
 								status === "outdated"
-									? "text-yellow-600 dark:text-yellow-500"
+									? "text-warning "
 									: "",
 								className,
 							)}
@@ -438,16 +447,16 @@ export function CopilotCliStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" ||
 										status === "gh-missing" ||
 										status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{status === "gh-missing"
-												? "gh missing"
+												? t("navigation:copilotCli.ghMissing")
 												: t("common:install", "Install")}
 										</span>
 									)}
@@ -477,7 +486,7 @@ export function CopilotCliStatusBadge({
 										t("settings:copilot.updateAvailable", "Update available")}
 									{status === "not-found" &&
 										t(
-											"copilot:extensionNotInstalled",
+											"settings:copilot.extensionNotInstalled",
 											"Extension not installed",
 										)}
 									{status === "gh-missing" &&
@@ -492,9 +501,9 @@ export function CopilotCliStatusBadge({
 					{/* gh-missing notice */}
 					{status === "gh-missing" && (
 						<div className="text-xs p-2 bg-destructive/10 text-destructive rounded-md">
-							<p className="font-medium">Requires GitHub CLI (gh)</p>
+							<p className="font-medium">{t("navigation:copilotCli.requiresGh")}</p>
 							<p className="mt-1 text-muted-foreground">
-								Install from{" "}
+								{t("navigation:copilotCli.installFrom")}{" "}
 								<button
 									type="button"
 									className="underline text-primary"
@@ -515,7 +524,7 @@ export function CopilotCliStatusBadge({
 						<div className="text-xs space-y-1 p-2 bg-muted rounded-md">
 							{versionInfo.installed && (
 								<div className="flex justify-between">
-									<span className="text-muted-foreground">Copilot:</span>
+									<span className="text-muted-foreground">{t("navigation:copilotCli.copilotLabel")}</span>
 									<span className="font-mono">{versionInfo.installed}</span>
 								</div>
 							)}
@@ -529,10 +538,10 @@ export function CopilotCliStatusBadge({
 								<div className="flex justify-between items-center gap-2">
 									<span className="text-muted-foreground flex items-center gap-1">
 										<FolderOpen className="h-3 w-3" />
-										Path:
+										{t("navigation:copilotCli.path")}
 									</span>
 									<span
-										className="font-mono text-[10px] truncate max-w-[140px]"
+										className="font-mono text-3xs truncate max-w-[140px]"
 										title={versionInfo.path}
 									>
 										{versionInfo.path}
@@ -541,24 +550,24 @@ export function CopilotCliStatusBadge({
 							)}
 							{authStatus && (
 								<div className="flex justify-between">
-									<span className="text-muted-foreground">Auth:</span>
+									<span className="text-muted-foreground">{t("navigation:copilotCli.auth")}</span>
 									<span
 										className={
 											authStatus.authenticated
-												? "text-green-600"
+												? "text-success"
 												: "text-destructive"
 										}
 									>
 										{authStatus.authenticated
-											? authStatus.username || "Authenticated"
-											: "Not authenticated"}
+											? authStatus.username || t("navigation:copilotCli.authenticated")
+											: t("navigation:copilotCli.notAuthenticated")}
 									</span>
 								</div>
 							)}
 							{lastChecked && (
 								<div className="flex justify-between text-muted-foreground">
-									<span>Last checked:</span>
-									<span>{lastChecked.toLocaleTimeString()}</span>
+									<span>{t("navigation:copilotCli.lastChecked")}</span>
+									<span>{formatAppTime(lastChecked)}</span>
 								</div>
 							)}
 						</div>
@@ -595,7 +604,7 @@ export function CopilotCliStatusBadge({
 									onClick={startAuth}
 								>
 									<LogIn className="h-3 w-3" />
-									Login
+									{t("navigation:copilotCli.login")}
 								</Button>
 							)}
 						<Button
@@ -649,7 +658,7 @@ export function CopilotCliStatusBadge({
 										>
 											<div className="flex flex-col">
 												<span
-													className="font-mono text-[10px] truncate max-w-[180px]"
+													className="font-mono text-3xs truncate max-w-[180px]"
 													title={installation.path}
 												>
 													{installation.path
@@ -657,7 +666,7 @@ export function CopilotCliStatusBadge({
 														.slice(-2)
 														.join("/") || installation.path}
 												</span>
-												<span className="text-muted-foreground text-[9px]">
+												<span className="text-muted-foreground text-3xs">
 													{installation.version
 														? `copilot v${installation.version}`
 														: t("settings:copilot.versionUnknown", "version unknown")}

@@ -32,6 +32,11 @@ PUBLIC_PATHS = {
     "/openapi.json",
 }
 
+#: The one path a personal access token opens, and the only one where an
+#: access token does not work (``server/auth/access_tokens.py``,
+#: ``shared_board/mcp_http.py``).
+MCP_PATH = "/mcp"
+
 _db_ready = False
 _db_init_lock: asyncio.Lock | None = None
 
@@ -85,17 +90,28 @@ CLIENT_PATH_PARAMS = frozenset(
 _FORM_TYPES = frozenset({"application/x-www-form-urlencoded", "multipart/form-data"})
 
 
-async def _attach_principal(request: Request, claims: dict) -> None:
-    """Resolve tenant + permissions and put a Principal on ``request.state``."""
+async def _attach_principal(request: Request, claims: dict) -> bool:
+    """Resolve tenant + permissions and put a Principal on ``request.state``.
+
+    False when the account was deactivated: an access token outlives that by
+    up to its lifetime, and deactivation must take effect on the next request,
+    not when the token expires. (An unknown account resolves to no
+    organization, hence no permission, below.)
+    """
     from server.authz.engine import resolve_permissions
     from server.authz.principal import Principal
     from server.authz.tenancy import ORG_HEADER, resolve_org_id
     from server.db.engine import get_session_factory
+    from server.db.models import User
+    from sqlalchemy import select
 
     user_id = claims["sub"]
     platform_role = claims.get("role", "member")
 
     async with get_session_factory()() as db:
+        active = await db.scalar(select(User.is_active).where(User.id == user_id))
+        if active is False:
+            return False
         org_id = await resolve_org_id(
             db,
             user_id=user_id,
@@ -120,6 +136,37 @@ async def _attach_principal(request: Request, claims: dict) -> None:
         org_role_slug=org_role_slug,
         permissions=permissions,
     )
+    return True
+
+
+async def _attach_token_principal(request: Request, raw: str) -> JSONResponse | None:
+    """Authenticate a personal access token for ``/mcp``; None when it passed."""
+    from server.auth.access_tokens import AccessTokenError, authenticate
+    from server.db.engine import get_session_factory
+
+    try:
+        async with get_session_factory()() as db:
+            use = await authenticate(db, raw)
+    except AccessTokenError as e:
+        # One answer for every reason, as for an access token; the reason is logged.
+        logger.warning("Server mode: rejected personal token: %s", e)
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid, revoked or expired token"},
+            headers={"WWW-Authenticate": 'Bearer realm="workpilot"'},
+        )
+    principal = use.principal
+    request.state.user_id = principal.id
+    request.state.user_email = principal.email
+    request.state.user_role = principal.platform_role
+    request.state.org_id = principal.org_id
+    request.state.principal = principal
+    request.state.access_token_scope = use.token.scope
+    # A task token's reach (P7): its project, its card; None for a personal one.
+    request.state.access_token_id = use.token.id
+    request.state.access_token_project = use.token.project_id
+    request.state.access_token_card = use.token.card_id
+    return None
 
 
 def _path_keys_in(payload: object) -> set[str]:
@@ -221,6 +268,15 @@ async def _ensure_db_ready() -> None:
         await init_db()
         _db_ready = True
         logger.info("Server-mode database initialized")
+        # Runs a previous server process left queued or running would hold
+        # quota slots and show as running forever: nothing will finish them.
+        from server.services.run_manager import get_run_manager
+        from sqlalchemy.exc import SQLAlchemyError
+
+        try:
+            await get_run_manager().settle_orphans()
+        except SQLAlchemyError:
+            logger.exception("Could not settle runs interrupted by a restart")
 
 
 def mount_server_mode(app: FastAPI) -> bool:
@@ -246,8 +302,19 @@ def mount_server_mode(app: FastAPI) -> bool:
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
             return JSONResponse(
-                status_code=401, content={"detail": "Authentication required"}
+                status_code=401,
+                content={"detail": "Authentication required"},
+                headers={"WWW-Authenticate": 'Bearer realm="workpilot"'},
             )
+        if request.url.path == MCP_PATH:
+            # A personal token, never an access token; and a personal token
+            # nowhere else, since every other path decodes a signed one below.
+            failure = await _attach_token_principal(
+                request, auth[len("Bearer ") :].strip()
+            )
+            if failure is not None:
+                return failure
+            return await call_next(request)
         try:
             claims = decode_access_token(auth[len("Bearer ") :].strip())
         except TokenError as e:
@@ -271,11 +338,16 @@ def mount_server_mode(app: FastAPI) -> bool:
         # legacy ones included — has an authorized principal available, and pays
         # for it exactly once.
         try:
-            await _attach_principal(request, claims)
+            attached = await _attach_principal(request, claims)
         except Exception:
             logger.exception("Failed to resolve the principal for a request")
             return JSONResponse(
                 status_code=500, content={"detail": "Authorization unavailable"}
+            )
+
+        if attached is False:
+            return JSONResponse(
+                status_code=401, content={"detail": "Invalid or expired token"}
             )
 
         forbidden = await _reject_client_supplied_paths(request)
@@ -293,6 +365,10 @@ def mount_server_mode(app: FastAPI) -> bool:
         ("server.routers.projects", "projects"),
         ("server.routers.specs", "specs"),
         ("server.routers.users", "users"),
+        ("server.routers.devices", "devices"),
+        ("server.routers.preferences", "preferences"),
+        ("server.routers.needs_you", "needs-you"),
+        ("server.routers.access_tokens", "access-tokens"),
         ("server.routers.admin", "admin"),
     ):
         try:

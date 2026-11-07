@@ -19,6 +19,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Textarea } from "./ui/textarea";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,17 +55,17 @@ const SEVERITY_CONFIG: Record<
 	string,
 	{ color: string; bg: string; label: string }
 > = {
-	critical: { color: "text-red-500", bg: "bg-red-500/10", label: "Critical" },
-	high: { color: "text-red-400", bg: "bg-red-400/10", label: "High" },
-	medium: { color: "text-amber-500", bg: "bg-amber-500/10", label: "Medium" },
+	critical: { color: "text-destructive", bg: "bg-destructive/10", label: "Critical" },
+	high: { color: "text-destructive", bg: "bg-destructive/10", label: "High" },
+	medium: { color: "text-warning", bg: "bg-warning/10", label: "Medium" },
 	low: { color: "text-blue-500", bg: "bg-blue-500/10", label: "Low" },
 	info: { color: "text-gray-400", bg: "bg-gray-400/10", label: "Info" },
 };
 
 const RISK_CONFIG: Record<string, { color: string; bg: string }> = {
-	high: { color: "text-red-500", bg: "bg-red-500/10" },
-	medium: { color: "text-amber-500", bg: "bg-amber-500/10" },
-	low: { color: "text-emerald-500", bg: "bg-emerald-500/10" },
+	high: { color: "text-destructive", bg: "bg-destructive/10" },
+	medium: { color: "text-warning", bg: "bg-warning/10" },
+	low: { color: "text-success", bg: "bg-success/10" },
 };
 
 // ---------------------------------------------------------------------------
@@ -177,18 +178,12 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center gap-3">
-					<Wand2 className="h-6 w-6 text-primary" />
-					<div>
-						<h1 className="text-xl font-bold text-foreground">
-							{t("refactoring:title")}
-						</h1>
-						<p className="text-sm text-muted-foreground">
-							{t("refactoring:description")}
-						</p>
-					</div>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={Wand2}
+					title={t("refactoring:title")}
+					description={t("refactoring:description")}
+				/>
 
 				{/* Source input */}
 				<Card>
@@ -274,8 +269,8 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 
 				{/* Error */}
 				{error && (
-					<Card className="border-red-500/30">
-						<CardContent className="p-4 flex items-center gap-3 text-red-500">
+					<Card className="border-destructive/30">
+						<CardContent className="p-4 flex items-center gap-3 text-destructive">
 							<AlertTriangle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">{error}</p>
 						</CardContent>
@@ -423,14 +418,14 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 											<p className="text-sm text-muted-foreground">
 												{p.description}
 											</p>
-											p.impact && (
-											<p className="text-xs text-muted-foreground">
+											{p.impact && (
+												<p className="text-xs text-muted-foreground">
 												<span className="font-medium text-foreground">
 													{t("refactoring:proposals.impact")}:
 												</span>{" "}
 												{p.impact}
-											</p>
-											)
+												</p>
+											)}
 										</div>
 									);
 								})}

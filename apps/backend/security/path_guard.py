@@ -113,13 +113,55 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # The task's definition of done (`goal/spec.py`): an agent that could
     # rewrite it would make `true` its goal.
     ".workpilot-goal.json",
+    # What the person told the next session (`foundation/human_input.py`): an
+    # agent that could write it would hand the next session a fake human
+    # instruction, planted by whatever content it read (rule S2).
+    "HUMAN_INPUT.md",
+    # Same reason for the messages the person sends while the task runs, and
+    # for their delivery marks (`foundation/steering.py`).
+    "steering.jsonl",
+    # The person's line comments and their status (`foundation/review_comments.py`):
+    # an agent that could write it would mark its own work reviewed.
+    "review-comments.json",
 )
+
+#: Why a protected file that is not security configuration is refused.
+_REFUSAL_REASONS: dict[str, str] = {
+    "human_input.md": (
+        "it holds the person's instructions for the next session, and only the "
+        "person writes them. If you need to tell the person something, say it "
+        "in your output."
+    ),
+    "steering.jsonl": (
+        "it holds the messages the person sends while the task runs, and only "
+        "the person and WorkPilot write it. If you need to tell the person "
+        "something, say it in your output."
+    ),
+    "review-comments.json": (
+        "it holds the person's line comments on the review and their status; "
+        "WorkPilot marks what your session changed. Fix the code the comments "
+        "point to, and say in your output what you did."
+    ),
+}
 
 #: Security configuration recognised by its directory *and* its name:
 #: `.workpilot/guardrails.yaml` is the user's policy, `config/guardrails.yaml`
 #: is the project's own business. Names are `fnmatch` patterns.
 PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
-    ".workpilot": ("guardrails.yaml", "guardrails.yml", "guardrails.json"),
+    # `worktree.toml` runs commands in every new worktree and
+    # `worktree-approved.json` says the person approved it
+    # (`core/workspace/recipe_run.py`): an agent that wrote either would run
+    # its commands in the next task's worktree.
+    # `mcp-pins.json`: the MCP tools the person approved (`mcp_pins`); an
+    # agent that could write it would approve its own server.
+    ".workpilot": (
+        "guardrails.yaml",
+        "guardrails.yml",
+        "guardrails.json",
+        "worktree.toml",
+        "worktree-approved.json",
+        "mcp-pins.json",
+    ),
     ".claude": ("settings*.json",),
 }
 
@@ -139,6 +181,8 @@ def _fold(component: str) -> str:
 
 def _component_matches(component: str, pattern: str, *, glob: bool) -> bool:
     folded = _fold(component)
+    # Folded like the component: `HUMAN_INPUT.md` is spelt as people see it.
+    pattern = pattern.casefold()
     if glob and _GLOB_CHARS.intersection(folded):
         # The shell does not let a wildcard match a leading dot: `*` is not
         # `.workpilot-allowlist`, `.*` is.
@@ -184,7 +228,15 @@ def protected_config_target(
         return None
 
     name = parts[-1]
-    if any(_component_matches(name, p, glob=glob) for p in PROTECTED_CONFIG_NAMES):
+    # A bare wildcard (`*`, `??`) means "every file here": it names a dotfile
+    # only as `.*`, and a plain name never, or `git add *` would be refused in
+    # every directory for a file that sits in one. `HUMAN*` or `*.md` still do.
+    bare = glob and not _fold(name).strip("*?")
+    if any(
+        _component_matches(name, p, glob=glob)
+        for p in PROTECTED_CONFIG_NAMES
+        if not (bare and not p.startswith("."))
+    ):
         return name
     if directories and any(
         _component_matches(name, d, glob=glob) for d in PROTECTED_CONFIG_DIRS
@@ -217,6 +269,9 @@ def protected_config_refusal(path: str, base: Path | None) -> str | None:
             target = protected_config_target(resolved)
     if target is None:
         return None
+    reason = _REFUSAL_REASONS.get(_fold(target.rsplit("/", 1)[-1]))
+    if reason:
+        return f"Refusing to write '{path}': {reason}"
     return (
         f"Refusing to write '{path}': {target} is security configuration — it "
         "decides which commands and writes this build's agents are allowed, "

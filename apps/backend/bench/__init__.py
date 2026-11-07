@@ -25,7 +25,13 @@ from .lifecycle import (
     prepare,
     read_manifest,
 )
-from .results import history_samples, router_verdict, scores, table
+from .results import (
+    history_samples,
+    recommendations,
+    router_verdict,
+    scores,
+    table,
+)
 
 __all__ = [
     "MAX_CANDIDATES",
@@ -37,6 +43,7 @@ __all__ = [
     "discard",
     "discover",
     "history_samples",
+    "recommendations",
     "judge_build",
     "main_project",
     "parse_commits",

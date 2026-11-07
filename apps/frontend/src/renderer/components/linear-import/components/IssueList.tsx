@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { ScrollArea } from "../../ui/scroll-area";
 import type { LinearIssue } from "../types";
 import { IssueCard } from "./IssueCard";
+import { useTranslation } from "react-i18next";
 
 interface IssueListProps {
 	issues: LinearIssue[];
@@ -26,6 +27,7 @@ export function IssueList({
 	filterState,
 	onToggleIssue,
 }: IssueListProps) {
+	const { t } = useTranslation();
 	if (isLoadingIssues) {
 		return (
 			<ScrollArea className="flex-1 -mx-6 px-6 min-h-0">
@@ -40,7 +42,7 @@ export function IssueList({
 		return (
 			<ScrollArea className="flex-1 -mx-6 px-6 min-h-0">
 				<div className="text-center py-12 text-muted-foreground">
-					<p className="text-sm">Select a team to view issues</p>
+					<p className="text-sm">{t("settings:linearImport.selectTeam")}</p>
 				</div>
 			</ScrollArea>
 		);
@@ -52,8 +54,8 @@ export function IssueList({
 				<div className="text-center py-12 text-muted-foreground">
 					<p className="text-sm">
 						{searchQuery || filterState !== "all"
-							? "No issues match your filters"
-							: "No issues found"}
+							? t("settings:linearImport.noMatch")
+							: t("settings:linearImport.empty")}
 					</p>
 				</div>
 			</ScrollArea>

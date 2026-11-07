@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 // Use modal={false} to prevent Radix Dialog from setting aria-hidden / pointer-events:none
 // on document.body, which would block Select / Popover portals rendered outside the dialog tree.
@@ -43,7 +44,9 @@ const FullScreenDialogContent = React.forwardRef<
 	(
 		{ className, children, onPointerDownOutside, onInteractOutside, ...props },
 		ref,
-	) => (
+	) => {
+	const { t } = useTranslation();
+	return (
 		<FullScreenDialogPortal>
 			<FullScreenDialogOverlay />
 			<DialogPrimitive.Content
@@ -93,11 +96,12 @@ const FullScreenDialogContent = React.forwardRef<
 					)}
 				>
 					<X className="h-5 w-5" />
-					<span className="sr-only">Close</span>
+					<span className="sr-only">{t("common:buttons.close")}</span>
 				</DialogPrimitive.Close>
 			</DialogPrimitive.Content>
 		</FullScreenDialogPortal>
-	),
+	);
+},
 );
 FullScreenDialogContent.displayName = "FullScreenDialogContent";
 

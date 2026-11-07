@@ -305,7 +305,7 @@ export function DevToolsSettings({
 									<div className="flex items-center gap-2">
 										<span>{option.label}</span>
 										{option.detected && (
-											<Check className="h-3 w-3 text-green-500" />
+											<Check className="h-3 w-3 text-success" />
 										)}
 									</div>
 								</SelectItem>
@@ -323,7 +323,7 @@ export function DevToolsSettings({
 					{settings.preferredIDE === "custom" && (
 						<div className="mt-3 space-y-2">
 							<Label htmlFor="custom-ide-path">
-								{t("devtools.customPath", "Custom path")}
+								{t("devtools.ide.customPath", "Custom path")}
 							</Label>
 							<div className="flex gap-2">
 								<Input
@@ -380,7 +380,7 @@ export function DevToolsSettings({
 									<div className="flex items-center gap-2">
 										<span>{option.label}</span>
 										{option.detected && (
-											<Check className="h-3 w-3 text-green-500" />
+											<Check className="h-3 w-3 text-success" />
 										)}
 									</div>
 								</SelectItem>
@@ -398,7 +398,7 @@ export function DevToolsSettings({
 					{settings.preferredTerminal === "custom" && (
 						<div className="mt-3 space-y-2">
 							<Label htmlFor="custom-terminal-path">
-								{t("devtools.customPath", "Custom path")}
+								{t("devtools.terminal.customPath", "Custom path")}
 							</Label>
 							<div className="flex gap-2">
 								<Input
@@ -463,11 +463,11 @@ export function DevToolsSettings({
 				</div>
 
 				{/* YOLO Mode Toggle */}
-				<div className="space-y-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
+				<div className="space-y-3 rounded-md border border-warning/30 bg-warning/5 p-4">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
-							<AlertTriangle className="h-4 w-4 text-amber-500" />
-							<Label htmlFor="yolo-mode" className="text-amber-200">
+							<AlertTriangle className="h-4 w-4 text-warning" />
+							<Label htmlFor="yolo-mode" className="text-warning">
 								{t("devtools.yoloMode.label", "YOLO Mode")}
 							</Label>
 						</div>
@@ -482,14 +482,14 @@ export function DevToolsSettings({
 							}}
 						/>
 					</div>
-					<p className="text-xs text-amber-400/80">
+					<p className="text-xs text-warning/80">
 						{t(
 							"devtools.yoloMode.description",
 							"Start Claude with --dangerously-skip-permissions flag, bypassing all safety prompts. Use with extreme caution.",
 						)}
 					</p>
 					{settings.dangerouslySkipPermissions && (
-						<p className="text-xs text-amber-500 font-medium flex items-center gap-1">
+						<p className="text-xs text-warning font-medium flex items-center gap-1">
 							<AlertTriangle className="h-3 w-3" />
 							{t(
 								"devtools.yoloMode.warning",

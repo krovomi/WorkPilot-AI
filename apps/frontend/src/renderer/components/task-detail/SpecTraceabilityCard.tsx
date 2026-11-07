@@ -5,6 +5,7 @@ import type { Task } from "../../../shared/types";
 import { useSpecTraceabilityStore } from "../../stores/spec-traceability-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { linkSignals, RequirementLinksSection } from "./RequirementLinksSection";
 
 export interface SpecTraceabilityCardProps {
 	readonly task: Task;
@@ -60,36 +61,57 @@ export function SpecTraceabilityCard({
 	const uncovered = coverage.applicable ? coverage.uncovered : [];
 	const unknown = coverage.applicable ? Object.keys(coverage.unknownRefs) : [];
 
-	// Nothing open and nothing unclaimed: the spec and the plan agree, and a
-	// card saying so is a card in the way.
-	if (questions.length === 0 && uncovered.length === 0 && unknown.length === 0) {
+	// What the build linked (P3): a requirement with a file and no test, an
+	// earlier requirement on the same files. Both are worth the card.
+	const links = data.links ?? null;
+	const signals = linkSignals(links);
+
+	// Nothing open, nothing unclaimed, nothing untested or overlapping: the
+	// spec, the plan and the code agree, and a card saying so is in the way.
+	if (
+		questions.length === 0 &&
+		uncovered.length === 0 &&
+		unknown.length === 0 &&
+		signals.untested === 0 &&
+		signals.earlier === 0
+	) {
 		return null;
 	}
 
 	return (
-		<div className="rounded-lg border border-amber-500/40 bg-amber-500/5">
+		<div className="rounded-lg border border-warning/40 bg-warning/5">
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
 						<ListChecks
-							className="h-4 w-4 shrink-0 text-amber-500"
+							className="h-4 w-4 shrink-0 text-warning"
 							aria-hidden
 						/>
 						<span className="text-sm font-medium">
 							{t("traceability:title")}
 						</span>
 						{questions.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("traceability:badge.questions", {
 									count: questions.length,
 								})}
 							</Badge>
 						)}
 						{uncovered.length > 0 && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t("traceability:badge.uncovered", {
 									count: uncovered.length,
 								})}
+							</Badge>
+						)}
+						{signals.untested > 0 && (
+							<Badge variant="outline" className="text-3xs">
+								{t("traceability:badge.untested", { count: signals.untested })}
+							</Badge>
+						)}
+						{signals.earlier > 0 && (
+							<Badge variant="outline" className="text-3xs">
+								{t("traceability:badge.earlier", { count: signals.earlier })}
 							</Badge>
 						)}
 					</div>
@@ -117,7 +139,7 @@ export function SpecTraceabilityCard({
 			</div>
 
 			{expanded && (
-				<div className="border-t border-amber-500/20 p-3 space-y-3">
+				<div className="border-t border-warning/20 p-3 space-y-3">
 					{questions.length > 0 && (
 						<section>
 							<h4 className="text-xs font-medium">
@@ -130,7 +152,7 @@ export function SpecTraceabilityCard({
 										className="flex items-start gap-2 text-xs text-muted-foreground"
 									>
 										<CircleHelp
-											className="mt-0.5 h-3 w-3 shrink-0 text-amber-500"
+											className="mt-0.5 h-3 w-3 shrink-0 text-warning"
 											aria-hidden
 										/>
 										<span>
@@ -155,13 +177,15 @@ export function SpecTraceabilityCard({
 							</p>
 							<div className="mt-1 flex flex-wrap gap-1">
 								{uncovered.map((id) => (
-									<Badge key={id} variant="outline" className="text-[10px]">
+									<Badge key={id} variant="outline" className="text-3xs">
 										{id}
 									</Badge>
 								))}
 							</div>
 						</section>
 					)}
+
+					{links && <RequirementLinksSection links={links} />}
 
 					{unknown.length > 0 && (
 						<section>
@@ -173,7 +197,7 @@ export function SpecTraceabilityCard({
 							</p>
 							<div className="mt-1 flex flex-wrap gap-1">
 								{unknown.map((id) => (
-									<Badge key={id} variant="outline" className="text-[10px]">
+									<Badge key={id} variant="outline" className="text-3xs">
 										{id}
 									</Badge>
 								))}

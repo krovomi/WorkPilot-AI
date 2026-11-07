@@ -68,7 +68,14 @@ const KANBAN_SETTINGS_KEY_PREFIX = "kanban-column-prefs";
 const KANBAN_COLUMN_ORDER_KEY_PREFIX = "kanban-column-order";
 
 /** Default column width in pixels */
-export const DEFAULT_COLUMN_WIDTH = 320;
+export const DEFAULT_COLUMN_WIDTH = 280;
+
+/**
+ * Former default width. Cards were redesigned to read well in a narrower
+ * column, so a column still at exactly this value (never resized by hand) is
+ * moved to the new default on load. A width the user dragged is kept.
+ */
+export const LEGACY_DEFAULT_COLUMN_WIDTH = 320;
 
 /** Minimum column width in pixels */
 export const MIN_COLUMN_WIDTH = 180;
@@ -129,6 +136,23 @@ function createDefaultPreferences(): KanbanColumnPreferences {
 	}
 
 	return preferences as KanbanColumnPreferences;
+}
+
+/**
+ * Move columns still at the former default width to the current default.
+ */
+export function migrateLegacyColumnWidths(
+	prefs: KanbanColumnPreferences,
+): KanbanColumnPreferences {
+	let changed = false;
+	const next = { ...prefs };
+	for (const column of TASK_STATUS_COLUMNS) {
+		if (next[column].width === LEGACY_DEFAULT_COLUMN_WIDTH) {
+			next[column] = { ...next[column], width: DEFAULT_COLUMN_WIDTH };
+			changed = true;
+		}
+	}
+	return changed ? next : prefs;
 }
 
 /**
@@ -388,7 +412,7 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 				if (stored) {
 					const parsed = JSON.parse(stored);
 					if (validatePreferences(parsed)) {
-						set({ columnPreferences: parsed });
+						set({ columnPreferences: migrateLegacyColumnWidths(parsed) });
 					} else {
 						set({ columnPreferences: createDefaultPreferences() });
 					}
@@ -455,12 +479,13 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 
 					if (result?.success && result.data) {
 						if (validatePreferences(result.data)) {
-							set({ columnPreferences: result.data });
+							const prefs = migrateLegacyColumnWidths(result.data);
+							set({ columnPreferences: prefs });
 
 							// Update localStorage sync cache with IPC data
 							try {
 								const key = getKanbanSettingsKey(projectId);
-								localStorage.setItem(key, JSON.stringify(result.data));
+								localStorage.setItem(key, JSON.stringify(prefs));
 							} catch {
 								// localStorage write failed, non-critical
 							}

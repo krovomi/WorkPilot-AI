@@ -256,7 +256,7 @@ def _parse_ratings(text: str, expected: int) -> dict[int, SpecFitRating]:
     """Pull the ratings object out of the judge's answer.
 
     Tolerant of a fence or a sentence in front of the JSON, for the same reason
-    `spec/plan_recovery.extract_json_document` is: the content is there, and
+    `foundation/json_document.extract_json_document` is: the content is there, and
     refusing it over its wrapper spends a whole judging round to learn nothing.
     """
     candidates: list[str] = []

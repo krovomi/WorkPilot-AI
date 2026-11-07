@@ -7,6 +7,8 @@
  */
 import { create } from "zustand";
 import { usePermissionsStore } from "./permissions-store";
+import { refreshProjects } from "./project-store";
+import { useSettingsStore } from "./settings-store";
 
 export interface ServerUser {
 	id: string;
@@ -24,6 +26,12 @@ interface ServerSessionState {
 	configured: boolean;
 	isLoginScreenOpen: boolean;
 	initialized: boolean;
+	/**
+	 * True once the persisted session has been read and the connection gate
+	 * decided (shown or not). Until then nothing else may open over the gate:
+	 * the first-run wizard would cover the local/server choice.
+	 */
+	sessionResolved: boolean;
 
 	initialize: () => Promise<void>;
 	openLoginScreen: () => void;
@@ -50,6 +58,19 @@ interface ServerSessionState {
 	logout: () => Promise<void>;
 }
 
+/**
+ * Apply the theme the server keeps for the person (main already wrote it in
+ * the settings file); nothing when the server has none or cannot be reached.
+ */
+async function applyServerTheme(): Promise<void> {
+	try {
+		const prefs = await window.electronAPI.serverAuth.pullUiPreferences?.();
+		if (prefs) useSettingsStore.getState().updateSettings(prefs);
+	} catch {
+		// The desktop's own theme stays.
+	}
+}
+
 type AuthStatePayload = {
 	mode: "local" | "server";
 	serverUrl: string | null;
@@ -59,6 +80,10 @@ type AuthStatePayload = {
 };
 
 export const useServerSessionStore = create<ServerSessionState>((set, get) => {
+	// Whose server projects the project list holds: when the session changes,
+	// the list is read again so it shows this user's projects and no one else's.
+	let projectsSession: string | null = null;
+
 	const applyState = (state: AuthStatePayload) => {
 		set({
 			mode: state.mode,
@@ -77,6 +102,17 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 		} else {
 			permissions.reset();
 		}
+		const session =
+			state.mode === "server" && state.isAuthenticated
+				? `${state.serverUrl}|${state.user?.id ?? ""}`
+				: null;
+		if (session !== projectsSession) {
+			const first = projectsSession === null && session === null;
+			projectsSession = session;
+			if (!first) void refreshProjects();
+			// The person's theme from the server, the same as on their phone.
+			if (session !== null) void applyServerTheme();
+		}
 	};
 
 	return {
@@ -87,6 +123,7 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 		configured: false,
 		isLoginScreenOpen: false,
 		initialized: false,
+		sessionResolved: false,
 
 		initialize: async () => {
 			if (get().initialized) return;
@@ -108,6 +145,8 @@ export const useServerSessionStore = create<ServerSessionState>((set, get) => {
 				}
 			} catch (err) {
 				console.error("[server-session] init failed:", err);
+			} finally {
+				set({ sessionResolved: true });
 			}
 		},
 

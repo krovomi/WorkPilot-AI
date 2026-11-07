@@ -36,6 +36,7 @@ import {
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 
+import { Input } from "../ui/input";
 interface HuggingFaceModelDiscoveryProps {
 	className?: string;
 	/** Optional HF read token (raises rate limits, unlocks gated repos). */
@@ -548,12 +549,12 @@ export function HuggingFaceModelDiscovery({
 			{/* Search-as-you-type (debounced) — no button needed. */}
 			<div className="relative">
 				<Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-				<input
+				<Input
 					type="text"
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
 					placeholder={td("searchPlaceholder")}
-					className="w-full pl-8 pr-8 py-1.5 text-sm rounded-md border border-input bg-background text-foreground"
+					className="w-full pl-8 pr-8 py-1.5 text-sm h-auto"
 				/>
 				{isLoading && (
 					<Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -628,25 +629,25 @@ export function HuggingFaceModelDiscovery({
 					value={minParamB}
 					onChange={(e) => setMinParamB(e.target.value)}
 					className={selectClass}
-					aria-label="Taille minimale (paramètres)"
+					aria-label={t("settings:sections.accounts.modelDiscovery.filters.minParamsAria")}
 				>
-					<option value="">Params : tous</option>
+					<option value="">{t("settings:sections.accounts.modelDiscovery.filters.paramsAll")}</option>
 					<option value="7">≥ 7B</option>
 					<option value="14">≥ 14B</option>
-					<option value="24">≥ 24B (planif.)</option>
+					<option value="24">{t("settings:sections.accounts.modelDiscovery.filters.params24")}</option>
 					<option value="70">≥ 70B</option>
 				</select>
 				<select
 					value={maxGb}
 					onChange={(e) => setMaxGb(e.target.value)}
 					className={selectClass}
-					aria-label="Taille disque max. estimée (Go)"
+					aria-label={t("settings:sections.accounts.modelDiscovery.filters.maxDiskAria")}
 				>
-					<option value="">Disque : tous</option>
-					<option value="6">≤ ~6 Go</option>
-					<option value="12">≤ ~12 Go</option>
-					<option value="24">≤ ~24 Go</option>
-					<option value="48">≤ ~48 Go</option>
+					<option value="">{t("settings:sections.accounts.modelDiscovery.filters.diskAll")}</option>
+					<option value="6">{t("settings:sections.accounts.modelDiscovery.filters.disk6")}</option>
+					<option value="12">{t("settings:sections.accounts.modelDiscovery.filters.disk12")}</option>
+					<option value="24">{t("settings:sections.accounts.modelDiscovery.filters.disk24")}</option>
+					<option value="48">{t("settings:sections.accounts.modelDiscovery.filters.disk48")}</option>
 				</select>
 			</div>
 
@@ -658,27 +659,22 @@ export function HuggingFaceModelDiscovery({
 					onChange={(e) => setAgenticOnly(e.target.checked)}
 					className="h-3.5 w-3.5 accent-success"
 				/>
-				Masquer les modèles inadaptés (embeddings, trop petits)
+				{t("settings:sections.accounts.modelDiscovery.filters.hideUnsuitable")}
 			</label>
 
 			{/* Explicit colour legend (what each model is good for). */}
-			<div className="space-y-0.5 text-[11px] text-muted-foreground">
+			<div className="space-y-0.5 text-2xs text-muted-foreground">
 				<div>
-					<span className="font-medium text-success">● Recommandé</span> — assez
-					gros (≥24B de paramètres actifs) et compatible tool-calling : bon pour
-					TOUTES les étapes, planification incluse.
+					<span className="font-medium text-success">{t("settings:sections.accounts.modelDiscovery.legend.recommended")}</span> {t("settings:sections.accounts.modelDiscovery.legend.recommendedDetail")}
 				</div>
 				<div>
 					<span className="font-medium text-warning">
-						● Trop petit pour planifier
+						{t("settings:sections.accounts.modelDiscovery.legend.tooSmall")}
 					</span>{" "}
-					— compatible tool-calling mais &lt;24B : ok codage / validation,
-					déconseillé en planification.
+					{t("settings:sections.accounts.modelDiscovery.legend.tooSmallDetail")}
 				</div>
 				<div>
-					<span className="font-medium">● Tool-calling à vérifier</span> — non
-					confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go
-					» sont estimées (quant 4-bit).
+					<span className="font-medium">{t("settings:sections.accounts.modelDiscovery.legend.unverified")}</span> {t("settings:sections.accounts.modelDiscovery.legend.unverifiedDetail")}
 				</div>
 			</div>
 
@@ -745,7 +741,7 @@ export function HuggingFaceModelDiscovery({
 									)}
 									{m.id}
 									{isSelected && (
-										<span className="text-[10px] font-normal text-primary">
+										<span className="text-3xs font-normal text-primary">
 											{td("default")}
 										</span>
 									)}
@@ -753,14 +749,18 @@ export function HuggingFaceModelDiscovery({
 								<div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
 									<span
 										className={cn(
-											"px-1.5 py-0.5 rounded text-[10px] font-medium",
+											"px-1.5 py-0.5 rounded text-3xs font-medium",
 											VERDICT_BADGE[assessment.verdict],
 										)}
 										title={assessment.reason}
 									>
 										{VERDICT_LABEL[assessment.verdict]}
 										{assessment.paramB != null ? ` · ${assessment.paramB}B` : ""}
-										{estGb != null ? ` · ~${estGb} Go` : ""}
+										{estGb != null
+											? t("settings:sections.accounts.modelDiscovery.estimatedSize", {
+													size: estGb,
+												})
+											: ""}
 									</span>
 									<span className="inline-flex items-center gap-1">
 										<Download className="h-3 w-3" />
@@ -771,12 +771,12 @@ export function HuggingFaceModelDiscovery({
 										{formatCount(m.likes)}
 									</span>
 									{m.pipelineTag && (
-										<span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">
+										<span className="px-1.5 py-0.5 rounded bg-muted text-3xs">
 											{m.pipelineTag}
 										</span>
 									)}
 									{m.library && (
-										<span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">
+										<span className="px-1.5 py-0.5 rounded bg-muted text-3xs">
 											{m.library}
 										</span>
 									)}

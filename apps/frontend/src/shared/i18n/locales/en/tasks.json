@@ -104,7 +104,9 @@
 		"sessionCompactionHint": "{{count}} execution phases — click to see the compacted summary",
 		"sessionCompaction": "Session Compaction",
 		"criticalPhases": "Key steps",
-		"lastError": "Last error"
+		"lastError": "Last error",
+		"automation": "Automations",
+		"automationTooltip": "Created by the automation rule “{{rule}}”"
 	},
 	"warnings": {
 		"stuck": {
@@ -136,9 +138,6 @@
 		"previewApp": "Preview application",
 		"pauseTask": "Pause task",
 		"resumeTask": "Resume task"
-	},
-	"prFiles": {
-		"short": "Files"
 	},
 	"creation": {
 		"title": "Create New Task",
@@ -248,6 +247,7 @@
 		"bulkMoveSuccess": "{{count}} task(s) moved successfully",
 		"bulkMoveError": "Failed to move {{failed}} of {{total}} tasks",
 		"dragColumn": "Drag to reorder column",
+		"columnOptions": "Column options",
 		"collapseColumn": "Collapse column",
 		"expandColumn": "Expand column",
 		"resizeColumn": "Resize column",
@@ -354,7 +354,6 @@
 			"missingProject": "Select a project first",
 			"errorTitle": "Slash command failed",
 			"successTitle": "Slash command completed",
-			"successBody": "Output was logged to the console.",
 			"ariaListLabel": "Available slash commands",
 			"runAsTaskLabel": "Run as task",
 			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a one-shot.",
@@ -383,6 +382,13 @@
 			"confidence": "Confidence: {{percent}}%",
 			"qaIterations_one": "1 QA pass expected.",
 			"qaIterations_other": "{{count}} QA passes expected."
+		},
+		"serverBoard": "Shared board · {{role}}",
+		"serverBoardHint": "This project lives on the WorkPilot server: everyone on it sees the same cards, and its builds run there. The board refreshes every few seconds.",
+		"serverRole": {
+			"viewer": "Viewer",
+			"member": "Member",
+			"owner": "Owner"
 		}
 	},
 	"queue": {
@@ -429,6 +435,12 @@
 			"qaPass": "QA review — pass #{{n}}",
 			"thinking": "Processing in progress"
 		},
+		"split": {
+			"legend": "Time spent per phase",
+			"share": "{{share}}%",
+			"segment": "{{phase}}: {{share}}%",
+			"segmentWithDuration": "{{phase}}: {{share}}% of the time ({{duration}})"
+		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",
@@ -474,7 +486,6 @@
 	"files": {
 		"title": "Files",
 		"tab": "Files",
-		"noSpecPath": "No spec files available",
 		"noFiles": "No files found",
 		"loading": "Loading files...",
 		"loadingContent": "Loading content...",
@@ -482,7 +493,21 @@
 		"errorLoadingContent": "Failed to load file content",
 		"retry": "Retry",
 		"selectFile": "Select a file to view its contents",
-		"openInIDE": "Open in IDE"
+		"openInIDE": "Open in IDE",
+		"taskChanges": "Created or changed by the task",
+		"noTaskChanges": "The task created or changed no files",
+		"fromSubtasks": "From the files the subtasks recorded",
+		"errorLoadingChanges": "Could not list the task's files",
+		"specSection": "Specification",
+		"emptyFile": "Empty file",
+		"refresh": "Refresh",
+		"status": {
+			"added": "Created",
+			"modified": "Modified",
+			"deleted": "Deleted",
+			"renamed": "Renamed",
+			"unknown": "Touched by a subtask"
+		}
 	},
 	"visualProof": {
 		"apiSmoke": {
@@ -605,7 +630,8 @@
 			"github": "GitHub",
 			"gitlab": "GitLab",
 			"visual-canvas": "Visual canvas",
-			"tech-debt": "Tech debt"
+			"tech-debt": "Tech debt",
+			"automation": "Automation"
 		}
 	},
 	"kind": {
@@ -889,8 +915,6 @@
 		"blockedCount_other": "{{count}} blocked",
 		"failedCount_one": "{{count}} failed",
 		"failedCount_other": "{{count}} failed",
-		"blockedReason": "Blocked: {{reason}}",
-		"blockedGeneric": "Blocked — needs manual attention",
 		"changeRequest": "Change requested",
 		"requestedAt": "Requested on {{date}}",
 		"filesViewer": {
@@ -920,6 +944,64 @@
 				"modified": "Modified",
 				"deleted": "Deleted",
 				"renamed": "Renamed"
+			}
+		},
+		"unblock": {
+			"regionLabel": "What this subtask needs from you",
+			"title": {
+				"needs_human": "The agent needs you to finish this subtask",
+				"manual_verification": "This check needs you",
+				"max_attempts": "The agent gave up after several attempts",
+				"file_validation": "The agent could not find the files to change",
+				"tool_concurrency": "The agent kept hitting a tool limit",
+				"agent": "The agent stopped on this subtask",
+				"failed": "This subtask failed"
+			},
+			"why": "Why: {{reason}}",
+			"noReason": "The agent did not say why.",
+			"manualReason": "the subtask asks for a manual check and the agent made no change.",
+			"hint": {
+				"needs_human": "Do what it asks, then click « It's done ». Or reply with what it needs and it tries again.",
+				"manual_verification": "Check it yourself, then click « It's done ». Or click « Try again » and the agent runs the check itself.",
+				"max_attempts": "Reply with a hint (a file, a command, an approach) and the agent tries again from scratch.",
+				"file_validation": "Reply with the right file paths and the agent tries again.",
+				"tool_concurrency": "Click « Try again »: the agent starts this subtask over.",
+				"agent": "Mark it done if it is, reply with what the agent needs, or let it try again.",
+				"failed": "Reply with a hint and the agent tries again, or mark it done if it is."
+			},
+			"lastReply": "Your last reply: {{reply}}",
+			"actions": {
+				"complete": "It's done",
+				"retry": "Try again",
+				"answer": "Reply to the agent",
+				"skip": "Not needed"
+			},
+			"replyLabel": "Your reply to the agent",
+			"replyPlaceholder": "What should the agent know or do? E.g. the file is at src/test.txt, run the tests with dotnet test…",
+			"sendReply": "Send and try again",
+			"cancel": "Cancel",
+			"done": {
+				"complete": "Subtask marked as done",
+				"skip": "Subtask marked as not needed",
+				"retry": "The agent tries this subtask again",
+				"answer": "Reply sent: the agent tries again"
+			},
+			"restarted": "The task has restarted.",
+			"resolved": {
+				"complete": "Marked as done by you",
+				"skip": "Marked as not needed by you"
+			},
+			"errorTitle": "Could not unblock the subtask",
+			"errors": {
+				"invalid_action": "This action is not available.",
+				"reply_required": "Write a reply first.",
+				"reply_too_long": "The reply is too long (4,000 characters at most).",
+				"subtask_not_found": "This subtask is no longer in the plan. Refresh the board.",
+				"not_blocked": "This subtask is no longer blocked.",
+				"task_running": "The task is running. Stop it first, then try again.",
+				"task_not_found": "Task not found.",
+				"plan_unreadable": "The task's plan could not be read.",
+				"generic": "Something went wrong. See the logs for details."
 			}
 		}
 	},
@@ -974,7 +1056,28 @@
 			"results_other": "{{count}} results",
 			"clear": "Clear search",
 			"noResults": "No results",
-			"noResultsHint": "No log entry matches “{{query}}”."
+			"noResultsHint": "No log entry matches “{{query}}”.",
+			"entries_one": "{{count}} entry",
+			"entries_other": "{{count}} entries",
+			"position": "{{current}}/{{total}}",
+			"previous": "Previous match (Shift+Enter)",
+			"next": "Next match (Enter)",
+			"caseSensitive": "Match case (Alt+C)",
+			"wholeWord": "Match whole word (Alt+W)",
+			"regex": "Use regular expression (Alt+R)",
+			"invalidRegex": "Invalid expression",
+			"filters": "Filters",
+			"filterPhase": "Phase",
+			"filterKind": "Type",
+			"resetFilters": "Reset",
+			"noResultsFiltered": "No log entry matches the filters.",
+			"kinds": {
+				"text": "Messages",
+				"tool": "Tools",
+				"error": "Errors",
+				"warning": "Warnings",
+				"status": "Status"
+			}
 		},
 		"thinking": {
 			"selectAria": "Thinking effort for this phase",
@@ -1610,25 +1713,50 @@
 			"handles": "{{from}} handles {{to}}."
 		}
 	},
-	"overview": {
-		"nav": "Overview sections",
+	"panel": {
+		"tabsLabel": "Task panel sections",
 		"sections": {
-			"review": {
-				"title": "To do",
-				"hint": "The task is waiting for your review: read, test, then merge or request changes."
+			"progress": {
+				"title": "Progress",
+				"hint": "Where the task stands and what it needs to move on: your review, the CI and the PR, the task itself, its goal."
 			},
-			"task": {
-				"title": "The task",
-				"hint": "What is asked: description, acceptance criteria, context."
+			"quality": {
+				"title": "Quality",
+				"hint": "Whether what was built is right: second opinion, spec coverage, design system, screens, verification."
 			},
-			"plan": {
-				"title": "Execution plan",
-				"hint": "What the agents will do, at which effort, and what they will read."
-			},
-			"learning": {
-				"title": "Memory & learning",
-				"hint": "What the system remembers — and what is waiting for your decision."
+			"costs": {
+				"title": "Costs & context",
+				"hint": "What the effort level buys, what the agents read, and what the system remembers."
 			}
+		},
+		"empty": "Nothing to show here for this task yet.",
+		"pendingDecisions_one": "1 decision waiting",
+		"pendingDecisions_other": "{{count}} decisions waiting"
+	},
+	"waiting": {
+		"title": "Waiting for you",
+		"items": {
+			"permission": "An agent is waiting for your answer to a question",
+			"plan": "A plan is waiting for your approval",
+			"failed": "The build failed: see why",
+			"ci": "CI is red on the task's branch",
+			"prChecks": "Checks are red on the task's pull request",
+			"goal": "The goal is not met",
+			"review": "The changes are waiting for your review"
+		}
+	},
+	"ciPipeline": {
+		"title": "CI pipeline",
+		"run": "{{provider}} {{run}} on {{branch}}",
+		"open": "Open the run",
+		"repairing": "An agent is repairing the build.",
+		"state": {
+			"queued": "Queued",
+			"running": "Running",
+			"succeeded": "Green",
+			"partiallySucceeded": "Partly green",
+			"failed": "Red",
+			"canceled": "Canceled"
 		}
 	},
 	"inlineEdit": {
@@ -1813,7 +1941,8 @@
 			"mobile": "Devices",
 			"screenshots": "Screenshots",
 			"scenario": "Scenario (replayed after QA)",
-			"findings": "Findings"
+			"findings": "Findings",
+			"cardScenario": "Scenario written on the card"
 		},
 		"kind": {
 			"web-frontend": "web front end",
@@ -1866,11 +1995,60 @@
 			"hint": "Launch the app after coding, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots).",
 			"windowLabel": "Window to verify (Windows apps)",
 			"windowPlaceholder": "Part of its title, e.g. Orders",
-			"windowHint": "WPF, WinForms or WinUI: only this window of the launched app is read and driven, never the rest of the desktop. Empty: the app's main window."
+			"windowHint": "WPF, WinForms or WinUI: only this window of the launched app is read and driven, never the rest of the desktop. Empty: the app's main window.",
+			"scenarioLabel": "Scenario to check (web apps)",
+			"scenarioPlaceholder": "One step per line, e.g.\n1. Open the orders page\n2. Click Save\n3. The toast says Saved",
+			"scenarioHint": "The verification follows these steps in the browser, takes a capture after each and keeps a Playwright trace. A step not carried out is never a pass. Empty: the verifier chooses its own clicks."
 		},
 		"cardBadge": {
 			"pass": "Verified",
 			"fail": "Verify failed"
+		},
+		"step": {
+			"pass": "passed",
+			"fail": "failed",
+			"blocked": "blocked",
+			"missing": "not reported"
+		},
+		"stepCapture": "Capture after step {{number}}",
+		"trace": {
+			"download": "Download the Playwright trace",
+			"hint": "and open it at trace.playwright.dev or with npx playwright show-trace.",
+			"none": "No Playwright trace: Playwright did not drive this session."
+		},
+		"walkthrough": {
+			"video": "Video of the scenario",
+			"gif": "The scenario's walkthrough: the capture of each step, in order",
+			"gifHint": "This GIF can be attached to the pull request's visual proof from the PR dialog.",
+			"noVideo": "No video of the scenario ({{reason}}): the trace and the captures are the proof."
+		},
+		"compare": {
+			"title": "Compared with the base branch",
+			"run": "Compare with the base branch",
+			"again": "Compare again",
+			"hint": "Replays the same scenario and calls, without a model, on the code this task started from and on the task, and lists what behaves differently.",
+			"skipped": "No comparison: {{reason}}",
+			"against": "Base branch at {{base}}, then this task.",
+			"same": "Nothing behaves differently.",
+			"status": "{{base}} on the base branch, {{task}} with the task",
+			"data": "Each side starts from its own data: a difference can come from the data rather than the code.",
+			"change": {
+				"broken": "Broken by the task",
+				"fixed": "Works thanks to the task",
+				"added": "New",
+				"removed": "Gone",
+				"changed": "Changed"
+			},
+			"kind": {
+				"scenario": "Scenario",
+				"console": "Console",
+				"network": "Network request",
+				"endpoint": "Endpoint call"
+			},
+			"side": {
+				"base": "Base branch, end of the scenario",
+				"task": "This task, end of the scenario"
+			}
 		}
 	},
 	"qaUnverified": {
@@ -2108,5 +2286,72 @@
 		"confirmBody": "The build on {{engine}} becomes the task's build. The {{others}} other variants, their worktrees and their branches are deleted. Nothing is merged.",
 		"adoptedLine": "Kept: {{variant}}",
 		"discardedLine": "Every variant was discarded."
+	},
+	"crossReview": {
+		"cardBadge": {
+			"agree": "Cross review OK",
+			"disagree": "Cross review: disagrees",
+			"inconclusive": "Cross review: no verdict"
+		}
+	},
+	"steering": {
+		"title": "Guide the agent",
+		"description": "Send a message while the task works: the next session it applies to receives it in its prompt. WorkPilot marks it delivered once that session has started.",
+		"placeholder": "For example: use the existing UserRepository instead of a new one",
+		"target": "Who receives it",
+		"nextSession": "The next session",
+		"send": "Send",
+		"queued": "Waiting for the next session",
+		"queuedForSubtask": "Waiting for the session of {{subtask}}",
+		"delivered": "Delivered to session {{session}} ({{date}})",
+		"deliveredToSubtask": "Delivered to session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "The message could not be sent.",
+			"empty_message": "The message is empty.",
+			"message_too_long": "The message is too long.",
+			"invalid_subtask": "This subtask does not exist.",
+			"task_not_found": "The task was not found.",
+			"queue_unwritable": "The task's folder could not be written."
+		}
+	},
+	"stack": {
+		"title": "Stacked on a blocker",
+		"description": "Start this task from a blocker's branch instead of the trunk, so its code builds on the blocker's before it is merged.",
+		"stackOn": "Stack on “{{title}}”",
+		"stackedNote": "Stacked on “{{title}}”: the worktree will start from its branch.",
+		"stackedOn": "Stacked on “{{title}}” ({{branch}})",
+		"upToDate": "Up to date with its parent.",
+		"parentMoved": "The parent has new commits since: update to rebase onto them.",
+		"parentMerged": "The parent is merged: this task can move onto {{base}}.",
+		"runningHint": "An agent is running on this task: update once it stops.",
+		"update": "Update",
+		"moveToBase": "Move onto {{base}}",
+		"outcome": {
+			"rebased": "Rebased onto the parent's latest commit.",
+			"metadata_only": "The task will start from the parent's latest commit.",
+			"moved_to_base": "Moved onto the parent's base.",
+			"up_to_date": "Already up to date."
+		},
+		"errors": {
+			"same_task": "A task cannot be stacked on itself.",
+			"already_stacked": "This task is already stacked.",
+			"not_blocker": "Only a blocker of this task can be its parent.",
+			"parent_done": "This blocker is already done: start from the trunk.",
+			"cycle": "Stacking here would create a loop.",
+			"child_started": "This task already has a worktree: its base can no longer change.",
+			"parent_no_worktree": "The blocker has no worktree or branch yet.",
+			"parent_no_commits": "The blocker has no commit yet: nothing to build on.",
+			"metadata_unwritable": "The task's metadata could not be written.",
+			"task_not_found": "Task not found.",
+			"not_stacked": "This task is not stacked.",
+			"running": "An agent is running on this task: try again once it stops.",
+			"dirty": "The task's worktree has uncommitted changes: commit or discard them first.",
+			"no_recorded_commit": "The parent's commit was not recorded: stack again.",
+			"no_base": "The parent's base branch could not be found.",
+			"conflict": "The rebase stopped on a conflict and was undone. Files in conflict:",
+			"pr_not_retargeted": "The pull request could not be retargeted: change its base on the forge.",
+			"pr_url_unreadable": "The pull request link could not be read: change its base on the forge.",
+			"unknown": "The operation failed."
+		}
 	}
 }

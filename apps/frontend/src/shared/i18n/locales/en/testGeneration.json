@@ -246,5 +246,9 @@
 		"installDone_other": "{{count}} packages added to {{target}}.",
 		"installFailed": "Some packages could not be added.",
 		"runByHand": "Run these yourself:"
+	},
+	"gap": {
+		"priority": "{{priority}} priority",
+		"details": "Line: {{line}} | Complexity: {{complexity}} | Tests needed: {{tests}}"
 	}
 }

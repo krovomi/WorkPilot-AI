@@ -6,6 +6,7 @@
  * - Open terminal with installation command
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, promises as fsPromises, readFileSync } from "node:fs";
 import { mkdir, rename, unlink } from "node:fs/promises";
@@ -30,7 +31,7 @@ import { getUsageMonitor } from "../claude-profile/usage-monitor";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import {
 	clearToolCache,
-	configureTools,
+	updateToolConfig,
 	type ExecFileAsyncOptionsWithVerbatim,
 	getClaudeDetectionPaths,
 	getToolInfo,
@@ -38,20 +39,53 @@ import {
 } from "../cli-tool-manager";
 import { isLinux, isMacOS, isWindows } from "../platform";
 import { readSettingsFile, writeSettingsFile } from "../settings-utils";
+import { coalesceInFlight } from "../utils/coalesce-in-flight";
+import {
+	createLatestVersionSource,
+	fetchJsonWithRetry,
+	npmVersionOf,
+} from "../utils/latest-version-source";
 import { isValidConfigDir } from "../utils/config-path-validator";
 import { isSecurePath } from "../utils/windows-paths";
 
 const execFileAsync = promisify(execFile);
 
-// Cache for latest version (avoid hammering npm registry)
+const CLAUDE_CODE_NPM = "https://registry.npmjs.org/@anthropic-ai/claude-code";
 
-let cachedLatestVersion: { version: string; timestamp: number } | null = null;
+// Latest version and version list on the npm registry (avoid hammering it)
+const claudeLatest = createLatestVersionSource({
+	label: "[Claude Code]",
+	what: "the latest version on npm",
+	ttlMs: 24 * 60 * 60 * 1000,
+	load: async () =>
+		npmVersionOf(
+			await fetchJsonWithRetry(`${CLAUDE_CODE_NPM}/latest`, {
+				"User-Agent": "Claude-Code-App/1.0",
+			}),
+		),
+});
 
-let cachedVersionList: { versions: string[]; timestamp: number } | null = null;
-
-const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-const VERSION_LIST_CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour for version list
+// The version picker is opened on purpose: a failure is retried on the next ask.
+const claudeVersionList = createLatestVersionSource({
+	label: "[Claude Code]",
+	what: "the available versions on npm",
+	ttlMs: 60 * 60 * 1000,
+	failureBackoffMs: 0,
+	load: async () => {
+		const data = (await fetchJsonWithRetry(CLAUDE_CODE_NPM, {}, 15000)) as {
+			versions?: Record<string, unknown>;
+		};
+		// Newest first, 20 at most
+		const versions = Object.keys(data?.versions ?? {})
+			.filter((v) => semver.valid(v))
+			.sort((a, b) => semver.rcompare(a, b))
+			.slice(0, 20);
+		if (versions.length === 0) {
+			throw new TypeError("no valid version in the npm registry answer");
+		}
+		return versions;
+	},
+});
 
 /**
 
@@ -442,183 +476,29 @@ async function scanClaudeInstallations(
 }
 
 /**
-
- * Fetch the latest version of Claude Code from npm registry
-
- * @param currentInstalled - Optional currently installed version. If provided and newer than
-
- *                           cached latest, cache will be invalidated and fresh data fetched.
-
- *                           This handles the case where CLI was updated while app was running.
-
+ * Latest Claude Code on npm, or `undefined` when the registry cannot be reached.
+ * An installed version newer than the cached latest means the CLI was updated
+ * while the app ran: the cache is stale, look again.
  */
-
 async function fetchLatestVersion(
 	currentInstalled?: string | null,
-): Promise<string> {
-	// Check cache first
-
-	if (
-		cachedLatestVersion &&
-		Date.now() - cachedLatestVersion.timestamp < CACHE_DURATION_MS
-	) {
-		const cachedVersion = cachedLatestVersion.version;
-
-		// Invalidate cache if installed version is newer than cached latest
-
-		// This handles the case where CLI was updated while app was running
-
-		if (currentInstalled && cachedVersion) {
-			try {
-				const cleanInstalled = currentInstalled.replace(/^v/, "");
-
-				const cleanCached = cachedVersion.replace(/^v/, "");
-
-				if (
-					semver.valid(cleanInstalled) &&
-					semver.valid(cleanCached) &&
-					semver.gt(cleanInstalled, cleanCached)
-				) {
-					console.warn(
-						"[Claude Code] Installed version newer than cached latest, invalidating cache",
-					);
-
-					cachedLatestVersion = null;
-
-					// Fall through to fetch fresh from npm
-				} else {
-					return cachedVersion;
-				}
-			} catch {
-				// If semver comparison fails, return cached version
-
-				return cachedVersion;
-			}
-		} else {
-			return cachedVersion;
+): Promise<string | undefined> {
+	const cached = claudeLatest.peek();
+	if (currentInstalled && cached) {
+		const installed = currentInstalled.replace(/^v/, "");
+		const latest = cached.replace(/^v/, "");
+		if (
+			semver.valid(installed) &&
+			semver.valid(latest) &&
+			semver.gt(installed, latest)
+		) {
+			debugLog(
+				"[Claude Code] Installed version newer than cached latest, invalidating cache",
+			);
+			claudeLatest.invalidate();
 		}
 	}
-
-	try {
-		const response = await fetch(
-			"https://registry.npmjs.org/@anthropic-ai/claude-code/latest",
-			{
-				headers: {
-					Accept: "application/json",
-
-					"User-Agent": "Claude-Code-App/1.0",
-				},
-
-				signal: AbortSignal.timeout(30000), // 30 second timeout for better reliability
-			},
-		);
-
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-		}
-
-		const data = await response.json();
-
-		const version = data.version;
-
-		if (!version || typeof version !== "string") {
-			throw new Error("Invalid version format from npm registry");
-		}
-
-		// Cache the result
-
-		cachedLatestVersion = { version, timestamp: Date.now() };
-
-		return version;
-	} catch (error) {
-		console.error("[Claude Code] Failed to fetch latest version:", error);
-
-		// Return cached version if available, even if expired
-
-		if (cachedLatestVersion) {
-			return cachedLatestVersion.version;
-		}
-
-		throw error;
-	}
-}
-
-/**
-
- * Fetch available versions of Claude Code from npm registry
-
- * Returns versions sorted by semver descending (newest first)
-
- * Limited to last 20 versions for performance
-
- */
-
-async function fetchAvailableVersions(): Promise<string[]> {
-	// Check cache first
-
-	if (
-		cachedVersionList &&
-		Date.now() - cachedVersionList.timestamp < VERSION_LIST_CACHE_DURATION_MS
-	) {
-		return cachedVersionList.versions;
-	}
-
-	try {
-		const response = await fetch(
-			"https://registry.npmjs.org/@anthropic-ai/claude-code",
-			{
-				headers: {
-					Accept: "application/json",
-				},
-
-				signal: AbortSignal.timeout(15000), // 15 second timeout
-			},
-		);
-
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-		}
-
-		const data = await response.json();
-
-		const versions = Object.keys(data.versions || {});
-
-		if (!versions.length) {
-			throw new Error("No versions found in npm registry");
-		}
-
-		// Sort by semver descending (newest first) and take last 20
-
-		const sortedVersions = versions
-
-			.filter((v) => semver.valid(v)) // Only valid semver versions
-
-			.sort((a, b) => semver.rcompare(a, b)) // Sort descending
-
-			.slice(0, 20); // Limit to 20 versions
-
-		// Validate we have versions after filtering
-
-		if (sortedVersions.length === 0) {
-			throw new Error("No valid semver versions found in npm registry");
-		}
-
-		// Cache the result
-
-		cachedVersionList = { versions: sortedVersions, timestamp: Date.now() };
-
-		return sortedVersions;
-	} catch (error) {
-		console.error("[Claude Code] Failed to fetch available versions:", error);
-
-		// Return cached versions if available, even if expired
-
-		if (cachedVersionList) {
-			return cachedVersionList.versions;
-		}
-
-		throw error;
-	}
+	return claudeLatest.get();
 }
 
 /**
@@ -1773,9 +1653,9 @@ export function registerClaudeCodeHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.CLAUDE_CODE_CHECK_VERSION,
 
-		async (): Promise<IPCResult<ClaudeCodeVersionInfo>> => {
+		coalesceInFlight(async (): Promise<IPCResult<ClaudeCodeVersionInfo>> => {
 			try {
-				console.warn("[Claude Code] Checking version...");
+				debugLog("[Claude Code] Checking version...");
 
 				// Get installed version via cli-tool-manager
 
@@ -1785,7 +1665,7 @@ export function registerClaudeCodeHandlers(): void {
 				try {
 					detectionResult = getToolInfo("claude");
 
-					console.warn(
+					debugLog(
 						"[Claude Code] Detection result:",
 						JSON.stringify(detectionResult, null, 2),
 					);
@@ -1894,7 +1774,8 @@ export function registerClaudeCodeHandlers(): void {
 						if (!installed || installed === "unknown") {
 							try {
 								const shellOut = (
-									await execFileAsync("claude", ["--version"], {
+									// No args array with shell:true (DEP0190)
+									await execFileAsync("claude --version", {
 										encoding: "utf-8",
 										timeout: 5000,
 										windowsHide: true,
@@ -1907,7 +1788,7 @@ export function registerClaudeCodeHandlers(): void {
 									if (!detectionResult.found) {
 										detectionResult = { ...detectionResult, found: true };
 									}
-									console.warn("[Claude Code] Version from shell:", installed);
+									debugLog("[Claude Code] Version from shell:", installed);
 								}
 							} catch (e) {
 								console.warn("[Claude Code] shell fallback failed:", e);
@@ -1916,43 +1797,14 @@ export function registerClaudeCodeHandlers(): void {
 					}
 				}
 
-				console.warn("[Claude Code] Installed version:", installed);
+				debugLog("[Claude Code] Installed version:", installed);
 
 				// Fetch latest version from npm
 				// Pass installed version to invalidate cache if installed > cached (handles CLI update while app running)
 
-				let latest: string;
-
-				try {
-					console.warn("[Claude Code] Fetching latest version from npm...");
-
-					latest = await fetchLatestVersion(installed);
-
-					console.warn("[Claude Code] Latest version:", latest);
-				} catch (error) {
-					console.warn(
-						"[Claude Code] Failed to fetch latest version, continuing with unknown:",
-						error,
-					);
-
-					// If we can't fetch latest, still return installed info
-
-					return {
-						success: true,
-
-						data: {
-							installed,
-
-							latest: "unknown",
-
-							isOutdated: false,
-
-							path: detectionResult.path,
-
-							detectionResult,
-						},
-					};
-				}
+				debugLog("[Claude Code] Fetching latest version from npm...");
+				const latest = (await fetchLatestVersion(installed)) ?? "unknown";
+				debugLog("[Claude Code] Latest version:", latest);
 
 				// Compare versions
 
@@ -1974,7 +1826,7 @@ export function registerClaudeCodeHandlers(): void {
 					}
 				}
 
-				console.warn("[Claude Code] Check complete:", {
+				debugLog("[Claude Code] Check complete:", {
 					installed,
 					latest,
 					isOutdated,
@@ -2007,7 +1859,7 @@ export function registerClaudeCodeHandlers(): void {
 					error: `Failed to check Claude Code version: ${errorMsg}`,
 				};
 			}
-		},
+		}),
 	);
 
 	// Silent install/update of Claude Code — runs in background, no terminal.
@@ -2077,7 +1929,7 @@ export function registerClaudeCodeHandlers(): void {
 
 				// Invalidate the latest-version cache so the next check sees
 				// the freshly-installed binary.
-				cachedLatestVersion = null;
+				claudeLatest.invalidate();
 				// Also invalidate the cli-tool-manager cache so getToolInfo
 				// re-detects the freshly-installed claude version.
 				clearToolCache();
@@ -2188,30 +2040,14 @@ export function registerClaudeCodeHandlers(): void {
 		IPC_CHANNELS.CLAUDE_CODE_GET_VERSIONS,
 
 		async (): Promise<IPCResult<{ versions: string[] }>> => {
-			try {
-				const versions = await fetchAvailableVersions();
-
-				return {
-					success: true,
-
-					data: { versions },
-				};
-			} catch (error) {
-				const errorMsg =
-					error instanceof Error ? error.message : "Unknown error";
-
-				console.error(
-					"[Claude Code] Failed to fetch versions:",
-					errorMsg,
-					error,
-				);
-
+			const versions = await claudeVersionList.get();
+			if (!versions) {
 				return {
 					success: false,
-
-					error: `Failed to fetch available versions: ${errorMsg}`,
+					error: `Failed to fetch available versions: ${claudeVersionList.lastFailure() ?? "unknown error"}`,
 				};
 			}
+			return { success: true, data: { versions } };
 		},
 	);
 
@@ -2356,17 +2192,14 @@ export function registerClaudeCodeHandlers(): void {
 
 				const mergedSettings = {
 					...DEFAULT_APP_SETTINGS,
-
 					...currentSettings,
-
 					claudePath: normalizedPath,
 				} as Record<string, unknown>;
 
 				writeSettingsFile(mergedSettings);
 
 				// Update CLI tool manager cache
-
-				configureTools({ claudePath: normalizedPath });
+				updateToolConfig({ claudePath: normalizedPath });
 
 				return {
 					success: true,
@@ -2749,5 +2582,5 @@ export function registerClaudeCodeHandlers(): void {
 		}
 	});
 
-	console.warn("[IPC] Claude Code handlers registered");
+	debugLog("[IPC] Claude Code handlers registered");
 }

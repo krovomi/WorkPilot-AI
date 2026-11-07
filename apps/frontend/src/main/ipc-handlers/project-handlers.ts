@@ -1,3 +1,4 @@
+import { debugLog } from "../../shared/utils/debug-logger";
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, renameSync } from "node:fs";
 import * as path from "node:path";
@@ -24,6 +25,7 @@ import { changelogService } from "../changelog-service";
 import { getToolPath } from "../cli-tool-manager";
 import { insightsService } from "../insights-service";
 import { migrateProjectEnvSecrets } from "../project-env-file";
+import { listServerProjects } from "../server-projects";
 import {
 	checkGitStatusAsync,
 	ensureProjectEnvFilesIgnored,
@@ -678,7 +680,7 @@ const configureServicesWithPython = (
 	autoBuildPath: string,
 	agentManager: AgentManager,
 ): void => {
-	console.warn("[IPC] Configuring services with Python:", pythonPath);
+	debugLog("[IPC] Configuring services with Python:", pythonPath);
 	agentManager.configure(pythonPath, autoBuildPath);
 	appEmulatorService.configure(pythonPath, autoBuildPath);
 	changelogService.configure(pythonPath, autoBuildPath);
@@ -711,7 +713,7 @@ const initializePythonEnvironment = async (
 		};
 	}
 
-	console.warn("[IPC] Initializing Python environment...");
+	debugLog("[IPC] Initializing Python environment...");
 	const status = await pythonEnvManager.initialize(autoBuildSource);
 
 	if (status.ready && status.pythonPath) {
@@ -823,8 +825,12 @@ export function registerProjectHandlers(
 				);
 			}
 
-			const projects = projectStore.getProjects();
-			console.warn("[IPC] PROJECT_LIST returning", projects.length, "projects");
+			// Server mode: the server's projects come after this computer's.
+			const projects = [
+				...projectStore.getProjects(),
+				...(await listServerProjects()),
+			];
+			debugLog("[IPC] PROJECT_LIST returning", projects.length, "projects");
 			return { success: true, data: projects };
 		},
 	);
@@ -1058,7 +1064,7 @@ export function registerProjectHandlers(
 
 	// Initialize Python environment on startup (non-blocking)
 	initializePythonEnvironment(pythonEnvManager, agentManager).then((status) => {
-		console.warn("[IPC] Python environment initialized:", status);
+		debugLog("[IPC] Python environment initialized:", status);
 	});
 
 	// IPC handler to get Python environment status

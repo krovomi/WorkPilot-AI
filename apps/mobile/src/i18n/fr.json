@@ -1,0 +1,564 @@
+{
+	"common": {
+		"cancel": "Annuler",
+		"retry": "Réessayer",
+		"loading": "Chargement…",
+		"back": "Retour"
+	},
+	"errors": {
+		"network": "Le serveur est injoignable. Vérifiez votre connexion.",
+		"timeout": "Le serveur a mis trop de temps à répondre.",
+		"signed_out": "Votre session a pris fin. Reconnectez-vous.",
+		"too_many": "Trop de tentatives. Attendez une minute, puis réessayez.",
+		"forbidden": "Vous n'avez pas les droits pour cette action.",
+		"generic": "Une erreur est survenue : {{message}}",
+		"card_not_indexed": "Le serveur n'a pas encore indexé cette carte. Tirez pour actualiser.",
+		"feedback_required": "Dites ce qu'il faut changer.",
+		"nothing_to_stop": "Plus rien ne tournait sur cette carte. Tire pour actualiser.",
+		"entra_disabled": "Ce serveur ne propose pas la connexion Microsoft.",
+		"entra_failed": "La connexion Microsoft n'a pas abouti.",
+		"entra_misconfigured": "Les réglages de connexion Microsoft du serveur sont invalides."
+	},
+	"signIn": {
+		"title": "WorkPilot AI",
+		"subtitle": "Connectez-vous au serveur WorkPilot de votre équipe.",
+		"server": "Adresse du serveur",
+		"serverPlaceholder": "workpilot.exemple.fr",
+		"email": "E-mail",
+		"password": "Mot de passe",
+		"submit": "Se connecter",
+		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
+		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
+		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
+		"failed": "Connexion impossible : {{message}}",
+		"badCredentials": "E-mail ou mot de passe incorrect.",
+		"or": "ou",
+		"microsoft": "Se connecter avec Microsoft",
+		"entraDisabled": "Ce serveur ne propose pas la connexion Microsoft.",
+		"entraRefused": "Le serveur a refusé ce compte Microsoft."
+	},
+	"unreachable": {
+		"title": "Serveur injoignable",
+		"body": "Votre session est conservée. Vérifiez votre connexion puis réessayez.",
+		"signOut": "Se déconnecter"
+	},
+	"projects": {
+		"title": "Projets",
+		"empty": "Aucun projet pour l'instant. Ajoutez-en un depuis l'app de bureau.",
+		"role": "Rôle : {{role}}",
+		"settings": "Réglages"
+	},
+	"board": {
+		"live": "En direct",
+		"offline": "Actualisé toutes les quelques secondes",
+		"newCard": "Nouvelle carte",
+		"emptyColumn": "Aucune carte ici.",
+		"subtasks": "{{completed}}/{{total}} sous-tâches",
+		"claimedBy": "Réservée par {{name}}"
+	},
+	"columns": {
+		"backlog": "Planification",
+		"queue": "File d'attente",
+		"in_progress": "En cours",
+		"ai_review": "Révision IA",
+		"human_review": "Révision humaine",
+		"build_failed": "Build rouge",
+		"pr_created": "PR créée",
+		"done": "Terminé",
+		"error": "Erreur"
+	},
+	"kinds": {
+		"none": "Non précisé",
+		"feature": "Fonctionnalité",
+		"bug_fix": "Correctif",
+		"refactoring": "Refactorisation",
+		"investigation": "Investigation",
+		"docs": "Documentation",
+		"test": "Test"
+	},
+	"newCard": {
+		"title": "Nouvelle carte",
+		"cardTitle": "Titre",
+		"description": "Description",
+		"descriptionPlaceholder": "Que doivent construire les agents ?",
+		"kind": "Type",
+		"requireReview": "Relire la spec avant le code",
+		"requireReviewHint": "Le build attend qu'une personne approuve la spec et le plan.",
+		"create": "Créer",
+		"dictationHint": "Astuce : le micro du clavier dicte la description.",
+		"fromShare": "Rempli avec ce qu'une autre app a partagé. Relisez-le avant de créer la carte.",
+		"default": "Par défaut",
+		"provider": "Moteur",
+		"model": "Modèle",
+		"modelPlaceholder": "Modèle par défaut du fournisseur",
+		"modelInvalid": "Un identifiant de modèle ne contient que des lettres, des chiffres et . _ : / @ + -, sans espace.",
+		"effort": "Effort",
+		"effort_none": "aucun",
+		"effort_low": "faible",
+		"effort_medium": "moyen",
+		"effort_high": "élevé",
+		"effort_ultrathink": "ultrathink",
+		"priority": "Priorité",
+		"images": "Images ({{count}}/{{max}})",
+		"fromLibrary": "Photothèque",
+		"fromCamera": "Appareil photo",
+		"removeImage": "Retirer {{name}}",
+		"cameraDenied": "L'appareil photo n'est pas autorisé pour WorkPilot AI. Autorisez-le dans les réglages du système.",
+		"imageRefused_tooMany": "{{name}} non ajoutée : une carte prend au plus {{max}} images.",
+		"imageRefused_tooLarge": "{{name}} non ajoutée : elle dépasse {{mb}} Mo.",
+		"imageRefused_unsupported": "{{name}} non ajoutée : seules les images PNG, JPEG, GIF et WebP sont acceptées.",
+		"imageRefused_unreadable": "{{name}} non ajoutée : elle n'a pas pu être lue."
+	},
+	"card": {
+		"description": "Description",
+		"spec": "Spec",
+		"noSpec": "Pas encore de spec. Démarrez la carte pour l'écrire.",
+		"approval": "Approbation",
+		"approvedBy": "Approuvée par {{name}}",
+		"notApproved": "Pas encore approuvée",
+		"runs": "Runs",
+		"noRuns": "Aucun run pour l'instant.",
+		"changes": "Changements",
+		"noChanges": "Pas encore d'espace de build.",
+		"changesSummary": "{{files}} fichiers · +{{additions}} −{{deletions}} · {{commits}} commits",
+		"showSpec": "Afficher toute la spec",
+		"hideSpec": "Masquer la spec",
+		"feedbackTitle": "Demander des changements",
+		"feedbackPlaceholder": "Que doivent changer les agents ?",
+		"send": "Envoyer",
+		"deleteConfirmTitle": "Supprimer cette carte ?",
+		"deleteConfirmBody": "La carte et sa spec disparaissent pour toute l'équipe.",
+		"done": "Terminé",
+		"edit": "Modifier",
+		"editTitle": "Modifier la carte",
+		"save": "Enregistrer",
+		"fileToggle": "Afficher ou masquer les modifications de {{path}}",
+		"noPatch": "Aucune différence à afficher pour ce fichier (binaire ou trop volumineux).",
+		"patchTruncated": "La différence s'arrête ici ; la suite se lit sur le bureau.",
+		"qaReport": "Rapport QA",
+		"showReport": "Afficher tout le rapport",
+		"hideReport": "Masquer le rapport",
+		"changesSummaryFiles": "{{files}} fichiers · +{{additions}} −{{deletions}}",
+		"settings": "Tourne avec",
+		"engine": "Moteur : {{engine}}",
+		"engineAuto": "auto",
+		"priority": "Priorité : {{priority}}",
+		"priority_low": "basse",
+		"priority_medium": "moyenne",
+		"priority_high": "haute",
+		"priority_urgent": "urgente",
+		"goal": "Terminé quand ceci passe :",
+		"goalError": "L'objectif est illisible : {{error}}",
+		"logs": "Journal du build",
+		"noLogs": "Pas encore de journal.",
+		"logsEmptyPhase": "Rien d'écrit dans cette phase pour l'instant.",
+		"logsEarlier": "{{count}} lignes plus anciennes masquées",
+		"logsTruncated": "Le serveur n'a envoyé que les dernières lignes.",
+		"logPhase_planning": "Planification",
+		"logPhase_coding": "Code",
+		"logPhase_validation": "Validation",
+		"logStatus_pending": "en attente",
+		"logStatus_active": "en cours",
+		"logStatus_completed": "terminé",
+		"logStatus_failed": "échec",
+		"logPhaseToggle": "Afficher le journal de {{phase}}",
+		"steeringTitle": "Guider l'agent",
+		"steeringLabel": "Message pour la prochaine session",
+		"steeringSend": "Envoyer",
+		"steeringQueued": "En attente de la prochaine session",
+		"steeringDelivered": "Remis à la session {{session}} ({{date}})"
+	},
+	"actions": {
+		"start": "Démarrer",
+		"approve": "Approuver la spec",
+		"stop": "Arrêter",
+		"requestChanges": "Demander des changements",
+		"merge": "Fusionner",
+		"createPr": "Créer la PR",
+		"retry": "Relancer le build",
+		"delete": "Supprimer"
+	},
+	"runStatus": {
+		"queued": "En file",
+		"running": "En cours",
+		"succeeded": "Réussi",
+		"failed": "Échoué",
+		"cancelled": "Annulé"
+	},
+	"settings": {
+		"title": "Réglages",
+		"account": "Compte",
+		"server": "Serveur",
+		"organization": "Organisation",
+		"signOut": "Se déconnecter",
+		"version": "Version {{version}}"
+	},
+	"theme": {
+		"title": "Apparence",
+		"hint": "Suit votre compte sur chaque appareil où vous vous connectez.",
+		"mode": "Mode",
+		"system": "Système",
+		"light": "Clair",
+		"dark": "Sombre",
+		"colorTheme": "Thème de couleur",
+		"colors": {
+			"default": "Par défaut",
+			"dusk": "Dusk",
+			"lime": "Lime",
+			"ocean": "Ocean",
+			"retro": "Retro",
+			"neo": "Neo",
+			"forest": "Forest"
+		}
+	},
+	"runPhase": {
+		"spec": "Spec",
+		"build": "Build",
+		"qa": "QA",
+		"merge": "Fusion",
+		"pr": "Pull request",
+		"ideation": "Idées",
+		"github-review": "Revue GitHub",
+		"gitlab-review": "Revue GitLab"
+	},
+	"features": {
+		"insights": "Insights",
+		"roadmap": "Roadmap",
+		"ideas": "Idées",
+		"generate": "Générer",
+		"regenerate": "Générer à nouveau",
+		"jobRunning": "Un agent y travaille…",
+		"jobFailed": "La dernière exécution a échoué. {{error}}",
+		"toCard": "En faire une carte",
+		"openCard": "Ouvrir sa carte",
+		"context": "Contexte"
+	},
+	"roadmap": {
+		"empty": "Pas encore de roadmap. Générez-en une : un agent étudie le projet et propose des phases et des fonctionnalités.",
+		"vision": "Vision",
+		"otherPhase": "Autres fonctionnalités",
+		"priority": {
+			"must": "Indispensable",
+			"should": "Important",
+			"could": "Souhaitable",
+			"wont": "Écarté"
+		},
+		"status": {
+			"idea": "Idée",
+			"planned": "Planifiée",
+			"in_progress": "En cours",
+			"done": "Terminée",
+			"under_review": "En revue"
+		}
+	},
+	"ideas": {
+		"empty": "Pas encore d'idées. Générez-en : des agents cherchent des améliorations, des failles de sécurité et de performance, des manques de documentation.",
+		"types": {
+			"code_improvements": "Améliorations du code",
+			"ui_ux_improvements": "UI et UX",
+			"documentation_gaps": "Documentation",
+			"security_hardening": "Sécurité",
+			"performance_optimizations": "Performance",
+			"code_quality": "Qualité du code"
+		}
+	},
+	"insights": {
+		"intro": "Posez des questions à un agent sur le code du projet. Toute l'équipe du projet lit les conversations ; seul leur auteur les poursuit.",
+		"new": "Nouvelle conversation",
+		"empty": "Pas encore de conversation.",
+		"meta": "{{owner}} · {{count}} messages · {{date}}",
+		"you": "Vous",
+		"askFirst": "Posez votre première question ci-dessous.",
+		"answering": "L'agent rédige sa réponse…",
+		"question": "Votre question",
+		"delete": "Supprimer la conversation",
+		"deleteTitle": "Supprimer cette conversation ?",
+		"deleteBody": "Elle disparaît pour tout le projet.",
+		"suggested": "Tâche suggérée : {{title}}"
+	},
+	"forge": {
+		"github": "GitHub",
+		"gitlab": "GitLab",
+		"none": "Le dépôt de ce projet n'est pas sur une forge que le serveur sert.",
+		"issues": "Issues",
+		"pulls_github": "Pull requests",
+		"pulls_gitlab": "Merge requests",
+		"noIssues": "Aucune issue ouverte.",
+		"noPulls": "Rien d'ouvert.",
+		"noDescription": "Pas de description.",
+		"comments": "Commentaires ({{count}})",
+		"newComment": "Votre commentaire",
+		"comment": "Commenter",
+		"aiReview": "Revue IA",
+		"noReview": "Pas encore revue.",
+		"runReview": "Lancer la revue IA",
+		"followupReview": "Revoir ce qui a changé depuis",
+		"checks": "Vérifications : {{passed}} réussies, {{failed}} en échec, {{pending}} en attente",
+		"mergeTitle": "Fusionner #{{number}} ?",
+		"mergeBody": "Elle est fusionnée dans {{base}} avec votre jeton.",
+		"state": {
+			"open": "Ouverte",
+			"opened": "Ouverte",
+			"closed": "Fermée",
+			"merged": "Fusionnée",
+			"locked": "Verrouillée"
+		},
+		"verdict": {
+			"ready_to_merge": "Prête à fusionner",
+			"merge_with_changes": "Fusionnable après de petits changements",
+			"needs_revision": "À reprendre",
+			"blocked": "Bloquée"
+		}
+	},
+	"dashboard": {
+		"title": "Tableau de bord",
+		"sessions": "Sessions",
+		"analyses": "Analyses",
+		"cards": "Cartes",
+		"noCards": "Pas encore de carte.",
+		"status": {
+			"pending": "À faire",
+			"in_progress": "En cours",
+			"ai_review": "Revue IA",
+			"human_review": "Revue humaine",
+			"completed": "Terminées",
+			"error": "Erreur"
+		},
+		"quality": "Qualité",
+		"qaFirstPass": "QA réussie du premier coup",
+		"qaScore": "Score QA moyen",
+		"mergesAuto": "Fusionnées automatiquement",
+		"mergesManual": "Fusionnées à la main",
+		"costs": "Dépenses, {{days}} derniers jours",
+		"total": "Total",
+		"dailyAvg": "Par jour",
+		"trend": "Par rapport à la période d'avant",
+		"tokens": "Tokens",
+		"allTime": "Depuis le début",
+		"noSessions": "Pas encore de session."
+	},
+	"analyses": {
+		"intro": "Chaque analyse tourne sur le serveur, sur le code du projet ; toute l'équipe du projet lit son dernier rapport.",
+		"none": "Jamais lancée sur ce projet.",
+		"lastRun": "Dernière exécution : {{date}}",
+		"summary": "Résumé",
+		"more": "Et {{count}} de plus sur le bureau.",
+		"unknown": "Analyse inconnue.",
+		"kinds": {
+			"accessibility": {
+				"title": "Accessibilité",
+				"body": "Problèmes WCAG dans le code de l'interface."
+			},
+			"i18n": {
+				"title": "Traductions",
+				"body": "Clés de traduction manquantes ou inutilisées, texte en dur."
+			},
+			"doc-drift": {
+				"title": "Dérive de la documentation",
+				"body": "La doc qui ne dit plus ce que fait le code."
+			},
+			"flaky-tests": {
+				"title": "Tests instables",
+				"body": "Les tests qui passent puis échouent sans changement."
+			},
+			"tech-debt": {
+				"title": "Dette technique",
+				"body": "La dette trouvée dans le code, par coût."
+			}
+		}
+	},
+	"context": {
+		"index": "Index",
+		"memories": "Mémoires",
+		"noIndex": "Le projet n'est pas encore indexé. Générez l'index pour voir ses services, son infrastructure et ses conventions.",
+		"projectType": "Projet : {{type}}",
+		"type": {
+			"single": "service unique",
+			"monorepo": "monorepo"
+		},
+		"services_one": "{{count}} service",
+		"services_other": "{{count}} services",
+		"port": "port {{port}}",
+		"infrastructure": "Infrastructure",
+		"conventions": "Conventions",
+		"infrastructureKeys": {
+			"docker_compose": "Docker Compose",
+			"docker_services": "Services Compose",
+			"dockerfile": "Dockerfile",
+			"dockerfiles": "Dockerfiles",
+			"ci": "CI",
+			"ci_workflows": "Workflows CI",
+			"deployment": "Déploiement"
+		},
+		"conventionsKeys": {
+			"python_linting": "Lint Python",
+			"python_formatting": "Formatage Python",
+			"js_linting": "Lint JS",
+			"formatting": "Formatage",
+			"typescript": "TypeScript",
+			"git_hooks": "Hooks Git"
+		},
+		"search": "Chercher dans les mémoires",
+		"noBrain": "Pas encore de mémoires : le premier build du projet qui apprend quelque chose les crée.",
+		"noMemories": "Pas encore de mémoires.",
+		"noMatch": "Aucune mémoire ne correspond à cette recherche.",
+		"memoryType": {
+			"gotcha": "Piège",
+			"pattern": "Modèle",
+			"codebase_discovery": "Découverte",
+			"task_outcome": "Résultat",
+			"session_insight": "Session"
+		}
+	},
+	"tokens": {
+		"title": "Mes jetons sur le serveur",
+		"summary": "Vos jetons GitHub, GitLab, Azure DevOps, Jira et Linear, utilisés pour vos propres appels.",
+		"manage": "Gérer mes jetons",
+		"intro": "Le serveur garde ces jetons chiffrés et s'en sert pour vos propres appels aux forges et aux outils de suivi. Une fois enregistré, un jeton n'est plus jamais affiché, ni sur le téléphone ni ailleurs.",
+		"kinds": {
+			"github_token": "GitHub",
+			"gitlab_token": "GitLab",
+			"azure_pat": "Azure DevOps",
+			"jira_token": "Jira",
+			"linear_api_key": "Linear"
+		},
+		"set": "Enregistré",
+		"notSet": "Absent",
+		"add": "Ajouter",
+		"replace": "Remplacer",
+		"remove": "Retirer",
+		"save": "Enregistrer",
+		"value": "Jeton {{name}}",
+		"removeTitle": "Retirer le jeton {{name}} ?",
+		"removeBody": "Le serveur l'oublie ; les appels qui en ont besoin s'arrêtent jusqu'à ce que vous en ajoutiez un."
+	},
+	"admin": {
+		"title": "Administration",
+		"summary": "Membres, invitations, groupes et rôles de cette organisation.",
+		"open": "Ouvrir l'administration",
+		"of": "Organisation : {{org}}",
+		"remove": "Retirer",
+		"projectRole": {
+			"owner": "Propriétaire",
+			"member": "Membre",
+			"viewer": "Lecteur"
+		},
+		"members": {
+			"title": "Membres",
+			"summary": "Qui fait partie de l'organisation, et avec quel rôle.",
+			"you": "(vous)",
+			"inactive": "désactivé",
+			"remove": "Retirer de l'organisation",
+			"removeTitle": "Retirer {{name}} ?",
+			"removeBody": "Cette personne perd l'accès aux projets de l'organisation. Son compte reste sur le serveur."
+		},
+		"invitations": {
+			"title": "Invitations",
+			"summary": "Inviter quelqu'un par e-mail, et les invitations en attente.",
+			"new": "Inviter quelqu'un",
+			"email": "E-mail",
+			"send": "Inviter",
+			"sent": "Invitation envoyée par e-mail à {{email}}.",
+			"notSent": "Aucun e-mail n'est parti vers {{email}} : partagez-lui ce lien. Il n'est affiché qu'une fois.",
+			"share": "Partager le lien",
+			"pending_one": "{{count}} invitation en attente",
+			"pending_other": "{{count}} invitations en attente",
+			"expires": "expire le {{date}}",
+			"revoke": "Révoquer",
+			"revokeTitle": "Révoquer l'invitation de {{email}} ?",
+			"revokeBody": "Son lien cesse de fonctionner.",
+			"roles": {
+				"member": {
+					"label": "Membre",
+					"detail": "Rejoint cette organisation comme contributeur."
+				},
+				"viewer": {
+					"label": "Lecteur",
+					"detail": "Rejoint cette organisation en lecture seule."
+				},
+				"admin": {
+					"label": "Administrateur du serveur",
+					"detail": "Administre cette organisation et tout le serveur, toutes organisations comprises."
+				}
+			}
+		},
+		"groups": {
+			"title": "Groupes",
+			"summary": "Des groupes de membres, les projets qu'ils atteignent et le rôle qu'ils donnent.",
+			"new": "Nouveau groupe",
+			"name": "Nom",
+			"create": "Créer le groupe",
+			"none": "Aucun groupe pour l'instant.",
+			"gone": "Ce groupe n'existe plus.",
+			"memberCount_one": "{{count}} membre",
+			"memberCount_other": "{{count}} membres",
+			"projectCount_one": "{{count}} projet",
+			"projectCount_other": "{{count}} projets",
+			"orgRole": "Rôle dans l'organisation",
+			"noRole": "Aucun rôle donné par le groupe",
+			"addMember": "Ajouter un membre",
+			"addProject": "Donner accès à un projet",
+			"delete": "Supprimer le groupe",
+			"deleteTitle": "Supprimer le groupe {{name}} ?",
+			"deleteBody": "Ses membres gardent leurs propres accès ; ce que le groupe leur donnait disparaît."
+		},
+		"roles": {
+			"title": "Rôles",
+			"summary": "Les rôles et les permissions que chacun accorde.",
+			"new": "Nouveau rôle",
+			"name": "Nom",
+			"description": "Description",
+			"slug": "Identifiant : {{slug}}",
+			"create": "Créer le rôle",
+			"save": "Enregistrer",
+			"delete": "Supprimer le rôle",
+			"deleteTitle": "Supprimer le rôle {{name}} ?",
+			"deleteBody": "Le serveur refuse tant que quelqu'un l'a encore.",
+			"gone": "Ce rôle n'existe plus.",
+			"builtIn": "intégré",
+			"custom": "personnalisé",
+			"readOnly": "Un rôle intégré ne se modifie pas.",
+			"privileged": "sensible",
+			"permissionCount_one": "{{count}} permission",
+			"permissionCount_other": "{{count}} permissions",
+			"scope": {
+				"org": "Organisation",
+				"project": "Projet"
+			}
+		}
+	},
+	"share": {
+		"title": "Partager vers une carte",
+		"pickProject": "Créer une carte dans quel projet ?",
+		"nothing": "Rien pour faire une carte : partagez un texte ou un lien.",
+		"back": "Retour aux projets"
+	},
+	"lock": {
+		"title": "WorkPilot AI est verrouillé",
+		"unlock": "Déverrouiller",
+		"failed": "Non reconnu. Réessayez.",
+		"prompt": "Déverrouiller WorkPilot AI",
+		"actionPrompt": "Confirmez que c'est vous",
+		"approvePrompt": "Confirmez que c'est vous pour valider le plan",
+		"section": "Verrouillage",
+		"atLaunch": "Demander à l'ouverture de l'app",
+		"atLaunchHint": "Face ID, Touch ID ou empreinte, avec votre code en secours. Redemandé après une minute en arrière-plan.",
+		"sensitive": "Demander avant de fusionner, de créer une pull request, de supprimer une carte ou de valider depuis une notification",
+		"unavailable": "Définissez un code ou la biométrie sur ce téléphone pour utiliser le verrouillage."
+	},
+	"push": {
+		"approve": "Valider et construire",
+		"view": "Voir",
+		"approveFailed": "Le plan n'a pas été validé"
+	},
+	"orgRole": {
+		"owner": "Propriétaire",
+		"admin": "Administrateur",
+		"maintainer": "Mainteneur",
+		"contributor": "Contributeur",
+		"reviewer": "Relecteur",
+		"operator": "Opérateur",
+		"analyst": "Analyste",
+		"viewer": "Lecteur"
+	}
+}

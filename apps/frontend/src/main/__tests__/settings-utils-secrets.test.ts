@@ -34,6 +34,7 @@ vi.mock("electron", async () => {
 });
 
 const fake = sharedFakeSafeStorage();
+const NOW = new Date("2026-10-30T12:00:00.000Z");
 const isWindows = process.platform === "win32";
 
 type SettingsUtils = typeof import("../settings-utils");
@@ -65,6 +66,7 @@ describe("settings.json secrets", () => {
 	afterEach(() => {
 		rmSync(paths.userData, { recursive: true, force: true });
 		vi.restoreAllMocks();
+		vi.useRealTimers();
 	});
 
 	it("names the secret keys, including the ones only the provider grid uses", async () => {
@@ -95,6 +97,7 @@ describe("settings.json secrets", () => {
 	});
 
 	it("writes secret keys encrypted and everything else as is", async () => {
+		vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
 		const { writeSettingsFile } = await load();
 
 		writeSettingsFile({
@@ -111,6 +114,10 @@ describe("settings.json secrets", () => {
 			globalOllamaApiUrl: "http://localhost:11434",
 			globalOpenAIApiKey: fakeEncrypted("sk-proj-secret"),
 			globalClaudeOAuthToken: fakeEncrypted("sk-ant-oat01-secret"),
+			credentialsSetAt: {
+				globalOpenAIApiKey: NOW.toISOString(),
+				globalClaudeOAuthToken: NOW.toISOString(),
+			},
 		});
 	});
 
@@ -124,16 +131,89 @@ describe("settings.json secrets", () => {
 	});
 
 	it("reads the secrets back decrypted", async () => {
+		vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
 		const utils = await load();
 		utils.writeSettingsFile({ theme: "dark", globalGroqApiKey: "gsk_secret" });
 
-		expect(utils.readSettingsFile()).toEqual({
+		const expected = {
 			theme: "dark",
 			globalGroqApiKey: "gsk_secret",
+			credentialsSetAt: { globalGroqApiKey: NOW.toISOString() },
+		};
+		expect(utils.readSettingsFile()).toEqual(expected);
+		await expect(utils.readSettingsFileAsync()).resolves.toEqual(expected);
+	});
+
+	describe("secret dates (S5)", () => {
+		const LATER = new Date("2027-02-01T09:00:00.000Z");
+
+		it("keeps a key's date while its value is unchanged", async () => {
+			vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+			const utils = await load();
+			utils.writeSettingsFile({ globalOpenAIApiKey: "sk-proj-secret" });
+
+			vi.setSystemTime(LATER);
+			const current = utils.readSettingsFile() ?? {};
+			const dates = utils.writeSettingsFile({ ...current, theme: "light" });
+
+			expect(dates).toEqual({ globalOpenAIApiKey: NOW.toISOString() });
+			expect(onDisk().credentialsSetAt).toEqual(dates);
 		});
-		await expect(utils.readSettingsFileAsync()).resolves.toEqual({
-			theme: "dark",
-			globalGroqApiKey: "gsk_secret",
+
+		it("dates a changed key on the day it changes", async () => {
+			vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+			const utils = await load();
+			utils.writeSettingsFile({
+				globalOpenAIApiKey: "sk-proj-old",
+				globalGroqApiKey: "gsk_kept",
+			});
+
+			vi.setSystemTime(LATER);
+			const dates = utils.writeSettingsFile({
+				...utils.readSettingsFile(),
+				globalOpenAIApiKey: "sk-proj-new",
+			});
+
+			expect(dates).toEqual({
+				globalOpenAIApiKey: LATER.toISOString(),
+				globalGroqApiKey: NOW.toISOString(),
+			});
+		});
+
+		it("never takes the dates from the caller", async () => {
+			vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+			const utils = await load();
+
+			utils.writeSettingsFile({
+				globalOpenAIApiKey: "sk-proj-secret",
+				credentialsSetAt: { globalOpenAIApiKey: "2020-01-01T00:00:00.000Z" },
+			});
+
+			expect(onDisk().credentialsSetAt).toEqual({
+				globalOpenAIApiKey: NOW.toISOString(),
+			});
+		});
+
+		it("drops the date of an emptied key", async () => {
+			const utils = await load();
+			utils.writeSettingsFile({ globalOpenAIApiKey: "sk-proj-secret" });
+
+			utils.writeSettingsFile({ globalOpenAIApiKey: "" });
+
+			expect(onDisk()).toEqual({ globalOpenAIApiKey: "" });
+		});
+
+		it("leaves a key stored before dating undated, never 'saved today'", async () => {
+			writeFileSync(
+				settingsFile(),
+				JSON.stringify({ globalAnthropicApiKey: "sk-ant-legacy" }),
+			);
+			const utils = await load();
+
+			utils.migrateSettingsSecrets();
+			utils.writeSettingsFile({ ...utils.readSettingsFile(), theme: "dark" });
+
+			expect(onDisk().credentialsSetAt).toBeUndefined();
 		});
 	});
 

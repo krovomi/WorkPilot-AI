@@ -58,13 +58,12 @@
 		"conflictPredictor": "Conflict Predictor",
 		"naturalLanguageGit": "Natural Language Git",
 		"contextAwareSnippets": "Context-Aware Snippets",
-		"voiceControl": "Voice Control",
+		"voiceControl": "Voice Assistant",
 		"appEmulator": "App Emulator",
 		"learningLoop": "Learning Loop",
 		"designToCode": "Design to Code",
 		"visualToCode": "Visual to Code",
 		"mcpMarketplace": "MCP Marketplace",
-		"multiRepoOrchestration": "Multi-Repo",
 		"missionControl": "Mission Control",
 		"phase35Hub": "Advanced Features",
 		"pixelOffice": "Pixel Office",
@@ -79,13 +78,13 @@
 		"repoBench": "Repo bench",
 		"techDebt": "Tech Debt Dashboard",
 		"apiExplorer": "API Studio",
-		"sandbox": "Agent Simulation Sandbox",
+		"sandbox": "Change Preview",
 		"regressionGuardian": "Regression Guardian",
 		"injectionGuard": "Injection Guard",
 		"apiWatcher": "API Contract Watcher",
-		"accessibilityAgent": "Accessibility Agent",
-		"i18nAgent": "i18n Agent",
-		"onboardingAgent": "Onboarding Agent",
+		"accessibilityAgent": "Accessibility Scan",
+		"i18nAgent": "i18n Scan",
+		"onboardingAgent": "Onboarding Pack",
 		"flakyTests": "Flaky Test Detective",
 		"performanceProfiler": "Performance Profiler",
 		"cicdTriggers": "CI/CD Triggers",
@@ -99,8 +98,7 @@
 		"releaseCoordinator": "Release Train Coordinator",
 		"carbonProfiler": "Carbon / Energy Profiler",
 		"consensusArbiter": "Cross-Agent Consensus Arbiter",
-		"notebookAgent": "Notebook Agent",
-		"specRefinement": "Incremental Spec Refinement",
+		"notebookAgent": "Notebook Checks",
 		"agentCoach": "Personal Agent Coach",
 		"agentDebugger": "Agent Debugger",
 		"teamBot": "Team Bot (Slack/Teams)",
@@ -108,7 +106,8 @@
 		"guardrails": "Agent Guardrails",
 		"envSnapshot": "Environment Snapshots",
 		"offlineMode": "Offline Mode",
-		"administration": "Administration"
+		"administration": "Administration",
+		"smartEstimation": "Smart Estimation"
 	},
 	"search": {
 		"placeholder": "Search...",
@@ -210,6 +209,18 @@
 		"notInstalledDescription": "{{name}} is not on your PATH. Install it, sign in once in a terminal, then refresh.",
 		"signInHint": "WorkPilot uses the CLI's own sign-in and never reads its credentials.",
 		"viewDocs": "View {{name}} documentation",
+		"install": {
+			"button": "Install {{name}}",
+			"installing": "Installing, please wait…",
+			"installingShort": "Installing…",
+			"description": "{{name}} is not on your PATH. WorkPilot can download and install it for you using the vendor's official method; then sign in once in a terminal.",
+			"error": {
+				"node_required": "{{name}} cannot be installed here: install Node.js (nodejs.org) first, then try again.",
+				"failed": "Installing {{name}} failed.",
+				"not_on_path": "{{name}} was installed but is still not found. Restart WorkPilot, then refresh.",
+				"busy": "{{name}} is already being installed."
+			}
+		},
 		"acp": {
 			"probing": "Asking the agent what it supports…",
 			"declares": "Declared by the agent (ACP initialize):",
@@ -269,9 +280,44 @@
 		}
 	},
 	"experimental": {
-		"badge": "Experimental",
-		"tooltip": "No design document and no test yet: this view may change or go away.",
-		"hide": "Hide experimental views",
-		"show": "Show experimental views ({{count}})"
+		"badge": "Beta",
+		"tooltip": "Beta: this view has no design document or test yet, so it may change or go away.",
+		"hide": "Hide beta views",
+		"show": "Show beta views ({{count}})",
+		"labelTooltip": "{{label}} (beta)",
+		"bannerTitle": "Beta feature",
+		"bannerBody": "This view has no design document or test yet: how it works may change, or it may go away. Your feedback helps decide whether it stays."
+	},
+	"copilotCli": {
+		"requiresGh": "Requires GitHub CLI (gh)",
+		"installFrom": "Install from",
+		"copilotLabel": "Copilot:",
+		"path": "Path:",
+		"auth": "Auth:",
+		"lastChecked": "Last checked:",
+		"login": "Login",
+		"ghMissing": "gh missing",
+		"authenticated": "Authenticated",
+		"notAuthenticated": "Not authenticated"
+	},
+	"hubs": {
+		"agentHistory": "Agent history",
+		"costs": "Costs and estimation",
+		"mcpTools": "MCP tools",
+		"context": "Project context",
+		"gitImpact": "Git impact",
+		"gitHistory": "Git history",
+		"docs": "Docs and drift",
+		"onboarding": "Onboarding",
+		"debt": "Debt and refactoring",
+		"arena": "Arena",
+		"open": "Open {{name}}",
+		"launchers": {
+			"smart-estimation": "Scores how complex a task is from its description, using this project's build history.",
+			"context-aware-snippets": "Writes a code snippet that follows this project's context and coding style.",
+			"conflict-predictor": "Looks for conflicts between worktrees and branches before you merge them.",
+			"natural-language-git": "Turns a sentence into a git command for this project.",
+			"arena-mode": "Runs one prompt on two models side by side without saying which is which, and lets you vote."
+		}
 	}
 }

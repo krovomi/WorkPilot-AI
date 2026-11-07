@@ -250,7 +250,7 @@ export function McpBuilder() {
 							}`}
 						>
 							<div
-								className="w-5 h-5 rounded shrink-0 flex items-center justify-center text-white text-[10px] font-bold"
+								className="w-5 h-5 rounded shrink-0 flex items-center justify-center text-white text-3xs font-bold"
 								style={{ backgroundColor: project.color }}
 							>
 								{project.name?.charAt(0) || "?"}
@@ -323,7 +323,7 @@ export function McpBuilder() {
 										<Input
 											value={editingProject.name}
 											onChange={(e) => updateProject({ name: e.target.value })}
-											placeholder="My Custom Server"
+											placeholder={t("common:mcpMarketplace.builder.namePlaceholder")}
 											className="h-8 text-sm mt-1"
 										/>
 									</div>
@@ -336,7 +336,7 @@ export function McpBuilder() {
 											onChange={(e) =>
 												updateProject({ description: e.target.value })
 											}
-											placeholder="What does this server do?"
+											placeholder={t("common:mcpMarketplace.builder.descriptionPlaceholder")}
 											className="text-sm mt-1 min-h-[60px]"
 										/>
 									</div>
@@ -415,7 +415,7 @@ export function McpBuilder() {
 													{tool.name ||
 														t("mcpMarketplace.builder.untitledTool")}
 												</span>
-												<Badge variant="secondary" className="text-[9px] px-1">
+												<Badge variant="secondary" className="text-3xs px-1">
 													{tool.action.type === "http_request"
 														? "HTTP"
 														: tool.action.type}
@@ -476,7 +476,7 @@ export function McpBuilder() {
 														description: e.target.value,
 													})
 												}
-												placeholder="Retrieve a list of users"
+												placeholder={t("common:mcpMarketplace.builder.toolDescriptionPlaceholder")}
 												className="h-8 text-sm mt-1"
 											/>
 										</div>
@@ -505,13 +505,13 @@ export function McpBuilder() {
 												<SelectItem value="http_request">
 													<span className="flex items-center gap-1.5">
 														<Globe className="h-3.5 w-3.5" />
-														HTTP Request
+														{t("common:mcpMarketplace.builder.httpRequest")}
 													</span>
 												</SelectItem>
 												<SelectItem value="transform">
 													<span className="flex items-center gap-1.5">
 														<Code className="h-3.5 w-3.5" />
-														Transform
+														{t("common:mcpMarketplace.builder.transform")}
 													</span>
 												</SelectItem>
 											</SelectContent>
@@ -523,7 +523,7 @@ export function McpBuilder() {
 										<div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
 											<h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
 												<Globe className="h-3.5 w-3.5" />
-												HTTP Configuration
+												{t("common:mcpMarketplace.builder.httpConfiguration")}
 											</h4>
 											<div className="flex gap-2">
 												<Select
@@ -625,7 +625,7 @@ export function McpBuilder() {
 										<div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
 											<h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
 												<Code className="h-3.5 w-3.5" />
-												Transform Template
+												{t("common:mcpMarketplace.builder.transformTemplate")}
 											</h4>
 											<Textarea
 												value={editingTool.action.transform?.template || ""}
@@ -637,7 +637,7 @@ export function McpBuilder() {
 														},
 													})
 												}
-												placeholder="Template for transforming input data..."
+												placeholder={t("common:mcpMarketplace.builder.transformPlaceholder")}
 												className="text-xs font-mono min-h-[100px]"
 											/>
 										</div>
@@ -714,7 +714,7 @@ export function McpBuilder() {
 																		description: e.target.value,
 																	})
 																}
-																placeholder="Description"
+																placeholder={t("common:mcpMarketplace.builder.paramDescriptionPlaceholder")}
 																className="h-7 text-xs"
 															/>
 														</div>

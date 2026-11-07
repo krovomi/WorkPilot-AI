@@ -76,7 +76,7 @@ function getItemBranch(item: NavigableItem): string {
 }
 
 const ITEM_ICONS = {
-	terminal: <FolderGit className="h-3 w-3 mr-2 text-amber-500/70 shrink-0" />,
+	terminal: <FolderGit className="h-3 w-3 mr-2 text-warning/70 shrink-0" />,
 	task: <ListTodo className="h-3 w-3 mr-2 text-cyan-500/70 shrink-0" />,
 	other: <GitFork className="h-3 w-3 mr-2 text-purple-500/70 shrink-0" />,
 };
@@ -404,7 +404,7 @@ export function WorktreeSelector({
 				<div className="flex flex-col min-w-0 flex-1">
 					<span className="truncate font-medium">{name}</span>
 					{branchLabel && (
-						<span className="text-[10px] text-muted-foreground truncate">
+						<span className="text-3xs text-muted-foreground truncate">
 							{branchLabel}
 						</span>
 					)}
@@ -439,7 +439,7 @@ export function WorktreeSelector({
 						type="button"
 						className={cn(
 							"flex items-center gap-1 h-6 px-2 rounded text-xs font-medium transition-colors",
-							"hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground",
+							"hover:bg-warning/10 hover:text-warning text-muted-foreground",
 						)}
 						onClick={(e) => e.stopPropagation()}
 					>
@@ -459,7 +459,7 @@ export function WorktreeSelector({
 					{/* Pinned: Create new worktree */}
 					<button
 						type="button"
-						className="flex items-center text-xs px-2 py-1.5 m-1 rounded-sm cursor-pointer text-amber-500 hover:bg-accent/50 w-[calc(100%-0.5rem)] text-left"
+						className="flex items-center text-xs px-2 py-1.5 m-1 rounded-sm cursor-pointer text-warning hover:bg-accent/50 w-[calc(100%-0.5rem)] text-left"
 						onClick={(e) => {
 							e.stopPropagation();
 							setIsOpen(false);
@@ -514,7 +514,7 @@ export function WorktreeSelector({
 									{/* Terminal Worktrees */}
 									{terminalItems.length > 0 && (
 										<>
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.existing")}
 											</div>
 											{terminalItems.map((item, i) =>
@@ -529,7 +529,7 @@ export function WorktreeSelector({
 											{terminalItems.length > 0 && (
 												<div className="border-t border-border my-1" />
 											)}
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.taskWorktrees")}
 											</div>
 											{taskItems.map((item, i) =>
@@ -544,7 +544,7 @@ export function WorktreeSelector({
 											{(terminalItems.length > 0 || taskItems.length > 0) && (
 												<div className="border-t border-border my-1" />
 											)}
-											<div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+											<div className="px-2 py-1 text-3xs font-medium text-muted-foreground uppercase tracking-wider">
 												{t("terminal:worktree.otherWorktrees")}
 											</div>
 											{otherItems.map((item, i) =>

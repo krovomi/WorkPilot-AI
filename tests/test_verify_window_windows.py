@@ -239,7 +239,17 @@ def test_a_wpf_app_is_detected_launched_and_driven(tmp_path):
     for name, text in WPF_PROJECT.items():
         (app / name).write_text(text, encoding="utf-8")
     build = subprocess.run(
-        ["dotnet", "build", str(app / "Orders.csproj"), "-nologo", "-v", "q"],
+        # No compiler or MSBuild server left running after the build: the
+        # runner found VBCSCompiler still up at the end of the job.
+        [
+            "dotnet",
+            "build",
+            str(app / "Orders.csproj"),
+            "-nologo",
+            "-v",
+            "q",
+            "--disable-build-servers",
+        ],
         capture_output=True,
         text=True,
         timeout=600,

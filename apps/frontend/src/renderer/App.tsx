@@ -322,11 +322,6 @@ const NotebookView = lazy(() =>
 		default: m.NotebookView,
 	})),
 );
-const RefinementHistoryView = lazy(() =>
-	import("./components/spec-refinement/RefinementHistoryView").then((m) => ({
-		default: m.RefinementHistoryView,
-	})),
-);
 const CoachReportView = lazy(() =>
 	import("./components/agent-coach/CoachReportView").then((m) => ({
 		default: m.CoachReportView,
@@ -399,18 +394,19 @@ import { CommandPalette } from "./components/CommandPalette";
 import { GitHubSetupModal } from "./components/GitHubSetupModal";
 import { GlobalDownloadIndicator } from "./components/GlobalDownloadIndicator";
 import { FormulaLab } from "./components/formula-lab/FormulaLab";
+import { HubMain } from "./components/sidebar/HubMain";
 import { KeyboardShortcutsOverlay } from "./components/KeyboardShortcutsOverlay";
 import { ActivityCentre } from "./components/ActivityCentre";
 import { NavigationConfirmDialog } from "./components/NavigationConfirmDialog";
 import { NoProjectPage } from "./components/NoProjectPage";
 import { OnboardingWizard } from "./components/onboarding";
+import { shouldOpenOnboardingWizard } from "./components/onboarding/first-run";
 import { ProjectTabBar } from "./components/ProjectTabBar";
 import { ProviderContextProvider } from "./components/ProviderContext";
 import { PageLlmSelector } from "./components/PageLlmSelector";
 import { RateLimitModal } from "./components/RateLimitModal";
 import { SDKRateLimitModal } from "./components/SDKRateLimitModal";
 import { VersionWarningModal } from "./components/VersionWarningModal";
-import { VoiceControlDialog } from "./components/voice-control";
 import { ViewStateProvider } from "./contexts/ViewStateContext";
 import { useGlobalTerminalListeners } from "./hooks/useGlobalTerminalListeners";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -516,6 +512,9 @@ export function App() {
 	const isLoginScreenOpen = useServerSessionStore(
 		(state) => state.isLoginScreenOpen,
 	);
+	const serverSessionResolved = useServerSessionStore(
+		(state) => state.sessionResolved,
+	);
 	useEffect(() => {
 		void initServerSession();
 	}, [initServerSession]);
@@ -572,11 +571,6 @@ export function App() {
 	const claudeProfiles = useClaudeProfileStore((state) => state.profiles);
 
 	// Initialize dialog state
-	const [_showInitDialog, setShowInitDialog] = useState(false);
-	const [_pendingProject, setPendingProject] = useState<Project | null>(null);
-	const [isInitializing, _setIsInitializing] = useState(false);
-	const [initSuccess, setInitSuccess] = useState(false);
-	const [_initError, setInitError] = useState<string | null>(null);
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 
 	// GitHub setup state (shown after WorkPilot AI init)
@@ -611,6 +605,17 @@ export function App() {
 	const [settingsProjectId, setSettingsProjectId] = useState<string | null>(
 		null,
 	);
+	// The gear on a project tab opens *that project's* settings — the "Projet"
+	// pane of the settings dialog, scoped to the tab's own project — not the
+	// global WorkPilot preferences the sidebar gear opens. It is also where a
+	// project that has no `.workpilot/` yet is initialized (with the git
+	// repairs that may need), so adding such a project lands there.
+	const openProjectSettings = useCallback((projectId: string) => {
+		setSettingsProjectId(projectId);
+		setSettingsInitialSection(undefined);
+		setSettingsInitialProjectSection("general");
+		setIsSettingsDialogOpen(true);
+	}, []);
 	const [activeView, setActiveView] = useState<SidebarView>("kanban");
 	const [hasRestoredView, setHasRestoredView] = useState(false);
 	const isRestoringView = useRef(false);
@@ -985,25 +990,21 @@ export function App() {
 		}
 	}, [settingsLoading, settingsHaveLoaded]);
 
-	// First-run detection - show onboarding wizard if not completed
-	// Only check AFTER settings have been loaded from disk to avoid race condition
+	// First-run detection: see shouldOpenOnboardingWizard for when it opens.
 	useEffect(() => {
-		// Check if either auth method is configured
-		// API profiles: if profiles exist, auth is configured (user has gone through setup)
-		const hasAPIProfileConfigured = profiles.length > 0;
-		const hasOAuthConfigured = claudeProfiles.some((p) => p.oauthToken);
-		const hasAnyAuth = hasAPIProfileConfigured || hasOAuthConfigured;
-
-		// Only show wizard if onboarding not completed AND no auth is configured
-		if (
-			settingsHaveLoaded &&
-			settings.onboardingCompleted === false &&
-			!hasAnyAuth
-		) {
-			setIsOnboardingWizardOpen(true);
-		}
+		const open = shouldOpenOnboardingWizard({
+			settingsHaveLoaded,
+			serverSessionResolved,
+			showServerLogin,
+			onboardingCompleted: settings.onboardingCompleted,
+			apiProfileCount: profiles.length,
+			claudeProfiles,
+		});
+		if (open) setIsOnboardingWizardOpen(true);
 	}, [
 		settingsHaveLoaded,
+		serverSessionResolved,
+		showServerLogin,
 		settings.onboardingCompleted,
 		profiles,
 		claudeProfiles,
@@ -1127,27 +1128,6 @@ export function App() {
 		};
 	}, []);
 
-	// Reset init success flag when a selected project changes
-	// This allows the init dialog to show for new/different projects
-	useEffect(() => {
-		setInitSuccess(false);
-		setInitError(null);
-	}, []);
-
-	// Check if a selected project needs initialization (e.g., .workpilot folder was deleted)
-	useEffect(() => {
-		// Don't show dialog while initialization is in progress
-		if (isInitializing) return;
-
-		// Don't reopen dialog after successful initialization
-		// (project update with autoBuildPath may not have propagated yet)
-		if (initSuccess) return;
-
-		if (selectedProject && !selectedProject.autoBuildPath) {
-			// Project exists but isn't initialized - show init dialog
-		}
-	}, [selectedProject, isInitializing, initSuccess]);
-
 	// Global keyboard shortcut: Cmd/Ctrl+T to add project (when not on terminals view)
 	useEffect(() => {
 		const handleKeyDown = async (e: KeyboardEvent) => {
@@ -1182,10 +1162,7 @@ export function App() {
 						if (project) {
 							openProjectTab(project.id);
 							if (!project.autoBuildPath) {
-								setPendingProject(project);
-								setInitError(null);
-								setInitSuccess(false);
-								setShowInitDialog(true);
+								openProjectSettings(project.id);
 							}
 						}
 					}
@@ -1197,7 +1174,7 @@ export function App() {
 
 		globalThis.addEventListener("keydown", handleKeyDown);
 		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-	}, [activeView, openProjectTab, toast]);
+	}, [activeView, openProjectTab, openProjectSettings, toast]);
 
 	// Load tasks when project changes
 	useEffect(() => {
@@ -1451,15 +1428,11 @@ export function App() {
 
 	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
 		openProjectTab(project.id);
-		// Si le projet a déjà une description et un provider, il est déjà initialisé
-		const alreadyInitialized = !!(
-			project.settings?.description && project.settings?.provider
-		);
-		if (needsInit && !alreadyInitialized) {
-			setPendingProject(project);
-			setInitError(null);
-			setInitSuccess(false);
-			setShowInitDialog(true);
+		// `autoBuildPath` is what the sidebar and the task dialog check: without
+		// it no task can be created. The add-project modal passes
+		// `needsInit: false` for an existing folder, so the flag alone missed it.
+		if (needsInit || !project.autoBuildPath) {
+			openProjectSettings(project.id);
 			return;
 		}
 		try {
@@ -1500,15 +1473,7 @@ export function App() {
 		renameProject(projectId, name);
 	};
 
-	// The gear on a project tab opens *that project's* settings — the "Projet"
-	// pane of the settings dialog, scoped to the tab's own project — not the
-	// global WorkPilot preferences the sidebar gear opens.
-	const handleProjectTabSettingsClick = (projectId: string) => {
-		setSettingsProjectId(projectId);
-		setSettingsInitialSection(undefined);
-		setSettingsInitialProjectSection("general");
-		setIsSettingsDialogOpen(true);
-	};
+	const handleProjectTabSettingsClick = openProjectSettings;
 
 	// Handle confirm remove project
 	const handleConfirmRemoveProject = () => {
@@ -1677,6 +1642,7 @@ export function App() {
 							{/* Sidebar */}
 							<Sidebar
 								onSettingsClick={() => setIsSettingsDialogOpen(true)}
+								onInitializeProject={openProjectSettings}
 								onNewTaskClick={() => setIsNewTaskDialogOpen(true)}
 								activeView={activeView}
 								onViewChange={handleViewChange}
@@ -1733,8 +1699,7 @@ export function App() {
 										</DragOverlay>
 									</DndContext>
 								}
-								{/* Main content area */}
-								<main className="flex-1 overflow-hidden">
+								<HubMain activeView={activeView} onSelectView={handleViewChange}>
 									<Suspense
 										fallback={
 											<div className="flex items-center justify-center h-full">
@@ -2130,16 +2095,6 @@ export function App() {
 														<NotebookView projectPath={selectedProject?.path} />
 													</div>
 												)}
-												{activeView === "spec-refinement" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<RefinementHistoryView
-															projectPath={selectedProject?.path}
-														/>
-													</div>
-												)}
 												{activeView === "agent-coach" && (
 													<div
 														className="overflow-auto"
@@ -2239,7 +2194,7 @@ export function App() {
 											</div>
 										)}
 									</Suspense>
-								</main>
+								</HubMain>
 							</div>
 						</div>
 
@@ -2335,8 +2290,6 @@ export function App() {
 
 						{/* AI Prompt Optimizer Dialog (Feature 9) */}
 
-						{/* Voice Control Dialog (Feature 23) */}
-						<VoiceControlDialog />
 					</TooltipProvider>
 
 					{/* Onboarding wizard - shown only once at app start */}

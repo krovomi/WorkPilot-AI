@@ -4,8 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { MODEL_ID_MAP } from "../shared/constants";
-import type { AppSettings } from "../shared/types";
-import { readSettingsFile } from "./settings-utils";
+import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 
 /**
@@ -117,7 +116,7 @@ export class ContextMeshService extends EventEmitter {
 		this.emit("status", `Running context mesh: ${request.command}...`);
 
 		const args = this.buildCommandArgs(request, runnerPath);
-		const processEnv = this.buildProcessEnvironment();
+		const processEnv = await this.buildProcessEnvironment();
 
 		await this.executeProcess(args, processEnv, autoBuildSource);
 	}
@@ -150,45 +149,13 @@ export class ContextMeshService extends EventEmitter {
 		return args;
 	}
 
-	private buildProcessEnvironment(): Record<string, string> {
-		const processEnv: Record<string, string> = {
-			...(process.env as Record<string, string>),
-		};
-
-		try {
-			// Through settings-utils: it decrypts the stored keys.
-			const settings = readSettingsFile() as Partial<AppSettings> | undefined;
-			if (settings) {
-				if (settings.globalClaudeOAuthToken) {
-					processEnv.CLAUDE_OAUTH_TOKEN = settings.globalClaudeOAuthToken;
-				}
-				if (settings.globalAnthropicApiKey) {
-					processEnv.ANTHROPIC_API_KEY = settings.globalAnthropicApiKey;
-				}
-				if (settings.globalOpenAIApiKey) {
-					processEnv.OPENAI_API_KEY = settings.globalOpenAIApiKey;
-				}
-				if (settings.globalGoogleApiKey) {
-					processEnv.GOOGLE_API_KEY = settings.globalGoogleApiKey;
-				}
-				if (settings.globalOpenRouterApiKey) {
-					processEnv.OPENROUTER_API_KEY = settings.globalOpenRouterApiKey;
-				}
-				if (settings.globalGroqApiKey) {
-					processEnv.GROQ_API_KEY = settings.globalGroqApiKey;
-				}
-				if (settings.globalMistralApiKey) {
-					processEnv.MISTRAL_API_KEY = settings.globalMistralApiKey;
-				}
-				if (settings.globalDeepSeekApiKey) {
-					processEnv.DEEPSEEK_API_KEY = settings.globalDeepSeekApiKey;
-				}
-			}
-		} catch {
-			// Ignore settings read errors
-		}
-
-		return processEnv;
+	/**
+	 * The runner's environment: the provider the user chose and its key, the
+	 * Claude sign-in only when that provider needs it, and no other credential
+	 * of the app (`pythonRunnerEnv`).
+	 */
+	private buildProcessEnvironment(): Promise<Record<string, string>> {
+		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
 	}
 
 	private async executeProcess(

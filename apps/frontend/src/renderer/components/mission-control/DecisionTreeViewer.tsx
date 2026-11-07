@@ -23,6 +23,7 @@ import type {
 	DecisionTree,
 } from "../../stores/mission-control-store";
 import { ScrollArea } from "../ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface DecisionTreeViewerProps {
 	readonly tree: DecisionTree;
@@ -42,9 +43,9 @@ const NODE_COLORS: Record<string, string> = {
 	root: "text-primary border-primary/30 bg-primary/5",
 	thinking: "text-purple-500 border-purple-500/30 bg-purple-500/5",
 	tool_call: "text-blue-500 border-blue-500/30 bg-blue-500/5",
-	decision: "text-amber-500 border-amber-500/30 bg-amber-500/5",
-	result: "text-green-500 border-green-500/30 bg-green-500/5",
-	error: "text-red-500 border-red-500/30 bg-red-500/5",
+	decision: "text-warning border-warning/30 bg-warning/5",
+	result: "text-success border-success/30 bg-success/5",
+	error: "text-destructive border-destructive/30 bg-destructive/5",
 	branch: "text-cyan-500 border-cyan-500/30 bg-cyan-500/5",
 };
 
@@ -53,16 +54,17 @@ const STATUS_INDICATORS: Record<
 	{ icon: React.ElementType; color: string }
 > = {
 	active: { icon: Circle, color: "text-blue-500 animate-pulse" },
-	completed: { icon: CheckCircle2, color: "text-green-500" },
-	failed: { icon: XCircle, color: "text-red-500" },
+	completed: { icon: CheckCircle2, color: "text-success" },
+	failed: { icon: XCircle, color: "text-destructive" },
 	skipped: { icon: Minus, color: "text-gray-400" },
 };
 
 export function DecisionTreeViewer({ tree }: DecisionTreeViewerProps) {
+	const { t } = useTranslation();
 	if (!tree.root_id || tree.node_count === 0) {
 		return (
 			<div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-				No decisions recorded yet
+				{t("missionControl:noDecisions")}
 			</div>
 		);
 	}
@@ -143,7 +145,7 @@ function TreeNode({ node, allNodes, currentNodeId, depth }: TreeNodeProps) {
 						<span className="font-medium truncate">{node.label}</span>
 						<StatusIcon className={cn("h-3 w-3 shrink-0", statusInfo.color)} />
 						{node.duration_ms > 0 && (
-							<span className="text-[10px] text-muted-foreground shrink-0">
+							<span className="text-3xs text-muted-foreground shrink-0">
 								{node.duration_ms.toFixed(0)}ms
 							</span>
 						)}

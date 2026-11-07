@@ -101,7 +101,7 @@ export const AUTO_BUILD_PATHS = {
 	IDEATION_DIR: ".workpilot/ideation",
 	IMPLEMENTATION_PLAN: "implementation_plan.json",
 	// Cooperative pause flag. Lives beside the spec rather than inside the
-	// plan so it exists during planning too — see core/pause_state.py.
+	// plan so it exists during planning too — see foundation/pause_state.py.
 	PAUSE_STATE: "pause_state.json",
 	SPEC_FILE: "spec.md",
 	QA_REPORT: "qa_report.md",

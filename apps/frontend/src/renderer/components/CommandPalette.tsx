@@ -18,6 +18,7 @@ import {
 	type LucideIcon,
 	// biome-ignore lint/suspicious/noShadowRestrictedNames: shadow name is intentional
 	Map,
+	Mic,
 	PlusCircle,
 	Router,
 	Search,
@@ -34,6 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
+import { openVoiceAssistant } from "../stores/voice-assistant-store";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -156,6 +158,16 @@ function getBuiltinCommands(
 			shortcut: "/",
 			keywords: ["find", "filter", "search"],
 			handler: () => onNavigate("kanban"),
+		},
+		{
+			id: "voice_assistant",
+			label: t("commandPalette.commands.voice_assistant.label"),
+			description: t("commandPalette.commands.voice_assistant.description"),
+			category: "tasks",
+			icon: Mic,
+			shortcut: "Ctrl+Shift+Space",
+			keywords: ["voice", "speech", "dictate", "vocal", "voix", "micro"],
+			handler: openVoiceAssistant,
 		},
 		{
 			id: "go_kanban",
@@ -669,7 +681,7 @@ export function CommandPalette({
 							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
 							spellCheck={false}
 						/>
-						<kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-secondary px-1.5 font-mono text-[10px] text-muted-foreground">
+						<kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-secondary px-1.5 font-mono text-3xs text-muted-foreground">
 							ESC
 						</kbd>
 					</div>
@@ -715,7 +727,7 @@ export function CommandPalette({
 													</span>
 												</div>
 												{cmd.shortcut && (
-													<kbd className="ml-auto hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-secondary px-1.5 font-mono text-[10px] text-muted-foreground">
+													<kbd className="ml-auto hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border bg-secondary px-1.5 font-mono text-3xs text-muted-foreground">
 														{cmd.shortcut}
 													</kbd>
 												)}
@@ -731,19 +743,19 @@ export function CommandPalette({
 					<div className="flex items-center justify-between border-t border-border px-4 py-2 text-xs text-muted-foreground">
 						<div className="flex items-center gap-3">
 							<span className="flex items-center gap-1">
-								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
 									↑↓
 								</kbd>
 								{t("commandPalette.footer.navigate")}
 							</span>
 							<span className="flex items-center gap-1">
-								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
 									↵
 								</kbd>
 								{t("commandPalette.footer.select")}
 							</span>
 							<span className="flex items-center gap-1">
-								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+								<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
 									esc
 								</kbd>
 								{t("commandPalette.footer.close")}

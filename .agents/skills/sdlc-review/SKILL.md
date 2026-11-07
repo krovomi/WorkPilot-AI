@@ -21,7 +21,7 @@ metadata:
     - kanban
   workpilot:
     pack: hermes
-    version: 0.0.1
+    version: 0.1.0
     content_sha256: 66ca6680e7be89739eaba6773072d185b70b504738278a444ff17eddaf0318db
 environments:
 - kanban

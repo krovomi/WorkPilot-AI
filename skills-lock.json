@@ -18,27 +18,27 @@
 			"path": "skills/comms"
 		},
 		"dotnet": {
-			"version": "1.0.0",
+			"version": "1.2.0",
 			"source": "local",
 			"path": "skills/dotnet"
 		},
 		"hermes": {
-			"version": "0.0.1",
+			"version": "0.1.0",
 			"source": "NousResearch/hermes-agent",
 			"path": "skills/hermes",
-			"upstreamTreeSha": "d03065ff8f3593f712ee5813ffdf67f77ea4a870"
+			"upstreamTreeSha": "675b4cea2d2aef80460f07235b0e27e6c6922743"
 		},
 		"impeccable": {
-			"version": "0.0.1",
+			"version": "0.0.3",
 			"source": "pbakaus/impeccable",
 			"path": "skills/impeccable",
-			"upstreamTreeSha": "b26383fff1bdeba764877c5f919e0f4008329f92"
+			"upstreamTreeSha": "7aa1a8a76d895bb43bda70584f83af2ca57ed4c1"
 		},
 		"mattpocock": {
-			"version": "0.0.1",
+			"version": "0.0.3",
 			"source": "mattpocock/skills",
 			"path": "skills/mattpocock",
-			"upstreamTreeSha": "b4ff05745c3973fe0e0a777a354a4470243e75bb"
+			"upstreamTreeSha": "a73b182b5f22565e829e0969eb0bfd284508a7b8"
 		},
 		"mobile": {
 			"version": "1.0.0",
@@ -46,7 +46,7 @@
 			"path": "skills/mobile"
 		},
 		"superpowers": {
-			"version": "0.0.1",
+			"version": "0.0.2",
 			"source": "obra/superpowers",
 			"path": "skills/superpowers",
 			"upstreamTreeSha": "5e3a3c9af45c3474506fb62a3ce664bd03a2cdc4"
@@ -57,20 +57,17 @@
 			"path": "skills/tooling"
 		},
 		"ui-ux-pro-max": {
-			"version": "2.15.0",
+			"version": "2.15.2",
 			"source": "nextlevelbuilder/ui-ux-pro-max-skill",
 			"path": "skills/ui-ux-pro-max",
-			"upstreamTreeSha": "676072da59e3ceee7c5685a2e41cc772c43ae102"
-		},
-		"claude-mem": {
-			"upstreamTreeSha": "67f997b449c7b2e3fe77f41a8107731b4e5a9d9f"
+			"upstreamTreeSha": "606af9408baaaa61d727a3cec386d259e88a1681"
 		}
 	},
 	"skills": {
 		"akka-net-patterns": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/akka-net-patterns/SKILL.md",
 			"contentSha256": "d7dce158a9f448cf2a9d5eae88304374626729699b83670c4c2a00bfb92df5a1",
 			"targets": {
@@ -109,7 +106,7 @@
 		"aspire-orchestration": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/aspire-orchestration/SKILL.md",
 			"contentSha256": "2aea56583ce5834574ea8e6279ca80050d666063fe0662d145d83f389fa4d2e5",
 			"targets": {
@@ -119,7 +116,7 @@
 		"benchmark-dotnet": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/benchmark-dotnet/SKILL.md",
 			"contentSha256": "d1befa51ea86eea0a0522ec779046c5157a50e8559970b65b737c2267bfa8045",
 			"targets": {
@@ -553,15 +550,15 @@
 		"claude-code": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/claude-code/SKILL.md",
-			"contentSha256": "f16fd7fd1f1167ef3a4dc0ef410e80df153973af44bd747feb6a46efd10176de",
+			"contentSha256": "0c8544a225ef392f0ac6024c032cb6eafb5942581dc26dac3df4d32650418fb0",
 			"targets": {}
 		},
 		"codebase-inspection": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/codebase-inspection/SKILL.md",
 			"contentSha256": "8d9b465c5c579b00247f06e4699d5b9b61146319ee454311f21d15405db1dfad",
 			"targets": {}
@@ -569,17 +566,17 @@
 		"codex": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/codex/SKILL.md",
-			"contentSha256": "987cb4f26abe19c3205da3488494cad352ce095fe8fcd471abb898d501efd159",
+			"contentSha256": "e42f2d1d5467039020039d4a6818016880226d0ae9f95312378d355c9cfbd971",
 			"targets": {}
 		},
 		"computer-use": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/computer-use/SKILL.md",
-			"contentSha256": "ae9a1ee749ce5acbda34b1317c4b3b44a69c20fda8c569fbb42dfe331af4d4f2",
+			"contentSha256": "09a781ac49ccd320562052d10c1a27c6b7fffc6f76e66bb35a64aacd60649c17",
 			"targets": {}
 		},
 		"convert-documents-to-markdown": {
@@ -612,9 +609,9 @@
 		"github": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/github/SKILL.md",
-			"contentSha256": "024e2ddd893111fa45275f01b7bb8472f2653131acfc687f88b1f3e30226773e",
+			"contentSha256": "524786da3f450924f79ad05400076522fc2785488b04d56b790585362a08103f",
 			"targets": {}
 		},
 		"investigate": {
@@ -661,6 +658,26 @@
 			"source": "skills/tooling/mem-search/SKILL.md",
 			"contentSha256": "6ecbd17c44f471bdc8581d25149aff6bc700a9b7e25ba6adcb8611d41d9bfde1",
 			"targets": {}
+		},
+		"migrate-dotnet10-to-dotnet11": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.2.0",
+			"source": "skills/dotnet/migrate-dotnet10-to-dotnet11/SKILL.md",
+			"contentSha256": "c2d261ed0997ce9935d3c7a2ef63eadb75721d5158fb7cc6c1da88e0c4362adb",
+			"targets": {
+				"dotnet": ">=10.0 <12.0"
+			}
+		},
+		"migrate-dotnet9-to-dotnet10": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.2.0",
+			"source": "skills/dotnet/migrate-dotnet9-to-dotnet10/SKILL.md",
+			"contentSha256": "bbc1845b86c7409515de3d02c5916274f3c8206c3cc1cd94c6e540db01cc3443",
+			"targets": {
+				"dotnet": ">=9.0 <11.0"
+			}
 		},
 		"mobile-architect": {
 			"kind": "agent",
@@ -709,7 +726,7 @@
 		"net-advanced": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/net-advanced/SKILL.md",
 			"contentSha256": "3e65ceb9d29b6a5272cc5ee33f2e5b7375a2562b61be830cc4b843de9e30eac3",
 			"targets": {
@@ -719,7 +736,7 @@
 		"net-architect": {
 			"kind": "agent",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/agents/net-architect.md",
 			"contentSha256": "ea1d268fa757a0648ff633a987bb76ce704c589384d49bcbf0aa9aa319c66dc3",
 			"targets": {
@@ -729,9 +746,9 @@
 		"net-developer": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/net-developer/SKILL.md",
-			"contentSha256": "5a02491af54e8b7480c2a068d818710fa37b03d0ed4af67c9d4b9f9d980883c3",
+			"contentSha256": "b37c981fae6acbb41fe69bdfb554f9ec19edee1b967a054abf520c041740005c",
 			"targets": {
 				"dotnet": ">=10.0"
 			}
@@ -739,23 +756,23 @@
 		"node-inspect-debugger": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/node-inspect-debugger/SKILL.md",
-			"contentSha256": "94d8e01c5d810236988100cb8563056c6118473c7b87218e5f4c44e1e54e68b1",
+			"contentSha256": "301eb7cd5c180bb2cf86c5dad402c3ef0a3a2200d69d5c246570186f05ca4851",
 			"targets": {}
 		},
 		"opencode": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/opencode/SKILL.md",
-			"contentSha256": "9285a272a5ece6e03cc25d3d4a81a2f6e33415e04f15587a47ef1a8f8990b1ac",
+			"contentSha256": "53aae5e64c7cdd4ff49c128f5d0b33a6977631bdf680ae6d8166ff9a0fa38470",
 			"targets": {}
 		},
 		"performance-analyst": {
 			"kind": "agent",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/agents/performance-analyst.md",
 			"contentSha256": "6206d4fda34f4a9181d3ef54ac1f42977213711a04c581ca5bbdd3c2c9074e3a",
 			"targets": {
@@ -781,9 +798,9 @@
 		"python-debugpy": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/python-debugpy/SKILL.md",
-			"contentSha256": "9879a67fefdfb47022c92eabf3dfca80868c54d78bb1d6bd27d56742d0f65ea4",
+			"contentSha256": "76383a4d01ff6a2c40d04c4034948356bc2a2830c81001fceeef179350a9abbb",
 			"targets": {}
 		},
 		"reproduce": {
@@ -813,7 +830,7 @@
 		"sdlc-review": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/sdlc-review/SKILL.md",
 			"contentSha256": "66ca6680e7be89739eaba6773072d185b70b504738278a444ff17eddaf0318db",
 			"targets": {}
@@ -821,7 +838,7 @@
 		"simplify-code": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/simplify-code/SKILL.md",
 			"contentSha256": "a5961afd328e8e44128e9d00a37796c1a9008717e5ac72e4faeacff2265c2d0a",
 			"targets": {}
@@ -837,7 +854,7 @@
 		"spike": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/spike/SKILL.md",
 			"contentSha256": "4473123d3dadc62b1b247c2a4c32694c39b3b02e342d76584035e887a0e78b74",
 			"targets": {}
@@ -853,9 +870,9 @@
 		"systematic-debugging": {
 			"kind": "skill",
 			"pack": "hermes",
-			"packVersion": "0.0.1",
+			"packVersion": "0.1.0",
 			"source": "skills/hermes/systematic-debugging/SKILL.md",
-			"contentSha256": "f4810745cc5b78f2760e8f04f0f4795364e2de097419803fc1ec442993e5000f",
+			"contentSha256": "7ed24a65d4d9d6d8f912253948c41963f8195706344b7f750303ab6eb0df1d2f",
 			"targets": {}
 		},
 		"tdd-cycle": {
@@ -869,7 +886,7 @@
 		"testcontainers-integration": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.2.0",
 			"source": "skills/dotnet/testcontainers-integration/SKILL.md",
 			"contentSha256": "2d5efbbc81bf7edb3c3fcac867e5978e6ad42a4dda7c7fdca43260bf7059bbb9",
 			"targets": {
@@ -879,7 +896,7 @@
 		"ui-ux-pro-max": {
 			"kind": "skill",
 			"pack": "ui-ux-pro-max",
-			"packVersion": "2.15.0",
+			"packVersion": "2.15.2",
 			"source": "skills/ui-ux-pro-max/ui-ux-pro-max/SKILL.md",
 			"contentSha256": "42502ab84c9bf61039c155a5904a6f78c226814d1d735ffc3b9768b878d8b789",
 			"targets": {}
@@ -1207,6 +1224,30 @@
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
 		".agents/skills/mem-search/scripts/mem_search.py",
+		".agents/skills/migrate-dotnet10-to-dotnet11/LICENSE",
+		".agents/skills/migrate-dotnet10-to-dotnet11/SKILL.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/aspnetcore-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/core-libraries-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/cryptography-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/csharp-compiler-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/csharp15-adoption.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/efcore-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/extensions-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/maui-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/runtime-jit-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/sdk-msbuild-dotnet10to11.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/LICENSE",
+		".agents/skills/migrate-dotnet9-to-dotnet10/SKILL.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/aspnetcore-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/containers-interop-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/core-libraries-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/cryptography-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/csharp-compiler-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/efcore-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/extensions-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/sdk-msbuild-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/serialization-networking-dotnet9to10.md",
+		".agents/skills/migrate-dotnet9-to-dotnet10/references/winforms-wpf-dotnet9to10.md",
 		".agents/skills/mobile-design-review/SKILL.md",
 		".agents/skills/mobile-device-testing/SKILL.md",
 		".agents/skills/mobile-store-readiness/SKILL.md",
@@ -1361,6 +1402,8 @@
 		".gemini/commands/ios-engineer.toml",
 		".gemini/commands/mcp-builder.toml",
 		".gemini/commands/mem-search.toml",
+		".gemini/commands/migrate-dotnet10-to-dotnet11.toml",
+		".gemini/commands/migrate-dotnet9-to-dotnet10.toml",
 		".gemini/commands/mobile-architect.toml",
 		".gemini/commands/mobile-design-review.toml",
 		".gemini/commands/mobile-device-testing.toml",

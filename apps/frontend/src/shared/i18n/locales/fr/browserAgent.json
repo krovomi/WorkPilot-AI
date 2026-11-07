@@ -27,7 +27,9 @@
 		"openExternal": "Ouvrir dans le navigateur",
 		"useEmulatorUrl": "Utiliser l'URL de l'emulateur",
 		"capturing": "Capture en cours...",
-		"errorHint": "Verifiez que l'URL est accessible et reessayez."
+		"errorHint": "Verifiez que l'URL est accessible et reessayez.",
+		"forward": "Suivant",
+		"screenshotAlt": "Capture du navigateur"
 	},
 	"regression": {
 		"setBaseline": "Definir comme reference",

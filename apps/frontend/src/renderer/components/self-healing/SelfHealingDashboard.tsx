@@ -6,6 +6,8 @@ import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { CICDTab } from "./CICDTab";
 import { ProactiveTab } from "./ProactiveTab";
 import { ProductionTab } from "./ProductionTab";
+import { HeartPulse } from "lucide-react";
+import { PageHeader } from "../ui/page-header";
 
 const TABS: Array<{ id: IncidentMode; icon: string; labelKey: string }> = [
 	{ id: "cicd", icon: "\uD83D\uDD04", labelKey: "selfHealing:tabCICD" },
@@ -36,21 +38,12 @@ export function SelfHealingDashboard() {
 
 	return (
 		<div className="h-full flex flex-col overflow-hidden">
-			{/* Header */}
-			<div className="px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-lg font-semibold text-[var(--text-primary)]">
-							{t("selfHealing:title")}
-						</h1>
-						<p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-							{t("selfHealing:subtitle")}
-						</p>
-					</div>
-				</div>
-
-				{/* Stats summary */}
-				<div className="grid grid-cols-5 gap-3 mt-3">
+			<PageHeader
+				icon={HeartPulse}
+				title={t("selfHealing:title")}
+				description={t("selfHealing:subtitle")}
+			>
+				<div className="grid grid-cols-5 gap-3">
 					<StatCard
 						label={t("selfHealing:totalIncidents")}
 						value={stats.totalIncidents}
@@ -75,10 +68,10 @@ export function SelfHealingDashboard() {
 						variant="success"
 					/>
 				</div>
-			</div>
+			</PageHeader>
 
 			{/* Tab bar */}
-			<div className="flex border-b border-[var(--border-primary)] bg-[var(--bg-primary)] px-6">
+			<div className="flex border-b border-border bg-background px-6">
 				{TABS.map((tab) => (
 					<button
 						key={tab.id}
@@ -86,8 +79,8 @@ export function SelfHealingDashboard() {
 						onClick={() => setActiveTab(tab.id)}
 						className={`flex items-center gap-1.5 px-4 py-2.5 text-sm border-b-2 transition-colors ${
 							activeTab === tab.id
-								? "border-[var(--accent-primary)] text-[var(--accent-primary)]"
-								: "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+								? "border-primary text-primary"
+								: "border-transparent text-muted-foreground hover:text-foreground"
 						}`}
 					>
 						<span>{tab.icon}</span>
@@ -98,8 +91,8 @@ export function SelfHealingDashboard() {
 
 			{/* Error banner */}
 			{error && (
-				<div className="px-6 py-2 bg-red-500/10 border-b border-red-500/20">
-					<p className="text-xs text-red-400">{error}</p>
+				<div className="px-6 py-2 bg-destructive/10 border-b border-destructive/20">
+					<p className="text-xs text-destructive">{error}</p>
 				</div>
 			)}
 
@@ -107,7 +100,7 @@ export function SelfHealingDashboard() {
 			<div className="flex-1 overflow-y-auto px-6 py-4">
 				{isLoading ? (
 					<div className="flex items-center justify-center h-32">
-						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--accent-primary)]" />
+						<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
 					</div>
 				) : (
 					<>
@@ -135,14 +128,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, variant = "default" }: StatCardProps) {
 	const valueColors = {
-		default: "text-[var(--text-primary)]",
-		success: "text-green-400",
-		warning: "text-yellow-400",
+		default: "text-foreground",
+		success: "text-success",
+		warning: "text-warning",
 	};
 
 	return (
-		<div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2.5">
-			<p className="text-xs text-[var(--text-tertiary)]">{label}</p>
+		<div className="rounded-lg border border-border bg-card p-2.5">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-lg font-semibold ${valueColors[variant]}`}>{value}</p>
 		</div>
 	);

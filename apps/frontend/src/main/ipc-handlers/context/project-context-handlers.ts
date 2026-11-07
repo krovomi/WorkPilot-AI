@@ -6,15 +6,22 @@ import { ipcMain } from "electron";
 import { AUTO_BUILD_PATHS, IPC_CHANNELS } from "../../../shared/constants";
 import type {
 	IPCResult,
+	Project,
 	ProjectContextData,
 	ProjectIndex,
 } from "../../../shared/types";
 import { getAugmentedEnv } from "../../env-utils";
-import { projectStore } from "../../project-store";
 import { parsePythonCommand } from "../../python-detector";
 import { getConfiguredPythonPath } from "../../python-env-manager";
 import { getEffectiveSourcePath } from "../../updater/path-resolver";
+import { featureProject } from "../server-feature-files";
 import { fetchBrainMemoryStatus, loadBrainMemories } from "./brain-memory";
+import {
+	fetchServerMemories,
+	mirroredIndex,
+	pullServerIndex,
+	rebuildServerIndex,
+} from "./server-context";
 
 /**
  * Load project index from file
@@ -34,6 +41,31 @@ function loadProjectIndex(projectPath: string): ProjectIndex | null {
 }
 
 /**
+ * The context of a server project: its index as the server has it, its
+ * memories from its own brain there (`server-context.ts`).
+ */
+async function serverProjectContext(
+	project: Project,
+): Promise<IPCResult<ProjectContextData>> {
+	const pulled = await pullServerIndex(project);
+	if (pulled) return { success: false, error: pulled };
+	const memories = await fetchServerMemories(project, { limit: 20 });
+	if (!memories.success || !memories.data) {
+		return { success: false, error: memories.error ?? "Server unavailable" };
+	}
+	return {
+		success: true,
+		data: {
+			projectIndex: mirroredIndex(project),
+			memoryStatus: memories.data.status,
+			memoryState: null,
+			recentMemories: memories.data.memories,
+			isLoading: false,
+		},
+	};
+}
+
+/**
  * Register project context handlers
  */
 export function registerProjectContextHandlers(
@@ -43,10 +75,11 @@ export function registerProjectContextHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_GET,
 		async (_, projectId: string): Promise<IPCResult<ProjectContextData>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (project.remote) return serverProjectContext(project);
 
 			try {
 				// Load project index
@@ -84,10 +117,11 @@ export function registerProjectContextHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.CONTEXT_REFRESH_INDEX,
 		async (_, projectId: string): Promise<IPCResult<ProjectIndex>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
+			if (project.remote) return rebuildServerIndex(project);
 
 			try {
 				// Run the analyzer script to regenerate project_index.json

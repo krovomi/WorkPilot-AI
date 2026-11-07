@@ -1,0 +1,80 @@
+{
+	"expo": {
+		"name": "WorkPilot AI",
+		"slug": "workpilot-ai",
+		"version": "1.3.4",
+		"scheme": "workpilot",
+		"orientation": "default",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "automatic",
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "io.github.krovomi.workpilot",
+			"config": {
+				"usesNonExemptEncryption": false
+			}
+		},
+		"android": {
+			"package": "io.github.krovomi.workpilot",
+			"adaptiveIcon": {
+				"backgroundColor": "#2C3136",
+				"foregroundImage": "./assets/android-icon-foreground.png",
+				"backgroundImage": "./assets/android-icon-background.png",
+				"monochromeImage": "./assets/android-icon-monochrome.png"
+			},
+			"allowBackup": false,
+			"predictiveBackGestureEnabled": false
+		},
+		"web": {
+			"favicon": "./assets/favicon.png",
+			"output": "single"
+		},
+		"plugins": [
+			"expo-router",
+			"expo-status-bar",
+			"expo-secure-store",
+			"expo-localization",
+			"expo-web-browser",
+			[
+				"expo-local-authentication",
+				{
+					"faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to unlock the app and confirm merges, pull requests and approvals."
+				}
+			],
+			[
+				"expo-notifications",
+				{
+					"color": "#2C3136"
+				}
+			],
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "WorkPilot AI attaches the photos you choose to the card you are creating.",
+					"cameraPermission": "WorkPilot AI attaches the photos you take to the card you are creating.",
+					"microphonePermission": false
+				}
+			],
+			[
+				"expo-sharing",
+				{
+					"ios": {
+						"enabled": false
+					},
+					"android": {
+						"enabled": true,
+						"singleShareMimeTypes": [
+							"text/plain"
+						]
+					}
+				}
+			]
+		],
+		"experiments": {
+			"typedRoutes": true
+		},
+		"locales": {
+			"fr": "./locales/fr.json"
+		}
+	}
+}

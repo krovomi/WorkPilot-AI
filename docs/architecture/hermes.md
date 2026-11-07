@@ -39,6 +39,14 @@ left is what it genuinely adds: `systematic-debugging`, `spike`, the two runtime
 debuggers, `merge-reconciler`, `sdlc-review`, and the procedures for driving Claude
 Code, Codex and OpenCode.
 
+**The debugging procedures are offered to the builds that need them.** The `reproduce`
+phase of `bug-fix` and `hotfix` lists `systematic-debugging`, `python-debugpy` and
+`node-inspect-debugger` as `companions:`, each with its case, and `investigation`
+lists `systematic-debugging`; the model opens one when its case applies and keeps
+following WorkPilot's procedure (see [workflows.md](workflows.md)). The hermes tool
+names in them (`terminal`, `search_files`, `delegate_task`) are read as their
+equivalents on every provider.
+
 **As a proposer, its learning loop feeds ours.** Hermes writes skills from its own
 experience, on surfaces WorkPilot never sees — Telegram, Discord, a cron job on a VPS.
 Two closed loops writing skills is one too many, so there is no second loop here:
@@ -164,6 +172,45 @@ python3 runners/hermes_runner.py --action status
 python3 runners/hermes_runner.py --action cycle --surface kanban
 ```
 
+### hermes 0.23.0, and what WorkPilot uses from it
+
+The pack, the doctor and the board follow hermes **releases**. v0.23.0 ("The Hearth
+Release", 5 November 2026) is the one wired here:
+
+- **The pack follows releases, not `HEAD`.** `skills/hermes/pack.json` bootstraps with
+  `--ref latest-release`: `vendor_pack.py` takes the highest stable `vX.Y.Z` tag
+  (canaries `+canary.<date>`, pre-releases and hermes's old calendar tags `v2026.9.24`
+  skipped, as hermes's own `update_channel` draws the line) and the receipt
+  (`.vendored.json`) records it beside `"follows": "latest-release"`. The weekly sync
+  compares the tree at that tag, so a canary upstream pushes every morning is not a move.
+  The twelve vendored skills did not change between the last `HEAD` snapshot and v0.23.0.
+- **A `version` condition in the doctor.** `hermes/version.py` runs `hermes --version`
+  (hermes's own answer: its package metadata says `0.0.0` on every source install),
+  bounded to 10 seconds and cached per binary path and modification time, and only when
+  the caller asks (`probe_version`: the status a person opens, `hermes_runner.py`) — never
+  the build's `observe` phase. Below `MIN_VERSION` (0.23.0) it warns with
+  `hermes update`, hermes's own updater, which knows whether the install is git, pip, nix
+  or the desktop app. A version it cannot read (a checkout without its tags prints
+  `vgit.<sha>`) is not reported at all: "unknown" is not "too old".
+- **`hermes sessions refresh-prompts` after a persona install.** A persona is read when a
+  session builds its system prompt, and since 0.23 one gateway owns every session, long
+  before the button was pressed. Right after an install the person asked for, the API
+  asks hermes to have its continuing sessions rebuild their prompt on their next turn
+  (history kept), on the same `HERMES_HOME` the file was written into. That is hermes's
+  own command writing hermes's own state, never a file WorkPilot edits; an older hermes is
+  not asked, and the panel shows `hermes update` then the command.
+- **`hermes curator lock`, offered, not run.** Since 0.23 a lock stops hermes's curator
+  from rewriting or archiving a skill. When a person keeps candidates, the panel lists one
+  `hermes curator lock <name>` per skill: whether hermes may keep improving a skill is
+  that person's call.
+- **The board's `wait_for_card` reports progress**, which hermes 0.23 relays to the
+  person, and the hermes entry carries a `timeout` long enough for it
+  ([board-mcp.md](board-mcp.md#waiting-is-a-task)).
+
+Not wired, on purpose: the Webapp, group chats, paid MCP tools (the board starts nothing
+that costs a model call), MCP webhook events (experimental, and they need a public HTTPS
+URL), and `hermes mcp-serve` (WorkPilot never launches hermes as a server).
+
 ### The cycle, and who may open it
 
 `apps/backend/hermes/` is the capability; the ingest above stays in `learning_loop/`
@@ -172,8 +219,9 @@ because that is where the review queue and its rules live.
 | Module | Answers |
 |---|---|
 | `home.py` | where hermes keeps its state, and what the user configured there |
-| `soul.py` | the persona this repository offers, and whether it is installed |
+| `soul.py` | the persona this repository offers, whether it is installed, and asking running sessions to take it |
 | `readiness.py` | whether the loop can run in this checkout, and what is missing |
+| `version.py` | which hermes release is installed, and whether it is at least `MIN_VERSION` |
 | `loop.py` | the cycle itself, opened by a named feature surface |
 | `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/review`, `POST /api/hermes/soul/install` |
 | `brain_link.py` | what hermes learned, filed in the shared brain — and whether hermes reads it back |
@@ -184,7 +232,10 @@ path: `build` (the `observe` phase), `kanban` (the task panel), `cli`, `self-hea
 (the end of an incident cycle, in `incident_responder/orchestrator.py`'s healing
 pipeline — in a `finally`, because a pipeline that failed is not a reason to skip the
 question, and reporting a step only when it filed something, since a "0 proposed" row on
-every incident is a row nobody reads), `github`. `SURFACES` is a closed set on purpose, because the surface is written into a
+every incident is a row nobody reads), `github` (the end of a pull request review, a
+follow-up review or an issue triage, through `runners/github/hermes_observe.py`, after the
+result is saved so the verdict never depends on it, and skipped in server mode for the
+same reason the API is refused there). `SURFACES` is a closed set on purpose, because the surface is written into a
 file a person reviews and a free-text field would fill with whatever string each caller
 happened to pass. The next feature to want the loop adds a line there, not a second
 ingest.
@@ -237,10 +288,24 @@ as data, which is the standing an unverified procedure deserves. The card also r
 the other half of the loop: whether hermes has the `workpilot-brain` MCP server, i.e.
 whether it reads back what the brain holds — and opens the brain settings when not.
 
+**Hermes can also drive the board.** Project settings → Integrations → *Use from other
+apps* registers this project's `workpilot-board` MCP server in `<HERMES_HOME>/config.yaml`
+(`mcp_servers`), like it does for Claude Code or Cursor ([`board-mcp.md`](board-mcp.md)): the
+cards hermes reads and writes there are the Kanban's own, on every surface hermes runs on.
+
 It renders nothing when hermes is not installed: a permanent card reading "feature not in
 use" is a card nobody reads. Like `workflows/api.py`, the router is refused in server
 mode — every answer is about `$HERMES_HOME` on the machine running the backend, which on
 a shared deployment belongs to the server and not to the tenant asking.
+
+**In the sidebar, where a missing hermes is said.** The task card stays silent when hermes
+is absent; the « Outils CLI » panel is where a person looks for the agent CLIs, so
+`HermesStatusBadge` closes that list (`CliToolBadges`). It reads the same status as the
+card: the state, each condition with the command that meets it (the doctor's `remedy`,
+the official install script included), how many candidates wait for review, and the
+persona install. It runs nothing else: installing hermes and `hermes skills trust` stay
+the person's to type. It is not an `AgentCliStatusBadge`, because hermes is not a
+provider WorkPilot hands a task to, and it renders nothing in server mode.
 
 ### Portability of a candidate
 
@@ -291,7 +356,9 @@ from the card's button or `--action install-soul`, never from a build. That home
 to the user's own agent, in conversations WorkPilot will never see; a pipeline that
 silently overwrote it would be rewriting a personality that is not ours. A *different*
 persona already in place is left alone unless the caller says otherwise, and the one it
-replaces is kept beside it with a timestamp.
+replaces is kept beside it with a timestamp. Once written, the sessions already running
+are asked to rebuild their prompt (`hermes sessions refresh-prompts`, hermes ≥ 0.23),
+see above.
 
 A candidate carries **no external verification signal**, and that is not a gap to close
 later. Hermes's approval gate is a person saying yes to a text; it is not an observation

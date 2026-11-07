@@ -24,7 +24,9 @@ upstreams are adaptations of each other and share names on purpose, so leaving t
 iteration order meant the emitted content depended on alphabetical luck.
 
 Those are **generated**. `skills/` is the source, and `scripts/skills_cli.py` is the only
-thing that writes the outputs — `pnpm run skills:check` fails CI on drift. Packs are
+thing that writes the outputs — `pnpm run skills:check` fails CI on drift (the `skills` job of
+`lint.yml` checks the outputs as committed, and the weekly `skills-sync` commits the outputs it
+rebuilds; until F125 the job rebuilt them before checking, so it could not fail). Packs are
 added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
 `skills:remove`), which keeps `skills-lock.json`, `.workpilot/skills.toml` and the
 `.gitignore` entries in step. See [skills/README.md](../../skills/README.md).
@@ -41,18 +43,6 @@ truncated any description ending in a quoted phrase.
 WorkPilot-specific fields live under `metadata.workpilot` (pack, version, targets,
 requires, min_effort, provenance) — a free-form space the Agent Skills spec reserves for
 tooling and that Claude Code ignores.
-
-**Python-side skills:** `apps/backend/skills/` holds two executable skills (`angular/`,
-`migration/`) loaded by `skill_manager.py` with progressive disclosure — metadata first,
-instructions on trigger, scripts on demand:
-
-```python
-from skills.skill_manager import SkillManager
-
-manager = SkillManager("apps/backend/skills")
-skill = manager.load_skill("framework-migration")
-result = skill.execute_script("analyze_stack.py", {"project-root": "/path/to/project"})
-```
 
 ## Gate 4 : un corps de skill ne s'adresse pas à l'agent
 

@@ -1,22 +1,21 @@
 import { Settings2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Globe } from "@/lib/icons";
 import { Button } from "../../ui/button";
+import { EmptyState as SharedEmptyState } from "../../ui/empty-state";
 import type { EmptyStateProps, NotConnectedStateProps } from "../types";
 
 export function EmptyState({
 	searchQuery,
-	icon: Icon = Globe,
+	icon = Globe,
 	message,
 }: EmptyStateProps) {
+	const { t } = useTranslation();
 	return (
-		<div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-			<div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-				<Icon className="h-6 w-6 text-muted-foreground" />
-			</div>
-			<p className="text-sm text-muted-foreground">
-				{searchQuery ? "No issues match your search" : message}
-			</p>
-		</div>
+		<SharedEmptyState
+			icon={icon}
+			description={searchQuery ? t("common:githubIssues.noMatch") : message}
+		/>
 	);
 }
 
@@ -24,24 +23,20 @@ export function NotConnectedState({
 	error,
 	onOpenSettings,
 }: NotConnectedStateProps) {
+	const { t } = useTranslation();
 	return (
-		<div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-			<div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-				<Globe className="h-8 w-8 text-muted-foreground" />
-			</div>
-			<h3 className="text-lg font-semibold text-foreground mb-2">
-				GitHub Not Connected
-			</h3>
-			<p className="text-sm text-muted-foreground mb-4 max-w-md">
-				{error ||
-					"Configure your GitHub token and repository in project settings to sync issues."}
-			</p>
-			{onOpenSettings && (
-				<Button onClick={onOpenSettings} variant="outline">
-					<Settings2 className="h-4 w-4 mr-2" />
-					Open Settings
-				</Button>
-			)}
-		</div>
+		<SharedEmptyState
+			icon={Globe}
+			title={t("common:githubIssues.notConnected")}
+			description={error || t("common:githubIssues.notConnectedDescription")}
+			action={
+				onOpenSettings && (
+					<Button onClick={onOpenSettings} variant="outline">
+						<Settings2 className="h-4 w-4 mr-2" />
+						{t("common:prReview.openSettings")}
+					</Button>
+				)
+			}
+		/>
 	);
 }

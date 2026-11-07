@@ -14,16 +14,16 @@ const STATUS_ICON: Record<StepStatus, string> = {
 };
 
 const STATUS_COLORS: Record<StepStatus, string> = {
-	success: "text-green-400 bg-green-500/10 border-green-500/20",
-	warning: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-	error: "text-red-400 bg-red-500/10 border-red-500/20",
+	success: "text-success bg-success/10 border-success/20",
+	warning: "text-warning bg-warning/10 border-warning/20",
+	error: "text-destructive bg-destructive/10 border-destructive/20",
 	skipped: "text-gray-400 bg-gray-500/10 border-gray-500/20",
 };
 
 const CHANGE_COLORS: Record<string, string> = {
-	added: "bg-green-500/20 text-green-400",
+	added: "bg-success/20 text-success",
 	modified: "bg-blue-500/20 text-blue-400",
-	deleted: "bg-red-500/20 text-red-400",
+	deleted: "bg-destructive/20 text-destructive",
 	renamed: "bg-purple-500/20 text-purple-400",
 };
 
@@ -43,10 +43,10 @@ function SummaryCard({
 	readonly color: string;
 }): React.ReactElement {
 	return (
-		<div className="p-3 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
-			<p className="text-xs text-(--text-secondary)">{label}</p>
+		<div className="p-3 rounded-lg bg-card border border-border">
+			<p className="text-xs text-muted-foreground">{label}</p>
 			<p className={`text-xl font-bold ${color}`}>{value}</p>
-			<p className="text-xs text-(--text-secondary)">{sub}</p>
+			<p className="text-xs text-muted-foreground">{sub}</p>
 		</div>
 	);
 }
@@ -82,22 +82,26 @@ function ResultBody({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-sm text-(--text-secondary)">
+			<p className="text-sm text-muted-foreground">
 				{t("dryRun", { specId: result.specId })}
 			</p>
 
 			<div className="grid grid-cols-4 gap-3">
+				{/* The preview diffs the working tree against HEAD and runs no
+				step: steps, warnings and cost only show when a run has some. */}
+				{result.steps.length > 0 && (
+					<>
 				<SummaryCard
 					label={t("steps")}
 					value={`${result.successCount}/${result.steps.length}`}
 					sub={t("passed")}
-					color="text-green-400"
+					color="text-success"
 				/>
 				<SummaryCard
 					label={t("warnings")}
 					value={String(result.warningCount)}
 					sub={t("issues")}
-					color="text-yellow-400"
+					color="text-warning"
 				/>
 				<SummaryCard
 					label={t("cost")}
@@ -105,6 +109,8 @@ function ResultBody({
 					sub={`${costSavingPercent}${t("savedVsReal")}`}
 					color="text-blue-400"
 				/>
+					</>
+				)}
 				<SummaryCard
 					label={t("files")}
 					value={String(result.diffs.length)}
@@ -115,7 +121,7 @@ function ResultBody({
 
 			{result.steps.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						{t("executionSteps")}
 					</h3>
 					<div className="space-y-2">
@@ -139,19 +145,19 @@ function ResultBody({
 			)}
 
 			<div>
-				<h3 className="text-sm font-medium text-(--text-secondary) mb-2">
+				<h3 className="text-sm font-medium text-muted-foreground mb-2">
 					{t("fileChanges")}
 				</h3>
 				<div className="space-y-1">
 					{result.diffs.map((diff) => (
 						<div
 							key={diff.filePath}
-							className="flex items-center gap-3 px-3 py-1.5 text-sm rounded hover:bg-(--bg-secondary)"
+							className="flex items-center gap-3 px-3 py-1.5 text-sm rounded hover:bg-card"
 						>
 							<ChangeTypeTag type={diff.changeType} />
 							<span className="flex-1 font-mono text-xs">{diff.filePath}</span>
-							<span className="text-green-400 text-xs">+{diff.additions}</span>
-							<span className="text-red-400 text-xs">-{diff.deletions}</span>
+							<span className="text-success text-xs">+{diff.additions}</span>
+							<span className="text-destructive text-xs">-{diff.deletions}</span>
 						</div>
 					))}
 				</div>
@@ -181,7 +187,7 @@ export function SimulationReport({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -199,7 +205,7 @@ export function SimulationReport({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -208,7 +214,7 @@ export function SimulationReport({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -217,23 +223,23 @@ export function SimulationReport({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{t("errors.failed", { error })}</p>
+				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
 			)}
 
 			{phase === "complete" && result && result.diffs.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noChanges")}</p>
+				<p className="text-sm text-muted-foreground">{t("noChanges")}</p>
 			)}
 
 			{phase === "complete" && result && result.diffs.length > 0 && (

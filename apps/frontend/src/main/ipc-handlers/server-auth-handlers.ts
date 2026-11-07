@@ -26,6 +26,28 @@ import {
 	setMode,
 } from "../server-connection";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { unwatchAllServerBoards } from "../server-board-live";
+import { leaveAllTeamRooms } from "../server-team-room";
+import { unwatchAllServerCardLogs } from "../server-card-logs";
+import { unwatchAllServerViews } from "../server-live-views";
+import {
+	createAccessToken,
+	listAccessTokens,
+	revokeAccessToken,
+} from "../server-access-tokens";
+import {
+	deleteServerSecret,
+	listServerSecrets,
+	setServerSecret,
+} from "../server-user-secrets";
+import { pullServerUiPreferences } from "../server-ui-preferences";
+import {
+	deleteServerNeedsYouChannel,
+	getServerNeedsYou,
+	saveServerNeedsYouChannel,
+	saveServerNeedsYouPreferences,
+	testServerNeedsYouChannel,
+} from "../server-needs-you";
 
 const ENTRA_SCOPES = "openid profile email";
 const LOOPBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -241,7 +263,47 @@ export function registerServerAuthHandlers(
 		async (_e, invitationId: string) => await revokeInvite(invitationId),
 	);
 
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LIST_ACCESS_TOKENS, () => listAccessTokens());
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_AUTH_CREATE_ACCESS_TOKEN,
+		(_e, name: unknown, scope: unknown, ttlDays: unknown) =>
+			createAccessToken(name, scope, ttlDays),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_REVOKE_ACCESS_TOKEN, (_e, id: unknown) =>
+		revokeAccessToken(id),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LIST_SECRETS, () => listServerSecrets());
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_SET_SECRET, (_e, kind: unknown, value: unknown) =>
+		setServerSecret(kind, value),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_DELETE_SECRET, (_e, kind: unknown) =>
+		deleteServerSecret(kind),
+	);
+	// No argument from the renderer: main reads the server and the settings file.
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES, () =>
+		pullServerUiPreferences().catch(() => null),
+	);
+
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_GET, () => getServerNeedsYou());
+	ipcMain.handle(
+		IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_CHANNEL,
+		(_e, channel: unknown, input: unknown) => saveServerNeedsYouChannel(channel, input),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_DELETE_CHANNEL, (_e, channel: unknown) =>
+		deleteServerNeedsYouChannel(channel),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_TEST_CHANNEL, (_e, channel: unknown) =>
+		testServerNeedsYouChannel(channel),
+	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_SAVE_PREFERENCES, (_e, prefs: unknown) =>
+		saveServerNeedsYouPreferences(prefs),
+	);
+
 	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_LOGOUT, async () => {
+		unwatchAllServerBoards();
+		leaveAllTeamRooms();
+		unwatchAllServerViews();
+		unwatchAllServerCardLogs();
 		await logout();
 		notifyRenderer();
 		return getAuthState();

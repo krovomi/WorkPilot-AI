@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { cn } from "../lib/utils";
+import { loadCostSummary, loadDashboardSnapshot } from "../lib/workspace-data";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
@@ -126,8 +128,8 @@ function BreakdownList({
 	const colors = [
 		"bg-primary",
 		"bg-blue-500",
-		"bg-emerald-500",
-		"bg-amber-500",
+		"bg-success",
+		"bg-warning",
 		"bg-purple-500",
 		"bg-pink-500",
 	];
@@ -177,11 +179,11 @@ function StatusBar({ data }: { readonly data: Record<string, number> }) {
 	}
 
 	const statusColors: Record<string, string> = {
-		completed: "bg-emerald-500",
-		complete: "bg-emerald-500",
+		completed: "bg-success",
+		complete: "bg-success",
 		in_progress: "bg-blue-500",
-		pending: "bg-amber-500",
-		failed: "bg-red-500",
+		pending: "bg-warning",
+		failed: "bg-destructive",
 		cancelled: "bg-gray-400",
 	};
 
@@ -266,11 +268,11 @@ function getTokensByProviderContent(
 
 function getTrendColor(trendPct: number): string {
 	if (trendPct > 20) {
-		return "text-red-500";
+		return "text-destructive";
 	} else if (trendPct > 0) {
-		return "text-amber-500";
+		return "text-warning";
 	} else {
-		return "text-emerald-500";
+		return "text-success";
 	}
 }
 
@@ -287,6 +289,7 @@ export function AnalyticsDashboard({
 	const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fetchAnalytics = useCallback(async () => {
 		if (!projectPath) {
@@ -297,8 +300,8 @@ export function AnalyticsDashboard({
 		setError(null);
 		try {
 			const [costRes, snapRes] = await Promise.allSettled([
-				globalThis.electronAPI.getCostSummary(projectPath),
-				globalThis.electronAPI.getDashboardSnapshot(projectPath),
+				loadCostSummary(projectPath, serverProjectId),
+				loadDashboardSnapshot(projectPath, serverProjectId),
 			]);
 
 			if (costRes.status === "fulfilled" && costRes.value.success) {
@@ -317,7 +320,7 @@ export function AnalyticsDashboard({
 		} finally {
 			setLoading(false);
 		}
-	}, [projectPath, t]);
+	}, [projectPath, serverProjectId, t]);
 
 	useEffect(() => {
 		fetchAnalytics();
@@ -391,7 +394,9 @@ export function AnalyticsDashboard({
 						<h2 className="text-2xl font-bold tracking-tight text-foreground">
 							{t("title")}
 						</h2>
-						<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+						<p className="text-sm text-muted-foreground">
+							{serverProjectId ? t("serverSubtitle") : t("subtitle")}
+						</p>
 					</div>
 					<Button onClick={fetchAnalytics} variant="outline" size="sm">
 						<RefreshCw className="h-3.5 w-3.5 mr-2" />
@@ -411,7 +416,7 @@ export function AnalyticsDashboard({
 						title={t("kpis.successRate.title")}
 						value={`${successRate.toFixed(1)}%`}
 						subtitle={t("kpis.successRate.description")}
-						icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
+						icon={<CheckCircle2 className="h-5 w-5 text-success" />}
 					/>
 					<KpiCard
 						title={t("kpis.totalTokens.title")}
@@ -485,7 +490,7 @@ export function AnalyticsDashboard({
 												</div>
 												<div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
 													<div
-														className="h-full rounded-full bg-emerald-500 transition-all"
+														className="h-full rounded-full bg-success transition-all"
 														style={{
 															width: `${Math.min(sn.qa_first_pass_rate, 100)}%`,
 														}}

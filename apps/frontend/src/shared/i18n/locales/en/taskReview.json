@@ -155,6 +155,8 @@
 			"changes": "Changes",
 			"prTitle": "PR Title (optional)",
 			"draftPR": "Create as draft PR",
+			"includeWalkthrough": "Attach the scenario walkthrough (GIF) to the visual proof",
+			"includeWalkthroughHint": "The GIF shows the app as the verification filmed it, with its data: every reader of the repository will see it.",
 			"unknown": "Unknown"
 		},
 		"hints": {
@@ -177,6 +179,17 @@
 		},
 		"warnings": {
 			"emptyBranch": "Nothing to push: the branch is identical to « {{base}} », so the PR would be empty. Check that the agent committed its changes, or that this is not a duplicate task already merged."
+		},
+		"crossReview": {
+			"blockedTitle": "The cross review disagrees with this change",
+			"blockedHint": "Fixing the code and running the build again starts a new review. If you have read the problems and still want the pull request, create it anyway.",
+			"createAnyway": "Create anyway",
+			"verdict": {
+				"agree": "Cross review by {{engine}}: no blocking problem.",
+				"disagree_one": "Cross review by {{engine}}: 1 blocking problem. The pull request is held back until the code changes or you create it anyway.",
+				"disagree_other": "Cross review by {{engine}}: {{count}} blocking problems. The pull request is held back until the code changes or you create it anyway.",
+				"inconclusive": "Cross review by {{engine}}: no usable verdict. It does not hold the pull request back, and it is not an approval."
+			}
 		}
 	},
 	"mergeProgress": {
@@ -238,6 +251,13 @@
 			"deleted": "deleted",
 			"modified": "modified",
 			"renamed": "renamed"
+		},
+		"selectedSuffix": " ({{count}} selected)",
+		"attribution": {
+			"fileBadge": "AI {{ai}}%",
+			"fileTitle": "Of the lines this file adds: {{ai}}% written by the agent, {{human}}% by you, {{unknown}}% not recorded (Agent Trace)",
+			"task": "{{ai}}% of the {{added}} added lines were written by the agent, {{human}}% by you (Agent Trace)",
+			"taskWithModels": "{{ai}}% of the {{added}} added lines were written by the agent ({{models}}), {{human}}% by you (Agent Trace)"
 		}
 	},
 	"bulkPR": {
@@ -281,6 +301,182 @@
 		"moreConflicts": "+ {{count}} more",
 		"errors": {
 			"unknown": "An unexpected error occurred during sync"
+		},
+		"local": "Local",
+		"remote": "Remote"
+	},
+	"prFiles": {
+		"renamedFrom": "(was: {{name}})",
+		"loadingTitle": "Loading PR files",
+		"loading": "Loading pull request files..."
+	},
+	"taskPanel": {
+		"noFilesInSubtask": "No files in this subtask",
+		"subtasksProgress": "{{completed}}/{{total}} subtasks",
+		"stuck": "Stuck",
+		"incomplete": "Incomplete",
+		"done": "Done",
+		"less": "Less",
+		"more": "More",
+		"subtaskLabel": "Subtask: {{name}}",
+		"progress": "Progress",
+		"phasePlanning": "Planning (0-20%)",
+		"phaseCoding": "Coding (20-80%)",
+		"phaseReview": "AI Review (80-95%)",
+		"phaseComplete": "Complete (95-100%)",
+		"editFilesTitle": "Edit Files: {{name}}",
+		"moreFiles": "+{{count}} more",
+		"noSubtasks": "No subtasks defined",
+		"noSubtasksHint": "Implementation subtasks will appear here after planning",
+		"editFiles": "Edit files",
+		"filesDeleted": "{{count}} file(s) deleted",
+		"filesModified": "{{count}} file(s) modified",
+		"saveChanges": "Save Changes",
+		"subtasksCompleted": "{{completed}}/{{total}} subtasks completed",
+		"noSubtasksYet": "No subtasks yet"
+	},
+	"conflicts": {
+		"detected_one": "{{count}} potential conflict detected.",
+		"detected_other": "{{count}} potential conflicts detected.",
+		"autoMergeable": "{{count}} can be auto-merged.",
+		"title": "Merge Conflicts Preview",
+		"autoMerge": "auto-merge",
+		"location": "Location:",
+		"reason": "Reason:",
+		"strategy": "Strategy:",
+		"none": "No conflicts detected",
+		"stageWithAi": "Stage with AI Merge",
+		"mergeWithAi": "Merge with AI"
+	},
+	"discard": {
+		"title": "Discard Build",
+		"confirmBefore": "Are you sure you want to discard all changes for",
+		"warning": "This will permanently delete the isolated workspace and all uncommitted changes. The task will be moved back to Planning status.",
+		"filesChanged": "Files changed:",
+		"lines": "Lines:",
+		"discarding": "Discarding..."
+	},
+	"mergePreview": {
+		"conflictsFound_one": "{{count}} Conflict Found",
+		"conflictsFound_other": "{{count}} Conflicts Found",
+		"filesToMerge": "Files to merge: {{count}}",
+		"autoMergeable": "Auto-mergeable: {{count}}",
+		"aiResolved": "AI resolved: {{count}}",
+		"manualReview": "Manual review: {{count}}",
+		"divergedTitle": "Branch Diverged - AI Will Resolve",
+		"noConflicts": "No Conflicts Detected",
+		"viewDetails": "View Details",
+		"diverged": "Branch has diverged - AI will resolve",
+		"aiWillMerge": "AI will automatically merge these conflicts when you click Stage Changes.",
+		"aiWillResolve": "AI will resolve conflicts",
+		"ready": "Ready to merge"
+	},
+	"staged": {
+		"title": "Changes Staged Successfully",
+		"aiMessage": "AI-generated commit message",
+		"copied": "Copied!",
+		"copy": "Copy",
+		"commitPlaceholder": "Commit message...",
+		"editHint": "Edit as needed, then copy and use with",
+		"nextSteps": "Next steps:",
+		"stepOpen": "Open your project in your IDE or terminal",
+		"stepReview": "Review the staged changes with",
+		"and": "and",
+		"stepCommit": "Commit when ready:"
+	},
+	"workspace": {
+		"updating": "Updating...",
+		"markDone": "Mark as Done",
+		"loadingPr": "Loading PR information...",
+		"proceedToCoding": "Proceed to Coding",
+		"stagedTitle": "Changes Staged in Project",
+		"stagedDescription": "This task's changes have been staged in your main project",
+		"stepReview": "Review staged changes with",
+		"stepPush": "Push to remote when satisfied",
+		"cleaningUp": "Cleaning up...",
+		"deleteAndDone": "Delete Worktree & Mark Done",
+		"markingDone": "Marking done...",
+		"markDoneOnly": "Mark Done Only",
+		"resetting": "Resetting...",
+		"reviewAgain": "Review Again",
+		"doneHint": "\"Delete Worktree & Mark Done\" cleans up the isolated workspace. \"Mark Done Only\" keeps it for reference.",
+		"openIn": "Open in {{app}}",
+		"uncommitted_one": "{{count}} uncommitted change in main project",
+		"uncommitted_other": "{{count}} uncommitted changes in main project",
+		"commitOrStash": "Commit or stash them in your terminal before staging to avoid conflicts.",
+		"stagedOn": " on {{date}}",
+		"humanReviewTitle": "Human Review Required",
+		"noWorkspaceTitle": "No Workspace Found",
+		"humanReviewDescription": "Human review required prior to coding. Review your spec.md for any necessary changes.",
+		"noWorkspaceDescription": "No isolated workspace was found for this task. The changes may have been made directly in your project.",
+		"commitsCount": "{{count}} commits"
+	},
+	"guided": {
+		"button": "Guided review",
+		"buttonHint": "The changes in the order of the plan, subtask by subtask",
+		"title": "Guided review",
+		"description": "The changes in the order of the plan. Each subtask shows what it changed itself, explained by the description the planner wrote. Then come the commits no subtask recorded, and what is not committed yet.",
+		"loading": "Grouping the changes…",
+		"empty": "The task has not changed anything yet.",
+		"groups": "Groups of changes",
+		"approximate": "This task was built before WorkPilot recorded where each subtask started: a subtask may include a commit made just before it.",
+		"viewedCount": "{{done}}/{{total}} viewed",
+		"outOfPlanCount_one": "{{count}} outside the plan",
+		"outOfPlanCount_other": "{{count}} outside the plan",
+		"qaCount_one": "{{count}} QA issue",
+		"qaCount_other": "{{count}} QA issues",
+		"uncommitted": "Not committed yet",
+		"part": "{{title}} (part {{part}} of {{parts}})",
+		"unrecordedCommit": "A commit no subtask recorded: a QA fix, a commit by hand or a sync with the base branch.",
+		"outOfPlan": "Outside the plan",
+		"outOfPlanHint": "No subtask announced this file. This is not a fault, but it is where to look first.",
+		"viewed": "Viewed",
+		"touchedLater": "Changed again later by: {{groups}}.",
+		"seeFinal": "See the final diff",
+		"movedFrom_one": "{{count}} line moved here from {{path}}",
+		"movedFrom_other": "{{count}} lines moved here from {{path}}",
+		"movedTo_one": "{{count}} line moved to {{path}}",
+		"movedTo_other": "{{count}} lines moved to {{path}}",
+		"line": "line {{line}}",
+		"noPatch": "No text diff for this file (binary or too large).",
+		"unanchoredQa": "QA issues about files this task did not change",
+		"openFinalDiff": "Final diff, all files",
+		"close": "Close",
+		"errors": {
+			"local_only": "The guided review is available for local tasks. For a server card, use the final diff.",
+			"no_worktree": "This task has no workspace any more.",
+			"no_merge_base": "The task's branch shares no history with its base branch.",
+			"task_not_found": "This task cannot be found.",
+			"git_failed": "Git could not compute the changes. The final diff may still open."
+		}
+	},
+	"comments": {
+		"where": "line {{line}}",
+		"removedLine": "(removed line)",
+		"composerLabel": "Comment on line {{line}}",
+		"placeholder": "What should change here?",
+		"add": "Add the comment",
+		"cancel": "Cancel",
+		"resolve": "Resolve",
+		"reopen": "Reopen",
+		"delete": "Delete the comment",
+		"willBeSent_one": "{{count}} open line comment will be sent with the request:",
+		"willBeSent_other": "{{count}} open line comments will be sent with the request:",
+		"status": {
+			"open": "Open",
+			"addressed": "Addressed by the fixer",
+			"resolved": "Resolved",
+			"stale": "Lines changed"
+		},
+		"errors": {
+			"invalid_path": "This file is not in the task's workspace.",
+			"invalid_line": "This line is not in the file.",
+			"empty_comment": "Write the comment first.",
+			"invalid_commit": "This version of the file cannot be found.",
+			"too_many_comments": "This task already has 500 comments.",
+			"not_writable": "The comment could not be saved.",
+			"local_only": "Line comments are available for local tasks.",
+			"no_worktree": "This task has no workspace any more."
 		}
 	}
 }

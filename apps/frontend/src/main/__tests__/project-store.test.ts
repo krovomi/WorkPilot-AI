@@ -755,6 +755,45 @@ describe("ProjectStore", () => {
 			expect(tasks[0].status).toBe("ai_review");
 		});
 
+		it("keeps a build_failed task in « Build rouge » once all subtasks are done", async () => {
+			// The code is finished there; the CI is what is red. The stale-status
+			// auto-correction used to send it to human_review on the next reload.
+			const specsDir = path.join(
+				TEST_PROJECT_PATH,
+				".workpilot",
+				"specs",
+				"003-red-build",
+			);
+			mkdirSync(specsDir, { recursive: true });
+			const plan = {
+				feature: "Red Build",
+				status: "build_failed",
+				phases: [
+					{
+						phase: 1,
+						name: "Phase 1",
+						type: "implementation",
+						subtasks: [
+							{ id: "subtask-1", description: "Subtask 1", status: "completed" },
+						],
+					},
+				],
+				created_at: "2024-01-01T00:00:00Z",
+				updated_at: "2024-01-01T00:00:00Z",
+			};
+			writeFileSync(
+				path.join(specsDir, "implementation_plan.json"),
+				JSON.stringify(plan),
+				"utf-8",
+			);
+
+			const { ProjectStore } = await import("../project-store");
+			const store = new ProjectStore();
+			const project = store.addProject(TEST_PROJECT_PATH);
+
+			expect(store.getTasks(project.id)[0].status).toBe("build_failed");
+		});
+
 		it("should determine status as human_review when plan status is human_review", async () => {
 			const specsDir = path.join(
 				TEST_PROJECT_PATH,

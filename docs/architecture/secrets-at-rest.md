@@ -113,6 +113,32 @@ caller layers the Claude profile after it, so the profile's token still wins.
 The handler revalidates its argument (rule S6): the token is a string on one
 line, since the file holds one variable per line.
 
+## Async safeStorage behind synchronous readers
+
+Electron 45 deprecated the synchronous `safeStorage` calls
+(`isEncryptionAvailable`, `encryptString`, `decryptString`) in favour of
+`isAsyncEncryptionAvailable`, `encryptStringAsync` and `decryptStringAsync`.
+The readers above stay synchronous (`readSettingsFile` has dozens of callers and
+runs on every log line), so `secret-storage.ts` runs the crypto ahead of them:
+
+- `initSecretStorage(files)`, awaited in `main()` right after `ready`, asks
+  `isAsyncEncryptionAvailable()` once and decrypts every `enc:` value found in
+  `settings.json`, `profiles.json` and the Claude profiles with
+  `decryptStringAsync`; `primeSecretFiles` then does the same for each
+  project's `.workpilot/.env` and the backend's `.env` (listing them reads
+  `settings.json`, so it comes second).
+- `prepareSecrets(values)` encrypts with `encryptStringAsync` a secret about to
+  be written; `SETTINGS_SAVE` and the `profiles.json` writers call it first.
+- Both fill a two-way cache, so the synchronous `decryptSecret` and
+  `encryptSecret` find the answer there, and rewriting an unchanged secret
+  keeps its ciphertext instead of encrypting it again.
+
+The synchronous calls remain only as a fallback for a value neither path has
+seen (a token set from a terminal capture, the one-off migration below), and
+before `ready` nothing is asked: safeStorage cannot decrypt then on Linux and
+Windows anyway. The server-mode refresh token (`server-connection.ts`) uses
+the async API directly.
+
 ## Reading never destroys
 
 A value that cannot be decrypted right now — `safeStorage` not ready yet (Linux
@@ -308,3 +334,25 @@ longer does.
 Before this, the renderer copied a Claude profile's `oauthToken` into the
 backend's `.env`. That token is encrypted in memory, so the `.env` received
 ciphertext. The main process now uses `getProfileToken`.
+
+## How old a stored key is
+
+Réglages > Comptes says how long ago each stored API key was saved, and past
+90 days (`SECRET_RENEWAL_DAYS`, `shared/utils/secret-age.ts`) the provider card
+suggests renewing it. A key is dated when its **value** changes, never when the
+settings are merely saved again:
+
+- App settings: `writeSettingsFile` compares each secret with the file it
+  replaces and writes `credentialsSetAt` (key → ISO date) beside the fields.
+  The dates are worked out in the main process from the previous file;
+  whatever the caller passes under `credentialsSetAt` is ignored. An emptied
+  key loses its date. `SETTINGS_SAVE` returns the new dates so the renderer's
+  copy is never stale.
+- API profiles: `apiKeySetAt` (ms), set on creation and when an update
+  changes the key, kept when only the name or URL changes.
+- A key stored before dating existed stays undated. The card says the date
+  is unknown and never asks to renew it, rather than calling it new.
+
+A date is not a secret: it goes to the renderer as is. The card shows an age
+only for a key (`authMethod: "api-key"`), not for an OAuth or CLI connection,
+whose tokens are refreshed outside the settings screen.

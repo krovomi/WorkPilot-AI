@@ -26,9 +26,9 @@ try:
     from rich.panel import Panel
     from rich.table import Table
 
-    HAS_RICH = True
 except ImportError:
-    HAS_RICH = False
+    # rich is in requirements.txt; without it the summary prints as plain text.
+    Console = Panel = Table = None  # type: ignore[assignment,misc]
 
 
 class SecurityReportGenerator:
@@ -45,7 +45,7 @@ class SecurityReportGenerator:
 
     def __init__(self):
         """Initialize report generator."""
-        self.console = Console() if HAS_RICH else None
+        self.console = Console() if Console is not None else None
 
     def generate_json_report(
         self,
@@ -643,7 +643,7 @@ class SecurityReportGenerator:
             vulnerability_results: Results from vulnerability scanner
             compliance_results: Results from compliance analyzer (optional)
         """
-        if not HAS_RICH or not self.console:
+        if Panel is None or Table is None or self.console is None:
             # Fallback to plain text
             self._print_plain_summary(vulnerability_results, compliance_results)
             return

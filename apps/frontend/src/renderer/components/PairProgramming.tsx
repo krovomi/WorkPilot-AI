@@ -65,7 +65,7 @@ function StatusBadge({ status }: { status: PairStatus }) {
 	return (
 		<Badge variant={variants[status]}>
 			{status === "active" && (
-				<span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+				<span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
 			)}
 			{t(`status.${status}`)}
 		</Badge>
@@ -177,11 +177,11 @@ function SetupForm({ onStart }: SetupFormProps) {
 function ActionIcon({ type }: { type: string }) {
 	switch (type) {
 		case "file_created":
-			return <FilePlus className="w-3.5 h-3.5 text-green-500" />;
+			return <FilePlus className="w-3.5 h-3.5 text-success" />;
 		case "file_modified":
 			return <FileCode2 className="w-3.5 h-3.5 text-blue-500" />;
 		case "command_run":
-			return <TerminalIcon className="w-3.5 h-3.5 text-yellow-500" />;
+			return <TerminalIcon className="w-3.5 h-3.5 text-warning" />;
 		default:
 			return <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />;
 	}
@@ -232,7 +232,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 				isUser ? "items-end" : "items-start",
 			)}
 		>
-			<span className="text-[10px] text-muted-foreground px-1">
+			<span className="text-3xs text-muted-foreground px-1">
 				{isUser
 					? t("chat.you")
 					: message.isQuestion
@@ -245,7 +245,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 					isUser
 						? "bg-primary text-primary-foreground"
 						: message.isQuestion
-							? "bg-amber-500/10 border border-amber-500/30 text-foreground"
+							? "bg-warning/10 border border-warning/30 text-foreground"
 							: "bg-muted text-foreground",
 				)}
 			>
@@ -351,7 +351,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 
 			{/* Conflicts banner */}
 			{conflicts.length > 0 && (
-				<div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-amber-600 text-xs flex-shrink-0">
+				<div className="flex items-center gap-2 px-4 py-2 bg-warning/10 border-b border-warning/30 text-warning text-xs flex-shrink-0">
 					<AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
 					<span>{t("conflicts.description")}</span>
 					<span className="font-mono">
@@ -385,7 +385,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 									{session.goal && (
 										<div>
 											<div className="text-xs font-medium text-muted-foreground mb-1">
-												Goal
+												{t("pairProgramming:session.goal")}
 											</div>
 											<p className="text-xs text-foreground leading-relaxed">
 												{session.goal}
@@ -451,7 +451,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 							<Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
 						)}
 						{status === "completed" && (
-							<CheckCircle2 className="w-3 h-3 text-green-500" />
+							<CheckCircle2 className="w-3 h-3 text-success" />
 						)}
 					</div>
 
@@ -478,7 +478,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 					)}
 
 					{/* Action log */}
-					<div className="px-3 py-2 border-b border-border/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+					<div className="px-3 py-2 border-b border-border/50 text-3xs font-semibold text-muted-foreground uppercase tracking-wide">
 						{t("aiWork.actionLog")}
 					</div>
 					<ScrollArea className="flex-1">

@@ -21,15 +21,24 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | Fichier | Lignes | Voisins / index |
 |---|---|---|
 | `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe |
-| `src/main/ipc-handlers/task/worktree-handlers.ts` | ~3 600 | `worktree-ide-terminal.ts`, `worktree-git-refs.ts`, `worktree-pr-helpers.ts` |
 | `src/main/app-emulator-service.ts` | ~3 250 | — |
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
-| `src/main/ipc-handlers/task/execution-handlers.ts` | ~3 100 | — |
 | `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 350 | `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
 Chercher le symbole (`grep -n`), lire le voisinage, éditer. Rien ne bloque une lecture complète :
-c'est une discipline, pas un garde-fou.
+c'est une discipline, pas un garde-fou. Leur taille, elle, est plafonnée : un fichier de plus de
+2 000 lignes ne peut pas grossir (`tests/baselines/file-size.json`), donc une feature y ajoute un
+module voisin plutôt que des lignes. Les handlers de worktree sont répartis par groupe :
+`task/worktree-handlers.ts` (état, liste, abandon, IDE, terminal, impact, synchronisation)
+enregistre `worktree-diff-handlers.ts`, `worktree-merge-handlers.ts`, `worktree-file-handlers.ts`,
+`worktree-create-pr-handlers.ts` et `worktree-visual-proof-handlers.ts` ; fonctions partagées
+dans `worktree-handler-utils.ts`. Ceux de l'exécution de même : `task/execution-handlers.ts`
+(démarrer, reprendre la session, arrêter, état, plan, pause) enregistre
+`execution-review-handlers.ts`, `execution-status-handlers.ts` (changement de statut à la main),
+`execution-resume-handlers.ts` (reprise, changement de provider, relance d'une phase, hot swap,
+remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche bloquée) ;
+`execution-utils.ts` porte les fonctions partagées et `ExecutionHandlerContext`.
 
 ## Où ajouter quoi
 
@@ -40,6 +49,10 @@ c'est une discipline, pas un garde-fou.
 | un texte visible | une clé dans `src/shared/i18n/locales/en/` **et** `fr/` |
 | une détection d'OS ou d'exécutable | `src/main/platform/` |
 | une couleur ou un thème | `src/shared/constants/themes.ts` |
+| regrouper des vues sous une entrée à onglets (hub) | `src/renderer/components/sidebar/hubs.ts` (onglets, une vue garde son id) ; conception : [`frontend-architecture.md`](../../docs/architecture/frontend-architecture.md#sidebar-hubs-sidebarhubsts) |
+| une carte du panneau de tâche (vue d'ensemble) | son onglet dans `src/renderer/components/task-detail/panel-sections.ts`, son rendu dans `TaskOverview.tsx` (elle rend `null` quand elle n'a rien à montrer) ; ce qui attend la personne : `task-detail/waiting-items.ts` ; conception : [`frontend-task-panel.md`](../../docs/architecture/frontend-task-panel.md#longlet-vue-densemble-task-detailtaskoverviewtsx) |
+| ce que l'app fait d'un projet du serveur (mode serveur) | `src/main/server-projects.ts` (liste, ajout, suppression), `src/main/remote-board.ts` (tableau par instantané), `src/main/server-board-actions.ts` (actions du Kanban envoyées au serveur), `src/main/server-board-review.ts` (revue, fusion, PR d'une carte du serveur), `src/main/server-project-stream.ts` (le flux en direct d'un projet, une WebSocket partagée par références), `src/main/server-board-live.ts` (le tableau sur ce flux), `src/main/server-live-views.ts` et `src/renderer/hooks/useServerViewLive.ts` (une vue partagée affichée tient le flux et se relit quand un collègue la change ; ne pas ouvrir de seconde WebSocket), `src/renderer/components/sidebar/server-gates.ts` (vues offertes) ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-projets-du-serveur-dans-lapp) |
+| l'administration du serveur (mode serveur) | `src/main/server-connection.ts` (`adminApi`), `src/main/server-admin-groups.ts` (groupes, arguments vérifiés avant la requête), `src/renderer/components/administration/` (un onglet par permission), `src/renderer/stores/admin-store.ts` ; conception : [`server-mode.md`](../../docs/architecture/server-mode.md#les-groupes) |
 
 ## Sécurité
 
@@ -59,7 +72,7 @@ c'est une discipline, pas un garde-fou.
 | Aucun identifiant stocké ne parvient au renderer : réglages, profils API et Claude, `.env` du backend masqués (`MASKED_SECRET`) ; une clé masquée ne sert qu'à son URL enregistrée ; tests de connexion dans le main | `src/main/utils/masked-secret.ts`, `src/main/settings-secrets.ts`, `src/main/claude-profile/renderer-view.ts`, `ipc-handlers/profile-handlers.ts` | `source-env-handlers.test.ts`, `profile-handlers.test.ts`, `renderer-view.test.ts`, `providerService.test.ts` |
 | État du bac à sable de l'OS reçu du backend : validé (zod), gardé par tâche, affiché sur la carte quand les commandes ne sont pas isolées | `src/main/task-sandbox.ts`, `src/main/ipc-handlers/task-sandbox-handlers.ts`, `src/renderer/components/task-sandbox/` ([os-sandbox.md](../../docs/architecture/os-sandbox.md)) | `task-sandbox.test.ts`, `TaskSandboxNotice.test.tsx` |
 | Approbation à distance : un plan seulement, jeton à usage unique de 30 min, chat et utilisateur configurés, tâche encore en attente au moment de l'appui ; aucun port ouvert (polling) | `src/main/needs-you/`, `src/main/notification-service.ts` ([needs-you.md](../../docs/architecture/needs-you.md)) | `needs-you/__tests__/`, `notification-service.test.ts` |
-| Automatisations : une règle arrive en données et un id de projet ; déclencheurs, types et efforts en listes fermées, branche et étiquette bornées, id de règle émis par le main ; la règle ne fait que créer une carte (brouillon par défaut), le jeton GitHub ne quitte pas le main | `src/main/automations/rules.ts`, `src/main/ipc-handlers/automations-handlers.ts` | `automations/__tests__/rules.test.ts`, `ipc-handlers/__tests__/automations-handlers.test.ts` |
+| Automatisations : une règle arrive en données et un id de projet ; déclencheurs, types et efforts en listes fermées, branche et étiquette bornées, id de règle émis par le main ; la règle ne fait que créer une carte (brouillon par défaut) ou lancer une revue de PR jamais publiée (`startDraftPRReview`, sans `--auto-post`, sans assignation), le jeton GitHub ne quitte pas le main | `src/main/automations/rules.ts`, `src/main/ipc-handlers/automations-handlers.ts`, `src/main/ipc-handlers/github/pr-handlers.ts` | `automations/__tests__/rules.test.ts`, `ipc-handlers/__tests__/automations-handlers.test.ts`, `ipc-handlers/github/__tests__/pr-draft-review.test.ts` |
 | Questions d'un agent ACP : validées (zod), gardées par tâche ; une réponse n'est écrite sur le stdin du build que pour une question en attente et une option offerte ; le build revérifie | `src/main/task-permissions.ts`, `src/main/ipc-handlers/task-permission-handlers.ts` ([acp.md](../../docs/architecture/acp.md)) | `task-permissions.test.ts`, `task-permission-handlers.test.ts` |
 | Chemins d'outils des réglages (`pythonPath`, `gitPath`, `claudePath`…) : nom nu de l'outil ou exécutable nommé comme lui, hors projet et hors dossier temporaire ; dossier du backend (`autoBuildPath`) qui contient `runners/spec_runner.py`, aux mêmes conditions sauf celui que le main détecte | `src/main/security/tool-path-policy.ts` (appelé par `SETTINGS_SAVE`) | `tool-path-policy.test.ts`, `source-env-handlers.test.ts` |
 | Expéditeur d'un appel IPC : seule la page de l'app (fichier local ou serveur de dev), dans le cadre principal de la fenêtre principale | `src/main/security/ipc-sender-policy.ts` (posé par `ipc-setup.ts`, avant le contrôle des dossiers) | `ipc-sender-policy.test.ts` |
@@ -90,4 +103,5 @@ nouveau canal n'y entre jamais.
 |---|---|---|
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
-| E2E | `e2e/` | `pnpm run test:e2e` (Playwright) |
+| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
+| E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend) | `pnpm run build && pnpm run test:e2e:server` |

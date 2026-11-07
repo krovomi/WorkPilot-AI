@@ -50,7 +50,7 @@ export function ServiceCard({ name, service }: ServiceCardProps) {
 						variant="outline"
 						className={cn("capitalize text-xs", colorClass)}
 					>
-						{service.type || "unknown"}
+						{service.type || t("context:serviceSections.unknownType")}
 					</Badge>
 				</div>
 				{service.path && (

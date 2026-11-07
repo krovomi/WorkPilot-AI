@@ -1,0 +1,28 @@
+{
+	// The phone app's own Biome root: the desktop's configuration carries
+	// Electron and Tailwind specifics that do not apply here. Same version
+	// (lint.yml reads it from apps/frontend/package.json), same recommended rules.
+	"root": true,
+	// The repository ignores nested .gitignore files: what to skip is listed below.
+	"vcs": { "enabled": false },
+	"assist": { "enabled": false },
+	"files": {
+		"includes": ["src/**", "e2e/**", "*.ts", "*.js", "*.json", "*.jsonc", "!**/node_modules", "!**/.expo", "!**/dist", "!**/coverage", "!**/test-results"],
+		"ignoreUnknown": true
+	},
+	"formatter": { "enabled": false },
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"a11y": "warn",
+			"correctness": {
+				"preset": "recommended",
+				"useExhaustiveDependencies": "warn",
+				"noUnusedVariables": "warn"
+			},
+			"style": { "preset": "recommended" },
+			"suspicious": { "preset": "recommended", "noExplicitAny": "warn" }
+		}
+	}
+}

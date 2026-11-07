@@ -2,11 +2,11 @@
 name: evidence-collector
 description: "Confirms or refutes one specific claim about the codebase with file:line evidence. Use before reporting any finding."
 tools: [Read, Grep, Glob]
-model: sonnet
+model: haiku
 metadata:
   workpilot:
     roster: research
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You are given one claim about this codebase. Establish whether it is true.

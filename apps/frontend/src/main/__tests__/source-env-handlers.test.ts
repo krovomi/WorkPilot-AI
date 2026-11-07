@@ -63,6 +63,7 @@ vi.mock("@electron-toolkit/utils", () => ({
 
 vi.mock("../cli-tool-manager", () => ({
 	configureTools: vi.fn(),
+	configureToolsFromSettings: vi.fn(() => false),
 	getToolInfo: vi.fn(),
 	isPathFromWrongPlatform: vi.fn(() => false),
 	preWarmToolCache: vi.fn(() => Promise.resolve()),
@@ -256,6 +257,13 @@ describe("AUTOBUILD_SOURCE_ENV handlers", () => {
 
 		const read = await getSettings();
 		expect(JSON.stringify(read)).not.toContain(KEY);
+		// Dated when set (S5): the date is not a secret, the renderer sees it
+		const dates = (read.data as { credentialsSetAt?: Record<string, string> })
+			.credentialsSetAt;
+		expect(Object.keys(dates ?? {}).sort()).toEqual([
+			"customProviderApiKey",
+			"globalOpenAIApiKey",
+		]);
 		expect(read.data).toMatchObject({
 			globalOpenAIApiKey: MASKED_SECRET,
 			customProviderApiKey: MASKED_SECRET,

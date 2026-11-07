@@ -146,5 +146,39 @@
 		"confidence": "Confidence",
 		"impact": "Impact",
 		"fileImpact": "File impact"
-	}
+	},
+	"stepsCount": "{{count}} steps",
+	"tokensCount": "{{value}} tokens",
+	"toolsCount": "{{count}} tools",
+	"filesCount": "{{count}} files",
+	"tokensInOut": "{{input}} in / {{output}} out",
+	"compareSelectSecond": "Select a second session to compare with",
+	"abCompareTitle": "A/B Compare",
+	"breakpointTypes": {
+		"fileChange": "File Change",
+		"tokenThreshold": "Token Threshold",
+		"stepIndex": "Step Index",
+		"patternMatch": "Pattern Match"
+	},
+	"breakpointConditionPlaceholder": "e.g. write_file",
+	"stepDetail": {
+		"cumulative": "Cumulative",
+		"tool": "Tool",
+		"reasoning": "Reasoning",
+		"toolInput": "Tool Input",
+		"toolOutput": "Tool Output",
+		"optionsConsidered": "Options Considered",
+		"selectStep": "Select a step from the timeline."
+	},
+	"heatmapLines": "lines",
+	"heatmapDescription": "Files most frequently touched by the agent",
+	"toolUsage": "Tool Usage",
+	"breakpoints": "Breakpoints",
+	"breakpointsDescription": "Set breakpoints to pause replay at specific events",
+	"compareEmpty": "Select two sessions from the session list to compare them side by side.",
+	"goToSessionList": "Go to session list",
+	"defaultAgentName": "Agent",
+	"noDescription": "No description",
+	"anyCondition": "(any)",
+	"untitled": "Untitled"
 }

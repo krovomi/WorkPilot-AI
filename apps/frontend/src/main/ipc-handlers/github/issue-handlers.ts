@@ -10,7 +10,7 @@ import type {
 	PaginatedIssuesResult,
 } from "../../../shared/types";
 import { debugLog } from "../../../shared/utils/debug-logger";
-import { projectStore } from "../../project-store";
+import { featureProject } from "../server-feature-files";
 import type { GitHubAPIComment, GitHubAPIIssue } from "./types";
 import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
 
@@ -79,7 +79,7 @@ export function registerGetIssues(): void {
 				fetchAll,
 			});
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				debugLog("[GitHub Issues] Project not found:", projectId);
 				return { success: false, error: "Project not found" };
@@ -280,7 +280,7 @@ export function registerGetIssue(): void {
 			projectId: string,
 			issueNumber: number,
 		): Promise<IPCResult<GitHubIssue>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}
@@ -332,7 +332,7 @@ export function registerGetIssueComments(): void {
 			projectId: string,
 			issueNumber: number,
 		): Promise<IPCResult<GitHubAPIComment[]>> => {
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

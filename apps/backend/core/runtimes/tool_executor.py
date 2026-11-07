@@ -18,8 +18,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from agent_trace import note_tool_write
 from core.llm_optimization import tool_result_max_chars, truncate_tool_result
-from harness.domain.paging import (
+from foundation.paging import (
     FOOTER_RESERVE,
     page_items,
     page_lines,
@@ -488,6 +489,7 @@ class ToolExecutor:
         # lines below. Before the JSON branch, not after: an invisible
         # character inside a string value survives `json.loads` and would be
         # written straight back out by `write_json_atomic`.
+        note_tool_write(self.spec_dir, "write_file", str(file_path))
         if isinstance(content, str) and content:
             cleaning = clean_generated(content)
             if cleaning.changed:
@@ -549,7 +551,7 @@ class ToolExecutor:
         goes back to the model so it can correct itself in the same session.
         """
         from foundation.file_utils import write_json_atomic
-        from spec.plan_recovery import extract_json_document
+        from foundation.json_document import extract_json_document
 
         if empty_file:
             # Said plainly rather than through the JSON parser: blanking the

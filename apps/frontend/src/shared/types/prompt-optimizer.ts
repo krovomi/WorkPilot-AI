@@ -25,7 +25,7 @@ export type PromptOptimizerStatus = "context" | "generating" | "parsing";
 /**
  * A failure, coded so the renderer can say it in the user's language.
  * `message` is the technical detail (redacted by the backend), shown
- * underneath. Codes come from the runner (`core.error_details`: `auth`,
+ * underneath. Codes come from the runner (`foundation.error_details`: `auth`,
  * `rate_limit`, `quota`, `network`, `timeout`, `provider_unavailable`,
  * `empty_response`…) or from the main process (`runner_missing`,
  * `python_missing`, `project_not_found`, `spawn_failed`, `process_failed`).

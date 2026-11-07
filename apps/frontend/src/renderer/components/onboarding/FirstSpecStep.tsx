@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
+import { useTranslation } from "react-i18next";
 
 interface FirstSpecStepProps {
 	onNext: () => void;
@@ -54,6 +55,7 @@ export function FirstSpecStep({
 	onSkip,
 	onOpenTaskCreator,
 }: FirstSpecStepProps) {
+	const { t } = useTranslation();
 	const [hasCreatedSpec, setHasCreatedSpec] = useState(false);
 
 	const tips = [
@@ -103,10 +105,10 @@ export function FirstSpecStep({
 						</div>
 					</div>
 					<h1 className="text-2xl font-bold text-foreground tracking-tight">
-						Create Your First Task
+						{t("onboarding:firstSpec.title")}
 					</h1>
 					<p className="mt-2 text-muted-foreground">
-						Describe what you want to build and let WorkPilot AI handle the rest
+						{t("onboarding:firstSpec.description")}
 					</p>
 				</div>
 
@@ -118,12 +120,10 @@ export function FirstSpecStep({
 								<CheckCircle2 className="h-6 w-6 text-success shrink-0 mt-0.5" />
 								<div className="flex-1">
 									<h3 className="text-lg font-medium text-success">
-										Task Creator Opened
+										{t("onboarding:firstSpec.openedTitle")}
 									</h3>
 									<p className="mt-1 text-sm text-success/80">
-										Great! You can create your first task now or continue with
-										the wizard. You can always create tasks later from the main
-										dashboard.
+										{t("onboarding:firstSpec.openedDescription")}
 									</p>
 								</div>
 							</div>
@@ -135,7 +135,7 @@ export function FirstSpecStep({
 				<div className="space-y-4 mb-8">
 					<div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
 						<Lightbulb className="h-4 w-4" />
-						Tips for Great Tasks
+						{t("onboarding:firstSpec.tipsTitle")}
 					</div>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 						{tips.map((tip, index) => (
@@ -157,13 +157,10 @@ export function FirstSpecStep({
 							<FileText className="h-5 w-5 text-info shrink-0 mt-0.5" />
 							<div className="flex-1 space-y-2">
 								<p className="text-sm font-medium text-foreground">
-									Example Task Description:
+									{t("onboarding:firstSpec.exampleTitle")}
 								</p>
 								<p className="text-sm text-muted-foreground italic">
-									&quot;Add a dark mode toggle to the settings page. It should
-									persist the user&apos;s preference in localStorage and apply
-									the theme immediately without page reload. Use the existing
-									color variables in styles/theme.css.&quot;
+									{t("onboarding:firstSpec.example")}
 								</p>
 							</div>
 						</div>
@@ -178,15 +175,15 @@ export function FirstSpecStep({
 						className="gap-2 px-8"
 					>
 						<ArrowRight className="h-5 w-5" />
-						Open Task Creator
+						{t("onboarding:firstSpec.open")}
 					</Button>
 				</div>
 
 				{/* Skip info */}
 				<p className="text-center text-sm text-muted-foreground mb-2">
 					{hasCreatedSpec
-						? "You can continue with the wizard now or create more tasks."
-						: "You can skip this step and create tasks later from the dashboard."}
+						? t("onboarding:firstSpec.continueHint")
+						: t("onboarding:firstSpec.skipHint")}
 				</p>
 
 				{/* Action Buttons */}
@@ -196,7 +193,7 @@ export function FirstSpecStep({
 						onClick={onBack}
 						className="text-muted-foreground hover:text-foreground"
 					>
-						Back
+						{t("common:buttons.back")}
 					</Button>
 					<div className="flex gap-4">
 						<Button
@@ -204,9 +201,9 @@ export function FirstSpecStep({
 							onClick={onSkip}
 							className="text-muted-foreground hover:text-foreground"
 						>
-							Skip
+							{t("common:buttons.skip")}
 						</Button>
-						<Button onClick={handleContinue}>Continue</Button>
+						<Button onClick={handleContinue}>{t("common:buttons.continue")}</Button>
 					</div>
 				</div>
 			</div>

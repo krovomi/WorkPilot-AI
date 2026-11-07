@@ -8,6 +8,7 @@
 import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
+import type { ReviewLesson } from "../../shared/types/learning-loop";
 import { learningLoopService } from "../learning-loop-service";
 import { backendFetch } from "./_backend-fetch";
 import { safeSendToRenderer } from "./utils";
@@ -25,6 +26,9 @@ function fetchLearningPatterns(projectDir: string) {
 		15_000,
 	);
 }
+
+/** The backend keeps 500; anything far longer is not a rule someone typed. */
+const MAX_RULE_LENGTH = 2_000;
 
 function postJson(body: Record<string, string>): RequestInit {
 	// No headers here: backendFetch sets the JSON content type and the
@@ -90,6 +94,60 @@ export function registerLearningLoopHandlers(
 			);
 			return result.success
 				? { success: true, data: result.enabled }
+				: { success: false, error: result.error };
+		},
+	);
+
+	// Rules learned from reviews (IA1): a person adopts or dismisses each
+	// candidate; only an adopted rule reaches a prompt.
+
+	ipcMain.handle(
+		IPC_CHANNELS.LEARNING_LOOP_GET_LESSONS,
+		async (_event, projectDir: string) => {
+			const query = new URLSearchParams({ project_dir: projectDir });
+			const result = await backendFetch<{ lessons?: ReviewLesson[] }>(
+				`/api/brain/review-lessons?${query.toString()}`,
+				{ method: "GET" },
+				15_000,
+			);
+			return result.success
+				? { success: true, data: result.lessons ?? [] }
+				: { success: false, error: result.error };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.LEARNING_LOOP_ADOPT_LESSON,
+		async (_event, projectDir: string, lessonId: unknown, rule: unknown) => {
+			if (
+				typeof lessonId !== "string" ||
+				typeof rule !== "string" ||
+				rule.length > MAX_RULE_LENGTH
+			) {
+				return { success: false, error: "Invalid lesson" };
+			}
+			const result = await backendFetch<{ lesson?: ReviewLesson }>(
+				"/api/brain/review-lessons/adopt",
+				postJson({ project_dir: projectDir, lesson_id: lessonId, rule }),
+			);
+			return result.success
+				? { success: true, data: result.lesson }
+				: { success: false, error: result.error };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.LEARNING_LOOP_DISMISS_LESSON,
+		async (_event, projectDir: string, lessonId: unknown) => {
+			if (typeof lessonId !== "string") {
+				return { success: false, error: "Invalid lesson" };
+			}
+			const result = await backendFetch(
+				"/api/brain/review-lessons/dismiss",
+				postJson({ project_dir: projectDir, lesson_id: lessonId }),
+			);
+			return result.success
+				? { success: true }
 				: { success: false, error: result.error };
 		},
 	);

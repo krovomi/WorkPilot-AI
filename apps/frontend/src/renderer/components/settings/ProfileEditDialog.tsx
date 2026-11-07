@@ -22,6 +22,7 @@ import { API_PROVIDER_PRESETS } from "../../../shared/constants";
 import { useToast } from "../../hooks/use-toast";
 import { isValidApiKey, isValidUrl, maskApiKey } from "../../lib/profile-utils";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -68,7 +69,17 @@ export function ProfileEditDialog({
 		testConnection,
 		isTestingConnection,
 		testConnectionResult,
-	} = useSettingsStore();
+	} = useSettingsStore(
+		useShallow((s) => ({
+			saveProfile: s.saveProfile,
+			updateProfile: s.updateProfile,
+			profilesLoading: s.profilesLoading,
+			profilesError: s.profilesError,
+			testConnection: s.testConnection,
+			isTestingConnection: s.isTestingConnection,
+			testConnectionResult: s.testConnectionResult,
+		})),
+	);
 	const { toast } = useToast();
 
 	// Edit mode detection: profile prop determines mode
@@ -502,21 +513,21 @@ export function ProfileEditDialog({
 						<div
 							className={`flex items-start gap-2 p-3 rounded-lg border ${
 								testConnectionResult.success
-									? "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800"
-									: "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800"
+									? "bg-success/10 border-success/30"
+									: "bg-destructive/10 border-destructive/30"
 							}`}
 						>
 							{testConnectionResult.success ? (
-								<CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+								<CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
 							) : (
-								<AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+								<AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
 							)}
 							<div className="flex-1 min-w-0">
 								<p
 									className={`text-sm font-medium ${
 										testConnectionResult.success
-											? "text-green-800 dark:text-green-200"
-											: "text-red-800 dark:text-red-200"
+											? "text-success"
+											: "text-destructive"
 									}`}
 								>
 									{testConnectionResult.success
@@ -526,8 +537,8 @@ export function ProfileEditDialog({
 								<p
 									className={`text-sm ${
 										testConnectionResult.success
-											? "text-green-700 dark:text-green-300"
-											: "text-red-700 dark:text-red-300"
+											? "text-success"
+											: "text-destructive"
 									}`}
 								>
 									{testConnectionResult.message}

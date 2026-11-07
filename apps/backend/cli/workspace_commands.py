@@ -15,7 +15,6 @@ _PARENT_DIR = Path(__file__).parent.parent
 if str(_PARENT_DIR) not in sys.path:
     sys.path.insert(0, str(_PARENT_DIR))
 
-from core.debug import debug_warning
 from core.workspace import (
     cleanup_all_worktrees,
     discard_existing_build,
@@ -34,6 +33,7 @@ from core.workspace.git_utils import (
 )
 from core.worktree import PushAndCreatePRResult as CreatePRResult
 from core.worktree import WorktreeManager
+from foundation.debug import debug_warning
 from ui import (
     Icons,
     icon,
@@ -119,15 +119,30 @@ def _get_changed_files_from_git(
         )
         merge_base = merge_base_result.stdout.strip()
 
-        # Use two-dot diff from merge-base to get only task's changes
+        # Diff the worktree itself against the merge-base, not just HEAD: a
+        # file the agent left uncommitted is committed before the merge
+        # (WorktreeManager.commit_pending_changes), so it counts here too.
         result = subprocess.run(
-            ["git", "diff", "--name-only", f"{merge_base}..HEAD"],
+            ["git", "diff", "--name-only", merge_base],
             cwd=worktree_path,
             capture_output=True,
             text=True,
             check=True,
         )
         files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for f in untracked.stdout.split("\n"):
+            f = f.strip()
+            # WorkPilot's own working files (.workpilot-discard-list...) never
+            # reach the branch: commit_in_worktree leaves them out.
+            if f and f not in files and not f.startswith(".workpilot"):
+                files.append(f)
         return files
     except subprocess.CalledProcessError as e:
         # Log the failure before trying fallback
@@ -323,7 +338,7 @@ def _detect_parallel_task_conflicts(
 
 # Import debug utilities
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_error,
@@ -1235,6 +1250,7 @@ def handle_create_pr_command(
     title: str | None = None,
     draft: bool = False,
     body: str | None = None,
+    allow_cross_review_disagreement: bool = False,
 ) -> CreatePRResult:
     """
     Handle the --create-pr command: push branch and create a GitHub PR.
@@ -1247,6 +1263,8 @@ def handle_create_pr_command(
         draft: Whether to create as draft PR
         body: Optional PR body. If provided, used verbatim (no AI generation,
               no impact block auto-injection).
+        allow_cross_review_disagreement: Create the PR although the cross
+              review disagrees with this code (the person's explicit choice).
 
     Returns:
         CreatePRResult with success status, pr_url, and any errors
@@ -1289,6 +1307,7 @@ def handle_create_pr_command(
             title=title,
             draft=draft,
             body=body,
+            allow_cross_review_disagreement=allow_cross_review_disagreement,
         )
     except Exception as e:
         debug_error(MODULE, f"Exception during PR creation: {e}")
@@ -1312,6 +1331,11 @@ def handle_create_pr_command(
         "remote": raw_result.get("remote", ""),
         "branch": raw_result.get("branch", ""),
     }
+    if raw_result.get("cross_review_blocked"):
+        result["cross_review_blocked"] = True
+    if "stack_linked" in raw_result:  # a stacked task's PR (F6)
+        result["stack_linked"] = bool(raw_result.get("stack_linked"))
+        result["stack_note"] = raw_result.get("stack_note", "")
 
     if result.get("success"):
         pr_url = result.get("pr_url")

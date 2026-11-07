@@ -38,34 +38,98 @@ par phase gonflerait à ~94% dès le démarrage de la QA), et un état terminal 
 
 ## L'onglet Vue d'ensemble (`task-detail/TaskOverview.tsx`)
 
-L'onglet empilait dix blocs dans l'ordre où ils avaient été écrits, et la
-description de la tâche arrivait en neuvième position — la revue humaine, seule
-chose qu'on vient faire sur une tâche en revue, en dixième. Il est rangé par la
-question que se pose la personne :
+L'onglet empilait une vingtaine de cartes, écrites chacune par une feature
+différente. Rangées d'abord en quatre sections qui défilaient (à traiter, la
+tâche, le plan, la mémoire), elles sont maintenant réparties en **trois
+onglets**, par la question que se pose la personne. La table qui fait foi est
+`task-detail/panel-sections.ts` (`PANEL_CARDS`) :
 
-| Section | Répond à | Contient |
+| Onglet | Répond à | Cartes |
 |---|---|---|
-| *(préalables)* | puis-je démarrer ? | entretien de spec, formule d'exécution — au-dessus de tout |
-| **À traiter** | que dois-je faire maintenant ? | la revue humaine, quand la tâche l'attend |
-| **La tâche** | de quoi parle-t-on ? | `TaskMetadata` |
-| **Plan d'exécution** | que vont faire les agents ? | profil d'effort, JEV, traçabilité, pièces jointes et ADR |
-| **Mémoire & apprentissage** | que retient le système ? | hermes, cerveau partagé, rtk |
+| **Avancement** | où en est la tâche, que lui faut-il de moi pour avancer ? | entretien de spec et formule d'exécution (préalables), question d'un agent ACP, revue humaine (approbation du plan comprise), pipeline CI, suivi de la PR, la tâche (`TaskMetadata`), mode objectif, Best-of-N, vues MCP Apps |
+| **Qualité** | ce qui a été construit est-il juste ? | JEV, traçabilité du spec, design system UI/UX, revue visuelle (OCR), boucle de vérification |
+| **Coûts et contexte** | que coûte-t-elle, que lisent et retiennent les agents ? | profil d'exécution (ce que l'effort achète), pièces jointes et ADR, hermes, cerveau partagé, rtk |
 
-Une barre de raccourcis collante mène à chaque section et porte le nombre de
-décisions en attente (skills hermes, règles proposées au cerveau).
+Les autres onglets du panneau (Sous-tâches, Logs, Fichiers, Graphe, Visual
+proof, Émulateur, Mobile, Vérification, Delta d'architecture) sont des vues
+pleine hauteur, pas des cartes : ils restent des onglets du panneau.
 
-**Une section vide disparaît avec son titre et son raccourci.** Chaque carte
-décide seule de s'afficher, et la plupart ne rendent rien quand elles n'ont rien
-à dire ; la présence est donc *observée* (`MutationObserver` sur le corps de la
-section) plutôt que recopiée : dix règles d'affichage dupliquées ici seraient dix
-occasions de se tromper.
+L'onglet **Fichiers** (`TaskFiles.tsx`, liste dans `task-files-model.ts`)
+montre d'abord les fichiers que la tâche a créés, modifiés ou supprimés : le
+diff du worktree (`getWorktreeDiff`, la même liste que « Fichiers modifiés » de
+la revue), lu dans le worktree ; quand ce diff est vide ou absent (branche
+fusionnée, worktree supprimé), les fichiers enregistrés par les sous-tâches,
+lus dans le projet. Le dossier de spécification (`.md`, `.json`) vient
+dessous. Une tâche créée ou dupliquée depuis le tableau porte son `specsPath`
+dès sa création, comme une tâche chargée du disque.
 
-**La barre de raccourcis ne défile pas.** Elle était `sticky` dans la zone qui
-défile, sous un parent en `overflow-x-hidden` — qui devient alors un conteneur
-de défilement immobile, et le `sticky` un élément ordinaire. `TaskOverview`
-possède désormais sa zone de défilement et pose la barre au-dessus ; elle est
-toujours rendue (une barre qui apparaît quand une carte asynchrone arrive pousse
-le contenu), et le raccourci de la section lue est allumé.
+L'onglet **Sous-tâches** (`TaskSubtasks.tsx`) place sous chaque sous-tâche
+bloquée ou échouée ce qu'elle attend de la personne (`BlockedSubtaskHelp.tsx`) :
+la raison (`blocked_reason`, ou `_blocked_reason` d'un ancien prompt), un conseil
+selon `blocked_kind` (`needs_human`, `manual_verification`, `max_attempts`,
+`file_validation`, `tool_concurrency`, `agent`) et quatre réponses : « C'est
+fait » et « Pas nécessaire » la terminent (`human_resolution`), « Réessayer » et
+« Répondre à l'agent » la rendent à l'agent (`unblocked_at`, `human_reply`) et
+relancent le build par le même chemin que Démarrer, jamais pendant qu'il tourne.
+Les règles sont celles de `foundation/subtask_unblock.py`, appliquées à une
+tâche locale par le main (`TASK_UNBLOCK_SUBTASK`,
+`task/subtask-unblock-handlers.ts`, logique dans `shared/utils/subtask-unblock.ts`)
+et à une carte du serveur par sa route (`shared_board/unblock.py`). Le codeur
+remet à zéro le compte de tentatives d'une sous-tâche renvoyée, exécute une
+vérification `manual` au lieu de la sauter, et met la réponse dans son prompt
+(`agents/manual_verification.py`, `prompts_pkg/prompt_generator.py`).
+
+**Les trois panneaux restent montés**, seuls les inactifs sont `hidden` : une
+carte charge ses données une fois, chaque onglet sait ce qu'il montre, et la
+bannière ci-dessous peut amener à une carte de n'importe quel onglet. Les onglets
+sont écrits à la main (pas les Radix du panneau, qui démontent l'inactif) selon
+le motif WAI-ARIA : `tablist` / `tab` / `tabpanel`, un seul onglet dans l'ordre
+de tabulation, flèches gauche/droite, Début et Fin, sélection au focus.
+L'onglet ouvert est gardé pour la session dans `stores/task-panel-store.ts`, en
+mémoire : aucun store d'interface existant ne convenait, et un choix qui
+survivrait au redémarrage cacherait l'onglet Avancement d'une tâche qui attend.
+
+**Une carte sans rien à montrer n'est pas rendue.** Chaque carte décide seule,
+et rend `null` quand elle n'a rien à dire ; `PanelCardSlot` l'*observe*
+(`MutationObserver` sur l'emplacement) plutôt que de recopier vingt règles, cache
+l'emplacement vide et le signale à son onglet. Un onglet dont toutes les cartes
+se taisent le dit en une ligne au lieu de disparaître : la barre ne change pas
+sous le clavier. `GoalCard` rendait une coquille (titre et phrase « fixez un
+objectif » sans bouton) pendant un run sans objectif : elle rend désormais
+`null` dans ce cas.
+
+**La barre d'onglets ne défile pas.** `TaskOverview` possède sa zone de
+défilement et pose la barre au-dessus (un `sticky` sous un parent en
+`overflow-x-hidden` partait avec le contenu). L'onglet Coûts et contexte porte
+le nombre de décisions en attente (skills hermes, règles proposées au cerveau).
+
+## « Ce qui vous attend » (`task-detail/TaskWaitingBanner.tsx`)
+
+En haut du panneau, au-dessus des onglets, une bannière liste ce qui demande la
+personne maintenant. Chaque ligne vient d'un état que l'application tient déjà
+(`task-detail/waiting-items.ts`, fonction pure) et mène à la carte qui la traite :
+
+| Ligne | Lu dans | Carte |
+|---|---|---|
+| question d'un agent | `task-permission-store` (validée par le main) | `TaskPermissionPrompt`, désormais aussi dans le panneau |
+| plan à approuver | `status === "human_review"`, `reviewReason === "plan_review"` | la revue (`PlanApprovalSection`) |
+| build en échec | `status === "error"` ou revue pour `errors` | `TaskFailureBanner`, juste en dessous |
+| CI rouge | `task-store.pipelineStatuses` (le poller CI du main), sans réparation en cours | `CiPipelineCard`, nouvelle : le badge du Kanban et son bouton « Réparer le build », dans le panneau |
+| checks rouges sur la PR | `pr-followup-store` : le dernier passage a vu des checks rouges ou a abandonné, et rien ne tourne | `PrFollowupCard` |
+| objectif non atteint | `task.goal.status !== "met"`, une fois qu'aucun agent ne travaille | `GoalCard` |
+| revue | toute autre revue humaine | la revue |
+
+Une CI rouge que la réparation automatique traite déjà, ou des checks que le
+suivi est en train de corriger, n'attendent personne : ils n'y sont pas. Rien à
+faire, pas de bannière. Un clic ouvre la Vue d'ensemble, sélectionne l'onglet de
+la carte (`task-panel-store.reveal`) ; l'emplacement de la carte défile à l'écran
+et prend le focus dès qu'elle est rendue (elle peut charger après coup).
+
+Le statut du suivi de PR vivait dans l'état local de sa carte, abonnée aux
+événements tant qu'elle était montée. Deux lecteurs en ont besoin : il est dans
+`stores/pr-followup-store.ts`, abonné une fois par `global-listeners.ts`.
+
+## Deux cartes : la tâche et JEV
 
 **Le titre et la description se modifient là où on les lit.** Un clic sur le
 titre de l'en-tête (`EditableTaskTitle`) ou sur l'encart de la description

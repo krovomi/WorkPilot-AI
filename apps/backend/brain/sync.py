@@ -228,7 +228,12 @@ def clone(remote: str, root: Path, timeout_s: int = 180) -> str | None:
     except subprocess.TimeoutExpired:
         return "git clone timed out"
     except OSError as exc:
-        return str(exc)
+        # A fixed sentence, not the exception: it may carry the path of the
+        # folder, and this text reaches the settings page (`_clone_error`).
+        logger.warning("brain: git clone could not start: %s", exc)
+        if isinstance(exc, FileNotFoundError):
+            return "git: no such file or directory"
+        return "git clone could not start"
     if done.returncode != 0:
         return done.stderr.strip()[-500:] or "git clone failed"
     return None

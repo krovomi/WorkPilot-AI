@@ -31,8 +31,8 @@ import pytest
 # Add apps/backend directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 
-from core.git_provider import detect_git_provider
 from core.glab_executable import get_glab_executable
+from foundation.git_provider import detect_git_provider
 
 
 def print_header(title: str) -> None:

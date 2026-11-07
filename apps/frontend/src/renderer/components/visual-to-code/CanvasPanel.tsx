@@ -22,6 +22,7 @@ import {
 	History,
 	Loader2,
 	LayoutGrid,
+	MessageSquareText,
 	MousePointerSquareDashed,
 	PanelLeftClose,
 	PanelLeftOpen,
@@ -31,7 +32,6 @@ import {
 	Rocket,
 	Save,
 	Sparkles,
-	Trash2,
 	Undo2,
 } from "lucide-react";
 import React, {
@@ -49,18 +49,17 @@ import ReactFlow, {
 	type Connection,
 	Controls,
 	type Edge,
-	MarkerType,
 	MiniMap,
 	type Node,
 	useEdgesState,
 	useNodesState,
 } from "reactflow";
-import { Button } from "../ui/button";
+import { Button, Input, NativeSelect } from "../ui";
 import "reactflow/dist/style.css";
+import "./flow-canvas.css";
 import { saveAs } from "file-saver";
 import { toast } from "@/hooks/use-toast";
 import {
-	blockAccent,
 	blockMeta,
 	FRAMEWORKS_BY_TYPE,
 	needsFramework,
@@ -68,8 +67,17 @@ import {
 import {
 	canConnect,
 	connectionLabel,
+	explainConnection,
 	type Lang,
 } from "../../lib/architecture-connections";
+import {
+	applyBricks,
+	BRICK_DRAG_PREFIX,
+	brickNodeData,
+	type NodeLook,
+	resolveLook,
+} from "../../lib/custom-bricks";
+import { useCustomBricksStore } from "../../stores/custom-bricks-store";
 import {
 	buildArchitectureSpec,
 	sanitizeEdges,
@@ -87,6 +95,8 @@ import {
 	undo as undoHistory,
 } from "../../lib/canvas-history";
 import { autoLayout } from "../../lib/canvas-layout";
+import { canvasThemeStyle } from "../../lib/canvas-themes";
+import { genNodeId } from "../../lib/node-id";
 import {
 	addProject as registerProject,
 	useProjectStore,
@@ -105,8 +115,12 @@ import {
 import { FileTree } from "../FileTree";
 import { ArchitectureHistoryDock } from "./ArchitectureHistoryDock";
 import { ArchitectureTabs } from "./ArchitectureTabs";
+import { CanvasInspector } from "./CanvasInspector";
+import { CanvasThemePicker } from "./CanvasThemePicker";
 import { GeneratedCodeDock } from "./GeneratedCodeDock";
+import { useFitViewOnShow } from "./useFitViewOnShow";
 import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
+import type { EdgePatch } from "../DefaultEdge";
 import { edgeTypes, nodeTypes } from "../reactflowTypes";
 import {
 	Dialog,
@@ -120,12 +134,6 @@ export type { DiagramType } from "../../stores/visual-to-code-store";
 
 const DIAGRAM_TYPES: DiagramType[] = ["architecture", "flowchart", "mockup"];
 
-/** What the Save-As dialog should do once the file is written. */
-
-// Collision-free node ids. The previous `(nodes.length + 1)` scheme reused ids
-// after a delete (e.g. delete "1" then add → "2" again), which left edges
-// pointing at the wrong / a now-missing node (the dangling `edge-1-6`). Module
-// scope so the callbacks that mint ids stay referentially stable.
 /**
  * How long editing has to settle before a construction step is recorded.
  *
@@ -143,10 +151,6 @@ const HISTORY_CAPTURE_DEBOUNCE_MS = 1500;
  * so this delays a write and never loses one.
  */
 const MIRROR_DEBOUNCE_MS = 250;
-
-const genNodeId = () =>
-	globalThis.crypto?.randomUUID?.() ??
-	`n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const CanvasPanel: React.FC = () => {
 	const { t, i18n } = useTranslation("visualProgramming");
@@ -249,6 +253,7 @@ export const CanvasPanel: React.FC = () => {
 	const [customFramework, setCustomFramework] = useState("");
 	// biome-ignore lint/suspicious/noExplicitAny: ReactFlow instance has no exported type in v11
 	const reactFlowRef = useRef<any>(null);
+	useFitViewOnShow(reactFlowRef, loadedArchitectureId);
 	const [showPalette, setShowPalette] = useState(true);
 	// MiniMap is collapsed to a small thumbnail and expands on hover.
 	const [miniMapExpanded, setMiniMapExpanded] = useState(false);
@@ -315,15 +320,24 @@ export const CanvasPanel: React.FC = () => {
 	const codeToVisualInputRef = useRef<HTMLInputElement>(null);
 
 	// ── Node / edge mutation ────────────────────────────────────────────
-	const handleRenameNode = useCallback(
-		(id: string, newLabel: string) => {
+	const bricks = useCustomBricksStore((state) => state.bricks);
+	// The nodes with their bricks' current look. What is drawn, specified,
+	// generated and exported: editing a brick restyles every block made from it.
+	const liveNodes = useMemo(() => applyBricks(nodes, bricks), [nodes, bricks]);
+	const [showExplanations, setShowExplanations] = useState(true);
+
+	const handleNodeChange = useCallback(
+		(id: string, patch: Partial<NodeLook>) => {
 			setNodes((nds) =>
-				nds.map((n) =>
-					n.id === id ? { ...n, data: { ...n.data, label: newLabel } } : n,
-				),
+				nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
 			);
 		},
 		[setNodes],
+	);
+
+	const handleRenameNode = useCallback(
+		(id: string, label: string) => handleNodeChange(id, { label }),
+		[handleNodeChange],
 	);
 
 	const handleDeleteNode = useCallback(
@@ -337,12 +351,20 @@ export const CanvasPanel: React.FC = () => {
 		[setEdges, setNodes],
 	);
 
-	const handleEdgeLabelChange = useCallback(
-		(id: string, newLabel: string) => {
+	/** A `null` drops the field: the automatic sentence, the canvas' wire colour. */
+	const handleEdgeChange = useCallback(
+		(id: string, patch: EdgePatch) => {
 			setEdges((eds) =>
-				eds.map((e) =>
-					e.id === id ? { ...e, data: { ...e.data, label: newLabel } } : e,
-				),
+				eds.map((e) => {
+					if (e.id !== id) return e;
+					const merged = Object.entries({ ...e.data, ...patch });
+					return {
+						...e,
+						data: Object.fromEntries(
+							merged.filter(([k, v]) => v !== null && (k !== "description" || v)),
+						),
+					};
+				}),
 			);
 		},
 		[setEdges],
@@ -353,22 +375,11 @@ export const CanvasPanel: React.FC = () => {
 		[setEdges],
 	);
 
-	const handleSetFramework = useCallback(
-		(id: string, framework: string) => {
-			setNodes((nds) =>
-				nds.map((n) =>
-					n.id === id ? { ...n, data: { ...n.data, framework } } : n,
-				),
-			);
-		},
-		[setNodes],
-	);
-
 	// The arrays ReactFlow actually renders: state data plus the handlers. Kept
 	// out of state so what we persist and export stays serialisable.
 	const renderNodes = useMemo(
 		() =>
-			nodes.map((n) => ({
+			liveNodes.map((n) => ({
 				...n,
 				data: {
 					...n.data,
@@ -376,29 +387,54 @@ export const CanvasPanel: React.FC = () => {
 					onDelete: handleDeleteNode,
 				},
 			})),
-		[nodes, handleRenameNode, handleDeleteNode],
+		[liveNodes, handleRenameNode, handleDeleteNode],
+	);
+
+	/** The sentence the canvas writes for an edge, from its blocks' current names. */
+	const defaultExplanation = useCallback(
+		(edge: Edge) => {
+			const src = liveNodes.find((n) => n.id === edge.source);
+			const tgt = liveNodes.find((n) => n.id === edge.target);
+			return explainConnection(
+				src?.data?.type,
+				tgt?.data?.type,
+				String(src?.data?.label ?? ""),
+				String(tgt?.data?.label ?? ""),
+				lang,
+			);
+		},
+		[liveNodes, lang],
 	);
 
 	const renderEdges = useMemo(
 		() =>
-			edges.map((e) => ({
-				...e,
-				markerEnd: e.markerEnd ?? {
-					type: MarkerType.ArrowClosed,
-					width: 18,
-					height: 18,
-				},
-				data: {
-					...e.data,
-					onEdgeLabelChange: handleEdgeLabelChange,
-					onDelete: handleDeleteEdge,
-				},
-			})),
-		[edges, handleEdgeLabelChange, handleDeleteEdge],
+			edges.map((e) => {
+				const auto = defaultExplanation(e);
+				return {
+					...e,
+					data: {
+						...e.data,
+						explanation: e.data?.description || auto,
+						defaultExplanation: auto,
+						showText: showExplanations,
+						onEdgeChange: handleEdgeChange,
+						onDelete: handleDeleteEdge,
+					},
+				};
+			}),
+		[edges, defaultExplanation, showExplanations, handleEdgeChange, handleDeleteEdge],
 	);
 
-	const selectedNodes = useMemo(() => nodes.filter((n) => n.selected), [nodes]);
+	const selectedNodes = useMemo(
+		() => liveNodes.filter((n) => n.selected),
+		[liveNodes],
+	);
 	const inspected = selectedNodes.length === 1 ? selectedNodes[0] : null;
+	const selectedEdges = edges.filter((e) => e.selected);
+	const inspectedEdge =
+		!inspected && selectedNodes.length === 0 && selectedEdges.length === 1
+			? selectedEdges[0]
+			: null;
 
 	// A reverse run (Code → Visuel) answers with a diagram, and the canvas is
 	// what it answers *into*. The listener that received it runs for the life of
@@ -466,8 +502,8 @@ export const CanvasPanel: React.FC = () => {
 		}
 		startRun("generate-code");
 		const diagramJson = JSON.stringify({
-			nodes,
-			edges: sanitizeEdges(nodes, edges),
+			nodes: liveNodes,
+			edges: sanitizeEdges(liveNodes, edges),
 			diagramType,
 		});
 		await globalThis.electronAPI.runVisualProgramming({
@@ -563,9 +599,9 @@ export const CanvasPanel: React.FC = () => {
 	// (backlog) — the user reviews the generated spec and launches the build
 	// from the Kanban when ready (no auto-start).
 	const runScaffold = async (projectId: string) => {
-		const cleanEdges = sanitizeEdges(nodes, edges);
+		const cleanEdges = sanitizeEdges(liveNodes, edges);
 		const { title, description } = buildArchitectureSpec(
-			nodes,
+			liveNodes,
 			cleanEdges,
 			diagramType,
 			lang,
@@ -738,6 +774,18 @@ export const CanvasPanel: React.FC = () => {
 	 */
 	const placeBlock = useCallback(
 		(type: string, position: { x: number; y: number }) => {
+			if (type.startsWith(BRICK_DRAG_PREFIX)) {
+				const id = type.slice(BRICK_DRAG_PREFIX.length);
+				const brick = useCustomBricksStore
+					.getState()
+					.bricks.find((b) => b.id === id);
+				if (!brick) return;
+				setNodes((nds) => [
+					...nds,
+					{ id: genNodeId(), position, data: brickNodeData(brick), type: "editable" },
+				]);
+				return;
+			}
 			if (needsFramework(type)) {
 				setPendingNode({ id: genNodeId(), type, position });
 				setCustomFramework("");
@@ -746,7 +794,7 @@ export const CanvasPanel: React.FC = () => {
 			}
 			createNode(type, position);
 		},
-		[createNode],
+		[createNode, setNodes],
 	);
 
 	const handleAddBlockFromPalette = useCallback(
@@ -769,8 +817,8 @@ export const CanvasPanel: React.FC = () => {
 
 	const handleExportCode = () => {
 		const exportData = {
-			nodes,
-			edges: sanitizeEdges(nodes, edges),
+			nodes: liveNodes,
+			edges: sanitizeEdges(liveNodes, edges),
 			diagramType,
 			exportedAt: new Date().toISOString(),
 		};
@@ -819,8 +867,8 @@ export const CanvasPanel: React.FC = () => {
 
 	const confirmSaveAs = async () => {
 		const exportData = {
-			nodes,
-			edges: sanitizeEdges(nodes, edges),
+			nodes: liveNodes,
+			edges: sanitizeEdges(liveNodes, edges),
 			diagramType,
 			exportedAt: new Date().toISOString(),
 		};
@@ -1251,10 +1299,6 @@ export const CanvasPanel: React.FC = () => {
 	const frameworkOptions = pendingNode
 		? (FRAMEWORKS_BY_TYPE[pendingNode.type] ?? [])
 		: [];
-	const inspectedType = inspected?.data?.type as string | undefined;
-	const inspectorStacks = inspectedType
-		? (FRAMEWORKS_BY_TYPE[inspectedType] ?? [])
-		: [];
 
 	return (
 		<div className="flex flex-col h-full flex-1 relative">
@@ -1270,7 +1314,7 @@ export const CanvasPanel: React.FC = () => {
 			/>
 
 			{/* Toolbar */}
-			<div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background shrink-0">
+			<div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background shrink-0 overflow-x-auto">
 				{/* Group 1 — Document */}
 				<Button
 					size="sm"
@@ -1282,19 +1326,19 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<Copy className="h-3.5 w-3.5" />
 				</Button>
-				<select
+				<NativeSelect
 					value={diagramType}
 					onChange={(e) => setDiagramType(e.target.value as DiagramType)}
 					aria-label={t("diagramType", "Type de diagramme")}
 					title={t("diagramType", "Type de diagramme")}
-					className="h-7 rounded-md border bg-background px-1.5 text-xs text-foreground outline-none focus:border-primary"
+					className="h-7 px-1.5 text-xs"
 				>
 					{DIAGRAM_TYPES.map((type) => (
 						<option key={type} value={type}>
 							{t(`diagramType_${type}`, type)}
 						</option>
 					))}
-				</select>
+				</NativeSelect>
 
 				<div className="h-5 w-px bg-border mx-0.5" />
 
@@ -1356,6 +1400,20 @@ export const CanvasPanel: React.FC = () => {
 				>
 					<LayoutGrid className="h-3.5 w-3.5" />
 				</Button>
+				<Button
+					size="sm"
+					variant={showExplanations ? "secondary" : "ghost"}
+					onClick={() => setShowExplanations((v) => !v)}
+					aria-pressed={showExplanations}
+					className="gap-1.5 h-7 px-2 text-xs"
+					title={t("toggleExplanations", "Afficher les explications des interactions")}
+				>
+					<MessageSquareText className="h-3.5 w-3.5" />
+					<span className="hidden xl:inline">
+						{t("explanations", "Interactions")}
+					</span>
+				</Button>
+				<CanvasThemePicker />
 				<input
 					type="file"
 					ref={codeToVisualInputRef}
@@ -1391,7 +1449,7 @@ export const CanvasPanel: React.FC = () => {
 						"scaffoldTooltip",
 						"Scaffolder le projet complet (production-ready) via le pipeline agentique, dans le projet actif",
 					)}
-					className="gap-1.5 h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+					className="gap-1.5 h-7 px-3 text-xs bg-success hover:bg-success/90 text-success-foreground"
 				>
 					{isScaffolding ? (
 						<Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1443,7 +1501,6 @@ export const CanvasPanel: React.FC = () => {
 					</Button>
 				)}
 
-				{/* Spacer */}
 				<div className="flex-1" />
 
 				{/* Group 4 — File operations */}
@@ -1455,7 +1512,7 @@ export const CanvasPanel: React.FC = () => {
 					title={t("export", "Exporter JSON")}
 				>
 					<FileJson className="h-3.5 w-3.5" />
-					<span className="hidden lg:inline">{t("export", "Exporter")}</span>
+					<span className="hidden min-[1800px]:inline">{t("export", "Exporter")}</span>
 				</Button>
 				<Button
 					size="sm"
@@ -1468,7 +1525,7 @@ export const CanvasPanel: React.FC = () => {
 					)}
 				>
 					<History className="h-3.5 w-3.5" />
-					<span className="hidden lg:inline">
+					<span className="hidden min-[1800px]:inline">
 						{t("historyShort", "Historique")}
 					</span>
 				</Button>
@@ -1480,9 +1537,9 @@ export const CanvasPanel: React.FC = () => {
 					title={t("saveAs", "Enregistrer sous…")}
 				>
 					<Save className="h-3.5 w-3.5" />
-					<span className="hidden lg:inline">{t("saveAs", "Enregistrer")}</span>
+					<span className="hidden min-[1800px]:inline">{t("saveAs", "Enregistrer")}</span>
 					{isDirty && (
-						<span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+						<span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-warning" />
 					)}
 				</Button>
 				<input
@@ -1500,7 +1557,7 @@ export const CanvasPanel: React.FC = () => {
 					title={t("load", "Charger")}
 				>
 					<FolderOpen className="h-3.5 w-3.5" />
-					<span className="hidden lg:inline">{t("load", "Charger")}</span>
+					<span className="hidden min-[1800px]:inline">{t("load", "Charger")}</span>
 				</Button>
 			</div>
 
@@ -1524,8 +1581,10 @@ export const CanvasPanel: React.FC = () => {
 
 				<div
 					ref={paneRef}
-					className="relative flex-1 min-h-0 overflow-hidden bg-muted/30"
+					className="vtc-flow relative flex-1 min-h-0 overflow-hidden"
+					style={canvasThemeStyle(activeArchitecture?.theme)}
 				>
+					<div className="vtc-ambient" />
 					<ReactFlow
 						onInit={(instance) => {
 							reactFlowRef.current = instance;
@@ -1537,6 +1596,7 @@ export const CanvasPanel: React.FC = () => {
 						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
 						fitView={true}
+						minZoom={0.15}
 						edgeTypes={edgeTypes}
 						nodeTypes={nodeTypes}
 						multiSelectionKeyCode={["Shift", "Meta", "Control"]}
@@ -1569,7 +1629,7 @@ export const CanvasPanel: React.FC = () => {
 								// the thumbnail is a map rather than a grey smear. The panel
 								// itself follows the theme instead of the hard-coded white it
 								// used to paint over every dark canvas.
-								nodeColor={(n) => blockAccent(n.data?.type as string)}
+								nodeColor={(n) => resolveLook(n.data).accent}
 								maskColor="color-mix(in srgb, var(--background) 65%, transparent)"
 								style={{
 									position: "relative",
@@ -1584,7 +1644,11 @@ export const CanvasPanel: React.FC = () => {
 								}}
 							/>
 						</div>
-						<Background variant={BackgroundVariant.Dots} gap={18} size={1} />
+						<Background
+							variant={BackgroundVariant.Lines}
+							gap={32}
+							color="var(--vtc-grid)"
+						/>
 					</ReactFlow>
 
 					{/* Empty state — the canvas used to be an unexplained grid. */}
@@ -1606,93 +1670,28 @@ export const CanvasPanel: React.FC = () => {
 					)}
 				</div>
 
-				{/* Inspector — the only place a block's stack can be changed after
-				    it is created. Before this, a wrong choice in the technology
-				    dialog meant deleting the block and drawing it again. */}
-				{inspected && (
-					<aside className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-l bg-background p-3">
-						<div className="flex items-center justify-between">
-							<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-								{t("inspector", "Bloc sélectionné")}
-							</span>
-							<button
-								type="button"
-								onClick={() => handleDeleteNode(inspected.id)}
-								title={t("deleteBlock", "Supprimer le bloc")}
-								aria-label={t("deleteBlock", "Supprimer le bloc")}
-								className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-							>
-								<Trash2 className="h-3.5 w-3.5" />
-							</button>
-						</div>
-
-						<div>
-							<label
-								htmlFor="inspector-name"
-								className="mb-1 block text-[11px] font-medium text-muted-foreground"
-							>
-								{t("blockName", "Nom")}
-							</label>
-							<input
-								id="inspector-name"
-								type="text"
-								value={String(inspected.data?.label ?? "")}
-								onChange={(e) =>
-									handleRenameNode(inspected.id, e.target.value)
-								}
-								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
-							/>
-						</div>
-
-						<div>
-							<span className="mb-1 block text-[11px] font-medium text-muted-foreground">
-								{t("blockRole", "Rôle")}
-							</span>
-							<p className="flex items-center gap-1.5 text-xs text-foreground">
-								<span
-									className="inline-block h-2 w-2 rounded-full"
-									style={{ backgroundColor: blockAccent(inspectedType) }}
-								/>
-								{inspectedType
-									? t(blockMeta(inspectedType)?.labelKey ?? inspectedType)
-									: t("untyped", "Bloc libre")}
-							</p>
-						</div>
-
-						{inspectorStacks.length > 0 && (
-							<div>
-								<label
-									htmlFor="inspector-stack"
-									className="mb-1 block text-[11px] font-medium text-muted-foreground"
-								>
-									{t("blockStack", "Technologie")}
-								</label>
-								<select
-									id="inspector-stack"
-									value={String(inspected.data?.framework ?? "")}
-									onChange={(e) =>
-										handleSetFramework(inspected.id, e.target.value)
-									}
-									className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
-								>
-									<option value="">{t("noStack", "Non précisée")}</option>
-									{inspectorStacks.map((fw) => (
-										<option key={fw} value={fw}>
-											{t(fw, fw)}
-										</option>
-									))}
-								</select>
-							</div>
-						)}
-
-						<p className="mt-auto text-[10px] leading-snug text-muted-foreground">
-							{t(
-								"inspectorHint",
-								"Double-cliquez un bloc pour le renommer sur le canvas, ou une connexion pour changer son libellé.",
-							)}
-						</p>
-					</aside>
-				)}
+				<CanvasInspector
+					node={inspected}
+					brickName={
+						inspected?.data?.brickId
+							? bricks.find((b) => b.id === inspected.data.brickId)?.name
+							: undefined
+					}
+					edge={inspectedEdge}
+					edgeEnds={
+						inspectedEdge
+							? [
+									String(liveNodes.find((n) => n.id === inspectedEdge.source)?.data?.label ?? ""),
+									String(liveNodes.find((n) => n.id === inspectedEdge.target)?.data?.label ?? ""),
+								]
+							: null
+					}
+					defaultExplanation={inspectedEdge ? defaultExplanation(inspectedEdge) : ""}
+					onNodeChange={handleNodeChange}
+					onDeleteNode={handleDeleteNode}
+					onEdgeChange={handleEdgeChange}
+					onDeleteEdge={handleDeleteEdge}
+				/>
 
 				{/* The generation, while it is happening — see GeneratedCodeDock. */}
 				<GeneratedCodeDock />
@@ -1725,7 +1724,7 @@ export const CanvasPanel: React.FC = () => {
 			</div>
 
 			{/* Status bar */}
-			<div className="flex shrink-0 items-center gap-3 border-t bg-background px-3 py-1 text-[11px] text-muted-foreground">
+			<div className="flex shrink-0 items-center gap-3 border-t bg-background px-3 py-1 text-2xs text-muted-foreground">
 				<span className="tabular-nums">
 					{t("statusBlocks", "{{count}} blocs", { count: nodes.length })}
 				</span>
@@ -1736,8 +1735,8 @@ export const CanvasPanel: React.FC = () => {
 				</span>
 				<span className="flex-1" />
 				{isDirty ? (
-					<span className="flex items-center gap-1 text-amber-500">
-						<span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+					<span className="flex items-center gap-1 text-warning">
+						<span className="h-1.5 w-1.5 rounded-full bg-warning" />
 						{t("statusUnsaved", "Non enregistré")}
 					</span>
 				) : (
@@ -1776,7 +1775,7 @@ export const CanvasPanel: React.FC = () => {
 							{t("otherStack", "Autre technologie")}
 						</label>
 						<div className="flex gap-2">
-							<input
+							<Input
 								id="custom-framework"
 								type="text"
 								value={customFramework}
@@ -1787,7 +1786,7 @@ export const CanvasPanel: React.FC = () => {
 									}
 								}}
 								placeholder={t("otherStackPlaceholder", "ex. Quarkus")}
-								className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+								className="w-full px-2 py-1 text-xs h-auto"
 							/>
 							<Button
 								size="sm"
@@ -1842,12 +1841,12 @@ export const CanvasPanel: React.FC = () => {
 							{t("explorerRoot", "Racine de l'explorateur :")}
 						</label>
 						<div className="flex gap-2">
-							<input
+							<Input
 								id="explorer-root-input"
 								type="text"
 								value={explorerRoot}
 								readOnly
-								className="w-full p-2 border rounded"
+								className="w-full p-2 h-auto"
 							/>
 							<Button variant="secondary" onClick={handleChooseExplorerRoot}>
 								{t("chooseFolder")}
@@ -1875,12 +1874,12 @@ export const CanvasPanel: React.FC = () => {
 						>
 							{t("fileNameLabel", "Nom du fichier :")}
 						</label>
-						<input
+						<Input
 							id="save-as-filename"
 							type="text"
 							value={saveAsFileName}
 							onChange={(e) => setSaveAsFileName(e.target.value)}
-							className="w-full mt-1 p-2 border rounded"
+							className="w-full mt-1 p-2 h-auto"
 						/>
 					</div>
 					<DialogFooter>
@@ -1921,7 +1920,7 @@ export const CanvasPanel: React.FC = () => {
 							disabled={!activeProject}
 							className={`text-left rounded-md border p-3 text-sm transition-colors disabled:opacity-50 ${
 								scaffoldMode === "active"
-									? "border-emerald-500 bg-emerald-500/10"
+									? "border-success bg-success/10"
 									: "hover:bg-accent/50"
 							}`}
 						>
@@ -1939,7 +1938,7 @@ export const CanvasPanel: React.FC = () => {
 							onClick={() => setScaffoldMode("new")}
 							className={`text-left rounded-md border p-3 text-sm transition-colors ${
 								scaffoldMode === "new"
-									? "border-emerald-500 bg-emerald-500/10"
+									? "border-success bg-success/10"
 									: "hover:bg-accent/50"
 							}`}
 						>
@@ -1964,12 +1963,12 @@ export const CanvasPanel: React.FC = () => {
 								>
 									{t("projectName", "Nom du projet")}
 								</label>
-								<input
+								<Input
 									id="scaffold-proj-name"
 									type="text"
 									value={newProjectName}
 									onChange={(e) => setNewProjectName(e.target.value)}
-									className="w-full p-2 border rounded text-sm"
+									className="w-full p-2 text-sm h-auto"
 									placeholder="mon-projet"
 								/>
 							</div>
@@ -1981,13 +1980,13 @@ export const CanvasPanel: React.FC = () => {
 									{t("projectLocation", "Emplacement")}
 								</label>
 								<div className="flex gap-2">
-									<input
+									<Input
 										id="scaffold-proj-loc"
 										type="text"
 										value={newProjectLocation}
 										onChange={(e) => setNewProjectLocation(e.target.value)}
-										className="w-full p-2 border rounded text-sm"
-										placeholder="C:\\ ou /"
+										className="w-full p-2 text-sm h-auto"
+										placeholder={t("visualProgramming:locationPlaceholder")}
 									/>
 									<Button variant="secondary" onClick={handleBrowseLocation}>
 										{t("browse", "Parcourir")}

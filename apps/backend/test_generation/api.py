@@ -31,7 +31,7 @@ def analyze_test_coverage(
 ):
     """Analyze test coverage gaps for a source file."""
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         agent = TestGeneratorAgent()
         gaps = agent.analyze_coverage(file_path, existing_test_path)
@@ -76,7 +76,7 @@ def generate_unit_tests(
 ):
     """Generate unit tests for a source file."""
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         agent = TestGeneratorAgent()
         result = agent.generate_unit_tests(
@@ -126,7 +126,7 @@ def generate_e2e_tests(
 ):
     """Generate E2E tests from a user story."""
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         agent = TestGeneratorAgent()
         result = agent.generate_tests_from_user_story(user_story, target_module)
@@ -160,7 +160,7 @@ def generate_e2e_tests(
 def generate_tdd_tests(spec: Annotated[dict, Body(...)]):
     """Generate tests before implementation (TDD mode)."""
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         agent = TestGeneratorAgent()
         result = agent.generate_tdd_tests(spec)
@@ -208,7 +208,7 @@ def run_post_build_test_generation(
 ):
     """Run automatic test generation after a build (post-build hook)."""
     try:
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         agent = TestGeneratorAgent()
         results = []

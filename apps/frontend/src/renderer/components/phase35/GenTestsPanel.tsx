@@ -12,6 +12,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 interface GenTestsPanelProps {
 	projectPath: string;
 }
@@ -93,14 +95,14 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 					</summary>
 					<div className="mt-2 space-y-2">
 						<div>
-							<input
+							<Input
 								value={label}
 								onChange={(e) => setLabel(e.target.value.slice(0, LABEL_MAX_LEN))}
 								maxLength={LABEL_MAX_LEN}
 								aria-invalid={Boolean(labelError) || undefined}
 								aria-describedby={labelError ? "label-error" : undefined}
 								placeholder={t("genTests.label")}
-								className="w-full rounded border bg-background p-2 text-sm"
+								className="w-full p-2 text-sm h-auto"
 							/>
 							{labelError && (
 								<p id="label-error" className="mt-1 text-xs text-destructive">
@@ -109,7 +111,8 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 							)}
 						</div>
 						<div>
-							<textarea
+							<Textarea
+								spellCheck={false}
 								value={junit}
 								onChange={(e) => setJunit(e.target.value.slice(0, JUNIT_MAX_LEN))}
 								rows={4}
@@ -117,7 +120,7 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 								aria-invalid={Boolean(junitError) || undefined}
 								aria-describedby={junitError ? "junit-error" : undefined}
 								placeholder={t("genTests.junitXml")}
-								className="w-full rounded border bg-background p-2 font-mono text-xs"
+								className="w-full p-2 font-mono text-xs min-h-0"
 							/>
 							{junitError && (
 								<p id="junit-error" className="mt-1 text-xs text-destructive">
@@ -168,7 +171,7 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 					</summary>
 					<div className="mt-2 space-y-2">
 						<div>
-							<input
+							<Input
 								value={baseline}
 								onChange={(e) =>
 									setBaseline(e.target.value.slice(0, LABEL_MAX_LEN))
@@ -177,7 +180,7 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 								aria-invalid={Boolean(baselineError) || undefined}
 								aria-describedby={baselineError ? "baseline-error" : undefined}
 								placeholder={t("genTests.baseline")}
-								className="w-full rounded border bg-background p-2 text-sm"
+								className="w-full p-2 text-sm h-auto"
 							/>
 							{baselineError && (
 								<p id="baseline-error" className="mt-1 text-xs text-destructive">
@@ -186,7 +189,8 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 							)}
 						</div>
 						<div>
-							<textarea
+							<Textarea
+								spellCheck={false}
 								value={currentJunit}
 								onChange={(e) =>
 									setCurrentJunit(e.target.value.slice(0, JUNIT_MAX_LEN))
@@ -198,7 +202,7 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 									currentJunitError ? "current-junit-error" : undefined
 								}
 								placeholder={t("genTests.current")}
-								className="w-full rounded border bg-background p-2 font-mono text-xs"
+								className="w-full p-2 font-mono text-xs min-h-0"
 							/>
 							{currentJunitError && (
 								<p

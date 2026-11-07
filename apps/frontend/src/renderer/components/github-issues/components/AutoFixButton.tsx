@@ -8,6 +8,7 @@ import type {
 import type { GitHubIssue } from "../../../../shared/types";
 import { Button } from "../../ui/button";
 import { Progress } from "../../ui/progress";
+import { useTranslation } from "react-i18next";
 
 interface AutoFixButtonProps {
 	issue: GitHubIssue;
@@ -22,6 +23,7 @@ export function AutoFixButton({
 	config,
 	queueItem,
 }: AutoFixButtonProps) {
+	const { t } = useTranslation();
 	const [isStarting, setIsStarting] = useState(false);
 	const [progress, setProgress] = useState<AutoFixProgress | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export function AutoFixButton({
 		return (
 			<div className="flex items-center gap-2 text-success text-sm">
 				<CheckCircle2 className="h-4 w-4" />
-				<span>Spec created from issue</span>
+				<span>{t("common:githubIssues.autoFix.specCreated")}</span>
 			</div>
 		);
 	}
@@ -121,11 +123,11 @@ export function AutoFixButton({
 			<div className="space-y-2">
 				<div className="flex items-center gap-2 text-destructive text-sm">
 					<AlertCircle className="h-4 w-4" />
-					<span>{error || queueItem?.error || "Auto-fix failed"}</span>
+					<span>{error || queueItem?.error || t("common:githubIssues.autoFix.failed")}</span>
 				</div>
 				<Button size="sm" variant="outline" onClick={handleStartAutoFix}>
 					<Wand2 className="h-4 w-4 mr-2" />
-					Retry Auto Fix
+					{t("common:githubIssues.autoFix.retry")}
 				</Button>
 			</div>
 		);
@@ -137,7 +139,7 @@ export function AutoFixButton({
 			<div className="space-y-2">
 				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Loader2 className="h-4 w-4 animate-spin" />
-					<span>{progress?.message || "Processing..."}</span>
+					<span>{progress?.message || t("common:githubIssues.autoFix.processingShort")}</span>
 				</div>
 				{progress && <Progress value={progress.progress} className="h-1" />}
 			</div>
@@ -152,7 +154,7 @@ export function AutoFixButton({
 			onClick={handleStartAutoFix}
 		>
 			<Wand2 className="h-4 w-4 mr-2" />
-			Auto Fix
+			{t("common:githubIssues.autoFix.button")}
 		</Button>
 	);
 }

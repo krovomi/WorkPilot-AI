@@ -23,8 +23,8 @@ metadata:
     - hermes-agent
   workpilot:
     pack: hermes
-    version: 0.0.1
-    content_sha256: 9285a272a5ece6e03cc25d3d4a81a2f6e33415e04f15587a47ef1a8f8990b1ac
+    version: 0.1.0
+    content_sha256: 53aae5e64c7cdd4ff49c128f5d0b33a6977631bdf680ae6d8166ff9a0fa38470
 ---
 
 # OpenCode CLI
@@ -182,8 +182,8 @@ terminal(command="REVIEW=$(mktemp -d) && git clone https://github.com/user/repo.
 Use separate workdirs/worktrees to avoid collisions:
 
 ```
-terminal(command="opencode run 'Fix issue #101 and commit'", workdir="/tmp/issue-101", background=true, pty=true)
-terminal(command="opencode run 'Add parser regression tests and commit'", workdir="/tmp/issue-102", background=true, pty=true)
+terminal(command="opencode run 'Fix issue #101 and commit'", workdir="~/.hermes/cache/scratch/issue-101", background=true, pty=true)
+terminal(command="opencode run 'Add parser regression tests and commit'", workdir="~/.hermes/cache/scratch/issue-102", background=true, pty=true)
 process(action="list")
 ```
 

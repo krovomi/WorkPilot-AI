@@ -572,7 +572,7 @@ class TestPhaseRosters:
     """
 
     def _rows(self):
-        from agents.subagents.phases import phase_specs
+        from subagents.phases import phase_specs
         from workflows.runner import SKILL_PHASE_AGENTS
         from workflows.spec import load_workflow
 
@@ -586,7 +586,7 @@ class TestPhaseRosters:
             yield phase, agent_type, set(phase_specs(agent_type, phase.roster))
 
     def test_no_phase_falls_through_to_the_kanban_default(self):
-        from agents.subagents.phases import PHASE_ALIASES
+        from subagents.phases import PHASE_ALIASES
 
         for phase, agent_type, _ in self._rows():
             assert phase.roster or agent_type in PHASE_ALIASES, (
@@ -630,7 +630,7 @@ class TestPhaseRosters:
 
     def test_an_unknown_roster_falls_back_rather_than_raising(self):
         """A typo in a workflow file costs the right roster, not the build."""
-        from agents.subagents.phases import phase_specs
+        from subagents.phases import phase_specs
 
         assert phase_specs("spec_validation", "nonsense") == phase_specs(
             "spec_validation"

@@ -6,6 +6,7 @@
  * and decision scoring. Works with any LLM provider.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 
@@ -27,6 +28,30 @@ async function timeTravelFetch<T = Record<string, unknown>>(
 		throw new Error(err || `HTTP ${res.status}`);
 	}
 	return res.json() as Promise<T>;
+}
+
+/** The fork fields the backend accepts, as strings; anything else the renderer
+ * sends (a provider key, for one) is dropped here rather than forwarded. */
+const FORK_FIELDS = [
+	"checkpoint_id",
+	"modified_prompt",
+	"additional_instructions",
+	"fork_provider",
+	"fork_model",
+	"fork_base_url",
+] as const;
+
+export function forkBody(raw: unknown): Record<string, string> {
+	const source = (raw && typeof raw === "object" ? raw : {}) as Record<
+		string,
+		unknown
+	>;
+	const body: Record<string, string> = {};
+	for (const field of FORK_FIELDS) {
+		const value = source[field];
+		if (typeof value === "string") body[field] = value;
+	}
+	return body;
 }
 
 /**
@@ -134,14 +159,13 @@ export function registerTimeTravelHandlers(): void {
 				additional_instructions?: string;
 				fork_provider?: string;
 				fork_model?: string;
-				fork_api_key?: string;
 				fork_base_url?: string;
 			},
 		) => {
 			try {
 				const result = await timeTravelFetch(`/sessions/${sessionId}/fork`, {
 					method: "POST",
-					body: JSON.stringify(forkRequest),
+					body: JSON.stringify(forkBody(forkRequest)),
 				});
 				return result;
 			} catch (error: unknown) {
@@ -253,5 +277,5 @@ export function registerTimeTravelHandlers(): void {
 		},
 	);
 
-	console.warn("[IPC] Time Travel handlers registered");
+	debugLog("[IPC] Time Travel handlers registered");
 }

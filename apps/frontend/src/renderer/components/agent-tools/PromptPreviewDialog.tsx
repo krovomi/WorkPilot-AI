@@ -77,7 +77,7 @@ export function PromptPreviewDialog({
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{error}
 					</div>
 				)}
@@ -86,7 +86,7 @@ export function PromptPreviewDialog({
 					<div className="space-y-3">
 						<div className="flex flex-wrap gap-2 text-xs">
 							<Badge variant="outline">
-								{t("promptPreview.badges.model")} <code>{preview.model || "default"}</code>
+								{t("promptPreview.badges.model")} <code>{preview.model || t("agentTools:promptPreview.defaultModel")}</code>
 							</Badge>
 							<Badge variant="outline">
 								{t("promptPreview.badges.provider")} <code>{preview.provider}</code>
@@ -124,7 +124,7 @@ export function PromptPreviewDialog({
 									{preview.allowed_tools.map((tool) => (
 										<code
 											key={tool}
-											className="px-1.5 py-0.5 rounded bg-muted text-[10px]"
+											className="px-1.5 py-0.5 rounded bg-muted text-3xs"
 										>
 											{tool}
 										</code>
@@ -134,7 +134,7 @@ export function PromptPreviewDialog({
 						)}
 
 						{preview.notes.length > 0 && (
-							<ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+							<ul className="text-xs text-warning space-y-0.5">
 								{preview.notes.map((n) => (
 									<li key={n}>· {n}</li>
 								))}

@@ -9,6 +9,7 @@ import {
 	useTaskPermissionStore,
 } from "../../stores/task-permission-store";
 import { Button } from "../ui/button";
+import { formatAppTime } from "@/lib/date-format";
 
 /** Allow first, then refuse: the order Gemini offers them in, kept stable. */
 const KIND_ORDER = ["allow_once", "allow_always", "reject_once", "reject_always"];
@@ -66,7 +67,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 					<p className="font-medium">{t("tasks:permission.asks", { agent: request.agent })}</p>
 					<p className="break-words">{request.title}</p>
 					{request.locations.slice(0, 3).map((location) => (
-						<p key={location} className="font-mono text-[11px] text-muted-foreground break-all">
+						<p key={location} className="font-mono text-2xs text-muted-foreground break-all">
 							{location}
 						</p>
 					))}
@@ -78,7 +79,7 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 						key={option.optionId}
 						size="sm"
 						variant={option.kind.startsWith("allow") ? "default" : "outline"}
-						className={cn("h-6 px-2 text-[11px]")}
+						className={cn("h-6 px-2 text-2xs")}
 						disabled={sending !== null}
 						onClick={() => void choose(option.optionId)}
 					>
@@ -86,15 +87,15 @@ function PermissionQuestion({ request }: { readonly request: TaskPermissionReque
 					</Button>
 				))}
 			</div>
-			<p className="text-[11px] text-muted-foreground">
+			<p className="text-2xs text-muted-foreground">
 				{t("tasks:permission.expires", {
-					time: new Date(request.expiresAt).toLocaleTimeString([], {
+					time: formatAppTime(request.expiresAt, {
 						hour: "2-digit",
 						minute: "2-digit",
 					}),
 				})}
 			</p>
-			{failure && <p className="text-[11px] text-destructive">{failure}</p>}
+			{failure && <p className="text-2xs text-destructive">{failure}</p>}
 		</fieldset>
 	);
 }

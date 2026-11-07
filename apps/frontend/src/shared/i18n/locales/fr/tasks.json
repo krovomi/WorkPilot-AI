@@ -104,7 +104,9 @@
 		"sessionCompactionHint": "{{count}} phases d'exécution — cliquez pour voir le résumé compacté",
 		"sessionCompaction": "Compaction de session",
 		"criticalPhases": "Étapes clés",
-		"lastError": "Dernière erreur"
+		"lastError": "Dernière erreur",
+		"automation": "Automations",
+		"automationTooltip": "Créée par la règle d'automatisation « {{rule}} »"
 	},
 	"warnings": {
 		"stuck": {
@@ -136,9 +138,6 @@
 		"previewApp": "Prévisualiser l'application",
 		"pauseTask": "Mettre en pause la tâche",
 		"resumeTask": "Reprendre la tâche"
-	},
-	"prFiles": {
-		"short": "Fichiers"
 	},
 	"creation": {
 		"title": "Créer une nouvelle tâche",
@@ -248,6 +247,7 @@
 		"bulkMoveSuccess": "{{count}} tâche(s) déplacée(s) avec succès",
 		"bulkMoveError": "Échec du déplacement de {{failed}} tâche(s) sur {{total}}",
 		"dragColumn": "Glisser pour réordonner la colonne",
+		"columnOptions": "Options de la colonne",
 		"collapseColumn": "Réduire la colonne",
 		"expandColumn": "Développer la colonne",
 		"resizeColumn": "Redimensionner la colonne",
@@ -354,7 +354,6 @@
 			"missingProject": "Sélectionne d'abord un projet",
 			"errorTitle": "Échec de la commande",
 			"successTitle": "Commande terminée",
-			"successBody": "La sortie a été écrite dans la console.",
 			"ariaListLabel": "Commandes slash disponibles",
 			"runAsTaskLabel": "Lancer en tâche",
 			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'un tir unique.",
@@ -383,6 +382,13 @@
 			"confidence": "Confiance : {{percent}} %",
 			"qaIterations_one": "1 passe QA attendue.",
 			"qaIterations_other": "{{count}} passes QA attendues."
+		},
+		"serverBoard": "Tableau partagé · {{role}}",
+		"serverBoardHint": "Ce projet vit sur le serveur WorkPilot : tous ses membres voient les mêmes cartes, et ses builds tournent là-bas. Le tableau se met à jour toutes les quelques secondes.",
+		"serverRole": {
+			"viewer": "Lecteur",
+			"member": "Membre",
+			"owner": "Propriétaire"
 		}
 	},
 	"queue": {
@@ -429,6 +435,12 @@
 			"qaPass": "Revue QA — passe n°{{n}}",
 			"thinking": "Traitement en cours"
 		},
+		"split": {
+			"legend": "Répartition du temps par phase",
+			"share": "{{share}} %",
+			"segment": "{{phase}} : {{share}} %",
+			"segmentWithDuration": "{{phase}} : {{share}} % du temps ({{duration}})"
+		},
 		"shortPhases": {
 			"plan": "Plan",
 			"code": "Code",
@@ -474,7 +486,6 @@
 	"files": {
 		"title": "Fichiers",
 		"tab": "Fichiers",
-		"noSpecPath": "Aucun fichier de spécification disponible",
 		"noFiles": "Aucun fichier trouvé",
 		"loading": "Chargement des fichiers...",
 		"loadingContent": "Chargement du contenu...",
@@ -482,7 +493,21 @@
 		"errorLoadingContent": "Échec du chargement du contenu du fichier",
 		"retry": "Réessayer",
 		"selectFile": "Sélectionnez un fichier pour voir son contenu",
-		"openInIDE": "Ouvrir dans l'IDE"
+		"openInIDE": "Ouvrir dans l'IDE",
+		"taskChanges": "Créés ou modifiés par la tâche",
+		"noTaskChanges": "La tâche n'a créé ni modifié aucun fichier",
+		"fromSubtasks": "D'après les fichiers enregistrés par les sous-tâches",
+		"errorLoadingChanges": "Impossible de lister les fichiers de la tâche",
+		"specSection": "Spécification",
+		"emptyFile": "Fichier vide",
+		"refresh": "Actualiser",
+		"status": {
+			"added": "Créé",
+			"modified": "Modifié",
+			"deleted": "Supprimé",
+			"renamed": "Renommé",
+			"unknown": "Touché par une sous-tâche"
+		}
 	},
 	"visualProof": {
 		"apiSmoke": {
@@ -605,7 +630,8 @@
 			"github": "GitHub",
 			"gitlab": "GitLab",
 			"visual-canvas": "Canvas visuel",
-			"tech-debt": "Dette technique"
+			"tech-debt": "Dette technique",
+			"automation": "Automatisation"
 		}
 	},
 	"kind": {
@@ -889,8 +915,6 @@
 		"blockedCount_other": "{{count}} bloquées",
 		"failedCount_one": "{{count}} échouée",
 		"failedCount_other": "{{count}} échouées",
-		"blockedReason": "Bloquée : {{reason}}",
-		"blockedGeneric": "Bloquée — intervention manuelle requise",
 		"changeRequest": "Modification demandée",
 		"requestedAt": "Demandée le {{date}}",
 		"filesViewer": {
@@ -920,6 +944,64 @@
 				"modified": "Modifié",
 				"deleted": "Supprimé",
 				"renamed": "Renommé"
+			}
+		},
+		"unblock": {
+			"regionLabel": "Ce que cette sous-tâche attend de vous",
+			"title": {
+				"needs_human": "L'agent a besoin de vous pour finir cette sous-tâche",
+				"manual_verification": "Cette vérification vous attend",
+				"max_attempts": "L'agent a abandonné après plusieurs tentatives",
+				"file_validation": "L'agent n'a pas trouvé les fichiers à modifier",
+				"tool_concurrency": "L'agent a buté plusieurs fois sur une limite d'outils",
+				"agent": "L'agent s'est arrêté sur cette sous-tâche",
+				"failed": "Cette sous-tâche a échoué"
+			},
+			"why": "Pourquoi : {{reason}}",
+			"noReason": "L'agent n'a pas donné de raison.",
+			"manualReason": "la sous-tâche demande une vérification manuelle et l'agent n'a rien modifié.",
+			"hint": {
+				"needs_human": "Faites ce qu'il demande, puis cliquez « C'est fait ». Ou répondez-lui ce qu'il lui faut et il réessaie.",
+				"manual_verification": "Vérifiez vous-même, puis cliquez « C'est fait ». Ou cliquez « Réessayer » et l'agent fait la vérification lui-même.",
+				"max_attempts": "Répondez avec une piste (un fichier, une commande, une approche) et l'agent réessaie depuis le début.",
+				"file_validation": "Répondez avec les bons chemins de fichiers et l'agent réessaie.",
+				"tool_concurrency": "Cliquez « Réessayer » : l'agent reprend cette sous-tâche depuis le début.",
+				"agent": "Marquez-la comme faite si c'est le cas, répondez ce dont l'agent a besoin, ou laissez-le réessayer.",
+				"failed": "Répondez avec une piste et l'agent réessaie, ou marquez-la comme faite si c'est le cas."
+			},
+			"lastReply": "Votre dernière réponse : {{reply}}",
+			"actions": {
+				"complete": "C'est fait",
+				"retry": "Réessayer",
+				"answer": "Répondre à l'agent",
+				"skip": "Pas nécessaire"
+			},
+			"replyLabel": "Votre réponse à l'agent",
+			"replyPlaceholder": "Que doit savoir ou faire l'agent ? Ex. : le fichier est dans src/test.txt, lance les tests avec dotnet test…",
+			"sendReply": "Envoyer et réessayer",
+			"cancel": "Annuler",
+			"done": {
+				"complete": "Sous-tâche marquée comme faite",
+				"skip": "Sous-tâche marquée comme pas nécessaire",
+				"retry": "L'agent réessaie cette sous-tâche",
+				"answer": "Réponse envoyée : l'agent réessaie"
+			},
+			"restarted": "La tâche a redémarré.",
+			"resolved": {
+				"complete": "Marquée comme faite par vous",
+				"skip": "Marquée comme pas nécessaire par vous"
+			},
+			"errorTitle": "Impossible de débloquer la sous-tâche",
+			"errors": {
+				"invalid_action": "Cette action n'est pas disponible.",
+				"reply_required": "Écrivez d'abord une réponse.",
+				"reply_too_long": "La réponse est trop longue (4 000 caractères au plus).",
+				"subtask_not_found": "Cette sous-tâche n'est plus dans le plan. Rafraîchissez le tableau.",
+				"not_blocked": "Cette sous-tâche n'est plus bloquée.",
+				"task_running": "La tâche tourne. Arrêtez-la d'abord, puis réessayez.",
+				"task_not_found": "Tâche introuvable.",
+				"plan_unreadable": "Le plan de la tâche est illisible.",
+				"generic": "Une erreur est survenue. Consultez les logs pour plus de détails."
 			}
 		}
 	},
@@ -974,7 +1056,28 @@
 			"results_other": "{{count}} résultats",
 			"clear": "Effacer la recherche",
 			"noResults": "Aucun résultat",
-			"noResultsHint": "Aucune entrée de log ne correspond à « {{query}} »."
+			"noResultsHint": "Aucune entrée de log ne correspond à « {{query}} ».",
+			"entries_one": "{{count}} entrée",
+			"entries_other": "{{count}} entrées",
+			"position": "{{current}}/{{total}}",
+			"previous": "Résultat précédent (Maj+Entrée)",
+			"next": "Résultat suivant (Entrée)",
+			"caseSensitive": "Respecter la casse (Alt+C)",
+			"wholeWord": "Mot entier (Alt+W)",
+			"regex": "Expression régulière (Alt+R)",
+			"invalidRegex": "Expression invalide",
+			"filters": "Filtres",
+			"filterPhase": "Phase",
+			"filterKind": "Type",
+			"resetFilters": "Réinitialiser",
+			"noResultsFiltered": "Aucune entrée ne correspond aux filtres.",
+			"kinds": {
+				"text": "Messages",
+				"tool": "Outils",
+				"error": "Erreurs",
+				"warning": "Avertissements",
+				"status": "Statuts"
+			}
 		},
 		"thinking": {
 			"selectAria": "Niveau de réflexion pour cette phase",
@@ -1610,25 +1713,50 @@
 			"handles": "{{from}} traite {{to}}."
 		}
 	},
-	"overview": {
-		"nav": "Sections de la vue d'ensemble",
+	"panel": {
+		"tabsLabel": "Sections du panneau de tâche",
 		"sections": {
-			"review": {
-				"title": "À traiter",
-				"hint": "La tâche attend votre revue : relisez, testez, puis mergez ou demandez des changements."
+			"progress": {
+				"title": "Avancement",
+				"hint": "Où en est la tâche et ce qu'il lui faut pour avancer : votre revue, la CI et la PR, la tâche elle-même, son objectif."
 			},
-			"task": {
-				"title": "La tâche",
-				"hint": "Ce qui est demandé : description, critères d'acceptation, contexte."
+			"quality": {
+				"title": "Qualité",
+				"hint": "Si ce qui a été construit est juste : second avis, couverture du spec, design system, écrans, vérification."
 			},
-			"plan": {
-				"title": "Plan d'exécution",
-				"hint": "Ce que les agents vont faire, avec quel effort, et ce qu'ils liront."
-			},
-			"learning": {
-				"title": "Mémoire & apprentissage",
-				"hint": "Ce que le système retient — et ce qui attend votre décision."
+			"costs": {
+				"title": "Coûts et contexte",
+				"hint": "Ce que le niveau d'effort achète, ce que lisent les agents, et ce que le système retient."
 			}
+		},
+		"empty": "Rien à montrer ici pour cette tâche pour l'instant.",
+		"pendingDecisions_one": "1 décision en attente",
+		"pendingDecisions_other": "{{count}} décisions en attente"
+	},
+	"waiting": {
+		"title": "Ce qui vous attend",
+		"items": {
+			"permission": "Un agent attend votre réponse à une question",
+			"plan": "Un plan attend votre approbation",
+			"failed": "Le build a échoué : voir pourquoi",
+			"ci": "La CI est rouge sur la branche de la tâche",
+			"prChecks": "Des checks sont rouges sur la pull request de la tâche",
+			"goal": "L'objectif n'est pas atteint",
+			"review": "Les changements attendent votre revue"
+		}
+	},
+	"ciPipeline": {
+		"title": "Pipeline CI",
+		"run": "{{provider}} {{run}} sur {{branch}}",
+		"open": "Ouvrir le run",
+		"repairing": "Un agent répare le build.",
+		"state": {
+			"queued": "En file",
+			"running": "En cours",
+			"succeeded": "Vert",
+			"partiallySucceeded": "Partiellement vert",
+			"failed": "Rouge",
+			"canceled": "Annulé"
 		}
 	},
 	"inlineEdit": {
@@ -1813,7 +1941,8 @@
 			"mobile": "Appareils",
 			"screenshots": "Captures",
 			"scenario": "Scénario (rejoué après la QA)",
-			"findings": "Constats"
+			"findings": "Constats",
+			"cardScenario": "Scénario écrit sur la carte"
 		},
 		"kind": {
 			"web-frontend": "front web",
@@ -1866,11 +1995,60 @@
 			"hint": "Lancer l'application après le code, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures).",
 			"windowLabel": "Fenêtre à vérifier (apps Windows)",
 			"windowPlaceholder": "Une partie de son titre, ex. Commandes",
-			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app."
+			"windowHint": "WPF, WinForms ou WinUI : seule cette fenêtre de l'app lancée est lue et pilotée, jamais le reste du bureau. Vide : la fenêtre principale de l'app.",
+			"scenarioLabel": "Scénario à vérifier (apps web)",
+			"scenarioPlaceholder": "Une étape par ligne, ex.\n1. Ouvrir la page des commandes\n2. Cliquer sur Enregistrer\n3. Le message dit Enregistré",
+			"scenarioHint": "La vérification suit ces étapes dans le navigateur, prend une capture après chacune et garde une trace Playwright. Une étape non réalisée n'est jamais un succès. Vide : le vérificateur choisit ses propres clics."
 		},
 		"cardBadge": {
 			"pass": "Vérifié",
 			"fail": "Vérif. en échec"
+		},
+		"step": {
+			"pass": "réussie",
+			"fail": "échouée",
+			"blocked": "bloquée",
+			"missing": "non rapportée"
+		},
+		"stepCapture": "Capture après l'étape {{number}}",
+		"trace": {
+			"download": "Télécharger la trace Playwright",
+			"hint": "et l'ouvrir sur trace.playwright.dev ou avec npx playwright show-trace.",
+			"none": "Pas de trace Playwright : Playwright n'a pas piloté cette session."
+		},
+		"walkthrough": {
+			"video": "Vidéo du scénario",
+			"gif": "Le parcours du scénario : la capture de chaque étape, dans l'ordre",
+			"gifHint": "Ce GIF peut être joint à la preuve visuelle de la PR depuis la boîte de création de PR.",
+			"noVideo": "Pas de vidéo du scénario ({{reason}}) : la trace et les captures font la preuve."
+		},
+		"compare": {
+			"title": "Comparaison avec la branche de base",
+			"run": "Comparer avec la branche de base",
+			"again": "Comparer à nouveau",
+			"hint": "Rejoue le même scénario et les mêmes appels, sans modèle, sur le code dont la tâche est partie puis sur la tâche, et liste ce qui se comporte autrement.",
+			"skipped": "Pas de comparaison : {{reason}}",
+			"against": "Branche de base à {{base}}, puis cette tâche.",
+			"same": "Rien ne se comporte autrement.",
+			"status": "{{base}} sur la branche de base, {{task}} avec la tâche",
+			"data": "Chaque côté part de ses propres données : un écart peut venir des données plutôt que du code.",
+			"change": {
+				"broken": "Cassé par la tâche",
+				"fixed": "Fonctionne grâce à la tâche",
+				"added": "Nouveau",
+				"removed": "Disparu",
+				"changed": "Changé"
+			},
+			"kind": {
+				"scenario": "Scénario",
+				"console": "Console",
+				"network": "Requête réseau",
+				"endpoint": "Appel d'endpoint"
+			},
+			"side": {
+				"base": "Branche de base, fin du scénario",
+				"task": "Cette tâche, fin du scénario"
+			}
 		}
 	},
 	"qaUnverified": {
@@ -2108,5 +2286,72 @@
 		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
 		"adoptedLine": "Gardée : {{variant}}",
 		"discardedLine": "Toutes les variantes ont été abandonnées."
+	},
+	"crossReview": {
+		"cardBadge": {
+			"agree": "Revue croisée OK",
+			"disagree": "Revue croisée : désaccord",
+			"inconclusive": "Revue croisée : sans verdict"
+		}
+	},
+	"steering": {
+		"title": "Guider l'agent",
+		"description": "Envoyez un message pendant que la tâche travaille : la prochaine session concernée le reçoit dans son prompt. WorkPilot le marque comme remis dès que cette session a démarré.",
+		"placeholder": "Par exemple : utilise le UserRepository existant au lieu d'en créer un",
+		"target": "Destinataire",
+		"nextSession": "La prochaine session",
+		"send": "Envoyer",
+		"queued": "En attente de la prochaine session",
+		"queuedForSubtask": "En attente de la session de {{subtask}}",
+		"delivered": "Remis à la session {{session}} ({{date}})",
+		"deliveredToSubtask": "Remis à la session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "Le message n'a pas pu être envoyé.",
+			"empty_message": "Le message est vide.",
+			"message_too_long": "Le message est trop long.",
+			"invalid_subtask": "Cette sous-tâche n'existe pas.",
+			"task_not_found": "La tâche est introuvable.",
+			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
+		}
+	},
+	"stack": {
+		"title": "Empilée sur un prérequis",
+		"description": "Faites partir cette tâche de la branche d'un prérequis au lieu du tronc : son code s'appuie sur celui du prérequis avant sa fusion.",
+		"stackOn": "Empiler sur « {{title}} »",
+		"stackedNote": "Empilée sur « {{title}} » : le worktree partira de sa branche.",
+		"stackedOn": "Empilée sur « {{title}} » ({{branch}})",
+		"upToDate": "À jour avec son parent.",
+		"parentMoved": "Le parent a de nouveaux commits : mettez à jour pour rebaser dessus.",
+		"parentMerged": "Le parent est fusionné : cette tâche peut passer sur {{base}}.",
+		"runningHint": "Un agent tourne sur cette tâche : mettez à jour une fois qu'il s'arrête.",
+		"update": "Mettre à jour",
+		"moveToBase": "Passer sur {{base}}",
+		"outcome": {
+			"rebased": "Rebasée sur le dernier commit du parent.",
+			"metadata_only": "La tâche partira du dernier commit du parent.",
+			"moved_to_base": "Passée sur la base du parent.",
+			"up_to_date": "Déjà à jour."
+		},
+		"errors": {
+			"same_task": "Une tâche ne peut pas être empilée sur elle-même.",
+			"already_stacked": "Cette tâche est déjà empilée.",
+			"not_blocker": "Seul un prérequis de cette tâche peut être son parent.",
+			"parent_done": "Ce prérequis est déjà terminé : partez du tronc.",
+			"cycle": "Empiler ici créerait une boucle.",
+			"child_started": "Cette tâche a déjà un worktree : sa base ne peut plus changer.",
+			"parent_no_worktree": "Le prérequis n'a pas encore de worktree ni de branche.",
+			"parent_no_commits": "Le prérequis n'a encore aucun commit : rien sur quoi s'appuyer.",
+			"metadata_unwritable": "Les métadonnées de la tâche n'ont pas pu être écrites.",
+			"task_not_found": "Tâche introuvable.",
+			"not_stacked": "Cette tâche n'est pas empilée.",
+			"running": "Un agent tourne sur cette tâche : réessayez une fois qu'il s'arrête.",
+			"dirty": "Le worktree de la tâche a des modifications non commitées : commitez-les ou annulez-les d'abord.",
+			"no_recorded_commit": "Le commit du parent n'a pas été enregistré : empilez à nouveau.",
+			"no_base": "La branche de base du parent est introuvable.",
+			"conflict": "Le rebase s'est arrêté sur un conflit et a été annulé. Fichiers en conflit :",
+			"pr_not_retargeted": "La pull request n'a pas pu être reciblée : changez sa base sur la forge.",
+			"pr_url_unreadable": "Le lien de la pull request est illisible : changez sa base sur la forge.",
+			"unknown": "L'opération a échoué."
+		}
 	}
 }

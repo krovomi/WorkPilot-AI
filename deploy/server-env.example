@@ -24,6 +24,10 @@ CLAUDE_CODE_OAUTH_TOKEN=
 # Public base URL of this server (used to build invitation links)
 WORKPILOT_PUBLIC_BASE_URL=https://workpilot.example.com
 
+# Where the desktop app opens the live board stream, when the proxy serves it
+# elsewhere than the API's host on port 8765 (ws:// or wss:// only)
+# WORKPILOT_PUBLIC_STREAM_URL=wss://workpilot.example.com:8765
+
 # Invitation-only self-service signup
 WORKPILOT_INVITATION_TTL_HOURS=72
 WORKPILOT_PASSWORD_MIN_LENGTH=12
@@ -51,5 +55,9 @@ WORKPILOT_REPOS_ROOT=/var/lib/workpilot/repos
 # are set per tenant in the administration console (Quotas tab); without one an
 # organization is unlimited, which is the historical behaviour.
 WORKPILOT_MAX_CONCURRENT_RUNS=3
+# Each run sees only its own project on disk (Landlock: Linux 5.13+, Docker
+# 23+, server not running as root). Runs fail rather than start unconfined.
+# `off` only where every user may read every project.
+# WORKPILOT_RUN_ISOLATION=required
 WORKPILOT_ACCESS_TOKEN_TTL_MINUTES=15
 WORKPILOT_REFRESH_TOKEN_TTL_DAYS=14

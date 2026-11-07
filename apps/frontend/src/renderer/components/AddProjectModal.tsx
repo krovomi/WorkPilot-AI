@@ -9,9 +9,11 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { Globe } from "@/lib/icons";
 import { addProject } from "@/stores/project-store";
+import { useServerSessionStore } from "@/stores/server-session-store";
 import { AzureDevOpsRemoteConfigModal } from "./AzureDevOpsRemoteConfigModal";
 import { GitHubRemoteConfigModal } from "./GitHubRemoteConfigModal";
 import { GitSetupModal } from "./GitSetupModal";
+import { ServerProjectDialog } from "./server-projects/ServerProjectDialog";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -65,6 +67,10 @@ export function AddProjectModal({
 }: AddProjectModalProps) {
 	const { t } = useTranslation("dialogs");
 	const { toast } = useToast();
+	// Server mode: a project is first a repository the server clones for the
+	// team; a folder of this computer stays one click away.
+	const serverMode = useServerSessionStore((state) => state.mode) === "server";
+	const [localFolder, setLocalFolder] = useState(false);
 	const [step, setStep] = useState<number>(0);
 	const [projectName, setProjectName] = useState<string>("");
 	const [projectLocation, setProjectLocation] = useState<string>("");
@@ -140,6 +146,7 @@ export function AddProjectModal({
 
 	useEffect(() => {
 		if (open) {
+			setLocalFolder(false);
 			setStep(0);
 			setProjectName("");
 			setProjectLocation("");
@@ -486,8 +493,8 @@ export function AddProjectModal({
 						(locationCheck.targetExists ||
 							locationCheck.locationIsProject ||
 							locationCheck.insideRepository) && (
-							<div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
-								<p className="text-xs text-amber-600 dark:text-amber-400">
+							<div className="rounded-md border border-warning/30 bg-warning/10 p-3 space-y-2">
+								<p className="text-xs text-warning ">
 									{locationCheck.targetExists
 										? t("addProject.targetAlreadyExists")
 										: locationCheck.locationIsProject
@@ -689,7 +696,7 @@ export function AddProjectModal({
 								<div
 									className={`px-2 py-1 rounded-full text-xs font-medium ${
 										initGit
-											? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+											? "bg-success/10 text-success"
 											: "bg-muted text-muted-foreground"
 									}`}
 								>
@@ -948,6 +955,16 @@ export function AddProjectModal({
 			);
 		return true;
 	};
+
+	if (serverMode && !localFolder) {
+		return (
+			<ServerProjectDialog
+				open={open}
+				onOpenChange={onOpenChange}
+				onChooseLocal={() => setLocalFolder(true)}
+			/>
+		);
+	}
 
 	// Rendu principal
 	return (

@@ -68,7 +68,7 @@ function tokenize(line: string): Tok[] {
 	// biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
 	while ((m = TOKEN_RE.exec(line)) !== null) {
 		if (m[1]) out.push({ t: m[1], c: "text-zinc-500 italic" });
-		else if (m[2]) out.push({ t: m[2], c: "text-amber-300" });
+		else if (m[2]) out.push({ t: m[2], c: "text-warning" });
 		else if (m[3]) out.push({ t: m[3], c: "text-fuchsia-300" });
 		else if (m[4])
 			out.push({
@@ -76,7 +76,7 @@ function tokenize(line: string): Tok[] {
 				c: KEYWORDS.has(m[4])
 					? "text-sky-300"
 					: /^[A-Z]/.test(m[4])
-						? "text-emerald-300"
+						? "text-success"
 						: "text-zinc-200",
 			});
 		else if (m[5]) out.push({ t: m[5], c: "text-orange-300" });
@@ -231,7 +231,7 @@ export function LiveGenerationSurface() {
 									: isActive
 										? "border-primary/50 bg-primary/5 ring-1 ring-primary/25"
 										: isDone
-											? "border-emerald-600/30 bg-emerald-500/5"
+											? "border-success/30 bg-success/5"
 											: "border-border bg-muted/30",
 								seen ? "opacity-100" : isSkipped ? "opacity-35" : "opacity-50",
 							].join(" ")}
@@ -243,7 +243,7 @@ export function LiveGenerationSurface() {
 										isFailed
 											? "text-destructive"
 											: isDone
-												? "text-emerald-400"
+												? "text-success"
 												: isActive
 													? "text-primary"
 													: "text-muted-foreground",
@@ -268,7 +268,7 @@ export function LiveGenerationSurface() {
 							</div>
 							<span
 								className={[
-									"min-h-[14px] truncate font-mono text-[10.5px]",
+									"min-h-[14px] truncate font-mono text-3xs",
 									isFailed ? "text-destructive" : "text-muted-foreground",
 								].join(" ")}
 							>
@@ -287,16 +287,16 @@ export function LiveGenerationSurface() {
 			<div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
 				<div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
 					<span className="flex gap-1.5">
-						<i className="block h-2.5 w-2.5 rounded-full bg-red-500/80" />
-						<i className="block h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-						<i className="block h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+						<i className="block h-2.5 w-2.5 rounded-full bg-destructive/80" />
+						<i className="block h-2.5 w-2.5 rounded-full bg-warning/80" />
+						<i className="block h-2.5 w-2.5 rounded-full bg-success/80" />
 					</span>
 					<span className="flex items-center gap-1.5 font-mono text-xs text-zinc-300">
 						<FileCode2 className="h-3.5 w-3.5 text-primary" />
 						{fileName ?? "…"}
 					</span>
 					{isGenerating && (
-						<span className="ml-auto flex items-center gap-1.5 text-[10.5px] tracking-wide text-primary">
+						<span className="ml-auto flex items-center gap-1.5 text-3xs tracking-wide text-primary">
 							<span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
 							{t("live.badgeLive")}
 						</span>
@@ -304,7 +304,7 @@ export function LiveGenerationSurface() {
 				</div>
 				<div ref={scrollRef} className="max-h-[300px] overflow-auto">
 					{revealed ? (
-						<pre className="m-0 font-mono text-[12px] leading-[1.6]">
+						<pre className="m-0 font-mono text-xs leading-[1.6]">
 							{lines.map((ln, i) => (
 								<div
 									// biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
@@ -380,9 +380,9 @@ export function LiveGenerationSurface() {
 			) : (
 				isComplete &&
 				filePath && (
-					<div className="flex flex-col gap-1.5 rounded-lg border border-emerald-600/30 bg-emerald-500/5 px-3 py-2.5">
+					<div className="flex flex-col gap-1.5 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
 						<div className="flex items-center gap-2 text-sm text-foreground">
-							<Check className="h-4 w-4 flex-none text-emerald-400" />
+							<Check className="h-4 w-4 flex-none text-success" />
 							<span className="font-medium">{t("live.writtenTo")}</span>
 						</div>
 						<div className="flex items-center gap-2 pl-6">
@@ -393,10 +393,10 @@ export function LiveGenerationSurface() {
 								type="button"
 								onClick={handleCopyPath}
 								title={t("live.copyPath")}
-								className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+								className="flex flex-none items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-2xs font-medium text-muted-foreground transition-colors hover:bg-muted"
 							>
 								{pathCopied ? (
-									<Check className="h-3 w-3 text-emerald-400" />
+									<Check className="h-3 w-3 text-success" />
 								) : (
 									<Copy className="h-3 w-3" />
 								)}
@@ -429,7 +429,7 @@ function Stat({
 			>
 				{children}
 			</span>
-			<span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+			<span className="text-3xs uppercase tracking-wider text-muted-foreground">
 				{label}
 			</span>
 		</div>

@@ -6,10 +6,11 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
+import { Textarea } from "../ui/textarea";
 const SCORE_STYLES: Record<"low" | "medium" | "high", string> = {
-	low: "bg-green-500/15 text-green-500 border-green-500/30",
-	medium: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
-	high: "bg-red-500/15 text-red-500 border-red-500/30",
+	low: "bg-success/15 text-success border-success/30",
+	medium: "bg-warning/15 text-warning border-warning/30",
+	high: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 interface Props {
@@ -55,8 +56,8 @@ export function BlastRadiusView({ projectRoot }: Props) {
 					<Label className="text-xs">
 						{t("blastRadius:targets", "Target files (comma or newline separated)")}
 					</Label>
-					<textarea
-						className="w-full min-h-[70px] rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+					<Textarea
+						className="w-full min-h-[70px] px-3 py-2 text-sm"
 						value={targetsInput}
 						onChange={(e) => setTargetsInput(e.target.value)}
 						placeholder="src/core/client.ts,src/utils/hash.ts"
@@ -104,7 +105,7 @@ export function BlastRadiusView({ projectRoot }: Props) {
 
 					{report.flags.length > 0 && (
 						<div className="text-xs">
-							<div className="flex items-center gap-1 text-yellow-500 font-medium">
+							<div className="flex items-center gap-1 text-warning font-medium">
 								<AlertTriangle className="w-3 h-3" />
 								{t("blastRadius:flags", "Feature flags referenced")}
 							</div>

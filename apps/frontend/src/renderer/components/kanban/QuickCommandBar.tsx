@@ -8,6 +8,7 @@ import {
 	useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
 import { createTask } from "../../stores/task-store";
@@ -44,6 +45,20 @@ const BACKEND_URL: string =
 	(import.meta as { env?: { VITE_BACKEND_URL?: string } }).env
 		?.VITE_BACKEND_URL || "";
 
+/** Longest command output shown in the result toast. */
+const MAX_OUTPUT_CHARS = 2000;
+
+/** The command's result as text for the toast, cut to MAX_OUTPUT_CHARS. */
+export function formatOutput(result: unknown): string {
+	if (result === null || result === undefined) return "";
+	const text = (
+		typeof result === "string" ? result : JSON.stringify(result, null, 2)
+	).trim();
+	return text.length > MAX_OUTPUT_CHARS
+		? `${text.slice(0, MAX_OUTPUT_CHARS)}…`
+		: text;
+}
+
 export function QuickCommandBar({
 	projectPath,
 	className,
@@ -57,6 +72,17 @@ export function QuickCommandBar({
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	// Active Kanban tab — needed to attach a "Run as task" creation to a project.
 	const activeProjectId = useProjectStore((s) => s.activeProjectId);
+
+	const showError = useCallback(
+		(detail?: string) => {
+			toast({
+				variant: "destructive",
+				title: t("tasks:kanban.quickCommand.errorTitle"),
+				description: detail,
+			});
+		},
+		[t],
+	);
 
 	// Fetch command list whenever the active project changes. Errors are
 	// swallowed: an empty picker is acceptable, we don't want to spam toasts
@@ -109,7 +135,10 @@ export function QuickCommandBar({
 	const runCommand = useCallback(
 		async (override?: string) => {
 			if (!projectPath) {
-				globalThis.window.alert(t("tasks:kanban.quickCommand.missingProject"));
+				toast({
+					variant: "destructive",
+					title: t("tasks:kanban.quickCommand.missingProject"),
+				});
 				return;
 			}
 			const parsed = override
@@ -130,26 +159,27 @@ export function QuickCommandBar({
 				});
 				const data = await res.json();
 				if (data?.success) {
-					// Don't pop a modal — surface in console so the dev can inspect.
-					console.info(
-						`[QuickCommand] /${parsed.command} →`,
-						data.result ?? "(no output)",
-					);
+					const output = formatOutput(data.result);
+					toast({
+						variant: "success",
+						title: `/${parsed.command} · ${t("tasks:kanban.quickCommand.successTitle")}`,
+						description: output ? (
+							<pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs">
+								{output}
+							</pre>
+						) : undefined,
+					});
 				} else {
-					globalThis.window.alert(
-						`${t("tasks:kanban.quickCommand.errorTitle")}: ${data?.error ?? "unknown"}`,
-					);
+					showError(data?.error ?? "unknown");
 				}
 			} catch (err) {
-				globalThis.window.alert(
-					`${t("tasks:kanban.quickCommand.errorTitle")}: ${(err as Error).message}`,
-				);
+				showError((err as Error).message);
 			} finally {
 				setIsRunning(false);
 				setInput("");
 			}
 		},
-		[projectPath, parseInput, t],
+		[projectPath, parseInput, showError, t],
 	);
 
 	// "Run as task": instead of the one-shot run, seed a real Kanban task with
@@ -159,7 +189,10 @@ export function QuickCommandBar({
 	const runAsTask = useCallback(
 		async (override?: string) => {
 			if (!projectPath || !activeProjectId) {
-				globalThis.window.alert(t("tasks:kanban.quickCommand.missingProject"));
+				toast({
+					variant: "destructive",
+					title: t("tasks:kanban.quickCommand.missingProject"),
+				});
 				return;
 			}
 			const parsed = override
@@ -175,9 +208,7 @@ export function QuickCommandBar({
 				const res = await fetch(url);
 				const data = await res.json();
 				if (!res.ok || !data?.success || !data.body) {
-					globalThis.window.alert(
-						`${t("tasks:kanban.quickCommand.errorTitle")}: ${data?.detail ?? data?.error ?? "unknown"}`,
-					);
+					showError(data?.detail ?? data?.error ?? "unknown");
 					return;
 				}
 				const description = parsed.args.trim()
@@ -189,23 +220,23 @@ export function QuickCommandBar({
 					description,
 				);
 				if (created) {
-					console.info(
-						`[QuickCommand] created task for /${parsed.command}`,
-						created.id,
-					);
+					toast({
+						variant: "success",
+						title: t("tasks:kanban.quickCommand.taskCreated", {
+							name: `/${parsed.command}`,
+						}),
+					});
 				} else {
-					globalThis.window.alert(t("tasks:kanban.quickCommand.errorTitle"));
+					showError();
 				}
 			} catch (err) {
-				globalThis.window.alert(
-					`${t("tasks:kanban.quickCommand.errorTitle")}: ${(err as Error).message}`,
-				);
+				showError((err as Error).message);
 			} finally {
 				setIsRunning(false);
 				setInput("");
 			}
 		},
-		[projectPath, activeProjectId, parseInput, t],
+		[projectPath, activeProjectId, parseInput, showError, t],
 	);
 
 	const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -335,7 +366,7 @@ export function QuickCommandBar({
 							>
 								<div className="flex w-full items-center justify-between gap-2">
 									<code className="font-mono">/{cmd.name}</code>
-									<span className="text-[10px] uppercase text-muted-foreground">
+									<span className="text-3xs uppercase text-muted-foreground">
 										{cmd.source === "project"
 											? t("tasks:kanban.quickCommand.sourceProject")
 											: cmd.source === "user"

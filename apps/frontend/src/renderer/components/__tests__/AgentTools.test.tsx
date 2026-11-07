@@ -264,7 +264,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "insights" },
 				resolvedSettings,
 			);
-			expect(insightsAgent.model).toBe("claude-sonnet-4-6");
+			expect(insightsAgent.model).toBe("claude-sonnet-5-5");
 			expect(insightsAgent.thinking).toBe("medium");
 
 			// Ideation feature agent (defaults to opus)
@@ -272,7 +272,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "ideation" },
 				resolvedSettings,
 			);
-			expect(ideationAgent.model).toBe("claude-opus-4-6");
+			expect(ideationAgent.model).toBe("claude-opus-5-5");
 			expect(ideationAgent.thinking).toBe("high");
 
 			// Roadmap feature agent (defaults to opus)
@@ -280,7 +280,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "roadmap" },
 				resolvedSettings,
 			);
-			expect(roadmapAgent.model).toBe("claude-opus-4-6");
+			expect(roadmapAgent.model).toBe("claude-opus-5-5");
 			expect(roadmapAgent.thinking).toBe("high");
 
 			// GitHub Issues feature agent (defaults to opus)
@@ -288,7 +288,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "githubIssues" },
 				resolvedSettings,
 			);
-			expect(githubIssuesAgent.model).toBe("claude-opus-4-6");
+			expect(githubIssuesAgent.model).toBe("claude-opus-5-5");
 			expect(githubIssuesAgent.thinking).toBe("medium");
 
 			// GitHub PRs feature agent (defaults to opus)
@@ -296,7 +296,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "githubPrs" },
 				resolvedSettings,
 			);
-			expect(githubPrsAgent.model).toBe("claude-opus-4-6");
+			expect(githubPrsAgent.model).toBe("claude-opus-5-5");
 			expect(githubPrsAgent.thinking).toBe("medium");
 
 			// Utility feature agent (defaults to haiku)
@@ -304,7 +304,7 @@ describe("AgentTools - Agent Profile Resolution", () => {
 				{ type: "feature", feature: "utility" },
 				resolvedSettings,
 			);
-			expect(utilityAgent.model).toBe("claude-haiku-4-5");
+			expect(utilityAgent.model).toBe("claude-haiku-5-5");
 			expect(utilityAgent.thinking).toBe("low");
 		});
 

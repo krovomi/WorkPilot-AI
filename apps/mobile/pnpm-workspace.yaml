@@ -1,0 +1,17 @@
+# The phone app is its own pnpm project, outside the desktop workspace (see the
+# root pnpm-workspace.yaml). Metro and the React Native native builds expect a
+# flat node_modules, hence the hoisted linker.
+packages:
+  - .
+
+minimumReleaseAgeExclude:
+  - i18next@26.6.0
+  - react-i18next@17.1.10
+
+nodeLinker: hoisted
+
+# No dependency needs its install script: both ship prebuilt binaries
+# through optional packages and only fall back to compiling.
+allowBuilds:
+  '@parcel/watcher': false
+  unrs-resolver: false

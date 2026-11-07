@@ -16,6 +16,7 @@ import { useToast } from "../hooks/use-toast";
 import { isWindows as checkIsWindows } from "../lib/os-detection";
 import { cn } from "../lib/utils";
 import { useSettingsStore } from "../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useTerminalStore } from "../stores/terminal-store";
 import { CreateWorktreeDialog } from "./terminal/CreateWorktreeDialog";
 import { TerminalHeader } from "./terminal/TerminalHeader";
@@ -25,6 +26,7 @@ import { usePtyProcess } from "./terminal/usePtyProcess";
 import { useTerminalEvents } from "./terminal/useTerminalEvents";
 import { useTerminalFileDrop } from "./terminal/useTerminalFileDrop";
 import { useXterm } from "./terminal/useXterm";
+import { useTranslation } from "react-i18next";
 
 // Minimum dimensions to prevent PTY creation with invalid sizes
 const MIN_COLS = 10;
@@ -77,6 +79,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 		},
 		ref,
 	) {
+	const { t } = useTranslation();
 		const isMountedRef = useRef(true);
 		const isCreatedRef = useRef(false);
 		// Track deliberate terminal recreation (e.g., worktree switching)
@@ -136,7 +139,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 		const effectiveCwd = terminal?.cwd || cwd;
 
 		// Settings store for IDE preferences
-		const { settings } = useSettingsStore();
+		const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 
 		// Toast for user feedback
 		const { toast } = useToast();
@@ -936,10 +939,10 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 					// Claude busy state indicator (subtle colored border when in Claude mode)
 					showClaudeBusyIndicator &&
 						isClaudeBusy &&
-						"border-red-500/60 ring-1 ring-red-500/20",
+						"border-destructive/60 ring-1 ring-destructive/20",
 					showClaudeBusyIndicator &&
 						!isClaudeBusy &&
-						"border-green-500/60 ring-1 ring-green-500/20",
+						"border-success/60 ring-1 ring-success/20",
 				)}
 				onClick={handleClick}
 				onDragOver={handleNativeDragOver}
@@ -950,7 +953,7 @@ Please confirm you're ready by saying: I'm ready to work on ${selectedTask.title
 					<div className="absolute inset-0 bg-info/10 z-10 flex items-center justify-center pointer-events-none">
 						<div className="flex items-center gap-2 bg-info/90 text-info-foreground px-3 py-2 rounded-md">
 							<FileDown className="h-4 w-4" />
-							<span className="text-sm font-medium">Drop to insert path</span>
+							<span className="text-sm font-medium">{t("terminal:dropToInsertPath")}</span>
 						</div>
 					</div>
 				)}

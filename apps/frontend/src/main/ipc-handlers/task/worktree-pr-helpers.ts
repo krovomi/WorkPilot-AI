@@ -74,6 +74,8 @@ export interface ParsedPRResult {
 	prUrl?: string;
 	alreadyExists?: boolean;
 	error?: string;
+	/** Held back by a cross review that disagrees (`cross_review/`). */
+	crossReviewBlocked?: boolean;
 }
 
 /**
@@ -94,18 +96,38 @@ export function isValidGitHubUrl(url: string): boolean {
 	}
 }
 
+/** The last line of `stdout` that is a JSON object, or null. */
+function lastJsonLine(stdout: string): string | null {
+	const lines = stdout.split(/\r?\n/);
+	for (let i = lines.length - 1; i >= 0; i--) {
+		const line = lines[i].trim();
+		if (!line.startsWith("{") || !line.endsWith("}")) continue;
+		try {
+			JSON.parse(line);
+			return line;
+		} catch {
+			// a log line that only looks like JSON
+		}
+	}
+	return null;
+}
+
 /**
  * Parse JSON output from the create-pr Python script
  * Handles both snake_case and camelCase field names
  * @returns ParsedPRResult if valid JSON found, null otherwise
  */
 export function parsePRJsonOutput(stdout: string): ParsedPRResult | null {
-	// Find the last complete JSON object in stdout (non-greedy, handles multiple objects)
+	// The script prints its result as one JSON line, last. Read that first: a
+	// message that quotes code (`/orders/{id}`) has braces the pattern below
+	// cannot balance. Otherwise the last complete JSON object in stdout
+	// (non-greedy, handles multiple objects).
 	const jsonMatches = stdout.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
 	const jsonMatch =
-		jsonMatches && jsonMatches.length > 0
+		lastJsonLine(stdout) ??
+		(jsonMatches && jsonMatches.length > 0
 			? jsonMatches[jsonMatches.length - 1]
-			: null;
+			: null);
 
 	if (!jsonMatch) {
 		return null;
@@ -143,6 +165,7 @@ export function parsePRJsonOutput(stdout: string): ParsedPRResult | null {
 						? parsed.alreadyExists
 						: undefined,
 			error: typeof parsed.error === "string" ? parsed.error : undefined,
+			...(parsed.cross_review_blocked === true && { crossReviewBlocked: true }),
 		};
 	} catch {
 		return null;
@@ -445,6 +468,10 @@ export function buildCreatePRArgs(
 	}
 	if (bodyFilePath) {
 		args.push("--pr-body-file", bodyFilePath);
+	}
+	// Strictly `true`: anything else from the renderer keeps the hold.
+	if (options?.allowCrossReviewDisagreement === true) {
+		args.push("--pr-ignore-cross-review");
 	}
 
 	// Add --base-branch if task was created with a specific base branch

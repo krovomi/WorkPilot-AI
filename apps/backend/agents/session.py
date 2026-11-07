@@ -17,6 +17,7 @@ try:
 except ImportError:
     ClaudeSDKClient = None  # type: ignore[assignment,misc]
 
+from agent_trace import after_session
 from core.agent_client import (
     AgentClient,
     AgentMessage,
@@ -25,11 +26,18 @@ from core.agent_client import (
     MessageRole,
 )
 from core.conversation_log import append_message as _log_append_message
-from core.debug import debug, debug_detailed, debug_error, debug_section, debug_success
 from core.progress import (
     count_subtasks_detailed,
     is_build_complete,
 )
+from foundation.debug import (
+    debug,
+    debug_detailed,
+    debug_error,
+    debug_section,
+    debug_success,
+)
+from foundation.subtask_unblock import blocked_reason
 from harness.application.budget import BUDGET_ENV
 from insight_extractor import extract_session_insights
 from integrations.linear.updater import (
@@ -51,8 +59,14 @@ from ui import (
 )
 
 from .base import sanitize_error_message
-from .decision_logger import AgentDecisionLogger, create_decision_logger
+from .manual_verification import settle_block
 from .memory_manager import save_session_memory
+from .tool_display import (
+    extract_streaming_command,
+    extract_streaming_file_change,
+    format_tool_input_display,
+    is_command_tool,
+)
 from .utils import (
     find_subtask_in_plan,
     get_commit_count,
@@ -75,127 +89,6 @@ except ImportError:
     _get_replay_recorder = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
-
-
-# Maximum length for the tool-input string shown in the live activity feed
-# and task logs. Generous enough that real-world commands and file paths are
-# displayed in full so the user can see exactly what the agent is doing; only
-# pathological inputs (e.g. an inline heredoc embedding a whole file) are
-# trimmed so they can't flood the console or task log.
-MAX_TOOL_INPUT_DISPLAY = 2000
-
-
-def _format_tool_input_display(inp: dict[str, Any] | None) -> str | None:
-    """Build a human-readable one-liner describing a tool call's input.
-
-    Commands and paths are shown in full (up to MAX_TOOL_INPUT_DISPLAY) so the
-    activity feed reveals the complete command rather than a truncated head.
-    For over-long inputs we keep the head of a command and the tail of a path
-    (the filename is the most useful part of a long path).
-    """
-    if not inp:
-        return None
-    if "pattern" in inp:
-        return f"pattern: {inp['pattern']}"
-    if "file_path" in inp:
-        fp = str(inp["file_path"])
-        if len(fp) > MAX_TOOL_INPUT_DISPLAY:
-            fp = "..." + fp[-(MAX_TOOL_INPUT_DISPLAY - 3) :]
-        return fp
-    if "command" in inp:
-        cmd = str(inp["command"])
-        if len(cmd) > MAX_TOOL_INPUT_DISPLAY:
-            cmd = cmd[: MAX_TOOL_INPUT_DISPLAY - 3] + "..."
-        return cmd
-    if "path" in inp:
-        return str(inp["path"])
-    return None
-
-
-# Tool names that write/modify a file, across every provider. Claude SDK uses
-# Edit/Write; non-Claude providers (Copilot, Windsurf...) use the tools defined
-# in core/runtimes/tool_executor.py (write_file, create_file...) plus common
-# editor variants. Matched case-insensitively so the live streaming view stays
-# provider-agnostic (otherwise the left frame never leaves "waiting for code
-# changes" for non-Claude runs).
-_FILE_WRITE_TOOL_NAMES = frozenset(
-    {
-        "edit",
-        "write",
-        "write_file",
-        "create",
-        "create_file",
-        "edit_file",
-        "str_replace",
-        "str_replace_editor",
-        "apply_patch",
-    }
-)
-
-# Tool names that run a shell command, across every provider. Claude SDK uses
-# Bash; non-Claude providers use run_command (tool_executor.py) and variants.
-_COMMAND_TOOL_NAMES = frozenset(
-    {
-        "bash",
-        "shell",
-        "run_command",
-        "run",
-        "execute_command",
-        "command",
-    }
-)
-
-# Candidate argument keys for a file path / file content / command, ordered by
-# preference. Different providers name the same concept differently
-# (file_path vs path, content vs new_string vs CodeContent...).
-_FILE_PATH_KEYS = ("file_path", "path", "filename", "file")
-_FILE_CONTENT_KEYS = ("content", "new_string", "new_str", "CodeContent", "text")
-_COMMAND_KEYS = ("command", "cmd")
-
-
-def _is_command_tool(tool_name: str | None) -> bool:
-    """Return True if the tool runs a shell command (any provider)."""
-    if not tool_name:
-        return False
-    return tool_name.lower() in _COMMAND_TOOL_NAMES
-
-
-def _extract_streaming_file_change(
-    tool_name: str | None, inp: dict[str, Any] | None
-) -> tuple[str, str | None] | None:
-    """Extract (file_path, content) for a file-write tool, or None.
-
-    Provider-agnostic: recognises Claude (Edit/Write) and non-Claude
-    (write_file, create_file, str_replace...) tool names so the live streaming
-    view updates regardless of which agent backend is running.
-    """
-    if not tool_name or not inp or tool_name.lower() not in _FILE_WRITE_TOOL_NAMES:
-        return None
-
-    file_path = next(
-        (str(inp[key]) for key in _FILE_PATH_KEYS if inp.get(key)),
-        None,
-    )
-    if not file_path:
-        return None
-
-    content = next(
-        (inp[key] for key in _FILE_CONTENT_KEYS if inp.get(key) is not None),
-        None,
-    )
-    return file_path, (str(content) if content is not None else None)
-
-
-def _extract_streaming_command(
-    tool_name: str | None, inp: dict[str, Any] | None
-) -> str | None:
-    """Extract the command string for a command tool, or None (any provider)."""
-    if not _is_command_tool(tool_name) or not inp:
-        return None
-    return next(
-        (str(inp[key]) for key in _COMMAND_KEYS if inp.get(key)),
-        None,
-    )
 
 
 def _read_current_subtask_id(spec_dir: Path) -> str | None:
@@ -824,6 +717,7 @@ async def post_session_processing(
     linear_enabled: bool = False,
     status_manager: StatusManager | None = None,
     source_spec_dir: Path | None = None,
+    model_id: str | None = None,
 ) -> bool:
     """
     Process session results and update memory automatically.
@@ -869,40 +763,18 @@ async def post_session_processing(
     commit_after = get_latest_commit(project_dir)
     commit_count_after = get_commit_count(project_dir)
     new_commits = commit_count_after - commit_count_before
+    # Who wrote which line of the session's commits (Agent Trace, F3).
+    after_session(
+        project_dir, spec_dir, commit_before, commit_after, model_id, source_spec_dir
+    )
 
     print_key_value("Subtask status", subtask_status)
     print_key_value("New commits", str(new_commits))
 
-    # AUTO-BLOCK: If this is a manual verification task and no commits were made,
-    # automatically mark it as "blocked" without waiting for human input.
-    # This prevents the coder from asking "should I mark this as blocked?" indefinitely.
-    verification = subtask.get("verification", {})
-    is_manual_verification = verification.get("type") == "manual"
-
-    # Force block for manual testing tasks with zero commits
-    # This covers cases where subtask_status is "pending", "in_progress", or anything else
-    if is_manual_verification and new_commits == 0:
-        # Automatically mark as blocked - no commits means no code implementation,
-        # just the agent asking questions
-        old_status = subtask.get("status", "pending")
-
-        # FORCE the status to "blocked" - ignore whatever the LLM set it to
-        subtask["status"] = "blocked"
-        subtask["_blocked_reason"] = "Manual testing required - no code changes"
-
-        # Update implementation plan
-        from qa.criteria import save_implementation_plan
-
-        try:
-            save_implementation_plan(spec_dir, plan)
-            print_status(
-                f"✓ Auto-blocked subtask {subtask_id} (manual verification, {new_commits} commits, was {old_status})",
-                "warning",
-            )
-            subtask_status = "blocked"
-        except Exception as e:
-            logger.error(f"Could not auto-mark as blocked: {e}")
-            print(f"  ✗ Warning: Could not auto-mark as blocked: {e}")
+    # A manual check left open with no commit is blocked with a reason the
+    # panel shows; an agent's own block gets its reason where the app reads it.
+    subtask_status = settle_block(spec_dir, plan, subtask, new_commits)
+    reason = blocked_reason(subtask) or "manual testing required"
 
     if subtask_status == "completed":
         # Success! Record the attempt and good commit
@@ -927,7 +799,7 @@ async def post_session_processing(
 
         # Record good commit for rollback safety
         if commit_after and commit_after != commit_before:
-            recovery_manager.record_good_commit(commit_after, subtask_id)
+            recovery_manager.record_good_commit(commit_after, subtask_id, commit_before)
             print_status(f"Recorded good commit: {commit_after[:8]}", "success")
 
         # Record the actual files this subtask changed (ground truth from git),
@@ -1006,7 +878,7 @@ async def post_session_processing(
     elif subtask_status == "blocked":
         # Subtask marked as blocked (waiting for manual testing/human intervention)
         print_status(
-            f"Subtask {subtask_id} blocked: {subtask.get('_blocked_reason', 'waiting for manual testing')}",
+            f"Subtask {subtask_id} blocked: {reason}",
             "warning",
         )
 
@@ -1015,7 +887,7 @@ async def post_session_processing(
             subtask_id=subtask_id,
             session=session_num,
             success=True,  # Blocking is considered success from code perspective
-            approach=f"Marked as blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+            approach=f"Marked as blocked: {reason}",
         )
 
         # Update status file
@@ -1034,7 +906,7 @@ async def post_session_processing(
                 spec_dir=spec_dir,
                 subtask_id=subtask_id,
                 attempt=attempt_count,
-                error_summary=f"Blocked: {subtask.get('_blocked_reason', 'manual testing required')}",
+                error_summary=f"Blocked: {reason}",
             )
 
         return True  # Blocking is considered success - move to next subtask
@@ -1053,7 +925,7 @@ async def post_session_processing(
 
         # Still record commit if one was made (partial progress)
         if commit_after and commit_after != commit_before:
-            recovery_manager.record_good_commit(commit_after, subtask_id)
+            recovery_manager.record_good_commit(commit_after, subtask_id, commit_before)
             print_status(
                 f"Recorded partial progress commit: {commit_after[:8]}", "info"
             )
@@ -1265,24 +1137,6 @@ async def run_agent_session(
             _rr = None
             _rs_id = None
 
-    # Decision logger — structured record of agent decisions (non-blocking)
-    _phase_to_agent = {
-        LogPhase.PLANNING: "planner",
-        LogPhase.CODING: "coder",
-        LogPhase.VALIDATION: "qa_reviewer",
-        LogPhase.QA_FIX: "qa_fixer",
-    }
-    _decision_logger: AgentDecisionLogger | None = None
-    try:
-        _decision_logger = create_decision_logger(
-            spec_dir=spec_dir,
-            agent_type=_phase_to_agent.get(phase, phase.value),
-        )
-    except Exception:
-        logger.debug(
-            "Failed to create decision logger; continuing without it", exc_info=True
-        )
-
     try:
         # Send the query
         debug("session", "Sending query to Claude SDK...")
@@ -1365,7 +1219,7 @@ async def run_agent_session(
                         inp = get_safe_tool_input(block)
 
                         # Extract meaningful tool input for display (full command)
-                        tool_input_display = _format_tool_input_display(inp)
+                        tool_input_display = format_tool_input_display(inp)
 
                         debug(
                             "session",
@@ -1423,24 +1277,16 @@ async def run_agent_session(
                                 # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
                                 pass
 
-                        # Record tool call in decision log (non-blocking)
-                        if _decision_logger and inp is not None:
-                            try:
-                                _decision_logger.log_tool_call(tool_name, inp)
-                            except Exception:
-                                # Le journal de decisions est annexe : il n'interrompt pas l'agent.
-                                pass
-
                         # Stream tool use events to live view
                         if streaming_wrapper and inp:
                             try:
                                 await streaming_wrapper.emit_tool_use(
                                     tool_name, tool_input_display
                                 )
-                                file_change = _extract_streaming_file_change(
+                                file_change = extract_streaming_file_change(
                                     tool_name, inp
                                 )
-                                command = _extract_streaming_command(tool_name, inp)
+                                command = extract_streaming_command(tool_name, inp)
                                 if file_change:
                                     fc_path, fc_content = file_change
                                     await streaming_wrapper.emit_file_change(
@@ -1537,7 +1383,7 @@ async def run_agent_session(
                         # Stream command output to live view
                         if streaming_wrapper and current_tool:
                             try:
-                                if _is_command_tool(current_tool):
+                                if is_command_tool(current_tool):
                                     await streaming_wrapper.emit_command_output(
                                         str(result_content)[:1000], is_error=is_error
                                     )
@@ -2209,7 +2055,7 @@ async def _run_agent_client_session(
                     tool_name = block.tool_name or ""
                     tool_count += 1
                     inp = block.tool_input or {}
-                    tool_input_display = _format_tool_input_display(inp)
+                    tool_input_display = format_tool_input_display(inp)
 
                     debug(
                         "session",
@@ -2241,8 +2087,8 @@ async def _run_agent_client_session(
                             await streaming_wrapper.emit_tool_use(
                                 tool_name, tool_input_display
                             )
-                            file_change = _extract_streaming_file_change(tool_name, inp)
-                            command = _extract_streaming_command(tool_name, inp)
+                            file_change = extract_streaming_file_change(tool_name, inp)
+                            command = extract_streaming_command(tool_name, inp)
                             if file_change:
                                 fc_path, fc_content = file_change
                                 await streaming_wrapper.emit_file_change(
@@ -2324,7 +2170,7 @@ async def _run_agent_client_session(
                     # Stream command output to live view
                     if streaming_wrapper and current_tool:
                         try:
-                            if _is_command_tool(current_tool):
+                            if is_command_tool(current_tool):
                                 await streaming_wrapper.emit_command_output(
                                     str(result_content)[:1000], is_error=is_error
                                 )

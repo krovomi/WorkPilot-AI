@@ -167,8 +167,18 @@ class HookScheduler:
 _scheduler: HookScheduler | None = None
 
 
-def start_hook_scheduler() -> HookScheduler:
-    """Start the process-wide scheduler, creating it on first call."""
+def start_hook_scheduler() -> HookScheduler | None:
+    """Start the process-wide scheduler, creating it on first call.
+
+    Hooks are a tool of the desktop app's local backend: a server does not
+    serve them (``server.authz.catalog.SERVER_FEATURES``), so it does not run
+    them on a schedule either, and nothing is started there.
+    """
+    from foundation.api_safety import server_mode_roots
+
+    if server_mode_roots() is not None:
+        logger.info("Hook scheduler not started: hooks stay with the local app")
+        return None
     global _scheduler
     if _scheduler is None:
         _scheduler = HookScheduler()

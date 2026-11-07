@@ -118,8 +118,8 @@ const PHASE_CONFIG: Record<
 		labelKey: "roadmapProgress.phases.analyzing.label",
 		descriptionKey: "roadmapProgress.phases.analyzing.description",
 		icon: Search,
-		color: "bg-amber-500",
-		bgColor: "bg-amber-500/20",
+		color: "bg-warning",
+		bgColor: "bg-warning/20",
 	},
 	discovering: {
 		labelKey: "roadmapProgress.phases.discovering.label",
@@ -553,7 +553,7 @@ export function RoadmapGenerationProgress({
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<span className="text-xs text-muted-foreground/70 cursor-help">
-											Â· {t("roadmapProgress.lastActivityPrefix")}{" "}
+											· {t("roadmapProgress.lastActivityPrefix")}{" "}
 											{lastActivityDisplay}
 										</span>
 									</TooltipTrigger>

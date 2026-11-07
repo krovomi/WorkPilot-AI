@@ -7,12 +7,12 @@ import type {
 } from "../../../shared/types/api-watcher";
 
 const CATEGORY_STYLES: Record<string, { color: string; icon: string }> = {
-	breaking: { color: "text-red-400 bg-red-500/10", icon: "🔴" },
+	breaking: { color: "text-destructive bg-destructive/10", icon: "🔴" },
 	potentially_breaking: {
-		color: "text-yellow-400 bg-yellow-500/10",
+		color: "text-warning bg-warning/10",
 		icon: "🟡",
 	},
-	non_breaking: { color: "text-green-400 bg-green-500/10", icon: "🟢" },
+	non_breaking: { color: "text-success bg-success/10", icon: "🟢" },
 };
 
 interface ApiWatcherDashboardProps {
@@ -36,13 +36,13 @@ export function ApiWatcherDashboard({
 	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center gap-3 flex-wrap">
 				{isScanning ? (
 					<button
 						type="button"
 						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20"
+						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
 					>
 						{t("actions.cancel")}
 					</button>
@@ -52,7 +52,7 @@ export function ApiWatcherDashboard({
 							type="button"
 							onClick={() => projectPath && startScan(projectPath, false)}
 							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-(--accent-color) text-white text-sm disabled:opacity-50"
+							className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
 						>
 							{t("actions.runScan")}
 						</button>
@@ -60,7 +60,7 @@ export function ApiWatcherDashboard({
 							type="button"
 							onClick={() => projectPath && startScan(projectPath, true)}
 							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm disabled:opacity-50 hover:bg-(--bg-tertiary)"
+							className="px-3 py-1.5 rounded bg-card border border-border text-sm disabled:opacity-50 hover:bg-muted"
 						>
 							{t("actions.saveBaseline")}
 						</button>
@@ -70,7 +70,7 @@ export function ApiWatcherDashboard({
 					<button
 						type="button"
 						onClick={reset}
-						className="px-3 py-1.5 rounded bg-(--bg-secondary) border border-(--border-color) text-sm hover:bg-(--bg-tertiary)"
+						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
 					>
 						{t("actions.reset")}
 					</button>
@@ -78,19 +78,19 @@ export function ApiWatcherDashboard({
 			</div>
 
 			{!projectPath && (
-				<div className="text-sm text-(--text-secondary)">
+				<div className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</div>
 			)}
 
 			{isScanning && (
-				<div className="text-sm text-(--text-secondary) animate-pulse">
+				<div className="text-sm text-muted-foreground animate-pulse">
 					{status || t("actions.scanning")}
 				</div>
 			)}
 
 			{phase === "error" && error && (
-				<div className="text-sm text-red-400">
+				<div className="text-sm text-destructive">
 					{t("errors.failed", { error })}
 				</div>
 			)}
@@ -104,7 +104,7 @@ export function ApiWatcherDashboard({
 				/>
 			) : (
 				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-(--text-secondary)">
+					<div className="flex items-center justify-center h-40 text-muted-foreground">
 						<p>{t("noData")}</p>
 					</div>
 				)
@@ -129,7 +129,7 @@ function ReportBody({
 		<div className="flex flex-col gap-4">
 			<div>
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{summary ||
 						(hasChanges
 							? t("changesDetected", { count: diff.changes.length })
@@ -138,25 +138,25 @@ function ReportBody({
 			</div>
 
 			<div className="grid grid-cols-3 gap-3">
-				<div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-					<p className="text-xs text-red-400">{t("categories.breaking")}</p>
-					<p className="text-2xl font-bold text-red-400">
+				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+					<p className="text-xs text-destructive">{t("categories.breaking")}</p>
+					<p className="text-2xl font-bold text-destructive">
 						{diff.breakingCount}
 					</p>
 				</div>
-				<div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-					<p className="text-xs text-yellow-400">
+				<div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+					<p className="text-xs text-warning">
 						{t("categories.potentiallyBreaking")}
 					</p>
-					<p className="text-2xl font-bold text-yellow-400">
+					<p className="text-2xl font-bold text-warning">
 						{diff.potentiallyBreakingCount}
 					</p>
 				</div>
-				<div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-					<p className="text-xs text-green-400">
+				<div className="p-3 rounded-lg bg-success/10 border border-success/20">
+					<p className="text-xs text-success">
 						{t("categories.nonBreaking")}
 					</p>
-					<p className="text-2xl font-bold text-green-400">
+					<p className="text-2xl font-bold text-success">
 						{diff.nonBreakingCount}
 					</p>
 				</div>
@@ -169,9 +169,9 @@ function ReportBody({
 			</div>
 
 			{migrationGuideMarkdown && (
-				<div className="mt-4 p-4 rounded-lg bg-(--bg-secondary) border border-(--border-color)">
+				<div className="mt-4 p-4 rounded-lg bg-card border border-border">
 					<h3 className="text-sm font-medium mb-2">{t("migrationGuide")}</h3>
-					<pre className="text-xs whitespace-pre-wrap font-mono text-(--text-secondary)">
+					<pre className="text-xs whitespace-pre-wrap font-mono text-muted-foreground">
 						{migrationGuideMarkdown}
 					</pre>
 				</div>

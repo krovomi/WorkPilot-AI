@@ -12,6 +12,7 @@ import {
 	GitMerge,
 	GitPullRequest,
 	Info,
+	ListChecks,
 	Loader2,
 	Minus,
 	Plus,
@@ -33,6 +34,7 @@ import type {
 } from "../../../../shared/types";
 import { cn } from "../../../lib/utils";
 import { useSettingsStore } from "../../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
@@ -63,6 +65,8 @@ interface WorkspaceStatusProps {
 	readonly isCreatingPR?: boolean;
 	readonly existingPrUrl?: string | null;
 	readonly onShowDiffDialog: (show: boolean) => void;
+	/** Opens the guided review (the diff grouped by the plan's subtasks). */
+	readonly onShowGuidedReview?: () => void;
 	readonly onShowDiscardDialog: (show: boolean) => void;
 	readonly onShowConflictDialog: (show: boolean) => void;
 	readonly onLoadMergePreview: () => void;
@@ -124,6 +128,7 @@ export function WorkspaceStatus({
 	isCreatingPR,
 	existingPrUrl,
 	onShowDiffDialog,
+	onShowGuidedReview,
 	onShowDiscardDialog,
 	onShowConflictDialog,
 	onLoadMergePreview,
@@ -134,7 +139,7 @@ export function WorkspaceStatus({
 	onRequestComplete,
 }: WorkspaceStatusProps) {
 	const { t } = useTranslation(["taskReview", "common", "tasks"]);
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const preferredIDE = settings.preferredIDE || "vscode";
 	const preferredTerminal = settings.preferredTerminal || "system";
 
@@ -411,7 +416,7 @@ export function WorkspaceStatus({
 							{t("taskReview:merge.status.aiWillResolve")} (
 							{hasPathMappedMerges
 								? `${pathMappedAIMergeCount} ${t("taskReview:merge.status.files")}`
-								: `${commitsBehind} commits`}
+								: t("taskReview:workspace.commitsCount", { count: commitsBehind })}
 							)
 						</span>
 					</div>
@@ -457,15 +462,29 @@ export function WorkspaceStatus({
 						<GitBranch className="h-4 w-4 text-purple-400" />
 						{t("taskReview:merge.buildReadyForReview")}
 					</h3>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => onShowDiffDialog(true)}
-						className="h-7 px-2 text-xs"
-					>
-						<Eye className="h-3.5 w-3.5 mr-1" />
-						{t("taskReview:merge.view")}
-					</Button>
+					<div className="flex items-center gap-1">
+						{onShowGuidedReview && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={onShowGuidedReview}
+								title={t("taskReview:guided.buttonHint")}
+								className="h-7 px-2 text-xs"
+							>
+								<ListChecks className="h-3.5 w-3.5 mr-1" />
+								{t("taskReview:guided.button")}
+							</Button>
+						)}
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => onShowDiffDialog(true)}
+							className="h-7 px-2 text-xs"
+						>
+							<Eye className="h-3.5 w-3.5 mr-1" />
+							{t("taskReview:merge.view")}
+						</Button>
+					</div>
 				</div>
 
 				{/* Compact stats row */}
@@ -497,11 +516,11 @@ export function WorkspaceStatus({
 				{/* Branch info: spec branch → user's current branch (merge target) */}
 				{worktreeStatus.branch && (
 					<div className="mt-2 text-xs text-muted-foreground">
-						<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+						<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 							{worktreeStatus.branch}
 						</code>
 						<span className="mx-1.5">→</span>
-						<code className="bg-background/80 px-1.5 py-0.5 rounded text-[11px]">
+						<code className="bg-background/80 px-1.5 py-0.5 rounded text-2xs">
 							{worktreeStatus.currentProjectBranch ||
 								worktreeStatus.baseBranch ||
 								"main"}
@@ -527,7 +546,7 @@ export function WorkspaceStatus({
 							className="h-7 px-2 text-xs"
 						>
 							<Code className="h-3.5 w-3.5 mr-1" />
-							Open in {IDE_LABELS[preferredIDE]}
+							{t("taskReview:workspace.openIn", { app: IDE_LABELS[preferredIDE] })}
 						</Button>
 						<Button
 							variant="outline"
@@ -536,7 +555,9 @@ export function WorkspaceStatus({
 							className="h-7 px-2 text-xs"
 						>
 							<Terminal className="h-3.5 w-3.5 mr-1" />
-							Open in {TERMINAL_LABELS[preferredTerminal]}
+							{t("taskReview:workspace.openIn", {
+								app: TERMINAL_LABELS[preferredTerminal],
+							})}
 						</Button>
 					</div>
 				)}
@@ -558,12 +579,10 @@ export function WorkspaceStatus({
 						<AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
 						<div className="flex-1 min-w-0">
 							<p className="text-sm font-medium text-warning">
-								{uncommittedCount} uncommitted{" "}
-								{uncommittedCount === 1 ? "change" : "changes"} in main project
+								{t("taskReview:workspace.uncommitted", { count: uncommittedCount })}
 							</p>
 							<p className="text-xs text-muted-foreground mt-0.5">
-								Commit or stash them in your terminal before staging to avoid
-								conflicts.
+								{t("taskReview:workspace.commitOrStash")}
 							</p>
 						</div>
 					</div>
@@ -573,7 +592,7 @@ export function WorkspaceStatus({
 				{isLoadingPreview && !mergePreview && (
 					<div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
 						<Loader2 className="h-4 w-4 animate-spin" />
-						Checking for conflicts...
+						{t("taskReview:merge.checkingForConflicts")}
 					</div>
 				)}
 
@@ -728,7 +747,7 @@ export function WorkspaceStatus({
 							<div className="flex items-center gap-2">
 								<span
 									className={cn(
-										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										"flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold transition-colors",
 										hasExistingPr
 											? "bg-success text-success-foreground"
 											: "bg-info text-info-foreground ring-2 ring-info/25",
@@ -754,7 +773,7 @@ export function WorkspaceStatus({
 							<div className="flex items-center gap-2">
 								<span
 									className={cn(
-										"flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors",
+										"flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold transition-colors",
 										hasExistingPr
 											? "bg-success text-success-foreground ring-2 ring-success/25"
 											: "bg-muted text-muted-foreground",
@@ -807,14 +826,14 @@ export function WorkspaceStatus({
 									type="button"
 									onClick={onRequestComplete}
 									disabled={actionsBusy}
-									className="mx-auto flex items-center gap-1 text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-warning hover:underline disabled:opacity-50"
+									className="mx-auto flex items-center gap-1 text-2xs text-muted-foreground underline-offset-2 transition-colors hover:text-warning hover:underline disabled:opacity-50"
 								>
 									{t("taskReview:close.closeWithoutPr")}
 								</button>
 							</div>
 						)}
 
-						<div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+						<div className="flex items-center gap-2 text-2xs text-muted-foreground">
 							<span className="h-px flex-1 bg-border" />
 							{t("taskReview:close.orGitActions")}
 							<span className="h-px flex-1 bg-border" />

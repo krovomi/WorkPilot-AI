@@ -175,9 +175,9 @@ export function GitHubRemoteConfigModal({
 	const getConnectionStatusClasses = () => {
 		switch (connectionStatus) {
 			case "success":
-				return "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400";
+				return "bg-success/10 text-success  ";
 			case "error":
-				return "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400";
+				return "bg-destructive/10 text-destructive  ";
 			default:
 				return "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400";
 		}

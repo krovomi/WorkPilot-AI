@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PROVIDER_MODELS_MAP } from "@shared/constants/models";
 import { useBountyBoardStore } from "../../stores/bounty-board-store";
+import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -22,6 +23,7 @@ import {
 } from "../ui/select";
 import { ContestantCard } from "./ContestantCard";
 import { JudgeVerdictModal } from "./JudgeVerdictModal";
+import { formatAppDateTime } from "@/lib/date-format";
 
 const PROVIDERS = Object.keys(PROVIDER_MODELS_MAP).sort((a, b) =>
 	a.localeCompare(b),
@@ -99,41 +101,55 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 
 	const tasks = useTaskStore((s) => s.tasks);
 	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+	// Same resolution as App's `selectedProject`, so the list never mixes in
+	// another project's specs.
+	const projectId = useProjectStore(
+		(s) => s.activeProjectId || s.selectedProjectId,
+	);
 
 	const [projectInput] = useState(projectPath ?? "");
-	const [specInput, setSpecInput] = useState(specId ?? "");
+	const [specInput, setSpecInput] = useState("");
 	const [verdictOpen, setVerdictOpen] = useState(false);
 
-	// Specs the user can pick from, derived from the loaded tasks (no extra IPC).
+	// The only specs a round can run on: the project's existing ones, derived
+	// from its loaded tasks (no extra IPC). There is deliberately no free-text
+	// fallback — a typed id that names no spec folder used to launch a round on
+	// nothing; the main process refuses such an id too.
 	const availableSpecs = useMemo(() => {
 		const seen = new Map<string, string>();
 		for (const task of tasks) {
+			if (projectId && task.projectId !== projectId) continue;
 			if (task.specId && !seen.has(task.specId)) {
 				seen.set(task.specId, task.title || task.specId);
 			}
 		}
-		return Array.from(seen, ([id, title]) => ({ id, title }));
-	}, [tasks]);
+		return Array.from(seen, ([id, title]) => ({ id, title })).sort((a, b) =>
+			a.id.localeCompare(b.id),
+		);
+	}, [tasks, projectId]);
 
 	// Prefer the explicit prop, then the currently-selected task's spec, then
 	// the first available spec — so the field is rarely empty on open.
+	const isKnownSpec = (id: string) => availableSpecs.some((s) => s.id === id);
 	const preferredSpecId = useMemo(() => {
-		if (specId) return specId;
+		const known = (id?: string) =>
+			id && availableSpecs.some((s) => s.id === id) ? id : "";
 		const selected = tasks.find((t) => t.id === selectedTaskId)?.specId;
-		return selected || availableSpecs[0]?.id || "";
+		return known(specId) || known(selected) || availableSpecs[0]?.id || "";
 	}, [specId, tasks, selectedTaskId, availableSpecs]);
 
+	// Keep the choice inside the list: a spec deleted since, or one from the
+	// project shown before, is replaced rather than sent.
 	useEffect(() => {
-		if (!specInput && preferredSpecId) {
-			setSpecInput(preferredSpecId);
-		}
-	}, [preferredSpecId, specInput]);
+		if (specInput && availableSpecs.some((s) => s.id === specInput)) return;
+		if (specInput !== preferredSpecId) setSpecInput(preferredSpecId);
+	}, [preferredSpecId, specInput, availableSpecs]);
 
 	useEffect(() => {
-		if (projectInput && specInput) {
+		if (projectInput && availableSpecs.some((s) => s.id === specInput)) {
 			void loadArchives(projectInput, specInput);
 		}
-	}, [projectInput, specInput, loadArchives]);
+	}, [projectInput, specInput, availableSpecs, loadArchives]);
 
 	useEffect(() => {
 		if (current?.status === "completed") {
@@ -144,7 +160,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 	const canStart = Boolean(
 		!loading &&
 			projectInput.trim() &&
-			specInput.trim() &&
+			isKnownSpec(specInput) &&
 			contestants.length > 0,
 	);
 
@@ -153,15 +169,20 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 		? null
 		: !projectInput.trim()
 			? t("bountyBoard:hint.selectProject", "Select a project first.")
-			: !specInput.trim()
-				? t("bountyBoard:hint.selectSpec", "Choose a spec to launch.")
-				: contestants.length === 0
-					? t("bountyBoard:hint.addContestant", "Add at least one contestant.")
-					: null;
+			: availableSpecs.length === 0
+				? t(
+						"bountyBoard:hint.noSpecs",
+						"This project has no spec yet: create a task first.",
+					)
+				: !isKnownSpec(specInput)
+					? t("bountyBoard:hint.selectSpec", "Choose a spec to launch.")
+					: contestants.length === 0
+						? t("bountyBoard:hint.addContestant", "Add at least one contestant.")
+						: null;
 
 	const handleStart = () => {
 		if (!canStart) return;
-		void startBounty(projectInput.trim(), specInput.trim());
+		void startBounty(projectInput.trim(), specInput);
 	};
 
 	return (
@@ -199,31 +220,31 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 					/>
 				</div>
 				<div>
-					<Label className="text-xs">
-						{t("bountyBoard:specId", "Spec id")}
+					<Label className="text-xs" htmlFor="bounty-spec">
+						{t("bountyBoard:specId", "Spec")}
 					</Label>
-					{availableSpecs.length > 0 ? (
-						<Select value={specInput} onValueChange={setSpecInput}>
-							<SelectTrigger>
-								<SelectValue
-									placeholder={t("bountyBoard:selectSpec", "Select a spec")}
-								/>
-							</SelectTrigger>
-							<SelectContent>
-								{availableSpecs.map((s) => (
-									<SelectItem key={s.id} value={s.id}>
-										{s.title}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					) : (
-						<Input
-							value={specInput}
-							onChange={(e) => setSpecInput(e.target.value)}
-							placeholder="001-my-feature"
-						/>
-					)}
+					<Select
+						value={specInput}
+						onValueChange={setSpecInput}
+						disabled={availableSpecs.length === 0}
+					>
+						<SelectTrigger id="bounty-spec" data-testid="bounty-spec-select">
+							<SelectValue
+								placeholder={
+									availableSpecs.length === 0
+										? t("bountyBoard:noSpecs", "No spec in this project")
+										: t("bountyBoard:selectSpec", "Select a spec")
+								}
+							/>
+						</SelectTrigger>
+						<SelectContent searchable={availableSpecs.length > 8}>
+							{availableSpecs.map((s) => (
+								<SelectItem key={s.id} value={s.id}>
+									{s.title === s.id ? s.id : `${s.title} (${s.id})`}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 			</section>
 
@@ -254,7 +275,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 							className="grid grid-cols-12 gap-2 items-end border rounded-md p-2 bg-card"
 						>
 							<div className="col-span-4">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.provider", "Provider")}
 								</Label>
 								<Select
@@ -284,7 +305,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 									</SelectContent>
 								</Select>
 								{degradesTo(c.provider) && (
-									<p className="text-[10px] text-destructive mt-1">
+									<p className="text-3xs text-destructive mt-1">
 										{t("bountyBoard:noAdapter", {
 											provider: c.provider,
 											target: degradesTo(c.provider),
@@ -295,7 +316,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 								)}
 							</div>
 							<div className="col-span-4">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.model", "Model")}
 								</Label>
 								<ContestantModelSelect
@@ -305,7 +326,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 								/>
 							</div>
 							<div className="col-span-3">
-								<Label className="text-[10px]">
+								<Label className="text-3xs">
 									{t("bountyBoard:field.profile", "Profile (optional)")}
 								</Label>
 								<Input
@@ -374,7 +395,7 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 						{archives.slice(0, 10).map((a) => (
 							<li key={a.id} className="flex gap-3 text-muted-foreground">
 								<span className="font-mono">
-									{new Date(a.createdAt).toLocaleString()}
+									{formatAppDateTime(a.createdAt)}
 								</span>
 								<span>
 									{t("bountyBoard:contestantsCount", {

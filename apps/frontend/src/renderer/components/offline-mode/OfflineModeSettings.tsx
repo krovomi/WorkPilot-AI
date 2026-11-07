@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 
+import { NativeSelect } from "../ui/native-select";
 const LOCAL_PROVIDERS = new Set<string>(LOCAL_PROVIDER_IDS);
 
 function formatAge(seconds: number): string {
@@ -85,8 +86,8 @@ export function OfflineModeSettings({ projectPath }: Props) {
 
 	const confidentiality = report?.confidentialityLevel ?? "unknown";
 	const confidentialityStyle: Record<string, string> = {
-		local: "bg-green-500/15 text-green-500 border-green-500/30",
-		mixed: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
+		local: "bg-success/15 text-success border-success/30",
+		mixed: "bg-warning/15 text-warning border-warning/30",
 		unknown: "bg-muted text-muted-foreground border-border",
 	};
 	const confidentialityIcon =
@@ -154,7 +155,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 							<span className="w-24">Ollama</span>
 							{status.runtimes.ollama.available ? (
 								<>
-									<Badge variant="outline" className="bg-green-500/10">
+									<Badge variant="outline" className="bg-success/10">
 										{t("offlineMode:available", "available")}
 									</Badge>
 									<span className="text-xs text-muted-foreground">
@@ -171,7 +172,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<li className="flex items-center gap-2">
 							<span className="w-24">llama.cpp</span>
 							{status.runtimes.llamaCpp.available ? (
-								<Badge variant="outline" className="bg-green-500/10">
+								<Badge variant="outline" className="bg-success/10">
 									{t("offlineMode:available", "available")}
 								</Badge>
 							) : (
@@ -183,7 +184,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						<li className="flex items-center gap-2">
 							<span className="w-24">LM Studio</span>
 							{status.runtimes.lmStudio.available ? (
-								<Badge variant="outline" className="bg-green-500/10">
+								<Badge variant="outline" className="bg-success/10">
 									{t("offlineMode:available", "available")}
 								</Badge>
 							) : (
@@ -253,12 +254,16 @@ export function OfflineModeSettings({ projectPath }: Props) {
 							{t("offlineMode:hybridDescription")}
 						</p>
 					)}
-					<label className="flex items-center gap-2 text-sm">
+					<label
+						htmlFor="offline-default-provider"
+						className="flex items-center gap-2 text-sm"
+					>
 						{t("offlineMode:defaultProvider")}
-						<select
+						<NativeSelect
+							id="offline-default-provider"
 							value={policy.defaultProvider}
 							onChange={(e) => setDefaultProvider(e.target.value)}
-							className="h-8 rounded-md border border-input bg-background px-2"
+							className="h-8 px-2"
 						>
 							{!LOCAL_PROVIDERS.has(policy.defaultProvider) && (
 								<option value={policy.defaultProvider} disabled>
@@ -271,13 +276,13 @@ export function OfflineModeSettings({ projectPath }: Props) {
 									{provider}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</label>
 					<p className="text-xs text-muted-foreground">
 						{t("offlineMode:defaultDescription")}
 					</p>
 					{!validPolicy && (
-						<p className="text-sm text-yellow-600" role="alert">
+						<p className="text-sm text-warning" role="alert">
 							{t("offlineMode:invalidPolicy")}
 						</p>
 					)}
@@ -310,14 +315,14 @@ export function OfflineModeSettings({ projectPath }: Props) {
 												{task}
 												{isLocal && (
 													<Home
-														className="w-3 h-3 text-green-500"
-														aria-label="local"
+														className="w-3 h-3 text-success"
+														aria-label={t("offlineMode:localAria")}
 													/>
 												)}
 											</span>
 										</td>
 										<td className="py-1 pr-2">
-											<select
+											<NativeSelect
 												value={entry.provider}
 												onChange={(e) => {
 													const nextProvider = e.target.value;
@@ -325,7 +330,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 													const nextModel = nextModels[0] ?? "";
 													setRouting(task, nextProvider, nextModel);
 												}}
-												className="h-7 w-full rounded-md border border-input bg-background px-2 text-sm"
+												className="h-7 w-full px-2 text-sm"
 											>
 												{!LOCAL_PROVIDERS.has(entry.provider) && (
 													<option value={entry.provider} disabled>
@@ -338,7 +343,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 														{p}
 													</option>
 												))}
-											</select>
+											</NativeSelect>
 										</td>
 										<td className="py-1 pr-2">
 											<select
@@ -347,7 +352,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 													setRouting(task, entry.provider, e.target.value)
 												}
 												className={`h-7 w-full rounded-md border bg-background px-2 text-sm ${
-													modelMissing ? "border-yellow-500/60" : "border-input"
+													modelMissing ? "border-warning/60" : "border-input"
 												}`}
 											>
 												{modelMissing && (
@@ -439,7 +444,7 @@ export function OfflineModeSettings({ projectPath }: Props) {
 						</Button>
 					</div>
 					{catalog && (
-						<p className="text-[11px] text-muted-foreground">
+						<p className="text-2xs text-muted-foreground">
 							{t(
 								"offlineMode:catalogMeta",
 								"{{total}} models detected across {{providers}} providers · cached {{age}} ago",

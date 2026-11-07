@@ -38,11 +38,11 @@ export function FeatureDetailPanel({
 	const getSeverityColorClass = (severity: string) => {
 		switch (severity) {
 			case "high":
-				return "text-red-500 border-red-500/50";
+				return "text-destructive border-destructive/50";
 			case "medium":
-				return "text-yellow-500 border-yellow-500/50";
+				return "text-warning border-warning/50";
 			default:
-				return "text-green-500 border-green-500/50";
+				return "text-success border-success/50";
 		}
 	};
 
@@ -107,7 +107,7 @@ export function FeatureDetailPanel({
 				<div className="p-4 space-y-6">
 					{/* Description */}
 					<div>
-						<h3 className="text-sm font-medium mb-2">Description</h3>
+						<h3 className="text-sm font-medium mb-2">{t("roadmap:features.description")}</h3>
 						<p className="text-sm text-muted-foreground">
 							{feature.description}
 						</p>
@@ -117,7 +117,7 @@ export function FeatureDetailPanel({
 					<div>
 						<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 							<Lightbulb className="h-4 w-4" />
-							Rationale
+							{t("roadmap:featureDetail.rationale")}
 						</h3>
 						<p className="text-sm text-muted-foreground">{feature.rationale}</p>
 					</div>
@@ -130,7 +130,7 @@ export function FeatureDetailPanel({
 							>
 								{feature.complexity}
 							</div>
-							<div className="text-xs text-muted-foreground">Complexity</div>
+							<div className="text-xs text-muted-foreground">{t("roadmap:featureDetail.complexity")}</div>
 						</Card>
 						<Card className="p-3 text-center">
 							<div
@@ -138,13 +138,13 @@ export function FeatureDetailPanel({
 							>
 								{feature.impact}
 							</div>
-							<div className="text-xs text-muted-foreground">Impact</div>
+							<div className="text-xs text-muted-foreground">{t("roadmap:featureDetail.impact")}</div>
 						</Card>
 						<Card className="p-3 text-center">
 							<div className="text-lg font-semibold">
 								{feature.dependencies.length}
 							</div>
-							<div className="text-xs text-muted-foreground">Dependencies</div>
+							<div className="text-xs text-muted-foreground">{t("roadmap:features.dependencies")}</div>
 						</Card>
 					</div>
 
@@ -153,7 +153,7 @@ export function FeatureDetailPanel({
 						<div>
 							<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 								<Users className="h-4 w-4" />
-								User Stories
+								{t("roadmap:featureDetail.userStories")}
 							</h3>
 							<div className="space-y-2">
 								{feature.userStories.map((story) => (
@@ -173,7 +173,7 @@ export function FeatureDetailPanel({
 						<div>
 							<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 								<CheckCircle2 className="h-4 w-4" />
-								Acceptance Criteria
+								{t("roadmap:features.acceptanceCriteria")}
 							</h3>
 							<ul className="space-y-1">
 								{feature.acceptanceCriteria.map((criterion) => (
@@ -194,7 +194,7 @@ export function FeatureDetailPanel({
 						<div>
 							<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 								<ArrowRight className="h-4 w-4" />
-								Dependencies
+								{t("roadmap:features.dependencies")}
 							</h3>
 							<div className="flex flex-wrap gap-1">
 								{feature.dependencies.map((dep) => (
@@ -211,7 +211,7 @@ export function FeatureDetailPanel({
 						<div>
 							<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
 								<TrendingUp className="h-4 w-4 text-primary" />
-								Addresses Competitor Pain Points
+								{t("roadmap:featureDetail.addressesPainPoints")}
 							</h3>
 							<div className="space-y-2">
 								{competitorInsights.map((insight) => (
@@ -230,7 +230,9 @@ export function FeatureDetailPanel({
 												variant="outline"
 												className={`text-xs ${getSeverityColorClass(insight.severity)}`}
 											>
-												{insight.severity} severity
+												{t("roadmap:featureDetail.severity", {
+												severity: insight.severity,
+											})}
 											</Badge>
 										</div>
 									</div>
@@ -247,7 +249,7 @@ export function FeatureDetailPanel({
 						onClick={() => onGoToTask(feature.linkedSpecId ?? "")}
 					>
 						<ExternalLink className="h-4 w-4 mr-2" />
-						Go to Task
+						{t("roadmap:features.goToTask")}
 					</Button>
 				</div>
 			) : (
@@ -255,7 +257,7 @@ export function FeatureDetailPanel({
 					<div className="shrink-0 p-4 border-t border-border">
 						<Button className="w-full" onClick={() => onConvertToSpec(feature)}>
 							<Zap className="h-4 w-4 mr-2" />
-							Convert to WorkPilot AI Task
+							{t("roadmap:featureDetail.convert")}
 						</Button>
 					</div>
 				)
@@ -267,10 +269,11 @@ export function FeatureDetailPanel({
 							<Trash2 className="h-6 w-6 text-destructive" />
 						</div>
 						<div>
-							<h3 className="font-semibold">Delete Feature?</h3>
+							<h3 className="font-semibold">{t("roadmap:featureDetail.deleteTitle")}</h3>
 							<p className="text-sm text-muted-foreground mt-1">
-								This will permanently remove "{feature.title}" from your
-								roadmap.
+								{t("roadmap:featureDetail.deleteDescription", {
+									title: feature.title,
+								})}
 							</p>
 						</div>
 						<div className="flex gap-2 justify-center">
@@ -278,10 +281,10 @@ export function FeatureDetailPanel({
 								variant="outline"
 								onClick={() => setShowDeleteConfirm(false)}
 							>
-								Cancel
+								{t("common:buttons.cancel")}
 							</Button>
 							<Button variant="destructive" onClick={handleDelete}>
-								Delete
+								{t("common:buttons.delete")}
 							</Button>
 						</div>
 					</div>

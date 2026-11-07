@@ -35,15 +35,15 @@ describe("automations listeners", () => {
 
 	it("reloads the open project's board when cards were created", () => {
 		setupAutomationsListeners();
-		emit({ projectId: "p1", created: 2 });
+		emit({ projectId: "p1", created: 2, reviews: 0 });
 		expect(loadTasks).toHaveBeenCalledWith("p1", { forceRefresh: true });
 		expect(useAutomationsStore.getState().passes).toEqual({ p1: 1 });
 	});
 
 	it("only counts a pass that created nothing, or another project's", () => {
 		setupAutomationsListeners();
-		emit({ projectId: "p1", created: 0 });
-		emit({ projectId: "p2", created: 3 });
+		emit({ projectId: "p1", created: 0, reviews: 0 });
+		emit({ projectId: "p2", created: 3, reviews: 0 });
 		expect(loadTasks).not.toHaveBeenCalled();
 		expect(useAutomationsStore.getState().passes).toEqual({ p1: 1, p2: 1 });
 	});

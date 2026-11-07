@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from core.debug import debug, debug_section, debug_warning
+    from foundation.debug import debug, debug_section, debug_warning
 except ImportError:
 
     def debug(module: str, message: str, **kwargs):

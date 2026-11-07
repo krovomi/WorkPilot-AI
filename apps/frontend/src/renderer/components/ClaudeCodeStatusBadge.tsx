@@ -26,6 +26,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -36,12 +37,15 @@ import {
 	SelectValue,
 } from "./ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface ClaudeCodeStatusBadgeProps {
 	readonly className?: string;
 	readonly onNavigateToTerminals?: () => void; // Ajout de la prop pour la navigation
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: variable kept for clarity
@@ -60,6 +64,7 @@ export function ClaudeCodeStatusBadge({
 	className,
 	onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: ClaudeCodeStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { data, refreshClaude } = useCliStatus();
@@ -100,6 +105,10 @@ export function ClaudeCodeStatusBadge({
 
 	// Use data from context
 	const status = claude.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = claude.versionInfo;
 	const lastChecked = claude.lastChecked;
 
@@ -422,9 +431,9 @@ export function ClaudeCodeStatusBadge({
 	const getStatusColor = () => {
 		switch (status) {
 			case "installed":
-				return "bg-green-500";
+				return "bg-success";
 			case "outdated":
-				return "bg-yellow-500";
+				return "bg-warning";
 			case "not-found":
 			case "error":
 				return "bg-destructive";
@@ -518,7 +527,7 @@ export function ClaudeCodeStatusBadge({
 									? "text-destructive"
 									: "",
 								status === "outdated"
-									? "text-yellow-600 dark:text-yellow-500"
+									? "text-warning "
 									: "",
 								className,
 							)}
@@ -542,12 +551,12 @@ export function ClaudeCodeStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" || status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{t("common:install", "Install")}
 										</span>
 									)}
@@ -612,7 +621,7 @@ export function ClaudeCodeStatusBadge({
 										{t("navigation:claudeCode.path", "Path")}:
 									</span>
 									<span
-										className="font-mono text-[10px] truncate max-w-[140px]"
+										className="font-mono text-3xs truncate max-w-[140px]"
 										title={versionInfo.path}
 									>
 										{versionInfo.path}
@@ -624,7 +633,7 @@ export function ClaudeCodeStatusBadge({
 									<span>
 										{t("navigation:claudeCode.lastChecked", "Last checked")}:
 									</span>
-									<span>{lastChecked.toLocaleTimeString()}</span>
+									<span>{formatAppTime(lastChecked)}</span>
 								</div>
 							)}
 						</div>
@@ -754,7 +763,7 @@ export function ClaudeCodeStatusBadge({
 										>
 											<div className="flex flex-col">
 												<span
-													className="font-mono text-[10px] truncate max-w-[180px]"
+													className="font-mono text-3xs truncate max-w-[180px]"
 													title={installation.path}
 												>
 													{/* Split on both path separators for cross-platform compatibility */}
@@ -763,7 +772,7 @@ export function ClaudeCodeStatusBadge({
 														.slice(-2)
 														.join("/") || installation.path}
 												</span>
-												<span className="text-muted-foreground text-[9px]">
+												<span className="text-muted-foreground text-3xs">
 													{installation.version
 														? `v${installation.version}`
 														: t(

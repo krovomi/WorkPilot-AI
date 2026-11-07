@@ -143,6 +143,9 @@ interface TaskFormFieldsProps {
 	/** The window a Windows app is verified in; omitted, the field is not shown. */
 	verifyWindow?: string;
 	onVerifyWindowChange?: (title: string) => void;
+	/** The steps a web front end is verified with; omitted, the field is not shown. */
+	verifyScenario?: string;
+	onVerifyScenarioChange?: (steps: string) => void;
 	/** Context-window policy for this task; omitted, the field is not shown. */
 	contextPolicy?: ContextPolicy;
 	onContextPolicyChange?: (policy: ContextPolicy) => void;
@@ -226,6 +229,8 @@ export function TaskFormFields({
 	onVerifyLoopChange,
 	verifyWindow,
 	onVerifyWindowChange,
+	verifyScenario,
+	onVerifyScenarioChange,
 	contextPolicy,
 	onContextPolicyChange,
 	contextProvider,
@@ -816,6 +821,8 @@ export function TaskFormFields({
 							onVerifyLoopChange={onVerifyLoopChange}
 							verifyWindow={verifyWindow}
 							onVerifyWindowChange={onVerifyWindowChange}
+							verifyScenario={verifyScenario}
+							onVerifyScenarioChange={onVerifyScenarioChange}
 							disabled={disabled}
 							idPrefix={idPrefix}
 						/>

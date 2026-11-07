@@ -147,7 +147,7 @@ export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 						<GitFork className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 						<span className="text-sm font-medium">{t("tasks:bestOfN.title")}</span>
 						{state && (
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{t(`tasks:bestOfN.phase.${state.phase}`)}
 							</Badge>
 						)}
@@ -222,7 +222,7 @@ export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 							)}
 						</div>
 					))}
-					<p className="text-[11px] text-muted-foreground">{t("tasks:bestOfN.costHint")}</p>
+					<p className="text-2xs text-muted-foreground">{t("tasks:bestOfN.costHint")}</p>
 					{error && <p className="text-xs text-destructive">{error}</p>}
 					<div className="flex flex-wrap justify-between gap-2">
 						<Button
@@ -253,7 +253,7 @@ export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 						<li key={variant.specId} className="flex flex-wrap items-center gap-2 text-xs">
 							<span className="text-muted-foreground">#{variant.index}</span>
 							<span className="font-mono">{engineLabel(variant.engine)}</span>
-							<Badge variant="outline" className="text-[10px]">
+							<Badge variant="outline" className="text-3xs">
 								{running.has(variant.specId)
 									? t("tasks:bestOfN.variant.running")
 									: variant.interrupted
@@ -335,18 +335,18 @@ export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 							</tbody>
 						</table>
 					</div>
-					<p className="text-[11px] text-muted-foreground">
+					<p className="text-2xs text-muted-foreground">
 						{t("tasks:bestOfN.criteriaUsed", {
 							list: ranking.criteria.map((c) => t(`tasks:bestOfN.columns.${c}`)).join(" › "),
 						})}
 					</p>
 					{Object.entries(ranking.skipped).map(([criterion, reason]) => (
-						<p key={criterion} className="text-[11px] text-muted-foreground">
+						<p key={criterion} className="text-2xs text-muted-foreground">
 							{t(`tasks:bestOfN.skipped.${reason}`)}
 						</p>
 					))}
 					{!ranking.recommended && (
-						<p className="text-[11px] text-muted-foreground">{t("tasks:bestOfN.noRecommendation")}</p>
+						<p className="text-2xs text-muted-foreground">{t("tasks:bestOfN.noRecommendation")}</p>
 					)}
 				</div>
 			)}

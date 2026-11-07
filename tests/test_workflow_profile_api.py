@@ -71,7 +71,7 @@ class TestResolution:
         res = ask(project, effort="low")
         verify = next(p for p in res["profile"]["phases"] if p["id"] == "verify")
         assert verify["runs"] is True
-        assert verify["hardGate"] == "tests-pass,app-verified"
+        assert verify["hardGate"] == "tests-pass,app-verified,deps-exist,proof-checks"
 
     def test_a_degradation_is_reported_not_hidden(self, project, monkeypatch):
         import types
@@ -108,20 +108,6 @@ class TestResolution:
         design = next(p for p in res["profile"]["phases"] if p["id"] == "design-check")
         assert design["deterministic"] is True
         assert design["runs"] is True
-
-
-class TestItDoesNotTouchAnything:
-    def test_resolving_leaves_the_resume_marker_alone(self, project, monkeypatch):
-        """The UI may poll this. It must not eat a single-shot choice."""
-        from core.client import RESUME_WITH_PROVIDER_FILE
-
-        monkeypatch.delenv("AUTO_CLAUDE_PROVIDER", raising=False)
-        spec = project / ".workpilot" / "specs" / "001-x"
-        marker = spec / RESUME_WITH_PROVIDER_FILE
-        marker.write_text("copilot", encoding="utf-8")
-
-        assert ask(project)["success"] is True
-        assert marker.exists()
 
 
 class TestItAnswersForRealProjects:

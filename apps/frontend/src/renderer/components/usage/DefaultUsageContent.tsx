@@ -26,7 +26,7 @@ export function DefaultUsageContent({
 			{/* Session/5-hour usage */}
 			<div className="space-y-1.5">
 				<div className="flex items-center justify-between">
-					<span className="text-muted-foreground font-medium text-[11px] flex items-center gap-1">
+					<span className="text-muted-foreground font-medium text-2xs flex items-center gap-1">
 						<Clock className="h-3 w-3" />
 						{sessionLabel}
 					</span>
@@ -37,7 +37,7 @@ export function DefaultUsageContent({
 					</span>
 				</div>
 				{sessionResetTime && (
-					<div className="text-[10px] text-muted-foreground pl-4 flex items-center gap-1">
+					<div className="text-3xs text-muted-foreground pl-4 flex items-center gap-1">
 						<Info className="h-2.5 w-2.5" />
 						{sessionResetTime}
 					</div>
@@ -51,7 +51,7 @@ export function DefaultUsageContent({
 					</div>
 				</div>
 				{usage.sessionUsageValue != null && usage.sessionUsageLimit != null && (
-					<div className="flex items-center justify-between text-[10px]">
+					<div className="flex items-center justify-between text-3xs">
 						<span className="text-muted-foreground">
 							{t("common:usage.used")}
 						</span>
@@ -67,7 +67,7 @@ export function DefaultUsageContent({
 			{/* Weekly/Monthly usage */}
 			<div className="space-y-1.5">
 				<div className="flex items-center justify-between">
-					<span className="text-muted-foreground font-medium text-[11px] flex items-center gap-1">
+					<span className="text-muted-foreground font-medium text-2xs flex items-center gap-1">
 						<TrendingUp className="h-3 w-3" />
 						{weeklyLabel}
 					</span>
@@ -78,7 +78,7 @@ export function DefaultUsageContent({
 					</span>
 				</div>
 				{weeklyResetTime && usage.weeklyPercent >= 0 && (
-					<div className="text-[10px] text-muted-foreground pl-4 flex items-center gap-1">
+					<div className="text-3xs text-muted-foreground pl-4 flex items-center gap-1">
 						<Info className="h-2.5 w-2.5" />
 						{weeklyResetTime}
 					</div>
@@ -94,7 +94,7 @@ export function DefaultUsageContent({
 				</div>
 				)}
 				{usage.weeklyUsageValue != null && usage.weeklyUsageLimit != null && (
-					<div className="flex items-center justify-between text-[10px]">
+					<div className="flex items-center justify-between text-3xs">
 						<span className="text-muted-foreground">
 							{t("common:usage.used")}
 						</span>

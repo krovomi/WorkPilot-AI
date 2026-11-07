@@ -1,17 +1,15 @@
 """The documentation every agent reads before its first question stays small and true.
 
-`CLAUDE.md` imports `AGENTS.md`, `docs/CLAUDE.md` and `docs/rules/security.md`, and
-the Claude Agent SDK loads the project's `CLAUDE.md` through `setting_sources`:
-every Claude Code session on this repository, WorkPilot building itself included,
-pays for those files before it reads anything else. `docs/CLAUDE.md` had grown to
-272 KB (~68k tokens) by mixing a page of rules with the design rationale of every
-feature, which now lives in `docs/architecture/`, one file per feature (audit F23).
-The rules themselves are split by theme under `docs/rules/`.
-
-Two families of harness read these files. Claude Code reads `CLAUDE.md` and follows
-its `@imports`; every other harness (Codex, Copilot, Cursor, Gemini, OpenCode…)
-reads `AGENTS.md` and nothing else. So each `AGENTS.md` index carries a sibling
-`CLAUDE.md` that imports it, and no `AGENTS.md` relies on an import it cannot follow.
+Every agent pays for its instruction files before it reads anything else. Claude
+Code reads `CLAUDE.md` and follows its `@imports`; Codex, Copilot, Cursor, Gemini
+CLI (through `.gemini/settings.json`), OpenCode, pi… read `AGENTS.md`, from the
+root down to the folder they work in. So the root `AGENTS.md` carries the rules
+that hold everywhere, once, and the root `CLAUDE.md` imports it and little else:
+`docs/CLAUDE.md` once reached 272 KB (~68k tokens) and, with `docs/rules/security.md`,
+was imported into every Claude session (audit F23). Theme rules load per folder
+(each `AGENTS.md` index has a sibling `CLAUDE.md` that imports it), design
+rationale lives in `docs/architecture/`, one file per feature
+(`docs/architecture/agent-instructions.md`).
 
 The `AGENTS.md` indexes are read the same way, and a path they name that no
 longer exists sends an agent looking for a file that was deleted
@@ -21,6 +19,7 @@ replaced it — audit F18).
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -38,6 +37,15 @@ MAX_CLAUDE_MD_BYTES = 25 * 1024
 
 # An instruction file longer than this is split by theme, not grown.
 MAX_INSTRUCTION_LINES = 200
+
+# What every Claude Code session loads (root CLAUDE.md and its imports), and the
+# root AGENTS.md every other agent loads: ~2k tokens, down from ~11k.
+MAX_ALWAYS_LOADED_BYTES = 8 * 1024
+MAX_ROOT_AGENTS_BYTES = 7 * 1024
+MAX_COPILOT_INSTRUCTIONS_BYTES = 2 * 1024
+
+# Codex's default `project_doc_max_bytes`.
+CODEX_PROJECT_DOC_MAX_BYTES = 32 * 1024
 
 # Paths an index may name although they are not tracked: generated outputs that
 # are not emitted by default, and git-ignored working directories.
@@ -189,13 +197,76 @@ def test_claude_imports_resolve(claude: Path):
     assert broken == [], _rel(claude)
 
 
-def test_root_claude_md_imports_the_always_loaded_files():
-    imports = {
-        m.group(1)
-        for _, line in _outside_fences((ROOT / "CLAUDE.md").read_text(encoding="utf-8"))
+def _imports(path: Path) -> list[Path]:
+    return [
+        (path.parent / m.group(1)).resolve()
+        for _, line in _outside_fences(path.read_text(encoding="utf-8"))
         if (m := IMPORT.match(line))
-    }
-    assert {"AGENTS.md", "docs/CLAUDE.md", "docs/rules/security.md"} <= imports
+    ]
+
+
+def _loaded_with(path: Path, seen: set[Path] | None = None) -> set[Path]:
+    """`path` and everything its `@imports` pull in, as Claude Code expands them."""
+    seen = set() if seen is None else seen
+    seen.add(path.resolve())
+    for target in _imports(path):
+        if target not in seen and target.is_file():
+            _loaded_with(target, seen)
+    return seen
+
+
+def test_root_claude_md_imports_agents_md():
+    assert (ROOT / "AGENTS.md").resolve() in _imports(ROOT / "CLAUDE.md")
+
+
+def test_what_every_claude_session_pays_stays_small():
+    """Root CLAUDE.md and its imports load in every session, before any question."""
+    loaded = _loaded_with(ROOT / "CLAUDE.md")
+    size = sum(p.stat().st_size for p in loaded)
+    assert size <= MAX_ALWAYS_LOADED_BYTES, (
+        f"every Claude Code session loads {size} bytes "
+        f"({', '.join(sorted(_rel(p) for p in loaded))}): import theme rules from "
+        "the CLAUDE.md of the folder they govern, not from the root"
+    )
+
+
+def test_root_agents_md_stays_small():
+    size = (ROOT / "AGENTS.md").stat().st_size
+    assert size <= MAX_ROOT_AGENTS_BYTES, (
+        f"AGENTS.md is {size} bytes and every agent pays for it in every session: "
+        "move what holds for one folder to that folder's AGENTS.md"
+    )
+
+
+@pytest.mark.parametrize("index", _agents_indexes(), ids=_rel)
+def test_an_agents_chain_fits_codex(index: Path):
+    """Codex concatenates AGENTS.md from the root down, and stops at 32 KiB."""
+    chain = [
+        parent / "AGENTS.md"
+        for parent in [index.parent, *index.parent.parents]
+        if (parent / "AGENTS.md").is_file() and parent.is_relative_to(ROOT)
+    ]
+    size = sum(p.stat().st_size for p in chain)
+    assert size <= CODEX_PROJECT_DOC_MAX_BYTES, (
+        f"{_rel(index)}: the AGENTS.md chain is {size} bytes, Codex drops the rest"
+    )
+
+
+def test_gemini_cli_reads_agents_md():
+    """Gemini CLI reads GEMINI.md unless told otherwise; one file, not two."""
+    settings = json.loads(
+        (ROOT / ".gemini" / "settings.json").read_text(encoding="utf-8")
+    )
+    assert "AGENTS.md" in settings["context"]["fileName"]
+    assert not (ROOT / "GEMINI.md").exists(), "GEMINI.md would duplicate AGENTS.md"
+
+
+def test_copilot_instructions_point_to_agents_md():
+    """Copilot loads it on every request: a pointer, not a second copy of the rules."""
+    path = ROOT / ".github" / "copilot-instructions.md"
+    text = path.read_text(encoding="utf-8")
+    assert "AGENTS.md" in text
+    assert path.stat().st_size <= MAX_COPILOT_INSTRUCTIONS_BYTES
 
 
 @pytest.mark.parametrize("index", _agents_indexes(), ids=_rel)

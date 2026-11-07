@@ -6,7 +6,7 @@ model: inherit
 metadata:
   workpilot:
     roster: pr-followup
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You verify whether previous findings are resolved.

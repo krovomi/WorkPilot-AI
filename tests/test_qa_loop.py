@@ -50,7 +50,7 @@ _mocked_module_names = [
     "phase_config",
     "foundation.phase_event",
     # Logging & UI
-    "core.debug",
+    "foundation.debug",
     "ui",
     "ui.capabilities",
     "task_logger",
@@ -74,15 +74,15 @@ _mocked_module_names = [
     "integrations.linear",
 ]
 
-# `core.build_signals` and `core.pause_state` have no dependencies, and the
+# `foundation.build_signals` and `foundation.pause_state` have no dependencies, and the
 # code under test imports them (`qa/loop.py`, `spec/pipeline/orchestrator.py`,
 # since the pause/halt signals of #151). They are not mocked: a MagicMock
 # `BuildPaused` cannot be caught, and a MagicMock `is_paused()` is truthy.
 # Import them for real *before* `core` is replaced below; once it is, Python
 # cannot resolve a submodule of it ("'core' is not a package"). Without this
 # the file only collected when an earlier test file had imported them.
-importlib.import_module("core.build_signals")
-importlib.import_module("core.pause_state")
+importlib.import_module("foundation.build_signals")
+importlib.import_module("foundation.pause_state")
 
 for name in _mocked_module_names:
     if name in sys.modules:

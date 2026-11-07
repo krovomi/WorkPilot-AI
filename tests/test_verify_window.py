@@ -167,6 +167,11 @@ FAKE_HELPER = textwrap.dedent(
         time.sleep(30)
         sys.exit(0)
     print("noise before the handshake", flush=True)
+    if mode in ("compiling", "compiling-forever"):
+        print(json.dumps({"starting": True}), flush=True)
+        time.sleep(1.5 if mode == "compiling" else 0)
+        print(json.dumps({"compiling": True}), flush=True)
+        time.sleep(1.5 if mode == "compiling" else 30)
     print(json.dumps({"ready": True}), flush=True)
     for line in sys.stdin:
         request = json.loads(line)
@@ -227,6 +232,15 @@ def test_a_helper_that_never_starts_is_a_machine_limit(helper):
     missing.command = None
     with pytest.raises(HelperUnavailable):
         missing.request("ping")
+
+
+def test_a_first_compile_gets_its_own_budget(helper):
+    # Past the start budget, within the compile one: the helper said so.
+    driver = helper("compiling", start_timeout=1.0, compile_timeout=10.0)
+    assert driver.request("ping")["op"] == "ping"
+    stuck = helper("compiling-forever", start_timeout=1.0, compile_timeout=1.0)
+    with pytest.raises(HelperUnavailable, match="did not start"):
+        stuck.request("ping")
 
 
 def test_the_helper_environment_carries_no_credential(monkeypatch):

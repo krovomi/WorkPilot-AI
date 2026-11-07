@@ -1,0 +1,80 @@
+{
+	"title": "Assistant vocal",
+	"description": "Dites ce que WorkPilot doit faire : ouvrir une fonctionnalité, créer une tâche…",
+	"shortcutHint": "Ouvrez-le de partout avec",
+	"language": "Langue parlée",
+	"auto": "Détection automatique",
+	"input": {
+		"label": "Votre commande",
+		"placeholder": "Parlez, ou tapez une commande puis Entrée"
+	},
+	"level": "Niveau du micro",
+	"phase": {
+		"idle": "Appuyez sur le micro, ou tapez une commande.",
+		"preparing": "Démarrage du micro…",
+		"downloading": "Téléchargement du modèle vocal (environ 150 Mo, une seule fois)…",
+		"listening": "J'écoute… marquez une pause quand vous avez fini.",
+		"finishing": "Transcription…",
+		"thinking": "Je comprends votre demande…"
+	},
+	"actions": {
+		"listen": "Écouter",
+		"stop": "Arrêter",
+		"run": "Exécuter",
+		"create": "Créer la tâche",
+		"cancel": "Annuler",
+		"retry": "Réessayer",
+		"download": "Télécharger le modèle vocal"
+	},
+	"confirm": {
+		"heading": "Créer cette tâche ?",
+		"title": "Titre",
+		"description": "Description",
+		"server": "Elle sera créée sur le tableau du serveur, pour toute l'équipe."
+	},
+	"results": {
+		"created": "Tâche créée : {{title}}",
+		"createFailed": "La tâche n'a pas pu être créée.",
+		"nothingHeard": "Je n'ai rien entendu. Parlez à nouveau, ou tapez votre commande.",
+		"unknown": "Je n'ai pas compris « {{text}} ».",
+		"noModel": "Aucun modèle d'IA n'a répondu : seules les commandes simples sont comprises pour l'instant.",
+		"noProject": "Sélectionnez d'abord un projet : une tâche appartient à un projet."
+	},
+	"examples": {
+		"heading": "Par exemple",
+		"createTask": "« Crée une tâche pour ajouter un export CSV »",
+		"open": "« Ouvre le Kanban »",
+		"draw": "« Ouvre la fonctionnalité qui me permet de dessiner une architecture »",
+		"settings": "« Ouvre les paramètres »"
+	},
+	"errors": {
+		"model": "Le modèle vocal n'est pas encore sur cet ordinateur.",
+		"dependency": "La reconnaissance vocale locale (faster-whisper) n'est pas installée dans le backend.",
+		"offline": "Le mode hors ligne strict bloque le téléchargement du modèle vocal.",
+		"download": "Le modèle vocal n'a pas pu être téléchargé.",
+		"busy": "Une dictée est déjà en cours ailleurs dans l'app. Terminez-la, puis réessayez.",
+		"timeout": "La reconnaissance vocale n'a pas répondu à temps.",
+		"transcription": "L'audio n'a pas pu être transcrit.",
+		"microphone": "Le micro est indisponible, ou son accès a été refusé.",
+		"downloadNeedsProject": "Sélectionnez un projet pour télécharger le modèle vocal (sa politique hors ligne s'applique)."
+	},
+	"settings": {
+		"title": "Assistant vocal",
+		"description": "Ouvrez l'assistant de partout dans WorkPilot et dites-lui quoi faire.",
+		"shortcut": "Raccourci clavier",
+		"shortcutHelp": "Cliquez sur Modifier, puis appuyez sur la nouvelle combinaison. Échap annule.",
+		"change": "Modifier",
+		"recording": "Appuyez sur les touches…",
+		"reset": "Rétablir la valeur par défaut",
+		"conflict": {
+			"invalid": "Utilisez Ctrl, Alt ou ⌘ avec une lettre, un chiffre, une touche de fonction ou Espace.",
+			"altgr": "Ctrl+Alt correspond à AltGr sur beaucoup de claviers (il tape @, € ou [). Choisissez une autre combinaison.",
+			"used": "{{shortcut}} est déjà utilisé par WorkPilot ou par le système."
+		},
+		"systemWide": "Même quand WorkPilot est en arrière-plan",
+		"systemWideHelp": "Enregistre le raccourci auprès du système : il ramène WorkPilot au premier plan et ouvre l'assistant. Prend effet à l'enregistrement.",
+		"systemWideRefused": "Le système a refusé ce raccourci (une autre app l'utilise peut-être, ou le bureau ne le permet pas). Il fonctionne toujours dans WorkPilot.",
+		"speech": "La voix est transcrite sur cet ordinateur (Whisper). Aucun audio n'est conservé.",
+		"model": "Les commandes simples sont comprises sans modèle. Les autres phrases utilisent le modèle « Assistant vocal » de Paramètres → Agent."
+	}
+}

@@ -13,11 +13,10 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `pre-push.js` | Rejoue les contrôles essentiels de la CI avant un push (lint par défaut, `--full` pour les tests). | `.husky/pre-push`, `pnpm run test:all` |
 | `staged-tests.js` | Lance seulement les tests liés aux fichiers indexés. | `.husky/pre-commit` |
 | `lib/` | `test-selection.js` : choix des tests à partir des fichiers modifiés, partagé par les deux précédents. | `pre-push.js`, `staged-tests.js` |
-| `check_encoding.py` | Signale une ouverture de fichier sans `encoding="utf-8"`. | à la main (écrit comme hook pre-commit, branché nulle part) |
+| `check_encoding.py` | Signale une ouverture de fichier sans `encoding="utf-8"`. | `tests/test_text_io_encoding.py`, à la main |
 | `validate-npm-scripts.js` | Vérifie que chaque script npm pointe vers un fichier qui existe. | `pnpm run validate:npm-scripts`, CI |
 | `fix-electron.js` | Répare le binaire Electron sous Windows. | `pnpm run fix:electron`, `beta-release.yml` |
 | `sync-backend-port-to-frontend-env.cjs` | Recopie le port du backend dans le `.env` du frontend. | `dev:vite` et `build` du frontend |
-| `setup_windows_git_hooks.bat` | Active les hooks Husky sous Windows. | à la main |
 | `kill_port_8765.py`, `kill_port_8765.sh`, `kill_port_8765.bat` | Libèrent le port du WebSocket (8765) quand un ancien backend le tient. | à la main |
 
 ## Skills, vendorisation, catalogues générés
@@ -39,10 +38,11 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 
 | Script | Rôle | Appelé par |
 |---|---|---|
+| `changelog.py` | Valide les fragments de `changelog.d/` (`check`), montre les notes de la prochaine version (`preview`), les verse dans `CHANGELOG.md` (`release X.Y.Z "Titre"`). | `pre-push.js`, `tests/test_changelog_fragments.py` ; `release` à la main avant la release |
 | `bump-version.js` | Change la version partout où elle est écrite. | `prepare-release.yml` |
 | `update-readme.py` | Met à jour les badges et liens de téléchargement du README. | `release.yml`, `beta-release.yml` |
+| `readme-screenshots/` | Régénère les captures du README dans `.github/assets/screenshots/` : `capture-desktop.cjs` (aperçu navigateur du renderer), `capture-mobile.cjs` (bundle web de l'app mobile), avec les données inventées de `demo-data.js` ; sans backend ni compte. | à la main |
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
-| `cleanup-version-branches.sh` | Supprime les anciennes branches de version. | à la main |
 | `mobile_device_check.py` | Installe une app mobile sur un appareil réel et rend compte. | `mobile-device-check.yml`, à la main |
 
 ## Fusion intelligente des worktrees
@@ -56,16 +56,12 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `git-hooks/` | Hooks `post-merge`, `post-rebase`, `pre-merge-head` qui l'appellent. | `install-merge-hooks.sh` |
 | `install-merge-hooks.sh`, `uninstall-merge-hooks.sh` | Posent et retirent ces hooks dans `.git/hooks`. | à la main |
 | `test-smart-merge.sh` | Tests du gestionnaire. | à la main |
-| `verify-backup.sh` | Vérifie les sauvegardes du gestionnaire. | à la main |
 
-## Diagnostic
+## Qualité
 
 | Script | Rôle | Appelé par |
 |---|---|---|
-| `diagnose_and_fix_azure.ps1` | Diagnostique et corrige la configuration Azure DevOps (PowerShell 5.1+ ou 7+). | à la main |
-| `diagnose_azure_config.py` | Diagnostique la configuration Azure DevOps. | à la main |
-| `verify_azure_config.py` | Vérifie la configuration Azure DevOps. | à la main |
-| `fix_azure_devops_config.py` | Corrige la configuration Azure DevOps. | à la main |
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
+| `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
+| `quality_baselines.py` | Plafonds par fichier des `except` aveugles (backend), des `biome-ignore` (frontend) et de la taille des fichiers de plus de 2 000 lignes dans `tests/baselines/` : `check`, et `update` qui ne fait que les baisser. | `pre-push.js`, `tests/test_quality_baselines.py` ; `update` à la main après une correction |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |
-| `ai-pr-reviewer.md` | Prompt de revue de PR à coller dans un assistant. | à la main |

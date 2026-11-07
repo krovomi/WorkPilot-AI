@@ -9,6 +9,8 @@ Similar to frontend functionality but adapted for backend architecture.
 
 import os
 
+from foundation.colored_logs import set_model_info_source
+
 
 def get_current_model_info() -> dict[str, str]:
     """
@@ -340,3 +342,7 @@ def get_model_info_for_logs() -> dict[str, str]:
         "provider": model_info["provider"],
         "model_label": model_info["model_label"],
     }
+
+
+# The log lines of foundation.colored_logs read the model from here.
+set_model_info_source(get_model_info_for_logs)

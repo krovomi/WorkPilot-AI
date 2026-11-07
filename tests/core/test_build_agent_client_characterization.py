@@ -105,7 +105,9 @@ def harness(tmp_path: Path, monkeypatch):
         state.route_chosen = chosen
         return state.offline or (provider, model, None)
 
-    def prompt(_project, tool_use_hint=False):
+    def prompt(_project, tool_use_hint=False, project_instructions=False):
+        # The WorkPilot-loop clients (hint on) are the ones given AGENTS.md.
+        assert project_instructions == tool_use_hint
         return f"BASE(hint={tool_use_hint})"
 
     patches = {
@@ -132,6 +134,11 @@ def harness(tmp_path: Path, monkeypatch):
             "compatible_effort_params": lambda provider, model, budget: {
                 "effort": f"cp:{provider}:{model}:{budget}"
             },
+            "compatible_cache_routing": lambda provider, _spec, agent: (
+                types.SimpleNamespace(
+                    body_key=f"ck:{provider}:{agent}", headers={"h": provider}
+                )
+            ),
         },
         offline: {
             "resolve_offline_route": offline_route,
@@ -380,6 +387,9 @@ def test_compatible_providers(harness, provider, default_url):
         "base_url": default_url,
         # Each provider's own effort scale (`compatible_effort_params`).
         "effort_params": {"effort": f"cp:{provider}:model-x:16384"},
+        # The cache routing each provider documents (`compatible_cache_routing`).
+        "prompt_cache_key": f"ck:{provider}:coder",
+        "cache_headers": {"h": provider},
         "system_prompt": "BASE(hint=True)+coder",
         "project_dir": str(harness.project_dir),
         "agent_type": "coder",

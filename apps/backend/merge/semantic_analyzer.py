@@ -18,7 +18,7 @@ from .types import FileAnalysis
 
 # Import debug utilities
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_success,

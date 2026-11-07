@@ -28,6 +28,7 @@ import type {
 	InsightsChatMessage,
 	InsightsModelConfig,
 } from "../../shared/types";
+import { useServerViewLive } from "../hooks/useServerViewLive";
 import { cn } from "../lib/utils";
 import {
 	createTaskFromSuggestion,
@@ -160,6 +161,8 @@ export function Insights({ projectId }: InsightsProps) {
 	useEffect(() => {
 		loadInsightsSession(projectId);
 	}, [projectId]);
+	// A server project's conversations show a teammate's change at once.
+	useServerViewLive(projectId, "insights");
 
 	// Smart auto-scroll: only scroll if user is already at bottom
 	// This allows users to scroll up to read previous messages without being
@@ -254,6 +257,8 @@ export function Insights({ projectId }: InsightsProps) {
 
 	const isLoading = status.phase === "thinking" || status.phase === "streaming";
 	const messages = session?.messages || [];
+	// Server mode: a teammate's conversation is read, not written.
+	const readOnly = session?.readOnly === true;
 
 	return (
 		<div className="flex h-full">
@@ -449,13 +454,17 @@ export function Insights({ projectId }: InsightsProps) {
 							value={inputValue}
 							onChange={(e) => setInputValue(e.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder={t("insights:input.placeholder")}
+							placeholder={
+								readOnly
+									? t("insights:input.readOnly", { name: session?.ownerName ?? "?" })
+									: t("insights:input.placeholder")
+							}
 							className="min-h-[80px] resize-none"
-							disabled={isLoading}
+							disabled={isLoading || readOnly}
 						/>
 						<Button
 							onClick={handleSend}
-							disabled={!inputValue.trim() || isLoading}
+							disabled={!inputValue.trim() || isLoading || readOnly}
 							className="self-end"
 						>
 							{isLoading ? (
@@ -658,9 +667,9 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 			case "Read":
 				return "text-blue-500";
 			case "Glob":
-				return "text-amber-500";
+				return "text-warning";
 			case "Grep":
-				return "text-green-500";
+				return "text-success";
 			default:
 				return "text-muted-foreground";
 		}
@@ -694,7 +703,7 @@ function ToolUsageHistory({ tools }: ToolUsageHistoryProps) {
 						: t("insights:tools.tools")}{" "}
 					{t("insights:tools.used")}
 				</span>
-				<span className="text-[10px]">{expanded ? "▲" : "▼"}</span>
+				<span className="text-3xs">{expanded ? "▲" : "▼"}</span>
 			</button>
 
 			{expanded && (
@@ -745,13 +754,13 @@ function ToolIndicator({ name, input }: ToolIndicatorProps) {
 				return {
 					icon: FolderSearch,
 					label: t("insights:tools.searching"),
-					color: "text-amber-500 bg-amber-500/10",
+					color: "text-warning bg-warning/10",
 				};
 			case "Grep":
 				return {
 					icon: Search,
 					label: t("insights:tools.searchingCode"),
-					color: "text-green-500 bg-green-500/10",
+					color: "text-success bg-success/10",
 				};
 			default:
 				return {

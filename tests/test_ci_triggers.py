@@ -17,8 +17,8 @@ yaml = pytest.importorskip("yaml")
 ROOT = Path(__file__).resolve().parents[1]
 
 # Files no build, lint or test reads. Anything added here must be just as inert.
+# CHANGELOG.md left the list: tests/test_changelog_fragments.py reads it.
 INERT = {
-    "CHANGELOG.md",
     "LICENSE",
     ".github/ISSUE_TEMPLATE/**",
     ".github/FUNDING.yml",
@@ -44,7 +44,6 @@ def test_no_whitelist_only_inert_files_ignored(workflow, event):
 
 def test_inert_files_are_read_by_no_test():
     names = {
-        "CHANGELOG.md",
         "FUNDING.yml",
         "PULL_REQUEST_TEMPLATE.md",
         "ISSUE_TEMPLATE",

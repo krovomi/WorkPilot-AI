@@ -8,6 +8,7 @@ import {
 	TooltipTrigger,
 } from "../ui/tooltip";
 import { getTitleMaxWidthClass } from "./types";
+import { useTranslation } from "react-i18next";
 
 interface TerminalTitleProps {
 	title: string;
@@ -22,6 +23,7 @@ export function TerminalTitle({
 	onTitleChange,
 	terminalCount = 1,
 }: TerminalTitleProps) {
+	const { t } = useTranslation();
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedTitle, setEditedTitle] = useState("");
 	const maxWidthClass = getTitleMaxWidthClass(terminalCount);
@@ -104,7 +106,7 @@ export function TerminalTitle({
 					<TooltipContent side="bottom" className="max-w-xs">
 						<p className="text-sm">{associatedTask.description}</p>
 						<p className="text-xs text-muted-foreground mt-1">
-							Double-click to rename
+							{t("terminal:doubleClickToRename")}
 						</p>
 					</TooltipContent>
 				</Tooltip>
@@ -132,7 +134,7 @@ export function TerminalTitle({
 					</span>
 				</TooltipTrigger>
 				<TooltipContent side="bottom">
-					<p className="text-xs">Double-click to rename</p>
+					<p className="text-xs">{t("terminal:doubleClickToRename")}</p>
 				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>

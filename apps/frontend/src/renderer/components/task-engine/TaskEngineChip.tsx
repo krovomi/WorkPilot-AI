@@ -56,7 +56,7 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 	const content = (
 		<span className="flex min-w-0 items-center gap-1">
 			<Cpu className="h-3 w-3 shrink-0" />
-			<span className="max-w-[160px] truncate">{label}</span>
+			<span className="max-w-[110px] truncate">{label}</span>
 		</span>
 	);
 
@@ -71,12 +71,12 @@ export function TaskEngineChip({ task, onClick }: TaskEngineChipProps) {
 							onClick(event);
 						}}
 						aria-label={t("tasks:engine.chipAria", { engine: label })}
-						className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
+						className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-3xs font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
 					>
 						{content}
 					</button>
 				) : (
-					<span className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-[10px] font-medium">
+					<span className="flex items-center rounded-full border border-border bg-card/60 px-1.5 py-0.5 text-3xs font-medium">
 						{content}
 					</span>
 				)}

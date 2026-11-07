@@ -20,13 +20,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
-from agents.subagents import (  # noqa: E402
+from subagents import (  # noqa: E402
     MAX_ROSTER,
     detect_languages,
     resolve,
 )
-from agents.subagents.languages import overlays_for  # noqa: E402
-from agents.subagents.phases import phase_defaults, sdk_available  # noqa: E402
+from subagents.languages import overlays_for  # noqa: E402
+from subagents.phases import phase_defaults, sdk_available  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
     not sdk_available(), reason="claude_agent_sdk not installed"
@@ -66,7 +66,7 @@ class TestPhaseDefaults:
 
     def test_a_role_shared_by_two_rosters_is_one_definition(self):
         """Rosters list names; the definition behind a name is the same object."""
-        from agents.subagents.phases import ROSTERS, SPECS, all_specs
+        from subagents.phases import ROSTERS, SPECS, all_specs
 
         named = {name for roster in ROSTERS.values() for name in roster}
         assert named == set(SPECS), "a spec no roster names, or a name with no spec"
@@ -222,12 +222,15 @@ class TestCallerPrecedence:
         assert resolve("commit_message", project_dir=tmp_path, user_agents=mine) == mine
 
     def test_no_defaults_and_no_caller_agents_yields_none(self, tmp_path, monkeypatch):
-        import agents.subagents as mod
+        import subagents as mod
 
-        # Two parameters: `resolve` passes the roster override through, so a
-        # stub that takes only the agent_type stops matching the function it
-        # replaces and fails with a TypeError that says nothing about rosters.
-        monkeypatch.setattr(mod, "phase_defaults", lambda _t, _roster=None: {})
+        # Three parameters: `resolve` passes the roster override and the
+        # session's model through, so a stub that takes only the agent_type
+        # stops matching the function it replaces and fails with a TypeError
+        # that says nothing about rosters.
+        monkeypatch.setattr(
+            mod, "phase_defaults", lambda _t, _roster=None, _parent=None: {}
+        )
         assert resolve("coder", project_dir=tmp_path) is None
 
 
@@ -261,7 +264,7 @@ class TestRobustness:
         assert len(resolve("coder", project_dir=tmp_path)) <= MAX_ROSTER
 
     def test_broken_stack_detection_does_not_raise(self, tmp_path, monkeypatch):
-        import agents.subagents as mod
+        import subagents as mod
 
         monkeypatch.setattr(
             mod, "detect_languages", lambda _p: (_ for _ in ()).throw(RuntimeError())
@@ -317,7 +320,7 @@ class TestPRReviewRoster:
 
     @staticmethod
     def _build():
-        from agents.subagents.pr_review import pr_review_agents
+        from subagents.pr_review import pr_review_agents
 
         return pr_review_agents(
             lambda name: f"PROMPT BODY for {name}",
@@ -325,7 +328,7 @@ class TestPRReviewRoster:
         )
 
     def test_every_specialist_is_present(self):
-        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+        from subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         assert {s.name for s in PR_REVIEW_SPECIALISTS} == {
             "security-reviewer",
@@ -337,7 +340,7 @@ class TestPRReviewRoster:
         }
 
     def test_the_roster_matches_the_specs(self):
-        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+        from subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         roster = self._build()
         assert set(roster) == {s.name for s in PR_REVIEW_SPECIALISTS}
@@ -353,7 +356,7 @@ class TestPRReviewRoster:
             assert agent.prompt.startswith("[wd] "), name
 
     def test_a_missing_prompt_file_falls_back_rather_than_crashing(self):
-        from agents.subagents.pr_review import pr_review_agents
+        from subagents.pr_review import pr_review_agents
 
         roster = pr_review_agents(
             lambda _name: None, lambda prompt, fallback: prompt or fallback
@@ -369,7 +372,7 @@ class TestPRReviewRoster:
         `_create_sdk_client`; nothing called it (lot L9), the live path runs
         each specialist as its own `pr_reviewer` session.
         """
-        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+        from subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         source = (
             REPO_ROOT
@@ -383,7 +386,7 @@ class TestPRReviewRoster:
 
     def test_every_prompt_file_the_specs_name_exists(self):
         prompts = REPO_ROOT / "apps/backend/prompts/github"
-        from agents.subagents.pr_review import PR_REVIEW_SPECIALISTS
+        from subagents.pr_review import PR_REVIEW_SPECIALISTS
 
         missing = [
             s.prompt_file
@@ -404,7 +407,7 @@ class TestPRReviewRoster:
     def test_the_follow_up_specialists_live_in_the_registry(self):
         """They were declared inline in the runner, `finding-validator` a second
         time with its own wording."""
-        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS, pr_review_agents
+        from subagents.pr_review import PR_FOLLOWUP_SPECIALISTS, pr_review_agents
 
         assert [s.name for s in PR_FOLLOWUP_SPECIALISTS] == [
             "resolution-verifier",
@@ -430,7 +433,7 @@ class TestPRReviewRoster:
         )
 
     def test_every_followup_prompt_file_exists(self):
-        from agents.subagents.pr_review import PR_FOLLOWUP_SPECIALISTS
+        from subagents.pr_review import PR_FOLLOWUP_SPECIALISTS
 
         prompts = REPO_ROOT / "apps/backend/prompts/github"
         assert all((prompts / s.prompt_file).is_file() for s in PR_FOLLOWUP_SPECIALISTS)
@@ -490,3 +493,55 @@ class TestProviderDegradationReachesTheClient:
         )
         assert resolve("coder", project_dir=tmp_path, provider="opencode") is None
         assert resolve("coder", project_dir=tmp_path, provider="claude") is not None
+
+
+# ---------------------------------------------------------------------------
+# A subagent never runs on a tier above its session's (token audit, lot 2b)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("tier", "parent", "expected"),
+    [
+        # A Haiku session's reviewers used to be promoted to Sonnet.
+        ("sonnet", "claude-haiku-5-5", "inherit"),
+        ("sonnet", "haiku", "inherit"),
+        ("sonnet", "claude-sonnet-5-5", "inherit"),
+        ("sonnet", "claude-opus-5-5", "sonnet"),
+        ("sonnet", "claude-fable-5-1", "sonnet"),
+        ("haiku", "claude-opus-5-5", "haiku"),
+        ("haiku", "claude-sonnet-4-6", "haiku"),
+        ("haiku", "claude-haiku-4-5", "inherit"),
+        # Nothing to compare with: the spec's tier stands.
+        ("sonnet", None, "sonnet"),
+        ("sonnet", "gpt-5.5", "sonnet"),
+        (None, "claude-opus-5-5", None),
+        ("inherit", "claude-opus-5-5", "inherit"),
+    ],
+)
+def test_subagent_model_is_capped_by_the_session(tier, parent, expected):
+    from subagents.phases import subagent_model
+
+    assert subagent_model(tier, parent) == expected
+
+
+def test_read_only_explorers_run_on_the_cheapest_tier():
+    """They grep, list and quote: no judgement a Haiku cannot give."""
+    from subagents.phases import SPECS
+
+    for name in (
+        "dependency-tracer",
+        "evidence-collector",
+        "prior-art-finder",
+        "constraint-collector",
+    ):
+        assert SPECS[name].model == "haiku", name
+        assert set(SPECS[name].tools) <= {"Read", "Grep", "Glob"}, name
+
+
+@pytest.mark.skipif(not sdk_available(), reason="claude_agent_sdk not installed")
+def test_the_roster_follows_the_session_model():
+    on_opus = phase_defaults("planner", parent_model="claude-opus-5-5")
+    on_haiku = phase_defaults("planner", parent_model="claude-haiku-5-5")
+    assert {d.model for d in on_haiku.values() if d.model} <= {"inherit"}
+    assert any(d.model in {"sonnet", "haiku"} for d in on_opus.values())

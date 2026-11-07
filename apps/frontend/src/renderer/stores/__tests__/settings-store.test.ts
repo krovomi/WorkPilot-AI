@@ -225,6 +225,23 @@ describe("Settings Store", () => {
 			);
 		});
 
+		it("takes the key dates from main, not from what it sent (S5)", async () => {
+			const dates = { globalOpenAIApiKey: "2026-10-30T12:00:00.000Z" };
+			mockSaveSettings.mockResolvedValue({
+				success: true,
+				data: { credentialsSetAt: dates },
+			});
+
+			await saveSettings({
+				globalOpenAIApiKey: "sk-test-0000", // pragma: allowlist secret
+				credentialsSetAt: { globalOpenAIApiKey: "2020-01-01T00:00:00.000Z" },
+			});
+
+			expect(useSettingsStore.getState().settings.credentialsSetAt).toEqual(
+				dates,
+			);
+		});
+
 		it("should return false on save failure", async () => {
 			mockSaveSettings.mockResolvedValue({ success: false });
 

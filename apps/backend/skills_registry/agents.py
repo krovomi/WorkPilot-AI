@@ -1,6 +1,6 @@
 """Emitting the subagent registry as harness-readable agent definitions.
 
-`apps/backend/agents/subagents/` is where WorkPilot's specialists are written,
+`apps/backend/subagents/` is where WorkPilot's specialists are written,
 and until now it was the only place they existed. That made them invisible to
 anyone driving Copilot or Codex directly: the pipeline had a `test-runner` that
 knew the project's commands, and the developer in their editor had nothing.
@@ -84,7 +84,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
     """
     found: list[EmittedAgent] = []
     try:
-        from agents.subagents.phases import all_specs
+        from subagents.phases import all_specs
 
         for phase, roster in all_specs().items():
             found.extend(
@@ -105,7 +105,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
     # phase roster lists them; the mobile pack carried its own copy of the
     # store auditor (`mobile-release-manager`) because this one was not emitted.
     try:
-        from agents.subagents.mobile import MOBILE_SPECS
+        from subagents.mobile import MOBILE_SPECS
 
         found.extend(
             EmittedAgent(
@@ -122,7 +122,7 @@ def collect_registry_agents() -> list[EmittedAgent]:
         logger.debug("mobile specs unavailable: %s", exc)
 
     try:
-        from agents.subagents.pr_review import PR_ROSTERS, PR_SPECIALISTS
+        from subagents.pr_review import PR_ROSTERS, PR_SPECIALISTS
 
         found.extend(
             EmittedAgent(
@@ -189,7 +189,7 @@ def render_agent(agent: EmittedAgent, harness: Harness) -> tuple[str, list[str]]
         "metadata:",
         "  workpilot:",
         f"    roster: {agent.origin or 'unknown'}",
-        "    source: apps/backend/agents/subagents/",
+        "    source: apps/backend/subagents/",
         "---",
         "",
         agent.prompt.rstrip(),

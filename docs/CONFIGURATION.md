@@ -22,10 +22,7 @@ reads, starting with [where they are read from](#where-environment-variables-are
 
 Consumers:
 
-- **Backend Python** — [core/configured_providers.py](../apps/backend/core/configured_providers.py)
-  (typed loader with validation) and [provider_api.py](../apps/backend/provider_api.py#L1).
-  Validated against `ConfiguredProvider` at load time — malformed entries
-  raise immediately instead of silently propagating empty strings.
+- **Backend Python** — [provider_api.py](../apps/backend/provider_api.py#L1).
 - **Frontend TypeScript** — read at runtime over IPC
   (`providers:getConfiguredProviders`) by
   [`shared/services/providerService.ts`](../apps/frontend/src/shared/services/providerService.ts),
@@ -193,6 +190,8 @@ The image (`deploy/Dockerfile.server`) installs `apps/backend/requirements.lock`
 unprivileged user `workpilot` (uid 10001: mount SSH keys under `/home/workpilot/.ssh`), and starts
 through `deploy/server-entrypoint.sh`: `alembic upgrade head` first, and a failed migration stops
 the container instead of serving. CI builds it and migrates a PostgreSQL 16 with it on every PR.
+Operating it — TLS reverse proxy, backups, upgrades, quotas, audit, key changes — is covered,
+in French, by [server-operations.md](server-operations.md).
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -202,7 +201,9 @@ the container instead of serving. CI builds it and migrates a PostgreSQL 16 with
 | `WORKPILOT_REPOS_ROOT` | `~/.workpilot/server-repos` | Where the server clones registered repositories — and, in server mode, the **only** directory tree a request can resolve a path inside. |
 | `WORKPILOT_SECRETS_MASTER_KEY` | — | Fernet key encrypting per-user integration secrets. |
 | `WORKPILOT_MAX_CONCURRENT_RUNS` | `3` | Deployment-wide ceiling. Per-organization ceilings are set in the console (see quotas below). |
+| `WORKPILOT_RUN_ISOLATION` | `required` | Each run is confined by Landlock to its own clone, its project's home (`REPOS_ROOT/.run-homes/<project>`) and its own temp directory; other projects and the server's state are out of its reach. Needs Linux 5.13+ with Landlock enabled (Docker 23+ allows it) and a server that does not run as root. Where it cannot be enforced, runs fail with the reason. `off` runs them unconfined: only for a deployment where every user may read every project. See [server-mode.md](architecture/server-mode.md#ce-quun-run-voit-sur-le-disque). |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Where the API pushes board events (projects, specs, runs) to the streaming WebSocket server. Change it only when that server is not on the API's loopback. |
+| `WORKPILOT_GITLAB_HOSTS` | — | Self-hosted GitLab instances (comma-separated host names, e.g. `git.acme.test`) whose projects show their GitLab views, relayed with each person's own GitLab token. gitlab.com is always one. A project cloned from any other host shows none: its owner chose that URL, and a member's token is never sent to a host the operator did not name. |
 
 Sign-in, invitations and email have their own variables, after
 [Quotas](#quotas).
@@ -277,6 +278,26 @@ fields — and `foundation.api_safety.validated_dir` confines resolution to
 and body models, so a new path-taking field fails the build until it is either
 refused or explicitly exempted with its reason.
 
+### Live feed and agent runs
+
+The streaming WebSocket server (`:8765`) has the same boundaries as the API. A
+client connects to `/stream/project:<project_id>` (the board) or
+`/stream/run:<run_id>` (one run's live feed) with `?token=<access token>`, and
+optionally `&org=<org id>` to name the organization it acts in. The channel
+opens only when the user has a role on that project in that organization;
+`viewer` reads, `member` and above may also chat and pause. Any other channel
+name is refused (close code `4403`), and so is a switch to a channel the user
+may not open. Only the API and a run publish events; a run's token names that
+run and opens nothing else.
+
+A run starts with the server's environment **minus** every variable the server
+reads for itself (signing key, secrets key, database, mail, Entra, repos root,
+`POSTGRES_PASSWORD`), plus its own streaming token, the launching user's id and
+that user's integration secrets. Provider credentials set for builds, such as
+`CLAUDE_CODE_OAUTH_TOKEN`, are passed. A new server variable is classified in
+[apps/backend/server/services/run_env.py](../apps/backend/server/services/run_env.py);
+`tests/backend/test_run_env.py` fails until it is.
+
 ### Quotas
 
 Per-organization ceilings on members, projects, concurrent runs and monthly
@@ -303,11 +324,19 @@ Entra sign-in is on only when both Entra variables are set; local accounts work
 either way. Neither identifier is a secret: `GET /auth/config` hands both to the
 sign-in page.
 
+The phone app signs in with the same app registration, as a public client
+(authorization code with PKCE, no secret on the phone). Add a **Mobile and
+desktop applications** platform to the registration with the redirect URI
+`workpilot://auth`; without it Microsoft refuses the phone's request.
+
 ### Invitations and local passwords
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_PUBLIC_BASE_URL` | — | Public URL of the server, the base of invitation links (`<url>/invite?token=…`). Without it the link is relative and the administrator completes it. |
+| `WORKPILOT_PUBLIC_STREAM_URL` | — | Where the desktop app opens a board's live stream (`ws://` or `wss://`), when it is not the API's host on port 8765, e.g. behind a TLS reverse proxy. Anything else is ignored. |
+| `WORKPILOT_PUSH_ENABLED` | `false` | Send notifications to the mobile app (a run you started succeeded or failed) through Expo's push service (`exp.host`), which hands them to Apple and Google. They carry the project's name, the card's number, the phase and its result, never a card's text. Off: nothing leaves the server and phones get no push. |
+| `WORKPILOT_NEEDS_YOU_ENABLED` | `false` | Tell each person, on the ntfy, Telegram or Teams channel they set up in the app (Settings, My notifications from the server), that a run they started needs them: a plan to approve, work to review, a stop on an error. Only the project's name and the card's number are sent. The server then posts to hosts its users chose, https only and never to a private address. Storing a channel also needs `WORKPILOT_SECRETS_MASTER_KEY`. Off: nothing is sent. |
 | `WORKPILOT_INVITATION_TTL_HOURS` | 72 | How long an invitation link stays usable. |
 | `WORKPILOT_PASSWORD_MIN_LENGTH` | 12 | Minimum length of a local password. It can only raise the floor: a value below 12 keeps 12. |
 | `WORKPILOT_PASSWORD_HIBP_CHECK` | `false` | Refuses a new local password found in Have I Been Pwned. Only the first five hex characters of its SHA-1 leave the server; when the service cannot be reached, the password is accepted. |
@@ -409,7 +438,12 @@ environment wins:
 | --- | ---: | --- |
 | `WORKPILOT_QA_MAX_ITERATIONS` | by effort | Review passes a task may run, whatever its QA effort. Capped at 50; a value below 1 or that is not a number is ignored. |
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
+| `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only and small code changes included (see *Text-only changes* below). |
+| `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
+| `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+| `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
+| `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
 
 ### Review budget
 
@@ -442,6 +476,41 @@ tests never passes at 100: lower the threshold or set it to `0`. The same value 
 into the spec writer, planner, QA reviewer and QA fixer prompts, so the agents aim at the
 threshold the gate enforces.
 
+### Text-only changes
+
+Before each review pass, the loop reads the task's change set from git
+([apps/backend/foundation/change_scope.py](../apps/backend/foundation/change_scope.py)):
+committed, uncommitted and untracked files since the base branch. When every changed file is
+plain text or documentation (`.txt`, `.md`, `.rst`, `.adoc`, README, LICENSE…), at most
+10 files and 400 changed lines, the pass is a **light review**: the reviewer gets the spec and
+the diff inline (`prompts/qa_reviewer_light.md`) and checks the change against the acceptance
+criteria, without the dev environment, the test suites, coverage, repository scans, the
+subagent roster or the project memory. The coverage gate does not apply: no source file
+changed. JSON, YAML, TOML, XML, `.env`, project files and scripts are read by a program and
+always get the full review, and so does a change set git cannot read. The decision is made
+from git and file names only, so it is the same for every provider and model. With strict TDD
+on, a subtask whose files are all text-only is not run as a red-green-refactor cycle either.
+`requirements*.txt` and `constraints*.txt` are dependency manifests, not text.
+
+### Small code changes (targeted QA)
+
+When the change set has at most 3 code files and 150 changed lines in them (text files aside),
+in a language whose test convention is known, and each has a test by that convention
+(`test_x.py`, `x.test.ts`, `Card.spec.ts` for `Card.vue`, `CartTests.cs`, `OrderTest.java`/`.kt`,
+`token_test.go`, `tests/parser.rs` or a `#[cfg(test)]` module, `UserTest.php`,
+`FormatterTests.swift`, `cart_test.dart`, `invoice_spec.rb`… full list in
+[docs/architecture/qa-tiers.md](architecture/qa-tiers.md)), the pass is a **targeted QA** (« QA
+ciblée »): the reviewer gets the spec, the diff and the test files to run
+(`prompts/qa_reviewer_targeted.md`), runs only those, with coverage of the touched files, and
+has no subagents. Its approval stands only if each mapped test is recorded as passed **and**
+named by a command the reviewer ran, and the touched files reach `WORKPILOT_QA_MIN_COVERAGE`
+([apps/backend/qa/targeted_gate.py](../apps/backend/qa/targeted_gate.py)); this replaces the
+unit + integration coverage gate for that pass. Coverage is per touched file, not per diff line.
+Any doubt gives the full review: a file without a mapped test, an unknown language, a generated,
+deleted or renamed file, `security/`, `server/auth*`, CI files, dependency manifests, lockfiles
+and tool configuration (`conftest.py`, `*.config.*`). The task log and `qa_report.md` say
+which tier ran. Details: [architecture/qa-tiers.md](architecture/qa-tiers.md).
+
 ## Verification loop (`verify`)
 
 The runtime verification phase (`apps/backend/verify/`, see
@@ -473,7 +542,11 @@ Agent commands run under bubblewrap (Linux) or Seatbelt (macOS), see
 
 On Ubuntu 24.04 and later, unprivileged user namespaces are restricted by AppArmor and bubblewrap
 fails; the card says so. `sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0` (or an
-AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`.
+AppArmor profile for `bwrap`) lifts it. Claude Code's own sandbox on Linux also needs `socat`: when
+it is missing, the Claude provider's commands run without isolation and the task feed shows
+`Sandbox (claude): commands are NOT isolated: … socat … install it with …`. On Debian, Ubuntu or
+WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
+command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
 
 ## RUN tasks — `.workpilot/environments.toml`
 
@@ -552,6 +625,8 @@ planner, coder, QA…).
 | `AUTO_CLAUDE_MAX_BUDGET_USD` | 5.0 | Spending cap, in US dollars, of one session — not of the task — on every provider. Past it the session ends (the Claude SDK ends it itself; for the other providers the session runner does, from each call's measured usage and the model's price in `cost_intelligence/catalog.py`) and the Kanban offers to resume. A model without a known price is not capped. 0 or less removes the cap; a value that is not a number falls back to 5.0. |
 | `AUTO_CLAUDE_EFFORT` | the phase's thinking level | Forces the SDK `effort` level (`low`, `medium`, `high`, `xhigh`, `max`) of sessions on an Opus model; other models ignore it. Without it, the effort follows the thinking level the user chose for the phase: `none` and `low` → `low`, `medium` → `medium`, `high` → `high`, `ultrathink` → `xhigh`. Opus 5.5 takes no thinking budget, so this is its only reasoning control. |
 | `AUTO_CLAUDE_OTEL_ENDPOINT` | — | OTLP endpoint, such as `http://localhost:4318`. When set, each session exports traces, metrics and logs over OTLP `http/protobuf` as the service `workpilot-<agent type>`, and these settings replace any `OTEL_*` variable of the same name. It also turns on WorkPilot's own GenAI spans for every provider (`invoke_agent`, `chat`, `execute_tool`; no prompt or output), sent to `<endpoint>/v1/traces` as the service `workpilot`, with any key read from `OTEL_EXPORTER_OTLP_HEADERS` ([genai-traces.md](architecture/genai-traces.md)). Point it only at a collector you control. |
+| `AUTO_CLAUDE_CODER_USER_SETTINGS` | on | `0`, `false`, `no` or `off`: the coder loads the project's Claude settings only, without your own `~/.claude` (your CLAUDE.md, skills and hooks) or the project's `.claude/settings.local.json`. Every other agent type (planner, QA, spec, analysis, PR review…) loads the project's settings only, whatever this says ([agent-instructions.md](architecture/agent-instructions.md)). |
+| `AUTO_CLAUDE_SETTING_SOURCES` | per agent type | Comma list among `project`, `user` and `local`, for every agent type, beating the variable above. `project` is always kept; other names are ignored, and an empty value is no override. `project,user,local` restores the former behaviour, your settings in every session. |
 | `AUTO_CLAUDE_AGENT_DEBUGGER` | off | `1`, `true`, `yes` or `on` attaches the Agent Debugger's breakpoints to every session, even when the debugger was not opened for that task. |
 | `CLAUDE_CLI_PATH` | the SDK's bundled CLI | `claude` executable the SDK launches. Ignored when it is not an existing file or holds shell metacharacters, `..` or a variable reference. The desktop app sets it from detection or the Claude path setting. |
 | `CLAUDE_CODE_GIT_BASH_PATH` | detected | Windows only: the Git for Windows `bash.exe` the Claude Code CLI needs; WorkPilot also looks for `git.exe` next to it. The desktop app sets it when it finds one. |
@@ -641,7 +716,7 @@ uses no network.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([core/model_config.py](../apps/backend/core/model_config.py)) | Model of the utility calls: the AI merge resolver and, when a pull request is created, the template filler and the impact analysis. The desktop app sets it for merges from the utility model in Settings. |
+| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([foundation/model_config.py](../apps/backend/foundation/model_config.py)) | Model of the utility calls: the AI merge resolver and, when a pull request is created, the template filler and the impact analysis. The desktop app sets it for merges from the utility model in Settings. |
 | `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. The desktop app sets it for merges. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
@@ -681,6 +756,13 @@ files. Only public `http` and `https` addresses are accepted.
 `SLACK_WEBHOOK_URL` and `TEAMS_WEBHOOK_URL` are also where a hook's `send_slack`
 or `send_teams` action posts when it names no URL.
 
+`WORKPILOT_TASK_DIGEST_HOURS` (off by default, 0.25 to 168) sends a digest of
+each running build to the same channels at that interval: subtasks done out of
+planned, what runs, what is blocked and why, the QA pass. The first one comes
+one interval after the build started, so a short task sends none, and a build
+resumed after a restart waits for the rest of the interval
+([task-digest.md](architecture/task-digest.md)).
+
 ### Third-party MCP servers
 
 These credentials go only to an MCP server an agent may be given. A server starts
@@ -709,6 +791,16 @@ providers on WorkPilot's own loop wait for it, see
 | --- | ---: | --- |
 | `WORKPILOT_MCP_TASK_TIMEOUT` | 1800 | Seconds a tool call returned as a task may run before WorkPilot cancels it (`tasks/cancel`) and gives the agent an error that says so. A value that is not a positive number keeps the default. |
 
+## Worktree preparation
+
+A task's worktree is prepared before the first session, see
+[architecture/worktree-recipe.md](architecture/worktree-recipe.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_WORKTREE_SETUP` | `1` | `0`: no recipe runs in new worktrees (neither `.workpilot/worktree.toml` nor the one detected from the stack). Teardown and port release still run on removal. |
+| `WORKPILOT_DATA_DIR` | `~/.workpilot` | Holds `ports.json`, the machine's port blocks (one per task, 10 ports wide from 20000). |
+
 ## Agent features
 
 Opt-in features. Those marked *API* are read by the local API: put them in
@@ -718,7 +810,6 @@ Opt-in features. Those marked *API* are read by the local API: put them in
 | --- | ---: | --- |
 | `WORKPILOT_LOOP_DETECTION_ENABLED` | off | `1`, `true`, `yes` or `on`: from the coder's second iteration, a diff that repeats one of the last four pauses the build, with the event in the audit trail. It resumes like any paused build. |
 | `WORKPILOT_AUTO_PROMOTE_THRESHOLD` | off | *API.* Integer from 0 to 100. Enables "Accept & skip human review" in the QA promotion dialog when the build's QA score reaches it; the score is 0 unless QA signed off. Nothing moves a card on its own. |
-| `WORKPILOT_PARALLEL_VARIATIONS` | 1 | *API.* How many variations, 1 to 5, the "Parallel variations" dialog may prepare; `1` leaves the feature off. |
 | `AUTO_TEST_GENERATION` | on | `false`, and only `false`, removes the "automated tests" section from each subtask's coding prompt. That section tells the coder which kinds of tests to write, with the test libraries the project already has. |
 | `AUTO_FIX_MAX_ATTEMPTS` | 5 | CLI: attempts of `run.py --spec … --auto-fix` when `--auto-fix-max-attempts` is not given. |
 

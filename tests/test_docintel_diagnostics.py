@@ -13,7 +13,7 @@ code: the frame is reported *not attached*. An agent sent to the wrong file
 spends a session there; one told to look spends a grep.
 
 **The same parsers everywhere.** The CI codes an attachment is read for are the
-ones the incident model records, from the one table in `cicd_mode.py`; the
+ones the incident model records, from the one table in `foundation/ci_logs.py`; the
 stack trace the production responder correlates is read by the same reader the
 preflight uses.
 """
@@ -432,7 +432,7 @@ class TestNothingInvented:
 
 
 # ---------------------------------------------------------------------------
-# CI logs — the parsers in cicd_mode.py
+# CI logs — the parsers in foundation/ci_logs.py
 # ---------------------------------------------------------------------------
 
 CI_LOG = r"""

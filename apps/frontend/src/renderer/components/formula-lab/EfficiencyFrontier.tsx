@@ -109,7 +109,7 @@ export function EfficiencyFrontier({
 							x={PAD.left - 6}
 							y={tk.y + 3}
 							textAnchor="end"
-							className="fill-muted-foreground text-[9px]"
+							className="fill-muted-foreground text-3xs"
 						>
 							{tk.label}
 						</text>
@@ -122,7 +122,7 @@ export function EfficiencyFrontier({
 						x={tk.x}
 						y={H - PAD.bottom + 14}
 						textAnchor="middle"
-						className="fill-muted-foreground text-[9px]"
+						className="fill-muted-foreground text-3xs"
 					>
 						{tk.label}
 					</text>
@@ -132,7 +132,7 @@ export function EfficiencyFrontier({
 					x={(W - PAD.right + PAD.left) / 2}
 					y={H - 4}
 					textAnchor="middle"
-					className="fill-muted-foreground text-[10px] font-medium"
+					className="fill-muted-foreground text-3xs font-medium"
 				>
 					{t("formulaLab:chart.xAxis")} →
 				</text>
@@ -141,7 +141,7 @@ export function EfficiencyFrontier({
 					y={12}
 					textAnchor="middle"
 					transform="rotate(-90)"
-					className="fill-muted-foreground text-[10px] font-medium"
+					className="fill-muted-foreground text-3xs font-medium"
 				>
 					{t("formulaLab:chart.yAxis")} →
 				</text>
@@ -193,7 +193,7 @@ export function EfficiencyFrontier({
 										p.f.effort,
 									)}\n${formatCost(p.f.expected_cost_usd)} · ${Math.round(
 										p.f.success_probability * 100,
-									)}% success`}
+									)}% ${t("formulaLab:frontier.success")}`}
 								</title>
 							</circle>
 						);

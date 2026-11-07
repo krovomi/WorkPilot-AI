@@ -36,7 +36,7 @@ env_file = Path(__file__).parent.parent.parent.parent / ".env-files" / ".env"
 if env_file.exists():
     load_dotenv(env_file)
 
-from core.debug import debug, debug_error, debug_warning
+from foundation.debug import debug, debug_error, debug_warning
 
 # Import from refactored roadmap package (now a subpackage of runners)
 from runners.roadmap import RoadmapOrchestrator
@@ -139,7 +139,7 @@ def main():
 
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     main()

@@ -112,7 +112,7 @@ export function TaskArchitectureDelta({
 						</h4>
 						<div className="mt-1 flex flex-wrap gap-1">
 							{status.continuity.lost?.map((id) => (
-								<Badge key={id} variant="outline" className="text-[10px]">
+								<Badge key={id} variant="outline" className="text-3xs">
 									{id}
 								</Badge>
 							))}
@@ -168,7 +168,7 @@ export function TaskArchitectureDelta({
 					</p>
 					<div className="mt-2 flex flex-wrap gap-1">
 						{counts.map(({ key, count }) => (
-							<Badge key={key} variant="outline" className="text-[10px]">
+							<Badge key={key} variant="outline" className="text-3xs">
 								{t(`architectureVisualizer:delta.counts.${key}`, { count })}
 							</Badge>
 						))}
@@ -238,7 +238,7 @@ function Notice({
 			<div className="max-w-md">
 				<div className="flex items-center gap-2">
 					{tone === "warning" && (
-						<AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+						<AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
 					)}
 					<h3 className="text-sm font-medium">{title}</h3>
 				</div>

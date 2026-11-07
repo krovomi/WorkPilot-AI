@@ -119,15 +119,15 @@ export function WorkflowProfileCard({
 			<div className="flex items-start justify-between gap-3 p-3">
 				<div className="min-w-0">
 					<div className="flex items-center gap-2">
-						<Zap className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
+						<Zap className="h-4 w-4 shrink-0 text-warning" aria-hidden />
 						<span className="text-sm font-medium">
 							{t("workflowProfile:title")}
 						</span>
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{profile.workflow}
 						</Badge>
 						{previewEffort !== null && (
-							<Badge className="text-[10px]">
+							<Badge className="text-3xs">
 								{t("workflowProfile:levels.preview")}
 							</Badge>
 						)}
@@ -174,7 +174,7 @@ export function WorkflowProfileCard({
 			</div>
 
 			{profile.enabled === false && (
-				<div className="mx-3 mb-3 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+				<div className="mx-3 mb-3 rounded border border-warning/40 bg-warning/10 p-2 text-xs">
 					<div className="font-medium">
 						{t("workflowProfile:disabled.title")}
 					</div>
@@ -187,7 +187,7 @@ export function WorkflowProfileCard({
 			{profile.missing.length > 0 && (
 				<div className="mx-3 mb-3 flex items-start gap-2 rounded border border-border bg-background/50 p-2 text-xs">
 					<AlertTriangle
-						className="mt-0.5 h-3 w-3 shrink-0 text-amber-500"
+						className="mt-0.5 h-3 w-3 shrink-0 text-warning"
 						aria-hidden
 					/>
 					<div>
@@ -262,9 +262,9 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 			<span className="mt-0.5 shrink-0" aria-hidden>
 				{phase.runs ? (
 					phase.hardGate ? (
-						<Lock className="h-3 w-3 text-emerald-600" />
+						<Lock className="h-3 w-3 text-success" />
 					) : (
-						<CircleDashed className="h-3 w-3 text-emerald-600" />
+						<CircleDashed className="h-3 w-3 text-success" />
 					)
 				) : (
 					<MinusCircle className="h-3 w-3 text-muted-foreground" />
@@ -275,33 +275,33 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 					<span className="font-medium">{phase.id}</span>
 					<span className="text-muted-foreground">{phase.impl}</span>
 					{phase.dispatch !== "inline" && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{dispatchLabel}
 						</Badge>
 					)}
 					{phase.hardGate && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.hardGate", { gate: phase.hardGate })}
 						</Badge>
 					)}
 					{phase.deterministic && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.deterministic")}
 						</Badge>
 					)}
 					{phase.gate === "human" && (
-						<Badge variant="outline" className="text-[10px]">
+						<Badge variant="outline" className="text-3xs">
 							{t("workflowProfile:phase.humanGate")}
 						</Badge>
 					)}
 					{phase.irreversible && (
-						<Badge variant="destructive" className="text-[10px]">
+						<Badge variant="destructive" className="text-3xs">
 							{t("workflowProfile:phase.irreversible")}
 						</Badge>
 					)}
 				</div>
 				{phase.degradedFrom && (
-					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+					<div className="mt-0.5 text-warning ">
 						{t("workflowProfile:phase.degraded", {
 							from: phase.degradedFrom,
 							reason: phase.degradedReason,
@@ -309,7 +309,7 @@ function PhaseRow({ phase }: { readonly phase: WorkflowPhasePayload }) {
 					</div>
 				)}
 				{phase.substitutedFrom && (
-					<div className="mt-0.5 text-amber-600 dark:text-amber-400">
+					<div className="mt-0.5 text-warning ">
 						{t("workflowProfile:phase.substituted", {
 							from: phase.substitutedFrom,
 							reason: phase.substitutionReason,
@@ -378,7 +378,7 @@ function LevelComparison({
 							key={level}
 							type="button"
 							onClick={() => onPreview(level)}
-							className={`rounded border px-2 py-1 text-[11px] transition-colors ${
+							className={`rounded border px-2 py-1 text-2xs transition-colors ${
 								isCurrent
 									? "border-primary/60 bg-primary/10"
 									: "border-border hover:bg-muted"
@@ -396,7 +396,7 @@ function LevelComparison({
 				<Button
 					size="sm"
 					variant="ghost"
-					className="mt-1.5 h-6 px-2 text-[11px]"
+					className="mt-1.5 h-6 px-2 text-2xs"
 					onClick={() => onPreview(null)}
 				>
 					{t("workflowProfile:levels.backToTask")}

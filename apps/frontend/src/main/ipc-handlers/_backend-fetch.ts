@@ -2,36 +2,25 @@
  * Shared helper for IPC handlers that proxy a request to the FastAPI
  * backend exposed by `apps/backend/provider_api.py`.
  *
+ * It always targets the backend this app starts on the machine, even while
+ * the app is signed in to a WorkPilot server: the features behind these
+ * calls (hooks, brain memory, notifications, learning loop...) belong to the
+ * machine. Server routes go through `authedFetch` (`server-connection.ts`),
+ * which carries the session token; this helper never does.
+ *
  * Most handlers for the new "Phase 3-5" feature modules look the same:
  * read a JSON body from the renderer, POST/GET it to a backend endpoint,
  * forward the JSON response back. This module hides the boilerplate.
  */
 
-import {
-	getAccessToken,
-	getServerUrl,
-	isServerMode,
-	refreshSession,
-} from "../server-connection";
-
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:9000";
 
 export function getBackendUrl(): string {
-	// Server mode: every backend call targets the remote multi-user server.
-	if (isServerMode()) {
-		return getServerUrl() as string;
-	}
 	return (
 		process.env.VITE_BACKEND_URL ||
 		process.env.BACKEND_URL ||
 		DEFAULT_BACKEND_URL
 	);
-}
-
-/** Authorization header for the current mode (empty object in local mode). */
-export function getAuthHeaders(): Record<string, string> {
-	const token = isServerMode() ? getAccessToken() : null;
-	return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export interface BackendError {
@@ -60,7 +49,6 @@ export async function backendFetch<T = Record<string, unknown>>(
 			return await fetch(`${getBackendUrl()}${path}`, {
 				headers: {
 					"Content-Type": "application/json",
-					...getAuthHeaders(),
 					...(init?.headers || {}),
 				},
 				signal: controller.signal,
@@ -72,15 +60,7 @@ export async function backendFetch<T = Record<string, unknown>>(
 	};
 
 	try {
-		let res = await doFetch();
-		// Server mode: a 401 usually means the access token expired between
-		// the proactive refreshes — refresh once and retry the request.
-		if (res.status === 401 && isServerMode()) {
-			const refreshed = await refreshSession();
-			if (refreshed) {
-				res = await doFetch();
-			}
-		}
+		const res = await doFetch();
 		const text = await res.text();
 		if (!res.ok) {
 			return { success: false, error: text || `HTTP ${res.status}` };

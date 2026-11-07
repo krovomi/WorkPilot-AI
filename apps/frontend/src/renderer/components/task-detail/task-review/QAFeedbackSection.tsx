@@ -13,6 +13,8 @@ import {
 	useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import type { ReviewComment } from "../../../../shared/types/review-comments";
+import { OpenCommentsSummary } from "./ReviewLineComments";
 import {
 	ALLOWED_IMAGE_TYPES_DISPLAY,
 	MAX_IMAGES_PER_TASK,
@@ -38,6 +40,8 @@ interface QAFeedbackSectionProps {
 	images?: ImageAttachment[];
 	/** Callback when images change - optional for backward compatibility */
 	onImagesChange?: (images: ImageAttachment[]) => void;
+	/** Line comments of the review (F9): the open ones go with the request. */
+	reviewComments?: ReviewComment[];
 }
 
 /**
@@ -51,6 +55,7 @@ export function QAFeedbackSection({
 	onReject,
 	images = [],
 	onImagesChange,
+	reviewComments = [],
 }: QAFeedbackSectionProps) {
 	const { t } = useTranslation("tasks");
 
@@ -307,7 +312,8 @@ export function QAFeedbackSection({
 	);
 
 	// Allow submission with either text feedback or images
-	const canSubmit = feedback.trim() || images.length > 0;
+	const canSubmit =
+		feedback.trim() || images.length > 0 || reviewComments.some((c) => c.status === "open");
 
 	return (
 		<div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
@@ -321,6 +327,8 @@ export function QAFeedbackSection({
 					"Found issues? Describe what needs to be fixed and the AI will continue working on it.",
 				)}
 			</p>
+
+			<OpenCommentsSummary comments={reviewComments} />
 
 			{/* Textarea with paste/drop support */}
 			<Textarea

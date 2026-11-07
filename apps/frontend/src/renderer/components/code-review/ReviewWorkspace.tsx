@@ -32,6 +32,9 @@ import {
 	excerptPatch,
 	type LineSelection,
 } from "./excerpts";
+import { PageHeader } from "../ui/page-header";
+
+import { NativeSelect } from "../ui/native-select";
 interface Props {
 	projectId: string;
 	onReview: (diff: string) => void;
@@ -403,7 +406,7 @@ export function ReviewWorkspace({
 								<span className="truncate">{entry.path}</span>
 							</button>
 							<span
-								className="shrink-0 font-mono text-[10px] text-amber-500"
+								className="shrink-0 font-mono text-3xs text-warning"
 								title={t("workspace.gitStatus")}
 							>
 								{entry.status.trim()}
@@ -534,7 +537,7 @@ export function ReviewWorkspace({
 						)}
 					</div>
 					<div
-						className="truncate border-b px-3 py-2 font-mono text-[11px] text-muted-foreground"
+						className="truncate border-b px-3 py-2 font-mono text-2xs text-muted-foreground"
 						title={active}
 					>
 						{snapshot && (
@@ -703,7 +706,7 @@ export function ReviewWorkspace({
 					)}
 					{t(loading ? "actions.analyzing" : "actions.runReview")}
 				</Button>
-				<p className="text-center text-[10px] text-muted-foreground">
+				<p className="text-center text-3xs text-muted-foreground">
 					{t("workspace.reviewShortcut")}
 				</p>
 			</div>
@@ -737,19 +740,12 @@ export function ReviewWorkspace({
 	);
 	return (
 		<div ref={container} className="flex h-full min-h-0 flex-col bg-background">
-			<header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-				<div className="flex items-center gap-3">
-					<div className="rounded-xl bg-primary/10 p-2.5">
-						<GitCompareArrows className="h-5 w-5 text-primary" />
-					</div>
-					<div>
-						<h1 className="text-lg font-semibold">{t("title")}</h1>
-						<p className="text-xs text-muted-foreground">
-							{t("workspace.subtitle")}
-						</p>
-					</div>
-				</div>
-				<div className="flex flex-wrap items-center gap-2">
+			<PageHeader
+				icon={GitCompareArrows}
+				title={t("title")}
+				description={t("workspace.subtitle")}
+				actions={
+					<>
 					<Button
 						size="sm"
 						variant={source === "project" ? "secondary" : "ghost"}
@@ -767,21 +763,21 @@ export function ReviewWorkspace({
 					>
 						{t("workspace.paste")}
 					</Button>
-					<select
+					<NativeSelect
 						aria-label={t("workspace.comparison")}
 						value={scope}
 						onChange={(e) => {
 							setSnapshot(null);
 							setScope(e.target.value as ReviewScope);
 						}}
-						className="h-9 max-w-52 rounded-md border bg-background px-2 text-xs"
+						className="h-9 max-w-52 px-2 text-xs"
 					>
 						{(["all", "staged", "working"] as const).map((value) => (
 							<option key={value} value={value}>
 								{t(`workspace.scope.${value}`)}
 							</option>
 						))}
-					</select>
+					</NativeSelect>
 					<Button
 						size="icon"
 						variant="outline"
@@ -794,8 +790,9 @@ export function ReviewWorkspace({
 					>
 						<RefreshCw className={cn("h-4 w-4", listing && "animate-spin")} />
 					</Button>
-				</div>
-			</header>
+					</>
+				}
+			/>
 			{localError && (
 				<div
 					role="alert"

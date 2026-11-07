@@ -14,6 +14,10 @@ import {
 	createAccessibilityAPI,
 } from "./modules/accessibility-api";
 import {
+	createSharedAnalysisAPI,
+	type SharedAnalysisAPI,
+} from "./modules/shared-analysis-api";
+import {
 	type AgentDebuggerAPI,
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
@@ -77,10 +81,6 @@ import {
 	createNotebookAgentAPI,
 } from "./modules/notebook-agent-api";
 import {
-	type SpecRefinementAPI,
-	createSpecRefinementAPI,
-} from "./modules/spec-refinement-api";
-import {
 	type AgentCoachAPI,
 	createAgentCoachAPI,
 } from "./modules/agent-coach-api";
@@ -140,6 +140,7 @@ import {
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
+import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
 	createTaskPermissionAPI,
 	type TaskPermissionAPI,
@@ -162,11 +163,8 @@ import {
 	type FormulaMatrixAPI,
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
+import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
-import type { DecisionLoggerAPI } from "./modules/decision-logger-api";
-import { createDecisionLoggerAPI } from "./modules/decision-logger-api";
-import type { DocumentationAgentAPI } from "./modules/documentation-agent-api";
-import { createDocumentationAgentAPI } from "./modules/documentation-agent-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import {
 	createEnvSnapshotAPI,
@@ -183,6 +181,8 @@ import {
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import type { McpPinsAPI } from "./modules/mcp-pins-api";
+import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
 import type { MultiRepoAPI } from "./modules/multi-repo-api";
 import { createMultiRepoAPI } from "./modules/multi-repo-api";
@@ -207,12 +207,16 @@ import type { DesignToCodeAPI } from "./modules/design-to-code-api";
 import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+import type { SteeringAPI } from "./modules/steering-api";
+import { createSteeringAPI } from "./modules/steering-api";
 import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+import type { WorktreeRecipeAPI } from "./modules/worktree-recipe-api";
+import { createWorktreeRecipeAPI } from "./modules/worktree-recipe-api";
 import {
-	createVoiceControlAPI,
-	type VoiceControlAPI,
-} from "./modules/voice-control-api";
+	createVoiceAssistantAPI,
+	type VoiceAssistantAPI,
+} from "./modules/voice-assistant-api";
 import {
 	createNaturalLanguageGitAPI,
 	type NaturalLanguageGitAPI,
@@ -259,6 +263,7 @@ export interface ElectronAPI
 		CopilotCliAPI,
 		AgentCliAPI,
 		TaskSandboxAPI,
+		StackAPI,
 		TaskPermissionAPI,
 		CopilotOAuthAPI,
 		McpAPI,
@@ -268,18 +273,17 @@ export interface ElectronAPI
 		PromptOptimizerAPI,
 		CodePlaygroundAPI,
 		ConflictPredictorAPI,
-		VoiceControlAPI,
+		VoiceAssistantAPI,
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
 		CodeMigrationAPI,
 		PerformanceProfilerAPI,
-		DocumentationAgentAPI,
-		DecisionLoggerAPI,
 		PairProgrammingAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
@@ -288,7 +292,9 @@ export interface ElectronAPI
 		CostPredictorAPI,
 		FormulaMatrixAPI,
 		BenchAPI,
+		BoardMcpAPI,
 		AccessibilityAPI,
+		SharedAnalysisAPI,
 		I18nAgentAPI,
 		DocDriftAPI,
 		FlakyTestsAPI,
@@ -298,7 +304,6 @@ export interface ElectronAPI
 		GitSurgeonAPI,
 		ReleaseCoordinatorAPI,
 		NotebookAgentAPI,
-		SpecRefinementAPI,
 		AgentCoachAPI,
 		OnboardingAgentAPI,
 		SandboxAPI,
@@ -318,7 +323,9 @@ export interface ElectronAPI
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		SteeringAPI,
 		VisualToCodeHistoryAPI,
+		WorktreeRecipeAPI,
 		AutoRefactorAPI,
 		GenericIpcAPI,
 		DesignToCodeAPI {
@@ -416,18 +423,17 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPromptOptimizerAPI(),
 		...createCodePlaygroundAPI(),
 		...createConflictPredictorAPI(),
-		...createVoiceControlAPI(),
+		...createVoiceAssistantAPI(),
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
 		...createCodeMigrationAPI(),
 		...createPerformanceProfilerAPI(),
-		...createDocumentationAgentAPI(),
-		...createDecisionLoggerAPI(),
 		...createPairProgrammingAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
@@ -436,7 +442,9 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createCostPredictorAPI(),
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
+		...createBoardMcpAPI(),
 		...createAccessibilityAPI(),
+		...createSharedAnalysisAPI(),
 		...createI18nAgentAPI(),
 		...createDocDriftAPI(),
 		...createFlakyTestsAPI(),
@@ -446,7 +454,6 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGitSurgeonAPI(),
 		...createReleaseCoordinatorAPI(),
 		...createNotebookAgentAPI(),
-		...createSpecRefinementAPI(),
 		...createAgentCoachAPI(),
 		...createOnboardingAgentAPI(),
 		...createSandboxAPI(),
@@ -466,11 +473,14 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createSteeringAPI(),
 		...createVisualToCodeHistoryAPI(),
+		...createWorktreeRecipeAPI(),
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
 		...createTaskSandboxAPI(),
+		...createStackAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		automations: createAutomationsAPI(),
@@ -577,10 +587,6 @@ export type { DebugAPI } from "./modules/debug-api";
 export type { TaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createTaskSandboxAPI } from "./modules/task-sandbox-api";
 export { createDebugAPI } from "./modules/debug-api";
-export type { DecisionLoggerAPI } from "./modules/decision-logger-api";
-export { createDecisionLoggerAPI } from "./modules/decision-logger-api";
-export type { DocumentationAgentAPI } from "./modules/documentation-agent-api";
-export { createDocumentationAgentAPI } from "./modules/documentation-agent-api";
 export type { GitHubAPI } from "./modules/github-api";
 export { createGitHubAPI } from "./modules/github-api";
 export type { McpAPI } from "./modules/mcp-api";
@@ -610,8 +616,8 @@ export type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 export { createVisualProgrammingAPI } from "./modules/visual-programming-api";
 export type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 export { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
-export type { VoiceControlAPI } from "./modules/voice-control-api";
-export { createVoiceControlAPI } from "./modules/voice-control-api";
+export type { VoiceAssistantAPI } from "./modules/voice-assistant-api";
+export { createVoiceAssistantAPI } from "./modules/voice-assistant-api";
 export type { NaturalLanguageGitAPI } from "./natural-language-git-api";
 export { createNaturalLanguageGitAPI } from "./natural-language-git-api";
 export type { ProfileAPI } from "./profile-api";

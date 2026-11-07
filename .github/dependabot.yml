@@ -82,10 +82,25 @@ updates:
       - docker
     commit-message:
       prefix: "chore(deps)"
+    # Digest and patch moves only. The image's Python is the one
+    # apps/backend/requirements.lock is compiled for (`--python-version 3.12`,
+    # ruff py312, the bundled 3.12 runtime): 3.12-slim -> 3.15-slim (#716)
+    # broke the build, ctranslate2==4.8.3 has no 3.15 wheel. Moving Python is
+    # a decision: lock, CI matrix and image change together, by hand.
+    ignore:
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
-  # GitHub Actions
+  # GitHub Actions. Every external action is pinned by commit SHA with its
+  # version in a comment (tests/test_action_pins.py); Dependabot bumps both.
+  # `directory: /` alone only reads .github/workflows: the composite actions
+  # under .github/actions/ are listed too, or their pins would never move.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

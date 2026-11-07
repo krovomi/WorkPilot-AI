@@ -2,6 +2,7 @@ import { Wand2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import {
 	FullScreenDialog,
 	FullScreenDialogBody,
@@ -66,7 +67,11 @@ export function OnboardingWizard({
 	onOpenSettings,
 }: OnboardingWizardProps) {
 	const { t } = useTranslation("onboarding");
-	const { updateSettings } = useSettingsStore();
+	const { updateSettings } = useSettingsStore(
+		useShallow((s) => ({
+			updateSettings: s.updateSettings,
+		})),
+	);
 	const [currentStepIndex, setCurrentStepIndex] = useState(0);
 	const [completedSteps, setCompletedSteps] = useState<Set<WizardStepId>>(
 		new Set(),

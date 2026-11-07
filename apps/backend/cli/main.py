@@ -180,6 +180,19 @@ Environment Variables:
         help="Discard an existing build (requires confirmation)",
     )
     build_group.add_argument(
+        "--steer",
+        metavar="TEXT",
+        default=None,
+        help="Send a message to the task while it runs: the next session receives it",
+    )
+    # Outside the exclusive group: it goes with --steer.
+    parser.add_argument(
+        "--steer-subtask",
+        metavar="SUBTASK_ID",
+        default=None,
+        help="With --steer: deliver the message only to this subtask's session",
+    )
+    build_group.add_argument(
         "--create-pr",
         action="store_true",
         help="Push branch and create a GitHub Pull Request",
@@ -220,6 +233,14 @@ Environment Variables:
         "--pr-draft",
         action="store_true",
         help="With --create-pr: create as draft PR",
+    )
+    parser.add_argument(
+        "--pr-ignore-cross-review",
+        action="store_true",
+        help=(
+            "With --create-pr: create the PR even though the cross review "
+            "disagrees with this code. A person's explicit choice."
+        ),
     )
     parser.add_argument(
         "--pr-body-file",
@@ -610,7 +631,7 @@ def _run_cli(argv=None, jev_run=None) -> None:
     args = parse_args(argv) if argv is not None else parse_args()
 
     # Import debug functions after environment setup
-    from core.debug import debug, debug_error, debug_section, debug_success
+    from foundation.debug import debug, debug_error, debug_section, debug_success
 
     debug_section("run.py", "Starting WorkPilot AI Framework")
     debug("run.py", "Arguments parsed", args=vars(args))
@@ -801,6 +822,15 @@ def _run_cli(argv=None, jev_run=None) -> None:
         handle_discard_command(project_dir, spec_dir.name)
         return
 
+    if args.steer is not None:
+        from .steer_command import handle_steer_command
+
+        if not handle_steer_command(
+            project_dir, spec_dir, args.steer, args.steer_subtask
+        ):
+            sys.exit(1)
+        return
+
     if args.analyze_impact:
         from .workspace_commands import handle_analyze_impact_command
 
@@ -855,6 +885,7 @@ def _run_cli(argv=None, jev_run=None) -> None:
             title=args.pr_title,
             draft=args.pr_draft,
             body=body_override,
+            allow_cross_review_disagreement=args.pr_ignore_cross_review,
         )
         # JSON output is already printed by handle_create_pr_command
         if not result.get("success"):

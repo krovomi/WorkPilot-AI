@@ -58,7 +58,9 @@
 		"adoptedToBrain_one": "{{count}} skill gardé et versé au cerveau partagé.",
 		"adoptedToBrain_other": "{{count}} skills gardés et versés au cerveau partagé.",
 		"declined_one": "{{count}} skill refusé — il ne sera plus proposé.",
-		"declined_other": "{{count}} skills refusés — ils ne seront plus proposés."
+		"declined_other": "{{count}} skills refusés — ils ne seront plus proposés.",
+		"lockHint_one": "Pour qu'hermes ne réécrive plus la version que vous venez de relire, verrouillez-la dans hermes :",
+		"lockHint_other": "Pour qu'hermes ne réécrive plus les versions que vous venez de relire, verrouillez-les dans hermes :"
 	},
 	"details": {
 		"toggle": "Comment ça marche",
@@ -84,13 +86,19 @@
 		"soul": "Persona",
 		"trust": "Confiance",
 		"skills": "Skills",
-		"agents": "Contexte projet"
+		"agents": "Contexte projet",
+		"version": "Version"
 	},
 	"soul": {
 		"title": "Persona (SOUL.md)",
 		"description": "Hermes lit SOUL.md depuis son propre répertoire et l'injecte comme identité de chaque session. Ce dépôt en propose un ; l'installer est une copie réversible — la persona remplacée est conservée horodatée.",
 		"install": "Installer SOUL.md",
-		"replace": "Remplacer la persona installée"
+		"replace": "Remplacer la persona installée",
+		"sessions": {
+			"requested": "Persona installée : les sessions hermes en cours la reprendront à leur prochain tour.",
+			"needs-update": "Persona installée pour les nouvelles sessions. Pour l'appliquer aux sessions en cours, mettez hermes à jour (0.23 ou plus) puis demandez-leur de recharger leur prompt :",
+			"unavailable": "Persona installée pour les nouvelles sessions. Pour l'appliquer aux sessions en cours :"
+		}
 	},
 	"triage": {
 		"title": "Décidé sans vous",
@@ -105,5 +113,13 @@
 	"adopted": {
 		"title": "Skills gardés",
 		"description": "Écrits dans skills/{{pack}}/, un pack qui n'est pas listé dans .workpilot/skills.toml : aucun agent ne les charge encore. Lister ce pack est la décision qui les active — et le moment de réécrire les noms d'outils propres à hermes. Supprimer un dossier revient à le refuser."
+	},
+	"sidebar": {
+		"checking": "vérification…",
+		"tooltip": "{{name}} : {{state}}",
+		"description": "L'agent de Nous Research, qui apprend hors de WorkPilot. Ce qu'il apprend arrive dans la file de relecture, à traiter depuis le panneau d'une tâche.",
+		"pending_one": "{{count}} skill attend votre relecture dans le panneau d'une tâche.",
+		"pending_other": "{{count}} skills attendent votre relecture dans le panneau d'une tâche.",
+		"docs": "Documentation de {{name}}"
 	}
 }

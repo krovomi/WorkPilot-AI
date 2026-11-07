@@ -22,5 +22,17 @@
 	"agentRole": "Rôle",
 	"provider": "Fournisseur",
 	"model": "Modèle",
-	"createAgent": "Créer l'agent"
+	"createAgent": "Créer l'agent",
+	"agentNamePlaceholder": "ex. : Agent d'architecture",
+	"noEvents": "Aucun événement pour l'instant",
+	"agentPanel": {
+		"files": "Fichiers ({{count}})",
+		"remove": "Retirer",
+		"thinking": "Réflexion",
+		"taskPlaceholder": "Description de la tâche...",
+		"restart": "Redémarrer",
+		"noModel": "Aucun modèle",
+		"working": "En cours..."
+	},
+	"noDecisions": "Aucune décision enregistrée pour l'instant"
 }

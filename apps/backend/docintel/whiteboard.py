@@ -103,7 +103,7 @@ class WhiteboardResult:
 def _extract_json(text: str):
     """The model's JSON, fenced or wrapped in prose — the plan reader's rule."""
     try:
-        from spec.plan_recovery import extract_json_document
+        from foundation.json_document import extract_json_document
 
         return extract_json_document(text)
     except Exception:  # noqa: BLE001

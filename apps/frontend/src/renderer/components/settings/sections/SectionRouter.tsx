@@ -13,6 +13,7 @@ import type {
 import { GeneralSettings } from "../../project-settings/GeneralSettings";
 import { InitializationGuard } from "../common/InitializationGuard";
 import { AutomationsIntegration } from "../integrations/AutomationsIntegration";
+import { BoardMcpIntegration } from "../integrations/BoardMcpIntegration";
 import { AzureDevOpsIntegration } from "../integrations/AzureDevOpsIntegration";
 import { ChannelNotificationsIntegration } from "../integrations/ChannelNotificationsIntegration";
 import { CICDPipelineIntegration } from "../integrations/CICDPipelineIntegration";
@@ -206,13 +207,13 @@ export function SectionRouter({
 		case "azure-devops":
 			return (
 				<SettingsSection
-					title="Azure DevOps Integration"
-					description="Configure and manage Azure DevOps work item synchronization"
+					title={t("settings:azureDevOps.integrationTitle")}
+					description={t("settings:azureDevOps.integrationDescription")}
 				>
 					<InitializationGuard
 						initialized={!!project.autoBuildPath}
-						title="Azure DevOps Integration"
-						description="Enable Azure DevOps integration to sync work items with your backlog"
+						title={t("settings:azureDevOps.integrationTitle")}
+						description={t("settings:azureDevOps.enableDescription")}
 					>
 						<AzureDevOpsIntegration
 							projectId={project.id}
@@ -263,6 +264,22 @@ export function SectionRouter({
 				</SettingsSection>
 			);
 
+		case "board-mcp":
+			return (
+				<SettingsSection
+					title={t("boardMcp.title")}
+					description={t("boardMcp.description")}
+				>
+					{project.remote ? (
+						<p className="text-sm text-muted-foreground">
+							{t("boardMcp.errors.server_project")}
+						</p>
+					) : (
+						<BoardMcpIntegration projectId={project.id} />
+					)}
+				</SettingsSection>
+			);
+
 		case "jira":
 			return (
 				<SettingsSection
@@ -272,7 +289,7 @@ export function SectionRouter({
 					<InitializationGuard
 						initialized={!!project.autoBuildPath}
 						title={t("jira.title")}
-						description="Enable Jira integration to sync issues with your backlog"
+						description={t("settings:jira.initGuardDescription")}
 					>
 						<JiraIntegration
 							projectId={project.id}

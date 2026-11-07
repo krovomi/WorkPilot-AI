@@ -71,5 +71,8 @@
 	"errors": {
 		"startFailed": "Failed to start pair programming session",
 		"noProject": "Please select a project first"
+	},
+	"session": {
+		"goal": "Goal"
 	}
 }

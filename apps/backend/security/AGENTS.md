@@ -30,13 +30,14 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 
 | Quoi | Où |
 |---|---|
-| nettoyage + scan d'injection + journal | `untrusted.py` (`clean_untrusted`, `quote_untrusted`, `record_untrusted`) |
+| nettoyage + scan d'injection + journal | `untrusted.py` (`clean_untrusted`, `quote_untrusted`, `record_untrusted`) ; `_FORGE_PATTERNS` : ce qu'un texte de forge demande à l'agent (script distant, secret, push sans revue, garde-fou, contrôle coupé), noté `suspect` ici seulement |
 | scanner d'injection | `injection_guard/` (`get_default_scanner`) ; `WORKPILOT_INJECTION_GUARD=block` durcit `quote_untrusted` |
 | nettoyage brut | `content_sanitizer.py` (utilisé par `untrusted.py`) |
 | appliqué aujourd'hui à | GitHub (`runners/github/context_gatherer.py`, `runners/github/batch_issues.py`) ; les corps de skills à l'émission (`skills_registry/injection_gate.py`, gate 4 du resolver) ; GitLab et Azure DevOps ont encore leur propre assainisseur |
 | refus plutôt que nettoyage, pour un corps de skill | `skills_registry/injection_gate.py` (liste fermée de verdicts ; `WORKPILOT_INJECTION_GUARD=report` rétrograde en avertissement) |
 
 Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middleware.py`,
+`tests/injection_guard/test_corpus.py` (51 charges de `corpus.yaml` : neutralisée ou signalée, jamais hors du cadre ; 10 rapports ordinaires jamais bloqués),
 `tests/backend/security_suite/`, `tests/test_skills_registry_injection_gate.py`.
 
 ## Hors de ce paquet
@@ -46,7 +47,7 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 | Autorisation du mode serveur | `server/authz/` (`require_permission`, `mount_guarded`, `scope.py`), `server/integration.py` | `tests/backend/test_feature_router_authz.py`, `tests/backend/test_project_scope_coverage.py` |
 | Authentification du mode serveur | `server/auth/` (JWT, argon2id, OIDC), `server/ratelimit.py` | `tests/backend/test_auth_session_lifecycle.py` |
 | Chemins côté API | `foundation/api_safety.py` (`validated_dir`) | `tests/test_api_safety.py` |
-| Redaction des logs | `core/log_redaction.py` (installé par `run.py`, chaque runner, l'API) | `tests/core/test_log_redaction.py`, `tests/test_entrypoints_redaction.py` |
+| Redaction des logs | `foundation/log_redaction.py` (installé par `run.py`, chaque runner, l'API) | `tests/core/test_log_redaction.py`, `tests/test_entrypoints_redaction.py` |
 | Hors-ligne strict | `offline_policy/` | `tests/test_offline_mode.py` |
 | Secrets des pièces jointes | `docintel/redact.py` | `tests/backend/security_suite/test_secret_scanning.py` |
 | Secrets d'un commit sur ce dépôt | `.husky/pre-commit` → `scan_secrets.py --staged-only` (lit l'index) | `tests/test_scan_secrets.py` |
@@ -60,7 +61,6 @@ d'exécution d'agent.
 - `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
 - `git_hooks.py`, `auto_integration.py` : `initialize_security` n'a aucun appelant, et le dépôt
   utilise `.husky/` (`core.hooksPath`), que `git_hooks.py install` ne touche pas.
-- `audit_trail.py`, `main.py` : sans importeur ; l'audit vivant est le paquet `audit_trail/`.
 - `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
   `subprocess` directement (voir la règle S4).
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.

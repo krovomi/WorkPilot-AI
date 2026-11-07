@@ -25,11 +25,11 @@ import {
 } from "./profile-manager";
 
 /**
- * Input type for creating a profile (without id, createdAt, updatedAt)
+ * Input type for creating a profile (without id, createdAt, updatedAt, apiKeySetAt)
  */
 export type CreateProfileInput = Omit<
 	APIProfile,
-	"id" | "createdAt" | "updatedAt"
+	"id" | "createdAt" | "updatedAt" | "apiKeySetAt"
 >;
 
 /**
@@ -176,6 +176,7 @@ export async function createProfile(
 			models: input.models,
 			createdAt: now,
 			updatedAt: now,
+			apiKeySetAt: now,
 		};
 
 		// Add to profiles list
@@ -237,15 +238,18 @@ export async function updateProfile(
 			}
 		}
 
-		// Update profile (including name)
+		// Update profile (including name). The key keeps its date unless it changed.
+		const now = Date.now();
+		const apiKey = input.apiKey.trim();
 		const updated: APIProfile = {
 			...existingProfile,
 			name: input.name.trim(),
 			baseUrl: input.baseUrl.trim(),
-			apiKey: input.apiKey.trim(),
+			apiKey,
 			models: input.models,
-			updatedAt: Date.now(),
+			updatedAt: now,
 		};
+		if (apiKey !== existingProfile.apiKey) updated.apiKeySetAt = now;
 
 		// Replace in profiles list
 		file.profiles[profileIndex] = updated;

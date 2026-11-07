@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import {
 	existsSync,
@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { AUTO_BUILD_PATHS } from "../../shared/constants";
-import type { Idea, IdeationConfig } from "../../shared/types";
+import type { Idea, IdeationConfig, Project } from "../../shared/types";
 import { stripAnsiCodes } from "../../shared/utils/ansi-sanitizer";
 import { debugError, debugLog } from "../../shared/utils/debug-logger";
 import { clearKeychainCache } from "../claude-profile/credential-utils";
@@ -24,6 +24,8 @@ import { transformRoadmapFromSnakeCase } from "../ipc-handlers/roadmap/transform
 import { getPathDelimiter } from "../platform";
 import { parsePythonCommand } from "../python-detector";
 import { pythonEnvManager } from "../python-env-manager";
+import { pullFeature, relayServerJob } from "../server-features";
+import { getServerProject } from "../server-projects";
 import {
 	createSDKRateLimitInfo,
 	detectRateLimit,
@@ -242,6 +244,23 @@ export class AgentQueueManager {
 			config,
 		});
 
+		const serverProject = getServerProject(projectId);
+		if (serverProject) {
+			// Server mode: the server runs the roadmap on its clone.
+			await this.followServerRoadmap(serverProject, {
+				options: {
+					refresh,
+					competitor_analysis: enableCompetitorAnalysis,
+					refresh_competitor_analysis: refreshCompetitorAnalysis,
+					...(config?.model ? { model: config.model } : {}),
+					...(config?.thinkingLevel
+						? { thinking_level: config.thinkingLevel }
+						: {}),
+				},
+			});
+			return;
+		}
+
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 
 		if (!autoBuildSource) {
@@ -320,6 +339,32 @@ export class AgentQueueManager {
 			refresh,
 		});
 
+		const serverProject = getServerProject(projectId);
+		if (serverProject) {
+			// Server mode: the server runs the ideation on its clone.
+			await this.followServerIdeation(
+				serverProject,
+				{
+					options: {
+						types: config.enabledTypes,
+						include_roadmap_context: config.includeRoadmapContext,
+						include_kanban_context: config.includeKanbanContext,
+						...(config.maxIdeasPerType
+							? { max_ideas_per_type: config.maxIdeasPerType }
+							: {}),
+						refresh,
+						append: !!config.append,
+						...(config.model ? { model: config.model } : {}),
+						...(config.thinkingLevel
+							? { thinking_level: config.thinkingLevel }
+							: {}),
+					},
+				},
+				config.enabledTypes,
+			);
+			return;
+		}
+
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 
 		if (!autoBuildSource) {
@@ -396,36 +441,37 @@ export class AgentQueueManager {
 	}
 
 	/**
-	 * Spawn a Python process for ideation generation
+	 * Follow a server project's ideation job (server mode): one started here
+	 * with `options`, or a teammate's already running (`jobId`). The job runs
+	 * on the server; its relay is followed like the local runner, each type's
+	 * ideas read from the server as the job announces them.
 	 */
-	private async spawnIdeationProcess(
-		projectId: string,
+	async followServerIdeation(
+		project: Project,
+		start: { options: Record<string, unknown> } | { jobId: string },
+		types: string[] = [],
+	): Promise<void> {
+		await this.spawnIdeationProcess(
+			project.id,
+			project.path,
+			types.length > 0 ? ["--types", types.join(",")] : [],
+			{
+				project,
+				// The relay has what the handlers below use of a child process.
+				start: () =>
+					relayServerJob(project, "ideation", start) as unknown as ChildProcess,
+			},
+		);
+	}
+
+	/** The ideation runner, started on this computer for a local project. */
+	private async spawnLocalIdeation(
 		projectPath: string,
 		args: string[],
-	): Promise<void> {
-		debugLog("[Agent Queue] Spawning ideation process:", {
-			projectId,
-			projectPath,
-		});
-
+	): Promise<ChildProcess> {
 		// Run from auto-claude source directory so imports work correctly
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 		const cwd = autoBuildSource || process.cwd();
-
-		// Ensure Python environment is ready before spawning
-		if (!(await this.ensurePythonEnvReady(projectId, "ideation-error"))) {
-			return;
-		}
-
-		// Kill existing process for this project if any
-		const wasKilled = this.processManager.killProcess(projectId);
-		if (wasKilled) {
-			debugLog("[Agent Queue] Killed existing process for project:", projectId);
-		}
-
-		// Generate unique spawn ID for this process instance
-		const spawnId = this.state.generateSpawnId();
-		debugLog("[Agent Queue] Generated spawn ID:", spawnId);
 
 		// Get combined environment variables
 		const combinedEnv = this.processManager.getCombinedEnv(projectPath);
@@ -500,10 +546,48 @@ export class AgentQueueManager {
 
 		// Parse Python command to handle space-separated commands like "py -3"
 		const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
-		const childProcess = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
+		return spawn(pythonCommand, [...pythonBaseArgs, ...args], {
 			cwd,
 			env: finalEnv,
 		});
+	}
+
+	/**
+	 * Follow an ideation run: the local runner, or a server job's relay
+	 * (`remote`), whose ideas are read from the server before each type's.
+	 */
+	private async spawnIdeationProcess(
+		projectId: string,
+		projectPath: string,
+		args: string[],
+		remote?: { project: Project; start: () => ChildProcess },
+	): Promise<void> {
+		debugLog("[Agent Queue] Spawning ideation process:", {
+			projectId,
+			projectPath,
+		});
+
+		// Ensure Python environment is ready before spawning
+		if (
+			!remote &&
+			!(await this.ensurePythonEnvReady(projectId, "ideation-error"))
+		) {
+			return;
+		}
+
+		// Kill existing process for this project if any
+		const wasKilled = this.processManager.killProcess(projectId);
+		if (wasKilled) {
+			debugLog("[Agent Queue] Killed existing process for project:", projectId);
+		}
+
+		// Generate unique spawn ID for this process instance
+		const spawnId = this.state.generateSpawnId();
+		debugLog("[Agent Queue] Generated spawn ID:", spawnId);
+
+		const childProcess = remote
+			? remote.start()
+			: await this.spawnLocalIdeation(projectPath, args);
 
 		this.state.addProcess(projectId, {
 			taskId: projectId,
@@ -570,6 +654,8 @@ export class AgentQueueManager {
 
 				const loadIdeationType = async (): Promise<void> => {
 					try {
+						// A server job wrote the type's ideas on the server.
+						if (remote) await pullFeature(remote.project, "ideation");
 						const content = await fsPromises.readFile(typeFilePath, "utf-8");
 						const data: Record<string, RawIdea[]> = JSON.parse(content);
 						const rawIdeas: RawIdea[] = data[ideationType] || [];
@@ -816,37 +902,14 @@ export class AgentQueueManager {
 	/**
 	 * Spawn a Python process for roadmap generation
 	 */
-	private async spawnRoadmapProcess(
-		projectId: string,
+	/** The roadmap runner, started on this computer for a local project. */
+	private async spawnLocalRoadmap(
 		projectPath: string,
 		args: string[],
-	): Promise<void> {
-		debugLog("[Agent Queue] Spawning roadmap process:", {
-			projectId,
-			projectPath,
-		});
-
+	): Promise<ChildProcess> {
 		// Run from auto-claude source directory so imports work correctly
 		const autoBuildSource = this.processManager.getAutoBuildSourcePath();
 		const cwd = autoBuildSource || process.cwd();
-
-		// Ensure Python environment is ready before spawning
-		if (!(await this.ensurePythonEnvReady(projectId, "roadmap-error"))) {
-			return;
-		}
-
-		// Kill existing process for this project if any
-		const wasKilled = this.processManager.killProcess(projectId);
-		if (wasKilled) {
-			debugLog(
-				"[Agent Queue] Killed existing roadmap process for project:",
-				projectId,
-			);
-		}
-
-		// Generate unique spawn ID for this process instance
-		const spawnId = this.state.generateSpawnId();
-		debugLog("[Agent Queue] Generated roadmap spawn ID:", spawnId);
 
 		// Get combined environment variables
 		const combinedEnv = this.processManager.getCombinedEnv(projectPath);
@@ -921,10 +984,64 @@ export class AgentQueueManager {
 
 		// Parse Python command to handle space-separated commands like "py -3"
 		const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
-		const childProcess = spawn(pythonCommand, [...pythonBaseArgs, ...args], {
+		return spawn(pythonCommand, [...pythonBaseArgs, ...args], {
 			cwd,
 			env: finalEnv,
 		});
+	}
+
+	/**
+	 * Follow a server project's roadmap job (server mode): one started here
+	 * with `options`, or a teammate's already running (`jobId`). The job runs
+	 * on the server; its relay is followed like the local runner, so progress,
+	 * completion and stop take the same path.
+	 */
+	async followServerRoadmap(
+		project: Project,
+		start: { options: Record<string, unknown> } | { jobId: string },
+	): Promise<void> {
+		await this.spawnRoadmapProcess(project.id, project.path, [], () =>
+			// The relay has what the handlers below use of a child process:
+			// stdout, stderr, exit and kill.
+			relayServerJob(project, "roadmap", start) as unknown as ChildProcess,
+		);
+	}
+
+	private async spawnRoadmapProcess(
+		projectId: string,
+		projectPath: string,
+		args: string[],
+		remote?: () => ChildProcess,
+	): Promise<void> {
+		debugLog("[Agent Queue] Spawning roadmap process:", {
+			projectId,
+			projectPath,
+		});
+
+		// Ensure Python environment is ready before spawning
+		if (
+			!remote &&
+			!(await this.ensurePythonEnvReady(projectId, "roadmap-error"))
+		) {
+			return;
+		}
+
+		// Kill existing process for this project if any
+		const wasKilled = this.processManager.killProcess(projectId);
+		if (wasKilled) {
+			debugLog(
+				"[Agent Queue] Killed existing roadmap process for project:",
+				projectId,
+			);
+		}
+
+		// Generate unique spawn ID for this process instance
+		const spawnId = this.state.generateSpawnId();
+		debugLog("[Agent Queue] Generated roadmap spawn ID:", spawnId);
+
+		const childProcess = remote
+			? remote()
+			: await this.spawnLocalRoadmap(projectPath, args);
 
 		this.state.addProcess(projectId, {
 			taskId: projectId,

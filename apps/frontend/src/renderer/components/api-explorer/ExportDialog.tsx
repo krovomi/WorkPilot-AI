@@ -293,13 +293,13 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
 			<div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-md p-6">
 				<div className="flex items-center justify-between mb-5">
-					<h2 className="text-base font-semibold text-[var(--color-text-primary)]">
+					<h2 className="text-base font-semibold text-foreground">
 						{t("apiExplorer:export.title")}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
-						className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+						className="text-muted-foreground hover:text-foreground transition-colors"
 					>
 						<X size={18} />
 					</button>
@@ -308,7 +308,7 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 				{allEndpoints.length > 0 && (
 					<div className="mb-4">
 						<div className="flex items-center justify-between mb-2">
-							<span className="text-xs font-medium text-[var(--color-text-secondary)]">
+							<span className="text-xs font-medium text-muted-foreground">
 								{t("apiExplorer:export.endpoints", {
 									selected: selectedEndpoints.size,
 									total: allEndpoints.length,
@@ -328,7 +328,7 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 							{allEndpoints.map((ep) => (
 								<label
 									key={ep.key}
-									className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-[var(--color-bg-secondary)] select-none"
+									className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-card select-none"
 								>
 									<input
 										type="checkbox"
@@ -337,7 +337,7 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 										className="shrink-0 accent-[var(--color-primary)]"
 									/>
 									<MethodBadge method={ep.method} />
-									<span className="text-xs text-[var(--color-text-secondary)] truncate font-mono">
+									<span className="text-xs text-muted-foreground truncate font-mono">
 										{ep.path}
 									</span>
 								</label>
@@ -353,22 +353,22 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 							key={fmt.label}
 							onClick={fmt.action}
 							disabled={selectedEndpoints.size === 0}
-							className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-secondary)] transition-all group disabled:opacity-40 disabled:cursor-not-allowed"
+							className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-[var(--color-border)] hover:border-primary/40 hover:bg-card transition-all group disabled:opacity-40 disabled:cursor-not-allowed"
 						>
-							<div className="w-10 h-10 rounded-lg bg-[var(--color-bg-tertiary)] flex items-center justify-center text-xs font-bold font-mono text-[var(--color-text-secondary)] shrink-0">
+							<div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xs font-bold font-mono text-muted-foreground shrink-0">
 								{fmt.icon}
 							</div>
 							<div className="flex-1 min-w-0">
-								<div className="text-sm font-medium text-[var(--color-text-primary)]">
+								<div className="text-sm font-medium text-foreground">
 									{fmt.label}
 								</div>
-								<div className="text-xs text-[var(--color-text-muted)] mt-0.5">
+								<div className="text-xs text-muted-foreground mt-0.5">
 									{fmt.description}
 								</div>
 							</div>
 							<Download
 								size={15}
-								className="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-primary)] transition-colors shrink-0"
+								className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0"
 							/>
 						</button>
 					))}
@@ -379,10 +379,10 @@ export function ExportDialog({ spec, onClose }: ExportDialogProps) {
 						type="button"
 						onClick={copyOpenApi}
 						disabled={selectedEndpoints.size === 0}
-						className="w-full flex items-center justify-center gap-2 py-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+						className="w-full flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{copied ? (
-							<Check size={14} className="text-emerald-400" />
+							<Check size={14} className="text-success" />
 						) : (
 							<Copy size={14} />
 						)}

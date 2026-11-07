@@ -93,6 +93,50 @@
 		"showAll": "Show all memories",
 		"brainHint": "Every build writes what it learns to the shared brain — an Obsidian vault every agent reads. It is created on the first write; to use an existing vault or a git remote, open Settings → Integrations → Shared brain.",
 		"reasons.brainNotCreated": "The shared brain does not exist yet",
-		"reasons.brainUnreachable": "The backend could not be reached to read the shared brain"
+		"reasons.brainUnreachable": "The backend could not be reached to read the shared brain",
+		"onServer": "On the server, this project's own",
+		"reasons.serverBrainNotCreated": "No build of this project has learned anything on the server yet",
+		"serverBrainHint": "Every build of this project on the server writes what it learns to the project's own brain there. Every member of the project reads it here.",
+		"score": "Score: {{score}}"
+	},
+	"memoryCard": {
+		"collapse": "Collapse",
+		"expand": "Expand",
+		"whatWorked": "What Worked",
+		"whatFailed": "What Failed",
+		"approach": "Approach",
+		"recommendations": "Recommendations",
+		"patterns": "Patterns",
+		"gotchas": "Gotchas",
+		"changedFiles": "Changed Files",
+		"fileInsights": "File Insights",
+		"subtasksCompleted": "Subtasks Completed"
+	},
+	"prReviewCard": {
+		"findings_one": "{{count}} finding",
+		"findings_other": "{{count}} findings",
+		"moreFindings": "+{{count}} more findings",
+		"title": "PR Review",
+		"details": "Details",
+		"keyFindings": "Key Findings",
+		"gotchas": "Gotchas Discovered",
+		"patterns": "Patterns Identified",
+		"viewOnGitHub": "View PR on GitHub"
+	},
+	"serviceSections": {
+		"apiRoutes": "API Routes ({{count}})",
+		"databaseModels": "Database Models ({{count}})",
+		"fields_one": "{{count}} field",
+		"fields_other": "{{count}} fields",
+		"dependencies": "Dependencies ({{count}})",
+		"more": "+{{count}} more",
+		"environmentVariables": "Environment Variables ({{count}})",
+		"databases": "Databases",
+		"email": "Email",
+		"payments": "Payments",
+		"cache": "Cache",
+		"health": "Health: {{checks}}",
+		"metrics": "Metrics:",
+		"unknownType": "unknown"
 	}
 }

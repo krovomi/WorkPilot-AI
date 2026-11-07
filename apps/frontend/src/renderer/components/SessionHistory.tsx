@@ -4,6 +4,7 @@ import {
 	ChevronDown,
 	ChevronRight,
 	Clock,
+	History,
 	FileCode2,
 	Loader2,
 	Pause,
@@ -14,38 +15,22 @@ import {
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import type { WorkspaceSession } from "@shared/types";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { formatAppDateTime } from "@/lib/date-format";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface SessionEntry {
-	session_id: string;
-	task_id?: string;
-	task_title?: string;
-	status: string;
-	started_at: string;
-	ended_at?: string;
-	duration_seconds?: number;
-	tokens_used?: number;
-	cost?: number;
-	files_changed?: number;
-	error?: string;
-	phases?: SessionPhase[];
-}
-
-interface SessionPhase {
-	name: string;
-	status: string;
-	duration_seconds?: number;
-	tokens?: number;
-}
+type SessionEntry = WorkspaceSession;
 
 interface SessionHistoryProps {
 	readonly projectId: string;
@@ -59,15 +44,15 @@ function StatusIcon({ status }: { readonly status: string }) {
 	switch (status.toLowerCase()) {
 		case "completed":
 		case "success":
-			return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+			return <CheckCircle2 className="h-4 w-4 text-success" />;
 		case "failed":
 		case "error":
-			return <XCircle className="h-4 w-4 text-red-500" />;
+			return <XCircle className="h-4 w-4 text-destructive" />;
 		case "running":
 		case "in_progress":
 			return <Play className="h-4 w-4 text-blue-500" />;
 		case "paused":
-			return <Pause className="h-4 w-4 text-amber-500" />;
+			return <Pause className="h-4 w-4 text-warning" />;
 		default:
 			return <Clock className="h-4 w-4 text-muted-foreground" />;
 	}
@@ -88,7 +73,7 @@ function formatDuration(seconds: number): string {
 function formatDateTime(iso: string): string {
 	try {
 		const d = new Date(iso);
-		return d.toLocaleString(undefined, {
+		return formatAppDateTime(d, {
 			month: "short",
 			day: "numeric",
 			hour: "2-digit",
@@ -108,10 +93,10 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 	const [expanded, setExpanded] = useState(false);
 
 	const statusColor: Record<string, string> = {
-		completed: "border-emerald-500/30",
-		success: "border-emerald-500/30",
-		failed: "border-red-500/30",
-		error: "border-red-500/30",
+		completed: "border-success/30",
+		success: "border-success/30",
+		failed: "border-destructive/30",
+		error: "border-destructive/30",
 		running: "border-blue-500/30",
 		in_progress: "border-blue-500/30",
 	};
@@ -140,12 +125,22 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 						<span className="text-sm font-medium text-foreground truncate">
 							{session.task_title || session.task_id || session.session_id}
 						</span>
-						<Badge variant="outline" className="text-[10px] capitalize">
+						{session.phase && session.phase !== session.task_title && (
+							<Badge variant="secondary" className="text-3xs">
+								{session.phase}
+							</Badge>
+						)}
+						<Badge variant="outline" className="text-3xs capitalize">
 							{session.status}
 						</Badge>
 					</div>
 					<div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
 						<span>{formatDateTime(session.started_at)}</span>
+						{session.started_by && (
+							<span>
+								{t("server.startedBy", { name: session.started_by })}
+							</span>
+						)}
 						{session.duration_seconds !== undefined && (
 							<span className="flex items-center gap-1">
 								<Timer className="h-3 w-3" />
@@ -155,13 +150,18 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 						{session.tokens_used !== undefined && (
 							<span className="flex items-center gap-1">
 								<Zap className="h-3 w-3" />
-								{session.tokens_used.toLocaleString()} tokens
+								{t("sessionHistory:tokensCount", {
+												count: session.tokens_used,
+												formatted: session.tokens_used.toLocaleString(),
+											})}
 							</span>
 						)}
 						{session.files_changed !== undefined && (
 							<span className="flex items-center gap-1">
 								<FileCode2 className="h-3 w-3" />
-								{session.files_changed} files
+								{t("sessionHistory:filesCount", {
+												count: session.files_changed,
+											})}
 							</span>
 						)}
 						{session.cost !== undefined && (
@@ -175,7 +175,7 @@ function SessionCard({ session }: { readonly session: SessionEntry }) {
 			{expanded && (
 				<div className="mt-3 pl-9 space-y-3">
 					{session.error && (
-						<div className="rounded-md bg-red-500/10 p-3 text-xs text-red-500">
+						<div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive">
 							<span className="font-medium">{t("error")}: </span>
 							{session.error}
 						</div>
@@ -241,12 +241,22 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 	const [filter, setFilter] = useState<
 		"all" | "completed" | "failed" | "running"
 	>("all");
+	const serverProjectId = useServerProjectId({ id: projectId });
 
 	const fetchSessions = useCallback(
 		async (signal?: AbortSignal) => {
 			setLoading(true);
 			setError(null);
 			try {
+				// A server project's sessions are its runs and jobs on the server.
+				if (serverProjectId) {
+					const result =
+						await globalThis.electronAPI.getServerSessions(serverProjectId);
+					if (signal?.aborted) return;
+					if (result.success) setSessions(result.data ?? []);
+					else setError(result.error || "Failed to load sessions");
+					return;
+				}
 				const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
 				const res = await fetch(
 					`${backendUrl}/api/sessions/${projectId}`,
@@ -265,7 +275,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 				setLoading(false);
 			}
 		},
-		[projectId],
+		[projectId, serverProjectId],
 	);
 
 	useEffect(() => {
@@ -311,22 +321,18 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<Clock className="h-6 w-6 text-primary" />
-						<div>
-							<h1 className="text-xl font-bold text-foreground">
-								{t("title")}
-							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
-						</div>
-					</div>
-					<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
-						<RefreshCw className="h-3.5 w-3.5 mr-2" />
-						{t("refresh")}
-					</Button>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={History}
+					title={t("title")}
+					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
+					actions={
+						<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
+							<RefreshCw className="h-3.5 w-3.5 mr-2" />
+							{t("refresh")}
+						</Button>
+					}
+				/>
 
 				{/* Stats */}
 				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -340,7 +346,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 					</Card>
 					<Card>
 						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-emerald-500">
+							<p className="text-lg font-bold text-success">
 								{stats.completed}
 							</p>
 							<p className="text-xs text-muted-foreground">
@@ -350,7 +356,7 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 					</Card>
 					<Card>
 						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-red-500">{stats.failed}</p>
+							<p className="text-lg font-bold text-destructive">{stats.failed}</p>
 							<p className="text-xs text-muted-foreground">
 								{t("stats.failed")}
 							</p>
@@ -402,8 +408,8 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 
 				{/* Error */}
 				{error && (
-					<Card className="border-red-500/30">
-						<CardContent className="p-4 flex items-center gap-3 text-red-500">
+					<Card className="border-destructive/30">
+						<CardContent className="p-4 flex items-center gap-3 text-destructive">
 							<AlertTriangle className="h-5 w-5 shrink-0" />
 							<p className="text-sm">{error}</p>
 						</CardContent>

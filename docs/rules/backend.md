@@ -2,7 +2,7 @@
 
 > **Normatif** pour `apps/backend/`, `src/` et `tests/`. Chargé par Claude Code dès qu'il lit un
 > fichier de `apps/backend/` ; carte du code : [`apps/backend/AGENTS.md`](../../apps/backend/AGENTS.md).
-> Sécurité : [`security.md`](security.md). Noyau : [`docs/CLAUDE.md`](../CLAUDE.md).
+> Sécurité : [`security.md`](security.md). Règles critiques : [`AGENTS.md`](../../AGENTS.md).
 
 ## Clients LLM : une seule fabrique
 
@@ -10,6 +10,11 @@ Toute interaction avec un modèle passe par le Claude Agent SDK. **Jamais** `ant
 en direct : `create_client()` (SDK Claude) ou `create_agent_client()` (multi-provider), tous deux
 dans `core/client.py`. Seuls `core/client.py` et `core/simple_client.py` construisent un
 `ClaudeAgentOptions`.
+
+Une unité que `core` ou `agents` importe (merge, intégrations, analyse, architecture) ne les
+importe pas en retour pour lancer une session : elle passe par le port `agent_runtime`
+(`agent_runtime.current()`), que `core` installe et qui appelle ces mêmes fabriques.
+→ [`architecture/agent-runtime.md`](../architecture/agent-runtime.md)
 
 Le modèle et le budget de réflexion se résolvent par phase, depuis les réglages de l'utilisateur :
 
@@ -57,8 +62,8 @@ le frontend puis refuser par le backend une tâche configurée pour Ollama.
 
 ## Signaux de build
 
-`BuildPaused` / `BuildHalted` (`core/build_signals.py`) remontent jusqu'à `handle_build_command` :
-ne pas les attraper en chemin. Le drapeau de pause coopérative est `core/pause_state.py`, lu par le
+`BuildPaused` / `BuildHalted` (`foundation/build_signals.py`) remontent jusqu'à `handle_build_command` :
+ne pas les attraper en chemin. Le drapeau de pause coopérative est `foundation/pause_state.py`, lu par le
 coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/pause-resume.md).
 
 ## Une porte par question
@@ -85,9 +90,21 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
   `python scripts/check_encoding.py` ; détails dans [`windows-development.md`](../windows-development.md).
 - **Imports plats** : `pytest.ini` pose `pythonpath = apps/backend . ./src` ; on écrit
   `from phase_config import …`, `from agents.coder import …`, jamais `from apps.backend…`.
-- **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `core.debug`,
+- **Importer le module réel**, jamais un fichier de la racine qui le réexporte : `foundation.debug`,
   `core.worktree`, `qa`. Les cales de compatibilité ont été retirées.
 - Un sous-processus prend une liste d'arguments, sans shell (règle S4 de [`security.md`](security.md)).
+- **Attraper ce qu'on attend.** Un `except Exception` (ou `except:`) de plus dans un fichier est
+  refusé : `tests/baselines/blind-except.json` plafonne chaque fichier à son compte du
+  30 octobre 2026, et un corps qui ne fait que `pass` compte à part. Une correction fait baisser
+  le plafond (`python scripts/quality_baselines.py update`, qui ne monte jamais) ; un relèvement
+  s'écrit à la main dans le JSON et se justifie dans la PR.
+- **Un gros fichier ne grossit plus.** Au-delà de 2 000 lignes, un fichier source (backend ou
+  frontend) a un plafond dans `tests/baselines/file-size.json`, à sa taille du 30 octobre 2026 ;
+  un nouveau fichier au-delà est refusé. Le code d'une feature va dans un module à lui ; une
+  découpe abaisse le plafond (`python scripts/quality_baselines.py update`).
+- **Types vérifiés** par pyright `1.1.408` (mode `basic`) sur les paquets listés dans
+  `apps/backend/pyrightconfig.json` (`bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`,
+  `os_sandbox`, `security`) ; on élargit la liste paquet par paquet, une fois le paquet à zéro.
 - **Contrats d'imports** entre unités de premier niveau (`tests/test_import_contracts.py`) :
   les unités listées dans `ALLOWED_IMPORTS` (`foundation`, `security`, `project`, `phase_config`,
   `offline_policy`, `harness`…) n'importent que ce qu'il leur accorde, et le plus grand cycle
@@ -111,7 +128,7 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
 - Un correctif de bug arrive avec son test de régression ; un refus de sécurité, avec le test qui
   prouve le refus.
 - Six modules de production portent le préfixe `test_` sans être des tests
-  (`agents/test_generator.py`, `analysis/test_discovery.py`…) : ne pas les déplacer.
+  (`test_generation/generator.py`, `analysis/test_discovery.py`…) : ne pas les déplacer.
 
 ## Répertoire d'une spec
 

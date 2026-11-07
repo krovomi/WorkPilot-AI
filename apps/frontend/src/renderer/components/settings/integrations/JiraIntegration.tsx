@@ -300,20 +300,20 @@ export function JiraIntegration({
 							<div
 								className={`rounded-lg border p-3 ${
 									connectionStatus.connected
-										? "border-green-500/30 bg-green-500/5"
+										? "border-success/30 bg-success/5"
 										: "border-destructive/30 bg-destructive/5"
 								}`}
 							>
 								<div className="flex items-center gap-2">
 									{connectionStatus.connected ? (
-										<CheckCircle2 className="h-4 w-4 text-green-500" />
+										<CheckCircle2 className="h-4 w-4 text-success" />
 									) : (
 										<AlertCircle className="h-4 w-4 text-destructive" />
 									)}
 									<span
 										className={`text-sm font-medium ${
 											connectionStatus.connected
-												? "text-green-500"
+												? "text-success"
 												: "text-destructive"
 										}`}
 									>
@@ -324,9 +324,13 @@ export function JiraIntegration({
 								</div>
 								{connectionStatus.connected && connectionStatus.instanceUrl && (
 									<p className="text-xs text-muted-foreground mt-1">
-										Instance: {connectionStatus.instanceUrl}
+										{t("settings:jira.instanceLabel", {
+											url: connectionStatus.instanceUrl,
+										})}
 										{connectionStatus.projectKey &&
-											` • Project: ${connectionStatus.projectKey}`}
+											t("settings:jira.projectSuffix", {
+												project: connectionStatus.projectKey,
+											})}
 									</p>
 								)}
 								{connectionStatus.error && (

@@ -1,5 +1,6 @@
 import { Keyboard, X } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 			{ keys: "Ctrl+N", label: "New Task" },
 			{ keys: "Ctrl+,", label: "Open Settings" },
 			{ keys: "Ctrl+T", label: "Add Project" },
+			// The default; Settings → Voice assistant changes it.
+			{ keys: "Ctrl+Shift+Space", label: "Voice Assistant" },
 			{ keys: "Escape", label: "Close dialog / overlay" },
 		],
 	},
@@ -79,7 +82,7 @@ function Kbd({ children }: { readonly children: string }) {
 			{parts.map((part, i) => (
 				<span key={part}>
 					{i > 0 && <span className="mx-0.5 text-muted-foreground/50">+</span>}
-					<kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-secondary px-1.5 font-mono text-[11px] font-medium text-foreground shadow-sm">
+					<kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-secondary px-1.5 font-mono text-2xs font-medium text-foreground shadow-sm">
 						{part}
 					</kbd>
 				</span>
@@ -96,6 +99,7 @@ export function KeyboardShortcutsOverlay({
 	open,
 	onOpenChange,
 }: KeyboardShortcutsOverlayProps) {
+	const { t } = useTranslation();
 	const overlayRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -138,7 +142,7 @@ export function KeyboardShortcutsOverlay({
 					<div className="flex items-center gap-3">
 						<Keyboard className="h-5 w-5 text-primary" />
 						<h2 className="text-lg font-semibold text-foreground">
-							Keyboard Shortcuts
+							{t("common:shortcutsOverlay.title")}
 						</h2>
 					</div>
 					<button
@@ -178,8 +182,7 @@ export function KeyboardShortcutsOverlay({
 
 				{/* Footer */}
 				<div className="border-t border-border px-6 py-3 text-center text-xs text-muted-foreground">
-					Press <Kbd>Escape</Kbd> to close &middot; Single-key shortcuts work
-					when not typing in an input
+					{t("common:shortcutsOverlay.pressBefore")} <Kbd>{t("common:shortcutsOverlay.escapeKey")}</Kbd> {t("common:shortcutsOverlay.pressAfter")}
 				</div>
 			</div>
 		</div>

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from core.client import create_agent_client
-from core.debug import debug, debug_error, debug_section, debug_success
+from foundation.debug import debug, debug_error, debug_section, debug_success
 from init import init_workpilot_dir
 from phase_config import get_thinking_budget
 from ui import Icons, box, icon, muted, print_section, print_status

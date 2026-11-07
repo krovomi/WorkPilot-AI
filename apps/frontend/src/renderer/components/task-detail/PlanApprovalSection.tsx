@@ -8,6 +8,7 @@ import { Separator } from "../ui/separator";
 import { PlanConflictAlert } from "./PlanConflictAlert";
 import { TaskResetButton } from "./TaskResetButton";
 
+import { Textarea } from "../ui/textarea";
 interface PlanApprovalSectionProps {
 	readonly task: Task;
 	readonly isSubmitting?: boolean;
@@ -78,9 +79,9 @@ export function PlanApprovalSection({
 	return (
 		<div className="space-y-4">
 			<Separator />
-			<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+			<div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
 				<h3 className="font-semibold text-sm text-foreground mb-2 flex items-center gap-2">
-					<CheckCircle2 className="h-4 w-4 text-amber-500" />
+					<CheckCircle2 className="h-4 w-4 text-warning" />
 					{t("tasks:modal.plan.approvalRequired")}
 				</h3>
 				<p className="text-sm text-muted-foreground mb-4">
@@ -102,12 +103,12 @@ export function PlanApprovalSection({
 						>
 							{t("tasks:modal.plan.rejectionReason")}
 						</label>
-						<textarea
+						<Textarea
 							id="plan-rejection-reason"
 							value={rejectionReason}
 							onChange={(e) => setRejectionReason(e.target.value)}
 							placeholder={t("tasks:modal.plan.rejectionPlaceholder")}
-							className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+							className="w-full px-3 py-2 text-sm placeholder-muted-foreground min-h-0"
 							rows={3}
 							disabled={isSubmitting}
 						/>
@@ -159,7 +160,7 @@ export function PlanApprovalSection({
 
 				{/* Last resort: the proposed subtasks are not worth fixing — wipe
 				    everything (plan, worktree, artifacts) and go back to backlog */}
-				<div className="mt-3 pt-3 border-t border-amber-500/20">
+				<div className="mt-3 pt-3 border-t border-warning/20">
 					<TaskResetButton task={task} className="w-full" />
 				</div>
 			</div>

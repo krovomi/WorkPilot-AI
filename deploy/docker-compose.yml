@@ -2,11 +2,16 @@
 #
 #   cd deploy
 #   cp server-env.example .env.server    # then fill the secrets
-#   docker compose up -d
-#   docker compose exec api python -m server.scripts.create_admin admin@ebp.fr
+#   docker compose --env-file .env.server up -d --build
+#   docker compose --env-file .env.server exec api python -m server.scripts.create_admin admin@ebp.fr
 #
-# Put a TLS reverse proxy (nginx/caddy/traefik) in front of ports 9000 (API)
-# and 8765 (WebSocket) before exposing this outside the LAN.
+# `--env-file` on every command: ${POSTGRES_PASSWORD} below is read from it
+# (`env_file:` only feeds the containers).
+#
+# Ports 9000 (API) and 8765 (WebSocket) are published here in clear text, on
+# every interface: a trial on a trusted network only. TLS in front:
+# docker-compose.override.example.yml and Caddyfile.example.
+# Guide: docs/server-operations.md
 
 services:
   postgres:

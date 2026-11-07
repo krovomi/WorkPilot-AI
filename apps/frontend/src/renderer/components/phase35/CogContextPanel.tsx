@@ -19,6 +19,8 @@ import { Button } from "../ui/button";
 import { PanelShell } from "./_panel-shell";
 import { TokenCostEstimate } from "./_token-cost-estimate";
 
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 const PROMPT_MAX_LEN = 4000;
 const PATH_MAX_LEN = 1024;
 const BUDGET_MIN = 100;
@@ -126,7 +128,7 @@ export function CogContextPanel() {
 					<label htmlFor="prompt-textarea" className="block font-medium mb-1">
 						{t("cogContext.prompt")}
 					</label>
-					<textarea
+					<Textarea
 						id="prompt-textarea"
 						value={prompt}
 						onChange={(e) => setPrompt(e.target.value.slice(0, PROMPT_MAX_LEN))}
@@ -134,7 +136,7 @@ export function CogContextPanel() {
 						maxLength={PROMPT_MAX_LEN}
 						aria-invalid={Boolean(promptError) || undefined}
 						aria-describedby={promptError ? "cog-prompt-error" : undefined}
-						className="w-full rounded border bg-background p-2 text-sm"
+						className="w-full p-2 text-sm min-h-0"
 					/>
 					{promptError && (
 						<p id="cog-prompt-error" className="mt-1 text-xs text-destructive">
@@ -196,7 +198,7 @@ export function CogContextPanel() {
 											<div className="flex min-w-0 flex-1 flex-col">
 												<span className="truncate font-medium">{basename(p)}</span>
 												<span
-													className="truncate font-mono text-[10px] text-muted-foreground"
+													className="truncate font-mono text-3xs text-muted-foreground"
 													title={p}
 												>
 													{p}
@@ -218,7 +220,8 @@ export function CogContextPanel() {
 
 						<div className="flex items-start gap-2">
 							<div className="flex-1">
-								<input
+								<Input
+									spellCheck={false}
 									value={manualPath}
 									onChange={(e) => {
 										setManualPath(e.target.value.slice(0, PATH_MAX_LEN));
@@ -233,7 +236,7 @@ export function CogContextPanel() {
 									maxLength={PATH_MAX_LEN}
 									aria-invalid={Boolean(manualError) || undefined}
 									aria-describedby={manualError ? "cog-manual-error" : undefined}
-									className="w-full rounded border bg-background p-2 font-mono text-xs"
+									className="w-full p-2 font-mono text-xs h-auto"
 									placeholder={t("cogContext.manualPathPlaceholder")}
 								/>
 								{manualError && (
@@ -268,7 +271,7 @@ export function CogContextPanel() {
 						<label htmlFor="budget-input" className="block font-medium mb-1">
 							{t("cogContext.tokenBudget")}
 						</label>
-						<input
+						<Input
 							id="budget-input"
 							type="number"
 							min={BUDGET_MIN}
@@ -281,7 +284,7 @@ export function CogContextPanel() {
 							}}
 							aria-invalid={Boolean(budgetError) || undefined}
 							aria-describedby={budgetError ? "cog-budget-error" : undefined}
-							className="w-full rounded border bg-background p-2 text-sm"
+							className="w-full p-2 text-sm h-auto"
 						/>
 						{budgetError && (
 							<p id="cog-budget-error" className="mt-1 text-xs text-destructive">

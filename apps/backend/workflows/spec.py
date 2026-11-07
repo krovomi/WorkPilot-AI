@@ -134,6 +134,11 @@ class Phase:
     # ``((name, globs), ...)``: ``lenses: {store-readiness: touches("…")}``.
     # Which names exist is the executor's business (`workflows.runner`).
     conditional_lenses: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # Procedures the phase may also read, each for the case it names, as
+    # ``((impl, when), ...)``: ``companions: {hermes/python-debugpy: "…"}``.
+    # Offered, not imposed: the phase's own procedure stays the one it follows,
+    # and the model opens a companion only when its case applies.
+    companions: tuple[tuple[str, str], ...] = ()
 
     @property
     def prunable(self) -> bool:
@@ -231,6 +236,37 @@ def _parse_lenses(raw: Any, phase_id: str) -> tuple[tuple[str, tuple[str, ...]],
     )
 
 
+def _parse_companions(
+    raw: Any, phase_id: str, impl: str
+) -> tuple[tuple[str, str], ...]:
+    """``companions:`` → ``((impl, when), ...)``, in the order written.
+
+    The sentence is required: a companion with no case is an instruction to
+    read it every time, and that is what ``impl`` is for.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise WorkflowError(f"phase {phase_id!r}: 'companions' must be a mapping")
+    out = []
+    for name, when in raw.items():
+        name = str(name)
+        if "/" not in name:
+            raise WorkflowError(
+                f"phase {phase_id!r}: companion {name!r} must be '<pack>/<skill>'"
+            )
+        if name == impl:
+            raise WorkflowError(
+                f"phase {phase_id!r}: companion {name!r} is the impl itself"
+            )
+        if not isinstance(when, str) or not when.strip():
+            raise WorkflowError(
+                f"phase {phase_id!r}: companion {name!r} needs the case it is for"
+            )
+        out.append((name, " ".join(when.split())))
+    return tuple(out)
+
+
 def _parse_phase(raw: Any, index: int) -> Phase:
     if not isinstance(raw, dict):
         raise WorkflowError(f"phase #{index}: expected a mapping")
@@ -288,6 +324,7 @@ def _parse_phase(raw: Any, index: int) -> Phase:
         irreversible=irreversible,
         description=str(raw.get("description", "")),
         conditional_lenses=_parse_lenses(raw.get("lenses"), str(phase_id)),
+        companions=_parse_companions(raw.get("companions"), str(phase_id), str(impl)),
     )
 
 

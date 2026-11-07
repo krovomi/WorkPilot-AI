@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { McpAppViewSummary, Task } from "../../../shared/types";
 import { Badge } from "../ui/badge";
 import { McpAppFrame } from "./McpAppFrame";
+import { formatAppDateTime } from "@/lib/date-format";
 
 export interface McpAppsCardProps {
 	readonly task: Task;
@@ -64,7 +65,7 @@ export function McpAppsCard({ task }: McpAppsCardProps) {
 			<div className="flex items-center gap-2">
 				<AppWindow className="h-4 w-4 shrink-0 text-primary" aria-hidden />
 				<span className="text-sm font-medium">{t("tasks:mcpApps.title")}</span>
-				<Badge variant="outline" className="text-[10px]">
+				<Badge variant="outline" className="text-3xs">
 					{t("tasks:mcpApps.count", { count: views.length })}
 				</Badge>
 			</div>
@@ -89,7 +90,7 @@ export function McpAppsCard({ task }: McpAppsCardProps) {
 									{view.server} · {view.tool}
 								</span>
 								<span className="ml-auto text-muted-foreground">
-									{new Date(view.createdAt * 1000).toLocaleString()}
+									{formatAppDateTime(view.createdAt * 1000)}
 								</span>
 							</button>
 							{isOpen && (

@@ -34,11 +34,11 @@ def test_imports():
     print("  ✓ agents.utils")
 
     # Test memory module
-    from agents import memory
+    from agents import memory_manager
 
-    assert hasattr(memory, "save_session_memory")
-    assert hasattr(memory, "get_memory_context")
-    print("  ✓ agents.memory")
+    assert hasattr(memory_manager, "save_session_memory")
+    assert hasattr(memory_manager, "get_memory_context")
+    print("  ✓ agents.memory_manager")
 
     # Test session module
     from agents import session
@@ -99,7 +99,7 @@ def test_module_structure():
         "__init__.py",
         "base.py",
         "utils.py",
-        "memory.py",
+        "memory_manager.py",
         "session.py",
         "planner.py",
         "coder.py",

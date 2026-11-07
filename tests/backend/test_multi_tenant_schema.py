@@ -241,3 +241,47 @@ class TestUpgradeOfAnExistingDeployment:
             select(projects.c.org_id).where(projects.c.id == kept)
         ).scalar_one()
         assert got == other
+
+    def test_a_member_of_another_org_is_left_where_they_are(self, conn):
+        other = seed.ensure_default_org(conn, slug="other-tenant")
+        role_ids = seed.seed_system_roles(conn)
+        lead = _add_user(conn, "lead@example.com", "member")
+        org_members = seed._table(conn, "org_members")
+        conn.execute(
+            insert(org_members).values(
+                id=str(uuid.uuid4()),
+                org_id=other,
+                user_id=lead,
+                role_id=role_ids["admin"],
+                created_at=_now(),
+            )
+        )
+
+        seed.backfill_existing_deployment(conn)
+
+        orgs = {
+            row.org_id
+            for row in conn.execute(
+                select(org_members.c.org_id).where(org_members.c.user_id == lead)
+            )
+        }
+        assert orgs == {other}
+
+    def test_runs_on_a_database_without_the_markers_table(self, legacy_conn):
+        """Revision 0003 runs before 0007 creates ``deployment_markers``."""
+        legacy_conn.execute(text("DROP TABLE deployment_markers"))
+        dev = _add_user(legacy_conn, "dev@example.com", "member")
+
+        org_id = seed.backfill_existing_deployment(legacy_conn)
+
+        org_members = seed._table(legacy_conn, "org_members")
+        got = legacy_conn.execute(
+            select(org_members.c.org_id).where(org_members.c.user_id == dev)
+        ).scalar_one()
+        assert got == org_id
+        assert not seed.has_marker(legacy_conn, seed.PRE_MULTI_TENANT_BACKFILL)
+
+    def test_records_that_it_ran(self, conn):
+        assert not seed.has_marker(conn, seed.PRE_MULTI_TENANT_BACKFILL)
+        seed.backfill_existing_deployment(conn)
+        assert seed.has_marker(conn, seed.PRE_MULTI_TENANT_BACKFILL)

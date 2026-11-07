@@ -21,12 +21,14 @@ this project, which is stronger evidence than the command its files suggest.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import socket
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .target import SKIP_DIRS, Target, _read_json, _relative
+from .web_stacks import EXTRA_DETECTORS, serves_pages, static_target
 
 logger = logging.getLogger(__name__)
 
@@ -43,26 +45,6 @@ __all__ = [
 #: WinForms or WinUI app (driven through UI Automation, `verify.window`).
 KINDS = ("web-frontend", "desktop", "windows-app", "mobile", "backend-api")
 
-#: Directories never searched for an app: dependencies, build output, VCS.
-_SKIP = {
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    "out",
-    "bin",
-    "obj",
-    "target",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    ".workpilot",
-    ".worktrees",
-    "vendor",
-    "Pods",
-}
 
 #: Where a monorepo keeps its apps.
 _APP_PARENTS = ("apps", "packages", "src", "services")
@@ -89,39 +71,21 @@ _NODE_FRONTEND = (
     "svelte",
     "vue",
     "astro",
+    "@remix-run/dev",
+    "@remix-run/react",
+    "gatsby",
+    "@builder.io/qwik",
+    "ember-source",
+    "lit",
+    "@docusaurus/core",
+    "@11ty/eleventy",
+    "webpack-dev-server",
+    "parcel",
+    "@stencil/core",
 )
-
-
-@dataclass
-class Target:
-    """One thing to launch."""
-
-    kind: str
-    name: str
-    #: The directory it runs from, relative to the project ("." for the root).
-    root: str = "."
-    framework: str = ""
-    #: The command line, with ``{port}`` where a port goes. Empty for mobile,
-    #: whose commands are per platform (`platforms`).
-    command: str = ""
-    #: The port the app listens on by default; the launch prefers a free one.
-    port: int = 0
-    #: A path that answers once the app is up ("/" accepts any HTTP status).
-    ready_path: str = "/"
-    #: Environment variables that carry the port, per framework.
-    port_env: list[str] = field(default_factory=list)
-    #: Extra environment for the launch (no secrets: names known to the stack).
-    env: dict[str, str] = field(default_factory=dict)
-    #: For mobile: the platforms this task asks for.
-    platforms: list[str] = field(default_factory=list)
-    #: A file of the task lives under `root`.
-    touched: bool = False
-    #: ``recipe`` when a learned recipe supplied the command, else ``detected``.
-    origin: str = "detected"
-    notes: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return asdict(self)
+#: UI libraries with no server of their own: a page only when no API
+#: framework sits beside them (an API may render its e-mails with React).
+_NODE_UI_LIBS = ("react", "preact", "solid-js", "lit")
 
 
 @dataclass
@@ -188,7 +152,7 @@ def _candidate_dirs(project_dir: Path) -> list[Path]:
             if (
                 child.is_dir()
                 and not child.is_symlink()
-                and child.name not in _SKIP
+                and child.name not in SKIP_DIRS
                 and not child.name.startswith(".")
             ):
                 out.append(child)
@@ -202,25 +166,17 @@ def _candidate_dirs(project_dir: Path) -> list[Path]:
     return unique
 
 
-def _relative(path: Path, project_dir: Path) -> str:
-    try:
-        rel = path.resolve().relative_to(project_dir.resolve()).as_posix()
-    except ValueError:
-        return "."
-    return rel or "."
-
-
 def _project_arg(csproj: Path) -> str:
     """The project file as `dotnet run --project` reads it from its own folder."""
     return f'"{csproj.name}"' if " " in csproj.name else csproj.name
 
 
-def _read_json(path: Path) -> dict:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+def _page_file(directory: Path) -> str:
+    return serves_pages(directory)
+
+
+def _pages(directory: Path) -> bool:
+    return bool(_page_file(directory))
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +229,9 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
         )
 
     is_api = any(d in deps for d in _NODE_API)
-    is_frontend = any(d in deps for d in _NODE_FRONTEND)
+    is_frontend = any(d in deps for d in _NODE_FRONTEND) or (
+        not is_api and any(d in deps for d in _NODE_UI_LIBS)
+    )
     if is_api and not is_frontend:
         command = _script("start:dev", "dev", "start")
         if not command:
@@ -291,6 +249,7 @@ def _node_target(directory: Path, project_dir: Path) -> Target | None:
             command=command,
             port=3000,
             port_env=["PORT"],
+            pages=_pages(directory),
         )
     if not is_frontend:
         return None
@@ -377,15 +336,18 @@ def _dotnet_targets(project_dir: Path) -> list[Target]:
                 out.append(app)
             continue
         rel = _project_arg(csproj)
-        blazor = "BlazorWebAssembly" in text or (csproj.parent / "Pages").is_dir()
+        wasm = "BlazorWebAssembly" in text
+        # Blazor Server / Web App, Razor Pages, MVC: pages the server renders.
+        page = "" if wasm else _page_file(csproj.parent)
         out.append(
             Target(
-                kind="web-frontend" if "BlazorWebAssembly" in text else "backend-api",
+                kind="web-frontend" if wasm else "backend-api",
                 name=csproj.stem,
                 root=_relative(csproj.parent, project_dir),
                 framework="blazor"
-                if blazor and "BlazorWebAssembly" in text
-                else "aspnetcore",
+                if wasm or page.endswith(".razor")
+                else ("aspnetcore-razor" if page else "aspnetcore"),
+                pages=bool(page),
                 # --no-launch-profile: launchSettings.json's applicationUrl
                 # would override ASPNETCORE_URLS, and the port is ours to pick.
                 command=f"dotnet run --project {rel} --no-launch-profile",
@@ -431,6 +393,7 @@ def _python_target(directory: Path, project_dir: Path) -> Target | None:
         port=int(found.get("port") or 8000),
         port_env=["PORT"],
         env=env,
+        pages=framework != "streamlit" and _pages(directory),
     )
 
 
@@ -468,6 +431,7 @@ def _jvm_target(directory: Path, project_dir: Path) -> Target | None:
         command=command,
         port=8080,
         port_env=["SERVER_PORT"],
+        pages=_pages(directory),
     )
 
 
@@ -488,6 +452,7 @@ def _go_target(directory: Path, project_dir: Path) -> Target | None:
         command="go run .",
         port=8080,
         port_env=["PORT"],
+        pages=_pages(directory),
     )
 
 
@@ -538,7 +503,7 @@ def _walk(root: Path, pattern: str, depth: int) -> list[Path]:
             if entry.is_symlink():
                 continue
             if entry.is_dir():
-                if entry.name not in _SKIP and not entry.name.startswith("."):
+                if entry.name not in SKIP_DIRS and not entry.name.startswith("."):
                     _visit(entry, level + 1)
             elif entry.match(pattern):
                 out.append(entry)
@@ -617,7 +582,8 @@ def detect_targets(
                 # A Flutter/RN tree carries a package.json or a Gradle build of
                 # its own: it is the phone app, not a second web target.
                 continue
-            for detector in (_node_target, _python_target, _jvm_target, _go_target):
+            detectors = (_node_target, _python_target, _jvm_target, _go_target)
+            for detector in (*detectors, *EXTRA_DETECTORS):
                 try:
                     found = detector(directory, root)
                 except Exception as exc:  # noqa: BLE001 - one detector never sinks the rest
@@ -627,6 +593,10 @@ def detect_targets(
                     t.root == found.root and t.kind == found.kind for t in targets
                 ):
                     targets.append(found)
+            if not any(t.root == rel for t in targets):
+                site = static_target(directory, root)
+                if site is not None:
+                    targets.append(site)
     except Exception as exc:  # noqa: BLE001
         logger.warning("verify: detection failed: %s", exc)
 

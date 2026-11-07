@@ -121,6 +121,37 @@ export interface AdminOverview {
 	}>;
 }
 
+export interface GroupMemberSummary {
+	user_id: string;
+	email: string;
+	display_name: string;
+}
+
+export interface GroupProjectSummary {
+	project_id: string;
+	name: string;
+	role: string;
+}
+
+/** A group: its members inherit its organization role and its project roles. */
+export interface GroupSummary {
+	id: string;
+	name: string;
+	description: string;
+	role_slug: string | null;
+	role_name: string | null;
+	members: GroupMemberSummary[];
+	projects: GroupProjectSummary[];
+	created_at: string;
+}
+
+export interface GroupProjectOption {
+	id: string;
+	name: string;
+}
+
+export type GroupProjectRole = "viewer" | "member" | "owner";
+
 export interface ServerAdminAPI {
 	myPermissions: () => Promise<DataResult<MyPermissions>>;
 	getActiveOrg: () => Promise<DataResult<string | null>>;
@@ -152,6 +183,31 @@ export interface ServerAdminAPI {
 		roleSlug: string,
 	) => Promise<DataResult<OrgMemberSummary>>;
 	removeMember: (userId: string) => Promise<DataResult<{ removed: boolean }>>;
+
+	listGroups: () => Promise<DataResult<GroupSummary[]>>;
+	listGroupProjects: () => Promise<DataResult<GroupProjectOption[]>>;
+	createGroup: (body: {
+		name: string;
+		description?: string;
+		role_slug?: string;
+	}) => Promise<DataResult<GroupSummary>>;
+	/** `role_slug: ""` removes the group's organization role. */
+	updateGroup: (
+		groupId: string,
+		body: { name?: string; description?: string; role_slug?: string },
+	) => Promise<DataResult<GroupSummary>>;
+	deleteGroup: (groupId: string) => Promise<DataResult<{ deleted: boolean }>>;
+	setGroupMember: (
+		groupId: string,
+		userId: string,
+		inGroup: boolean,
+	) => Promise<DataResult<GroupSummary>>;
+	/** A null role takes the project away from the group. */
+	setGroupProjectRole: (
+		groupId: string,
+		projectId: string,
+		role: GroupProjectRole | null,
+	) => Promise<DataResult<GroupSummary>>;
 
 	listOrgs: () => Promise<DataResult<OrganizationSummary[]>>;
 	createOrg: (body: {
@@ -206,6 +262,17 @@ export const createServerAdminAPI = (): ServerAdminAPI => ({
 	updateMemberRole: (userId, roleSlug) =>
 		invokeIpc(IPC_CHANNELS.SERVER_ADMIN_UPDATE_MEMBER_ROLE, userId, roleSlug),
 	removeMember: (userId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_REMOVE_MEMBER, userId),
+
+	listGroups: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUPS_LIST),
+	listGroupProjects: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUPS_PROJECTS),
+	createGroup: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUP_CREATE, body),
+	updateGroup: (groupId, body) =>
+		invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUP_UPDATE, groupId, body),
+	deleteGroup: (groupId) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUP_DELETE, groupId),
+	setGroupMember: (groupId, userId, inGroup) =>
+		invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUP_SET_MEMBER, groupId, userId, inGroup),
+	setGroupProjectRole: (groupId, projectId, role) =>
+		invokeIpc(IPC_CHANNELS.SERVER_ADMIN_GROUP_SET_PROJECT_ROLE, groupId, projectId, role),
 
 	listOrgs: () => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_LIST_ORGS),
 	createOrg: (body) => invokeIpc(IPC_CHANNELS.SERVER_ADMIN_CREATE_ORG, body),

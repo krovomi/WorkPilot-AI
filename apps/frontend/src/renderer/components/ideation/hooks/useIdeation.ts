@@ -201,6 +201,8 @@ export function useIdeation(
 		const result = await window.electronAPI.dismissIdea(projectId, idea.id);
 		if (result.success) {
 			useIdeationStore.getState().dismissIdea(idea.id);
+		} else {
+			await loadIdeation(projectId);
 		}
 	};
 

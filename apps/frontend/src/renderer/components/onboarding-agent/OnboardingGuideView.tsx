@@ -20,7 +20,7 @@ function GuideBody({
 	return (
 		<div className="flex flex-col gap-4">
 			<div>
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{guide.projectName} ·{" "}
 					{t("duration", { minutes: guide.totalEstimatedMinutes })}
 				</p>
@@ -40,7 +40,7 @@ function GuideBody({
 				{guide.steps.map((step) => (
 					<div
 						key={`${step.section}-${step.title}`}
-						className="px-4 py-3 rounded-lg border border-(--border-color)"
+						className="px-4 py-3 rounded-lg border border-border"
 					>
 						<div className="flex items-center justify-between mb-2">
 							<div className="flex items-center gap-2">
@@ -51,12 +51,12 @@ function GuideBody({
 									{generated(step.titleI18n, step.title)}
 								</p>
 							</div>
-							<span className="text-xs text-(--text-secondary)">
+							<span className="text-xs text-muted-foreground">
 								{t("duration", { minutes: step.estimatedMinutes })}
 							</span>
 						</div>
 						{step.lines && step.lines.length > 0 ? (
-							<ul className="text-sm text-(--text-secondary) mb-2 space-y-1 list-disc list-inside">
+							<ul className="text-sm text-muted-foreground mb-2 space-y-1 list-disc list-inside">
 								{step.lines.map((line) => (
 									<li key={`${line.key}:${line.fallback}`}>
 										{generated(line)}
@@ -64,7 +64,7 @@ function GuideBody({
 								))}
 							</ul>
 						) : (
-							<p className="text-sm text-(--text-secondary) mb-2 whitespace-pre-wrap">
+							<p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">
 								{step.content}
 							</p>
 						)}
@@ -73,7 +73,7 @@ function GuideBody({
 								{step.commands.map((cmd) => (
 									<pre
 										key={`${cmd.slice(0, 20)}`}
-										className="px-3 py-1.5 rounded bg-(--bg-secondary) text-xs font-mono text-green-400"
+										className="px-3 py-1.5 rounded bg-card text-xs font-mono text-success"
 									>
 										$ {cmd}
 									</pre>
@@ -85,7 +85,7 @@ function GuideBody({
 			</div>
 
 			{guide.summary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{generated(guide.summaryI18n, guide.summary)}
 				</p>
 			)}
@@ -114,7 +114,7 @@ export function OnboardingGuideView({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -132,7 +132,7 @@ export function OnboardingGuideView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -141,7 +141,7 @@ export function OnboardingGuideView({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -150,23 +150,23 @@ export function OnboardingGuideView({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{t("errors.failed", { error })}</p>
+				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
 			)}
 
 			{phase === "complete" && !guide && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{phase === "complete" && guide && <GuideBody guide={guide} t={t} />}

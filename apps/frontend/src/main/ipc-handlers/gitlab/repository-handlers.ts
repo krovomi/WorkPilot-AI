@@ -7,6 +7,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitLabSyncStatus, IPCResult } from "../../../shared/types";
 import { projectStore } from "../../project-store";
+import { featureProject } from "../server-feature-files";
 import type { GitLabAPIProject } from "./types";
 import {
 	encodeProjectPath,
@@ -17,7 +18,7 @@ import {
 
 // Debug logging helper
 const DEBUG =
-	process.env.DEBUG === "true" || process.env.NODE_ENV === "development";
+	process.env.DEBUG === "true";
 
 function debugLog(_message: string, data?: unknown): void {
 	if (DEBUG) {
@@ -38,7 +39,7 @@ export function registerCheckConnection(): void {
 		async (_event, projectId: string): Promise<IPCResult<GitLabSyncStatus>> => {
 			debugLog("checkGitLabConnection handler called", { projectId });
 
-			const project = projectStore.getProject(projectId);
+			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
 			}

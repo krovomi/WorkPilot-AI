@@ -26,9 +26,6 @@ import {
 	Activity,
 	AlertTriangle,
 	BarChart3,
-	Bug,
-	BookOpen,
-	BookOpenCheck,
 	Box,
 	Brain,
 	Building2,
@@ -38,16 +35,13 @@ import {
 	ClipboardCheck,
 	ChevronRight,
 	Code,
-	Coins,
 	Compass,
 	Database,
 	Download,
 	FileCode2,
-	FileEdit,
 	FileJson,
 	FileText,
 	FlaskConical,
-	Gauge,
 	GitBranch,
 	GitFork,
 	GitMerge,
@@ -55,7 +49,6 @@ import {
 	Globe,
 	HeartPulse,
 	HelpCircle,
-	History,
 	Layers,
 	Languages,
 	LayoutGrid,
@@ -69,28 +62,22 @@ import {
 	PanelLeft,
 	PanelLeftClose,
 	Plus,
-	Puzzle,
 	Radio,
 	RefreshCcw,
 	Rocket,
-	RotateCcw,
 	Search,
 	Settings,
-	Share2,
 	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	Sparkles,
 	Star,
-	Store,
-	Swords,
 	Target,
 	Terminal,
 	TestTube,
 	Trophy,
 	UserCheck,
 	Users,
-	Wand2,
 	WandSparkles,
 	WifiOff,
 	Workflow,
@@ -117,30 +104,24 @@ import {
 	loadProjectEnvConfig,
 	useProjectEnvStore,
 } from "@/stores/project-env-store";
-import { useAnyPermission } from "@/stores/permissions-store";
 // Stores
 import { useProjectStore } from "@/stores/project-store";
 import {
 	selectGroupBadge,
-	selectViewBadge,
 	useActivityStore,
 	useAttentionView,
 } from "@/stores/activity-store";
 import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
-import { useServerSessionStore } from "@/stores/server-session-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 import { openTestGenerationDialog } from "@/stores/test-generation-store";
-import { openVoiceControlDialog } from "@/stores/voice-control-store";
+import { openVoiceAssistant } from "@/stores/voice-assistant-store";
 // Modals & Components
 import { AddProjectModal } from "./AddProjectModal";
 import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
-import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
-import { AgentCliStatusBadge } from "./AgentCliStatusBadge";
-import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
-import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
+import { CliToolBadges } from "./CliToolBadges";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
 import { ConflictPredictorDialog } from "./conflict-predictor/ConflictPredictorDialog";
 import { ContextAwareSnippetsDialog } from "./context-aware-snippets/ContextAwareSnippetsDialog";
@@ -174,9 +155,21 @@ import {
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
+import { NavIcon, navLabelTitle } from "./sidebar/ExperimentalMarker";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
+import {
+	entryIdOfView,
+	getHub,
+	type HubTabGates,
+	hubEntryTarget,
+	isHubExperimental,
+	SIDEBAR_HUBS,
+	type SidebarHubId,
+	shownHubTabs,
+} from "./sidebar/hubs";
+import { serverForge, showsView, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
-import { VoiceControlDialog } from "./voice-control/VoiceControlDialog";
+import { VoiceAssistant } from "./voice-assistant/VoiceAssistant";
 
 export type SidebarView =
 	| "kanban"
@@ -240,7 +233,6 @@ export type SidebarView =
 	| "carbon-profiler"
 	| "consensus-arbiter"
 	| "notebook-agent"
-	| "spec-refinement"
 	| "agent-coach"
 	| "bounty-board"
 	| "repo-bench"
@@ -257,10 +249,13 @@ export type SidebarView =
 	| "live-companion"
 	| "context-mesh"
 	| "administration"
-	| "phase35-hub";
+	| "phase35-hub"
+	| "smart-estimation";
 
 interface SidebarProps {
 	readonly onSettingsClick: () => void;
+	/** Opens the project's settings, where an uninitialized project is set up. */
+	readonly onInitializeProject?: (projectId: string) => void;
 	readonly onNewTaskClick: () => void;
 	readonly activeView?: SidebarView;
 	readonly onViewChange?: (view: SidebarView, force?: boolean) => void;
@@ -272,6 +267,37 @@ interface NavItem {
 	icon: React.ElementType;
 	shortcut?: string;
 	subGroup?: string; // i18n key for visual sub-group header within a group
+	hub?: SidebarHubId; // the entry stands for this hub's tabs (`sidebar/hubs.ts`)
+}
+
+function hubNavItem(id: SidebarHubId, subGroup?: string): NavItem {
+	const hub = getHub(id);
+	return { id: hub.tabs[0].view, labelKey: hub.labelKey, icon: hub.icon, hub: id, subGroup };
+}
+
+/** The views a menu entry stands for: a hub's tabs, or its own view. */
+function itemViews(item: NavItem): SidebarView[] {
+	return item.hub ? getHub(item.hub).tabs.map((tab) => tab.view) : [item.id];
+}
+
+/** A hub's tabs as menu entries, for the search and the shortcuts. */
+function hubTabItems(item: NavItem, gates: HubTabGates): NavItem[] {
+	if (!item.hub) return [item];
+	return shownHubTabs(getHub(item.hub), gates).map((tab) => ({ ...tab, id: tab.view, subGroup: item.subGroup }));
+}
+
+/** Whether a menu entry stands for this view. */
+function isOn(item: NavItem, view: SidebarView | null): boolean {
+	return view !== null && itemViews(item).includes(view);
+}
+
+function isItemExperimental(item: NavItem): boolean {
+	return item.hub ? isHubExperimental(getHub(item.hub)) : EXPERIMENTAL_VIEWS.has(item.id);
+}
+
+function itemShown(item: NavItem, gates: HubTabGates): boolean {
+	if (item.hub) return shownHubTabs(getHub(item.hub), gates).length > 0;
+	return !(gates.hideExperimental && isItemExperimental(item)) && showsView(item.id, gates.serverProject);
 }
 
 interface NavGroup {
@@ -307,12 +333,7 @@ const navGroups: NavGroup[] = [
 				icon: Rocket,
 				shortcut: "WM",
 			},
-			{
-				id: "session-history",
-				labelKey: "navigation:items.sessionHistory",
-				icon: History,
-				shortcut: "WS",
-			},
+			hubNavItem("agent-history"),
 			{
 				id: "phase35-hub",
 				labelKey: "navigation:items.phase35Hub",
@@ -340,29 +361,12 @@ const navGroups: NavGroup[] = [
 				shortcut: "PO",
 			},
 			{
-				id: "agent-replay",
-				labelKey: "navigation:items.agentReplay",
-				icon: RotateCcw,
-				shortcut: "AR",
-			},
-			{
-				id: "agent-debugger",
-				labelKey: "navigation:items.agentDebugger",
-				icon: Bug,
-				shortcut: "AG",
-			},
-			{
 				id: "self-healing",
 				labelKey: "navigation:items.selfHealing",
 				icon: HeartPulse,
 				shortcut: "SE",
 			},
-			{
-				id: "arena-mode",
-				labelKey: "navigation:items.arenaMode",
-				icon: Swords,
-				shortcut: "AM",
-			},
+			hubNavItem("arena"),
 			{
 				id: "repo-bench",
 				labelKey: "navigation:items.repoBench",
@@ -374,12 +378,6 @@ const navGroups: NavGroup[] = [
 				labelKey: "navigation:items.bountyBoard",
 				icon: Trophy,
 				shortcut: "BB",
-			},
-			{
-				id: "consensus-arbiter",
-				labelKey: "navigation:items.consensusArbiter",
-				icon: Users,
-				shortcut: "CA",
 			},
 			{
 				id: "agent-coach",
@@ -413,12 +411,7 @@ const navGroups: NavGroup[] = [
 				icon: FileCode2,
 				shortcut: "CR",
 			},
-			{
-				id: "refactoring",
-				labelKey: "navigation:items.refactoring",
-				icon: Wand2,
-				shortcut: "RF",
-			},
+			hubNavItem("debt"),
 			{
 				id: "test-generation",
 				labelKey: "navigation:items.testGeneration",
@@ -437,18 +430,8 @@ const navGroups: NavGroup[] = [
 				icon: WandSparkles,
 				shortcut: "VC",
 			},
-			{
-				id: "documentation",
-				labelKey: "navigation:items.documentation",
-				icon: BookOpenCheck,
-				shortcut: "DC",
-			},
-			{
-				id: "onboarding-guide",
-				labelKey: "navigation:items.onboardingGuide",
-				icon: BookOpen,
-				shortcut: "OG",
-			},
+			hubNavItem("docs"),
+			hubNavItem("onboarding"),
 			{
 				id: "flaky-tests",
 				labelKey: "navigation:items.flakyTests",
@@ -481,18 +464,7 @@ const navGroups: NavGroup[] = [
 				icon: Sparkles,
 				shortcut: "IN",
 			},
-			{
-				id: "context",
-				labelKey: "navigation:items.context",
-				icon: BookOpen,
-				shortcut: "CT",
-			},
-			{
-				id: "context-mesh",
-				labelKey: "navigation:items.contextMesh",
-				icon: Share2,
-				shortcut: "CM",
-			},
+			hubNavItem("context"),
 			{
 				id: "architecture-visualizer",
 				labelKey: "navigation:items.architectureVisualizer",
@@ -525,29 +497,13 @@ const navGroups: NavGroup[] = [
 				icon: GitBranch,
 				shortcut: "WT",
 			},
-			{
-				id: "natural-language-git",
-				labelKey: "navigation:items.naturalLanguageGit",
-				icon: GitBranch,
-				shortcut: "NG",
-			},
-			{
-				id: "conflict-predictor",
-				labelKey: "navigation:items.conflictPredictor",
-				icon: GitMerge,
-				shortcut: "CF",
-			},
+			hubNavItem("git-history"),
+			hubNavItem("git-impact"),
 			{
 				id: "cicd-triggers",
 				labelKey: "navigation:items.cicdTriggers",
 				icon: Workflow,
 				shortcut: "CD",
-			},
-			{
-				id: "git-surgeon",
-				labelKey: "navigation:items.gitSurgeon",
-				icon: GitBranch,
-				shortcut: "GU",
 			},
 		],
 		defaultExpanded: false,
@@ -569,12 +525,7 @@ const navGroups: NavGroup[] = [
 				icon: Database,
 				shortcut: "AN",
 			},
-			{
-				id: "cost-estimator",
-				labelKey: "navigation:items.costEstimator",
-				icon: Coins,
-				shortcut: "CE",
-			},
+			hubNavItem("costs"),
 			{
 				id: "spec-approval",
 				labelKey: "navigation:items.specApproval",
@@ -600,12 +551,6 @@ const navGroups: NavGroup[] = [
 				shortcut: "CB",
 			},
 			{
-				id: "tech-debt",
-				labelKey: "navigation:items.techDebt",
-				icon: Gauge,
-				shortcut: "TD",
-			},
-			{
 				id: "env-snapshot",
 				labelKey: "navigation:items.envSnapshot",
 				icon: Camera,
@@ -620,27 +565,7 @@ const navGroups: NavGroup[] = [
 		icon: Wrench,
 		items: [
 			// Extensions
-			{
-				id: "agent-tools",
-				labelKey: "navigation:items.agentTools",
-				icon: Wrench,
-				shortcut: "AT",
-				subGroup: "navigation:subGroups.extensions",
-			},
-			{
-				id: "mcp-marketplace",
-				labelKey: "navigation:items.mcpMarketplace",
-				icon: Store,
-				shortcut: "MK",
-				subGroup: "navigation:subGroups.extensions",
-			},
-			{
-				id: "plugin-marketplace",
-				labelKey: "navigation:items.pluginMarketplace",
-				icon: Puzzle,
-				shortcut: "PM",
-				subGroup: "navigation:subGroups.extensions",
-			},
+			hubNavItem("mcp-tools", "navigation:subGroups.extensions"),
 			// Code Quality & Testing
 			{
 				id: "regression-guardian",
@@ -671,40 +596,11 @@ const navGroups: NavGroup[] = [
 				subGroup: "navigation:subGroups.codeQuality",
 			},
 			{
-				id: "blast-radius",
-				labelKey: "navigation:items.blastRadius",
-				icon: Target,
-				shortcut: "BR",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
 				id: "guardrails",
 				labelKey: "navigation:items.guardrails",
 				icon: Shield,
 				shortcut: "GR",
 				subGroup: "navigation:subGroups.codeQuality",
-			},
-			// Documentation & Spec
-			{
-				id: "onboarding-agent",
-				labelKey: "navigation:items.onboardingAgent",
-				icon: BookOpen,
-				shortcut: "OA",
-				subGroup: "navigation:subGroups.documentation",
-			},
-			{
-				id: "doc-drift",
-				labelKey: "navigation:items.docDrift",
-				icon: FileText,
-				shortcut: "DD",
-				subGroup: "navigation:subGroups.documentation",
-			},
-			{
-				id: "spec-refinement",
-				labelKey: "navigation:items.specRefinement",
-				icon: FileEdit,
-				shortcut: "SR",
-				subGroup: "navigation:subGroups.documentation",
 			},
 			// Accessibility & i18n
 			{
@@ -802,13 +698,6 @@ const navGroups: NavGroup[] = [
 				subGroup: "navigation:subGroups.utilities",
 			},
 			{
-				id: "context-aware-snippets",
-				labelKey: "navigation:items.contextAwareSnippets",
-				icon: Code,
-				shortcut: "CS",
-				subGroup: "navigation:subGroups.utilities",
-			},
-			{
 				id: "offline-mode",
 				labelKey: "navigation:items.offlineMode",
 				icon: WifiOff,
@@ -883,6 +772,8 @@ const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
 		...navGroups.flatMap((group) => group.items),
 		...githubNavItems,
 		...gitlabNavItems,
+		// A hub's entry has its first tab's id: the tab's own name wins.
+		...SIDEBAR_HUBS.flatMap((hub) => hub.tabs.map((tab) => ({ ...tab, id: tab.view }))),
 	].map((item) => [item.id, item.labelKey]),
 );
 
@@ -892,6 +783,7 @@ export function navItemLabelKey(view: SidebarView): string | undefined {
 
 export function Sidebar({
 	onSettingsClick,
+	onInitializeProject,
 	onNewTaskClick,
 	activeView = "kanban",
 	onViewChange,
@@ -906,15 +798,11 @@ export function Sidebar({
 	// instead of one hook per menu entry over ~80 entries.
 	const activities = useActivityStore((state) => state.activities);
 	const attentionView = useAttentionView();
-	const badgeFor = useCallback(
-		(view: SidebarView) => selectViewBadge(activities, view, selectedProjectId),
-		[activities, selectedProjectId],
-	);
 	const groupBadgeFor = useCallback(
 		(items: NavItem[]) =>
 			selectGroupBadge(
 				activities,
-				items.map((item) => item.id),
+				items.flatMap(itemViews),
 				selectedProjectId,
 			),
 		[activities, selectedProjectId],
@@ -928,6 +816,7 @@ export function Sidebar({
 	const {
 		prefs: sidebarPrefs,
 		toggleItemPin,
+		unpinItems,
 		toggleGroupPin,
 		reorderGroups,
 		reorderItems,
@@ -1035,25 +924,19 @@ export function Sidebar({
 		saveSettings({ cliPanelExpanded: value });
 
 	// Subscribe to project-env-store for reactive GitHub/GitLab tab visibility
-	const githubEnabled = useProjectEnvStore(
-		(state) => state.envConfig?.githubEnabled ?? false,
-	);
-	const gitlabEnabled = useProjectEnvStore(
-		(state) => state.envConfig?.gitlabEnabled ?? false,
-	);
+	const envGitHub = useProjectEnvStore((state) => state.envConfig?.githubEnabled ?? false);
+	const envGitLab = useProjectEnvStore((state) => state.envConfig?.gitlabEnabled ?? false);
 
-	// The administration console is reachable only in server mode, and only for
-	// someone holding at least one administration permission. `useAnyPermission`
-	// reports true in local mode, so the server-mode check is what keeps the
-	// entry out of the desktop app, where there is nothing to administer.
-	const isServerMode = useServerSessionStore((state) => state.mode) === "server";
-	const hasAdminPermission = useAnyPermission([
-		"org.member.read",
-		"org.role.read",
-		"org.quota.read",
-		"audit.read",
-	]);
-	const canAdminister = isServerMode && hasAdminPermission;
+	// Server mode: the administration console, and the views a server project
+	// offers (`sidebar/server-gates.ts`), its forge's (GitHub or GitLab) among them.
+	const { canAdminister, serverProject } = useServerNavGates(
+		selectedProject,
+		activeView,
+		onViewChange,
+	);
+	const forge = serverForge(selectedProject);
+	const githubEnabled = serverProject ? forge === "github" : envGitHub;
+	const gitlabEnabled = serverProject ? forge === "gitlab" : envGitLab;
 
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
@@ -1090,7 +973,7 @@ export function Sidebar({
 
 		// Apply custom per-group item order, without the experimental views
 		// when the user hid them
-		const hideExperimental = sidebarPrefs.hideExperimental === true;
+		const gates = { serverProject, hideExperimental: sidebarPrefs.hideExperimental === true };
 		return orderedGroups
 			.map((group) => {
 				const actualItemIds = group.items.map((i) => i.id);
@@ -1100,7 +983,7 @@ export function Sidebar({
 				const items = orderedItemIds
 					.map((id) => itemById.get(id as SidebarView))
 					.filter((i): i is NavItem => Boolean(i))
-					.filter((i) => !(hideExperimental && EXPERIMENTAL_VIEWS.has(i.id)));
+					.filter((i) => itemShown(i, gates));
 				return { ...group, items };
 			})
 			.filter((group) => group.items.length > 0);
@@ -1109,6 +992,7 @@ export function Sidebar({
 		githubEnabled,
 		gitlabEnabled,
 		canAdminister,
+		serverProject,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -1134,9 +1018,8 @@ export function Sidebar({
 			}
 		}
 		for (const itemId of sidebarPrefs.pinnedItems) {
-			if (seen.has(itemId)) continue;
-			const item = itemById.get(itemId as SidebarView);
-			if (!item) continue;
+			const item = itemById.get(entryIdOfView(itemId as SidebarView));
+			if (!item || seen.has(item.id)) continue;
 			seen.add(item.id);
 			collected.push(item);
 		}
@@ -1156,10 +1039,18 @@ export function Sidebar({
 		sidebarPrefs.pinnedItems,
 	]);
 
-	// Get all visible items for keyboard shortcuts
+	// The tabs a hub's entry leads to, under the same gates as the entries
+	const hubGates = useMemo<HubTabGates>(
+		() => ({ serverProject, hideExperimental: sidebarPrefs.hideExperimental === true }),
+		[serverProject, sidebarPrefs.hideExperimental],
+	);
+
+	// Get all visible items for keyboard shortcuts; a hub's tabs keep theirs
 	const visibleNavItems = useMemo(() => {
-		return visibleNavGroups.flatMap((group) => group.items);
-	}, [visibleNavGroups]);
+		return visibleNavGroups.flatMap((group) =>
+			group.items.flatMap((item) => hubTabItems(item, hubGates)),
+		);
+	}, [visibleNavGroups, hubGates]);
 
 	// Filter nav groups based on search query
 	const filteredNavGroups = useMemo(() => {
@@ -1168,12 +1059,16 @@ export function Sidebar({
 		return visibleNavGroups
 			.map((group) => ({
 				...group,
-				items: group.items.filter((item) =>
-					t(item.labelKey).toLowerCase().includes(query),
-				),
+				items: group.items.flatMap((item) => {
+					const hubMatches = item.hub && matches(item);
+					return hubTabItems(item, hubGates).filter((tab) => hubMatches || matches(tab));
+				}),
 			}))
 			.filter((group) => group.items.length > 0);
-	}, [visibleNavGroups, searchQuery, t]);
+		function matches(item: NavItem) {
+			return t(item.labelKey).toLowerCase().includes(query);
+		}
+	}, [visibleNavGroups, searchQuery, t, hubGates]);
 
 	// Load envConfig when project changes to ensure store is populated
 	useEffect(() => {
@@ -1463,7 +1358,7 @@ export function Sidebar({
 			return;
 		}
 		if (view === "voice-control") {
-			openVoiceControlDialog();
+			openVoiceAssistant();
 			return;
 		}
 		if (view === "app-emulator") {
@@ -1481,6 +1376,14 @@ export function Sidebar({
 
 		// Handle regular view changes
 		onViewChange?.(view);
+	};
+
+	const openNavItem = (item: NavItem) => {
+		if (!item.hub) return handleNavClick(item.id);
+		setSearchQuery("");
+		setIsSearchOpen(false);
+		const target = hubEntryTarget(getHub(item.hub), hubGates);
+		if (target) onViewChange?.(target);
 	};
 
 	const toggleGroupExpansion = (groupId: string) => {
@@ -1583,11 +1486,11 @@ export function Sidebar({
 		isSubItem = false,
 		context: "default" | "favorites" = "default",
 	) => {
-		const isActive = activeView === item.id;
+		const isActive = isOn(item, activeView);
 		const Icon = item.icon;
-		const isPinned = pinnedItemsSet.has(item.id);
-		const badge = badgeFor(item.id);
-		const hasAttention = attentionView === item.id;
+		const isPinned = itemViews(item).some((view) => pinnedItemsSet.has(view));
+		const badge = groupBadgeFor([item]);
+		const hasAttention = isOn(item, attentionView);
 
 		// Determine CSS classes based on collapsed state and sub-item status
 		const getLayoutClasses = () => {
@@ -1610,7 +1513,8 @@ export function Sidebar({
 				type="button"
 				onClick={(e) => {
 					e.stopPropagation();
-					toggleItemPin(item.id);
+					if (isPinned && item.hub) unpinItems(itemViews(item));
+					else toggleItemPin(item.id);
 				}}
 				aria-label={
 					isPinned
@@ -1625,12 +1529,12 @@ export function Sidebar({
 					"hover:bg-accent/60 hover:scale-110",
 					"opacity-0 group-hover/nav-item:opacity-100 focus-visible:opacity-100",
 					isPinned
-						? "text-amber-400"
-						: "text-muted-foreground/40 hover:text-amber-400",
+						? "text-warning"
+						: "text-muted-foreground/40 hover:text-warning",
 				)}
 			>
 				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-amber-400")}
+					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
 				/>
 			</button>
 		) : null;
@@ -1642,7 +1546,7 @@ export function Sidebar({
 			>
 				<button
 					type="button"
-					onClick={() => handleNavClick(item.id)}
+					onClick={() => openNavItem(item)}
 					// The console is deployment-scoped, not project-scoped.
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
@@ -1654,29 +1558,21 @@ export function Sidebar({
 						isPinned &&
 							!isActive &&
 							context !== "favorites" &&
-							"ring-1 ring-inset ring-amber-400/20 shadow-[inset_0_0_12px_-6px_rgba(251,191,36,0.25)]",
+							"ring-1 ring-inset ring-warning/20 shadow-[inset_0_0_12px_-6px_rgba(251,191,36,0.25)]",
 						getLayoutClasses(),
 					)}
 				>
-					<Icon className="h-4 w-4 shrink-0" />
+					<NavIcon icon={Icon} experimental={isItemExperimental(item)} />
 					{!isCollapsed && (
 						<>
-							<span className="flex-1 text-left truncate">
+							<span className="flex-1 text-left truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>
 								{t(item.labelKey)}
 							</span>
-							{EXPERIMENTAL_VIEWS.has(item.id) && (
-								<span
-									title={t("navigation:experimental.tooltip")}
-									className="shrink-0 rounded border border-amber-400/40 px-1 text-[10px] uppercase tracking-wide text-amber-500"
-								>
-									{t("navigation:experimental.badge")}
-								</span>
-							)}
 							<ActivityBadge badge={badge} attention={hasAttention} />
 							{item.shortcut && (
 								<kbd
 									className={cn(
-										"pointer-events-none hidden h-5 select-none items-center gap-1 rounded-md border border-border bg-secondary px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex",
+										"pointer-events-none hidden h-5 select-none items-center gap-1 rounded-md border border-border bg-secondary px-1.5 font-mono text-3xs font-medium text-muted-foreground sm:flex",
 										"transition-opacity duration-200",
 										context !== "favorites" &&
 											"group-hover/nav-item:opacity-0",
@@ -1706,8 +1602,11 @@ export function Sidebar({
 					<TooltipTrigger asChild>{button}</TooltipTrigger>
 					<TooltipContent side="right">
 						<span>{t(item.labelKey)}</span>
+						{isItemExperimental(item) && (
+							<span className="ml-2 text-warning">{t("navigation:experimental.badge")}</span>
+						)}
 						{item.shortcut && (
-							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
 								{item.shortcut}
 							</kbd>
 						)}
@@ -1734,13 +1633,13 @@ export function Sidebar({
 	};
 
 	const renderTooltipSubGroupItem = (item: NavItem) => {
-		const isActive = activeView === item.id;
-		const badge = badgeFor(item.id);
+		const isActive = isOn(item, activeView);
+		const badge = groupBadgeFor([item]);
 		return (
 			<button
 				key={item.id}
 				type="button"
-				onClick={() => handleNavClick(item.id)}
+				onClick={() => openNavItem(item)}
 				disabled={!selectedProjectId && item.id !== "administration"}
 				aria-keyshortcuts={item.shortcut}
 				className={cn(
@@ -1750,11 +1649,11 @@ export function Sidebar({
 					isActive && "bg-accent text-accent-foreground",
 				)}
 			>
-				<item.icon className="h-3 w-3 shrink-0" />
-				<span className="flex-1 truncate">{t(item.labelKey)}</span>
+				<NavIcon icon={item.icon} experimental={isItemExperimental(item)} size="sm" />
+				<span className="flex-1 truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>{t(item.labelKey)}</span>
 				<ActivityBadge badge={badge} />
 				{item.shortcut && (
-					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-[9px]">
+					<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
 						{item.shortcut}
 					</kbd>
 				)}
@@ -1779,7 +1678,7 @@ export function Sidebar({
 				)}
 			>
 				{sg.key && (
-					<div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
+					<div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
 						{t(sg.key)}
 					</div>
 				)}
@@ -1854,7 +1753,7 @@ export function Sidebar({
 				)}
 			>
 				{sg.key && (
-					<div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+					<div className="px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground/70">
 						{t(sg.key)}
 					</div>
 				)}
@@ -1907,7 +1806,7 @@ export function Sidebar({
 	// Helper function to get icon container className
 	const getIconContainerClassName = (isFavorites: boolean, hasActiveItem: boolean): string => {
 		if (isFavorites) {
-			return "bg-amber-400/10 text-amber-400";
+			return "bg-warning/10 text-warning";
 		}
 		if (hasActiveItem) {
 			return "bg-primary/10 text-primary";
@@ -1922,9 +1821,7 @@ export function Sidebar({
 		// On the rail there is no room for a row, so the group icon carries the
 		// rollup of everything folded behind it.
 		const groupBadge = groupBadgeFor(group.items);
-		const groupAttention = group.items.some(
-			(item) => attentionView === item.id,
-		);
+		const groupAttention = group.items.some((item) => isOn(item, attentionView));
 
 		return (
 			<Tooltip key={group.id}>
@@ -1936,13 +1833,13 @@ export function Sidebar({
 								hasActiveItem
 									? "bg-accent text-accent-foreground shadow-sm"
 									: "hover:bg-accent hover:text-accent-foreground",
-								isFavorites && "ring-1 ring-amber-400/40",
+								isFavorites && "ring-1 ring-warning/40",
 							)}
 						>
 							<GroupIcon
 								className={cn(
 									"h-4 w-4",
-									isFavorites && "fill-amber-400 text-amber-400",
+									isFavorites && "fill-warning text-warning",
 								)}
 							/>
 							<ActivityBadge
@@ -1969,7 +1866,7 @@ export function Sidebar({
 	) => {
 		const isFavorites = group.id === "__favorites__";
 		const isExpanded = getGroupExpandedState(group, isFavorites);
-		const hasActiveItem = group.items.some((item) => activeView === item.id);
+		const hasActiveItem = group.items.some((item) => isOn(item, activeView));
 		const isPinned = pinnedGroupsSet.has(group.id);
 
 		if (isCollapsed) {
@@ -2007,12 +1904,12 @@ export function Sidebar({
 					"hover:bg-accent/60 hover:scale-110",
 					"opacity-0 group-hover/group-header:opacity-100 focus-visible:opacity-100",
 					isPinned
-						? "text-amber-400"
-						: "text-muted-foreground/40 hover:text-amber-400",
+						? "text-warning"
+						: "text-muted-foreground/40 hover:text-warning",
 				)}
 			>
 				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-amber-400")}
+					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
 				/>
 			</button>
 		);
@@ -2055,9 +1952,7 @@ export function Sidebar({
 		// A collapsed group hides its entries, so it carries the worst state
 		// among them — otherwise work in a folded group is invisible.
 		const groupBadge = isExpanded ? null : groupBadgeFor(group.items);
-		const groupAttention = group.items.some(
-			(item) => attentionView === item.id,
-		);
+		const groupAttention = group.items.some((item) => isOn(item, attentionView));
 		
 		const toggleExpand = () => {
 			if (isFavorites) {
@@ -2087,7 +1982,7 @@ export function Sidebar({
 					<GroupIcon
 						className={cn(
 							"h-4 w-4",
-							isFavorites && "fill-amber-400 text-amber-400",
+							isFavorites && "fill-warning text-warning",
 						)}
 					/>
 				</div>
@@ -2109,7 +2004,7 @@ export function Sidebar({
 						className={cn(
 							"text-xs px-1.5 py-0.5 rounded-full",
 							isFavorites
-								? "text-amber-400 bg-amber-400/10"
+								? "text-warning bg-warning/10"
 								: "text-muted-foreground bg-muted",
 						)}
 					>
@@ -2132,7 +2027,7 @@ export function Sidebar({
 				className={cn(
 					"space-y-1",
 					isFavorites &&
-						"rounded-lg bg-linear-to-b from-amber-400/5 to-transparent border border-amber-400/20 p-1",
+						"rounded-lg bg-linear-to-b from-amber-400/5 to-transparent border border-warning/20 p-1",
 				)}
 			>
 				<div className="group/group-header relative flex items-center">
@@ -2251,7 +2146,7 @@ export function Sidebar({
 									</TooltipTrigger>
 									<TooltipContent side="bottom">
 										{t("search.placeholder")}
-										<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-[10px]">
+										<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
 											/
 										</kbd>
 									</TooltipContent>
@@ -2472,31 +2367,10 @@ export function Sidebar({
 						</CollapsibleTrigger>
 
 						<CollapsibleContent className="mt-2 space-y-2">
-							{/* CLI Tools — compact grouped badges */}
-							<div className="rounded-lg bg-white/4 border border-white/8 p-2 space-y-0.5 overflow-hidden">
-								<ClaudeCodeStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<CopilotCliStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<CodexCliStatusBadge
-									onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-									isCollapsed={isCollapsed}
-								/>
-								<AgentCliStatusBadge tool="opencode" isCollapsed={isCollapsed} />
-								<AgentCliStatusBadge
-									tool="antigravity"
-									isCollapsed={isCollapsed}
-								/>
-								<AgentCliStatusBadge tool="pi" isCollapsed={isCollapsed} />
-								<AgentCliStatusBadge
-									tool="gemini-cli"
-									isCollapsed={isCollapsed}
-								/>
-							</div>
+							<CliToolBadges
+								isCollapsed={isCollapsed}
+								onNavigateToTerminals={() => onViewChange?.("terminals", true)}
+							/>
 						</CollapsibleContent>
 					</Collapsible>
 
@@ -2584,9 +2458,18 @@ export function Sidebar({
 					{!isCollapsed &&
 						selectedProject &&
 						!selectedProject.autoBuildPath && (
-							<p className="mt-2 text-xs text-muted-foreground text-center">
+							// The hint used to be plain text pointing at an
+							// initialization dialog that no longer rendered: a project
+							// added from an existing folder had no way from here to
+							// its first task. It now opens the pane that initializes it.
+							<Button
+								variant="link"
+								size="sm"
+								className="mt-1 h-auto w-full whitespace-normal text-xs text-muted-foreground"
+								onClick={() => onInitializeProject?.(selectedProject.id)}
+							>
 								{t("messages.initializeToCreateTasks")}
-							</p>
+							</Button>
 						)}
 				</div>
 
@@ -2657,12 +2540,11 @@ export function Sidebar({
 			<ConflictPredictorDialog />
 			<DependencySentinelDialog />
 			<NaturalLanguageGitDialog />
-			<VoiceControlDialog
-				onExecuteCommand={(result) => {
-					if (result.action === "navigate" && result.parameters?.destination) {
-						onViewChange?.(result.parameters.destination as SidebarView);
-					}
-				}}
+			<VoiceAssistant
+				destinations={visibleNavItems.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
+				onNavigate={(view) => handleNavClick(view as SidebarView)}
+				onNewTask={onNewTaskClick}
+				onOpenSettings={onSettingsClick}
 			/>
 			<AppEmulatorDialog />
 			<LearningLoopDialog />

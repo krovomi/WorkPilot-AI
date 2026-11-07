@@ -1,6 +1,6 @@
 {
 	"title": "Mode Arena",
-	"subtitle": "Comparaison A/B de modèles à l'aveugle — laissez les données parler",
+	"subtitle": "Comparaison A/B de modèles — laissez les données parler",
 	"tabs": {
 		"battle": "Combat",
 		"history": "Historique",
@@ -24,7 +24,7 @@
 		"startBattle": "Lancer le combat",
 		"model": "Modèle",
 		"voteForThis": "Voter pour celui-ci",
-		"votePrompt": "Les deux modèles ont terminé — quelle réponse est meilleure ? Votre vote est anonyme.",
+		"votePrompt": "Les modèles ont terminé — quelle réponse est meilleure ?",
 		"winner": "Vainqueur",
 		"newBattle": "Nouveau combat",
 		"statusRunning": "En cours…",
@@ -45,15 +45,16 @@
 		"removeModel": "Retirer ce modèle",
 		"tokensEstimatedHint": "Estimation : ce fournisseur n'a pas rapporté sa consommation",
 		"costUnknownHint": "Ce fournisseur n'a pas rapporté de coût — aucun montant n'est inventé",
-		"providersDegrade": "Sans adaptateur propre, donc hors Arena (leurs réponses viendraient d'un autre modèle) : {{providers}}"
+		"providersDegrade": "Sans adaptateur propre, donc hors Arena (leurs réponses viendraient d'un autre modèle) : {{providers}}",
+		"failed": "Échec : cette réponse ne peut pas être choisie",
+		"notEnoughAnswers": "Moins de deux modèles ont répondu : ce combat ne peut pas être voté."
 	},
 	"history": {
 		"loading": "Chargement de l'historique…",
 		"empty": "Aucun combat pour l'instant",
 		"battles": "combats",
 		"clearAll": "Tout effacer",
-		"awaitingVote": "En attente de vote",
-		"hiddenUntilVote": "Identité masquée jusqu'au vote"
+		"awaitingVote": "En attente de vote"
 	},
 	"analytics": {
 		"loading": "Calcul des analytics…",
@@ -84,5 +85,7 @@
 	"errors": {
 		"startFailed": "Impossible de démarrer le combat",
 		"voteFailed": "Impossible de soumettre le vote"
-	}
+	},
+	"tokensUsed": "{{value}} tokens",
+	"modelFallback": "Modèle {{label}}"
 }

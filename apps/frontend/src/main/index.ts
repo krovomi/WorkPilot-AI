@@ -3,6 +3,7 @@
 // require-in-the-middle hooks. Sentry's hooks expect require.cache to exist,
 // which is only available in CommonJS. Without this, node-pty native module
 // loading fails with "ReferenceError: require is not defined".
+import { debugLog } from "../shared/utils/debug-logger";
 import { createRequire } from "node:module";
 
 // Make require globally available for Sentry's require-in-the-middle hooks.
@@ -65,7 +66,10 @@ import {
 	getClaudeProfileManager,
 	initializeClaudeProfileManager,
 } from "./claude-profile-manager";
-import { preWarmToolCache } from "./cli-tool-manager";
+import {
+	configureToolsFromSettings,
+	preWarmToolCache,
+} from "./cli-tool-manager";
 import {
 	pauseRunningTasksForShutdown,
 	resumeTasksInterruptedByAppExit,
@@ -74,11 +78,7 @@ import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
-import {
-	isServerMode,
-	loadPersistedState,
-	restoreSession,
-} from "./server-connection";
+import { loadPersistedState, restoreSession } from "./server-connection";
 import {
 	enforceWebviewPreferences,
 	isPermissionGranted,
@@ -98,15 +98,22 @@ import { openExternalUrl } from "./open-external";
 import { notificationService } from "./notification-service";
 import { isMacOS, isWindows } from "./platform";
 import {
+	getProjectEnvPath,
 	migrateProjectEnvSecrets,
 	migrateRootEnvCicdKeys,
 } from "./project-env-file";
 import { ensureProjectEnvFilesIgnored } from "./project-initializer";
 import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
-import { migrateProfilesSecrets } from "./services/profile/profile-manager";
-import { initSentryMain } from "./sentry";
 import {
+	getProfilesFilePath,
+	migrateProfilesSecrets,
+} from "./services/profile/profile-manager";
+import { initSentryMain } from "./sentry";
+import { armSmokeTest, isSmokeTest } from "./smoke-test";
+import { initSecretStorage, primeSecretFiles } from "./secret-storage";
+import {
+	getSettingsPath,
 	migrateSettingsSecrets,
 	readSettingsFile,
 	writeSettingsFile,
@@ -542,6 +549,9 @@ function createWindow(): void {
 		mainWindow?.show();
 	});
 
+	// WORKPILOT_SMOKE_TEST=1: quit once the renderer has mounted (CI, release)
+	armSmokeTest(mainWindow);
+
 	// Initialize spell check languages
 	initializeSpellCheckLanguages();
 
@@ -561,8 +571,17 @@ function createWindow(): void {
 		}
 	}
 
-	// Open DevTools in development
-	if (is.dev && mainWindow) {
+	// Open DevTools in development when asked (WORKPILOT_DEVTOOLS=1; F12
+	// toggles them anyway). Opening them on every launch made Chromium log
+	// "WebGL1 blocklisted" where the GPU is blocklisted (WSLg, VMs). Not in the
+	// smoke test: it models the shipped app, and DevTools docking into the
+	// closing window crashed it (F134).
+	if (
+		is.dev &&
+		process.env.WORKPILOT_DEVTOOLS === "1" &&
+		mainWindow &&
+		!isSmokeTest()
+	) {
 		mainWindow.webContents.openDevTools({ mode: "right" });
 	}
 
@@ -620,11 +639,9 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
 
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
-	// Mode serveur multi-utilisateurs : le backend tourne sur un serveur
-	// distant, on ne spawne rien en local.
-	if (isServerMode()) {
-		return;
-	}
+	// Lancé aussi quand l'app est connectée à un serveur WorkPilot : les
+	// projets locaux et les outils propres à la machine (hooks, mémoire,
+	// notifications) parlent à ce backend local, le serveur ne les sert pas.
 	// Vérifie si le backend répond déjà
 	try {
 		await waitForBackendReady("http://127.0.0.1:9000/providers", 1500);
@@ -801,7 +818,7 @@ async function ensureStreamingServerLaunched() {
 const backendSourcePath = resolve(import.meta.dirname, "../../../backend");
 pythonEnvManager
 	.initialize(backendSourcePath)
-	.then((status) => console.warn("[main] PythonEnvManager status:", status))
+	.then((status) => debugLog("[main] PythonEnvManager status:", status))
 	.catch((err) =>
 		console.error(
 			"[main] Erreur lors de l'initialisation du PythonEnvManager:",
@@ -837,6 +854,30 @@ async function setupMacOSDockIcon() {
 	} catch (e) {
 		console.warn("Could not set dock icon:", e);
 	}
+}
+
+// The files whose `enc:` secrets are decrypted ahead at launch.
+function appSecretFiles(): string[] {
+	return [
+		getSettingsPath(),
+		getProfilesFilePath(),
+		join(app.getPath("userData"), "config", "claude-profiles.json"),
+	];
+}
+
+function envSecretFiles(): string[] {
+	const files: string[] = [];
+	try {
+		for (const project of projectStore.getProjects()) {
+			const envPath = getProjectEnvPath(project);
+			if (envPath) files.push(envPath);
+		}
+		const { envPath } = getSourceEnvPath();
+		if (envPath) files.push(envPath);
+	} catch (error) {
+		console.warn("[main] Could not list the project .env files:", error);
+	}
+	return files;
 }
 
 // Encrypt the secrets settings.json, profiles.json, each project's
@@ -898,7 +939,7 @@ function loadAndValidateSettings() {
 
 		// Configure agent manager if we have valid settings
 		if (settings.pythonPath || validAutoBuildPath) {
-			console.warn("[main] Configuring AgentManager with settings:", {
+			debugLog("[main] Configuring AgentManager with settings:", {
 				pythonPath: settings.pythonPath,
 				autoBuildPath: validAutoBuildPath,
 			});
@@ -1023,7 +1064,7 @@ async function initializeProfileManager() {
 			// Start the usage monitor (uses unified OperationRegistry for proactive restart)
 			const usageMonitor = getUsageMonitor();
 			usageMonitor.start();
-			console.warn(
+			debugLog(
 				"[main] Usage monitor initialized and started (after profile load)",
 			);
 
@@ -1129,11 +1170,9 @@ function initializeAppUpdaterIfNeeded() {
 			console.warn("[main] Note: Updates won't actually work in dev mode");
 		}
 	} else {
-		console.warn("[main] ========================================");
-		console.warn("[main] App auto-updater DISABLED (development mode)");
-		console.warn("[main] To test updater logging, set DEBUG_UPDATER=true");
-		console.warn("[main] Note: Actual updates only work in packaged builds");
-		console.warn("[main] ========================================");
+		debugLog(
+			"[main] App auto-updater disabled in development (DEBUG_UPDATER=true forces it; updates only work in packaged builds)",
+		);
 	}
 }
 
@@ -1200,9 +1239,15 @@ async function main() {
 		optimizer.watchWindowShortcuts(window);
 	});
 
+	// Secrets at rest: probe the keyring and decrypt what is on disk with the
+	// async safeStorage API, before anything reads those files.
+	await initSecretStorage(appSecretFiles());
+	// Listing these reads settings.json, decrypted ahead by now.
+	await primeSecretFiles(envSecretFiles());
+
 	// Multi-user server mode: restore persisted connection (mode, URL,
 	// encrypted refresh token) before anything queries the backend.
-	loadPersistedState();
+	await loadPersistedState();
 	restoreSession().catch((err) =>
 		console.warn("[main] Could not restore server session:", err),
 	);
@@ -1245,6 +1290,9 @@ async function main() {
 	// Pre-warm CLI tool cache in background (non-blocking)
 	// This ensures CLI detection is done before user needs it
 	// Include all commonly used tools to prevent sync blocking on first use
+	// The user's CLI paths first, so the pre-warm detects what settings ask for
+	// and a later settings read does not clear it.
+	configureToolsFromSettings(loadSettingsSync());
 	setImmediate(() => {
 		preWarmToolCache(["claude", "git", "gh", "python"]).catch((error) => {
 			console.warn("[main] Failed to pre-warm CLI cache:", error);

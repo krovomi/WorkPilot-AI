@@ -1,6 +1,7 @@
 {
 	"title": "Cost Estimator",
 	"subtitle": "LLM usage costs, budgets, and forecasts",
+	"serverSubtitle": "What this project's agents spent on the server over the last 30 days",
 	"retry": "Retry",
 	"error": "Failed to load cost data",
 	"kpi": {

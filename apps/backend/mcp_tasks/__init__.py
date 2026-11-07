@@ -9,7 +9,8 @@ The client side, for the providers on WorkPilot's own loop, is in
 A leaf: the standard library only (``tests/test_import_contracts.py``).
 """
 
-from .server import ToolServer
+from .progress import bind_progress, report_progress
+from .server import RESOURCE_NOT_FOUND, Resources, ToolServer
 from .store import TaskStore
 from .wire import (
     APP_MIME_TYPE,
@@ -26,11 +27,15 @@ __all__ = [
     "APPS_EXTENSION",
     "APP_MIME_TYPE",
     "MODERN_VERSION",
+    "RESOURCE_NOT_FOUND",
+    "Resources",
     "TASKS_EXTENSION",
     "TERMINAL_STATUSES",
     "TaskStore",
     "ToolServer",
     "WireError",
+    "bind_progress",
     "declares_extension",
+    "report_progress",
     "request_version",
 ]

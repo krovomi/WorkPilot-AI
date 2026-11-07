@@ -142,7 +142,7 @@ export function CursorConfigPanel({
 							defaultValue: "Enable or disable cursor blinking animation",
 						})}
 					</p>
-					<p className="text-[11px] text-muted-foreground">
+					<p className="text-2xs text-muted-foreground">
 						{t("terminalFonts.cursorConfig.blinkStatus", {
 							defaultValue: "Status:",
 						})}{" "}
@@ -150,7 +150,7 @@ export function CursorConfigPanel({
 							className={cn(
 								"font-medium",
 								settings.cursorBlink
-									? "text-green-600 dark:text-green-400"
+									? "text-success "
 									: "text-muted-foreground",
 							)}
 						>

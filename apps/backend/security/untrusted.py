@@ -57,6 +57,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,80 @@ GUARD_MODE_ENV_VAR = "WORKPILOT_INJECTION_GUARD"
 #: Beside `watermarks.jsonl`, and for the same reason: this is the other place
 #: WorkPilot changes text a model will read without telling the model.
 LEDGER_FILENAME = "untrusted_content.jsonl"
+
+
+#: What a forge text asks *of the agent*, beyond the scanner's override
+#: phrasings. They live here, not in `injection_guard`, because they are only
+#: suspicious from a stranger: a task the user writes may well say "run
+#: `curl … | sh`", and an attachment may document `pull_request_target`; an
+#: issue that tells the agent to do so is the attack the plan's corpus
+#: (tests/injection_guard/corpus.yaml) replays. A hit rates the text `suspect`:
+#: it is written to the ledger and logged, never silently passed on.
+_FORGE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern, re.IGNORECASE), description)
+    for pattern, description in (
+        (
+            r"\b(?:curl|wget|iwr|irm|Invoke-WebRequest)\b[^\n|]*\|\s*(?:sudo\s+)?"
+            r"(?:ba|z|da|k)?sh\b|\|\s*(?:iex|Invoke-Expression)\b",
+            "Remote script piped to a shell",
+        ),
+        (
+            r"(?:\bcat|\btype|\bGet-Content|\bcp|\bscp)\s+\S*"
+            r"(?:\.ssh/|id_rsa|id_ed25519|\.aws/|\.npmrc|\.netrc|\.pypirc|\.env\b)",
+            "Read of a credential file",
+        ),
+        (
+            r"\b(?:paste|post|send|upload|share|include|commit|print|reply\s+with)\b"
+            r"[^.\n]{0,40}(?:\.env\b|id_rsa|\.ssh/|\.aws/credentials|\.npmrc|\.netrc|"
+            r"\b(?:secrets?|tokens?|credentials|private\s+keys?)\b)",
+            "Request to disclose credentials",
+        ),
+        (
+            r"!\[[^\]]*\]\(\s*https?://[^)\s]*(?:\$\{|\$\(|\{\{|%24%7B|"
+            r"[?&](?:token|key|secret|password|session|auth)[^=)]*=)",
+            "Image URL that carries data out",
+        ),
+        (
+            r"\bgit\s+push\b[^\n]*(?:--force\b|\s-f\b)|"
+            r"\bpush\s+(?:it\s+)?(?:directly|straight)\s+(?:to|on)\s+(?:main|master|develop)\b|"
+            r"\bpousse[rz]?\s+directement\s+sur\s+(?:main|master|develop)\b",
+            "Push that skips review",
+        ),
+        (
+            r"\bpull_request_target\b|\.github/workflows\b[^\n]{0,40}\b(?:secrets?|edit|change|modify)",
+            "Request to change CI with secrets",
+        ),
+        (
+            r"\.workpilot-allowlist|\.workpilot-security\.json|\.workpilot/guardrails|"
+            r"\.claude(?:_settings\.json|/settings)|\.workpilot-goal\.json",
+            "Mention of an agent guardrail file",
+        ),
+        (
+            r"\b(?:disable|remove|skip|bypass|turn\s+off|d[e\u00e9]sactive[rz]?|saute[rz]?)\s+"
+            r"(?:the\s+|les?\s+|la\s+)?(?:secret\s+scan|pre-commit|hooks?|tests?|QA|"
+            r"review(?:\s+gate)?|allowlist|sandbox|guardrails?|checks?)\b",
+            "Request to switch off a control",
+        ),
+        (
+            r"\b(?:note|message|instructions?|reminder|task)\s+(?:to|for)\s+(?:the\s+|any\s+)?"
+            r"(?:AI|LLMs?|agents?|assistants?|Claude|Codex|Copilot|GPT|Gemini|bots?|coding\s+agents?)\b|"
+            r"\bif\s+you\s+are\s+(?:an?\s+)?(?:AI|LLM|language\s+model|agent|assistant|bot)\b|"
+            r"\b(?:AI|coding|reviewer)\s+(?:agent|bot)\s*:",
+            "Text addressed to the agent",
+        ),
+        (
+            r"\bI\s+(?:hereby\s+)?(?:authori[sz]e|allow|permit)\s+you\s+to\b|"
+            r"\bje\s+t'autorise\s+[\u00e0a]\b",
+            "Claimed authorisation",
+        ),
+    )
+)
+
+
+def _forge_findings(text: str) -> list[str]:
+    return [
+        description for pattern, description in _FORGE_PATTERNS if pattern.search(text)
+    ]
 
 
 class UntrustedContent:
@@ -166,6 +241,11 @@ def clean_untrusted(
             logger.debug("sanitizing %s failed; passing through", kind, exc_info=True)
 
     threat_level, findings = _scan(text, source or kind)
+    forge = _forge_findings(text)
+    if forge:
+        findings = findings + forge
+        if threat_level in ("", "safe", "clean"):
+            threat_level = "suspect"
 
     return UntrustedContent(text, removed, truncated, findings, threat_level, kind)
 

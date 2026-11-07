@@ -11,7 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import type { InvitationPublic } from "../../../preload/api/modules/server-auth-api";
+import { formatAppDateTime } from "@/lib/date-format";
 
+import { NativeSelect } from "../ui/native-select";
 export function InvitationsAdmin() {
 	const { t } = useTranslation("settings");
 	const [email, setEmail] = useState("");
@@ -103,9 +105,9 @@ export function InvitationsAdmin() {
 						<Label htmlFor="invite-role">
 							{t("invitationsAdmin.role", "Rôle")}
 						</Label>
-						<select
+						<NativeSelect
 							id="invite-role"
-							className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+							className="h-9 px-3 text-sm"
 							value={role}
 							onChange={(e) => setRole(e.target.value)}
 						>
@@ -118,7 +120,7 @@ export function InvitationsAdmin() {
 							<option value="admin">
 								{t("invitationsAdmin.roleAdmin", "Administrateur")}
 							</option>
-						</select>
+						</NativeSelect>
 					</div>
 					<Button onClick={handleCreate} disabled={!email.trim() || busy}>
 						{busy ? (
@@ -183,7 +185,7 @@ export function InvitationsAdmin() {
 									<div className="text-xs text-muted-foreground">
 										{inv.role} ·{" "}
 										{t("invitationsAdmin.expires", "expire le")}{" "}
-										{new Date(inv.expires_at).toLocaleString()}
+										{formatAppDateTime(inv.expires_at)}
 									</div>
 								</div>
 								<Button

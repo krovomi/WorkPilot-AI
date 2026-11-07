@@ -58,6 +58,7 @@ import {
 } from "../ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { TimeTravelPanel } from "./TimeTravelPanel";
+import { formatAppDateTime } from "@/lib/date-format";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,27 +78,27 @@ const formatTokens = (tokens: number) => {
 
 const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
 
-const formatDate = (ts: number) => new Date(ts * 1000).toLocaleString();
+const formatDate = (ts: number) => formatAppDateTime(ts * 1000);
 
 const STEP_COLORS: Record<string, string> = {
-	session_start: "bg-green-500",
-	session_end: "bg-red-500",
+	session_start: "bg-success",
+	session_end: "bg-destructive",
 	agent_thinking: "bg-blue-500",
 	agent_response: "bg-purple-500",
 	tool_call: "bg-orange-500",
-	tool_result: "bg-yellow-500",
+	tool_result: "bg-warning",
 	file_read: "bg-cyan-500",
-	file_create: "bg-emerald-500",
+	file_create: "bg-success",
 	file_update: "bg-indigo-500",
 	file_delete: "bg-rose-500",
-	command_run: "bg-amber-500",
+	command_run: "bg-warning",
 	command_output: "bg-lime-500",
 	test_run: "bg-teal-500",
 	test_result: "bg-violet-500",
 	decision: "bg-pink-500",
-	error: "bg-red-600",
+	error: "bg-destructive",
 	progress: "bg-sky-500",
-	breakpoint_hit: "bg-red-400",
+	breakpoint_hit: "bg-destructive",
 };
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
@@ -177,7 +178,7 @@ const SessionListView: React.FC<{
 			{compareA && (
 				<div className="p-3 rounded-lg border border-primary bg-primary/5 flex items-center justify-between">
 					<span className="text-sm">
-						Select a second session to compare with{" "}
+						{t("replay:compareSelectSecond")}{" "}
 						<strong>{compareA.slice(0, 8)}...</strong>
 					</span>
 					<Button variant="ghost" size="sm" onClick={() => setCompareA(null)}>
@@ -218,7 +219,7 @@ const SessionListView: React.FC<{
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center gap-2">
 											<span className="font-medium truncate">
-												{session.agent_name || "Agent"}
+												{session.agent_name || t("replay:defaultAgentName")}
 											</span>
 											<Badge variant="secondary" className="text-xs">
 												{session.agent_role}
@@ -235,15 +236,21 @@ const SessionListView: React.FC<{
 											</Badge>
 										</div>
 										<p className="text-sm text-muted-foreground truncate mt-0.5">
-											{session.task_description || "No description"}
+											{session.task_description || t("replay:noDescription")}
 										</p>
 										<div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
 											<span>{formatDate(session.start_time)}</span>
-											<span>{session.step_count} steps</span>
-											<span>{formatTokens(session.total_tokens)} tokens</span>
+											<span>{t("replay:stepsCount", { count: session.step_count })}</span>
+						<span>
+							{t("replay:tokensCount", {
+								value: formatTokens(session.total_tokens),
+							})}
+						</span>
 											<span>{formatCost(session.total_cost_usd)}</span>
-											<span>{session.total_tool_calls} tools</span>
-											<span>{session.total_file_changes} files</span>
+											<span>{t("replay:toolsCount", { count: session.total_tool_calls })}</span>
+						<span>
+							{t("replay:filesCount", { count: session.total_file_changes })}
+						</span>
 											{session.model_label && (
 												<Badge variant="outline" className="text-xs">
 													{session.model_label}
@@ -259,7 +266,7 @@ const SessionListView: React.FC<{
 												e.stopPropagation();
 												setCompareA(session.session_id);
 											}}
-											title="A/B Compare"
+											title={t("replay:abCompareTitle")}
 										>
 											<GitCompare className="h-4 w-4" />
 										</Button>
@@ -270,7 +277,7 @@ const SessionListView: React.FC<{
 												e.stopPropagation();
 												onDelete(session.session_id);
 											}}
-											title="Delete"
+											title={t("common:buttons.delete")}
 										>
 											<Trash2 className="h-4 w-4 text-destructive" />
 										</Button>
@@ -399,7 +406,7 @@ const MetricRow: React.FC<{
 		<span className="text-center">{valA}</span>
 		<span className="text-center">{valB}</span>
 		<span
-			className={`text-center font-medium ${positive ? "text-green-500" : "text-red-500"}`}
+			className={`text-center font-medium ${positive ? "text-success" : "text-destructive"}`}
 		>
 			{diff}
 		</span>
@@ -574,13 +581,13 @@ const DebugPanel: React.FC<{
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="tool_call">Tool Call</SelectItem>
-							<SelectItem value="file_change">File Change</SelectItem>
-							<SelectItem value="decision">Decision</SelectItem>
-							<SelectItem value="error">Error</SelectItem>
-							<SelectItem value="token_threshold">Token Threshold</SelectItem>
-							<SelectItem value="step_index">Step Index</SelectItem>
-							<SelectItem value="pattern_match">Pattern Match</SelectItem>
+							<SelectItem value="tool_call">{t("replay:toolCall")}</SelectItem>
+							<SelectItem value="file_change">{t("replay:breakpointTypes.fileChange")}</SelectItem>
+							<SelectItem value="decision">{t("replay:decision")}</SelectItem>
+							<SelectItem value="error">{t("replay:error")}</SelectItem>
+							<SelectItem value="token_threshold">{t("replay:breakpointTypes.tokenThreshold")}</SelectItem>
+							<SelectItem value="step_index">{t("replay:breakpointTypes.stepIndex")}</SelectItem>
+							<SelectItem value="pattern_match">{t("replay:breakpointTypes.patternMatch")}</SelectItem>
 						</SelectContent>
 					</Select>
 				</div>
@@ -588,7 +595,7 @@ const DebugPanel: React.FC<{
 					<Label className="text-xs">{t("replay:condition")}</Label>
 					<Input
 						className="h-8 text-xs"
-						placeholder="e.g. write_file"
+						placeholder={t("replay:breakpointConditionPlaceholder")}
 						value={newCondition}
 						onChange={(e) => setNewCondition(e.target.value)}
 					/>
@@ -619,12 +626,12 @@ const DebugPanel: React.FC<{
 							className="flex items-center justify-between p-2 rounded border text-sm"
 						>
 							<div className="flex items-center gap-2">
-								<Bug className="h-3.5 w-3.5 text-red-500" />
+								<Bug className="h-3.5 w-3.5 text-destructive" />
 								<Badge variant="outline" className="text-xs">
 									{bp.breakpoint_type}
 								</Badge>
 								<span className="text-muted-foreground">
-									{bp.condition || "(any)"}
+									{bp.condition || t("replay:anyCondition")}
 								</span>
 								{bp.hit_count > 0 && (
 									<Badge variant="secondary" className="text-xs">
@@ -790,13 +797,19 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 							)}
 						</h2>
 						<p className="text-xs text-muted-foreground truncate max-w-md">
-							{activeSession.task_description || "Untitled"}
+							{activeSession.task_description || t("replay:untitled")}
 						</p>
 					</div>
 				</div>
 				<div className="flex items-center gap-3 text-xs text-muted-foreground">
-					<span>{activeSession.step_count} steps</span>
-					<span>{formatTokens(activeSession.total_tokens)} tokens</span>
+					<span>
+						{t("replay:stepsCount", { count: activeSession.step_count })}
+					</span>
+					<span>
+						{t("replay:tokensCount", {
+							value: formatTokens(activeSession.total_tokens),
+						})}
+					</span>
 					<span>{formatCost(activeSession.total_cost_usd)}</span>
 					<span>{formatDuration(activeSession.duration_seconds * 1000)}</span>
 					<Button
@@ -949,7 +962,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										</span>
 										<span className="font-medium truncate">{step.label}</span>
 										{step.is_breakpoint && (
-											<Bug className="h-3 w-3 text-red-500 shrink-0" />
+											<Bug className="h-3 w-3 text-destructive shrink-0" />
 										)}
 									</div>
 									{step.description && step.description !== step.label && (
@@ -1015,28 +1028,30 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										<div className="grid grid-cols-2 gap-3">
 											<div className="space-y-2">
 												<div className="flex justify-between text-sm">
-													<Label>Type</Label>
+													<Label>{t("replay:type")}</Label>
 													<Badge variant="secondary">
 														{currentStep.step_type}
 													</Badge>
 												</div>
 												<div className="flex justify-between text-sm">
-													<Label>Duration</Label>
+													<Label>{t("replay:duration")}</Label>
 													<span>{formatDuration(currentStep.duration_ms)}</span>
 												</div>
 												<div className="flex justify-between text-sm">
-													<Label>Tokens</Label>
+													<Label>{t("replay:tokens")}</Label>
 													<span>
-														{formatTokens(currentStep.input_tokens)} in /{" "}
-														{formatTokens(currentStep.output_tokens)} out
+														{t("replay:tokensInOut", {
+								input: formatTokens(currentStep.input_tokens),
+								output: formatTokens(currentStep.output_tokens),
+							})}
 													</span>
 												</div>
 												<div className="flex justify-between text-sm">
-													<Label>Cost</Label>
+													<Label>{t("replay:cost")}</Label>
 													<span>{formatCost(currentStep.cost_usd)}</span>
 												</div>
 												<div className="flex justify-between text-sm">
-													<Label>Cumulative</Label>
+													<Label>{t("replay:stepDetail.cumulative")}</Label>
 													<span>
 														{formatTokens(currentStep.cumulative_tokens)} /{" "}
 														{formatCost(currentStep.cumulative_cost_usd)}
@@ -1046,7 +1061,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 											<div className="space-y-2">
 												{currentStep.tool_name && (
 													<div className="flex justify-between text-sm">
-														<Label>Tool</Label>
+														<Label>{t("replay:stepDetail.tool")}</Label>
 														<Badge variant="outline">
 															{currentStep.tool_name}
 														</Badge>
@@ -1054,7 +1069,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 												)}
 												{currentStep.chosen_option && (
 													<div className="text-sm">
-														<Label>Decision</Label>
+														<Label>{t("replay:decision")}</Label>
 														<p className="text-muted-foreground mt-0.5">
 															{currentStep.chosen_option}
 														</p>
@@ -1067,7 +1082,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{currentStep.reasoning && (
 											<div>
 												<Label className="text-xs text-muted-foreground">
-													Reasoning
+													{t("replay:stepDetail.reasoning")}
 												</Label>
 												<div className="mt-1 p-3 bg-muted rounded-lg">
 													<pre className="text-xs whitespace-pre-wrap">
@@ -1081,7 +1096,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{currentStep.tool_input && (
 											<div>
 												<Label className="text-xs text-muted-foreground">
-													Tool Input
+													{t("replay:stepDetail.toolInput")}
 												</Label>
 												<div className="mt-1 p-3 bg-muted rounded-lg">
 													<pre className="text-xs whitespace-pre-wrap overflow-auto max-h-40">
@@ -1093,7 +1108,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{currentStep.tool_output && (
 											<div>
 												<Label className="text-xs text-muted-foreground">
-													Tool Output
+													{t("replay:stepDetail.toolOutput")}
 												</Label>
 												<div className="mt-1 p-3 bg-muted rounded-lg">
 													<pre className="text-xs whitespace-pre-wrap overflow-auto max-h-40">
@@ -1107,7 +1122,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										{currentStep.options_considered.length > 0 && (
 											<div>
 												<Label className="text-xs text-muted-foreground">
-													Options Considered
+													{t("replay:stepDetail.optionsConsidered")}
 												</Label>
 												<div className="mt-1 space-y-1">
 													{currentStep.options_considered.map((opt) => (
@@ -1131,7 +1146,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 									</>
 								) : (
 									<p className="text-sm text-muted-foreground">
-										Select a step from the timeline.
+										{t("replay:stepDetail.selectStep")}
 									</p>
 								)}
 							</TabsContent>
@@ -1151,9 +1166,9 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 
 										const getLineClassName = (line: string): string => {
 											if (line.startsWith("+"))
-												return "text-green-600 bg-green-500/10";
+												return "text-success bg-success/10";
 											if (line.startsWith("-"))
-												return "text-red-600 bg-red-500/10";
+												return "text-destructive bg-destructive/10";
 											return "";
 										};
 
@@ -1184,7 +1199,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 													) : (
 														<p className="text-xs text-muted-foreground">
 															{diff.line_count_before} → {diff.line_count_after}{" "}
-															lines
+															{t("replay:heatmapLines")}
 														</p>
 													)}
 												</CardContent>
@@ -1207,7 +1222,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 											{t("replay:fileActivityHeatmap")}
 										</CardTitle>
 										<CardDescription className="text-xs">
-											Files most frequently touched by the agent
+											{t("replay:heatmapDescription")}
 										</CardDescription>
 									</CardHeader>
 									<CardContent>
@@ -1219,7 +1234,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 								<Card className="mt-4">
 									<CardHeader>
 										<CardTitle className="text-sm flex items-center gap-2">
-											<Wrench className="h-4 w-4" /> Tool Usage
+											<Wrench className="h-4 w-4" /> {t("replay:toolUsage")}
 										</CardTitle>
 									</CardHeader>
 									<CardContent>
@@ -1271,10 +1286,10 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 								<Card>
 									<CardHeader>
 										<CardTitle className="text-sm flex items-center gap-2">
-											<Bug className="h-4 w-4" /> Breakpoints
+											<Bug className="h-4 w-4" /> {t("replay:breakpoints")}
 										</CardTitle>
 										<CardDescription className="text-xs">
-											Set breakpoints to pause replay at specific events
+											{t("replay:breakpointsDescription")}
 										</CardDescription>
 									</CardHeader>
 									<CardContent>
@@ -1311,8 +1326,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										<CardContent className="py-8 text-center">
 											<GitCompare className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
 											<p className="text-sm text-muted-foreground">
-												Select two sessions from the session list to compare
-												them side by side.
+												{t("replay:compareEmpty")}
 											</p>
 											<Button
 												variant="outline"
@@ -1320,8 +1334,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 												className="mt-3"
 												onClick={closeSession}
 											>
-												<ArrowLeft className="h-3.5 w-3.5 mr-1" /> Go to session
-												list
+												<ArrowLeft className="h-3.5 w-3.5 mr-1" /> {t("replay:goToSessionList")}
 											</Button>
 										</CardContent>
 									</Card>

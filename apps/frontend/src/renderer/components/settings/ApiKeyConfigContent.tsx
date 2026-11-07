@@ -157,13 +157,13 @@ function GitHubCopilotTokenConfig({
 			<div className="space-y-2">
 				<Label htmlFor="copilot-token" className="flex items-center gap-2">
 					<Key className="w-4 h-4" />
-					{t("githubCopilot.token.label")}
+					{t("githubCopilot.token.inputLabel")}
 				</Label>
 				<div className="relative">
 					<Input
 						id="copilot-token"
 						type={showApiKey ? "text" : "password"}
-						placeholder={t("githubCopilot.token.placeholder")}
+						placeholder={t("githubCopilot.token.inputPlaceholder")}
 						className="font-mono pr-10"
 					/>
 					<Button
@@ -187,8 +187,8 @@ function GitHubCopilotTokenConfig({
 
 			{/* Token Actions */}
 			<div className="flex gap-2">
-				<Button>{t("common.save")}</Button>
-				<Button variant="outline">{t("common.remove")}</Button>
+				<Button>{t("githubCopilot.token.save")}</Button>
+				<Button variant="outline">{t("githubCopilot.token.remove")}</Button>
 			</div>
 
 			{/* Token Status */}
@@ -206,7 +206,6 @@ function ApiUrlInput({
 	value,
 	onChange,
 	placeholder,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	t,
 }: {
 	readonly value: string;
@@ -219,7 +218,7 @@ function ApiUrlInput({
 		<div className="space-y-2">
 			<Label htmlFor="apiUrl" className="flex items-center gap-2">
 				<Globe className="w-4 h-4" />
-				URL de l'API
+				{t("settings:apiKeyConfig.apiUrl")}
 			</Label>
 			<Input
 				id="apiUrl"
@@ -234,7 +233,6 @@ function ApiUrlInput({
 function ModelInput({
 	value,
 	onChange,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	t,
 }: {
 	readonly value: string;
@@ -244,10 +242,10 @@ function ModelInput({
 }) {
 	return (
 		<div className="space-y-2">
-			<Label htmlFor="model">Modèle par défaut</Label>
+			<Label htmlFor="model">{t("settings:apiKeyConfig.defaultModel")}</Label>
 			<Input
 				id="model"
-				placeholder="gpt-5.3, claude-4.6-opus, etc."
+				placeholder={t("settings:apiKeyConfig.modelPlaceholder")}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 			/>
@@ -264,8 +262,8 @@ function TestResultAlert({
 		<Alert
 			className={cn(
 				testResult.success
-					? "border-green-200 bg-green-50 text-green-800"
-					: "border-red-200 bg-red-50 text-red-800",
+					? "border-success/30 bg-success/10 text-success"
+					: "border-destructive/30 bg-destructive/10 text-destructive",
 			)}
 		>
 			{testResult.success ? (

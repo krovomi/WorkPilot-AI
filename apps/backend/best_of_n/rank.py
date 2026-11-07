@@ -176,7 +176,9 @@ def measure_variant(
         worktree=worktree is not None and worktree.is_dir(),
     )
     local_spec = (
-        worktree / ".workpilot" / "specs" / variant_dir.name if score.worktree else None
+        worktree / ".workpilot" / "specs" / variant_dir.name
+        if worktree is not None and score.worktree
+        else None
     )
     plan = None
     for candidate in (local_spec, variant_dir):

@@ -8,6 +8,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Project } from "../../../../shared/types";
 import { projectStore } from "../../../project-store";
+import { featureProject } from "../../server-feature-files";
 
 /**
  * Validate that a project path is safe for file operations
@@ -96,6 +97,21 @@ export async function withProjectOrNull<T>(
 	}
 
 	return handler(project);
+}
+
+/**
+ * {@link withProjectOrNull} for the GitHub views that also work on a server
+ * project (server mode). Its calls go through the server (`server-relay.ts`)
+ * and nothing is read from or run in its folder, the app's mirror, so a
+ * handler that reads the folder or runs a tool there keeps `withProjectOrNull`.
+ */
+export async function withForgeProjectOrNull<T>(
+	projectId: string,
+	handler: (project: Project) => Promise<T>,
+): Promise<T | null> {
+	const project = featureProject(projectId);
+	if (project?.remote) return handler(project);
+	return withProjectOrNull(projectId, handler);
 }
 
 /**

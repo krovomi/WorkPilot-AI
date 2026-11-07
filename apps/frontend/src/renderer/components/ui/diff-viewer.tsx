@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText, MessageSquarePlus } from "lucide-react";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
@@ -10,6 +10,17 @@ interface DiffViewerProps {
 	className?: string;
 	/** "unified" (default) shows one column; "split" shows old/new side by side. */
 	viewMode?: DiffViewMode;
+	/**
+	 * Shows a comment button in the gutter of every line (unified view): a
+	 * removed line is commented on the old side, any other on the new side.
+	 */
+	onCommentLine?: (target: DiffLineTarget) => void;
+}
+
+/** A line of the diff a comment can be anchored on. */
+export interface DiffLineTarget {
+	side: "old" | "new";
+	line: number;
 }
 
 interface DiffLine {
@@ -30,6 +41,7 @@ export function DiffViewer({
 	patch,
 	className,
 	viewMode = "unified",
+	onCommentLine,
 }: DiffViewerProps) {
 	const { t } = useTranslation(["common"]);
 
@@ -54,14 +66,29 @@ export function DiffViewer({
 			{viewMode === "split" ? (
 				<SplitDiff lines={lines} />
 			) : (
-				<UnifiedDiff lines={lines} />
+				<UnifiedDiff lines={lines} onCommentLine={onCommentLine} />
 			)}
 		</div>
 	);
 }
 
+function lineTarget(line: DiffLine): DiffLineTarget | null {
+	if (line.type === "hunk") return null;
+	if (line.type === "removed") {
+		return line.oldLineNumber ? { side: "old", line: line.oldLineNumber } : null;
+	}
+	return line.newLineNumber ? { side: "new", line: line.newLineNumber } : null;
+}
+
 /** Classic single-column diff: removed and added lines interleaved. */
-function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
+function UnifiedDiff({
+	lines,
+	onCommentLine,
+}: {
+	lines: DiffLine[];
+	onCommentLine?: (target: DiffLineTarget) => void;
+}) {
+	const { t } = useTranslation(["common"]);
 	return (
 		<div className="diff-content">
 			{lines.map((line, index) => (
@@ -71,12 +98,30 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 					data-diff-hunk={line.type === "hunk" ? "true" : undefined}
 					className={cn(
 						"flex diff-line",
-						line.type === "added" && "bg-green-500/20",
-						line.type === "removed" && "bg-red-500/20",
+						line.type === "added" && "bg-success/20",
+						line.type === "removed" && "bg-destructive/20",
 						line.type === "hunk" && "bg-blue-500/20",
 						line.type === "context" && "bg-transparent",
 					)}
 				>
+					{onCommentLine && (
+						<div className="w-6 shrink-0 flex items-center justify-center">
+							{(() => {
+								const target = lineTarget(line);
+								return target ? (
+									<button
+										type="button"
+										onClick={() => onCommentLine(target)}
+										aria-label={t("common:diffViewer.commentLine", { line: target.line })}
+										title={t("common:diffViewer.commentLine", { line: target.line })}
+										className="rounded p-0.5 text-muted-foreground opacity-40 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+									>
+										<MessageSquarePlus className="h-3 w-3" />
+									</button>
+								) : null;
+							})()}
+						</div>
+					)}
 					<div
 						className={cn(
 							"diff-line-numbers flex shrink-0 select-none",
@@ -86,8 +131,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"w-10 text-right pr-2",
-								line.type === "added" && "text-green-400 font-medium",
-								line.type === "removed" && "text-red-400 font-medium",
+								line.type === "added" && "text-success font-medium",
+								line.type === "removed" && "text-destructive font-medium",
 								line.type === "context" && "text-muted-foreground",
 								line.type === "hunk" && "text-blue-400 font-medium",
 							)}
@@ -97,8 +142,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"w-10 text-right pr-2 border-l border-border",
-								line.type === "added" && "text-green-400 font-medium",
-								line.type === "removed" && "text-red-400 font-medium",
+								line.type === "added" && "text-success font-medium",
+								line.type === "removed" && "text-destructive font-medium",
 								line.type === "context" && "text-muted-foreground",
 								line.type === "hunk" && "text-blue-400 font-medium",
 							)}
@@ -109,8 +154,8 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 					<div
 						className={cn(
 							"flex-1 px-2 py-0.5 whitespace-pre overflow-x-auto",
-							line.type === "added" && "text-green-400 font-medium",
-							line.type === "removed" && "text-red-400 font-medium",
+							line.type === "added" && "text-success font-medium",
+							line.type === "removed" && "text-destructive font-medium",
 							line.type === "hunk" && "text-blue-400 font-medium",
 							line.type === "context" && "text-foreground",
 						)}
@@ -158,7 +203,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 text-right select-none border-r border-border tabular-nums",
-								leftRemoved ? "text-red-400" : "text-muted-foreground",
+								leftRemoved ? "text-destructive" : "text-muted-foreground",
 								!row.left && "bg-muted/30",
 							)}
 						>
@@ -167,7 +212,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 py-0.5 whitespace-pre overflow-x-auto border-r border-border",
-								leftRemoved && "bg-red-500/20 text-red-400",
+								leftRemoved && "bg-destructive/20 text-destructive",
 								!leftRemoved && row.left && "text-foreground",
 								!row.left && "bg-muted/30",
 							)}
@@ -179,7 +224,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 text-right select-none border-r border-border tabular-nums",
-								rightAdded ? "text-green-400" : "text-muted-foreground",
+								rightAdded ? "text-success" : "text-muted-foreground",
 								!row.right && "bg-muted/30",
 							)}
 						>
@@ -188,7 +233,7 @@ function SplitDiff({ lines }: { lines: DiffLine[] }) {
 						<div
 							className={cn(
 								"px-2 py-0.5 whitespace-pre overflow-x-auto",
-								rightAdded && "bg-green-500/20 text-green-400",
+								rightAdded && "bg-success/20 text-success",
 								!rightAdded && row.right && "text-foreground",
 								!row.right && "bg-muted/30",
 							)}

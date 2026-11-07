@@ -162,12 +162,7 @@ def find_spec(project_dir: Path, spec_identifier: str) -> Path | None:
 
 
 def _active_provider(spec_dir: Path) -> str:
-    """Which provider this build would run on, resolved without side effects.
-
-    `peek_active_provider` is the repository's read-only resolver: the normal
-    one deletes the single-shot RESUME_WITH_PROVIDER marker on read, and a
-    function called `validate_environment` must not eat the "resume with X"
-    choice the session it is validating was about to honour.
+    """Which provider this build would run on.
 
     Falls back to the environment signal the frontend's credential manager
     sets. That fallback only matters if `core.client` cannot be imported at

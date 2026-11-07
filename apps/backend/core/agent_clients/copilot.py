@@ -14,6 +14,8 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import aclosing
 from typing import Any
 
+from copilot_models import EXCHANGE_REFUSED_STATUSES as _EXCHANGE_REFUSED_STATUSES
+from copilot_models import IDE_HEADERS
 from harness.application.loop import run_turns
 from harness.application.subagents import (
     launch_staggered,
@@ -110,6 +112,13 @@ def _normalize_copilot_model_id(model: str | None) -> str | None:
         family, major, minor = match.group(1), match.group(2), match.group(3)
         return f"{family}-{major}.{minor}"
     return model
+
+
+def _model_not_served(model: str) -> str:
+    return (
+        f"Copilot does not serve '{model}' to this account: the model is not "
+        "in its plan, or not enabled at https://github.com/settings/copilot/features."
+    )
 
 
 def _copilot_fallback_model(model: str) -> str:
@@ -474,7 +483,16 @@ class _CopilotAdapter(ChatCompletionsAdapter):
                         # and retry the turn instead of failing the phase.
                         error_text = await resp.text()
                         if "model_not_supported" in error_text:
-                            fallback = _copilot_fallback_model(client.model)
+                            if not client.allow_model_fallback:
+                                # A caller comparing models (the Arena) wants
+                                # this model's answer or a failure, never
+                                # another model's answer under its name.
+                                yield self.notice(_model_not_served(client.model))
+                                yield Outcome.HALT
+                                return
+                            fallback = await client._served_fallback(
+                                session, request_headers
+                            )
                             self.model_fallback_attempted = True
                             logger.warning(
                                 "[CopilotAgentClient] Model "
@@ -771,12 +789,7 @@ class CopilotAgentClient(AgentClient):
     # IDE impersonation headers — required by the Copilot API gateway.
     # Omitting any of these causes 400 / 421 errors on Copilot Enterprise.
     # Versions verified against working open-source implementations (2025).
-    _IDE_HEADERS = {
-        "editor-version": "vscode/1.104.3",
-        "editor-plugin-version": "copilot-chat/0.26.7",
-        "user-agent": "GitHubCopilotChat/0.26.7",
-        "x-vscode-user-agent-library-version": "electron-fetch",
-    }
+    _IDE_HEADERS = IDE_HEADERS
 
     def __init__(
         self,
@@ -790,10 +803,14 @@ class CopilotAgentClient(AgentClient):
         agent_type: str = "coder",
         spec_dir: str | None = None,
         thinking_budget: int | None = None,
+        allow_model_fallback: bool = True,
     ):
         import os
 
         self.model = _normalize_copilot_model_id(model) or "gpt-4o"
+        # When Copilot refuses the model: run on another one (a build that
+        # must finish) or fail (a comparison that must not substitute).
+        self.allow_model_fallback = allow_model_fallback
         # The user's thinking budget for the phase. What reaches the API is
         # `_session_thinking_budget`: kept inside the bounds Copilot's
         # `/models` gives this model, or None when it takes no budget.
@@ -962,11 +979,13 @@ class CopilotAgentClient(AgentClient):
         Two-path authentication:
         1. (Preferred) Exchange a GitHub OAuth token at copilot_internal/v2/token
            for a short-lived session token (~30 min TTL).
-        2. (Fallback) Some Copilot Business/Enterprise accounts managed by an
-           organisation have the token-exchange endpoint restricted (returns 404).
-           In that case the raw GitHub OAuth token (gho_…) is accepted directly
-           as a Bearer token by api.githubcopilot.com.  We cache this as the
-           "session token" with a 30-minute TTL to match normal behaviour.
+        2. (Fallback) The exchange refuses the token: 404 when an organisation
+           restricts the endpoint (Copilot Business/Enterprise), 403 when the
+           token comes from an OAuth app GitHub does not reserve it for (the
+           GitHub CLI's, typically). In that case the raw GitHub OAuth token
+           (gho_…) is accepted directly as a Bearer token by
+           api.githubcopilot.com.  We cache this as the "session token" with a
+           30-minute TTL to match normal behaviour.
         """
         import time
 
@@ -1018,18 +1037,26 @@ class CopilotAgentClient(AgentClient):
                         "[CopilotAgentClient] Session token refreshed via exchange"
                     )
                     return self._copilot_token
-                elif resp.status == 404:
-                    # Copilot Business/Enterprise accounts managed by an organisation
-                    # often restrict the internal token-exchange endpoint.  Fall back
-                    # to using the raw GitHub OAuth token directly as Bearer auth —
-                    # api.githubcopilot.com accepts it for these account types.
+                elif resp.status in _EXCHANGE_REFUSED_STATUSES:
+                    # The internal exchange is closed to this token:
+                    # - 404: Copilot Business/Enterprise accounts managed by an
+                    #   organisation often restrict the endpoint;
+                    # - 403 ("For more on scraping GitHub…"): GitHub now keeps it
+                    #   for its own Copilot apps, and refuses tokens from any
+                    #   other OAuth app — the GitHub CLI's `gh auth token`
+                    #   included.
+                    # api.githubcopilot.com accepts the GitHub OAuth token itself
+                    # as Bearer auth, which is how GitHub's own Copilot CLI
+                    # authenticates with a `gh` token; use it directly.
+                    await resp.text()  # read the refusal before moving on
                     logger.info(
-                        "[CopilotAgentClient] Token exchange endpoint returned 404 "
-                        "(organisation-managed Copilot). Using GitHub token directly as Bearer."
+                        "[CopilotAgentClient] Token exchange endpoint returned %s. "
+                        "Using GitHub token directly as Bearer.",
+                        resp.status,
                     )
                     print(
                         "[CopilotAgentClient] [INFO] Token exchange not available "
-                        "(Copilot Business/Enterprise). Using GitHub token directly.",
+                        f"({resp.status}). Using GitHub token directly.",
                         flush=True,
                     )
                     self._copilot_token = self.github_token
@@ -1046,6 +1073,42 @@ class CopilotAgentClient(AgentClient):
                     raise ValueError(
                         f"Copilot token exchange failed ({resp.status}): {error_text}{token_hint}"
                     )
+
+    async def _served_fallback(self, session: Any, headers: dict[str, str]) -> str:
+        """The model to retry with once Copilot refused ``self.model``.
+
+        The id's normalised spelling first (it keeps the intent), else the
+        default fallback when this account's ``/models`` serves it, else the
+        first model it does serve. Without an answer from ``/models``, the
+        default fallback, as before.
+        """
+        from copilot_models import is_served, usable_chat_models
+
+        fallback = _copilot_fallback_model(self.model)
+        if fallback != _COPILOT_DEFAULT_FALLBACK_MODEL:
+            return fallback
+        try:
+            token = await self._get_copilot_token()
+            async with session.get(
+                self._models_url,
+                headers={**headers, "Authorization": f"Bearer {token}"},
+            ) as resp:
+                if resp.status != 200:
+                    await resp.text()
+                    return fallback
+                data = await resp.json()
+        except (OSError, ValueError, TimeoutError) as error:
+            logger.info("[CopilotAgentClient] /models unavailable (%s)", error)
+            return fallback
+        entries = data.get("data") if isinstance(data, dict) else None
+        if is_served(fallback, entries):
+            return fallback
+        served = [
+            entry["id"]
+            for entry in usable_chat_models(entries)
+            if entry["id"] != self.model
+        ]
+        return served[0] if served else fallback
 
     async def _resolve_thinking_budget(
         self, session: Any, headers: dict[str, str]

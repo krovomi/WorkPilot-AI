@@ -55,7 +55,7 @@ function isSourceFile(name: string): boolean {
 function getFileIcon(node: FileNode) {
 	if (node.isDirectory) return null;
 	return (
-		<FileCode className="w-3.5 h-3.5 shrink-0 text-(--color-text-secondary)" />
+		<FileCode className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
 	);
 }
 
@@ -201,7 +201,7 @@ export function SmartFilePicker({
 	const openStateClasses =
 		"border-[var(--color-accent)] bg-[var(--color-accent)]/5";
 	const hasValueClasses =
-		"border-[var(--color-border)] bg-[var(--color-bg-secondary)]";
+		"border-[var(--color-border)] bg-card";
 	const noValueClasses =
 		"border-dashed border-[var(--color-border)] bg-transparent";
 
@@ -244,26 +244,26 @@ export function SmartFilePicker({
 				{value ? (
 					<>
 						<FileCode className="w-4 h-4 shrink-0 text-accent" />
-						<span className="flex-1 text-sm font-mono truncate text-(--color-text-primary)">
+						<span className="flex-1 text-sm font-mono truncate text-foreground">
 							{displayValue}
 						</span>
 						<button
 							type="button"
 							onClick={clearSelection}
-							className="p-0.5 rounded hover:bg-(--color-bg-tertiary) text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors"
+							className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
 						>
 							<X className="w-3.5 h-3.5" />
 						</button>
 					</>
 				) : (
 					<>
-						<FolderOpen className="w-4 h-4 shrink-0 text-(--color-text-secondary)" />
-						<span className="flex-1 text-sm text-(--color-text-secondary)">
+						<FolderOpen className="w-4 h-4 shrink-0 text-muted-foreground" />
+						<span className="flex-1 text-sm text-muted-foreground">
 							{placeholder ?? t("testGeneration:filePicker.selectFile")}
 						</span>
 					</>
 				)}
-				<span className="text-(--color-text-secondary)">
+				<span className="text-muted-foreground">
 					{isOpen ? (
 						<ChevronUp className="w-4 h-4" />
 					) : (
@@ -274,7 +274,7 @@ export function SmartFilePicker({
 
 			{/* Inline file tree panel */}
 			{isOpen && (
-				<div className="rounded-lg border border-border bg-(--color-bg-secondary) overflow-hidden shadow-lg">
+				<div className="rounded-lg border border-border bg-card overflow-hidden shadow-lg">
 					{/* Breadcrumb */}
 					<div className="flex items-center gap-1 px-3 py-2 border-b border-border overflow-x-auto scrollbar-none">
 						{breadcrumbs.map((crumb, idx) => (
@@ -283,7 +283,7 @@ export function SmartFilePicker({
 								className="flex items-center gap-1 shrink-0"
 							>
 								{idx > 0 && (
-									<ChevronRight className="w-3 h-3 text-(--color-text-secondary)" />
+									<ChevronRight className="w-3 h-3 text-muted-foreground" />
 								)}
 								<button
 									type="button"
@@ -291,8 +291,8 @@ export function SmartFilePicker({
 									className={cn(
 										"text-xs px-1.5 py-0.5 rounded transition-colors",
 										idx === breadcrumbs.length - 1
-											? "text-(--color-text-primary) font-medium bg-accent/10"
-											: "text-(--color-text-secondary) hover:text-(--color-text-primary) hover:bg-(--color-bg-tertiary)",
+											? "text-foreground font-medium bg-accent/10"
+											: "text-muted-foreground hover:text-foreground hover:bg-muted",
 									)}
 								>
 									{crumb.name}
@@ -303,20 +303,20 @@ export function SmartFilePicker({
 
 					{/* Search filter */}
 					<div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-						<Search className="w-3.5 h-3.5 shrink-0 text-(--color-text-secondary)" />
+						<Search className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
 						<input
 							ref={filterRef}
 							type="text"
 							value={filter}
 							onChange={(e) => setFilter(e.target.value)}
 							placeholder={t("testGeneration:filePicker.filter")}
-							className="flex-1 bg-transparent text-sm text-(--color-text-primary) placeholder:text-(--color-text-secondary) outline-none"
+							className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
 						/>
 						{filter && (
 							<button
 								type="button"
 								onClick={() => setFilter("")}
-								className="text-(--color-text-secondary) hover:text-(--color-text-primary)"
+								className="text-muted-foreground hover:text-foreground"
 							>
 								<X className="w-3 h-3" />
 							</button>
@@ -327,12 +327,12 @@ export function SmartFilePicker({
 					<div className="max-h-56 overflow-y-auto">
 						{loading && (
 							<div className="flex items-center justify-center py-6">
-								<Loader2 className="w-4 h-4 animate-spin text-(--color-text-secondary)" />
+								<Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
 							</div>
 						)}
 
 						{!loading && filteredEntries.length === 0 && (
-							<p className="text-xs text-(--color-text-secondary) text-center py-6">
+							<p className="text-xs text-muted-foreground text-center py-6">
 								{t("testGeneration:filePicker.empty")}
 							</p>
 						)}
@@ -363,14 +363,14 @@ export function SmartFilePicker({
 												className={cn(
 													"flex-1 truncate font-mono",
 													node.isDirectory
-														? "text-(--color-text-primary)"
-														: "text-(--color-text-secondary) group-hover:text-(--color-text-primary)",
+														? "text-foreground"
+														: "text-muted-foreground group-hover:text-foreground",
 												)}
 											>
 												{node.name}
 											</span>
 											{node.isDirectory && (
-												<ChevronRight className="w-3 h-3 shrink-0 text-(--color-text-secondary) opacity-0 group-hover:opacity-100 transition-opacity" />
+												<ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
 											)}
 										</button>
 									</li>

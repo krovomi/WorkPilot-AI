@@ -35,10 +35,10 @@ jobs:
       notarization_id: ${{ steps.notarize.outputs.notarization-id }}
       dmg_file: ${{ steps.notarize.outputs.dmg-file }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@v7.1.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
 
@@ -49,7 +49,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
 
       - name: Cache pip wheel cache (for compiled packages)
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Library/Caches/pip
           key: pip-wheel-${{ runner.os }}-x64-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -57,7 +57,7 @@ jobs:
             pip-wheel-${{ runner.os }}-x64-
 
       - name: Cache bundled Python
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/frontend/python-runtime
           key: python-bundle-${{ runner.os }}-x64-3.12.8-rust-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -90,6 +90,11 @@ jobs:
           SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE }}
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
 
+      # Start the packaged app once before anything is published: the 1.3.1
+      # main process threw while loading (F114) and shipped.
+      - name: Start the packaged app once (smoke test)
+        run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
+
       - name: Submit notarization (async)
         id: notarize
         uses: ./.github/actions/submit-macos-notarization
@@ -99,9 +104,10 @@ jobs:
           apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-intel-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.dmg
             apps/frontend/dist/*.zip
@@ -115,10 +121,10 @@ jobs:
       notarization_id: ${{ steps.notarize.outputs.notarization-id }}
       dmg_file: ${{ steps.notarize.outputs.dmg-file }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@v7.1.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
 
@@ -126,7 +132,7 @@ jobs:
         uses: ./.github/actions/setup-node-frontend
 
       - name: Cache pip wheel cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Library/Caches/pip
           key: pip-wheel-${{ runner.os }}-arm64-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -134,7 +140,7 @@ jobs:
             pip-wheel-${{ runner.os }}-arm64-
 
       - name: Cache bundled Python
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/frontend/python-runtime
           key: python-bundle-${{ runner.os }}-arm64-3.12.8-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -167,6 +173,11 @@ jobs:
           SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE }}
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
 
+      # Start the packaged app once before anything is published: the 1.3.1
+      # main process threw while loading (F114) and shipped.
+      - name: Start the packaged app once (smoke test)
+        run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
+
       - name: Submit notarization (async)
         id: notarize
         uses: ./.github/actions/submit-macos-notarization
@@ -176,9 +187,10 @@ jobs:
           apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-arm64-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.dmg
             apps/frontend/dist/*.zip
@@ -194,10 +206,10 @@ jobs:
       # Job-level env so AZURE_CLIENT_ID is available for step-level if conditions
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@v7.1.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
 
@@ -205,7 +217,7 @@ jobs:
         uses: ./.github/actions/setup-node-frontend
 
       - name: Cache pip wheel cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~\AppData\Local\pip\Cache
           key: pip-wheel-${{ runner.os }}-x64-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -213,7 +225,7 @@ jobs:
             pip-wheel-${{ runner.os }}-x64-
 
       - name: Cache bundled Python
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/frontend/python-runtime
           key: python-bundle-${{ runner.os }}-x64-3.12.8-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -236,6 +248,11 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE }}
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
+
+      # Start the packaged app once before anything is published: the 1.3.1
+      # main process threw while loading (F114) and shipped.
+      - name: Start the packaged app once (smoke test)
+        run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
 
       - name: Azure Login (OIDC)
         if: env.AZURE_CLIENT_ID != ''
@@ -349,9 +366,10 @@ jobs:
         run: echo "::warning::Windows signing skipped - AZURE_CLIENT_ID not configured. The .exe will be unsigned."
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.exe
             apps/frontend/dist/*.yml
@@ -360,10 +378,10 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@v7.1.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
 
@@ -379,7 +397,7 @@ jobs:
           flatpak install -y --user flathub org.electronjs.Electron2.BaseApp//25.08
 
       - name: Cache pip wheel cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/pip
           key: pip-wheel-${{ runner.os }}-x64-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -387,7 +405,7 @@ jobs:
             pip-wheel-${{ runner.os }}-x64-
 
       - name: Cache bundled Python
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/frontend/python-runtime
           key: python-bundle-${{ runner.os }}-x64-3.12.8-${{ hashFiles('apps/backend/requirements.txt') }}
@@ -409,13 +427,19 @@ jobs:
           SENTRY_TRACES_SAMPLE_RATE: ${{ secrets.SENTRY_TRACES_SAMPLE_RATE }}
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
 
+      # Start the packaged app once before anything is published: the 1.3.1
+      # main process threw while loading (F114) and shipped.
+      - name: Start the packaged app once (smoke test)
+        run: cd apps/frontend && xvfb-run -a node scripts/smoke-test.cjs --packaged
+
       - name: Verify Linux packages
         run: cd apps/frontend && pnpm run verify:linux
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-builds
+          retention-days: 1
           path: |
             apps/frontend/dist/*.AppImage
             apps/frontend/dist/*.deb
@@ -428,16 +452,16 @@ jobs:
     needs: [build-macos-intel, build-macos-arm64]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download Intel DMG
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: macos-intel-builds
           path: intel
 
       - name: Download ARM64 DMG
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: macos-arm64-builds
           path: arm64
@@ -454,15 +478,17 @@ jobs:
           arm64-dmg-file: ${{ needs.build-macos-arm64.outputs.dmg_file }}
 
       - name: Upload stapled Intel DMG
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-intel-stapled
+          retention-days: 1
           path: intel/*.dmg
 
       - name: Upload stapled ARM64 DMG
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-arm64-stapled
+          retention-days: 1
           path: arm64/*.dmg
 
   create-release:
@@ -473,13 +499,30 @@ jobs:
       # Needed to dispatch the wiki refresh below — a `release: published`
       # event raised by GITHUB_TOKEN does not trigger other workflows.
       actions: write
+      # The build provenance attestation (lot N6, S3): a short-lived OIDC
+      # token signs it, and it is stored with the repository's attestations.
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
+      # What the release is built from, as a CycloneDX SBOM published beside
+      # the binaries: the npm packages of pnpm-lock.yaml and the Python
+      # packages of apps/backend/requirements.lock, read from the checkout
+      # before any binary is downloaded next to it.
+      - name: Generate the SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: release-assets/workpilot-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
 
@@ -560,6 +603,15 @@ jobs:
           cd release-assets
           sha256sum ./* > checksums.sha256
           cat checksums.sha256
+
+      # Every published file, SBOM and checksums included, gets a signed
+      # statement of the workflow run that built it:
+      #   gh attestation verify <file> --repo krovomi/WorkPilot-AI
+      - name: Attest the build provenance
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release-assets/*
 
       - name: Dry run summary
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
@@ -699,6 +751,8 @@ jobs:
 
             **Full Changelog**: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
 
+            **Supply chain**: `workpilot-sbom.cdx.json` lists the npm and Python packages this release is built from. Each file carries a build provenance attestation: `gh attestation verify <file> --repo ${{ github.repository }}`.
+
             _VirusTotal scan results are added to these notes after release when the scan is configured._
           files: release-assets/*
           draft: false
@@ -753,9 +807,12 @@ jobs:
       # Needed by "Carry the README to main" below, which opens a pull request.
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: develop
+          # Full history: the README commit is built on `main` and merged into
+          # `develop`, which needs their common ancestor.
+          fetch-depth: 0
           # Use PAT_TOKEN if configured, otherwise fall back to GITHUB_TOKEN
           token: ${{ secrets.PAT_TOKEN || github.token }}
 
@@ -803,24 +860,14 @@ jobs:
           echo "--- Verifying update ---"
           grep -E "(stable-|beta-|version-)[0-9]" README.md | head -5
 
-      - name: Commit and push README update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Check if there are changes to commit
-          if git diff --quiet README.md; then
-            echo "No changes to README.md, skipping commit"
-            exit 0
-          fi
-
-          git add README.md
-          git commit -m "docs: update README to v${{ steps.version.outputs.version }} [skip ci]"
-          git push origin develop
-
-      # This job writes to `develop` by design, which leaves `main` advertising
-      # the *previous* release until someone opens a sync PR by hand. That lag
-      # is not cosmetic: after v1.2.1 shipped, `main` still offered
+      # One README commit, shared by both branches. It is built on `main`,
+      # merged into `develop` with a merge commit, and carried to `main` by a
+      # pull request merged with a merge commit too (the only method the `main`
+      # ruleset allows). Two separate commits with the same change, one per
+      # branch, is how `main` and `develop` drifted apart: each release left a
+      # commit on one side the other never had.
+      #
+      # Why `main` needs it at all: after v1.2.1 shipped, `main` still offered
       # `WorkPilot-AI-1.2.0-darwin-x64.dmg` — an asset that never existed,
       # because that release had no macOS Intel build. Anyone landing on the
       # repository got a 404.
@@ -832,31 +879,65 @@ jobs:
       # it merge on its own.
       #
       # It lives here rather than in a push-triggered workflow because the
-      # commit above carries `[skip ci]` — a `push: develop` trigger would never
-      # fire for it.
-      - name: Carry the README to main
+      # `develop` push below carries `[skip ci]`: a `push: develop` trigger
+      # would never fire for it.
+      - name: Commit the README on main's history and merge it into develop
+        id: readme
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           BRANCH="chore/readme-v${VERSION}"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
           # Keep the freshly generated README before moving off `develop`.
           cp README.md /tmp/readme-updated.md
+          git checkout -- README.md
 
-          # Fetch the sync branch too when a re-run finds it already pushed:
-          # without its remote-tracking ref, --force-with-lease below refuses.
-          git fetch origin main "$BRANCH" --depth=1 || git fetch origin main --depth=1
+          git fetch origin main develop
           git checkout -B "$BRANCH" origin/main
           cp /tmp/readme-updated.md README.md
-
           if git diff --quiet -- README.md; then
-            echo "main already carries this README — nothing to sync."
-            exit 0
+            echo "main already carries this README."
+            echo "carry=false" >> "$GITHUB_OUTPUT"
+          else
+            git add README.md
+            git commit -m "docs: update README to v${VERSION}"
+            echo "carry=true" >> "$GITHUB_OUTPUT"
           fi
 
-          git add README.md
-          git commit -m "docs: carry the v${VERSION} README to main"
+          git checkout -B develop origin/develop
+          if git merge --no-ff --no-edit "$BRANCH" \
+               -m "docs: merge the v${VERSION} README into develop [skip ci]"; then
+            if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/develop)" ]; then
+              echo "develop already has this commit."
+            else
+              git push origin develop
+            fi
+          else
+            # develop changed the same README lines since the release: keep
+            # develop's README history linear and say so, rather than block.
+            git merge --abort
+            cp /tmp/readme-updated.md README.md
+            if ! git diff --quiet -- README.md; then
+              git add README.md
+              git commit -m "docs: update README to v${VERSION} [skip ci]"
+              git push origin develop
+            fi
+            echo "::warning::README commit could not be merged into develop; committed on develop directly. main and develop now differ by this README commit."
+          fi
+
+      - name: Carry the README to main
+        if: steps.readme.outputs.carry == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.readme.outputs.branch }}
+        run: |
+          # Fetch the sync branch too when a re-run finds it already pushed:
+          # without its remote-tracking ref, --force-with-lease below refuses.
+          git fetch origin "$BRANCH" --depth=1 || true
           git push --force-with-lease -u origin "$BRANCH"
 
           # Reuse an open PR for this version rather than stacking duplicates
@@ -872,18 +953,18 @@ jobs:
               --body "$(printf '%s\n' \
                 "Generated by \`release.yml\` after publishing **v${VERSION}**." \
                 "" \
-                "\`update-readme\` writes to \`develop\`, so \`main\` keeps advertising the" \
-                "previous release until this lands — including download links to assets" \
-                "that release may not have carried." \
+                "The same commit is already merged into \`develop\`, so \`main\` and" \
+                "\`develop\` keep one shared history. Merge with a **merge commit**." \
                 "" \
                 "Touches \`README.md\` only.")")
           fi
           echo "Sync PR: $url"
 
           # Auto-merge rather than a straight push: `main` is protected, and
-          # this keeps the change reviewable in the meantime. Not fatal if the
-          # repository has auto-merge switched off.
-          gh pr merge "$url" --auto --squash \
-            || echo "::warning::Could not enable auto-merge — merge $url by hand."
+          # this keeps the change reviewable in the meantime. A merge commit,
+          # never a squash: a squash would give `main` a commit `develop` lacks.
+          # Not fatal if the repository has auto-merge switched off.
+          gh pr merge "$url" --auto --merge \
+            || echo "::warning::Could not enable auto-merge — merge $url by hand, with a merge commit."
 
           echo "::notice::README sync PR for v${VERSION}: $url"

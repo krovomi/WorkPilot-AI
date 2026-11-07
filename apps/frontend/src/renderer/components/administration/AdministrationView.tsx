@@ -18,15 +18,19 @@ import { useAdminStore } from "@/stores/admin-store";
 import { usePermissionsStore } from "@/stores/permissions-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { AuditTab } from "./AuditTab";
+import { GroupsTab } from "./GroupsTab";
 import { MembersTab } from "./MembersTab";
 import { OrganizationsTab } from "./OrganizationsTab";
 import { OverviewTab } from "./OverviewTab";
 import { QuotasTab } from "./QuotasTab";
 import { RolesTab } from "./RolesTab";
+import { PageHeader } from "../ui/page-header";
 
+import { NativeSelect } from "../ui/native-select";
 type TabId =
 	| "overview"
 	| "members"
+	| "groups"
 	| "roles"
 	| "organizations"
 	| "invitations"
@@ -45,6 +49,7 @@ interface TabDef {
 const TABS: readonly TabDef[] = [
 	{ id: "overview", labelKey: "tabs.overview", permission: "analytics.read" },
 	{ id: "members", labelKey: "tabs.members", permission: "org.member.read" },
+	{ id: "groups", labelKey: "tabs.groups", permission: "org.member.read" },
 	{ id: "roles", labelKey: "tabs.roles", permission: "org.role.read" },
 	{ id: "organizations", labelKey: "tabs.organizations", platformOnly: true },
 	{
@@ -104,18 +109,13 @@ export function AdministrationView() {
 
 	return (
 		<div className="p-6 space-y-6 overflow-auto h-full">
-			<header className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-2xl font-semibold flex items-center gap-2">
-						<ShieldCheck className="h-6 w-6" />
-						{t("administration:title")}
-					</h1>
-					<p className="text-sm text-muted-foreground">
-						{t("administration:description")}
-					</p>
-				</div>
-
-				{organizations.length > 1 && (
+			<PageHeader
+				variant="inline"
+				icon={ShieldCheck}
+				title={t("administration:title")}
+				description={t("administration:description")}
+				actions={
+					organizations.length > 1 && (
 					<div className="flex items-center gap-2">
 						<label
 							htmlFor="admin-org"
@@ -123,9 +123,9 @@ export function AdministrationView() {
 						>
 							{t("administration:organizations.current")}
 						</label>
-						<select
+						<NativeSelect
 							id="admin-org"
-							className="bg-background border border-border rounded px-2 py-1 text-sm"
+							className="px-2 py-1 text-sm h-auto"
 							value={orgId ?? ""}
 							onChange={(e) => void switchOrg(e.target.value)}
 						>
@@ -134,10 +134,11 @@ export function AdministrationView() {
 									{org.name}
 								</option>
 							))}
-						</select>
+						</NativeSelect>
 					</div>
-				)}
-			</header>
+					)
+				}
+			/>
 
 			{error && (
 				<div
@@ -178,6 +179,7 @@ export function AdministrationView() {
 					<div>
 						{current === "overview" && <OverviewTab />}
 						{current === "members" && <MembersTab />}
+						{current === "groups" && <GroupsTab />}
 						{current === "roles" && <RolesTab />}
 						{current === "organizations" && <OrganizationsTab />}
 						{current === "invitations" && <InvitationsAdmin />}

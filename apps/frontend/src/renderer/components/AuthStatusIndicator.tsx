@@ -32,6 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useClaudeProfileStore } from "@/stores/claude-profile-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useProviderContext } from "./ProviderContext";
 import {
 	Tooltip,
@@ -70,7 +71,12 @@ const OAUTH_FALLBACK = {
 } as const;
 
 export function AuthStatusIndicator() {
-	const { profiles, activeProfileId } = useSettingsStore();
+	const { profiles, activeProfileId } = useSettingsStore(
+		useShallow((s) => ({
+			profiles: s.profiles,
+			activeProfileId: s.activeProfileId,
+		})),
+	);
 	const { t } = useTranslation(["common"]);
 	// The provider the usage badges observe: the running tasks', unless the
 	// person picked one (UsageLensSelector). Not the default provider.
@@ -258,7 +264,7 @@ export function AuthStatusIndicator() {
 		if (selectedProvider === "copilot") {
 			return (
 				<div className="pt-2 border-t space-y-2">
-					<div className="text-[10px] text-muted-foreground">
+					<div className="text-3xs text-muted-foreground">
 						{t("common:usage.copilotAuthNote", { provider: "GitHub Copilot" })}
 					</div>
 
@@ -266,7 +272,7 @@ export function AuthStatusIndicator() {
 					{(() => {
 						if (isLoadingGithubStatus) {
 							return (
-								<div className="text-[10px] text-muted-foreground italic">
+								<div className="text-3xs text-muted-foreground italic">
 									{t("common:usage.checkingGithubStatus")}
 								</div>
 							);
@@ -274,7 +280,7 @@ export function AuthStatusIndicator() {
 
 						if (!githubStatus) {
 							return (
-								<div className="text-[10px] text-muted-foreground italic">
+								<div className="text-3xs text-muted-foreground italic">
 									{t("common:usage.cannotCheckGithubStatus")}
 								</div>
 							);
@@ -286,12 +292,12 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Shield className="h-3 w-3" />
-											<span className="text-[10px]">
+											<span className="text-3xs">
 												{t("common:usage.githubStatus")}
 											</span>
 										</div>
 										<span
-											className={`text-[10px] font-medium ${githubStatus.isAuth ? "text-green-500" : "text-red-500"}`}
+											className={`text-3xs font-medium ${githubStatus.isAuth ? "text-success" : "text-destructive"}`}
 										>
 											{githubStatus.isAuth
 												? t("common:usage.connected")
@@ -302,11 +308,11 @@ export function AuthStatusIndicator() {
 										<div className="flex items-center justify-between">
 											<div className="flex items-center gap-1.5 text-muted-foreground">
 												<Key className="h-3 w-3" />
-												<span className="text-[10px]">
+												<span className="text-3xs">
 													{t("common:usage.activeAccount")}
 												</span>
 											</div>
-											<span className="text-[10px] font-medium text-blue-500">
+											<span className="text-3xs font-medium text-blue-500">
 												@{githubStatus.username}
 											</span>
 										</div>
@@ -316,7 +322,7 @@ export function AuthStatusIndicator() {
 						}
 
 						return (
-							<div className="text-[10px] text-red-500">
+							<div className="text-3xs text-destructive">
 								{t("common:usage.githubCliNotAvailable")}{" "}
 								<code className="bg-muted px-1 rounded">gh auth login</code>
 							</div>
@@ -325,13 +331,13 @@ export function AuthStatusIndicator() {
 
 					{/* Note about missing usage data */}
 					<div className="pt-1 border-t">
-						<div className="text-[10px] text-muted-foreground italic">
+						<div className="text-3xs text-muted-foreground italic">
 							{t("common:usage.dataUnavailable")}
 						</div>
-						<div className="text-[10px] text-muted-foreground italic">
+						<div className="text-3xs text-muted-foreground italic">
 							{t("common:usage.dataUnavailableDescription")}
 						</div>
-						<div className="text-[10px] text-muted-foreground mt-1">
+						<div className="text-3xs text-muted-foreground mt-1">
 							<a
 								href="https://github.com/settings/copilot"
 								target="_blank"
@@ -349,7 +355,7 @@ export function AuthStatusIndicator() {
 		if (selectedProvider === "windsurf") {
 			return (
 				<div className="pt-2 border-t space-y-2">
-					<div className="text-[10px] text-muted-foreground">
+					<div className="text-3xs text-muted-foreground">
 						{t("common:usage.windsurfAuthNote")}
 					</div>
 
@@ -357,7 +363,7 @@ export function AuthStatusIndicator() {
 					{(() => {
 						if (isLoadingWindsurfAccount) {
 							return (
-								<div className="text-[10px] text-muted-foreground italic">
+								<div className="text-3xs text-muted-foreground italic">
 									{t("common:usage.checkingWindsurfStatus")}
 								</div>
 							);
@@ -365,7 +371,7 @@ export function AuthStatusIndicator() {
 
 						if (!windsurfAccount) {
 							return (
-								<div className="text-[10px] text-muted-foreground italic">
+								<div className="text-3xs text-muted-foreground italic">
 									{t("common:usage.windsurfNotDetected")}
 								</div>
 							);
@@ -378,11 +384,11 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Key className="h-3 w-3" />
-											<span className="text-[10px]">
+											<span className="text-3xs">
 												{t("common:usage.activeAccount")}
 											</span>
 										</div>
-										<span className="text-[10px] font-medium text-teal-500">
+										<span className="text-3xs font-medium text-teal-500">
 											{windsurfAccount.userName}
 										</span>
 									</div>
@@ -392,11 +398,11 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Shield className="h-3 w-3" />
-											<span className="text-[10px]">
+											<span className="text-3xs">
 												{t("common:usage.windsurfPlan")}
 											</span>
 										</div>
-										<span className="text-[10px] font-medium">
+										<span className="text-3xs font-medium">
 											{windsurfAccount.planName}
 										</span>
 									</div>
@@ -405,10 +411,10 @@ export function AuthStatusIndicator() {
 								{windsurfAccount.usageInfo && (
 									<div className="space-y-1 pt-1 border-t">
 										<div className="flex items-center justify-between">
-											<span className="text-[10px] text-muted-foreground">
+											<span className="text-3xs text-muted-foreground">
 												{t("common:usage.windsurfCredits")}
 											</span>
-											<span className="text-[10px] font-medium">
+											<span className="text-3xs font-medium">
 												{Math.round(
 													windsurfAccount.usageInfo.usedMessages / 100,
 												)}
@@ -419,10 +425,10 @@ export function AuthStatusIndicator() {
 											</span>
 										</div>
 										<div className="flex items-center justify-between">
-											<span className="text-[10px] text-muted-foreground">
+											<span className="text-3xs text-muted-foreground">
 												{t("common:usage.windsurfFlowActions")}
 											</span>
-											<span className="text-[10px] font-medium">
+											<span className="text-3xs font-medium">
 												{Math.round(
 													windsurfAccount.usageInfo.usedFlowActions / 100,
 												)}
@@ -440,7 +446,7 @@ export function AuthStatusIndicator() {
 
 					{/* Dashboard link */}
 					<div className="pt-1 border-t">
-						<div className="text-[10px] text-muted-foreground mt-1">
+						<div className="text-3xs text-muted-foreground mt-1">
 							<a
 								href="https://windsurf.com/subscription/usage"
 								target="_blank"
@@ -457,7 +463,7 @@ export function AuthStatusIndicator() {
 
 		// Fallback when no profile configured for this provider
 		return (
-			<div className="pt-2 border-t text-[10px] text-muted-foreground">
+			<div className="pt-2 border-t text-3xs text-muted-foreground">
 				{t("common:usage.noProfileForProvider", { provider: badgeLabel })}
 			</div>
 		);
@@ -505,7 +511,7 @@ export function AuthStatusIndicator() {
 									</span>
 								</div>
 								<div
-									className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+									className={`px-1.5 py-0.5 rounded text-3xs font-semibold ${
 										isOAuth
 											? "bg-orange-500/15 text-orange-500"
 											: "bg-primary/15 text-primary"
@@ -519,7 +525,7 @@ export function AuthStatusIndicator() {
 							<div className="flex items-center justify-between">
 								<div className="flex items-center gap-1.5 text-muted-foreground">
 									<Server className="h-3.5 w-3.5" />
-									<span className="font-medium text-[11px]">
+									<span className="font-medium text-2xs">
 										{t("common:usage.provider")}
 									</span>
 								</div>
@@ -531,11 +537,11 @@ export function AuthStatusIndicator() {
 								<div className="flex items-center justify-between pt-2 border-t">
 									<div className="flex items-center gap-1.5 text-muted-foreground">
 										<Lock className="h-3 w-3" />
-										<span className="text-[10px]">
+										<span className="text-3xs">
 											{t("common:usage.subscription")}
 										</span>
 									</div>
-									<span className="font-medium text-[10px]">
+									<span className="font-medium text-3xs">
 										{t(getSubscriptionTranslationKey(claudeSubscriptionType))}
 									</span>
 								</div>
@@ -548,11 +554,11 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Key className="h-3 w-3" />
-											<span className="text-[10px]">
+											<span className="text-3xs">
 												{t("common:usage.profile")}
 											</span>
 										</div>
-										<span className="font-medium text-[10px]">
+										<span className="font-medium text-3xs">
 											{authStatus.name}
 										</span>
 									</div>
@@ -560,7 +566,7 @@ export function AuthStatusIndicator() {
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-1.5 text-muted-foreground">
 											<Fingerprint className="h-3 w-3" />
-											<span className="text-[10px]">
+											<span className="text-3xs">
 												{t("common:usage.id")}
 											</span>
 										</div>
@@ -573,11 +579,11 @@ export function AuthStatusIndicator() {
 									{/* API Endpoint */}
 									{authStatus.baseUrl && (
 										<div className="pt-1">
-											<div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1">
+											<div className="flex items-center gap-1.5 text-3xs text-muted-foreground mb-1">
 												<ExternalLink className="h-3 w-3" />
 												<span>{t("common:usage.apiEndpoint")}</span>
 											</div>
-											<div className="text-[10px] font-mono bg-muted px-2 py-1.5 rounded break-all border">
+											<div className="text-3xs font-mono bg-muted px-2 py-1.5 rounded break-all border">
 												{authStatus.baseUrl}
 											</div>
 										</div>

@@ -38,7 +38,7 @@ from ui import (
 
 # Import debug utilities
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_error,
@@ -246,8 +246,8 @@ def merge_existing_build(
     print()
     print(box(content, width=60, style="heavy"))
 
-    # Use current branch as merge target (not auto-detected main/master)
     manager = WorktreeManager(project_dir, base_branch=current_branch)
+    manager.settle_branch(spec_name)  # pending work in, bin/, obj/... out
     show_build_summary(manager, spec_name)
     print()
 

@@ -230,6 +230,29 @@ def pytest_collectstart(collector) -> None:
     _clean_mock_modules()
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items) -> None:
+    """Keep only this CI shard's tests when WORKPILOT_TEST_SHARD is set (tests/ci_shard.py)."""
+    from tests.ci_shard import ENV, split
+
+    # Taken out of the environment: a test that starts pytest in a subprocess
+    # must collect its own files, not a shard of them.
+    kept, dropped = split(items, os.environ.pop(ENV, ""))
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    """Stop what the tests left running, and name it (tests/ci_leftovers.py)."""
+    _leftovers.stop_leftovers()
+
+
+# Imported when conftest loads, so the outermost session claims
+# tests/ci_leftovers.OWNER before any test starts pytest in a subprocess.
+from tests import ci_leftovers as _leftovers  # noqa: E402
+
+
 def pytest_runtest_setup(item) -> None:
     """Remove MagicMock pollution from sys.modules before each test runs.
 
@@ -246,6 +269,34 @@ def pytest_runtest_setup(item) -> None:
     already imported their targets at module level, so this cleanup is safe.
     """
     _clean_mock_modules()
+    _sync_package_attributes()
+
+
+def _sync_package_attributes() -> None:
+    """Point each package's submodule attribute at the module sys.modules holds.
+
+    A test that imports a module afresh inside ``patch.dict(sys.modules)`` (or
+    pops it and lets it re-import) leaves the package attribute on the new copy
+    once sys.modules is restored to the old one. ``from core import client``
+    then returns a copy that ``from core.client import x`` never reads, and a
+    later test's ``monkeypatch.setattr`` on it changes nothing. Whether a test
+    met such a predecessor depended on file order, which CI shards change.
+    """
+    modules = sys.modules
+    for key, mod in list(modules.items()):
+        parent_name, dot, child = key.rpartition(".")
+        if not dot or not isinstance(mod, _types.ModuleType):
+            continue
+        parent = modules.get(parent_name)
+        if not isinstance(parent, _types.ModuleType):
+            continue
+        current = parent.__dict__.get(child)
+        if (
+            isinstance(current, _types.ModuleType)
+            and current is not mod
+            and getattr(current, "__name__", None) == key
+        ):
+            setattr(parent, child, mod)
 
 
 # ---------------------------------------------------------------------------
@@ -1221,6 +1272,18 @@ def _isolated_brain(tmp_path_factory, monkeypatch):
 @pytest.fixture(autouse=True)
 def _os_sandbox_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_SANDBOX", "off")
+
+
+# A worktree's recipe (`core/workspace/recipe_run.py`) runs the package
+# managers its project's lockfiles name: a test that creates a worktree with a
+# `package.json` would run `npm install`. The recipe's own tests
+# (`tests/workspace/`) turn it back on, and keep the port registry in a
+# temporary directory.
+
+
+@pytest.fixture(autouse=True)
+def _worktree_setup_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_WORKTREE_SETUP", "0")
 
 
 # ── Ambient state is not input ─────────────────────────────────────────

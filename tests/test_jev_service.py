@@ -3,7 +3,7 @@ import sys
 
 import httpx
 import pytest
-from core.build_signals import BuildPaused
+from foundation.build_signals import BuildPaused
 from integrations.jev.client import JevClient
 from integrations.jev.models import JevContext, JevQuestion, JevSettings
 from integrations.jev.service import evaluate

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import CurrentUser, get_current_user
 from server.db.engine import get_db
-from server.db.models import User
+from server.db.models import OrgMember, User
 from server.schemas import SecretKindsResponse, SetSecretRequest, UserPublic
 from server.services.secrets import (
     SECRET_KINDS,
@@ -19,16 +19,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+#: The longest token kept: longer than any forge or tracker issues.
+MAX_SECRET_LENGTH = 4096
+
 
 @router.get("", response_model=list[UserPublic])
 async def list_users(
+    request: Request,
     user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[UserPublic]:
-    """Directory for member pickers — any authenticated user may list."""
-    users = await db.scalars(
-        select(User).where(User.is_active.is_(True)).order_by(User.display_name)
-    )
+    """Directory for member pickers: the active members of the caller's
+    organization. A platform administrator sees every account."""
+    query = select(User).where(User.is_active.is_(True))
+    if not user.is_admin:
+        org_id = getattr(request.state, "org_id", None)
+        if not org_id:
+            query = query.where(User.id == user.id)
+        else:
+            query = query.where(
+                User.id.in_(select(OrgMember.user_id).where(OrgMember.org_id == org_id))
+            )
+    users = await db.scalars(query.order_by(User.display_name))
     return [UserPublic.model_validate(u) for u in users]
 
 
@@ -50,10 +62,13 @@ async def set_my_secret(
     if body.kind not in SECRET_KINDS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown secret kind '{body.kind}'. Allowed: {sorted(SECRET_KINDS)}",
+            detail=f"Unknown secret kind. Allowed: {sorted(SECRET_KINDS)}",
         )
+    value = body.value.strip()
+    if not value or len(value) > MAX_SECRET_LENGTH:
+        raise HTTPException(status_code=400, detail="Invalid secret value")
     try:
-        await set_user_secret(db, user.id, body.kind, body.value)
+        await set_user_secret(db, user.id, body.kind, value)
     except SecretsVaultError as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"saved": True}

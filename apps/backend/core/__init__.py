@@ -8,6 +8,13 @@ Core components for the WorkPilot AI autonomous coding framework.
 # Note: We use lazy imports here because the full agent module has many dependencies
 # that may not be needed for basic operations like workspace management.
 
+# Light, and registers the provider/model label of the backend log lines
+# (foundation.colored_logs cannot import core).
+# Light too: installs the agent_runtime port, through which the units below
+# core (merge, integrations, analysis, architecture) start a session.
+from . import agent_runtime as _agent_runtime  # noqa: F401
+from . import model_info as _model_info  # noqa: F401
+
 __all__ = [
     "run_autonomous_agent",
     "run_followup_planner",

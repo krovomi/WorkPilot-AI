@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from agents.test_generator import (
+from test_generation.generator import (
     StreamingJsonFieldExtractor,
     TestGeneratorAgent,
     _decode_json_string_prefix,

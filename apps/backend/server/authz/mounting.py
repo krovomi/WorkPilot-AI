@@ -26,7 +26,11 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
-from server.authz.catalog import PERMISSIONS, domain_for_feature
+from server.authz.catalog import (
+    PERMISSIONS,
+    domain_for_feature,
+    served_in_server_mode,
+)
 from server.authz.principal import Principal, get_principal
 
 logger = logging.getLogger(__name__)
@@ -41,19 +45,56 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/slash-commands/run"): "agent.execute",
     # Launches the task's app and may run fixer and verifier sessions.
     ("POST", "/api/verify/run"): "agent.execute",
+    # Launches the task's app twice, on its base branch and on the task.
+    ("POST", "/api/verify/compare"): "agent.execute",
     # Executes arbitrary submitted code in the playground sandbox.
     ("POST", "/api/code-playground/run"): "agent.execute",
     # Starts and stops orchestration sessions.
     ("POST", "/api/mission-control/session/start"): "ops.execute",
     ("POST", "/api/mission-control/session/stop"): "ops.execute",
-    # Scaffolds worktrees and runs variations.
-    ("POST", "/api/parallel-variations/create"): "agent.execute",
     # Runs the reviewer agent.
     ("POST", "/api/virtual-reviewer/run"): "agent.execute",
     # Generates and writes test files.
     ("POST", "/api/test-generation/generate"): "agent.execute",
     # Fires a real outbound notification.
     ("POST", "/api/notifications/test"): "integration.write",
+    # A card of the shared board: deleting it and approving its spec are
+    # their own permissions, not the board's plain write.
+    ("DELETE", "/api/board/cards/{card_id}"): "task.delete",
+    ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
+    # Sending a card's work back is the other answer to the same review.
+    ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
+    # A message to a running card's agent changes what the agent does.
+    ("POST", "/api/board/cards/{card_id}/steering"): "agent.execute",
+    # A shared feature's job runs its agent on the project's clone; stopping
+    # one is the same right as stopping a run. Turning a roadmap feature or
+    # an idea into a card writes a card.
+    ("POST", "/api/features/roadmap/jobs"): "agent.execute",
+    ("POST", "/api/features/roadmap/jobs/{job_id}/cancel"): "agent.cancel",
+    ("POST", "/api/features/roadmap/features/{feature_id}/convert"): "task.write",
+    ("POST", "/api/features/ideation/jobs"): "agent.execute",
+    ("POST", "/api/features/ideation/jobs/{job_id}/cancel"): "agent.cancel",
+    ("POST", "/api/features/ideation/ideas/{idea_id}/convert"): "task.write",
+    # The boards over MCP: reading is the floor; each tool then asks for its
+    # own permission (``shared_board/mcp_http.py``).
+    ("POST", "/mcp"): "task.read",
+    ("POST", "/api/features/context/jobs"): "agent.execute",
+    ("POST", "/api/features/context/jobs/{job_id}/cancel"): "agent.cancel",
+    # The forge relays: a read and a query are reads, whatever their verb.
+    ("POST", "/api/features/forge/github/read"): "vcs.read",
+    ("POST", "/api/features/forge/github/pulls"): "vcs.read",
+    ("POST", "/api/features/forge/gitlab/read"): "vcs.read",
+    # The AI review of a pull or merge request runs the reviewer agent on the clone.
+    ("POST", "/api/features/forge/github/reviews/jobs"): "agent.execute",
+    ("POST", "/api/features/forge/github/reviews/jobs/{job_id}/cancel"): "agent.cancel",
+    ("POST", "/api/features/forge/gitlab/reviews/jobs"): "agent.execute",
+    ("POST", "/api/features/forge/gitlab/reviews/jobs/{job_id}/cancel"): "agent.cancel",
+    # An analysis runs its runner on the clone, as a job.
+    ("POST", "/api/features/analyses/{kind}/jobs"): "agent.execute",
+    ("POST", "/api/features/analyses/{kind}/jobs/{job_id}/cancel"): "agent.cancel",
+    # A question to Insights runs the insights agent on the clone.
+    ("POST", "/api/features/insights/sessions/{session_id}/messages"): "agent.execute",
+    ("POST", "/api/features/insights/jobs/{job_id}/cancel"): "agent.cancel",
     # Audit trail is append-only and its exports carry personal data.
     ("GET", "/api/audit-trail/export/soc2"): "audit.export",
     ("GET", "/api/audit-trail/export/gdpr"): "audit.export",
@@ -120,3 +161,22 @@ def mount_guarded(
     logger.debug(
         "Mounted %s router guarded by %s.*", feature, domain_for_feature(feature)
     )
+
+
+def mount_served(app: FastAPI, router: APIRouter, feature: str) -> bool:
+    """Mount `feature` on a server, guarded, when a server serves it.
+
+    Server mode serves only what an organization's projects own; machine-local
+    tools stay with the desktop app's local backend
+    (:data:`server.authz.catalog.SERVER_FEATURES`). A feature outside that set
+    is not mounted, so its routes answer 404. An unknown name still raises, as
+    it does for :func:`mount_guarded`. Returns whether the router was mounted.
+    """
+    domain_for_feature(feature)
+    if not served_in_server_mode(feature):
+        logger.debug(
+            "Not mounting %s on a server: it stays with the local app", feature
+        )
+        return False
+    mount_guarded(app, router, feature)
+    return True

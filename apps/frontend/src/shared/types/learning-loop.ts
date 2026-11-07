@@ -36,6 +36,32 @@ export interface LearningPattern {
 	effectiveness_rate: number;
 }
 
+/**
+ * A rule candidate from a review thread the PR follow-up fixed, or from the
+ * feedback given with a rejected plan (`learning_loop/review_lessons.py`).
+ * Only an adopted lesson reaches a prompt, as `rule`.
+ */
+export interface ReviewLesson {
+	id: string;
+	source: "pr_review" | "plan_review";
+	status: "pending" | "adopted" | "dismissed";
+	/** The candidate: the reviewer's first comment, or the plan feedback, cleaned. */
+	text: string;
+	/** The wording the person adopted; empty until then. */
+	rule: string;
+	/** What the injection scan saw in the text; shown before deciding. */
+	flags: string[];
+	origin: {
+		pr_url?: string;
+		path?: string;
+		author?: string;
+		url?: string;
+		spec?: string;
+	};
+	seen_at: string;
+	decided_at: string;
+}
+
 export interface LearningImprovementMetrics {
 	qa_first_pass_rate: { before: number; after: number };
 	avg_qa_iterations: { before: number; after: number };

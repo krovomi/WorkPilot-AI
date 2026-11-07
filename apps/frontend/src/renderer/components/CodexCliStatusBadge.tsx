@@ -12,15 +12,19 @@ import { useTranslation } from "react-i18next";
 import { useCliStatus } from "@/contexts/CliStatusContext";
 import { refreshProviderModelCatalog } from "@/hooks/useProviderModelCatalog";
 import { cn } from "@/lib/utils";
+import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { formatAppTime } from "@/lib/date-format";
 
 interface CodexCliStatusBadgeProps {
 	readonly className?: string;
 	readonly onNavigateToTerminals?: () => void;
 	// Mode replié de la sidebar : affiche uniquement l'icône pour éviter le débordement
 	readonly isCollapsed?: boolean;
+	/** Where the « Outils CLI » panel places this badge, once its check answers. */
+	readonly onPresenceChange?: (presence: CliPresence) => void;
 }
 
 interface CodexIconProps {
@@ -64,6 +68,7 @@ export function CodexCliStatusBadge({
 	className,
 	onNavigateToTerminals: _onNavigateToTerminals,
 	isCollapsed = false,
+	onPresenceChange,
 }: CodexCliStatusBadgeProps) {
 	const { t } = useTranslation(["common", "navigation"]);
 	const { data, refreshCodex } = useCliStatus();
@@ -75,6 +80,10 @@ export function CodexCliStatusBadge({
 
 	// Use data from context
 	const status = codex.status;
+	useReportCliPresence(
+		onPresenceChange,
+		status === "loading" ? null : status === "not-found" || status === "error" ? "missing" : "installed",
+	);
 	const versionInfo = codex.versionInfo;
 	const lastChecked = codex.lastChecked;
 
@@ -117,9 +126,9 @@ export function CodexCliStatusBadge({
 	const getStatusColor = () => {
 		switch (status) {
 			case "installed":
-				return "bg-green-500";
+				return "bg-success";
 			case "outdated":
-				return "bg-yellow-500";
+				return "bg-warning";
 			case "not-found":
 			case "error":
 				return "bg-destructive";
@@ -184,7 +193,7 @@ export function CodexCliStatusBadge({
 									? "text-destructive"
 									: "",
 								status === "outdated"
-									? "text-yellow-600 dark:text-yellow-500"
+									? "text-warning "
 									: "",
 								className,
 							)}
@@ -207,12 +216,12 @@ export function CodexCliStatusBadge({
 											: ""}
 									</span>
 									{status === "outdated" && (
-										<span className="ml-auto text-[10px] bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded">
 											{t("common:update", "Update")}
 										</span>
 									)}
 									{(status === "not-found" || status === "error") && (
-										<span className="ml-auto text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
+										<span className="ml-auto text-3xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded">
 											{t("common:install", "Install")}
 										</span>
 									)}
@@ -273,7 +282,7 @@ export function CodexCliStatusBadge({
 										<span>
 											{t("navigation:codex.lastChecked", "Last checked")}:
 										</span>
-										<span>{lastChecked.toLocaleTimeString()}</span>
+										<span>{formatAppTime(lastChecked)}</span>
 									</div>
 								)}
 							</div>

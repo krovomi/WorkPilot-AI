@@ -89,7 +89,7 @@ python scripts/mobile_device_check.py --project-dir ../my-app --launch
 
 | Where | What |
 |---|---|
-| `agents/subagents/mobile.py` | `device-runner` (installs and launches, reports; the only roster entry that touches a device) and `store-readiness-auditor` (read-only; the rules Apple and Google reject on). Both are protected from the roster cap — they are the only entries that know the project is a phone app — and added only to a phase that has a roster: coder, QA, verifier and the `pr_reviewer` the mobile workflow phases run under keep them, a `solo` call (a commit message) stays empty. |
+| `subagents/mobile.py` | `device-runner` (installs and launches, reports; the only roster entry that touches a device) and `store-readiness-auditor` (read-only; the rules Apple and Google reject on). Both are protected from the roster cap — they are the only entries that know the project is a phone app — and added only to a phase that has a roster: coder, QA, verifier and the `pr_reviewer` the mobile workflow phases run under keep them, a `solo` call (a commit message) stays empty. |
 | `workflows/feature-build/workflow.yaml` | `mobile-design` before coding, and the store audit as lens 5 of `review` (`lenses: {store-readiness: *mobile_surface}`). Both conditional on mobile files being touched, both `fresh-context`, both read-only. |
 | `skills/mobile/` | the procedures: `android-developer`, `ios-developer`, `cross-platform-mobile`, `mobile-design-review`, `mobile-device-testing`, `mobile-store-readiness`, plus four agent definitions. |
 

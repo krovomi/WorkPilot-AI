@@ -1,182 +1,150 @@
-import type {
-	BreakingChange,
-	MultiRepoOrchestration,
-	MultiRepoStatus,
-	RepoDependencyGraph,
-	RepoExecutionState,
-	RepoTarget,
-} from "@shared/types";
+/**
+ * Multi-repo orchestrations of the selected project, as the dialog shows them.
+ *
+ * The main process runs them (`main/multi-repo/`) and sends the whole
+ * orchestration on each change (`onMultiRepoUpdated`); this store keeps the
+ * latest of each and the dialog's form.
+ */
+import type { MultiRepoOrchestration } from "@shared/types";
 import { create } from "zustand";
+import { loadProjects } from "./project-store";
 
-interface MultiRepoState {
-	// Dialog state
-	isDialogOpen: boolean;
+export type MultiRepoView = "list" | "new" | "detail";
 
-	// Active orchestration
-	activeOrchestration: MultiRepoOrchestration | null;
-	orchestrations: MultiRepoOrchestration[];
-
-	// Configuration (dialog form state)
-	targetRepos: RepoTarget[];
-	taskDescription: string;
-
-	// Execution state
-	status: MultiRepoStatus;
-	repoStates: RepoExecutionState[];
-	dependencyGraph: RepoDependencyGraph | null;
-	executionOrder: string[];
-	breakingChanges: BreakingChange[];
-	overallProgress: number;
-	currentRepo: string | null;
-	statusMessage: string;
-
-	// Loading states
-	isCreating: boolean;
-	isStarting: boolean;
-
-	// Actions - Dialog
-	openDialog: () => void;
-	closeDialog: () => void;
-
-	// Actions - Repo configuration
-	addRepo: (repo: RepoTarget) => void;
-	removeRepo: (repoId: string) => void;
-	updateRepo: (repoId: string, updates: Partial<RepoTarget>) => void;
-	setTaskDescription: (desc: string) => void;
-
-	// Actions - Orchestration lifecycle
-	setActiveOrchestration: (orch: MultiRepoOrchestration | null) => void;
-	setOrchestrations: (orchs: MultiRepoOrchestration[]) => void;
-	setIsCreating: (val: boolean) => void;
-	setIsStarting: (val: boolean) => void;
-
-	// Actions - Execution updates (from IPC events)
-	setStatus: (status: MultiRepoStatus) => void;
-	setStatusMessage: (message: string) => void;
-	updateRepoState: (repo: string, state: Partial<RepoExecutionState>) => void;
-	setDependencyGraph: (graph: RepoDependencyGraph) => void;
-	setExecutionOrder: (order: string[]) => void;
-	addBreakingChange: (change: BreakingChange) => void;
-	setOverallProgress: (progress: number) => void;
-	setCurrentRepo: (repo: string | null) => void;
-
-	// Actions - Reset
-	reset: () => void;
-	resetForm: () => void;
+/** A repository picked in the form: a project of this computer or a folder. */
+export interface PickedRepo {
+	readonly path: string;
+	readonly name: string;
 }
 
-const initialFormState = {
-	targetRepos: [] as RepoTarget[],
-	taskDescription: "",
-};
+interface MultiRepoState {
+	isDialogOpen: boolean;
+	view: MultiRepoView;
+	projectId: string | null;
+	orchestrations: MultiRepoOrchestration[];
+	activeId: string | null;
+	pickedRepos: PickedRepo[];
+	taskDescription: string;
+	busy: boolean;
+	/** A `multiRepo:` i18n key. */
+	error: string | null;
 
-const initialExecutionState = {
-	status: "pending" as MultiRepoStatus,
-	repoStates: [] as RepoExecutionState[],
-	dependencyGraph: null as RepoDependencyGraph | null,
-	executionOrder: [] as string[],
-	breakingChanges: [] as BreakingChange[],
-	overallProgress: 0,
-	currentRepo: null as string | null,
-	statusMessage: "",
-};
+	openDialog: (projectId: string) => Promise<void>;
+	closeDialog: () => void;
+	showList: () => void;
+	showNew: () => void;
+	showDetail: (id: string) => void;
+	toggleRepo: (repo: PickedRepo) => void;
+	setTaskDescription: (text: string) => void;
+	launch: () => Promise<void>;
+	start: (id: string) => Promise<void>;
+	stop: (id: string) => Promise<void>;
+	applyUpdate: (orchestration: MultiRepoOrchestration) => void;
+}
 
-export const useMultiRepoStore = create<MultiRepoState>((set) => ({
-	// Initial state
+const emptyForm = { pickedRepos: [] as PickedRepo[], taskDescription: "" };
+
+function api() {
+	return typeof window === "undefined" ? undefined : window.electronAPI;
+}
+
+export const useMultiRepoStore = create<MultiRepoState>((set, get) => ({
 	isDialogOpen: false,
-	activeOrchestration: null,
+	view: "list",
+	projectId: null,
 	orchestrations: [],
-	...initialFormState,
-	...initialExecutionState,
-	isCreating: false,
-	isStarting: false,
+	activeId: null,
+	...emptyForm,
+	busy: false,
+	error: null,
 
-	// Dialog
-	openDialog: () => set({ isDialogOpen: true }),
-	closeDialog: () => set({ isDialogOpen: false }),
+	openDialog: async (projectId) => {
+		set({ isDialogOpen: true, projectId, error: null, activeId: null, view: "list" });
+		const result = await api()?.listMultiRepoOrchestrations(projectId);
+		if (get().projectId !== projectId) return;
+		const orchestrations = result?.success && result.data ? result.data : [];
+		set({ orchestrations, view: orchestrations.length > 0 ? "list" : "new" });
+	},
 
-	// Repo configuration
-	addRepo: (repo) =>
+	closeDialog: () => set({ isDialogOpen: false, error: null }),
+	showList: () => set({ view: "list", activeId: null, error: null }),
+	showNew: () => set({ view: "new", activeId: null, error: null, ...emptyForm }),
+	showDetail: (id) => set({ view: "detail", activeId: id, error: null }),
+
+	toggleRepo: (repo) =>
 		set((state) => ({
-			targetRepos: [...state.targetRepos, repo],
+			pickedRepos: state.pickedRepos.some((r) => r.path === repo.path)
+				? state.pickedRepos.filter((r) => r.path !== repo.path)
+				: [...state.pickedRepos, repo],
 		})),
 
-	removeRepo: (repoId) =>
-		set((state) => ({
-			targetRepos: state.targetRepos.filter((r) => r.id !== repoId),
-		})),
+	setTaskDescription: (text) => set({ taskDescription: text }),
 
-	updateRepo: (repoId, updates) =>
-		set((state) => ({
-			targetRepos: state.targetRepos.map((r) =>
-				r.id === repoId ? { ...r, ...updates } : r,
-			),
-		})),
+	launch: async () => {
+		const { projectId, pickedRepos, taskDescription } = get();
+		const electron = api();
+		if (!projectId || !electron) return;
+		set({ busy: true, error: null });
+		try {
+			const created = await electron.createMultiRepoOrchestration(projectId, {
+				repos: pickedRepos.map((r) => ({ localPath: r.path })),
+				taskDescription: taskDescription.trim(),
+			});
+			if (!created.success || !created.data) {
+				set({ error: created.error ?? "errors.createFailed" });
+				return;
+			}
+			const orchestration = created.data;
+			set((state) => ({
+				orchestrations: [orchestration, ...state.orchestrations],
+				activeId: orchestration.id,
+				view: "detail",
+				...emptyForm,
+			}));
+			// A folder picked in the form became a project of this computer.
+			void loadProjects();
+			const started = await electron.startMultiRepoOrchestration(projectId, orchestration.id);
+			if (!started.success) set({ error: started.error ?? "errors.startFailed" });
+		} finally {
+			set({ busy: false });
+		}
+	},
 
-	setTaskDescription: (desc) => set({ taskDescription: desc }),
+	start: async (id) => {
+		const { projectId } = get();
+		const result = projectId
+			? await api()?.startMultiRepoOrchestration(projectId, id)
+			: undefined;
+		if (result && !result.success) set({ error: result.error ?? "errors.startFailed" });
+	},
 
-	// Orchestration lifecycle
-	setActiveOrchestration: (orch) =>
-		set({
-			activeOrchestration: orch,
-			...(orch
-				? {
-						status: orch.status,
-						repoStates: orch.repoStates,
-						dependencyGraph: orch.dependencyGraph,
-						executionOrder: orch.executionOrder,
-						breakingChanges: orch.breakingChanges,
-						overallProgress: orch.overallProgress,
-					}
-				: {}),
+	stop: async (id) => {
+		const { projectId } = get();
+		if (projectId) await api()?.stopMultiRepoOrchestration(projectId, id);
+	},
+
+	applyUpdate: (orchestration) =>
+		set((state) => {
+			if (orchestration.projectId !== state.projectId) return {};
+			const known = state.orchestrations.some((o) => o.id === orchestration.id);
+			return {
+				orchestrations: known
+					? state.orchestrations.map((o) => (o.id === orchestration.id ? orchestration : o))
+					: [orchestration, ...state.orchestrations],
+			};
 		}),
-
-	setOrchestrations: (orchs) => set({ orchestrations: orchs }),
-	setIsCreating: (val) => set({ isCreating: val }),
-	setIsStarting: (val) => set({ isStarting: val }),
-
-	// Execution updates
-	setStatus: (status) => set({ status }),
-	setStatusMessage: (message) => set({ statusMessage: message }),
-
-	updateRepoState: (repo, updates) =>
-		set((state) => ({
-			repoStates: state.repoStates.some((rs) => rs.repo === repo)
-				? state.repoStates.map((rs) =>
-						rs.repo === repo ? { ...rs, ...updates } : rs,
-					)
-				: [
-						...state.repoStates,
-						{
-							repo,
-							status: "pending",
-							progress: 0,
-							...updates,
-						} as RepoExecutionState,
-					],
-		})),
-
-	setDependencyGraph: (graph) => set({ dependencyGraph: graph }),
-	setExecutionOrder: (order) => set({ executionOrder: order }),
-
-	addBreakingChange: (change) =>
-		set((state) => ({
-			breakingChanges: [...state.breakingChanges, change],
-		})),
-
-	setOverallProgress: (progress) => set({ overallProgress: progress }),
-	setCurrentRepo: (repo) => set({ currentRepo: repo }),
-
-	// Reset
-	reset: () =>
-		set({
-			isDialogOpen: false,
-			activeOrchestration: null,
-			...initialFormState,
-			...initialExecutionState,
-			isCreating: false,
-			isStarting: false,
-		}),
-
-	resetForm: () => set(initialFormState),
 }));
+
+/** Opens the dialog for `projectId`. */
+export function openMultiRepoDialog(projectId: string): void {
+	void useMultiRepoStore.getState().openDialog(projectId);
+}
+
+/** Follows the runs of the main process; answers the cleanup. */
+export function setupMultiRepoListeners(): () => void {
+	const electron = api();
+	if (!electron?.onMultiRepoUpdated) return () => undefined;
+	return electron.onMultiRepoUpdated((orchestration) =>
+		useMultiRepoStore.getState().applyUpdate(orchestration),
+	);
+}

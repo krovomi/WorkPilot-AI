@@ -7,9 +7,9 @@ import type {
 } from "../../../shared/types/consensus-arbiter";
 
 const SEVERITY_STYLES: Record<ConflictSeverity, string> = {
-	critical: "text-red-400 bg-red-500/10 border-red-500/20",
+	critical: "text-destructive bg-destructive/10 border-destructive/20",
 	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	medium: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+	medium: "text-warning bg-warning/10 border-warning/20",
 	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
@@ -26,18 +26,18 @@ function ResultBody({
 }): React.ReactElement {
 	return (
 		<>
-			<p className="text-sm text-(--text-secondary)">
+			<p className="text-sm text-muted-foreground">
 				{result.conflicts.length} {t("disagreements")} ·{" "}
 				{result.resolvedCount} {t("agreements")} · {result.escalatedCount}{" "}
 				{t("escalated")}
 			</p>
 
 			{result.allResolved ? (
-				<div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+				<div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm">
 					✅ {t("allConflictsResolved")}
 				</div>
 			) : (
-				<div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm">
+				<div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning text-sm">
 					⚠️ {result.escalatedCount} {t("conflictsRequireHumanDecision")}
 				</div>
 			)}
@@ -59,8 +59,8 @@ function ResultBody({
 								<span
 									className={`px-2 py-0.5 rounded text-xs font-medium ${
 										conflict.resolved
-											? "bg-green-500/20 text-green-400"
-											: "bg-yellow-500/20 text-yellow-400"
+											? "bg-success/20 text-success"
+											: "bg-warning/20 text-warning"
 									}`}
 								>
 									{conflict.resolved ? t("resolved") : t("pending")}
@@ -87,7 +87,7 @@ function ResultBody({
 						</div>
 
 						{conflict.resolution && (
-							<p className="text-xs mt-1 text-green-400">
+							<p className="text-xs mt-1 text-success">
 								→ {conflict.resolution}
 							</p>
 						)}
@@ -96,7 +96,7 @@ function ResultBody({
 			</div>
 
 			{result.consensusSummary && (
-				<p className="text-sm text-(--text-secondary) italic mt-2">
+				<p className="text-sm text-muted-foreground italic mt-2">
 					{result.consensusSummary}
 				</p>
 			)}
@@ -125,7 +125,7 @@ export function ConsensusView({
 	const isScanning = phase === "scanning";
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-(--bg-primary) text-(--text-primary)">
+		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
 			<div className="flex items-center justify-between">
 				<h2 className="text-lg font-semibold">{t("title")}</h2>
 				<div className="flex gap-2">
@@ -143,7 +143,7 @@ export function ConsensusView({
 						<button
 							type="button"
 							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
 						>
 							{t("actions.cancel")}
 						</button>
@@ -152,7 +152,7 @@ export function ConsensusView({
 						<button
 							type="button"
 							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-(--border-color) hover:bg-(--bg-secondary) text-sm font-medium transition-colors"
+							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
 						>
 							{t("actions.reset")}
 						</button>
@@ -161,23 +161,23 @@ export function ConsensusView({
 			</div>
 
 			{!projectPath && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{t("errors.noProject")}
 				</p>
 			)}
 
 			{isScanning && (
-				<p className="text-sm text-(--text-secondary)">
+				<p className="text-sm text-muted-foreground">
 					{status || t("actions.scanning")}
 				</p>
 			)}
 
 			{phase === "error" && error && (
-				<p className="text-sm text-red-400">{error}</p>
+				<p className="text-sm text-destructive">{error}</p>
 			)}
 
 			{phase === "complete" && result?.conflicts.length === 0 && (
-				<p className="text-sm text-(--text-secondary)">{t("noData")}</p>
+				<p className="text-sm text-muted-foreground">{t("noData")}</p>
 			)}
 
 			{phase === "complete" && result && result.conflicts.length > 0 && (

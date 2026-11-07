@@ -65,7 +65,7 @@ export function FormulaCard({
 		>
 			{pickLabel && (
 				<span
-					className="absolute -top-2 left-3 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+					className="absolute -top-2 left-3 rounded-full px-2 py-0.5 text-3xs font-semibold text-white shadow-sm"
 					style={{ backgroundColor: accent ?? color }}
 				>
 					{pickLabel}
@@ -83,7 +83,7 @@ export function FormulaCard({
 							{shortModel(formula.model)}
 						</span>
 					</div>
-					<div className="mt-0.5 flex items-center gap-1.5 text-[11px] capitalize text-muted-foreground">
+					<div className="mt-0.5 flex items-center gap-1.5 text-2xs capitalize text-muted-foreground">
 						<span>
 							{formula.provider} · {effortLabel(formula.effort)}
 						</span>
@@ -91,7 +91,7 @@ export function FormulaCard({
 							(formula.installed ? (
 								<Badge
 									variant="outline"
-									className="gap-1 border-emerald-500/40 text-[9px] normal-case text-emerald-600 dark:text-emerald-400"
+									className="gap-1 border-success/40 text-3xs normal-case text-success "
 									title={t("formulaLab:local.installedTooltip")}
 								>
 									<HardDriveDownload className="h-2.5 w-2.5" />
@@ -100,7 +100,7 @@ export function FormulaCard({
 							) : (
 								<Badge
 									variant="outline"
-									className="gap-1 text-[9px] normal-case text-muted-foreground"
+									className="gap-1 text-3xs normal-case text-muted-foreground"
 									title={t("formulaLab:local.notInstalledTooltip")}
 								>
 									<Download className="h-2.5 w-2.5" />
@@ -117,12 +117,12 @@ export function FormulaCard({
 					<div className="text-base font-semibold tabular-nums">
 						{formatCostBand(formula)}
 					</div>
-					<div className="text-[11px] text-muted-foreground">
+					<div className="text-2xs text-muted-foreground">
 						{formatTokens(totalTokens(formula))} {t("formulaLab:tokens")}
 					</div>
 				</div>
 				{!formula.per_token_billed && (
-					<Badge variant="outline" className="gap-1 text-[10px]">
+					<Badge variant="outline" className="gap-1 text-3xs">
 						<Zap className="h-3 w-3" />
 						{t("formulaLab:flatRate")}
 					</Badge>

@@ -181,7 +181,7 @@ export function PluginSDKView() {
 								/>
 								<div>
 									<p className="text-xs font-medium font-mono">{type}</p>
-									<p className="text-[10px] text-muted-foreground mt-0.5">
+									<p className="text-3xs text-muted-foreground mt-0.5">
 										{t(descKey)}
 									</p>
 								</div>

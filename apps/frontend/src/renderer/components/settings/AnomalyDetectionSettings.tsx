@@ -109,9 +109,9 @@ export function AnomalyDetectionSettings() {
 	];
 
 	const severityColor: Record<string, string> = {
-		critical: "bg-red-500/15 text-red-600",
+		critical: "bg-destructive/15 text-destructive",
 		high: "bg-orange-500/15 text-orange-600",
-		medium: "bg-amber-500/15 text-amber-600",
+		medium: "bg-warning/15 text-warning",
 		low: "bg-blue-500/15 text-blue-600",
 	};
 
@@ -178,7 +178,7 @@ export function AnomalyDetectionSettings() {
 								>
 									{t("sections.anomaly-detection.trustScore.pauseThreshold")}
 								</label>
-								<span className="text-xs font-mono tabular-nums text-amber-600">
+								<span className="text-xs font-mono tabular-nums text-warning">
 									{thresholds.trust_score_pause}
 								</span>
 							</div>
@@ -192,9 +192,9 @@ export function AnomalyDetectionSettings() {
 								onChange={(e) =>
 									handleChange("trust_score_pause", Number(e.target.value))
 								}
-								className="w-full accent-amber-500"
+								className="w-full accent-warning"
 							/>
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-3xs text-muted-foreground">
 								{t("sections.anomaly-detection.trustScore.pauseDescription")}
 							</p>
 						</div>
@@ -208,7 +208,7 @@ export function AnomalyDetectionSettings() {
 										"sections.anomaly-detection.trustScore.terminateThreshold",
 									)}
 								</label>
-								<span className="text-xs font-mono tabular-nums text-red-600">
+								<span className="text-xs font-mono tabular-nums text-destructive">
 									{thresholds.trust_score_terminate}
 								</span>
 							</div>
@@ -222,9 +222,9 @@ export function AnomalyDetectionSettings() {
 								onChange={(e) =>
 									handleChange("trust_score_terminate", Number(e.target.value))
 								}
-								className="w-full accent-red-500"
+								className="w-full accent-destructive"
 							/>
-							<p className="text-[10px] text-muted-foreground">
+							<p className="text-3xs text-muted-foreground">
 								{t(
 									"sections.anomaly-detection.trustScore.terminateDescription",
 								)}
@@ -312,7 +312,7 @@ export function AnomalyDetectionSettings() {
 									onChange={(e) => handleChange(key, Number(e.target.value))}
 									className="w-full accent-primary"
 								/>
-								<p className="text-[10px] text-muted-foreground">{desc}</p>
+								<p className="text-3xs text-muted-foreground">{desc}</p>
 							</div>
 						))}
 					</div>
@@ -352,7 +352,7 @@ export function AnomalyDetectionSettings() {
 										<td className="px-3 py-1.5">
 											<span
 												className={cn(
-													"rounded-full px-2 py-0.5 text-[10px] font-medium",
+													"rounded-full px-2 py-0.5 text-3xs font-medium",
 													severityColor[a.severity],
 												)}
 											>

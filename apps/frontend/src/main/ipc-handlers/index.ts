@@ -5,6 +5,7 @@
  * organized by domain into separate handler modules.
  */
 
+import { debugLog } from "../../shared/utils/debug-logger";
 import path from "node:path";
 import { registerDictationHandlers } from "./dictation-handlers";
 import { app, type BrowserWindow } from "electron";
@@ -29,6 +30,7 @@ import { registerTaskSandboxHandlers } from "./task-sandbox-handlers";
 import { registerBlastRadiusHandlers } from "./blast-radius-handlers";
 import { registerBountyBoardHandlers } from "./bounty-board-handlers";
 import { registerTechDebtHandlers } from "./tech-debt-handlers";
+import { registerServerAnalysisHandlers } from "./server-analyses";
 import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
@@ -67,15 +69,11 @@ import { registerCostHandlers } from "./cost-handlers";
 import { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 import { registerFormulaMatrixHandlers } from "./formula-matrix-handlers";
 import { registerBenchHandlers } from "./bench-handlers";
+import { registerBoardMcpHandlers } from "./board-mcp-handlers";
 import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
-import { registerDecisionLoggerHandlers } from "./decision-logger-handlers";
 import { registerDocDriftHandlers } from "./doc-drift-handlers";
-import {
-	registerDocumentationAgentHandlers,
-	setupDocumentationAgentEventForwarding,
-} from "./documentation-agent-handlers";
 import { registerEnvHandlers } from "./env-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -92,6 +90,7 @@ import { registerInsightsHandlers } from "./insights-handlers";
 import { registerFigmaHandlers } from "./figma-handlers";
 import { registerJiraHandlers } from "./jira-handlers";
 import { registerLearningLoopHandlers } from "./learning-loop-handlers";
+import { registerMcpPinsHandlers } from "./mcp-pins-handlers";
 import { registerLinearHandlers } from "./linear-handlers";
 import { registerLiveCompanionHandlers } from "./live-companion-handlers";
 import { registerMcpHandlers } from "./mcp-handlers";
@@ -122,6 +121,9 @@ import { registerScreenshotHandlers } from "./screenshot-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
+import { registerServerProjectHandlers } from "./server-project-handlers";
+import { registerServerWorkspaceHandlers } from "./server-workspace-handlers";
+import { registerTeamRoomHandlers } from "./team-room-handlers";
 import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
@@ -133,7 +135,6 @@ import { registerRegressionGuardianHandlers } from "./regression-guardian-handle
 import { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 import { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 import { registerSpecApprovalHandlers } from "./spec-approval-handlers";
-import { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
@@ -146,11 +147,11 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerPreviewPointHandlers } from "./task/preview-point-handlers";
+import { registerSteeringHandlers } from "./task/steering-handlers";
 import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
-import {
-	registerVoiceControlHandlers,
-	setupVoiceControlEvents,
-} from "./voice-control-handlers";
+import { registerVoiceAssistantHandlers } from "./voice-assistant-handlers";
+import { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
 
 export { registerAccessibilityHandlers } from "./accessibility-handlers";
 export { registerAgenteventsHandlers } from "./agent-events-handlers";
@@ -191,12 +192,7 @@ export { registerCostPredictorHandlers } from "./cost-predictor-handlers";
 export { registerCredentialHandlers } from "./credential-handlers";
 export { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 export { registerDebugHandlers } from "./debug-handlers";
-export { registerDecisionLoggerHandlers } from "./decision-logger-handlers";
 export { registerDocDriftHandlers } from "./doc-drift-handlers";
-export {
-	registerDocumentationAgentHandlers,
-	setupDocumentationAgentEventForwarding,
-} from "./documentation-agent-handlers";
 export { registerEnvHandlers } from "./env-handlers";
 export { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 export { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -212,6 +208,7 @@ export { registerIdeationHandlers } from "./ideation-handlers";
 export { registerInsightsHandlers } from "./insights-handlers";
 export { registerJiraHandlers } from "./jira-handlers";
 export { registerLearningLoopHandlers } from "./learning-loop-handlers";
+export { registerMcpPinsHandlers } from "./mcp-pins-handlers";
 export { registerLinearHandlers } from "./linear-handlers";
 export { registerLiveCompanionHandlers } from "./live-companion-handlers";
 export { registerMcpHandlers } from "./mcp-handlers";
@@ -249,7 +246,6 @@ export { registerRegressionGuardianHandlers } from "./regression-guardian-handle
 export { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 export { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 export { registerSpecApprovalHandlers } from "./spec-approval-handlers";
-export { registerSpecRefinementHandlers } from "./spec-refinement-handlers";
 export { registerTaskHandlers } from "./task-handlers";
 export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
@@ -259,8 +255,11 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerPreviewPointHandlers } from "./task/preview-point-handlers";
+export { registerSteeringHandlers } from "./task/steering-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
-export { registerVoiceControlHandlers } from "./voice-control-handlers";
+export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
+export { registerVoiceAssistantHandlers } from "./voice-assistant-handlers";
 
 /**
  * Setup all IPC handlers across all domains
@@ -326,6 +325,9 @@ export function setupIpcHandlers(
 	registerServerAuthHandlers(getMainWindow);
 	// Multi-tenant administration console (orgs, roles, members, quotas, audit)
 	registerServerAdminHandlers();
+	registerServerProjectHandlers();
+	registerServerWorkspaceHandlers();
+	registerTeamRoomHandlers();
 
 	// File explorer handlers
 	registerFileHandlers();
@@ -421,15 +423,14 @@ export function setupIpcHandlers(
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
 
-	// Voice Control handlers
-	registerVoiceControlHandlers();
+	// Voice assistant: local dictation, then the sentence read into an app action
+	registerVoiceAssistantHandlers(getMainWindow);
 	registerDictationHandlers(
 		() => pythonEnvManager.getPythonPath(),
 		getBackendSourcePath,
 		getMainWindow,
 		() => pythonEnvManager.getPythonEnv(),
 	);
-	setupVoiceControlEvents();
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
@@ -437,12 +438,13 @@ export function setupIpcHandlers(
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
 	registerLearningLoopHandlers(getMainWindow);
+	registerMcpPinsHandlers();
 
 	// MCP Marketplace handlers (catalog, install, builder)
 	registerMcpMarketplaceHandlers();
 
 	// Multi-Repo Orchestration handlers
-	registerMultiRepoHandlers(agentManager, getMainWindow);
+	registerMultiRepoHandlers(getMainWindow);
 
 	// Self-Healing Codebase + Incident Responder handlers
 	registerSelfHealingHandlers(getMainWindow);
@@ -461,13 +463,6 @@ export function setupIpcHandlers(
 	// Performance Profiler Agent handlers
 	registerPerformanceProfilerHandlers();
 	setupPerformanceProfilerEventForwarding(getMainWindow);
-
-	// Documentation Agent handlers
-	registerDocumentationAgentHandlers();
-	setupDocumentationAgentEventForwarding(getMainWindow);
-
-	// Agent Decision Logger handlers (Feature 30)
-	registerDecisionLoggerHandlers();
 
 	// AI Pair Programming handlers (Feature 10)
 	registerPairProgrammingHandlers(getMainWindow);
@@ -504,6 +499,9 @@ export function setupIpcHandlers(
 	registerVisualProgrammingHandlers(getMainWindow);
 	setupVisualProgrammingEventForwarding(getMainWindow);
 	registerVisualToCodeHistoryHandlers();
+	registerWorktreeRecipeHandlers();
+	registerSteeringHandlers();
+	registerPreviewPointHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();
@@ -555,7 +553,6 @@ export function setupIpcHandlers(
 	registerNotebookAgentHandlers();
 
 	// Spec Refinement handlers (load persisted refinement histories)
-	registerSpecRefinementHandlers();
 
 	// Agent Coach handlers (analyse persisted agent run records)
 	registerAgentCoachHandlers();
@@ -587,6 +584,9 @@ export function setupIpcHandlers(
 	// Repo bench: finished cards replayed per engine, judged by their own tests
 	registerBenchHandlers(agentManager, getMainWindow);
 
+	// workpilot-board MCP server: registered with Claude Code, Codex, Cursor...
+	registerBoardMcpHandlers();
+
 	// Agent Debugger handlers (Feature 1)
 	registerAgentDebuggerHandlers();
 
@@ -598,6 +598,9 @@ export function setupIpcHandlers(
 
 	// Tech Debt handlers (Feature 9 — ROI-scored tech debt dashboard)
 	registerTechDebtHandlers();
+
+	// The analyses of a server project, run on the server, their reports shared
+	registerServerAnalysisHandlers();
 
 	// Team Bot handlers (Feature 4 — Slack / Microsoft Teams notifications)
 	registerTeamBotHandlers();
@@ -632,5 +635,5 @@ export function setupIpcHandlers(
 		getClaudeProfileManager(),
 	);
 
-	console.warn("[IPC] All handler modules registered successfully");
+	debugLog("[IPC] All handler modules registered successfully");
 }

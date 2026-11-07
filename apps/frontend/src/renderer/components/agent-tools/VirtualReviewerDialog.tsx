@@ -14,6 +14,7 @@ import {
 	fetchVirtualReviewSummary,
 	runVirtualReview,
 } from "../../lib/agent-tools-api";
+import { useTranslation } from "react-i18next";
 
 export interface VirtualReviewerDialogProps {
 	readonly open: boolean;
@@ -31,6 +32,7 @@ export function VirtualReviewerDialog({
 	specDir,
 	onReviewWritten,
 }: VirtualReviewerDialogProps) {
+	const { t } = useTranslation();
 	const [summary, setSummary] = useState<VirtualReviewSummaryPayload | null>(
 		null,
 	);
@@ -80,11 +82,10 @@ export function VirtualReviewerDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Virtual reviewer (advisory)</DialogTitle>
+					<DialogTitle>{t("agentTools:virtualReviewer.title")}</DialogTitle>
 					<DialogDescription>
-						<strong>Machine-generated commentary, not a human review.</strong>{" "}
-						Writes <code className="text-xs">virtual_review.md</code> at the
-						spec root. Never signs in your name, never opens a PR. Enable via{" "}
+						<strong>{t("agentTools:virtualReviewer.disclaimer")}</strong>{" "}
+						{t("agentTools:virtualReviewer.writesBefore")} <code className="text-xs">virtual_review.md</code> {t("agentTools:virtualReviewer.writesAfter")}{" "}
 						<code className="text-xs">
 							WORKPILOT_VIRTUAL_REVIEWER_ENABLED
 						</code>
@@ -94,12 +95,12 @@ export function VirtualReviewerDialog({
 
 				{loading && (
 					<div className="py-6 text-center text-sm text-muted-foreground">
-						Loading…
+						{t("agentTools:virtualReviewer.loading")}
 					</div>
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{error}
 					</div>
 				)}
@@ -108,42 +109,48 @@ export function VirtualReviewerDialog({
 					<div className="space-y-3">
 						<div className="flex flex-wrap gap-2 text-xs">
 							{enabled ? (
-								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-									enabled
+								<Badge className="bg-success/15 text-success ">
+									{t("agentTools:virtualReviewer.enabled")}
 								</Badge>
 							) : (
 								<Badge className="bg-slate-500/15 text-slate-700 dark:text-slate-300">
-									disabled (env flag off)
+									{t("agentTools:virtualReviewer.disabled")}
 								</Badge>
 							)}
 							<Badge variant="outline">
-								spec: {summary.spec_chars}ch
+								{t("agentTools:virtualReviewer.chars", {
+									label: "spec",
+									count: summary.spec_chars,
+								})}
 							</Badge>
 							<Badge variant="outline">
-								qa_report: {summary.qa_report_chars}ch
+								{t("agentTools:virtualReviewer.chars", {
+									label: "qa_report",
+									count: summary.qa_report_chars,
+								})}
 							</Badge>
 							{summary.self_review_present && (
 								<Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300">
-									self_review.md present
+									{t("agentTools:virtualReviewer.selfReviewPresent")}
 								</Badge>
 							)}
 							{summary.diff_truncated && (
-								<Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
-									diff truncated
+								<Badge className="bg-warning/15 text-warning ">
+									{t("agentTools:virtualReviewer.diffTruncated")}
 								</Badge>
 							)}
 						</div>
 
 						{summary.error && (
-							<div className="text-xs text-amber-700 dark:text-amber-300">
+							<div className="text-xs text-warning ">
 								⚠ {summary.error}
 							</div>
 						)}
 
 						{writtenPath && (
-							<div className="rounded-md bg-emerald-500/10 p-3 text-sm">
-								<div className="font-medium text-emerald-700 dark:text-emerald-300">
-									✓ virtual_review.md written
+							<div className="rounded-md bg-success/10 p-3 text-sm">
+								<div className="font-medium text-success ">
+									{t("agentTools:virtualReviewer.written")}
 								</div>
 								<code className="text-xs text-muted-foreground break-all">
 									{writtenPath}
@@ -152,19 +159,17 @@ export function VirtualReviewerDialog({
 						)}
 
 						<div className="text-xs text-muted-foreground">
-							The HTTP endpoint runs in stub mode (deterministic fallback). For
-							a full SDK-backed review, the agent runtime needs to wire an
-							in-process invokable client.
+							{t("agentTools:virtualReviewer.stubNotice")}
 						</div>
 					</div>
 				)}
 
 				<DialogFooter>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
-						Close
+						{t("common:buttons.close")}
 					</Button>
 					<Button disabled={!enabled || running} onClick={handleRun}>
-						{running ? "Running…" : "Run virtual review"}
+						{running ? t("agentTools:virtualReviewer.running") : t("agentTools:virtualReviewer.run")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

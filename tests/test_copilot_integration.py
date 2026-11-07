@@ -41,10 +41,12 @@ if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 # Also add runners/github to sys.path so fallback imports like
-# 'from context_gatherer import ...' work when relative imports fail
+# 'from context_gatherer import ...' work when relative imports fail. Appended,
+# not prepended: its ``services/`` package would otherwise shadow
+# apps/backend/services for every test collected after this one.
 _RUNNERS_GITHUB = _BACKEND / "runners" / "github"
 if str(_RUNNERS_GITHUB) not in sys.path:
-    sys.path.insert(0, str(_RUNNERS_GITHUB))
+    sys.path.append(str(_RUNNERS_GITHUB))
 
 # Pre-load specific services.* modules so imports resolve correctly regardless
 # of whether sys.modules["services"] is set to apps/backend/services or not.

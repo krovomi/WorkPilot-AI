@@ -2,6 +2,7 @@ import { Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IDEATION_TYPE_DESCRIPTIONS } from "../../../shared/constants";
 import { useViewState } from "../../contexts/ViewStateContext";
+import { useServerViewLive } from "../../hooks/useServerViewLive";
 import { EnvConfigModal } from "../EnvConfigModal";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -23,6 +24,8 @@ interface IdeationProps {
 
 export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 	const { t } = useTranslation("ideation");
+	// A server project's ideas show a teammate's change at once.
+	useServerViewLive(projectId, "ideation");
 	// Get showArchived from shared context for cross-page sync
 	const { showArchived } = useViewState();
 

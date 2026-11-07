@@ -47,6 +47,7 @@ import { ProfileRenderer } from "./usage/ProfileRenderer";
 import { ReauthContent } from "./usage/ReauthContent";
 import { THRESHOLD_ELEVATED, THRESHOLD_WARNING } from "./usage/usageConstants";
 import { useContextUsage } from "../hooks/useContextUsage";
+import { formatAppDateTime } from "@/lib/date-format";
 
 // All provider keys from the canonical map (including both 'anthropic' and 'claude' aliases)
 const KNOWN_PROVIDERS = new Set(Object.keys(PROVIDER_MODELS_MAP));
@@ -713,7 +714,7 @@ export function UsageIndicator() {
 								<p className="font-medium">
 									{t("common:usage.dataUnavailable")}
 								</p>
-								<p className="text-muted-foreground text-[10px]">
+								<p className="text-muted-foreground text-3xs">
 									<span>
 										{t("common:usage.openaiHelp.text")}{" "}
 										<a
@@ -727,17 +728,17 @@ export function UsageIndicator() {
 									</span>
 								</p>
 								{openaiError && (
-									<div className="mt-2 p-1 bg-red-50 border border-red-200 rounded text-[10px] text-red-700">
+									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-3xs text-destructive">
 										<b>{t("common:usage.openaiError")}</b> {openaiError}
 									</div>
 								)}
-								<div className="mt-2 p-1 bg-muted/30 rounded text-[10px]">
+								<div className="mt-2 p-1 bg-muted/30 rounded text-3xs">
 									<b>{t("common:usage.debugProfiles")}</b>
 									<ul>
 										{debugProfiles.length > 0 ? (
 											debugProfiles.map((p) => (
 												<li key={`${p.name}-${p.baseUrl}`}>
-													{p.name} | {p.baseUrl} | provider:{" "}
+													{p.name} | {p.baseUrl} | {t("common:usage.debugProvider")}{" "}
 													{p.detectedProvider}
 												</li>
 											))
@@ -783,7 +784,7 @@ export function UsageIndicator() {
 								<p className="font-medium">
 									{t("common:usage.dataUnavailable")}
 								</p>
-								<p className="text-muted-foreground text-[10px]">
+								<p className="text-muted-foreground text-3xs">
 									{t("common:usage.providerNotSupported")}
 								</p>
 							</div>
@@ -814,7 +815,7 @@ export function UsageIndicator() {
 					<TooltipContent side="bottom" className="text-xs w-64">
 						<div className="space-y-1">
 							<p className="font-medium">{t("common:usage.dataUnavailable")}</p>
-							<p className="text-muted-foreground text-[10px]">
+							<p className="text-muted-foreground text-3xs">
 								{selectedProvider === "anthropic"
 									? t("common:usage.dataUnavailableAnthropic")
 									: t("common:usage.dataUnavailableDescription")}
@@ -824,7 +825,7 @@ export function UsageIndicator() {
 									href="https://claude.ai/settings"
 									target="_blank"
 									rel="noopener noreferrer"
-									className="text-[10px] text-primary font-medium underline hover:text-primary/80 block mt-1"
+									className="text-3xs text-primary font-medium underline hover:text-primary/80 block mt-1"
 								>
 									claude.ai/settings
 								</a>
@@ -847,7 +848,7 @@ export function UsageIndicator() {
 	const isUnmeasured = usage.usageUnmeasured === true;
 	let badgeColorClasses: string;
 	if (usage.needsReauthentication) {
-		badgeColorClasses = "text-red-500 bg-red-500/10 border-red-500/20";
+		badgeColorClasses = "text-destructive bg-destructive/10 border-destructive/20";
 	} else if (isUnmeasured) {
 		badgeColorClasses = "text-muted-foreground bg-muted/50 border-border";
 	} else {
@@ -914,7 +915,7 @@ export function UsageIndicator() {
 
 		if (isUnmeasured) {
 			return (
-				<p className="text-[11px] text-muted-foreground leading-relaxed">
+				<p className="text-2xs text-muted-foreground leading-relaxed">
 					{t("common:usage.notMeasuredDescription")}
 				</p>
 			);
@@ -939,12 +940,10 @@ export function UsageIndicator() {
 					weeklyLabel={weeklyLabel}
 				/>
 				{subscription && (
-					<p className="text-[10px] text-muted-foreground leading-relaxed">
+					<p className="text-3xs text-muted-foreground leading-relaxed">
 						{subscription.source === "codex-session-log"
 							? t("common:usage.chatgptFromCodexLog", {
-									time: new Date(subscription.observedAt).toLocaleString(
-										i18n.language,
-									),
+									time: formatAppDateTime(subscription.observedAt),
 								})
 							: t("common:usage.chatgptFromApi")}
 					</p>
@@ -984,8 +983,8 @@ export function UsageIndicator() {
 		if (usage.needsReauthentication) {
 			return (
 				<span
-					className="text-xs font-semibold text-red-500"
-					title="Needs re-authentication"
+					className="text-xs font-semibold text-destructive"
+					title={t("common:usage.needsReauthTitle")}
 				>
 					!
 				</span>
@@ -1010,7 +1009,7 @@ export function UsageIndicator() {
 			return (
 				<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
 					<span
-						className={cost ? "text-green-500" : "text-muted-foreground/60"}
+						className={cost ? "text-success" : "text-muted-foreground/60"}
 						title={t("common:usage.openaiCostLabel")}
 					>
 						${cost ?? "–"}
@@ -1026,7 +1025,7 @@ export function UsageIndicator() {
 				const pct = contextUsage.percentUsed;
 				const colorClass =
 					pct >= THRESHOLD_WARNING
-						? "text-red-500"
+						? "text-destructive"
 						: pct >= THRESHOLD_ELEVATED
 							? "text-orange-500"
 							: "text-blue-500";
@@ -1039,7 +1038,7 @@ export function UsageIndicator() {
 							})}
 						>
 							{pct.toFixed(0)}
-							<span className="ml-0.5 text-[10px] font-normal opacity-80">
+							<span className="ml-0.5 text-3xs font-normal opacity-80">
 								%
 							</span>
 						</span>
@@ -1057,7 +1056,7 @@ export function UsageIndicator() {
 							title={t("common:usage.copilotPremiumTitle")}
 						>
 							{Math.round(copilotPremiumPercent)}
-							<span className="ml-0.5 text-[10px] font-normal opacity-80">
+							<span className="ml-0.5 text-3xs font-normal opacity-80">
 								%
 							</span>
 						</span>
@@ -1078,7 +1077,7 @@ export function UsageIndicator() {
 						title={t("common:usage.copilotTokensTitle")}
 					>
 						{tokens ?? "0"}
-						<span className="ml-0.5 text-[10px] font-normal opacity-80">
+						<span className="ml-0.5 text-3xs font-normal opacity-80">
 							{t("common:usage.copilotTokensSuffix")}
 						</span>
 					</span>
@@ -1088,11 +1087,11 @@ export function UsageIndicator() {
 
 		return (
 			<div className="flex items-center gap-0.5 text-xs font-semibold font-mono">
-				<span className={sessionColorClass} title="Session usage">
+				<span className={sessionColorClass} title={t("common:usage.sessionUsage")}>
 					{Math.round(sessionPercent)}
 				</span>
 				<span className="text-muted-foreground/50">│</span>
-				<span className={weeklyUnavailable ? "text-muted-foreground/50" : weeklyColorClass} title="Weekly usage">
+				<span className={weeklyUnavailable ? "text-muted-foreground/50" : weeklyColorClass} title={t("common:usage.weeklyUsage")}>
 					{weeklyUnavailable ? "–" : Math.round(weeklyPercent)}
 				</span>
 			</div>
@@ -1133,7 +1132,7 @@ export function UsageIndicator() {
 							</span>
 						</div>
 						{/* Real-time indicator */}
-						<div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+						<div className="flex items-center gap-1 text-3xs text-muted-foreground">
 							{renderRealTimeIndicator()}
 						</div>
 					</div>
@@ -1152,14 +1151,14 @@ export function UsageIndicator() {
 							<div
 								className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
 									usage.needsReauthentication
-										? "bg-red-500/10"
+										? "bg-destructive/10"
 										: "bg-primary/10"
 								}`}
 							>
 								<span
 									className={`text-xs font-semibold ${
 										usage.needsReauthentication
-											? "text-red-500"
+											? "text-destructive"
 											: "text-primary"
 									}`}
 								>
@@ -1170,18 +1169,18 @@ export function UsageIndicator() {
 							</div>
 							{/* Status dot for re-auth needed */}
 							{usage.needsReauthentication && (
-								<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+								<div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border-2 border-background" />
 							)}
 						</div>
 
 						{/* Account Info */}
 						<div className="flex-1 min-w-0 text-left">
 							<div className="flex items-center gap-1.5">
-								<span className="text-[10px] text-muted-foreground font-medium">
+								<span className="text-3xs text-muted-foreground font-medium">
 									{t("common:usage.activeAccount")}
 								</span>
 								{usage.needsReauthentication && (
-									<span className="text-[9px] px-1.5 py-0.5 bg-red-500/10 text-destructive rounded font-semibold">
+									<span className="text-3xs px-1.5 py-0.5 bg-destructive/10 text-destructive rounded font-semibold">
 										{t("common:usage.needsReauth")}
 									</span>
 								)}
@@ -1206,7 +1205,7 @@ export function UsageIndicator() {
 					{/* Other profiles section - sorted by availability */}
 					{otherProfiles.length > 0 && (
 						<div className="pt-2 -mx-3 px-3 -mb-3 pb-3 space-y-1">
-							<div className="text-[10px] text-muted-foreground font-medium mb-1.5">
+							<div className="text-3xs text-muted-foreground font-medium mb-1.5">
 								{t("common:usage.otherAccounts")}
 							</div>
 							{otherProfiles.map((profile) => {

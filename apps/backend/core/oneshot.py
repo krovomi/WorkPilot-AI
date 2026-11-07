@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 # For a build that is the right trade: the task runs. For a caller that is
 # *comparing* providers it is the wrong one, because the answer comes back
 # labelled with a vendor that never saw the prompt. `require_provider` is how
-# such a caller says so; see `oneshot_completion`.
+# such a caller says so; see `oneshot_completion`. It also keeps the model: a
+# client that would retry on another model when the provider refuses this one
+# (Copilot's `model_not_supported`) fails instead.
 _DIRECT_PROVIDERS = frozenset(
     {
         "claude",
@@ -173,7 +175,7 @@ def _provider_reported_error(msg) -> ProviderReportedError | None:
 
 
 def _error_code(error: Exception, message: str) -> str:
-    from core.error_details import (
+    from foundation.error_details import (
         AUTH,
         MODEL_UNAVAILABLE,
         PROVIDER_UNAVAILABLE,
@@ -194,6 +196,19 @@ def _error_code(error: Exception, message: str) -> str:
             return code
         return classify(error.kind, message)
     return classify(type(error).__name__, message)
+
+
+def _is_status_message(msg) -> bool:
+    """Whether ``msg`` is a status line the client emits about itself.
+
+    Every ``MessageRole.SYSTEM`` message an AgentClient yields is one (see
+    ``AgentClient.notice`` and ``agents.session``): a provider error such as
+    "Copilot auth error: …" arrives that way. Read as text, it became the
+    completion, and the Arena offered it as a model's answer to vote for.
+    """
+    from core.agent_client import MessageRole
+
+    return getattr(msg, "role", None) == MessageRole.SYSTEM
 
 
 def _extract_text(msg) -> str:
@@ -248,6 +263,7 @@ def _build_client(
     *,
     chosen: bool = False,
     thinking_level: str | None = None,
+    exact_model: bool = False,
 ):
     cwd = str(Path(project_dir).resolve()) if project_dir else None
     from offline_policy import local_endpoint, resolve_offline_route
@@ -278,6 +294,9 @@ def _build_client(
             cwd=cwd,
             agent_type="commit_message",
             max_turns=max_turns,
+            # A caller that compares models wants this one's answer or a
+            # failure, never another model's answer under its name.
+            allow_model_fallback=not exact_model,
         )
 
     if provider == "openai":
@@ -448,7 +467,7 @@ async def oneshot_completion(
     never break the generation.
 
     ``on_error`` — optional callback invoked with a **redacted** diagnostic dict
-    (``core.error_details.ErrorDetail.to_dict``) when the provider call fails.
+    (``foundation.error_details.ErrorDetail.to_dict``) when the provider call fails.
     The return value stays an empty string either way; this is how a caller that
     wants to *explain* the failure gets something to explain, instead of having
     to guess from "the model returned nothing". Nothing here re-raises: the
@@ -491,7 +510,7 @@ async def oneshot_completion(
         )
         logger.warning("[oneshot] %s", message)
         if on_error is not None:
-            from core.error_details import PROVIDER_UNAVAILABLE, ErrorDetail
+            from foundation.error_details import PROVIDER_UNAVAILABLE, ErrorDetail
 
             detail = ErrorDetail(
                 message=message,
@@ -515,9 +534,11 @@ async def oneshot_completion(
         max_turns,
         chosen=provider_chosen,
         thinking_level=thinking_level,
+        exact_model=require_provider,
     )
 
     text = ""
+    status_lines: list[str] = []
     try:
         try:
             async with client:
@@ -526,6 +547,14 @@ async def oneshot_completion(
                     reported = _provider_reported_error(msg)
                     if reported is not None:
                         raise reported
+                    if _is_status_message(msg):
+                        # A line the client says about itself (an auth error, a
+                        # retry notice), never the model's answer: kept out of
+                        # the completion, and the reason if nothing else came.
+                        status = _extract_text(msg).strip()
+                        if status:
+                            status_lines.append(status)
+                        continue
                     delta = _extract_text(msg)
                     if not delta:
                         continue
@@ -537,6 +566,8 @@ async def oneshot_completion(
                             logger.debug(
                                 "[oneshot] on_delta callback raised", exc_info=True
                             )
+            if not text.strip() and status_lines:
+                raise ProviderReportedError("provider_error", status_lines[-1])
         except Exception as error:  # noqa: BLE001 — one-shot callers own degradation
             # Never echo a raw provider diagnostic: it may carry credential material.
             # ``ErrorDetail`` redacts it, which is what makes it safe to hand to the
@@ -545,7 +576,7 @@ async def oneshot_completion(
                 "[oneshot] provider completion failed (%s)", type(error).__name__
             )
             if on_error is not None:
-                from core.error_details import ErrorDetail
+                from foundation.error_details import ErrorDetail
 
                 message = str(error).strip() or type(error).__name__
                 label = (

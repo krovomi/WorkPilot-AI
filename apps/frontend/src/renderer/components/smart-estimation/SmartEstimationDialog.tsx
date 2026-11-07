@@ -301,13 +301,13 @@ function ResultView({
 	readonly result: SmartEstimationResult;
 	readonly copied: boolean;
 	readonly onCopy: (text: string) => void;
-	readonly t: (key: string) => string;
+	readonly t: (key: string, options?: Record<string, unknown>) => string;
 }) {
 	const getComplexityColor = (score: number) => {
-		if (score <= 3) return "bg-green-500";
-		if (score <= 7) return "bg-yellow-500";
+		if (score <= 3) return "bg-success";
+		if (score <= 7) return "bg-warning";
 		if (score <= 10) return "bg-orange-500";
-		return "bg-red-500";
+		return "bg-destructive";
 	};
 
 	const getComplexityLabel = (score: number) => {
@@ -318,9 +318,9 @@ function ResultView({
 	};
 
 	const getConfidenceColor = (confidence: number) => {
-		if (confidence >= 0.8) return "text-green-600";
-		if (confidence >= 0.6) return "text-yellow-600";
-		return "text-red-600";
+		if (confidence >= 0.8) return "text-success";
+		if (confidence >= 0.6) return "text-warning";
+		return "text-destructive";
 	};
 
 	return (
@@ -372,7 +372,9 @@ function ResultView({
 							<span
 								className={`text-sm font-medium ${getConfidenceColor(result.confidence_level)}`}
 							>
-								{Math.round(result.confidence_level * 100)}% confidence
+								{t("smartEstimation:confidencePercent", {
+									percent: Math.round(result.confidence_level * 100),
+								})}
 							</span>
 						</div>
 					</div>
@@ -504,7 +506,7 @@ function ResultView({
 										</span>
 										<div className="flex items-center gap-2">
 											<Badge variant="outline" className="text-xs">
-												Score: {task.complexity_score}
+												{t("smartEstimation:scoreLabel", { score: task.complexity_score })}
 											</Badge>
 											<Badge
 												variant={
@@ -517,7 +519,9 @@ function ResultView({
 										</div>
 									</div>
 									<div className="text-xs text-muted-foreground">
-										{Math.round(task.similarity_score * 100)}% similar
+										{t("smartEstimation:similarPercent", {
+										percent: Math.round(task.similarity_score * 100),
+									})}
 										{task.cost_usd && ` • $${task.cost_usd.toFixed(2)}`}
 									</div>
 								</div>

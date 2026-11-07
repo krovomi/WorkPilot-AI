@@ -8,7 +8,8 @@ Validates implementation_plan.json structure, phases, subtasks, and dependencies
 import json
 from pathlib import Path
 
-from ...traceability import compute_coverage
+from foundation.traceability import compute_coverage
+
 from ..models import ValidationResult
 from ..schemas import IMPLEMENTATION_PLAN_SCHEMA
 

@@ -1,5 +1,13 @@
 {
 	"title": "Générateur de journal des modifications",
+	"server": {
+		"lastShared": "Dernier journal partagé sur le serveur : version {{version}}, généré le {{date}}",
+		"open": "Ouvrir",
+		"save": "Enregistrer pour l'équipe",
+		"saveTooltip": "Garder ce texte comme journal partagé du projet sur le serveur",
+		"savedTitle": "Journal partagé",
+		"savedDescription": "La version {{tag}} est le journal partagé du projet : chaque membre du projet le voit."
+	},
 	"steps": {
 		"step1": "Étape 1 : Sélectionner les tâches terminées à inclure",
 		"step2": "Étape 2 : Configurer et générer le journal",
@@ -164,5 +172,53 @@
 		"generationFailed": "Échec de la génération du journal",
 		"saveFailed": "Échec de l'enregistrement du journal",
 		"loadFailed": "Échec du chargement des données"
+	},
+	"archive": {
+		"archived_one": "{{count}} tâche archivée !",
+		"archived_other": "{{count}} tâches archivées !",
+		"description_one": "Archivez {{count}} tâche pour désencombrer votre tableau Kanban. Les tâches archivées restent visibles avec l'option « Afficher les archives ».",
+		"description_other": "Archivez {{count}} tâches pour désencombrer votre tableau Kanban. Les tâches archivées restent visibles avec l'option « Afficher les archives ».",
+		"button_one": "Archiver {{count}} tâche",
+		"button_other": "Archiver {{count}} tâches",
+		"title": "Archiver les tâches terminées",
+		"archiving": "Archivage..."
+	},
+	"noProject": {
+		"title": "Aucun projet sélectionné",
+		"description": "Sélectionnez un projet dans la barre latérale pour générer un changelog."
+	},
+	"entry": {
+		"files_one": "{{count}} fichier",
+		"files_other": "{{count}} fichiers",
+		"hasSpecs": "Avec specs"
+	},
+	"githubRelease": {
+		"description": "Créer la release {{tag}} sur GitHub avec le changelog comme notes de version.",
+		"create": "Créer la release {{tag}}",
+		"title": "Créer une release GitHub",
+		"created": "Release créée !",
+		"view": "Voir la release sur GitHub",
+		"creating": "Création de la release..."
+	},
+	"previewPanel": {
+		"loadingImage": "Chargement de l'image...",
+		"preview": "Aperçu",
+		"copy": "Copier dans le presse-papiers",
+		"prepend": "Ajouter en tête de CHANGELOG.md à la racine du projet",
+		"aria": "Aperçu du changelog, glisser-déposer accepté",
+		"dropImages": "Déposez des images ici pour les ajouter au changelog",
+		"pasteImages": "Collez des images dans la description pour les enregistrer dans le changelog",
+		"placeholder": "Le changelog généré apparaîtra ici...",
+		"empty": "Cliquez sur « Générer le changelog » pour créer les notes de version.",
+		"imageNotFound": "Image introuvable",
+		"copied": "Copié !",
+		"copyShort": "Copier",
+		"saved": "Enregistré !",
+		"saveToFile": "Enregistrer dans CHANGELOG.md"
+	},
+	"success": {
+		"description": "La version {{tag}} a été ajoutée à CHANGELOG.md",
+		"title": "Changelog enregistré !",
+		"done": "Terminé"
 	}
 }

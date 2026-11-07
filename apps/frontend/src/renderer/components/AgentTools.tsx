@@ -59,6 +59,7 @@ import { CustomMcpDialog } from "./CustomMcpDialog";
 import { McpServerSettingsDialog } from "./McpServerSettingsDialog";
 import { TokenSavingsSettings } from "./settings/TokenSavingsSettings";
 import { UiUxSettings } from "./settings/UiUxSettings";
+import { McpPinsSection } from "./settings/McpPinsSection";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -70,6 +71,7 @@ import {
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
+import { PageHeader } from "./ui/page-header";
 
 // Agent configuration data - mirrors AGENT_CONFIGS from backend
 // Model and thinking are now dynamically read from user settings
@@ -583,9 +585,9 @@ function StatusIndicator({
 	}
 	switch (health?.status) {
 		case "healthy":
-			return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+			return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
 		case "needs_auth":
-			return <Lock className="h-3.5 w-3.5 text-amber-500" />;
+			return <Lock className="h-3.5 w-3.5 text-warning" />;
 		case "unhealthy":
 			return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
 		default:
@@ -741,10 +743,10 @@ function AgentCard({
 						<h3 className="font-medium text-sm text-foreground">
 							{t(`agents.${id}.label`, { defaultValue: config.label })}
 						</h3>
-						<span className="px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+						<span className="px-2 py-0.5 rounded text-3xs font-medium bg-secondary text-secondary-foreground">
 							{modelLabel}
 						</span>
-						<span className="px-2 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
+						<span className="px-2 py-0.5 rounded text-3xs font-medium bg-secondary text-secondary-foreground">
 							{thinkingLabel}
 						</span>
 					</div>
@@ -771,7 +773,7 @@ function AgentCard({
 					<div>
 						<div className="flex items-center justify-between mb-2">
 							<h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-								MCP Servers
+								{t("settings:agentToolsPanel.mcpServers")}
 							</h4>
 							{availableMcps.length > 0 && (
 								<button
@@ -813,13 +815,13 @@ function AgentCard({
 												className="flex items-center gap-2 text-sm text-left rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"
 												title={t("mcp.configureServer")}
 											>
-												<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+												<CheckCircle2 className="h-3.5 w-3.5 text-success" />
 												<ServerIcon className="h-3.5 w-3.5 text-muted-foreground" />
 												<span className="font-medium group-hover:underline">
 													{serverInfo?.name || server}
 												</span>
 												{isAdded && (
-													<span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+													<span className="text-3xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
 														{t("mcp.added")}
 													</span>
 												)}
@@ -870,7 +872,7 @@ function AgentCard({
 												<span className="font-medium">
 													{serverInfo?.name || server}
 												</span>
-												<span className="text-[10px] text-muted-foreground no-underline">
+												<span className="text-3xs text-muted-foreground no-underline">
 													({t("mcp.removed")})
 												</span>
 											</div>
@@ -942,14 +944,14 @@ function AgentCard({
 					{/* Search */}
 					<div className="relative">
 						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-						<input
+						<Input
 							type="text"
 							value={mcpSearch}
 							onChange={(e) => setMcpSearch(e.target.value)}
 							placeholder={t("mcp.searchPlaceholder", {
 								defaultValue: "Search MCP servers…",
 							})}
-							className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary/50"
+							className="w-full pl-9 pr-3 py-2 text-sm h-auto"
 						/>
 					</div>
 
@@ -960,7 +962,7 @@ function AgentCard({
 									key={group.labelKey}
 									className={index > 0 ? "pt-2" : ""}
 								>
-									<p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+									<p className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
 										{t(group.labelKey, { defaultValue: group.fallback })}
 									</p>
 									<div className="space-y-1">
@@ -990,7 +992,7 @@ function AgentCard({
 																{server?.name || mcpId}
 															</span>
 															{needsSetup && (
-																<span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium shrink-0">
+																<span className="text-3xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
 																	{t("mcp.setupRequired", {
 																		defaultValue: "Setup required",
 																	})}
@@ -1021,7 +1023,7 @@ function AgentCard({
 						{/* Restore removed MCPs */}
 						{removedMcps.length > 0 && !mcpSearch && (
 							<div className="border-t border-border pt-3">
-								<p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
+								<p className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
 									{t("mcp.restore")}
 								</p>
 								<div className="space-y-1">
@@ -1571,38 +1573,31 @@ export function AgentTools() {
 
 	return (
 		<div className="h-full flex flex-col">
-			{/* Header */}
-			<div className="border-b border-border p-6">
-				<div className="flex items-center gap-3">
-					<div className="p-2 rounded-lg bg-muted">
-						<Server className="h-5 w-5 text-muted-foreground" />
-					</div>
-					<div className="flex-1">
-						<div className="flex items-center gap-2">
-							<h1 className="text-xl font-semibold text-foreground">
-								{t("settings:mcp.title")}
-							</h1>
-							{selectedProject && (
-								<span className="text-sm text-muted-foreground">
-									{t("agents.forProject", { name: selectedProject.name })}
-								</span>
-							)}
-						</div>
-						<p className="text-sm text-muted-foreground">
-							{selectedProject
-								? t("settings:mcp.description")
-								: t("settings:mcp.descriptionNoProject")}
-						</p>
-					</div>
-					{envConfig && (
-						<div className="text-right">
-							<span className="text-sm text-muted-foreground">
-								{t("settings:mcp.serversEnabled", { count: enabledCount })}
+			<PageHeader
+				icon={Wrench}
+				title={
+					<>
+						{t("settings:mcp.title")}
+						{selectedProject && (
+							<span className="ml-2 text-sm font-normal text-muted-foreground">
+								{t("agents.forProject", { name: selectedProject.name })}
 							</span>
-						</div>
-					)}
-				</div>
-			</div>
+						)}
+					</>
+				}
+				description={
+					selectedProject
+						? t("settings:mcp.description")
+						: t("settings:mcp.descriptionNoProject")
+				}
+				actions={
+					envConfig && (
+						<span className="text-sm text-muted-foreground">
+							{t("settings:mcp.serversEnabled", { count: enabledCount })}
+						</span>
+					)
+				}
+			/>
 
 			{/* Content */}
 			<ScrollArea className="flex-1">
@@ -1810,16 +1805,14 @@ export function AgentTools() {
 									<Switch checked={true} disabled />
 								</div>
 
-								{/* rtk — la condensation de sortie. Toujours visible :
-								    c'est ici qu'on découvre qu'elle existe. */}
+								{/* rtk — la condensation de sortie, toujours visible : on la découvre ici. */}
 								<TokenSavingsSettings
 									tokenSavings={envConfig?.tokenSavings}
 									projectPath={selectedProject?.path}
 									onUpdate={updateTokenSavings}
 								/>
 
-								{/* ui-ux-pro-max — le design system des tâches qui touchent
-								    l'interface. Toujours visible, comme rtk. */}
+								{/* ui-ux-pro-max — le design system des tâches d'interface, toujours visible. */}
 								<UiUxSettings uiux={envConfig?.uiux} onUpdate={updateUiux} />
 
 								{/* Custom MCP Servers Section */}
@@ -1874,7 +1867,7 @@ export function AgentTools() {
 																		{server.name}
 																	</span>
 																	{health?.responseTime && (
-																		<span className="text-[10px] text-muted-foreground">
+																		<span className="text-3xs text-muted-foreground">
 																			{health.responseTime}ms
 																		</span>
 																	)}
@@ -1895,14 +1888,14 @@ export function AgentTools() {
 																onClick={() => handleTestConnection(server)}
 																disabled={isTesting}
 																className="h-7 px-2 text-xs"
-																title="Test Connection"
+																title={t("dialogs:githubSetup.testConnection")}
 															>
 																{isTesting ? (
 																	<Loader2 className="h-3 w-3 animate-spin" />
 																) : (
 																	<RefreshCw className="h-3 w-3" />
 																)}
-																<span className="ml-1">Test</span>
+																<span className="ml-1">{t("common:buttons.test")}</span>
 															</Button>
 															{/* Edit/Delete - show on hover */}
 															<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1913,7 +1906,7 @@ export function AgentTools() {
 																		setShowCustomMcpDialog(true);
 																	}}
 																	className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-																	title="Edit"
+																	title={t("settings:agentToolsPanel.edit")}
 																>
 																	<Pencil className="h-3.5 w-3.5" />
 																</button>
@@ -1923,7 +1916,7 @@ export function AgentTools() {
 																		handleDeleteCustomServer(server.id)
 																	}
 																	className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-																	title="Delete"
+																	title={t("common:buttons.delete")}
 																>
 																	<Trash2 className="h-3.5 w-3.5" />
 																</button>
@@ -1939,6 +1932,7 @@ export function AgentTools() {
 										</p>
 									)}
 								</div>
+								<McpPinsSection projectPath={selectedProject?.path} />
 							</div>
 						</div>
 					)}

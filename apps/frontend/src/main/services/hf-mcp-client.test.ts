@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildCatalog } from "../ipc-handlers/mcp-marketplace-handlers";
+import { loadMcpCatalog } from "../../shared/mcp-catalog/install";
 import { parseModelSearchResult } from "./hf-mcp-client";
 
 describe("parseModelSearchResult", () => {
@@ -130,7 +130,7 @@ describe("parseModelSearchResult", () => {
 
 describe("MCP marketplace catalog — Hugging Face entry", () => {
 	it("registers the Hugging Face MCP server (http transport)", () => {
-		const hf = buildCatalog().find((s) => s.id === "huggingface");
+		const hf = loadMcpCatalog().find((s) => s.id === "huggingface");
 		expect(hf).toBeDefined();
 		expect(hf?.transport).toBe("http");
 		expect(hf?.url).toBe("https://huggingface.co/mcp");

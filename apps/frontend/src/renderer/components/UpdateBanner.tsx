@@ -224,7 +224,7 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 			{/* Download progress */}
 			{isDownloading && downloadProgress && (
 				<div className="mb-3">
-					<div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+					<div className="flex items-center justify-between text-3xs text-muted-foreground mb-1">
 						<span>{t("navigation:updateBanner.downloading")}</span>
 						<span>{Math.round(downloadProgress.percent)}%</span>
 					</div>
@@ -241,12 +241,12 @@ export function UpdateBanner({ className }: UpdateBannerProps) {
 
 			{/* Error message */}
 			{downloadError && (
-				<p className="text-[10px] text-destructive mb-2">{downloadError}</p>
+				<p className="text-3xs text-destructive mb-2">{downloadError}</p>
 			)}
 
 			{/* Read-only volume warning (DMG install on macOS) */}
 			{showReadOnlyWarning && (
-				<div className="flex items-start gap-2 text-[10px] text-warning bg-warning/10 border border-warning/30 rounded p-2 mb-2">
+				<div className="flex items-start gap-2 text-3xs text-warning bg-warning/10 border border-warning/30 rounded p-2 mb-2">
 					<AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
 					<span>
 						{t(

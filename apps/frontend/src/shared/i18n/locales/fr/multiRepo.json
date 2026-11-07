@@ -1,54 +1,86 @@
 {
-	"title": "Orchestration Multi-Repo",
+	"title": "Tâche multi-dépôts",
+	"button": {
+		"label": "Multi-dépôts",
+		"title": "Un changement sur plusieurs dépôts : une carte par dépôt, lancées dans l'ordre des dépendances"
+	},
 	"dialog": {
-		"title": "Orchestration Multi-Repo",
-		"description": "Coordonner les modifications sur plusieurs d\u00e9p\u00f4ts simultan\u00e9ment",
-		"stepRepos": "1. D\u00e9p\u00f4ts cibles",
-		"stepTask": "2. Description de la t\u00e2che",
-		"addRepo": "Ajouter",
-		"removeRepo": "Supprimer",
-		"repoNamePlaceholder": "Nom du d\u00e9p\u00f4t (ex: owner/frontend)",
-		"repoPathPlaceholder": "Chemin local vers le d\u00e9p\u00f4t",
-		"taskPlaceholder": "D\u00e9crivez ce que vous souhaitez construire \u00e0 travers ces d\u00e9p\u00f4ts...",
-		"noReposAdded": "Ajoutez au moins 2 d\u00e9p\u00f4ts pour d\u00e9marrer une orchestration multi-repo",
-		"createOrchestration": "Cr\u00e9er l'orchestration",
-		"creating": "Cr\u00e9ation...",
-		"startOrchestration": "D\u00e9marrer l'orchestration",
-		"cancel": "Annuler"
+		"title": "Tâche multi-dépôts",
+		"description": "Un changement sur plusieurs dépôts. Chaque dépôt reçoit une carte de son propre projet, lancée une fois que les dépôts dont il dépend ont passé la QA.",
+		"stepRepos": "1. Dépôts",
+		"stepTask": "2. Ce qu'il faut changer",
+		"taskPlaceholder": "Décrivez le changement à faire dans ces dépôts...",
+		"howItRuns": "WorkPilot lit les dépôts pour les ordonner (fournisseurs d'abord), puis fait passer chaque carte par la spec, le plan, le code et la QA habituels. Une carte qui a besoin de vous met la suite en attente jusqu'à ce que vous agissiez depuis le tableau.",
+		"noProjects": "Aucun projet sur cet ordinateur pour l'instant : ajoutez un dossier.",
+		"pickedCount_one": "{{count}} dépôt choisi (au moins 2)",
+		"pickedCount_other": "{{count}} dépôts choisis (au moins 2)",
+		"addFolder": "Ajouter un dossier",
+		"newOrchestration": "Nouvelle tâche multi-dépôts",
+		"launch": "Lancer",
+		"creating": "Création...",
+		"start": "Démarrer",
+		"resume": "Reprendre",
+		"stop": "Arrêter",
+		"back": "Toutes les tâches multi-dépôts"
 	},
 	"status": {
-		"pending": "En attente",
-		"analyzing": "Analyse des d\u00e9p\u00f4ts...",
-		"planning": "Planification des changements cross-repo...",
-		"executing": "Ex\u00e9cution des pipelines par d\u00e9p\u00f4t...",
-		"creating_prs": "Cr\u00e9ation des PR li\u00e9es...",
-		"completed": "Orchestration termin\u00e9e",
-		"failed": "\u00c9chec de l'orchestration"
+		"pending": "Pas démarrée",
+		"analyzing": "Lecture des dépôts...",
+		"executing": "Cartes en cours",
+		"completed": "Tous les dépôts ont passé la QA",
+		"failed": "Arrêtée sur une erreur",
+		"stopped": "Arrêtée",
+		"waitingOnRepo": "En attente de vous sur {{repo}} : ouvrez sa carte dans le tableau."
+	},
+	"repoStatus": {
+		"pending": "Pas démarré",
+		"coding": "En cours",
+		"qa": "QA",
+		"needs_you": "Vous attend",
+		"completed": "QA passée",
+		"failed": "Erreur"
 	},
 	"graph": {
-		"title": "Graphe de d\u00e9pendances",
-		"noRepos": "Aucun d\u00e9p\u00f4t configur\u00e9",
-		"noEdges": "Aucune d\u00e9pendance d\u00e9tect\u00e9e entre les d\u00e9p\u00f4ts",
-		"executionOrder": "Ordre d'ex\u00e9cution"
+		"title": "Graphe des dépendances",
+		"noRepos": "Aucun dépôt configuré",
+		"noEdges": "Aucune dépendance détectée entre les dépôts",
+		"executionOrder": "Ordre d'exécution"
 	},
 	"breakingChanges": {
-		"title": "Changements cassants d\u00e9tect\u00e9s",
+		"title": "Ruptures détectées",
 		"severity": {
 			"warning": "Avertissement",
 			"error": "Erreur"
 		},
-		"noChanges": "Aucun changement cassant d\u00e9tect\u00e9"
+		"noChanges": "Aucune rupture détectée"
 	},
 	"execution": {
-		"repoProgress": "Progression de {{repo}}",
-		"overall": "Progression globale"
+		"overall": "Avancement global",
+		"card": "Carte {{task}}",
+		"noCardYet": "Pas encore de carte",
+		"branch": "Branche {{branch}}",
+		"pr": "Pull request : {{url}}"
 	},
 	"errors": {
-		"noRepos": "Veuillez ajouter au moins deux d\u00e9p\u00f4ts",
-		"noDescription": "Veuillez entrer une description de t\u00e2che",
-		"repoNotFound": "D\u00e9p\u00f4t introuvable : {{repo}}",
-		"circularDependency": "D\u00e9pendance circulaire d\u00e9tect\u00e9e entre les d\u00e9p\u00f4ts",
-		"createFailed": "\u00c9chec de la cr\u00e9ation de l'orchestration",
-		"startFailed": "\u00c9chec du d\u00e9marrage de l'orchestration"
+		"noRepos": "Choisissez au moins deux dépôts.",
+		"tooManyRepos": "Choisissez au plus 8 dépôts.",
+		"repoNotAllowed": "Un dépôt doit être un projet de cet ordinateur ou un dossier que vous avez choisi.",
+		"duplicateRepo": "Le même dépôt est choisi deux fois.",
+		"repoNotUsable": "Un dépôt n'a pas pu être ouvert comme projet : il doit être un dépôt git avec au moins un commit.",
+		"noDescription": "Décrivez le changement.",
+		"descriptionTooLong": "La description est trop longue.",
+		"projectNotFound": "Ce projet n'est pas sur cet ordinateur.",
+		"notFound": "Cette tâche multi-dépôts n'existe plus.",
+		"alreadyRunning": "Cette tâche multi-dépôts tourne déjà.",
+		"createFailed": "La tâche multi-dépôts n'a pas pu être créée.",
+		"startFailed": "La tâche multi-dépôts n'a pas pu démarrer.",
+		"circularDependency": "Les dépôts dépendent les uns des autres en cercle : il n'y a pas d'ordre pour les lancer.",
+		"analysisFailed": "Les dépôts n'ont pas pu être lus.",
+		"projectUnavailable": "{{repo}} n'a pas pu être ouvert comme projet.",
+		"briefFailed": "La carte de {{repo}} n'a pas pu être décrite.",
+		"taskCreateFailed": "La carte de {{repo}} n'a pas pu être créée.",
+		"taskStartFailed": "La carte de {{repo}} n'a pas pu démarrer : ouvrez-la dans le tableau pour voir pourquoi, puis reprenez.",
+		"taskMissing": "La carte de {{repo}} a été supprimée.",
+		"unexpected": "L'exécution s'est arrêtée sur une erreur inattendue."
 	}
 }

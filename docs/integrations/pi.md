@@ -9,7 +9,9 @@ aucune clé de pi et n'en écrit aucune. Conception et faits vérifiés :
 
 ## Installer et se connecter
 
-1. Node.js **22.19 ou plus** (celui de pi, pas celui de ce dépôt), puis
+1. Le plus simple : le bouton **Installer** du badge **pi** (barre latérale, « Outils CLI ») lance
+   l'une des commandes ci-dessous à votre place. À la main : Node.js **22.19 ou plus** (celui de
+   pi, pas celui de ce dépôt), puis
    `npm install -g --ignore-scripts @earendil-works/pi-coding-agent` — ou
    `powershell -c "irm https://pi.dev/install.ps1 | iex"` sous Windows,
    `curl -fsSL https://pi.dev/install.sh | sh` ailleurs.

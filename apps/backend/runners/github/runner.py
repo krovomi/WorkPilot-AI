@@ -76,7 +76,7 @@ from core.sentry import capture_exception, init_sentry, set_context
 
 init_sentry(component="github-runner")
 
-from core.debug import debug_error
+from foundation.debug import debug_error
 
 # Add github runner directory to path for direct imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -849,7 +849,7 @@ def main():
 
 
 if __name__ == "__main__":
-    from core.log_redaction import install_global_redaction
+    from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()
     main()

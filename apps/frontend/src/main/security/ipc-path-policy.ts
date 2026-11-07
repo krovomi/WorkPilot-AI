@@ -22,8 +22,7 @@ import { resolveInProject } from "./renderer-path";
 
 /** Channel → positions (after the event) of its directory arguments. */
 export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
-	"agentDecision:clearLog": [0],
-	"agentDecision:getLog": [0],
+	"analyses:sharedReport": [1],
 	"apiExplorer:probeLiveSpec": [0],
 	"apiExplorer:scanRoutes": [0],
 	"architectureVisualizer:delta": [0],
@@ -74,6 +73,11 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"learningLoop:getSummary": [0],
 	"learningLoop:runAnalysis": [0],
 	"learningLoop:togglePattern": [0],
+	"learningLoop:getLessons": [0],
+	"learningLoop:adoptLesson": [0],
+	"learningLoop:dismissLesson": [0],
+	"mcpPins:list": [0],
+	"mcpPins:approve": [0],
 	"liveCompanion:start": [0],
 	"selfHealing:cancelOperation": [0],
 	"selfHealing:cicd:config": [0],
@@ -92,12 +96,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"selfHealing:retryIncident": [0],
 	"selfHealing:triggerFix": [0],
 	"shell:openTerminal": [0],
-	"specApproval:approve": [0],
-	"specApproval:getHistory": [0],
-	"specApproval:getPendingSpecs": [0],
 	"specApproval:getSpec": [0],
-	"specApproval:reject": [0],
-	"specApproval:requestChanges": [0],
 	"task:loadImageThumbnail": [0],
 	"task:worktreeDeleteFiles": [0],
 	"task:worktreeOpenInIDE": [0],
@@ -113,6 +112,9 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"terminal:worktreeList": [0],
 	"terminal:worktreeListOther": [0],
 	"terminal:worktreeRemove": [0],
+	"worktreeRecipe:approve": [0],
+	"worktreeRecipe:get": [0],
+	"worktreeRecipe:saveDetected": [0],
 };
 
 /** Keys of an object argument that name a project directory. */

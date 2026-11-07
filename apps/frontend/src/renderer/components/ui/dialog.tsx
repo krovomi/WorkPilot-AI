@@ -7,6 +7,7 @@ import {
 	DialogMaximizeButton,
 	useDialogMaximize,
 } from "./dialog-maximize";
+import { useTranslation } from "react-i18next";
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
@@ -44,6 +45,7 @@ const DialogContent = React.forwardRef<
 	React.ElementRef<typeof DialogPrimitive.Content>,
 	DialogContentProps
 >(({ className, children, hideCloseButton, maximizable, ...props }, ref) => {
+	const { t } = useTranslation();
 	const { maximized, toggle } = useDialogMaximize();
 	// Maximize lives alongside the standard close affordance; custom headers
 	// (hideCloseButton) opt in explicitly via the exported button.
@@ -91,7 +93,7 @@ const DialogContent = React.forwardRef<
 										)}
 									>
 										<X className="h-4 w-4" />
-										<span className="sr-only">Close</span>
+										<span className="sr-only">{t("common:buttons.close")}</span>
 									</DialogPrimitive.Close>
 								)}
 							</div>

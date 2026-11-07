@@ -210,7 +210,7 @@ class ParallelFollowupReviewer:
 
         # Declared once, in the registry, with the orchestrator's specialists:
         # `finding-validator` is the same agent in both reviews.
-        from agents.subagents.pr_review import pr_review_agents
+        from subagents.pr_review import pr_review_agents
 
         # CRITICAL: Inject working directory into all prompts
         # Subagents don't inherit cwd from parent, so they need explicit path info

@@ -6,7 +6,7 @@ model: sonnet
 metadata:
   workpilot:
     roster: kanban
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You map an area of a codebase, or a spec/documentation tree, and return its structure.

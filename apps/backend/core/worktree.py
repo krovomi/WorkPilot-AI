@@ -25,7 +25,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
-from core.debug import debug_warning
+from core.build_artifacts import ensure_artifact_excludes, strip_committed_artifacts
 
 # Helpers and types live in `core.worktree_common`, the PR half in
 # `core.worktree_pr` (audit lot L11, F36). Every name is imported back so the
@@ -48,6 +48,7 @@ from core.worktree_common import (  # noqa: F401
     _wt,
 )
 from core.worktree_pr import WorktreePRMixin
+from foundation.debug import debug_warning
 from foundation.git_executable import run_git
 
 logger = logging.getLogger(__name__)
@@ -905,6 +906,12 @@ class WorktreeManager(WorktreePRMixin):
             )
             raise RuntimeError(error_msg)
 
+        # The recipe's teardown (containers, databases) runs while the
+        # worktree is still there, and the task's ports go back.
+        from core.workspace.recipe_run import teardown_worktree
+
+        teardown_worktree(self.project_dir, worktree_path, spec_name)
+
         if worktree_path.exists():
             result = self._run_git(
                 ["worktree", "remove", "--force", str(worktree_path)]
@@ -946,6 +953,8 @@ class WorktreeManager(WorktreePRMixin):
         if not info:
             print(f"No worktree found for spec: {spec_name}")
             return False
+
+        self.strip_build_artifacts(spec_name)
 
         if no_commit:
             print(
@@ -1054,6 +1063,9 @@ class WorktreeManager(WorktreePRMixin):
         if not worktree_path.exists():
             return False
 
+        # Build and test outputs (bin/, obj/, TestResults/, node_modules/...)
+        # stay out of the commit even when the project has no .gitignore.
+        ensure_artifact_excludes(worktree_path, self.base_branch)
         self._run_git(
             [
                 "add",
@@ -1074,6 +1086,59 @@ class WorktreeManager(WorktreePRMixin):
         else:
             print(f"Commit failed: {result.stderr}")
             return False
+
+    def ensure_build_artifact_excludes(self, spec_name: str) -> list[str]:
+        """Keep the project's build and test outputs out of ``git add``.
+
+        See ``core.build_artifacts``: a managed block in the repository's
+        ``info/exclude``, so it works whatever agent commits.
+        """
+        worktree_path = self.get_worktree_path(spec_name)
+        if not worktree_path.exists():
+            return []
+        return ensure_artifact_excludes(worktree_path, self.base_branch)
+
+    def commit_pending_changes(self, spec_name: str) -> list[str]:
+        """Commit what the agent left uncommitted in the task's worktree.
+
+        An agent can end its session with a file it created but never
+        committed. Everything downstream reads the branch: the review diff,
+        QA's change set, the merge. Such a file was shown as "0 files changed"
+        and silently left behind by the merge. WorkPilot's own files stay out
+        (see :meth:`commit_in_worktree`).
+
+        Returns:
+            The paths ``git status`` reported (empty when nothing was pending).
+        """
+        has_changes, changed_files = self._has_uncommitted_changes(spec_name)
+        if not has_changes:
+            return []
+        self.commit_in_worktree(
+            spec_name, "workpilot: commit changes left uncommitted by the agent"
+        )
+        return changed_files
+
+    def settle_branch(self, spec_name: str) -> None:
+        """Make the branch hold exactly the task's work, before anything reads it.
+
+        Commits what the agent left uncommitted, then takes the build and test
+        outputs back out. Called after coding, at the end of the build and
+        before a merge.
+        """
+        self.commit_pending_changes(spec_name)
+        self.strip_build_artifacts(spec_name)
+
+    def strip_build_artifacts(self, spec_name: str) -> list[str]:
+        """Take the build and test outputs the branch committed back out.
+
+        Files the branch added that ``.gitignore`` or the managed excludes
+        ignore (``bin/``, ``obj/``, ``TestResults/``...) leave the index in a
+        commit of their own and stay on disk. Files of the base branch are
+        never touched.
+        """
+        return strip_committed_artifacts(
+            self.get_worktree_path(spec_name), self.base_branch
+        )
 
     def _strip_workpilot_artifacts(self, spec_name: str) -> list[str]:
         """Retire les artefacts internes de WorkPilot de la branche poussée.
@@ -1238,6 +1303,9 @@ class WorktreeManager(WorktreePRMixin):
         for item in self.worktrees_dir.iterdir():
             if item.is_dir() and item not in registered_paths:
                 print(f"Removing stale worktree directory: {item.name}")
+                from core.workspace.recipe_run import teardown_worktree
+
+                teardown_worktree(self.project_dir, item, item.name)
                 shutil.rmtree(item, ignore_errors=True)
 
         self._run_git(["worktree", "prune"])

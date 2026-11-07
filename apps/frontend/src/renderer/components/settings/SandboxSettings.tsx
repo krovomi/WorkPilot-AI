@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "./SettingsSection";
 
+import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -147,9 +149,9 @@ export function SandboxSettings() {
 								<span className="flex-1 font-mono text-xs">{rule.path}</span>
 								<span
 									className={cn(
-										"rounded-full px-2 py-0.5 text-[10px] font-medium",
+										"rounded-full px-2 py-0.5 text-3xs font-medium",
 										rule.access === "write"
-											? "bg-amber-500/15 text-amber-600"
+											? "bg-warning/15 text-warning"
 											: "bg-blue-500/15 text-blue-600",
 									)}
 								>
@@ -167,19 +169,19 @@ export function SandboxSettings() {
 							</div>
 						))}
 						<div className="flex items-center gap-2">
-							<input
+							<Input
 								value={newPath}
 								onChange={(e) => setNewPath(e.target.value)}
 								onKeyDown={(e) => e.key === "Enter" && handleAddPath()}
 								placeholder={t("sections.sandbox.fileAccess.placeholder")}
-								className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
+								className="flex-1 px-3 py-1.5 text-sm h-auto"
 							/>
-							<select
+							<NativeSelect
 								value={newAccess}
 								onChange={(e) =>
 									setNewAccess(e.target.value as "read" | "write")
 								}
-								className="rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none"
+								className="px-2 py-1.5 text-sm h-auto"
 							>
 								<option value="read">
 									{t("sections.sandbox.fileAccess.read")}
@@ -187,7 +189,7 @@ export function SandboxSettings() {
 								<option value="write">
 									{t("sections.sandbox.fileAccess.write")}
 								</option>
-							</select>
+							</NativeSelect>
 							<button
 								type="button"
 								onClick={handleAddPath}
@@ -288,7 +290,7 @@ export function SandboxSettings() {
 					</p>
 					<div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
 						<div className="flex items-start gap-2">
-							<AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+							<AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
 							<span>{t("sections.sandbox.snapshots.warning")}</span>
 						</div>
 					</div>

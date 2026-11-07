@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects/{project_id}/specs", tags=["specs"])
 
+#: What a phase needs beyond ``agent.execute``: merging lands code on the base
+#: branch of the server's clone, a pull request writes to the forge.
+PHASE_PERMISSIONS: dict[str, tuple[str, ...]] = {
+    "merge": ("task.merge",),
+    "pr": ("vcs.pr.create",),
+}
+
 
 async def _get_project_or_404(db: AsyncSession, project_id: str) -> Project:
     project = await db.get(Project, project_id)
@@ -92,14 +99,24 @@ async def list_specs(
     return [await _spec_to_public(db, row) for row in rows]
 
 
+def _require(request: Request, permission: str) -> None:
+    """Project membership says where; the caller's roles say what. A reader
+    of the project, or anyone of a suspended organization, holds neither
+    ``task.claim`` nor ``agent.cancel``."""
+    if not get_principal(request).has(permission):
+        raise HTTPException(status_code=403, detail=f"Missing permission: {permission}")
+
+
 @router.post("/{spec_id}/claim", response_model=SpecPublic)
 async def claim_spec(
     project_id: str,
     spec_id: str,
     body: ClaimRequest,
+    request: Request,
     user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
     db: AsyncSession = Depends(get_db),
 ) -> SpecPublic:
+    _require(request, "task.claim")
     spec = await _get_spec_or_404(db, project_id, spec_id)
 
     if spec.claimed_by and spec.claimed_by != user.id:
@@ -149,9 +166,11 @@ async def claim_spec(
 async def release_spec(
     project_id: str,
     spec_id: str,
+    request: Request,
     user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
     db: AsyncSession = Depends(get_db),
 ) -> SpecPublic:
+    _require(request, "task.claim")
     spec = await _get_spec_or_404(db, project_id, spec_id)
     if spec.claimed_by and spec.claimed_by != user.id:
         role = await get_project_role(db, user, project_id)
@@ -201,8 +220,9 @@ async def start_run(
     from server.services.run_manager import RunManagerError, get_run_manager
 
     principal = get_principal(request)
-    if not principal.has("agent.execute"):
-        raise HTTPException(status_code=403, detail="Missing permission: agent.execute")
+    for needed in ("agent.execute", *PHASE_PERMISSIONS.get(body.phase, ())):
+        if not principal.has(needed):
+            raise HTTPException(status_code=403, detail=f"Missing permission: {needed}")
 
     project = await _get_project_or_404(db, project_id)
     spec = await _get_spec_or_404(db, project_id, spec_id)
@@ -221,6 +241,7 @@ async def start_run(
             user_id=user.id,
             model=body.model,
             org_id=project.org_id,
+            pr=body.pr.model_dump() if body.pr else None,
         )
     except RunManagerError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -242,10 +263,13 @@ async def cancel_run(
     project_id: str,
     spec_id: str,
     run_id: str,
+    request: Request,
     user: CurrentUser = Depends(require_project_role(ProjectRole.MEMBER.value)),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     from server.services.run_manager import get_run_manager
+
+    _require(request, "agent.cancel")
 
     spec = await _get_spec_or_404(db, project_id, spec_id)
     ensure_can_act_on_spec(spec, user, None)

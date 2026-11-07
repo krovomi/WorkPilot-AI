@@ -32,6 +32,8 @@
 		"activate": "Activate",
 		"reject": "Reject",
 		"openInObsidian": "Open in Obsidian",
+		"openFailedTitle": "Could not open the note in Obsidian",
+		"openFailed": "Check that Obsidian is installed and that the brain folder is opened as a vault in it. Note: {{path}}",
 		"by": "by {{agents}}",
 		"kind": {
 			"instruction": "rule",

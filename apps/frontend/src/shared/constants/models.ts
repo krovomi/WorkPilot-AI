@@ -151,35 +151,44 @@ export function providerSupportsThinking(provider: string): boolean {
 // ============================================
 
 export const AVAILABLE_MODELS = [
+	{ value: "opus", label: "Claude Opus 5.5" },
+	{ value: "sonnet", label: "Claude Sonnet 5.5" },
+	{ value: "haiku", label: "Claude Haiku 5.5" },
+	{ value: "fable-5-1", label: "Claude Fable 5.1" },
 	{ value: "opus-5", label: "Claude Opus 5" },
 	{ value: "fable-5", label: "Claude Fable 5" },
 	{ value: "opus-4-8", label: "Claude Opus 4.8" },
 	{ value: "opus-4-7", label: "Claude Opus 4.7" },
-	{ value: "opus", label: "Claude Opus 4.6" },
+	{ value: "opus-4-6", label: "Claude Opus 4.6" },
 	{ value: "sonnet-5", label: "Claude Sonnet 5" },
-	{ value: "sonnet", label: "Claude Sonnet 4.6" },
-	// `haiku` resolves to Claude Haiku 4.5 — see MODEL_ID_MAP. It was labelled
-	// "Claude Haiku 4.6" here, a version Anthropic never shipped, so the picker
-	// offered a model that does not exist under a value that silently ran 4.5.
-	{ value: "haiku", label: "Claude Haiku 4.5" },
+	{ value: "sonnet-4-6", label: "Claude Sonnet 4.6" },
 	{ value: "opus-4-5", label: "Claude Opus 4.5" },
 	{ value: "sonnet-4-5", label: "Claude Sonnet 4.5" },
 	{ value: "haiku-4-5", label: "Claude Haiku 4.5" },
 ] as const;
 
 // Maps model shorthand to actual Claude model IDs.
-// Short aliases (opus/sonnet/haiku) intentionally still point to 4.6 so
-// existing tasks persisted with these values keep working. Newer versions
-// are exposed under explicit version-suffixed keys (e.g. "opus-4-7").
+// The bare aliases (opus/sonnet/haiku) name the current generation, as Claude
+// Code's own aliases do: the presets and every card saved with them run on
+// it. The 5.5 models cost less per token than the 4.x ones these aliases used
+// to name (Sonnet $2/$10 against $3/$15, Haiku $0.10/$0.50 against $1/$5) and
+// take `effort`. Older versions stay reachable under version-suffixed keys.
+// Same table as `MODEL_ID_MAP` in apps/backend/phase_config.py.
 export const MODEL_ID_MAP: Record<string, string> = {
+	opus: "claude-opus-5-5",
+	sonnet: "claude-sonnet-5-5",
+	haiku: "claude-haiku-5-5",
+	"opus-5-5": "claude-opus-5-5",
+	"sonnet-5-5": "claude-sonnet-5-5",
+	"haiku-5-5": "claude-haiku-5-5",
+	"fable-5-1": "claude-fable-5-1",
 	"opus-5": "claude-opus-5",
 	"fable-5": "claude-fable-5",
 	"sonnet-5": "claude-sonnet-5",
 	"opus-4-8": "claude-opus-4-8",
 	"opus-4-7": "claude-opus-4-7",
-	opus: "claude-opus-4-6",
-	sonnet: "claude-sonnet-4-6",
-	haiku: "claude-haiku-4-5", // no Haiku 4.6 exists — latest Haiku is 4.5
+	"opus-4-6": "claude-opus-4-6",
+	"sonnet-4-6": "claude-sonnet-4-6",
 	"opus-4-5": "claude-opus-4-5",
 	"sonnet-4-5": "claude-sonnet-4-5",
 	"haiku-4-5": "claude-haiku-4-5",
@@ -205,7 +214,7 @@ export const MODEL_ID_MAP: Record<string, string> = {
  */
 export function getCanonicalModelKey(value: string): string {
 	if (!value) return value;
-	// 1. Alias court → id complet (ex. "opus" → "claude-opus-4-6").
+	// 1. Alias court → id complet (ex. "opus" → "claude-opus-5-5").
 	let id = MODEL_ID_MAP[value] ?? value;
 	id = id.toLowerCase().trim();
 	// 2. Préfixe Gemini live ("models/gemini-3.1-pro").
@@ -593,18 +602,19 @@ export const DEFAULT_PHASE_THINKING: import("../types/settings").PhaseThinkingCo
 
 // Default feature model configuration (for insights, ideation, roadmap, github, utility).
 // Values must match the `value` field of entries in PROVIDER_MODELS_MAP['anthropic'].
+// The current generation: same tiers as before, at a lower price per token.
 export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
-	insights: "claude-sonnet-4-6", // Fast, responsive chat with latest model
-	ideation: "claude-opus-4-6", // Creative ideation benefits from Opus
-	roadmap: "claude-opus-4-6", // Strategic planning benefits from Opus
-	"natural-language-git": "claude-sonnet-4-6", // Natural language Git commands
-	githubIssues: "claude-opus-4-6", // Issue triage and analysis benefits from Opus
-	githubPrs: "claude-opus-4-6", // PR review benefits from thorough Opus analysis
-	utility: "claude-haiku-4-5", // Fast utility operations (commit messages, merge resolution)
-	promptOptimizer: "claude-sonnet-4-6", // Balanced prompt optimization
-	testGenerator: "claude-sonnet-4-6", // Balanced test generation for comprehensive coverage
-	codeReview: "claude-opus-4-6", // Code review benefits from thorough Opus analysis
-	voiceControl: "claude-haiku-4-5", // Fast voice control operations
+	insights: "claude-sonnet-5-5", // Fast, responsive chat with latest model
+	ideation: "claude-opus-5-5", // Creative ideation benefits from Opus
+	roadmap: "claude-opus-5-5", // Strategic planning benefits from Opus
+	"natural-language-git": "claude-sonnet-5-5", // Natural language Git commands
+	githubIssues: "claude-opus-5-5", // Issue triage and analysis benefits from Opus
+	githubPrs: "claude-opus-5-5", // PR review benefits from thorough Opus analysis
+	utility: "claude-haiku-5-5", // Fast utility operations (commit messages, merge resolution)
+	promptOptimizer: "claude-sonnet-5-5", // Balanced prompt optimization
+	testGenerator: "claude-sonnet-5-5", // Balanced test generation for comprehensive coverage
+	codeReview: "claude-opus-5-5", // Code review benefits from thorough Opus analysis
+	voiceControl: "claude-haiku-5-5", // Voice assistant: a short, fast reading
 };
 
 // Default feature thinking configuration
@@ -619,7 +629,7 @@ export const DEFAULT_FEATURE_THINKING: FeatureThinkingConfig = {
 	promptOptimizer: "medium", // Balanced thinking for prompt optimization
 	testGenerator: "medium", // Balanced thinking for test generation
 	codeReview: "medium", // Balanced thinking for code review
-	voiceControl: "low", // Fast thinking for voice control
+	voiceControl: "low", // Voice assistant
 };
 
 // Default agent profiles for preset model/thinking configurations

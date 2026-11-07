@@ -150,10 +150,13 @@ class TestEffortPruning:
         assert sets["ultrathink"] - sets["high"] == {"prd"}
 
     def test_the_cheapest_level_runs_only_what_cannot_be_skipped(self, workflow):
-        """Coding, QA, the hard gate, and the two near-free phases.
+        """Coding, QA, the hard gate, the two near-free phases, the cross review.
 
         `docs` is in that set for the same reason `observe` is: it spends no
-        API call, so no effort level saves anything by dropping it.
+        API call, so no effort level saves anything by dropping it. The cross
+        review is switched on by the project's setting, not by the effort: a
+        gate the person asked for does not vanish at a low level, and without
+        a second engine it opens no session.
         """
         profile = resolve_profile(workflow, "none", changed_files=[])
         assert set(profile.phase_ids) == {
@@ -163,6 +166,7 @@ class TestEffortPruning:
             "verify",
             "qa",
             "verify-replay",
+            "cross-review",
             "observe",
         }
 

@@ -250,7 +250,7 @@ matrice). Le pack `skills/hermes` (vendorisé, amont) n'est pas touché : une pr
 | `skills/README.md`, `.workpilot/skills.toml` (commentaire `harnesses`) | pi dans la liste des harness |
 | `docs/audit/AUDIT-NETTOYAGE.md` | nouvelle annexe datée « ce qui a changé » + inventaire (`capabilities/`, `brain/agents.py`) |
 | `docs/audit/WorkPilot-architecture.html` | nœud « Agents externes » (`Claude Code · Codex · hermes · Gemini… · pi`), section 02 (table des agents du cerveau) |
-| `CHANGELOG.md` `[Unreleased]` | entrée *Nouveautés* |
+| `CHANGELOG.md` `[Unreleased]` (aujourd'hui un fragment de `changelog.d/`) | entrée *Nouveautés* |
 
 ## 5. Lot 2 — pi comme provider, mode `--mode json` (une invocation par turn) (livré)
 

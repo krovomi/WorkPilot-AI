@@ -1,9 +1,8 @@
 # Règles de sécurité
 
-> **Normatif.** Chargé dans chaque session Claude Code par [`CLAUDE.md`](../../CLAUDE.md) ; les
-> autres agents y arrivent par [`AGENTS.md`](../../AGENTS.md). Carte du code qui applique ces
-> règles : [`apps/backend/security/AGENTS.md`](../../apps/backend/security/AGENTS.md) (backend),
-> [`apps/frontend/AGENTS.md`](../../apps/frontend/AGENTS.md#sécurité) (Electron).
+> **Normatif.** L'essentiel est dans les règles critiques d'[`AGENTS.md`](../../AGENTS.md) ; ici le détail, à
+> lire avant de toucher une frontière (Claude Code le charge sous `security/`, `server/`, `src/main/`,
+> `.github/workflows/`). Code : [backend](../../apps/backend/security/AGENTS.md), [Electron](../../apps/frontend/AGENTS.md#sécurité).
 > Une vulnérabilité se signale par [`docs/SECURITY.md`](../SECURITY.md), **jamais** par une issue publique.
 
 ## Modèle de menace
@@ -44,11 +43,11 @@ l'UI n'existe pas.
 - **Jamais dans** : un fichier suivi, un test (valeur factice évidente : `sk-test-0000`), un log, un
   message d'erreur renvoyé à l'UI, un prompt, une URL, un artefact de spec (`.workpilot/specs/`),
   un rapport de QA, un commentaire de PR.
-- **Logs** : l'API backend installe `core/log_redaction.py` (`install_global_redaction`) au
+- **Logs** : l'API backend installe `foundation/log_redaction.py` (`install_global_redaction`) au
   démarrage de `provider_api.py` ; `run.py` et chaque runner l'installent en tête de leur bloc
   `__main__` (`tests/test_entrypoints_redaction.py`), un nouveau point d'entrée aussi. Le masque
   s'applique à la création de chaque enregistrement, donc aussi aux handlers posés après ;
-  `core/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
+  `foundation/debug.py`, qui écrit hors `logging`, passe par `redact_text`. Côté
   Electron, `app-logger.ts` expurge chaque message avant écriture (hook electron-log,
   `shared/utils/secret-redaction.ts`). Côté UI, une clé s'affiche masquée (`maskApiKey`). Ne jamais logger un en-tête `Authorization`, un
   jeton, ni le corps d'une requête d'authentification.
@@ -101,7 +100,7 @@ l'UI n'existe pas.
   écrire, supprimer, exécuter du code ou joindre le réseau, et un test dans `tests/`.
 - Un agent ne modifie jamais ses garde-fous : `.workpilot-security.json`, `.workpilot-allowlist`,
   `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`, `.workpilot-goal.json`.
-- Serveur MCP tiers : seulement par `CUSTOM_MCP_SERVERS`, validé par `_validate_custom_mcp_server`.
+- Serveur MCP tiers : seulement par `CUSTOM_MCP_SERVERS`, validé par `validate_custom_mcp_server` (`core/custom_mcp_validation.py`).
   N'élargir ni la liste des lanceurs autorisés ni celle des options refusées.
 
 ## S4 — Chemins résolus, processus sans shell
@@ -126,15 +125,16 @@ l'UI n'existe pas.
 ## S5 — Mode serveur : authentification, autorisation, tenant
 
 - Chaque route porte une permission (`server/authz/` : `require_permission`, `mount_guarded`) ;
-  `tests/backend/test_feature_router_authz.py` échoue sinon, y compris pour une route déclarée sur
-  `app` hors de `_mount` (seule `/health` l'est, et n'y répond que son verdict). Masquer un bouton
-  n'est pas un contrôle.
-- Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…), ni en query ni
-  dans le corps JSON : il donne un `project_id` et le serveur résout son checkout
-  (`server/authz/scope.py`). Le middleware refuse ces clés (`CLIENT_PATH_PARAMS`) en query et dans
-  le corps (JSON à toute profondeur, formulaire) ; `tests/backend/test_project_scope_coverage.py`
-  balaie les paramètres et les modèles de corps de chaque route.
-- Le projet d'un autre tenant répond 404, jamais 403.
+  `tests/backend/test_feature_router_authz.py` échoue sinon, même pour une route sur `app` hors de
+  `_mount` (seule `/health`, qui ne répond que son verdict). Masquer un bouton n'est pas un contrôle.
+- Un serveur ne monte que les features d'un projet (`SERVER_FEATURES`) ; un outil de la machine reste local.
+- Un client ne fournit jamais de chemin (`project_dir`, `spec_dir`, `file_path`…) : il donne un
+  `project_id` et le serveur résout son checkout (`server/authz/scope.py`). Le middleware refuse ces
+  clés (`CLIENT_PATH_PARAMS`) en query et dans le corps, à toute profondeur ;
+  `tests/backend/test_project_scope_coverage.py` balaie paramètres et corps de chaque route.
+- Le projet d'un autre tenant répond 404, jamais 403. Le flux en direct et les runs tiennent la même
+  frontière : un canal ne s'ouvre qu'aux membres de son projet, un run démarre sans les variables du
+  serveur et ne voit sur le disque que son projet ([server-mode.md](../architecture/server-mode.md), `run_isolation.py`).
 - Le backend écoute sur `127.0.0.1` ; CORS est une liste explicite. Ni `0.0.0.0`, ni `*`.
 - Échec fermé : si le mode serveur ne se monte pas, le backend ne démarre pas
   (`tests/backend/test_server_mode_fail_closed.py`).

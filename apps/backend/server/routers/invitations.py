@@ -1,9 +1,19 @@
-"""Invitation endpoints: admin issues/lists/revokes; invitee looks up + accepts.
+"""Invitation endpoints: an organization admin issues/lists/revokes; invitee looks up + accepts.
 
 Mounted under ``/auth/invitations``. The ``lookup`` and ``accept`` endpoints
 are public (listed in ``PUBLIC_PATHS``) and rate-limited; everything else
-requires an admin. Acceptance auto-logs the new user in by returning a fresh
-token pair (same shape as ``/auth/login``).
+takes the organization's invitation permissions. Acceptance auto-logs the new
+user in by returning a fresh token pair (same shape as ``/auth/login``).
+
+An invitation belongs to the organization the caller is acting in (the
+request's active organization, which the auth middleware has verified):
+issuing or revoking one takes ``org.invitation.write`` there, listing
+``org.invitation.read``, and each sees only that organization's invitations.
+
+An invitation's ``role`` is the new account's *platform* role
+(``GlobalRole``). ``admin`` makes a server administrator, who reaches every
+organization, so only a platform admin may hand it out: an organization admin
+invites members and viewers into their own organization.
 """
 
 from __future__ import annotations
@@ -11,7 +21,6 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from server.auth.deps import CurrentUser, require_admin
 from server.auth.invitations import (
     InvitationError,
     accept_invitation,
@@ -23,9 +32,11 @@ from server.auth.invitations import (
 from server.auth.invitations import revoke as revoke_invitation
 from server.auth.jwt_tokens import issue_token_pair
 from server.auth.local import LocalAuthError
+from server.authz.deps import require_org, require_permission
+from server.authz.principal import Principal
 from server.config import get_settings
 from server.db.engine import get_db
-from server.db.models import AuditLog
+from server.db.models import AuditLog, GlobalRole
 from server.ratelimit import limiter
 from server.schemas import (
     AcceptInvitationRequest,
@@ -51,16 +62,27 @@ def _client_meta(request: Request) -> tuple[str | None, str | None]:
     return ua, ip
 
 
-@router.post("", response_model=CreateInvitationResponse, status_code=201)
+@router.post(
+    "",
+    response_model=CreateInvitationResponse,
+    status_code=201,
+)
 async def create_invitation_endpoint(
     body: CreateInvitationRequest,
-    admin: CurrentUser = Depends(require_admin),
+    admin: Principal = Depends(require_permission("org.invitation.write")),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> CreateInvitationResponse:
+    if body.role == GlobalRole.ADMIN.value and not admin.is_platform_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Only a platform admin can invite a server administrator",
+        )
     try:
         invitation, token = await create_invitation(
             db,
             email=str(body.email),
+            org_id=org_id,
             role=body.role,
             invited_by=admin.id,
             project_id=body.project_id,
@@ -89,26 +111,32 @@ async def create_invitation_endpoint(
     )
 
 
-@router.get("", response_model=list[InvitationPublic])
+@router.get(
+    "",
+    response_model=list[InvitationPublic],
+)
 async def list_invitations_endpoint(
-    admin: CurrentUser = Depends(require_admin),
+    _: Principal = Depends(require_permission("org.invitation.read")),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> list[InvitationPublic]:
-    return [InvitationPublic.model_validate(i) for i in await list_pending(db)]
+    return [InvitationPublic.model_validate(i) for i in await list_pending(db, org_id)]
 
 
 @router.delete("/{invitation_id}")
 async def revoke_invitation_endpoint(
     invitation_id: str,
-    admin: CurrentUser = Depends(require_admin),
+    admin: Principal = Depends(require_permission("org.invitation.write")),
+    org_id: str = Depends(require_org),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    revoked = await revoke_invitation(db, invitation_id)
+    revoked = await revoke_invitation(db, invitation_id, org_id)
     if not revoked:
         raise HTTPException(status_code=404, detail="No revocable invitation found")
     db.add(
         AuditLog(
             user_id=admin.id,
+            org_id=org_id,
             action="auth.invitation.revoked",
             payload={"invitation_id": invitation_id},
         )

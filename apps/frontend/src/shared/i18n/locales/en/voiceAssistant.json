@@ -1,0 +1,80 @@
+{
+	"title": "Voice assistant",
+	"description": "Say what you want WorkPilot to do: open a feature, create a task…",
+	"shortcutHint": "Open it from anywhere with",
+	"language": "Speech language",
+	"auto": "Detect automatically",
+	"input": {
+		"label": "Your command",
+		"placeholder": "Speak, or type a command and press Enter"
+	},
+	"level": "Microphone level",
+	"phase": {
+		"idle": "Press the microphone, or type a command.",
+		"preparing": "Starting the microphone…",
+		"downloading": "Downloading the speech model (about 150 MB, once)…",
+		"listening": "Listening… pause when you are done.",
+		"finishing": "Transcribing…",
+		"thinking": "Understanding your request…"
+	},
+	"actions": {
+		"listen": "Listen",
+		"stop": "Stop",
+		"run": "Run",
+		"create": "Create the task",
+		"cancel": "Cancel",
+		"retry": "Try again",
+		"download": "Download the speech model"
+	},
+	"confirm": {
+		"heading": "Create this task?",
+		"title": "Title",
+		"description": "Description",
+		"server": "It will be created on the server's board, for the whole team."
+	},
+	"results": {
+		"created": "Task created: {{title}}",
+		"createFailed": "The task could not be created.",
+		"nothingHeard": "I didn't hear anything. Speak again, or type your command.",
+		"unknown": "I didn't understand “{{text}}”.",
+		"noModel": "No AI model answered, so only simple commands are understood right now.",
+		"noProject": "Select a project first: a task belongs to a project."
+	},
+	"examples": {
+		"heading": "For example",
+		"createTask": "“Create a task to add a CSV export”",
+		"open": "“Open the Kanban board”",
+		"draw": "“Open the feature that lets me draw an architecture”",
+		"settings": "“Open settings”"
+	},
+	"errors": {
+		"model": "The speech model is not on this computer yet.",
+		"dependency": "Local speech recognition (faster-whisper) is not installed in the backend.",
+		"offline": "Strict offline mode blocks the speech model download.",
+		"download": "The speech model could not be downloaded.",
+		"busy": "Dictation is already running elsewhere in the app. Finish it, then try again.",
+		"timeout": "Speech recognition did not answer in time.",
+		"transcription": "The audio could not be transcribed.",
+		"microphone": "The microphone is unavailable, or access to it was refused.",
+		"downloadNeedsProject": "Select a project to download the speech model (its offline policy applies)."
+	},
+	"settings": {
+		"title": "Voice assistant",
+		"description": "Open the assistant from anywhere in WorkPilot and tell it what to do.",
+		"shortcut": "Keyboard shortcut",
+		"shortcutHelp": "Click Change, then press the new combination. Escape cancels.",
+		"change": "Change",
+		"recording": "Press the keys…",
+		"reset": "Restore the default",
+		"conflict": {
+			"invalid": "Use Ctrl, Alt or ⌘ with a letter, a digit, a function key or Space.",
+			"altgr": "Ctrl+Alt is AltGr on many keyboards (it types @, € or [). Choose another combination.",
+			"used": "{{shortcut}} is already used by WorkPilot or by the system."
+		},
+		"systemWide": "Even when WorkPilot is in the background",
+		"systemWideHelp": "Registers the shortcut with the operating system: pressing it brings WorkPilot forward and opens the assistant. Takes effect when you save.",
+		"systemWideRefused": "The system refused this shortcut (another app may use it, or the desktop does not allow it). It still works inside WorkPilot.",
+		"speech": "Speech is transcribed on this computer (Whisper). No audio is kept.",
+		"model": "Simple commands are understood without a model. Other sentences use the “Voice assistant” model of Settings → Agent."
+	}
+}

@@ -2,7 +2,7 @@
 
 **Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
 
-![WorkPilot AI Kanban Board](.github/assets/WorkPilot-AI-Kanban.png)
+![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
 [![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
@@ -41,7 +41,7 @@
 _No beta build is currently published. The table above is the latest stable release._
 <!-- BETA_DOWNLOADS_END -->
 
-> All releases include SHA256 checksums; VirusTotal scan results are added to the release notes when the scan is configured.
+> All releases include SHA256 checksums, a CycloneDX SBOM (`workpilot-sbom.cdx.json`) and a build provenance attestation for each file (`gh attestation verify <file> --repo krovomi/WorkPilot-AI`); VirusTotal scan results are added to the release notes when the scan is configured.
 
 ---
 
@@ -76,7 +76,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
 | **AI-Powered Merge** | Semantic conflict resolution when integrating worktrees back to main |
 | **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
-| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes |
+| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes. A card can also list, in plain language, the steps that prove a web change: the verifier follows them in Playwright, captures each step and attaches the Playwright trace to the card; a step not carried out is never a pass |
 | **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
 | **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
 | **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
@@ -86,11 +86,25 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **PR Follow-Through** | Once the task's PR is open, the card keeps driving it: a red check or an unresolved review thread goes to the QA fixer in the task's worktree, the commit is checked (no test skipped or deleted, no CI file edited) and pushed — never forced, never merged. A failure that is also red on the base branch is reported, not "fixed". GitHub for now — see [docs/architecture/pr-followup.md](docs/architecture/pr-followup.md) |
 | **GenAI Traces for Every Provider** | Set one OTLP endpoint and every provider's sessions show up the same way in Jaeger, Langfuse or Phoenix: an agent span, its model calls with token counts, its tool calls. No prompt or output leaves; a provider that reports no usage is marked "estimated", never counted as zero |
 | **OS Sandbox** | An agent's commands run under bubblewrap (Linux) or Seatbelt (macOS): writes stay in the task's worktree, your SSH keys and tokens are hidden, the network is the provider's hosts and the package registries through a filtering proxy. When the machine has no sandbox the card says so at launch; `WORKPILOT_SANDBOX=required` refuses to start instead. Windows is not covered yet — see [docs/architecture/os-sandbox.md](docs/architecture/os-sandbox.md) |
-| **MCP 2026: Tasks and MCP Apps** | WorkPilot's own MCP servers speak MCP 2026-07-28 and still answer older clients as before. `verify_launch`, `verify_perf_trace` and `verify_device` come back as tasks to a client that reads them: polled, cancelled when the build stops, timed out. A tool of an installed MCP server that attaches a view shows it in the task panel, in an iframe sandboxed without `allow-same-origin` and with the view's own CSP. The view shows the call that happened and cannot act on the task. See [docs/architecture/mcp-2026.md](docs/architecture/mcp-2026.md) |
+| **MCP 2026: Tasks and MCP Apps** | WorkPilot's own MCP servers speak MCP 2026-07-28 and still answer older clients as before. `verify_launch`, `verify_perf_trace` and `verify_device` come back as tasks to a client that reads them: polled, cancelled when the build stops, timed out. A tool of an installed MCP server that attaches a view shows it in the task panel, on every provider including Claude, in an iframe sandboxed without `allow-same-origin` and with the view's own CSP. The view shows the call that happened and cannot act on the task. See [docs/architecture/mcp-2026.md](docs/architecture/mcp-2026.md) |
 | **Best-of-N** | Build one task 2 to 4 times, each in its own worktree with its own provider, model and effort; the card ranks them on numbers (finished build, QA, goal, diff size, cost) and you keep the one you choose. Nothing is merged on its own |
 | **Goal Mode** | A task is done when a command says so (`dotnet test` exits 0), not when a reviewer thinks so: QA keeps fixing within a pass and spending cap, and the tests it must pass are protected from edits |
-| **Needs You** | When a task waits for you (plan, review, QA hand-over, error), you hear about it on the desktop and, if you want, on ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot button |
-| **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments |
+| **Spec by Example (.NET)** | On an ASP.NET Core Web API, when the project turns it on, the spec's acceptance criteria are written as HTTP integration tests (`WebApplicationFactory`) before any code. WorkPilot checks they touch only the test project, compile and fail, then makes `dotnet test` the task's goal with those tests protected. A goal you set yourself is kept. See [docs/architecture/spec-by-example.md](docs/architecture/spec-by-example.md) |
+| **.NET Upgrades, One Release at a Time** | A Kanban task that names .NET 9, 10 or 11 (or C# 13, 14, 15) gets the .NET team's migration procedures, reviewed and completed up to .NET 11 RC2, for each step between the project's version and the one asked, in order: the planner plans one step per version and QA checks the target. `/migrate-dotnet8-to-dotnet9`, `/migrate-dotnet9-to-dotnet10` and `/migrate-dotnet10-to-dotnet11` appear only in the projects concerned; other stacks pay nothing. See [docs/architecture/dotnet-upgrade.md](docs/architecture/dotnet-upgrade.md) |
+| **Cross Review** | After QA, a second engine (another provider and model, chosen per project) reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you: fix it, or create it anyway. An answer it cannot read is never taken as approval. See [docs/architecture/cross-review.md](docs/architecture/cross-review.md) |
+| **Steering** | Guide the agent while it works, without pausing the task: a message typed in the task's Subtasks tab, the mobile app or the CLI (`--steer`, `--steer-subtask`) goes into the prompt of the next coder or QA fixer session, and the task says which session received it. See [docs/architecture/steering.md](docs/architecture/steering.md) |
+| **Guided Review** | The review shows the diff subtask by subtask, each with what it changed and the planner's description as its explanation, then the commits no subtask recorded and what is not committed yet. Out-of-plan files, moved code and QA remarks are flagged on their file; no model is called. Comment any line: open comments go to the fixer with "Request changes" (file, line, excerpt, request), and a comment is marked handled when the diff changed its lines, not when the model says so. See [docs/architecture/guided-review.md](docs/architecture/guided-review.md) and [review-comments.md](docs/architecture/review-comments.md) |
+| **Stacked Tasks** | A task waiting on a prerequisite can start from that prerequisite's branch instead of the trunk; its PR shows only its own diff, "Update" rebases it when the prerequisite changes, and once the prerequisite is merged it moves back to the base and retargets its PR (linked as a stack with `gh stack`). See [docs/architecture/stacked-tasks.md](docs/architecture/stacked-tasks.md) |
+| **Hard Gates After QA** | Once QA approves, `deps-exist` looks up every package the task added on its public registry (npm, PyPI, NuGet, Maven, Cargo, Go, Composer, pub, RubyGems) so an invented name never ships (slopsquatting); `tests-bite` plants simple faults in the lines the task wrote and sends a fault the tests miss back to the fixer, on every stack; `proof-checks` runs the project's Dafny, Lean, Verus or F* verifiers. A checker that cannot answer says "unknown", never green. See [docs/architecture/dependency-guard.md](docs/architecture/dependency-guard.md), [mutation-gate.md](docs/architecture/mutation-gate.md), [proof-checks.md](docs/architecture/proof-checks.md) |
+| **Worktree Recipe** | Each new task worktree is prepared before the first session for its stack (`npm ci`/pnpm/yarn/bun, `dotnet restore`, `uv sync`, poetry, pip, `go mod download`, `cargo fetch`, composer, bundler, `flutter pub get`, Gradle, Maven). `.workpilot/worktree.toml` adds your own steps, ignored files to copy (`.env.local`), a port block per task and a teardown; a written recipe runs only once you approved it as it is. See [docs/architecture/worktree-recipe.md](docs/architecture/worktree-recipe.md) |
+| **Agent Trace** | Which lines of the PR the AI wrote, and with which model, recorded after each session in the open Agent Trace format (`agent-trace.jsonl`) for every provider; lines you edited between sessions stay yours. The changed-files view shows the AI share per file and the PR body sums it up. No prompt or code is stored. See [docs/architecture/agent-trace.md](docs/architecture/agent-trace.md) |
+| **Provenance Dossier** | When the PR is created, the task folder gets one dossier: who wrote the code and with which model, the dependencies added and their check, a CycloneDX SBOM of the packages the diff added (every stack), the gates passed and the verification verdict. The PR body sums it up and the compliance scan uses it as evidence. See [docs/architecture/provenance.md](docs/architecture/provenance.md) |
+| **Requirement Traceability** | At the end of a build, each `FR-###` requirement of the spec is linked to the files its subtasks wrote and to the tests that cover them, on every stack, and the link stays in the project after the merge. The traceability map flags requirements without a test and requirements of other tasks that touched the same files. See [docs/architecture/requirement-links.md](docs/architecture/requirement-links.md) |
+| **Point and Change** | In a task's Emulator tab, "Point" turns on the DevTools element picker: click a button or a card of the page and say what to change. Each element goes to the task as a steering message with its image, its path, its style and the files that probably render it (React, Angular, Vue, Svelte, Blazor, Razor Pages, Twig, Blade, ERB…). No script is added to the page. See [docs/architecture/preview-point.md](docs/architecture/preview-point.md) |
+| **Proof Video and Base Comparison** | A verification scenario is filmed (WebM in the Verification tab) and its steps assembled into a short GIF you can attach to the PR. The Verification tab also replays the scenario and the checked calls on the code the task started from, then on the task, and lists what behaves differently: broken or fixed steps, console errors, requests and endpoint statuses. A proof for the reviewer, never a gate. See [docs/architecture/verify.md](docs/architecture/verify.md) |
+| **Board over MCP** | The `workpilot-board` MCP server gives Claude Code, Codex, Gemini CLI, GitHub Copilot (CLI and VS Code), Cursor, Claude Desktop, Windsurf or OpenCode the project's Kanban: list and read cards and their specs, add one to the backlog, fix a card's text before it starts, wait until a card is ready for your review, read the roadmap and Ideation's ideas (also as MCP resources). Add it to each app in one click from Project settings → Use from other apps. In server mode, the same tools reach the team's boards over HTTP (`<server>/mcp`) with a personal access token made in Settings → MCP access to the server. Starting a build, approving a plan and merging stay with you, on the card. See [docs/architecture/board-mcp.md](docs/architecture/board-mcp.md) |
+| **Needs You** | When a task waits for you (plan, review, QA hand-over, error), you hear about it on the desktop and, if you want, on ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot button. With `WORKPILOT_TASK_DIGEST_HOURS`, a long build also sends a periodic digest (subtasks done, what runs, what is blocked and why) to the notification channels you configured. See [docs/architecture/task-digest.md](docs/architecture/task-digest.md) |
+| **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments. A PR opened by someone else gets the AI review instead, kept as an unposted draft in GitHub PRs until you post it |
 | **ACP Agents** | Any agent that speaks the Agent Client Protocol runs a task from one entry in `capabilities/providers.yaml`, Gemini CLI first. A question the agent asks before acting appears on the card with its options; the agent type's tool rights are held by the session mode, by refusing questions outside them, and by stopping a turn that runs an undeclared tool. The sidebar lists only the capabilities the agent declares — see [docs/architecture/acp.md](docs/architecture/acp.md) |
 | **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
 | **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
@@ -117,7 +131,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Coder** | Context-aware implementation with parallel subagent spawning |
 | **QA Reviewer / Fixer** | Acceptance criteria validation and automated issue resolution |
 | **Test Generator** | Unit and integration test generation with live streaming of the code as it is written |
-| **Flaky Test Detective** | Parses test reports (JUnit XML, .NET TRX, …) to surface intermittently failing tests |
+| **Flaky Test Detective** | Runs your test suite several times (dotnet test, pytest, Vitest, Jest, Maven, Gradle, Go) and flags the tests whose result changes between runs; also reads existing JUnit XML and .NET TRX reports |
 | **Refactorer** | Safe code refactoring with pattern detection and API migration |
 | **Documenter** | README, API docs, and architecture documentation generation |
 | **Migration Agent** | Framework and library migration with breaking change detection |
@@ -134,7 +148,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Linear** | Bulk issue import with team/project filtering |
 | **Jira** | Issue management integration |
 | **MCP Marketplace** | Browse, install, and configure Model Context Protocol servers |
-| **Custom MCPs** | Define and host custom MCP servers with local authentication |
+| **Custom MCPs** | Define and host custom MCP servers with local authentication. Each custom server's tools are pinned by the fingerprint of what the model reads: a new tool or a changed description waits for your approval in Agent tools → MCP servers, the old description beside the new one, and a description that reads like a hidden instruction asks for an explicit confirmation. See [docs/architecture/mcp-pins.md](docs/architecture/mcp-pins.md) |
 | **Windsurf** | Windsurf IDE integration via Connect protocol |
 
 ### AI Providers & Authentication
@@ -178,11 +192,12 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Auto-Refactoring** | Pattern-based and architectural code transformations |
 | **Code Migration** | Large-scale codebase migrations across frameworks and libraries |
 | **Design to Code** | Converts UI mockups and screenshots to React/HTML |
+| **Visual to Code** | Draw an architecture as a node graph (services, databases, agents, a mobile app…) on every stack, with your own reusable bricks, a sentence explaining each connection and eight canvas themes; the bricks' descriptions and the interaction texts go into the build spec sent to the agents. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) |
 | **Pipeline Generator** | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
-| **Voice Control** | Hands-free task and terminal control via speech-to-text |
-| **Multi-Repo Orchestration** | Coordinate changes across multiple repositories simultaneously |
+| **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally; a task is created only once you confirm it, locally or on a server project's board. See [docs/architecture/voice-assistant.md](docs/architecture/voice-assistant.md) |
+| **Multi-Repo Orchestration** | The Kanban's "Multi-repo" button runs one change across several repositories: WorkPilot orders them (libraries and APIs first), opens one card per repository and starts each once the previous one passed QA, telling it what the earlier repositories changed. See [docs/architecture/multi-repo.md](docs/architecture/multi-repo.md) |
 | **Code Playground** | Sandbox environment for testing code snippets in isolation |
 | **Prompt Optimizer** | Analyzes and rewrites prompts for better AI output |
 
@@ -193,7 +208,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Memory System (shared brain)** | One Obsidian vault + `graph.json`, served over MCP — agents retain insights across sessions |
 | **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini); read natively by hermes and [pi](https://pi.dev) |
 | **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
-| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted |
+| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) (0.23.0 or later) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted; the vendored hermes pack follows hermes releases, and the Kanban MCP server reports `wait_for_card` progress to it |
 | **pi** | [pi](https://pi.dev) reads `AGENTS.md` and `.agents/skills/` natively and joins the shared brain (`~/.pi/agent/mcp.json`); project resources stay behind its own `/trust`, which WorkPilot never grants — see [docs/architecture/pi.md](docs/architecture/pi.md) |
 | **Context Management** | Intelligent context building with file relevance ranking and dependency graph analysis |
 | **Session History** | Browse and replay past agent sessions with full statistics |
@@ -204,12 +219,12 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 |---------|-------------|
 | **Analytics Dashboard** | Token consumption, cost tracking, success rates, and execution time metrics — live SQLite-backed API; falls back to an explicit 503 when the analytics DB is unavailable |
 | **Formula Lab** | Pre-flight cost/success estimation per Provider × Model × Effort, calibrated on your real usage history |
-| **Repo Bench** | Replays 10 to 20 of your finished cards from the commit before them, once per engine, in isolated copies that do not hold the answer, and judges each build with the tests the card landed with — tests the agent never sees, kept only when they fail before the card and pass after it. The table says which provider × model × effort resolves your project's work; Formula Lab and the model router read it. See [docs/architecture/repo-bench.md](docs/architecture/repo-bench.md) |
+| **Repo Bench** | Replays 10 to 20 of your finished cards from the commit before them, once per engine, in isolated copies that do not hold the answer, and judges each build with the tests the card landed with — tests the agent never sees, kept only when they fail before the card and pass after it. The table says which provider × model × effort resolves your project's work, and per kind of card (bug fix, feature…) which engine to use: the cheapest one close to the best measured rate, offered on the card's engine step with its evidence, never applied for you. Formula Lab and the model router read it. See [docs/architecture/repo-bench.md](docs/architecture/repo-bench.md) |
 | **Cost Estimator** | Per-task cost calculation with provider comparison and budget alerts |
 | **Carbon Profiler** | Estimates the energy (kWh) and carbon footprint of your agent runs |
 | **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |
 | **Workflow Logger** | Structured execution logs with trace IDs for all agents, skills, and hooks |
-| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess |
+| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess. Review comments the PR follow-up fixed and the feedback of rejected plans become rule candidates; once you adopt one, every build follows it |
 
 ### Customization
 
@@ -225,7 +240,9 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 | Feature | Description |
 |---------|-------------|
-| **Multi-User Server Mode** | Central deployment with JWT / Microsoft Entra auth, per-user claims, and a shared run manager |
+| **Multi-User Server Mode** | One server for the team, with JWT / Microsoft Entra auth: every feature is shared (board, roadmap, ideation, insights, context, changelog, analyses, GitHub and GitLab views, AI reviews, automations), live for everyone, with organisations isolated from each other, roles and permissions, user groups and admins. Runs execute on the server, each one seeing only its own project. A task token reaches only its card and is revoked when the card ends. Operations guide: [docs/server-operations.md](docs/server-operations.md); design: [docs/architecture/server-mode.md](docs/architecture/server-mode.md) |
+| **Team Collaboration** | On a server project, the board shows who is there and opens a team chat (replies, search, `@name` mentions); a card someone took carries their name, and an edit that crosses a teammate's offers both versions instead of overwriting. See [docs/architecture/collaboration.md](docs/architecture/collaboration.md) |
+| **Mobile App (iOS & Android)** | The team server in your pocket: shared Kanban, card detail and creation, start, approve or stop runs, approve a plan from its notification, dashboard, Insights, roadmap, ideas, GitHub and GitLab, admin and invitations. See [docs/architecture/mobile-app.md](docs/architecture/mobile-app.md) |
 | **Invitation-Only Signup** | Self-service registration gated by admin invitations, with SMTP delivery and rate limiting |
 | **Notifications** | Multi-channel "PR ready" alerts (Slack, email, webhook) with SSRF hardening |
 
@@ -233,8 +250,37 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 
 ## Interface
 
+> Every screenshot below comes from the real app, filled with an invented demo project (`acme-storefront`). They are regenerated with `scripts/readme-screenshots/`.
+
 ### Kanban Board
-Visual task management from planning through completion. Create tasks and monitor agent progress in real-time.
+Describe a task, and agents take it from planning to a merged pull request. Each card shows its phase (plan, code, QA), its progress, the provider at work and what it is about (category, impact, priority). Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done.
+
+![Kanban board](.github/assets/screenshots/kanban.png)
+
+### Task Detail
+Open a card to follow the agents live: the plan split into subtasks with the files each one touches, the logs, the changed files, the change graph, visual proofs and the emulator.
+
+![Task detail with its subtasks](.github/assets/screenshots/task-detail.png)
+
+### Insights
+Ask questions about your codebase. The assistant reads the code (the tools it used are listed), answers with file and line references, and turns a finding into a ready-to-run task in one click.
+
+![Insights: a conversation about the codebase that ends in a suggested task](.github/assets/screenshots/insights.png)
+
+### Roadmap
+AI-assisted feature planning: product vision, target audience, phases, MoSCoW priorities, competitor analysis and votes imported from Canny or GitHub. Any feature becomes a task with **Build**.
+
+![Roadmap as a Kanban of features](.github/assets/screenshots/roadmap.png)
+
+### Ideation
+Agents scan the project and propose improvements by type: code, UI/UX, documentation, security, performance and code quality, each with its rationale and the files concerned.
+
+![Ideation: improvement ideas by type](.github/assets/screenshots/ideation.png)
+
+### Dashboard
+What the agents produce and cost: tasks by status, QA first-pass rate, tokens and cost by provider and model, merges resolved automatically, completion time by complexity. Exportable as JSON or CSV.
+
+![Dashboard of project metrics](.github/assets/screenshots/dashboard.png)
 
 ### Agent Terminals
 AI-powered terminals with one-click task context injection. Spawn multiple agents for parallel work.
@@ -244,18 +290,17 @@ AI-powered terminals with one-click task context injection. Spawn multiple agent
 ### Mission Control
 NASA-style multi-agent orchestration hub with per-agent monitoring, model assignment, and live decision visualization.
 
-### Roadmap
-AI-assisted feature planning with competitor analysis and audience targeting.
+### Mobile App (iOS & Android)
+The team's board in your pocket: in server mode, the phone app follows the shared Kanban, opens a card (spec, approval, runs, changes), starts, approves or stops the agents, and reads the dashboard, Insights, roadmap and ideas. The agents keep running on the team server.
 
-![Roadmap](.github/assets/WorkPilot-AI-roadmap.png)
+![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
 ### Additional Views
-- **Insights** — AI chat for codebase exploration and semantic search
-- **Ideation** — Discover improvements, vulnerabilities, and performance issues
 - **Changelog** — Generate release notes from completed tasks
 - **Architecture Visualizer** — Interactive dependency and module graphs
 - **Agent Replay** — Step-by-step session replay with breakpoints and diffs
 - **Analytics** — Usage, cost, and performance dashboards
+- **Session History** — Every agent session with its phases, tokens and cost
 
 ---
 
@@ -263,12 +308,13 @@ AI-assisted feature planning with competitor analysis and audience targeting.
 
 > Pour une lecture guidée — y compris sans prérequis technique — ouvrez l'atlas
 > [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
-> schémas cliquables, constats, feuille de route). Les justifications de conception sont dans
+> schémas cliquables, constats, feuille de route ; un fichier par constat depuis F113 dans
+> [`docs/audit/findings/`](docs/audit/findings/)). Les justifications de conception sont dans
 > [`docs/architecture/`](docs/architecture/).
 >
 > Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
 > sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
-> backend et plafond du cycle principal, ramené de 81 à 26 unités par la couche `foundation/`
+> backend et plafond du cycle principal, ramené de 81 à 10 unités par la couche `foundation/` et le port `agent_runtime`
 > (`tests/test_import_contracts.py`), une ligne par vue dans
 > [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
 >
@@ -315,8 +361,8 @@ Détail et plan par lots : [`docs/architecture/kanban-task-types.md`](docs/archi
 
 #### Sous-agents spécialisés
 Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un seul registre**,
-[`apps/backend/agents/subagents/`](apps/backend/agents/subagents/), et chaque session reçoit un
-*roster* composé par `agents.subagents.resolve()` depuis `core/client.py` :
+[`apps/backend/subagents/`](apps/backend/subagents/), et chaque session reçoit un
+*roster* composé par `subagents.resolve()` depuis `core/client.py` :
 
 1. **Défauts de phase** (`phases.py`) — p. ex. coder : `code-reviewer`, `test-runner`,
    `architecture-analyst` ; planner : `architecture-analyst`, `dependency-tracer` ;
@@ -386,7 +432,7 @@ apps/backend/
 ├── integrations/        # Connecteurs (GitHub, GitLab, etc.)
 ├── project/             # Analyse et détection de projets
 ├── merge/               # Système de fusion sémantique
-├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation)
+├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation, scénario Playwright)
 ├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
 ├── goal/                # Mode objectif : une commande dit « fini »
 ├── best_of_n/           # Une tâche construite N fois, classée sur des chiffres
@@ -394,6 +440,7 @@ apps/backend/
 ├── os_sandbox/          # bubblewrap / Seatbelt autour des commandes d'agent
 ├── genai_trace/         # Spans OpenTelemetry GenAI pour tous les providers
 ├── mcp_tasks/           # MCP 2026-07-28 : tasks côté serveurs WorkPilot
+├── board_mcp/           # Serveur MCP workpilot-board : le Kanban depuis le terminal
 ├── self_healing/        # Surveillance de santé + auto-réparation
 ├── tech_debt/           # Suivi et résolution de la dette technique
 ├── consensus_arbiter/   # Arbitrage des avis d'agents (sécurité/QA)
@@ -417,7 +464,7 @@ apps/frontend/src/
 │   ├── terminal/        # Daemon PTY et cycle de vie
 │   ├── platform/        # Abstraction cross-plateforme
 │   ├── security/        # Politiques IPC : expéditeur, dossiers, chemins d'outils et du backend
-│   ├── automations/     # Règles qui créent une carte (issue étiquetée, CI rouge, horaire)
+│   ├── automations/     # Règles qui créent une carte (issue étiquetée, CI rouge, horaire) ou relisent une PR en brouillon
 │   ├── needs-you/       # Notifications bureau, ntfy, Telegram ; approbation de plan à distance
 │   ├── mcp-apps/        # Vues MCP Apps servies au panneau de tâche (workpilot-mcp-app://)
 │   ├── ipc-handlers/    # 100+ modules de gestion IPC
@@ -466,6 +513,7 @@ apps/frontend/src/
 #### Gestion des Credentials
 - **Système de Profils Claude** → Gestion OAuth multi-comptes
 - **Stockage Secure** → Keychain OS / Credential Manager
+- **Âge des clés** → Réglages > Comptes dit depuis quand chaque clé d'API est enregistrée, rappel après 90 jours
 - **Rotation Automatique** → Cycle de vie des tokens OAuth
 - **Validation Input** → Chemins et commandes sanitizées
 - **Aucun secret dans le renderer** → L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur ; les tests de connexion tournent dans le main
@@ -536,6 +584,10 @@ apps/frontend/src/
    pnpm run dev
    ```
    *Crée automatiquement l'environnement virtuel Python et installe toutes les dépendances*
+
+   Ou, sans rien installer sur la machine : ouvrez le dépôt dans le conteneur de
+   [`.devcontainer/`](.devcontainer/) (VS Code « Reopen in Container », ou Codespaces). Il porte
+   Python 3.13, uv, Node 22, pnpm et de quoi lancer Electron sous xvfb pour les tests E2E.
 
 3. **Lancement Manuel — Guide Pas à Pas par OS**
 
@@ -745,6 +797,9 @@ pnpm run test:backend
 
 # Suite complète (pré-push)
 pnpm run test:all
+
+# Parcours E2E dans l'app construite (Linux sans écran : xvfb-run -a)
+cd apps/frontend && pnpm run build && pnpm run test:e2e
 ```
 
 #### Vérification de l'Environnement
@@ -766,8 +821,8 @@ Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue l
 | Étage | Ce qui tourne | Budget |
 |-------|---------------|--------|
 | `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
-| `pre-push` | ruff check, ruff format --check, biome lint | < 30 s |
-| CI | pytest, typecheck, vitest, build — sur 3 OS | — |
+| `pre-push` | ruff check, ruff format --check, fichiers générés, plafonds des `except` aveugles et des `biome-ignore`, biome lint | < 30 s |
+| CI | pytest, typecheck, vitest, build et démarrage de l'app — sur 3 OS ; parcours E2E Playwright sous Linux | — |
 
 Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/frontend/tsconfig.json`) : la première passe reste longue, les suivantes tombent à quelques secondes.
 
@@ -775,6 +830,7 @@ Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/
 
 ```bash
 PRE_PUSH_FULL=1 git push        # ajoute pytest, typecheck et vitest au pre-push
+pnpm verify                     # la même chose, sans pousser
 pnpm run test:all               # ou directement, sans pousser
 ```
 
@@ -872,7 +928,9 @@ WorkPilot AI uses a three-layer security model:
 2. **Filesystem Restrictions** — Operations limited to project directory
 3. **Dynamic Command Allowlist** — Only approved commands based on detected project stack
 
-All releases include SHA256 checksums, and VirusTotal scan results once the scan is configured for the repository.
+API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days.
+
+All releases include SHA256 checksums, a CycloneDX SBOM and a build provenance attestation for each file (`gh attestation verify <file> --repo krovomi/WorkPilot-AI`), and VirusTotal scan results once the scan is configured for the repository.
 
 To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md) — never a public issue.
 The security rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).

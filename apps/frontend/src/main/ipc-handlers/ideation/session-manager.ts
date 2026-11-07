@@ -5,21 +5,36 @@
 import path from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { AUTO_BUILD_PATHS } from "../../../shared/constants";
-import type { IdeationSession, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
+import type {
+	IdeationSession,
+	IPCResult,
+	Project,
+} from "../../../shared/types";
+import { isActiveJob, pullFeature } from "../../server-features";
+import { featureProject } from "../server-feature-files";
 import { readIdeationFile } from "./file-utils";
 import { transformIdeaFromSnakeCase } from "./transformers";
 
 /**
- * Get ideation session for a project
+ * Get ideation session for a project. A server project's is read fresh from
+ * the server; a job a teammate is running there is handed to `follow`.
  */
 export async function getIdeationSession(
 	_event: IpcMainInvokeEvent,
 	projectId: string,
+	follow?: (project: Project, jobId: string) => void,
 ): Promise<IPCResult<IdeationSession | null>> {
-	const project = projectStore.getProject(projectId);
+	const project = featureProject(projectId);
 	if (!project) {
 		return { success: false, error: "Project not found" };
+	}
+	if (project.remote) {
+		const pulled = await pullFeature(project, "ideation");
+		if (!pulled.success) {
+			return { success: false, error: pulled.error ?? "Server unavailable" };
+		}
+		const job = pulled.data?.job ?? null;
+		if (isActiveJob(job)) follow?.(project, job.id);
 	}
 
 	const ideationPath = path.join(

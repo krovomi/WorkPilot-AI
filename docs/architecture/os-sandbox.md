@@ -1,6 +1,6 @@
 # Bac à sable de l'OS autour des commandes d'agent
 
-> Annexe G8 de [`audit/AUDIT-NETTOYAGE.md`](../audit/AUDIT-NETTOYAGE.md). Code :
+> [Annexe G8](../audit/annexes/G8.md) du cahier d'audit. Code :
 > `apps/backend/os_sandbox/`. Règles : [`rules/security.md`](../rules/security.md) S3 et S4.
 
 ## Le problème

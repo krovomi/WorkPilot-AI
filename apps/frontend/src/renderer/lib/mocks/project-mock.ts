@@ -21,6 +21,35 @@ export const projectMock = {
 
 	removeProject: async () => ({ success: true }),
 
+	createServerProject: async () => ({
+		success: false,
+		error: "Not connected to a WorkPilot server",
+	}),
+
+	deleteServerProject: async () => ({ success: true }),
+
+	watchServerBoard: async () => ({ success: false }),
+
+	unwatchServerBoard: async () => ({ success: true }),
+
+	onServerBoardLive: () => () => {},
+
+	joinTeamRoom: async () => ({ success: false }),
+
+	leaveTeamRoom: async () => ({ success: true }),
+
+	sendTeamChat: async () => ({ success: false, error: "notJoined" }),
+
+	releaseCardClaim: async () => ({ success: false, error: "notFound" }),
+
+	onTeamRoomUpdate: () => () => undefined,
+
+	watchServerView: async () => ({ success: false }),
+
+	unwatchServerView: async () => ({ success: true }),
+
+	onServerViewChanged: () => () => undefined,
+
 	getProjects: async () => ({
 		success: true,
 		data: mockProjects,

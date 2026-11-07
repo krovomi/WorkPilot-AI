@@ -20,7 +20,11 @@
 	"tabs": {
 		"kanban": "Kanban",
 		"timeline": "Chronologie",
-		"table": "Tableau"
+		"table": "Tableau",
+		"featuresCount": "{{count}} fonctionnalités",
+		"allFeatures": "Toutes les fonctionnalités",
+		"byPriority": "Par priorité",
+		"insight": "Info"
 	},
 	"features": {
 		"title": "Fonctionnalités",
@@ -102,7 +106,28 @@
 			"optionalInfo": "Vous pouvez générer une roadmap sans analyse concurrentielle si vous préférez. La roadmap sera toujours basée sur la structure de votre projet et les meilleures pratiques.",
 			"skipButton": "Non, Ignorer l'Analyse",
 			"enableButton": "Oui, Activer l'Analyse"
-		}
+		},
+		"analyzed": "{{count}} concurrents analysés pour repérer les manques et les opportunités du marché",
+		"painPointsCount": "Points de friction identifiés ({{count}})",
+		"frequency": "Fréquence : {{value}}",
+		"resultsTitle": "Résultats de l'analyse concurrentielle",
+		"visit": "Visiter",
+		"noPainPoints": "Aucun point de friction identifié",
+		"source": "Source :",
+		"opportunity": "Opportunité :",
+		"summaryTitle": "Synthèse du marché",
+		"topPainPoints": "Principaux points de friction :",
+		"differentiators": "Pistes de différenciation :",
+		"marketTrends": "Tendances du marché :",
+		"optionsTitle": "Options de l'analyse concurrentielle",
+		"existingFrom": "Ce projet dispose déjà d'une analyse concurrentielle du",
+		"useExisting": "Utiliser l'analyse existante",
+		"recommended": "(Recommandé)",
+		"useExistingDescription": "Réutiliser les informations concurrentielles déjà obtenues. Plus rapide, sans nouvelle recherche web.",
+		"runNew": "Lancer une nouvelle analyse",
+		"runNewDescription": "Faire de nouvelles recherches web pour des informations à jour. Plus long.",
+		"skip": "Ignorer l'analyse concurrentielle",
+		"skipDescription": "Générer la roadmap sans informations concurrentielles."
 	},
 	"generation": {
 		"title": "Génération de la Roadmap",
@@ -154,5 +179,40 @@
 		"totalPhases": "Total des Phases",
 		"completedPhases": "Phases Terminées",
 		"currentPhase": "Phase Actuelle"
+	},
+	"kanbanView": {
+		"dropHere": "Déposer ici",
+		"noFeatures": "Aucune fonctionnalité",
+		"dragHere": "Glissez des fonctionnalités ici"
+	},
+	"featureCard": {
+		"phase": "Phase : {{name}}",
+		"votes": "{{count}} votes issus des retours utilisateurs",
+		"importedFrom": "Importé depuis {{provider}}",
+		"competitorInsight": "Cette fonctionnalité répond à des points de friction des concurrents",
+		"task": "Tâche",
+		"build": "Construire",
+		"impact": "impact {{impact}}",
+		"competitorInsightTitle": "Info concurrentielle",
+		"external": "Externe"
+	},
+	"featureDetail": {
+		"severity": "gravité {{severity}}",
+		"deleteDescription": "« {{title}} » sera définitivement retirée de votre roadmap.",
+		"rationale": "Justification",
+		"complexity": "Complexité",
+		"impact": "Impact",
+		"userStories": "User stories",
+		"addressesPainPoints": "Répond aux points de friction des concurrents",
+		"convert": "Convertir en tâche WorkPilot AI",
+		"deleteTitle": "Supprimer la fonctionnalité ?"
+	},
+	"phaseCard": {
+		"featuresProgress": "{{completed}}/{{total}} fonctionnalités",
+		"featuresCount": "Fonctionnalités ({{count}})",
+		"moreFeatures": "+{{count}} autres fonctionnalités",
+		"viewTask": "Voir la tâche",
+		"progress": "Avancement",
+		"milestones": "Jalons"
 	}
 }

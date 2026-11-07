@@ -17,7 +17,7 @@ import types
 from pathlib import Path
 
 import pytest
-from core.build_signals import BuildPaused
+from foundation.build_signals import BuildPaused
 
 
 class _Logger:
@@ -121,6 +121,7 @@ def harness(tmp_path: Path, monkeypatch):
         review_calls=[],
         fixer_calls=[],
         clients=[],
+        client_kwargs=[],
         client_errors={},
         cap=3,
         threshold=10,
@@ -134,6 +135,7 @@ def harness(tmp_path: Path, monkeypatch):
                 "iteration": iteration,
                 "max": max_iterations,
                 "previous_error": kw.get("previous_error"),
+                "review_scope": kw.get("review_scope"),
             }
         )
         step = state.reviews.pop(0)
@@ -163,6 +165,7 @@ def harness(tmp_path: Path, monkeypatch):
     def create_client(**kwargs):
         agent = kwargs["agent_type"]
         state.clients.append(agent)
+        state.client_kwargs.append(kwargs)
         if agent in state.client_errors:
             raise state.client_errors[agent]
         return _Client()
@@ -512,6 +515,42 @@ async def test_human_feedback_runs_the_fixer_first(harness):
     ]
 
 
+async def test_human_feedback_marks_comments_from_the_session_diff(
+    harness, monkeypatch
+):
+    """The orchestrator, not the model, says which line comments were addressed."""
+    marked = []
+    monkeypatch.setattr(
+        harness.loop,
+        "run_git",
+        lambda args, cwd=None: types.SimpleNamespace(returncode=0, stdout="abc1234\n"),
+    )
+    monkeypatch.setattr(
+        harness.loop,
+        "mark_addressed",
+        lambda spec, project, before, session=None: marked.append((before, session)),
+    )
+    _sign_off(harness.spec_dir, "approved", [])
+    (harness.spec_dir / "QA_FIX_REQUEST.md").write_text("# Fix", encoding="utf-8")
+    harness.reviews = [("approved", [])]
+
+    assert await harness.run() is True
+
+    assert marked == [("abc1234", 0)]
+
+
+async def test_a_failed_human_feedback_fix_marks_no_comment(harness, monkeypatch):
+    marked = []
+    monkeypatch.setattr(
+        harness.loop, "mark_addressed", lambda *a, **k: marked.append(a)
+    )
+    (harness.spec_dir / "QA_FIX_REQUEST.md").write_text("# Fix", encoding="utf-8")
+    harness.fixes = [("error", "could not apply")]
+
+    assert await harness.run() is False
+    assert marked == []
+
+
 async def test_human_feedback_opens_a_new_budget(harness):
     # Three passes already spent: the reviewer's sign-off counts them.
     for _ in range(3):
@@ -547,3 +586,64 @@ async def test_a_pause_between_passes_raises(harness, monkeypatch):
         await harness.run()
 
     assert harness.review_calls == []
+
+
+def _git(cwd: Path, *args: str) -> None:
+    import subprocess
+
+    subprocess.run(
+        ["git", "-c", "user.email=qa@test", "-c", "user.name=qa", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _task_branch(project: Path, files: dict[str, str]) -> None:
+    """A `main` with one commit, and a task branch that adds `files`."""
+    _git(project, "init", "-q", "-b", "main")
+    # The spec directory lives in the project in this harness; in a real
+    # worktree it is under the gitignored `.workpilot/`.
+    (project / ".gitignore").write_text("001-task/\n", encoding="utf-8")
+    _git(project, "add", ".gitignore")
+    _git(project, "commit", "-q", "-m", "init")
+    _git(project, "checkout", "-q", "-b", "task")
+    for name, content in files.items():
+        (project / name).write_text(content, encoding="utf-8")
+    _git(project, "add", *files)
+    _git(project, "commit", "-q", "-m", "task")
+
+
+async def test_a_text_only_task_is_not_rejected_by_the_coverage_gate(
+    harness, monkeypatch
+):
+    """Leub, 2026-10-31: "Create toto.txt" gave up after 3 passes.
+
+    The reviewer approved, but a text file has no coverage to measure, the
+    gate at 100 % turned every approval into a rejection, and the fixer
+    could not add coverage to a `.txt`.
+    """
+    monkeypatch.setenv("WORKPILOT_QA_MIN_COVERAGE", "100")
+    _task_branch(harness.spec_dir.parent, {"toto.txt": "OK\n"})
+    harness.reviews = [("approved", [])]
+
+    assert await harness.run() is True
+
+    assert len(harness.review_calls) == 1
+    scope = harness.review_calls[0]["review_scope"]
+    assert scope.is_light and scope.files == ("toto.txt",)
+    # No test-runner roster for a change nothing executes.
+    assert harness.client_kwargs[0]["use_subagents"] is False
+
+
+async def test_a_code_change_still_meets_the_coverage_gate(harness, monkeypatch):
+    monkeypatch.setenv("WORKPILOT_QA_MIN_COVERAGE", "100")
+    _task_branch(harness.spec_dir.parent, {"toto.py": "print('OK')\n"})
+    harness.cap = 1
+    harness.reviews = [("approved", [])]
+
+    assert await harness.run() is False
+
+    scope = harness.review_calls[0]["review_scope"]
+    assert not scope.is_light
+    assert harness.client_kwargs[0]["use_subagents"] is True

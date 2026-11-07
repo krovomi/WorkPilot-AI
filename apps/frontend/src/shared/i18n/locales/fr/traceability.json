@@ -7,7 +7,11 @@
 		"questions": "{{count}} question ouverte",
 		"questions_other": "{{count}} questions ouvertes",
 		"uncovered": "{{count}} exigence non réclamée",
-		"uncovered_other": "{{count}} exigences non réclamées"
+		"uncovered_other": "{{count}} exigences non réclamées",
+		"untested": "{{count}} exigence sans test",
+		"untested_other": "{{count}} exigences sans test",
+		"earlier": "{{count}} exigence antérieure sur les mêmes fichiers",
+		"earlier_other": "{{count}} exigences antérieures sur les mêmes fichiers"
 	},
 	"coverage": {
 		"summary": "{{covered}} exigences sur {{total}} réclamées par une subtask ({{percent}} %)"
@@ -23,5 +27,22 @@
 	"unknown": {
 		"title": "Référencées mais non déclarées",
 		"body": "Une subtask cite une exigence que spec.md ne déclare pas : les deux documents ont divergé."
+	},
+	"links": {
+		"title": "Ce que chaque exigence est devenue",
+		"source": {
+			"agent-trace": "Fichiers écrits par les sessions de chaque sous-tâche.",
+			"plan": "Fichiers déclarés par le plan : aucun enregistrement de session ne les confirme."
+		},
+		"files": "{{count}} fichier",
+		"files_other": "{{count}} fichiers",
+		"tests": "Tests : {{tests}}",
+		"noTest": "Aucun test trouvé pour : {{files}}",
+		"none": "Aucun fichier lié",
+		"earlier": {
+			"title": "Exigences antérieures sur les mêmes fichiers",
+			"body": "Ces exigences d'autres tâches ont touché des fichiers que cette tâche modifie : vérifiez qu'elles tiennent toujours.",
+			"item": "{{spec}} · {{id}}"
+		}
 	}
 }

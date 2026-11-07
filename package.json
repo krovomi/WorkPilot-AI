@@ -1,12 +1,13 @@
 {
 	"name": "workpilot-ai",
-	"version": "1.3.3",
+	"version": "1.3.4",
 	"description": "Autonomous multi-agent coding framework",
 	"license": "AGPL-3.0",
 	"author": "WorkPilot AI Team",
 	"workspaces": [
 		"apps/*",
-		"libs/*"
+		"libs/*",
+		"!apps/mobile"
 	],
 	"scripts": {
 		"prepare": "git config core.hooksPath .husky",
@@ -22,6 +23,7 @@
 		"test": "cd apps/frontend && pnpm test",
 		"test:backend": "node scripts/test-backend.js",
 		"test:all": "node scripts/pre-push.js",
+		"verify": "node scripts/pre-push.js --full",
 		"package": "cd apps/frontend && pnpm run package",
 		"package:mac": "cd apps/frontend && pnpm run package:mac",
 		"package:win": "cd apps/frontend && pnpm run package:win",
@@ -42,7 +44,7 @@
 		"node": ">=20.0.0",
 		"pnpm": ">=8.0.0"
 	},
-	"packageManager": "pnpm@12.5.1",
+	"packageManager": "pnpm@12.16.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/krovomi/WorkPilot-AI.git"
@@ -60,8 +62,8 @@
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
-		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.15",
-		"lucide-react": "^1.61.0",
+		"@lydell/node-pty-darwin-arm64": "1.2.0-beta.18",
+		"lucide-react": "^1.68.0",
 		"tar": "^7.5.22",
 		"unzipper": "^0.12.5"
 	}

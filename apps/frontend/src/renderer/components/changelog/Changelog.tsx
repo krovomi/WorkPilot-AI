@@ -8,8 +8,11 @@ import { ChangelogFilters } from "./ChangelogFilters";
 import { ChangelogHeader } from "./ChangelogHeader";
 import { ChangelogList } from "./ChangelogList";
 import { useChangelog } from "./hooks/useChangelog";
+import { useTranslation } from "react-i18next";
+import { SharedChangelogNote, useServerChangelogProject } from "./SharedChangelogNote";
 
 export function Changelog() {
+	const { t } = useTranslation();
 	const {
 		// State
 		selectedProjectId,
@@ -73,6 +76,7 @@ export function Changelog() {
 		setCustomInstructions,
 		updateGeneratedChangelog,
 		setShowAdvanced,
+		setStep,
 		handleLoadCommitsPreview,
 		handleGenerate,
 		handleSave,
@@ -82,15 +86,16 @@ export function Changelog() {
 		handleDone,
 		handleRefresh,
 	} = useChangelog();
+	const serverProject = Boolean(useServerChangelogProject());
 
 	if (!selectedProjectId) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center">
 					<FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-					<h3 className="mt-4 text-lg font-medium">No Project Selected</h3>
+					<h3 className="mt-4 text-lg font-medium">{t("changelog:noProject.title")}</h3>
 					<p className="mt-2 text-sm text-muted-foreground">
-						Select a project from the sidebar to generate changelogs.
+						{t("changelog:noProject.description")}
 					</p>
 				</div>
 			</div>
@@ -104,6 +109,16 @@ export function Changelog() {
 				<ChangelogHeader step={step} onRefresh={handleRefresh} />
 
 				{/* Content */}
+				{step === 1 && (
+					<SharedChangelogNote
+						isGenerating={isGenerating}
+						onOpen={(changelog, sharedVersion) => {
+							updateGeneratedChangelog(changelog);
+							if (sharedVersion) setVersion(sharedVersion);
+							setStep(2);
+						}}
+					/>
+				)}
 				{step === 1 && (
 					<div className="flex flex-1 overflow-hidden">
 						<ChangelogFilters
@@ -184,6 +199,7 @@ export function Changelog() {
 						onSave={handleSave}
 						onCopy={handleCopy}
 						onChangelogEdit={updateGeneratedChangelog}
+						serverProject={serverProject}
 					/>
 				)}
 				{step === 3 && selectedProjectId && (
@@ -193,6 +209,7 @@ export function Changelog() {
 						selectedTaskIds={selectedTaskIds}
 						doneTasks={doneTasks}
 						generatedChangelog={generatedChangelog}
+						serverProject={serverProject}
 						onDone={handleDone}
 					/>
 				)}

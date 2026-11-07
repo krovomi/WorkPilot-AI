@@ -13,29 +13,20 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
 import { cn } from "../lib/utils";
+import { loadDashboardSnapshot } from "../lib/workspace-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import type { DashboardSnapshot } from "@shared/types";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface DashboardSnapshot {
-	tasks_by_status: Record<string, number>;
-	avg_completion_by_complexity: Record<string, number>;
-	qa_first_pass_rate: number;
-	qa_avg_score: number;
-	total_tokens: number;
-	tokens_by_provider: Record<string, number>;
-	total_cost: number;
-	cost_by_model: Record<string, number>;
-	merge_auto_count: number;
-	merge_manual_count: number;
-}
 
 interface DashboardMetricsProps {
 	projectPath: string;
@@ -62,9 +53,9 @@ function KpiCard({
 }) {
 	const colorClasses = {
 		primary: "text-primary bg-primary/10",
-		green: "text-emerald-500 bg-emerald-500/10",
-		amber: "text-amber-500 bg-amber-500/10",
-		red: "text-red-500 bg-red-500/10",
+		green: "text-success bg-success/10",
+		amber: "text-warning bg-warning/10",
+		red: "text-destructive bg-destructive/10",
 		blue: "text-blue-500 bg-blue-500/10",
 	};
 
@@ -82,8 +73,8 @@ function KpiCard({
 						)}
 						{trend && (
 							<div className="mt-2 flex items-center gap-1">
-								<TrendingUp className="h-3 w-3 text-emerald-500" />
-								<span className="text-xs text-emerald-500 font-medium">
+								<TrendingUp className="h-3 w-3 text-success" />
+								<span className="text-xs text-success font-medium">
 									{trend}
 								</span>
 							</div>
@@ -111,10 +102,10 @@ function StatusBar({ data }: { data: Record<string, number> }) {
 		);
 
 	const statusColors: Record<string, string> = {
-		completed: "bg-emerald-500",
+		completed: "bg-success",
 		in_progress: "bg-blue-500",
-		pending: "bg-amber-500",
-		failed: "bg-red-500",
+		pending: "bg-warning",
+		failed: "bg-destructive",
 		cancelled: "bg-gray-400",
 	};
 
@@ -226,6 +217,7 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [eurRate, setEurRate] = useState(0.92);
+	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fmtCost = useCallback(
 		(usd: number, decimals = 4) => formatCurrency(usd, lang, eurRate, decimals),
@@ -236,10 +228,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 		setLoading(true);
 		setError(null);
 		try {
-			const result = await window.electronAPI.getDashboardSnapshot(projectPath);
+			const result = await loadDashboardSnapshot(projectPath, serverProjectId);
 			if (result.success) {
-				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-				setSnapshot(result.snapshot!);
+				setSnapshot(result.snapshot ?? null);
 			} else {
 				setError(result.error || "Failed to load dashboard");
 			}
@@ -248,7 +239,7 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 		} finally {
 			setLoading(false);
 		}
-	}, [projectPath]);
+	}, [projectPath, serverProjectId]);
 
 	useEffect(() => {
 		fetchSnapshot();
@@ -256,7 +247,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	}, [fetchSnapshot]);
 
 	// Subscribe to real-time updates when dashboard_snapshot.json changes
+	// (this computer's file; a server project is read again on refresh)
 	useEffect(() => {
+		if (serverProjectId) return;
 		const unsubscribe = window.electronAPI.onDashboardSnapshotUpdated(
 			(updatedPath: string) => {
 				if (updatedPath === projectPath) {
@@ -265,11 +258,11 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 			},
 		);
 		return () => unsubscribe();
-	}, [projectPath, fetchSnapshot]);
+	}, [projectPath, fetchSnapshot, serverProjectId]);
 
 	const handleExport = async (fmt: "json" | "csv") => {
 		try {
-			const result = await window.electronAPI.getDashboardSnapshot(projectPath);
+			const result = await loadDashboardSnapshot(projectPath, serverProjectId);
 			if (!result.success || !result.snapshot) return;
 			const snap = result.snapshot;
 			let content: string;
@@ -362,18 +355,13 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-6xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<BarChart3 className="h-6 w-6 text-primary" />
-						<div>
-							<h1 className="text-xl font-bold text-foreground">
-								{t("title")}
-							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
+				<PageHeader
+					variant="inline"
+					icon={BarChart3}
+					title={t("title")}
+					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
+					actions={
+					<>
 						<Button variant="outline" size="sm" onClick={fetchSnapshot}>
 							<RefreshCw className="h-3.5 w-3.5 mr-2" />
 							{t("common:buttons.refresh")}
@@ -394,8 +382,9 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 							<Download className="h-3.5 w-3.5 mr-2" />
 							CSV
 						</Button>
-					</div>
-				</div>
+					</>
+					}
+				/>
 
 				{/* KPI Cards */}
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -538,8 +527,8 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 						</h3>
 						<div className="flex items-center gap-8">
 							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-									<Zap className="h-5 w-5 text-emerald-500" />
+								<div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+									<Zap className="h-5 w-5 text-success" />
 								</div>
 								<div>
 									<p className="text-lg font-bold text-foreground">
@@ -551,8 +540,8 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 								</div>
 							</div>
 							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-									<GitMerge className="h-5 w-5 text-amber-500" />
+								<div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
+									<GitMerge className="h-5 w-5 text-warning" />
 								</div>
 								<div>
 									<p className="text-lg font-bold text-foreground">

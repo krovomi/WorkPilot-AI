@@ -43,7 +43,7 @@ from .types import (
 
 # Import debug utilities
 try:
-    from core.debug import (
+    from foundation.debug import (
         debug,
         debug_detailed,
         debug_error,

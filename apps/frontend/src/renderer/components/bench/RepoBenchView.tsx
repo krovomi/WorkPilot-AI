@@ -19,6 +19,8 @@ import type {
 	BenchStatus,
 	BenchTableRow,
 } from "../../../shared/types";
+import type { ReviewLesson } from "../../../shared/types/learning-loop";
+import { armsFor, MAX_RULE_CHARS, normalizeRule, ruleVerdict } from "../../../shared/utils/bench-rule";
 import {
 	defaultEngineProvider,
 	type EngineTrio,
@@ -28,28 +30,21 @@ import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
 import { useBenchStore } from "../../stores/bench-store";
 import { useSettingsStore } from "../../stores/settings-store";
 import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
+import { BenchRecommendationList } from "./BenchRecommendation";
+import { dollars, minutes, percent } from "./format";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
+import { PageHeader } from "../ui/page-header";
+import { Textarea } from "../ui/textarea";
 
 export const MAX_CASES = 20;
 export const MAX_ENGINES = 4;
 
 interface Props {
 	readonly projectId?: string;
-}
-
-function percent(value: number | null | undefined): string {
-	return typeof value === "number" ? `${Math.round(value * 100)} %` : "—";
-}
-
-function dollars(value: number | null | undefined): string {
-	return typeof value === "number" ? `$${value.toFixed(2)}` : "—";
-}
-
-function minutes(value: number | null | undefined): string {
-	return typeof value === "number" ? `${Math.round(value / 60)} min` : "—";
 }
 
 function ResultsTable({ rows }: { rows: BenchTableRow[] }) {
@@ -147,8 +142,8 @@ function BuildCell({
 	if (build.state === "judged") {
 		label = build.resolved ? t("run.resolved") : t("run.notResolved");
 		tone = build.resolved
-			? "text-emerald-600 dark:text-emerald-400"
-			: "text-red-600 dark:text-red-400";
+			? "text-success "
+			: "text-destructive ";
 	} else if (build.state === "skipped") {
 		label = t("run.notCounted");
 	} else {
@@ -158,7 +153,7 @@ function BuildCell({
 		<td className="px-2 py-1">
 			<div className={`text-sm font-medium ${tone}`}>{label}</div>
 			{build.state === "judged" && (
-				<div className="text-[11px] text-muted-foreground">
+				<div className="text-2xs text-muted-foreground">
 					{dollars(build.costUsd)} · {minutes(build.durationS)}
 				</div>
 			)}
@@ -231,9 +226,14 @@ function RunCard({
 								{run.engines.map((e) => (
 									<th key={e.id} className="px-2 py-1">
 										{e.model}
-										<span className="ml-1 text-[11px]">
+										<span className="ml-1 text-2xs">
 											{e.provider} · {e.effort}
 										</span>
+										{e.rule && (
+											<Badge variant="outline" className="ml-1 text-2xs" title={e.rule}>
+												{t("run.withRule")}
+											</Badge>
+										)}
 									</th>
 								))}
 							</tr>
@@ -262,6 +262,32 @@ function RunCard({
 					</table>
 				</div>
 			)}
+			<RuleVerdictLine run={run} />
+		</div>
+	);
+}
+
+function RuleVerdictLine({ run }: { run: BenchManifest }) {
+	const { t } = useTranslation("bench");
+	const verdict = ruleVerdict(run);
+	if (!verdict) return null;
+	return (
+		<div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-xs">
+			<p className="font-semibold">{t("run.rule.title")}</p>
+			<p className="italic text-muted-foreground">{verdict.rule}</p>
+			{verdict.pairs > 0 && (
+				<p>
+					{t("run.rule.summary", {
+						without: verdict.withoutResolved,
+						with: verdict.withResolved,
+						pairs: verdict.pairs,
+						regressions: verdict.regressions,
+					})}
+				</p>
+			)}
+			<p className={verdict.verdict === "worse" ? "text-destructive" : undefined}>
+				{t(`run.rule.${verdict.verdict}`)}
+			</p>
 		</div>
 	);
 }
@@ -285,6 +311,8 @@ export function RepoBenchView({ projectId }: Props) {
 	const [selected, setSelected] = useState<string[]>([]);
 	const [commits, setCommits] = useState<Record<string, string>>({});
 	const [engines, setEngines] = useState<EngineTrio[]>([]);
+	const [rule, setRule] = useState("");
+	const [lessons, setLessons] = useState<ReviewLesson[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [starting, setStarting] = useState(false);
 
@@ -326,6 +354,19 @@ export function RepoBenchView({ projectId }: Props) {
 		void loadCandidates();
 	}, [loadCandidates]);
 
+	// The candidates a person has not decided yet: the rules worth measuring.
+	useEffect(() => {
+		if (!projectId) return;
+		window.electronAPI
+			.getReviewLessons(projectId)
+			.then((result) => {
+				if (result.success && result.data) {
+					setLessons(result.data.filter((l) => l.status === "pending" && l.text));
+				}
+			})
+			.catch(() => setLessons([]));
+	}, [projectId]);
+
 	const selectable = useCallback(
 		(candidate: BenchCandidate) =>
 			candidate.case.status === "candidate" ||
@@ -344,11 +385,14 @@ export function RepoBenchView({ projectId }: Props) {
 		);
 	};
 
-	const builds = selected.length * engines.length;
+	const ruleText = normalizeRule(rule);
+	const arms = armsFor(engines, ruleText);
+	const builds = selected.length * arms.length;
+	const tooManyArms = arms.length > MAX_ENGINES;
 	const busy = !!status?.activeRunId;
 
 	const start = async () => {
-		if (!projectId || selected.length === 0 || engines.length === 0) return;
+		if (!projectId || selected.length === 0 || engines.length === 0 || tooManyArms) return;
 		setStarting(true);
 		setError(null);
 		const given = Object.fromEntries(
@@ -359,7 +403,7 @@ export function RepoBenchView({ projectId }: Props) {
 		const result = await window.electronAPI.startBench(
 			projectId,
 			selected,
-			engines.map((e) => ({ provider: e.provider, model: e.model, effort: e.effort })),
+			arms,
 			given,
 		);
 		setStarting(false);
@@ -388,13 +432,12 @@ export function RepoBenchView({ projectId }: Props) {
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6 p-6">
-			<header className="space-y-1">
-				<h1 className="flex items-center gap-2 text-xl font-semibold">
-					<FlaskConical className="h-5 w-5" />
-					{t("bench:title")}
-				</h1>
-				<p className="text-sm text-muted-foreground">{t("bench:description")}</p>
-			</header>
+			<PageHeader
+				variant="inline"
+				icon={FlaskConical}
+				title={t("bench:title")}
+				description={t("bench:description")}
+			/>
 
 			{error && (
 				<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -402,7 +445,7 @@ export function RepoBenchView({ projectId }: Props) {
 				</div>
 			)}
 			{status?.error && (
-				<div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+				<div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
 					{status.error}
 				</div>
 			)}
@@ -411,6 +454,12 @@ export function RepoBenchView({ projectId }: Props) {
 				<h2 className="text-sm font-semibold">{t("bench:table.title")}</h2>
 				<ResultsTable rows={status?.table ?? []} />
 				<p className="text-xs text-muted-foreground">{t("bench:table.readers")}</p>
+			</section>
+
+			<section className="space-y-2">
+				<h2 className="text-sm font-semibold">{t("bench:recommend.title")}</h2>
+				<BenchRecommendationList recommendations={status?.recommendations ?? {}} />
+				<p className="text-xs text-muted-foreground">{t("bench:recommend.rule")}</p>
 			</section>
 
 			<section className="space-y-3 rounded-lg border border-border p-4">
@@ -539,9 +588,49 @@ export function RepoBenchView({ projectId }: Props) {
 					)}
 				</div>
 
+				<div className="space-y-2">
+					<h3 className="text-xs font-semibold text-muted-foreground">
+						{t("bench:new.rule.title")}
+					</h3>
+					<p className="text-xs text-muted-foreground">{t("bench:new.rule.help")}</p>
+					{lessons.length > 0 && (
+						<NativeSelect
+							aria-label={t("bench:new.rule.fromLessons")}
+							value=""
+							disabled={busy}
+							onChange={(e) => {
+								const lesson = lessons.find((l) => l.id === e.target.value);
+								if (lesson) setRule(lesson.text.slice(0, MAX_RULE_CHARS));
+							}}
+							className="w-full px-2 py-1.5 text-sm h-auto"
+						>
+							<option value="">{t("bench:new.rule.pick")}</option>
+							{lessons.map((l) => (
+								<option key={l.id} value={l.id}>
+									{l.text.length > 90 ? `${l.text.slice(0, 90)}…` : l.text}
+								</option>
+							))}
+						</NativeSelect>
+					)}
+					<Textarea
+						aria-label={t("bench:new.rule.title")}
+						value={rule}
+						maxLength={MAX_RULE_CHARS}
+						disabled={busy}
+						placeholder={t("bench:new.rule.placeholder")}
+						onChange={(e) => setRule(e.target.value)}
+						rows={2}
+					/>
+					{tooManyArms && (
+						<p className="text-xs text-destructive">
+							{t("bench:new.rule.tooManyEngines", { max: MAX_ENGINES / 2 })}
+						</p>
+					)}
+				</div>
+
 				<div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
 					<span className="text-xs text-muted-foreground">
-						{t("bench:new.summary", {
+						{t(ruleText ? "bench:new.summaryRule" : "bench:new.summary", {
 							cards: selected.length,
 							engines: engines.length,
 							builds,
@@ -549,7 +638,9 @@ export function RepoBenchView({ projectId }: Props) {
 					</span>
 					<Button
 						className="ml-auto"
-						disabled={busy || starting || selected.length === 0 || engines.length === 0}
+						disabled={
+							busy || starting || selected.length === 0 || engines.length === 0 || tooManyArms
+						}
 						onClick={() => void start()}
 					>
 						{starting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}

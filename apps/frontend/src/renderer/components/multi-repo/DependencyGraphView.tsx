@@ -14,13 +14,11 @@ interface DependencyGraphViewProps {
 
 const STATUS_COLORS: Record<RepoExecutionStatus, string> = {
 	pending: "#6b7280", // gray
-	analyzing: "#3b82f6", // blue
-	planning: "#8b5cf6", // purple
 	coding: "#f59e0b", // amber
 	qa: "#06b6d4", // cyan
+	needs_you: "#8b5cf6", // purple
 	completed: "#22c55e", // green
 	failed: "#ef4444", // red
-	skipped: "#9ca3af", // light gray
 };
 
 /**
@@ -190,7 +188,7 @@ export function DependencyGraphView({
 								<text
 									x={node.x + 26}
 									y={node.y + node.height / 2 - 4}
-									className="text-[11px] font-medium"
+									className="text-2xs font-medium"
 									fill="var(--color-foreground)"
 									dominantBaseline="auto"
 								>
@@ -203,11 +201,11 @@ export function DependencyGraphView({
 								<text
 									x={node.x + 26}
 									y={node.y + node.height / 2 + 10}
-									className="text-[9px]"
+									className="text-3xs"
 									fill={color}
 									dominantBaseline="auto"
 								>
-									{status}
+									{t(`multiRepo:repoStatus.${status}`)}
 									{progress > 0 && progress < 100
 										? ` ${Math.round(progress)}%`
 										: ""}
@@ -226,7 +224,7 @@ export function DependencyGraphView({
 					</span>
 					{executionOrder.map((repo, i) => (
 						<span key={repo} className="flex items-center gap-1">
-							<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">
+							<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-3xs font-medium text-primary">
 								{i + 1}
 							</span>
 							{repo.split("/").pop()}

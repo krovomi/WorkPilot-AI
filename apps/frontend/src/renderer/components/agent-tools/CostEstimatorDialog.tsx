@@ -13,6 +13,7 @@ import {
 	type CostEstimate,
 	previewBuildCost,
 } from "../../lib/agent-tools-api";
+import { useTranslation } from "react-i18next";
 
 export interface CostEstimatorDialogProps {
 	readonly open: boolean;
@@ -23,9 +24,9 @@ export interface CostEstimatorDialogProps {
 }
 
 const CONFIDENCE_COLORS: Record<CostEstimate["confidence"], string> = {
-	high: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-	medium: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-	low: "bg-red-500/15 text-red-700 dark:text-red-300",
+	high: "bg-success/15 text-success ",
+	medium: "bg-warning/15 text-warning ",
+	low: "bg-destructive/15 text-destructive ",
 };
 
 const formatCost = (usd: number): string => {
@@ -43,6 +44,7 @@ export function CostEstimatorDialog({
 	specDir,
 	onConfirm,
 }: CostEstimatorDialogProps) {
+	const { t } = useTranslation();
 	const [estimate, setEstimate] = useState<CostEstimate | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -72,23 +74,23 @@ export function CostEstimatorDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Estimated build cost</DialogTitle>
+					<DialogTitle>{t("agentTools:costDialog.title")}</DialogTitle>
 					<DialogDescription>
-						Token usage and cost projection for{" "}
+						{t("agentTools:costDialog.descriptionBefore")}{" "}
 						<code className="text-xs">{specDir.split(/[/\\]/).pop()}</code>{" "}
-						before the agent starts.
+						{t("agentTools:costDialog.descriptionAfter")}
 					</DialogDescription>
 				</DialogHeader>
 
 				{loading && (
 					<div className="py-8 text-center text-sm text-muted-foreground">
-						Estimating…
+						{t("agentTools:costDialog.estimating")}
 					</div>
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-						Estimation unavailable: {error}
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
+						{t("agentTools:costDialog.unavailable", { error })}
 					</div>
 				)}
 
@@ -97,14 +99,16 @@ export function CostEstimatorDialog({
 						<div className="flex items-center justify-between rounded-md border p-3">
 							<div>
 								<div className="text-xs text-muted-foreground">
-									Total estimate
+									{t("agentTools:costDialog.total")}
 								</div>
 								<div className="text-2xl font-semibold">
 									{formatCost(estimate.total_cost_usd)}
 								</div>
 							</div>
 							<Badge className={CONFIDENCE_COLORS[estimate.confidence]}>
-								{estimate.confidence} confidence
+								{t("agentTools:costDialog.confidence", {
+									level: estimate.confidence,
+								})}
 							</Badge>
 						</div>
 
@@ -126,8 +130,10 @@ export function CostEstimatorDialog({
 											{formatCost(phase.estimated_cost_usd)}
 										</div>
 										<div className="text-xs text-muted-foreground">
-											{formatTokens(phase.input_tokens)} in /{" "}
-											{formatTokens(phase.output_tokens)} out
+											{t("agentTools:costDialog.inOut", {
+											input: formatTokens(phase.input_tokens),
+											output: formatTokens(phase.output_tokens),
+										})}
 										</div>
 									</div>
 								</div>
@@ -135,7 +141,7 @@ export function CostEstimatorDialog({
 						</div>
 
 						{estimate.warnings.length > 0 && (
-							<ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+							<ul className="text-xs text-warning space-y-0.5">
 								{estimate.warnings.map((w) => (
 									<li key={w}>⚠ {w}</li>
 								))}
@@ -146,7 +152,7 @@ export function CostEstimatorDialog({
 
 				<DialogFooter>
 					<Button variant="outline" onClick={() => onOpenChange(false)}>
-						Cancel
+						{t("common:buttons.cancel")}
 					</Button>
 					<Button
 						disabled={loading || error !== null}
@@ -155,7 +161,7 @@ export function CostEstimatorDialog({
 							onOpenChange(false);
 						}}
 					>
-						Start build
+						{t("agentTools:costDialog.start")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

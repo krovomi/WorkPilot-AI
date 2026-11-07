@@ -9,6 +9,7 @@ import type { Project } from "../../../shared/types";
 import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
 import { getProjectEnvPath, readProjectEnvFile } from "../../project-env-file";
+import { isServerHandle, relayGitHubFetch, serverGitHubConfig } from "./server-relay";
 import type { GitHubConfig } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -62,9 +63,11 @@ export async function getGitHubTokenForSubprocess(): Promise<string | null> {
 
 /**
  * Get GitHub configuration from project environment file
- * Falls back to gh CLI token if GITHUB_TOKEN not in .env
+ * Falls back to gh CLI token if GITHUB_TOKEN not in .env.
+ * A server project's calls go through the server (`server-relay.ts`).
  */
 export function getGitHubConfig(project: Project): GitHubConfig | null {
+	if (project.remote) return serverGitHubConfig(project);
 	const envPath = getProjectEnvPath(project);
 	if (!envPath || !existsSync(envPath)) return null;
 
@@ -122,6 +125,7 @@ export async function githubFetch(
 	endpoint: string,
 	options: RequestInit = {},
 ): Promise<unknown> {
+	if (isServerHandle(token)) return relayGitHubFetch(token, endpoint, options);
 	const url = endpoint.startsWith("http")
 		? endpoint
 		: `https://api.github.com${endpoint}`;

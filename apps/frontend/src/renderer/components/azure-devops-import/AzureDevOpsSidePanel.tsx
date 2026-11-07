@@ -653,11 +653,11 @@ export function AzureDevOpsSidePanel({
 	const getTypeColor = (type: string): string => {
 		switch (type.toLowerCase()) {
 			case "bug":
-				return "bg-red-500/10 text-red-500 border-red-500/20";
+				return "bg-destructive/10 text-destructive border-destructive/20";
 			case "task":
 				return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 			case "user story":
-				return "bg-green-500/10 text-green-500 border-green-500/20";
+				return "bg-success/10 text-success border-success/20";
 			case "feature":
 				return "bg-purple-500/10 text-purple-500 border-purple-500/20";
 			case "epic":
@@ -745,7 +745,7 @@ export function AzureDevOpsSidePanel({
 						{/* Repository info - display if available */}
 						{workItems.length > 0 && workItems[0]?.repository && (
 							<p className="text-sm text-foreground/70 mt-1">
-								<strong>Repository:</strong> {workItems[0].repository}
+								<strong>{t("settings:azureDevOpsImport.repositoryLabel")}</strong> {workItems[0].repository}
 							</p>
 						)}
 					</div>
@@ -753,8 +753,8 @@ export function AzureDevOpsSidePanel({
 
 				{/* Error Banner */}
 				{error && (
-					<div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-						<p className="text-sm text-red-500 mb-3">{error}</p>
+					<div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+						<p className="text-sm text-destructive mb-3">{error}</p>
 						{onOpenSettings && (
 							<Button
 								variant="outline"
@@ -1053,7 +1053,7 @@ export function AzureDevOpsSidePanel({
 					type="button"
 					className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 transition-colors border-0 bg-transparent p-0"
 					onMouseDown={handleResizeStart}
-					title="Redimensionner"
+					title={t("settings:jiraImport.resize")}
 					aria-label={t("azureDevOpsImport.resizeHandleAriaLabel")}
 				>
 					{/* Wider invisible hit area for easier grabbing */}

@@ -39,5 +39,22 @@
 	},
 	"errors": {
 		"noProject": "Please select a project to analyze."
+	},
+	"lessons": {
+		"title": "Rules from reviews",
+		"description": "A review comment the PR follow-up fixed, or the feedback you gave when rejecting a plan, can become a rule for this project. Nothing reaches an agent until you adopt it; an adopted rule is given to every phase of every build.",
+		"pending_one": "{{count}} candidate",
+		"pending_other": "{{count}} candidates",
+		"adopted_one": "{{count}} adopted rule",
+		"adopted_other": "{{count}} adopted rules",
+		"ruleLabel": "Rule wording",
+		"adopt": "Adopt",
+		"dismiss": "Dismiss",
+		"withdraw": "Withdraw",
+		"flagged": "This comment looks aimed at an agent ({{flags}}). Read it before adopting anything.",
+		"sources": {
+			"pr_review": "PR review",
+			"plan_review": "Rejected plan"
+		}
 	}
 }

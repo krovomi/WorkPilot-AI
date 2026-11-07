@@ -159,7 +159,8 @@
 			"success": "Commande d'installation envoyée au terminal. Veuillez terminer l'installation là-bas.",
 			"instructions": "L'installateur s'ouvrira dans votre terminal. Suivez les instructions pour terminer l'installation."
 		},
-		"learnMore": "En savoir plus sur le CLI IA"
+		"learnMore": "En savoir plus sur le CLI IA",
+		"pathLabel": "Chemin :"
 	},
 	"devtools": {
 		"title": "Outils de développement",
@@ -171,12 +172,14 @@
 		"ide": {
 			"label": "IDE préféré",
 			"description": "WorkPilot AI ouvrira les arbres de travail dans cet éditeur",
-			"customPath": "Chemin IDE personnalisé"
+			"customPath": "Chemin IDE personnalisé",
+			"placeholder": "Choisir un IDE..."
 		},
 		"terminal": {
 			"label": "Terminal préféré",
 			"description": "WorkPilot AI ouvrira les sessions terminal ici",
-			"customPath": "Chemin terminal personnalisé"
+			"customPath": "Chemin terminal personnalisé",
+			"placeholder": "Choisir un terminal..."
 		},
 		"detectedSummary": "Détecté sur votre système :",
 		"noToolsDetected": "Aucun outil supplémentaire détecté (VS Code et le terminal système seront utilisés)",
@@ -199,6 +202,38 @@
 			"description": "Ollama est installé mais non démarré. Lancez Ollama pour utiliser les modèles d'embeddings locaux.",
 			"retry": "Réessayer",
 			"fallbackNote": "La mémoire fonctionnera toujours avec la recherche par mots-clés même sans embeddings."
-		}
+		},
+		"dimensions": "({{count}} dim.)",
+		"checking": "Vérification des modèles Ollama...",
+		"recommended": "Recommandé",
+		"highestQuality": "Meilleure qualité",
+		"fastest": "Le plus rapide",
+		"installed": "Installé",
+		"downloading": "Téléchargement...",
+		"download": "Télécharger",
+		"selectHint": "Choisissez un modèle installé pour la recherche sémantique. La mémoire fonctionne en recherche par mots-clés même sans embeddings.",
+		"startingDownload": "Démarrage du téléchargement..."
+	},
+	"authChoice": {
+		"title": "Choisissez votre méthode d'authentification",
+		"description": "Choisissez comment vous authentifier auprès de Claude. Vous pourrez changer plus tard dans les paramètres.",
+		"oauthTitle": "Se connecter avec Anthropic",
+		"oauthDescription": "Authentifiez-vous avec votre compte Anthropic. Un flux OAuth simple et sûr.",
+		"apiKeyTitle": "Utiliser une clé API personnalisée",
+		"apiKeyDescription": "Apportez votre clé API Anthropic ou d'un fournisseur compatible. ⚠️ Très expérimental : peut entraîner des coûts importants.",
+		"footer": "Les deux options donnent accès à toutes les fonctions de Claude Code. Choisissez selon votre préférence.",
+		"skip": "Passer pour l'instant"
+	},
+	"firstSpec": {
+		"title": "Créez votre première tâche",
+		"description": "Décrivez ce que vous voulez construire et laissez WorkPilot AI s'occuper du reste",
+		"openedTitle": "Créateur de tâche ouvert",
+		"openedDescription": "Parfait ! Créez votre première tâche maintenant ou continuez l'assistant. Vous pourrez toujours créer des tâches plus tard depuis le tableau de bord.",
+		"tipsTitle": "Conseils pour de bonnes tâches",
+		"exampleTitle": "Exemple de description de tâche :",
+		"example": "« Ajoute un interrupteur de mode sombre dans la page des paramètres. Il doit garder la préférence de l'utilisateur dans localStorage et appliquer le thème tout de suite, sans recharger la page. Utilise les variables de couleur existantes de styles/theme.css. »",
+		"open": "Ouvrir le créateur de tâche",
+		"continueHint": "Vous pouvez continuer l'assistant maintenant ou créer d'autres tâches.",
+		"skipHint": "Vous pouvez passer cette étape et créer des tâches plus tard depuis le tableau de bord."
 	}
 }

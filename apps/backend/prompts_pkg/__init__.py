@@ -24,11 +24,12 @@ from .prompt_generator import (
 
 # Import all functions from prompts
 from .prompts import (
-    get_architecture_reviewer_prompt,
     get_followup_planner_prompt,
     get_planner_prompt,
     get_qa_fixer_prompt,
+    get_qa_reviewer_light_prompt,
     get_qa_reviewer_prompt,
+    get_qa_reviewer_targeted_prompt,
     is_first_run,
 )
 
@@ -44,8 +45,9 @@ __all__ = [
     "get_planner_prompt",
     "get_followup_planner_prompt",
     "get_qa_reviewer_prompt",
+    "get_qa_reviewer_light_prompt",
+    "get_qa_reviewer_targeted_prompt",
     "get_qa_fixer_prompt",
-    "get_architecture_reviewer_prompt",
     "is_first_run",
     # project_context functions
     "load_project_index",

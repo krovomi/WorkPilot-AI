@@ -2,6 +2,7 @@
  * Task-related types
  */
 
+import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
 import type {
 	CompletablePhase,
 	ExecutionPhase as ExecutionPhaseType,
@@ -102,6 +103,12 @@ export interface Subtask {
 	 * subtask reads as "needs attention" rather than a silent gray state.
 	 */
 	blockedReason?: string;
+	/** Why, from a closed list, so the panel can say what to do. */
+	blockedKind?: BlockedKind;
+	/** What the person answered when they sent it back to the agent. */
+	humanReply?: string;
+	/** Set when the person marked it done or not needed themselves. */
+	humanResolution?: HumanResolution;
 	verification?: {
 		type: "command" | "browser";
 		run?: string;
@@ -264,6 +271,8 @@ export interface TaskDraft {
 	verifyLoop?: boolean;
 	/** Part of the title of the one window a Windows app is verified in. */
 	verifyWindow?: string;
+	/** The steps a web front end's verification follows, one per line. */
+	verifyScenario?: string;
 	/** Context-window policy chosen in the wizard (absent = defaults). */
 	contextPolicy?: ContextPolicy;
 	mobileTargets?: MobilePlatform[];
@@ -514,6 +523,11 @@ export interface TaskMetadata {
 	// launched app's main window.
 	verifyWindow?: string;
 
+	// The steps that prove the change on a web front end, one per line, in
+	// plain language. Read by `verify/scenario.py`: the verifier follows them
+	// in Playwright, captures each and keeps a trace. Absent = its own clicks.
+	verifyScenario?: string;
+
 	// Context-window management (compact / clear at a threshold). Read live by
 	// the backend; absent = defaults (auto, 50%, handoff prepared in parallel).
 	contextPolicy?: ContextPolicy;
@@ -548,6 +562,14 @@ export interface TaskMetadata {
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
+	/**
+	 * Stacked on another task (F6, `shared/utils/task-stack.ts`): the parent's
+	 * spec id, its commit when this task was last put on it, and the branch
+	 * the stack ends on.
+	 */
+	stackParent?: string;
+	stackParentSha?: string;
+	stackTrunk?: string;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {
@@ -607,6 +629,8 @@ export interface Task {
 	verification?: TaskVerificationSummary;
 	/** The goal gate's last verdict (`apps/backend/goal/`), from the plan. */
 	goal?: TaskGoalSummary;
+	/** The second engine's verdict (`apps/backend/cross_review/`), from the plan. */
+	crossReview?: TaskCrossReviewSummary;
 	subtasks: Subtask[];
 	qaReport?: QAReport;
 	logs: string[];
@@ -620,6 +644,20 @@ export interface Task {
 	prUrl?: string; // URL of the PR created automatically when task is completed
 	createdAt: Date;
 	updatedAt: Date;
+}
+
+/**
+ * What a second engine said about the finished task (`cross_review/`).
+ * `disagree` names at least one blocking problem and holds the pull request
+ * back; `inconclusive` is everything unclear and never reads as `agree`.
+ */
+export interface TaskCrossReviewSummary {
+	verdict: "agree" | "disagree" | "inconclusive";
+	provider: string;
+	model: string;
+	blockers: number;
+	summary?: string;
+	at?: string;
 }
 
 /** What the card needs to know about the task's last verification. */
@@ -651,6 +689,8 @@ export interface ImplementationPlan {
 	verification?: TaskVerificationSummary;
 	/** Written by the goal gate (`goal/gate.py::record_verdict`). */
 	goal?: TaskGoalSummary;
+	/** Written by the cross review (`cross_review/review.py::write_verdict`). */
+	crossReview?: TaskCrossReviewSummary;
 	xstateState?: string; // Persisted XState machine state for restoration (e.g., 'planning', 'coding')
 	lastEvent?: {
 		eventId: string;
@@ -661,7 +701,7 @@ export interface ImplementationPlan {
 	recoveryNote?: string;
 	description?: string;
 	// Pause/Resume state, LEGACY. The live store is `pause_state.json` (see
-	// AUTO_BUILD_PATHS.PAUSE_STATE and core/pause_state.py): it lives beside the
+	// AUTO_BUILD_PATHS.PAUSE_STATE and foundation/pause_state.py): it lives beside the
 	// spec, which exists from the moment the task does, so a pause also works
 	// during spec creation and planning — the phases where this file does not
 	// exist yet. This block is still read so a task paused before the move does
@@ -713,6 +753,14 @@ export interface PlanSubtask {
 	files_to_create?: string[];
 	/** Backend-emitted reason a subtask was marked "blocked". */
 	blocked_reason?: string;
+	/** Reason written by agents told by an older prompt. */
+	_blocked_reason?: string;
+	/** Why it is blocked (`BLOCKED_KINDS`, shared/utils/subtask-unblock.ts). */
+	blocked_kind?: string;
+	/** The person's reply from the subtask panel, read by the coder. */
+	human_reply?: string;
+	/** The person marked it done or not needed (`complete` / `skip`). */
+	human_resolution?: { action: string; at: string; reason?: string };
 	verification?: {
 		type: string;
 		run?: string;
@@ -740,6 +788,17 @@ export interface WorktreeStatus {
 export interface WorktreeDiff {
 	files: WorktreeDiffFile[];
 	summary: string;
+	/** Agent Trace (F3): who wrote the task's added lines, when recorded. */
+	attribution?: WorktreeDiffAttribution;
+}
+
+export interface WorktreeDiffAttribution {
+	added: number;
+	ai: number;
+	human: number;
+	unknown: number;
+	/** Lines per `provider/model`. */
+	models: Record<string, number>;
 }
 
 export interface WorktreeDiffFile {
@@ -748,6 +807,8 @@ export interface WorktreeDiffFile {
 	additions: number;
 	deletions: number;
 	patch?: string; // Git patch/diff content for the file
+	/** Agent Trace (F3): of the file's added lines, the agent's and the person's. */
+	attribution?: { added: number; ai: number; human: number; unknown: number };
 }
 
 // ============================================
@@ -986,6 +1047,13 @@ export interface WorktreeCreatePROptions {
 	 * Defaults to true.
 	 */
 	runVisualProof?: boolean;
+	/** Attach the scenario walkthrough (GIF) to the visual proof; off unless ticked. */
+	includeWalkthrough?: boolean;
+	/**
+	 * Create the PR although the cross review disagrees with this code. Set
+	 * only by the person's "create anyway" in the PR dialog.
+	 */
+	allowCrossReviewDisagreement?: boolean;
 }
 
 /**
@@ -998,6 +1066,8 @@ export interface WorktreeCreatePRResult {
 	message?: string; // Human-readable message for both success and error cases
 	alreadyExists?: boolean;
 	visualProof?: VisualProofRun;
+	/** Held back because the cross review disagrees with this code. */
+	crossReviewBlocked?: boolean;
 }
 
 export type VisualProofStatus = "pending" | "passed" | "failed" | "skipped";
@@ -1078,6 +1148,8 @@ export interface VisualProofRun {
 	 */
 	publishError?: string;
 	screenshots: VisualProofScreenshot[];
+	/** The card scenario's GIF (`visual-proof-walkthrough.ts`), when the person attached it. */
+	walkthrough?: VisualProofScreenshot;
 	/** API smoke proof, present when an OpenAPI document was discovered. */
 	apiSmoke?: VisualProofApiSmoke;
 	error?: string;
@@ -1098,6 +1170,12 @@ export interface VisualProofRunOptions {
 	worktreePath?: string;
 	autoBuildPath?: string;
 	provider?: VisualProofProviderId | "auto";
+	/**
+	 * Attach the verification's scenario walkthrough (a GIF) to the proof.
+	 * Only the person's tick in the PR dialog sets it: the GIF films the app
+	 * with its data, and every reader of the repository will see it.
+	 */
+	includeWalkthrough?: boolean;
 }
 
 /**

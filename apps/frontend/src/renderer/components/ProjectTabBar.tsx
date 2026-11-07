@@ -232,13 +232,13 @@ export function ProjectTabBar({
 							size="icon"
 							className="h-8 w-8 shrink-0"
 							onClick={() => scrollTabs("left")}
-							aria-label="Défiler vers la gauche"
+							aria-label={t("common:projectTab.scrollLeft")}
 						>
 							<ChevronLeft className="h-4 w-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						<p>Défiler vers la gauche</p>
+						<p>{t("common:projectTab.scrollLeft")}</p>
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -298,13 +298,13 @@ export function ProjectTabBar({
 							size="icon"
 							className="h-8 w-8 shrink-0"
 							onClick={() => scrollTabs("right")}
-							aria-label="Défiler vers la droite"
+							aria-label={t("common:projectTab.scrollRight")}
 						>
 							<ChevronRight className="h-4 w-4" />
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						<p>Défiler vers la droite</p>
+						<p>{t("common:projectTab.scrollRight")}</p>
 					</TooltipContent>
 				</Tooltip>
 			)}
@@ -319,7 +319,7 @@ export function ProjectTabBar({
 					(usage.sessionPercent >= 90 || (usage.weeklyPercent >= 0 && usage.weeklyPercent >= 90)) && (
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
+								<div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-destructive/10 text-destructive border-destructive/20">
 									<AlertTriangle className="h-3.5 w-3.5 motion-safe:animate-pulse" />
 								</div>
 							</TooltipTrigger>
@@ -329,7 +329,7 @@ export function ProjectTabBar({
 										<span className="text-muted-foreground font-medium">
 											{t("common:usage.usageAlert")}
 										</span>
-										<span className="font-semibold text-red-500">
+										<span className="font-semibold text-destructive">
 											{Math.round(
 												Math.max(usage.sessionPercent, Math.max(usage.weeklyPercent, 0)),
 											)}
@@ -337,7 +337,7 @@ export function ProjectTabBar({
 										</span>
 									</div>
 									<div className="h-px bg-border" />
-									<div className="text-[10px] text-muted-foreground">
+									<div className="text-3xs text-muted-foreground">
 										{t("common:usage.accountExceedsThreshold")}
 									</div>
 								</div>

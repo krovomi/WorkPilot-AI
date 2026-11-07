@@ -43,6 +43,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "../../ui/tooltip";
+import { AiFileShare, AiTaskShare } from "./AiShare";
 
 // ── Tree data structure ──────────────────────────────────────────────
 
@@ -227,9 +228,9 @@ function FileTreeNode({
 							<ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 						)}
 						{expanded ? (
-							<FolderOpen className="h-4 w-4 shrink-0 text-amber-400" />
+							<FolderOpen className="h-4 w-4 shrink-0 text-warning" />
 						) : (
-							<Folder className="h-4 w-4 shrink-0 text-amber-400" />
+							<Folder className="h-4 w-4 shrink-0 text-warning" />
 						)}
 						<span className="text-sm font-medium truncate">{node.name}</span>
 					</div>
@@ -305,6 +306,7 @@ function FileTreeNode({
 					<span className="text-sm font-mono truncate">{node.name}</span>
 				</div>
 				<div className="flex items-center gap-2 shrink-0 ml-2">
+					<AiFileShare file={file} />
 					<Badge
 						variant="secondary"
 						className={cn(
@@ -720,7 +722,7 @@ export function DiffViewDialog({
 								{t("taskReview:diff.selectAll")}
 								{selectedPaths.size > 0 &&
 									selectedPaths.size < filteredFiles.length &&
-									` (${selectedPaths.size} selected)`}
+									t("taskReview:diff.selectedSuffix", { count: selectedPaths.size })}
 							</span>
 						</div>
 					)}
@@ -876,7 +878,7 @@ export function DiffViewDialog({
 									>
 										<ChevronRight className="h-4 w-4 rotate-180" />
 									</button>
-									<Plus className="h-5 w-5 text-green-400" />
+									<Plus className="h-5 w-5 text-success" />
 									{t("taskReview:diff.addFile")}
 								</>
 							) : (
@@ -1002,6 +1004,9 @@ export function DiffViewDialog({
 								? t("taskReview:diff.addingNewFile")
 								: worktreeDiff?.summary || t("taskReview:diff.noChanges")}
 					</AlertDialogDescription>
+					{!editingFile && !showAddFile && (
+						<AiTaskShare attribution={worktreeDiff?.attribution} />
+					)}
 				</AlertDialogHeader>
 
 				<div className="flex-1 overflow-auto min-h-0 -mx-6 px-6">

@@ -32,6 +32,7 @@ import {
 } from "../../ui/dialog";
 import { Progress } from "../../ui/progress";
 import { ScrollArea } from "../../ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface BatchReviewWizardProps {
 	isOpen: boolean;
@@ -59,6 +60,7 @@ export function BatchReviewWizard({
 	isAnalyzing,
 	isApproving,
 }: BatchReviewWizardProps) {
+	const { t } = useTranslation();
 	// Track which batches are selected for approval
 	const [selectedBatchIds, setSelectedBatchIds] = useState<Set<number>>(
 		new Set(),
@@ -220,10 +222,9 @@ export function BatchReviewWizard({
 				<Layers className="h-12 w-12 text-primary" />
 			</div>
 			<div className="text-center space-y-2">
-				<h3 className="text-lg font-semibold">Analyze & Group Issues</h3>
+				<h3 className="text-lg font-semibold">{t("common:githubIssues.batch.title")}</h3>
 				<p className="text-sm text-muted-foreground max-w-md">
-					This will analyze up to 200 open issues, group similar ones together,
-					and let you review the proposed batches before creating any tasks.
+					{t("common:githubIssues.batch.intro")}
 				</p>
 			</div>
 			{analysisError && (
@@ -234,7 +235,7 @@ export function BatchReviewWizard({
 			)}
 			<Button onClick={onStartAnalysis} size="lg">
 				<Layers className="h-4 w-4 mr-2" />
-				Start Analysis
+				{t("common:githubIssues.batch.start")}
 			</Button>
 		</div>
 	);
@@ -243,16 +244,18 @@ export function BatchReviewWizard({
 		<div className="flex flex-col items-center justify-center py-8 space-y-6">
 			<Loader2 className="h-12 w-12 text-primary animate-spin" />
 			<div className="text-center space-y-2">
-				<h3 className="text-lg font-semibold">Analyzing Issues...</h3>
+				<h3 className="text-lg font-semibold">{t("common:githubIssues.batch.analyzing")}</h3>
 				<p className="text-sm text-muted-foreground">
 					{analysisProgress?.message ||
-						"Computing similarity and validating batches..."}
+						t("common:githubIssues.batch.computing")}
 				</p>
 			</div>
 			<div className="w-full max-w-md">
 				<Progress value={analysisProgress?.progress ?? 0} />
 				<p className="text-xs text-center text-muted-foreground mt-2">
-					{analysisProgress?.progress ?? 0}% complete
+					{t("common:githubIssues.batch.percentComplete", {
+									percent: analysisProgress?.progress ?? 0,
+								})}
 				</p>
 			</div>
 		</div>
@@ -273,23 +276,23 @@ export function BatchReviewWizard({
 				<div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-4">
 					<div className="flex items-center gap-4 text-sm">
 						<span>
-							<strong>{totalIssues}</strong> issues analyzed
+							<strong>{totalIssues}</strong> {t("common:githubIssues.batch.issuesAnalyzed")}
 						</span>
 						<span className="text-muted-foreground">|</span>
 						<span>
-							<strong>{proposedBatches.length}</strong> batches proposed
+							<strong>{proposedBatches.length}</strong> {t("common:githubIssues.batch.batchesProposed")}
 						</span>
 						<span className="text-muted-foreground">|</span>
 						<span>
-							<strong>{singleIssues.length}</strong> single issues
+							<strong>{singleIssues.length}</strong> {t("common:githubIssues.batch.singleIssues")}
 						</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<Button variant="ghost" size="sm" onClick={selectAllBatches}>
-							Select All
+							{t("common:prReview.selectAll")}
 						</Button>
 						<Button variant="ghost" size="sm" onClick={deselectAllBatches}>
-							Deselect All
+							{t("common:githubIssues.batch.deselectAll")}
 						</Button>
 					</div>
 				</div>
@@ -315,7 +318,7 @@ export function BatchReviewWizard({
 					{singleIssues.length > 0 && (
 						<div className="mt-6">
 							<h4 className="text-sm font-medium text-muted-foreground mb-2">
-								Single Issues (not grouped)
+								{t("common:githubIssues.batch.singleIssuesTitle")}
 							</h4>
 							<div className="grid grid-cols-2 gap-2">
 								{singleIssues.slice(0, 10).map((issue) => (
@@ -353,7 +356,9 @@ export function BatchReviewWizard({
 								))}
 								{singleIssues.length > 10 && (
 									<div className="p-2 text-sm text-muted-foreground">
-										...and {singleIssues.length - 10} more
+										{t("common:githubIssues.batch.andMore", {
+											count: singleIssues.length - 10,
+										})}
 									</div>
 								)}
 							</div>
@@ -364,13 +369,16 @@ export function BatchReviewWizard({
 				{/* Selection Summary */}
 				<div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
 					<div className="text-sm text-muted-foreground">
-						{selectedCount} batch{selectedCount !== 1 ? "es" : ""} selected (
-						{totalIssuesInSelected} issues)
+						{t("common:githubIssues.batch.selectedBatches", {
+							count: selectedCount,
+							issues: totalIssuesInSelected,
+						})}
 						{selectedSingleIssueNumbers.size > 0 && (
 							<>
 								{" "}
-								+ {selectedSingleIssueNumbers.size} single issue
-								{selectedSingleIssueNumbers.size !== 1 ? "s" : ""}
+								{t("common:githubIssues.batch.plusSingle", {
+									count: selectedSingleIssueNumbers.size,
+								})}
 							</>
 						)}
 					</div>
@@ -383,9 +391,9 @@ export function BatchReviewWizard({
 		<div className="flex flex-col items-center justify-center py-8 space-y-6">
 			<Loader2 className="h-12 w-12 text-primary animate-spin" />
 			<div className="text-center space-y-2">
-				<h3 className="text-lg font-semibold">Creating Batches...</h3>
+				<h3 className="text-lg font-semibold">{t("common:githubIssues.batch.creating")}</h3>
 				<p className="text-sm text-muted-foreground">
-					Setting up the approved issue batches for processing.
+					{t("common:githubIssues.batch.creatingDescription")}
 				</p>
 			</div>
 		</div>
@@ -393,16 +401,16 @@ export function BatchReviewWizard({
 
 	const renderDone = () => (
 		<div className="flex flex-col items-center justify-center py-8 space-y-6">
-			<div className="p-4 rounded-full bg-green-500/10">
-				<CheckCircle2 className="h-12 w-12 text-green-500" />
+			<div className="p-4 rounded-full bg-success/10">
+				<CheckCircle2 className="h-12 w-12 text-success" />
 			</div>
 			<div className="text-center space-y-2">
-				<h3 className="text-lg font-semibold">Batches Created</h3>
+				<h3 className="text-lg font-semibold">{t("common:githubIssues.batch.created")}</h3>
 				<p className="text-sm text-muted-foreground">
-					Your selected issue batches are ready for processing.
+					{t("common:githubIssues.batch.createdDescription")}
 				</p>
 			</div>
-			<Button onClick={onClose}>Close</Button>
+			<Button onClick={onClose}>{t("common:buttons.close")}</Button>
 		</div>
 	);
 
@@ -412,17 +420,17 @@ export function BatchReviewWizard({
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Layers className="h-5 w-5" />
-						Analyze & Group Issues
+						{t("common:githubIssues.batch.title")}
 					</DialogTitle>
 					<DialogDescription>
 						{step === "intro" &&
-							"Analyze open issues and group similar ones for batch processing."}
+							t("common:githubIssues.batch.stepIntro")}
 						{step === "analyzing" &&
-							"Analyzing issues for semantic similarity..."}
+							t("common:githubIssues.batch.stepAnalyzing")}
 						{step === "review" &&
-							"Review and approve the proposed issue batches."}
-						{step === "approving" && "Creating the approved batches..."}
-						{step === "done" && "Batches have been created successfully."}
+							t("common:githubIssues.batch.stepReview")}
+						{step === "approving" && t("common:githubIssues.batch.stepCreating")}
+						{step === "done" && t("common:githubIssues.batch.stepDone")}
 					</DialogDescription>
 				</DialogHeader>
 
@@ -437,7 +445,7 @@ export function BatchReviewWizard({
 				{step === "review" && (
 					<DialogFooter>
 						<Button variant="outline" onClick={onClose}>
-							Cancel
+							{t("common:buttons.cancel")}
 						</Button>
 						<Button
 							onClick={handleApprove}
@@ -450,17 +458,14 @@ export function BatchReviewWizard({
 							{isApproving ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Creating...
+									{t("common:buttons.creating")}
 								</>
 							) : (
 								<>
 									<Play className="h-4 w-4 mr-2" />
-									Approve & Create (
-									{selectedBatchIds.size + selectedSingleIssueNumbers.size}{" "}
-									{selectedBatchIds.size + selectedSingleIssueNumbers.size === 1
-										? "batch"
-										: "batches"}
-									)
+									{t("common:githubIssues.batch.approveCreateCount", {
+										count: selectedBatchIds.size + selectedSingleIssueNumbers.size,
+									})}
 								</>
 							)}
 						</Button>
@@ -488,12 +493,13 @@ function BatchCard({
 	onToggleSelect,
 	onToggleExpand,
 }: BatchCardProps) {
+	const { t } = useTranslation();
 	const confidenceColor =
 		batch.confidence >= 0.8
-			? "text-green-500"
+			? "text-success"
 			: batch.confidence >= 0.6
-				? "text-yellow-500"
-				: "text-red-500";
+				? "text-warning"
+				: "text-destructive";
 
 	return (
 		<div
@@ -517,14 +523,15 @@ function BatchCard({
 								<ChevronRight className="h-4 w-4" />
 							)}
 							<span className="font-medium text-sm">
-								{batch.theme || `Batch ${index + 1}`}
+								{batch.theme ||
+									t("common:githubIssues.batch.defaultName", { number: index + 1 })}
 							</span>
 						</CollapsibleTrigger>
 
 						<div className="flex items-center gap-2">
 							<Badge variant="outline" className="text-xs">
 								<Users className="h-3 w-3 mr-1" />
-								{batch.issueCount} issues
+								{t("common:githubIssues.batch.issueCount", { count: batch.issueCount })}
 							</Badge>
 							<Badge
 								variant={batch.validated ? "default" : "secondary"}
@@ -562,7 +569,9 @@ function BatchCard({
 										<span className="truncate">{issue.title}</span>
 									</div>
 									<span className="text-xs text-muted-foreground">
-										{Math.round(issue.similarityToPrimary * 100)}% similar
+										{t("common:githubIssues.batch.similar", {
+									percent: Math.round(issue.similarityToPrimary * 100),
+								})}
 									</span>
 								</div>
 							))}

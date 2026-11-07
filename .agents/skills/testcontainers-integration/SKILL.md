@@ -10,7 +10,7 @@ paths:
 metadata:
   workpilot:
     pack: dotnet
-    version: 1.0.0
+    version: 1.2.0
     content_sha256: 2d5efbbc81bf7edb3c3fcac867e5978e6ad42a4dda7c7fdca43260bf7059bbb9
     targets:
       dotnet: '>=10.0'

@@ -12,12 +12,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
 import { cn } from "../lib/utils";
+import { loadCostSummary } from "../lib/workspace-data";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { PageHeader } from "./ui/page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,9 +70,9 @@ function CostKpiCard({
 }) {
 	const colorClasses = {
 		primary: "text-primary bg-primary/10",
-		green: "text-emerald-500 bg-emerald-500/10",
-		amber: "text-amber-500 bg-amber-500/10",
-		red: "text-red-500 bg-red-500/10",
+		green: "text-success bg-success/10",
+		amber: "text-warning bg-warning/10",
+		red: "text-destructive bg-destructive/10",
 	};
 
 	return (
@@ -111,21 +114,21 @@ function BudgetBar({
 	// Determine bar color based on utilization percentage
 	let barColor: string;
 	if (pct >= 90) {
-		barColor = "bg-red-500";
+		barColor = "bg-destructive";
 	} else if (pct >= 70) {
-		barColor = "bg-amber-500";
+		barColor = "bg-warning";
 	} else {
-		barColor = "bg-emerald-500";
+		barColor = "bg-success";
 	}
 
 	// Determine text color based on utilization percentage
 	let textColor: string;
 	if (pct >= 90) {
-		textColor = "text-red-500";
+		textColor = "text-destructive";
 	} else if (pct >= 70) {
-		textColor = "text-amber-500";
+		textColor = "text-warning";
 	} else {
-		textColor = "text-emerald-500";
+		textColor = "text-success";
 	}
 
 	return (
@@ -171,7 +174,7 @@ function BudgetBar({
 					{budget.forecast_end_of_month > budget.monthly_budget && (
 						<Badge
 							variant="outline"
-							className="text-[10px] text-red-500 border-red-500/20"
+							className="text-3xs text-destructive border-destructive/20"
 						>
 							{t("budget.overBudget")}
 						</Badge>
@@ -209,8 +212,8 @@ function ProviderBreakdown({
 	const colors = [
 		"bg-primary",
 		"bg-blue-500",
-		"bg-emerald-500",
-		"bg-amber-500",
+		"bg-success",
+		"bg-warning",
 		"bg-purple-500",
 		"bg-pink-500",
 	];
@@ -248,7 +251,7 @@ function ProviderBreakdown({
 						{unused.map(([name]) => (
 							<span
 								key={name}
-								className="text-[10px] text-muted-foreground/60 capitalize"
+								className="text-3xs text-muted-foreground/60 capitalize"
 							>
 								{name} — {formatAmount(0, 2)}
 							</span>
@@ -289,6 +292,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	const [budget, setBudget] = useState<BudgetInfo | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fmtCurrency = (usd: number, decimals = 4) =>
 		formatCurrency(usd, i18n.language, eurRate, decimals);
@@ -333,9 +337,12 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	const fetchFromAPIs = useCallback(
 		async (silent: boolean) => {
 			try {
+				// A server project keeps no budget: only what its agents spent.
 				const [summaryRes, budgetRes] = await Promise.allSettled([
-					globalThis.electronAPI.getCostSummary(projectPath),
-					globalThis.electronAPI.getCostBudget(projectPath),
+					loadCostSummary(projectPath, serverProjectId),
+					serverProjectId
+						? Promise.resolve({ success: false })
+						: globalThis.electronAPI.getCostBudget(projectPath),
 				]);
 
 				const summarySuccess = handleApiResponse(
@@ -347,7 +354,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 				const budgetSuccess = handleApiResponse(
 					budgetRes,
 					(v) => setBudget(v as BudgetInfo | null),
-					silent,
+					silent || Boolean(serverProjectId),
 					"error",
 				);
 
@@ -359,7 +366,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 				return false;
 			}
 		},
-		[projectPath, handleApiResponse, t],
+		[projectPath, serverProjectId, handleApiResponse, t],
 	);
 
 	// Main fetchData function
@@ -386,8 +393,10 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 		fetchData();
 	}, [fetchData]);
 
-	// Auto-refresh when cost_data.json changes (pushed by main process)
+	// Auto-refresh when cost_data.json changes (pushed by main process; this
+	// computer's file, so not for a server project)
 	useEffect(() => {
+		if (serverProjectId) return;
 		if (typeof globalThis.electronAPI?.onCostsUpdated !== "function") return;
 		const unsubscribe = globalThis.electronAPI.onCostsUpdated(
 			(updatedPath: string) => {
@@ -395,7 +404,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 			},
 		);
 		return unsubscribe;
-	}, [projectPath, fetchData]);
+	}, [projectPath, fetchData, serverProjectId]);
 
 	if (loading) {
 		return (
@@ -421,22 +430,18 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<Coins className="h-6 w-6 text-primary" />
-						<div>
-							<h1 className="text-xl font-bold text-foreground">
-								{t("title")}
-							</h1>
-							<p className="text-sm text-muted-foreground">{t("subtitle")}</p>
-						</div>
-					</div>
-					<Button variant="outline" size="sm" onClick={() => fetchData()}>
-						<RefreshCw className="h-3.5 w-3.5 mr-2" />
-						{t("common:buttons.refresh")}
-					</Button>
-				</div>
+				<PageHeader
+					variant="inline"
+					icon={Coins}
+					title={t("title")}
+					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
+					actions={
+						<Button variant="outline" size="sm" onClick={() => fetchData()}>
+							<RefreshCw className="h-3.5 w-3.5 mr-2" />
+							{t("common:buttons.refresh")}
+						</Button>
+					}
+				/>
 
 				{/* KPI cards */}
 				{summary && (
@@ -493,7 +498,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 									{budget.alerts.map((alert) => (
 										<div
 											key={alert}
-											className="flex items-center gap-2 text-xs text-amber-500"
+											className="flex items-center gap-2 text-xs text-warning"
 										>
 											<Bell className="h-3.5 w-3.5 shrink-0" />
 											<span>{alert}</span>

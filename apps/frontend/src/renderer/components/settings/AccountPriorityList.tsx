@@ -56,20 +56,20 @@ const THRESHOLD_ELEVATED = 71; // Yellow: Moderate usage
  * Get color class based on usage percentage
  */
 const getColorClass = (percent: number): string => {
-	if (percent >= THRESHOLD_CRITICAL) return "text-red-500";
+	if (percent >= THRESHOLD_CRITICAL) return "text-destructive";
 	if (percent >= THRESHOLD_WARNING) return "text-orange-500";
-	if (percent >= THRESHOLD_ELEVATED) return "text-yellow-500";
-	return "text-green-500";
+	if (percent >= THRESHOLD_ELEVATED) return "text-warning";
+	return "text-success";
 };
 
 /**
  * Get background class for progress bars
  */
 const getBarColorClass = (percent: number): string => {
-	if (percent >= THRESHOLD_CRITICAL) return "bg-red-500";
+	if (percent >= THRESHOLD_CRITICAL) return "bg-destructive";
 	if (percent >= THRESHOLD_WARNING) return "bg-orange-500";
-	if (percent >= THRESHOLD_ELEVATED) return "bg-yellow-500";
-	return "bg-green-500";
+	if (percent >= THRESHOLD_ELEVATED) return "bg-warning";
+	return "bg-success";
 };
 
 /**
@@ -197,20 +197,20 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 						{account.displayName}
 					</span>
 					{/* Account type indicator */}
-					<span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
+					<span className="text-3xs text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
 						{account.type === "oauth"
 							? t("accounts.priority.typeOAuth")
 							: t("accounts.priority.typeAPI")}
 					</span>
 					{/* Status badges - only ONE account should have "In Use" */}
 					{account.isActive && (
-						<span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
+						<span className="text-3xs bg-primary/20 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
 							<Star className="h-2.5 w-2.5" />
 							{t("accounts.priority.inUse")}
 						</span>
 					)}
 					{account.isNext && !account.isActive && (
-						<span className="text-[10px] bg-warning/20 text-warning px-1.5 py-0.5 rounded flex items-center gap-1">
+						<span className="text-3xs bg-warning/20 text-warning px-1.5 py-0.5 rounded flex items-center gap-1">
 							<Tag className="h-2.5 w-2.5" />
 							{t("accounts.priority.next")}
 						</span>
@@ -243,7 +243,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 										</div>
 										<span
 											className={cn(
-												"text-[10px] tabular-nums font-medium w-8",
+												"text-3xs tabular-nums font-medium w-8",
 												getColorClass(account.sessionPercent),
 											)}
 										>
@@ -274,7 +274,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 										</div>
 										<span
 											className={cn(
-												"text-[10px] tabular-nums font-medium w-8",
+												"text-3xs tabular-nums font-medium w-8",
 												getColorClass(account.weeklyPercent ?? 0),
 											)}
 										>
@@ -290,15 +290,15 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 							{/* Status indicator */}
 							<span
 								className={cn(
-									"text-[10px] px-1.5 py-0.5 rounded shrink-0",
-									statusKey === "healthy" && "bg-green-500/10 text-green-600",
+									"text-3xs px-1.5 py-0.5 rounded shrink-0",
+									statusKey === "healthy" && "bg-success/10 text-success",
 									statusKey === "moderate" &&
-										"bg-yellow-500/10 text-yellow-600",
+										"bg-warning/10 text-warning",
 									statusKey === "highUsage" &&
 										"bg-orange-500/10 text-orange-600",
-									statusKey === "nearLimit" && "bg-red-500/10 text-red-600",
+									statusKey === "nearLimit" && "bg-destructive/10 text-destructive",
 									statusKey === "rateLimited" &&
-										"bg-red-500/20 text-red-600 font-medium",
+										"bg-destructive/20 text-destructive font-medium",
 								)}
 							>
 								{t(`accounts.priority.status.${statusKey}`)}
@@ -310,7 +310,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 				{account.type === "oauth" && !account.isAvailable && (
 					<div className="flex items-center gap-1.5 mt-1.5">
 						<AlertCircle className="h-3 w-3 text-destructive" />
-						<span className="text-[10px] text-destructive">
+						<span className="text-3xs text-destructive">
 							{t("accounts.priority.needsAuth")}
 						</span>
 					</div>
@@ -324,7 +324,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 							<TooltipTrigger asChild>
 								<div className="flex items-center gap-1.5 mt-1.5 cursor-help">
 									<AlertCircle className="h-3 w-3 text-warning" />
-									<span className="text-[10px] text-warning">
+									<span className="text-3xs text-warning">
 										{t("accounts.priority.duplicateUsage")}
 									</span>
 								</div>
@@ -341,7 +341,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 						<TooltipTrigger asChild>
 							<div className="flex items-center gap-1.5 mt-1.5 cursor-help">
 								<AlertCircle className="h-3 w-3 text-destructive" />
-								<span className="text-[10px] text-destructive">
+								<span className="text-3xs text-destructive">
 									{t("accounts.priority.needsReauth")}
 								</span>
 							</div>
@@ -356,7 +356,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 			{/* Right side badge for API profiles */}
 			{account.type === "api" && (
 				<div className="flex items-center gap-1.5 shrink-0">
-					<span className="text-[10px] bg-muted text-muted-foreground px-2 py-1 rounded flex items-center gap-1">
+					<span className="text-3xs bg-muted text-muted-foreground px-2 py-1 rounded flex items-center gap-1">
 						<Infinity className="h-3 w-3" />
 						{t("accounts.priority.payPerUse")}
 					</span>

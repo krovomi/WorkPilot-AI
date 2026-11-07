@@ -133,7 +133,7 @@ export function AddAgentDialog({
 						<Input
 							value={name}
 							onChange={(e) => setName(e.target.value)}
-							placeholder="e.g. Architecture Agent"
+							placeholder={t("missionControl:agentNamePlaceholder")}
 							className="text-sm"
 						/>
 					</div>
@@ -201,7 +201,7 @@ export function AddAgentDialog({
 							<Cpu className="h-3.5 w-3.5" />
 							{t("missionControl:model", "Model")}
 							{modelData && (
-								<span className="ml-auto text-[10px] text-muted-foreground capitalize">
+								<span className="ml-auto text-3xs text-muted-foreground capitalize">
 									{modelData.tier}
 								</span>
 							)}
@@ -216,11 +216,11 @@ export function AddAgentDialog({
 										<div className="flex items-center gap-2">
 											<span>{m.label}</span>
 											<span
-												className={`text-[10px] capitalize px-1 rounded ${
+												className={`text-3xs capitalize px-1 rounded ${
 													m.tier === "flagship"
-														? "bg-amber-500/10 text-amber-600"
+														? "bg-warning/10 text-warning"
 														: m.tier === "fast"
-															? "bg-green-500/10 text-green-600"
+															? "bg-success/10 text-success"
 															: "bg-blue-500/10 text-blue-600"
 												}`}
 											>

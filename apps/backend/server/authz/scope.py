@@ -22,6 +22,7 @@ import logging
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, Query, Request
+from server.authz.groups import group_project_role, highest_role
 from server.authz.principal import Principal, get_principal
 from server.db.engine import get_db
 from server.db.models import Project, ProjectMember
@@ -68,12 +69,14 @@ async def load_project_scope(
         )
         raise HTTPException(status_code=404, detail="Project not found")
 
-    role = await db.scalar(
+    own = await db.scalar(
         select(ProjectMember.role).where(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == principal.id,
         )
     )
+    # The highest of the person's own role and the ones their groups give.
+    role = highest_role(own, await group_project_role(db, principal.id, project_id))
     if role is None and not (
         principal.is_platform_admin or principal.has("project.member.write")
     ):

@@ -36,6 +36,7 @@ import {
 	DEFAULT_PHASE_THINKING,
 } from "../../shared/constants";
 import type {
+	CardEditConflict,
 	ImageAttachment,
 	Task,
 	TaskCategory,
@@ -54,17 +55,24 @@ import type {
 	PhaseModelConfig,
 	PhaseThinkingConfig,
 } from "../../shared/types/settings";
+import { ConflictResolver } from "./collaboration/ConflictResolver";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
-import { duplicateTask, persistUpdateTask } from "../stores/task-store";
+import { useShallow } from "zustand/react/shallow";
+import { useCollaborationStore } from "../stores/collaboration-store";
+import { duplicateTask, persistUpdateTask, saveTaskEdit } from "../stores/task-store";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
+	isUniformEngine,
 	resolveTaskEngine,
+	sameTrio,
 	seedEngine,
 	type TaskEngine,
+	uniformEngine,
 } from "../../shared/utils/task-engine";
+import { BenchEngineHint } from "./bench/BenchRecommendation";
 import { TaskEngineEditor } from "./task-engine/TaskEngineEditor";
 import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
@@ -130,7 +138,7 @@ export function TaskEditDialog({
 		? `${task.title} ${t("tasks:actions.duplicateSuffix")}`
 		: task.title;
 	// Get selected agent profile from settings for defaults
-	const { settings } = useSettingsStore();
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
 	const selectedProfile =
 		DEFAULT_AGENT_PROFILES.find(
 			(p) => p.id === settings.selectedAgentProfile,
@@ -150,6 +158,13 @@ export function TaskEditDialog({
 	const [dictationPending, setDictationPending] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// Server card: the text as the dialog opened it, and the fields a teammate
+	// changed meanwhile, for the person to settle before saving.
+	const baseRef = useRef({ title: task.title, description: task.description });
+	const openedForRef = useRef<string | null>(null);
+	const [conflicts, setConflicts] = useState<CardEditConflict[]>([]);
+	const conflictStrategy = useCollaborationStore((s) => s.settings.conflictStrategy);
+	const isServerCard = task.id.startsWith("server:");
 	const [showClassification, setShowClassification] = useState(false);
 	// 2-step wizard: 1 = task details, 2 = execution engine (provider/LLM/effort),
 	// so the engine choice gets a dedicated, prominent page instead of being buried.
@@ -243,6 +258,7 @@ export function TaskEditDialog({
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
 	const [verifyWindow, setVerifyWindow] = useState(task.metadata?.verifyWindow ?? "");
+	const [verifyScenario, setVerifyScenario] = useState(task.metadata?.verifyScenario ?? "");
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
 		resolveContextPolicy(task.metadata),
 	);
@@ -250,79 +266,88 @@ export function TaskEditDialog({
 		task.metadata?.mobileTargets ?? [],
 	);
 
-	// Reset form when task changes or dialog opens
+	// Reset the form when the dialog opens, or opens on another task. A change
+	// of the same task while the dialog is open (a teammate's, on a server
+	// board) keeps the person's edits; saving weighs them against it.
 	useEffect(() => {
-		if (open) {
-			setTitle(initialTitle);
-			setDescription(task.description);
-			setCategory(task.metadata?.category || "");
-			setPriority(task.metadata?.priority || "");
-			setComplexity(task.metadata?.complexity || "");
-			setImpact(task.metadata?.impact || "");
+		if (!open) {
+			openedForRef.current = null;
+			return;
+		}
+		if (openedForRef.current === task.id) return;
+		openedForRef.current = task.id;
+		baseRef.current = { title: task.title, description: task.description };
+		setConflicts([]);
+		setTitle(initialTitle);
+		setDescription(task.description);
+		setCategory(task.metadata?.category || "");
+		setPriority(task.metadata?.priority || "");
+		setComplexity(task.metadata?.complexity || "");
+		setImpact(task.metadata?.impact || "");
 
-			// Reset model configuration
-			const taskModel = task.metadata?.model;
-			const taskThinking = task.metadata?.thinkingLevel;
-			const isAutoProfile = task.metadata?.isAutoProfile;
+		// Reset model configuration
+		const taskModel = task.metadata?.model;
+		const taskThinking = task.metadata?.thinkingLevel;
+		const isAutoProfile = task.metadata?.isAutoProfile;
 
-			if (isAutoProfile) {
-				setProfileId("auto");
-				setModel(taskModel || selectedProfile.model);
-				setThinkingLevel(taskThinking || selectedProfile.thinkingLevel);
-				setPhaseModels(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS);
-				setPhaseThinking(
-					task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
-				);
-			} else if (taskModel && taskThinking) {
-				const matchingProfile = DEFAULT_AGENT_PROFILES.find(
-					(p) =>
-						p.model === taskModel &&
-						p.thinkingLevel === taskThinking &&
-						!p.isAutoProfile,
-				);
-				setProfileId(matchingProfile?.id || "custom");
-				setModel(taskModel);
-				setThinkingLevel(taskThinking);
-				setPhaseModels(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS);
-				setPhaseThinking(
-					task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
-				);
-			} else {
-				setProfileId(settings.selectedAgentProfile || "auto");
-				setModel(selectedProfile.model);
-				setThinkingLevel(selectedProfile.thinkingLevel);
-				setPhaseModels(selectedProfile.phaseModels || DEFAULT_PHASE_MODELS);
-				setPhaseThinking(
-					selectedProfile.phaseThinking || DEFAULT_PHASE_THINKING,
-				);
-			}
-
-			setImages(task.metadata?.attachedImages || []);
-			setRequireReviewBeforeCoding(
-				task.metadata?.requireReviewBeforeCoding ?? false,
+		if (isAutoProfile) {
+			setProfileId("auto");
+			setModel(taskModel || selectedProfile.model);
+			setThinkingLevel(taskThinking || selectedProfile.thinkingLevel);
+			setPhaseModels(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS);
+			setPhaseThinking(
+				task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
 			);
-			setTddMode(task.metadata?.tddMode ?? false);
-			setVerifyLoop(task.metadata?.verifyLoop ?? true);
-			setVerifyWindow(task.metadata?.verifyWindow ?? "");
-			setContextPolicy(resolveContextPolicy(task.metadata));
-			setMobileTargets(task.metadata?.mobileTargets ?? []);
-			const openedEngine = engineForTask();
-			setEngine(openedEngine);
-			initialEngineRef.current = JSON.stringify(openedEngine);
-			setError(null);
-			setStep(1);
+		} else if (taskModel && taskThinking) {
+			const matchingProfile = DEFAULT_AGENT_PROFILES.find(
+				(p) =>
+					p.model === taskModel &&
+					p.thinkingLevel === taskThinking &&
+					!p.isAutoProfile,
+			);
+			setProfileId(matchingProfile?.id || "custom");
+			setModel(taskModel);
+			setThinkingLevel(taskThinking);
+			setPhaseModels(task.metadata?.phaseModels || DEFAULT_PHASE_MODELS);
+			setPhaseThinking(
+				task.metadata?.phaseThinking || DEFAULT_PHASE_THINKING,
+			);
+		} else {
+			setProfileId(settings.selectedAgentProfile || "auto");
+			setModel(selectedProfile.model);
+			setThinkingLevel(selectedProfile.thinkingLevel);
+			setPhaseModels(selectedProfile.phaseModels || DEFAULT_PHASE_MODELS);
+			setPhaseThinking(
+				selectedProfile.phaseThinking || DEFAULT_PHASE_THINKING,
+			);
+		}
 
-			// Auto-expand classification if it has content
-			if (
-				task.metadata?.category ||
-				task.metadata?.priority ||
-				task.metadata?.complexity ||
-				task.metadata?.impact
-			) {
-				setShowClassification(true);
-			} else {
-				setShowClassification(false);
-			}
+		setImages(task.metadata?.attachedImages || []);
+		setRequireReviewBeforeCoding(
+			task.metadata?.requireReviewBeforeCoding ?? false,
+		);
+		setTddMode(task.metadata?.tddMode ?? false);
+		setVerifyLoop(task.metadata?.verifyLoop ?? true);
+		setVerifyWindow(task.metadata?.verifyWindow ?? "");
+		setVerifyScenario(task.metadata?.verifyScenario ?? "");
+		setContextPolicy(resolveContextPolicy(task.metadata));
+		setMobileTargets(task.metadata?.mobileTargets ?? []);
+		const openedEngine = engineForTask();
+		setEngine(openedEngine);
+		initialEngineRef.current = JSON.stringify(openedEngine);
+		setError(null);
+		setStep(1);
+
+		// Auto-expand classification if it has content
+		if (
+			task.metadata?.category ||
+			task.metadata?.priority ||
+			task.metadata?.complexity ||
+			task.metadata?.impact
+		) {
+			setShowClassification(true);
+		} else {
+			setShowClassification(false);
 		}
 	}, [
 		open,
@@ -383,16 +408,17 @@ export function TaskEditDialog({
 		[],
 	);
 
-	const handleSave = async () => {
+	const handleSave = async (text?: { title: string; description: string }) => {
 		if (dictationPending) { setError(t("tasks:dictation.pending")); return; }
+		const shownDescription = text?.description ?? description;
 		// Validate input
-		if (!description.trim()) {
+		if (!shownDescription.trim()) {
 			setError(t("tasks:form.errors.descriptionRequired"));
 			return;
 		}
 
-		const trimmedTitle = title.trim();
-		const trimmedDescription = description.trim();
+		const trimmedTitle = (text?.title ?? title).trim();
+		const trimmedDescription = shownDescription.trim();
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
@@ -416,6 +442,7 @@ export function TaskEditDialog({
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
+				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
 				contextPolicyChanged ||
 				!sameTargets(mobileTargets, task.metadata?.mobileTargets) ||
 				JSON.stringify(images) !==
@@ -458,6 +485,9 @@ export function TaskEditDialog({
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
 			metadataUpdates.verifyWindow = verifyWindow.trim();
 		}
+		if (verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "")) {
+			metadataUpdates.verifyScenario = verifyScenario.trim();
+		}
 		if (contextPolicyChanged) {
 			metadataUpdates.contextPolicy = { ...contextPolicy };
 		}
@@ -482,11 +512,25 @@ export function TaskEditDialog({
 			return;
 		}
 
-		const success = await persistUpdateTask(task.id, {
+		const outcome = await saveTaskEdit(task.id, {
 			title: trimmedTitle,
 			description: trimmedDescription,
 			metadata: metadataUpdates,
+			// "Last write wins" sends no base: the server card takes the edit as is.
+			...(isServerCard && conflictStrategy !== "last_write_wins"
+				? { base: baseRef.current }
+				: {}),
 		});
+		if (outcome.conflicts) {
+			setIsSaving(false);
+			if (conflictStrategy === "first_write_wins") {
+				void keepTheirs(outcome.conflicts, { title: trimmedTitle, description: trimmedDescription });
+			} else {
+				setConflicts(outcome.conflicts);
+			}
+			return;
+		}
+		const success = outcome.saved;
 
 		if (success && contextPolicyChanged) {
 			// TASK_UPDATE rewrites only the main copy of task_metadata.json; a
@@ -504,6 +548,29 @@ export function TaskEditDialog({
 		}
 
 		setIsSaving(false);
+	};
+
+	/** Keep this person's text: the teammate's becomes the base, then save again. */
+	const keepMine = () => {
+		for (const c of conflicts) baseRef.current = { ...baseRef.current, [c.field]: c.theirs };
+		setConflicts([]);
+		void handleSave();
+	};
+
+	/** Keep the teammate's text for the conflicting fields, and save the rest. */
+	const keepTheirs = async (
+		settled: CardEditConflict[],
+		mine: { title: string; description: string },
+	) => {
+		const text = { ...mine };
+		for (const c of settled) {
+			text[c.field] = c.theirs;
+			baseRef.current = { ...baseRef.current, [c.field]: c.theirs };
+		}
+		setConflicts([]);
+		setTitle(text.title);
+		setDescription(text.description);
+		await handleSave(text);
 	};
 
 	const isValid = description.trim().length > 0 && !dictationPending;
@@ -569,7 +636,7 @@ export function TaskEditDialog({
 									<ChevronLeft className="mr-2 h-4 w-4" />
 									{t("tasks:form.previousStep")}
 								</Button>
-								<Button onClick={handleSave} disabled={isSaving || !isValid}>
+								<Button onClick={() => void handleSave()} disabled={isSaving || !isValid}>
 									{isSaving ? (
 										<>
 											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -603,12 +670,22 @@ export function TaskEditDialog({
 				model={model}
 				thinkingLevel={thinkingLevel}
 				engineSlot={
-					<TaskEngineEditor
-						engine={engine}
-						onChange={setEngine}
-						idPrefix={`task-engine-${task.id}`}
-						disabled={isSaving}
-					/>
+					<div className="space-y-3">
+						{/* What the repo bench measured for cards of this kind: offered, never applied. */}
+						<BenchEngineHint
+							projectId={task.projectId}
+							kind={task.metadata?.kind}
+							isCurrent={(trio) => isUniformEngine(engine) && sameTrio(engine.spec, trio)}
+							onUse={(trio) => setEngine(uniformEngine(trio))}
+							disabled={isSaving}
+						/>
+						<TaskEngineEditor
+							engine={engine}
+							onChange={setEngine}
+							idPrefix={`task-engine-${task.id}`}
+							disabled={isSaving}
+						/>
+					</div>
 				}
 				phaseModels={phaseModels}
 				phaseThinking={phaseThinking}
@@ -643,6 +720,8 @@ export function TaskEditDialog({
 				onVerifyLoopChange={setVerifyLoop}
 				verifyWindow={verifyWindow}
 				onVerifyWindowChange={setVerifyWindow}
+				verifyScenario={verifyScenario}
+				onVerifyScenarioChange={setVerifyScenario}
 				contextPolicy={contextPolicy}
 				onContextPolicyChange={setContextPolicy}
 				contextProvider={engine.coding?.provider}
@@ -651,6 +730,16 @@ export function TaskEditDialog({
 				onError={setError}
 				onFileReferenceDrop={handleFileReferenceDrop}
 				idPrefix="edit"
+			/>
+			<ConflictResolver
+				conflicts={conflicts}
+				open={conflicts.length > 0}
+				busy={isSaving}
+				onKeepMine={keepMine}
+				onKeepTheirs={() =>
+					void keepTheirs(conflicts, { title: title.trim(), description: description.trim() })
+				}
+				onClose={() => setConflicts([])}
 			/>
 		</TaskModalLayout>
 	);

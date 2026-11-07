@@ -25,6 +25,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -252,6 +254,49 @@ class AuthSession(Base):
     )
 
 
+class AccessToken(Base):
+    """A personal access token for the board's MCP endpoint (``/mcp``).
+
+    Made by a person in the app, for one organization, to give an AI app
+    (Claude Code, Codex, Cursor...) their access to the boards of that
+    organization's projects. Only its SHA-256 hash is stored, with a short
+    prefix to tell tokens apart in a list. ``scope`` is ``read`` or ``write``:
+    a read token cannot create or edit a card whatever the person's role. It
+    opens ``/mcp`` and nothing else (``server/auth/access_tokens.py``,
+    ``shared_board/mcp_http.py``).
+    """
+
+    __tablename__ = "access_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    prefix: Mapped[str] = mapped_column(String(16))
+    scope: Mapped[str] = mapped_column(String(10), default="read")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: A task token (prospective P7) reaches this project only, and lasts
+    #: while ``card_id`` is not done; both are None for a personal token.
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    card_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -303,6 +348,72 @@ class ProjectMember(Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="members")
+
+
+class UserGroup(Base):
+    """A group of people in one organization (« Front team », « QA »).
+
+    A group carries what its members inherit: optionally an organization role
+    (its permissions are added to each member's own, never removed), and a
+    project role on the projects it is given (``ProjectGroup``). A member's
+    effective project role is the highest of their own and their groups'.
+    Only people who belong to the organization count: leaving it ends every
+    group membership in it.
+    """
+
+    __tablename__ = "user_groups"
+    __table_args__ = (UniqueConstraint("org_id", "name", name="uq_group_org_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    # An organization role every member inherits on top of their own.
+    role_id: Mapped[str | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_member"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    group_id: Mapped[str] = mapped_column(
+        ForeignKey("user_groups.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class ProjectGroup(Base):
+    """A group's role on a project: each of its members has at least it."""
+
+    __tablename__ = "project_groups"
+    __table_args__ = (
+        UniqueConstraint("project_id", "group_id", name="uq_project_group"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    group_id: Mapped[str] = mapped_column(
+        ForeignKey("user_groups.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20), default=ProjectRole.MEMBER.value)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
 
 
 class SpecIndex(Base):
@@ -366,6 +477,177 @@ class AgentRun(Base):
         DateTime(timezone=True), nullable=True
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ProjectJob(Base):
+    """A feature's runner launched on a project's clone (roadmap, ideation...).
+
+    Not tied to a card, unlike ``AgentRun``: it writes the feature's own
+    files under ``.workpilot/<feature>/`` (``shared_features``). Counted with
+    the runs in the organization's concurrency quota.
+    """
+
+    __tablename__ = "project_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    feature: Mapped[str] = mapped_column(String(40))
+    started_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    # queued / running / succeeded / failed / cancelled
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class InsightSession(Base):
+    """One person's Insights conversation on a server project.
+
+    Its owner writes it (sends a message, renames it, deletes it); every
+    member of the project reads it. Each answer is a project job running the
+    insights runner on the clone (``shared_features/insights.py``).
+    """
+
+    __tablename__ = "insight_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200), default="")
+    #: The messages, a JSON list; the model and effort, a JSON object.
+    messages: Mapped[str] = mapped_column(Text, default="[]")
+    model_settings: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The job answering its last message, while it runs and after.
+    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class PushDevice(Base):
+    """A phone that receives a person's notifications (the mobile app).
+
+    The token is the Expo push token the app obtained on that phone; it names
+    a device, not a person, so registering it again under another account
+    moves it (one phone, one signed-in person). ``locale`` picks the language
+    of the text the server sends.
+    """
+
+    __tablename__ = "push_devices"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token: Mapped[str] = mapped_column(String(200), unique=True)
+    platform: Mapped[str] = mapped_column(String(10))  # ios / android
+    locale: Mapped[str] = mapped_column(String(8), default="en")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class UserPreference(Base):
+    """A person's interface choices, the same on every device they sign in on.
+
+    ``theme`` is the mode (light, dark, system) and ``color_theme`` one of the
+    desktop's colour themes; ``server.services.preferences`` holds the closed
+    lists. One row per person, created on the first save.
+    """
+
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    theme: Mapped[str] = mapped_column(String(10))
+    color_theme: Mapped[str] = mapped_column(String(20))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class NeedsYouChannel(Base):
+    """Where a person is told a card needs them: ntfy, Telegram or Teams.
+
+    One row per person and channel (``services/needs_you.py``). ``settings``
+    holds what is not a secret (the ntfy server, the Telegram chat id);
+    ``encrypted_secrets`` the rest (the topic, a token, a webhook URL), as one
+    Fernet-encrypted JSON object, never read back by any route.
+    """
+
+    __tablename__ = "needs_you_channels"
+    __table_args__ = (
+        UniqueConstraint("user_id", "channel", name="uq_needs_you_channel"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    channel: Mapped[str] = mapped_column(String(20))  # ntfy / telegram / teams
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    settings: Mapped[str] = mapped_column(Text, default="{}")
+    encrypted_secrets: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class NeedsYouPreference(Base):
+    """Which moments call a person, and in which language they are told."""
+
+    __tablename__ = "needs_you_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: The moments turned off, a JSON list (``needs_you.EVENTS``).
+    muted_events: Mapped[str] = mapped_column(Text, default="[]")
+    locale: Mapped[str] = mapped_column(String(8), default="en")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class ProjectAutomation(Base):
+    """A server project's automation rules and what they did
+    (``shared_features/automations``).
+
+    The rules are the desktop's (``rules.json``), shared by the team; the
+    ledger is the desktop's ``ledger.json``. ``owners`` names, per rule, the
+    person who saved it last: the rule reads the forge with their token.
+    """
+
+    __tablename__ = "project_automations"
+
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    rules: Mapped[list] = mapped_column(JSON, default=list)
+    owners: Mapped[dict] = mapped_column(JSON, default=dict)
+    ledger: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
 
 
 class UserSecret(Base):
@@ -455,6 +737,63 @@ class AuditLog(Base):
     payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+@event.listens_for(AuditLog, "before_insert")
+def _audit_org_from_project(_mapper, connection, target: AuditLog) -> None:
+    """An event about a project belongs to that project's organization.
+
+    The organization's history (``admin/overview``) filters on ``org_id``;
+    project and card routes wrote their events with only ``project_id``, so an
+    organization admin never saw who deleted a project or forced a claim.
+    """
+    if target.org_id is None and target.project_id is not None:
+        target.org_id = connection.scalar(
+            select(Project.org_id).where(Project.id == target.project_id)
+        )
+
+
+class DeploymentMarker(Base):
+    """A one-time step this deployment has already taken, by key.
+
+    Startup code that must run once per deployment, rather than on every
+    start, looks for its key here and records it when done. The row is the
+    only state: what the step did lives in the tables it changed.
+    """
+
+    __tablename__ = "deployment_markers"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+
+class TeamChatMessage(Base):
+    """One message of a server project's team chat (``services/team_chat.py``).
+
+    The members of a project write it from the app, over the project's stream;
+    the WebSocket server checks who may write and stores the message here, so
+    the chat outlives a restart. ``author_name`` is the name at the time of
+    writing: a removed account leaves its messages, without a user.
+    """
+
+    __tablename__ = "team_chat_messages"
+    __table_args__ = (Index("ix_team_chat_project_time", "project_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_name: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    reply_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

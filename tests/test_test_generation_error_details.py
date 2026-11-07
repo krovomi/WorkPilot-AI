@@ -17,7 +17,7 @@ import pytest
 BACKEND = Path(__file__).resolve().parents[1] / "apps" / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from core.error_details import (  # noqa: E402
+from foundation.error_details import (  # noqa: E402
     AUTH,
     EMPTY_RESPONSE,
     FILE_NOT_FOUND,
@@ -113,7 +113,7 @@ class TestCallLlmSurfacesTheRealReason:
     """
 
     def _agent(self):
-        from agents.test_generator import TestGeneratorAgent
+        from test_generation.generator import TestGeneratorAgent
 
         return TestGeneratorAgent()
 

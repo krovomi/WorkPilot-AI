@@ -18,10 +18,8 @@ cannot:
 Side effects
 ------------
 None, deliberately. Provider resolution goes through `get_phase_provider`,
-which reads metadata and the IPC selection and nothing else. The other
-resolution path (`_get_active_provider`) consumes the single-shot
-RESUME_WITH_PROVIDER marker, and an endpoint the UI may poll must never eat a
-choice the next build was supposed to honour.
+which reads metadata and the IPC selection and nothing else: an endpoint the
+UI may poll must not change what the next build runs on.
 """
 
 from __future__ import annotations

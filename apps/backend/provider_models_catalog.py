@@ -13,9 +13,10 @@ from `models_registry.py`, so the UI never sees an empty dropdown — and a mode
 released after that file was last edited still reaches it.
 
 Supported providers (with live fetching):
-    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio, llama-cpp
+    anthropic, openai, google, mistral, deepseek, grok, ollama, lm-studio,
+    llama-cpp, copilot (through the GitHub CLI's token)
 
-Other providers (copilot, aws, meta, custom, windsurf, …) get the static
+Other providers (aws, meta, custom, windsurf, …) get the static
 catalog without a live fetch.
 """
 
@@ -260,6 +261,37 @@ def _api_key_for(provider: str) -> str | None:
     return key.strip() if isinstance(key, str) and key.strip() else None
 
 
+def _json_object(resp: Any) -> dict[str, Any]:
+    """The decoded body of a model-list response, which must be a JSON object."""
+    payload = resp.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Model list response is not a JSON object")
+    return payload
+
+
+def _records(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """The ``key`` list of a model-list response, objects only.
+
+    A server with nothing to list may say so with ``null`` instead of ``[]``:
+    Ollama answers ``{"object": "list", "data": null}`` on ``/v1/models`` when
+    no model is pulled, and iterating that ``None`` used to turn the catalog
+    endpoint into a 500. Missing or ``null`` is an empty list; any other
+    non-list value is a malformed answer (``ValueError``, which callers already
+    treat as "live fetch failed").
+    """
+    items = payload.get(key)
+    if items is None:
+        return []
+    if not isinstance(items, list):
+        raise ValueError(f"Model list field {key!r} is not a list")
+    return [it for it in items if isinstance(it, dict)]
+
+
+def _str_field(record: dict[str, Any], key: str) -> str:
+    value = record.get(key)
+    return value if isinstance(value, str) else ""
+
+
 def _fetch_anthropic() -> list[dict[str, Any]]:
     key = _api_key_for("anthropic") or _api_key_for("claude")
     if not key:
@@ -275,8 +307,8 @@ def _fetch_anthropic() -> list[dict[str, Any]]:
                 "https://api.anthropic.com/v1/models", headers=headers, params=params
             )
             resp.raise_for_status()
-            page = resp.json()
-            items.extend(page.get("data", []))
+            page = _json_object(resp)
+            items.extend(_records(page, "data"))
             if not page.get("has_more"):
                 break
             cursor = page.get("last_id")
@@ -285,10 +317,10 @@ def _fetch_anthropic() -> list[dict[str, Any]]:
             seen.add(cursor)
     out: list[dict[str, Any]] = []
     for it in items:
-        mid = it.get("id", "")
+        mid = _str_field(it, "id")
         if not _ANTHROPIC_KEEP.search(mid):
             continue
-        label = it.get("display_name") or mid
+        label = _str_field(it, "display_name") or mid
         out.append(
             {
                 "value": mid,
@@ -310,12 +342,12 @@ def _fetch_openai() -> list[dict[str, Any]]:
             headers={"Authorization": f"Bearer {key}"},
         )
     resp.raise_for_status()
-    items = resp.json().get("data", [])
+    items = _records(_json_object(resp), "data")
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for it in items:
-        mid = it.get("id", "")
-        if mid in seen:
+        mid = _str_field(it, "id")
+        if not mid or mid in seen:
             continue
         if _OPENAI_DROP.search(mid):
             continue
@@ -382,8 +414,8 @@ def _fetch_google() -> list[dict[str, Any]]:
                 "https://generativelanguage.googleapis.com/v1beta/models", params=params
             )
             resp.raise_for_status()
-            page = resp.json()
-            items.extend(page.get("models", []))
+            page = _json_object(resp)
+            items.extend(_records(page, "models"))
             token = page.get("nextPageToken")
             if not token:
                 break
@@ -393,17 +425,17 @@ def _fetch_google() -> list[dict[str, Any]]:
             params["pageToken"] = token
     out: list[dict[str, Any]] = []
     for it in items:
-        name = it.get("name", "")  # "models/gemini-3.1-pro"
+        name = _str_field(it, "name")  # "models/gemini-3.1-pro"
         if not _GEMINI_KEEP.match(name):
             continue
         if _GEMINI_DROP.search(name):
             continue
-        methods = it.get("supportedGenerationMethods", [])
-        if "generateContent" not in methods:
+        methods = it.get("supportedGenerationMethods")
+        if not isinstance(methods, list) or "generateContent" not in methods:
             continue
         mid = name.split("/", 1)[1]
         # Drop preview snapshots when a stable counterpart exists in the same response.
-        label = it.get("displayName") or mid
+        label = _str_field(it, "displayName") or mid
         out.append(
             {
                 "value": mid,
@@ -445,10 +477,12 @@ def _fetch_openai_compatible(
             headers={"Authorization": f"Bearer {key}"},
         )
     resp.raise_for_status()
-    items = resp.json().get("data", [])
+    items = _records(_json_object(resp), "data")
     out: list[dict[str, Any]] = []
     for it in items:
-        mid = it.get("id", "")
+        mid = _str_field(it, "id")
+        if not mid:
+            continue
         if drop and drop.search(mid):
             continue
         if not keep.search(mid):
@@ -559,11 +593,9 @@ def _fetch_ollama(provider: str = "ollama") -> list[dict[str, Any]]:
         with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             resp = client.get(f"{root}/v1/models")
         resp.raise_for_status()
-        items = resp.json().get("data", [])
+        ids = [_str_field(it, "id") for it in _records(_json_object(resp), "data")]
         out: list[dict[str, Any]] = [
-            _entry(it.get("id", ""))
-            for it in items
-            if it.get("id") and not is_embedding_model(it["id"])
+            _entry(mid) for mid in ids if mid and not is_embedding_model(mid)
         ]
         if out or provider != "ollama":
             return out
@@ -574,12 +606,8 @@ def _fetch_ollama(provider: str = "ollama") -> list[dict[str, Any]]:
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
         resp = client.get(f"{root}/api/tags")
     resp.raise_for_status()
-    items = resp.json().get("models", [])
-    return [
-        _entry(it["name"])
-        for it in items
-        if it.get("name") and not is_embedding_model(it["name"])
-    ]
+    names = [_str_field(it, "name") for it in _records(_json_object(resp), "models")]
+    return [_entry(name) for name in names if name and not is_embedding_model(name)]
 
 
 def _fetch_windsurf() -> list[dict[str, Any]]:
@@ -590,8 +618,25 @@ def _fetch_windsurf() -> list[dict[str, Any]]:
     return []
 
 
+def _fetch_copilot() -> list[dict[str, Any]]:
+    """The models GitHub serves to this account's Copilot (``/models``).
+
+    The registry lists every model released to Copilot; this list is the
+    account's: its plan, its organisation's policy, what the user enabled.
+    """
+    try:
+        from .copilot_models import fetch_catalog
+    except ImportError:
+        from copilot_models import fetch_catalog  # type: ignore[no-redef]
+
+    return [
+        {**entry, "tier": _tier_for_label(entry["label"])} for entry in fetch_catalog()
+    ]
+
+
 _FETCHERS = {
     "anthropic": _fetch_anthropic,
+    "copilot": _fetch_copilot,
     "claude": _fetch_anthropic,
     "openai": _fetch_openai,
     "google": _fetch_google,
@@ -784,7 +829,16 @@ def list_models(provider: str, *, force_refresh: bool = False) -> dict[str, Any]
         except httpx.HTTPStatusError as e:
             error = f"HTTP {e.response.status_code}"
             logger.warning("Live model fetch failed for %s: %s", provider, error)
-        except (httpx.HTTPError, OSError, ValueError, KeyError) as e:
+        except (
+            httpx.HTTPError,
+            OSError,
+            ValueError,
+            KeyError,
+            # A response shaped unlike the fetcher expects (a field of another
+            # type) is a failed fetch, not a 500: the dropdown falls back.
+            TypeError,
+            AttributeError,
+        ) as e:
             error = type(e).__name__
             logger.warning("Live model fetch failed for %s: %s", provider, e)
 

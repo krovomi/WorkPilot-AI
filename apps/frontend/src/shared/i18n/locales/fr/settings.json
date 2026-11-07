@@ -62,6 +62,14 @@
 				"lastTest": "Dernier test",
 				"localRunning": "Instance locale",
 				"needsReauth": "Ré-authentification requise",
+				"toggleDetails": "Afficher les détails",
+				"keySaved": "Clé enregistrée",
+				"keySavedToday": "aujourd'hui",
+				"keySavedDaysAgo_one": "il y a {{count}} jour",
+				"keySavedDaysAgo_other": "il y a {{count}} jours",
+				"keySavedUnknown": "date inconnue",
+				"keyRenewal_one": "Clé enregistrée il y a {{count}} jour : pensez à la renouveler (plus de {{threshold}} jours)",
+				"keyRenewal_other": "Clé enregistrée il y a {{count}} jours : pensez à la renouveler (plus de {{threshold}} jours)",
 				"neverTested": "Jamais testé",
 				"notAvailable": "Non disponible",
 				"notConfigured": "Non configuré",
@@ -117,7 +125,8 @@
 					"saveSuccess": "Connexion Windsurf enregistrée avec succès !",
 					"terminalInstructions": "Cela ouvrira un terminal où vous pourrez exécuter la commande `/login` pour vous authentifier.",
 					"tokenDetected": "Clé API détectée",
-					"tokenLoaded": "Le jeton SSO Windsurf a été automatiquement chargé depuis votre environnement IDE local."
+					"tokenLoaded": "Le jeton SSO Windsurf a été automatiquement chargé depuis votre environnement IDE local.",
+					"tokenReceived": "Jeton Windsurf reçu"
 				},
 				"openaiAuth": {
 					"codexCliAuth": "Réutilisez la session ChatGPT gérée par Codex CLI.",
@@ -131,6 +140,37 @@
 					"notConnected": "Aucune authentification Codex CLI active. Connectez-vous d'abord.",
 					"timeout": "Le délai d'authentification Codex CLI est dépassé. Réessayez.",
 					"checkError": "Impossible de vérifier l'authentification Codex CLI."
+				},
+				"savedTitle": "Fournisseur enregistré",
+				"agentCli": {
+					"status": "État du CLI",
+					"checking": "Vérification du CLI…",
+					"installed": "Installé",
+					"installedVersion": "Installé (version {{version}})",
+					"notInstalled": "Non installé : {{executable}} est introuvable dans le PATH.",
+					"install": "Installer {{name}}",
+					"installing": "Installation…",
+					"recheck": "Vérifier à nouveau",
+					"signInTitle": "Connexion",
+					"signInDescription": "{{name}} gère sa propre connexion : WorkPilot utilise le compte et les clés API configurés dans le CLI. Connectez-vous une fois, puis toutes les tâches pourront l'utiliser.",
+					"signInCommand": "Commande à lancer",
+					"openTerminal": "Se connecter depuis un terminal",
+					"closeTerminal": "Fermer le terminal",
+					"docs": "Documentation",
+					"modelTitle": "Modèle",
+					"modelDescription": "Le modèle se choisit pour chaque tâche à sa création. « Par défaut » utilise le modèle configuré dans le CLI.",
+					"activate": "Utiliser comme fournisseur par défaut",
+					"activated": "{{name}} est maintenant le fournisseur par défaut.",
+					"hints": {
+						"opencode": "Lancez la commande, choisissez un fournisseur (Anthropic, OpenAI, GitHub Copilot…) puis collez sa clé ou suivez la connexion dans le navigateur.",
+						"pi": "Lancez pi, tapez /login et choisissez votre fournisseur. pi lit aussi les clés API des variables d'environnement comme ANTHROPIC_API_KEY.",
+						"antigravity": "Lancez agy une fois et connectez-vous avec votre compte Google ; les exécutions sans interface réutilisent cette connexion. GEMINI_API_KEY fonctionne aussi.",
+						"gemini-cli": "Lancez gemini une fois et choisissez « Login with Google » (ou définissez GEMINI_API_KEY). WorkPilot le lance ensuite avec --acp."
+					},
+					"terminalTitle": "Connexion à {{name}}",
+					"terminalStep1": "Appuyez sur Entrée : {{command}}",
+					"terminalStep2": "Suivez les étapes de connexion du CLI",
+					"terminalStep3": "Fermez ce terminal une fois connecté"
 				}
 			},
 			"providerToggle": {
@@ -226,8 +266,27 @@
 						"likes": "Likes",
 						"created": "Récents",
 						"modified": "Modifiés"
-					}
-				}
+					},
+					"minParamsAria": "Taille minimale (paramètres)",
+					"paramsAll": "Params : tous",
+					"params24": "≥ 24B (planif.)",
+					"maxDiskAria": "Taille disque max. estimée (Go)",
+					"diskAll": "Disque : tous",
+					"disk6": "≤ ~6 Go",
+					"disk12": "≤ ~12 Go",
+					"disk24": "≤ ~24 Go",
+					"disk48": "≤ ~48 Go",
+					"hideUnsuitable": "Masquer les modèles inadaptés (embeddings, trop petits)"
+				},
+				"legend": {
+					"recommended": "● Recommandé",
+					"recommendedDetail": "— assez gros (≥24B de paramètres actifs) et compatible tool-calling : bon pour TOUTES les étapes, planification incluse.",
+					"tooSmall": "● Trop petit pour planifier",
+					"tooSmallDetail": "— compatible tool-calling mais <24B : ok codage / validation, déconseillé en planification.",
+					"unverified": "● Tool-calling à vérifier",
+					"unverifiedDetail": "— non confirmé d'après le nom ; ouvrez la carte du modèle. Les tailles « ~Go » sont estimées (quant 4-bit)."
+				},
+				"estimatedSize": " · ~{{size}} Go"
 			},
 			"providers": {
 				"anthropic": "Modèles Anthropic Claude",
@@ -242,7 +301,11 @@
 				"mistral": "Modèles Mistral AI (Mistral, Codéal, etc.)",
 				"ollama": "Modèles open-source locaux avec Ollama",
 				"openai": "GPT-5 et autres modèles OpenAI",
-				"windsurf": "Fournisseur IA Windsurf"
+				"windsurf": "Fournisseur IA Windsurf",
+				"opencode": "Agent de code open source, piloté via le CLI opencode",
+				"antigravity": "Agent de code de Google, piloté via le CLI agy",
+				"pi": "Agent de code minimaliste, piloté via le CLI pi",
+				"gemini-cli": "Gemini CLI, l'agent open source de Google, piloté via le protocole ACP"
 			},
 			"title": "Comptes"
 		},
@@ -888,7 +951,10 @@
 		"tierFlagship": "Flagship",
 		"tierStandard": "Standard",
 		"urlRequired": "URL requise",
-		"urlRequiredDesc": "Veuillez saisir l'URL de votre API avant de découvrir les modèles."
+		"urlRequiredDesc": "Veuillez saisir l'URL de votre API avant de découvrir les modèles.",
+		"integrationTitle": "Intégration Azure DevOps",
+		"integrationDescription": "Configurer et gérer la synchronisation des éléments de travail Azure DevOps",
+		"enableDescription": "Activez l'intégration Azure DevOps pour synchroniser les éléments de travail avec votre backlog"
 	},
 	"azureDevOpsImport": {
 		"cancel": "Annuler",
@@ -935,7 +1001,10 @@
 		"title": "Importer les éléments Azure DevOps",
 		"titleWithRepository": "Importer les éléments de {{repository}}",
 		"toggleSelection": "Basculer la sélection pour l'élément de travail {{id}}",
-		"importError": "Échec de l'import Azure DevOps"
+		"importError": "Échec de l'import Azure DevOps",
+		"repositoryLabel": "Dépôt :",
+		"sidePanelAriaLabel": "Panneau d'import Azure DevOps",
+		"resizeHandleAriaLabel": "Redimensionner le panneau"
 	},
 	"collaboration": {
 		"description": "Paramètres de collaboration multi-utilisateurs",
@@ -947,7 +1016,8 @@
 		"description": "Accéder aux logs et informations de debug pour le dépannage",
 		"errorReporting": {
 			"description": "Envoyer des rapports de crash pour aider à améliorer WorkPilot AI. Aucune donnée personnelle ou code n'est collecté.",
-			"label": "Rapports d'erreurs anonymes"
+			"label": "Rapports d'erreurs anonymes",
+			"saveFailed": "Impossible d'enregistrer le réglage des rapports d'erreurs"
 		},
 		"helpText": "Lors du signalement de bugs, cliquez sur « Copier les infos de debug » pour obtenir les informations système et erreurs récentes qui nous aident à diagnostiquer le problème.",
 		"helpTitle": "Signalement de problèmes",
@@ -962,7 +1032,11 @@
 			"title": "Usage des pages",
 			"reset": "Réinitialiser",
 			"description": "Visites et temps passé par page, conservés sur cette machine uniquement.",
-			"row": "{{visits}} visites · {{minutes}} min"
+			"row": "{{visits}} visites · {{minutes}} min",
+			"export": "Exporter en JSON",
+			"since": "Compté depuis le {{date}}.",
+			"neverOpenedTitle": "Pages expérimentales jamais ouvertes",
+			"allOpened": "Chaque page expérimentale a été ouverte au moins une fois."
 		}
 	},
 	"devtools": {
@@ -1063,8 +1137,8 @@
 				"description": "Revue de code et analyse de qualité assistées par IA"
 			},
 			"voiceControl": {
-				"label": "Commande vocale",
-				"description": "Commandes de développement à la voix"
+				"label": "Assistant vocal",
+				"description": "Lit les commandes vocales que l'assistant ne comprend pas seul"
 			}
 		},
 		"thinkingLevels": {
@@ -1101,7 +1175,8 @@
 		"sourceSystemPath": "PATH système",
 		"sourceUserConfig": "Configuration utilisateur",
 		"sourceVenv": "Environnement virtuel",
-		"thinkingLevel": "Niveau de réflexion"
+		"thinkingLevel": "Niveau de réflexion",
+		"detecting": "Détection..."
 	},
 	"instructions": {
 		"authCloseWarning": "Le terminal est en cours d'authentification. Êtes-vous sûr de vouloir fermer ?",
@@ -1328,7 +1403,10 @@
 		"projectKeyPlaceholder": "PROJ",
 		"required": "*",
 		"testConnection": "Tester la connexion",
-		"title": "Intégration Jira"
+		"title": "Intégration Jira",
+		"instanceLabel": "Instance : {{url}}",
+		"projectSuffix": " • Projet : {{project}}",
+		"initGuardDescription": "Activez l'intégration Jira pour synchroniser les tickets avec votre backlog"
 	},
 	"channelNotifications": {
 		"navLabel": "Notifications (Teams, Slack…)",
@@ -1385,6 +1463,128 @@
 		"autoFixDescription": "Quand un build passe au rouge, lancer automatiquement l'agent pour le corriger",
 		"pollLabel": "Intervalle de vérification (secondes)",
 		"pollDescription": "Fréquence de vérification du statut du pipeline (minimum 15 s, défaut 60 s)"
+	},
+	"serverTokens": {
+		"navLabel": "Mes jetons sur le serveur",
+		"title": "Mes jetons sur le serveur",
+		"description": "Les runs que vous lancez sur le serveur utilisent ces jetons : ce qu'ils font sur GitHub, GitLab, Jira, Linear ou Azure DevOps est fait en votre nom. Un jeton est gardé chiffré sur le serveur et n'est plus jamais affiché.",
+		"kinds": {
+			"github_token": "Jeton GitHub",
+			"gitlab_token": "Jeton GitLab",
+			"jira_token": "Jeton d'API Jira",
+			"linear_api_key": "Clé d'API Linear",
+			"azure_pat": "Jeton d'accès personnel Azure DevOps"
+		},
+		"stored": "Enregistré",
+		"placeholder": "Collez un jeton",
+		"replacePlaceholder": "Collez un nouveau jeton pour le remplacer",
+		"save": "Enregistrer",
+		"remove": "Retirer du serveur",
+		"unavailable": "Le serveur est injoignable"
+	},
+	"serverMcp": {
+		"navLabel": "Accès MCP au serveur",
+		"title": "Accès MCP au serveur d'équipe",
+		"description": "Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres apps d'IA peuvent lire et modifier les tableaux de ce serveur par son point d'accès MCP. Crée un jeton d'accès pour chaque app, puis colle l'entrée affichée pour cette app.",
+		"limits": "Un jeton vaut pour l'organisation où tu es maintenant, sur le point d'accès MCP seulement, et ne va jamais plus loin que ton propre rôle. Un jeton en lecture liste et lit ; un jeton en écriture peut aussi créer et modifier les cartes pas encore démarrées.",
+		"unavailable": "Le serveur est injoignable",
+		"copyToken": "Copier le jeton",
+		"copySnippet": "Copier l'entrée",
+		"form": {
+			"name": "Nom du jeton",
+			"namePlaceholder": "Par exemple : Codex sur mon portable",
+			"scope": "Accès",
+			"duration": "Valable",
+			"days_one": "{{count}} jour",
+			"days_other": "{{count}} jours",
+			"create": "Créer un jeton"
+		},
+		"scope": {
+			"read": "Lecture seule",
+			"write": "Lecture et écriture"
+		},
+		"created": {
+			"title": "Jeton « {{name}} » créé",
+			"once": "Copie-le maintenant : il ne s'affiche que cette fois. Révoque-le ci-dessous s'il fuite.",
+			"endpoint": "Point d'accès MCP : {{url}}",
+			"pasteIn": "À coller dans",
+			"done": "C'est fait, masquer le jeton"
+		},
+		"list": {
+			"title": "Mes jetons d'accès",
+			"empty": "Aucun jeton d'accès pour l'instant.",
+			"expires": "Expire le {{date}}",
+			"lastUsed": "utilisé le {{date}}",
+			"neverUsed": "jamais utilisé",
+			"revoke": "Révoquer {{name}}"
+		},
+		"where": {
+			"claude-code": "Lance cette commande dans un terminal.",
+			"codex": "Ajoute-la à ~/.codex/config.toml.",
+			"gemini-cli": "Fusionne-la dans ~/.gemini/settings.json.",
+			"copilot-cli": "Fusionne-la dans ~/.copilot/mcp-config.json.",
+			"vscode": "Fusionne-la dans ton mcp.json utilisateur (palette de commandes : MCP: Open User Configuration).",
+			"cursor": "Fusionne-la dans ~/.cursor/mcp.json.",
+			"claude-desktop": "Fusionne-la dans claude_desktop_config.json (Réglages, Développeur, Modifier la config). Elle passe par mcp-remote, qui demande Node.js.",
+			"windsurf": "Fusionne-la dans ~/.codeium/windsurf/mcp_config.json.",
+			"opencode": "Fusionne-la dans ~/.config/opencode/opencode.json."
+		}
+	},
+	"serverCollaboration": {
+		"navLabel": "Collaboration d'équipe"
+	},
+	"serverNeedsYou": {
+		"navLabel": "Mes notifications du serveur",
+		"title": "Besoin de toi : mes notifications du serveur",
+		"description": "Quand un run que tu as lancé sur le serveur a besoin de toi (un plan à approuver, un travail à revoir, un arrêt sur erreur), le serveur te prévient sur tes propres canaux. Seuls le nom du projet et le numéro de la carte partent. Les secrets sont chiffrés sur le serveur et jamais réaffichés ; laisse un champ secret vide pour garder celui enregistré.",
+		"offOnServer": "L'opérateur de ton serveur n'a pas encore activé ces notifications. Tu peux configurer tes canaux ; rien ne part d'ici là.",
+		"noVault": "Le serveur n'a pas de clé maîtresse pour les secrets : les canaux ne peuvent pas être enregistrés. Demande à son opérateur de définir WORKPILOT_SECRETS_MASTER_KEY.",
+		"unavailable": "Le serveur est injoignable",
+		"unreadable": "Le serveur ne sait plus lire ce canal (sa clé a changé). Saisis à nouveau ses secrets.",
+		"moments": "Préviens-moi quand",
+		"events": {
+			"plan_review": "Un plan attend son approbation",
+			"review_ready": "Un travail est prêt pour ma revue",
+			"failed": "Un run s'est arrêté sur une erreur"
+		},
+		"language": "Langue des messages",
+		"enabled": "{{channel}} activé",
+		"stored": "Enregistré",
+		"replacePlaceholder": "Enregistré : saisis une nouvelle valeur pour le remplacer",
+		"save": "Enregistrer",
+		"test": "Envoyer un test",
+		"remove": "Retirer {{channel}} du serveur",
+		"results": {
+			"sent": "Test envoyé",
+			"refused": "Le service a refusé le message",
+			"blocked": "Destination refusée par le serveur",
+			"unreachable": "Le service est injoignable"
+		},
+		"ntfy": {
+			"title": "ntfy",
+			"description": "Une notification dans l'app ntfy. Sur ntfy.sh, le topic est le seul secret : choisis-en un long.",
+			"server": "Serveur",
+			"serverPlaceholder": "https://ntfy.sh",
+			"topic": "Topic",
+			"topicPlaceholder": "Au moins 16 caractères sur ntfy.sh",
+			"access_token": "Jeton d'accès (facultatif)",
+			"access_tokenPlaceholder": "Pour un topic protégé",
+			"generate": "Générer"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "Un message de ton propre bot (créé avec @BotFather) dans une conversation privée.",
+			"bot_token": "Jeton du bot",
+			"bot_tokenPlaceholder": "123456:ABC…",
+			"chat_id": "Identifiant de la conversation",
+			"chat_idPlaceholder": "L'identifiant numérique de ta conversation"
+		},
+		"teams": {
+			"title": "Microsoft Teams",
+			"description": "Une carte postée par un webhook entrant ou une URL Workflows d'un canal ou d'une conversation.",
+			"webhook_url": "URL du webhook",
+			"webhook_urlPlaceholder": "https://….webhook.office.com/… ou une URL Workflows"
+		}
 	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (équipe)",
@@ -1444,7 +1644,15 @@
 		"successFailedSuffix": "{{count}} échoué(s).",
 		"successTitle": "Import réussi !",
 		"title": "Importer les tickets Jira",
-		"titleWithProject": "Importer les tickets de {{project}}"
+		"titleWithProject": "Importer les tickets de {{project}}",
+		"assignee": "Assigné : {{name}}",
+		"selectedOfTotal": "{{selected}} / {{total}} sélectionné(s)",
+		"noJiraIssues": "Aucun ticket Jira trouvé",
+		"typeLabel": "Type",
+		"statusLabel": "Statut",
+		"allStatuses": "Tous les statuts",
+		"dragHint": "Glissez les tickets sélectionnés dans une colonne du Kanban pour les importer",
+		"resize": "Redimensionner"
 	},
 	"language": {
 		"description": "Sélectionnez la langue de l'interface de l'application",
@@ -1607,6 +1815,32 @@
 			"requirementMissing": "Ce serveur attend sa propre configuration avant de pouvoir être activé.",
 			"alwaysOn": "Les outils propres à WorkPilot AI sont toujours disponibles pour les agents qui les déclarent : il n'y a rien à configurer.",
 			"configuredInIntegrations": "Ce serveur s'authentifie avec un jeton défini dans Réglages → Intégrations. Configurez-le là-bas et il devient disponible pour les agents qui le déclarent."
+		},
+		"pins": {
+			"title": "Outils MCP approuvés",
+			"description": "Un serveur MCP personnalisé n'atteint vos agents qu'avec les outils que vous avez approuvés. La description d'un outil est lue par le modèle et n'est montrée nulle part ailleurs : vérifiez-la ici avant d'approuver.",
+			"pending": "Nouveau serveur : aucun de ses outils n'atteint un agent tant que vous ne les avez pas approuvés.",
+			"changed": "Modifié depuis votre approbation : les outils ci-dessous sont retenus tant que vous n'avez pas approuvé le changement.",
+			"programChanged": "Sa commande ou son URL a changé depuis votre approbation : le serveur est retenu tant que vous ne l'avez pas approuvé à nouveau.",
+			"approve": "Approuver",
+			"confirmApprove": "Approuver quand même",
+			"suspicious": "Certaines descriptions ressemblent à des instructions cachées adressées au modèle. Lisez-les avant d'approuver.",
+			"toolAdded": "nouvel outil",
+			"toolChanged": "description modifiée",
+			"noDescription": "(aucune description)",
+			"removed": "Plus proposés : {{tools}}",
+			"finding": {
+				"invisible": "caractères invisibles",
+				"private-use": "caractères à usage privé",
+				"model-tag": "une balise adressée au modèle",
+				"secrecy": "demande de vous cacher quelque chose",
+				"secret-file": "nomme un fichier d'identifiants ou de configuration",
+				"precondition": "demande une étape avant d'utiliser l'outil",
+				"other-tools": "donne des ordres sur d'autres outils",
+				"shadowing": "nomme l'outil d'un autre serveur : {{detail}}",
+				"long": "anormalement longue ({{detail}} caractères)",
+				"injection": "injection de prompt : {{detail}}"
+			}
 		}
 	},
 	"modelSelect": {
@@ -1673,7 +1907,20 @@
 		},
 		"claude": {
 			"description": "Authentification Claude",
-			"title": "Auth Claude"
+			"title": "Auth Claude",
+			"override": "(Remplacement)",
+			"connected": "Connecté",
+			"notConnected": "Non connecté",
+			"authTitle": "Authentification Claude",
+			"loadingConfig": "Chargement de la configuration...",
+			"usingGlobalToken": "Jeton global utilisé",
+			"usingGlobalTokenDescription": "Le jeton des paramètres de l'application est utilisé. Saisissez ci-dessous un jeton propre au projet pour le remplacer.",
+			"pasteTokenFrom": "Collez un jeton obtenu avec",
+			"authenticatedOAuth": "Authentifié via OAuth",
+			"notAuthenticated": "Non authentifié",
+			"statusUnknown": "Statut inconnu",
+			"reauthenticate": "Se réauthentifier",
+			"setupOAuth": "Configurer OAuth"
 		},
 		"customModelPlaceholder": "Saisir le nom du modèle (ex : llama3.3:latest)",
 		"flagshipModel": "Modèle flagship : {{model}}",
@@ -1686,7 +1933,12 @@
 			"tddMode": "Mode TDD",
 			"tddModeDescription": "Imposer le TDD strict (Red-Green-Refactor) : l'agent écrit le test, le voit échouer, puis implémente",
 			"verifyLoop": "Boucle de vérification",
-			"verifyLoopDescription": "Après le code, lancer l'application, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures). Chaque tâche peut la désactiver."
+			"verifyLoopDescription": "Après le code, lancer l'application, corriger ce qui casse, l'amener jusqu'au changement et la mesurer (trace Chrome DevTools, captures). Chaque tâche peut la désactiver.",
+			"specByExample": "Tests d'intégration d'abord (ASP.NET Core)",
+			"specByExampleDescription": "Sur une Web API ASP.NET Core, les critères d'acceptation de la spec sont écrits en tests d'intégration avant tout code. S'ils échouent comme prévu, `dotnet test` devient l'objectif de la tâche et le build se termine quand il passe. Un objectif que tu as posé toi-même est conservé.",
+			"crossReview": "Revue croisée par un second moteur",
+			"crossReviewDescription": "Après la QA, un autre fournisseur relit le diff au regard de la spec et de l'objectif. S'il signale un problème bloquant, la pull request t'attend.",
+			"crossReviewSameProvider": "C'est le fournisseur avec lequel les tâches sont construites ({{provider}}). Choisis-en un autre : un modèle qui relit son propre travail n'apporte pas de second regard, et la revue ne se lancera pas."
 		},
 		"github": {
 			"authenticatedAs": "Authentifié en tant que {{username}}",
@@ -1739,7 +1991,18 @@
 			"connectedToGitHub": "Connecté à GitHub",
 			"notConnectedToGitHub": "Non connecté à GitHub",
 			"failedToLoadBranches": "Échec du chargement des branches",
-			"failedToLoadRepositories": "Échec du chargement des dépôts"
+			"failedToLoadRepositories": "Échec du chargement des dépôts",
+			"authenticatedViaOAuth": "Authentifié via OAuth GitHub (gh CLI)",
+			"tokenPlaceholder": "ghp_xxxxxxxx ou github_pat_xxxxxxxx",
+			"projectSpecificTitle": "Configuration propre au projet",
+			"projectSpecificBefore": "Ce dépôt GitHub est configuré uniquement pour",
+			"projectSpecificAfter": ". Chaque projet peut avoir son propre dépôt GitHub.",
+			"mainBranch": "Branche principale",
+			"mainBranchDescription": "La branche de base des worktrees de tâche. Toutes les nouvelles tâches partiront d'ici.",
+			"loadingBranches": "Chargement des branches...",
+			"selectMainBranch": "Choisir la branche principale",
+			"branchHintBefore": "Les tâches seront créées sur des branches comme",
+			"branchHintFrom": "à partir de"
 		},
 		"gitlab": {
 			"description": "Synchronisation des issues GitLab",
@@ -1870,7 +2133,9 @@
 		"fineTuneDescription": "Ajuster de 75 % à 200 % par incréments de 5 %",
 		"large": "Grand",
 		"presets": "Presets d'échelle",
-		"presetsDescription": "Options d'échelle rapides pour les préférences courantes"
+		"presetsDescription": "Options d'échelle rapides pour les préférences courantes",
+		"resetToDefault": "Revenir à la valeur par défaut (100 %)",
+		"applyChanges": "Appliquer le changement d'échelle"
 	},
 	"terminalFonts": {
 		"configActions": "Configuration :",
@@ -2025,7 +2290,9 @@
 			"retro": "Ambiances ambrées chaleureuses et nostalgiques",
 			"neo": "Rose/magenta cyberpunk moderne",
 			"forest": "Tons verts naturels et terreux"
-		}
+		},
+		"backgroundColor": "Couleur de fond",
+		"accentColor": "Couleur d'accent"
 	},
 	"updates": {
 		"appUpdateReady": "Mise à jour prête",
@@ -2055,7 +2322,8 @@
 		"unableToCheck": "Impossible de vérifier les mises à jour",
 		"updateDownloaded": "Mise à jour téléchargée ! Cliquez sur Installer pour redémarrer et appliquer la mise à jour.",
 		"version": "Version",
-		"viewRelease": "Voir la version complète sur GitHub"
+		"viewRelease": "Voir la version complète sur GitHub",
+		"unknownVersion": "Inconnue"
 	},
 	"workspace": {
 		"roles": {
@@ -2146,7 +2414,8 @@
 			"currentStatus": "Statut :",
 			"configured": "Configuré",
 			"useInstead": "Utiliser un Personal Access Token à la place",
-			"hide": "Masquer"
+			"hide": "Masquer",
+			"description": "Un Personal Access Token GitHub avec accès à Copilot."
 		},
 		"instructions": {
 			"title": "Instructions",
@@ -2272,7 +2541,8 @@
 			"warn": "Avertir",
 			"deny": "Refuser",
 			"require_approval": "Demander une approbation"
-		}
+		},
+		"fileContentPlaceholder": "contenu du fichier…"
 	},
 	"search": {
 		"placeholder": "Rechercher un paramètre...",
@@ -2410,8 +2680,8 @@
 	},
 	"automations": {
 		"title": "Automatisations",
-		"description": "Un événement crée une carte sur le tableau : une issue étiquetée, la CI de la branche de base qui passe au rouge, une heure de la journée.",
-		"intro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle ne merge, ne pousse et ne commente jamais rien. Les règles tournent toutes les 5 minutes tant que l'app est ouverte.",
+		"description": "Un événement crée une carte sur le tableau : une issue étiquetée, la CI de la branche de base qui passe au rouge, une heure de la journée. Une PR ouverte par quelqu'un d'autre reçoit une revue en brouillon.",
+		"intro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle sur les PR lance plutôt la revue IA, gardée en brouillon. Une règle ne merge, ne pousse et ne commente jamais rien. Les règles tournent toutes les 5 minutes tant que l'app est ouverte.",
 		"add": "Ajouter une règle",
 		"runNow": "Lancer maintenant",
 		"save": "Enregistrer la règle",
@@ -2439,25 +2709,30 @@
 			"kind": "Type de carte",
 			"engine": "Choisir le moteur",
 			"draft": "Cartes en brouillon",
-			"dailyCap": "Cartes par jour, au plus"
+			"dailyCap": "Cartes par jour, au plus",
+			"base": "Branche de base"
 		},
 		"triggers": {
-			"issue_labeled": "Une issue GitHub reçoit une étiquette",
+			"issue_labeled": "Une issue reçoit une étiquette (GitHub ou GitLab)",
 			"ci_failed": "La CI passe au rouge sur une branche",
-			"schedule": "À une heure de la journée"
+			"schedule": "À une heure de la journée",
+			"pr_opened": "Quelqu'un d'autre ouvre une PR GitHub"
 		},
 		"help": {
-			"issue_labeled": "Seulement les issues étiquetées après la création de la règle. Une issue qui a déjà une carte n'est pas importée deux fois.",
+			"issue_labeled": "Seulement les issues étiquetées après la création de la règle, sur le GitHub du projet ou, à défaut, son GitLab. Une issue qui a déjà une carte n'est pas importée deux fois.",
 			"ci_failed": "Lu chez le fournisseur de CI réglé dans Réglages › Pipeline CI/CD. Une carte par série rouge : tant qu'elle est ouverte, un nouvel échec n'en crée pas d'autre.",
 			"schedule": "Se déclenche une fois par jour choisi, une fois l'heure passée. Un jour où l'app était fermée n'est pas rattrapé.",
 			"draft": "La carte attend dans le backlog que tu la lances.",
 			"noDraft": "Chaque carte lance son build dès sa création.",
-			"dailyCap": "Les événements au-delà du plafond attendent le lendemain ; aucun n'est perdu."
+			"dailyCap": "Les événements au-delà du plafond attendent le lendemain ; aucun n'est perdu.",
+			"pr_opened": "Seulement les PR ouvertes après la création de la règle, par quelqu'un d'autre que toi et pas par un bot. Une PR en brouillon attend d'être prête pour la revue. Laisse la branche vide pour toutes les branches de base.",
+			"review": "La règle lance la revue de GitHub PRs, avec le moteur de cette page. La revue n'est jamais publiée : elle t'attend dans GitHub PRs jusqu'à ce que tu la publies, la modifies ou l'écartes. Personne n'est assigné. Le plafond du jour compte les revues."
 		},
 		"summary": {
 			"issue_labeled": "Issue étiquetée « {{label}} »",
 			"ci_failed": "CI rouge sur {{branch}}",
-			"schedule": "{{days}} à {{time}}"
+			"schedule": "{{days}} à {{time}}",
+			"pr_opened": "PR ouverte vers {{base}}"
 		},
 		"status": {
 			"never": "Pas encore lancée",
@@ -2465,14 +2740,17 @@
 			"today_one": "{{count}} carte aujourd'hui (au plus {{cap}})",
 			"today_other": "{{count}} cartes aujourd'hui (au plus {{cap}})",
 			"deferred_one": "{{count}} événement attend demain",
-			"deferred_other": "{{count}} événements attendent demain"
+			"deferred_other": "{{count}} événements attendent demain",
+			"reviewsToday_one": "{{count}} revue aujourd'hui (au plus {{cap}})",
+			"reviewsToday_other": "{{count}} revues aujourd'hui (au plus {{cap}})"
 		},
 		"outcome": {
 			"created": "a créé {{specId}} pour {{subject}}",
 			"started": "a créé et lancé {{specId}} pour {{subject}}",
 			"duplicate": "a écarté {{subject}}",
 			"ignored": "a ignoré {{subject}}",
-			"error": "n'a pas pu tourner sur {{subject}}"
+			"error": "n'a pas pu tourner sur {{subject}}",
+			"review_started": "a lancé la revue de {{subject}}"
 		},
 		"reasons": {
 			"label_predates_rule": "l'étiquette était là avant la règle",
@@ -2482,7 +2760,193 @@
 			"github_not_connected": "GitHub n'est pas connecté pour ce projet (Réglages › GitHub)",
 			"no_ci_provider": "aucun fournisseur de CI n'est réglé pour ce projet (Réglages › Pipeline CI/CD)",
 			"source_failed": "la source n'a pas pu être lue",
-			"card_failed": "la carte n'a pas pu être créée"
+			"card_failed": "la carte n'a pas pu être créée",
+			"own_pr": "tu as ouvert cette PR",
+			"bot_author": "un bot a ouvert cette PR",
+			"already_reviewed": "cette PR a déjà une revue",
+			"review_failed": "la revue n'a pas pu démarrer",
+			"forge_not_connected": "ni GitHub ni GitLab n'est connecté pour ce projet",
+			"token_missing": "la personne qui a enregistré cette règle n'a pas de jeton pour cette forge sur le serveur (Réglages › Mes jetons sur le serveur)",
+			"owner_not_allowed": "la personne qui a enregistré cette règle ne peut plus la faire tourner sur ce projet : enregistrez-la à nouveau pour la reprendre"
+		},
+		"anyBranch": "n'importe quelle branche",
+		"reviewDrafts": "les revues t'attendent",
+		"serverIntro": "Une règle crée une carte Kanban quand son événement arrive, et la carte suit le cycle normal. Une règle sur les PR lance plutôt la revue IA, gardée en brouillon. Une règle ne merge, ne pousse et ne commente jamais rien. Ce projet est sur le serveur : ses règles sont celles de l'équipe, et le serveur les fait tourner toutes les 5 minutes, même quand personne n'a l'app ouverte. Chaque règle lit GitHub ou GitLab avec le jeton de la personne qui l'a enregistrée en dernier, et ses cartes sont créées par Automations. Les heures sont celles du serveur.",
+		"runsAs": "tourne avec les jetons de {{name}}"
+	},
+	"githubOAuth": {
+		"usingCli": "GitHub CLI {{version}} utilisé",
+		"openLink": "Ouvrir {{url}}",
+		"cliRequired": "GitHub CLI requis",
+		"cliRequiredDescription": "Le GitHub CLI (gh) est requis pour l'authentification OAuth. Il permet de s'authentifier de façon sûre sans créer de jeton à la main.",
+		"installCli": "Installer GitHub CLI",
+		"installed": "Je l'ai installé",
+		"installInstructions": "Instructions d'installation :",
+		"linuxVisit": "Linux : consultez",
+		"connectTitle": "Se connecter à GitHub",
+		"connectDescription": "Cliquez sur le bouton ci-dessous pour vous authentifier auprès de GitHub. Votre navigateur s'ouvrira pour que vous autorisiez l'application.",
+		"authenticate": "S'authentifier avec GitHub",
+		"authenticating": "Authentification...",
+		"oneTimeCode": "Votre code à usage unique",
+		"copied": "Copié",
+		"copy": "Copier",
+		"connected": "Connexion réussie",
+		"manualTitle": "Terminer l'authentification manuellement",
+		"manualDescription": "Le navigateur n'a pas pu s'ouvrir automatiquement. Ouvrez l'URL ci-dessous pour terminer l'authentification :",
+		"openUrl": "Ouvrir l'URL dans le navigateur",
+		"enterCode": "Lorsque c'est demandé, saisissez ce code :",
+		"connectedAs": "Connecté en tant que {{username}}",
+		"completeInBrowser": "Terminez l'authentification dans votre navigateur. Cette fenêtre se mettra à jour automatiquement.",
+		"waitingStart": "En attente du démarrage de l'authentification...",
+		"enterCodeInBrowser": "Saisissez ce code dans votre navigateur pour terminer l'authentification.",
+		"copyThenOpen": "Copiez ce code puis ouvrez le lien ci-dessous pour vous authentifier.",
+		"accountConnected": "Votre compte GitHub est connecté",
+		"timedOut": "Délai d'authentification dépassé",
+		"failed": "Échec de l'authentification"
+	},
+	"apiKeyConfig": {
+		"apiUrl": "URL de l'API",
+		"defaultModel": "Modèle par défaut",
+		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
+	},
+	"customProvider": {
+		"modelNamePlaceholder": "Nom du modèle personnalisé",
+		"title": "Fournisseur personnalisé",
+		"description": "Connectez n'importe quel point d'accès compatible OpenAI et choisissez ses modèles.",
+		"apiConfig": "Configuration de l'API",
+		"apiUrl": "URL de l'API",
+		"apiKey": "Clé API",
+		"urlRequired": "URL requise",
+		"urlRequiredDesc": "Saisissez l'URL de l'API avant de rechercher les modèles.",
+		"discoverModels": "Rechercher les modèles",
+		"discovering": "Recherche…",
+		"modelsDiscovered": "Modèles trouvés",
+		"modelsDiscoveredDesc": "{{count}} modèles trouvés.",
+		"noModelsFound": "Aucun modèle trouvé",
+		"noModelsFoundDesc": "Le point d'accès n'a renvoyé aucun modèle. Ajoutez-les à la main ci-dessous.",
+		"discoveryFailed": "Échec de la recherche",
+		"discoveryFailedDesc": "Impossible de joindre le point d'accès. Vérifiez l'URL et la clé.",
+		"manualModels": "Ajouter un modèle à la main",
+		"modelName": "Nom du modèle",
+		"modelId": "Identifiant du modèle",
+		"modelTier": "Catégorie",
+		"tierFlagship": "Haut de gamme",
+		"tierStandard": "Standard",
+		"tierFast": "Rapide",
+		"supportsThinking": "Prend en charge la réflexion étendue",
+		"addModel": "Ajouter le modèle",
+		"modelInfoRequired": "Informations du modèle requises",
+		"modelInfoRequiredDesc": "Saisissez le nom du modèle et son identifiant.",
+		"modelAdded": "Modèle ajouté",
+		"modelAddedDesc": "{{name}} a été ajouté.",
+		"modelRemoved": "Modèle supprimé",
+		"modelRemovedDesc": "Le modèle a été retiré de la liste.",
+		"availableModels": "Modèles disponibles",
+		"noModelsConfigured": "Aucun modèle configuré",
+		"addModelsDesc": "Recherchez les modèles du point d'accès ou ajoutez-les à la main."
+	},
+	"customThemes": {
+		"title": "Thèmes personnalisés",
+		"description": "Créez vos propres thèmes de couleurs ou importez-en des partagés",
+		"import": "Importer",
+		"newTheme": "Nouveau thème",
+		"themeName": "Nom du thème",
+		"themeNamePlaceholder": "Mon thème personnalisé",
+		"descriptionLabel": "Description",
+		"descriptionPlaceholder": "Une brève description",
+		"preview": "Aperçu :",
+		"create": "Créer le thème",
+		"export": "Exporter",
+		"empty": "Aucun thème personnalisé pour l'instant",
+		"emptyHint": "Créez un thème ou importez-en un pour commencer"
+	},
+	"projectSelector": {
+		"placeholder": "Sélectionner un projet...",
+		"empty": "Aucun projet pour l'instant",
+		"add": "Ajouter un projet...",
+		"emptyState": "Sélectionnez un projet pour voir et modifier ses paramètres",
+		"initializeFirst": "Initialisez d'abord WorkPilot AI pour configurer : {{section}}"
+	},
+	"agentToolsPanel": {
+		"mcpServers": "Serveurs MCP",
+		"edit": "Modifier"
+	},
+	"insightsModel": {
+		"custom": "Personnalisé...",
+		"customDescription": "Choisir le modèle et le niveau de réflexion"
+	},
+	"linearImport": {
+		"importButton_one": "Importer {{count}} tâche",
+		"importButton_other": "Importer {{count}} tâches",
+		"title": "Importer des tâches Linear",
+		"description": "Sélectionnez les tâches Linear à importer dans AutoBuild",
+		"imported_one": "{{count}} tâche importée",
+		"imported_other": "{{count}} tâches importées",
+		"processing": "Les tâches sont en cours de traitement. Suivez leur avancement sur le tableau Kanban.",
+		"moreLabels": "+{{count}} de plus",
+		"assignedTo": "Assigné à {{name}}",
+		"project": "Projet : {{name}}",
+		"hideDescription": "Masquer la description",
+		"showDescription": "Afficher la description",
+		"viewInLinear": "Voir dans Linear",
+		"selectTeam": "Sélectionnez une équipe pour voir ses tickets",
+		"searchPlaceholder": "Rechercher des tâches...",
+		"allStates": "Tous les états",
+		"selectedOfTotal": "{{selected}} sur {{total}} sélectionnée(s)",
+		"team": "Équipe",
+		"projectOptional": "Projet (facultatif)",
+		"allProjects": "Tous les projets",
+		"noMatch": "Aucun ticket ne correspond à vos filtres",
+		"empty": "Aucun ticket trouvé",
+		"deselectAll": "Tout désélectionner",
+		"selectAll": "Tout sélectionner"
+	},
+	"boardMcp": {
+		"navLabel": "Utiliser depuis d'autres apps",
+		"title": "Utiliser ce projet depuis d'autres apps d'IA",
+		"description": "Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Claude Desktop, Windsurf ou OpenCode peuvent lire le tableau de ce projet et y ajouter des cartes, grâce au serveur MCP workpilot-board.",
+		"intro": "Chaque app démarre le serveur elle-même, sur cet ordinateur, sous le nom {{name}}. Ajoute-le à une app en un clic, ou copie ce qu'il faut coller quand l'app ne peut pas être modifiée d'ici.",
+		"limits": "Le serveur liste et lit les cartes et leur spec, ajoute une carte au backlog, corrige le texte d'une carte tant que rien n'a démarré, attend qu'une carte soit prête pour ta revue, et lit la roadmap et les idées d'Ideation. Lancer un build, approuver un plan et fusionner restent à toi, sur la carte.",
+		"loading": "Recherche de tes apps d'IA…",
+		"add": "Ajouter",
+		"update": "Mettre à jour",
+		"remove": "Retirer",
+		"copy": "Copier la configuration",
+		"showSnippet": "Voir ce qu'il faut coller",
+		"hideSnippet": "Masquer",
+		"location": "Configuration : {{location}}",
+		"restartHint": "Redémarre l'app (ou ouvre une nouvelle session) pour qu'elle voie le serveur.",
+		"state": {
+			"current": "Ajouté",
+			"stale": "À mettre à jour",
+			"absent": "Pas ajouté",
+			"notDetected": "Non détectée"
+		},
+		"errors": {
+			"server_project": "Un projet du serveur se partage par le serveur d'équipe : connecte tes apps d'IA dans Réglages, Accès MCP au serveur.",
+			"python_not_ready": "L'environnement Python de l'app n'est pas encore prêt. Réessaie dans un instant.",
+			"config_unreadable": "Le fichier de configuration de cette app n'a pas pu être lu (JSON invalide ou commentaires). Rien n'a été modifié : colle la configuration à la main.",
+			"client_not_found": "Cette app n'a pas été trouvée sur cet ordinateur. Copie la configuration à la place.",
+			"claude_not_found": "La commande claude n'a pas pu être lancée d'ici. Colle la commande dans un terminal à la place.",
+			"generic": "Impossible : {{detail}}"
 		}
+	},
+	"worktreeRecipe": {
+		"title": "Préparation du worktree",
+		"description": "Ce que WorkPilot lance dans chaque nouveau worktree de tâche avant la première session : restaurer les dépendances de la stack, copier les fichiers locaux ignorés, réserver des ports pour la tâche. Une étape en échec n'arrête pas la tâche ; l'agent en est informé.",
+		"sourceFile": "Depuis .workpilot/worktree.toml",
+		"sourceDetected": "Détectée d'après les fichiers du projet (pas de .workpilot/worktree.toml)",
+		"noCommands": "Aucun gestionnaire de paquets reconnu : rien ne s'exécute.",
+		"copies": "Copie : {{files}}",
+		"ports_one": "Réserve {{count}} port par tâche",
+		"ports_other": "Réserve {{count}} ports par tâche",
+		"teardown": "À la suppression du worktree : {{commands}}",
+		"proofs": "Après l'approbation de la QA, vérificateurs de preuves : {{commands}}",
+		"invalid": "Invalide, rien ne s'exécute : {{errors}}",
+		"approved": "Approuvée : s'exécute dans les nouveaux worktrees.",
+		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
+		"approve": "Approuver",
+		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
+		"saveDetected": "Enregistrer en worktree.toml"
 	}
 }

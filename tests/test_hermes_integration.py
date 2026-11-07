@@ -123,7 +123,23 @@ class TestThePack:
         assert "--subdir" in command
         subdirs = [command[i + 1] for i, a in enumerate(command) if a == "--subdir"]
         assert subdirs
-        assert all(s.startswith("skills/") for s in subdirs)
+        # Whole categories from `skills/`; from `optional-skills/`, only single
+        # skills named one by one (`optional-skills/<category>/<skill>`).
+        for subdir in subdirs:
+            parts = subdir.strip("/").split("/")
+            if parts[0] == "skills":
+                assert len(parts) == 2, subdir
+            else:
+                assert parts[0] == "optional-skills" and len(parts) == 3, subdir
+
+    def test_skills_upstream_moved_to_optional_skills_are_still_vendored(self):
+        """Upstream moved these three out of `skills/`; the weekly sync read the
+        move as a removal and deleted them here (PR #683)."""
+        command = load_pack(REPO_ROOT / "skills" / "hermes").bootstrap["command"]
+        subdirs = {command[i + 1] for i, a in enumerate(command) if a == "--subdir"}
+        for skill in ("python-debugpy", "node-inspect-debugger", "opencode"):
+            assert any(s.endswith(f"/{skill}") for s in subdirs), skill
+            assert (REPO_ROOT / "skills" / "hermes" / skill / "SKILL.md").is_file()
 
     def test_skills_another_tracked_pack_already_provides_are_excluded(self):
         command = load_pack(REPO_ROOT / "skills" / "hermes").bootstrap["command"]

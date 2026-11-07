@@ -5,7 +5,7 @@ description: Analyste performance spécialisé expert en optimisation .NET, prof
 metadata:
   workpilot:
     pack: dotnet
-    version: 1.0.0
+    version: 1.2.0
     content_sha256: 6206d4fda34f4a9181d3ef54ac1f42977213711a04c581ca5bbdd3c2c9074e3a
     targets:
       dotnet: '>=10.0'

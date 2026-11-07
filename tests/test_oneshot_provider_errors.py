@@ -9,6 +9,7 @@ completion, so the prompt optimizer displayed it as the optimized prompt, with
 """
 
 import asyncio
+import importlib
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,7 +109,7 @@ def test_an_ordinary_answer_is_untouched(monkeypatch):
 
 
 def test_classify_names_an_unknown_model_whichever_provider_said_it():
-    from core.error_details import MODEL_UNAVAILABLE, classify
+    from foundation.error_details import MODEL_UNAVAILABLE, classify
 
     assert classify(MODEL_ERROR) == MODEL_UNAVAILABLE
     # OpenAI's 404 body, and Ollama's.
@@ -125,7 +126,14 @@ def test_classify_names_an_unknown_model_whichever_provider_said_it():
 def test_the_claude_client_applies_the_chosen_effort(monkeypatch):
     # "none" must reach the SDK as 0: None would mean "the agent type's
     # default", and a page set to no thinking would think anyway.
-    from core import oneshot, simple_client
+    from core import oneshot
+
+    # `_claude_client` reads `create_simple_client` from sys.modules when it
+    # runs. test_qa_loop.py mocks `core.simple_client` while it is collected:
+    # when its tests are in another CI shard, the mock is deleted, and the
+    # `core` package keeps its `simple_client` attribute on the old copy, so
+    # `from core import simple_client` patched a module the call never read.
+    simple_client = importlib.import_module("core.simple_client")
 
     budgets = []
 
@@ -143,3 +151,97 @@ def test_the_claude_client_applies_the_chosen_effort(monkeypatch):
     from phase_config import get_thinking_budget
 
     assert budgets == [None, 0, get_thinking_budget("high")]
+
+
+class NoticeClient:
+    """Yields ``AgentMessage``s as a streaming client (Copilot, OpenAI…) does."""
+
+    def __init__(self, *messages):
+        self._messages = messages
+        self.last_usage = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def query(self, prompt):
+        return None
+
+    async def receive_response(self):
+        for message in self._messages:
+            yield message
+
+
+def _message(role_name: str, text: str):
+    from core.agent_client import (
+        AgentMessage,
+        ContentBlock,
+        ContentBlockType,
+        MessageRole,
+    )
+
+    return AgentMessage(
+        role=getattr(MessageRole, role_name),
+        content=[ContentBlock(type=ContentBlockType.TEXT, text=text)],
+    )
+
+
+COPILOT_AUTH_ERROR = (
+    "Copilot auth error: Copilot token exchange failed (403): 403 Forbidden."
+)
+
+
+def test_a_client_notice_is_a_failure_not_the_answer(monkeypatch):
+    """The Arena offered "Copilot auth error: …" as Copilot's answer to vote for."""
+    client = NoticeClient(_message("SYSTEM", COPILOT_AUTH_ERROR))
+    deltas, errors = [], []
+
+    text = run(monkeypatch, client, on_delta=deltas.append, on_error=errors.append)
+
+    assert text == ""
+    assert deltas == []
+    assert errors and "Copilot auth error" in errors[0]["message"]
+    assert errors[0]["code"] == "auth"
+
+
+def test_a_notice_beside_a_real_answer_stays_out_of_it(monkeypatch):
+    client = NoticeClient(
+        _message("SYSTEM", "⚠️ the model refused the effort setting"),
+        _message("ASSISTANT", "Hello!"),
+    )
+    deltas, errors = [], []
+
+    text = run(monkeypatch, client, on_delta=deltas.append, on_error=errors.append)
+
+    assert text == "Hello!"
+    assert deltas == ["Hello!"]
+    assert errors == []
+
+
+def test_a_comparison_keeps_copilot_on_the_model_it_named(monkeypatch):
+    """`require_provider` (the Arena) also forbids Copilot's model swap."""
+    import core.agent_client as agent_client
+    from core import oneshot
+
+    built = []
+
+    class Recorder:
+        def __init__(self, **kwargs):
+            built.append(kwargs)
+
+    monkeypatch.setattr(agent_client, "CopilotAgentClient", Recorder)
+    for require in (True, False):
+        oneshot._build_client(
+            "copilot",
+            "claude-opus-4.8",
+            None,
+            None,
+            None,
+            1,
+            chosen=True,
+            exact_model=require,
+        )
+
+    assert [kw["allow_model_fallback"] for kw in built] == [False, True]

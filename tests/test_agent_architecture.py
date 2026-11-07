@@ -204,15 +204,15 @@ class TestProjectDocumentation:
         )
 
     def test_subagent_architecture_documented(self):
-        """CLAUDE.md documents subagent-based architecture."""
-        claude_md_path = Path(__file__).parent.parent / "docs" / "CLAUDE.md"
+        """AGENTS.md, read by every agent, documents subagent-based architecture."""
+        claude_md_path = Path(__file__).parent.parent / "AGENTS.md"
         content = claude_md_path.read_text(encoding="utf-8")
 
         has_subagent = "subagent" in content.lower()
         has_task_tool = "task tool" in content.lower()
 
         assert has_subagent or has_task_tool, (
-            "CLAUDE.md should document subagent-based parallel work"
+            "AGENTS.md should document subagent-based parallel work"
         )
 
 

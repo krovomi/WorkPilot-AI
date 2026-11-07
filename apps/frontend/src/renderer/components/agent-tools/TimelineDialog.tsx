@@ -15,6 +15,7 @@ import {
 	type TimelineEntry,
 	fetchTimeline,
 } from "../../lib/agent-tools-api";
+import { useTranslation } from "react-i18next";
 
 export interface TimelineDialogProps {
 	readonly open: boolean;
@@ -25,8 +26,8 @@ export interface TimelineDialogProps {
 
 const PHASE_COLORS: Record<string, string> = {
 	planning: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-	coding: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-	qa: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+	coding: "bg-success/15 text-success ",
+	qa: "bg-warning/15 text-warning ",
 	documentation: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
 	system: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
@@ -55,6 +56,7 @@ function formatDuration(seconds: number): string {
 }
 
 function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 	const hasPayload = Object.keys(entry.payload).length > 0;
 	const phaseClass = PHASE_COLORS[entry.phase] ?? PHASE_COLORS.system;
@@ -66,14 +68,14 @@ function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
 				<span className="text-sm font-mono w-4 shrink-0">{icon}</span>
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2 flex-wrap">
-						<Badge className={`text-[10px] ${phaseClass}`}>
+						<Badge className={`text-3xs ${phaseClass}`}>
 							{entry.actor}
 						</Badge>
 						<span className="text-xs text-muted-foreground font-mono">
 							{entry.kind}
 						</span>
 						{entry.delta_seconds > 0 && (
-							<span className="text-[10px] text-muted-foreground">
+							<span className="text-3xs text-muted-foreground">
 								{formatDelta(entry.delta_seconds)}
 							</span>
 						)}
@@ -82,19 +84,19 @@ function EntryRow({ entry }: { readonly entry: TimelineEntry }) {
 					{hasPayload && (
 						<button
 							type="button"
-							className="text-[10px] text-muted-foreground hover:text-foreground mt-1 cursor-pointer bg-transparent border-none p-0"
+							className="text-3xs text-muted-foreground hover:text-foreground mt-1 cursor-pointer bg-transparent border-none p-0"
 							onClick={() => setExpanded(!expanded)}
 						>
-							{expanded ? "▾ Hide payload" : "▸ Show payload"}
+							{expanded ? t("agentTools:timeline.hidePayload") : t("agentTools:timeline.showPayload")}
 						</button>
 					)}
 					{expanded && hasPayload && (
-						<pre className="mt-1 text-[10px] bg-muted/50 p-2 rounded overflow-x-auto">
+						<pre className="mt-1 text-3xs bg-muted/50 p-2 rounded overflow-x-auto">
 							{JSON.stringify(entry.payload, null, 2)}
 						</pre>
 					)}
 				</div>
-				<span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+				<span className="text-3xs text-muted-foreground shrink-0 font-mono">
 					#{entry.sequence}
 				</span>
 			</div>
@@ -108,6 +110,7 @@ export function TimelineDialog({
 	projectDir,
 	correlationId,
 }: TimelineDialogProps) {
+	const { t } = useTranslation();
 	const [timeline, setTimeline] = useState<Timeline | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -134,22 +137,21 @@ export function TimelineDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-3xl">
 				<DialogHeader>
-					<DialogTitle>Agent timeline</DialogTitle>
+					<DialogTitle>{t("agentTools:timeline.title")}</DialogTitle>
 					<DialogDescription>
-						Every audit-trail event for spec{" "}
-						<code className="text-xs">{correlationId}</code>, in causal order.
-						Click an event to inspect its payload.
+						{t("agentTools:timeline.descriptionBefore")}{" "}
+						<code className="text-xs">{correlationId}</code>{t("agentTools:timeline.descriptionAfter")}
 					</DialogDescription>
 				</DialogHeader>
 
 				{loading && (
 					<div className="py-8 text-center text-sm text-muted-foreground">
-						Loading timeline…
+						{t("agentTools:timeline.loading")}
 					</div>
 				)}
 
 				{error && (
-					<div className="rounded-md bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+					<div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive ">
 						{error}
 					</div>
 				)}
@@ -158,18 +160,22 @@ export function TimelineDialog({
 					<div className="space-y-3">
 						<div className="flex flex-wrap gap-2 text-xs">
 							<Badge variant="outline">
-								{timeline.entry_count} event{timeline.entry_count !== 1 ? "s" : ""}
+								{t("agentTools:timeline.events", { count: timeline.entry_count })}
 							</Badge>
 							<Badge variant="outline">
-								duration: {formatDuration(timeline.duration_seconds)}
+								{t("agentTools:timeline.duration", {
+									duration: formatDuration(timeline.duration_seconds),
+								})}
 							</Badge>
 							{timeline.integrity.intact ? (
-								<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-									chain intact
+								<Badge className="bg-success/15 text-success ">
+									{t("agentTools:timeline.chainIntact")}
 								</Badge>
 							) : (
-								<Badge className="bg-red-500/15 text-red-700 dark:text-red-300">
-									⚠ chain broken: {timeline.integrity.reason}
+								<Badge className="bg-destructive/15 text-destructive ">
+									{t("agentTools:timeline.chainBroken", {
+										reason: timeline.integrity.reason,
+									})}
 								</Badge>
 							)}
 							{Object.entries(timeline.phase_counts).map(([phase, count]) => (
@@ -181,8 +187,7 @@ export function TimelineDialog({
 
 						{timeline.entries.length === 0 ? (
 							<div className="py-6 text-center text-sm text-muted-foreground">
-								No events recorded yet for this spec. Events will appear once
-								an agent runs against it.
+								{t("agentTools:timeline.empty")}
 							</div>
 						) : (
 							<ScrollArea className="h-96 rounded-md border">
@@ -197,7 +202,7 @@ export function TimelineDialog({
 				)}
 
 				<DialogFooter>
-					<Button onClick={() => onOpenChange(false)}>Close</Button>
+					<Button onClick={() => onOpenChange(false)}>{t("common:buttons.close")}</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

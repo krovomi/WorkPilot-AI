@@ -27,6 +27,7 @@ except ImportError:
     WEBSOCKETS_AVAILABLE = False
     WebSocketServerProtocol = None
 
+from .project_room import ProjectRooms
 from .session_recorder import SessionRecorder
 from .streaming_manager import get_streaming_manager
 
@@ -34,16 +35,26 @@ logger = logging.getLogger(__name__)
 
 # WebSocket close code used when authentication fails in server mode.
 WS_CLOSE_UNAUTHORIZED = 4401
+# Close code for a valid token that is not entitled to the channel it asked for.
+WS_CLOSE_FORBIDDEN = 4403
+
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
 def _server_mode_enabled() -> bool:
-    """True when multi-user server mode is active (lazy, never raises)."""
+    """True when multi-user server mode is active (lazy, never raises).
+
+    Fails closed: when server mode was asked for but its settings cannot be
+    built (a missing JWT secret, say), the server still behaves as a server
+    and refuses every connection, since no token can be checked. Falling back
+    to local mode would serve every channel to anyone who can reach the port.
+    """
     try:
         from server.config import get_settings
 
         return get_settings().server_mode
     except Exception:
-        return False
+        return os.environ.get("WORKPILOT_SERVER_MODE", "").strip().lower() in _TRUTHY
 
 
 def _validate_ws_token(token: str) -> dict | None:
@@ -229,6 +240,8 @@ class StreamingWebSocketServer:
         self.session_recorder = SessionRecorder()
         self._server = None
         self._clients: dict[str, set[Any]] = {}
+        # Server mode: who is on each project, and its team chat.
+        self._rooms = ProjectRooms()
         self._connection_paths: dict[int, str] = {}  # Store path by connection ID
 
     async def start(self):
@@ -335,11 +348,22 @@ class StreamingWebSocketServer:
         return None
 
     def _extract_websocket_path(self, websocket: WebSocketServerProtocol) -> str:
-        """Extract path from websocket connection."""
+        """Extract path from websocket connection.
+
+        websockets 13 and later (the asyncio server ``websockets.serve`` is
+        since 14) keep it on the handshake's request, the legacy server on the
+        connection. Missing it, every connection fell back to the default
+        path: in server mode no channel was named, so the app was refused
+        every channel, and the ``?token=`` of the API and of runs was never
+        read, so none of their events was published.
+        """
         path = "/stream/default"  # Default fallback
 
         try:
-            if hasattr(websocket, "path"):
+            request = getattr(websocket, "request", None)
+            if isinstance(getattr(request, "path", None), str):
+                path = request.path
+            elif hasattr(websocket, "path"):
                 path = websocket.path
             elif hasattr(websocket, "scope"):
                 scope = websocket.scope
@@ -422,6 +446,7 @@ class StreamingWebSocketServer:
         clients = self._clients.get(session_id)
         if clients is not None:
             clients.discard(websocket)
+        self._rooms.leave_soon(session_id, websocket)
         self.streaming_manager.unsubscribe(session_id, websocket)
         logger.info(f"Client cleanup completed for session {session_id}")
 
@@ -443,8 +468,24 @@ class StreamingWebSocketServer:
         finally:
             self._ensure_cleanup(ctx, websocket)
 
-    def _authenticate_connection(self, path: str, ctx: dict) -> bool:
-        """Server mode: require a valid ?token=<JWT> on the WS URL.
+    @staticmethod
+    def _request_headers(websocket) -> Any:
+        """The handshake's headers, whichever websockets version accepted it."""
+        request = getattr(websocket, "request", None)
+        headers = getattr(request, "headers", None)
+        if headers is None:
+            headers = getattr(websocket, "request_headers", None)
+        return headers if hasattr(headers, "get") else None
+
+    def _authenticate_connection(
+        self, path: str, ctx: dict, headers: Any = None
+    ) -> bool:
+        """Server mode: require a valid access token.
+
+        The token comes in an ``Authorization: Bearer`` header, which the
+        desktop app sends so that it never appears in a URL a proxy logs, or
+        else as ``?token=`` (the API's and the runs' own local connections).
+        The organization comes in ``X-WorkPilot-Org`` or ``?org=``.
 
         Stores the user claims in ctx["user"] for event attribution.
         Local mode: no-op, anonymous ctx. Returns False when the connection
@@ -457,10 +498,24 @@ class StreamingWebSocketServer:
         from urllib.parse import parse_qs, urlparse
 
         query = parse_qs(urlparse(path).query)
-        token_values = query.get("token", [])
-        claims = _validate_ws_token(token_values[0]) if token_values else None
+        token = None
+        org = None
+        if headers is not None:
+            bearer = str(headers.get("Authorization") or "")
+            if bearer[:7].lower() == "bearer ":
+                token = bearer[7:].strip() or None
+            org = headers.get("X-WorkPilot-Org") or None
+        if token is None:
+            token_values = query.get("token", [])
+            token = token_values[0] if token_values else None
+        claims = _validate_ws_token(token) if token else None
         if claims is None:
             return False
+        ctx["claims"] = claims
+        if org is None:
+            org_values = query.get("org", [])
+            org = org_values[0] if org_values else None
+        ctx["org_hint"] = org
         ctx["user"] = {
             "id": claims.get("sub"),
             "name": claims.get("name", ""),
@@ -476,7 +531,8 @@ class StreamingWebSocketServer:
         # Extract path and session ID
         path = self._extract_websocket_path(websocket)
 
-        if not self._authenticate_connection(path, ctx):
+        headers = self._request_headers(websocket)
+        if not self._authenticate_connection(path, ctx, headers):
             logger.warning(
                 "Rejecting unauthenticated WS connection from %s",
                 getattr(websocket, "remote_address", "?"),
@@ -486,7 +542,19 @@ class StreamingWebSocketServer:
             )
             return
 
-        ctx["session_id"] = self._extract_session_id(path, websocket)
+        session_id = self._extract_session_id(path, websocket)
+        if ctx.get("claims") is not None:
+            grant = await self._authorize_channel(ctx, session_id)
+            if grant is None:
+                logger.warning(
+                    "Refusing WS channel %s to %s", session_id, ctx["claims"].get("sub")
+                )
+                await websocket.close(
+                    code=WS_CLOSE_FORBIDDEN, reason="channel not allowed"
+                )
+                return
+            ctx["grant"] = grant
+        ctx["session_id"] = session_id
         logger.info(
             f"New connection for session {ctx['session_id']} from {websocket.remote_address}"
         )
@@ -500,6 +568,36 @@ class StreamingWebSocketServer:
         # Send welcome message
         session_info = self.streaming_manager.get_session_info(ctx["session_id"])
         await self._send_welcome_message(ctx["session_id"], websocket, session_info)
+        await self._rooms.enter(ctx, websocket)
+
+    async def _authorize_channel(self, ctx: dict, channel: str):
+        """Server mode: the grant this connection's token has on `channel`.
+
+        ``None`` refuses it. A database or settings failure refuses it too;
+        anything else propagates and the connection is dropped unregistered.
+        """
+        try:
+            from server.authz.ws_channels import authorize_channel
+            from server.db.engine import get_session_factory
+            from sqlalchemy.exc import SQLAlchemyError
+        except ImportError as e:
+            logger.warning("WS channel check unavailable: %s", e)
+            return None
+        try:
+            async with get_session_factory()() as db:
+                return await authorize_channel(
+                    db, ctx["claims"], channel, org_hint=ctx.get("org_hint")
+                )
+        except (SQLAlchemyError, OSError, RuntimeError, ValueError) as e:
+            logger.warning("WS channel check failed: %s", type(e).__name__)
+            return None
+
+    def _may(self, ctx: dict, what: str) -> bool:
+        """Local mode: always. Server mode: what this connection's grant allows."""
+        if ctx.get("claims") is None:
+            return True
+        grant = ctx.get("grant")
+        return bool(grant is not None and getattr(grant, what, False))
 
     async def _handle_client_messages(
         self, websocket: WebSocketServerProtocol, ctx: dict
@@ -572,11 +670,18 @@ class StreamingWebSocketServer:
             if msg_type == "init_session":
                 await self._handle_init_session(ctx, websocket, data)
             elif msg_type == "agent_event":
-                await self._handle_agent_event(session_id, data, websocket, ctx)
+                if self._may(ctx, "can_publish"):
+                    await self._handle_agent_event(session_id, data, websocket, ctx)
             elif msg_type == "chat_message":
-                await self._handle_chat_message(session_id, data, ctx)
+                if self._rooms.is_room(ctx, websocket):
+                    await self._rooms.chat(
+                        ctx, websocket, data, allowed=self._may(ctx, "can_interact")
+                    )
+                elif self._may(ctx, "can_interact"):
+                    await self._handle_chat_message(session_id, data, ctx)
             elif msg_type == "control":
-                await self._handle_control(session_id, data.get("action"))
+                if self._may(ctx, "can_interact"):
+                    await self._handle_control(session_id, data.get("action"))
             # Unknown message types are ignored gracefully
 
         except json.JSONDecodeError:
@@ -594,6 +699,18 @@ class StreamingWebSocketServer:
 
         if not actual_session_id or actual_session_id == current_session_id:
             return
+        if ctx.get("claims") is not None:
+            # Server mode: switching channel is opening a channel, and is
+            # checked the same way as the one in the URL.
+            grant = await self._authorize_channel(ctx, str(actual_session_id))
+            if grant is None:
+                logger.warning(
+                    "Refusing WS channel switch to %s for %s",
+                    actual_session_id,
+                    ctx["claims"].get("sub"),
+                )
+                return
+            ctx["grant"] = grant
 
         logger.info(
             f"Client requested session change: {current_session_id} -> {actual_session_id}"
@@ -616,6 +733,7 @@ class StreamingWebSocketServer:
         if old_session_id in self._clients:
             self._clients[old_session_id].discard(websocket)
         self.streaming_manager.unsubscribe(old_session_id, websocket)
+        await self._rooms.leave(old_session_id, websocket)
         logger.info(f"Unsubscribed from old session: {old_session_id}")
 
         # Update context
@@ -629,6 +747,7 @@ class StreamingWebSocketServer:
             self._clients[new_session_id] = set()
         self._clients[new_session_id].add(websocket)
         self.streaming_manager.subscribe(new_session_id, websocket)
+        await self._rooms.enter(ctx, websocket)
         logger.info(f"Subscribed to new session: {new_session_id}")
 
     async def _ensure_session_exists(self, session_id: str):
@@ -677,8 +796,13 @@ class StreamingWebSocketServer:
 
         from .streaming_manager import EventType, StreamingEvent
 
-        # Use session_id from event data as authoritative source
-        event_session = event_data.get("session_id", session_id)
+        # Local mode: the event names its session. Server mode: a connection
+        # publishes on the one channel it was authorized for, whatever the
+        # event says.
+        if (ctx or {}).get("claims") is not None:
+            event_session = session_id
+        else:
+            event_session = event_data.get("session_id", session_id)
         try:
             payload = event_data.get("data", {})
             # Server mode: stamp the authenticated sender on the event so

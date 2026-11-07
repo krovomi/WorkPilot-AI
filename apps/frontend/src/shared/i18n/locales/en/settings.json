@@ -95,7 +95,8 @@
 					"accountName": "Name",
 					"accountPlan": "Plan",
 					"accountCredits": "Credits",
-					"accountFlowActions": "Flow Actions"
+					"accountFlowActions": "Flow Actions",
+					"tokenReceived": "Windsurf token received"
 				},
 				"openaiAuth": {
 					"codexCliAuth": "Reuse the ChatGPT session managed by Codex CLI.",
@@ -109,6 +110,37 @@
 					"notConnected": "No active Codex CLI authentication. Sign in first.",
 					"timeout": "Codex CLI authentication timed out. Try again.",
 					"checkError": "Could not verify Codex CLI authentication."
+				},
+				"savedTitle": "Provider saved",
+				"agentCli": {
+					"status": "CLI status",
+					"checking": "Checking the CLI…",
+					"installed": "Installed",
+					"installedVersion": "Installed (version {{version}})",
+					"notInstalled": "Not installed: {{executable}} was not found on the PATH.",
+					"install": "Install {{name}}",
+					"installing": "Installing…",
+					"recheck": "Check again",
+					"signInTitle": "Sign in",
+					"signInDescription": "{{name}} keeps its own sign-in: WorkPilot uses the account and the API keys you set up in the CLI. Sign in once, then every task can run with it.",
+					"signInCommand": "Command to run",
+					"openTerminal": "Sign in from a terminal",
+					"closeTerminal": "Close the terminal",
+					"docs": "Documentation",
+					"modelTitle": "Model",
+					"modelDescription": "Pick the model per task when you create it. \"Default\" uses the model configured in the CLI.",
+					"activate": "Use as default provider",
+					"activated": "{{name}} is now the default provider.",
+					"hints": {
+						"opencode": "Run the command, pick a provider (Anthropic, OpenAI, GitHub Copilot…) and paste its key or follow the browser sign-in.",
+						"pi": "Start pi, type /login and pick your provider. pi also reads API keys from environment variables such as ANTHROPIC_API_KEY.",
+						"antigravity": "Start agy once and sign in with your Google account; headless runs reuse that sign-in. GEMINI_API_KEY also works.",
+						"gemini-cli": "Start gemini once and choose \"Login with Google\" (or set GEMINI_API_KEY). WorkPilot then runs it with --acp."
+					},
+					"terminalTitle": "Sign in to {{name}}",
+					"terminalStep1": "Press Enter to run {{command}}",
+					"terminalStep2": "Follow the CLI's sign-in steps",
+					"terminalStep3": "Close this terminal once signed in"
 				}
 			},
 			"providerCard": {
@@ -140,6 +172,14 @@
 				},
 				"rateLimited": "Rate limited",
 				"needsReauth": "Needs re-authentication",
+				"toggleDetails": "Show details",
+				"keySaved": "Key saved",
+				"keySavedToday": "today",
+				"keySavedDaysAgo_one": "{{count}} day ago",
+				"keySavedDaysAgo_other": "{{count}} days ago",
+				"keySavedUnknown": "date unknown",
+				"keyRenewal_one": "Key saved {{count}} day ago: consider renewing it (over {{threshold}} days)",
+				"keyRenewal_other": "Key saved {{count}} days ago: consider renewing it (over {{threshold}} days)",
 				"statusNested": {
 					"notConfigured": "Not configured",
 					"error": "Error",
@@ -171,7 +211,11 @@
 				"anthropic": "Anthropic Claude models",
 				"google": "Google and Google DeepMind API access",
 				"openai": "GPT-5 and other OpenAI models",
-				"loadError": "Failed to load provider list"
+				"loadError": "Failed to load provider list",
+				"opencode": "Open-source coding agent, driven through the opencode CLI",
+				"antigravity": "Google's coding agent, driven through the agy CLI",
+				"pi": "Minimal coding agent, driven through the pi CLI",
+				"gemini-cli": "Google's open-source Gemini CLI, driven over the Agent Client Protocol"
 			},
 			"providerToggle": {
 				"enabled": "Provider enabled",
@@ -266,8 +310,27 @@
 						"likes": "Likes",
 						"created": "Recent",
 						"modified": "Modified"
-					}
-				}
+					},
+					"minParamsAria": "Minimum size (parameters)",
+					"paramsAll": "Params: all",
+					"params24": "≥ 24B (planning)",
+					"maxDiskAria": "Max. estimated disk size (GB)",
+					"diskAll": "Disk: all",
+					"disk6": "≤ ~6 GB",
+					"disk12": "≤ ~12 GB",
+					"disk24": "≤ ~24 GB",
+					"disk48": "≤ ~48 GB",
+					"hideUnsuitable": "Hide unsuitable models (embeddings, too small)"
+				},
+				"legend": {
+					"recommended": "● Recommended",
+					"recommendedDetail": "— large enough (≥24B active parameters) and tool-calling capable: good for EVERY phase, planning included.",
+					"tooSmall": "● Too small to plan",
+					"tooSmallDetail": "— tool-calling capable but <24B: fine for coding / QA, not advised for planning.",
+					"unverified": "● Tool-calling to verify",
+					"unverifiedDetail": "— not confirmed from the name; open the model card. \"~GB\" sizes are estimates (4-bit quant)."
+				},
+				"estimatedSize": " · ~{{size}} GB"
 			}
 		},
 		"updates": {
@@ -558,7 +621,9 @@
 		"fineTuneDescription": "Adjust from 75% to 200% in 5% increments",
 		"default": "Default",
 		"comfortable": "Comfortable",
-		"large": "Large"
+		"large": "Large",
+		"resetToDefault": "Reset to default (100%)",
+		"applyChanges": "Apply scale changes"
 	},
 	"logOrder": {
 		"label": "Log Order",
@@ -620,8 +685,8 @@
 				"description": "AI-powered code review and quality analysis"
 			},
 			"voiceControl": {
-				"label": "Voice Control",
-				"description": "Voice-activated development commands"
+				"label": "Voice assistant",
+				"description": "Reads spoken commands the assistant cannot place by itself"
 			}
 		},
 		"thinkingLevels": {
@@ -667,7 +732,8 @@
 		"autoClaudePathDescription": "Relative path to workpilot-ai directory in projects",
 		"autoClaudePathPlaceholder": "workpilot-ai (default)",
 		"autoNameTerminals": "Automatically name terminals",
-		"autoNameTerminalsDescription": "Use AI to generate descriptive names for terminal tabs based on their activity"
+		"autoNameTerminalsDescription": "Use AI to generate descriptive names for terminal tabs based on their activity",
+		"detecting": "Detecting..."
 	},
 	"theme": {
 		"title": "Appearance",
@@ -687,7 +753,9 @@
 			"retro": "Warm and nostalgic amber atmospheres",
 			"neo": "Modern cyberpunk pink/magenta",
 			"forest": "Natural and earthy green tones"
-		}
+		},
+		"backgroundColor": "Background color",
+		"accentColor": "Accent color"
 	},
 	"devtools": {
 		"title": "Developer Tools",
@@ -752,7 +820,8 @@
 		"downloadStableVersion": "Download Stable Version",
 		"readOnlyVolumeTitle": "Cannot Install from Disk Image",
 		"readOnlyVolumeDescription": "WorkPilot AI is running from a read-only disk image (DMG). Please drag the app to your Applications folder and relaunch it from there to install updates.",
-		"downloadError": "Failed to download update"
+		"downloadError": "Failed to download update",
+		"unknownVersion": "Unknown"
 	},
 	"notifications": {
 		"title": "Notifications",
@@ -781,7 +850,12 @@
 			"tddMode": "TDD Mode",
 			"tddModeDescription": "Enforce strict TDD (Red-Green-Refactor): the agent writes the test, watches it fail, then implements",
 			"verifyLoop": "Verification loop",
-			"verifyLoopDescription": "After coding, launch the app, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots). Cards can override it."
+			"verifyLoopDescription": "After coding, launch the app, fix what breaks, drive it to the change and measure it (Chrome DevTools trace, screenshots). Cards can override it.",
+			"specByExample": "Integration tests first (ASP.NET Core)",
+			"specByExampleDescription": "On an ASP.NET Core Web API, the spec's acceptance criteria are written as integration tests before any code. When they fail as expected, `dotnet test` becomes the task's goal and the build ends when it passes. A goal you set yourself is kept.",
+			"crossReview": "Cross review by a second engine",
+			"crossReviewDescription": "After QA, another provider reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you.",
+			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run."
 		},
 		"autoBuild": {
 			"title": "WorkPilot AI Integration",
@@ -820,7 +894,20 @@
 		},
 		"claude": {
 			"title": "Claude Auth",
-			"description": "Claude authentication"
+			"description": "Claude authentication",
+			"override": "(Override)",
+			"connected": "Connected",
+			"notConnected": "Not Connected",
+			"authTitle": "Claude Authentication",
+			"loadingConfig": "Loading configuration...",
+			"usingGlobalToken": "Using global token",
+			"usingGlobalTokenDescription": "Using token from App Settings. Enter a project-specific token below to override.",
+			"pasteTokenFrom": "Paste a token from",
+			"authenticatedOAuth": "Authenticated via OAuth",
+			"notAuthenticated": "Not authenticated",
+			"statusUnknown": "Status unknown",
+			"reauthenticate": "Re-authenticate",
+			"setupOAuth": "Setup OAuth"
 		},
 		"linear": {
 			"title": "Linear",
@@ -888,7 +975,18 @@
 			"connectedToGitHub": "Connected to GitHub",
 			"notConnectedToGitHub": "Not connected to GitHub",
 			"failedToLoadBranches": "Failed to load branches",
-			"failedToLoadRepositories": "Failed to load repositories"
+			"failedToLoadRepositories": "Failed to load repositories",
+			"authenticatedViaOAuth": "Authenticated via GitHub OAuth (gh CLI)",
+			"tokenPlaceholder": "ghp_xxxxxxxx or github_pat_xxxxxxxx",
+			"projectSpecificTitle": "Project-Specific Configuration",
+			"projectSpecificBefore": "This GitHub repository is configured only for",
+			"projectSpecificAfter": ". Each project can have its own GitHub repository.",
+			"mainBranch": "Main Branch",
+			"mainBranchDescription": "The base branch for creating task worktrees. All new tasks will branch from here.",
+			"loadingBranches": "Loading branches...",
+			"selectMainBranch": "Select main branch",
+			"branchHintBefore": "Tasks will be created on branches like",
+			"branchHintFrom": "from"
 		},
 		"gitlab": {
 			"title": "GitLab",
@@ -1223,7 +1321,8 @@
 		"description": "Access logs and debug information for troubleshooting",
 		"errorReporting": {
 			"label": "Anonymous Error Reporting",
-			"description": "Send crash reports to help improve WorkPilot AI. No personal data or code is collected."
+			"description": "Send crash reports to help improve WorkPilot AI. No personal data or code is collected.",
+			"saveFailed": "Failed to save error reporting setting"
 		},
 		"openLogsFolder": "Open Logs Folder",
 		"copyDebugInfo": "Copy Debug Info",
@@ -1239,7 +1338,11 @@
 			"title": "Page usage",
 			"reset": "Reset",
 			"description": "Visits and time spent per page, kept on this machine only.",
-			"row": "{{visits}} visits · {{minutes}} min"
+			"row": "{{visits}} visits · {{minutes}} min",
+			"export": "Export JSON",
+			"since": "Counting since {{date}}.",
+			"neverOpenedTitle": "Experimental pages never opened",
+			"allOpened": "Every experimental page has been opened at least once."
 		}
 	},
 	"projectSettings": {
@@ -1399,6 +1502,32 @@
 			"requirementMissing": "This server needs its own configuration before it can be enabled.",
 			"alwaysOn": "WorkPilot AI's own tools are always available to the agents that declare them — there is nothing to configure.",
 			"configuredInIntegrations": "This server authenticates with a token set in Settings → Integrations. Configure it there and it becomes available to the agents that declare it."
+		},
+		"pins": {
+			"title": "Approved MCP tools",
+			"description": "A custom MCP server reaches your agents only with the tools you approved. A tool's description is read by the model and never shown elsewhere: check it here before approving.",
+			"pending": "New server: none of its tools reaches an agent until you approve them.",
+			"changed": "Changed since your approval: the tools below are held back until you approve the change.",
+			"programChanged": "Its command or URL changed since your approval: the server is held back until you approve it again.",
+			"approve": "Approve",
+			"confirmApprove": "Approve anyway",
+			"suspicious": "Some descriptions look like hidden instructions to the model. Read them before approving.",
+			"toolAdded": "new tool",
+			"toolChanged": "description changed",
+			"noDescription": "(no description)",
+			"removed": "No longer listed: {{tools}}",
+			"finding": {
+				"invisible": "invisible characters",
+				"private-use": "private-use characters",
+				"model-tag": "a tag addressed to the model",
+				"secrecy": "asks to keep something from you",
+				"secret-file": "names a credential or configuration file",
+				"precondition": "asks for a step before the tool is used",
+				"other-tools": "gives orders about other tools",
+				"shadowing": "names another server's tool: {{detail}}",
+				"long": "unusually long ({{detail}} characters)",
+				"injection": "prompt injection: {{detail}}"
+			}
 		}
 	},
 	"terminalFonts": {
@@ -1711,7 +1840,10 @@
 		"importConfirmButton": "Import {{count}} item(s)",
 		"selectedItems": "{{count}} item(s) selected",
 		"toggleSelection": "Toggle selection for work item {{id}}",
-		"importError": "Azure DevOps import failed"
+		"importError": "Azure DevOps import failed",
+		"repositoryLabel": "Repository:",
+		"sidePanelAriaLabel": "Azure DevOps import panel",
+		"resizeHandleAriaLabel": "Resize the panel"
 	},
 	"azureDevOps": {
 		"enableSyncLabel": "Enable Azure DevOps Sync",
@@ -1772,7 +1904,10 @@
 		"modelAdded": "Model Added",
 		"modelAddedDesc": "{{name}} has been added to available models.",
 		"modelRemoved": "Model Removed",
-		"modelRemovedDesc": "Model has been removed from the list."
+		"modelRemovedDesc": "Model has been removed from the list.",
+		"integrationTitle": "Azure DevOps Integration",
+		"integrationDescription": "Configure and manage Azure DevOps work item synchronization",
+		"enableDescription": "Enable Azure DevOps integration to sync work items with your backlog"
 	},
 	"autoSwitching": {
 		"title": "Auto-switching",
@@ -1829,7 +1964,10 @@
 		"instance": "Instance",
 		"required": "*",
 		"fillAllFields": "Please fill in all required fields (Instance URL, Email, API Token)",
-		"bridgeUnavailable": "Connection testing is unavailable in this environment"
+		"bridgeUnavailable": "Connection testing is unavailable in this environment",
+		"instanceLabel": "Instance: {{url}}",
+		"projectSuffix": " • Project: {{project}}",
+		"initGuardDescription": "Enable Jira integration to sync issues with your backlog"
 	},
 	"channelNotifications": {
 		"navLabel": "Notifications (Teams, Slack…)",
@@ -1886,6 +2024,128 @@
 		"autoFixDescription": "When a build goes red, launch the agent automatically to fix it",
 		"pollLabel": "Polling interval (seconds)",
 		"pollDescription": "How often the pipeline status is checked (minimum 15s, default 60s)"
+	},
+	"serverTokens": {
+		"navLabel": "My tokens on the server",
+		"title": "My tokens on the server",
+		"description": "The runs you start on the server use these tokens, so what they do on GitHub, GitLab, Jira, Linear or Azure DevOps is done in your name. A token is stored encrypted on the server and never shown again.",
+		"kinds": {
+			"github_token": "GitHub token",
+			"gitlab_token": "GitLab token",
+			"jira_token": "Jira API token",
+			"linear_api_key": "Linear API key",
+			"azure_pat": "Azure DevOps personal access token"
+		},
+		"stored": "Stored",
+		"placeholder": "Paste a token",
+		"replacePlaceholder": "Paste a new token to replace it",
+		"save": "Save",
+		"remove": "Remove from the server",
+		"unavailable": "The server could not be reached"
+	},
+	"serverMcp": {
+		"navLabel": "MCP access to the server",
+		"title": "MCP access to the team server",
+		"description": "Claude Code, Codex, Gemini CLI, Copilot, Cursor and other AI apps can read and update this server's boards through its MCP endpoint. Make an access token for each app, then paste the entry shown for that app.",
+		"limits": "A token works for the organization you are in now, on the MCP endpoint only, and never reaches further than your own role. A read token lists and reads; a write token can also create and edit cards that have not started.",
+		"unavailable": "The server could not be reached",
+		"copyToken": "Copy the token",
+		"copySnippet": "Copy the entry",
+		"form": {
+			"name": "Token name",
+			"namePlaceholder": "For example: Codex on my laptop",
+			"scope": "Access",
+			"duration": "Valid for",
+			"days_one": "{{count}} day",
+			"days_other": "{{count}} days",
+			"create": "Create a token"
+		},
+		"scope": {
+			"read": "Read only",
+			"write": "Read and write"
+		},
+		"created": {
+			"title": "Token \"{{name}}\" created",
+			"once": "Copy it now: it is shown only this once. Revoke it below if it leaks.",
+			"endpoint": "MCP endpoint: {{url}}",
+			"pasteIn": "Paste in",
+			"done": "Done, hide the token"
+		},
+		"list": {
+			"title": "My access tokens",
+			"empty": "No access token yet.",
+			"expires": "Expires {{date}}",
+			"lastUsed": "last used {{date}}",
+			"neverUsed": "never used",
+			"revoke": "Revoke {{name}}"
+		},
+		"where": {
+			"claude-code": "Run this command in a terminal.",
+			"codex": "Add it to ~/.codex/config.toml.",
+			"gemini-cli": "Merge it into ~/.gemini/settings.json.",
+			"copilot-cli": "Merge it into ~/.copilot/mcp-config.json.",
+			"vscode": "Merge it into your user mcp.json (Command Palette: MCP: Open User Configuration).",
+			"cursor": "Merge it into ~/.cursor/mcp.json.",
+			"claude-desktop": "Merge it into claude_desktop_config.json (Settings, Developer, Edit Config). It goes through mcp-remote, which needs Node.js.",
+			"windsurf": "Merge it into ~/.codeium/windsurf/mcp_config.json.",
+			"opencode": "Merge it into ~/.config/opencode/opencode.json."
+		}
+	},
+	"serverCollaboration": {
+		"navLabel": "Team collaboration"
+	},
+	"serverNeedsYou": {
+		"navLabel": "My notifications from the server",
+		"title": "Needs you: my notifications from the server",
+		"description": "When a run you started on the server needs you (a plan to approve, work to review, a stop on an error), the server tells you on your own channels. Only the project's name and the card's number are sent. Secrets are stored encrypted on the server and never shown again; leave a secret field empty to keep the stored one.",
+		"offOnServer": "Your server's operator has not turned these notifications on yet. You can set up your channels; nothing is sent until then.",
+		"noVault": "The server has no master key for secrets, so channels cannot be stored. Ask its operator to set WORKPILOT_SECRETS_MASTER_KEY.",
+		"unavailable": "The server could not be reached",
+		"unreadable": "The server can no longer read this channel (its key changed). Enter its secrets again.",
+		"moments": "Tell me when",
+		"events": {
+			"plan_review": "A plan waits for approval",
+			"review_ready": "Work is ready for my review",
+			"failed": "A run stopped on an error"
+		},
+		"language": "Language of the messages",
+		"enabled": "{{channel}} on",
+		"stored": "Stored",
+		"replacePlaceholder": "Stored: type a new value to replace it",
+		"save": "Save",
+		"test": "Send a test",
+		"remove": "Remove {{channel}} from the server",
+		"results": {
+			"sent": "Test sent",
+			"refused": "The service refused the message",
+			"blocked": "Destination refused by the server",
+			"unreachable": "The service could not be reached"
+		},
+		"ntfy": {
+			"title": "ntfy",
+			"description": "A push to the ntfy app. On ntfy.sh the topic is the only secret: use a long one.",
+			"server": "Server",
+			"serverPlaceholder": "https://ntfy.sh",
+			"topic": "Topic",
+			"topicPlaceholder": "At least 16 characters on ntfy.sh",
+			"access_token": "Access token (optional)",
+			"access_tokenPlaceholder": "For a protected topic",
+			"generate": "Generate"
+		},
+		"telegram": {
+			"title": "Telegram",
+			"description": "A message from your own bot (created with @BotFather) in a private chat.",
+			"bot_token": "Bot token",
+			"bot_tokenPlaceholder": "123456:ABC…",
+			"chat_id": "Chat id",
+			"chat_idPlaceholder": "Your chat's numeric id"
+		},
+		"teams": {
+			"title": "Microsoft Teams",
+			"description": "A card posted by an incoming webhook or a Workflows URL of a channel or chat.",
+			"webhook_url": "Webhook URL",
+			"webhook_urlPlaceholder": "https://….webhook.office.com/… or a Workflows URL"
+		}
 	},
 	"invitationsAdmin": {
 		"navLabel": "Invitations (team)",
@@ -1945,7 +2205,15 @@
 		"importConfirmTitle": "Import {{count}} issue(s)",
 		"importConfirmDescription": "The following items will be imported into the {{column}} column.",
 		"importConfirmButton": "Import {{count}} item(s)",
-		"selectedItems": "{{count}} item(s) selected"
+		"selectedItems": "{{count}} item(s) selected",
+		"assignee": "Assignee: {{name}}",
+		"selectedOfTotal": "{{selected}} / {{total}} selected",
+		"noJiraIssues": "No Jira issues found",
+		"typeLabel": "Type",
+		"statusLabel": "Status",
+		"allStatuses": "All Statuses",
+		"dragHint": "Drag selected issues to a Kanban column to import",
+		"resize": "Resize"
 	},
 	"instructions": {
 		"title": "GitHub Copilot Instructions",
@@ -2220,7 +2488,8 @@
 			"currentStatus": "Status:",
 			"configured": "Configured",
 			"useInstead": "Use a Personal Access Token instead",
-			"hide": "Hide"
+			"hide": "Hide",
+			"description": "A GitHub Personal Access Token with Copilot access."
 		},
 		"instructions": {
 			"title": "Instructions",
@@ -2269,7 +2538,8 @@
 			"warn": "Warn",
 			"deny": "Deny",
 			"require_approval": "Require approval"
-		}
+		},
+		"fileContentPlaceholder": "file content…"
 	},
 	"search": {
 		"placeholder": "Search settings...",
@@ -2407,8 +2677,8 @@
 	},
 	"automations": {
 		"title": "Automations",
-		"description": "An event creates a card on the board: an issue labelled, the base branch's CI going red, a time of day.",
-		"intro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule never merges, pushes or comments. Rules run every 5 minutes while the app is open.",
+		"description": "An event creates a card on the board: an issue labelled, the base branch's CI going red, a time of day. A PR opened by someone else gets a draft review.",
+		"intro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. Rules run every 5 minutes while the app is open.",
 		"add": "Add a rule",
 		"runNow": "Run now",
 		"save": "Save rule",
@@ -2436,25 +2706,30 @@
 			"kind": "Card kind",
 			"engine": "Choose the engine",
 			"draft": "Draft cards",
-			"dailyCap": "Cards per day, at most"
+			"dailyCap": "Cards per day, at most",
+			"base": "Base branch"
 		},
 		"triggers": {
-			"issue_labeled": "A GitHub issue gets a label",
+			"issue_labeled": "An issue gets a label (GitHub or GitLab)",
 			"ci_failed": "The CI turns red on a branch",
-			"schedule": "At a time of day"
+			"schedule": "At a time of day",
+			"pr_opened": "Someone else opens a GitHub PR"
 		},
 		"help": {
-			"issue_labeled": "Only issues labelled after the rule is created. An issue that already has a card is not imported twice.",
+			"issue_labeled": "Only issues labelled after the rule is created, on the project's GitHub or, without it, its GitLab. An issue that already has a card is not imported twice.",
 			"ci_failed": "Read from the CI provider set in Settings › CI/CD pipeline. One card per red streak: while that card is open, a new failed run does not create another.",
 			"schedule": "Fires once on each chosen day, once the time has passed. A day the app was closed is not made up.",
 			"draft": "The card waits in the backlog until you start it.",
 			"noDraft": "Each card starts its build as soon as it is created.",
-			"dailyCap": "Events over the cap wait for the next day; none is dropped."
+			"dailyCap": "Events over the cap wait for the next day; none is dropped.",
+			"pr_opened": "Only PRs opened after the rule is created, by someone other than you and not by a bot. A draft PR waits until it is ready for review. Leave the branch empty for any base branch.",
+			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews."
 		},
 		"summary": {
 			"issue_labeled": "Issue labelled “{{label}}”",
 			"ci_failed": "CI red on {{branch}}",
-			"schedule": "{{days}} at {{time}}"
+			"schedule": "{{days}} at {{time}}",
+			"pr_opened": "PR opened into {{base}}"
 		},
 		"status": {
 			"never": "Not run yet",
@@ -2462,14 +2737,17 @@
 			"today_one": "{{count}} card today (at most {{cap}})",
 			"today_other": "{{count}} cards today (at most {{cap}})",
 			"deferred_one": "{{count}} event waits for tomorrow",
-			"deferred_other": "{{count}} events wait for tomorrow"
+			"deferred_other": "{{count}} events wait for tomorrow",
+			"reviewsToday_one": "{{count}} review today (at most {{cap}})",
+			"reviewsToday_other": "{{count}} reviews today (at most {{cap}})"
 		},
 		"outcome": {
 			"created": "created {{specId}} for {{subject}}",
 			"started": "created and started {{specId}} for {{subject}}",
 			"duplicate": "skipped {{subject}}",
 			"ignored": "ignored {{subject}}",
-			"error": "could not run on {{subject}}"
+			"error": "could not run on {{subject}}",
+			"review_started": "started the review of {{subject}}"
 		},
 		"reasons": {
 			"label_predates_rule": "the label was there before the rule",
@@ -2479,7 +2757,193 @@
 			"github_not_connected": "GitHub is not connected for this project (Settings › GitHub)",
 			"no_ci_provider": "no CI provider is configured for this project (Settings › CI/CD pipeline)",
 			"source_failed": "the source could not be read",
-			"card_failed": "the card could not be created"
+			"card_failed": "the card could not be created",
+			"own_pr": "you opened this PR",
+			"bot_author": "a bot opened this PR",
+			"already_reviewed": "this PR already has a review",
+			"review_failed": "the review could not start",
+			"forge_not_connected": "neither GitHub nor GitLab is connected for this project",
+			"token_missing": "the person who saved this rule has no token for this forge on the server (Settings › My tokens on the server)",
+			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over"
+		},
+		"anyBranch": "any branch",
+		"reviewDrafts": "reviews wait for you",
+		"serverIntro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. This project is on the server: its rules are the team's, and the server runs them every 5 minutes, even when nobody has the app open. Each rule reads GitHub or GitLab with the token of the person who saved it last, and its cards are created by Automations. Times are the server's.",
+		"runsAs": "runs with {{name}}'s tokens"
+	},
+	"githubOAuth": {
+		"usingCli": "Using GitHub CLI {{version}}",
+		"openLink": "Open {{url}}",
+		"cliRequired": "GitHub CLI Required",
+		"cliRequiredDescription": "The GitHub CLI (gh) is required for OAuth authentication. This provides a secure way to authenticate without manually creating tokens.",
+		"installCli": "Install GitHub CLI",
+		"installed": "I've Installed It",
+		"installInstructions": "Installation instructions:",
+		"linuxVisit": "Linux: Visit",
+		"connectTitle": "Connect to GitHub",
+		"connectDescription": "Click the button below to authenticate with GitHub. This will open your browser where you can authorize the application.",
+		"authenticate": "Authenticate with GitHub",
+		"authenticating": "Authenticating...",
+		"oneTimeCode": "Your one-time code",
+		"copied": "Copied",
+		"copy": "Copy",
+		"connected": "Successfully Connected",
+		"manualTitle": "Complete Authentication Manually",
+		"manualDescription": "The browser couldn't be opened automatically. Please visit the URL below to complete authentication:",
+		"openUrl": "Open URL in Browser",
+		"enterCode": "When prompted, enter this code:",
+		"connectedAs": "Connected as {{username}}",
+		"completeInBrowser": "Please complete the authentication in your browser. This window will update automatically.",
+		"waitingStart": "Waiting for authentication flow to start...",
+		"enterCodeInBrowser": "Enter this code in your browser to complete authentication.",
+		"copyThenOpen": "Copy this code, then open the link below to authenticate.",
+		"accountConnected": "Your GitHub account is now connected",
+		"timedOut": "Authentication Timed Out",
+		"failed": "Authentication Failed"
+	},
+	"apiKeyConfig": {
+		"apiUrl": "API URL",
+		"defaultModel": "Default model",
+		"modelPlaceholder": "gpt-5.3, claude-4.6-opus, etc."
+	},
+	"customProvider": {
+		"modelNamePlaceholder": "Custom Model Name",
+		"title": "Custom provider",
+		"description": "Connect any OpenAI-compatible endpoint and choose its models.",
+		"apiConfig": "API configuration",
+		"apiUrl": "API URL",
+		"apiKey": "API key",
+		"urlRequired": "URL required",
+		"urlRequiredDesc": "Enter the API URL before discovering models.",
+		"discoverModels": "Discover models",
+		"discovering": "Discovering…",
+		"modelsDiscovered": "Models found",
+		"modelsDiscoveredDesc": "{{count}} models found.",
+		"noModelsFound": "No models found",
+		"noModelsFoundDesc": "The endpoint did not return any model. Add them by hand below.",
+		"discoveryFailed": "Discovery failed",
+		"discoveryFailedDesc": "Could not reach the endpoint. Check the URL and the key.",
+		"manualModels": "Add a model by hand",
+		"modelName": "Model name",
+		"modelId": "Model ID",
+		"modelTier": "Tier",
+		"tierFlagship": "Flagship",
+		"tierStandard": "Standard",
+		"tierFast": "Fast",
+		"supportsThinking": "Supports extended thinking",
+		"addModel": "Add model",
+		"modelInfoRequired": "Model details required",
+		"modelInfoRequiredDesc": "Enter both the model name and its ID.",
+		"modelAdded": "Model added",
+		"modelAddedDesc": "{{name}} was added.",
+		"modelRemoved": "Model removed",
+		"modelRemovedDesc": "The model was removed from the list.",
+		"availableModels": "Available models",
+		"noModelsConfigured": "No model configured",
+		"addModelsDesc": "Discover the endpoint's models or add them by hand."
+	},
+	"customThemes": {
+		"title": "Custom Themes",
+		"description": "Create your own color themes or import shared ones",
+		"import": "Import",
+		"newTheme": "New Theme",
+		"themeName": "Theme Name",
+		"themeNamePlaceholder": "My Custom Theme",
+		"descriptionLabel": "Description",
+		"descriptionPlaceholder": "A brief description",
+		"preview": "Preview:",
+		"create": "Create Theme",
+		"export": "Export",
+		"empty": "No custom themes yet",
+		"emptyHint": "Create a new theme or import one to get started"
+	},
+	"projectSelector": {
+		"placeholder": "Select a project...",
+		"empty": "No projects yet",
+		"add": "Add Project...",
+		"emptyState": "Select a project to view and edit its settings",
+		"initializeFirst": "Initialize WorkPilot AI first to configure {{section}}"
+	},
+	"agentToolsPanel": {
+		"mcpServers": "MCP Servers",
+		"edit": "Edit"
+	},
+	"insightsModel": {
+		"custom": "Custom...",
+		"customDescription": "Choose model & thinking level"
+	},
+	"linearImport": {
+		"importButton_one": "Import {{count}} Task",
+		"importButton_other": "Import {{count}} Tasks",
+		"title": "Import Linear Tasks",
+		"description": "Select tasks from Linear to import into AutoBuild",
+		"imported_one": "Successfully imported {{count}} task",
+		"imported_other": "Successfully imported {{count}} tasks",
+		"processing": "Tasks are being processed. Check your Kanban board for progress.",
+		"moreLabels": "+{{count}} more",
+		"assignedTo": "Assigned to {{name}}",
+		"project": "Project: {{name}}",
+		"hideDescription": "Hide description",
+		"showDescription": "Show description",
+		"viewInLinear": "View in Linear",
+		"selectTeam": "Select a team to view issues",
+		"searchPlaceholder": "Search tasks...",
+		"allStates": "All states",
+		"selectedOfTotal": "{{selected}} of {{total}} selected",
+		"team": "Team",
+		"projectOptional": "Project (Optional)",
+		"allProjects": "All projects",
+		"noMatch": "No issues match your filters",
+		"empty": "No issues found",
+		"deselectAll": "Deselect all",
+		"selectAll": "Select all"
+	},
+	"boardMcp": {
+		"navLabel": "Use from other apps",
+		"title": "Use this project from other AI apps",
+		"description": "Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Claude Desktop, Windsurf or OpenCode can read this project's board and add cards to it, through the workpilot-board MCP server.",
+		"intro": "Each app starts the server itself, on this computer, under the name {{name}}. Add it to an app with one click, or copy what to paste when the app cannot be written to.",
+		"limits": "The server lists and reads cards and their specs, adds a card to the backlog, edits a card's text until work starts on it, waits until a card is ready for your review, and reads the roadmap and Ideation's ideas. Starting a build, approving a plan and merging stay with you, on the card.",
+		"loading": "Looking for your AI apps…",
+		"add": "Add",
+		"update": "Update",
+		"remove": "Remove",
+		"copy": "Copy the configuration",
+		"showSnippet": "Show what to paste",
+		"hideSnippet": "Hide",
+		"location": "Configuration: {{location}}",
+		"restartHint": "Restart the app (or open a new session) for it to see the server.",
+		"state": {
+			"current": "Added",
+			"stale": "Out of date",
+			"absent": "Not added",
+			"notDetected": "Not detected"
+		},
+		"errors": {
+			"server_project": "A server project is shared through the team server: connect your AI apps to it in Settings, MCP access to the server.",
+			"python_not_ready": "The app's Python environment is not ready yet. Try again in a moment.",
+			"config_unreadable": "This app's configuration file could not be read (invalid JSON or comments). Nothing was changed: paste the configuration by hand.",
+			"client_not_found": "This app was not found on this computer. Copy the configuration instead.",
+			"claude_not_found": "The claude command could not be run from here. Paste the command in a terminal instead.",
+			"generic": "Could not do it: {{detail}}"
 		}
+	},
+	"worktreeRecipe": {
+		"title": "Worktree preparation",
+		"description": "What WorkPilot runs in each new task worktree before the first session: restore the stack's dependencies, copy ignored local files, reserve ports for the task. A failed step does not stop the task; the agent is told about it.",
+		"sourceFile": "From .workpilot/worktree.toml",
+		"sourceDetected": "Detected from the project's files (no .workpilot/worktree.toml)",
+		"noCommands": "No package manager recognised: nothing runs.",
+		"copies": "Copies: {{files}}",
+		"ports_one": "Reserves {{count}} port per task",
+		"ports_other": "Reserves {{count}} ports per task",
+		"teardown": "When the worktree is removed: {{commands}}",
+		"proofs": "After QA approves, proof checkers: {{commands}}",
+		"invalid": "Invalid, nothing runs: {{errors}}",
+		"approved": "Approved: runs in new worktrees.",
+		"awaiting": "This recipe runs commands on your machine. It runs only once you approve it as it is now.",
+		"approve": "Approve",
+		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
+		"saveDetected": "Save as worktree.toml"
 	}
 }

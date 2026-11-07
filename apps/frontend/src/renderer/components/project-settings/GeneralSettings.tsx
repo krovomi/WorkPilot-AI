@@ -20,7 +20,9 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useProviderContext } from "../ProviderContext";
+import { CrossReviewSettings } from "./CrossReviewSettings";
 import { RepositorySection } from "./RepositorySection";
+import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
@@ -224,7 +226,7 @@ export function GeneralSettings({
 											<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
 												{t("projectSections.autoBuild.blocker.manual")}
 											</summary>
-											<div className="mt-2 rounded-md bg-muted/60 p-3 font-mono text-[11px] space-y-1 text-muted-foreground">
+											<div className="mt-2 rounded-md bg-muted/60 p-3 font-mono text-2xs space-y-1 text-muted-foreground">
 												{repairableBlocker === "not-a-git-repo" && (
 													<p>git init</p>
 												)}
@@ -338,7 +340,29 @@ export function GeneralSettings({
 								}
 							/>
 						</div>
+						<div className="flex items-center justify-between pt-2">
+							<div className="space-y-0.5">
+								<Label htmlFor="spec-by-example" className="font-normal text-foreground">
+									{t("projectSections.general.specByExample")}
+								</Label>
+								<p className="text-xs text-muted-foreground">
+									{t("projectSections.general.specByExampleDescription")}
+								</p>
+							</div>
+							<Switch
+								id="spec-by-example"
+								checked={settings.specByExample ?? false}
+								onCheckedChange={(checked) =>
+									setSettings({ ...settings, specByExample: checked })
+								}
+							/>
+						</div>
+						<CrossReviewSettings settings={settings} setSettings={setSettings} />
 					</section>
+
+					<Separator />
+
+					<WorktreeRecipeSection projectPath={project.path} />
 
 					<Separator />
 

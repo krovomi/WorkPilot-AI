@@ -207,14 +207,20 @@ export function SDKRateLimitModal() {
 				hideSDKRateLimitModal();
 
 				// Direct user to Settings to complete authentication
-				alert(
-					`${t("profileCreated.title", { profileName })}\n\n` +
-						`${t("profileCreated.instructions")}\n` +
-						`1. ${t("profileCreated.step1")}\n` +
-						`2. ${t("profileCreated.step2")}\n` +
-						`3. ${t("profileCreated.step3")}\n\n` +
-						`${t("profileCreated.footer")}`,
-				);
+				toast({
+					variant: "success",
+					title: t("profileCreated.title", { profileName }),
+					description: (
+						<span className="whitespace-pre-line">
+							{`${t("profileCreated.instructions")}\n` +
+								`1. ${t("profileCreated.step1")}\n` +
+								`2. ${t("profileCreated.step2")}\n` +
+								`3. ${t("profileCreated.step3")}\n\n` +
+								t("profileCreated.footer")}
+						</span>
+					),
+					duration: 15000,
+				});
 			}
 		} catch (err) {
 			debugError("[SDKRateLimitModal] Failed to add profile:", err);
@@ -294,7 +300,7 @@ export function SDKRateLimitModal() {
 						{currentProfile && (
 							<span className="text-muted-foreground">
 								{" "}
-								(Profile: {currentProfile.name})
+								({t("common:rateLimit.profile", { name: currentProfile.name })})
 							</span>
 						)}
 					</DialogDescription>
@@ -321,7 +327,7 @@ export function SDKRateLimitModal() {
 												to: swapInfo.swappedTo,
 											})}
 								</p>
-								<p className="mt-2 text-[10px]">
+								<p className="mt-2 text-3xs">
 									{t("rateLimit.sdk.continueWithoutInterruption")}
 								</p>
 							</>
@@ -386,11 +392,12 @@ export function SDKRateLimitModal() {
 								<p className="text-sm text-muted-foreground mb-3">
 									{suggestedProfile ? (
 										<>
-											Recommended: <strong>{suggestedProfile.name}</strong> has
-											more capacity available.
+											{t("common:rateLimit.sdk.recommendedBefore")}{" "}
+											<strong>{suggestedProfile.name}</strong>{" "}
+											{t("common:rateLimit.sdk.recommendedAfter")}
 										</>
 									) : (
-										"Switch to another Claude account and retry the operation:"
+										t("common:rateLimit.sdk.switchClaudeRetry")
 									)}
 								</p>
 
@@ -402,10 +409,10 @@ export function SDKRateLimitModal() {
 												className="flex-1 justify-between"
 											>
 												<span className="truncate flex items-center gap-2">
-													{selectedProfile?.name || "Select account..."}
+													{selectedProfile?.name || t("common:rateLimit.selectAccount")}
 													{selectedProfileId ===
 														sdkRateLimitInfo.suggestedProfile?.id && (
-														<Star className="h-3 w-3 text-yellow-500" />
+														<Star className="h-3 w-3 text-warning" />
 													)}
 												</span>
 												<ChevronDown className="h-4 w-4 shrink-0 ml-2" />
@@ -426,8 +433,8 @@ export function SDKRateLimitModal() {
 														{profile.id ===
 															sdkRateLimitInfo.suggestedProfile?.id && (
 															<Star
-																className="h-3 w-3 text-yellow-500"
-																aria-label="Recommended"
+																className="h-3 w-3 text-warning"
+																aria-label={t("common:rateLimit.recommendedAria")}
 															/>
 														)}
 													</span>
@@ -448,7 +455,7 @@ export function SDKRateLimitModal() {
 												className="flex items-center gap-2 text-muted-foreground"
 											>
 												<Plus className="h-4 w-4" />
-												Add new account...
+												{t("common:rateLimit.addNewAccount")}
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
@@ -500,8 +507,7 @@ export function SDKRateLimitModal() {
 							</>
 						) : (
 							<p className="text-sm text-muted-foreground mb-3">
-								Add another Claude subscription to automatically switch when you
-								hit rate limits.
+								{t("common:rateLimit.sdk.addClaudeSubscription")}
 							</p>
 						)}
 
@@ -513,12 +519,12 @@ export function SDKRateLimitModal() {
 						>
 							<p className="text-xs text-muted-foreground mb-2">
 								{hasMultipleProfiles
-									? "Add another account:"
-									: "Connect a Claude account:"}
+									? t("common:rateLimit.addAnotherAccount")
+									: t("common:rateLimit.sdk.connectClaude")}
 							</p>
 							<div className="flex items-center gap-2">
 								<Input
-									placeholder="Account name (e.g., Work, Personal)"
+									placeholder={t("common:rateLimit.accountNamePlaceholder")}
 									value={newProfileName}
 									onChange={(e) => setNewProfileName(e.target.value)}
 									className="flex-1 h-8 text-sm"
@@ -544,7 +550,7 @@ export function SDKRateLimitModal() {
 								</Button>
 							</div>
 							<p className="text-xs text-muted-foreground mt-2">
-								This will open Claude login to authenticate the new account.
+								{t("common:rateLimit.sdk.willOpenClaudeLogin")}
 							</p>
 						</div>
 					</div>
@@ -552,10 +558,10 @@ export function SDKRateLimitModal() {
 					{/* Upgrade prompt */}
 					<div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
 						<h4 className="text-sm font-medium text-foreground mb-2">
-							Upgrade for more usage
+							{t("common:rateLimit.upgradeTitle")}
 						</h4>
 						<p className="text-sm text-muted-foreground mb-3">
-							Upgrade your Claude subscription for higher usage limits.
+							{t("common:rateLimit.upgradeDescription")}
 						</p>
 						<Button
 							variant="outline"
@@ -564,7 +570,7 @@ export function SDKRateLimitModal() {
 							onClick={handleUpgrade}
 						>
 							<ExternalLink className="h-4 w-4" />
-							Upgrade Subscription
+							{t("common:rateLimit.upgradeSubscription")}
 						</Button>
 					</div>
 

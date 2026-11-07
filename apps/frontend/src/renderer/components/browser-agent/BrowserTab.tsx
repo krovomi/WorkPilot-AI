@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
 
+import { Input } from "../ui/input";
 interface BrowserTabProps {
 	readonly projectPath: string;
 }
@@ -78,10 +79,10 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 	return (
 		<div className="flex flex-col gap-0 h-full">
 			{/* Browser toolbar */}
-			<div className="flex items-center gap-1.5 p-2 rounded-t-lg bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-secondary)] border border-[var(--border-primary)] border-b-0">
+			<div className="flex items-center gap-1.5 p-2 rounded-t-lg bg-gradient-to-r from-card to-card border border-border border-b-0">
 				{/* Navigation buttons */}
-				<ToolbarButton icon={ArrowLeft} disabled title="Back" />
-				<ToolbarButton icon={ArrowRight} disabled title="Forward" />
+				<ToolbarButton icon={ArrowLeft} disabled title={t("common:buttons.back")} />
+				<ToolbarButton icon={ArrowRight} disabled title={t("browserAgent:browser.forward")} />
 				<ToolbarButton
 					icon={RotateCw}
 					onClick={handleRefresh}
@@ -92,7 +93,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				/>
 
 				{/* URL bar */}
-				<div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-primary)] focus-within:border-blue-400/50 focus-within:shadow-[0_0_0_1px_rgba(96,165,250,0.15)] transition-all">
+				<div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md bg-background border border-border focus-within:border-blue-400/50 focus-within:shadow-[0_0_0_1px_rgba(96,165,250,0.15)] transition-all">
 					{isNavigating ? (
 						<Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
 					) : (
@@ -104,7 +105,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 						onChange={(e) => setUrlInput(e.target.value)}
 						onKeyDown={handleKeyDown}
 						placeholder={t("browserAgent:browser.urlPlaceholder")}
-						className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
+						className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 					/>
 					{urlInput.trim() && (
 						<button
@@ -140,7 +141,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 			{showCaptureBar && (
 				<div className="flex items-center gap-2 px-3 py-2 bg-purple-500/8 border-x border-purple-500/20">
 					<Camera className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-					<input
+					<Input
 						type="text"
 						value={screenshotName}
 						onChange={(e) => setScreenshotName(e.target.value)}
@@ -148,7 +149,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 							if (e.key === "Enter") handleCapture();
 						}}
 						placeholder={t("browserAgent:browser.screenshotNamePlaceholder")}
-						className="flex-1 px-2.5 py-1 rounded bg-[var(--bg-primary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-purple-400/50"
+						className="flex-1 px-2.5 py-1 text-sm h-auto"
 					/>
 					<button
 						type="button"
@@ -165,13 +166,13 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 			)}
 
 			{/* Browser viewport */}
-			<div className="flex-1 rounded-b-lg border border-[var(--border-primary)] bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center min-h-[400px] relative">
+			<div className="flex-1 rounded-b-lg border border-border bg-muted overflow-hidden flex items-center justify-center min-h-[400px] relative">
 				{/* Loading overlay */}
 				{isNavigating && browserScreenshot && (
 					<div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 backdrop-blur-[2px]">
-						<div className="flex flex-col items-center gap-2 px-5 py-4 rounded-xl bg-[var(--bg-secondary)]/95 backdrop-blur-sm border border-blue-500/20 shadow-lg shadow-blue-500/10">
+						<div className="flex flex-col items-center gap-2 px-5 py-4 rounded-xl bg-card/95 backdrop-blur-sm border border-blue-500/20 shadow-lg shadow-blue-500/10">
 							<Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-							<p className="text-xs text-[var(--text-secondary)]">
+							<p className="text-xs text-muted-foreground">
 								{browserStatus === "launching"
 									? t("browserAgent:browser.launching")
 									: t("browserAgent:browser.navigating")}
@@ -187,10 +188,10 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 							<MonitorPlay className="w-10 h-10 text-blue-400/70" />
 						</div>
 						<div>
-							<p className="text-sm font-medium text-[var(--text-secondary)] mb-1.5">
+							<p className="text-sm font-medium text-muted-foreground mb-1.5">
 								{t("browserAgent:browser.idleTitle")}
 							</p>
-							<p className="text-xs text-[var(--text-tertiary)] leading-relaxed">
+							<p className="text-xs text-muted-foreground leading-relaxed">
 								{t("browserAgent:browser.idleDescription")}
 							</p>
 						</div>
@@ -215,7 +216,7 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				{browserScreenshot && (
 					<img
 						src={browserScreenshot}
-						alt="Browser screenshot"
+						alt={t("browserAgent:browser.screenshotAlt")}
 						className="max-w-full max-h-full object-contain"
 					/>
 				)}
@@ -223,13 +224,13 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 				{/* Error state */}
 				{browserStatus === "error" && !browserScreenshot && (
 					<div className="flex flex-col items-center gap-3 text-center max-w-xs">
-						<div className="w-14 h-14 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-							<WifiOff className="w-7 h-7 text-red-400" />
+						<div className="w-14 h-14 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+							<WifiOff className="w-7 h-7 text-destructive" />
 						</div>
-						<p className="text-sm font-medium text-red-400">
+						<p className="text-sm font-medium text-destructive">
 							{t("browserAgent:errors.screenshotFailed")}
 						</p>
-						<p className="text-xs text-[var(--text-tertiary)]">
+						<p className="text-xs text-muted-foreground">
 							{t("browserAgent:browser.errorHint")}
 						</p>
 					</div>
@@ -238,22 +239,22 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 
 			{/* Status bar */}
 			{currentUrl && (
-				<div className="flex items-center gap-2 px-3 py-1.5 text-[11px]">
+				<div className="flex items-center gap-2 px-3 py-1.5 text-2xs">
 					{browserStatus === "ready" ? (
 						<>
-							<Wifi className="w-3 h-3 text-emerald-400" />
-							<span className="text-emerald-400/80 font-medium">
+							<Wifi className="w-3 h-3 text-success" />
+							<span className="text-success/80 font-medium">
 								{t("browserAgent:browser.ready")}
 							</span>
-							<span className="text-[var(--text-tertiary)]">·</span>
-							<span className="text-[var(--text-tertiary)] truncate">
+							<span className="text-muted-foreground">·</span>
+							<span className="text-muted-foreground truncate">
 								{currentUrl}
 							</span>
 						</>
 					) : browserStatus === "error" ? (
 						<>
-							<WifiOff className="w-3 h-3 text-red-400" />
-							<span className="text-red-400/80 font-medium">
+							<WifiOff className="w-3 h-3 text-destructive" />
+							<span className="text-destructive/80 font-medium">
 								{t("browserAgent:errors.screenshotFailed")}
 							</span>
 						</>
@@ -299,7 +300,7 @@ function ToolbarButton({
 			className={`p-1.5 rounded-md transition-colors ${
 				active
 					? activeColors[color]
-					: "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+					: "text-muted-foreground hover:text-foreground hover:bg-accent"
 			} disabled:opacity-30 disabled:cursor-not-allowed`}
 		>
 			<Icon className={`w-4 h-4 ${spinning ? "animate-spin" : ""}`} />

@@ -219,6 +219,9 @@ class PushAndCreatePRResult(TypedDict, total=False):
     already_exists: bool
     error: str
     message: str
+    cross_review_blocked: bool  # held back by a cross review that disagrees
+    stack_linked: bool  # F6: joined its parent's stack (gh stack link)
+    stack_note: str  # why it did not, when it did not
 
 
 class WorktreeError(Exception):

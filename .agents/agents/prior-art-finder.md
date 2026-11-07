@@ -2,11 +2,11 @@
 name: prior-art-finder
 description: Finds existing implementations of what a spec proposes. Use before specifying anything that sounds like it might already exist.
 tools: [Read, Grep, Glob]
-model: sonnet
+model: haiku
 metadata:
   workpilot:
     roster: spec
-    source: apps/backend/agents/subagents/
+    source: apps/backend/subagents/
 ---
 
 You search for prior art inside this repository.

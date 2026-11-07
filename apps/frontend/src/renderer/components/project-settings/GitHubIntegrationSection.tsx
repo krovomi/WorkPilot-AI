@@ -40,7 +40,7 @@ export function GitHubIntegrationSection({
 	);
 
 	const badge = envConfig.githubEnabled ? (
-		<StatusBadge status="success" label="Enabled" />
+		<StatusBadge status="success" label={t("settings:common.enabled")} />
 	) : null;
 
 	const handleOAuthSuccess = (token: string, _username?: string) => {
@@ -56,7 +56,7 @@ export function GitHubIntegrationSection({
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
 				<Label className="text-sm font-medium text-foreground">
-					GitHub Authentication
+					{t("settings:projectSections.github.githubAuthentication")}
 				</Label>
 				<Button
 					variant="ghost"
@@ -66,13 +66,13 @@ export function GitHubIntegrationSection({
 					}
 					className="text-muted-foreground hover:text-foreground"
 				>
-					Use Manual Token
+					{t("settings:projectSections.github.useManualToken")}
 				</Button>
 			</div>
 			<div className="flex items-center gap-2 p-3 rounded-lg border border-success/30 bg-success/5">
 				<CheckCircle2 className="h-4 w-4 text-success" />
 				<span className="text-sm text-foreground">
-					Authenticated via GitHub OAuth (gh CLI)
+					{t("settings:projectSections.github.authenticatedViaOAuth")}
 				</span>
 			</div>
 		</div>
@@ -82,14 +82,14 @@ export function GitHubIntegrationSection({
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<Label className="text-sm font-medium text-foreground">
-					GitHub Authentication
+					{t("settings:projectSections.github.githubAuthentication")}
 				</Label>
 				<Button
 					variant="ghost"
 					size="sm"
 					onClick={() => setShowOAuthFlow(false)}
 				>
-					Use Manual Token
+					{t("settings:projectSections.github.useManualToken")}
 				</Button>
 			</div>
 			<GitHubOAuthFlow
@@ -103,7 +103,7 @@ export function GitHubIntegrationSection({
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
 				<Label className="text-sm font-medium text-foreground">
-					Personal Access Token
+					{t("settings:projectSections.github.patLabel")}
 				</Label>
 				<Button
 					variant="outline"
@@ -112,25 +112,25 @@ export function GitHubIntegrationSection({
 					className="gap-2"
 				>
 					<KeyRound className="h-3 w-3" />
-					Use OAuth Instead
+					{t("settings:projectSections.github.useOAuthInstead")}
 				</Button>
 			</div>
 			<p className="text-xs text-muted-foreground">
-				Create a token with <code className="px-1 bg-muted rounded">repo</code>{" "}
-				scope from{" "}
+				{t("settings:projectSections.github.patHelpBefore")} <code className="px-1 bg-muted rounded">repo</code>{" "}
+				{t("settings:projectSections.github.patHelpAfter")}{" "}
 				<a
 					href="https://github.com/settings/tokens/new?scopes=repo&description=WorkPilot AI-UI"
 					target="_blank"
 					rel="noopener noreferrer"
 					className="text-info hover:underline"
 				>
-					GitHub Settings
+					{t("settings:projectSections.github.githubSettingsLink")}
 				</a>
 			</p>
 			<PasswordInput
 				value={envConfig.githubToken || ""}
 				onChange={handleManualTokenChange}
-				placeholder="ghp_xxxxxxxx or github_pat_xxxxxxxx"
+				placeholder={t("settings:projectSections.github.tokenPlaceholder")}
 			/>
 		</div>
 	);
@@ -153,7 +153,7 @@ export function GitHubIntegrationSection({
 
 	return (
 		<CollapsibleSection
-			title="GitHub Integration"
+			title={t("settings:projectSections.github.integrationTitle")}
 			icon={<Globe className="h-4 w-4" />}
 			isExpanded={isExpanded}
 			onToggle={onToggle}
@@ -166,14 +166,14 @@ export function GitHubIntegrationSection({
 						<Info className="h-4 w-4 text-info mt-0.5 shrink-0" />
 						<div className="flex-1">
 							<p className="text-sm font-medium text-foreground">
-								Project-Specific Configuration
+								{t("settings:projectSections.github.projectSpecificTitle")}
 							</p>
 							<p className="text-xs text-muted-foreground mt-1">
-								This GitHub repository is configured only for{" "}
+								{t("settings:projectSections.github.projectSpecificBefore")}{" "}
 								<span className="font-semibold text-foreground">
 									{projectName}
 								</span>
-								. Each project can have its own GitHub repository.
+								{t("settings:projectSections.github.projectSpecificAfter")}
 							</p>
 						</div>
 					</div>
@@ -206,11 +206,11 @@ export function GitHubIntegrationSection({
 
 					<div className="space-y-2">
 						<Label className="text-sm font-medium text-foreground">
-							Repository
+							{t("settings:projectSections.github.repository")}
 						</Label>
 						<p className="text-xs text-muted-foreground">
-							Format: <code className="px-1 bg-muted rounded">owner/repo</code>{" "}
-							(e.g., facebook/react)
+							{t("settings:projectSections.github.repositoryFormatPrefix")} <code className="px-1 bg-muted rounded">owner/repo</code>{" "}
+							{t("settings:projectSections.github.repositoryFormatExample")}
 						</p>
 						<Input
 							placeholder="owner/repository"
@@ -224,7 +224,7 @@ export function GitHubIntegrationSection({
 						<ConnectionStatus
 							isChecking={isCheckingGitHub}
 							isConnected={gitHubConnectionStatus?.connected || false}
-							title="Connection Status"
+							title={t("settings:projectSections.github.connectionStatus")}
 							successMessage={`Connected to ${gitHubConnectionStatus?.repoFullName}`}
 							errorMessage={gitHubConnectionStatus?.error || "Not connected"}
 							additionalInfo={gitHubConnectionStatus?.repoDescription}
@@ -238,11 +238,10 @@ export function GitHubIntegrationSection({
 								<Globe className="h-5 w-5 text-info mt-0.5" />
 								<div className="flex-1">
 									<p className="text-sm font-medium text-foreground">
-										Issues Available
+										{t("settings:projectSections.github.issuesAvailable")}
 									</p>
 									<p className="text-xs text-muted-foreground mt-1">
-										Access GitHub Issues from the sidebar to view, investigate,
-										and create tasks from issues.
+										{t("settings:projectSections.github.issuesAvailableDescription")}
 									</p>
 								</div>
 							</div>
@@ -257,11 +256,11 @@ export function GitHubIntegrationSection({
 							<div className="flex items-center gap-2">
 								<RefreshCw className="h-4 w-4 text-info" />
 								<Label className="font-normal text-foreground">
-									Auto-Sync on Load
+									{t("settings:projectSections.github.autoSyncOnLoad")}
 								</Label>
 							</div>
 							<p className="text-xs text-muted-foreground pl-6">
-								Automatically fetch issues when the project loads
+								{t("settings:projectSections.github.autoSyncDescription")}
 							</p>
 						</div>
 						<Switch

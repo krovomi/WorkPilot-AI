@@ -80,6 +80,7 @@ __all__ = [
     "run_skill_phases",
     "subagents_allowed",
     "fresh_context",
+    "companion_lines",
 ]
 
 # Phases WorkPilot executes itself, by **phase id** rather than by `impl`.
@@ -142,6 +143,11 @@ CONFIG_PHASE = {
     "verify-replay": "qa",
     # Architecture mapping runs after QA and describes the system topology changes.
     "architecture-map": "qa",
+    # A second engine reading the finished task: a QA cost. Its own provider
+    # and model come from `cross_review_phase.resolve_reviewer`, not from this.
+    # The integration tests written before the code (IA6): coding's model.
+    "spec-by-example": "coding",
+    "cross-review": "qa",
     # Phases of the per-kind workflows (`workflows/registry.py`). Before the
     # code is written, they are planning costs; what reads the finished work
     # is a QA cost.
@@ -215,6 +221,9 @@ SKILL_PHASE_AGENTS = {
     "analyze": "spec_validation",
     "mobile-design": "pr_reviewer",
     "review": "pr_reviewer",
+    # Read-only; `workflows.cross_review_phase` opens the session itself, on the
+    # second engine, and names this agent too.
+    "cross-review": "pr_reviewer",
     # The verification loop drives the app and may fix it: `verifier` writes,
     # like `qa_fixer`, and gets the `verify_*` tools on every provider.
     "verify": "verifier",
@@ -628,6 +637,14 @@ def _uiux(spec_dir: Path, phase_id: str) -> str:
         return ""
 
 
+def _dotnet(project_dir: Path, spec_dir: Path, phase_id: str) -> str:
+    """`prompts.dotnet_section`, deferred like the above; it reads one file."""
+    from prompts_pkg.prompts import dotnet_section
+
+    role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
+    return dotnet_section(project_dir, spec_dir, role=role)
+
+
 def _build_prompt(
     resolved, body: str, ctx: PhaseContext, source: Path | None = None
 ) -> str:
@@ -664,6 +681,15 @@ def _build_prompt(
             + " — apply these and no other."
         )
         lines += procedures
+    if offered := companion_lines(phase, ctx.repo_root):
+        lines.append(
+            "COMPANION PROCEDURES: open one only when its case applies, and keep "
+            "following the procedure below. A companion may name another "
+            "agent's tools (`terminal`, `read_file`, `search_files`, "
+            "`delegate_task`): use your own equivalents, and skip a step none "
+            "of your tools can do."
+        )
+        lines += offered
     if resolved.degraded_from:
         lines.append(
             f"NOTE: this phase asked for `{resolved.degraded_from}` and was "
@@ -717,6 +743,11 @@ def _build_prompt(
     # The design system of a UI task (ui-ux-pro-max). Empty off the interface.
     if design := _uiux(ctx.spec_dir, phase.id):
         lines += ["", "---", "", design]
+
+    # The .NET 11 procedure staged for this task (`dotnet_upgrade`): `analyze`
+    # checks the plan against it, `review` the diff. Empty on every other task.
+    if dotnet := _dotnet(ctx.project_dir, ctx.spec_dir, phase.id):
+        lines += ["", "---", "", dotnet]
 
     lines += [
         "",
@@ -791,7 +822,7 @@ def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
 
     The first time the build reaches the phase, the gate writes a marker
     (`workflow/<id>.pause.json`), marks the build paused in the one pause
-    store (`core.pause_state`, which the Kanban reads to show the Resume
+    store (`foundation.pause_state`, which the Kanban reads to show the Resume
     control), prints what would run, and raises `BuildPaused` — the signal
     that unwinds to the entry point without finalizing anything. Resuming
     clears the pause flag and restarts the build; the window re-enters the
@@ -802,8 +833,8 @@ def irreversible_gate(spec_dir: Path, phase_id: str) -> None:
     spec's `workflow/` directory and does not touch the pause store (rule
     S3: an agent never edits its own guard-rails).
     """
-    from core.build_signals import BuildPaused
-    from core.pause_state import is_paused, write_pause_state
+    from foundation.build_signals import BuildPaused
+    from foundation.pause_state import is_paused, write_pause_state
 
     workflow = Path(spec_dir) / OUTPUT_DIRNAME
     workflow.mkdir(parents=True, exist_ok=True)
@@ -1171,10 +1202,40 @@ async def _run_execute(resolved, ctx: PhaseContext) -> PhaseOutcome:
     return await run_execute_phase(resolved, ctx)
 
 
-async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
-    """The `architecture-map` phase: `archify.phase`, imported when it runs."""
+async def _run_spec_by_example(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `spec-by-example` phase: red integration tests, then the goal (IA6)."""
     try:
-        from architecture_visualizer.archify.phase import run_architecture_map_phase
+        from workflows.spec_by_example_phase import run_spec_by_example_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_spec_by_example_phase(resolved, ctx)
+
+
+async def _run_cross_review(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `cross-review` phase: `workflows.cross_review_phase`, on a second engine."""
+    try:
+        from workflows.cross_review_phase import run_cross_review_phase
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return PhaseOutcome(
+            resolved.phase.id,
+            resolved.phase.impl,
+            resolved.dispatch,
+            None,
+            detail=f"unavailable: {exc}",
+        )
+    return await run_cross_review_phase(resolved, ctx)
+
+
+async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
+    """The `architecture-map` phase: `workflows.architecture_map_phase`, imported when it runs."""
+    try:
+        from workflows.architecture_map_phase import run_architecture_map_phase
     except ImportError as exc:  # pragma: no cover - import-time environment
         return PhaseOutcome(
             resolved.phase.id,
@@ -1199,10 +1260,16 @@ async def _run_architecture_map(resolved, ctx: PhaseContext) -> PhaseOutcome:
 # validate/deliver/compare and the record the Delta tab reads are Python; only
 # authoring the head model needs a session. As a one-shot session it answered
 # in prose, mapped nothing, and left the tab empty.
+#
+# `cross-review` opens its session on another provider than the build's, and
+# what it must produce is a verdict the pull request step can read, not prose:
+# both are the executor's, so the phase is too.
 CUSTOM_EXECUTORS = {
     "verify": _run_verify_loop,
     "verify-replay": _run_verify_replay,
     "architecture-map": _run_architecture_map,
+    "spec-by-example": _run_spec_by_example,
+    "cross-review": _run_cross_review,
     "execute": _run_execute,
 }
 
@@ -1349,6 +1416,32 @@ def effort_preamble(
                 f"subtasks one at a time; do not attempt to dispatch them."
             )
     return "\n".join(lines)
+
+
+def companion_lines(phase, repo_root: Path) -> list[str]:
+    """One line per declared companion that is on disk: its case, its file.
+
+    The source tree is read before the built output, the reverse of
+    `_locate_skill`: `.agents/skills/` is flat by skill name, so with two packs
+    offering `systematic-debugging` it holds whichever the build preferred, and
+    a companion names its pack. The path is absolute because the session runs
+    in the project being built, not in this repository. A companion missing
+    from disk is left out, like a lens.
+    """
+    out = []
+    for impl, when in getattr(phase, "companions", ()):
+        pack, _, skill = impl.partition("/")
+        for candidate in (
+            repo_root / "skills" / pack / skill / "SKILL.md",
+            repo_root / ".agents" / "skills" / skill / "SKILL.md",
+        ):
+            try:
+                if candidate.is_file():
+                    out.append(f"  - when {when}: `{candidate.resolve()}`")
+                    break
+            except OSError:
+                continue
+    return out
 
 
 def _locate_skill(repo_root: Path, impl: str) -> str | None:

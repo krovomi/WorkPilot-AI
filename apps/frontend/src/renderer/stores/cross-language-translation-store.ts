@@ -14,8 +14,11 @@ export interface TranslationHistoryEntry {
 	completed_at?: string;
 	source_lang: string;
 	target_lang: string;
-	file_path: string;
-	status: "pending" | "complete" | "failed";
+	/** Lines of the source; absent on older entries. */
+	lines?: number;
+	/** Written by older versions, which translated files. */
+	file_path?: string;
+	status: "pending" | "complete" | "failed" | "cancelled";
 }
 
 interface CrossLangTranslationState {
@@ -24,6 +27,9 @@ interface CrossLangTranslationState {
 	targetLang: string;
 	inputCode: string;
 	outputCode: string;
+	testCode: string;
+	/** The language of `outputCode`, which the target picker may have left. */
+	resultLang: string;
 	streamBuffer: string;
 	status: TranslationStatus;
 	history: TranslationHistoryEntry[];
@@ -37,10 +43,8 @@ interface CrossLangTranslationState {
 	setInputCode: (code: string) => void;
 	setPreserveComments: (v: boolean) => void;
 	setGenerateTests: (v: boolean) => void;
-	translate: (
-		projectDir: string,
-		params?: { filePath?: string; outputPath?: string },
-	) => Promise<void>;
+	swapLanguages: () => void;
+	translate: (projectDir: string) => Promise<void>;
 	cancelTranslation: (projectDir: string) => Promise<void>;
 	loadHistory: (projectDir: string) => Promise<void>;
 	clearHistory: (projectDir: string) => Promise<void>;
@@ -55,6 +59,9 @@ const DEFAULT_LANGUAGES: SupportedLanguage[] = [
 	{ id: "java", label: "Java", extension: ".java" },
 	{ id: "csharp", label: "C#", extension: ".cs" },
 	{ id: "rust", label: "Rust", extension: ".rs" },
+	{ id: "kotlin", label: "Kotlin", extension: ".kt" },
+	{ id: "swift", label: "Swift", extension: ".swift" },
+	{ id: "php", label: "PHP", extension: ".php" },
 ];
 
 export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
@@ -64,6 +71,8 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 		targetLang: "typescript",
 		inputCode: "",
 		outputCode: "",
+		testCode: "",
+		resultLang: "typescript",
 		streamBuffer: "",
 		status: "idle",
 		history: [],
@@ -76,7 +85,7 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 				const result = await globalThis.electronAPI.invoke(
 					"crossLangTranslation:getSupportedLanguages",
 				);
-				if (result.success) {
+				if (result?.success && Array.isArray(result.data) && result.data.length) {
 					set({ languages: result.data as SupportedLanguage[] });
 				}
 			} catch {
@@ -89,8 +98,21 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 		setInputCode: (code) => set({ inputCode: code }),
 		setPreserveComments: (v) => set({ preserveComments: v }),
 		setGenerateTests: (v) => set({ generateTests: v }),
+		swapLanguages: () => {
+			const { sourceLang, targetLang, outputCode } = get();
+			// Once there is a result, it becomes the new source, so that
+			// "swap" means "now translate this back" rather than mislabelling
+			// the pasted code with the other language.
+			set({
+				sourceLang: targetLang,
+				targetLang: sourceLang,
+				...(outputCode
+					? { inputCode: outputCode, outputCode: "", testCode: "", streamBuffer: "" }
+					: {}),
+			});
+		},
 
-		translate: async (projectDir, params = {}) => {
+		translate: async (projectDir) => {
 			const {
 				sourceLang,
 				targetLang,
@@ -102,6 +124,8 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 				status: "translating",
 				streamBuffer: "",
 				outputCode: "",
+				testCode: "",
+				resultLang: targetLang,
 				error: null,
 			});
 
@@ -120,20 +144,26 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 						projectDir,
 						sourceLang,
 						targetLang,
-						code: params.filePath ? undefined : inputCode,
-						filePath: params.filePath,
-						outputPath: params.outputPath,
+						code: inputCode,
 						preserveComments,
 						generateTests,
 					},
 				);
 
 				if (result.success) {
-					const data = result.data as { translated_code?: string };
+					const data = result.data as {
+						translated_code?: string;
+						test_code?: string | null;
+					};
 					set({
 						status: "complete",
-						outputCode: data.translated_code ?? get().streamBuffer,
+						outputCode: data.translated_code ?? "",
+						testCode: data.test_code ?? "",
+						resultLang: targetLang,
+						streamBuffer: "",
 					});
+				} else if (result.cancelled) {
+					set({ status: "idle", streamBuffer: "" });
 				} else {
 					set({
 						status: "failed",
@@ -144,6 +174,7 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 				set({ status: "failed", error: String(err) });
 			} finally {
 				removeListener?.();
+				get().loadHistory(projectDir);
 			}
 		},
 
@@ -165,7 +196,7 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 					"crossLangTranslation:getHistory",
 					projectDir,
 				);
-				if (result.success) {
+				if (result?.success && Array.isArray(result.data)) {
 					set({ history: result.data as TranslationHistoryEntry[] });
 				}
 			} catch {

@@ -197,11 +197,11 @@ export function PRFilesModal({
 	const getFileStatusIcon = (status: string) => {
 		switch (status) {
 			case "added":
-				return <Plus className="h-4 w-4 text-green-500" />;
+				return <Plus className="h-4 w-4 text-success" />;
 			case "removed":
-				return <Minus className="h-4 w-4 text-red-500" />;
+				return <Minus className="h-4 w-4 text-destructive" />;
 			case "modified":
-				return <ChevronRight className="h-4 w-4 text-yellow-500" />;
+				return <ChevronRight className="h-4 w-4 text-warning" />;
 			case "renamed":
 				return <ChevronRight className="h-4 w-4 text-blue-500" />;
 			default:
@@ -237,9 +237,9 @@ export function PRFilesModal({
 			<Dialog open={open} onOpenChange={onOpenChange}>
 				<DialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[90vh] overflow-hidden flex flex-col">
 					<DialogHeader>
-						<DialogTitle className="sr-only">Loading PR files</DialogTitle>
+						<DialogTitle className="sr-only">{t("taskReview:prFiles.loadingTitle")}</DialogTitle>
 						<DialogDescription className="sr-only">
-							Loading pull request files...
+							{t("taskReview:prFiles.loading")}
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex flex-col items-center justify-center py-8 flex-1">
@@ -328,7 +328,7 @@ export function PRFilesModal({
 						<div className="space-y-4">
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 								<div className="text-center p-4 border rounded-lg">
-									<div className="text-2xl font-bold text-green-500">
+									<div className="text-2xl font-bold text-success">
 										+{prData.additions}
 									</div>
 									<div className="text-sm text-muted-foreground">
@@ -336,7 +336,7 @@ export function PRFilesModal({
 									</div>
 								</div>
 								<div className="text-center p-4 border rounded-lg">
-									<div className="text-2xl font-bold text-red-500">
+									<div className="text-2xl font-bold text-destructive">
 										-{prData.deletions}
 									</div>
 									<div className="text-sm text-muted-foreground">
@@ -438,7 +438,9 @@ export function PRFilesModal({
 												</span>
 												{file.previous_filename && (
 													<span className="text-xs text-muted-foreground">
-														(was: {file.previous_filename})
+														{t("taskReview:prFiles.renamedFrom", {
+													name: file.previous_filename,
+												})}
 													</span>
 												)}
 												<ChevronRight
@@ -449,10 +451,10 @@ export function PRFilesModal({
 												/>
 											</div>
 											<div className="flex items-center gap-2 text-sm text-muted-foreground">
-												<span className="text-green-600">
+												<span className="text-success">
 													+{file.additions}
 												</span>
-												<span className="text-red-600">-{file.deletions}</span>
+												<span className="text-destructive">-{file.deletions}</span>
 											</div>
 										</div>
 										{expandedFiles.has(file.filename) && (

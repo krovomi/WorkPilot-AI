@@ -157,11 +157,11 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 							</h3>
 							<Badge
 								variant={readiness.state === "ready" ? "success" : "warning"}
-								className="text-[10px]"
+								className="text-3xs"
 							>
 								{t(`hermes:state.${readiness.state}`)}
 							</Badge>
-							<Badge variant="muted" className="gap-1 text-[10px]">
+							<Badge variant="muted" className="gap-1 text-3xs">
 								<RefreshCw className="h-2.5 w-2.5" aria-hidden />
 								{t("hermes:auto.badge")}
 							</Badge>
@@ -273,6 +273,7 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 						: t("hermes:review.declined", { count: lastReview.declined.length })}
 				</p>
 			)}
+			{lastReview?.decision === "adopt" && <CuratorLockHint names={lastReview.adopted} />}
 			{error && (
 				<p className="mx-4 mt-2 text-xs text-destructive" role="alert">
 					{error}
@@ -404,6 +405,8 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 							</ul>
 						</section>
 
+						<SoulInstallNote />
+
 						{soulMissing && (
 							<section>
 								<h4 className="font-medium">{t("hermes:soul.title")}</h4>
@@ -433,7 +436,7 @@ export function HermesLearningCard({ task, projectPath }: HermesLearningCardProp
 								</p>
 								<div className="mt-1.5 flex flex-wrap gap-1">
 									{adopted.map((name) => (
-										<Badge key={name} variant="muted" className="font-mono text-[10px]">
+										<Badge key={name} variant="muted" className="font-mono text-3xs">
 											{name}
 										</Badge>
 									))}
@@ -494,7 +497,7 @@ function PipelineStep({
 			)}
 			title={hint}
 		>
-			<div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+			<div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
 				{icon}
 				<span className="truncate">{label}</span>
 			</div>
@@ -549,12 +552,12 @@ function CandidateRow({
 					<div className="flex flex-wrap items-center gap-1.5">
 						<span className="text-sm font-medium capitalize">{title}</span>
 						{candidate.category && (
-							<Badge variant="muted" className="text-[10px]">
+							<Badge variant="muted" className="text-3xs">
 								{candidate.category}
 							</Badge>
 						)}
 						{candidate.pendingInHermes && (
-							<Badge variant="info" className="text-[10px]">
+							<Badge variant="info" className="text-3xs">
 								{t("hermes:review.pendingInHermes")}
 							</Badge>
 						)}
@@ -569,7 +572,7 @@ function CandidateRow({
 							type="button"
 							onClick={() => setOpen((v) => !v)}
 							aria-expanded={open}
-							className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+							className="mt-1 inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground"
 						>
 							{open ? (
 								<ChevronDown className="h-3 w-3" aria-hidden />
@@ -581,11 +584,11 @@ function CandidateRow({
 					)}
 					{open && (
 						<div className="mt-1.5 space-y-1.5">
-							<pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/40 p-2 font-mono text-[11px] leading-relaxed">
+							<pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-muted/40 p-2 font-mono text-2xs leading-relaxed">
 								{candidate.excerpt}
 							</pre>
 							{candidate.tools.length > 0 && (
-								<p className="text-[11px] text-muted-foreground">
+								<p className="text-2xs text-muted-foreground">
 									{t("hermes:review.tools")}{" "}
 									{candidate.tools.map((tool) => (
 										<code key={tool} className="mr-1 rounded bg-muted px-1 py-0.5">
@@ -634,7 +637,61 @@ function CandidateRow({
 	);
 }
 
-function CheckRow({
+/** hermes's own command that keeps its curator from rewriting a skill. */
+export const CURATOR_LOCK = "hermes curator lock";
+
+/**
+ * After a persona install: whether the hermes sessions already running were
+ * asked to take it (hermes ≥ 0.23 `sessions refresh-prompts`), or the command
+ * that does it. Renders nothing until a persona was actually written.
+ */
+export function SoulInstallNote() {
+	const { t } = useTranslation(["hermes"]);
+	const install = useHermesStore((s) => s.lastSoulInstall);
+	if (!install?.changed || !install.sessions) return null;
+	const refresh = install.refreshCommand ?? "hermes sessions refresh-prompts";
+	const commands =
+		install.sessions === "requested"
+			? null
+			: install.sessions === "needs-update"
+				? `${install.updateCommand ?? "hermes update"}\n${refresh}`
+				: refresh;
+	return (
+		<div className="text-xs text-muted-foreground" aria-live="polite">
+			<p>{t(`hermes:soul.sessions.${install.sessions}`)}</p>
+			{commands && (
+				<code className="mt-1 block whitespace-pre-wrap break-all rounded bg-muted px-1.5 py-0.5 text-3xs">
+					{commands}
+				</code>
+			)}
+		</div>
+	);
+}
+
+/**
+ * The skills a person just kept, as `hermes curator lock` commands: since
+ * hermes 0.23 a lock stops hermes's own curator from rewriting or archiving
+ * the version that was reviewed here. Typed by the person, never run: whether
+ * hermes may keep improving a skill is their call, not the panel's. Hidden
+ * when the doctor says hermes is older than the command.
+ */
+export function CuratorLockHint({ names }: { readonly names: readonly string[] }) {
+	const { t } = useTranslation(["hermes"]);
+	const tooOld = useHermesStore((s) =>
+		s.status?.readiness.checks.some((c) => c.name === "version" && !c.ok),
+	);
+	if (names.length === 0 || tooOld) return null;
+	return (
+		<div className="mx-4 mt-1 text-xs text-muted-foreground">
+			<p>{t("hermes:review.lockHint", { count: names.length })}</p>
+			<code className="mt-1 block whitespace-pre-wrap break-all rounded bg-muted px-1.5 py-0.5 text-3xs">
+				{names.map((name) => `${CURATOR_LOCK} ${name}`).join("\n")}
+			</code>
+		</div>
+	);
+}
+
+export function CheckRow({
 	check,
 }: {
 	readonly check: { name: string; ok: boolean; detail: string; remedy: string };
@@ -653,7 +710,7 @@ function CheckRow({
 				</span>
 				<span className="ml-1">{check.detail}</span>
 				{!check.ok && check.remedy && (
-					<code className="mt-1 block break-all rounded bg-muted px-1.5 py-0.5 text-[10px]">
+					<code className="mt-1 block break-all rounded bg-muted px-1.5 py-0.5 text-3xs">
 						{check.remedy}
 					</code>
 				)}

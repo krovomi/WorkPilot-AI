@@ -10,7 +10,7 @@ import { cn } from "./utils";
 // Badge styling constants for branch type indicators
 const BADGE_BASE_CLASSES = "text-xs px-1.5 py-0.5 rounded";
 const LOCAL_BADGE_CLASSES =
-	"bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+	"bg-success/10 text-success ";
 const REMOTE_BADGE_CLASSES = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
 
 /**

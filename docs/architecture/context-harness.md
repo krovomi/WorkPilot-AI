@@ -89,7 +89,7 @@ sens partout, une boucle unique, et la troncature à la source.
 | Tool clearing | boucles WorkPilot : `compact_messages` remplace les vieux résultats par un marqueur au-delà de 300 k caractères ; lot 4 : par lots, jusqu'à 60 % du budget, et seulement pour un gain d'au moins 10 % ; les arguments des appels comptent, et les longs partent des vieux appels. Claude Code purge de son côté | — |
 | Troncature | rtk sur Bash ; boucles WorkPilot : résultat coupé à 10 k caractères (70 % tête / 30 % queue). Lot 3 : `read_file`, `search_files` et `find_files` paginent sous ce plafond ; une longue sortie de `run_command` ou d'un outil exécuté dans le processus va dans un fichier ; le cerveau pagine ses notes et ses skills. Claude Code plafonne nativement (table ci-dessus) | aucun plafond natif réglé par WorkPilot : la ligne de base dira s'il faut baisser ceux de Claude Code |
 | Mémoire externe | cerveau (vault, `graph.json`, serveur MCP 9 outils), `implementation_plan.json`, `build-progress.txt`, `handoff_pending.md`, rapports de phase plafonnés. Lot 3b : les sorties longues des boucles WorkPilot vont dans `<spec>/tool-output/`, relues par `read_file` | un `MemoryPort` unique, avec la boucle partagée (lot 1b-ii) |
-| Sous-agents | registre `agents/subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
+| Sous-agents | registre `subagents/`, roster ≤ 7 ; Claude et Copilot. Lot 5 : contrat `{conclusion, files, evidence}` sous 2 000 tokens, résultat coupé et marqué au-delà, délimité comme une donnée (hook PostToolUse sur Claude, `run_subagents` sur Copilot) ; Copilot les lance en échelon | `run_subagents` n'a pas d'appelant en production |
 | Outils dynamiques | `AGENT_CONFIGS` par type d'agent ; MCP ajoutés selon la tâche ; schémas MCP différés sur Claude face à l'API d'Anthropic (`ENABLE_TOOL_SEARCH=auto:5`). Lot 6 : un jeu d'outils canonique, trié et figé par session dans les boucles WorkPilot (`harness/domain/tools.py`) ; ni cerveau ni ui-ux pour un type sans outils | rien par sous-tâche ; la réduction des phases de build, mesurée par `tool_weights` |
 | Effort et routage | effort par phase (`phase_config.py`), traduit par provider (`reasoning_effort`, budget de réflexion) ; routeur de complexité et `model_router` presque toujours éteints | pas d'escalade automatique |
 | Récupération de code | `context/search.py` : correspondance de sous-chaînes ; grepai seulement pour l'autofix. Lot 7 : `search_code`, BM25 sur des morceaux par symbole fusionné par RRF avec une recherche exacte d'identifiants, 5 à 8 extraits par appel avec curseur, servi en MCP (`workpilot-code`) et par `ToolExecutor` aux types qui déclarent `code` | l'éval qui tranche (5, 20, 50 extraits), sur la ligne de base du lot 0 |
@@ -155,7 +155,7 @@ apps/backend/harness/
    table ; la boucle ne contient pas de `if` de politique, ni de `if provider ==`.
 7. **Les règles du dépôt tiennent.** Une sortie d'outil, un fichier relu depuis la mémoire ou un
    handoff entre délimité comme une donnée (S2). Le journal de contexte passe par
-   `core/log_redaction.py` et ne garde que des nombres et des empreintes, jamais un corps (S1).
+   `foundation/log_redaction.py` et ne garde que des nombres et des empreintes, jamais un corps (S1).
    Aucun nouvel appel réseau hors `offline_policy/` (S7).
 
 ## Les décisions à prendre
@@ -182,12 +182,19 @@ la fenêtre annoncée.
 
 **D3 — Durée de vie du cache, là où elle se règle.** La plupart des providers cachent un préfixe
 sans réglage. Deux exceptions : Anthropic, où l'écriture coûte 1,25× pour 5 minutes et 2× pour
-1 heure (WorkPilot pose `ENABLE_PROMPT_CACHING_1H=1` ; `CLAUDE_CODE_PROMPT_CACHE_TTL` prime sur
-lui, `FORCE_PROMPT_CACHING_5M=1` force 5 minutes), et le cache explicite de Gemini, facturé au
+1 heure, et le cache explicite de Gemini, facturé au
 stockage par heure. Une durée longue ne rapporte que si deux appels qui partagent un préfixe
 démarrent à plus de 5 minutes d'écart (attente humaine, revue) ; entre deux tours d'une session,
 chaque lecture rafraîchit le cache. Le lot 0 mesure ces écarts pour tous les providers ; le
 réglage suit, là où il existe.
+
+*Tranché pour Claude (novembre 2026)* : WorkPilot ne pose plus `ENABLE_PROMPT_CACHING_1H=1` et
+laisse la CLI choisir, comme le documente Claude Code (« Which TTL each request gets ») : une
+heure sur un abonnement dans son forfait, cinq minutes dès que l'usage est facturé (clé d'API,
+crédits d'usage, cloud). Forcer une heure faisait payer 2× chaque écriture de tour, alors que les
+tours d'une session se suivent à quelques secondes et que deux cartes ne partagent jamais de
+préfixe : la conversation de la CLI s'ouvre sur le dossier de travail, propre au worktree.
+`CLAUDE_CODE_PROMPT_CACHE_TTL` ou `FORCE_PROMPT_CACHING_5M`, exportés, atteignent toujours la CLI.
 
 **D4 — Contexte de code : recherche agentique ou injection.** Recommandation : un outil
 `search_code` que le modèle appelle (toujours à jour, il suit les vraies références), hybride
@@ -372,7 +379,7 @@ après le texte propre à la sous-tâche.
   ADR et pièces jointes, rapports des phases précédentes (tâche). Le texte de la sous-tâche vient
   ensuite, et son en-tête d'environnement, stable sur la tâche, le prolonge. Avant, seul le
   préambule d'effort précédait la sous-tâche ; le reste la suivait.
-- **Rosters** : déjà en place. `agents/subagents/phases.py` donne le roster vide `solo` à chaque
+- **Rosters** : déjà en place. `subagents/phases.py` donne le roster vide `solo` à chaque
   type à tâche unique (`commit_message`, `merge_resolver`…), et
   `tests/test_subagents_coverage.py` vérifie que seul `coder` retombe sur le roster par défaut.
 
@@ -403,7 +410,7 @@ Ollama/LM Studio, Copilot, Windsurf) lisent et cherchent par `ToolExecutor`, et 
 long résultat en une tête et une queue : le milieu d'un long fichier était illisible, et le modèle ne
 pouvait pas le demander.
 
-- `harness/domain/paging.py` (pur) : `page_lines` rend une suite de lignes sous un plafond de
+- `foundation/paging.py` (pur) : `page_lines` rend une suite de lignes sous un plafond de
   caractères, `render_page` la fait suivre de sa plage et de l'`offset` qui lit la suite, `page_items`
   pagine une liste produite à la demande (une recherche s'arrête de parcourir les fichiers dès que la
   page est pleine).
@@ -425,7 +432,7 @@ sortie, et coûter des minutes.
 
 - **Déversement** (`ToolExecutor._fit_output`) : une sortie de `run_command` plus longue qu'une page
   est écrite entière dans `<spec>/tool-output/command-<empreinte>.txt`, et le modèle lit
-  `spill_excerpt` (`harness/domain/paging.py`, pur) : d'abord la note qui dit où est le tout et sa
+  `spill_excerpt` (`foundation/paging.py`, pur) : d'abord la note qui dit où est le tout et sa
   taille, puis la tête et la queue en lignes entières, avec l'`offset` exact où commence la partie
   cachée, relue par `read_file`. La note vient en premier : un client qui coupe le résultat ensuite
   en garde la tête, donc le chemin. Une commande qui échoue déverse sa sortie de la même façon, et
@@ -566,7 +573,7 @@ texte remis à un parent.
 - **Le dire au sous-agent**, là où son prompt part chez le provider : `bind_contract` ajoute le
   contrat à une copie de chaque définition du roster que `create_client` donne au SDK, et
   `subagent_messages` le place dans le message système de chaque appel Copilot. Le registre
-  `agents/subagents/` et ses sorties générées (`.agents/agents/`) ne changent pas : des harnesses
+  `subagents/` et ses sorties générées (`.agents/agents/`) ne changent pas : des harnesses
   dont WorkPilot ne reçoit pas les résultats les lisent.
 - **Mesurer** : le ledger garde chaque retour (`SubagentReturn` : tokens reçus, tokens lus par le
   parent, coupé ou non), et `summary()` en donne le nombre, les tokens et les coupes. Copilot

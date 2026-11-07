@@ -28,13 +28,21 @@ except ImportError:
 # exist"). Without the numbered entries below, a task whose phaseModels held
 # "opus-4-8" failed planning with "issue with the selected model (opus-4-8)".
 MODEL_ID_MAP: dict[str, str] = {
-    # Bare family aliases (kept for backward compatibility with old profiles).
-    # Use the un-dated canonical id (the dated snapshot is unnecessary noise and
-    # is what surfaced as "claude-haiku-4-5-20251001" in the context-switch log).
-    "opus": "claude-opus-4-5-20251101",
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "haiku": "claude-haiku-4-5",
+    # Bare family aliases: the current generation, as Claude Code resolves its
+    # own `opus` / `sonnet` / `haiku`. The presets (Balanced, Quick Edits,
+    # Auto, Complex) and every card saved with them run on these. They used to
+    # name Opus 4.5, Sonnet 4.5 and Haiku 4.5 here (4.6 in the frontend's
+    # picker): the 5.5 generation is cheaper per token (Sonnet $2/$10 against
+    # $3/$15, Haiku $0.10/$0.50 against $1/$5, Opus $4/$20 against $5/$25) and
+    # takes `effort`. A numbered alias below still pins an older model.
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5",
     # Numbered aliases → full Anthropic ids (mirror the frontend catalog).
+    "opus-5-5": "claude-opus-5-5",
+    "sonnet-5-5": "claude-sonnet-5-5",
+    "haiku-5-5": "claude-haiku-5-5",
+    "fable-5-1": "claude-fable-5-1",
     "opus-5": "claude-opus-5",
     "fable-5": "claude-fable-5",
     "sonnet-5": "claude-sonnet-5",
@@ -813,7 +821,7 @@ def get_phase_thinking(
         # Per-phase thinking wins whenever the phase is present — regardless of
         # isAutoProfile. This mirrors the frontend selector, whose `getPhaseConfig`
         # reads `metadata.phaseThinking[phase]` unconditionally. A single-model
-        # resume (RESUME_WITH_PROVIDER sets isAutoProfile=false to force its chosen
+        # resume (TASK_RESUME_WITH_PROVIDER sets isAutoProfile=false to force its chosen
         # model) must keep honouring the per-phase effort the user still sees;
         # otherwise the UI shows e.g. "Low" while the run uses the "high" default.
         phase_thinking = metadata.get("phaseThinking") or {}

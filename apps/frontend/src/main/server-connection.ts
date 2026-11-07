@@ -65,36 +65,71 @@ function stateFilePath(): string {
 	return path.join(app.getPath("userData"), "server-connection.json");
 }
 
-function persist(): void {
+// Writes are chained so an older state never lands after a newer one.
+let persistChain: Promise<void> = Promise.resolve();
+
+async function encryptionAvailable(): Promise<boolean> {
 	try {
-		let encryptedRefreshToken: string | null = null;
-		if (refreshToken && safeStorage.isEncryptionAvailable()) {
-			encryptedRefreshToken = safeStorage
-				.encryptString(refreshToken)
-				.toString("base64");
-		}
-		const state: PersistedState = { mode, serverUrl, encryptedRefreshToken };
-		fs.writeFileSync(stateFilePath(), JSON.stringify(state), "utf-8");
-		configured = true;
-	} catch (err) {
-		console.error("[server-connection] Failed to persist state:", err);
+		return await safeStorage.isAsyncEncryptionAvailable();
+	} catch {
+		return false;
 	}
 }
 
-export function loadPersistedState(): void {
+async function writeState(state: {
+	mode: ConnectionMode;
+	serverUrl: string | null;
+	refreshToken: string | null;
+}): Promise<void> {
+	let encryptedRefreshToken: string | null = null;
+	if (state.refreshToken && (await encryptionAvailable())) {
+		encryptedRefreshToken = (
+			await safeStorage.encryptStringAsync(state.refreshToken)
+		).toString("base64");
+	}
+	const persisted: PersistedState = {
+		mode: state.mode,
+		serverUrl: state.serverUrl,
+		encryptedRefreshToken,
+	};
+	await fs.promises.writeFile(
+		stateFilePath(),
+		JSON.stringify(persisted),
+		"utf-8",
+	);
+}
+
+function persist(): void {
+	configured = true;
+	const snapshot = { mode, serverUrl, refreshToken };
+	persistChain = persistChain
+		.then(() => writeState(snapshot))
+		.catch((err) => {
+			console.error("[server-connection] Failed to persist state:", err);
+		});
+}
+
+/** Resolves once every state change so far is on disk. */
+export function flushPersistedState(): Promise<void> {
+	return persistChain;
+}
+
+export async function loadPersistedState(): Promise<void> {
 	try {
 		if (!fs.existsSync(stateFilePath())) return;
 		const raw = JSON.parse(
-			fs.readFileSync(stateFilePath(), "utf-8"),
+			await fs.promises.readFile(stateFilePath(), "utf-8"),
 		) as PersistedState;
 		// A persisted file means the user has already made a connection choice.
 		configured = true;
 		mode = raw.mode === "server" ? "server" : "local";
 		serverUrl = raw.serverUrl || null;
-		if (raw.encryptedRefreshToken && safeStorage.isEncryptionAvailable()) {
-			refreshToken = safeStorage.decryptString(
-				Buffer.from(raw.encryptedRefreshToken, "base64"),
-			);
+		if (raw.encryptedRefreshToken && (await encryptionAvailable())) {
+			refreshToken = (
+				await safeStorage.decryptStringAsync(
+					Buffer.from(raw.encryptedRefreshToken, "base64"),
+				)
+			).result;
 		}
 	} catch (err) {
 		console.error("[server-connection] Failed to load persisted state:", err);
@@ -216,9 +251,10 @@ export async function getServerAuthConfig(
 
 /**
  * Authenticated request against the current server, attaching the access
- * token. Used by admin-only invitation management.
+ * token and the organization it acts in. An expired access token is refreshed
+ * once, shared with any concurrent caller, and the request sent again.
  */
-async function authedFetch<T>(
+export async function authedFetch<T>(
 	pathName: string,
 	method: string,
 	body?: unknown,
@@ -226,20 +262,23 @@ async function authedFetch<T>(
 	if (!serverUrl) return { ok: false, error: "No server URL configured" };
 	if (!accessToken) return { ok: false, error: "Not authenticated" };
 	try {
-		const headers: Record<string, string> = {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${accessToken}`,
+		const send = () => {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			};
+			// Which tenant this request acts in. The server verifies membership
+			// against the database every time, so this only *selects* among the
+			// organizations the caller already belongs to; it never grants access.
+			if (activeOrgId) headers["X-WorkPilot-Org"] = activeOrgId;
+			return fetch(`${serverUrl}${pathName}`, {
+				method,
+				headers,
+				body: body === undefined ? undefined : JSON.stringify(body),
+			});
 		};
-		// Which tenant this request acts in. The server verifies membership
-		// against the database every time, so this only *selects* among the
-		// organizations the caller already belongs to — it never grants access.
-		if (activeOrgId) headers["X-WorkPilot-Org"] = activeOrgId;
-
-		const res = await fetch(`${serverUrl}${pathName}`, {
-			method,
-			headers,
-			body: body === undefined ? undefined : JSON.stringify(body),
-		});
+		let res = await send();
+		if (res.status === 401 && (await refreshShared())) res = await send();
 		const text = await res.text();
 		if (!res.ok) {
 			try {
@@ -418,8 +457,15 @@ export async function logout(): Promise<void> {
 export async function restoreSession(): Promise<boolean> {
 	if (accessToken) return true; // already restored this run
 	if (!isServerMode() || !refreshToken) return false;
-	// Share a single in-flight refresh so a concurrent main + renderer restore
-	// does not rotate the refresh token twice (the second call would fail).
+	return refreshShared();
+}
+
+/**
+ * One refresh at a time: a concurrent main + renderer restore, or several
+ * requests meeting an expired token together, must not rotate the refresh
+ * token twice (the second call would fail and sign the user out).
+ */
+function refreshShared(): Promise<boolean> {
 	if (restoreInFlight) return restoreInFlight;
 	restoreInFlight = refreshSession().finally(() => {
 		restoreInFlight = null;

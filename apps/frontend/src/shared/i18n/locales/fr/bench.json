@@ -12,7 +12,7 @@
 		"cost": "Coût moyen",
 		"duration": "Durée moyenne",
 		"cards": "Cartes",
-		"readers": "Formula Lab compte ces rejeux dans ses estimations de réussite, et le routeur de modèles écarte un modèle qui a réussi moins de la moitié d'au moins trois cartes."
+		"readers": "Formula Lab compte ces rejeux dans ses estimations de réussite, et le routeur de modèles écarte un modèle qui a réussi moins de la moitié d'au moins trois cartes (du type de la tâche, quand il y en a assez)."
 	},
 	"new": {
 		"title": "Nouveau passage",
@@ -28,7 +28,16 @@
 		"summary": "{{cards}} carte(s) × {{engines}} moteur(s) = {{builds}} build(s) complet(s)",
 		"start": "Lancer le passage",
 		"oneAtATime": "Un passage est en cours pour ce projet : un seul à la fois.",
-		"costWarning": "Chaque build est une tâche complète (plan, code, QA) facturée par son provider. Le juge lance d'abord trois fois les tests de chaque carte, pour ne garder que ceux qui distinguent le travail de la carte de son absence."
+		"costWarning": "Chaque build est une tâche complète (plan, code, QA) facturée par son provider. Le juge lance d'abord trois fois les tests de chaque carte, pour ne garder que ceux qui distinguent le travail de la carte de son absence.",
+		"rule": {
+			"title": "Règle candidate (facultatif)",
+			"help": "Mesurez une règle avant de l'adopter : chaque moteur est rejoué sans la règle et avec, la règle n'étant adoptée que dans la copie. Rien n'est adopté d'après le score.",
+			"fromLessons": "Partir d'une règle apprise des revues",
+			"pick": "Choisir une candidate…",
+			"placeholder": "Par exemple : écrire le test avant le code qu'il vérifie.",
+			"tooManyEngines": "Avec une règle, chaque moteur est rejoué deux fois : gardez au plus {{max}} moteurs."
+		},
+		"summaryRule": "{{cards}} carte(s) × {{engines}} moteur(s) × 2 (sans et avec la règle) = {{builds}} build(s) complet(s)"
 	},
 	"source": {
 		"merge": "son merge",
@@ -83,11 +92,33 @@
 		"notResolved": "échoué",
 		"notCounted": "non compté",
 		"building": "build en cours…",
-		"waiting": "en attente"
+		"waiting": "en attente",
+		"withRule": "avec la règle",
+		"rule": {
+			"title": "Règle candidate",
+			"summary": "Sans la règle : {{without}}/{{pairs}} réussies. Avec : {{with}}/{{pairs}}. Régressions : {{regressions}}.",
+			"better": "Meilleure sur ces cartes, sans régression. L'adopter reste votre décision, dans la Learning Loop.",
+			"worse": "Elle fait échouer une carte que le moteur réussissait sans elle : ne l'adoptez pas telle quelle.",
+			"same": "Aucune différence mesurée sur ces cartes.",
+			"unmeasured": "Pas encore mesurée : aucune carte n'a été jugée dans les deux variantes."
+		}
 	},
 	"errors": {
 		"candidates": "Impossible de lister les cartes terminées.",
 		"start": "Le passage n'a pas pu démarrer.",
 		"discard": "Le passage n'a pas pu être abandonné."
+	},
+	"recommend": {
+		"title": "Moteur recommandé par type de carte",
+		"allKinds": "Toutes les cartes",
+		"evidence": "{{rate}} résolues ({{resolved}} sur {{judged}}) sur {{cases}} cartes",
+		"cost": "coût moyen {{cost}}",
+		"costUnknown": "coût non mesuré",
+		"rule": "Parmi les moteurs qui ont résolu au moins la moitié d'au moins trois cartes d'un type, le moins cher à dix points ou moins du meilleur taux. Un type avec moins de preuves n'a pas de recommandation propre. Sur l'étape moteur d'une carte, la recommandation est proposée, jamais appliquée à ta place.",
+		"empty": "Pas encore assez de rejeux : un moteur a besoin d'au moins trois cartes jugées.",
+		"hintKind": "Sur les cartes de type « {{kind}} » de ce projet, le banc recommande",
+		"hintAll": "Sur les cartes de ce projet, le banc recommande",
+		"use": "L'utiliser",
+		"inUse": "Déjà choisi"
 	}
 }

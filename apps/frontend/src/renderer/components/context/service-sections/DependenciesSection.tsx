@@ -6,6 +6,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { useTranslation } from "react-i18next";
 
 interface DependenciesSectionProps {
 	readonly dependencies: string[];
@@ -14,6 +15,7 @@ interface DependenciesSectionProps {
 export function DependenciesSection({
 	dependencies,
 }: DependenciesSectionProps) {
+	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 
 	if (!dependencies || dependencies.length === 0) {
@@ -29,7 +31,9 @@ export function DependenciesSection({
 			<CollapsibleTrigger className="flex w-full items-center justify-between text-xs font-medium hover:text-foreground">
 				<div className="flex items-center gap-2">
 					<Package className="h-3 w-3" />
-					Dependencies ({dependencies.length})
+					{t("context:serviceSections.dependencies", {
+						count: dependencies.length,
+					})}
 				</div>
 				{expanded ? (
 					<ChevronDown className="h-3 w-3" />
@@ -46,7 +50,7 @@ export function DependenciesSection({
 					))}
 					{dependencies.length > 20 && (
 						<Badge variant="secondary" className="text-xs">
-							+{dependencies.length - 20} more
+							{t("context:serviceSections.more", { count: dependencies.length - 20 })}
 						</Badge>
 					)}
 				</div>

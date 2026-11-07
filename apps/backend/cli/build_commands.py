@@ -16,7 +16,6 @@ if str(_PARENT_DIR) not in sys.path:
 
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
-from core.build_signals import BuildHalted, BuildPaused
 from core.progress import print_paused_banner
 from core.workspace import (
     WorkspaceMode,
@@ -27,7 +26,9 @@ from core.workspace import (
     handle_workspace_choice,
     setup_workspace,
 )
+from foundation.build_signals import BuildHalted, BuildPaused
 from review import ReviewState
+from services.notifications.digest import start_digest_heartbeat
 from ui import (
     BuildState,
     Icons,
@@ -114,7 +115,7 @@ def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
     try:
         return [path for _status, path in worktree_manager.get_changed_files(spec_name)]
     except Exception as exc:  # noqa: BLE001 - advisory input, never fatal
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Could not list changed files: {exc}")
         return None
@@ -189,12 +190,6 @@ def _resolve_workflow_profile(
         profile = resolve_profile(
             workflow,
             effort,
-            # Peeked, not consumed. `_get_active_provider` deletes the
-            # RESUME_WITH_PROVIDER marker on read — it is single-shot by
-            # design — so resolving the profile with it would eat the user's
-            # "resume with X" choice before the session meant to honour it
-            # ever started. The engine decides here; it does not start
-            # anything.
             provider=peek_active_provider(spec_dir),
             changed_files=changed_files,
             inventory=inventory,
@@ -258,7 +253,7 @@ def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> No
 
         sync_spec_to_source(spec_dir, source_spec_dir)
     except Exception as exc:  # noqa: BLE001 - a sync never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Spec sync skipped: {exc}")
     try:
@@ -280,7 +275,7 @@ def _conclude_without_coder(profile, run, spec_dir: Path, source_spec_dir) -> No
         else:
             emitter.emit("QA_PASSED", {"iteration": 0, "testsRun": {}})
     except Exception as exc:  # noqa: BLE001 - best-effort
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Could not settle the card: {exc}")
     print(
@@ -331,7 +326,7 @@ def _run_deterministic_gates(profile, working_dir: Path, spec_dir: Path):
             print("\n" + summary)
         return run
     except Exception as exc:  # noqa: BLE001 - gates never fail a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Deterministic gates skipped: {exc}")
         return None
@@ -353,7 +348,7 @@ def _run_docs_preflight(
     try:
         from libdocs import run_preflight
     except Exception as exc:  # noqa: BLE001 - the package is optional at runtime
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Documentation preflight unavailable: {exc}")
         return
@@ -361,7 +356,7 @@ def _run_docs_preflight(
     try:
         result = run_preflight(working_dir, spec_dir, cache_dir=source_project_dir)
     except Exception as exc:  # noqa: BLE001 - documentation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Documentation preflight skipped: {exc}")
         return
@@ -386,9 +381,22 @@ def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None
         if summary := result.describe():
             print("\n" + summary)
     except Exception as exc:  # noqa: BLE001 - attachments never fail a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Attachments preflight skipped: {exc}")
+
+
+def _run_dotnet_preflight(working_dir: Path, spec_dir: Path) -> None:
+    """Stage the .NET 11 migration skill next to the spec when the task needs it.
+
+    Before planning, so the planner plans along the procedure. Reads the
+    worktree (its TargetFramework is the one being built) and the task's words;
+    never raises (`dotnet_upgrade.preflight`).
+    """
+    from dotnet_upgrade import run_preflight
+
+    if summary := run_preflight(working_dir, spec_dir).describe():
+        print("\n" + summary)
 
 
 def _phase_context(
@@ -427,7 +435,7 @@ def _phase_context(
             source_spec_dir=source_spec_dir,
         )
     except Exception as exc:  # noqa: BLE001 - never block a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phase context unavailable: {exc}")
         return None
@@ -457,7 +465,7 @@ def _run_workflow_phases(profile, ctx, *, after: str | None, before: str | None)
     except (BuildPaused, BuildHalted):
         raise
     except Exception as exc:  # noqa: BLE001 - phases report, they do not fail builds
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Workflow phases skipped: {exc}")
         return None
@@ -477,12 +485,12 @@ def _sync_spec_back(spec_dir: Path, source_spec_dir: Path | None, moment: str) -
         return
     try:
         from agents.utils import sync_spec_to_source
-        from core.debug import debug_info
+        from foundation.debug import debug_info
 
         if sync_spec_to_source(spec_dir, source_spec_dir):
             debug_info("run.py", f"Spec directory synced to main project {moment}")
     except Exception as exc:  # noqa: BLE001 - a copy never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Spec sync {moment} skipped: {exc}")
 
@@ -507,7 +515,7 @@ def _primary_language(spec_dir: Path) -> str:
     coarser lesson, a raised exception is a failed build.
     """
     try:
-        from agents.subagents import detect_languages
+        from subagents import detect_languages
 
         languages = detect_languages(_project_dir(spec_dir))
         return languages[0] if languages else ""
@@ -541,7 +549,7 @@ def _record_build_in_brain(
         if rel:
             print(f"  brain: build recorded in {rel}")
     except Exception as exc:  # noqa: BLE001 - learning never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Brain record skipped: {exc}")
 
@@ -617,7 +625,7 @@ def _run_observe_phase(
         # signals as everything else above.
         _run_convention_pass(spec_dir, outcome, changed_files)
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Observe phase skipped: {exc}")
 
@@ -652,9 +660,35 @@ def _run_convention_pass(
         for path in proposals:
             print(f"  proposed  conventions/_proposed/{path.name}")
     except Exception as exc:  # noqa: BLE001 - observation never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Convention pass skipped: {exc}")
+
+
+def _write_requirement_links(
+    working_dir: Path,
+    spec_dir: Path,
+    source_spec_dir: Path | None,
+    project_dir: Path,
+    changed_files: list[str] | None,
+) -> None:
+    """Link each requirement to its files and tests. Never fails a build."""
+    try:
+        from requirement_trace import write_links
+
+        links = write_links(
+            working_dir, [spec_dir, source_spec_dir], project_dir, changed_files
+        )
+        if links:
+            untested = [r["id"] for r in links["requirements"] if r["untested"]]
+            print(
+                f"\n  requirements: {len(links['requirements'])} linked to their files"
+                + (f", without a test for: {', '.join(untested)}" if untested else "")
+            )
+    except ImportError as exc:
+        from foundation.debug import debug_warning
+
+        debug_warning("run.py", f"Requirement links skipped: {exc}")
 
 
 def _report_hard_gates(
@@ -673,17 +707,18 @@ def _report_hard_gates(
     if profile is None:
         return
     try:
-        from workflows import evaluate_hard_gates
+        from workflows.hard_gates import evaluate_hard_gates, write_gate_record
 
         report = evaluate_hard_gates(
             profile, spec_dir, tests_passed=tests_passed, changed_files=changed_files
         )
+        write_gate_record(spec_dir, report)
         if summary := report.describe():
             print("\n" + summary)
         if report.blocking:
             print("  → the branch is not ready to merge on this evidence.")
     except Exception as exc:  # noqa: BLE001 - a gate reports, never fails a build
-        from core.debug import debug_warning
+        from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Hard gate check skipped: {exc}")
 
@@ -770,7 +805,11 @@ def handle_build_command(
         JevContext("feature-build", project_dir, spec_dir)
     )
     from core.agent import run_autonomous_agent, sync_spec_to_source
-    from core.debug import (
+    from foundation.base_branch import (
+        get_base_branch_from_metadata,
+        get_use_local_branch_from_metadata,
+    )
+    from foundation.debug import (
         debug,
         debug_info,
         debug_section,
@@ -778,10 +817,6 @@ def handle_build_command(
         debug_warning,
     )
     from phase_config import get_phase_model
-    from prompts_pkg.prompts import (
-        get_base_branch_from_metadata,
-        get_use_local_branch_from_metadata,
-    )
     from qa import is_qa_approved, run_qa_validation_loop, should_run_qa
 
     from .utils import print_banner, validate_environment
@@ -964,6 +999,10 @@ def handle_build_command(
         # What the person attached to the task — screenshots, mockups, draw.io
         # and Excalidraw diagrams — read once, before the plan is written.
         _run_attachments_preflight(spec_dir, project_dir)
+        # A .NET 10 project the task moves to .NET 11, or one already on it.
+        _run_dotnet_preflight(working_dir, spec_dir)
+        # Long tasks: a digest on the notification channels, when asked (P1).
+        start_digest_heartbeat(spec_dir, project_dir)
 
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there
@@ -1043,6 +1082,12 @@ def handle_build_command(
         # anything was written; this one decides the conditional phases.
         # `announce=False` — reprinting the plan here would read as a second
         # build starting.
+        # Build outputs the coder committed (bin/, obj/, TestResults/...) are
+        # taken out before anything reads the change set: QA scope, review.
+        # A file the coder created without committing it is part of the change
+        # set too: commit it first, or QA and the review see nothing.
+        if worktree_manager:
+            worktree_manager.settle_branch(spec_dir.name)
         _changed = _changed_files(worktree_manager, spec_dir.name)
         _post_profile = (
             _resolve_workflow_profile(
@@ -1192,6 +1237,12 @@ def handle_build_command(
         _tests_green = _tests_went_green(spec_dir)
         _report_hard_gates(_post_profile or _profile, spec_dir, _tests_green, _changed)
 
+        # Requirement → subtask → files → tests (P3), kept in the project's
+        # ledger so it outlives the worktree and the task.
+        _write_requirement_links(
+            working_dir, spec_dir, source_spec_dir, project_dir, _changed
+        )
+
         # The `observe` phase. Marked `always: true` in the workflow, so it
         # runs at every effort level — it costs no API call, it only reads what
         # the verifiers already said. Placed after QA so the QA verdict is one
@@ -1267,6 +1318,7 @@ def handle_build_command(
     except KeyboardInterrupt:
         _handle_build_interrupt(
             spec_dir=spec_dir,
+            source_spec_dir=source_spec_dir,
             project_dir=project_dir,
             worktree_manager=worktree_manager,
             working_dir=working_dir,
@@ -1295,12 +1347,13 @@ def _handle_build_interrupt(
     verbose: bool,
     profile=None,
     jev_run=None,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
 
     Args:
-        spec_dir: Spec directory path
+        spec_dir: Spec directory path (the worktree's copy in isolated mode)
         project_dir: Project root directory
         worktree_manager: Worktree manager instance (if using isolated mode)
         working_dir: Current working directory
@@ -1312,6 +1365,8 @@ def _handle_build_interrupt(
             started with. Resuming into a differently-shaped pipeline than the
             one that was announced is the kind of surprise this whole refactor
             exists to remove.
+        source_spec_dir: The project's copy of the spec in isolated mode, which
+            the resumed build copies over the worktree's; ``None`` otherwise.
     """
     from core.agent import run_autonomous_agent
 
@@ -1387,9 +1442,12 @@ def _handle_build_interrupt(
                 sys.exit(0)
 
         if human_input:
-            # Save to HUMAN_INPUT.md
-            input_file = spec_dir / "HUMAN_INPUT.md"
-            input_file.write_text(human_input, encoding="utf-8")
+            # Every copy of the spec: the resumed build replaces the worktree's
+            # copy from the project's one (`foundation.human_input`).
+            from foundation.human_input import HUMAN_INPUT_FILE, write_human_input
+
+            write_human_input(human_input, spec_dir, source_spec_dir)
+            input_file = spec_dir / HUMAN_INPUT_FILE
 
             content = [
                 success(f"{icon(Icons.SUCCESS)} INSTRUCTIONS SAVED"),
@@ -1418,6 +1476,7 @@ def _handle_build_interrupt(
                     model=model,
                     max_iterations=max_iterations,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
                     streaming_session_id=streaming_session_id,  # noqa: F821
                     profile=profile,
                     jev_run=jev_run,

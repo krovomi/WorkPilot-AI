@@ -29,6 +29,11 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 `TASK_STATUS_COLUMNS` (`shared/constants/task.ts:13`) :
 `backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `build_failed` · `done`
 
+`build_failed` (« Build rouge ») est piloté par la CI (`main/ci-pipeline-service.ts`) : une
+tâche y entre quand le pipeline de sa branche `workpilot/<spec>` passe au rouge et en sort, vers
+son statut d'avant, quand il repasse au vert. `useVisibleKanbanColumns` masque la colonne tant
+qu'aucune tâche du tableau n'a de run CI et qu'elle est vide.
+
 Deux statuts n'ont pas de colonne à eux et sont projetés par `getVisualColumn()` :
 `pr_created → done`, `error → human_review`.
 

@@ -8,6 +8,7 @@
 
 import { gitHubCopilotService } from "../services/githubCopilotService";
 import { providerRegistry } from "../services/providerRegistry";
+import { type AgentCliTool, isAgentCliTool } from "../types/agent-cli";
 import type { APIProfile } from "../types/profile";
 import { detectProvider } from "./provider-detection";
 
@@ -57,6 +58,25 @@ export async function getStaticProviders(
 		.getAllProviders()
 		.filter((p) => p.name !== "claude" && p.name !== "custom");
 
+	// Coding-agent CLIs (OpenCode, Antigravity, pi, Gemini CLI) sign in inside
+	// the CLI itself, so "installed" is what WorkPilot can check — the same
+	// rule as `providerRegistry.checkProviderStatus`.
+	const agentCliInstalled = new Map<string, boolean>(
+		await Promise.all(
+			allProviders
+				.map((p) => p.name)
+				.filter(isAgentCliTool)
+				.map(async (tool: AgentCliTool): Promise<[string, boolean]> => {
+					try {
+						const check = globalThis.electronAPI?.checkAgentCli;
+						return [tool, check ? (await check(tool)).installed === true : false];
+					} catch {
+						return [tool, false];
+					}
+				}),
+		),
+	);
+
 	const providers: CanonicalProvider[] = allProviders.map((p) => ({
 		name: p.name,
 		label: p.label,
@@ -75,7 +95,9 @@ export async function getStaticProviders(
 			return detectProvider(prof.baseUrl) === p.name;
 		});
 
-		if (p.name === "copilot") {
+		if (agentCliInstalled.has(p.name)) {
+			status[p.name] = agentCliInstalled.get(p.name) === true;
+		} else if (p.name === "copilot") {
 			status[p.name] = copilot?.authenticated === true;
 		} else if (p.name === "ollama") {
 			// Ollama is local with a default URL (localhost:11434) — always available

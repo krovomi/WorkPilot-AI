@@ -33,6 +33,7 @@ import type {
 	GitLabMRReviewResult,
 } from "../hooks/useGitLabMRs";
 import { ReviewFindings } from "./ReviewFindings";
+import { formatAppDate } from "@/lib/date-format";
 
 interface MRDetailProps {
 	projectId?: string;
@@ -52,7 +53,7 @@ interface MRDetailProps {
 }
 
 function formatDate(dateString: string): string {
-	return new Date(dateString).toLocaleDateString("en-US", {
+	return formatAppDate(dateString, {
 		month: "short",
 		day: "numeric",
 		year: "numeric",
@@ -469,8 +470,9 @@ export function MRDetail({
 									variant="secondary"
 								>
 									<RefreshCw className="h-4 w-4 mr-2" />
-									Follow-up Review ({newCommitsCheck.newCommitCount} new commit
-									{newCommitsCheck.newCommitCount !== 1 ? "s" : ""})
+									{t("gitlab:mrReview.followupWithCommits", {
+									count: newCommitsCheck.newCommitCount,
+								})}
 								</Button>
 							) : (
 								<Button
@@ -481,12 +483,12 @@ export function MRDetail({
 									{isReviewing ? (
 										<>
 											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-											Reviewing...
+											{t("gitlab:mrReview.reviewing")}
 										</>
 									) : (
 										<>
 											<Sparkles className="h-4 w-4 mr-2" />
-											Run AI Review
+											{t("gitlab:mrReview.runReview")}
 										</>
 									)}
 								</Button>
@@ -494,7 +496,7 @@ export function MRDetail({
 							{isReviewing && (
 								<Button onClick={onCancelReview} variant="destructive">
 									<XCircle className="h-4 w-4 mr-2" />
-									Cancel
+									{t("common:buttons.cancel")}
 								</Button>
 							)}
 							{reviewResult?.success && selectedCount > 0 && !isReviewing && (
@@ -506,13 +508,12 @@ export function MRDetail({
 									{isPostingFindings ? (
 										<>
 											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-											Posting...
+											{t("gitlab:mrReview.posting")}
 										</>
 									) : (
 										<>
 											<Send className="h-4 w-4 mr-2" />
-											Post {selectedCount} Finding
-											{selectedCount !== 1 ? "s" : ""}
+											{t("gitlab:mrReview.postCount", { count: selectedCount })}
 										</>
 									)}
 								</Button>
@@ -521,8 +522,7 @@ export function MRDetail({
 							{postSuccess && (
 								<div className="flex items-center gap-2 text-success text-sm">
 									<CheckCircle className="h-4 w-4" />
-									Posted {postSuccess.count} finding
-									{postSuccess.count !== 1 ? "s" : ""} to GitLab
+									{t("gitlab:mrReview.postedCount", { count: postSuccess.count })}
 								</div>
 							)}
 						</div>
@@ -541,12 +541,12 @@ export function MRDetail({
 										{isApproving ? (
 											<>
 												<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-												Approving...
+												{t("gitlab:mrReview.approving")}
 											</>
 										) : (
 											<>
 												<CheckCircle className="h-4 w-4 mr-2" />
-												Approve
+												{t("gitlab:mrReview.approve")}
 											</>
 										)}
 									</Button>
@@ -559,12 +559,12 @@ export function MRDetail({
 										{isMerging ? (
 											<>
 												<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-												Merging...
+												{t("gitlab:mrReview.merging")}
 											</>
 										) : (
 											<>
 												<GitMerge className="h-4 w-4 mr-2" />
-												Merge MR
+												{t("gitlab:mrReview.merge")}
 											</>
 										)}
 									</Button>
@@ -596,12 +596,12 @@ export function MRDetail({
 										{isReviewing ? (
 											<>
 												<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-												Reviewing...
+												{t("gitlab:mrReview.reviewing")}
 											</>
 										) : (
 											<>
 												<RefreshCw className="h-4 w-4 mr-2" />
-												Run Follow-up Review
+												{t("gitlab:mrReview.runFollowup")}
 											</>
 										)}
 									</Button>
@@ -613,8 +613,9 @@ export function MRDetail({
 											className="bg-primary/20 text-primary border-primary/50 shrink-0"
 										>
 											<RefreshCw className="h-3 w-3 mr-1" />
-											{newCommitsCheck.newCommitCount} new commit
-											{newCommitsCheck.newCommitCount !== 1 ? "s" : ""}
+											{t("gitlab:mrReview.newCommitsBadge", {
+									count: newCommitsCheck.newCommitCount,
+								})}
 										</Badge>
 									)}
 							</div>
@@ -650,17 +651,17 @@ export function MRDetail({
 											<Sparkles className="h-4 w-4" />
 										)}
 										{reviewResult.isFollowupReview
-											? "Follow-up Review"
-											: "AI Review Result"}
+											? t("gitlab:mrReview.followupReviewResult")
+											: t("gitlab:mrReview.aiReviewResult")}
 									</span>
 									<Badge
 										variant="outline"
 										className={getStatusColor(reviewResult.overallStatus)}
 									>
-										{reviewResult.overallStatus === "approve" && "Approve"}
+										{reviewResult.overallStatus === "approve" && t("gitlab:mrReview.overallStatus.approve")}
 										{reviewResult.overallStatus === "request_changes" &&
-											"Changes Requested"}
-										{reviewResult.overallStatus === "comment" && "Comment"}
+											t("gitlab:mrReview.overallStatus.requestChanges")}
+										{reviewResult.overallStatus === "comment" && t("gitlab:mrReview.overallStatus.comment")}
 									</Badge>
 								</CardTitle>
 							</CardHeader>
@@ -674,7 +675,9 @@ export function MRDetail({
 												className="bg-success/20 text-success border-success/50"
 											>
 												<CheckCircle className="h-3 w-3 mr-1" />
-												{reviewResult.resolvedFindings?.length} resolved
+												{t("gitlab:mrReview.resolvedCount", {
+											count: reviewResult.resolvedFindings?.length,
+										})}
 											</Badge>
 										)}
 										{(reviewResult.unresolvedFindings?.length ?? 0) > 0 && (
@@ -683,7 +686,9 @@ export function MRDetail({
 												className="bg-warning/20 text-warning border-warning/50"
 											>
 												<AlertCircle className="h-3 w-3 mr-1" />
-												{reviewResult.unresolvedFindings?.length} still open
+												{t("gitlab:mrReview.stillOpenCount", {
+											count: reviewResult.unresolvedFindings?.length,
+										})}
 											</Badge>
 										)}
 										{(reviewResult.newFindingsSinceLastReview?.length ?? 0) >
@@ -693,11 +698,9 @@ export function MRDetail({
 												className="bg-destructive/20 text-destructive border-destructive/50"
 											>
 												<XCircle className="h-3 w-3 mr-1" />
-												{reviewResult.newFindingsSinceLastReview?.length} new
-												issue
-												{reviewResult.newFindingsSinceLastReview?.length !== 1
-													? "s"
-													: ""}
+												{t("gitlab:mrReview.newIssueCount", {
+												count: reviewResult.newFindingsSinceLastReview?.length,
+											})}
 											</Badge>
 										)}
 									</div>
@@ -717,12 +720,15 @@ export function MRDetail({
 
 								{reviewResult.reviewedAt && (
 									<p className="text-xs text-muted-foreground">
-										Reviewed: {formatDate(reviewResult.reviewedAt)}
+										{t("gitlab:mrReview.reviewedAt", {
+								date: formatDate(reviewResult.reviewedAt),
+							})}
 										{reviewResult.reviewedCommitSha && (
 											<>
 												{" "}
-												at commit{" "}
-												{reviewResult.reviewedCommitSha.substring(0, 7)}
+												{t("gitlab:mrReview.atCommit", {
+										sha: reviewResult.reviewedCommitSha.substring(0, 7),
+									})}
 											</>
 										)}
 									</p>
@@ -737,7 +743,7 @@ export function MRDetail({
 							<CardContent className="pt-4">
 								<div className="flex items-center gap-2 text-destructive">
 									<XCircle className="h-4 w-4" />
-									<span className="text-sm">Review failed</span>
+									<span className="text-sm">{t("gitlab:mrReview.reviewFailed")}</span>
 								</div>
 							</CardContent>
 						</Card>
@@ -746,7 +752,7 @@ export function MRDetail({
 					{/* Description */}
 					<Card>
 						<CardHeader className="pb-2">
-							<CardTitle className="text-sm">Description</CardTitle>
+							<CardTitle className="text-sm">{t("gitlab:mrReview.description")}</CardTitle>
 						</CardHeader>
 						<CardContent className="overflow-hidden">
 							{mr.description ? (
@@ -755,7 +761,7 @@ export function MRDetail({
 								</pre>
 							) : (
 								<p className="text-sm text-muted-foreground italic">
-									No description provided.
+									{t("gitlab:mrReview.noDescription")}
 								</p>
 							)}
 						</CardContent>
@@ -765,7 +771,7 @@ export function MRDetail({
 					{mr.labels && mr.labels.length > 0 && (
 						<Card>
 							<CardHeader className="pb-2">
-								<CardTitle className="text-sm">Labels</CardTitle>
+								<CardTitle className="text-sm">{t("gitlab:mrReview.labels")}</CardTitle>
 							</CardHeader>
 							<CardContent>
 								<div className="flex flex-wrap gap-2">
