@@ -54,6 +54,7 @@ import {
 	loadProjectEnvForSubprocess,
 	initializePythonEnvForPR,
 } from "./worktree-pr-helpers";
+import { registerReviewGroupsHandlers } from "./review-groups-handlers";
 import { registerWorktreeDiffHandlers } from "./worktree-diff-handlers";
 import { registerWorktreeMergeHandlers } from "./worktree-merge-handlers";
 import { registerWorktreeFileHandlers } from "./worktree-file-handlers";
@@ -70,6 +71,7 @@ export function registerWorktreeHandlers(
 	getMainWindow: () => BrowserWindow | null,
 ): void {
 	registerWorktreeDiffHandlers();
+	registerReviewGroupsHandlers();
 	registerWorktreeMergeHandlers(pythonEnvManager, getMainWindow);
 	registerWorktreeFileHandlers();
 	registerWorktreeCreatePRHandlers(pythonEnvManager, getMainWindow);
