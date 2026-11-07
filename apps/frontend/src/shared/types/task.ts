@@ -562,6 +562,14 @@ export interface TaskMetadata {
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
+	/**
+	 * Stacked on another task (F6, `shared/utils/task-stack.ts`): the parent's
+	 * spec id, its commit when this task was last put on it, and the branch
+	 * the stack ends on.
+	 */
+	stackParent?: string;
+	stackParentSha?: string;
+	stackTrunk?: string;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {
@@ -780,6 +788,17 @@ export interface WorktreeStatus {
 export interface WorktreeDiff {
 	files: WorktreeDiffFile[];
 	summary: string;
+	/** Agent Trace (F3): who wrote the task's added lines, when recorded. */
+	attribution?: WorktreeDiffAttribution;
+}
+
+export interface WorktreeDiffAttribution {
+	added: number;
+	ai: number;
+	human: number;
+	unknown: number;
+	/** Lines per `provider/model`. */
+	models: Record<string, number>;
 }
 
 export interface WorktreeDiffFile {
@@ -788,6 +807,8 @@ export interface WorktreeDiffFile {
 	additions: number;
 	deletions: number;
 	patch?: string; // Git patch/diff content for the file
+	/** Agent Trace (F3): of the file's added lines, the agent's and the person's. */
+	attribution?: { added: number; ai: number; human: number; unknown: number };
 }
 
 // ============================================
@@ -1026,6 +1047,8 @@ export interface WorktreeCreatePROptions {
 	 * Defaults to true.
 	 */
 	runVisualProof?: boolean;
+	/** Attach the scenario walkthrough (GIF) to the visual proof; off unless ticked. */
+	includeWalkthrough?: boolean;
 	/**
 	 * Create the PR although the cross review disagrees with this code. Set
 	 * only by the person's "create anyway" in the PR dialog.
@@ -1125,6 +1148,8 @@ export interface VisualProofRun {
 	 */
 	publishError?: string;
 	screenshots: VisualProofScreenshot[];
+	/** The card scenario's GIF (`visual-proof-walkthrough.ts`), when the person attached it. */
+	walkthrough?: VisualProofScreenshot;
 	/** API smoke proof, present when an OpenAPI document was discovered. */
 	apiSmoke?: VisualProofApiSmoke;
 	error?: string;
@@ -1145,6 +1170,12 @@ export interface VisualProofRunOptions {
 	worktreePath?: string;
 	autoBuildPath?: string;
 	provider?: VisualProofProviderId | "auto";
+	/**
+	 * Attach the verification's scenario walkthrough (a GIF) to the proof.
+	 * Only the person's tick in the PR dialog sets it: the GIF films the app
+	 * with its data, and every reader of the repository will see it.
+	 */
+	includeWalkthrough?: boolean;
 }
 
 /**

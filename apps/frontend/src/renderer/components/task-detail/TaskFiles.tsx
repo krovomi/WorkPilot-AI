@@ -8,7 +8,7 @@ import {
 	Loader2,
 	RefreshCw,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import type { Task } from "../../../shared/types";
@@ -97,6 +97,9 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 
 	// State for file content
 	const [selected, setSelected] = useState<Selection | null>(null);
+	// The latest pick, set as soon as it is made: a read that answers after a
+	// newer pick, or an auto-select that runs after the user's click, is dropped.
+	const pickRef = useRef<Selection | null>(null);
 	const [fileContent, setFileContent] = useState<string | null>(null);
 	/** True when the content shown is the file's diff, not its text. */
 	const [contentIsPatch, setContentIsPatch] = useState(false);
@@ -211,7 +214,10 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 
 	// Load the selected file's content
 	const loadContent = useCallback(
-		async (selection: Selection) => {
+		async (selection: Selection, auto = false) => {
+			if (auto && pickRef.current !== null) return;
+			pickRef.current = selection;
+			const current = () => pickRef.current === selection;
 			setSelected(selection);
 			setIsLoadingContent(true);
 			setContentError(null);
@@ -226,6 +232,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 					if (!result.success || result.data === undefined) {
 						throw new Error(result.error || "Failed to read file");
 					}
+					if (!current()) return;
 					setFileContent(result.data);
 					return;
 				}
@@ -237,6 +244,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 						taskFiles.root,
 						entry.path,
 					);
+					if (!current()) return;
 					if (result.success && result.data !== undefined) {
 						setFileContent(result.data);
 						return;
@@ -252,9 +260,10 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 				}
 				throw new Error(readError || "Failed to read file");
 			} catch (err) {
+				if (!current()) return;
 				setContentError(err instanceof Error ? err.message : "Unknown error");
 			} finally {
-				setIsLoadingContent(false);
+				if (current()) setIsLoadingContent(false);
 			}
 		},
 		[taskFiles.root],
@@ -268,7 +277,7 @@ export function TaskFiles({ task, projectPath }: TaskFilesProps) {
 	// Auto-select the first file (a file the task created, else spec.md)
 	useEffect(() => {
 		if (entries.length > 0 && selected === null) {
-			void loadContent(entries[0]);
+			void loadContent(entries[0], true);
 		}
 	}, [entries, loadContent, selected]);
 

@@ -23,6 +23,7 @@ import {
 } from "../../stores/app-emulator-store";
 import { useDocintelVisualStore } from "../../stores/docintel-visual-store";
 import { ResponsivePreview } from "../app-emulator/ResponsivePreview";
+import { type PointedDraft, PointedElementsPanel } from "./PointedElementsPanel";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
@@ -205,6 +206,57 @@ export function TaskEmulator({
 		},
 		[config?.projectDir, project?.path, resolvedWorktreePath, saveCapture, specId, t, taskId],
 	);
+
+	// Les éléments pointés dans l'aperçu (F10), en attente de leur consigne.
+	const [pointing, setPointing] = useState(false);
+	const [drafts, setDrafts] = useState<PointedDraft[]>([]);
+	const [pointBusy, setPointBusy] = useState(false);
+	const [pointError, setPointError] = useState<string | null>(null);
+	const [pointNote, setPointNote] = useState<string | null>(null);
+	const pointErrorText = useCallback(
+		(code: string | undefined) =>
+			t(`appEmulator:pointPanel.errors.${code ?? "generic"}`, {
+				defaultValue: t("appEmulator:pointPanel.errors.generic"),
+			}),
+		[t],
+	);
+
+	const handlePoint = useCallback(
+		async (webContentsId: number) => {
+			setPointing(true);
+			setPointError(null);
+			setPointNote(null);
+			const result = await globalThis.electronAPI.startPreviewPoint(taskId, webContentsId);
+			setPointing(false);
+			if (!result.success) {
+				setPointError(pointErrorText(result.error));
+				return;
+			}
+			const element = result.data;
+			if (element) setDrafts((current) => [...current, { element, text: "" }]);
+		},
+		[pointErrorText, taskId],
+	);
+
+	const handleCancelPoint = useCallback((webContentsId: number) => {
+		void globalThis.electronAPI.cancelPreviewPoint(webContentsId);
+	}, []);
+
+	const handleSendPoints = useCallback(async () => {
+		setPointBusy(true);
+		const result = await globalThis.electronAPI.sendPreviewPoints(
+			taskId,
+			drafts.map((d) => ({ elementId: d.element.id, text: d.text })),
+		);
+		setPointBusy(false);
+		if (result.success) {
+			setPointNote(t("appEmulator:pointPanel.sent", { count: drafts.length }));
+			setPointError(null);
+			setDrafts([]);
+		} else {
+			setPointError(pointErrorText(result.error));
+		}
+	}, [drafts, pointErrorText, t, taskId]);
 
 	const isLoading = phase === "detecting" || phase === "starting";
 	const isRunning = phase === "running";
@@ -428,6 +480,9 @@ export function TaskEmulator({
 						onNavigate={handlePreviewNavigate}
 						onCapture={project?.path && specId ? handleCapture : undefined}
 						capturing={capturing}
+						onPoint={project?.path ? (id) => void handlePoint(id) : undefined}
+						pointing={pointing}
+						onCancelPoint={handleCancelPoint}
 					/>
 				) : (
 					<div className="flex h-full flex-col">
@@ -446,6 +501,24 @@ export function TaskEmulator({
 				)}
 			</div>
 
+			{canPreview && (
+				<PointedElementsPanel
+					drafts={drafts}
+					busy={pointBusy}
+					error={pointError}
+					sentNote={pointNote}
+					onChange={(id, text) =>
+						setDrafts((current) =>
+							current.map((d) => (d.element.id === id ? { ...d, text } : d)),
+						)
+					}
+					onRemove={(id) => {
+						setDrafts((current) => current.filter((d) => d.element.id !== id));
+						void globalThis.electronAPI.discardPreviewPoint(taskId, id);
+					}}
+					onSend={() => void handleSendPoints()}
+				/>
+			)}
 			{canPreview && (
 				<details className="shrink-0 border-t border-border p-2 text-sm">
 					<summary className="cursor-pointer">

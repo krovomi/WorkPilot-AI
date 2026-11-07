@@ -28,6 +28,7 @@ from core.workspace import (
 )
 from foundation.build_signals import BuildHalted, BuildPaused
 from review import ReviewState
+from services.notifications.digest import start_digest_heartbeat
 from ui import (
     BuildState,
     Icons,
@@ -383,6 +384,19 @@ def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None
         from foundation.debug import debug_warning
 
         debug_warning("run.py", f"Attachments preflight skipped: {exc}")
+
+
+def _run_dotnet_preflight(working_dir: Path, spec_dir: Path) -> None:
+    """Stage the .NET 11 migration skill next to the spec when the task needs it.
+
+    Before planning, so the planner plans along the procedure. Reads the
+    worktree (its TargetFramework is the one being built) and the task's words;
+    never raises (`dotnet_upgrade.preflight`).
+    """
+    from dotnet_upgrade import run_preflight
+
+    if summary := run_preflight(working_dir, spec_dir).describe():
+        print("\n" + summary)
 
 
 def _phase_context(
@@ -958,6 +972,10 @@ def handle_build_command(
         # What the person attached to the task — screenshots, mockups, draw.io
         # and Excalidraw diagrams — read once, before the plan is written.
         _run_attachments_preflight(spec_dir, project_dir)
+        # A .NET 10 project the task moves to .NET 11, or one already on it.
+        _run_dotnet_preflight(working_dir, spec_dir)
+        # Long tasks: a digest on the notification channels, when asked (P1).
+        start_digest_heartbeat(spec_dir, project_dir)
 
         # Phases the workflow declares before `planning`. At low and medium
         # effort the profile has already dropped them, so this is a no-op there
@@ -1267,6 +1285,7 @@ def handle_build_command(
     except KeyboardInterrupt:
         _handle_build_interrupt(
             spec_dir=spec_dir,
+            source_spec_dir=source_spec_dir,
             project_dir=project_dir,
             worktree_manager=worktree_manager,
             working_dir=working_dir,
@@ -1295,12 +1314,13 @@ def _handle_build_interrupt(
     verbose: bool,
     profile=None,
     jev_run=None,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
 
     Args:
-        spec_dir: Spec directory path
+        spec_dir: Spec directory path (the worktree's copy in isolated mode)
         project_dir: Project root directory
         worktree_manager: Worktree manager instance (if using isolated mode)
         working_dir: Current working directory
@@ -1312,6 +1332,8 @@ def _handle_build_interrupt(
             started with. Resuming into a differently-shaped pipeline than the
             one that was announced is the kind of surprise this whole refactor
             exists to remove.
+        source_spec_dir: The project's copy of the spec in isolated mode, which
+            the resumed build copies over the worktree's; ``None`` otherwise.
     """
     from core.agent import run_autonomous_agent
 
@@ -1387,9 +1409,12 @@ def _handle_build_interrupt(
                 sys.exit(0)
 
         if human_input:
-            # Save to HUMAN_INPUT.md
-            input_file = spec_dir / "HUMAN_INPUT.md"
-            input_file.write_text(human_input, encoding="utf-8")
+            # Every copy of the spec: the resumed build replaces the worktree's
+            # copy from the project's one (`foundation.human_input`).
+            from foundation.human_input import HUMAN_INPUT_FILE, write_human_input
+
+            write_human_input(human_input, spec_dir, source_spec_dir)
+            input_file = spec_dir / HUMAN_INPUT_FILE
 
             content = [
                 success(f"{icon(Icons.SUCCESS)} INSTRUCTIONS SAVED"),
@@ -1418,6 +1443,7 @@ def _handle_build_interrupt(
                     model=model,
                     max_iterations=max_iterations,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
                     streaming_session_id=streaming_session_id,  # noqa: F821
                     profile=profile,
                     jev_run=jev_run,

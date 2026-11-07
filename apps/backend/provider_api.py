@@ -109,22 +109,13 @@ def deny_in_server_mode() -> None:
 
 
 def _safe_error_message(e: Exception) -> str:
-    """Return a safe error message without exposing internal stack traces."""
-    logger.error("Operation failed: %s: %s", type(e).__name__, e)
-    # Map known exception types to safe user-facing messages
-    _SAFE_MESSAGES: dict[type, str] = {
-        TimeoutError: "Request timed out",
-        ConnectionError: "Connection failed",
-        PermissionError: "Permission denied",
-        FileNotFoundError: "Resource not found",
-        ValueError: "Invalid input",
-        KeyError: "Missing required field",
-        OSError: "System error",
-    }
-    for exc_type, msg in _SAFE_MESSAGES.items():
-        if isinstance(e, exc_type):
-            return msg
-    return "An unexpected error occurred"
+    """Return a safe error message without exposing internal stack traces.
+
+    The one mapping of `foundation.api_safety.safe_error`, which this used to copy.
+    """
+    from foundation.api_safety import safe_error
+
+    return safe_error(e, logger, "Operation")
 
 
 # SSRF Protection - Authorized URLs list
@@ -1931,6 +1922,14 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import brain router: {e}")
 
+# --- MCP tool pins (the custom servers' tools the person approved) ---
+try:
+    from mcp_pins.api import router as mcp_pins_router
+
+    _mount(mcp_pins_router, "mcp_pins")
+except ImportError as e:
+    print(f"Warning: Could not import mcp_pins router: {e}")
+
 # --- rtk API (is the output-condensing proxy working here, and what it saved) ---
 try:
     from rtk.api import router as rtk_router
@@ -2058,6 +2057,11 @@ try:
     _mount(notifications_router, "notifications")
 except ImportError as e:
     print(f"Warning: Could not import notifications router: {e}")
+
+# --- Worktree recipe (how a task's worktree is prepared, per stack) ---
+from core.workspace.recipe_api import router as worktree_recipe_router  # noqa: E402
+
+_mount(worktree_recipe_router, "worktree_recipe")
 
 if __name__ == "__main__":
     import uvicorn

@@ -45,6 +45,8 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/slash-commands/run"): "agent.execute",
     # Launches the task's app and may run fixer and verifier sessions.
     ("POST", "/api/verify/run"): "agent.execute",
+    # Launches the task's app twice, on its base branch and on the task.
+    ("POST", "/api/verify/compare"): "agent.execute",
     # Executes arbitrary submitted code in the playground sandbox.
     ("POST", "/api/code-playground/run"): "agent.execute",
     # Starts and stops orchestration sessions.
@@ -62,6 +64,8 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/board/cards/{card_id}/approve"): "review.approve",
     # Sending a card's work back is the other answer to the same review.
     ("POST", "/api/board/cards/{card_id}/request-changes"): "review.approve",
+    # A message to a running card's agent changes what the agent does.
+    ("POST", "/api/board/cards/{card_id}/steering"): "agent.execute",
     # A shared feature's job runs its agent on the project's clone; stopping
     # one is the same right as stopping a run. Turning a roadmap feature or
     # an idea into a card writes a card.

@@ -43,7 +43,11 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, HTTPException, Query
 from foundation.api_safety import validated_dir
-from skills_registry.bundled import BUNDLED_SKILLS, load_bundled_skill
+from skills_registry.bundled import (
+    BUNDLED_SKILLS,
+    bundled_skill_dirs,
+    load_bundled_skill,
+)
 from skills_registry.frontmatter import parse_frontmatter, workpilot_meta
 from skills_registry.resolver import check_requires
 
@@ -250,8 +254,53 @@ def _resolve_command_body(proj: Path, command: str) -> str | None:
                 return body
         except (OSError, ValueError):
             continue
+    return _bundled_body(command)
+
+
+def _bundled_body(command: str) -> str | None:
+    """A bundled skill's body, told where its own files are when it has some.
+
+    A bundled skill is not in the project: its `references/` or `scripts/` sit
+    beside the SKILL.md in the release (or the checkout), and a bare
+    `references/x.md` read from the project directory finds nothing.
+    """
     bundled = load_bundled_skill(command)
-    return bundled[1] if bundled is not None else None
+    if bundled is None:
+        return None
+    body = bundled[1]
+    for directory in bundled_skill_dirs(command):
+        if not (directory / "SKILL.md").is_file():
+            continue
+        if any((directory / sub).is_dir() for sub in ("references", "scripts")):
+            body = (
+                f"PROCEDURE SOURCE: {directory / 'SKILL.md'} (bare paths such as "
+                f"references/… resolve from {directory})\n\n{body}"
+            )
+        break
+    return body
+
+
+def _bundled_applies(meta: dict[str, Any], proj: Path) -> bool:
+    """A bundled skill pinned to a toolchain is offered only to a project on it.
+
+    `migrate-dotnet10-to-dotnet11` declares `dotnet: ">=10.0 <12.0"`: a Python
+    project's palette has no use for it. A skill that declares no target is
+    offered everywhere, as before. Read the way the build reads a project
+    (`.workpilot/skills.toml` first, then detection).
+    """
+    targets = workpilot_meta(meta).get("targets")
+    if not isinstance(targets, dict) or not targets:
+        return True
+    from skills_registry.project import load_project_config
+    from skills_registry.targets import targets_match
+
+    try:
+        ok, reason = targets_match(targets, load_project_config(proj).targets)
+    except (OSError, ValueError) as exc:
+        ok, reason = False, str(exc)
+    if not ok:
+        logger.debug("bundled command hidden: %s", reason)
+    return ok
 
 
 # Built-in slash commands the SDK / CLI recognises AND that make sense in
@@ -305,7 +354,7 @@ def list_slash_commands(project_dir: Annotated[str, Query()]):
         if name in seen:
             continue
         skill = load_bundled_skill(name)
-        if skill is not None:
+        if skill is not None and _bundled_applies(skill[0], proj):
             bundled_cmds.append(
                 {
                     "name": name,

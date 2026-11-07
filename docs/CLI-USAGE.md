@@ -157,6 +157,18 @@ python run.py --spec 001 --merge
 python run.py --spec 001 --discard
 ```
 
+## Steering a Running Task
+
+Send the agent a message without pausing it. It reaches the prompt of the next
+coding or QA fixer session, and the task shows which session received it:
+
+```bash
+python run.py --spec 001 --steer "Keep the old route, add the new one beside it"
+
+# Only for one subtask's next session
+python run.py --spec 001 --steer "Log the retries" --steer-subtask subtask-2-1
+```
+
 ## Interactive Controls
 
 While the agent is running:
@@ -177,6 +189,10 @@ touch specs/001-name/PAUSE
 # Add instructions
 echo "Focus on fixing the login bug first" > specs/001-name/HUMAN_INPUT.md
 ```
+
+The next subtask session receives the instructions first in its prompt. Once that session has run,
+WorkPilot archives the file as `HUMAN_INPUT.<UTC timestamp>.md`: an instruction applies once, and
+the archive keeps its trace. Agents cannot write `HUMAN_INPUT.md`; only you do.
 
 ## Spec Validation
 

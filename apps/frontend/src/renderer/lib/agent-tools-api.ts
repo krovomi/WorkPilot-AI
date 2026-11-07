@@ -1577,6 +1577,11 @@ export interface VerifyRecord {
 	scenario_steps?: VerifyScenarioStep[];
 	/** Whether a Playwright trace of the scenario can be downloaded (`verifyTraceUrl`). */
 	trace?: boolean;
+	/** Whether the scenario was filmed (`verifyMediaUrl(query, "video")`), and why not. */
+	video?: boolean;
+	video_note?: string;
+	/** Whether the step captures make a GIF (`verifyMediaUrl(query, "walkthrough")`). */
+	walkthrough?: boolean;
 	confirmations: Array<{ state?: string; evidence?: string; url?: string }>;
 	endpoints: VerifyEndpoint[];
 	perf: VerifyPerf[];
@@ -1587,6 +1592,31 @@ export interface VerifyRecord {
 	findings: Array<{ severity: string; kind?: string; message: string }>;
 	browser?: { engine: string; reasons: string[] };
 	replay?: { status: string; problems?: string[]; reason?: string };
+	/** The same scenario replayed on the base branch and on the task (`POST /api/verify/compare`). */
+	compare?: VerifyCompare;
+}
+
+/** One behaviour that differs between the base branch and the task. */
+export interface VerifyDifference {
+	kind: "scenario" | "console" | "network" | "endpoint";
+	/** `broken`: worked on the base, not on the task; `fixed`: the reverse. */
+	change: "broken" | "fixed" | "added" | "removed" | "changed";
+	what: string;
+	base?: string | null;
+	task?: string | null;
+}
+
+export interface VerifyCompare {
+	status: "done" | "skipped";
+	reason?: string;
+	base?: string;
+	head?: string;
+	at?: number;
+	differences?: VerifyDifference[];
+	base_problems?: string[];
+	task_problems?: string[];
+	/** Indices in `screenshots` of the page at the end of the scenario, per side. */
+	screenshots?: { base: number | null; task: number | null };
 }
 
 export interface VerifyScenarioStep {
@@ -1631,6 +1661,14 @@ export function runVerify(
 	);
 }
 
+/** Replay the verification on the base branch and on the task, and list what differs. */
+export function compareVerify(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<VerifyPayload>> {
+	return _post<VerifyPayload>("/api/verify/compare", specAddress(query), signal);
+}
+
 /** The URL of one screenshot the record names — by index, never by path. */
 export function verifyScreenshotUrl(
 	query: SpecTraceabilityQuery,
@@ -1647,4 +1685,10 @@ export function verifyScreenshotUrl(
 export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
 	return `${backendUrl()}/api/verify/trace?${qs}`;
+}
+
+/** The scenario's video or GIF, served by the record, never by path. */
+export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
+	const qs = new URLSearchParams(specAddress(query)).toString();
+	return `${backendUrl()}/api/verify/${kind}?${qs}`;
 }
