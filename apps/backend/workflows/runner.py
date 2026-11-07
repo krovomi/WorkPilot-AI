@@ -637,6 +637,14 @@ def _uiux(spec_dir: Path, phase_id: str) -> str:
         return ""
 
 
+def _dotnet(project_dir: Path, spec_dir: Path, phase_id: str) -> str:
+    """`prompts.dotnet_section`, deferred like the above; it reads one file."""
+    from prompts_pkg.prompts import dotnet_section
+
+    role = "qa" if CONFIG_PHASE.get(phase_id) == "qa" else "phase"
+    return dotnet_section(project_dir, spec_dir, role=role)
+
+
 def _build_prompt(
     resolved, body: str, ctx: PhaseContext, source: Path | None = None
 ) -> str:
@@ -735,6 +743,11 @@ def _build_prompt(
     # The design system of a UI task (ui-ux-pro-max). Empty off the interface.
     if design := _uiux(ctx.spec_dir, phase.id):
         lines += ["", "---", "", design]
+
+    # The .NET 11 procedure staged for this task (`dotnet_upgrade`): `analyze`
+    # checks the plan against it, `review` the diff. Empty on every other task.
+    if dotnet := _dotnet(ctx.project_dir, ctx.spec_dir, phase.id):
+        lines += ["", "---", "", dotnet]
 
     lines += [
         "",
