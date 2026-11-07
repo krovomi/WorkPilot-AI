@@ -95,4 +95,4 @@ pillow>=12.0.0
 # OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
 # installed through mcp; the SDK and the exporter make the spans leave.
 opentelemetry-sdk>=1.45.1
-opentelemetry-exporter-otlp-proto-http>=1.45.1
+opentelemetry-exporter-otlp-proto-http>=1.45.2
