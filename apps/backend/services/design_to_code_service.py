@@ -29,10 +29,21 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from services.design_to_code_stacks import (
+    STACKS,
+    build_visual_test,
+    component_name,
+    get_stack,
+    is_component_file,
+    output_example,
+    style_instruction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +72,7 @@ class PipelinePhase(str, Enum):
 
 
 class FrameworkType(str, Enum):
-    """Supported frontend frameworks."""
+    """Supported target stacks (web, mobile, desktop); see design_to_code_stacks."""
 
     REACT = "react"
     VUE = "vue"
@@ -69,6 +80,15 @@ class FrameworkType(str, Enum):
     SVELTE = "svelte"
     NEXTJS = "nextjs"
     NUXT = "nuxt"
+    BLAZOR = "blazor"
+    HTML = "html"
+    REACT_NATIVE = "react_native"
+    FLUTTER = "flutter"
+    SWIFTUI = "swiftui"
+    JETPACK_COMPOSE = "jetpack_compose"
+    MAUI = "maui"
+    WPF = "wpf"
+    AVALONIA = "avalonia"
 
 
 class DesignSourceType(str, Enum):
@@ -93,6 +113,9 @@ class ComponentSpec:
     interactions: list[str] = field(default_factory=list)
     accessibility: dict[str, str] = field(default_factory=dict)
     description: str = ""
+    # Where the component sits on the design, as fractions of the image
+    # (x, y, w, h in 0..1), when the vision model gave it.
+    bounds: dict[str, float] | None = None
 
 
 @dataclass
@@ -151,6 +174,7 @@ class VisualTest:
     reference_screenshot: str = ""  # base64
     threshold: float = 0.95
     description: str = ""
+    path: str = ""  # where the test belongs in the project, per the stack
 
 
 @dataclass
@@ -168,6 +192,9 @@ class PipelineResult:
     warnings: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
     tokens_used: int = 0
+    # True when no model answered and a canned example stood in for it: the
+    # page must say so instead of presenting it as an analysis of the design.
+    simulated: bool = False
 
 
 # =============================================================================
@@ -196,12 +223,38 @@ class DesignTokenExtractor:
     def __init__(self, project_path: Path):
         self.project_path = project_path
         self.tokens: list[DesignToken] = []
+        self._seen_files: set[Path] = set()
+
+    # Build outputs and dependencies hold copies of tokens, never their source.
+    SKIPPED_DIRS = {
+        "node_modules",
+        "bin",
+        "obj",
+        "dist",
+        "build",
+        "out",
+        "target",
+        "vendor",
+        "Pods",
+        "coverage",
+    }
+
+    def _within_project(self, relative: str) -> Path | None:
+        """``relative`` resolved under the project, or ``None`` if it escapes."""
+        root = self.project_path.resolve()
+        candidate = (root / relative).resolve()
+        if candidate == root or root in candidate.parents:
+            return candidate
+        logger.warning("Design system path ignored: outside the project")
+        return None
 
     def extract(self, design_system_path: str | None = None) -> list[DesignToken]:
         """Extract design tokens from the project."""
         search_paths = []
         if design_system_path:
-            search_paths.append(self.project_path / design_system_path)
+            confined = self._within_project(design_system_path)
+            if confined is not None:
+                search_paths.append(confined)
         search_paths.extend(
             [
                 self.project_path / "src",
@@ -212,11 +265,16 @@ class DesignTokenExtractor:
             ]
         )
 
+        self._seen_files = set()
         for search_path in search_paths:
             if not search_path.exists():
                 continue
             self._scan_directory(search_path)
 
+        unique: dict[str, DesignToken] = {}
+        for token in self.tokens:
+            unique.setdefault(token.name, token)
+        self.tokens = list(unique.values())
         logger.info(f"Extracted {len(self.tokens)} design tokens from project")
         return self.tokens
 
@@ -227,9 +285,16 @@ class DesignTokenExtractor:
         try:
             for item in directory.iterdir():
                 if item.is_file() and item.name in self.SUPPORTED_TOKEN_FILES:
+                    resolved = item.resolve()
+                    if resolved in self._seen_files:
+                        continue
+                    self._seen_files.add(resolved)
                     self._parse_token_file(item)
-                elif item.is_dir() and not item.name.startswith(
-                    (".", "node_modules", "__")
+                elif (
+                    item.is_dir()
+                    and not item.is_symlink()
+                    and item.name not in self.SKIPPED_DIRS
+                    and not item.name.startswith((".", "__"))
                 ):
                     self._scan_directory(item, depth + 1)
         except PermissionError:
@@ -400,178 +465,50 @@ class DesignTokenExtractor:
 
 
 class VisualTestGenerator:
-    """Generates visual regression tests for generated components."""
+    """Generates the visual regression tests of the generated components.
+
+    Each stack has its own convention (Playwright screenshots on the web,
+    golden files in Flutter, snapshots in SwiftUI…), held by
+    ``design_to_code_stacks``. A stack without one gets no test.
+    """
 
     def __init__(self, framework: FrameworkType):
         self.framework = framework
+        self.stack = get_stack(framework.value)
+
+    @property
+    def supported(self) -> bool:
+        return self.stack.test_kind is not None
 
     def generate_tests(
         self,
         generated_files: list[GeneratedFile],
     ) -> list[VisualTest]:
         """Generate visual tests for the generated components."""
-        tests = []
+        tests: list[VisualTest] = []
+        seen: set[str] = set()
         for gf in generated_files:
-            if not self._is_component_file(gf):
+            if not is_component_file(self.stack, gf.path, gf.language):
                 continue
-            component_name = self._extract_component_name(gf)
-            if not component_name:
+            name = component_name(gf.path)
+            if not name or name in seen:
                 continue
-            test = self._generate_visual_test(component_name)
-            tests.append(test)
+            draft = build_visual_test(self.stack, name)
+            if draft is None:
+                continue
+            seen.add(name)
+            tests.append(
+                VisualTest(
+                    name=draft.name,
+                    test_code=draft.code,
+                    threshold=0.98,
+                    description=draft.description,
+                    path=draft.path,
+                )
+            )
 
         logger.info(f"Generated {len(tests)} visual tests")
         return tests
-
-    def _is_component_file(self, gf: GeneratedFile) -> bool:
-        """Check if a file is a component file."""
-        return gf.language in ("tsx", "jsx", "vue", "svelte")
-
-    def _extract_component_name(self, gf: GeneratedFile) -> str | None:
-        """Extract the component name from a generated file."""
-        path = Path(gf.path)
-        name = path.stem
-        if name in ("index", "styles", "types"):
-            return path.parent.name
-        return name
-
-    def _generate_visual_test(self, component_name: str) -> VisualTest:
-        """Generate a visual test for a specific component."""
-        if self.framework in (FrameworkType.REACT, FrameworkType.NEXTJS):
-            return self._generate_react_visual_test(component_name)
-        elif self.framework == FrameworkType.VUE:
-            return self._generate_vue_visual_test(component_name)
-        elif self.framework == FrameworkType.SVELTE:
-            return self._generate_svelte_visual_test(component_name)
-        else:
-            return self._generate_react_visual_test(component_name)
-
-    def _generate_react_visual_test(self, component_name: str) -> VisualTest:
-        """Generate a Playwright visual test for a React component."""
-        test_code = f'''import {{ test, expect }} from '@playwright/test';
-
-test.describe('{component_name} Visual Regression', () => {{
-  test('should match design screenshot', async ({{ page }}) => {{
-    // Navigate to the component story or route
-    await page.goto('/components/{component_name.lower()}');
-
-    // Wait for the component to be fully rendered
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-
-    // Wait for fonts and images to load
-    await page.waitForLoadState('networkidle');
-
-    // Take a screenshot and compare with reference
-    await expect(page).toHaveScreenshot('{component_name.lower()}.png', {{
-      maxDiffPixelRatio: 0.05,
-      threshold: 0.2,
-    }});
-  }});
-
-  test('should match design on mobile viewport', async ({{ page }}) => {{
-    await page.setViewportSize({{ width: 375, height: 812 }});
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveScreenshot('{component_name.lower()}-mobile.png', {{
-      maxDiffPixelRatio: 0.05,
-      threshold: 0.2,
-    }});
-  }});
-
-  test('should match design on tablet viewport', async ({{ page }}) => {{
-    await page.setViewportSize({{ width: 768, height: 1024 }});
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveScreenshot('{component_name.lower()}-tablet.png', {{
-      maxDiffPixelRatio: 0.05,
-      threshold: 0.2,
-    }});
-  }});
-
-  test('should be accessible', async ({{ page }}) => {{
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-
-    // Check for accessibility violations
-    const violations = await page.evaluate(async () => {{
-      const {{ default: axe }} = await import('axe-core');
-      const results = await axe.run();
-      return results.violations;
-    }});
-
-    expect(violations).toEqual([]);
-  }});
-}});
-'''
-        return VisualTest(
-            name=f"{component_name}VisualTest",
-            test_code=test_code,
-            threshold=0.95,
-            description=f"Visual regression tests for {component_name} component",
-        )
-
-    def _generate_vue_visual_test(self, component_name: str) -> VisualTest:
-        """Generate a Playwright visual test for a Vue component."""
-        test_code = f'''import {{ test, expect }} from '@playwright/test';
-
-test.describe('{component_name} Visual Regression', () => {{
-  test('should match design screenshot', async ({{ page }}) => {{
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveScreenshot('{component_name.lower()}.png', {{
-      maxDiffPixelRatio: 0.05,
-      threshold: 0.2,
-    }});
-  }});
-
-  test('should match design on mobile', async ({{ page }}) => {{
-    await page.setViewportSize({{ width: 375, height: 812 }});
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveScreenshot('{component_name.lower()}-mobile.png', {{
-      maxDiffPixelRatio: 0.05,
-    }});
-  }});
-}});
-'''
-        return VisualTest(
-            name=f"{component_name}VisualTest",
-            test_code=test_code,
-            threshold=0.95,
-            description=f"Visual regression tests for {component_name} (Vue)",
-        )
-
-    def _generate_svelte_visual_test(self, component_name: str) -> VisualTest:
-        """Generate a Playwright visual test for a Svelte component."""
-        test_code = f'''import {{ test, expect }} from '@playwright/test';
-
-test.describe('{component_name} Visual Regression', () => {{
-  test('should match design screenshot', async ({{ page }}) => {{
-    await page.goto('/components/{component_name.lower()}');
-    await page.waitForSelector('[data-testid="{component_name.lower()}"]');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveScreenshot('{component_name.lower()}.png', {{
-      maxDiffPixelRatio: 0.05,
-      threshold: 0.2,
-    }});
-  }});
-}});
-'''
-        return VisualTest(
-            name=f"{component_name}VisualTest",
-            test_code=test_code,
-            threshold=0.95,
-            description=f"Visual regression tests for {component_name} (Svelte)",
-        )
 
 
 # =============================================================================
@@ -580,37 +517,7 @@ test.describe('{component_name} Visual Regression', () => {{
 
 
 FRAMEWORK_SYSTEM_PROMPTS = {
-    FrameworkType.REACT: """You are an expert React developer. Generate production-ready React code using:
-- Functional components with TypeScript
-- React hooks (useState, useEffect, useCallback, useMemo)
-- CSS Modules or Tailwind CSS for styling
-- Proper TypeScript interfaces for all props
-- data-testid attributes for testing
-- Semantic HTML and ARIA attributes for accessibility
-- Responsive design with mobile-first approach""",
-    FrameworkType.VUE: """You are an expert Vue.js developer. Generate production-ready Vue 3 code using:
-- Composition API with <script setup lang="ts">
-- TypeScript for type safety
-- Scoped styles or Tailwind CSS
-- Proper prop definitions with TypeScript interfaces
-- data-testid attributes for testing
-- Semantic HTML and ARIA attributes for accessibility
-- Responsive design with mobile-first approach""",
-    FrameworkType.ANGULAR: """You are an expert Angular developer. Generate production-ready Angular code using:
-- Standalone components with TypeScript
-- Angular signals where appropriate
-- SCSS for styling
-- Proper Input/Output decorators with TypeScript types
-- data-testid attributes for testing
-- Semantic HTML and ARIA attributes for accessibility
-- Responsive design with mobile-first approach""",
-    FrameworkType.SVELTE: """You are an expert Svelte developer. Generate production-ready Svelte code using:
-- Svelte 5 with TypeScript
-- Scoped styles or Tailwind CSS
-- Proper prop exports with TypeScript
-- data-testid attributes for testing
-- Semantic HTML and ARIA attributes for accessibility
-- Responsive design with mobile-first approach""",
+    FrameworkType(stack_id): profile.prompt for stack_id, profile in STACKS.items()
 }
 
 
@@ -636,20 +543,32 @@ class DesignToCodeService:
         self.token_extractor = DesignTokenExtractor(self.project_path)
         self.phase = PipelinePhase.IDLE
         self.phase_callbacks: list[Any] = []
+        self.progress_callbacks: list[Callable[..., None]] = []
+        # Set when a canned example answered instead of a model.
+        self._simulated = False
 
-        # Configuration
-        self.vision_model = os.getenv(
-            "DESIGN_TO_CODE_VISION_MODEL", "claude-3-5-sonnet-20241022"
-        )
-        self.code_model = os.getenv(
-            "DESIGN_TO_CODE_CODE_MODEL", "claude-3-5-sonnet-20241022"
-        )
+        # Configuration (direct API calls only; the one-shot trunk and the
+        # Claude subscription route use the user's own model choice).
+        from phase_config import MODEL_ID_MAP
+
+        default_model = MODEL_ID_MAP.get("sonnet", "claude-sonnet-5-5")
+        self.vision_model = os.getenv("DESIGN_TO_CODE_VISION_MODEL", default_model)
+        self.code_model = os.getenv("DESIGN_TO_CODE_CODE_MODEL", default_model)
 
     def on_phase_change(self, callback) -> None:
-        """Register a callback for phase changes."""
+        """Register a callback for phase changes: ``callback(phase, status)``."""
         self.phase_callbacks.append(callback)
 
-    def _set_phase(self, phase: PipelinePhase, status: str = "") -> None:
+    def on_progress(self, callback: Callable[..., None]) -> None:
+        """Register ``callback(phase, status, detail)``: the phase plus what it found."""
+        self.progress_callbacks.append(callback)
+
+    def _set_phase(
+        self,
+        phase: PipelinePhase,
+        status: str = "",
+        detail: dict[str, Any] | None = None,
+    ) -> None:
         """Update the current pipeline phase."""
         self.phase = phase
         for cb in self.phase_callbacks:
@@ -657,6 +576,28 @@ class DesignToCodeService:
                 cb(phase, status)
             except Exception:
                 pass
+        for cb in self.progress_callbacks:
+            try:
+                cb(phase, status, detail or {})
+            except (OSError, TypeError, ValueError):
+                logger.debug("design-to-code progress callback raised", exc_info=True)
+
+    @staticmethod
+    def _spec_summary(spec: DesignSpec) -> dict[str, Any]:
+        """What the page shows while the run goes on: components and their zones."""
+        return {
+            "components": [
+                {
+                    "name": c.name,
+                    "type": c.type,
+                    "children": [ch.name for ch in c.children],
+                    "bounds": c.bounds,
+                }
+                for c in spec.components
+            ],
+            "palette": spec.color_palette,
+            "typography": spec.typography,
+        }
 
     async def run_pipeline(
         self,
@@ -668,25 +609,30 @@ class DesignToCodeService:
         figma_node_id: str | None = None,
         generate_tests: bool = True,
         custom_instructions: str = "",
+        style: str = "",
+        use_design_tokens: bool = True,
     ) -> PipelineResult:
         """
         Run the complete design-to-code pipeline.
 
         Args:
             image_data: Base64-encoded image data (with or without data URI prefix)
-            framework: Target framework (react, vue, angular, svelte)
-            design_system_path: Path to the project's design system directory
+            framework: Target stack id (see ``design_to_code_stacks.STACKS``)
+            design_system_path: Design system directory, relative to the project
             source_type: Type of design source (screenshot, figma, wireframe, etc.)
             figma_file_key: Figma file key for API sync
             figma_node_id: Figma node ID for specific component
             generate_tests: Whether to generate visual tests
             custom_instructions: Additional instructions for code generation
+            style: Styling approach for web stacks (tailwind, css_modules, …)
+            use_design_tokens: Read the project's tokens and use them in the code
 
         Returns:
             PipelineResult with generated code, tests, and metadata
         """
         start_time = time.time()
         result = PipelineResult()
+        self._simulated = False
         fw = (
             FrameworkType(framework)
             if framework in FrameworkType._value2member_map_
@@ -705,36 +651,51 @@ class DesignToCodeService:
 
             # Phase 2: Extract design tokens
             self._set_phase(
-                PipelinePhase.DESIGN_TOKEN_INTEGRATION, "Extracting design tokens..."
+                PipelinePhase.DESIGN_TOKEN_INTEGRATION,
+                "Extracting design tokens...",
+                {"spec": self._spec_summary(design_spec)},
             )
-            tokens = self.token_extractor.extract(design_system_path)
+            tokens = (
+                self.token_extractor.extract(design_system_path)
+                if use_design_tokens
+                else []
+            )
             result.design_tokens_used = tokens
 
             # Phase 3: Generate structured spec
             self._set_phase(
-                PipelinePhase.SPEC_GENERATION, "Generating component specification..."
+                PipelinePhase.SPEC_GENERATION,
+                "Generating component specification...",
+                {"tokens": len(tokens), "tokens_skipped": not use_design_tokens},
             )
             enriched_spec = self._enrich_spec_with_tokens(design_spec, tokens)
             result.design_spec = enriched_spec
 
             # Phase 4: Generate code
             self._set_phase(
-                PipelinePhase.CODE_GENERATION, "Generating production-ready code..."
+                PipelinePhase.CODE_GENERATION,
+                "Generating production-ready code...",
+                {"spec": self._spec_summary(enriched_spec)},
             )
             generated_files = await self._generate_code(
-                enriched_spec, fw, tokens, custom_instructions
+                enriched_spec, fw, tokens, custom_instructions, style
             )
             result.generated_files = generated_files
 
             # Phase 5: Visual test generation
             if generate_tests:
+                test_gen = VisualTestGenerator(fw)
                 self._set_phase(
                     PipelinePhase.VISUAL_TEST_GENERATION,
                     "Generating visual regression tests...",
+                    {
+                        "files": [f.path for f in generated_files],
+                        "tests_supported": test_gen.supported,
+                    },
                 )
-                test_gen = VisualTestGenerator(fw)
-                visual_tests = test_gen.generate_tests(generated_files)
-                result.visual_tests = visual_tests
+                result.visual_tests = test_gen.generate_tests(generated_files)
+                if not test_gen.supported:
+                    result.warnings.append("visual_tests_unsupported")
 
             # Phase 6: Figma sync (if configured)
             if figma_file_key:
@@ -755,6 +716,7 @@ class DesignToCodeService:
             result.phase = PipelinePhase.ERROR
             result.errors.append(str(e))
 
+        result.simulated = self._simulated
         result.duration_seconds = time.time() - start_time
         return result
 
@@ -801,7 +763,8 @@ Please provide a comprehensive JSON analysis with the following structure:
       "interactions": ["hover effect", "click action", etc.],
       "accessibility": {{"role": "button", "aria-label": "description"}},
       "children": [],
-      "description": "What this component does"
+      "description": "What this component does",
+      "bounds": {{"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.1}}
     }}
   ],
   "layout": {{
@@ -832,6 +795,8 @@ Please provide a comprehensive JSON analysis with the following structure:
 }}
 
 Be thorough and specific. Extract exact colors, sizes, and positioning from the design.
+"bounds" is where each top-level component sits on the image, as fractions of
+its width and height (x, y = top-left corner, w, h = size), all between 0 and 1.
 Return ONLY the JSON, no additional text."""
 
         # Call Vision AI
@@ -877,7 +842,12 @@ Return ONLY the JSON, no additional text."""
             if selected and selected[0]:
                 return await selected[1](selected[0], image_data, prompt)
 
-            # 2) Fall back to any available vision-capable provider.
+            # 2) Claude through the user's subscription (Claude Code sign-in):
+            #    no API key, the image goes to the CLI as a message block.
+            if provider in ("", "claude", "anthropic") and _claude_signed_in():
+                return await self._call_claude_subscription_vision(image_data, prompt)
+
+            # 3) Fall back to any available vision-capable provider.
             if anthropic_key:
                 return await self._call_claude_vision(anthropic_key, image_data, prompt)
             if openai_key:
@@ -889,6 +859,7 @@ Return ONLY the JSON, no additional text."""
                 "No vision-capable provider configured (provider=%s). Using mock analysis.",
                 provider or "unknown",
             )
+            self._simulated = True
             return self._mock_vision_analysis()
 
         except Exception as e:
@@ -942,6 +913,64 @@ Return ONLY the JSON, no additional text."""
             response.raise_for_status()
             data = response.json()
             return data["content"][0]["text"]
+
+    async def _call_claude_subscription_vision(
+        self, image_data: str, prompt: str
+    ) -> str:
+        """Ask Claude through the Claude Code sign-in, the image as a content block.
+
+        Tool-less agent type: the model sees the picture and the prompt, and
+        nothing it reads on the picture can make it open a file or run a command.
+        """
+        from core.oneshot import _resolve_model
+        from core.simple_client import create_simple_client
+
+        if image_data.startswith("data:"):
+            header, b64_data = image_data.split(",", 1)
+            media_type = header.split(":")[1].split(";")[0]
+        else:
+            media_type, b64_data = "image/png", image_data
+
+        model = _resolve_model("claude", None, None)
+        client = create_simple_client(
+            agent_type="commit_message",
+            model=model if model != "default" else self.vision_model,
+            cwd=self.project_path,
+            max_turns=1,
+        )
+
+        async def _message():
+            yield {
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": b64_data,
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                },
+                "parent_tool_use_id": None,
+            }
+
+        chunks: list[str] = []
+        async with client:
+            await client.query(_message())
+            async for msg in client.receive_response():
+                for block in getattr(msg, "content", None) or []:
+                    text = getattr(block, "text", None)
+                    if isinstance(text, str):
+                        chunks.append(text)
+        answer = "".join(chunks).strip()
+        if not answer:
+            raise RuntimeError("Claude returned no analysis for the design")
+        return answer
 
     async def _call_openai_vision(
         self, api_key: str, image_data: str, prompt: str
@@ -1157,6 +1186,7 @@ Return ONLY the JSON, no additional text."""
                 interactions=comp_data.get("interactions", []),
                 accessibility=comp_data.get("accessibility", {}),
                 description=comp_data.get("description", ""),
+                bounds=_parse_bounds(comp_data.get("bounds")),
             )
             # Parse nested children
             for child_data in comp_data.get("children", []):
@@ -1236,56 +1266,40 @@ Return ONLY the JSON, no additional text."""
         framework: FrameworkType,
         tokens: list[DesignToken],
         custom_instructions: str = "",
+        style: str = "",
     ) -> list[GeneratedFile]:
         """Generate production-ready code from the design spec."""
-        system_prompt = FRAMEWORK_SYSTEM_PROMPTS.get(
-            framework, FRAMEWORK_SYSTEM_PROMPTS[FrameworkType.REACT]
-        )
+        stack = get_stack(framework.value)
+        style_hint = style_instruction(stack, style)
 
         token_context = self.token_extractor.get_tokens_as_context() if tokens else ""
 
         # Build the spec context for the LLM
         spec_context = self._spec_to_context(spec)
 
-        generation_prompt = f"""{system_prompt}
+        generation_prompt = f"""{stack.prompt}
 
 ## Task
-Generate production-ready component code from the following design specification.
-The code must be pixel-perfect, responsive, and follow best practices.
+Generate production-ready {stack.label} code from the following design specification.
+The code must be pixel-perfect, responsive, and follow the conventions of {stack.label}.
+Split the design into reusable components, one file per component, and a file
+that assembles the screen. Paths are relative to the project root.
 
 {spec_context}
+
+{f"## Styling{chr(10)}{style_hint}" if style_hint else ""}
 
 {f"## Project Design Tokens (use these instead of raw values){chr(10)}{token_context}" if token_context else ""}
 
 {f"## Additional Instructions{chr(10)}{custom_instructions}" if custom_instructions else ""}
 
 ## Output Format
-Return a JSON array of files to generate:
+Return a JSON array of files to generate, for example:
 ```json
-[
-  {{
-    "path": "src/components/ComponentName/ComponentName.tsx",
-    "content": "... full component code ...",
-    "language": "tsx",
-    "description": "Main component"
-  }},
-  {{
-    "path": "src/components/ComponentName/ComponentName.module.css",
-    "content": "... styles ...",
-    "language": "css",
-    "description": "Component styles"
-  }},
-  {{
-    "path": "src/components/ComponentName/index.ts",
-    "content": "export {{ default }} from './ComponentName';",
-    "language": "ts",
-    "description": "Barrel export"
-  }}
-]
+{output_example(stack)}
 ```
 
-Generate ALL necessary files for a production-ready component.
-Include proper TypeScript types, CSS/styles, and barrel exports.
+Generate ALL necessary files (components, styles, resources) for {stack.label}.
 Return ONLY the JSON array."""
 
         # Call the code generation model
@@ -1414,6 +1428,7 @@ Return ONLY the JSON array."""
 
             # Mock response for development
             logger.warning("No API key found for code generation. Using mock response.")
+            self._simulated = True
             return self._mock_code_generation()
 
         except Exception as e:
@@ -1650,6 +1665,33 @@ export default DesignComponent;
 # =============================================================================
 
 
+def _parse_bounds(raw: Any) -> dict[str, float] | None:
+    """``{"x","y","w","h"}`` clamped to the image, or ``None`` when unusable."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        box = {k: float(raw[k]) for k in ("x", "y", "w", "h")}
+    except (KeyError, TypeError, ValueError):
+        return None
+    # A model that answers in pixels or percents is not trusted to mean 0..1.
+    if any(v < 0 or v > 1 for v in box.values()) or box["w"] <= 0 or box["h"] <= 0:
+        return None
+    box["w"] = min(box["w"], 1 - box["x"])
+    box["h"] = min(box["h"], 1 - box["y"])
+    return box
+
+
+def _claude_signed_in() -> bool:
+    """Whether the Claude Code sign-in (OAuth) is available to this process."""
+    try:
+        from core.auth import get_auth_token
+
+        return bool(get_auth_token())
+    except (ImportError, OSError, RuntimeError, ValueError):
+        # No keychain, no sign-in.
+        return False
+
+
 async def run_design_to_code_pipeline(
     project_path: str,
     image_data: str,
@@ -1659,6 +1701,7 @@ async def run_design_to_code_pipeline(
     figma_file_key: str | None = None,
     generate_tests: bool = True,
     custom_instructions: str = "",
+    style: str = "",
 ) -> dict[str, Any]:
     """
     Convenience function to run the complete design-to-code pipeline.
@@ -1674,14 +1717,15 @@ async def run_design_to_code_pipeline(
         figma_file_key=figma_file_key,
         generate_tests=generate_tests,
         custom_instructions=custom_instructions,
+        style=style,
     )
 
-    design_spec = result.design_spec
+    return serialize_result(result)
 
-    # Extract design spec properties to avoid nested conditionals
-    color_palette = design_spec.color_palette if design_spec else {}
-    typography = design_spec.typography if design_spec else {}
 
+def serialize_result(result: PipelineResult) -> dict[str, Any]:
+    """The pipeline result as the renderer reads it (``DesignToCodeResult``)."""
+    spec = result.design_spec
     return {
         "success": result.success,
         "phase": result.phase.value,
@@ -1691,16 +1735,17 @@ async def run_design_to_code_pipeline(
                     "name": c.name,
                     "type": c.type,
                     "description": c.description,
+                    "bounds": c.bounds,
                     "children": [
                         {"name": ch.name, "type": ch.type} for ch in c.children
                     ],
                 }
-                for c in (design_spec.components if design_spec else [])
+                for c in spec.components
             ],
-            "color_palette": color_palette,
-            "typography": typography,
+            "color_palette": spec.color_palette,
+            "typography": spec.typography,
         }
-        if design_spec
+        if spec
         else None,
         "generated_files": [
             {
@@ -1714,6 +1759,7 @@ async def run_design_to_code_pipeline(
         "visual_tests": [
             {
                 "name": t.name,
+                "path": t.path,
                 "test_code": t.test_code,
                 "threshold": t.threshold,
                 "description": t.description,
@@ -1729,4 +1775,5 @@ async def run_design_to_code_pipeline(
         "warnings": result.warnings,
         "duration_seconds": result.duration_seconds,
         "tokens_used": result.tokens_used,
+        "simulated": result.simulated,
     }

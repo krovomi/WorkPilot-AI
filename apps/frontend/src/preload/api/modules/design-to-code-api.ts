@@ -1,50 +1,46 @@
 /**
  * Design-to-Code API — preload bridge for the "Import Design" pipeline
- * (design image → structured spec → generated code).
+ * (design image → structured spec → generated code → files in the project).
  */
-import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type {
+	DesignFileToWrite,
+	DesignStackDetection,
+	DesignToCodeProgress,
+	DesignToCodeRequest,
+	DesignToCodeResult,
+	DesignWriteOutcome,
+} from "../../../shared/types/design-to-code";
+import { createIpcListener, invokeIpc } from "./ipc-utils";
 
-export interface DesignToCodeRequest {
-	imageData?: string;
-	framework?: string;
-	sourceType?: string;
-	designSystemPath?: string;
-	figmaUrl?: string;
-	generateTests?: boolean;
-	customInstructions?: string;
-}
-
-export interface DesignToCodeGeneratedFile {
-	path: string;
-	content: string;
-	language: string;
-	description: string;
-}
-
-export interface DesignToCodePipelineResult {
-	success: boolean;
-	phase: string;
-	design_spec: unknown;
-	generated_files: DesignToCodeGeneratedFile[];
-	visual_tests: unknown[];
-	design_tokens_used: unknown[];
-	figma_sync_status: Record<string, unknown> | null;
-	errors: string[];
-	warnings: string[];
-	duration_seconds: number;
-	tokens_used: number;
-}
+export type {
+	DesignToCodeRequest,
+	DesignToCodeResult as DesignToCodePipelineResult,
+};
 
 export interface DesignToCodeAPI {
 	runDesignToCodePipeline: (
 		request: DesignToCodeRequest,
-	) => Promise<DesignToCodePipelineResult>;
+	) => Promise<DesignToCodeResult>;
+	detectDesignStack: (projectId: string) => Promise<DesignStackDetection>;
+	writeDesignFiles: (
+		projectId: string,
+		files: DesignFileToWrite[],
+	) => Promise<DesignWriteOutcome>;
+	onDesignToCodeProgress: (
+		callback: (progress: DesignToCodeProgress) => void,
+	) => () => void;
 }
 
 export function createDesignToCodeAPI(): DesignToCodeAPI {
 	return {
 		runDesignToCodePipeline: (request) =>
-			ipcRenderer.invoke(IPC_CHANNELS.DESIGN_TO_CODE_RUN, request),
+			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_RUN, request),
+		detectDesignStack: (projectId) =>
+			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_DETECT_STACK, projectId),
+		writeDesignFiles: (projectId, files) =>
+			invokeIpc(IPC_CHANNELS.DESIGN_TO_CODE_WRITE_FILES, projectId, files),
+		onDesignToCodeProgress: (callback) =>
+			createIpcListener(IPC_CHANNELS.DESIGN_TO_CODE_PROGRESS, callback),
 	};
 }

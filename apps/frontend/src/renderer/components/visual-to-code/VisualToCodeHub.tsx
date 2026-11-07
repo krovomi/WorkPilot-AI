@@ -23,9 +23,10 @@ export function VisualToCodeHub() {
 				<button
 					type="button"
 					onClick={() => setActiveMode("design-import")}
-					className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
+					data-active={activeMode === "design-import"}
+					className={`di-hub-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
 						activeMode === "design-import"
-							? "border-violet-500 text-violet-700 dark:text-violet-300"
+							? "text-foreground"
 							: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
 					}`}
 				>
@@ -35,9 +36,10 @@ export function VisualToCodeHub() {
 				<button
 					type="button"
 					onClick={() => setActiveMode("canvas")}
-					className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
+					data-active={activeMode === "canvas"}
+					className={`di-hub-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${
 						activeMode === "canvas"
-							? "border-violet-500 text-violet-700 dark:text-violet-300"
+							? "text-foreground"
 							: "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
 					}`}
 				>

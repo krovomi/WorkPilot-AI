@@ -22,6 +22,7 @@ import {
 	setupContextAwareSnippetsListeners,
 } from "./context-aware-snippets-store";
 import { setupContextMeshListeners } from "./context-mesh-store";
+import { setupDesignToCodeListeners } from "./design-to-code-store";
 import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
 import { setupTaskPermissionListeners } from "./task-permission-store";
@@ -100,6 +101,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Context-window telemetry of running tasks: the gauge in the task modal
 	// and the mini ring on the card read it whether or not they are mounted.
 	["ContextUsage", setupContextUsageListeners],
+	// Import Design: each step of a run reaches the page as it happens.
+	["DesignToCode", setupDesignToCodeListeners],
 	["DocDrift", setupDocDriftListeners],
 	["FlakyTests", setupFlakyTestsListeners],
 	["GitSurgeon", setupGitSurgeonListeners],
