@@ -619,6 +619,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	approveMcpServer: async () => ({ success: true, data: [] }),
 	listTaskSteering: async () => ({ success: true, data: [] }),
 	sendTaskSteering: async () => ({ success: false, error: "Not available in browser mode" }),
+	startPreviewPoint: async () => ({ success: false, error: "Not available in browser mode" }),
+	cancelPreviewPoint: async () => ({ success: true, data: false }),
+	discardPreviewPoint: async () => ({ success: true, data: false }),
+	sendPreviewPoints: async () => ({ success: false, error: "Not available in browser mode" }),
 	adoptReviewLesson: async () => ({
 		success: false,
 		error: "Not available in browser mode",

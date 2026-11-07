@@ -54,6 +54,10 @@ export const IPC_CHANNELS = {
 	TASK_RESET_CONVERSATION: "task:resetConversation", // Clear conversation.jsonl + PROMPT_TOO_LONG_HALT marker so the task can restart with a fresh context
 	TASK_STEERING_LIST: "task:steeringList", // Messages sent to a running task, with the session each was delivered to
 	TASK_STEERING_SEND: "task:steeringSend", // Queue a message for the next session of a running task (steering.jsonl)
+	TASK_PREVIEW_POINT_START: "task:previewPointStart", // Turn on the DevTools element picker in the task preview and describe the element clicked (F10)
+	TASK_PREVIEW_POINT_CANCEL: "task:previewPointCancel", // Turn the preview's element picker off
+	TASK_PREVIEW_POINT_DISCARD: "task:previewPointDiscard", // Forget a pointed element before it is sent
+	TASK_PREVIEW_POINT_SEND: "task:previewPointSend", // Send each pointed element, with what to change, as a steering message
 	TASK_UNBLOCK_SUBTASK: "task:unblockSubtask", // Answer a blocked subtask from its panel: done, not needed, retry, or retry with a reply (restarts the build)
 	TASK_STACK_ON: "task:stackOn", // Stack a task on one of its blockers: it starts from that task's branch (F6)
 	TASK_STACK_STATUS: "task:stackStatus", // A stacked task's parent: moved, merged, or up to date
@@ -86,6 +90,7 @@ export const IPC_CHANNELS = {
 	// Per-spec architecture: Each spec has its own worktree at .worktrees/{spec-name}/
 	TASK_WORKTREE_STATUS: "task:worktreeStatus",
 	TASK_WORKTREE_DIFF: "task:worktreeDiff",
+	TASK_REVIEW_GROUPS: "task:reviewGroups", // Revue guidée : le diff regroupé par sous-tâche du plan
 	TASK_FILE_DIFF: "task:fileDiff", // Diff à la demande d'un fichier impacté (inclut les changements non commités)
 	TASK_WORKTREE_MERGE: "task:worktreeMerge",
 	TASK_WORKTREE_MERGE_PREVIEW: "task:worktreeMergePreview", // Preview merge conflicts before merging
