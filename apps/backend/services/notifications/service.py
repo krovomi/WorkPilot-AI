@@ -67,6 +67,17 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return result
 
 
+def project_env_vars(project_path: str | Path | None) -> dict[str, str]:
+    """The project's ``.workpilot/.env`` as KEY=VALUE pairs, or ``{}``.
+
+    The one place the notifications read the file: the channels here, the
+    digest's interval (`digest.py`)."""
+    if not project_path:
+        return {}
+    env_file = Path(project_path) / ".workpilot" / ".env"
+    return _parse_env_file(env_file) if env_file.exists() else {}
+
+
 class NotificationService:
     """Resolves enabled channels and dispatches notifications to all of them."""
 
@@ -81,11 +92,7 @@ class NotificationService:
             project_path: Project root; when given, ``.workpilot/.env`` is read
                 for any key missing from the process environment.
         """
-        file_vars: dict[str, str] = {}
-        if project_path:
-            env_file = Path(project_path) / ".workpilot" / ".env"
-            if env_file.exists():
-                file_vars = _parse_env_file(env_file)
+        file_vars = project_env_vars(project_path)
 
         def get(key: str) -> str:
             value = os.environ.get(key, "").strip()

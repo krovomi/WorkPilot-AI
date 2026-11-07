@@ -3,6 +3,7 @@
     python runners/verify_runner.py --action detect --project-dir .
     python runners/verify_runner.py --action run    --project-dir . [--spec-dir …] [--effort low]
     python runners/verify_runner.py --action replay --project-dir . --spec-dir …
+    python runners/verify_runner.py --action compare --project-dir . --spec-dir …
     python runners/verify_runner.py --action status --project-dir . [--spec-dir …]
 
 `detect` and `status` read files only. `run` launches the app and, unless
@@ -31,7 +32,9 @@ def _emit(payload: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
-        "--action", choices=("detect", "run", "replay", "status"), required=True
+        "--action",
+        choices=("detect", "run", "replay", "compare", "status"),
+        required=True,
     )
     parser.add_argument("--project-dir", default=".")
     parser.add_argument("--spec-dir", default=None)
@@ -72,6 +75,16 @@ def main() -> int:
                 "settings": load_settings(project).to_dict(),
             }
         )
+        return 0
+
+    if args.action == "compare":
+        if spec is None:
+            _emit({"success": False, "error": "--spec-dir is required to compare"})
+            return 1
+        from verify.compare import run_base_comparison
+
+        entry = asyncio.run(run_base_comparison(project, spec))
+        _emit({"success": True, "compare": entry})
         return 0
 
     if args.action == "replay":

@@ -2,7 +2,8 @@
  * Verification loop — Zustand store
  *
  * The record of the `verify` phase per task (`GET /api/verify/`), and a re-run
- * on request (`POST /api/verify/run`). Keyed by task id, and a request the
+ * on request (`POST /api/verify/run`), and a comparison with the base branch
+ * (`POST /api/verify/compare`). Keyed by task id, and a request the
  * store has already replaced does not get to answer: a re-run launches the
  * app and can outlast the modal it was started from — the rule
  * `docintel-visual-store` follows, for the same reason.
@@ -10,13 +11,14 @@
 
 import { create } from "zustand";
 import {
+	compareVerify,
 	fetchVerify,
 	runVerify,
 	type SpecTraceabilityQuery,
 	type VerifyPayload,
 } from "../lib/agent-tools-api";
 
-export type VerifyBusy = "loading" | "running" | null;
+export type VerifyBusy = "loading" | "running" | "comparing" | null;
 
 export interface VerifyEntry {
 	data: VerifyPayload | null;
@@ -30,6 +32,7 @@ interface VerifyState {
 	byTask: Record<string, VerifyEntry>;
 	load: (taskId: string, query: SpecTraceabilityQuery) => Promise<void>;
 	run: (taskId: string, query: SpecTraceabilityQuery, effort?: string) => Promise<void>;
+	compare: (taskId: string, query: SpecTraceabilityQuery) => Promise<void>;
 	clear: (taskId: string) => void;
 }
 
@@ -100,6 +103,21 @@ export const useVerifyStore = create<VerifyState>((set, get) => {
 			if (!current(taskId, controller)) return;
 			if (!res.ok && res.error === "aborted") return;
 			settle(taskId, res);
+		},
+
+		compare: async (taskId, query) => {
+			if (!addressable(query)) return;
+			const controller = begin(taskId, "comparing");
+			const res = await compareVerify(query, controller.signal);
+			if (!current(taskId, controller)) return;
+			if (!res.ok && res.error === "aborted") return;
+			// The answer carries the record with the comparison folded in; keep the
+			// settings the last read brought.
+			const settings = get().byTask[taskId]?.data?.settings;
+			settle(
+				taskId,
+				res.ok ? { ok: true, data: { record: res.data.record ?? null, settings } } : res,
+			);
 		},
 	};
 });

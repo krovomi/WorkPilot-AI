@@ -1178,7 +1178,22 @@ class WorktreePRMixin:
             return body
 
         analysis = self._run_impact_analysis(spec_name, diff_summary, commit_log)
-        return append_impact_block(body, analysis)
+        return self._with_attribution(spec_name, append_impact_block(body, analysis))
+
+    def _with_attribution(self, spec_name: str, body: str) -> str:
+        """Append the Agent Trace summary line (F3) when the task has records."""
+        try:
+            from agent_trace import attribution_line, summarize
+
+            worktree = self.get_worktree_path(spec_name)
+            spec_dir = worktree / ".workpilot" / "specs" / spec_name
+            if not spec_dir.is_dir():
+                spec_dir = self.project_dir / ".workpilot" / "specs" / spec_name
+            line = attribution_line(summarize(worktree, spec_dir))
+        except (ImportError, OSError, ValueError) as exc:
+            logger.debug(f"Agent Trace summary skipped: {exc}")
+            return body
+        return f"{body.rstrip()}\n\n{line}\n" if line else body
 
     def preview_pr_body(
         self,
@@ -1231,6 +1246,7 @@ class WorktreePRMixin:
         body_with_block = body
         if include_impact and append_impact_block is not None:
             body_with_block = append_impact_block(body, analysis)
+        body_with_block = self._with_attribution(spec_name, body_with_block)
 
         return {
             "body": body_with_block,
@@ -1749,6 +1765,19 @@ class WorktreePRMixin:
                 error=push_result.get("error", "Push failed"),
             )
 
+        # Step 1.5: a task stacked on another (F6) targets its parent's
+        # branch, which must exist on the remote for the PR to be created.
+        from core.stacked_pr import link_after_pr, push_parent, spec_dir_of, stack_info
+
+        stack = stack_info(spec_dir_of(self, spec_name), effective_target)
+        if stack is not None and (refused := push_parent(self, stack)):
+            return PushAndCreatePRResult(
+                success=False,
+                pushed=True,
+                branch=push_result.get("branch", ""),
+                error=refused,
+            )
+
         # Step 2: Detect git provider (use the remote that was pushed to)
         provider = detect_git_provider(
             self.project_dir, remote_name=push_result.get("remote")
@@ -1790,8 +1819,16 @@ class WorktreePRMixin:
                 error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
             )
 
+        # A stacked PR on GitHub joins its parent's stack when `gh stack` is
+        # installed; failing to link never undoes the PR.
+        stack_fields: dict = {}
+        if stack is not None and provider == "github" and pr_result.get("success"):
+            linked, note = link_after_pr(self, stack, spec_name, get_gh_executable())
+            stack_fields = {"stack_linked": linked, "stack_note": note}
+
         # Combine results
         return PushAndCreatePRResult(
+            **stack_fields,
             success=pr_result.get("success", False),
             pushed=True,
             remote=push_result.get("remote"),

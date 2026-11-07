@@ -19,6 +19,7 @@ vi.mock("../../stores/task-store", () => ({
 	useTaskStore: { getState: () => ({ updateTask: vi.fn() }) },
 }));
 vi.mock("./TaskBlockers", () => ({ TaskBlockers: () => null }));
+vi.mock("./TaskStack", () => ({ TaskStack: () => null }));
 
 import { TooltipProvider } from "../ui/tooltip";
 import { TaskMetadata } from "./TaskMetadata";

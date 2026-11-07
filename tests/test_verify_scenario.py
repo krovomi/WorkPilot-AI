@@ -162,10 +162,15 @@ class FakeBrowser:
 
     def __init__(self):
         self.saved: list[bool] = []
+        self.filmed: list[bool] = []
 
     async def save_trace(self, keep: bool = True):
         self.saved.append(keep)
         return Path("/trace.zip") if keep else None
+
+    async def save_video(self, keep: bool = True, *, reopen: bool = True):
+        self.filmed.append(keep)
+        return None
 
     async def close(self):
         pass
@@ -223,11 +228,13 @@ class TestTools:
             toolbox.call("verify_record", {"kind": "verdict", "verdict": "pass"})
         )
         assert toolbox._browser.saved == [True]
+        # The scenario's video follows its trace.
+        assert toolbox._browser.filmed == [True]
 
     def test_a_toolbox_that_recorded_no_step_drops_its_trace(self, toolbox):
         browser = toolbox._browser
         asyncio.run(toolbox.aclose())
-        assert browser.saved == [False]
+        assert browser.saved == [False] and browser.filmed == [False]
 
 
 class TestApi:

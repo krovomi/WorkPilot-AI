@@ -161,7 +161,12 @@
 		"logStatus_active": "en cours",
 		"logStatus_completed": "terminé",
 		"logStatus_failed": "échec",
-		"logPhaseToggle": "Afficher le journal de {{phase}}"
+		"logPhaseToggle": "Afficher le journal de {{phase}}",
+		"steeringTitle": "Guider l'agent",
+		"steeringLabel": "Message pour la prochaine session",
+		"steeringSend": "Envoyer",
+		"steeringQueued": "En attente de la prochaine session",
+		"steeringDelivered": "Remis à la session {{session}} ({{date}})"
 	},
 	"actions": {
 		"start": "Démarrer",
