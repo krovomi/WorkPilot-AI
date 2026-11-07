@@ -68,6 +68,8 @@ export interface TaskAPI {
 		approved: boolean,
 		feedback?: string,
 		images?: ImageAttachment[],
+		/** Open review comments to send with the request (F9); the main reads them from disk. */
+		commentIds?: string[],
 	) => Promise<IPCResult>;
 	updateTaskStatus: (
 		taskId: string,
@@ -179,6 +181,19 @@ export interface TaskAPI {
 		taskId: string,
 		filePath: string,
 	) => Promise<IPCResult<import("../../shared/types").WorktreeDiffFile>>;
+	/** Review comments anchored on a line of the diff (F9). */
+	listReviewComments: (
+		taskId: string,
+	) => Promise<IPCResult<import("../../shared/types/review-comments").ReviewComment[]>>;
+	addReviewComment: (
+		taskId: string,
+		input: import("../../shared/types/review-comments").ReviewCommentInput,
+	) => Promise<IPCResult<import("../../shared/types/review-comments").ReviewComment[]>>;
+	updateReviewComment: (
+		taskId: string,
+		id: string,
+		action: "resolve" | "reopen" | "delete",
+	) => Promise<IPCResult<import("../../shared/types/review-comments").ReviewComment[]>>;
 	/** The guided review: the diff grouped by the plan's subtasks. */
 	getReviewGroups: (
 		taskId: string,
@@ -446,6 +461,7 @@ export const createTaskAPI = (): TaskAPI => ({
 		approved: boolean,
 		feedback?: string,
 		images?: ImageAttachment[],
+		commentIds?: string[],
 	): Promise<IPCResult> =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.TASK_REVIEW,
@@ -453,6 +469,8 @@ export const createTaskAPI = (): TaskAPI => ({
 			approved,
 			feedback,
 			images,
+			// Only when there are some: older callers keep their exact call.
+			...(commentIds && commentIds.length > 0 ? [commentIds] : []),
 		),
 
 	updateTaskStatus: (
@@ -648,6 +666,18 @@ export const createTaskAPI = (): TaskAPI => ({
 		filePath: string,
 	): Promise<IPCResult<import("../../shared/types").WorktreeDiffFile>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_FILE_DIFF, taskId, filePath),
+
+	listReviewComments: (taskId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_REVIEW_COMMENTS_LIST, taskId),
+	addReviewComment: (
+		taskId: string,
+		input: import("../../shared/types/review-comments").ReviewCommentInput,
+	) => ipcRenderer.invoke(IPC_CHANNELS.TASK_REVIEW_COMMENT_ADD, taskId, input),
+	updateReviewComment: (
+		taskId: string,
+		id: string,
+		action: "resolve" | "reopen" | "delete",
+	) => ipcRenderer.invoke(IPC_CHANNELS.TASK_REVIEW_COMMENT_UPDATE, taskId, id, action),
 
 	getReviewGroups: (
 		taskId: string,

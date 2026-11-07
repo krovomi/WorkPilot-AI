@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText, MessageSquarePlus } from "lucide-react";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
@@ -10,6 +10,17 @@ interface DiffViewerProps {
 	className?: string;
 	/** "unified" (default) shows one column; "split" shows old/new side by side. */
 	viewMode?: DiffViewMode;
+	/**
+	 * Shows a comment button in the gutter of every line (unified view): a
+	 * removed line is commented on the old side, any other on the new side.
+	 */
+	onCommentLine?: (target: DiffLineTarget) => void;
+}
+
+/** A line of the diff a comment can be anchored on. */
+export interface DiffLineTarget {
+	side: "old" | "new";
+	line: number;
 }
 
 interface DiffLine {
@@ -30,6 +41,7 @@ export function DiffViewer({
 	patch,
 	className,
 	viewMode = "unified",
+	onCommentLine,
 }: DiffViewerProps) {
 	const { t } = useTranslation(["common"]);
 
@@ -54,14 +66,29 @@ export function DiffViewer({
 			{viewMode === "split" ? (
 				<SplitDiff lines={lines} />
 			) : (
-				<UnifiedDiff lines={lines} />
+				<UnifiedDiff lines={lines} onCommentLine={onCommentLine} />
 			)}
 		</div>
 	);
 }
 
+function lineTarget(line: DiffLine): DiffLineTarget | null {
+	if (line.type === "hunk") return null;
+	if (line.type === "removed") {
+		return line.oldLineNumber ? { side: "old", line: line.oldLineNumber } : null;
+	}
+	return line.newLineNumber ? { side: "new", line: line.newLineNumber } : null;
+}
+
 /** Classic single-column diff: removed and added lines interleaved. */
-function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
+function UnifiedDiff({
+	lines,
+	onCommentLine,
+}: {
+	lines: DiffLine[];
+	onCommentLine?: (target: DiffLineTarget) => void;
+}) {
+	const { t } = useTranslation(["common"]);
 	return (
 		<div className="diff-content">
 			{lines.map((line, index) => (
@@ -77,6 +104,24 @@ function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
 						line.type === "context" && "bg-transparent",
 					)}
 				>
+					{onCommentLine && (
+						<div className="w-6 shrink-0 flex items-center justify-center">
+							{(() => {
+								const target = lineTarget(line);
+								return target ? (
+									<button
+										type="button"
+										onClick={() => onCommentLine(target)}
+										aria-label={t("common:diffViewer.commentLine", { line: target.line })}
+										title={t("common:diffViewer.commentLine", { line: target.line })}
+										className="rounded p-0.5 text-muted-foreground opacity-40 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+									>
+										<MessageSquarePlus className="h-3 w-3" />
+									</button>
+								) : null;
+							})()}
+						</div>
+					)}
 					<div
 						className={cn(
 							"diff-line-numbers flex shrink-0 select-none",

@@ -1087,6 +1087,7 @@ export async function submitReview(
 	approved: boolean,
 	feedback?: string,
 	images?: ImageAttachment[],
+	commentIds?: string[],
 ): Promise<boolean> {
 	try {
 		const result = await globalThis.electronAPI.submitReview(
@@ -1094,6 +1095,7 @@ export async function submitReview(
 			approved,
 			feedback,
 			images,
+			commentIds,
 		);
 		if (result.success) {
 			return true;
