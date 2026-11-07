@@ -43,10 +43,8 @@ import React, {
 } from "react";
 import { useTranslation } from "react-i18next";
 import ReactFlow, {
-	addEdge,
 	Background,
 	BackgroundVariant,
-	type Connection,
 	Controls,
 	type Edge,
 	MiniMap,
@@ -65,8 +63,6 @@ import {
 	needsFramework,
 } from "../../lib/architecture-blocks";
 import {
-	canConnect,
-	connectionLabel,
 	explainConnection,
 	type Lang,
 } from "../../lib/architecture-connections";
@@ -118,6 +114,7 @@ import { ArchitectureTabs } from "./ArchitectureTabs";
 import { CanvasInspector } from "./CanvasInspector";
 import { CanvasThemePicker } from "./CanvasThemePicker";
 import { GeneratedCodeDock } from "./GeneratedCodeDock";
+import { edgeRelationOptions, useConnectBlocks } from "./useConnectBlocks";
 import { useFitViewOnShow } from "./useFitViewOnShow";
 import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
 import type { EdgePatch } from "../DefaultEdge";
@@ -535,45 +532,7 @@ export const CanvasPanel: React.FC = () => {
 		});
 	};
 
-	const onConnect = (params: Edge | Connection) => {
-		const src = nodes.find((n) => n.id === params.source);
-		const tgt = nodes.find((n) => n.id === params.target);
-		const srcType = src?.data?.type as string | undefined;
-		const tgtType = tgt?.data?.type as string | undefined;
-		// Drawing the same connection twice produced two overlapping edges, two
-		// labels stacked on each other, and a duplicated line in the spec.
-		if (
-			edges.some(
-				(e) => e.source === params.source && e.target === params.target,
-			)
-		) {
-			toast({
-				title: t("duplicateConnection", "Connexion déjà présente"),
-				description: t(
-					"duplicateConnectionDesc",
-					"Ces deux blocs sont déjà reliés dans ce sens.",
-				),
-			});
-			return;
-		}
-		// Only allow logical software-architecture edges (e.g. reject Worker →
-		// Database). Untyped/custom nodes stay permissive.
-		if (!canConnect(srcType, tgtType)) {
-			toast({
-				title: t("invalidConnection", "Connexion non valide"),
-				description: `${t(
-					"invalidConnectionDesc",
-					"Cet enchaînement n'est pas une suite logique d'architecture.",
-				)} (${src?.data?.label ?? params.source} → ${tgt?.data?.label ?? params.target})`,
-				variant: "destructive",
-			});
-			return;
-		}
-		// Attach a spoken relationship label so the diagram reads as an
-		// architecture (and the generated spec is precise).
-		const label = connectionLabel(srcType, tgtType, lang);
-		setEdges((eds) => addEdge({ ...params, data: { label } }, eds));
-	};
+	const onConnect = useConnectBlocks(nodes, edges, setEdges, lang);
 
 	// ── Scaffold on demand ──────────────────────────────────────────────
 	// Hand the drawn architecture to WorkPilot's agentic build pipeline: the
@@ -1687,6 +1646,7 @@ export const CanvasPanel: React.FC = () => {
 							: null
 					}
 					defaultExplanation={inspectedEdge ? defaultExplanation(inspectedEdge) : ""}
+					relationOptions={edgeRelationOptions(liveNodes, inspectedEdge, lang)}
 					onNodeChange={handleNodeChange}
 					onDeleteNode={handleDeleteNode}
 					onEdgeChange={handleEdgeChange}

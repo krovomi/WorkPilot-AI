@@ -128,13 +128,42 @@ technologie d'un bloc restent les siens. Tout ce qui revient du stockage
 repasse par `normalizeBrick` (nom requis, longueurs bornées, icône connue,
 couleur hexadécimale).
 
+## Les connexions : règles, relations, connexions forcées
+
+`architecture-connections.ts` tient la table des paires cohérentes (`RULES`),
+dans le sens de la requête ou du flux de données : un client appelle un
+service, un service lit sa base, déclenche un worker ou pousse vers ses
+clients (SignalR, WebSocket), une file est consommée par un worker, un
+fournisseur rappelle un backend par webhook, une base diffuse ses changements
+(CDC) ou se réplique, et tout bloc typé remonte vers le monitoring. Les
+sources qui se ressemblent partagent leurs lignes (`CLIENT_COMMON`,
+`SERVICE_COMMON`) pour qu'un backend et un microservice ne divergent plus.
+
+Une paire hors table n'est pas interdite, elle est **inhabituelle** :
+`useConnectBlocks` affiche « Connexion inhabituelle » avec « Relier quand
+même ». Le fil forcé porte `data.forced` et se dessine en pointillés ; sa
+relation est générique jusqu'à ce que la personne en choisisse une. Les blocs
+libres et « custom » n'ont pas de règle.
+
+La **relation** de l'inspecteur (`RelationField`) est une liste déroulante :
+le libellé du canvas, puis ce qui relie habituellement ces deux blocs *avec
+leurs stacks* (`relationOptions` → `connection-protocols.ts`) — gRPC-Web
+depuis un navigateur, SignalR dès qu'un bout est .NET, tRPC entre TypeScript
+et Node, EF Core / JPA / Prisma / Eloquent / Active Record vers une base SQL,
+le protocole du broker et la bibliothèque de messagerie de la stack
+(MassTransit, Spring Kafka, Celery…), FCM / APNs vers un mobile. Elle finit par
+« Autre (saisie libre)… » ; une relation inconnue de la liste s'ouvre dans ce
+champ libre, gardée telle quelle. `connection-protocols.test.ts` vérifie que
+chaque stack de la palette a sa bibliothèque d'accès aux données.
+
 ## Les explications des interactions (`explainConnection`)
 
 Chaque connexion porte sa relation (« lit / écrit ») et une phrase. La phrase
-est écrite par le canvas depuis les deux blocs (`EXPLAIN` dans
-`architecture-connections.ts`, une par relation, testé) **tant que la personne
+est écrite par le canvas depuis les deux blocs (`VERBS` dans
+`architecture-connections.ts`, une par paire connue, testé) **tant que la personne
 n'a pas écrit la sienne** (`data.description`). Garder la phrase automatique
 comme texte figerait les noms : renommer un bloc ne la mettrait plus à jour.
+La phrase ne nomme jamais de protocole : la personne peut en choisir un autre.
 C'est pourquoi l'éditeur ne stocke un texte que s'il diffère de l'automatique,
 et qu'un texte vidé revient à l'automatique. Les deux partent dans la
 spécification de build, une ligne par connexion.
