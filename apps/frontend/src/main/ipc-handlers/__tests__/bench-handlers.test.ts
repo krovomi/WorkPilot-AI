@@ -207,6 +207,16 @@ describe("requests from the renderer", () => {
 		expect(sanitizeEngines([ENGINES[0], ENGINES[0]])).toMatch(/twice/);
 		expect(sanitizeEngines([{ ...ENGINES[0], provider: "Bad One" }])).toMatch(/provider/);
 		expect(sanitizeEngines([{ ...ENGINES[0], model: "a\nb" }])).toMatch(/model/);
+		// A candidate rule makes another arm of the same engine.
+		const ruled = { ...ENGINES[0], rule: " Test\n first. " };
+		expect(sanitizeEngines([ENGINES[0], ruled])).toEqual([
+			ENGINES[0],
+			{ ...ENGINES[0], rule: "Test first." },
+		]);
+		expect(sanitizeEngines([ruled, { ...ruled, rule: "Test first." }])).toMatch(/twice/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: "x".repeat(501) }])).toMatch(/500/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: "a\u0000b" }])).toMatch(/rule/);
+		expect(sanitizeEngines([{ ...ENGINES[0], rule: 42 }])).toMatch(/rule/);
 	});
 
 	it("takes only finished cards of the project", () => {

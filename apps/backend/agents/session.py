@@ -793,7 +793,7 @@ async def post_session_processing(
 
         # Record good commit for rollback safety
         if commit_after and commit_after != commit_before:
-            recovery_manager.record_good_commit(commit_after, subtask_id)
+            recovery_manager.record_good_commit(commit_after, subtask_id, commit_before)
             print_status(f"Recorded good commit: {commit_after[:8]}", "success")
 
         # Record the actual files this subtask changed (ground truth from git),
@@ -919,7 +919,7 @@ async def post_session_processing(
 
         # Still record commit if one was made (partial progress)
         if commit_after and commit_after != commit_before:
-            recovery_manager.record_good_commit(commit_after, subtask_id)
+            recovery_manager.record_good_commit(commit_after, subtask_id, commit_before)
             print_status(
                 f"Recorded partial progress commit: {commit_after[:8]}", "info"
             )

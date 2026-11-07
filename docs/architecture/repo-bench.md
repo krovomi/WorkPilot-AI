@@ -138,6 +138,34 @@ réussis, taux de F2P passés, coût moyen (lu dans le `cost_data.json` de la co
 - **L'étape moteur d'une carte** propose le moteur recommandé pour son type (plan du 29 octobre,
   IA3), voir plus bas.
 
+## Mesurer une règle candidate (prospective P6)
+
+Une règle apprise des revues (`learning_loop/review_lessons.py`) attend qu'une personne l'adopte.
+Avant, le banc peut la mesurer : le formulaire prend une règle (tapée, ou partie d'une candidate en
+attente), et chaque moteur est rejoué deux fois, sans la règle puis avec (`armsFor`,
+`shared/utils/bench-rule.ts`). La variante avec la règle porte `rule` dans le manifeste ; sa copie
+est construite avec la règle adoptée dans son propre `.workpilot/learning/review-lessons.json`
+(`write_rule`, source `bench`), refusé à travers un lien. Comme chaque phase de chaque provider lit
+les règles adoptées (`rules_block`), les deux variantes ne diffèrent que par la règle. Rien n'est
+écrit dans le projet.
+
+- **Le verdict** compare, carte par carte, les deux variantes du même moteur (`ruleVerdict`) :
+  réussies sans et avec, et les *régressions* (réussie sans, échouée avec). Une seule régression
+  donne « à ne pas adopter telle quelle », quoi qu'elle corrige ailleurs ; « meilleure » demande
+  plus de réussites et aucune régression.
+- **Jamais adoptée d'après le score** : le verdict s'affiche dans la carte du passage, l'adoption
+  reste un geste de la personne dans la Learning Loop.
+- **Le tableau mesure les modèles** : un record fait avec une règle garde `rule` dans
+  `results.json` et n'atteint ni le tableau, ni le routeur, ni Formula Lab, ni les
+  recommandations (`_records_from`).
+- `project_root` (`review_lessons`) ne remonte plus qu'un dossier de worktree
+  (`.workpilot/worktrees/…`, `.worktrees/…`) : une copie sous `~/.workpilot/bench/…` lisait
+  jusque-là les règles du dossier personnel, pas les siennes.
+
+Pas encore : rejouer de la même façon une proposition de skill ou de prompt
+(`learning_loop/skill_proposer.py`, `skills/_proposed/`), qui vise les prompts de WorkPilot et
+non ceux d'un projet.
+
 ## Le moteur recommandé par type de carte
 
 Chaque record garde le type de sa carte, lu dans `task_metadata.json` à la découverte du cas

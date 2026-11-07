@@ -74,7 +74,12 @@ def snapshot_tree(project_dir: Path) -> str | None:
         tmp_index = Path(tmp) / "index"
         try:
             if real_index.is_file():
-                shutil.copyfile(real_index, tmp_index)
+                # copy2 keeps the index's mtime: git trusts a cached stat only
+                # for entries older than the index file, and re-reads the rest
+                # ("racily clean"). A copy with a new mtime would trust them
+                # all, and miss a same-size edit made in the tick the index was
+                # written in (seen on Windows, where ctime is not compared).
+                shutil.copy2(real_index, tmp_index)
         except OSError:
             return None
         env = {**get_isolated_git_env(), "GIT_INDEX_FILE": str(tmp_index)}

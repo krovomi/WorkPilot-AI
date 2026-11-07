@@ -2021,6 +2021,34 @@
 			"gif": "The scenario's walkthrough: the capture of each step, in order",
 			"gifHint": "This GIF can be attached to the pull request's visual proof from the PR dialog.",
 			"noVideo": "No video of the scenario ({{reason}}): the trace and the captures are the proof."
+		},
+		"compare": {
+			"title": "Compared with the base branch",
+			"run": "Compare with the base branch",
+			"again": "Compare again",
+			"hint": "Replays the same scenario and calls, without a model, on the code this task started from and on the task, and lists what behaves differently.",
+			"skipped": "No comparison: {{reason}}",
+			"against": "Base branch at {{base}}, then this task.",
+			"same": "Nothing behaves differently.",
+			"status": "{{base}} on the base branch, {{task}} with the task",
+			"data": "Each side starts from its own data: a difference can come from the data rather than the code.",
+			"change": {
+				"broken": "Broken by the task",
+				"fixed": "Works thanks to the task",
+				"added": "New",
+				"removed": "Gone",
+				"changed": "Changed"
+			},
+			"kind": {
+				"scenario": "Scenario",
+				"console": "Console",
+				"network": "Network request",
+				"endpoint": "Endpoint call"
+			},
+			"side": {
+				"base": "Base branch, end of the scenario",
+				"task": "This task, end of the scenario"
+			}
 		}
 	},
 	"qaUnverified": {
@@ -2284,6 +2312,46 @@
 			"invalid_subtask": "This subtask does not exist.",
 			"task_not_found": "The task was not found.",
 			"queue_unwritable": "The task's folder could not be written."
+		}
+	},
+	"stack": {
+		"title": "Stacked on a blocker",
+		"description": "Start this task from a blocker's branch instead of the trunk, so its code builds on the blocker's before it is merged.",
+		"stackOn": "Stack on “{{title}}”",
+		"stackedNote": "Stacked on “{{title}}”: the worktree will start from its branch.",
+		"stackedOn": "Stacked on “{{title}}” ({{branch}})",
+		"upToDate": "Up to date with its parent.",
+		"parentMoved": "The parent has new commits since: update to rebase onto them.",
+		"parentMerged": "The parent is merged: this task can move onto {{base}}.",
+		"runningHint": "An agent is running on this task: update once it stops.",
+		"update": "Update",
+		"moveToBase": "Move onto {{base}}",
+		"outcome": {
+			"rebased": "Rebased onto the parent's latest commit.",
+			"metadata_only": "The task will start from the parent's latest commit.",
+			"moved_to_base": "Moved onto the parent's base.",
+			"up_to_date": "Already up to date."
+		},
+		"errors": {
+			"same_task": "A task cannot be stacked on itself.",
+			"already_stacked": "This task is already stacked.",
+			"not_blocker": "Only a blocker of this task can be its parent.",
+			"parent_done": "This blocker is already done: start from the trunk.",
+			"cycle": "Stacking here would create a loop.",
+			"child_started": "This task already has a worktree: its base can no longer change.",
+			"parent_no_worktree": "The blocker has no worktree or branch yet.",
+			"parent_no_commits": "The blocker has no commit yet: nothing to build on.",
+			"metadata_unwritable": "The task's metadata could not be written.",
+			"task_not_found": "Task not found.",
+			"not_stacked": "This task is not stacked.",
+			"running": "An agent is running on this task: try again once it stops.",
+			"dirty": "The task's worktree has uncommitted changes: commit or discard them first.",
+			"no_recorded_commit": "The parent's commit was not recorded: stack again.",
+			"no_base": "The parent's base branch could not be found.",
+			"conflict": "The rebase stopped on a conflict and was undone. Files in conflict:",
+			"pr_not_retargeted": "The pull request could not be retargeted: change its base on the forge.",
+			"pr_url_unreadable": "The pull request link could not be read: change its base on the forge.",
+			"unknown": "The operation failed."
 		}
 	}
 }

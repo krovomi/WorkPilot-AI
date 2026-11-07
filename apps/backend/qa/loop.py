@@ -73,6 +73,7 @@ from .criteria import (
 )
 from .dependency_gate import dependency_gate
 from .fixer import run_qa_fixer_session
+from .mutation_gate import guard_start, guard_test_only, mutation_gate
 from .report import (
     create_manual_test_plan,
     escalate_to_human,
@@ -545,6 +546,13 @@ async def run_qa_validation_loop(
                     state.qa_iteration,
                     state.review_scope,
                     state.review_commands,
+                )
+                or mutation_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
                 )
             )
             if gate is None and goal is not None:
@@ -1575,9 +1583,13 @@ async def _on_rejected(
     # Un gate a déjà écrit le sien, plus précis : on le garde.
     # The next pass checks the fixer's delta first (`qa.recheck`).
     recheck.record_rejection(spec_dir, scope.project_dir, qa_iteration, current_issues)
-    return await _run_fixer(
+    # Missing tests are answered with tests: other files the fixer touches are restored.
+    head = guard_start(scope.project_dir, gate)
+    nxt = await _run_fixer(
         scope, state, qa_model, current_issues if gate is None else None
     )
+    guard_test_only(scope.project_dir, spec_dir, head)
+    return nxt
 
 
 async def _escalate_recurring(

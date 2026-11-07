@@ -58,11 +58,12 @@ apps/backend/verify/
   mcp_server.py the same tools over stdio MCP (runners/verify_mcp.py)
   loop.py       launch -> errors -> fixer, bounded by progress; then the verifier session; then evidence
   replay.py     the verify-replay phase: the recorded scenario and endpoints, without a model
+  compare.py    the same replay on the base branch and on the task: what behaves differently
   scenario.py   the card's own scenario (verifyScenario): steps, verifier instructions, verdict
   walkthrough.py the scenario filmed (WebM, launch mode) and its step captures as a GIF for the PR
   record.py     <spec_dir>/verify/verify.json, report.md, events.jsonl; the computed status
   learn.py      launch recipe, perf baseline, brain note, gotchas
-  api.py        GET /api/verify/, /screenshot, /trace, /walkthrough, /video; POST /api/verify/run
+  api.py        GET /api/verify/, /screenshot, /trace, /walkthrough, /video; POST /api/verify/run, /compare
 ```
 
 **Python does the deterministic half, for every provider.** Launching,
@@ -206,6 +207,27 @@ deterministic phase after QA: when QA changed the working tree since the
 verification, it replays the recorded endpoints and scenario without a model,
 and turns a pass into "regressed after QA" when they no longer hold; an
 unchanged fingerprint costs nothing.
+
+**Compared with the base branch (prospective P8).** A reviewer wants to know
+what the change *does*, not only that it works. *Compare with the base branch*
+in the *Verification* tab (`POST /api/verify/compare`, `agent.execute` in
+server mode; `verify_runner.py --action compare`) replays the recorded scenario
+and endpoint calls twice, without a model: on the branch's merge base, checked
+out apart in `.workpilot/verify-base/<spec>` and prepared by the same worktree
+recipe as the task (dependencies linked, its own port block), then on the task.
+The sides run one after the other, each with a spec folder of its own, so the
+verification's trace and video stay untouched. `compare.py` lists what differs:
+a step or confirmed state that works on one side only (*broken by the task*
+first, then *works thanks to the task*), console errors and warnings that
+appear or disappear, network requests and endpoint calls that appear, vanish
+or answer another status, and the page at the end of the scenario on each side.
+What two launches of the same code print differently is dropped first: a
+loopback origin and its port, the query string, a bundler's content hash, a
+line and column; a pending request is never compared. The comparison is
+evidence, never a gate: it does not change the record's status. Each side
+starts from its own data, which the panel says. The checkout's dependency
+links are removed before the checkout is deleted, so deleting it never walks
+into the project's folders.
 
 **It never decides alone that a build failed.** A missing Chrome, no `npx`, no
 OpenAPI document: the step is recorded `unknown` with its reason, and a metric
