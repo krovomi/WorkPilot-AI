@@ -388,7 +388,7 @@ describe("CreatePRDialog", () => {
 		});
 
 		// Find and click the draft checkbox
-		const draftCheckbox = screen.getByRole("checkbox");
+		const draftCheckbox = screen.getByRole("checkbox", { name: "Create as draft PR" });
 		fireEvent.click(draftCheckbox);
 
 		// Create the PR
@@ -406,6 +406,49 @@ describe("CreatePRDialog", () => {
 				}),
 			);
 		});
+	});
+
+	it("attaches the scenario walkthrough only when the person ticks it, after the warning", async () => {
+		render(
+			<CreatePRDialog
+				open={true}
+				task={mockTask}
+				worktreeStatus={mockWorktreeStatus}
+				onOpenChange={mockOnOpenChange}
+				onCreatePR={mockOnCreatePR}
+			/>,
+		);
+		const walkthrough = await screen.findByRole("checkbox", {
+			name: "Attach the scenario walkthrough (GIF) to the visual proof",
+		});
+		expect(walkthrough).not.toBeChecked();
+		expect(walkthrough).toHaveAccessibleDescription(/every reader of the repository will see it/);
+		const createButton = screen.getByRole("button", { name: /create pull request/i });
+
+		fireEvent.click(createButton);
+		await waitFor(() => expect(mockOnCreatePR).toHaveBeenCalledTimes(1));
+		expect(mockOnCreatePR.mock.calls[0][0]).not.toHaveProperty("includeWalkthrough");
+	});
+
+	it("sends includeWalkthrough when the walkthrough is ticked", async () => {
+		render(
+			<CreatePRDialog
+				open={true}
+				task={mockTask}
+				worktreeStatus={mockWorktreeStatus}
+				onOpenChange={mockOnOpenChange}
+				onCreatePR={mockOnCreatePR}
+			/>,
+		);
+		fireEvent.click(
+			await screen.findByRole("checkbox", {
+				name: "Attach the scenario walkthrough (GIF) to the visual proof",
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: /create pull request/i }));
+		await waitFor(() =>
+			expect(mockOnCreatePR).toHaveBeenCalledWith(expect.objectContaining({ includeWalkthrough: true })),
+		);
 	});
 
 	it("should show already exists message when PR already exists", async () => {

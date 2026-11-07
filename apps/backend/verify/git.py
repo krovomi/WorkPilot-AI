@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-__all__ = ["changed_files", "head_sha", "fingerprint"]
+__all__ = ["base_commit", "changed_files", "fingerprint", "head_sha", "main_checkout"]
 
 _BASES = (
     "@{upstream}",
@@ -38,6 +38,29 @@ def _git(project_dir: Path, *args: str) -> tuple[int, str]:
     except (OSError, subprocess.SubprocessError):
         return 1, ""
     return completed.returncode, completed.stdout
+
+
+def base_commit(project_dir: Path | str) -> str:
+    """The commit this branch forked from: where the base branch's code is
+    read for a comparison (`compare.py`). ``""`` when no base is found."""
+    root = Path(project_dir)
+    for base in _BASES:
+        code, merge_base = _git(root, "merge-base", "HEAD", base)
+        if code == 0 and merge_base.strip():
+            return merge_base.strip()
+    return ""
+
+
+def main_checkout(project_dir: Path | str) -> Path | None:
+    """The repository's main working tree, whose dependencies a task worktree
+    links to (`None` for a bare repository or when git cannot say)."""
+    root = Path(project_dir)
+    code, out = _git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if code != 0 or not out.strip():
+        return None
+    common = Path(out.strip())
+    main = common.parent if common.name == ".git" else None
+    return main if main is not None and main.is_dir() else None
 
 
 def head_sha(project_dir: Path | str) -> str:

@@ -113,6 +113,28 @@ describe("TaskFiles", () => {
 		expect(await screen.findByText("# Spec")).toBeInTheDocument();
 	});
 
+	it("keeps the user's pick when the auto-selected file answers late", async () => {
+		let answer: ((value: { success: boolean; data: string }) => void) | undefined;
+		api.worktreeReadFile.mockReturnValue(
+			new Promise((resolve) => {
+				answer = resolve;
+			}),
+		);
+		renderFiles(makeTask({ specsPath: SPECS }));
+
+		await waitFor(() => expect(api.worktreeReadFile).toHaveBeenCalled());
+		fireEvent.click(screen.getByRole("option", { name: /spec\.md/ }));
+		expect(await screen.findByText("# Spec")).toBeInTheDocument();
+
+		answer?.({ success: true, data: "OK\n" });
+		await waitFor(() => expect(screen.getByText("# Spec")).toBeInTheDocument());
+		expect(screen.queryByText("OK")).not.toBeInTheDocument();
+		expect(screen.getByRole("option", { name: /spec\.md/ })).toHaveAttribute(
+			"aria-selected",
+			"true",
+		);
+	});
+
 	it("falls back to the subtasks' files, read from the project, when the worktree is gone", async () => {
 		api.getWorktreeStatus.mockResolvedValue({ success: true, data: { exists: false } });
 		api.getWorktreeDiff.mockResolvedValue({

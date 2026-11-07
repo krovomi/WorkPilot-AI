@@ -18,6 +18,12 @@ What a token is not:
 - **Not wider than its scope.** A ``read`` token lists and reads; only a
   ``write`` token creates or edits a card, and only where the person's own
   role lets them.
+
+A *task token* (prospective P7) is the same token narrowed to one card: made
+by the person for an agent working on that card, it reaches the card's
+project only, edits no other card, lasts hours rather than days, and stops
+once the card is done (``shared_board/mcp_http.py`` checks the card on every
+call). What it writes is audited with the card, not only the person.
 """
 
 from __future__ import annotations
@@ -40,6 +46,9 @@ MAX_TOKENS_PER_USER = 20
 #: A use updates ``last_used_at`` at most this often (one write per minute,
 #: not one per tool call).
 LAST_USED_RESOLUTION = timedelta(minutes=1)
+TASK_DEFAULT_TTL_HOURS = 24
+TASK_MAX_TTL_HOURS = 72
+MAX_TASK_TOKENS_PER_USER = 20
 
 
 class AccessTokenError(Exception):
@@ -105,14 +114,70 @@ async def create_token(
     return row, raw
 
 
-async def live_tokens(db: AsyncSession, user_id: str) -> list[AccessToken]:
+async def _live(db: AsyncSession, user_id: str, *, task: bool) -> list[AccessToken]:
+    kind = AccessToken.card_id.is_not(None) if task else AccessToken.card_id.is_(None)
     rows = await db.scalars(
         select(AccessToken)
-        .where(AccessToken.user_id == user_id, AccessToken.revoked_at.is_(None))
+        .where(AccessToken.user_id == user_id, AccessToken.revoked_at.is_(None), kind)
         .order_by(AccessToken.created_at.desc())
     )
     now = _utcnow()
     return [row for row in rows if _aware(row.expires_at) > now]
+
+
+async def live_tokens(db: AsyncSession, user_id: str) -> list[AccessToken]:
+    """The person's own tokens, the ones they manage in the app."""
+    return await _live(db, user_id, task=False)
+
+
+async def live_task_tokens(db: AsyncSession, user_id: str) -> list[AccessToken]:
+    return await _live(db, user_id, task=True)
+
+
+async def create_task_token(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    org_id: str,
+    project_id: str,
+    card_id: str,
+    scope: str,
+    ttl_hours: int = TASK_DEFAULT_TTL_HOURS,
+) -> tuple[AccessToken, str]:
+    """A token for one card of one project, shown once. The caller has checked
+    that the person reaches the project and that the card is not done."""
+    if scope not in SCOPES:
+        raise ValueError(f"scope must be one of {', '.join(SCOPES)}")
+    if not 1 <= ttl_hours <= TASK_MAX_TTL_HOURS:
+        raise ValueError(f"a task token lasts between 1 and {TASK_MAX_TTL_HOURS} hours")
+    if len(await live_task_tokens(db, user_id)) >= MAX_TASK_TOKENS_PER_USER:
+        raise ValueError(
+            f"at most {MAX_TASK_TOKENS_PER_USER} task tokens; let a task end first"
+        )
+    raw = new_token()
+    row = AccessToken(
+        user_id=user_id,
+        org_id=org_id,
+        name=f"task {card_id}"[:80],
+        token_hash=hash_token(raw),
+        prefix=raw[: len(TOKEN_PREFIX) + 6],
+        scope=scope,
+        expires_at=_utcnow() + timedelta(hours=ttl_hours),
+        project_id=project_id,
+        card_id=card_id,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row, raw
+
+
+async def end_task_token(db: AsyncSession, token_id: str) -> None:
+    """Revoke a task token whose card is done: it never works again."""
+    row = await db.get(AccessToken, token_id)
+    if row is not None and row.card_id is not None and row.revoked_at is None:
+        row.revoked_at = _utcnow()
+        await db.commit()
 
 
 async def revoke_token(db: AsyncSession, user_id: str, token_id: str) -> bool:

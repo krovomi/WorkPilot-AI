@@ -46,6 +46,22 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "offline_policy": {"ollama_model_detector", "phase_config"},
     # The preview's project detector, read by verify and the Kanban runner.
     "app_detection": set(),
+    # The dependency guard (docs/architecture/dependency-guard.md): manifests,
+    # registries and its record; git through foundation. The QA gate that
+    # calls it, and offline_policy, live in qa. A leaf.
+    "dependency_guard": {"foundation"},
+    # Agent Trace attribution (docs/architecture/agent-trace.md): git through
+    # foundation, the records in the spec directory. A leaf the coder session,
+    # the write hooks and the PR body read.
+    "agent_trace": {"foundation"},
+    # The mutation gate (docs/architecture/mutation-gate.md): git, the test
+    # conventions and the platform through foundation; the child environment
+    # without credentials from security. The QA gate that calls it is in qa.
+    "mutation_gate": {"foundation", "security"},
+    # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
+    # poisoning scan and the project's pins file; the desktop route reads the
+    # API helpers of foundation. Probing a server is core's (mcp_pinning).
+    "mcp_pins": {"foundation", "injection_guard"},
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),

@@ -394,13 +394,20 @@ class RecoveryManager:
         commits = self._load_build_commits()
         return commits.get("last_good_commit")
 
-    def record_good_commit(self, commit_hash: str, subtask_id: str) -> None:
+    def record_good_commit(
+        self, commit_hash: str, subtask_id: str, commit_before: str | None = None
+    ) -> None:
         """
         Record a commit where the build was working.
 
         Args:
             commit_hash: Git commit hash
             subtask_id: Subtask that was successfully completed
+            commit_before: HEAD when the session started. With it the review
+                groups the subtask's own range, ``commit_before..commit_hash``,
+                and a commit made between two sessions (QA fixer, a person)
+                is not absorbed by the next subtask. Records written before
+                it existed fall back to the previous record.
         """
         commits = self._load_build_commits()
 
@@ -409,6 +416,8 @@ class RecoveryManager:
             "subtask_id": subtask_id,
             "timestamp": datetime.now().isoformat(),
         }
+        if commit_before:
+            commit_record["commit_before"] = commit_before
 
         commits["commits"].append(commit_record)
         commits["last_good_commit"] = commit_hash

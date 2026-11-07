@@ -22,6 +22,7 @@ import { useSettingsStore } from "../../stores/settings-store";
 import { useProviderContext } from "../ProviderContext";
 import { CrossReviewSettings } from "./CrossReviewSettings";
 import { RepositorySection } from "./RepositorySection";
+import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
@@ -358,6 +359,10 @@ export function GeneralSettings({
 						</div>
 						<CrossReviewSettings settings={settings} setSettings={setSettings} />
 					</section>
+
+					<Separator />
+
+					<WorktreeRecipeSection projectPath={project.path} />
 
 					<Separator />
 

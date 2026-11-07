@@ -59,6 +59,7 @@ from .record import (
 from .scenario import TRACE_FILE, card_scenario, scenario_prompt
 from .settings import VerifySettings, load_settings
 from .state import stop_all, work_dir
+from .walkthrough import VIDEO_FILE, build_walkthrough, clear_walkthrough
 
 logger = logging.getLogger(__name__)
 
@@ -581,8 +582,9 @@ async def run_verify_loop(
 
     try:
         (base / EVENTS_FILE).unlink(missing_ok=True)
-        # Last run's trace is not this run's proof.
+        # Last run's trace and walkthrough are not this run's proof.
         (base / TRACE_FILE).unlink(missing_ok=True)
+        clear_walkthrough(base)
     except OSError:
         # A stale event log is folded into this run's record at worst; the
         # verification itself does not depend on removing it.
@@ -667,6 +669,7 @@ async def run_verify_loop(
         fold_events(record, events)
         if (base / TRACE_FILE).is_file():
             record["trace"] = str(base / TRACE_FILE)
+        _walkthrough(record, base, browser)
         _final_errors(record, project, base)
         _summarise(record)
 
@@ -696,6 +699,19 @@ async def run_verify_loop(
 
         await close_toolboxes(project)
         stop_all(base)
+
+
+def _walkthrough(record: dict, base: Path, browser) -> None:
+    """The scenario's video and GIF, when the scenario was reported."""
+    if not record.get("scenario_requested"):
+        return
+    if (base / VIDEO_FILE).is_file():
+        record["video"] = str(base / VIDEO_FILE)
+    elif browser is not None and browser.video_note:
+        record["video_note"] = browser.video_note
+    gif = build_walkthrough(record, base)
+    if gif is not None:
+        record["walkthrough"] = str(gif)
 
 
 def _learn(project: Path, spec: Path | None, record: dict) -> None:

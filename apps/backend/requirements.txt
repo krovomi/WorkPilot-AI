@@ -83,6 +83,11 @@ defusedxml>=0.7.1
 #   playwright install chromium
 playwright>=1.64.1
 
+# The verification's scenario walkthrough (verify/walkthrough.py): the GIF of
+# the step captures shown in the PR. Pillow (MIT-CMU licence) was only a test
+# dependency until now.
+pillow>=12.0.0
+
 # Ajout d'une note pour l'installation automatique de uvicorn si absent
 # Pour garantir l'automatisation, il est recommandé d'ajouter uvicorn dans requirements.txt racine ou de documenter l'installation automatique.
 
@@ -90,4 +95,4 @@ playwright>=1.64.1
 # OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
 # installed through mcp; the SDK and the exporter make the spans leave.
 opentelemetry-sdk>=1.45.1
-opentelemetry-exporter-otlp-proto-http>=1.45.1
+opentelemetry-exporter-otlp-proto-http>=1.45.2

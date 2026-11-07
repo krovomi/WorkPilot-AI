@@ -70,7 +70,7 @@ class TestTasksEndToEnd:
 
         async def run():
             async with MCPToolManager(
-                None, [_command("tasks", FIXTURES / "task_server.py")]
+                None, [_command("tasks", FIXTURES / "task_server.py")], pin=False
             ) as mcp:
                 session, _ = mcp._route["mcp__tasks__slow"]
                 return (
@@ -97,7 +97,7 @@ class TestTasksEndToEnd:
                     env={"TASK_SERVER_CANCELLED_MARKER": str(marker)},
                 )
             ]
-            async with MCPToolManager(None, servers) as mcp:
+            async with MCPToolManager(None, servers, pin=False) as mcp:
                 call = asyncio.ensure_future(mcp.call("mcp__tasks__hang", {}))
                 await asyncio.sleep(1.0)
                 call.cancel()
@@ -117,7 +117,7 @@ class TestAppsEndToEnd:
     def test_an_app_only_tool_never_reaches_the_agent(self):
         async def run():
             async with MCPToolManager(
-                None, [_command("weather", FIXTURES / "apps_server.py")]
+                None, [_command("weather", FIXTURES / "apps_server.py")], pin=False
             ) as mcp:
                 return {d["name"] for d in mcp.tool_definitions()}
 
@@ -131,7 +131,7 @@ class TestAppsEndToEnd:
 
         async def run():
             servers = [_command("weather", FIXTURES / "apps_server.py")]
-            async with MCPToolManager(None, servers, spec_dir=spec) as mcp:
+            async with MCPToolManager(None, servers, spec_dir=spec, pin=False) as mcp:
                 return await mcp.call("mcp__weather__weather", {"city": "Paris"})
 
         text = asyncio.run(run())
@@ -159,7 +159,7 @@ class TestAppsEndToEnd:
 
         async def run():
             async with MCPToolManager(
-                None, [_command("weather", FIXTURES / "apps_server.py")]
+                None, [_command("weather", FIXTURES / "apps_server.py")], pin=False
             ) as mcp:
                 assert mcp._views == {}
                 return await mcp.call("mcp__weather__weather", {"city": "Lyon"})
@@ -176,7 +176,7 @@ class TestVerifyServer:
 
         async def run():
             servers = [_command("verify", VERIFY_RUNNER, "--project-dir", str(project))]
-            async with MCPToolManager(None, servers) as mcp:
+            async with MCPToolManager(None, servers, pin=False) as mcp:
                 session, _ = mcp._route["mcp__verify__verify_launch"]
                 return session.protocol_version, await mcp.call(
                     "mcp__verify__verify_launch", {}

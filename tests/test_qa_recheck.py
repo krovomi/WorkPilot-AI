@@ -99,6 +99,33 @@ def test_the_next_pass_opens_with_the_issues_and_the_delta(repo, spec_dir):
     assert "this is the pass\nthat signs" in section
 
 
+def test_a_same_size_edit_in_the_same_clock_tick_is_seen(repo, spec_dir):
+    """Windows CI: the fix landed in the tick the index was written in.
+
+    Where the clock is coarse and ctime is not trusted (Windows), git tells a
+    same-size edit from the committed file only because the entry is "racily
+    clean" (its mtime is not older than the index file's). A copy of the index
+    that takes a new mtime loses that, and the snapshot misses the edit.
+    """
+    import os
+
+    _git(repo, "config", "core.trustctime", "false")
+    _git(repo, "config", "core.checkStat", "minimal")
+    calc = repo / "src" / "calc.py"
+    tick = int(calc.stat().st_mtime) - 10
+    os.utime(calc, (tick, tick))
+    _git(repo, "add", "src/calc.py")  # the entry records the tick
+    index = Path(_git(repo, "rev-parse", "--git-path", "index").strip())
+    index = index if index.is_absolute() else repo / index
+    os.utime(index, (tick, tick))  # and the index was written in the same tick
+    before = recheck.snapshot_tree(repo)
+
+    calc.write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    os.utime(calc, (tick, tick))
+
+    assert recheck.snapshot_tree(repo) != before
+
+
 def test_a_fixer_that_changed_nothing_is_called_out(repo, spec_dir):
     recheck.record_rejection(spec_dir, repo, 3, ISSUES)
 
