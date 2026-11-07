@@ -59,6 +59,9 @@ export const IPC_CHANNELS = {
 	TASK_PREVIEW_POINT_DISCARD: "task:previewPointDiscard", // Forget a pointed element before it is sent
 	TASK_PREVIEW_POINT_SEND: "task:previewPointSend", // Send each pointed element, with what to change, as a steering message
 	TASK_UNBLOCK_SUBTASK: "task:unblockSubtask", // Answer a blocked subtask from its panel: done, not needed, retry, or retry with a reply (restarts the build)
+	TASK_STACK_ON: "task:stackOn", // Stack a task on one of its blockers: it starts from that task's branch (F6)
+	TASK_STACK_STATUS: "task:stackStatus", // A stacked task's parent: moved, merged, or up to date
+	TASK_STACK_UPDATE: "task:stackUpdate", // Rebase a stacked task onto its parent's new commit, or onto the trunk once the parent is merged
 	TASK_RESET: "task:reset", // Full reset: discard plan/subtasks, worktree and runtime artifacts; keep the spec and go back to backlog
 	TASK_RERUN_PHASE: "task:rerunPhase", // Re-run one execution phase on demand (planning/coding/validation); cascade-invalidates downstream phases and restarts
 	TASK_HOT_SWAP: "task:hotSwap", // Live provider/model/effort change during a running phase (applied at the next turn, context replayed)
