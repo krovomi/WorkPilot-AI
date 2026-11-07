@@ -61,7 +61,7 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass,app-verified,deps-exist
+    hard_gate: tests-pass,app-verified,deps-exist,proof-checks
     description: >-
       The application launched with the fix, the incident gone. The gates
       are the proof the merge is made on.
