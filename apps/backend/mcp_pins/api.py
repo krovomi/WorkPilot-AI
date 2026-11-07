@@ -7,6 +7,7 @@ mode the feature is not mounted (`LOCAL_ONLY_FEATURES`).
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -15,7 +16,30 @@ from pydantic import BaseModel, Field
 
 from .store import PinError, approve, server_states
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/mcp-pins", tags=["mcp-pins"])
+
+# What the person reads for each refusal (`PinError.code`). Fixed sentences:
+# the exception's own message names a path of the checkout and stays in the log.
+_REFUSALS = {
+    "unreadable": "The pins file of this project is unreadable",
+    "nothing-pending": "Nothing waits for an approval on this server",
+    "suspicious": "These tools look poisoned and need an explicit confirmation",
+}
+
+
+def _refusal(exc: PinError) -> dict:
+    logger.warning("mcp pins: %s", exc)
+    # The key is taken from the table, never from the exception.
+    code = next((known for known in _REFUSALS if known == exc.code), "unreadable")
+    return {
+        "success": False,
+        "error": _REFUSALS[code],
+        "code": code,
+        "suspicious": code == "suspicious",
+    }
+
 
 _DESKTOP_ONLY = {
     "success": False,
@@ -50,7 +74,7 @@ def list_pins(project_dir: str = "") -> dict:
     try:
         return {"success": True, "servers": server_states(project)}
     except PinError as exc:
-        return {"success": False, "error": str(exc)}
+        return _refusal(exc)
 
 
 @router.post("/approve")
@@ -69,9 +93,5 @@ def approve_server(request: ApproveRequest) -> dict:
             confirm_suspicious=request.confirm_suspicious,
         )
     except PinError as exc:
-        return {
-            "success": False,
-            "error": str(exc),
-            "suspicious": "poisoned" in str(exc),
-        }
+        return _refusal(exc)
     return {"success": True, "servers": server_states(project)}

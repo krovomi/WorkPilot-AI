@@ -190,6 +190,23 @@ def test_a_github_style_remote_is_cloned(client, home, tmp_path):
     assert (target / "knowledge" / "decision.md").is_file()
 
 
+def test_a_clone_git_cannot_start_names_no_path(tmp_path, monkeypatch):
+    import subprocess
+
+    from brain.api import _clone_error
+    from brain.sync import clone
+
+    secret_dir = tmp_path / "private-folder"
+
+    def missing_git(*_args, **_kwargs):
+        raise FileNotFoundError(2, "No such file or directory", str(secret_dir))
+
+    monkeypatch.setattr(subprocess, "run", missing_git)
+    message = clone("owner/repo", tmp_path / "probe")
+    assert message and str(secret_dir) not in message
+    assert _clone_error(message) == "git-missing"
+
+
 @needs_git
 def test_a_clone_that_fails_says_why(client, home, tmp_path):
     from brain.api import _clone_error

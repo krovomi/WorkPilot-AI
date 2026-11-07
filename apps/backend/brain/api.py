@@ -147,6 +147,13 @@ def _home_path(raw: str) -> tuple[Path | None, str | None]:
     )
     if code:
         return None, code
+    # The same containment, said where the path is opened: a home folder, or a
+    # mounted Windows drive `windows_folder_verdict` has just accepted.
+    allowed = tuple(root.rstrip(os.sep) + os.sep for root in roots)
+    if windows_folder_verdict(full) == "ok":
+        allowed += (automount_root(),)
+    if not full.startswith(allowed):
+        return None, "outside-home"
 
     target = Path(full)
     try:
