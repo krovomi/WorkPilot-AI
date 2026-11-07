@@ -140,6 +140,7 @@ import {
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
+import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
 	createTaskPermissionAPI,
 	type TaskPermissionAPI,
@@ -180,6 +181,8 @@ import {
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import type { McpPinsAPI } from "./modules/mcp-pins-api";
+import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
 import type { MultiRepoAPI } from "./modules/multi-repo-api";
 import { createMultiRepoAPI } from "./modules/multi-repo-api";
@@ -204,8 +207,12 @@ import type { DesignToCodeAPI } from "./modules/design-to-code-api";
 import { createDesignToCodeAPI } from "./modules/design-to-code-api";
 import type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 import { createVisualProgrammingAPI } from "./modules/visual-programming-api";
+import type { SteeringAPI } from "./modules/steering-api";
+import { createSteeringAPI } from "./modules/steering-api";
 import type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
+import type { WorktreeRecipeAPI } from "./modules/worktree-recipe-api";
+import { createWorktreeRecipeAPI } from "./modules/worktree-recipe-api";
 import {
 	createVoiceControlAPI,
 	type VoiceControlAPI,
@@ -256,6 +263,7 @@ export interface ElectronAPI
 		CopilotCliAPI,
 		AgentCliAPI,
 		TaskSandboxAPI,
+		StackAPI,
 		TaskPermissionAPI,
 		CopilotOAuthAPI,
 		McpAPI,
@@ -271,6 +279,7 @@ export interface ElectronAPI
 		AppEmulatorAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
 		CodeMigrationAPI,
@@ -314,7 +323,9 @@ export interface ElectronAPI
 		EnvSnapshotAPI,
 		OfflineModeAPI,
 		VisualProgrammingAPI,
+		SteeringAPI,
 		VisualToCodeHistoryAPI,
+		WorktreeRecipeAPI,
 		AutoRefactorAPI,
 		GenericIpcAPI,
 		DesignToCodeAPI {
@@ -418,6 +429,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAppEmulatorAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
 		...createCodeMigrationAPI(),
@@ -461,11 +473,14 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createEnvSnapshotAPI(),
 		...createOfflineModeAPI(),
 		...createVisualProgrammingAPI(),
+		...createSteeringAPI(),
 		...createVisualToCodeHistoryAPI(),
+		...createWorktreeRecipeAPI(),
 		...createDesignToCodeAPI(),
 		...createAutoRefactorAPI(),
 		...createGenericIpcAPI(),
 		...createTaskSandboxAPI(),
+		...createStackAPI(),
 		github: createGitHubAPI(),
 		swarm: createSwarmAPI(),
 		automations: createAutomationsAPI(),

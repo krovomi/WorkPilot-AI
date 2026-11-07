@@ -40,6 +40,7 @@ _RECORD_KEYS = (
     "provider",
     "model",
     "effort",
+    "rule",
     "resolved",
     "f2pPassed",
     "f2pTotal",
@@ -87,12 +88,16 @@ def add_records(project_dir: Path, new: list[dict]) -> None:
 
 
 def _records_from(records: list[dict]) -> list[dict]:
+    """The records that measure a model. A build made with a candidate rule
+    measures the rule: it stays in the file and never reaches the table, the
+    router, Formula Lab or the recommendations."""
     return [
         r
         for r in records
         if isinstance(r.get("provider"), str)
         and isinstance(r.get("model"), str)
         and isinstance(r.get("resolved"), bool)
+        and not r.get("rule")
     ]
 
 

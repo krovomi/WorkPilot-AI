@@ -9,7 +9,11 @@ from typing import Any
 
 from .frontmatter import parse_frontmatter
 
-BUNDLED_SKILLS = ("convert-documents-to-markdown", "ui-ux-pro-max")
+BUNDLED_SKILLS = (
+    "convert-documents-to-markdown",
+    "migrate-dotnet10-to-dotnet11",
+    "ui-ux-pro-max",
+)
 
 
 def bundled_skill_dirs(name: str) -> tuple[Path, ...]:

@@ -442,6 +442,8 @@ environment wins:
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+| `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
+| `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
 
 ### Review budget
 
@@ -754,6 +756,13 @@ files. Only public `http` and `https` addresses are accepted.
 `SLACK_WEBHOOK_URL` and `TEAMS_WEBHOOK_URL` are also where a hook's `send_slack`
 or `send_teams` action posts when it names no URL.
 
+`WORKPILOT_TASK_DIGEST_HOURS` (off by default, 0.25 to 168) sends a digest of
+each running build to the same channels at that interval: subtasks done out of
+planned, what runs, what is blocked and why, the QA pass. The first one comes
+one interval after the build started, so a short task sends none, and a build
+resumed after a restart waits for the rest of the interval
+([task-digest.md](architecture/task-digest.md)).
+
 ### Third-party MCP servers
 
 These credentials go only to an MCP server an agent may be given. A server starts
@@ -781,6 +790,16 @@ providers on WorkPilot's own loop wait for it, see
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_MCP_TASK_TIMEOUT` | 1800 | Seconds a tool call returned as a task may run before WorkPilot cancels it (`tasks/cancel`) and gives the agent an error that says so. A value that is not a positive number keeps the default. |
+
+## Worktree preparation
+
+A task's worktree is prepared before the first session, see
+[architecture/worktree-recipe.md](architecture/worktree-recipe.md). Read from the backend environment:
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_WORKTREE_SETUP` | `1` | `0`: no recipe runs in new worktrees (neither `.workpilot/worktree.toml` nor the one detected from the stack). Teardown and port release still run on removal. |
+| `WORKPILOT_DATA_DIR` | `~/.workpilot` | Holds `ports.json`, the machine's port blocks (one per task, 10 ports wide from 20000). |
 
 ## Agent features
 

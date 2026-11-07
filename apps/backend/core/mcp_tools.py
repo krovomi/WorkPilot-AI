@@ -49,6 +49,7 @@ from core.mcp_extensions import (
     session_options,
     visible_to_model,
 )
+from mcp_pins import tool_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -235,8 +236,15 @@ class MCPToolManager:
         servers: list[dict[str, Any]] | None = None,
         *,
         spec_dir: str | Path | None = None,
+        pin: bool = True,
     ):
         self._project_dir = project_dir
+        # Custom servers expose only the tools the person approved
+        # (`mcp_pins`). Off for WorkPilot's own servers and side sessions that
+        # never hand a tool to a model.
+        self._pin = pin
+        # server id -> the tools it listed, as snapshots (the probe's answer)
+        self._listed: dict[str, list[Any]] = {}
         # Where a tool's MCP App view is kept for the task panel; without
         # one, the session does not declare Apps (`core/mcp_extensions.py`).
         self._spec_dir = Path(spec_dir) if spec_dir else None
@@ -261,45 +269,79 @@ class MCPToolManager:
         if not self._servers:
             return
         self._stack = AsyncExitStack()
+        opened: list[tuple[str, dict[str, Any], Any, list[Any]]] = []
         for index, cfg in enumerate(self._servers):
             sid = _server_id(cfg, index)
             try:
                 session = await self._open_session(cfg)
                 await _handshake(session)
                 listed = await session.list_tools()
-                tools = getattr(listed, "tools", None) or []
-                for tool in tools:
-                    tname = getattr(tool, "name", None)
-                    if not tname:
-                        continue
-                    meta = _field(tool, "meta", "_meta")
-                    if not visible_to_model(meta):
-                        # MCP Apps: an app-only tool is never the agent's.
-                        continue
-                    full = f"{MCP_TOOL_PREFIX}{sid}__{_sanitize(tname)}"
-                    view = app_resource_uri(meta)
-                    if view and self._spec_dir is not None:
-                        self._views[full] = (sid, view)
-                    schema = _field(tool, "inputSchema", "input_schema") or {
-                        "type": "object",
-                        "properties": {},
-                    }
-                    self._defs.append(
-                        {
-                            "name": full,
-                            "description": (
-                                getattr(tool, "description", None)
-                                or f"{tname} (MCP: {sid})"
-                            ),
-                            "parameters": schema,
-                        }
-                    )
-                    self._route[full] = (session, tname)
-                logger.info(
-                    "[mcp] connected to '%s' — %d tool(s) bridged", sid, len(tools)
-                )
             except Exception as e:  # noqa: BLE001 — one bad server must not break the loop
                 logger.warning("[mcp] could not connect to server '%s': %s", sid, e)
+                continue
+            tools = [
+                t
+                for t in getattr(listed, "tools", None) or []
+                if getattr(t, "name", None)
+                # MCP Apps: an app-only tool is never the agent's.
+                and visible_to_model(_field(t, "meta", "_meta"))
+            ]
+            self._listed[sid] = [s for s in map(tool_snapshot, tools) if s]
+            opened.append((sid, cfg, session, tools))
+        allowed = self._pinned(opened) if self._pin else None
+        for sid, _cfg, session, tools in opened:
+            kept = [
+                t for t in tools if allowed is None or t.name in allowed.get(sid, ())
+            ]
+            for tool in kept:
+                self._bridge(sid, session, tool)
+            logger.info(
+                "[mcp] connected to '%s' — %d of %d tool(s) bridged",
+                sid,
+                len(kept),
+                len(tools),
+            )
+
+    def _pinned(self, opened: list[tuple]) -> dict[str, frozenset[str]]:
+        """The tools of each server the person approved (`mcp_pins`)."""
+        if not self._project_dir:
+            logger.warning(
+                "[mcp] no project to read the MCP pins from: no tool bridged"
+            )
+            return {}
+        from core.mcp_pinning import pin_verdicts  # noqa: PLC0415
+
+        verdicts = pin_verdicts(
+            self._project_dir,
+            [(cfg, self._listed.get(sid)) for sid, cfg, _s, _t in opened],
+        )
+        return {sid: verdicts[sid].allowed for sid, *_ in opened if sid in verdicts}
+
+    def listed(self) -> dict[str, list[Any]]:
+        """The tools each server listed, as `mcp_pins.ToolSnapshot`s."""
+        return dict(self._listed)
+
+    def _bridge(self, sid: str, session: Any, tool: Any) -> None:
+        tname = tool.name
+        meta = _field(tool, "meta", "_meta")
+        full = f"{MCP_TOOL_PREFIX}{sid}__{_sanitize(tname)}"
+        view = app_resource_uri(meta)
+        if view and self._spec_dir is not None:
+            self._views[full] = (sid, view)
+        schema = _field(tool, "inputSchema", "input_schema") or {
+            "type": "object",
+            "properties": {},
+        }
+        self._defs.append(
+            {
+                "name": full,
+                "description": (
+                    getattr(tool, "description", None) or f"{tname} (MCP: {sid})"
+                ),
+                "parameters": schema,
+            }
+        )
+        self._route[full] = (session, tname)
 
     async def _open_session(self, cfg: dict[str, Any]) -> Any:
         """Open and enter an MCP ClientSession for one server config."""
@@ -307,14 +349,10 @@ class MCPToolManager:
 
         assert self._stack is not None
         if cfg.get("type") == "http":
-            from mcp.client.streamable_http import (  # noqa: PLC0415
-                streamablehttp_client,
-            )
-
             transport = await self._stack.enter_async_context(
-                streamablehttp_client(cfg["url"], headers=cfg.get("headers"))
+                _http_transport(cfg["url"], cfg.get("headers"), self._stack)
             )
-            # (read, write, get_session_id)
+            # (read, write[, get_session_id])
             read, write = transport[0], transport[1]
         else:  # command / stdio
             from mcp import StdioServerParameters  # noqa: PLC0415
@@ -449,7 +487,9 @@ def make_app_view_hook(
     view_tools: dict[str, frozenset[str]] = {}
 
     async def _capture(sid: str, name: str, arguments: Any, result: Any) -> None:
-        async with MCPToolManager(None, [configs[sid]], spec_dir=spec_dir) as mcp:
+        async with MCPToolManager(
+            None, [configs[sid]], spec_dir=spec_dir, pin=False
+        ) as mcp:
             if not mcp.connected():
                 return
             view_tools[sid] = mcp.view_tools()
@@ -481,6 +521,23 @@ def make_app_view_hook(
         return {}
 
     return _hook
+
+
+def _http_transport(url: str, headers: dict | None, stack: AsyncExitStack) -> Any:
+    """The streamable HTTP transport of whichever MCP SDK is installed.
+
+    MCP SDK 2 renamed `streamablehttp_client(url, headers=...)` to
+    `streamable_http_client(url, http_client=...)`; with the old name alone,
+    every HTTP server failed to connect.
+    """
+    from mcp.client import streamable_http  # noqa: PLC0415
+
+    modern = getattr(streamable_http, "streamable_http_client", None)
+    if modern is None:
+        return streamable_http.streamablehttp_client(url, headers=headers)
+    client = streamable_http.create_mcp_http_client(headers=headers)
+    stack.push_async_callback(client.aclose)
+    return modern(url, http_client=client)
 
 
 async def _handshake(session: Any) -> None:

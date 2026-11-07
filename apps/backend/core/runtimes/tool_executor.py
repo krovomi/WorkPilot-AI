@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from agent_trace import note_tool_write
 from core.llm_optimization import tool_result_max_chars, truncate_tool_result
 from foundation.paging import (
     FOOTER_RESERVE,
@@ -488,6 +489,7 @@ class ToolExecutor:
         # lines below. Before the JSON branch, not after: an invisible
         # character inside a string value survives `json.loads` and would be
         # written straight back out by `write_json_atomic`.
+        note_tool_write(self.spec_dir, "write_file", str(file_path))
         if isinstance(content, str) and content:
             cleaning = clean_generated(content)
             if cleaning.changed:

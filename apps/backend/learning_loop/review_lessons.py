@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 LESSONS_FILE = Path(".workpilot") / "learning" / "review-lessons.json"
 
-SOURCES = ("pr_review", "plan_review")
+SOURCES = ("pr_review", "plan_review", "bench")
+"""``bench``: a candidate rule a bench copy is built with (`bench.lifecycle`)."""
 STATUSES = ("pending", "adopted", "dismissed")
 
 MAX_CANDIDATE_CHARS = 600
@@ -58,15 +59,19 @@ def project_root(path: str | Path) -> Path:
     """The project a path belongs to: a task worktree maps to its project.
 
     Prompts are built in the task's worktree, where ``.workpilot/`` holds no
-    learning folder; the rules live in the project that owns it.
+    learning folder; the rules live in the project that owns it. Only a
+    worktree folder maps (``.workpilot/worktrees/…`` or ``.worktrees/…``): a
+    bench copy under ``~/.workpilot/bench/…`` is a project of its own, not
+    the home folder.
     """
     path = Path(path)
     parts = PurePath(path).parts
-    for marker in (".workpilot", ".worktrees"):
-        if marker in parts:
-            index = parts.index(marker)
-            if index > 0:
-                return Path(*parts[:index])
+    for index in range(1, len(parts)):
+        nested = parts[index] == ".workpilot" and parts[index + 1 : index + 2] == (
+            "worktrees",
+        )
+        if nested or parts[index] == ".worktrees":
+            return Path(*parts[:index])
     return path
 
 

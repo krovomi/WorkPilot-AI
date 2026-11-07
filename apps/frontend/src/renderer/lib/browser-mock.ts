@@ -609,6 +609,20 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		error: "Not available in browser mode",
 	}),
 	getReviewLessons: async () => ({ success: true, data: [] }),
+	getWorktreeRecipe: async () => ({ success: false, error: "Not available in browser mode" }),
+	approveWorktreeRecipe: async () => ({ success: false, error: "Not available in browser mode" }),
+	saveDetectedWorktreeRecipe: async () => ({
+		success: false,
+		error: "Not available in browser mode",
+	}),
+	getMcpPins: async () => ({ success: true, data: [] }),
+	approveMcpServer: async () => ({ success: true, data: [] }),
+	listTaskSteering: async () => ({ success: true, data: [] }),
+	sendTaskSteering: async () => ({ success: false, error: "Not available in browser mode" }),
+	startPreviewPoint: async () => ({ success: false, error: "Not available in browser mode" }),
+	cancelPreviewPoint: async () => ({ success: true, data: false }),
+	discardPreviewPoint: async () => ({ success: true, data: false }),
+	sendPreviewPoints: async () => ({ success: false, error: "Not available in browser mode" }),
 	adoptReviewLesson: async () => ({
 		success: false,
 		error: "Not available in browser mode",
@@ -793,6 +807,10 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	},
 	// Context-window management: registered at startup by global-listeners.
 	// No backend in the preview, so the commands report unavailable.
+	// Stacked tasks (F6): git runs in the main process only.
+	stackTaskOn: async () => ({ success: false, error: "Not available in browser mode" }),
+	getTaskStackStatus: async () => ({ success: true, data: { stacked: false } }),
+	updateTaskStack: async () => ({ success: false, error: "Not available in browser mode" }),
 	listTaskSandboxes: async () => [],
 	onTaskSandboxStatus: () => () => {
 		/* nothing to remove in the browser mock */

@@ -161,7 +161,12 @@
 		"logStatus_active": "running",
 		"logStatus_completed": "done",
 		"logStatus_failed": "failed",
-		"logPhaseToggle": "Show the {{phase}} log"
+		"logPhaseToggle": "Show the {{phase}} log",
+		"steeringTitle": "Guide the agent",
+		"steeringLabel": "Message for the next session",
+		"steeringSend": "Send",
+		"steeringQueued": "Waiting for the next session",
+		"steeringDelivered": "Delivered to session {{session}} ({{date}})"
 	},
 	"actions": {
 		"start": "Start",
