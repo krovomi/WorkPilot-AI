@@ -28,9 +28,12 @@ export interface LayoutOptions {
 	originY?: number;
 }
 
+// A column holds a card (up to 280 px) and the explanation written on the
+// wires that leave it (up to 240 px): narrower, and the sentence sits on the
+// next card instead of between the two.
 const DEFAULTS: Required<LayoutOptions> = {
-	columnGap: 260,
-	rowGap: 120,
+	columnGap: 520,
+	rowGap: 150,
 	originX: 80,
 	originY: 60,
 };

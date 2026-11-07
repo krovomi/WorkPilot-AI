@@ -35,6 +35,7 @@ import {
 	Server,
 	Share2,
 	ShieldCheck,
+	Smartphone,
 } from "lucide-react";
 
 export interface BlockMeta {
@@ -69,6 +70,13 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
 				descKey: "desktopDesc",
 				icon: MonitorSmartphone,
 				accent: "#0ea5e9",
+			},
+			{
+				type: "mobile",
+				labelKey: "mobile",
+				descKey: "mobileDesc",
+				icon: Smartphone,
+				accent: "#06b6d4",
 			},
 		],
 	},
@@ -243,7 +251,18 @@ export function blockAccent(type?: string): string {
  * framework?" about a Redis cache has no useful answer.
  */
 export const FRAMEWORKS_BY_TYPE: Record<string, string[]> = {
-	frontend: ["React", "Angular", "Vue", "Svelte", "NextJs", "Blazor"],
+	frontend: [
+		"React",
+		"Angular",
+		"Vue",
+		"Svelte",
+		"NextJs",
+		"Nuxt",
+		"Blazor",
+		"TypeScript",
+		"JavaScript",
+	],
+	mobile: ["Flutter", "ReactNative", "Swift", "Kotlin", "DotNetMaui", "Ionic"],
 	desktop: [
 		"WPF",
 		"WinForms",
@@ -251,19 +270,35 @@ export const FRAMEWORKS_BY_TYPE: Record<string, string[]> = {
 		"DotNetMaui",
 		"Avalonia",
 		"Electron",
+		"Tauri",
 		"Qt",
 	],
 	backend: [
 		"DotNet",
 		"NodeJs",
 		"Python",
+		"FastApi",
 		"Django",
 		"Flask",
 		"Spring",
+		"Quarkus",
+		"Ktor",
 		"Go",
 		"Rust",
+		"Laravel",
+		"Symfony",
+		"Rails",
 	],
-	microservice: ["DotNet", "NodeJs", "Python", "Spring", "Go", "Rust"],
+	microservice: [
+		"DotNet",
+		"NodeJs",
+		"Python",
+		"Spring",
+		"Ktor",
+		"Go",
+		"Rust",
+		"Laravel",
+	],
 	worker: ["DotNet", "Celery", "BullMQ", "Sidekiq", "Temporal"],
 	gateway: ["Nginx", "Kong", "Traefik", "YARP", "ApiGateway"],
 	database: ["Postgres", "MySql", "MongoDb", "Sqlite", "SqlServer", "Redis"],
