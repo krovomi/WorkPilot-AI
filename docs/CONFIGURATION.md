@@ -40,19 +40,21 @@ to that path is stale and should point at `config/`.
 {
   "providers": [
     {
-      "id": "anthropic",
+      "name": "anthropic",
       "label": "Anthropic (Claude)",
-      "models": ["claude-3-5-sonnet-20241022", "claude-opus-4-7"],
-      "default_model": "claude-opus-4-7",
-      "capabilities": ["chat", "tools", "streaming"]
+      "description": "Claude, focalisé sur la sécurité et l’IA d’entreprise."
     }
   ]
 }
 ```
 
+Each entry has exactly these three fields. The models a provider offers come from the model
+catalog (below), and what it can do when it drives a task (agent client, subagents, MCP, sandbox,
+effort) from [`capabilities/providers.yaml`](../capabilities/providers.yaml).
+
 If you add a new provider field, update both consumers in the same PR:
 - backend: `apps/backend/provider_api.py`
-- frontend: `apps/frontend/src/renderer/services/providers.*` (or equivalent)
+- frontend: `apps/frontend/src/shared/services/providerService.ts`
 
 ---
 
