@@ -15,6 +15,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from agent_trace import model_id_of, session_start
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
@@ -131,7 +132,6 @@ from .utils import (
     find_phase_for_subtask,
     find_subtask_in_plan,
     get_commit_count,
-    get_latest_commit,
     load_implementation_plan,
     sync_spec_to_source,
 )
@@ -2176,7 +2176,7 @@ async def run_autonomous_agent(
         )
 
         # Capture state before session for post-processing
-        commit_before = get_latest_commit(project_dir)
+        commit_before = session_start(spec_dir, project_dir, subtask_id, iteration)
         commit_count_before = get_commit_count(project_dir)
 
         # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
@@ -2679,6 +2679,7 @@ async def run_autonomous_agent(
                 linear_enabled=linear_is_enabled,
                 status_manager=status_manager,
                 source_spec_dir=source_spec_dir,
+                model_id=model_id_of(client, phase_model),
             )
 
             # Check for stuck subtasks
