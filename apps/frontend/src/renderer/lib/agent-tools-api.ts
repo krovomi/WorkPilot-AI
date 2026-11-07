@@ -1044,6 +1044,10 @@ export interface HermesReadiness {
 	readonly ready: boolean;
 	readonly degraded: boolean;
 	readonly home: string;
+	/** Release named by `hermes --version` (`0.23.0`); null when unread. */
+	readonly version?: string | null;
+	/** The release whose features WorkPilot wires. */
+	readonly minVersion?: string;
 	readonly checks: readonly HermesCheck[];
 }
 
@@ -1185,11 +1189,28 @@ export async function reviewHermesCandidates(
 	);
 }
 
+/**
+ * What happened to the hermes sessions already running when a persona was
+ * installed: asked to rebuild their prompt on their next turn (hermes ≥ 0.23),
+ * or not — with the command a person can type instead.
+ */
+export type HermesSessionsRefresh = "requested" | "needs-update" | "unavailable";
+
+export interface HermesSoulInstall {
+	readonly changed: boolean;
+	readonly message: string;
+	/** Null when nothing was written (already installed, or refused). */
+	readonly sessions?: HermesSessionsRefresh | null;
+	readonly refreshCommand?: string;
+	readonly updateCommand?: string;
+	readonly soul: HermesSoul;
+}
+
 export async function installHermesSoul(
 	overwrite: boolean,
 	signal?: AbortSignal,
-): Promise<ApiResult<{ changed: boolean; message: string; soul: HermesSoul }>> {
-	return _post<{ changed: boolean; message: string; soul: HermesSoul }>(
+): Promise<ApiResult<HermesSoulInstall>> {
+	return _post<HermesSoulInstall>(
 		"/api/hermes/soul/install",
 		{ overwrite },
 		signal,
