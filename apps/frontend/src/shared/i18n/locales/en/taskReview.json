@@ -252,7 +252,13 @@
 			"modified": "modified",
 			"renamed": "renamed"
 		},
-		"selectedSuffix": " ({{count}} selected)"
+		"selectedSuffix": " ({{count}} selected)",
+		"attribution": {
+			"fileBadge": "AI {{ai}}%",
+			"fileTitle": "Of the lines this file adds: {{ai}}% written by the agent, {{human}}% by you, {{unknown}}% not recorded (Agent Trace)",
+			"task": "{{ai}}% of the {{added}} added lines were written by the agent, {{human}}% by you (Agent Trace)",
+			"taskWithModels": "{{ai}}% of the {{added}} added lines were written by the agent ({{models}}), {{human}}% by you (Agent Trace)"
+		}
 	},
 	"bulkPR": {
 		"title": "Create Pull Requests",

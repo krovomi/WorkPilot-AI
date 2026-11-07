@@ -50,6 +50,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # Agent Trace attribution (docs/architecture/agent-trace.md): git through
+    # foundation, the records in the spec directory. A leaf the coder session,
+    # the write hooks and the PR body read.
+    "agent_trace": {"foundation"},
     # The mutation gate (docs/architecture/mutation-gate.md): git, the test
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
