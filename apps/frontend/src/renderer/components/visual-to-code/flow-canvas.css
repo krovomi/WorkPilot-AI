@@ -1,0 +1,277 @@
+/*
+ * The Visual-to-Code canvas: a dark node graph with warm, glowing connectors.
+ *
+ * Scoped to `.vtc-flow` so ReactFlow keeps its defaults everywhere else in the
+ * app (the architecture visualizer draws its own). The colours are tokens, not
+ * the theme's: a node graph reads by contrast between the cards and the lines
+ * between them, and an accent that turns lime or blue with the colour theme
+ * would make the connectors the least visible thing on screen. Light mode keeps
+ * the same idea on paper.
+ */
+
+/*
+ * In the components layer, so a Tailwind utility on the same element still
+ * wins. The order is restated first: this file can be loaded before
+ * globals.css, and a layer named before Tailwind's would rank below its
+ * preflight (padding and borders reset to 0 on every card).
+ */
+@layer theme, base, components, utilities;
+
+@layer components {
+	.vtc-flow {
+		--vtc-bg: #f7f4f1;
+		--vtc-grid: rgba(41, 37, 36, 0.06);
+		--vtc-card: rgba(255, 255, 255, 0.94);
+		--vtc-card-solid: #ffffff;
+		--vtc-card-border: rgba(41, 37, 36, 0.12);
+		--vtc-title: #1c1917;
+		--vtc-flow: #e8642a;
+		--vtc-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		background: var(--vtc-bg);
+		color: var(--vtc-title);
+	}
+
+	/*
+	 * Derived from the tokens above, so a theme or a colour picked by the
+	 * person (lib/canvas-themes.ts) only sets those. Restated on `.vtc-tint`
+	 * because a custom property is computed where it is declared: a wire given
+	 * its own colour needs its core and its light recomputed on the wire.
+	 */
+	.vtc-flow,
+	.vtc-tint {
+		--vtc-muted: color-mix(in srgb, var(--vtc-title) 62%, transparent);
+		--vtc-flow-core: color-mix(in srgb, var(--vtc-flow) 72%, white);
+		--vtc-flow-spark: color-mix(in srgb, var(--vtc-flow) 22%, white);
+		--vtc-ambient: color-mix(in srgb, var(--vtc-flow) 15%, transparent);
+	}
+
+	.dark .vtc-flow {
+		--vtc-bg: #0c0b0a;
+		--vtc-grid: rgba(255, 255, 255, 0.035);
+		--vtc-card: rgba(26, 24, 23, 0.92);
+		--vtc-card-solid: #1a1817;
+		--vtc-card-border: rgba(255, 255, 255, 0.09);
+		--vtc-title: #f5f1ed;
+		--vtc-flow: #f26b2d;
+		--vtc-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
+	}
+
+	/* A warm light pooling in the corner, as if the graph were lit from there. */
+	.vtc-ambient {
+		pointer-events: none;
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(55% 60% at 100% 100%, var(--vtc-ambient), transparent 70%),
+			radial-gradient(35% 40% at 0% 0%, color-mix(in srgb, var(--vtc-ambient) 45%, transparent), transparent 70%);
+	}
+
+	/* ── Cards ─────────────────────────────────────────────────────────── */
+
+	.vtc-card {
+		position: relative;
+		min-width: 196px;
+		max-width: 280px;
+		border-radius: 14px;
+		border: 1px solid var(--vtc-card-border);
+		background: var(--vtc-card);
+		box-shadow: var(--vtc-shadow);
+		backdrop-filter: blur(6px);
+		padding: 12px 16px 14px;
+		transition:
+			border-color 160ms ease,
+			box-shadow 160ms ease,
+			background-color 160ms ease;
+	}
+
+	.vtc-card:hover {
+		border-color: color-mix(in srgb, var(--vtc-accent) 45%, var(--vtc-card-border));
+	}
+
+	/* Selected: the card takes its accent, like the highlighted agent of a graph. */
+	.vtc-card[data-selected="true"] {
+		border-color: var(--vtc-accent);
+		background: color-mix(in srgb, var(--vtc-accent) 10%, var(--vtc-card-solid));
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--vtc-accent) 35%, transparent),
+			0 0 28px -6px color-mix(in srgb, var(--vtc-accent) 55%, transparent);
+	}
+
+	.vtc-kicker {
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		font-size: var(--text-3xs, 0.625rem);
+		font-weight: 600;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		line-height: 1.2;
+		color: var(--vtc-accent);
+	}
+
+	.vtc-title {
+		color: var(--vtc-title);
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		line-height: 1.25;
+	}
+
+	.vtc-muted {
+		color: var(--vtc-muted);
+	}
+
+	.vtc-stack {
+		font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+		border: 1px solid var(--vtc-card-border);
+		border-radius: 6px;
+		padding: 1px 6px;
+		color: var(--vtc-muted);
+	}
+
+	/* ── Connectors ────────────────────────────────────────────────────── */
+
+	.vtc-edge-glow {
+		stroke: var(--vtc-flow);
+		stroke-width: 7;
+		stroke-opacity: 0.22;
+		fill: none;
+		filter: blur(4px);
+	}
+
+	.vtc-edge-core {
+		stroke: var(--vtc-flow);
+		stroke-width: 1.75;
+		fill: none;
+	}
+
+	/* Light running along the wire, in the direction of the interaction. */
+	.vtc-edge-spark {
+		stroke: var(--vtc-flow-spark);
+		stroke-width: 2.25;
+		stroke-linecap: round;
+		stroke-dasharray: 1.5 22;
+		fill: none;
+		animation: vtc-flow-run 1.8s linear infinite;
+	}
+
+	.react-flow__edge.selected .vtc-edge-core,
+	.react-flow__edge:hover .vtc-edge-core {
+		stroke: var(--vtc-flow-core);
+		stroke-width: 2.25;
+	}
+
+	.react-flow__edge.selected .vtc-edge-glow {
+		stroke-opacity: 0.4;
+	}
+
+	@keyframes vtc-flow-run {
+		to {
+			stroke-dashoffset: -47;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.vtc-edge-spark {
+			animation: none;
+		}
+	}
+
+	.vtc-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 9999px;
+		border: 1px solid var(--vtc-card-border);
+		background: var(--vtc-card-solid);
+		color: var(--vtc-muted);
+		padding: 3px;
+	}
+
+	.vtc-chip:hover {
+		border-color: var(--vtc-flow);
+	}
+
+	/* The sentence written on a connector. */
+	.vtc-edge-label {
+		max-width: 240px;
+		border-radius: 10px;
+		border: 1px solid color-mix(in srgb, var(--vtc-flow) 30%, var(--vtc-card-border));
+		background: var(--vtc-card);
+		box-shadow: var(--vtc-shadow);
+		backdrop-filter: blur(6px);
+		padding: 5px 9px 6px;
+		text-align: left;
+		transition: border-color 140ms ease;
+	}
+
+	.vtc-edge-label:hover,
+	.vtc-edge-label[data-selected="true"] {
+		border-color: var(--vtc-flow);
+	}
+
+	.vtc-edge-label .vtc-kicker {
+		--vtc-accent: var(--vtc-flow-core);
+	}
+
+	.vtc-edge-text {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		overflow: hidden;
+		color: var(--vtc-muted);
+		font-size: var(--text-2xs, 0.6875rem);
+		line-height: 1.35;
+	}
+}
+
+/*
+ * ReactFlow's own stylesheet is not in a layer, so overrides of its classes
+ * have to be out of one too: a layered rule loses to it at any specificity.
+ */
+
+/* Handles stay out of the way until a card is pointed at or a link is drawn. */
+.vtc-flow .react-flow__handle {
+	width: 9px;
+	height: 9px;
+	border: 2px solid var(--vtc-flow);
+	background: var(--vtc-card-solid);
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.vtc-flow .react-flow__node:hover .react-flow__handle,
+.vtc-flow .react-flow__node.selected .react-flow__handle,
+.vtc-flow .react-flow__handle.connectingfrom,
+.vtc-flow .react-flow__handle:focus-visible {
+	opacity: 1;
+}
+
+.vtc-flow .react-flow__connection-path {
+	stroke: var(--vtc-flow);
+	stroke-width: 1.75;
+	stroke-dasharray: 5 5;
+}
+
+/* ── ReactFlow chrome ──────────────────────────────────────────────── */
+
+.vtc-flow .react-flow__controls {
+	box-shadow: var(--vtc-shadow);
+	border: 1px solid var(--vtc-card-border);
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.vtc-flow .react-flow__controls-button {
+	background: var(--vtc-card-solid);
+	border-bottom: 1px solid var(--vtc-card-border);
+	fill: var(--vtc-muted);
+	color: var(--vtc-muted);
+}
+
+.vtc-flow .react-flow__controls-button:hover {
+	background: color-mix(in srgb, var(--vtc-flow) 12%, var(--vtc-card-solid));
+	fill: var(--vtc-title);
+}
+
+.vtc-flow .react-flow__selection {
+	background: color-mix(in srgb, var(--vtc-flow) 8%, transparent);
+	border: 1px dashed var(--vtc-flow);
+}

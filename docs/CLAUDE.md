@@ -93,7 +93,7 @@ fichier-ci reste l'autorité sur les règles.
 | Architecture frontend | [frontend-architecture.md](architecture/frontend-architecture.md) | Stores, activité de fond et barre latérale, agents, profils, terminaux, liens d'auth. |
 | Panneau de tâche | [frontend-task-panel.md](architecture/frontend-task-panel.md) | Progression (`shared/progress.ts`), onglets Avancement / Qualité / Coûts et contexte, bannière « ce qui vous attend », critères d'acceptation, graphe des changements. |
 | Moteur de tâche et LLM de page | [task-engine.md](architecture/task-engine.md) | Une tâche possède son provider × LLM × effort par phase ; une page résout le sien par `page-llm.ts`. |
-| Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque. |
+| Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque ; canvas en graphe de nœuds, briques personnalisées, explications des interactions, thèmes de couleurs. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |
 | Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées par moteur depuis le commit d'avant, jugées par les tests du commit d'arrivée (F2P/P2P) ; recommande par type de carte le moteur le moins cher proche du meilleur, jamais appliqué seul ; une règle candidate se mesure sans et avec elle, une régression suffit à la déconseiller. |

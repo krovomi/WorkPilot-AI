@@ -10,7 +10,7 @@
  * tested and reused from anywhere.
  */
 
-import type { Lang } from "./architecture-connections";
+import { explainConnection, type Lang } from "./architecture-connections";
 
 export interface DiagramNodeInput {
 	id: string;
@@ -18,13 +18,21 @@ export interface DiagramNodeInput {
 		label?: string;
 		type?: string;
 		framework?: string;
+		/** The small uppercase role written above the name, when the person set one. */
+		kicker?: string;
+		/** What a custom brick does, as its author described it. */
+		description?: string;
 	};
 }
 
 export interface DiagramEdgeInput {
 	source: string;
 	target: string;
-	data?: { label?: string };
+	data?: {
+		label?: string;
+		/** The sentence the person wrote between the two blocks, if any. */
+		description?: string;
+	};
 }
 
 export type DiagramKind = "flowchart" | "architecture" | "mockup" | string;
@@ -47,6 +55,7 @@ const ROLE_BY_TYPE: Record<Lang, Record<string, string>> = {
 	en: {
 		frontend: "Frontend UI",
 		desktop: "Desktop application",
+		mobile: "Mobile application",
 		backend: "Backend service",
 		database: "Database",
 		api: "API layer",
@@ -69,6 +78,7 @@ const ROLE_BY_TYPE: Record<Lang, Record<string, string>> = {
 	fr: {
 		frontend: "UI Frontend",
 		desktop: "Application desktop",
+		mobile: "Application mobile",
 		backend: "Service backend",
 		database: "Base de données",
 		api: "Couche API",
@@ -117,6 +127,7 @@ interface SpecStrings {
 	reqFeBe: string;
 	reqFeOnly: string;
 	reqDesktop: string;
+	reqMobile: string;
 	reqDb: string;
 	reqAuth: string;
 	reqReadme: string;
@@ -160,6 +171,8 @@ const STRINGS: Record<Lang, SpecStrings> = {
 			"Provide a runnable frontend app with a dev server and build script.",
 		reqDesktop:
 			"Package the desktop client as a distributable app (installer / MSI / setup) for the stated framework and platform; include build, run and packaging instructions.",
+		reqMobile:
+			"Deliver the mobile app as a runnable project for the stated framework (iOS and/or Android), with build and run instructions; read the API base URL from configuration.",
 		reqDb:
 			"Include the database schema and migrations; read connection settings from environment variables (no hard-coded secrets).",
 		reqAuth:
@@ -205,6 +218,8 @@ const STRINGS: Record<Lang, SpecStrings> = {
 			"Fournir une application frontend exécutable avec un serveur de dev et un script de build.",
 		reqDesktop:
 			"Empaqueter le client lourd en application distribuable (installeur / MSI / setup) pour le framework et la plateforme indiqués ; inclure les instructions de build, d'exécution et de packaging.",
+		reqMobile:
+			"Livrer l'application mobile comme un projet exécutable pour le framework indiqué (iOS et/ou Android), avec les instructions de build et d'exécution ; lire l'URL de base de l'API depuis la configuration.",
 		reqDb:
 			"Inclure le schéma de base de données et les migrations ; lire la configuration de connexion depuis des variables d'environnement (aucun secret en dur).",
 		reqAuth:
@@ -255,6 +270,11 @@ function roleFor(type: string | undefined, lang: Lang): string {
 	);
 }
 
+/** A table cell: a pipe or a line break would split the row it sits in. */
+function cell(text: string): string {
+	return text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+}
+
 function kindLabel(kind: DiagramKind, s: SpecStrings): string {
 	if (kind === "architecture") return s.kindArchitecture;
 	if (kind === "mockup") return s.kindMockup;
@@ -282,14 +302,17 @@ export function buildArchitectureSpec(
 	const hasHttpBackend = [...types].some((t) => HTTP_BACKEND_TYPES.has(t));
 	const hasFrontend = types.has("frontend");
 	const hasDesktop = types.has("desktop");
+	const hasMobile = types.has("mobile");
 	const hasDatabase = types.has("database");
 	const hasAuth = types.has("auth");
 
 	// ── Components table ────────────────────────────────────────────────
 	const componentRows = nodes
 		.map((n) => {
-			const stack = n.data?.framework?.trim() || "—";
-			return `| ${nodeName(n, s)} | ${roleFor(n.data?.type, lang)} | ${stack} |`;
+			const stack = cell(n.data?.framework?.trim() || "—");
+			const role = n.data?.kicker?.trim() || roleFor(n.data?.type, lang);
+			const what = n.data?.description?.trim();
+			return `| ${cell(nodeName(n, s))} | ${cell(what ? `${role} — ${what}` : role)} | ${stack} |`;
 		})
 		.join("\n");
 
@@ -300,7 +323,16 @@ export function buildArchitectureSpec(
 			const tgt = byId.get(e.target);
 			if (!src || !tgt) return null;
 			const rel = e.data?.label?.trim();
-			return `- **${nodeName(src, s)}** → **${nodeName(tgt, s)}**${rel ? ` (${rel})` : ""}`;
+			const why =
+				e.data?.description?.trim() ||
+				explainConnection(
+					src.data?.type,
+					tgt.data?.type,
+					nodeName(src, s),
+					nodeName(tgt, s),
+					lang,
+				);
+			return `- **${nodeName(src, s)}** → **${nodeName(tgt, s)}**${rel ? ` (${rel})` : ""} — ${why}`;
 		})
 		.filter((l): l is string => l !== null)
 		.join("\n");
@@ -310,12 +342,13 @@ export function buildArchitectureSpec(
 	if (hasHttpBackend) {
 		reqs.push(s.reqHttp1, s.reqHttp2, s.reqHttp3);
 	}
-	if (hasFrontend && hasHttpBackend) {
+	if ((hasFrontend || hasMobile) && hasHttpBackend) {
 		reqs.push(s.reqFeBe);
 	} else if (hasFrontend) {
 		reqs.push(s.reqFeOnly);
 	}
 	if (hasDesktop) reqs.push(s.reqDesktop);
+	if (hasMobile) reqs.push(s.reqMobile);
 	if (hasDatabase) reqs.push(s.reqDb);
 	if (hasAuth) reqs.push(s.reqAuth);
 	reqs.push(s.reqReadme, s.reqFlows);

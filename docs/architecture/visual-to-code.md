@@ -76,3 +76,62 @@ correction : sur le rendu où le document actif change, le miroir s'exécute ave
 le *nouvel* id et les *anciens* blocs. Une ref posée par le chargeur dans le
 même commit se lirait déjà à jour, et le miroir écrirait les blocs d'un
 document dans un autre.
+
+## Le canvas en graphe de nœuds (`flow-canvas.css`, `FlowCard`, `DefaultEdge`)
+
+Le canvas se dessine comme un graphe de nœuds : chaque bloc est une carte
+(`FlowCard`) avec son rôle en petites capitales, dans sa couleur, au-dessus de
+son nom ; les connexions sont des courbes (Bézier, plus des marches) avec un
+halo, un trait et une lumière qui court dans le sens de l'interaction.
+
+**Des jetons, pas le thème de l'app.** Tout se dessine depuis quelques
+variables `--vtc-*` posées sur `.vtc-flow`. Le reste (cœur du trait, lumière,
+lueur d'angle, texte secondaire) en est *dérivé* par `color-mix` dans la feuille :
+une couleur de connecteur choisie recolore tout ce qui lui appartient. Ces
+dérivées sont redéclarées sur `.vtc-tint`, parce qu'une propriété personnalisée
+se calcule là où elle est déclarée : un fil qui a sa propre couleur doit
+recalculer son cœur sur le fil.
+
+**Le fichier redéclare l'ordre des couches** (`@layer theme, base, components,
+utilities`). Il peut être chargé avant `globals.css` ; une couche nommée avant
+celles de Tailwind passerait sous sa remise à zéro (cartes sans marge ni
+bordure). Les règles qui surchargent ReactFlow sont hors couche : sa feuille
+n'est pas dans une couche et gagnerait à toute spécificité.
+
+**Thèmes par architecture** (`lib/canvas-themes.ts`, `CanvasThemePicker`). Un
+thème est un préréglage plus les couleurs choisies à la main, qui gagnent ; il
+est rangé sur l'architecture (`theme`), donc chaque document garde son allure.
+Seules des couleurs `#rrggbb` sont gardées (`normalizeCanvasTheme`) : la valeur
+finit dans un attribut `style`. Le préréglage « Thème de l'app » emprunte les
+variables du thème de couleurs actif.
+
+## Les briques personnalisées (`lib/custom-bricks.ts`, `stores/custom-bricks-store.ts`)
+
+Une brique est un bloc que la personne s'est fait : nom, rôle affiché, couleur,
+icône, technologie, description. C'est une **bibliothèque**, pas une partie
+d'une architecture : la palette de toutes les architectures la propose. Store
+séparé, parce que celui des architectures se re-rend à chaque fichier d'une
+génération.
+
+**Un bloc porte une copie de l'allure de sa brique**, pour qu'un diagramme
+exporté, partagé ou dont la brique a été supprimée reste lisible.
+`applyBricks` rafraîchit cette copie tant que la brique existe : c'est ce qui
+est dessiné, mis dans la spec, généré et exporté (`liveNodes`). Le nom et la
+technologie d'un bloc restent les siens. Tout ce qui revient du stockage
+repasse par `normalizeBrick` (nom requis, longueurs bornées, icône connue,
+couleur hexadécimale).
+
+## Les explications des interactions (`explainConnection`)
+
+Chaque connexion porte sa relation (« lit / écrit ») et une phrase. La phrase
+est écrite par le canvas depuis les deux blocs (`EXPLAIN` dans
+`architecture-connections.ts`, une par relation, testé) **tant que la personne
+n'a pas écrit la sienne** (`data.description`). Garder la phrase automatique
+comme texte figerait les noms : renommer un bloc ne la mettrait plus à jour.
+C'est pourquoi l'éditeur ne stocke un texte que s'il diffère de l'automatique,
+et qu'un texte vidé revient à l'automatique. Les deux partent dans la
+spécification de build, une ligne par connexion.
+
+**Écart de colonnes de 520 px** (`canvas-layout.ts`) : une carte (jusqu'à
+280 px) plus la phrase posée sur ses fils (jusqu'à 240 px) ; plus serré, la
+phrase tombe sur la carte suivante.

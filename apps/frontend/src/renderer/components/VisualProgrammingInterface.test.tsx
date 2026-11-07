@@ -202,6 +202,7 @@ vi.mock("@/stores/visual-to-code-store", () => {
 	};
 });
 
+import { useCustomBricksStore } from "../stores/custom-bricks-store";
 import { CanvasPanel } from "./visual-to-code/CanvasPanel";
 
 describe("CanvasPanel", () => {
@@ -462,6 +463,42 @@ describe("CanvasPanel", () => {
 
 		fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
 		expect(await screen.findByText("1 blocks")).toBeInTheDocument();
+	});
+
+	it("places one of the person's own bricks from the palette, with its look", async () => {
+		useCustomBricksStore.setState({
+			bricks: [
+				{
+					id: "brick-hermes",
+					name: "Hermes",
+					kicker: "Main agent",
+					accent: "#f97316",
+					icon: "bot",
+					description: "",
+					stack: "",
+				},
+			],
+		});
+		render(<CanvasPanel />);
+		fireEvent.click(screen.getByRole("button", { name: /Hermes/ }));
+		expect(await screen.findByText("2 blocks")).toBeInTheDocument();
+		await waitFor(() =>
+			expect(storeState.updateArchitecture).toHaveBeenCalledWith(
+				"arch-1",
+				expect.objectContaining({
+					nodes: expect.arrayContaining([
+						expect.objectContaining({
+							data: expect.objectContaining({
+								label: "Hermes",
+								brickId: "brick-hermes",
+								kicker: "Main agent",
+							}),
+						}),
+					]),
+				}),
+			),
+		);
+		useCustomBricksStore.setState({ bricks: [] });
 	});
 
 	it("filters the palette by translated label", () => {
