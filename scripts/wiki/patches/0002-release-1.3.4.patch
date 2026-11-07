@@ -1,0 +1,493 @@
+From 5b23bb6c936f26bc1f6ab97d80f3d099b763e02a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 10:27:58 +0000
+Subject: [PATCH] =?UTF-8?q?docs(wiki):=201.3.4=20=E2=80=94=20what's=20new,?=
+ =?UTF-8?q?=20roadmap,=20server=20mode,=20mobile=20app,=20steering,=20gate?=
+ =?UTF-8?q?s,=20security?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Advanced-Features.fr.md  | 124 +++++++++++++++++++++++++++++++++++++--
+ Customization.fr.md      |  22 ++++---
+ Home.md                  |   4 +-
+ Roadmap.fr.md            |  53 ++++++++++++++++-
+ Roadmap.md               |  27 ++++++++-
+ Security.fr.md           |  61 ++++++++++++++++++-
+ Specialized-Agents.fr.md |  13 ++--
+ User-Interface.fr.md     |   7 +++
+ User-Interface.md        |   6 ++
+ 9 files changed, 290 insertions(+), 27 deletions(-)
+
+diff --git a/Advanced-Features.fr.md b/Advanced-Features.fr.md
+index 589d564..17ab715 100644
+--- a/Advanced-Features.fr.md
++++ b/Advanced-Features.fr.md
+@@ -215,6 +215,19 @@ Parfait pour démarrer depuis un design Figma ou un mockup papier.
+ 
+ ---
+ 
++## 🧩 Visuel vers Code (1.3.4)
++
++Dessinez une **architecture** en graphe de nœuds, puis faites-la construire :
++- Chaque bloc est une carte (rôle, nom, technologie), reliée aux autres par des connecteurs qui
++  portent leur relation et une phrase écrite d'après les deux blocs, modifiable
++- **Mes briques** : vos propres blocs (nom, rôle, couleur, icône, technologie, description),
++  réutilisables dans toutes les architectures ; leur description part dans la spec de build
++- Huit thèmes de canvas, et chaque couleur réglable à la main
++- Toutes les stacks, dont un bloc « Application mobile » (Flutter, React Native, Swift, Kotlin,
++  .NET MAUI, Ionic), Nuxt, Tauri, FastAPI, Quarkus, Ktor, Laravel, Symfony, Ruby on Rails
++
++---
++
+ ## 🏆 Prompt Optimizer
+ 
+ **Analyse et améliore vos prompts** pour obtenir de meilleurs résultats IA.
+@@ -264,6 +277,8 @@ Système d'**apprentissage analytique** continu :
+ - Identifie les patterns de réussite/échec
+ - Ajuste les prompts et les choix de modèles
+ - Produit des rapports périodiques (« votre QA échoue 3× plus sur les features touchant la DB — pensez à enrichir le contexte »)
++- **Règles apprises des revues** (1.3.4) : un commentaire de revue que le suivi de PR a corrigé, ou le retour donné en rejetant un plan, devient une règle candidate ; une fois adoptée dans votre formulation, chaque phase des builds suivants la reçoit
++- Une règle candidate se **mesure sur le banc de rejeu** avant d'être adoptée : chaque moteur rejoue vos cartes sans elle puis avec elle, et une seule régression suffit à la déconseiller
+ 
+ ---
+ 
+@@ -315,11 +330,12 @@ Estime l'**énergie consommée (kWh)** et l'**empreinte carbone** de vos exécut
+ 
+ ## 🩺 Flaky Test Detective
+ 
+-Analyse les **rapports de tests** pour repérer les tests **instables** (qui passent puis échouent sans changement de code).
++Exécute la suite de tests du projet plusieurs fois et repère les tests **instables** (qui passent puis échouent sans changement de code).
+ 
+-- Parseurs multi-formats : **JUnit XML** et **.NET TRX** (dispatch selon la racine du rapport)
+-- Détecte le langage du projet et propose la **bonne commande** de test quand aucun rapport n'est trouvé
+-- Ignore les tests non exécutés, normalise les durées
++- Détecte la commande de test (.NET, pytest, Vitest, Jest avec jest-junit, Maven, Gradle, Go) et l'exécute le nombre de fois choisi, avec la sortie TRX ou JUnit (1.3.4)
++- Montre chaque exécution pendant qu'elle tourne et garde les rapports dans `.workpilot/flaky-tests/`
++- Lit aussi les rapports **JUnit XML** et **.NET TRX** déjà présents ; liste à part les tests qui échouent à chaque exécution
++- Un projet du serveur exécute ses tests sur le serveur
+ 
+ ---
+ 
+@@ -337,7 +353,105 @@ Déployez WorkPilot AI de façon **centralisée** pour une équipe :
+ - **Inscription sur invitation** : modèle d'invitation, envoi SMTP, acceptation publique rate-limitée
+ - Portail d'administration des invitations
+ 
+-Activé via `WORKPILOT_SERVER_MODE`.
++Depuis la 1.3.4, **toutes les features sont partagées** sur un projet du serveur, et ce qu'une
++personne ajoute, modifie ou supprime est visible des autres en direct : tableau, Roadmap,
++Idéation, Insights, contexte du projet, changelog, analyses, issues et pull requests GitHub,
++issues et merge requests GitLab, revues IA, automatisations. Les organisations sont isolées ;
++rôles et permissions, groupes d'utilisateurs et administrateurs règlent qui fait quoi. Chacun
++pose ses propres jetons. Les runs tournent sur le serveur, chacun confiné à son projet.
++
++**Collaboration d'équipe** : la barre du tableau montre qui est sur le projet et ouvre un chat
++d'équipe (réponses, recherche, mentions `@nom`) ; une carte prise porte le nom de la personne, et
++une modification qui croise celle d'un coéquipier propose les deux versions au lieu d'écraser.
++
++**Le Kanban dans vos autres apps d'IA** : le serveur MCP `workpilot-board` répond aussi en HTTP
++(`<serveur>/mcp`) avec un jeton d'accès personnel créé dans Réglages → Accès MCP au serveur.
++
++Activé via `WORKPILOT_SERVER_MODE`. Guide d'exploitation (déploiement, TLS, sauvegarde, mise à
++jour, quotas, audit) : [`docs/server-operations.md`](https://github.com/krovomi/WorkPilot-AI/blob/main/docs/server-operations.md).
++
++---
++
++## 📱 App mobile (iOS et Android)
++
++Une app Expo (`apps/mobile`) qui se connecte au serveur d'équipe : on choisit son organisation,
++on ouvre un projet et on suit son Kanban en direct. Depuis le téléphone : créer une carte (moteur,
++images, dictée), lire sa spec et ce que le build a changé, démarrer, approuver ou arrêter une
++phase, approuver un plan depuis sa notification, ouvrir la PR ; tableau de bord, sessions,
++Insights, Roadmap, idées, GitHub et GitLab, contexte, jetons personnels, administration et
++invitations. Le jeton reste dans le Keychain ou le Keystore, l'app peut se verrouiller, et le
++serveur vérifie chaque droit comme pour l'app de bureau.
++
++---
++
++## 🧭 Piloter l'agent pendant qu'il travaille (1.3.4)
++
++- **Guidage** — sans mettre la tâche en pause, un message écrit dans l'onglet Sous-tâches, l'app
++  mobile ou la CLI (`python run.py --spec 001 --steer "…"`, `--steer-subtask` pour viser une
++  sous-tâche) entre dans le prompt de la prochaine session du coder ou du QA fixer ; la tâche dit
++  quelle session l'a reçu.
++- **Pointer un élément** — dans l'onglet Émulateur, « Pointer » active le sélecteur d'éléments des
++  DevTools : cliquez sur un bouton, un titre ou une carte, écrivez quoi changer. La session suivante
++  reçoit l'élément, son image, son chemin dans la page, son style et les fichiers qui le rendent
++  probablement (React, Angular, Vue, Svelte, Blazor, Razor Pages, Twig, Blade, ERB…).
++- **Revue guidée** — le diff sous-tâche par sous-tâche, avec la description du planner comme
++  explication, puis les commits qu'aucune sous-tâche n'a enregistrés et ce qui n'est pas encore
++  commité ; fichiers hors plan, code déplacé et remarques QA signalés. Aucun modèle n'est appelé.
++  Chaque ligne se **commente** : les commentaires ouverts partent au fixer avec « Demander des
++  corrections », et un commentaire est marqué traité quand le diff a changé ses lignes, pas quand
++  le modèle le dit ; vous seul le résolvez.
++- **Tâches empilées** — une tâche qui attend un prérequis part de sa branche ; sa PR ne montre que
++  son propre diff, « Mettre à jour » la rebase, et « Passer sur <base> » la remet sur la base une
++  fois le prérequis fusionné. Avec `gh stack`, les deux PR sont liées en pile.
++- **Point périodique** — avec `WORKPILOT_TASK_DIGEST_HOURS`, un build long envoie un point régulier
++  (sous-tâches terminées, ce qui tourne, ce qui est bloqué et pourquoi) sur les canaux de
++  notification configurés.
++- **Tâches multi-dépôts** — le bouton « Multi-dépôts » du Kanban ordonne les dépôts (bibliothèques
++  et API d'abord), ouvre une carte par dépôt et la lance quand la précédente a passé la QA.
++
++---
++
++## ✅ Prouver avant la PR (1.3.4)
++
++- **`tests-bite`** — une fois la QA approuvée, WorkPilot plante quelques fautes simples dans les
++  seules lignes que la tâche a écrites et lance les tests du fichier muté, sur toutes les stacks
++  (StrykerJS et cargo-mutants quand le projet les a). Une faute que les tests ne voient pas renvoie
++  au QA fixer, qui ne peut alors modifier que des tests.
++- **`deps-exist`** — les paquets ajoutés existent sur leur registre public (voir
++  [Sécurité](Security.fr)).
++- **`proof-checks`** — les vérificateurs déclarés dans `[proofs]` de `.workpilot/worktree.toml`
++  (Dafny, Lean, Verus, F*…) tournent dans le worktree ; une preuve refusée renvoie le fixer.
++- **Recette de worktree** — chaque worktree est préparé pour sa stack avant la première session
++  (`npm ci`, `dotnet restore`, `uv sync`, `go mod download`, `cargo fetch`, composer, bundler,
++  `flutter pub get`, Gradle, Maven…) ; `.workpilot/worktree.toml` ajoute vos étapes, les fichiers
++  ignorés à copier (`.env.local`), un bloc de ports par tâche et un nettoyage.
++- **Revue croisée** — après la QA, un second moteur relit le diff contre la spec ; s'il nomme un
++  problème bloquant, la PR vous attend.
++- **Agent Trace** — quelles lignes l'agent a écrites et avec quel modèle, au format ouvert Agent
++  Trace, quel que soit le fournisseur ; la part de l'IA par fichier et dans le corps de la PR.
++- **Traçabilité des exigences** — à la fin d'un build, chaque exigence `FR-###` de la spec est reliée
++  aux fichiers que ses sous-tâches ont écrits et aux tests qui les couvrent ; le lien reste dans le
++  projet après la fusion, et la carte signale les exigences sans test.
++- **Dossier de provenance** — à la création de la PR, le dossier de la tâche rassemble qui a écrit
++  le code et avec quel modèle, les dépendances ajoutées et leur vérification, un SBOM CycloneDX des
++  paquets ajoutés par le diff, les portes passées et le verdict de vérification ; le corps de la PR
++  en donne le résumé.
++- **Vidéo du scénario et comparaison** — le scénario de vérification est filmé (WebM) et résumé en
++  GIF à joindre à la PR ; l'onglet Vérification rejoue aussi le scénario sur la branche de base
++  puis sur la tâche et liste ce qui se comporte autrement.
++
++---
++
++## 🟣 Migrations .NET, une version à la fois (1.3.4)
++
++Une tâche Kanban qui nomme .NET 9, 10 ou 11 (ou C# 13, 14, 15) reçoit les procédures de migration
++de l'équipe .NET, revues et complétées jusqu'à la RC2 de .NET 11, pour chaque étape entre la
++version du projet et celle demandée, dans l'ordre : le planificateur prévoit une étape par
++version, la QA vérifie la cible. .NET 8 et 9 ne sont plus supportés après le 10 novembre 2026 :
++les procédures le rappellent et visent .NET 10 (LTS) par défaut. Les commandes
++`/migrate-dotnet8-to-dotnet9`, `/migrate-dotnet9-to-dotnet10` et `/migrate-dotnet10-to-dotnet11`
++n'apparaissent que dans les projets concernés ; les projets WPF, WinUI, MAUI et à
++`Directory.Build.props` sont reconnus.
+ 
+ ---
+ 
+diff --git a/Customization.fr.md b/Customization.fr.md
+index cf3ddaf..270ddb5 100644
+--- a/Customization.fr.md
++++ b/Customization.fr.md
+@@ -139,19 +139,23 @@ Quelques raccourcis par défaut (tous personnalisables) :
+ 
+ ---
+ 
+-## 🎙 Voice Control
++## 🎙 Assistant vocal
+ 
+-Pour les mains libres ou l'accessibilité :
++Pour les mains libres ou l'accessibilité (1.3.4) : **Ctrl+Shift+Espace** (⇧⌘Espace sur macOS)
++ouvre, de n'importe où dans l'app, un panneau qui écoute.
+ 
+-**Paramètres → Voice Control → Activer**
++Exemples :
++- « Crée-moi une tâche pour ajouter un export CSV »
++- « Ouvre la fonctionnalité qui me permet de dessiner une architecture »
++- « Ouvre les paramètres »
+ 
+-Exemples de commandes vocales :
+-- « Ouvre une nouvelle tâche pour ajouter l'authentification »
+-- « Mets en pause la tâche numéro 3 »
+-- « Lance la revue QA sur la spec en cours »
+-- « Change de thème »
++La voix est transcrite sur l'ordinateur (Whisper, comme la dictée du Kanban). Les commandes
++simples sont comprises sans modèle, les autres par le modèle « Assistant vocal » de Paramètres →
++Agent, quel que soit le fournisseur. Une tâche n'est créée qu'après confirmation, en local comme
++sur le tableau d'un projet du serveur.
+ 
+-Moteur STT configurable (Whisper local, OpenAI, Azure…).
++**Paramètres → Assistant vocal** : changer le raccourci (les raccourcis existants et Ctrl+Alt, qui
++est AltGr, sont refusés) et le laisser actif quand WorkPilot est en arrière-plan.
+ 
+ ---
+ 
+diff --git a/Home.md b/Home.md
+index 04496af..96ee491 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,9 +6,9 @@
+ 
+ ---
+ 
+-## 🆕 What's new in 1.3.1 / Nouveautés de la 1.3.1
++## 🆕 What's new in 1.3.4 / Nouveautés de la 1.3.4
+ 
+-PR follow-through to merge, goal mode, "needs you" notifications (ntfy, Telegram), OpenTelemetry GenAI traces, Best-of-N, automations (replacing the Continuous AI daemon), ACP agents (Gemini CLI), OS sandbox, MCP 2026 tasks and MCP Apps, repo bench, Windows apps verified through UI Automation, and honest reasoning effort on every provider. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++A team server where every feature is shared, an iOS and Android app, and the agent you can steer: guide a running task, point an element of its preview, review its diff subtask by subtask, stack a task on its prerequisite. New hard gates after QA (invented packages, tests that do not bite, formal proofs), a per-stack worktree recipe, Agent Trace attribution, a proof video and a comparison with the base branch, MCP tool pinning, the Kanban reachable from other AI apps over MCP, and a global voice assistant. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
+ 
+ ---
+ 
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index 3ef1ab2..8e4edf9 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,54 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.3.1 — Stable actuelle (28 octobre 2026)
++### v1.3.4 — Stable actuelle (7 novembre 2026)
++
++*L'équipe partage tout, et l'agent se guide pendant qu'il travaille.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++**Mode serveur complet**
++- Toutes les features partagées sur un projet du serveur : tableau, roadmap, idéation, insights,
++  contexte, changelog, analyses, vues GitHub et GitLab, revues IA, automatisations, à jour en direct
++- Organisations isolées, rôles et permissions, groupes d'utilisateurs, administrateurs ; chaque run
++  ne voit que son projet sur le disque (Landlock) ; jetons de tâche limités à une carte
++- Collaboration d'équipe : présence, chat d'équipe, cartes prises, modifications croisées sans écrasement
++
++**App mobile** (iOS et Android) — le Kanban du serveur, la création et le détail des cartes, les
++runs, l'approbation d'un plan depuis sa notification, le tableau de bord, Insights, roadmap,
++GitHub et GitLab, l'administration et les invitations.
++
++**Piloter l'agent**
++- **Guidage** : un message à l'agent en cours de route, depuis la tâche, le téléphone ou la CLI
++- **Pointer un élément** de l'aperçu de la tâche et dire quoi changer
++- **Revue guidée** : le diff dans l'ordre du plan, sous-tâche par sous-tâche, avec des commentaires
++  de ligne envoyés au fixer
++- **Tâches empilées** sur la branche d'un prérequis, liées avec `gh stack`
++- **Point périodique** des tâches longues sur les canaux de notification
++
++**Prouver**
++- Portes dures après la QA : paquets inventés (`deps-exist`), tests qui ne mordent pas
++  (`tests-bite`), preuves formelles (`proof-checks`)
++- Recette de worktree par stack, et la vôtre dans `.workpilot/worktree.toml`
++- **Agent Trace** : quelles lignes de la PR l'IA a écrites, et un dossier de provenance par PR
++- Traçabilité : chaque exigence reliée à ses fichiers et à ses tests, gardée après la fusion
++- Vidéo du scénario de vérification, GIF dans la PR, comparaison avec la branche de base
++- Revue croisée par un second moteur, règles apprises des revues, moteur recommandé par type de
++  carte, règle candidate mesurée sur le banc
++
++**Sécurité** — épinglage des outils MCP, SBOM et attestation de provenance à chaque release,
++garde d'injection mesuré sur 51 charges, âge des clés d'API.
++
++**Ailleurs** — le Kanban depuis les autres apps d'IA par MCP (Claude Code, Codex, Gemini CLI,
++Copilot, Cursor, Claude Desktop, Windsurf, OpenCode, Hermes), CLI manquants installés en un clic, assistant vocal global (Ctrl+Shift+Espace), Visuel vers Code en graphe de nœuds avec vos briques,
++migrations .NET 8 → 9 → 10 → 11 une version à la fois, Hermes 0.23, profils par défaut sur
++Claude 5.5, interface harmonisée et traduite partout.
++
++### v1.3.2 et v1.3.3 — 28 et 29 octobre 2026
++
++L'application démarre de nouveau (1.3.2), la reconnexion Claude tient sous Linux et WSL (1.3.3),
++et le wiki suit chaque release.
++
++### v1.3.1 — 28 octobre 2026
+ 
+ *La carte va jusqu'au bout, et l'effort annoncé est celui reçu.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+@@ -121,9 +168,9 @@ et 150 correctifs depuis la 1.0.0. Détail complet dans le
+ - Plugin **Neovim** pour les fans du clavier
+ 
+ ### Voice Control avancé
+-- Commandes vocales contextuelles
++- ✅ Assistant vocal global avec STT local (Whisper), livré en 1.3.4
+ - Dictée de specs en langage naturel
+-- STT local (Whisper) et cloud
++- STT cloud
+ 
+ ### Collaboration multi-utilisateurs
+ - Sessions partagées en équipe sur une même instance
+diff --git a/Roadmap.md b/Roadmap.md
+index 66dfa5b..ba6a531 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -29,7 +29,32 @@ WorkPilot marks any sidebar view that lacks both a design-rationale document and
+ 
+ ## Recent releases
+ 
+-### v1.3.1 — current stable (October 28, 2026)
++### v1.3.4 — current stable (November 7, 2026)
++
++- **Team server, every feature shared**: board, roadmap, ideation, insights, context, changelog, analyses, GitHub and GitLab views, AI reviews and automations, live for everyone; organisations isolated, roles, groups and admins; each run sees only its own project
++- **Mobile app** (iOS, Android) for the team server: board, cards, runs, plan approval from a notification, dashboard, insights, roadmap, GitHub and GitLab, admin
++- **Steering**: guide the agent while it works, from the task, the phone or the CLI
++- **Point and change**: click an element of the task preview and say what to change
++- **Guided review**: the diff in the order of the plan, subtask by subtask, with line comments sent to the fixer
++- **Stacked tasks** on a prerequisite's branch, linked with `gh stack`
++- **Hard gates after QA**: invented packages (`deps-exist`), tests that do not bite (`tests-bite`), formal proofs (`proof-checks`)
++- **Worktree recipe** per stack, and your own in `.workpilot/worktree.toml`
++- **Agent Trace**: which lines of the PR the AI wrote, and a provenance dossier per PR (SBOM of added packages, gates, verdict)
++- **Requirement traceability**: each requirement linked to its files and tests, kept after the merge
++- **Proof video**, walkthrough GIF in the PR, and a comparison with the base branch
++- **MCP tool pinning** against hidden instructions and tool swaps
++- **Board over MCP** for Claude Code, Codex, Gemini CLI, Copilot, Cursor, Claude Desktop, Windsurf, OpenCode and Hermes
++- **Cross review** by a second engine, review lessons as project rules, engine recommended per kind of card, candidate rules measured on the bench
++- **.NET upgrades** 8 → 9 → 10 → 11, one release at a time; Hermes 0.23
++- **Visual to Code** as a node graph, with your own bricks and interaction texts
++- **Voice assistant** from anywhere (Ctrl+Shift+Space), transcribed locally
++- Default profiles on Claude 5.5; release SBOM and provenance attestation
++
++### v1.3.2 and v1.3.3 — October 28-29, 2026
++
++The app starts again (1.3.2), the Claude reconnection holds on Linux and WSL (1.3.3), and the wiki follows each release.
++
++### v1.3.1 — October 28, 2026
+ 
+ - **PR follow-through**: the card keeps driving its PR to merge (red checks and review threads go to the QA fixer; the merge stays human)
+ - **Goal mode**: a command and its exit code decide when a task is done
+diff --git a/Security.fr.md b/Security.fr.md
+index 4ed9d05..991974b 100644
+--- a/Security.fr.md
++++ b/Security.fr.md
+@@ -141,6 +141,60 @@ Seule la page de l'application atteint un handler IPC ; un chemin reçu de l'int
+ dans un projet enregistré ou un dossier choisi dans une boîte de dialogue, et un chemin d'outil ou
+ du backend saisi dans les réglages est vérifié avant d'être exécuté.
+ 
++### Âge des clés d'API (1.3.4)
++Réglages > Comptes dit depuis quand chaque clé d'API est enregistrée et suggère de la renouveler
++après 90 jours. Une clé enregistrée avant la 1.3.4 reste « date inconnue ».
++
++---
++
++## 🧩 Ce que l'agent ajoute et ce qu'il lit (1.3.4)
++
++### Garde contre les paquets inventés
++Un agent peut ajouter une dépendance qui n'existe pas, et quelqu'un peut la publier ensuite pour
++faire installer son code (*slopsquatting*). Après l'approbation de la QA, la porte `deps-exist`
++cherche chaque paquet ajouté à un manifeste sur son registre public (npm, PyPI, NuGet,
++Maven/Gradle, Cargo, Go, Composer, pub, RubyGems). Un paquet inconnu renvoie le QA fixer le
++remplacer ; un nom à une frappe d'un paquet populaire avertit. Un flux privé déclaré, un registre
++qui ne répond pas ou le mode hors-ligne strict donnent « inconnu », jamais un blocage.
++`WORKPILOT_DEPENDENCY_GUARD=0` coupe la garde.
++
++### Épinglage des outils MCP
++La description d'un outil MCP est lue par le modèle et jamais montrée : un serveur peut y cacher
++des instructions, ou changer ses outils après coup. Les outils de chaque serveur MCP personnalisé
++sont épinglés par l'empreinte de ce que lit le modèle. Un outil ajouté ou une description modifiée
++attend votre approbation dans Outils des agents → serveurs MCP, l'ancienne description à côté de
++la nouvelle ; une description qui ressemble à une consigne cachée demande une confirmation
++explicite. Les agents ne peuvent pas écrire `.workpilot/mcp-pins.json`.
++
++### Contenu externe
++Le garde d'injection est mesuré sur 51 charges connues, rejouées en CI : une issue, une PR ou un
++commentaire de revue qui s'adresse à l'agent, lui demande un secret, un push sans revue ou un
++script distant, ou cache sa consigne (lettres espacées, caractères d'aspect latin, octets
++échappés) est signalé dans le journal de la spec. Ce que pointe la fonction « Pointer » dans
++l'aperçu d'une tâche part comme une donnée, jamais comme une consigne, et aucun script n'est
++ajouté à la page.
++
++### Recettes exécutées
++Une recette de worktree (`.workpilot/worktree.toml`) ou un vérificateur de preuves ne tourne
++qu'une fois approuvé tel quel dans Réglages du projet, depuis le projet et jamais depuis la
++branche de la tâche ; les commandes sont des listes d'arguments, sans shell. Les agents ne
++peuvent pas modifier la recette.
++
++---
++
++## 🏢 Mode serveur (1.3.4)
++
++- Un canal du flux en direct ne s'ouvre qu'aux membres de son projet, dans leur organisation ;
++  le jeton d'un run n'ouvre que le canal de ce run.
++- Un run démarre avec un environnement construit : aucune variable propre au serveur (clé des
++  jetons, clé des secrets, base de données, mail) n'arrive à un agent.
++- Chaque run est confiné par Landlock à son clone, au dossier de son projet et à son dossier
++  temporaire (Linux 5.13 ou plus ; `WORKPILOT_RUN_ISOLATION=off` pour un déploiement où chacun
++  peut tout lire).
++- Un jeton de tâche n'atteint que le projet de sa carte, ne modifie que cette carte, dure quelques
++  heures et est révoqué dès que la carte est terminée ; les écritures faites par `/mcp` sont
++  inscrites dans l'audit avec la tâche qui les a faites.
++
+ ---
+ 
+ ## 🧱 Isolation par worktree
+@@ -170,17 +224,20 @@ mon-projet/
+ Toutes les releases publiées sur GitHub incluent :
+ 
+ - **Checksums SHA256** pour vérifier l'intégrité des binaires téléchargés
++- **SBOM CycloneDX** (`workpilot-sbom.cdx.json`) : les paquets npm et Python de la version (1.3.4)
++- **Attestation de provenance** pour chaque fichier publié :
++  `gh attestation verify <fichier> --repo krovomi/WorkPilot-AI` (1.3.4)
+ - **Scans VirusTotal** publiés en commentaire de release
+ - **Builds reproductibles** (dans la mesure où les toolchains le permettent)
+ 
+ ### Vérifier un téléchargement
+ ```bash
+ # Linux/macOS
+-sha256sum WorkPilot-AI-1.1.0-linux-x86_64.AppImage
++sha256sum WorkPilot-AI-1.3.4-linux-x86_64.AppImage
+ # Comparer avec la valeur publiée sur la page de release
+ 
+ # Windows PowerShell
+-Get-FileHash WorkPilot-AI-1.1.0-win32-x64.exe -Algorithm SHA256
++Get-FileHash WorkPilot-AI-1.3.4-win32-x64.exe -Algorithm SHA256
+ ```
+ 
+ ---
+diff --git a/Specialized-Agents.fr.md b/Specialized-Agents.fr.md
+index b4d9aca..d85689a 100644
+--- a/Specialized-Agents.fr.md
++++ b/Specialized-Agents.fr.md
+@@ -286,12 +286,15 @@ Permet de **comparer plusieurs modèles IA** côte à côte sur la même tâche.
+ 
+ ---
+ 
+-## 🎙 Voice Control
++## 🎙 Assistant vocal
+ 
+-Contrôle **mains libres** de l'application via speech-to-text :
+-- « Crée une tâche pour ajouter l'authentification »
+-- « Ouvre un terminal »
+-- « Mets en pause la tâche 003 »
++**Ctrl+Shift+Espace** ouvre un panneau qui écoute, de partout dans l'app (1.3.4) :
++- « Crée-moi une tâche pour ajouter un export CSV » (créée après confirmation)
++- « Ouvre la fonctionnalité qui me permet de dessiner une architecture »
++- « Ouvre les paramètres »
++
++Transcription locale (Whisper) ; commandes simples sans modèle, les autres par le modèle choisi
++dans Paramètres → Agent. Détail dans [Personnalisation](Customization.fr).
+ 
+ ---
+ 
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 3e256f7..9f0880a 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -25,6 +25,13 @@ Le menu latéral donne accès à toutes les fonctionnalités. Voici les plus imp
+ | **Agent Debugger / Replay** | Points d'arrêt live + rejeu pas-à-pas des sessions |
+ | **Settings** | Fournisseurs IA, intégrations, préférences |
+ 
++Depuis la 1.3.4, les vues qui se recoupent sont regroupées en **hubs à onglets** (historique des
++agents, coûts et estimation, outils MCP, contexte du projet, impact et historique Git, docs et
++dérive, dette et refactoring, arène) : aucune vue n'est retirée, une vue ouverte par la palette de
++commandes ou une notification s'ouvre dans son hub, sur son onglet. Sur un serveur d'équipe,
++l'[app mobile](Advanced-Features.fr#-app-mobile-ios-et-android) suit le même Kanban depuis
++iPhone et Android.
++
+ ---
+ 
+ ## 📋 Kanban Board
+diff --git a/User-Interface.md b/User-Interface.md
+index 0f1dd4a..c286f61 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -21,6 +21,12 @@ The sidebar gives access to all features. Here are the most important ones for a
+ | **Analytics** | Cost, consumption, execution time |
+ | **Settings** | AI providers, integrations, preferences |
+ 
++Since 1.3.4, views that overlap are grouped into **tabbed hubs** (agent history, costs and
++estimation, MCP tools, project context, Git impact and history, docs and drift, debt and
++refactoring, arena): no view is removed, and a view opened from the command palette or a
++notification opens in its hub, on its tab. On a team server, the iOS and Android app follows the
++same Kanban from your phone.
++
+ ---
+ 
+ ## 📋 Kanban Board
+-- 
+2.43.0
+

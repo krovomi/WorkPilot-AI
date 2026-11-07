@@ -1,4 +1,4 @@
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, Pencil, Plus, Search, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,8 +7,14 @@ import {
 	type BlockMeta,
 	filterBlocks,
 } from "../lib/architecture-blocks";
-
+import {
+	BRICK_DRAG_PREFIX,
+	type CustomBrick,
+	resolveLook,
+} from "../lib/custom-bricks";
+import { useCustomBricksStore } from "../stores/custom-bricks-store";
 import { Input } from "./ui/input";
+import { BrickEditorDialog } from "./visual-to-code/BrickEditorDialog";
 interface PaletteProps {
 	compact?: boolean;
 	/**
@@ -33,14 +39,29 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 	const { t } = useTranslation("visualProgramming");
 	const [query, setQuery] = useState("");
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+	const bricks = useCustomBricksStore((s) => s.bricks);
+	const [editor, setEditor] = useState<{
+		open: boolean;
+		brick: CustomBrick | null;
+	}>({ open: false, brick: null });
+	const shownBricks = useMemo(() => {
+		const q = query.trim().toLowerCase();
+		if (!q) return bricks;
+		return bricks.filter((b) =>
+			[b.name, b.kicker, b.description].some((v) =>
+				v.toLowerCase().includes(q),
+			),
+		);
+	}, [bricks, query]);
 
 	const categories = useMemo(
 		() => filterBlocks(query, (key) => t(key, key)),
 		[query, t],
 	);
 	const total = useMemo(
-		() => categories.reduce((n, c) => n + c.blocks.length, 0),
-		[categories],
+		() =>
+			categories.reduce((n, c) => n + c.blocks.length, 0) + shownBricks.length,
+		[categories, shownBricks],
 	);
 
 	const toggle = (key: string) =>
@@ -90,6 +111,62 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 		);
 	};
 
+	/**
+	 * The person's own bricks, above the catalogue: they are what this person
+	 * reaches for, and the catalogue is the same for everyone.
+	 */
+	const renderBrick = (brick: CustomBrick) => {
+		const look = resolveLook({ type: "custom", ...brick });
+		const Icon = look.icon;
+		const type = `${BRICK_DRAG_PREFIX}${brick.id}`;
+		return (
+			<div key={brick.id} className="group relative">
+				<button
+					type="button"
+					draggable
+					onDragStart={(e) => handleDragStart(e, type)}
+					onClick={() => onAddBlock?.(type)}
+					title={brick.description || brick.name}
+					className="flex w-full items-center gap-2.5 rounded-md border border-transparent bg-card/40 px-2 py-1.5 pr-7 text-left text-xs transition-colors hover:border-border hover:bg-accent/60 active:cursor-grabbing cursor-grab"
+				>
+					<span
+						className="flex h-6 w-6 shrink-0 items-center justify-center rounded"
+						style={{
+							backgroundColor: `color-mix(in srgb, ${look.accent} 18%, transparent)`,
+							color: look.accent,
+						}}
+					>
+						<Icon className="h-3.5 w-3.5" />
+					</span>
+					<span className="min-w-0 flex-1">
+						<span className="block truncate font-medium text-foreground">
+							{brick.name}
+						</span>
+						{brick.kicker ? (
+							<span
+								className="block truncate font-mono text-3xs uppercase tracking-wide"
+								style={{ color: look.accent }}
+							>
+								{brick.kicker}
+							</span>
+						) : null}
+					</span>
+				</button>
+				<button
+					type="button"
+					onClick={() => setEditor({ open: true, brick })}
+					title={t("brickEditTitle", "Modifier la brique")}
+					aria-label={t("brickEditTitle", "Modifier la brique")}
+					className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+				>
+					<Pencil className="h-3 w-3" />
+				</button>
+			</div>
+		);
+	};
+
+	const myBricksOpen = query ? true : !collapsed.myBricks;
+
 	return (
 		<div className="flex h-full w-full flex-col gap-2 text-foreground">
 			<div className="px-1">
@@ -123,7 +200,52 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 			</div>
 
 			<div className="flex-1 overflow-y-auto pr-0.5">
-				{categories.length === 0 ? (
+				<div className="mb-1.5">
+					<div className="flex items-center">
+						<button
+							type="button"
+							onClick={() => toggle("myBricks")}
+							aria-expanded={myBricksOpen}
+							className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-3xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+						>
+							<ChevronRight
+								className={`h-3 w-3 shrink-0 transition-transform ${myBricksOpen ? "rotate-90" : ""}`}
+							/>
+							<span className="truncate">{t("myBricks", "Mes briques")}</span>
+							<span className="ml-auto tabular-nums opacity-60">
+								{shownBricks.length}
+							</span>
+						</button>
+						<button
+							type="button"
+							onClick={() => setEditor({ open: true, brick: null })}
+							title={t("brickCreateTitle", "Nouvelle brique")}
+							aria-label={t("brickCreateTitle", "Nouvelle brique")}
+							className="ml-1 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+						>
+							<Plus className="h-3.5 w-3.5" />
+						</button>
+					</div>
+					{myBricksOpen ? (
+						<div className="mt-0.5 flex flex-col gap-0.5 pl-1">
+							{shownBricks.map(renderBrick)}
+							{bricks.length === 0 ? (
+								<button
+									type="button"
+									onClick={() => setEditor({ open: true, brick: null })}
+									className="flex items-center gap-2 rounded-md border border-dashed px-2 py-2 text-left text-3xs leading-snug text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+								>
+									<Plus className="h-3.5 w-3.5 shrink-0" />
+									{t(
+										"myBricksEmpty",
+										"Créez vos propres briques : un agent, un moteur métier, un système existant…",
+									)}
+								</button>
+							) : null}
+						</div>
+					) : null}
+				</div>
+				{categories.length === 0 && shownBricks.length === 0 ? (
 					<p className="px-2 py-6 text-center text-xs text-muted-foreground">
 						{t("noBlockMatch", "Aucun bloc ne correspond.")}
 					</p>
@@ -162,6 +284,11 @@ export const VisualProgrammingPalette: React.FC<PaletteProps> = ({
 			<p className="shrink-0 border-t px-1 pt-2 text-3xs leading-snug text-muted-foreground">
 				{t("paletteHint", "Glissez un bloc sur le canvas, ou cliquez-le.")}
 			</p>
+			<BrickEditorDialog
+				open={editor.open}
+				brick={editor.brick}
+				onOpenChange={(open) => setEditor((e) => ({ ...e, open }))}
+			/>
 		</div>
 	);
 };

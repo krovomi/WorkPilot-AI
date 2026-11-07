@@ -6,6 +6,7 @@ import type {
 	GeneratedFile,
 	GenerateCodeResult,
 } from "@preload/api/modules/visual-programming-api";
+import type { CanvasTheme } from "../lib/canvas-themes";
 import type {
 	ArchitectureVersionInput,
 	ArchitectureVersionMeta,
@@ -39,6 +40,8 @@ export interface Architecture {
 	diagramType: DiagramType;
 	nodes: Node[];
 	edges: Edge[];
+	/** The canvas' colours (`lib/canvas-themes.ts`); absent: the default look. */
+	theme?: CanvasTheme;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -96,7 +99,7 @@ interface VisualToCodeState {
 	/** The canvas mirroring itself back. Ignored for an id that is not open. */
 	updateArchitecture: (
 		id: string,
-		patch: Partial<Pick<Architecture, "nodes" | "edges" | "diagramType">>,
+		patch: Partial<Pick<Architecture, "nodes" | "edges" | "diagramType" | "theme">>,
 	) => void;
 
 	// ── The construction history of the active architecture ─────────────
