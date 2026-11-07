@@ -24,6 +24,8 @@ import yaml
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "INSTRUCTION_SUPPORT",
+    "MCP_SUPPORT",
     "AcpSpec",
     "ProviderCapabilities",
     "SandboxSpec",
@@ -173,6 +175,34 @@ def _parse_acp(name: str, raw: object) -> AcpSpec | None:
     )
 
 
+#: The closed vocabularies of the `standards` field (see providers.yaml).
+MCP_SUPPORT = ("native", "bridged", "own", "none", "unverified")
+INSTRUCTION_SUPPORT = ("agents_md", "claude_md", "injected", "unverified")
+
+
+def _parse_standards(name: str, raw: object) -> dict[str, str]:
+    """The `standards` block, each value checked against its vocabulary."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"providers.yaml: {name}.standards must be a mapping")
+    out: dict[str, str] = {}
+    for key, allowed in (("mcp", MCP_SUPPORT), ("instructions", INSTRUCTION_SUPPORT)):
+        value = str(raw.get(key, "unverified"))
+        if value not in allowed:
+            raise ValueError(
+                f"providers.yaml: {name}.standards.{key} is {value!r}, "
+                f"expected one of {', '.join(allowed)}"
+            )
+        out[key] = value
+    unknown = set(raw) - {"mcp", "instructions"}
+    if unknown:
+        raise ValueError(
+            f"providers.yaml: {name}.standards has unknown keys {sorted(unknown)}"
+        )
+    return out
+
+
 @dataclass(frozen=True)
 class ProviderCapabilities:
     name: str
@@ -191,6 +221,10 @@ class ProviderCapabilities:
     sandbox: SandboxSpec | None = None
     # Set for an Agent Client Protocol agent (`adapter: AcpAgentClient`).
     acp: AcpSpec | None = None
+    # Which open formats reach the provider (the `standards` field); an
+    # undeclared one is `unverified`, never read as support.
+    mcp: str = "unverified"
+    instructions: str = "unverified"
 
     @property
     def supports_subagents(self) -> bool:
@@ -242,6 +276,7 @@ def load_providers(repo_root: Path | None = None) -> dict[str, ProviderCapabilit
             context_usage=str(context.get("usage", "estimated")),
             sandbox=_parse_sandbox(name, cfg.get("sandbox")),
             acp=_parse_acp(name, cfg.get("acp")),
+            **_parse_standards(name, cfg.get("standards")),
         )
     return out
 

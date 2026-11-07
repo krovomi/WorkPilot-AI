@@ -2015,6 +2015,40 @@
 			"download": "Télécharger la trace Playwright",
 			"hint": "et l'ouvrir sur trace.playwright.dev ou avec npx playwright show-trace.",
 			"none": "Pas de trace Playwright : Playwright n'a pas piloté cette session."
+		},
+		"walkthrough": {
+			"video": "Vidéo du scénario",
+			"gif": "Le parcours du scénario : la capture de chaque étape, dans l'ordre",
+			"gifHint": "Ce GIF peut être joint à la preuve visuelle de la PR depuis la boîte de création de PR.",
+			"noVideo": "Pas de vidéo du scénario ({{reason}}) : la trace et les captures font la preuve."
+		},
+		"compare": {
+			"title": "Comparaison avec la branche de base",
+			"run": "Comparer avec la branche de base",
+			"again": "Comparer à nouveau",
+			"hint": "Rejoue le même scénario et les mêmes appels, sans modèle, sur le code dont la tâche est partie puis sur la tâche, et liste ce qui se comporte autrement.",
+			"skipped": "Pas de comparaison : {{reason}}",
+			"against": "Branche de base à {{base}}, puis cette tâche.",
+			"same": "Rien ne se comporte autrement.",
+			"status": "{{base}} sur la branche de base, {{task}} avec la tâche",
+			"data": "Chaque côté part de ses propres données : un écart peut venir des données plutôt que du code.",
+			"change": {
+				"broken": "Cassé par la tâche",
+				"fixed": "Fonctionne grâce à la tâche",
+				"added": "Nouveau",
+				"removed": "Disparu",
+				"changed": "Changé"
+			},
+			"kind": {
+				"scenario": "Scénario",
+				"console": "Console",
+				"network": "Requête réseau",
+				"endpoint": "Appel d'endpoint"
+			},
+			"side": {
+				"base": "Branche de base, fin du scénario",
+				"task": "Cette tâche, fin du scénario"
+			}
 		}
 	},
 	"qaUnverified": {
@@ -2258,6 +2292,66 @@
 			"agree": "Revue croisée OK",
 			"disagree": "Revue croisée : désaccord",
 			"inconclusive": "Revue croisée : sans verdict"
+		}
+	},
+	"steering": {
+		"title": "Guider l'agent",
+		"description": "Envoyez un message pendant que la tâche travaille : la prochaine session concernée le reçoit dans son prompt. WorkPilot le marque comme remis dès que cette session a démarré.",
+		"placeholder": "Par exemple : utilise le UserRepository existant au lieu d'en créer un",
+		"target": "Destinataire",
+		"nextSession": "La prochaine session",
+		"send": "Envoyer",
+		"queued": "En attente de la prochaine session",
+		"queuedForSubtask": "En attente de la session de {{subtask}}",
+		"delivered": "Remis à la session {{session}} ({{date}})",
+		"deliveredToSubtask": "Remis à la session {{session}}, {{subtask}} ({{date}})",
+		"errors": {
+			"generic": "Le message n'a pas pu être envoyé.",
+			"empty_message": "Le message est vide.",
+			"message_too_long": "Le message est trop long.",
+			"invalid_subtask": "Cette sous-tâche n'existe pas.",
+			"task_not_found": "La tâche est introuvable.",
+			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
+		}
+	},
+	"stack": {
+		"title": "Empilée sur un prérequis",
+		"description": "Faites partir cette tâche de la branche d'un prérequis au lieu du tronc : son code s'appuie sur celui du prérequis avant sa fusion.",
+		"stackOn": "Empiler sur « {{title}} »",
+		"stackedNote": "Empilée sur « {{title}} » : le worktree partira de sa branche.",
+		"stackedOn": "Empilée sur « {{title}} » ({{branch}})",
+		"upToDate": "À jour avec son parent.",
+		"parentMoved": "Le parent a de nouveaux commits : mettez à jour pour rebaser dessus.",
+		"parentMerged": "Le parent est fusionné : cette tâche peut passer sur {{base}}.",
+		"runningHint": "Un agent tourne sur cette tâche : mettez à jour une fois qu'il s'arrête.",
+		"update": "Mettre à jour",
+		"moveToBase": "Passer sur {{base}}",
+		"outcome": {
+			"rebased": "Rebasée sur le dernier commit du parent.",
+			"metadata_only": "La tâche partira du dernier commit du parent.",
+			"moved_to_base": "Passée sur la base du parent.",
+			"up_to_date": "Déjà à jour."
+		},
+		"errors": {
+			"same_task": "Une tâche ne peut pas être empilée sur elle-même.",
+			"already_stacked": "Cette tâche est déjà empilée.",
+			"not_blocker": "Seul un prérequis de cette tâche peut être son parent.",
+			"parent_done": "Ce prérequis est déjà terminé : partez du tronc.",
+			"cycle": "Empiler ici créerait une boucle.",
+			"child_started": "Cette tâche a déjà un worktree : sa base ne peut plus changer.",
+			"parent_no_worktree": "Le prérequis n'a pas encore de worktree ni de branche.",
+			"parent_no_commits": "Le prérequis n'a encore aucun commit : rien sur quoi s'appuyer.",
+			"metadata_unwritable": "Les métadonnées de la tâche n'ont pas pu être écrites.",
+			"task_not_found": "Tâche introuvable.",
+			"not_stacked": "Cette tâche n'est pas empilée.",
+			"running": "Un agent tourne sur cette tâche : réessayez une fois qu'il s'arrête.",
+			"dirty": "Le worktree de la tâche a des modifications non commitées : commitez-les ou annulez-les d'abord.",
+			"no_recorded_commit": "Le commit du parent n'a pas été enregistré : empilez à nouveau.",
+			"no_base": "La branche de base du parent est introuvable.",
+			"conflict": "Le rebase s'est arrêté sur un conflit et a été annulé. Fichiers en conflit :",
+			"pr_not_retargeted": "La pull request n'a pas pu être reciblée : changez sa base sur la forge.",
+			"pr_url_unreadable": "Le lien de la pull request est illisible : changez sa base sur la forge.",
+			"unknown": "L'opération a échoué."
 		}
 	}
 }

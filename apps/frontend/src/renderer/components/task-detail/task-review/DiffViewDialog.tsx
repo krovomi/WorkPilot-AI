@@ -43,6 +43,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "../../ui/tooltip";
+import { AiFileShare, AiTaskShare } from "./AiShare";
 
 // ── Tree data structure ──────────────────────────────────────────────
 
@@ -305,6 +306,7 @@ function FileTreeNode({
 					<span className="text-sm font-mono truncate">{node.name}</span>
 				</div>
 				<div className="flex items-center gap-2 shrink-0 ml-2">
+					<AiFileShare file={file} />
 					<Badge
 						variant="secondary"
 						className={cn(
@@ -1002,6 +1004,9 @@ export function DiffViewDialog({
 								? t("taskReview:diff.addingNewFile")
 								: worktreeDiff?.summary || t("taskReview:diff.noChanges")}
 					</AlertDialogDescription>
+					{!editingFile && !showAddFile && (
+						<AiTaskShare attribution={worktreeDiff?.attribution} />
+					)}
 				</AlertDialogHeader>
 
 				<div className="flex-1 overflow-auto min-h-0 -mx-6 px-6">

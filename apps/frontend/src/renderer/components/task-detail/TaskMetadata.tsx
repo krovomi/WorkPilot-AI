@@ -57,6 +57,7 @@ import {
 } from "./acceptance-criteria-draft";
 import { extractAcceptanceCriteriaFromDescription } from "../../../shared/utils/acceptance-criteria";
 import { TaskBlockers } from "./TaskBlockers";
+import { TaskStack } from "./TaskStack";
 import { TaskKindBadge } from "./TaskKindBadge";
 
 // Schéma de sanitization personnalisé permettant les styles inline
@@ -865,6 +866,9 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 
 					{/* Blocked by — the typed dependencies the queue gate reads. */}
 					<TaskBlockers task={task} />
+
+					{/* Stacked on a blocker (F6): start from its branch, keep up with it. */}
+					<TaskStack task={task} />
 
 					{/* Dependencies */}
 					{task.metadata.dependencies &&

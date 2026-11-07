@@ -1,0 +1,76 @@
+{
+  "$comment": "The Agent Trace trace-record schema v0.1 (https://github.com/cursor/agent-trace, CC BY 4.0), transcribed for the tests.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "id", "timestamp", "files"],
+  "properties": {
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "format": "uuid"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "vcs": {
+      "type": "object",
+      "required": ["type", "revision"],
+      "properties": {
+        "type": {"enum": ["git", "jj", "hg", "svn"]},
+        "revision": {"type": "string"}
+      }
+    },
+    "tool": {
+      "type": "object",
+      "properties": {"name": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "conversations"],
+        "properties": {
+          "path": {"type": "string"},
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["ranges"],
+              "properties": {
+                "url": {"type": "string", "format": "uri"},
+                "contributor": {"$ref": "#/$defs/contributor"},
+                "ranges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["start_line", "end_line"],
+                    "properties": {
+                      "start_line": {"type": "integer", "minimum": 1},
+                      "end_line": {"type": "integer", "minimum": 1},
+                      "content_hash": {"type": "string"},
+                      "contributor": {"$ref": "#/$defs/contributor"}
+                    }
+                  }
+                },
+                "related": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["type", "url"],
+                    "properties": {"type": {"type": "string"}, "url": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "metadata": {"type": "object"}
+  },
+  "$defs": {
+    "contributor": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["human", "ai", "mixed", "unknown"]},
+        "model_id": {"type": "string", "maxLength": 250}
+      }
+    }
+  }
+}

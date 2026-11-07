@@ -289,6 +289,12 @@ class AccessToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    #: A task token (prospective P7) reaches this project only, and lasts
+    #: while ``card_id`` is not done; both are None for a personal token.
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    card_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
 
 class Project(Base):

@@ -19,6 +19,8 @@ from pathlib import Path
 
 from foundation.change_scope import is_text_only_path
 from foundation.dotnet_tools import generate_dotnet_env_section
+from foundation.human_input import human_input_section, read_human_input
+from foundation.steering import PersonNotes
 
 # Stack-aware automatic test planning (API contract / WinForms UI / web E2E
 # tests derived from the touched files + installed libraries). Optional: the
@@ -311,6 +313,15 @@ Follow this answer. It overrides the earlier reason for the block.
 """
 
 
+def _preview_quote(spec_dir):
+    """Quote a steering message's preview element (F10) as untrusted data."""
+    from security.untrusted import quote_untrusted
+
+    return lambda context: quote_untrusted(
+        context, kind="preview_element", source="task preview", spec_dir=spec_dir
+    )
+
+
 def generate_subtask_prompt(
     spec_dir: Path,
     project_dir: Path,
@@ -318,6 +329,7 @@ def generate_subtask_prompt(
     phase: dict,
     attempt_count: int = 0,
     recovery_hints: list[str] | None = None,
+    human_input: str | PersonNotes | None = None,
 ) -> str:
     """
     Generate a minimal, focused prompt for implementing a single subtask.
@@ -329,6 +341,10 @@ def generate_subtask_prompt(
         phase: The phase containing this subtask
         attempt_count: Number of previous attempts (for retry context)
         recovery_hints: Hints from previous failed attempts
+        human_input: What the person said, as the orchestrator read it (it
+            marks what it delivered): the ``PersonNotes`` of
+            ``HUMAN_INPUT.md`` and the steering queue, or the text of
+            ``HUMAN_INPUT.md`` alone; ``None`` reads ``spec_dir``'s copy
 
     Returns:
         A focused prompt string (~100 lines instead of 900)
@@ -366,6 +382,16 @@ def generate_subtask_prompt(
 {description}
 """)
 
+    # What the person wrote after stopping the build (`foundation.human_input`).
+    # First after the description: it is the most recent word on the task.
+    # Then what the person sent while it ran (`foundation.steering`).
+    if isinstance(human_input, PersonNotes):
+        sections.extend(human_input.sections(_preview_quote(spec_dir)))
+    elif instructions := human_input_section(
+        read_human_input(spec_dir) if human_input is None else human_input
+    ):
+        sections.append(instructions)
+
     # TDD banner (only when strict TDD applies to this subtask)
     if tdd_active:
         sections.append("""
@@ -392,6 +418,13 @@ You MUST use a DIFFERENT approach than previous attempts.
     reply = _human_reply_section(subtask)
     if reply:
         sections.append(reply)
+
+    # What the worktree's recipe left undone, and the task's ports: read
+    # before the first build, not discovered by it (core/workspace/recipe_run.py).
+    from core.workspace.recipe_run import setup_prompt_section
+
+    if setup := setup_prompt_section(project_dir):
+        sections.append(setup)
 
     # Files section
     sections.append("## Files\n")

@@ -11,10 +11,11 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from agent_trace import model_id_of, session_start
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
@@ -31,6 +32,7 @@ from core.task_event import TaskEventEmitter
 from core.workflow_logger import workflow_logger
 from foundation.build_signals import BuildHalted, BuildPaused
 from foundation.pause_state import is_paused, read_pause_state
+from foundation.steering import PersonNotes, deliver_notes, person_notes
 
 try:
     from core.usage_tracker import (
@@ -120,6 +122,7 @@ from .base import (
 )
 from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
+from .rate_limit_time import parse_rate_limit_reset_time
 from .session import (
     is_prompt_too_long_error,
     post_session_processing,
@@ -129,7 +132,6 @@ from .utils import (
     find_phase_for_subtask,
     find_subtask_in_plan,
     get_commit_count,
-    get_latest_commit,
     load_implementation_plan,
     sync_spec_to_source,
 )
@@ -381,139 +383,6 @@ async def wait_for_auth_resume(
         pause_file.unlink(missing_ok=True)
     except OSError as e:
         logger.debug(f"Error cleaning up pause file {pause_file} after timeout: {e}")
-
-
-def _parse_relative_time(message: str) -> int | None:
-    """Parse 'in X minutes/hours' pattern from message."""
-    in_time_match = re.search(r"in\s+(\d+)\s*(minute|hour|min|hr)s?", message, re.I)
-    if not in_time_match:
-        return None
-
-    amount = int(in_time_match.group(1))
-    unit = in_time_match.group(2).lower()
-
-    if unit.startswith("hour") or unit.startswith("hr"):
-        delta = timedelta(hours=amount)
-    else:
-        delta = timedelta(minutes=amount)
-
-    return int((datetime.now() + delta).timestamp())
-
-
-def _validate_time_values(hour: int, minute: int) -> bool:
-    """Validate hour and minute ranges."""
-    return 0 <= hour <= 23 and 0 <= minute <= 59
-
-
-def _convert_meridiem_to_24h(hour: int, meridiem: str) -> int:
-    """Convert 12-hour format with meridiem to 24-hour format."""
-    if meridiem.lower() == "pm" and hour < 12:
-        return hour + 12
-    elif meridiem.lower() == "am" and hour == 12:
-        return 0
-    return hour
-
-
-def _validate_meridiem_hour(hour: int, meridiem: str) -> bool:
-    """Validate hour range when meridiem is present (should be 1-12)."""
-    return 1 <= hour <= 12
-
-
-def _parse_absolute_time(message: str) -> int | None:
-    """Parse absolute clock times from CLI messages.
-
-    Handles both shapes the Claude CLI emits:
-      - ``"resets at 10:30 pm"`` / ``"resets at 22:30"`` (legacy)
-      - ``"resets 3:20pm (Europe/Paris)"`` / ``"resets 10am"`` (newer session-limit
-        and weekly-limit banners — no ``at`` prefix, minute portion sometimes
-        omitted)
-
-    Missing the no-``at`` variant let the rate-limit shield fail to compute a
-    reset timestamp, so the caller fell back to its retry loop and the
-    conversation summary kept re-injecting until the prompt overflowed.
-    """
-    # Try minute-precision first (HH:MM with optional meridiem).
-    at_time_match = re.search(
-        r"(?:at|resets)\s+(\d{1,2}):(\d{2})\s*(am|pm)?", message, re.I
-    )
-    if not at_time_match:
-        # Fall back to hour-only ("resets 10am" / "resets 3pm").
-        hour_only = re.search(r"(?:at|resets)\s+(\d{1,2})\s*(am|pm)", message, re.I)
-        if not hour_only:
-            return None
-        # Synthesise a zero-minute match so the rest of the function stays one branch.
-        try:
-            hour = int(hour_only.group(1))
-        except ValueError:
-            return None
-        minute = 0
-        meridiem = hour_only.group(2)
-    else:
-        try:
-            hour = int(at_time_match.group(1))
-            minute = int(at_time_match.group(2))
-        except ValueError:
-            return None
-        meridiem = at_time_match.group(3)
-
-    try:
-        # Validate hour range when meridiem is present
-        if meridiem and not _validate_meridiem_hour(hour, meridiem):
-            return None
-
-        if meridiem:
-            hour = _convert_meridiem_to_24h(hour, meridiem)
-
-        # Validate final hour and minute ranges
-        if not _validate_time_values(hour, minute):
-            return None
-
-        now = datetime.now()
-        reset_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if reset_time <= now:
-            reset_time += timedelta(days=1)
-        return int(reset_time.timestamp())
-    except ValueError:
-        return None
-
-
-def parse_rate_limit_reset_time(error_info: dict | None) -> int | None:
-    """
-    Parse rate limit reset time from error info.
-
-    Attempts to extract reset time from various formats in error messages.
-
-    TIMEZONE ASSUMPTIONS:
-    - "in X minutes/hours" patterns are timezone-safe (relative time)
-    - "at HH:MM" patterns assume LOCAL timezone, which is reasonable since:
-      1. The user sees timestamps in their local timezone
-      2. The wait calculation happens locally using datetime.now()
-      3. If the API returns UTC "at" times, this would need adjustment
-        (but Claude API typically returns relative times like "in X minutes")
-
-    Args:
-        error_info: Error info dict with 'message' key
-
-    Returns:
-        Unix timestamp of reset time, or None if not parseable
-    """
-    if not error_info:
-        return None
-
-    message = error_info.get("message", "")
-
-    # Try relative time pattern first
-    reset_time = _parse_relative_time(message)
-    if reset_time:
-        return reset_time
-
-    # Try absolute time pattern
-    reset_time = _parse_absolute_time(message)
-    if reset_time:
-        return reset_time
-
-    # No pattern matched
-    return None
 
 
 def _cleanup_stray_root_plan(project_dir: Path, spec_dir: Path) -> str | None:
@@ -1281,6 +1150,7 @@ async def _coding_prompt(
     current_phase: str,
     phase_thinking_budget,
     retry: _RetryState,
+    human_input: str | PersonNotes = "",
 ) -> str:
     """One subtask's prompt: what the task shares first, then the subtask."""
     recovery_hints = (
@@ -1299,6 +1169,7 @@ async def _coding_prompt(
         phase=phase or {},
         attempt_count=attempt_count,
         recovery_hints=recovery_hints,
+        human_input=human_input,
     )
     effort = (
         effort_preamble(workflow_plan, "coding", workflow_repo_root)
@@ -2277,6 +2148,7 @@ async def run_autonomous_agent(
         # Get the next subtask to work on (planner sessions shouldn't bind to a subtask)
         next_subtask = None if first_run else get_next_subtask(spec_dir)
         subtask_id = next_subtask.get("id") if next_subtask else None
+        human_note = ""  # read with the subtask prompt below
         phase_name = next_subtask.get("phase_name") if next_subtask else None
 
         # Update status for this session
@@ -2304,7 +2176,7 @@ async def run_autonomous_agent(
         )
 
         # Capture state before session for post-processing
-        commit_before = get_latest_commit(project_dir)
+        commit_before = session_start(spec_dir, project_dir, subtask_id, iteration)
         commit_count_before = get_commit_count(project_dir)
 
         # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
@@ -2552,6 +2424,8 @@ async def run_autonomous_agent(
 
             # Get attempt count for recovery context
             attempt_count = recovery_manager.get_attempt_count(subtask_id)
+            # Read here, not in the prompt: what was delivered is archived below.
+            human_note = person_notes(spec_dir, source_spec_dir, subtask_id)
             prompt = await _coding_prompt(
                 spec_dir,
                 project_dir,
@@ -2566,6 +2440,7 @@ async def run_autonomous_agent(
                 current_phase=current_phase,
                 phase_thinking_budget=phase_thinking_budget,
                 retry=retry,
+                human_input=human_note,
             )
 
             # Show what we're working on
@@ -2621,6 +2496,10 @@ async def run_autonomous_agent(
                 context_managed=True,
                 context_monitor_only=context_resets.monitor_only(context_unit),
             )
+            # A session that ran has received the person's instructions: they
+            # apply once (`foundation.steering`), the orchestrator says so.
+            if subtask_id and status in ("complete", "continue"):
+                deliver_notes(human_note, spec_dir, source_spec_dir, session=iteration)
             if context_resets.record(context_unit, status):
                 notice = context_resets.notice(f"subtask {subtask_id or 'planning'}")
                 if task_logger:
@@ -2800,6 +2679,7 @@ async def run_autonomous_agent(
                 linear_enabled=linear_is_enabled,
                 status_manager=status_manager,
                 source_spec_dir=source_spec_dir,
+                model_id=model_id_of(client, phase_model),
             )
 
             # Check for stuck subtasks

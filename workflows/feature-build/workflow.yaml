@@ -208,7 +208,7 @@ phases:
     agent: verifier
     roster: verify
     dispatch: fresh-context
-    hard_gate: tests-pass,app-verified
+    hard_gate: tests-pass,app-verified,deps-exist,proof-checks
     description: >-
       La boucle de vérification : lancer l'application que la tâche a
       modifiée, constater qu'aucune erreur n'apparaît, corriger et relancer
