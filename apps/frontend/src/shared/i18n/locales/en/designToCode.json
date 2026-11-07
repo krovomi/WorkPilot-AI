@@ -1,72 +1,24 @@
 {
-	"title": "Design-to-Code Pipeline",
-	"description": "Upload a design and generate production-ready code in one click.",
-	"tabs": {
-		"upload": "Upload",
-		"spec": "Spec",
-		"code": "Code",
-		"tests": "Tests",
-		"tokens": "Tokens"
-	},
-	"phases": {
-		"idle": "Ready",
-		"analyzing": "Analyzing Design...",
-		"spec_generation": "Generating Spec...",
-		"code_generation": "Generating Code...",
-		"design_token_integration": "Integrating Tokens...",
-		"visual_test_generation": "Generating Tests...",
-		"figma_sync": "Syncing with Figma...",
-		"complete": "Complete!",
-		"error": "Error"
+	"source": {
+		"kicker": "Source",
+		"title": "Your design",
+		"zones_one": "{{count}} zone found",
+		"zones_other": "{{count}} zones found",
+		"reading": "reading…",
+		"remove": "Remove the design",
+		"previewAlt": "Design preview",
+		"palette": "Palette",
+		"typography": "Typography"
 	},
 	"upload": {
-		"dropDesign": "Drop your design here",
-		"dropDescription": "Screenshot, Figma export, wireframe, whiteboard photo",
-		"dropFormats": "PNG, JPG, GIF, WebP, SVG — Max 20 MB",
-		"designPreviewAlt": "Design preview",
-		"figmaUrl": "Figma URL (optional)",
-		"figmaUrlPlaceholder": "https://www.figma.com/design/FILE_KEY/...",
-		"figmaUrlHelp": "Paste a Figma file/node URL for bidirectional sync",
-		"targetFramework": "Target Framework",
-		"sourceType": "Source Type",
-		"advancedSettings": "Advanced Settings",
-		"designSystemPath": "Design System Path",
-		"designSystemPathPlaceholder": "src/design-system or styles/tokens",
-		"generateVisualTests": "Generate Visual Tests",
-		"customInstructions": "Custom Instructions",
-		"customInstructionsPlaceholder": "E.g.: Use Tailwind CSS, follow our BEM naming convention..."
-	},
-	"spec": {
-		"components": "Components",
-		"colorPalette": "Color Palette",
-		"typography": "Typography",
-		"emptyState": "Run the pipeline to see the design specification."
-	},
-	"code": {
-		"emptyState": "Run the pipeline to see generated code.",
-		"copied": "Copied",
-		"copy": "Copy"
-	},
-	"tests": {
-		"visualRegressionTests": "Visual Regression Tests",
-		"desktop": "Desktop",
-		"tablet": "Tablet",
-		"mobile": "Mobile",
-		"threshold": "Threshold",
-		"emptyState": "Visual tests will appear here after the pipeline runs.",
-		"copied": "Copied",
-		"copy": "Copy"
-	},
-	"tokens": {
-		"designTokensIntegrated": "Design Tokens Integrated",
-		"emptyState": "Design tokens from your project will appear here."
-	},
-	"footer": {
-		"files": "files",
-		"tests": "tests",
-		"reset": "Reset",
-		"processing": "Processing...",
-		"generateCode": "Generate Code"
+		"rejectedType": "Unsupported format: PNG, JPG, GIF, WebP or SVG.",
+		"rejectedSize": "Image too large: 20 MB at most.",
+		"dropDesign": "Drop a design here",
+		"dropDescription": "A screenshot, a Figma export, a wireframe or a whiteboard photo. You can also paste an image.",
+		"browse": "Browse…",
+		"paste": "Paste",
+		"pasteKey": "Ctrl V",
+		"dropFormats": "PNG · JPG · GIF · WebP · SVG — 20 MB max"
 	},
 	"sourceTypes": {
 		"screenshot": "Screenshot",
@@ -75,13 +27,208 @@
 		"whiteboard": "Whiteboard",
 		"photo": "Photo"
 	},
-	"frameworks": {
-		"react": "React",
-		"angular": "Angular",
-		"vue": "Vue.js",
-		"nextjs": "Next.js",
-		"nuxt": "Nuxt",
-		"svelte": "Svelte"
+	"pipeline": {
+		"kicker": "Pipeline",
+		"title": "What the agent does",
+		"editNote": "Click to rewrite this sentence",
+		"off": "turned off",
+		"testsUnsupported": "no visual-test convention for this stack",
+		"running": "running…",
+		"doneIn": "done · {{seconds}} s",
+		"stepCount": "{{count}} steps",
+		"stepKicker": "0{{n}} · {{name}}",
+		"legend": "Click a step to see its result · the text between steps can be edited",
+		"legendDone": "Click a step to open its result on the right",
+		"meta": {
+			"vision": "zones, hierarchy, colours",
+			"visionDone_one": "{{count}} zone · {{colors}} colours",
+			"visionDone_other": "{{count}} zones · {{colors}} colours",
+			"tokens": "the project's tokens",
+			"tokensDone_one": "{{count}} token found",
+			"tokensDone_other": "{{count}} tokens found",
+			"spec": "components and their children",
+			"specDone_one": "{{count}} component",
+			"specDone_other": "{{count}} components",
+			"code": "one file per component · {{stack}}",
+			"codeDone_one": "{{count}} file",
+			"codeDone_other": "{{count}} files",
+			"tests": "desktop, tablet, mobile",
+			"testsDone_one": "{{count}} test",
+			"testsDone_other": "{{count}} tests",
+			"project": "you approve before anything is written",
+			"projectReady_one": "ready · {{count}} file to write",
+			"projectReady_other": "ready · {{count}} files to write",
+			"projectWritten_one": "{{count}} file written",
+			"projectWritten_other": "{{count}} files written"
+		}
 	},
-	"previewAlt": "Design preview"
+	"steps": {
+		"vision": {
+			"kicker": "Vision",
+			"title": "Read the design"
+		},
+		"tokens": {
+			"kicker": "Design system",
+			"title": "Your tokens",
+			"toggle": "Use the project's tokens"
+		},
+		"spec": {
+			"kicker": "Specification",
+			"title": "Component tree"
+		},
+		"code": {
+			"kicker": "Code",
+			"title": "Generate the components"
+		},
+		"tests": {
+			"kicker": "Visual tests",
+			"title": "Pin the rendering",
+			"toggle": "Generate visual tests"
+		},
+		"project": {
+			"kicker": "Project",
+			"title": "Write to the repository"
+		}
+	},
+	"stepStates": {
+		"pending": "waiting",
+		"running": "running",
+		"done": "done",
+		"ready": "ready, waiting for your approval",
+		"off": "turned off",
+		"unsupported": "not available for this stack",
+		"error": "failed"
+	},
+	"notes": {
+		"visionToTokens": "matches the colours and sizes it saw to your tokens",
+		"tokensToSpec": "hands over the tokens to use instead of raw values",
+		"specToCode": "passes the component tree to code",
+		"codeToTests": "pins the rendering on three screen sizes",
+		"testsToProject": "proposes the files, nothing is written without you"
+	},
+	"stacks": {
+		"react": "React",
+		"nextjs": "Next.js",
+		"vue": "Vue",
+		"nuxt": "Nuxt",
+		"angular": "Angular",
+		"svelte": "Svelte",
+		"blazor": "Blazor",
+		"html": "HTML + CSS",
+		"react_native": "React Native",
+		"flutter": "Flutter",
+		"swiftui": "SwiftUI",
+		"jetpack_compose": "Jetpack Compose",
+		"maui": ".NET MAUI",
+		"wpf": "WPF / WinUI",
+		"avalonia": "Avalonia"
+	},
+	"styles": {
+		"auto": "Follow the project",
+		"tailwind": "Tailwind",
+		"css_modules": "CSS Modules",
+		"scss": "SCSS",
+		"styled_components": "styled-components"
+	},
+	"groups": {
+		"web": "Web",
+		"mobile": "Mobile",
+		"desktop": "Desktop",
+		"style": "Style"
+	},
+	"inspector": {
+		"kicker": "Result",
+		"live": "Live",
+		"liveTitle": "The agent is breaking your design down",
+		"waitingVision": "The agent is looking at the design…",
+		"journal": "Log",
+		"elapsed": "{{seconds}} s",
+		"emptyTitle": "Nothing yet",
+		"emptyLead": "Each step's result will show here",
+		"emptyBody": "The component tree, the code, the tokens and the tests. You review them, then write them to the project or create a Kanban task.",
+		"simulated": "Demo example: no model able to read an image answered. Sign in to Claude, or add an Anthropic, OpenAI or Gemini key, then run again.",
+		"files_one": "{{count}} file",
+		"files_other": "{{count}} files",
+		"tokens_one": "{{count}} token",
+		"tokens_other": "{{count}} tokens",
+		"tests_one": "{{count}} test",
+		"tests_other": "{{count}} tests",
+		"duration": "{{seconds}} s",
+		"specTitle_one": "{{count}} component found",
+		"specTitle_other": "{{count}} components found",
+		"tokensTitle_one": "{{count}} project token",
+		"tokensTitle_other": "{{count}} project tokens",
+		"noTokens": "No token found in the project. Point to your design system folder in the bottom bar.",
+		"testsTitle_one": "{{count}} visual test",
+		"testsTitle_other": "{{count}} visual tests",
+		"noTests": "No visual test generated.",
+		"writtenTitle": "Files written to the project",
+		"projectTitle": "Ready to write to the project",
+		"projectBody": "Review the code and the tests, then click \"Write to the project\". A file that already exists is marked \"replaces\". You can also create a Kanban task: the agent will integrate the design in its own worktree, with build, tests and review.",
+		"created": "created",
+		"updated": "replaced",
+		"refused": {
+			"outside": "refused: outside the project",
+			"protected": "refused: protected file",
+			"invalid": "refused: invalid content"
+		},
+		"codeTitle_one": "{{count}} file ready to review",
+		"codeTitle_other": "{{count}} files ready to review",
+		"fileExists": "replaces",
+		"fileNew": "new",
+		"fileExistsHint": "This file already exists in the project: writing replaces it.",
+		"fileNewHint": "This file does not exist in the project yet."
+	},
+	"phases": {
+		"analyzing": "Reading the design",
+		"design_token_integration": "Reading the project's tokens",
+		"spec_generation": "Component tree",
+		"code_generation": "Generating code",
+		"visual_test_generation": "Visual tests",
+		"figma_sync": "Figma sync",
+		"complete": "Done",
+		"error": "Error"
+	},
+	"errors": {
+		"missingInput": "Add an image or a Figma link."
+	},
+	"code": {
+		"copy": "Copy",
+		"copied": "Copied"
+	},
+	"composer": {
+		"target": "Target",
+		"detected": "Detected in the project: {{stack}}{{style}}",
+		"placeholder": "Tell the agent what to respect, e.g. \"reuse our shadcn/ui components\"",
+		"instructions": "Instructions for the agent",
+		"source": "Source",
+		"designSystem": "Design system",
+		"designSystemPlaceholder": "src/styles",
+		"figma": "Figma",
+		"figmaPlaceholder": "file or node link"
+	},
+	"footer": {
+		"reset": "Start over",
+		"taskCreated": "Task created",
+		"creatingTask": "Creating…",
+		"createTask": "Create a Kanban task",
+		"regenerate": "Regenerate",
+		"written_one": "{{count}} file written",
+		"written_other": "{{count}} files written",
+		"write_one": "Write {{count}} file to the project",
+		"write_other": "Write {{count}} files to the project",
+		"processing": "Generating…",
+		"generateCode": "Generate code",
+		"shortcut": "Ctrl ↵"
+	},
+	"kanban": {
+		"title": "Integrate the \"{{name}}\" design",
+		"untitled": "imported",
+		"intro": "Integrate this design into the project, in {{stack}}. The code below comes from Import Design: it is a starting point to adapt to the repository's existing components and conventions.",
+		"style": "Style: {{style}}",
+		"instructions": "Instructions",
+		"components": "Components found",
+		"palette": "Palette",
+		"files": "Generated files"
+	}
 }

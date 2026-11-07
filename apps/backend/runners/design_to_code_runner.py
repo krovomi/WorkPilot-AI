@@ -28,6 +28,10 @@ from foundation.debug import (
     debug_section,
     debug_success,
 )
+from services.design_to_code_stacks import STACKS, STYLE_HINTS
+
+PHASE_PREFIX = "__DESIGN_TO_CODE_PHASE__:"
+_MODULE = "design_to_code"
 
 # Load .env file
 load_dotenv = import_dotenv()
@@ -51,6 +55,9 @@ class DesignToCodeRunner:
         generate_tests: bool = True,
         custom_instructions: str = "",
         output_dir: str = "",
+        style: str = "",
+        use_design_tokens: bool = True,
+        write_files: bool = True,
     ):
         self.project_dir = Path(project_dir)
         self.image_path = image_path
@@ -62,18 +69,23 @@ class DesignToCodeRunner:
         self.generate_tests = generate_tests
         self.custom_instructions = custom_instructions
         self.output_dir = output_dir or str(self.project_dir)
+        self.style = style
+        self.use_design_tokens = use_design_tokens
+        # The desktop app reviews the files first and writes them itself
+        # (``--no-write``); the CLI writes them where it was told.
+        self.write_files = write_files
 
     async def run(self) -> dict:
         """Run the complete design-to-code pipeline."""
-        debug_section("Design-to-Code Pipeline")
-        debug(f"Project: {self.project_dir}")
-        debug(f"Framework: {self.framework}")
-        debug(f"Source type: {self.source_type}")
+        debug_section(_MODULE, "Design-to-Code Pipeline")
+        debug(_MODULE, f"Project: {self.project_dir}")
+        debug(_MODULE, f"Framework: {self.framework}")
+        debug(_MODULE, f"Source type: {self.source_type}")
 
         # Resolve image data
         image_data = await self._resolve_image_data()
         if not image_data:
-            debug_error("No image data provided")
+            debug_error(_MODULE, "No image data provided")
             return {
                 "success": False,
                 "error": "No image data provided. Provide --image-path or --image-data.",
@@ -89,7 +101,7 @@ class DesignToCodeRunner:
             if parsed:
                 figma_file_key = parsed.get("file_key")
                 figma_node_id = parsed.get("node_id")
-                debug(f"Figma file: {figma_file_key}, node: {figma_node_id}")
+                debug(_MODULE, f"Figma file: {figma_file_key}, node: {figma_node_id}")
 
         # Run the pipeline
         from services.design_to_code_service import DesignToCodeService
@@ -111,7 +123,13 @@ class DesignToCodeRunner:
             icon = phase_icons.get(phase.value, "⏳")
             print(f"  {icon} [{phase.value}] {status}")
 
+        def on_progress(phase, status, detail):
+            # Structured line the Electron service forwards to the page live.
+            payload = {"phase": phase.value, "status": status, "detail": detail}
+            print(f"{PHASE_PREFIX}{json.dumps(payload)}", flush=True)
+
         service.on_phase_change(on_phase)
+        service.on_progress(on_progress)
 
         result = await service.run_pipeline(
             image_data=image_data,
@@ -122,10 +140,12 @@ class DesignToCodeRunner:
             figma_node_id=figma_node_id,
             generate_tests=self.generate_tests,
             custom_instructions=self.custom_instructions,
+            style=self.style,
+            use_design_tokens=self.use_design_tokens,
         )
 
         # Write generated files to disk
-        if result.success and result.generated_files:
+        if self.write_files and result.success and result.generated_files:
             await self._write_generated_files(result)
 
         # Print summary
@@ -137,8 +157,6 @@ class DesignToCodeRunner:
         """Resolve image data from path, base64, or Figma URL."""
         import base64
 
-        import aiofiles
-
         # Direct base64 data
         if self.image_data:
             return self.image_data
@@ -147,11 +165,11 @@ class DesignToCodeRunner:
         if self.image_path:
             path = Path(self.image_path)
             if not path.exists():
-                debug_error(f"Image file not found: {self.image_path}")
+                debug_error(_MODULE, f"Image file not found: {self.image_path}")
                 return ""
 
-            async with aiofiles.open(path, "rb") as f:
-                data = await f.read()
+            # aiofiles is not a dependency of the backend: plain reads.
+            data = path.read_bytes()
 
             # Detect MIME type
             mime_map = {
@@ -174,47 +192,53 @@ class DesignToCodeRunner:
                 connector = FigmaConnector()
                 parsed = connector.parse_figma_url(self.figma_url)
                 if parsed and parsed.get("node_id"):
-                    debug(f"Exporting image from Figma node {parsed['node_id']}...")
+                    debug(
+                        _MODULE,
+                        f"Exporting image from Figma node {parsed['node_id']}...",
+                    )
                     export = await connector.export_node_image(
                         parsed["file_key"], parsed["node_id"]
                     )
                     if export.image_data:
                         return f"data:image/png;base64,{export.image_data}"
             except Exception as e:
-                debug_error(f"Could not fetch Figma image: {e}")
+                debug_error(_MODULE, f"Could not fetch Figma image: {e}")
 
         return ""
 
     async def _write_generated_files(self, result) -> None:
-        """Write generated files to the output directory."""
+        """Write generated files under the output directory, never outside it.
 
-        import aiofiles
+        Paths come from the model: ``../`` or an absolute path is skipped.
+        """
+        output_base = Path(self.output_dir).resolve()
 
-        output_base = Path(self.output_dir)
+        def target(relative: str) -> Path | None:
+            if not relative or Path(relative).is_absolute():
+                return None
+            resolved = (output_base / relative).resolve()
+            return resolved if output_base in resolved.parents else None
 
-        print(f"\n📁 Writing {len(result.generated_files)} files:")
-        for gf in result.generated_files:
-            file_path = output_base / gf.path
+        entries = [(gf.path, gf.content) for gf in result.generated_files]
+        entries += [
+            (vt.path or f"tests/visual/{vt.name}.spec.ts", vt.test_code)
+            for vt in result.visual_tests
+        ]
+        print(f"\n📁 Writing {len(entries)} files:")
+        for relative, content in entries:
+            file_path = target(relative)
+            if file_path is None:
+                print(f"  ⛔ skipped (outside the output directory): {relative}")
+                continue
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-                await f.write(gf.content)
-            print(f"  ✅ {gf.path}")
-
-        # Write visual tests
-        if result.visual_tests:
-            print(f"\n🧪 Writing {len(result.visual_tests)} visual tests:")
-            for vt in result.visual_tests:
-                test_path = output_base / "tests" / "visual" / f"{vt.name}.spec.ts"
-                test_path.parent.mkdir(parents=True, exist_ok=True)
-                async with aiofiles.open(test_path, "w", encoding="utf-8") as f:
-                    await f.write(vt.test_code)
-                print(f"  ✅ tests/visual/{vt.name}.spec.ts")
+            file_path.write_text(content, encoding="utf-8")
+            print(f"  ✅ {relative}")
 
     def _print_summary(self, result) -> None:
         """Print a pipeline summary."""
         print("\n" + "=" * 60)
         if result.success:
-            debug_success("Design-to-Code Pipeline Complete!")
+            debug_success(_MODULE, "Design-to-Code Pipeline Complete!")
             print(f"  📄 Files generated: {len(result.generated_files)}")
             print(f"  🧪 Visual tests: {len(result.visual_tests)}")
             print(f"  🎨 Design tokens used: {len(result.design_tokens_used)}")
@@ -227,68 +251,16 @@ class DesignToCodeRunner:
                 print(f"  🔄 Figma sync: {sync}")
             print(f"  ⏱️  Duration: {result.duration_seconds:.1f}s")
         else:
-            debug_error("Pipeline Failed!")
+            debug_error(_MODULE, "Pipeline Failed!")
             for error in result.errors:
                 print(f"  ❌ {error}")
         print("=" * 60)
 
     def _serialize_result(self, result) -> dict:
-        """Serialize the full pipeline result for the renderer.
+        """Serialize the full pipeline result for the renderer."""
+        from services.design_to_code_service import serialize_result
 
-        The frontend (DesignToCodeResult) needs the *content* of every generated
-        file plus the design spec, tests and tokens — not just counts — so this
-        mirrors the frontend interface field-for-field.
-        """
-        design_spec = None
-        if result.design_spec:
-            design_spec = {
-                "components": [
-                    {
-                        "name": c.name,
-                        "type": c.type,
-                        "description": c.description,
-                        "children": [
-                            {"name": ch.name, "type": ch.type} for ch in c.children
-                        ],
-                    }
-                    for c in result.design_spec.components
-                ],
-                "color_palette": result.design_spec.color_palette,
-                "typography": result.design_spec.typography,
-            }
-
-        return {
-            "success": result.success,
-            "phase": result.phase.value,
-            "design_spec": design_spec,
-            "generated_files": [
-                {
-                    "path": f.path,
-                    "content": f.content,
-                    "language": f.language,
-                    "description": f.description,
-                }
-                for f in result.generated_files
-            ],
-            "visual_tests": [
-                {
-                    "name": t.name,
-                    "test_code": t.test_code,
-                    "threshold": t.threshold,
-                    "description": t.description,
-                }
-                for t in result.visual_tests
-            ],
-            "design_tokens_used": [
-                {"name": tok.name, "value": tok.value, "category": tok.category}
-                for tok in result.design_tokens_used
-            ],
-            "figma_sync_status": result.figma_sync_status,
-            "errors": result.errors,
-            "warnings": result.warnings,
-            "duration_seconds": result.duration_seconds,
-            "tokens_used": result.tokens_used,
-        }
+        return serialize_result(result)
 
 
 async def main():
@@ -306,8 +278,24 @@ async def main():
     parser.add_argument(
         "--framework",
         default="react",
-        choices=["react", "vue", "angular", "svelte", "nextjs", "nuxt"],
-        help="Target framework (default: react)",
+        choices=sorted(STACKS),
+        help="Target stack (default: react)",
+    )
+    parser.add_argument(
+        "--style",
+        default="",
+        choices=["", *sorted(STYLE_HINTS)],
+        help="Styling approach for web stacks",
+    )
+    parser.add_argument(
+        "--no-tokens",
+        action="store_true",
+        help="Do not read the project's design tokens",
+    )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Return the files without writing them (the caller reviews them)",
     )
     parser.add_argument(
         "--source-type",
@@ -345,6 +333,9 @@ async def main():
         generate_tests=not args.no_tests,
         custom_instructions=args.instructions,
         output_dir=args.output_dir,
+        style=args.style,
+        use_design_tokens=not args.no_tokens,
+        write_files=not args.no_write,
     )
 
     try:

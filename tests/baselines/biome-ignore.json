@@ -241,7 +241,6 @@
   "apps/frontend/src/renderer/components/ui/resizable-panels.tsx": 2,
   "apps/frontend/src/renderer/components/ui/toaster.tsx": 3,
   "apps/frontend/src/renderer/components/visual-to-code/CanvasPanel.tsx": 4,
-  "apps/frontend/src/renderer/components/visual-to-code/DesignImportPanel.tsx": 7,
   "apps/frontend/src/renderer/hooks/__tests__/useOllamaModelDownload.test.ts": 1,
   "apps/frontend/src/renderer/lib/__tests__/os-detection.test.ts": 2,
   "apps/frontend/src/renderer/lib/browser-mock.ts": 2,

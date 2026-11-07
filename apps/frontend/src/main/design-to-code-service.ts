@@ -1,46 +1,83 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import {
+	DESIGN_SOURCE_TYPES,
+	DESIGN_TO_CODE_STACKS,
+	DESIGN_TO_CODE_STYLES,
+	type DesignFileToWrite,
+	type DesignToCodeProgress,
+	type DesignToCodeRequest,
+	type DesignToCodeResult,
+	type DesignWriteOutcome,
+} from "../shared/types/design-to-code";
+import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
+import {
+	resolveKnownProject,
+	resolveWritableUnder,
+} from "./security/renderer-path";
 import { getEffectiveSourcePath } from "./updater/path-resolver";
 import { pythonRunnerEnv } from "./utils/python-runner-env";
 
 /**
  * Design-to-Code service — bridges the renderer's "Import Design" panel to the
- * Python `design_to_code_runner.py`. Unlike the streaming VisualProgramming
- * service, the renderer store awaits a single Promise, so this runs
- * request → response: spawn the runner, parse its structured result line, and
- * resolve with the full pipeline result.
+ * Python `design_to_code_runner.py`. The run reads the selected project (its
+ * stack, its design tokens) but writes nothing: the runner gets `--no-write`,
+ * the page shows the files, and only `writeFiles` puts the ones the person
+ * accepted into the project, each path resolved inside it.
+ *
+ * The renderer is not trusted (security.md, S6): every field of the request
+ * is checked against a closed list or a size here, and a project is named by
+ * its id, never by a path.
  */
 
-export interface DesignToCodeRequest {
-	imageData?: string; // data URL (data:image/png;base64,...)
-	framework?: string;
-	sourceType?: string;
-	designSystemPath?: string;
-	figmaUrl?: string;
-	generateTests?: boolean;
-	customInstructions?: string;
+export type { DesignToCodeRequest, DesignToCodeResult };
+
+const PHASE_PREFIX = "__DESIGN_TO_CODE_PHASE__:";
+const MAX_IMAGE_DATA = 28 * 1024 * 1024; // a 20 MB image, base64-encoded
+const MAX_TEXT = 4000;
+const MAX_FILES = 200;
+const MAX_FILE_BYTES = 1024 * 1024;
+
+/** What the page may not write, whatever the model proposed. */
+function isProtectedPath(relative: string): boolean {
+	const parts = relative.split(/[\\/]+/).filter(Boolean);
+	const first = (parts[0] ?? "").toLowerCase();
+	if (parts.some((p) => p.toLowerCase() === ".git")) return true;
+	if (first.startsWith(".workpilot") || first.startsWith(".claude")) return true;
+	if (first.startsWith(".env")) return true;
+	return first === ".github" && (parts[1] ?? "").toLowerCase() === "workflows";
 }
 
-export interface DesignToCodeResult {
-	success: boolean;
-	phase: string;
-	design_spec: unknown;
-	generated_files: {
-		path: string;
-		content: string;
-		language: string;
-		description: string;
-	}[];
-	visual_tests: unknown[];
-	design_tokens_used: unknown[];
-	figma_sync_status: Record<string, unknown> | null;
-	errors: string[];
-	warnings: string[];
-	duration_seconds: number;
-	tokens_used: number;
+function oneOf<T extends string>(
+	value: unknown,
+	allowed: readonly T[],
+): T | undefined {
+	return typeof value === "string" && (allowed as readonly string[]).includes(value)
+		? (value as T)
+		: undefined;
+}
+
+function shortText(value: unknown): string | undefined {
+	return typeof value === "string" && value.length <= MAX_TEXT
+		? value
+		: undefined;
+}
+
+/** The project directory an id names, resolved, or `null`. */
+export function projectDirFor(projectId: unknown): string | null {
+	if (typeof projectId !== "string" || !projectId) return null;
+	const project = projectStore.getProject(projectId);
+	return project ? resolveKnownProject(project.path) : null;
 }
 
 const RESULT_PREFIX = "__DESIGN_TO_CODE_RESULT__:";
@@ -107,14 +144,27 @@ export class DesignToCodeService {
 		return imagePath;
 	}
 
-	async run(request: DesignToCodeRequest): Promise<DesignToCodeResult> {
+	/**
+	 * Run the pipeline. `onProgress` receives each phase as the runner
+	 * reaches it, so the page shows the steps instead of one long wait.
+	 */
+	async run(
+		request: DesignToCodeRequest,
+		onProgress?: (progress: DesignToCodeProgress) => void,
+	): Promise<DesignToCodeResult> {
 		const sourcePath = this.getSourcePath();
 		if (!sourcePath) {
 			throw new Error(
 				"WorkPilot AI source not found. Cannot locate design_to_code_runner.py",
 			);
 		}
-		if (!request.imageData && !request.figmaUrl) {
+		const req = (request ?? {}) as DesignToCodeRequest;
+		const imageData =
+			typeof req.imageData === "string" && req.imageData.length <= MAX_IMAGE_DATA
+				? req.imageData
+				: undefined;
+		const figmaUrl = shortText(req.figmaUrl);
+		if (!imageData && !figmaUrl) {
 			throw new Error("Provide an image or a Figma URL.");
 		}
 
@@ -127,37 +177,50 @@ export class DesignToCodeService {
 			throw new Error("design_to_code_runner.py not found");
 		}
 
-		// Scratch directory used both as the runner's project/output dir and to
-		// stash the decoded image. Generated files are written here; the renderer
-		// only displays their contents, so a temp dir keeps the user's project clean.
+		// The image goes through a scratch folder; the project, when one is
+		// selected, is where the stack and the tokens are read from.
 		const workDir = mkdtempSync(path.join(tmpdir(), "wp-design2code-"));
+		const projectDir = projectDirFor(req.projectId);
 
-		const args = [runnerPath, "--project-dir", workDir, "--output-dir", workDir];
+		const args = [
+			runnerPath,
+			"--project-dir",
+			projectDir ?? workDir,
+			"--no-write",
+		];
 
-		if (request.imageData) {
-			const imagePath = this.writeImageToTemp(request.imageData, workDir);
+		if (imageData) {
+			const imagePath = this.writeImageToTemp(imageData, workDir);
 			args.push("--image-path", imagePath);
 		}
-		if (request.framework) args.push("--framework", request.framework);
-		if (request.sourceType) args.push("--source-type", request.sourceType);
-		if (request.designSystemPath)
-			args.push("--design-system-path", request.designSystemPath);
-		if (request.figmaUrl) args.push("--figma-url", request.figmaUrl);
-		if (request.generateTests === false) args.push("--no-tests");
-		if (request.customInstructions)
-			args.push("--instructions", request.customInstructions);
+		const framework = oneOf(req.framework, DESIGN_TO_CODE_STACKS);
+		if (framework) args.push("--framework", framework);
+		const style = oneOf(req.style, DESIGN_TO_CODE_STYLES);
+		if (style) args.push("--style", style);
+		const sourceType = oneOf(req.sourceType, DESIGN_SOURCE_TYPES);
+		if (sourceType) args.push("--source-type", sourceType);
+		const designSystemPath = shortText(req.designSystemPath)?.trim();
+		// Relative to the project; the backend resolves it inside the project too.
+		if (designSystemPath && projectDir && !path.isAbsolute(designSystemPath)) {
+			args.push("--design-system-path", designSystemPath);
+		}
+		if (figmaUrl) args.push("--figma-url", figmaUrl);
+		if (req.generateTests === false) args.push("--no-tests");
+		if (req.useDesignTokens === false) args.push("--no-tokens");
+		const instructions = shortText(req.customInstructions);
+		if (instructions) args.push("--instructions", instructions);
 
 		const env = await this.buildEnv(sourcePath);
 		const pythonExe = this.resolvePythonExecutable();
 
-		return await new Promise<DesignToCodeResult>((resolve, reject) => {
+		const running = new Promise<DesignToCodeResult>((resolve, reject) => {
 			const proc = spawn(pythonExe, args, {
 				cwd: sourcePath,
 				env,
 				stdio: ["pipe", "pipe", "pipe"],
 			});
 
-			let result: DesignToCodeResult | null = null;
+			let parsed: DesignToCodeResult | null = null;
 			let markerError: string | null = null;
 			let stderrTail = "";
 			let stdoutBuffer = "";
@@ -165,9 +228,15 @@ export class DesignToCodeService {
 			const handleLine = (line: string) => {
 				if (line.startsWith(RESULT_PREFIX)) {
 					try {
-						result = JSON.parse(line.slice(RESULT_PREFIX.length));
+						parsed = JSON.parse(line.slice(RESULT_PREFIX.length));
 					} catch {
 						/* ignore malformed result line */
+					}
+				} else if (line.startsWith(PHASE_PREFIX)) {
+					try {
+						onProgress?.(JSON.parse(line.slice(PHASE_PREFIX.length)));
+					} catch {
+						/* a malformed progress line only costs one live update */
 					}
 				} else if (line.startsWith(ERROR_PREFIX)) {
 					markerError = line.slice(ERROR_PREFIX.length);
@@ -194,8 +263,8 @@ export class DesignToCodeService {
 
 			proc.on("close", (code) => {
 				if (stdoutBuffer.trim()) handleLine(stdoutBuffer.trim());
-				if (result) {
-					resolve(result);
+				if (parsed) {
+					resolve(parsed);
 					return;
 				}
 				if (markerError) {
@@ -209,7 +278,83 @@ export class DesignToCodeService {
 				);
 			});
 		});
+
+		let result: DesignToCodeResult;
+		try {
+			result = await running;
+		} finally {
+			// The scratch folder only held the image.
+			rmSync(workDir, { recursive: true, force: true });
+		}
+		return projectDir ? markExisting(result, projectDir) : result;
 	}
+
+	/**
+	 * Write the files the person accepted into the project. Each path is
+	 * resolved inside the project (links included); a path outside it, a
+	 * protected file or an oversized content is refused, the rest written.
+	 */
+	writeFiles(projectId: unknown, files: unknown): DesignWriteOutcome {
+		const projectDir = projectDirFor(projectId);
+		if (!projectDir) throw new Error("Unknown project");
+		if (!Array.isArray(files) || files.length > MAX_FILES) {
+			throw new Error("Invalid file list");
+		}
+		const outcome: DesignWriteOutcome = { written: [], refused: [] };
+		for (const raw of files as DesignFileToWrite[]) {
+			const relative = typeof raw?.path === "string" ? raw.path : "";
+			const content = raw?.content;
+			if (
+				!relative ||
+				typeof content !== "string" ||
+				Buffer.byteLength(content, "utf-8") > MAX_FILE_BYTES
+			) {
+				outcome.refused.push({ path: relative, reason: "invalid" });
+				continue;
+			}
+			const target = resolveWritableUnder(projectDir, relative);
+			if (!target) {
+				outcome.refused.push({ path: relative, reason: "outside" });
+				continue;
+			}
+			if (isProtectedPath(path.relative(projectDir, target))) {
+				outcome.refused.push({ path: relative, reason: "protected" });
+				continue;
+			}
+			const created = !existsSync(target);
+			if (!created && !statSync(target).isFile()) {
+				outcome.refused.push({ path: relative, reason: "invalid" });
+				continue;
+			}
+			mkdirSync(path.dirname(target), { recursive: true });
+			writeFileSync(target, content, "utf-8");
+			outcome.written.push({ path: relative, created });
+		}
+		return outcome;
+	}
+}
+
+/** Flag the generated files that would replace a file of the project. */
+function markExisting(
+	result: DesignToCodeResult,
+	projectDir: string,
+): DesignToCodeResult {
+	const exists = (relative: string | undefined) => {
+		if (!relative) return false;
+		const target = resolveWritableUnder(projectDir, relative);
+		return target !== null && existsSync(target);
+	};
+	return {
+		...result,
+		generated_files: (result.generated_files ?? []).map((f) => ({
+			...f,
+			exists: exists(f.path),
+		})),
+		visual_tests: (result.visual_tests ?? []).map((t) => ({
+			...t,
+			exists: exists(t.path),
+		})),
+	};
 }
 
 export const designToCodeService = new DesignToCodeService();
