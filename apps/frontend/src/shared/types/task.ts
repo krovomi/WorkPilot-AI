@@ -562,6 +562,14 @@ export interface TaskMetadata {
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
+	/**
+	 * Stacked on another task (F6, `shared/utils/task-stack.ts`): the parent's
+	 * spec id, its commit when this task was last put on it, and the branch
+	 * the stack ends on.
+	 */
+	stackParent?: string;
+	stackParentSha?: string;
+	stackTrunk?: string;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {

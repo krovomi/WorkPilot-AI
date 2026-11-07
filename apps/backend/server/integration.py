@@ -162,6 +162,10 @@ async def _attach_token_principal(request: Request, raw: str) -> JSONResponse | 
     request.state.org_id = principal.org_id
     request.state.principal = principal
     request.state.access_token_scope = use.token.scope
+    # A task token's reach (P7): its project, its card; None for a personal one.
+    request.state.access_token_id = use.token.id
+    request.state.access_token_project = use.token.project_id
+    request.state.access_token_card = use.token.card_id
     return None
 
 

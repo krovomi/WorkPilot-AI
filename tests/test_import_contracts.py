@@ -54,6 +54,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # foundation, the records in the spec directory. A leaf the coder session,
     # the write hooks and the PR body read.
     "agent_trace": {"foundation"},
+    # The mutation gate (docs/architecture/mutation-gate.md): git, the test
+    # conventions and the platform through foundation; the child environment
+    # without credentials from security. The QA gate that calls it is in qa.
+    "mutation_gate": {"foundation", "security"},
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).

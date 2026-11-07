@@ -107,6 +107,19 @@ export async function sendSteering(
 			: { success: false, error: sent.error };
 	}
 
+	return queueLocal(taskId, cleaned, target);
+}
+
+/**
+ * Queue a checked message for a local task. `context` is set by the main
+ * process only (the preview element of F10), never taken from the renderer.
+ */
+export async function queueLocal(
+	taskId: string,
+	cleaned: string,
+	target: string | null,
+	context = "",
+): Promise<SteeringResult> {
 	const dirs = localDirs(taskId);
 	if (!dirs || dirs.length === 0) return refused("task_not_found");
 	const line = messageLine(
@@ -115,6 +128,7 @@ export async function sendSteering(
 		new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00"),
 		"desktop",
 		target,
+		context,
 	);
 	let written = 0;
 	for (const dir of dirs) {

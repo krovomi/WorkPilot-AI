@@ -442,6 +442,7 @@ environment wins:
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
 | `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+| `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
 | `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
 
 ### Review budget

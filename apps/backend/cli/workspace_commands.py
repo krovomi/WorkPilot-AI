@@ -1333,6 +1333,9 @@ def handle_create_pr_command(
     }
     if raw_result.get("cross_review_blocked"):
         result["cross_review_blocked"] = True
+    if "stack_linked" in raw_result:  # a stacked task's PR (F6)
+        result["stack_linked"] = bool(raw_result.get("stack_linked"))
+        result["stack_note"] = raw_result.get("stack_note", "")
 
     if result.get("success"):
         pr_url = result.get("pr_url")

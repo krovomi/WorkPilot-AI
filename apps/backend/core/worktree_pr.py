@@ -1765,6 +1765,19 @@ class WorktreePRMixin:
                 error=push_result.get("error", "Push failed"),
             )
 
+        # Step 1.5: a task stacked on another (F6) targets its parent's
+        # branch, which must exist on the remote for the PR to be created.
+        from core.stacked_pr import link_after_pr, push_parent, spec_dir_of, stack_info
+
+        stack = stack_info(spec_dir_of(self, spec_name), effective_target)
+        if stack is not None and (refused := push_parent(self, stack)):
+            return PushAndCreatePRResult(
+                success=False,
+                pushed=True,
+                branch=push_result.get("branch", ""),
+                error=refused,
+            )
+
         # Step 2: Detect git provider (use the remote that was pushed to)
         provider = detect_git_provider(
             self.project_dir, remote_name=push_result.get("remote")
@@ -1806,8 +1819,16 @@ class WorktreePRMixin:
                 error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
             )
 
+        # A stacked PR on GitHub joins its parent's stack when `gh stack` is
+        # installed; failing to link never undoes the PR.
+        stack_fields: dict = {}
+        if stack is not None and provider == "github" and pr_result.get("success"):
+            linked, note = link_after_pr(self, stack, spec_name, get_gh_executable())
+            stack_fields = {"stack_linked": linked, "stack_note": note}
+
         # Combine results
         return PushAndCreatePRResult(
+            **stack_fields,
             success=pr_result.get("success", False),
             pushed=True,
             remote=push_result.get("remote"),

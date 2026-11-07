@@ -469,6 +469,51 @@ def test_formula_lab_and_router_read_the_table(project):
     assert scores(worktree) == scores(project)
 
 
+RULE = "Write the test before the code it checks."
+
+
+def test_a_candidate_rule_is_measured_beside_its_engine(project):
+    """The arm with the rule differs by the rule only, and measures the rule."""
+    from learning_loop.prompt_injection import get_learning_context
+
+    manifest = _prepare(project, [ENGINE_A, {**ENGINE_A, "rule": f"  {RULE}\n"}])
+    assert [e.get("rule") for e in manifest["engines"]] == [None, RULE]
+    plain, ruled = (Path(b["copy"]) for b in manifest["builds"])
+    assert RULE not in get_learning_context(plain, "coding")
+    for phase in ("planning", "coding", "qa_review", "qa_fixing"):
+        assert f"- {RULE}" in get_learning_context(ruled, phase)
+    assert not (project / ".workpilot" / "learning").exists()
+
+    _agent_writes(manifest, "b1", CALC_BASE + "\n\ndef mul(a, b):\n    return 0\n")
+    _agent_writes(manifest, "b2", CALC_TARGET)
+    judge_build(project, manifest["runId"], "b1", "ended", 0)
+    judge_build(project, manifest["runId"], "b2", "ended", 0)
+    # The table, the router and Formula Lab measure models: the rule's build
+    # stays in the file and reaches none of them.
+    (row,) = table(project)
+    assert (row["judged"], row["resolved"]) == (1, 0)
+    assert scores(project)[("anthropic", "claude-sonnet-4-6")]["judged"] == 1
+    assert len(history_samples(project)) == 1
+    stored = json.loads(results_path(project).read_text(encoding="utf-8"))
+    assert [(r["rule"], r["resolved"]) for r in stored["records"]] == [
+        (None, False),
+        (RULE, True),
+    ]
+
+
+def test_a_rule_through_a_link_is_refused(tmp_path):
+    from bench.lifecycle import write_rule
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    copy = tmp_path / "copy"
+    copy.mkdir()
+    (copy / ".workpilot").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(BenchError):
+        write_rule(copy, RULE)
+    assert not any(outside.iterdir())
+
+
 def test_a_record_keeps_the_kind_of_its_card(project):
     manifest = _prepare(project, [ENGINE_B])
     assert manifest["cases"][0]["kind"] == "feature"
@@ -490,6 +535,12 @@ def test_requests_are_validated():
         parse_engines([ENGINE_A, ENGINE_A])
     with pytest.raises(BenchError):
         parse_engines([{**ENGINE_A, "provider": "Bad Provider"}])
+    with pytest.raises(BenchError):
+        parse_engines([{**ENGINE_A, "rule": "x" * 501}])
+    with pytest.raises(BenchError):
+        parse_engines([{**ENGINE_A, "rule": "a\x00b"}])
+    with pytest.raises(BenchError):
+        parse_engines([{**ENGINE_A, "rule": "same"}, {**ENGINE_A, "rule": " same "}])
     with pytest.raises(BenchError):
         parse_specs(["../x"])
     with pytest.raises(BenchError):
