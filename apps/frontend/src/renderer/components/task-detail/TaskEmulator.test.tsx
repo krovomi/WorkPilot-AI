@@ -589,3 +589,60 @@ describe("TaskEmulator — la route de la tâche et la barre d'adresse", () => {
 		);
 	});
 });
+
+it("points an element of the preview, then sends what to change about it", async () => {
+	const startPreviewPoint = vi.fn().mockResolvedValue({
+		success: true,
+		data: {
+			id: "e".repeat(32),
+			selector: "button.pay-cta",
+			text: "Pay",
+			candidates: [{ path: "src/Cart.vue", line: 2 }],
+			image: null,
+		},
+	});
+	const sendPreviewPoints = vi.fn().mockResolvedValue({ success: true, data: [] });
+	Object.assign(window.electronAPI, {
+		startPreviewPoint,
+		sendPreviewPoints,
+		cancelPreviewPoint: vi.fn(),
+		discardPreviewPoint: vi.fn(),
+	});
+	useAppEmulatorStore.setState({
+		phase: "running",
+		url: "http://localhost:5173",
+		config: {
+			type: "web",
+			framework: "vite",
+			startCommand: "pnpm dev",
+			port: 5173,
+			isWeb: true,
+			projectDir: project.path,
+		},
+	});
+	const { container } = render(<TaskEmulator taskId="task-1" project={project} />);
+	const view = container.querySelector("webview");
+	if (!view) throw new Error("Missing preview");
+	Object.assign(view, { getWebContentsId: () => 42 });
+	fireEvent.click(
+		screen.getByRole("button", { name: "Point an element of the page and say what to change" }),
+	);
+	expect(startPreviewPoint).toHaveBeenCalledWith("task-1", 42);
+	expect(await screen.findByText("button.pay-cta")).toBeInTheDocument();
+	expect(screen.getByText("src/Cart.vue:2")).toBeInTheDocument();
+	const send = screen.getByRole("button", { name: "Send to the agent" });
+	expect(send).toBeDisabled(); // nothing said yet about the element
+	fireEvent.change(screen.getByLabelText("What to change about button.pay-cta"), {
+		target: { value: "Make it red" },
+	});
+	fireEvent.click(send);
+	await waitFor(() =>
+		expect(sendPreviewPoints).toHaveBeenCalledWith("task-1", [
+			{ elementId: "e".repeat(32), text: "Make it red" },
+		]),
+	);
+	expect(
+		await screen.findByText("Sent: the next session of the task gets it."),
+	).toBeInTheDocument();
+	expect(screen.queryByText("button.pay-cta")).not.toBeInTheDocument();
+});

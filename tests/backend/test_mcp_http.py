@@ -465,3 +465,151 @@ class TestTools:
             client, pat("alice"), "initialize", {"protocolVersion": "2025-06-18"}
         )
         assert "extensions" not in init.json()["result"]["capabilities"]
+
+
+def _second_project(world: dict, tmp_path: Path) -> str:
+    """PA2 in org A, alice a member: a project her personal token reaches too."""
+
+    async def make() -> str:
+        from server.db.engine import get_session_factory
+        from server.db.models import Project, ProjectMember
+
+        clone = tmp_path / "clone-a2"
+        clone.mkdir()
+        subprocess.run(["git", "init", "-q", str(clone)], check=True)
+        async with get_session_factory()() as db:
+            project = Project(
+                org_id=world["org_a"], name="PA2", repo_url="x", server_path=str(clone)
+            )
+            db.add(project)
+            await db.flush()
+            db.add(
+                ProjectMember(
+                    project_id=project.id,
+                    user_id=world["users"]["alice"].id,
+                    role="member",
+                )
+            )
+            await db.commit()
+            return project.id
+
+    return asyncio.run(make())
+
+
+def _audit(action: str) -> list[dict]:
+    async def read() -> list[dict]:
+        from server.db.engine import get_session_factory
+        from server.db.models import AuditLog
+        from sqlalchemy import select
+
+        async with get_session_factory()() as db:
+            rows = await db.scalars(select(AuditLog).where(AuditLog.action == action))
+            return [row.payload or {} for row in rows]
+
+    return asyncio.run(read())
+
+
+class TestTaskTokens:
+    """P7: a token for one card, its project only, ended with the card."""
+
+    def _card(self, client, world, pat) -> str:
+        card, error = _tool(
+            client, pat("alice"), "create_card", project_id=world["pa"], title="Login"
+        )
+        assert not error
+        return card["id"]
+
+    def _task_token(self, client, jwt, project_id, card_id, who="alice", **extra):
+        return client.post(
+            f"/api/board/cards/{card_id}/task-token",
+            params={"project_id": project_id},
+            json=extra,
+            headers=jwt(who) if isinstance(who, str) else who,
+        )
+
+    def test_it_reaches_its_project_only(self, stack, tmp_path):
+        client, world, jwt, pat = stack
+        other = _second_project(world, tmp_path)
+        card = self._card(client, world, pat)
+        res = self._task_token(client, jwt, world["pa"], card, scope="write")
+        assert res.status_code == 201, res.text
+        raw = res.json()["token"]
+        projects, _ = _tool(client, raw, "list_projects")
+        assert [p["id"] for p in projects] == [world["pa"]]
+        listed, error = _tool(client, raw, "list_cards", project_id=world["pa"])
+        assert not error and [c["id"] for c in listed] == [card]
+        for project_id in (other, world["pb"]):
+            value, error = _tool(client, raw, "list_cards", project_id=project_id)
+            assert error and value == "Error: no such project"
+        # Not one of the tokens the person manages in the app.
+        listed = client.get("/users/me/access-tokens", headers=jwt("alice")).json()
+        assert listed and not any(t["name"].startswith("task ") for t in listed)
+
+    def test_it_edits_its_own_card_only_and_its_writes_name_the_task(self, stack):
+        client, world, jwt, pat = stack
+        card = self._card(client, world, pat)
+        other = self._card(client, world, pat)
+        raw = self._task_token(client, jwt, world["pa"], card, scope="write").json()[
+            "token"
+        ]
+        value, error = _tool(
+            client, raw, "update_card", project_id=world["pa"], card_id=other, title="x"
+        )
+        assert error and "its own card" in value
+        _, error = _tool(
+            client, raw, "update_card", project_id=world["pa"], card_id=card, title="y"
+        )
+        assert not error
+        made, error = _tool(
+            client, raw, "create_card", project_id=world["pa"], title="Follow-up"
+        )
+        assert not error
+        updates = _audit("mcp.update_card")
+        assert {"task": card, "card": card} in [
+            {k: u[k] for k in ("task", "card")} for u in updates
+        ]
+        created = [p for p in _audit("mcp.create_card") if p["task"] == card]
+        assert [p["card"] for p in created] == [made["id"]]
+        # A personal token's writes are audited too, without a task.
+        assert {p["task"] for p in _audit("mcp.create_card")} == {None, card}
+
+    def test_it_ends_with_its_card(self, stack):
+        client, world, jwt, pat = stack
+        card = self._card(client, world, pat)
+        raw = self._task_token(client, jwt, world["pa"], card).json()["token"]
+        _, error = _tool(client, raw, "get_card", project_id=world["pa"], card_id=card)
+        assert not error
+        plan = (
+            world["clone_a"]
+            / ".workpilot"
+            / "specs"
+            / card
+            / "implementation_plan.json"
+        )
+        plan.write_text(json.dumps({"status": "done"}), encoding="utf-8")
+        value, error = _tool(client, raw, "list_projects")
+        assert error and "ended" in value
+        # Revoked, not only refused: it stays dead if the card moves back.
+        plan.write_text(json.dumps({"status": "in_progress"}), encoding="utf-8")
+        assert _rpc(client, raw, "tools/list").status_code == 401
+        assert self._task_token(client, jwt, world["pa"], card).status_code == 201
+        plan.write_text(json.dumps({"status": "done"}), encoding="utf-8")
+        assert self._task_token(client, jwt, world["pa"], card).status_code == 409
+
+    def test_refusals(self, stack):
+        client, world, jwt, pat = stack
+        card = self._card(client, world, pat)
+        assert self._task_token(client, jwt, world["pa"], "999-nope").status_code == 404
+        # Another organization's project: 404, never 403.
+        assert self._task_token(client, jwt, world["pb"], card).status_code == 404
+        assert (
+            self._task_token(client, jwt, world["pa"], card, ttl_hours=73).status_code
+            == 422
+        )
+        viewer = self._task_token(client, jwt, world["pa"], card, "vic", scope="write")
+        assert viewer.status_code == 403
+        # A personal token never makes a task token.
+        made = self._task_token(
+            client, jwt, world["pa"], card, {"Authorization": f"Bearer {pat('alice')}"}
+        )
+        assert made.status_code == 401
