@@ -45,6 +45,7 @@ const fileRecipe: WorktreeRecipe = {
 	copy: [".env.local"],
 	ports: 3,
 	teardown: [["docker", "compose", "down"]],
+	proofs: [["dafny", "verify", "src/Cart.dfy"]],
 };
 
 const api = {
@@ -92,6 +93,8 @@ describe("WorktreeRecipeSection", () => {
 		expect(screen.getByText(/\.env\.local/)).toBeInTheDocument();
 		expect(screen.getByText(/3 ports/)).toBeInTheDocument();
 		expect(screen.getByText(/docker compose down/)).toBeInTheDocument();
+		// The proof checkers are part of what the approval covers: shown too.
+		expect(screen.getByText(/dafny verify src\/Cart\.dfy/)).toBeInTheDocument();
 		fireEvent.click(screen.getByRole("button", { name: "Approve" }));
 		await waitFor(() => expect(api.approveWorktreeRecipe).toHaveBeenCalledWith("/repo"));
 		expect(await screen.findByText(/Approved/)).toBeInTheDocument();

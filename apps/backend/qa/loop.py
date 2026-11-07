@@ -76,6 +76,7 @@ from .criteria import (
 from .dependency_gate import dependency_gate
 from .fixer import run_qa_fixer_session
 from .mutation_gate import guard_start, guard_test_only, mutation_gate
+from .proof_gate import proof_gate
 from .report import (
     create_manual_test_plan,
     escalate_to_human,
@@ -540,6 +541,12 @@ async def run_qa_validation_loop(
                     project_dir,
                     state.qa_iteration,
                     state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or proof_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
                     task_logger=scope.task_logger,
                 )
                 or await _architecture_gate(scope, state.qa_iteration, qa_model)

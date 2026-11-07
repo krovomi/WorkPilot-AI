@@ -49,6 +49,7 @@ a `gate` command is implemented by that gate (`pack_inventory`).
 | `reproduce`, `investigate`, `procedure`, `proofread`, `verdict` | the engine, as one-shot skill sessions of the per-kind workflows (`skills/tooling/`) |
 | the `tests-unchanged` hard gate | the engine (`workflows/hard_gates.py`), from the task's real diff |
 | the `deps-exist` hard gate | the engine (`workflows/hard_gates.py`), from the dependency guard's record ([dependency-guard.md](dependency-guard.md)) |
+| the `proof-checks` hard gate | the engine (`workflows/hard_gates.py`), from the record of the project's proof checkers ([proof-checks.md](proof-checks.md)); no line for a project without `[proofs]` |
 | `execute` (a RUN's procedure) | the engine, through a dedicated executor (`workflows/execute.py`): no model, behind the irreversible gate and the command allowlist |
 
 **One workflow per task kind.** The workflow a build loads is the card's kind's
