@@ -270,9 +270,16 @@ function roleFor(type: string | undefined, lang: Lang): string {
 	);
 }
 
-/** A table cell: a pipe or a line break would split the row it sits in. */
-function cell(text: string): string {
-	return text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+/**
+ * A table cell: a pipe or a line break would split the row it sits in.
+ * Backslashes are escaped first, or a text ending in `\` would turn the
+ * escaped pipe after it back into a column separator.
+ */
+export function cell(text: string): string {
+	return text
+		.replace(/\\/g, "\\\\")
+		.replace(/\|/g, "\\|")
+		.replace(/\s*\n\s*/g, " ");
 }
 
 function kindLabel(kind: DiagramKind, s: SpecStrings): string {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildArchitectureSpec,
+	cell,
 	type DiagramEdgeInput,
 	type DiagramNodeInput,
 	sanitizeEdges,
@@ -210,5 +211,14 @@ describe("buildArchitectureSpec — explanations and custom bricks", () => {
 		expect(description).toContain("| App | Mobile application | Flutter |");
 		expect(description).toContain("runnable project for the stated framework");
 		expect(description).toContain("Wire the frontend to the backend API");
+	});
+});
+
+describe("cell", () => {
+	it("keeps a table row whole whatever the text holds", () => {
+		expect(cell("a | b")).toBe("a \\| b");
+		expect(cell("line one\n  line two")).toBe("line one line two");
+		// A trailing backslash must not unescape the pipe that follows it.
+		expect(cell("C:\\temp\\|x")).toBe("C:\\\\temp\\\\\\|x");
 	});
 });
