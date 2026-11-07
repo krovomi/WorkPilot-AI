@@ -9,6 +9,8 @@ import type { SteeringMessage } from "../types/steering";
 
 export const STEERING_FILE = "steering.jsonl";
 export const MAX_STEERING_CHARS = 4000;
+/** The element of the preview a message points at (F10): `MAX_CONTEXT_CHARS` in `foundation/steering.py`. */
+export const MAX_CONTEXT_CHARS = 8000;
 /** A subtask id as planners write them (`subtask-1-2`, `change-request-…`). */
 export const SUBTASK_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -27,6 +29,7 @@ export function messageLine(
 	createdAt: string,
 	source: string,
 	targetSubtaskId: string | null,
+	context = "",
 ): string {
 	return `${JSON.stringify({
 		type: "message",
@@ -35,6 +38,7 @@ export function messageLine(
 		created_at: createdAt,
 		source,
 		target_subtask_id: targetSubtaskId,
+		...(context ? { context: context.slice(0, MAX_CONTEXT_CHARS) } : {}),
 	})}\n`;
 }
 
@@ -84,6 +88,7 @@ export function parseSteering(contents: readonly string[]): SteeringMessage[] {
 				deliveredAt: d ? str(d.at) : null,
 				deliveredSession: d && typeof d.session === "number" ? d.session : null,
 				deliveredSubtaskId: d ? str(d.subtask_id) : null,
+				...(typeof m.context === "string" && m.context ? { hasContext: true } : {}),
 			};
 		})
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt));

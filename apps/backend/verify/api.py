@@ -13,6 +13,11 @@ app and may run agent sessions, so in server mode it answers to
 which server mode refuses outright — a desktop feature until a
 `project_id`-addressed endpoint exists.
 
+`POST /api/verify/compare` replays the verification on the branch the task
+forked from and on the task, without a model, and records what behaves
+differently (`compare.py`). It launches the app twice: `agent.execute`, like
+the run.
+
 `GET /api/verify/screenshot` serves one screenshot the record names — never a
 path from the request. `GET /api/verify/trace` serves the Playwright trace of
 the card's scenario the same way: the one the record names, inside the spec.
@@ -267,21 +272,53 @@ def verify_video(
     return error or FileResponse(found[0], media_type="video/webm")
 
 
-@router.post("/run")
-async def verify_run(body: VerifyRunRequest):
-    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
-    if error:
-        return error
+def _task_code(resolved: Path) -> tuple[Path, Path] | None:
+    """The task's code (its worktree when it exists) and the spec copy beside it."""
     project = _project_of(resolved)
     if project is None:
-        return {"success": False, "error": "the spec is not inside a project"}
+        return None
     worktree = _worktree(project, resolved.name)
     code_dir = worktree or project
     spec_dir = (
         (worktree / ".workpilot" / "specs" / resolved.name) if worktree else resolved
     )
-    if not spec_dir.is_dir():
-        spec_dir = resolved
+    return code_dir, (spec_dir if spec_dir.is_dir() else resolved)
+
+
+@router.post("/compare")
+async def verify_compare(body: VerifyRunRequest):
+    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
+    if error:
+        return error
+    found = _task_code(resolved)
+    if found is None:
+        return {"success": False, "error": "the spec is not inside a project"}
+    code_dir, spec_dir = found
+    try:
+        from .compare import run_base_comparison
+
+        entry = await run_base_comparison(code_dir, spec_dir)
+        record, where = _latest(resolved)
+        return {
+            "success": True,
+            "compare": entry,
+            "record": _public(record, where) if record else None,
+        }
+    except (OSError, RuntimeError, ValueError, TimeoutError):
+        # A git, launch or browser failure; a replay problem is in the entry.
+        logger.exception("verify compare failed")
+        return {"success": False, "error": "An internal error has occurred."}
+
+
+@router.post("/run")
+async def verify_run(body: VerifyRunRequest):
+    resolved, error = _resolve(body.spec_dir, body.project_dir, body.spec_id)
+    if error:
+        return error
+    found = _task_code(resolved)
+    if found is None:
+        return {"success": False, "error": "the spec is not inside a project"}
+    code_dir, spec_dir = found
     try:
         from verify.git import changed_files
         from workflows.runner import find_skill_body, phase_provider

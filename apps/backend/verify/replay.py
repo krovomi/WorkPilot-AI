@@ -30,7 +30,7 @@ from .record import load_record, persist_plan_summary, save_record
 from .settings import load_settings
 from .state import stop_all, work_dir
 
-__all__ = ["run_replay", "run_replay_phase"]
+__all__ = ["launch_targets", "replay_scenario", "run_replay", "run_replay_phase"]
 
 _ROW = re.compile(r"uid=(?P<uid>[\w-]+)\s+(?P<desc>.+)$")
 
@@ -118,7 +118,7 @@ async def _replay_window(
     return problems
 
 
-async def _replay_scenario(toolbox, record: dict) -> list[str]:
+async def replay_scenario(toolbox, record: dict) -> list[str]:
     problems: list[str] = []
     every = record.get("scenario") or []
     window_steps = [
@@ -209,6 +209,30 @@ async def _replay_endpoints(toolbox, record: dict) -> list[str]:
     return problems
 
 
+async def launch_targets(toolbox, detection, project: Path, base: Path) -> list[str]:
+    """Launch the detected targets (not the mobile ones); what kept one from starting."""
+    problems: list[str] = []
+    for target in detection.primary():
+        if target.kind == "mobile":
+            continue
+        result = await asyncio.to_thread(
+            launch,
+            target,
+            project,
+            base,
+            timeout=float(toolbox.settings.launch_timeout),
+            window_title=toolbox.window_title(),
+        )
+        blocking = [e for e in result.errors if e.kind != "environment"]
+        if not result.ok:
+            problems.append(
+                f"{target.name} did not start: {result.detail or result.status}"
+            )
+        elif blocking:
+            problems += [f"{target.name}: {e.message}" for e in blocking[:5]]
+    return problems
+
+
 async def run_replay(project_dir: Path | str, spec_dir: Path | str) -> dict:
     """Replay and fold the result into the record. Returns the replay entry."""
     project = Path(project_dir).resolve()
@@ -240,26 +264,9 @@ async def run_replay(project_dir: Path | str, spec_dir: Path | str) -> dict:
     toolbox._detection = detection
     problems: list[str] = []
     try:
-        for target in detection.primary():
-            if target.kind == "mobile":
-                continue
-            result = await asyncio.to_thread(
-                launch,
-                target,
-                project,
-                base,
-                timeout=float(toolbox.settings.launch_timeout),
-                window_title=toolbox.window_title(),
-            )
-            blocking = [e for e in result.errors if e.kind != "environment"]
-            if not result.ok:
-                problems.append(
-                    f"{target.name} did not start: {result.detail or result.status}"
-                )
-            elif blocking:
-                problems += [f"{target.name}: {e.message}" for e in blocking[:5]]
+        problems += await launch_targets(toolbox, detection, project, base)
         problems += await _replay_endpoints(toolbox, record)
-        problems += await _replay_scenario(toolbox, record)
+        problems += await replay_scenario(toolbox, record)
     finally:
         await close_toolboxes(project)
         stop_all(base)
