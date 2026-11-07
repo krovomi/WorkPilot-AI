@@ -35,12 +35,27 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
-__all__ = ["ProjectConfig", "load_project_config", "detect_targets"]
+__all__ = [
+    "ProjectConfig",
+    "detect_targets",
+    "dotnet_project_files",
+    "load_project_config",
+]
 
 CONFIG_RELPATH = Path(".workpilot") / "skills.toml"
 
-# net48 -> 4.8, net472 -> 4.7.2, net10.0 -> 10.0, netcoreapp3.1 -> 3.1
-_TFM_RE = re.compile(r"^net(?:coreapp|standard)?(\d+(?:\.\d+)*)$")
+# net48 -> 4.8, net472 -> 4.7.2, net10.0 -> 10.0, netcoreapp3.1 -> 3.1, and a
+# platform TFM by its runtime: net10.0-windows -> 10.0, net11.0-android36.0 -> 11.0.
+# `netstandard2.0` names an API surface, not a runtime: it is not a version here.
+_TFM_RE = re.compile(
+    r"^net(?:coreapp)?(\d+(?:\.\d+)*)(?:-[a-z]+[\d.]*)?$", re.IGNORECASE
+)
+
+# Where a TargetFramework can be written: every MSBuild project language, and the
+# Directory.Build.props that centralises it for a whole solution.
+_DOTNET_PROJECT_GLOBS = ("*.csproj", "*.fsproj", "*.vbproj", "Directory.Build.props")
+_MAX_PROJECT_FILES = 200
+_SKIPPED_PROJECT_DIRS = frozenset({"bin", "obj", "node_modules"})
 
 
 @dataclass
@@ -73,6 +88,21 @@ def _normalise_tfm(moniker: str) -> str | None:
     return ".".join(digits) if len(digits) <= 3 else None
 
 
+def dotnet_project_files(project_dir: Path) -> list[Path]:
+    """The MSBuild files that may set a TargetFramework, at most a fixed number."""
+    found: list[Path] = []
+    for pattern in _DOTNET_PROJECT_GLOBS:
+        for path in project_dir.rglob(pattern):
+            # Build output and vendored trees, judged below the project root
+            # only: a checkout under ~/bin/ is still read.
+            if _SKIPPED_PROJECT_DIRS & set(path.relative_to(project_dir).parts[:-1]):
+                continue
+            found.append(path)
+            if len(found) >= _MAX_PROJECT_FILES:
+                return found
+    return found
+
+
 def _detect_dotnet(project_dir: Path) -> str | None:
     # global.json pins the SDK and is the most authoritative marker.
     gj = project_dir / "global.json"
@@ -88,7 +118,7 @@ def _detect_dotnet(project_dir: Path) -> str | None:
     # multi-targeting solution should get the guidance for its newest runtime.
     best: tuple[int, ...] | None = None
     best_text: str | None = None
-    for proj in list(project_dir.rglob("*.csproj"))[:200]:
+    for proj in dotnet_project_files(project_dir):
         try:
             text = proj.read_text(encoding="utf-8", errors="replace")
         except OSError:

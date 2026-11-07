@@ -80,6 +80,7 @@ from prompts_pkg.prompt_generator import (
 from prompts_pkg.prompts import (
     constitution_section,
     docintel_section,
+    dotnet_section,
     is_first_run,
     mobile_section,
     uiux_section,
@@ -512,9 +513,9 @@ def _coding_task_segments(
         # The constitution applies to every subtask, not to the one that
         # happens to mention a library — so it goes in whole, each time.
         section("constitution", constitution_section(project_dir), Stability.PROJECT),
-        # Same reasoning: the platform rules apply to every subtask, not to
-        # the one that happens to mention a device.
+        # Same reasoning: the platform rules apply to every subtask, not one.
         section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("dotnet", dotnet_section(project_dir, spec_dir), Stability.TASK),
         section("effort", effort, Stability.TASK),
         # The ADRs bind every subtask too; the attachments come with them
         # because a subtask implementing a screen is the one that needs the
@@ -1101,37 +1102,36 @@ async def _planning_prompt(
         prompt += "\n\n" + planner_docs
         print_status("Library documentation available to planner", "success")
 
-    # A spec-kit project states its own rules; a plan written without
-    # them is one its own tooling would reject.
+    # A spec-kit project's rules: a plan without them is one its tooling rejects.
     planner_rules = constitution_section(project_dir)
     if planner_rules:
         prompt += "\n\n" + planner_rules
         print_status("spec-kit constitution applied to planning", "success")
 
-    # The ADRs bind the plan the way the constitution does, and the
-    # diagram or mockup attached to the task is where the person said
-    # what they meant when the description did not.
+    # The ADRs bind the plan like the constitution; the attached mockup or
+    # diagram says what the person meant when the description did not.
     planner_documents = docintel_section(project_dir, spec_dir)
     if planner_documents:
         prompt += "\n\n" + planner_documents
         print_status("ADRs and task attachments applied to planning", "success")
 
-    # The approaches `brainstorm` compared before planning. Its report
-    # was written to the spec's workflow/ directory and read by nobody
-    # until handed over here (`workflows.handoff`).
+    # The approaches `brainstorm` compared, from the spec's workflow/
+    # directory, read by nobody until handed over here (`workflows.handoff`).
     planner_reports = workflow_reports_section(spec_dir, "planning")
     if planner_reports:
         prompt += "\n\n" + planner_reports
         print_status("Earlier phase reports handed to the planner", "success")
 
-    # A phone application has no dev server and no URL: the plan has to
-    # say which platform each subtask is verified on, and on a machine
-    # without the toolchain for one of them, that it is not. A planner
-    # told this after the fact writes subtasks nobody can execute.
+    # A phone app has no URL: the plan says which platform verifies each
+    # subtask, and which one this machine cannot build.
     planner_mobile = mobile_section(project_dir)
     if planner_mobile:
         prompt += "\n\n" + planner_mobile
         print_status("Mobile stack and device toolchain applied to planning", "success")
+    # A .NET 11 migration is planned along its procedure (`dotnet_upgrade`).
+    if planner_dotnet := dotnet_section(project_dir, spec_dir, role="planner"):
+        prompt += "\n\n" + planner_dotnet
+        print_status(".NET 11 migration procedure applied to planning", "success")
     return prompt
 
 
