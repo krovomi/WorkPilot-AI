@@ -212,6 +212,29 @@ The screen then shows the entry to paste in each app, with the token in an
 `Authorization: Bearer` header (`apps/frontend/src/shared/utils/board-mcp-http.ts`).
 It is never in the URL.
 
+### Task tokens (prospective P7)
+
+"The agent has the person's rights" is not enough once agents work for hours
+on their own. A task token is a personal token narrowed to one card, for the
+agent working on it: `POST /api/board/cards/{card_id}/task-token` on the card's project
+(`shared_board/mcp_http.py`), with the board's write permission (`task.write`).
+
+- Made with the person's session, never with a token; for a card of a project
+  they reach (another organization's project is 404), not done (409); a write
+  token needs `task.write` and a member's role on the project, as any write.
+- It reaches its project only: `list_projects` lists that one, any other
+  `project_id` is "no such project". `update_card` edits its own card only.
+- It lasts 24 hours by default, 72 at most, and ends with its card: on every
+  call `/mcp` reads the card, and once it is done or has its pull request the
+  token is revoked and stays so, whatever the card does next.
+- Not listed with the person's tokens; 20 live task tokens per person.
+- Each write over `/mcp` is in the audit log (`mcp.create_card`,
+  `mcp.update_card`) with the token and, for a task token, its card: the log
+  says which task acted, not only which person.
+
+Not done yet: handing a task token, instead of the person's, to the agent of a
+server card's build.
+
 ### Tools
 
 The same as on a desktop, plus `list_projects`, the projects of the

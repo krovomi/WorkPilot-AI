@@ -407,6 +407,9 @@ activer : la route passe par le proxy comme le reste de l'API.
 - Retirer une personne de l'organisation, désactiver son compte ou ôter `task.read` à son rôle
   coupe aussitôt ses jetons ; il n'y a rien d'autre à révoquer.
 - Créations et révocations sont dans l'audit (`access_token.create`, `access_token.revoke`).
+- Un *jeton de tâche* (`POST /api/board/cards/{card_id}/task-token`, migration `0014`) ne vaut que pour une
+  carte et son projet, 72 heures au plus, et il est révoqué dès que la carte est terminée ; les
+  écritures par `/mcp` sont dans l'audit (`mcp.create_card`, `mcp.update_card`) avec la tâche.
 - Une requête dont l'`Origin` désigne un autre hôte est refusée (403) ; 240 requêtes par minute et
   par adresse.
 
