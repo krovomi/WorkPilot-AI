@@ -147,6 +147,7 @@ import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+import { registerPreviewPointHandlers } from "./task/preview-point-handlers";
 import { registerSteeringHandlers } from "./task/steering-handlers";
 import { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 import {
@@ -257,6 +258,7 @@ export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
 } from "./visual-programming-handlers";
+export { registerPreviewPointHandlers } from "./task/preview-point-handlers";
 export { registerSteeringHandlers } from "./task/steering-handlers";
 export { registerVisualToCodeHistoryHandlers } from "./visual-to-code-history-handlers";
 export { registerWorktreeRecipeHandlers } from "./worktree-recipe-handlers";
@@ -503,6 +505,7 @@ export function setupIpcHandlers(
 	registerVisualToCodeHistoryHandlers();
 	registerWorktreeRecipeHandlers();
 	registerSteeringHandlers();
+	registerPreviewPointHandlers();
 
 	// Design-to-Code handlers (design image → generated code)
 	registerDesignToCodeHandlers();

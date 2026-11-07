@@ -12,6 +12,7 @@ import {
 	GitMerge,
 	GitPullRequest,
 	Info,
+	ListChecks,
 	Loader2,
 	Minus,
 	Plus,
@@ -64,6 +65,8 @@ interface WorkspaceStatusProps {
 	readonly isCreatingPR?: boolean;
 	readonly existingPrUrl?: string | null;
 	readonly onShowDiffDialog: (show: boolean) => void;
+	/** Opens the guided review (the diff grouped by the plan's subtasks). */
+	readonly onShowGuidedReview?: () => void;
 	readonly onShowDiscardDialog: (show: boolean) => void;
 	readonly onShowConflictDialog: (show: boolean) => void;
 	readonly onLoadMergePreview: () => void;
@@ -125,6 +128,7 @@ export function WorkspaceStatus({
 	isCreatingPR,
 	existingPrUrl,
 	onShowDiffDialog,
+	onShowGuidedReview,
 	onShowDiscardDialog,
 	onShowConflictDialog,
 	onLoadMergePreview,
@@ -458,15 +462,29 @@ export function WorkspaceStatus({
 						<GitBranch className="h-4 w-4 text-purple-400" />
 						{t("taskReview:merge.buildReadyForReview")}
 					</h3>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => onShowDiffDialog(true)}
-						className="h-7 px-2 text-xs"
-					>
-						<Eye className="h-3.5 w-3.5 mr-1" />
-						{t("taskReview:merge.view")}
-					</Button>
+					<div className="flex items-center gap-1">
+						{onShowGuidedReview && (
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={onShowGuidedReview}
+								title={t("taskReview:guided.buttonHint")}
+								className="h-7 px-2 text-xs"
+							>
+								<ListChecks className="h-3.5 w-3.5 mr-1" />
+								{t("taskReview:guided.button")}
+							</Button>
+						)}
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => onShowDiffDialog(true)}
+							className="h-7 px-2 text-xs"
+						>
+							<Eye className="h-3.5 w-3.5 mr-1" />
+							{t("taskReview:merge.view")}
+						</Button>
+					</div>
 				</div>
 
 				{/* Compact stats row */}
