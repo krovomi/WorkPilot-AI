@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ReviewComment } from "../../types/review-comments";
 import {
 	checkCommentInput,
+	cleanCommentText,
 	excerptAround,
 	fixRequestSection,
 	locateComment,
@@ -50,6 +51,19 @@ describe("what the renderer may send", () => {
 			ok: true,
 			input: { path: "src/a.ts", side: "new", line: 2, text: "fix", commit: undefined },
 		});
+	});
+});
+
+describe("the person's text", () => {
+	it("drops control and invisible characters, keeps tabs and line breaks", () => {
+		const raw = `  a\u0000b\u0007c\td\ne\r\u007ff\u200bg\u202eh\u2062i\ufeffj  `;
+		expect(cleanCommentText(raw)).toBe("abc\td\ne\rfghij");
+	});
+
+	it("is bounded and never throws on a non-string", () => {
+		expect(cleanCommentText("x".repeat(5000))).toHaveLength(4000);
+		expect(cleanCommentText(undefined)).toBe("");
+		expect(cleanCommentText("é😀")).toBe("é😀");
 	});
 });
 

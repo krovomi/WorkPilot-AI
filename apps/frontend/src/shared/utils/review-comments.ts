@@ -25,13 +25,25 @@ export function safeRelativePath(raw: unknown): string | null {
 	return p;
 }
 
+/** Control characters, and the invisible ones that reorder or hide text. */
+function isHiddenChar(code: number): boolean {
+	return (
+		(code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+		code === 0x7f ||
+		(code >= 0x200b && code <= 0x200f) ||
+		(code >= 0x202a && code <= 0x202e) ||
+		(code >= 0x2060 && code <= 0x2064) ||
+		code === 0xfeff
+	);
+}
+
 /** The person's text without control characters, bounded. */
 export function cleanCommentText(raw: unknown): string {
-	return String(raw ?? "")
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: removing them is the point
-		.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f​-‏‪-‮⁠-⁤﻿]/g, "")
-		.trim()
-		.slice(0, MAX_COMMENT_CHARS);
+	let out = "";
+	for (const ch of String(raw ?? "")) {
+		if (!isHiddenChar(ch.codePointAt(0) ?? 0)) out += ch;
+	}
+	return out.trim().slice(0, MAX_COMMENT_CHARS);
 }
 
 export type InputCheck =
