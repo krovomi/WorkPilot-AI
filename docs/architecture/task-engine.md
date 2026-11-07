@@ -158,8 +158,10 @@ Côté backend, `core.oneshot` ne prend plus le message d'erreur que le CLI Clau
 son runner lit la réponse ; un sélecteur qui promet ce que le runner ignore est
 pire que pas de sélecteur. Aujourd'hui : `insights`, `ideation`, `roadmap`,
 `github-issues`, `github-prs`, `gitlab-merge-requests`, `prompt-optimizer`,
-`natural-language-git`. Les fonctionnalités qui ont un réglage de modèle mais
-aucun lecteur (`testGenerator`, `codeReview`, `voiceControl`, `utility`) n'en
+`natural-language-git`, `voice-control` (l'assistant vocal n'a pas de page : seul
+son handler lit la formule, [voice-assistant.md](voice-assistant.md)). Les
+fonctionnalités qui ont un réglage de modèle mais aucun lecteur (`testGenerator`,
+`codeReview`, `utility`) n'en
 font pas partie — le Kanban, lui, a déjà sa formule *par tâche*.
 
 | Qui lit | Où |
