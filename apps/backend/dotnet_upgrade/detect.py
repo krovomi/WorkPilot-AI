@@ -140,6 +140,7 @@ def task_text(spec_dir: Path | str | None) -> str:
     try:
         parts.append((spec / "spec.md").read_text(encoding="utf-8", errors="replace"))
     except OSError:
+        # No spec.md yet (the planner writes it): the requirement alone decides.
         pass
     return "\n".join(parts)[:_MAX_TASK_CHARS]
 

@@ -43,6 +43,7 @@ def _display(path: Path, project_dir: Path | str | None) -> str:
                 + path.resolve().relative_to(Path(project_dir).resolve()).as_posix()
             )
         except (OSError, ValueError):
+            # Outside the project (or unresolvable): fall back to the path as is.
             pass
     return path.as_posix()
 
