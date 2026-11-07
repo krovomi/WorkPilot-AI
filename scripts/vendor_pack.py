@@ -2,6 +2,11 @@
 """Vendor an upstream skill pack into `skills/<pack>/`.
 
     vendor_pack.py <owner/repo|url> --into skills/superpowers [--ref v2.1.0]
+    vendor_pack.py <owner/repo|url> --into skills/hermes --ref latest-release
+
+``--ref latest-release`` takes the upstream's highest stable ``vX.Y.Z`` tag
+(canaries and pre-releases skipped) and records that tag in the receipt, so a
+pack can follow a product's releases rather than its default branch.
 
 Why this exists rather than `npx skills add`
 --------------------------------------------
@@ -42,6 +47,9 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
+
+from skills_registry.upstream import LATEST_RELEASE, resolve_ref  # noqa: E402
 
 # Directories that belong to the upstream project rather than to its skills.
 # Copying them in would put a second CI config and a second node_modules under
@@ -236,7 +244,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--into", required=True, help="pack directory, e.g. skills/superpowers"
     )
-    parser.add_argument("--ref", default="HEAD", help="tag, branch or commit to pin")
+    parser.add_argument(
+        "--ref",
+        default="HEAD",
+        help=f"tag, branch or commit to pin, or {LATEST_RELEASE!r}",
+    )
     parser.add_argument(
         "--subdir",
         action="append",
@@ -269,11 +281,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    ref = resolve_ref(args.source, args.ref)
+    if ref is None:
+        print(
+            f"vendor_pack: {args.source} has no stable release tag to follow",
+            file=sys.stderr,
+        )
+        return 1
+
     pack = dest.name
     with tempfile.TemporaryDirectory(prefix="workpilot-vendor-") as tmp:
         clone_dir = Path(tmp) / "src"
         try:
-            _clone(args.source, args.ref, clone_dir)
+            _clone(args.source, ref, clone_dir)
         except subprocess.CalledProcessError as exc:
             print(f"vendor_pack: clone failed — {exc}", file=sys.stderr)
             return 1
@@ -303,15 +323,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(
-        f"vendored {args.source}@{head[:12] or args.ref} → {args.into} ({count} skill(s))"
+        f"vendored {args.source}@{ref if ref != 'HEAD' else head[:12] or ref}"
+        f" → {args.into} ({count} skill(s))"
     )
     # Leave a receipt so a human reading the tree knows it is generated.
     receipt = {
         "source": args.source,
-        "ref": args.ref,
+        "ref": ref,
         "commit": head,
         "skills": count,
     }
+    if args.ref != ref:
+        # What the manifest asked for, beside what it resolved to: a reader
+        # of the receipt can tell a pin from a pack that follows releases.
+        receipt["follows"] = args.ref
     if args.subdir:
         receipt["subdirs"] = sorted(args.subdir)
     if args.exclude:
