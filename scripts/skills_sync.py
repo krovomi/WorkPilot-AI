@@ -39,9 +39,11 @@ from skills_registry.classify import (  # noqa: E402
 from skills_registry.packs import load_packs  # noqa: E402
 from skills_registry.upstream import (  # noqa: E402
     LOCKFILE_NAME,
+    bootstrap_ref,
     fetch_tree_sha,
     record_shas,
     recorded_shas,
+    resolve_ref,
 )
 
 LOCKFILE = REPO_ROOT / LOCKFILE_NAME
@@ -178,8 +180,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.pack and pack.name != args.pack:
             continue
 
-        current = fetch_tree_sha(pack.source)
+        # A pack that follows releases is compared at its latest release, not
+        # at HEAD: otherwise every canary upstream pushes reads as a move,
+        # and the refetch would land on the same tag every week.
+        wanted = bootstrap_ref(pack.bootstrap)
+        ref = resolve_ref(pack.source, wanted)
+        if ref is None:
+            lines.append(
+                f"- `{pack.name}` — no release found on {pack.source}, skipped"
+            )
+            continue
+        current = fetch_tree_sha(pack.source, ref)
         known = recorded.get(pack.name, "")
+        at = f" at `{ref}`" if ref != wanted else ""
 
         if current is None:
             lines.append(f"- `{pack.name}` — could not reach {pack.source}, skipped")
@@ -187,13 +200,13 @@ def main(argv: list[str] | None = None) -> int:
         observed[pack.name] = current
 
         if current == known:
-            lines.append(f"- `{pack.name}` — unchanged (`{current[:12]}`)")
+            lines.append(f"- `{pack.name}` — unchanged (`{current[:12]}`){at}")
             continue
 
         changed = True
         lines.append(
             f"- `{pack.name}` — **moved** `{known[:12] or 'none'}` → `{current[:12]}` "
-            f"({pack.source})"
+            f"({pack.source}){at}"
         )
         if args.apply:
             # Snapshot before the fetch: this is the release we are on, and
