@@ -28,7 +28,9 @@ import {
 	buildChangeRequestSubtask,
 	addChangeRequestSubtaskToPlan,
 } from "./plan-file-utils";
+import { openCommentsFor } from "./review-comments-handlers";
 import { findTaskAndProject } from "./shared";
+import { fixRequestSection } from "../../../shared/utils/review-comments";
 import { updateExistingFile } from "../../utils/existing-file";
 import { type ExecutionHandlerContext } from "./execution-utils";
 
@@ -46,6 +48,7 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 			approved: boolean,
 			feedback?: string,
 			images?: ImageAttachment[],
+			commentIds?: unknown,
 		): Promise<IPCResult> => {
 			const serverCard = findServerCard(taskId);
 			if (serverCard) {
@@ -251,10 +254,15 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 					}
 				}
 
+				// Line comments are read from disk by id, never taken from the renderer.
+				const comments = openCommentsFor(taskId, commentIds);
+				const commentSection = fixRequestSection(comments);
+				const feedbackText =
+					feedback || (comments.length > 0 ? "See the review comments below." : "No feedback provided");
 				try {
 					writeFileSync(
 						fixRequestPath,
-						`# QA Fix Request\n\nStatus: REJECTED\n\n## Feedback\n\n${feedback || "No feedback provided"}${imageReferences}\n\nCreated at: ${new Date().toISOString()}\n`,
+						`# QA Fix Request\n\nStatus: REJECTED\n\n## Feedback\n\n${feedbackText}${commentSection}${imageReferences}\n\nCreated at: ${new Date().toISOString()}\n`,
 						"utf-8",
 					);
 				} catch (error) {
