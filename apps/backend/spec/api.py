@@ -20,11 +20,17 @@ shared server is a cross-tenant read — so this endpoint answers nothing there,
 exactly like `workflows/api.py`. Serving it under a tenant would mean addressing
 a task by `project_id` and letting the server resolve its own checkout; that is
 a different endpoint, not a parameter on this one.
+
+The links of each requirement to its files and tests (`requirement_trace`,
+P3) exist only once a build ran: they are read back, never recomputed here,
+with the requirements of earlier tasks, from the project's ledger, that
+touched the same files.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, Query
 from foundation.api_safety import (
@@ -33,6 +39,7 @@ from foundation.api_safety import (
     resolve_spec_dir,
 )
 from foundation.traceability import collect
+from requirement_trace import earlier_requirements, load_links
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +68,23 @@ def spec_traceability(
         }
 
     try:
-        return {"success": True, "traceability": collect(resolved)}
+        record = collect(resolved)
+        record["links"] = _links(resolved)
+        return {"success": True, "traceability": record}
     except Exception:  # noqa: BLE001
         logger.exception("traceability collection failed")
         return {"success": False, "error": "An internal error has occurred."}
+
+
+def _links(spec_dir: Path) -> dict | None:
+    """The build's links, and the earlier requirements on the same files."""
+    links = load_links(spec_dir)
+    if not links:
+        return None
+    project = spec_dir.parent.parent.parent
+    if spec_dir.parent.name != "specs" or spec_dir.parent.parent.name != ".workpilot":
+        return {**links, "earlier": []}
+    files = sorted(
+        {f for r in links.get("requirements") or [] for f in r.get("files") or []}
+    )
+    return {**links, "earlier": earlier_requirements(project, files, spec_dir.name)}

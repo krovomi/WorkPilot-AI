@@ -4,7 +4,7 @@
  * A project of this computer keeps reading its own folder.
  */
 
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { Project } from "@shared/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectStore } from "../../stores/project-store";
@@ -99,9 +99,13 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	// Let the views' pending loads settle while the DOM is still here: a load
-	// resolving after the last test of the file updates state once jsdom is
-	// gone ("window is not defined", an unhandled rejection that fails the run).
+	// Unmount first: emptying the project store below re-renders a mounted
+	// view as a project of this computer, which starts a new load after the
+	// settle. Then let the pending loads settle while the DOM is still here: a
+	// load resolving after the last test of the file updates state once jsdom
+	// is gone ("window is not defined", an unhandled rejection that fails the
+	// run).
+	cleanup();
 	await act(async () => {
 		await new Promise((resolve) => setTimeout(resolve, 0));
 	});
