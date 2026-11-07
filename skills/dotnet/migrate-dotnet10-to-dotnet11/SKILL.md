@@ -29,8 +29,8 @@ improvements, not a longer support window. Say so when the task's goal is suppor
 - Updating `global.json`, Dockerfiles and CI for .NET 11.
 - A project already on `net11.0` adopting C# 15: read `references/csharp15-adoption.md`.
 
-Not for: .NET Framework (separate porting effort), or a project below `net10.0` — pass
-the 8 → 9 and 9 → 10 breaking changes first, then come back here.
+Not for: .NET Framework (separate porting effort), or a project below `net10.0` — run
+`migrate-dotnet8-to-dotnet9` and `migrate-dotnet9-to-dotnet10` first, then come back here.
 
 ## Ground rules
 
