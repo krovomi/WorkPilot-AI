@@ -22,6 +22,7 @@ import {
 	type HermesCycle,
 	type HermesDecision,
 	type HermesReviewOutcome,
+	type HermesSoulInstall,
 	type HermesStatus,
 	fetchHermesStatus,
 	installHermesSoul,
@@ -45,6 +46,8 @@ export interface HermesState {
 	lastRunAt: number | null;
 	/** The last decision taken from the panel, for its confirmation line. */
 	lastReview: (HermesReviewOutcome & { decision: HermesDecision }) | null;
+	/** The last persona install, for the line about running sessions. */
+	lastSoulInstall: HermesSoulInstall | null;
 	/** Queue files a decision is being written for. */
 	deciding: readonly string[];
 	loading: boolean;
@@ -73,6 +76,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 	lastCycle: null,
 	lastRunAt: null,
 	lastReview: null,
+	lastSoulInstall: null,
 	deciding: [],
 	loading: false,
 	running: false,
@@ -87,6 +91,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 			lastCycle: null,
 			lastRunAt: null,
 			lastReview: null,
+			lastSoulInstall: null,
 			deciding: [],
 			loading: false,
 			running: false,
@@ -196,11 +201,12 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 		}
 		set((state) => ({
 			running: false,
+			lastSoulInstall: res.data,
 			status: state.status
 				? { ...state.status, soul: res.data.soul }
 				: state.status,
 		}));
-		// The persona is one of the doctor's five conditions, so its verdict
+		// The persona is one of the doctor's conditions, so its verdict
 		// changed too.
 		await get().load(true);
 	},

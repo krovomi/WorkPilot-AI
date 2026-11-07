@@ -120,6 +120,9 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # Same reason for the messages the person sends while the task runs, and
     # for their delivery marks (`foundation/steering.py`).
     "steering.jsonl",
+    # The person's line comments and their status (`foundation/review_comments.py`):
+    # an agent that could write it would mark its own work reviewed.
+    "review-comments.json",
 )
 
 #: Why a protected file that is not security configuration is refused.
@@ -133,6 +136,11 @@ _REFUSAL_REASONS: dict[str, str] = {
         "it holds the messages the person sends while the task runs, and only "
         "the person and WorkPilot write it. If you need to tell the person "
         "something, say it in your output."
+    ),
+    "review-comments.json": (
+        "it holds the person's line comments on the review and their status; "
+        "WorkPilot marks what your session changed. Fix the code the comments "
+        "point to, and say in your output what you did."
     ),
 }
 

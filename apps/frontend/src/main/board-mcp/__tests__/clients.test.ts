@@ -3,6 +3,7 @@
  * stale when it runs something else, removed, and the rest of the file kept.
  */
 import { describe, expect, it } from "vitest";
+import { HERMES_MCP_TIMEOUT_SECONDS } from "../../../shared/types/board-mcp";
 import {
 	type ClientFormat,
 	ConfigParseError,
@@ -115,6 +116,27 @@ describe("formats as each client documents them", () => {
 		expect(entryState("hermes-yaml", snippet("hermes-yaml", "w", windows), "w", windows)).toBe(
 			"current",
 		);
+	});
+
+	it("hermes gets a timeout that outlasts wait_for_card, and an entry without one is stale", () => {
+		const text = withEntry("hermes-yaml", "", "w", entry);
+		expect(text).toContain(`timeout: ${HERMES_MCP_TIMEOUT_SECONDS}`);
+		expect(snippet("hermes-yaml", "w", entry)).toContain(
+			`    timeout: ${HERMES_MCP_TIMEOUT_SECONDS}`,
+		);
+		// Written by an app before hermes 0.23 support: same command, no timeout.
+		const before = [
+			"mcp_servers:",
+			"  w:",
+			`    command: ${JSON.stringify(entry.command)}`,
+			"    args:",
+			...entry.args.map((arg) => `      - ${JSON.stringify(arg)}`),
+			"",
+		].join("\n");
+		expect(entryState("hermes-yaml", before, "w", entry)).toBe("stale");
+		const redone = withEntry("hermes-yaml", before, "w", entry);
+		expect(entryState("hermes-yaml", redone, "w", entry)).toBe("current");
+		expect(redone.match(/timeout:/g)).toHaveLength(1);
 	});
 
 	it("Claude Code is read from ~/.claude.json and written through its CLI", () => {

@@ -23,6 +23,7 @@ import {
 	StagedSuccessMessage,
 	WorkspaceStatus,
 } from "./task-review";
+import { useReviewComments } from "./hooks/useReviewComments";
 import { PlanApprovalSection } from "./PlanApprovalSection";
 import { TaskTestGenerator } from "./TaskTestGenerator";
 
@@ -138,6 +139,7 @@ export function TaskReview({
 	// the workspace view and the no-workspace view can trigger the same dialog.
 	const [showCompletionDialog, setShowCompletionDialog] = useState(false);
 	const [showGuidedReview, setShowGuidedReview] = useState(false);
+	const reviewComments = useReviewComments(task.id, !!worktreeStatus?.exists);
 
 	// Extract nested ternary into a clear variable
 	const workspaceStatusComponent = (() => {
@@ -238,6 +240,7 @@ export function TaskReview({
 				onReject={onReject}
 				images={images}
 				onImagesChange={onImagesChange}
+				reviewComments={reviewComments.comments}
 			/>
 
 			{/* Discard Confirmation Dialog */}
@@ -263,7 +266,11 @@ export function TaskReview({
 			<GuidedReviewDialog
 				open={showGuidedReview}
 				taskId={task.id}
-				onOpenChange={setShowGuidedReview}
+				onOpenChange={(open) => {
+					setShowGuidedReview(open);
+					if (!open) void reviewComments.refresh();
+				}}
+				reviewComments={reviewComments}
 				onShowFinalDiff={() => {
 					setShowGuidedReview(false);
 					onShowDiffDialog(true);

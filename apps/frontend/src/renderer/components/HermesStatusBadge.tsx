@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useHermesStore } from "../stores/hermes-store";
-import { CheckRow } from "./task-detail/HermesLearningCard";
+import { CheckRow, SoulInstallNote } from "./task-detail/HermesLearningCard";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -197,6 +197,8 @@ export function HermesStatusBadge({
 								: t("hermes:soul.install")}
 						</Button>
 					)}
+
+					<SoulInstallNote />
 
 					{error && (
 						<p

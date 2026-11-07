@@ -18,6 +18,10 @@ export const workspaceMock = {
 		},
 	}),
 
+	listReviewComments: async () => ({ success: true, data: [] }),
+	addReviewComment: async () => ({ success: false, error: "local_only" }),
+	updateReviewComment: async () => ({ success: false, error: "local_only" }),
+
 	getReviewGroups: async () => ({
 		success: true,
 		data: { groups: [], outOfPlan: [], unanchoredQa: [], approximate: false },
