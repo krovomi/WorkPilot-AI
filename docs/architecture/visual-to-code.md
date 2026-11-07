@@ -142,3 +142,48 @@ spécification de build, une ligne par connexion.
 **Écart de colonnes de 520 px** (`canvas-layout.ts`) : une carte (jusqu'à
 280 px) plus la phrase posée sur ses fils (jusqu'à 240 px) ; plus serré, la
 phrase tombe sur la carte suivante.
+
+## Import Design (`visual-to-code/design-import/`)
+
+L'onglet « Import Design » transforme une image (maquette, capture, export
+Figma) en composants de la stack du projet. Avant la refonte, il ne marchait
+pas de bout en bout : le runner plantait à la première ligne (`debug_section`
+sans module, `aiofiles` absent), le projet transmis était un dossier
+temporaire, et sans clé d'API la page montrait un exemple inventé comme s'il
+était une analyse.
+
+| Où | Quoi |
+|---|---|
+| `apps/backend/services/design_to_code_stacks.py` | une fiche par stack (15 : web, mobile, desktop) : prompt, fichier d'exemple, ce qu'est un composant, test visuel |
+| `apps/backend/services/design_to_code_service.py` | le pipeline : vision, jetons du design system, spec, code, tests ; une ligne de progression par phase |
+| `apps/backend/runners/design_to_code_runner.py` | le runner ; `--no-write` quand l'app l'appelle |
+| `main/design-to-code-service.ts` | le pont : requête revalidée, projet nommé par son id, écriture confinée |
+| `main/design-to-code-stack.ts` | la stack du projet lue dans ses manifestes (racine et sous-dossiers directs) |
+| `stores/design-to-code-store.ts`, `lib/design-import-steps.ts` | l'état de la page et l'état de chaque étape |
+
+**Le run lit le projet, il n'écrit rien.** Le runner reçoit toujours
+`--no-write` ; la page montre les fichiers (« nouveau » ou « remplace ») et
+seul `writeDesignFiles`, sur un clic, écrit ceux que la personne a acceptés.
+Chaque chemin passe par `resolveWritableUnder` (liens compris) ; `.git`,
+`.workpilot*`, `.claude*`, `.env*` et `.github/workflows` sont refusés, quel
+que soit ce que le modèle a proposé. Un fichier refusé est listé avec sa
+raison, pas ignoré en silence.
+
+**La vision passe par l'abonnement Claude quand il n'y a pas de clé.** Le
+client SDK de l'agent `commit_message` (sans outil) reçoit l'image comme bloc
+de contenu. Un agent qui lirait l'image avec l'outil `Read` pourrait suivre un
+texte injecté dans la maquette ; sans outil, ce texte reste une donnée. Sans
+aucun modèle, le résultat porte `simulated: true` et la page l'annonce.
+
+**Toutes les stacks, pas seulement React.** La cible se choisit dans le
+composer, et la stack détectée est proposée sans écraser un choix déjà fait.
+Les tests visuels suivent la stack (Playwright sur trois tailles d'écran,
+golden Flutter, SnapshotTesting, Paparazzi, Jest pour React Native) ; MAUI,
+WPF/WinUI et Avalonia n'en ont pas d'outil commun, et l'étape l'affiche comme
+« non prise en charge » au lieu de produire un fichier qui ne tournerait pas.
+
+**Les blocs et les phrases ne se confondent pas.** Les six étapes sont des
+cartes ; la phrase entre deux étapes est du texte en italique sans cadre,
+modifiable, gardé dans `localStorage` (`design-import-notes`). C'est la
+demande qui a lancé la refonte : avec un cadre, les phrases se lisaient comme
+des blocs.
