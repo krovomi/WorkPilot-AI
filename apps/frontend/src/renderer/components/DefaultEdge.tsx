@@ -27,6 +27,8 @@ export interface DefaultEdgeData {
 	description?: string;
 	/** This wire's own colour (`#rrggbb`). Absent: the canvas' connectors. */
 	color?: string;
+	/** Linked although the architecture rules do not foresee it: drawn dashed. */
+	forced?: boolean;
 	/** Render-only: the sentence shown, theirs or the canvas'. */
 	explanation?: string;
 	/** Render-only: the sentence the canvas would write. */
@@ -140,7 +142,11 @@ export const DefaultEdge: React.FC<EdgeProps<DefaultEdgeData>> = ({
 					interactionWidth={18}
 					style={{ stroke: "transparent" }}
 				/>
-				<path d={edgePath} className="vtc-edge-core" />
+				<path
+					d={edgePath}
+					className="vtc-edge-core"
+					style={data?.forced ? { strokeDasharray: "6 5" } : undefined}
+				/>
 				<path d={edgePath} className="vtc-edge-spark" />
 			</g>
 			<EdgeLabelRenderer>
