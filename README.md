@@ -192,6 +192,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Auto-Refactoring** | Pattern-based and architectural code transformations |
 | **Code Migration** | Large-scale codebase migrations across frameworks and libraries |
 | **Design to Code** | Converts UI mockups and screenshots to React/HTML |
+| **Visual to Code** | Draw an architecture as a node graph (services, databases, agents, a mobile app…) on every stack, with your own reusable bricks, a sentence explaining each connection and eight canvas themes; the bricks' descriptions and the interaction texts go into the build spec sent to the agents. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) |
 | **Pipeline Generator** | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
