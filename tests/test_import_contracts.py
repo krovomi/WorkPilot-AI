@@ -58,6 +58,15 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
     "mutation_gate": {"foundation", "security"},
+    # The provenance dossier of a PR (docs/architecture/provenance.md): it
+    # reads what Agent Trace, the dependency guard and the build recorded, and
+    # hands it to the compliance collector. The PR body (core) reads it.
+    "provenance": {
+        "foundation",
+        "agent_trace",
+        "dependency_guard",
+        "compliance_collector",
+    },
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).
@@ -170,6 +179,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "hermes": {"brain", "foundation", "learning_loop"},
     "memory": {"brain"},
     "uiux": {"brain", "foundation", "injection_guard", "project", "skills_registry"},
+    # .NET 11 / C# 15 for the projects WorkPilot builds: the project's toolchain
+    # and the bundled skill through skills_registry, nothing that runs an agent
+    # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
+    "dotnet_upgrade": {"skills_registry"},
 }
 
 # The largest set of units that all import one another, directly or not. It

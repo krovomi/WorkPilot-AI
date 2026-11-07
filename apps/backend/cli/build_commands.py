@@ -386,6 +386,19 @@ def _run_attachments_preflight(spec_dir: Path, source_project_dir: Path) -> None
         debug_warning("run.py", f"Attachments preflight skipped: {exc}")
 
 
+def _run_dotnet_preflight(working_dir: Path, spec_dir: Path) -> None:
+    """Stage the .NET 11 migration skill next to the spec when the task needs it.
+
+    Before planning, so the planner plans along the procedure. Reads the
+    worktree (its TargetFramework is the one being built) and the task's words;
+    never raises (`dotnet_upgrade.preflight`).
+    """
+    from dotnet_upgrade import run_preflight
+
+    if summary := run_preflight(working_dir, spec_dir).describe():
+        print("\n" + summary)
+
+
 def _phase_context(
     profile,
     project_dir: Path,
@@ -668,11 +681,12 @@ def _report_hard_gates(
     if profile is None:
         return
     try:
-        from workflows import evaluate_hard_gates
+        from workflows.hard_gates import evaluate_hard_gates, write_gate_record
 
         report = evaluate_hard_gates(
             profile, spec_dir, tests_passed=tests_passed, changed_files=changed_files
         )
+        write_gate_record(spec_dir, report)
         if summary := report.describe():
             print("\n" + summary)
         if report.blocking:
@@ -959,6 +973,8 @@ def handle_build_command(
         # What the person attached to the task — screenshots, mockups, draw.io
         # and Excalidraw diagrams — read once, before the plan is written.
         _run_attachments_preflight(spec_dir, project_dir)
+        # A .NET 10 project the task moves to .NET 11, or one already on it.
+        _run_dotnet_preflight(working_dir, spec_dir)
         # Long tasks: a digest on the notification channels, when asked (P1).
         start_digest_heartbeat(spec_dir, project_dir)
 
