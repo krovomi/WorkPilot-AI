@@ -100,6 +100,66 @@ describe("GuidedReviewDialog", () => {
 		expect(await screen.findByText("0/2 viewed")).toBeInTheDocument();
 	});
 
+	it("comments a line from the gutter, by keyboard too, on the group's version", async () => {
+		const add = vi.fn().mockResolvedValue(true);
+		const reviewComments = { comments: [], error: null, add, update: vi.fn() };
+		render(
+			<GuidedReviewDialog
+				open
+				taskId="task-1"
+				onOpenChange={vi.fn()}
+				onShowFinalDiff={vi.fn()}
+				reviewComments={reviewComments}
+			/>,
+		);
+		await screen.findByText("GET /orders returns the user's orders");
+		const gutter = screen.getAllByRole("button", { name: "Comment on line 1" })[0];
+		gutter.focus();
+		expect(gutter).toHaveFocus();
+		fireEvent.click(gutter);
+		fireEvent.change(screen.getByRole("textbox", { name: "Comment on line 1" }), { target: { value: "Handle a null order" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add the comment" }));
+		await waitFor(() =>
+			expect(add).toHaveBeenCalledWith({
+				path: "api.ts",
+				side: "old",
+				line: 1,
+				text: "Handle a null order",
+				commit: "base",
+			}),
+		);
+	});
+
+	it("shows a comment with its status where it was written", async () => {
+		const comment = {
+			id: "c1",
+			path: "api.ts",
+			side: "new" as const,
+			line: 1,
+			commit: "c1",
+			excerpt: ["b"],
+			excerptOffset: 0,
+			text: "Rename it",
+			status: "addressed" as const,
+			createdAt: "2026-11-06T10:00:00Z",
+			updatedAt: "2026-11-06T10:00:00Z",
+		};
+		const update = vi.fn().mockResolvedValue(true);
+		render(
+			<GuidedReviewDialog
+				open
+				taskId="task-1"
+				onOpenChange={vi.fn()}
+				onShowFinalDiff={vi.fn()}
+				reviewComments={{ comments: [comment], error: null, add: vi.fn(), update }}
+			/>,
+		);
+		expect(await screen.findByText("Rename it")).toBeInTheDocument();
+		expect(screen.getByText("Addressed by the fixer")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+		await waitFor(() => expect(update).toHaveBeenCalledWith("c1", "resolve"));
+	});
+
 	it("sends a server card to the final diff", async () => {
 		api.getReviewGroups.mockResolvedValue({ success: false, error: "local_only" });
 		const onShowFinalDiff = vi.fn();

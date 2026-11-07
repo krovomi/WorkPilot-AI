@@ -172,6 +172,45 @@ python3 runners/hermes_runner.py --action status
 python3 runners/hermes_runner.py --action cycle --surface kanban
 ```
 
+### hermes 0.23.0, and what WorkPilot uses from it
+
+The pack, the doctor and the board follow hermes **releases**. v0.23.0 ("The Hearth
+Release", 5 November 2026) is the one wired here:
+
+- **The pack follows releases, not `HEAD`.** `skills/hermes/pack.json` bootstraps with
+  `--ref latest-release`: `vendor_pack.py` takes the highest stable `vX.Y.Z` tag
+  (canaries `+canary.<date>`, pre-releases and hermes's old calendar tags `v2026.9.24`
+  skipped, as hermes's own `update_channel` draws the line) and the receipt
+  (`.vendored.json`) records it beside `"follows": "latest-release"`. The weekly sync
+  compares the tree at that tag, so a canary upstream pushes every morning is not a move.
+  The twelve vendored skills did not change between the last `HEAD` snapshot and v0.23.0.
+- **A `version` condition in the doctor.** `hermes/version.py` runs `hermes --version`
+  (hermes's own answer: its package metadata says `0.0.0` on every source install),
+  bounded to 10 seconds and cached per binary path and modification time, and only when
+  the caller asks (`probe_version`: the status a person opens, `hermes_runner.py`) — never
+  the build's `observe` phase. Below `MIN_VERSION` (0.23.0) it warns with
+  `hermes update`, hermes's own updater, which knows whether the install is git, pip, nix
+  or the desktop app. A version it cannot read (a checkout without its tags prints
+  `vgit.<sha>`) is not reported at all: "unknown" is not "too old".
+- **`hermes sessions refresh-prompts` after a persona install.** A persona is read when a
+  session builds its system prompt, and since 0.23 one gateway owns every session, long
+  before the button was pressed. Right after an install the person asked for, the API
+  asks hermes to have its continuing sessions rebuild their prompt on their next turn
+  (history kept), on the same `HERMES_HOME` the file was written into. That is hermes's
+  own command writing hermes's own state, never a file WorkPilot edits; an older hermes is
+  not asked, and the panel shows `hermes update` then the command.
+- **`hermes curator lock`, offered, not run.** Since 0.23 a lock stops hermes's curator
+  from rewriting or archiving a skill. When a person keeps candidates, the panel lists one
+  `hermes curator lock <name>` per skill: whether hermes may keep improving a skill is
+  that person's call.
+- **The board's `wait_for_card` reports progress**, which hermes 0.23 relays to the
+  person, and the hermes entry carries a `timeout` long enough for it
+  ([board-mcp.md](board-mcp.md#waiting-is-a-task)).
+
+Not wired, on purpose: the Webapp, group chats, paid MCP tools (the board starts nothing
+that costs a model call), MCP webhook events (experimental, and they need a public HTTPS
+URL), and `hermes mcp-serve` (WorkPilot never launches hermes as a server).
+
 ### The cycle, and who may open it
 
 `apps/backend/hermes/` is the capability; the ingest above stays in `learning_loop/`
@@ -180,8 +219,9 @@ because that is where the review queue and its rules live.
 | Module | Answers |
 |---|---|
 | `home.py` | where hermes keeps its state, and what the user configured there |
-| `soul.py` | the persona this repository offers, and whether it is installed |
+| `soul.py` | the persona this repository offers, whether it is installed, and asking running sessions to take it |
 | `readiness.py` | whether the loop can run in this checkout, and what is missing |
+| `version.py` | which hermes release is installed, and whether it is at least `MIN_VERSION` |
 | `loop.py` | the cycle itself, opened by a named feature surface |
 | `api.py` | `GET /api/hermes/status`, `POST /api/hermes/cycle`, `POST /api/hermes/review`, `POST /api/hermes/soul/install` |
 | `brain_link.py` | what hermes learned, filed in the shared brain — and whether hermes reads it back |
@@ -316,7 +356,9 @@ from the card's button or `--action install-soul`, never from a build. That home
 to the user's own agent, in conversations WorkPilot will never see; a pipeline that
 silently overwrote it would be rewriting a personality that is not ours. A *different*
 persona already in place is left alone unless the caller says otherwise, and the one it
-replaces is kept beside it with a timestamp.
+replaces is kept beside it with a timestamp. Once written, the sessions already running
+are asked to rebuild their prompt (`hermes sessions refresh-prompts`, hermes ≥ 0.23),
+see above.
 
 A candidate carries **no external verification signal**, and that is not a gap to close
 later. Hermes's approval gate is a person saying yes to a text; it is not an observation

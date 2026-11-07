@@ -36,6 +36,18 @@ export const BOARD_MCP_CLIENT_NAMES: Readonly<Record<BoardMcpClientId, string>> 
 	hermes: "Hermes Agent",
 };
 
+/**
+ * `mcp_servers.<name>.timeout` in a hermes entry, in seconds.
+ *
+ * hermes cuts every MCP call at 300 s unless the entry says otherwise, and
+ * `wait_for_card` waits up to four hours (`MAX_WAIT_SECONDS` in
+ * `apps/backend/board_mcp/server.py`; `tests/test_board_mcp_hermes_timeout.py`
+ * keeps the two in step). Since hermes 0.23 the person sees the card move
+ * while it waits (`notifications/progress`), so a long wait is no longer a
+ * silent one worth cutting short.
+ */
+export const HERMES_MCP_TIMEOUT_SECONDS = 4 * 3600 + 60;
+
 export function isBoardMcpClient(value: unknown): value is BoardMcpClientId {
 	return typeof value === "string" && (BOARD_MCP_CLIENTS as readonly string[]).includes(value);
 }
