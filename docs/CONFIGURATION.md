@@ -755,6 +755,13 @@ files. Only public `http` and `https` addresses are accepted.
 `SLACK_WEBHOOK_URL` and `TEAMS_WEBHOOK_URL` are also where a hook's `send_slack`
 or `send_teams` action posts when it names no URL.
 
+`WORKPILOT_TASK_DIGEST_HOURS` (off by default, 0.25 to 168) sends a digest of
+each running build to the same channels at that interval: subtasks done out of
+planned, what runs, what is blocked and why, the QA pass. The first one comes
+one interval after the build started, so a short task sends none, and a build
+resumed after a restart waits for the rest of the interval
+([task-digest.md](architecture/task-digest.md)).
+
 ### Third-party MCP servers
 
 These credentials go only to an MCP server an agent may be given. A server starts
