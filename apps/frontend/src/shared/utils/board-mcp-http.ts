@@ -9,7 +9,7 @@
  * Streamable HTTP, and its `headers` are sent as configured.
  */
 
-import type { BoardMcpClientId } from "../types/board-mcp";
+import { type BoardMcpClientId, HERMES_MCP_TIMEOUT_SECONDS } from "../types/board-mcp";
 
 export const SERVER_MCP_NAME = "workpilot-server";
 
@@ -74,6 +74,7 @@ export function httpSnippet(client: BoardMcpClientId, url: string, token: string
 				`    url: ${JSON.stringify(url)}`,
 				"    headers:",
 				`      Authorization: ${JSON.stringify(auth)}`,
+				`    timeout: ${HERMES_MCP_TIMEOUT_SECONDS}`,
 				"",
 			].join("\n");
 		case "claude-desktop":

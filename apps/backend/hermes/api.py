@@ -53,7 +53,8 @@ from pydantic import BaseModel, Field
 
 from .loop import SURFACES, run_cycle
 from .readiness import doctor
-from .soul import install_soul, soul_status
+from .soul import REFRESH_COMMAND, install_soul, refresh_prompts, soul_status
+from .version import MIN_VERSION, UPDATE_COMMAND
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,9 @@ def _status_payload(repo_root: Path) -> dict:
 
     from .brain_link import brain_link
 
-    report = doctor(repo_root)
+    # The version probe is the one condition that runs hermes: asked for here,
+    # where a person opened a panel, and cached per binary after that.
+    report = doctor(repo_root, probe_version=True)
     pending, stale = _pending(repo_root)
     return {
         "readiness": report.to_dict(),
@@ -229,6 +232,13 @@ def hermes_install_soul(body: SoulRequest):
             "success": True,
             "changed": changed,
             "message": message,
+            # Running sessions rebuild their prompt with the new persona on
+            # their next turn (hermes >= 0.23); the command is returned so the
+            # panel can show it when hermes could not be asked.
+            "sessions": refresh_prompts() if changed else None,
+            "refreshCommand": REFRESH_COMMAND,
+            "updateCommand": UPDATE_COMMAND,
+            "minVersion": MIN_VERSION,
             "soul": soul_status(_REPO_ROOT).to_dict(),
         }
     except Exception:  # noqa: BLE001
