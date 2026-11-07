@@ -74,8 +74,9 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 
 	useEffect(() => {
 		let alive = true;
-		window.electronAPI
-			.runCodeInsights({ action: "languages" })
+		// Started inside a promise so that a preview without the bridge degrades, not throws.
+		Promise.resolve()
+			.then(() => window.electronAPI.runCodeInsights({ action: "languages" }))
 			.then((result) => {
 				if (alive) setLanguages(result.languages);
 			})
