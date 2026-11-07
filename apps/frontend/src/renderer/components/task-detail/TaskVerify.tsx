@@ -10,6 +10,7 @@ import {
 import { useVerifyStore } from "../../stores/verify-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { compareShotIndices, VerifyCompare } from "./VerifyCompare";
 import { measured, statusVariant } from "./verify-view";
 
 export interface TaskVerifyProps {
@@ -39,6 +40,8 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 	}
 	const query = { projectDir: projectPath, specId: task.specId };
 	const running = entry?.busy === "running";
+	// A comparison launches the app too: no run on top of it.
+	const busy = running || entry?.busy === "comparing";
 
 	return (
 		<div className="space-y-5 p-4 text-sm">
@@ -55,10 +58,10 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 					{record.reason && <span className="text-muted-foreground">{record.reason}</span>}
 				</div>
 				<div className="flex gap-2">
-					<Button size="sm" variant="outline" disabled={running} onClick={() => void run(task.id, query, "low")}>
+					<Button size="sm" variant="outline" disabled={busy} onClick={() => void run(task.id, query, "low")}>
 						{t("tasks:verify.rerunQuick")}
 					</Button>
-					<Button size="sm" disabled={running} onClick={() => void run(task.id, query)}>
+					<Button size="sm" disabled={busy} onClick={() => void run(task.id, query)}>
 						{running && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
 						{t("tasks:verify.rerun")}
 					</Button>
@@ -74,6 +77,7 @@ export function TaskVerify({ task, projectPath }: TaskVerifyProps) {
 			<CardScenario record={record} query={query} />
 			<Screenshots record={record} query={query} />
 			<Scenario record={record} />
+			<VerifyCompare taskId={task.id} record={record} query={query} />
 			<Findings record={record} />
 			{record.browser?.reasons && record.browser.reasons.length > 0 && !record.browser.engine && (
 				<p className="text-xs text-muted-foreground">
@@ -332,11 +336,13 @@ function Screenshots({
 	readonly query: { projectDir: string; specId: string };
 }) {
 	const { t } = useTranslation(["tasks"]);
-	if (record.screenshots.length === 0) return null;
+	const compared = compareShotIndices(record);
+	const shots = record.screenshots.filter((shot) => !compared.has(shot.index));
+	if (shots.length === 0) return null;
 	return (
 		<Section title={t("tasks:verify.sections.screenshots")}>
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				{record.screenshots.map((shot) => (
+				{shots.map((shot) => (
 					<figure key={shot.index} className="overflow-hidden rounded border border-border">
 						<img
 							src={verifyScreenshotUrl(query, shot.index)}

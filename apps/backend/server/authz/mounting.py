@@ -45,6 +45,8 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/slash-commands/run"): "agent.execute",
     # Launches the task's app and may run fixer and verifier sessions.
     ("POST", "/api/verify/run"): "agent.execute",
+    # Launches the task's app twice, on its base branch and on the task.
+    ("POST", "/api/verify/compare"): "agent.execute",
     # Executes arbitrary submitted code in the playground sandbox.
     ("POST", "/api/code-playground/run"): "agent.execute",
     # Starts and stops orchestration sessions.
