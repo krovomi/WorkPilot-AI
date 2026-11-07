@@ -20,7 +20,7 @@ import {
 	MessageSquareWarning,
 	PencilLine,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	ReviewGroup,
@@ -46,7 +46,12 @@ import {
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
-import { DiffViewer } from "../../ui/diff-viewer";
+import { type DiffLineTarget, DiffViewer } from "../../ui/diff-viewer";
+import {
+	FileComments,
+	type ReviewCommentsApi,
+	ReviewCommentsContext,
+} from "./ReviewLineComments";
 
 const STORAGE_PREFIX = "workpilot:guided-review:";
 
@@ -74,6 +79,8 @@ interface GuidedReviewDialogProps {
 	readonly onOpenChange: (open: boolean) => void;
 	/** Opens the flat review of the final diff. */
 	readonly onShowFinalDiff: () => void;
+	/** Line comments (F9); absent, the diff has no comment buttons. */
+	readonly reviewComments?: Omit<ReviewCommentsApi, "versions">;
 }
 
 export function GuidedReviewDialog({
@@ -81,6 +88,7 @@ export function GuidedReviewDialog({
 	taskId,
 	onOpenChange,
 	onShowFinalDiff,
+	reviewComments,
 }: GuidedReviewDialogProps) {
 	const { t } = useTranslation(["taskReview"]);
 	const [data, setData] = useState<ReviewGroups | null>(null);
@@ -125,6 +133,11 @@ export function GuidedReviewDialog({
 		() => new Map(groups.map((g) => [g.key, groupTitle(g, t)])),
 		[groups, t],
 	);
+	const commentsApi = useMemo<ReviewCommentsApi | null>(() => {
+		if (!reviewComments) return null;
+		const versions = new Set(groups.flatMap((g) => [g.from, g.to]).filter((v): v is string => !!v));
+		return { ...reviewComments, versions };
+	}, [reviewComments, groups]);
 
 	const toggle = (group: ReviewGroup, file: ReviewGroupFile, value: boolean) => {
 		setViewedState((state) => {
@@ -135,6 +148,7 @@ export function GuidedReviewDialog({
 	};
 
 	return (
+		<ReviewCommentsContext.Provider value={commentsApi}>
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
 			<AlertDialogContent className="max-w-7xl max-h-[95vh] w-[95vw] h-[90vh] overflow-hidden flex flex-col">
 				<AlertDialogHeader>
@@ -228,6 +242,7 @@ export function GuidedReviewDialog({
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
+		</ReviewCommentsContext.Provider>
 	);
 }
 
@@ -300,6 +315,8 @@ function FileView({
 }) {
 	const { t } = useTranslation(["taskReview"]);
 	const [expanded, setExpanded] = useState(!viewed);
+	const [target, setTarget] = useState<DiffLineTarget | null>(null);
+	const canComment = useContext(ReviewCommentsContext) !== null;
 	useEffect(() => setExpanded(!viewed), [viewed]);
 	const checkboxId = `viewed-${group.key}-${file.path}`;
 	return (
@@ -364,12 +381,13 @@ function FileView({
 			{expanded && (
 				<div className="border-t border-border">
 					{file.patch ? (
-						<DiffViewer patch={file.patch} />
+						<DiffViewer patch={file.patch} onCommentLine={canComment ? setTarget : undefined} />
 					) : (
 						<p className="px-3 py-2 text-xs text-muted-foreground">{t("taskReview:guided.noPatch")}</p>
 					)}
 				</div>
 			)}
+			<FileComments group={group} path={file.path} target={target} onCloseComposer={() => setTarget(null)} />
 		</article>
 	);
 }

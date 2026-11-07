@@ -23,6 +23,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from .progress import Notify, bind_progress
 from .store import TaskStore
 from .wire import (
     INVALID_PARAMS,
@@ -34,6 +35,7 @@ from .wire import (
     UNSUPPORTED_PROTOCOL_VERSION,
     WireError,
     declares_extension,
+    request_meta,
     request_version,
 )
 
@@ -84,6 +86,9 @@ class ToolServer:
         self._task_tools = task_tools & self._names
         self.tasks = store or TaskStore()
         self._resources = resources
+        self.notify: Notify | None = None
+        """Writes a notification to the client, set by a transport that can
+        (stdio). None means the client is never sent progress."""
         # One tool at a time, task or not: the tools share state (a browser,
         # a launched app) and ran in order before tasks existed.
         self._run_lock = asyncio.Lock()
@@ -130,7 +135,8 @@ class ToolServer:
         if method == "tools/list":
             return {"tools": self._tools}
         if method == "tools/call":
-            return await self._run(*self._tool_call(params))
+            name, arguments = self._tool_call(params)
+            return await self._run(name, arguments, _progress_token(params))
         if method in _RESOURCE_METHODS:
             return await self._resource(method, params)
         if method in _TASK_METHODS:
@@ -164,16 +170,17 @@ class ToolServer:
             }
         if method == "tools/call":
             name, arguments = self._tool_call(params)
+            token = _progress_token(params)
             if name in self._task_tools and declares_extension(params, TASKS_EXTENSION):
                 return {
                     **self.tasks.start(
-                        lambda: self._run(name, arguments),
+                        lambda: self._run(name, arguments, token),
                         status_message=f"{name} running",
                     ),
                     "_meta": meta,
                 }
             return {
-                **await self._run(name, arguments),
+                **await self._run(name, arguments, token),
                 "resultType": "complete",
                 "_meta": meta,
             }
@@ -226,12 +233,20 @@ class ToolServer:
             raise WireError(INVALID_PARAMS, "arguments must be an object")
         return name, arguments
 
-    async def _run(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def _run(
+        self, name: str, arguments: dict[str, Any], token: Any = None
+    ) -> dict[str, Any]:
         async with self._run_lock:
-            return await self._call(name, arguments)
+            with bind_progress(self.notify, token):
+                return await self._call(name, arguments)
 
     async def aclose(self) -> None:
         await self.tasks.aclose()
+
+
+def _progress_token(params: dict[str, Any]) -> Any:
+    """The ``_meta.progressToken`` a client sends to ask for progress."""
+    return request_meta(params).get("progressToken")
 
 
 def _undeclared() -> WireError:

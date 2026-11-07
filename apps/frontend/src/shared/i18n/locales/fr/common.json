@@ -73,7 +73,8 @@
 	},
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
-		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible"
+		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible",
+		"commentLine": "Commenter la ligne {{line}}"
 	},
 	"buttons": {
 		"save": "Enregistrer",

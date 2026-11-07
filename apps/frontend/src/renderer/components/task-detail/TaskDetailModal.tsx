@@ -399,11 +399,21 @@ function useTaskDetailHandlers(
 	};
 
 	const handleReject = async () => {
-		if (!state.feedback.trim() && state.feedbackImages.length === 0) {
+		// The open line comments go with the request (F9); the main reads them from disk.
+		let commentIds: string[] = [];
+		try {
+			const listed = await window.electronAPI.listReviewComments(task.id);
+			if (listed.success && listed.data) {
+				commentIds = listed.data.filter((c) => c.status === "open").map((c) => c.id);
+			}
+		} catch {
+			// no comment can be read: the request goes with its text
+		}
+		if (!state.feedback.trim() && state.feedbackImages.length === 0 && commentIds.length === 0) {
 			return;
 		}
 		state.setIsSubmitting(true);
-		await submitReview(task.id, false, state.feedback, state.feedbackImages);
+		await submitReview(task.id, false, state.feedback, state.feedbackImages, commentIds);
 		state.setIsSubmitting(false);
 		state.setFeedback("");
 		state.setFeedbackImages([]);

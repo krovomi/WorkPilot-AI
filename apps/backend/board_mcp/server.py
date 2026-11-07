@@ -44,7 +44,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from mcp_tasks import Resources, ToolServer
+from mcp_tasks import Resources, ToolServer, report_progress
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ IDEATION_FILE = Path(".workpilot") / "ideation" / "ideation.json"
 RESOURCE_SCHEME = "workpilot://"
 SUMMARY_CHARS = 300
 POLL_SECONDS = 5.0
+PROGRESS_HEARTBEAT_SECONDS = 60.0
 MAX_WAIT_SECONDS = 4 * 3600
 DEFAULT_WAIT_SECONDS = 3600
 
@@ -300,8 +301,17 @@ def write_card(root: Path, title: str, body: str, metadata: dict[str, Any]) -> P
 async def wait_for_card(
     root: Path, card_id: str, columns: tuple[str, ...], timeout_s: float
 ) -> dict[str, Any]:
-    """The card once it is in one of `columns`, or as it is when time runs out."""
-    deadline = time.monotonic() + timeout_s
+    """The card once it is in one of `columns`, or as it is when time runs out.
+
+    A client that sent a ``progressToken`` hears where the card is while it
+    waits: on every change of column or of subtasks done, and once a minute
+    otherwise (hermes-agent shows these since v0.23.0). Progress is the
+    seconds waited, out of the timeout.
+    """
+    started_at = time.monotonic()
+    deadline = started_at + timeout_s
+    last_seen: tuple[str, int, int] | None = None
+    last_report = 0.0
     while True:
         directory = card_dir(root, card_id)
         if directory is None:
@@ -309,8 +319,19 @@ async def wait_for_card(
         card = summary(directory)
         if card["column"] in columns:
             return {"reached": True, "card": details(directory)}
-        if time.monotonic() >= deadline:
+        now = time.monotonic()
+        if now >= deadline:
             return {"reached": False, "card": details(directory)}
+        done, total = _subtasks(_json(directory / "implementation_plan.json"))
+        seen = (card["column"], done, total)
+        if seen != last_seen or now - last_report >= PROGRESS_HEARTBEAT_SECONDS:
+            steps = f", {done}/{total} subtasks" if total else ""
+            report_progress(
+                round(now - started_at, 3),
+                float(timeout_s),
+                f"{card_id}: {card['column']}{steps}",
+            )
+            last_seen, last_report = seen, now
         await asyncio.sleep(min(POLL_SECONDS, max(0.0, deadline - time.monotonic())))
 
 
@@ -787,6 +808,14 @@ def _utf8(stream):
 
 async def _serve(root: Path, stdin, stdout) -> None:
     loop = asyncio.get_running_loop()
+
+    def notify(message: dict[str, Any]) -> None:
+        # Same stream, same loop thread as the replies: a notification is
+        # written whole between two of them, never inside one.
+        stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
+        stdout.flush()
+
+    _server(root).notify = notify
     try:
         while True:
             line = await loop.run_in_executor(None, stdin.readline)
