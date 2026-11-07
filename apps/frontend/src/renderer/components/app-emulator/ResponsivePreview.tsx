@@ -3,6 +3,7 @@ import {
 	ArrowRight,
 	Camera,
 	Home,
+	MousePointerClick,
 	RotateCw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -121,6 +122,15 @@ interface ResponsivePreviewProps {
 	onCapture?: (image: string, url: string) => void;
 	/** Une capture est en cours d'envoi : le bouton attend. */
 	capturing?: boolean;
+	/**
+	 * Pointer un élément de la page (F10) : reçoit l'identifiant du
+	 * `<webview>`, que le main vérifie avant d'y activer le sélecteur des
+	 * DevTools. Sans ce rappel, pas de bouton.
+	 */
+	onPoint?: (webContentsId: number) => void;
+	/** Le sélecteur attend un clic dans la page : le bouton l'annule. */
+	pointing?: boolean;
+	onCancelPoint?: (webContentsId: number) => void;
 }
 
 /** CSS viewport simulation: dimensions change media queries, zoom only scales the preview. */
@@ -133,6 +143,9 @@ export function ResponsivePreview({
 	onNavigate,
 	onCapture,
 	capturing = false,
+	onPoint,
+	pointing = false,
+	onCancelPoint,
 }: ResponsivePreviewProps) {
 	const { t } = useTranslation("appEmulator");
 	const viewRef = useRef<Electron.WebviewTag>(null);
@@ -401,6 +414,32 @@ export function ResponsivePreview({
 						}}
 					>
 						<Camera className="h-4 w-4" />
+					</Button>
+				)}
+				{onPoint && (
+					<Button
+						size="icon"
+						variant={pointing ? "secondary" : "ghost"}
+						className="h-8 w-8"
+						aria-label={pointing ? t("preview.point.cancel") : t("preview.point.start")}
+						title={pointing ? t("preview.point.cancel") : t("preview.point.start")}
+						aria-pressed={pointing}
+						onClick={() => {
+							const view = viewRef.current as
+								| (Electron.WebviewTag & { getWebContentsId?: () => number })
+								| null;
+							if (typeof view?.getWebContentsId !== "function") return;
+							let id: number;
+							try {
+								id = view.getWebContentsId();
+							} catch {
+								return; // le <webview> n'est pas encore attaché
+							}
+							if (pointing) onCancelPoint?.(id);
+							else onPoint(id);
+						}}
+					>
+						<MousePointerClick className="h-4 w-4" />
 					</Button>
 				)}
 				<label className="flex min-w-0 flex-1 items-center gap-2 text-sm">

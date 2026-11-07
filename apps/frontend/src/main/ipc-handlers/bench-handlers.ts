@@ -44,6 +44,7 @@ import type {
 	Project,
 	Task,
 } from "../../shared/types";
+import { MAX_RULE_CHARS, normalizeRule } from "../../shared/utils/bench-rule";
 import type { AgentManager } from "../agent";
 import { appLog } from "../app-logger";
 import { getAugmentedEnv } from "../env-utils";
@@ -141,13 +142,24 @@ export function sanitizeEngines(raw: unknown): BenchEngine[] | string {
 		if (typeof effort !== "string" || !EFFORT.test(effort)) {
 			return "An engine has no valid effort";
 		}
-		const engine = { provider, model: model.trim(), effort };
+		const rawRule = (item as Record<string, unknown>).rule ?? "";
+		if (
+			typeof rawRule !== "string" ||
+			[...rawRule].some((c) => c.charCodeAt(0) < 32 && c !== "\n" && c !== "\t")
+		) {
+			return "An engine has an invalid rule";
+		}
+		const rule = normalizeRule(rawRule);
+		if (rule.length > MAX_RULE_CHARS) return `A rule is over ${MAX_RULE_CHARS} characters`;
+		const engine: BenchEngine = { provider, model: model.trim(), effort };
+		if (rule) engine.rule = rule;
 		if (
 			engines.some(
 				(e) =>
 					e.provider === engine.provider &&
 					e.model === engine.model &&
-					e.effort === engine.effort,
+					e.effort === engine.effort &&
+					(e.rule ?? "") === rule,
 			)
 		) {
 			return "The same engine is listed twice";

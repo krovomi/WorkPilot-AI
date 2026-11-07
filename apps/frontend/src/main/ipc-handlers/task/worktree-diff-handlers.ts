@@ -25,7 +25,7 @@ import {
 } from "./worktree-git-refs";
 
 /** WorkPilot's own working files, never part of a task's changes. */
-function isWorkpilotArtifact(p: string): boolean {
+export function isWorkpilotArtifact(p: string): boolean {
 	const normalized = p.replaceAll("\\", "/");
 	return (
 		normalized === ".workpilot" ||
