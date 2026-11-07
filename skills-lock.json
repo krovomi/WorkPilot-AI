@@ -18,7 +18,7 @@
 			"path": "skills/comms"
 		},
 		"dotnet": {
-			"version": "1.0.0",
+			"version": "1.1.0",
 			"source": "local",
 			"path": "skills/dotnet"
 		},
@@ -67,7 +67,7 @@
 		"akka-net-patterns": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/akka-net-patterns/SKILL.md",
 			"contentSha256": "d7dce158a9f448cf2a9d5eae88304374626729699b83670c4c2a00bfb92df5a1",
 			"targets": {
@@ -106,7 +106,7 @@
 		"aspire-orchestration": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/aspire-orchestration/SKILL.md",
 			"contentSha256": "2aea56583ce5834574ea8e6279ca80050d666063fe0662d145d83f389fa4d2e5",
 			"targets": {
@@ -116,7 +116,7 @@
 		"benchmark-dotnet": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/benchmark-dotnet/SKILL.md",
 			"contentSha256": "d1befa51ea86eea0a0522ec779046c5157a50e8559970b65b737c2267bfa8045",
 			"targets": {
@@ -659,6 +659,16 @@
 			"contentSha256": "6ecbd17c44f471bdc8581d25149aff6bc700a9b7e25ba6adcb8611d41d9bfde1",
 			"targets": {}
 		},
+		"migrate-dotnet10-to-dotnet11": {
+			"kind": "skill",
+			"pack": "dotnet",
+			"packVersion": "1.1.0",
+			"source": "skills/dotnet/migrate-dotnet10-to-dotnet11/SKILL.md",
+			"contentSha256": "66daf7358164c34842dfba1d65a7e96b47f70f9118b01b479739a6d0993c8cf7",
+			"targets": {
+				"dotnet": ">=10.0 <12.0"
+			}
+		},
 		"mobile-architect": {
 			"kind": "agent",
 			"pack": "mobile",
@@ -706,7 +716,7 @@
 		"net-advanced": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/net-advanced/SKILL.md",
 			"contentSha256": "3e65ceb9d29b6a5272cc5ee33f2e5b7375a2562b61be830cc4b843de9e30eac3",
 			"targets": {
@@ -716,7 +726,7 @@
 		"net-architect": {
 			"kind": "agent",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/agents/net-architect.md",
 			"contentSha256": "ea1d268fa757a0648ff633a987bb76ce704c589384d49bcbf0aa9aa319c66dc3",
 			"targets": {
@@ -726,9 +736,9 @@
 		"net-developer": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/net-developer/SKILL.md",
-			"contentSha256": "5a02491af54e8b7480c2a068d818710fa37b03d0ed4af67c9d4b9f9d980883c3",
+			"contentSha256": "9a66d4a20e4701b714bfeb4a274a1fe780026201b4242f1b35bcb7132901f942",
 			"targets": {
 				"dotnet": ">=10.0"
 			}
@@ -752,7 +762,7 @@
 		"performance-analyst": {
 			"kind": "agent",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/agents/performance-analyst.md",
 			"contentSha256": "6206d4fda34f4a9181d3ef54ac1f42977213711a04c581ca5bbdd3c2c9074e3a",
 			"targets": {
@@ -866,7 +876,7 @@
 		"testcontainers-integration": {
 			"kind": "skill",
 			"pack": "dotnet",
-			"packVersion": "1.0.0",
+			"packVersion": "1.1.0",
 			"source": "skills/dotnet/testcontainers-integration/SKILL.md",
 			"contentSha256": "2d5efbbc81bf7edb3c3fcac867e5978e6ad42a4dda7c7fdca43260bf7059bbb9",
 			"targets": {
@@ -1204,6 +1214,18 @@
 		".agents/skills/mcp-builder/SKILL.md",
 		".agents/skills/mem-search/SKILL.md",
 		".agents/skills/mem-search/scripts/mem_search.py",
+		".agents/skills/migrate-dotnet10-to-dotnet11/LICENSE",
+		".agents/skills/migrate-dotnet10-to-dotnet11/SKILL.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/aspnetcore-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/core-libraries-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/cryptography-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/csharp-compiler-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/csharp15-adoption.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/efcore-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/extensions-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/maui-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/runtime-jit-dotnet10to11.md",
+		".agents/skills/migrate-dotnet10-to-dotnet11/references/sdk-msbuild-dotnet10to11.md",
 		".agents/skills/mobile-design-review/SKILL.md",
 		".agents/skills/mobile-device-testing/SKILL.md",
 		".agents/skills/mobile-store-readiness/SKILL.md",
@@ -1358,6 +1380,7 @@
 		".gemini/commands/ios-engineer.toml",
 		".gemini/commands/mcp-builder.toml",
 		".gemini/commands/mem-search.toml",
+		".gemini/commands/migrate-dotnet10-to-dotnet11.toml",
 		".gemini/commands/mobile-architect.toml",
 		".gemini/commands/mobile-design-review.toml",
 		".gemini/commands/mobile-device-testing.toml",
