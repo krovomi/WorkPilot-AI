@@ -184,8 +184,16 @@
 				"to": "backend/skills_registry/bundled/convert-documents-to-markdown"
 			},
 			{
-				"from": "../../.agents/skills/migrate-dotnet10-to-dotnet11",
+				"from": "../../skills/dotnet/migrate-dotnet10-to-dotnet11",
 				"to": "backend/skills_registry/bundled/migrate-dotnet10-to-dotnet11"
+			},
+			{
+				"from": "../../skills/dotnet/migrate-dotnet8-to-dotnet9",
+				"to": "backend/skills_registry/bundled/migrate-dotnet8-to-dotnet9"
+			},
+			{
+				"from": "../../skills/dotnet/migrate-dotnet9-to-dotnet10",
+				"to": "backend/skills_registry/bundled/migrate-dotnet9-to-dotnet10"
 			},
 			{
 				"from": "../../.agents/skills/ui-ux-pro-max",
