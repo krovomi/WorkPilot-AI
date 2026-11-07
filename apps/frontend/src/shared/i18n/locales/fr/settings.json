@@ -2941,6 +2941,7 @@
 		"ports_one": "Réserve {{count}} port par tâche",
 		"ports_other": "Réserve {{count}} ports par tâche",
 		"teardown": "À la suppression du worktree : {{commands}}",
+		"proofs": "Après l'approbation de la QA, vérificateurs de preuves : {{commands}}",
 		"invalid": "Invalide, rien ne s'exécute : {{errors}}",
 		"approved": "Approuvée : s'exécute dans les nouveaux worktrees.",
 		"awaiting": "Cette recette lance des commandes sur votre machine. Elle ne s'exécute qu'une fois approuvée telle qu'elle est maintenant.",
