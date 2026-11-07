@@ -55,7 +55,16 @@ UNKNOWN = "unknown"
 
 
 class PinError(ValueError):
-    """An approval that cannot be made as asked."""
+    """An approval that cannot be made as asked.
+
+    ``code`` says which refusal it is (``unreadable``, ``nothing-pending``,
+    ``suspicious``): the route answers with the code and a fixed sentence, and
+    the message, which names a path of the checkout, stays in the log.
+    """
+
+    def __init__(self, message: str, code: str = "unreadable") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -259,12 +268,15 @@ def approve(
     entry = pins.servers.get(server_id)
     pending = (entry or {}).get("pending")
     if not pending:
-        raise PinError(f"nothing waits for an approval on {server_id!r}")
+        raise PinError(
+            f"nothing waits for an approval on {server_id!r}", code="nothing-pending"
+        )
     suspicious = sorted(n for n, t in pending["tools"].items() if t.get("findings"))
     if suspicious and not confirm_suspicious:
         raise PinError(
             "these tools look poisoned and need an explicit confirmation: "
-            + ", ".join(suspicious)
+            + ", ".join(suspicious),
+            code="suspicious",
         )
     approved = (
         {} if pending.get("program_changed") else dict(entry.get("approved") or {})
