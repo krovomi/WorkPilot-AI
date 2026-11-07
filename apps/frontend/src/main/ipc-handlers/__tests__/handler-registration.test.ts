@@ -12,7 +12,7 @@
  * (or `setup*Handler`): `renderer-log-handler.ts` and
  * `context-aware-snippets-handlers.ts` were both never called, and a check that
  * only knew the `register*` spelling could not see them. The other `setup*`
- * exports — `setup*EventForwarding`, `setupVoiceControlEvents` — register no
+ * exports — `setup*EventForwarding` — register no
  * `ipcMain` handler: they forward service events to the window, so a missing
  * call there loses events, not channels, and is not this test's question.
  *

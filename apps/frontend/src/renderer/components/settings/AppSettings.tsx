@@ -15,6 +15,7 @@ import {
 	KeyRound,
 	Loader2,
 	MessageSquare,
+	Mic,
 	Monitor,
 	Package,
 	Palette,
@@ -68,6 +69,7 @@ import { DisplaySettings } from "./DisplaySettings";
 import { GeneralSettings } from "./GeneralSettings";
 import { useSettings } from "./hooks/useSettings";
 import { LanguageSettings } from "./LanguageSettings";
+import { VoiceAssistantSettings } from "./VoiceAssistantSettings";
 import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
@@ -131,6 +133,7 @@ export type AppSection =
 	| "appearance"
 	| "display"
 	| "language"
+	| "voice-assistant"
 	| "terminal-fonts"
 	// Développement & Outils
 	| "devtools"
@@ -298,6 +301,12 @@ const createSettingsThemes = (t: {
 			{ id: "appearance", icon: Palette, label: "Apparence", type: "app" },
 			{ id: "display", icon: Monitor, label: "Affichage", type: "app" },
 			{ id: "language", icon: Globe, label: "Langue", type: "app" },
+			{
+				id: "voice-assistant",
+				icon: Mic,
+				label: t("voiceAssistant:settings.title"),
+				type: "app",
+			},
 			{
 				id: "terminal-fonts",
 				icon: Terminal,
@@ -627,6 +636,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			case "language":
 				return (
 					<LanguageSettings
+						settings={settings}
+						onSettingsChange={setSettings}
+					/>
+				);
+			case "voice-assistant":
+				return (
+					<VoiceAssistantSettings
 						settings={settings}
 						onSettingsChange={setSettings}
 					/>

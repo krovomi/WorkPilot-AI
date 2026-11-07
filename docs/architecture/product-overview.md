@@ -161,7 +161,7 @@ it, inside its hub. The hubs are listed in
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
 | `sandbox` | Change Preview | Toolbox | — |  |
 | `team-bot` | Team Bot (Slack/Teams) | Toolbox | — | yes |
-| `voice-control` | Voice Control | Toolbox | — |  |
+| `voice-control` | Voice Assistant | Toolbox | [voice-assistant.md](voice-assistant.md) |  |
 | `administration` | Administration | Administration, in server mode for an administrator | — |  |
 | `github-issues` | GitHub Issues | Git & Integrations, when GitHub is enabled | — |  |
 | `github-prs` | GitHub Pull Requests | Git & Integrations, when GitHub is enabled | — |  |

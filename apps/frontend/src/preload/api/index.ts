@@ -214,9 +214,9 @@ import { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-a
 import type { WorktreeRecipeAPI } from "./modules/worktree-recipe-api";
 import { createWorktreeRecipeAPI } from "./modules/worktree-recipe-api";
 import {
-	createVoiceControlAPI,
-	type VoiceControlAPI,
-} from "./modules/voice-control-api";
+	createVoiceAssistantAPI,
+	type VoiceAssistantAPI,
+} from "./modules/voice-assistant-api";
 import {
 	createNaturalLanguageGitAPI,
 	type NaturalLanguageGitAPI,
@@ -273,7 +273,7 @@ export interface ElectronAPI
 		PromptOptimizerAPI,
 		CodePlaygroundAPI,
 		ConflictPredictorAPI,
-		VoiceControlAPI,
+		VoiceAssistantAPI,
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
@@ -423,7 +423,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPromptOptimizerAPI(),
 		...createCodePlaygroundAPI(),
 		...createConflictPredictorAPI(),
-		...createVoiceControlAPI(),
+		...createVoiceAssistantAPI(),
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
@@ -616,8 +616,8 @@ export type { VisualProgrammingAPI } from "./modules/visual-programming-api";
 export { createVisualProgrammingAPI } from "./modules/visual-programming-api";
 export type { VisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
 export { createVisualToCodeHistoryAPI } from "./modules/visual-to-code-history-api";
-export type { VoiceControlAPI } from "./modules/voice-control-api";
-export { createVoiceControlAPI } from "./modules/voice-control-api";
+export type { VoiceAssistantAPI } from "./modules/voice-assistant-api";
+export { createVoiceAssistantAPI } from "./modules/voice-assistant-api";
 export type { NaturalLanguageGitAPI } from "./natural-language-git-api";
 export { createNaturalLanguageGitAPI } from "./natural-language-git-api";
 export type { ProfileAPI } from "./profile-api";
