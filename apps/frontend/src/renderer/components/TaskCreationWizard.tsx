@@ -58,6 +58,7 @@ import type {
 	PhaseThinkingConfig,
 } from "../../shared/types/settings";
 import { buildBranchOptions } from "../lib/branch-utils";
+import { createMobileSetup, inheritedSetupMetadata } from "../lib/mobile-setup";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
@@ -70,6 +71,7 @@ import {
 	saveDraft,
 } from "../stores/task-store";
 import { FileAutocomplete } from "./FileAutocomplete";
+import { useMobileSetup } from "./task-form/useMobileSetup";
 import { TaskFileExplorerDrawer } from "./TaskFileExplorerDrawer";
 import {
 	type CriterionDraft,
@@ -84,6 +86,16 @@ import type { FileReferenceData } from "./task-form/useImageUpload";
 import { Button } from "./ui/button";
 import { Combobox } from "./ui/combobox";
 import { Label } from "./ui/label";
+import {
+	type AutoSplitValue,
+	DEFAULT_AUTO_SPLIT_VALUE,
+	autoSplitMetadata,
+	isAutoSplitValueValid,
+} from "./task-form/AutoSplitFields";
+import {
+	autoSplitCeilingFor,
+	kindFromCategory,
+} from "../../shared/utils/task-split";
 
 interface TaskCreationWizardProps {
 	projectId: string;
@@ -133,6 +145,10 @@ export function TaskCreationWizard({
 	}, [projects, projectId]);
 	const projectProvider = useMemo(
 		() => projects.find((p) => p.id === projectId)?.settings?.provider,
+		[projects, projectId],
+	);
+	const projectAutoSplit = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.autoSplit,
 		[projects, projectId],
 	);
 	// The engine this task will own: provider × model × effort per phase.
@@ -208,6 +224,10 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	// The automatic split: on, at the project's ceiling, unless the task says.
+	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(
+		DEFAULT_AUTO_SPLIT_VALUE,
+	);
 	const [verifyWindow, setVerifyWindow] = useState("");
 	const [verifyScenario, setVerifyScenario] = useState("");
 	// Context-window management (compact / new thread at a threshold).
@@ -217,6 +237,8 @@ export function TaskCreationWizard({
 	// Empty is the default and means "every platform the project has":
 	// a card that names none on a mobile repo is not asking for none.
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
+	// On a project with no phone app, the checked platforms need setup tasks.
+	const mobileSetup = useMobileSetup(open ? projectId : undefined, mobileTargets);
 	// Critères d'acceptation et note supplémentaire : les mêmes champs que le
 	// panneau d'une tâche créée, remplis avant qu'elle ne parte.
 	const [acceptanceCriteria, setAcceptanceCriteria] = useState<
@@ -277,6 +299,7 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setAutoSplit(draft.autoSplit ?? DEFAULT_AUTO_SPLIT_VALUE);
 				setVerifyWindow(draft.verifyWindow ?? "");
 				setVerifyScenario(draft.verifyScenario ?? "");
 				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
@@ -416,6 +439,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			autoSplit,
 			verifyWindow,
 			verifyScenario,
 			contextPolicy,
@@ -443,6 +467,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			autoSplit,
 			verifyWindow,
 			verifyScenario,
 			contextPolicy,
@@ -647,6 +672,9 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			const split = autoSplitMetadata(autoSplit);
+			if (split.noSplit) metadata.noSplit = true;
+			if (split.splitMaxLines !== undefined) metadata.splitMaxLines = split.splitMaxLines;
 			if (verifyLoop && verifyWindow.trim()) metadata.verifyWindow = verifyWindow.trim();
 			if (verifyLoop && verifyScenario.trim()) metadata.verifyScenario = verifyScenario.trim();
 			// Absent means the defaults (auto, 50%, handoff prepared): only a
@@ -671,6 +699,20 @@ export function TaskCreationWizard({
 			// Set useLocalBranch when user explicitly selects a local branch
 			// This preserves gitignored files (.env, configs) by not switching to origin
 			if (isSelectedBranchLocal) metadata.useLocalBranch = true;
+
+			// No phone app yet: the setup tasks go on the board first, and this
+			// task waits for them. A failure here creates nothing more.
+			if (mobileSetup.plan && mobileSetup.profile) {
+				const blockers = await createMobileSetup(
+					mobileSetup.plan,
+					mobileSetup.profile,
+					projectId,
+					inheritedSetupMetadata(metadata),
+					createTask,
+					t,
+				);
+				metadata.blockedBy = [...new Set([...(metadata.blockedBy ?? []), ...blockers])];
+			}
 
 			const task = await createTask(
 				projectId,
@@ -718,6 +760,7 @@ export function TaskCreationWizard({
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
+		setAutoSplit(DEFAULT_AUTO_SPLIT_VALUE);
 		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
@@ -849,7 +892,12 @@ export function TaskCreationWizard({
 						</Button>
 						<Button
 							onClick={handleCreate}
-							disabled={isCreating || dictationPending || !description.trim()}
+							disabled={
+								isCreating ||
+								dictationPending ||
+								!description.trim() ||
+								!isAutoSplitValueValid(autoSplit)
+							}
 						>
 							{isCreating ? (
 								<>
@@ -930,6 +978,14 @@ export function TaskCreationWizard({
 					onRequireReviewChange={setRequireReviewBeforeCoding}
 					tddMode={tddMode}
 					onTddModeChange={setTddMode}
+					autoSplit={autoSplit}
+					onAutoSplitChange={setAutoSplit}
+					autoSplitKind={kindFromCategory(category)}
+					autoSplitProjectMaxLines={autoSplitCeilingFor(
+						projectAutoSplit,
+						kindFromCategory(category),
+					)}
+					autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
 					verifyWindow={verifyWindow}
@@ -941,6 +997,7 @@ export function TaskCreationWizard({
 					contextProvider={engine.coding?.provider}
 					mobileTargets={mobileTargets}
 					onMobileTargetsChange={setMobileTargets}
+					mobileSetup={mobileSetup}
 					disabled={isCreating}
 					error={error}
 					onError={setError}

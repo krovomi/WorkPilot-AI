@@ -22,6 +22,20 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+try:
+    from doc_languages import doc_comment_template, extract_symbols, language_for
+    from doc_languages.polyglot import SourceSymbol, doc_status
+except ImportError:  # pragma: no cover - imported as apps.backend.agents
+    from apps.backend.doc_languages import (  # type: ignore[no-redef]
+        doc_comment_template,
+        extract_symbols,
+        language_for,
+    )
+    from apps.backend.doc_languages.polyglot import (  # type: ignore[no-redef]
+        SourceSymbol,
+        doc_status,
+    )
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -93,11 +107,14 @@ class SymbolDoc:
     generated_doc: str = ""
     args: list[str] = field(default_factory=list)
     return_type: str | None = None
+    language: str = "python"
+    indent: str = ""
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "symbol_type": self.symbol_type,
+            "language": self.language,
             "file_path": self.file_path,
             "line_number": self.line_number,
             "status": self.status.value,
@@ -182,17 +199,48 @@ class DocAnalyzer:
     """Analyzes Python source code to extract symbols and documentation status."""
 
     def analyze_file(self, file_path: str) -> list[SymbolDoc]:
-        """Analyze a Python file for documentation coverage.
+        """Analyze a source file for documentation coverage.
+
+        Python goes through the AST (docstrings sit below the def); every other
+        language in ``doc_languages`` through its declaration patterns and the
+        doc comment above each declaration.
 
         Args:
-            file_path: Path to the Python file.
+            file_path: Path to the source file.
 
         Returns:
             List of SymbolDoc with documentation status for each symbol.
         """
-        with open(file_path, encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
             source = f.read()
+        lang = language_for(file_path)
+        if lang is not None and lang.id != "python":
+            return self.analyze_polyglot(source, file_path)
         return self.analyze_source(source, file_path)
+
+    @staticmethod
+    def analyze_polyglot(source: str, file_path: str) -> list[SymbolDoc]:
+        """Coverage of a non-Python file: one SymbolDoc per declaration."""
+        lang = language_for(file_path)
+        if lang is None:
+            return []
+        symbols: list[SymbolDoc] = []
+        for sym in extract_symbols(source, file_path):
+            symbols.append(
+                SymbolDoc(
+                    name=sym.name,
+                    symbol_type=sym.kind,
+                    file_path=file_path,
+                    line_number=sym.line,
+                    status=DocStatus(doc_status(sym, lang)),
+                    existing_doc=sym.doc,
+                    args=sym.args,
+                    return_type="value" if sym.returns else None,
+                    language=sym.language,
+                    indent=sym.indent,
+                )
+            )
+        return symbols
 
     def analyze_source(
         self, source: str, file_path: str = DEFAULT_SOURCE_PATH
@@ -293,7 +341,7 @@ class DocAnalyzer:
 
         for entry in sorted(os.listdir(dir_path)):
             full_path = os.path.join(dir_path, entry)
-            if os.path.isfile(full_path) and entry.endswith(".py"):
+            if os.path.isfile(full_path) and language_for(entry) is not None:
                 info.files.append(entry)
                 # Extract classes and functions
                 try:
@@ -306,7 +354,9 @@ class DocAnalyzer:
                 except Exception:
                     pass
 
-                # Extract imports for dependencies
+                # Extract imports for dependencies (Python's are read exactly)
+                if not entry.endswith(".py"):
+                    continue
                 try:
                     with open(full_path, encoding="utf-8") as f:
                         source = f.read()
@@ -324,9 +374,9 @@ class DocAnalyzer:
                 except Exception:
                     pass
 
-            elif os.path.isdir(full_path):
+            elif os.path.isdir(full_path) and not entry.startswith("."):
                 init_file = os.path.join(full_path, "__init__.py")
-                if os.path.exists(init_file):
+                if os.path.exists(init_file) or _has_source(full_path):
                     info.submodules.append(entry)
 
         # Try to extract description from __init__.py
@@ -343,6 +393,18 @@ class DocAnalyzer:
                 pass
 
         return info
+
+
+def _has_source(dir_path: str) -> bool:
+    """True when a directory holds a source file of a supported language."""
+    try:
+        return any(
+            language_for(e) is not None
+            for e in os.listdir(dir_path)
+            if os.path.isfile(os.path.join(dir_path, e))
+        )
+    except OSError:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +429,20 @@ class DocGenerator:
         Returns:
             Generated docstring string.
         """
+        if symbol.language != "python":
+            # Each language keeps its own convention (XML doc in C#, rustdoc,
+            # godoc, KDoc, Swift markup...) whatever the Python format asked.
+            return doc_comment_template(
+                SourceSymbol(
+                    name=symbol.name,
+                    kind=symbol.symbol_type,
+                    line=symbol.line_number,
+                    language=symbol.language,
+                    indent=symbol.indent,
+                    args=list(symbol.args),
+                    returns=bool(symbol.return_type),
+                )
+            )
         if fmt == DocFormat.GOOGLE:
             return self._generate_google_docstring(symbol)
         elif fmt == DocFormat.NUMPY:

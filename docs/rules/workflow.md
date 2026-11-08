@@ -99,6 +99,19 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   build`), une nouvelle annexe un fichier de `docs/audit/annexes/`. Deux PR ouvertes en même temps
   ne touchent plus les mêmes lignes ; `tests/test_changelog_fragments.py` et
   `tests/test_audit_findings.py` le gardent.
+- **PR empilées : le pilote de pile** (`stack-autopilot.yml`, `scripts/stack_autopilot.py`). Une PR
+  vers `develop` avec l'auto-merge GitHub activé, ou le label `autopilot`, est fusionnée par lui,
+  dans l'ordre de sa pile : B attend A si B est basée sur la branche de A, si sa description nomme A
+  (« built on #A », « Merge order: #A, … », « basée sur #A ») ou si les deux partagent des commits
+  absents de `develop`. Pour la première de chaque pile, il fusionne `develop` dedans (un parent
+  fusionné en squash est absorbé sans rejouer ses conflits), confie un conflit restant à Claude Code,
+  pousse avec `PAT_TOKEN` pour que la CI tourne, puis fusionne quand **tous** les checks du commit
+  sont verts, avec la méthode choisie (`autopilot:squash|merge|rebase`, squash par défaut). Il
+  remplace l'auto-merge natif par ces labels : le ruleset de `develop` n'exigeant aucun check,
+  l'auto-merge GitHub fusionnerait une PR dès qu'elle ne conflicte plus, avant la CI. Blocages :
+  `autopilot/conflit` (retiré seul au commit suivant) et `autopilot/rouge`. Secrets : `PAT_TOKEN`
+  (Contents, Pull requests, Workflows en écriture), `CLAUDE_CODE_OAUTH_TOKEN` ou `ANTHROPIC_API_KEY` ;
+  sans eux, le résumé du run dit ce qui manque. `tests/test_stack_autopilot.py` le garde.
 
 ## CI (`.github/workflows/`)
 
@@ -108,6 +121,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 | `lint.yml` | ruff (dont `scripts/`), pyright sur les paquets de `apps/backend/pyrightconfig.json`, Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
+| `stack-autopilot.yml` | rien : il fusionne les PR inscrites dans l'ordre de leur pile (push sur `develop`, fin d'un workflow, toutes les 20 min, à la main avec `dry_run`) |
 
 `ci.yml` et `lint.yml` tournent sur tout changement sauf les quelques fichiers que rien ne lit
 (`paths-ignore` : `LICENSE`, gabarits d'issue et de PR, `FUNDING.yml` ; `CHANGELOG.md` n'y est plus, un test le lit) ; une liste
@@ -127,6 +141,11 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
   `tests/test_smoke_test_wiring.py` garde ces étapes.
 - **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
   suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
+- **Téléchargements depuis les releases GitHub** : elles ont répondu 504 toute une matinée
+  (2026-11-08). Electron passe par `.github/actions/fetch-electron` (cache Actions, 5 essais, empreintes
+  de `checksums.json` toujours vérifiées) ; Biome vient du registre npm, pas de `setup-biome` ; le
+  `curl` du CLI GitHub dans `deploy/Dockerfile.server` réessaie
+  (`tests/test_ci_release_downloads.py`).
 - **E2E** (lot N3) : le job `e2e` de `ci.yml` construit l'app et lance `pnpm run test:e2e` sous
   xvfb ; `ci-complete` l'attend. Chaque spec démarre l'app par `e2e/app-harness.ts` (HOME et
   profil jetables), aucun `test.skip`, et un test qui ne passe qu'au second essai fait échouer

@@ -120,5 +120,11 @@
 		"hintAll": "Sur les cartes de ce projet, le banc recommande",
 		"use": "L'utiliser",
 		"inUse": "Déjà choisi"
+	},
+	"kickers": {
+		"results": "Résultats",
+		"recommend": "Recommandation",
+		"new": "Nouveau banc",
+		"runs": "Exécutions"
 	}
 }

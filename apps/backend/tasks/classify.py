@@ -40,6 +40,8 @@ class TaskKind(str, Enum):
     TEST = "test"
     DOCS = "docs"
     SPIKE = "spike"
+    #: A version upgrade: framework, SDK, runtime or dependencies, any stack.
+    UPGRADE = "upgrade"
 
 
 #: Below this a verdict is a proposal: the UI says so, and a later lot may ask
@@ -102,6 +104,10 @@ _BY_IMPORTED_TYPE: Mapping[str, TaskKind] = {
     "tech debt": TaskKind.REFACTORING,
     "tech-debt": TaskKind.REFACTORING,
     "technical debt": TaskKind.REFACTORING,
+    # Dependabot and Renovate label their pull requests and issues so.
+    "dependencies": TaskKind.UPGRADE,
+    "dependency": TaskKind.UPGRADE,
+    "upgrade": TaskKind.UPGRADE,
 }
 
 # ── the words of the title and description ───────────────────────────────────
@@ -168,6 +174,23 @@ _KEYWORDS: tuple[tuple[TaskKind, tuple[str, ...]], ...] = (
             r"\brun the (job|batch|migration)\b",
             r"\bdata migration\b",
             r"\bbackfill\b",
+        ),
+    ),
+    (
+        TaskKind.UPGRADE,
+        (
+            r"\bmontee (de|en) version\b",
+            r"\bmonter (de|en) version\b",
+            r"\bmonter (\w+ )?(vers|en) (la )?v?\d",
+            r"\bmettre a jour (la |les |le )?(version|dependances?|paquets?|packages?|framework|sdk|runtime)\b",
+            r"\bmise a jour (de |des |du )?(la )?(version|dependances?|paquets?|packages?|framework|sdk|runtime)\b",
+            r"\bmigrer (\w+ )?vers (\.net|net|java|node|python|angular|react|vue|php|go|rust|kotlin|swift|flutter|dart|spring|django|rails|laravel|next|nuxt)\b",
+            r"\bupgrade\b",
+            r"\bbump\b",
+            r"\bupdate (the )?(dependenc(y|ies)|deps|packages?|sdk|runtime|framework)\b",
+            r"\bmigrat(e|ion) to (\.net|net|java|node|python|angular|react|vue|php|go|rust|kotlin|swift|flutter|dart|spring|django|rails|laravel|next|nuxt)\b",
+            r"\bdependabot\b",
+            r"\brenovate\b",
         ),
     ),
     (

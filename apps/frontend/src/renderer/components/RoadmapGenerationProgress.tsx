@@ -290,7 +290,6 @@ function PhaseStepsIndicator({
 							)}
 							{t(phase.labelKey)}
 						</motion.div>
-						)
 						{index < STEP_PHASES.length - 1 && (
 							<div
 								className={cn(

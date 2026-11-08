@@ -14,7 +14,6 @@ import type {
 	GitBranchInfo,
 	GitTagInfo,
 } from "../../../shared/types";
-import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -101,13 +100,11 @@ export function ChangelogFilters({
 	const localBranches = branches.filter((b) => !b.isRemote);
 
 	return (
-		<div className="w-80 shrink-0 border-r border-border overflow-y-auto">
-			<div className="p-6 space-y-6">
+		<div className="wp-card w-80 shrink-0 overflow-y-auto">
+			<div className="space-y-5 p-4">
 				{/* Source Mode Selection */}
 				<div className="space-y-3">
-					<Label className="text-sm font-medium">
-						{t("changelog:source.title")}
-					</Label>
+					<span className="wp-kicker block">{t("changelog:source.title")}</span>
 					<RadioGroup
 						value={sourceMode}
 						onValueChange={(value) =>
@@ -117,12 +114,8 @@ export function ChangelogFilters({
 					>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label
-							className={cn(
-								"flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all",
-								sourceMode === "tasks"
-									? "border-primary bg-primary/5"
-									: "border-border hover:border-primary/50",
-							)}
+							className="wp-card wp-card-pad wp-rail wp-step wp-tone-green flex cursor-pointer flex-row items-start gap-3"
+							data-active={sourceMode === "tasks" ? "true" : undefined}
 						>
 							<RadioGroupItem value="tasks" className="mt-1" />
 							<div className="flex-1">
@@ -142,12 +135,8 @@ export function ChangelogFilters({
 						</label>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label
-							className={cn(
-								"flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all",
-								sourceMode === "git-history"
-									? "border-primary bg-primary/5"
-									: "border-border hover:border-primary/50",
-							)}
+							className="wp-card wp-card-pad wp-rail wp-step wp-tone-green flex cursor-pointer flex-row items-start gap-3"
+							data-active={sourceMode === "git-history" ? "true" : undefined}
 						>
 							<RadioGroupItem value="git-history" className="mt-1" />
 							<div className="flex-1">
@@ -164,12 +153,8 @@ export function ChangelogFilters({
 						</label>
 						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
 						<label
-							className={cn(
-								"flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-all",
-								sourceMode === "branch-diff"
-									? "border-primary bg-primary/5"
-									: "border-border hover:border-primary/50",
-							)}
+							className="wp-card wp-card-pad wp-rail wp-step wp-tone-green flex cursor-pointer flex-row items-start gap-3"
+							data-active={sourceMode === "branch-diff" ? "true" : undefined}
 						>
 							<RadioGroupItem value="branch-diff" className="mt-1" />
 							<div className="flex-1">

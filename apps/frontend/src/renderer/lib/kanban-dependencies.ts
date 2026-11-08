@@ -17,6 +17,7 @@
  */
 
 import type { Task, TaskStatus } from "../../shared/types";
+import { canStartOnSibling } from "../../shared/utils/task-split";
 
 /** Statuses that count as "this blocker is out of the way". */
 const SATISFIED: ReadonlySet<TaskStatus> = new Set(["done", "pr_created"]);
@@ -55,6 +56,10 @@ export function resolveBlockers(
 		if (!blocker) {
 			missing.push(id);
 		} else if (SATISFIED.has(blocker.status) || blocker.metadata?.archivedAt) {
+			resolved.push(blocker);
+		} else if (canStartOnSibling(task, blocker)) {
+			// A part of the same split that passed QA: this one starts stacked
+			// on its branch (`task-split.ts`), without waiting for the merge.
 			resolved.push(blocker);
 		} else if (blocker.metadata?.abandoned) {
 			// An abandoned blocker is never going to finish; treating it as

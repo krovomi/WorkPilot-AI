@@ -1,23 +1,16 @@
-import {
-	Bookmark,
-	CheckCircle2,
-	GitCompareArrows,
-	ImageIcon,
-	Layers,
-	Loader2,
-	ScanEye,
-	Trash2,
-	XCircle,
-} from "lucide-react";
-import { useState } from "react";
+import { Bookmark, GitCompareArrows, ScanEye, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
 import { formatAppDate } from "@/lib/date-format";
+import { Bar, CharterButton, Chip, EmptyStage, Panel, Section, type Tone } from "../charter";
 
 interface VisualRegressionTabProps {
 	readonly projectPath: string;
 }
 
+const matchTone = (value: number): Tone => (value >= 95 ? "green" : value >= 85 ? "amber" : "red");
+
+/** Screenshots turned into baselines, then compared pixel by pixel. */
 export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 	const { t } = useTranslation(["browserAgent"]);
 	const {
@@ -31,278 +24,150 @@ export function VisualRegressionTab({ projectPath }: VisualRegressionTabProps) {
 		deleteBaseline,
 	} = useBrowserAgentStore();
 
-	const [, setSelectedComparison] = useState<string | null>(null);
-
 	const handleSetBaseline = async (name: string) => {
 		const screenshot = screenshots.find((s) => s.name === name);
 		await setBaseline(projectPath, name, screenshot?.path);
 	};
 
-	const handleCompare = async (name: string) => {
-		await compareScreenshot(projectPath, name);
-		setSelectedComparison(name);
-	};
-
-	// Empty state
 	if (baselines.length === 0 && screenshots.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center h-64 gap-4">
-				<div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/15 to-pink-500/15 border border-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/5">
-					<ScanEye className="w-10 h-10 text-purple-400/70" />
-				</div>
-				<div className="text-center max-w-xs">
-					<p className="text-sm font-medium text-muted-foreground mb-1">
-						{t("browserAgent:regression.noBaselinesTitle")}
-					</p>
-					<p className="text-xs text-muted-foreground leading-relaxed">
-						{t("browserAgent:regression.noBaselines")}
-					</p>
-				</div>
-			</div>
+			<EmptyStage icon={ScanEye} tone="violet" title={t("browserAgent:regression.noBaselinesTitle")}>
+				{t("browserAgent:regression.noBaselines")}
+			</EmptyStage>
 		);
 	}
 
 	return (
-		<div className="flex flex-col gap-6">
-			{/* Screenshots available to set as baseline */}
-			{screenshots.length > 0 && (
-				<section>
-					<div className="flex items-center gap-2 mb-3">
-						<ImageIcon className="w-4 h-4 text-cyan-400" />
-						<h3 className="text-sm font-medium text-foreground">
-							{t("browserAgent:stats.screenshots")}
-						</h3>
-						<span className="text-xs text-cyan-400 px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
-							{screenshots.length}
-						</span>
-					</div>
-					<div className="grid grid-cols-2 gap-3">
-						{screenshots.slice(0, 10).map((screenshot) => {
-							const hasBaseline = baselines.some(
-								(b) => b.name === screenshot.name,
-							);
+		<div className="space-y-4">
+			{comparisons.length > 0 && (
+				<Section kicker={t("browserAgent:regression.kicker")} title={t("browserAgent:regression.resultsTitle")}>
+					<div className="grid gap-2.5 lg:grid-cols-2">
+						{comparisons.map((comparison) => {
+							const tone: Tone = comparison.passed ? "green" : "red";
 							return (
-								<div
-									key={screenshot.path}
-									className="group p-3 rounded-lg border border-border bg-card hover:border-cyan-500/30 transition-colors"
-								>
-									<div className="flex items-center justify-between mb-2">
-										<div className="flex items-center gap-2 min-w-0">
-											<ImageIcon className="w-3.5 h-3.5 text-cyan-400/70 shrink-0" />
-											<span className="text-sm font-medium text-foreground truncate">
-												{screenshot.name}
-											</span>
+								<Panel key={comparison.name} rail tone={tone}>
+									<div className="flex items-center justify-between gap-2">
+										<span className="wp-title truncate text-sm">{comparison.name}</span>
+										<Chip tone={tone}>
+											{comparison.passed
+												? t("browserAgent:regression.passed")
+												: t("browserAgent:regression.failed")}
+										</Chip>
+									</div>
+									<div className="mt-2 flex items-center gap-3">
+										<div className="flex-1">
+											<Bar value={comparison.matchPercentage} tone={matchTone(comparison.matchPercentage)} />
 										</div>
-										<span className="text-2xs text-muted-foreground font-mono shrink-0 ml-2">
-											{screenshot.width}x{screenshot.height}
+										<span className="wp-meta font-mono">
+											{t("browserAgent:regression.matchValue", { value: comparison.matchPercentage })}
 										</span>
 									</div>
-									<div className="flex gap-2">
-										{!hasBaseline && (
-											<button
-												type="button"
-												onClick={() => handleSetBaseline(screenshot.name)}
-												disabled={isLoading}
-												className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-warning text-warning-foreground hover:bg-warning disabled:opacity-50 transition-colors"
-											>
-												<Bookmark className="w-3 h-3" />
-												{t("browserAgent:regression.setBaseline")}
-											</button>
-										)}
-										{hasBaseline && (
-											<button
-												type="button"
-												onClick={() => handleCompare(screenshot.name)}
-												disabled={isComparing}
-												className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50 transition-colors"
-											>
-												{isComparing ? (
-													<Loader2 className="w-3 h-3 animate-spin" />
-												) : (
-													<GitCompareArrows className="w-3 h-3" />
-												)}
-												{isComparing
-													? t("browserAgent:regression.comparing")
-													: t("browserAgent:regression.compare")}
-											</button>
-										)}
-									</div>
-								</div>
+									<p className="wp-meta mt-1.5">
+										{t("browserAgent:regression.diffSummary", {
+											pixels: comparison.diffPixels.toLocaleString(),
+											threshold: comparison.threshold,
+										})}
+									</p>
+								</Panel>
 							);
 						})}
 					</div>
-				</section>
+				</Section>
 			)}
 
-			{/* Baselines */}
 			{baselines.length > 0 && (
-				<section>
-					<div className="flex items-center gap-2 mb-3">
-						<Layers className="w-4 h-4 text-warning" />
-						<h3 className="text-sm font-medium text-foreground">
-							{t("browserAgent:regression.baseline")}s
-						</h3>
-						<span className="text-xs text-warning px-1.5 py-0.5 rounded-full bg-warning/10 border border-warning/20">
-							{baselines.length}
-						</span>
-					</div>
-					<div className="space-y-2">
+				<Section
+					kicker={t("browserAgent:regression.baselinesKicker")}
+					title={t("browserAgent:regression.baselinesTitle", { count: baselines.length })}
+				>
+					<div className="grid gap-2.5 lg:grid-cols-2">
 						{baselines.map((baseline) => (
-							<div
-								key={baseline.name}
-								className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-warning/25 transition-colors"
-							>
-								<div className="flex items-center gap-3 min-w-0">
-									<div className="w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-										<Layers className="w-4 h-4 text-warning" />
-									</div>
+							<Panel key={baseline.name} rail tone="amber">
+								<div className="flex items-center justify-between gap-2">
 									<div className="min-w-0">
-										<p className="text-sm font-medium text-foreground truncate">
-											{baseline.name}
+										<p className="wp-title truncate text-sm">{baseline.name}</p>
+										<p className="wp-meta">
+											{t("browserAgent:regression.sizeAndDate", {
+												width: baseline.width,
+												height: baseline.height,
+												date: formatAppDate(baseline.createdAt),
+											})}
 										</p>
-										<div className="flex items-center gap-2 text-2xs text-muted-foreground">
-											<span className="font-mono">
-												{baseline.width}x{baseline.height}
-											</span>
-											<span>·</span>
-											<span>
-												{formatAppDate(baseline.createdAt)}
-											</span>
-										</div>
 									</div>
+									<span className="flex shrink-0 gap-1.5">
+										<CharterButton
+											size="sm"
+											icon={GitCompareArrows}
+											busy={isComparing}
+											onClick={() => void compareScreenshot(projectPath, baseline.name)}
+											disabled={isComparing}
+										>
+											{t("browserAgent:regression.compare")}
+										</CharterButton>
+										<CharterButton
+											size="sm"
+											variant="ghost"
+											icon={Trash2}
+											onClick={() => deleteBaseline(projectPath, baseline.name)}
+											disabled={isLoading}
+										>
+											{t("browserAgent:regression.deleteBaseline")}
+										</CharterButton>
+									</span>
 								</div>
-								<div className="flex gap-1.5 shrink-0 ml-3">
-									<button
-										type="button"
-										onClick={() => handleCompare(baseline.name)}
-										disabled={isComparing}
-										className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50 transition-colors"
-									>
-										{isComparing ? (
-											<Loader2 className="w-3 h-3 animate-spin" />
-										) : (
-											<GitCompareArrows className="w-3 h-3" />
-										)}
-										{t("browserAgent:regression.compare")}
-									</button>
-									<button
-										type="button"
-										onClick={() => deleteBaseline(projectPath, baseline.name)}
-										disabled={isLoading}
-										className="p-1.5 rounded-md border border-destructive/20 text-destructive/70 hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
-										title={t("browserAgent:regression.deleteBaseline")}
-									>
-										<Trash2 className="w-3.5 h-3.5" />
-									</button>
-								</div>
-							</div>
+							</Panel>
 						))}
 					</div>
-				</section>
+				</Section>
 			)}
 
-			{/* Comparison results */}
-			{comparisons.length > 0 && (
-				<section>
-					<div className="flex items-center gap-2 mb-3">
-						<GitCompareArrows className="w-4 h-4 text-indigo-400" />
-						<h3 className="text-sm font-medium text-foreground">
-							{t("browserAgent:regression.resultsTitle")}
-						</h3>
-					</div>
-					<div className="space-y-3">
-						{comparisons.map((comparison) => {
-							const passed = comparison.passed;
+			{screenshots.length > 0 && (
+				<Section
+					kicker={t("browserAgent:regression.screenshotsKicker")}
+					title={t("browserAgent:regression.screenshotsTitle", { count: screenshots.length })}
+				>
+					<div className="grid gap-2.5 lg:grid-cols-2">
+						{screenshots.slice(0, 10).map((screenshot) => {
+							const hasBaseline = baselines.some((b) => b.name === screenshot.name);
 							return (
-								<div
-									key={comparison.name}
-									className={`p-4 rounded-lg border ${
-										passed
-											? "border-success/25 bg-success/5"
-											: "border-rose-500/25 bg-rose-500/5"
-									}`}
-								>
-									<div className="flex items-center justify-between mb-2">
-										<div className="flex items-center gap-2">
-											{passed ? (
-												<CheckCircle2 className="w-4.5 h-4.5 text-success" />
-											) : (
-												<XCircle className="w-4.5 h-4.5 text-rose-400" />
-											)}
-											<span className="text-sm font-medium text-foreground">
-												{comparison.name}
-											</span>
+								<Panel key={screenshot.path} rail tone="blue">
+									<div className="flex items-center justify-between gap-2">
+										<div className="min-w-0">
+											<p className="wp-title truncate text-sm">{screenshot.name}</p>
+											<p className="wp-meta">
+												{t("browserAgent:regression.size", {
+													width: screenshot.width,
+													height: screenshot.height,
+												})}
+											</p>
 										</div>
-										<div className="flex items-center gap-3">
-											<span
-												className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
-													passed
-														? "bg-success/10 text-success border-success/25"
-														: "bg-rose-500/10 text-rose-400 border-rose-500/25"
-												}`}
+										{hasBaseline ? (
+											<CharterButton
+												size="sm"
+												icon={GitCompareArrows}
+												busy={isComparing}
+												onClick={() => void compareScreenshot(projectPath, screenshot.name)}
+												disabled={isComparing}
 											>
-												{passed
-													? t("browserAgent:regression.passed")
-													: t("browserAgent:regression.failed")}
-											</span>
-											<MatchPercentage value={comparison.matchPercentage} />
-										</div>
+												{t("browserAgent:regression.compare")}
+											</CharterButton>
+										) : (
+											<CharterButton
+												size="sm"
+												icon={Bookmark}
+												onClick={() => void handleSetBaseline(screenshot.name)}
+												disabled={isLoading}
+											>
+												{t("browserAgent:regression.setBaseline")}
+											</CharterButton>
+										)}
 									</div>
-									<div className="flex gap-4 text-xs text-muted-foreground">
-										<span>
-											{t("browserAgent:regression.diffPixels")}:{" "}
-											<span className="text-orange-400 font-mono">
-												{comparison.diffPixels.toLocaleString()}
-											</span>
-										</span>
-										<span>
-											{t("browserAgent:regression.threshold")}:{" "}
-											<span className="text-blue-400 font-mono">
-												{comparison.threshold}%
-											</span>
-										</span>
-									</div>
-								</div>
+								</Panel>
 							);
 						})}
 					</div>
-				</section>
+				</Section>
 			)}
-		</div>
-	);
-}
-
-// ── MatchPercentage ─────────────────────────────────────────
-
-function MatchPercentage({ value }: { readonly value: number }) {
-	const color =
-		value >= 95
-			? "text-success"
-			: value >= 85
-				? "text-warning"
-				: "text-rose-400";
-	const bgColor =
-		value >= 95
-			? "bg-success"
-			: value >= 85
-				? "bg-warning"
-				: "bg-rose-400";
-	const trackColor =
-		value >= 95
-			? "bg-success/15"
-			: value >= 85
-				? "bg-warning/15"
-				: "bg-rose-500/15";
-
-	return (
-		<div className="flex items-center gap-2">
-			<div className={`w-16 h-1.5 rounded-full ${trackColor} overflow-hidden`}>
-				<div
-					className={`h-full rounded-full ${bgColor} transition-all`}
-					style={{ width: `${Math.min(value, 100)}%` }}
-				/>
-			</div>
-			<span className={`text-sm font-mono font-bold ${color}`}>{value}%</span>
 		</div>
 	);
 }

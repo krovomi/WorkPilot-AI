@@ -72,6 +72,9 @@ RUN_ENV: frozenset[str] = frozenset(
         # server's own value would be one brain for every tenant.
         "WORKPILOT_BRAIN_DIR",
         "WORKPILOT_BRAIN_CONFIG",
+        # The card's phone targets (``run_manager.card_environment``): the
+        # server's own value would choose for every card.
+        "WORKPILOT_MOBILE_TARGETS",
     }
 )
 

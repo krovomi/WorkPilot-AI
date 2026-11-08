@@ -1,16 +1,32 @@
+import { AlertTriangle, Leaf, Play, RotateCcw, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useCarbonProfilerStore } from "../../stores/carbon-profiler-store";
 import type { CarbonReport } from "../../../shared/types/carbon-profiler";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+} from "../charter";
 
 interface CarbonReportViewProps {
 	readonly projectPath?: string;
 }
 
+/** Energy and CO₂ of the project's LLM calls and CI runs, from its ledger. */
 export function CarbonReportView({
 	projectPath,
 }: CarbonReportViewProps): React.ReactElement {
-	const { t } = useTranslation("carbonProfiler");
+	const { t } = useTranslation(["carbonProfiler", "navigation"]);
 
 	const phase = useCarbonProfilerStore((s) => s.phase);
 	const status = useCarbonProfilerStore((s) => s.status);
@@ -21,205 +37,126 @@ export function CarbonReportView({
 	const reset = useCarbonProfilerStore((s) => s.reset);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center gap-3 flex-wrap">
-				{isScanning ? (
-					<button
-						type="button"
-						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-					>
-						{t("actions.cancel")}
-					</button>
+		<ModuleStage scroll="page" data-testid="carbon-profiler-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.planning")}
+				title={t("carbonProfiler:title")}
+				description={t("carbonProfiler:description")}
+				icon={Leaf}
+				tone="green"
+				actions={
+					<>
+						{report && !isScanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("carbonProfiler:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelScan()}>
+								{t("carbonProfiler:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && startScan(projectPath)}
+								disabled={!projectPath}
+							>
+								{t("carbonProfiler:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("carbonProfiler:errors.noProject")}
+					</Notice>
+				)}
+				{isScanning && <ScanLine label={status || t("carbonProfiler:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("carbonProfiler:errors.failed", { error })}
+					</Notice>
+				)}
+				{report ? (
+					<ReportBody report={report} />
 				) : (
-					<button
-						type="button"
-						onClick={() => projectPath && startScan(projectPath)}
-						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-					>
-						{t("actions.runScan")}
-					</button>
+					phase === "idle" && (
+						<EmptyStage icon={Leaf} title={t("carbonProfiler:emptyTitle")} tone="green">
+							{t("carbonProfiler:noData")}
+						</EmptyStage>
+					)
 				)}
-				{report && !isScanning && (
-					<button
-						type="button"
-						onClick={reset}
-						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-					>
-						{t("actions.reset")}
-					</button>
-				)}
-			</div>
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{report ? (
-				<ReportBody report={report} t={t} />
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
+			</Page>
+		</ModuleStage>
 	);
 }
 
-function StatCard({
-	label,
-	value,
-	color,
+function Breakdown({
+	kicker,
+	title,
+	values,
 }: {
-	readonly label: string;
-	readonly value: string;
-	readonly color: string;
-}): React.ReactElement {
+	readonly kicker: string;
+	readonly title: string;
+	readonly values: Record<string, number>;
+}): React.ReactElement | null {
+	const entries = Object.entries(values).sort(([, a], [, b]) => b - a);
+	if (entries.length === 0) return null;
 	return (
-		<div className="p-3 rounded-lg bg-card border border-border">
-			<p className="text-xs text-muted-foreground">{label}</p>
-			<p className={`text-xl font-bold ${color}`}>{value}</p>
-		</div>
+		<Section kicker={kicker} title={title}>
+			<div className="wp-chips">
+				{entries.map(([name, co2]) => (
+					<Chip key={name} tone="muted" dot={false} title={name}>
+						<span className="max-w-[14rem] truncate">{name}</span>
+						<span className="font-mono">{co2.toFixed(1)} g</span>
+					</Chip>
+				))}
+			</div>
+		</Section>
 	);
 }
 
-function ReportBody({
-	report,
-	t,
-}: {
-	readonly report: CarbonReport;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-}): React.ReactElement {
+function ReportBody({ report }: { readonly report: CarbonReport }): React.ReactElement {
+	const { t } = useTranslation("carbonProfiler");
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{report.periodStart || "—"} → {report.periodEnd || "—"}
-				</p>
-			</div>
+		<>
+			<Stats>
+				<Stat label={t("totalEnergy")} value={`${report.totalKwh.toFixed(3)} kWh`} tone="amber" />
+				<Stat label={t("co2Emissions")} value={`${report.totalCo2G.toFixed(1)} g`} tone="red" />
+				<Stat label={t("records")} value={report.records.length} tone="blue" />
+			</Stats>
+			<p className="wp-meta">
+				{t("period", { start: report.periodStart || "—", end: report.periodEnd || "—" })}
+			</p>
 
-			<div className="grid grid-cols-3 gap-3">
-				<StatCard
-					label={t("totalEnergy")}
-					value={`${report.totalKwh.toFixed(3)} kWh`}
-					color="text-warning"
-				/>
-				<StatCard
-					label={t("co2Emissions")}
-					value={`${report.totalCo2G.toFixed(1)} g`}
-					color="text-destructive"
-				/>
-				<StatCard
-					label={t("records")}
-					value={String(report.records.length)}
-					color="text-blue-400"
-				/>
-			</div>
-
-			{Object.keys(report.byProvider).length > 0 && (
-				<div>
-					<h3 className="text-sm font-medium text-muted-foreground mb-2">
-						{t("co2ByProvider")}
-					</h3>
-					<div className="grid grid-cols-4 gap-2">
-						{Object.entries(report.byProvider).map(([provider, co2]) => (
-							<div
-								key={provider}
-								className="p-2 rounded-lg bg-card border border-border"
-							>
-								<p className="text-xs text-muted-foreground truncate">
-									{provider}
-								</p>
-								<p className="text-sm font-bold text-orange-400">
-									{co2.toFixed(1)}
-								</p>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-
-			{Object.keys(report.byModel).length > 0 && (
-				<div>
-					<h3 className="text-sm font-medium text-muted-foreground mb-2">
-						{t("co2ByModel")}
-					</h3>
-					<div className="grid grid-cols-4 gap-2">
-						{Object.entries(report.byModel).map(([model, co2]) => (
-							<div
-								key={model}
-								className="p-2 rounded-lg bg-card border border-border"
-							>
-								<p className="text-xs text-muted-foreground truncate">
-									{model}
-								</p>
-								<p className="text-sm font-bold text-purple-400">
-									{co2.toFixed(1)}
-								</p>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
+			<Breakdown kicker={t("kickers.providers")} title={t("co2ByProvider")} values={report.byProvider} />
+			<Breakdown kicker={t("kickers.models")} title={t("co2ByModel")} values={report.byModel} />
 
 			{report.records.length > 0 && (
-				<div>
-					<h3 className="text-sm font-medium text-muted-foreground mb-2">
-						{t("recentRecords")}
-					</h3>
-					<div className="space-y-1">
+				<Section kicker={t("kickers.records")} title={t("recentRecords")}>
+					<div className="grid gap-2">
 						{report.records.slice(0, 20).map((rec) => (
-							<div
-								key={rec.timestamp}
-								className="flex items-center gap-3 px-3 py-2 text-xs rounded hover:bg-card transition-colors"
+							<Panel
+								key={`${rec.timestamp}-${rec.source}-${rec.model || rec.provider}`}
+								className="flex flex-wrap items-center gap-3 text-xs"
 							>
-								<span className="text-muted-foreground w-20 shrink-0">
-									{rec.source}
-								</span>
-								<span className="font-mono w-28 shrink-0 truncate">
-									{rec.model || rec.provider}
-								</span>
-								<span className="text-warning w-20 shrink-0">
-									{rec.kwh.toFixed(4)} kWh
-								</span>
-								<span className="text-destructive w-16 shrink-0">
-									{rec.co2G.toFixed(2)} g
-								</span>
-								<span className="text-muted-foreground ml-auto">
-									{rec.durationS.toFixed(1)}s
-								</span>
-							</div>
+								<Chip tone={rec.source === "ci_cd" ? "violet" : "blue"}>{rec.source}</Chip>
+								<span className="min-w-0 flex-1 truncate font-mono">{rec.model || rec.provider}</span>
+								<span className="font-mono">{rec.kwh.toFixed(4)} kWh</span>
+								<span className="font-mono">{rec.co2G.toFixed(2)} g</span>
+								<span className="wp-meta">{rec.durationS.toFixed(1)} s</span>
+							</Panel>
 						))}
 					</div>
-				</div>
+				</Section>
 			)}
 
-			{report.summary && (
-				<p className="text-sm text-muted-foreground italic mt-2">
-					{report.summary}
-				</p>
-			)}
-		</div>
+			{report.summary && <Notice tone="green" icon={Leaf}>{report.summary}</Notice>}
+		</>
 	);
 }

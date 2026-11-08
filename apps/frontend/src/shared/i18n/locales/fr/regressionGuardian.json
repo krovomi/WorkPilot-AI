@@ -3,8 +3,7 @@
 	"duplicate": "Doublon",
 	"viewTest": "Voir le test",
 	"noTest": "Aucun test généré",
-	"noData": "Aucun incident trouvé dans .workpilot/incidents/",
-	"incidentsDetected": "{{count}} incident(s) détecté(s)",
+	"noData": "Déposez des incidents APM (JSON) dans .workpilot/incidents/, puis lancez l'analyse.",
 	"stats": {
 		"incidents": "Incidents",
 		"testsGenerated": "Tests générés",
@@ -20,5 +19,36 @@
 		"noProject": "Sélectionnez un projet pour lancer le Gardien des Régressions.",
 		"failed": "Échec de l'analyse : {{error}}"
 	},
-	"unknownException": "inconnue"
+	"unknownException": "inconnue",
+	"description": "Transforme les incidents déposés dans .workpilot/incidents/ (Sentry, Datadog, CloudWatch…) en squelettes de tests de non-régression, dans le framework de la pile en cause.",
+	"idleTitle": "Pas encore d'analyse",
+	"emptyTitle": "Aucun incident trouvé",
+	"kickers": {
+		"incidents": "Incidents"
+	},
+	"severities": {
+		"critical": "Critique",
+		"error": "Erreur",
+		"warning": "Avertissement",
+		"info": "Info"
+	},
+	"frameworks": {
+		"pytest": "pytest",
+		"unittest": "unittest",
+		"jest": "Jest",
+		"vitest": "Vitest",
+		"mocha": "Mocha",
+		"junit5": "JUnit 5",
+		"testng": "TestNG",
+		"go_test": "Go test",
+		"xunit": "xUnit",
+		"nunit": "NUnit",
+		"cargo_test": "cargo test",
+		"phpunit": "PHPUnit",
+		"rspec": "RSpec",
+		"dart_test": "Dart test",
+		"xctest": "XCTest"
+	},
+	"incidentsDetected_one": "{{count}} incident détecté",
+	"incidentsDetected_other": "{{count}} incidents détectés"
 }

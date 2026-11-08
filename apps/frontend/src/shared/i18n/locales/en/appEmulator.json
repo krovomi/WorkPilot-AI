@@ -31,7 +31,10 @@
 		"framework": "Framework",
 		"port": "Port",
 		"command": "Command",
-		"url": "URL"
+		"url": "URL",
+		"serviceWithPort": "{{name}} :{{port}}",
+		"portValue": "Port {{port}}",
+		"api": "API"
 	},
 	"tabs": {
 		"preview": "Preview"

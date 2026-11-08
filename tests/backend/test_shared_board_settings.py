@@ -232,3 +232,69 @@ async def test_an_unusable_goal_file_is_reported_without_its_cause(tmp_path):
     assert shown["goal"] is None
     assert shown["goalError"] == GOAL_UNREADABLE
     assert str(clone) not in shown["goalError"]
+
+
+@pytest.mark.asyncio
+async def test_a_card_keeps_its_phone_targets_blockers_and_setup_mark(tmp_path):
+    """The task form's Android / iOS boxes, and the setup cards it creates for a
+    project with no phone app, reach a server card as they reach a local one."""
+    from server.services.run_manager import card_environment
+    from shared_board.api import get_card
+    from shared_board.settings import CardSettings
+
+    settings = CardSettings(
+        mobileTargets=["ios", "android"],
+        blockedBy=["server:p1:001-install-flutter"],
+        mobileBootstrap={"framework": "flutter", "step": "platform", "platform": "ios"},
+    )
+    scope, clone, card_id = await _create(tmp_path, settings)
+
+    metadata = _metadata(clone, card_id)
+    assert metadata["mobileTargets"] == ["android", "ios"]
+    assert metadata["blockedBy"] == ["server:p1:001-install-flutter"]
+    assert metadata["mobileBootstrap"] == {
+        "framework": "flutter",
+        "step": "platform",
+        "platform": "ios",
+    }
+    shown = (await get_card(card_id, scope))["settings"]
+    assert shown["mobileTargets"] == ["android", "ios"]
+
+    # The run gets them as the desktop gives them (`env-utils.ts`).
+    env = card_environment(str(clone), card_id)
+    assert env == {"WORKPILOT_MOBILE_TARGETS": "android,ios"}
+
+
+@pytest.mark.asyncio
+async def test_a_card_without_targets_runs_for_every_platform(tmp_path):
+    from server.services.run_manager import card_environment
+
+    _, clone, card_id = await _create(tmp_path)
+    # Set even when empty: the server's own environment never picks for a card.
+    assert card_environment(str(clone), card_id) == {"WORKPILOT_MOBILE_TARGETS": ""}
+
+
+def test_strange_phone_settings_are_refused():
+    from pydantic import ValidationError
+    from shared_board.settings import CardSettings
+
+    with pytest.raises(ValidationError):
+        CardSettings(mobileTargets=["windows-phone"])
+    with pytest.raises(ValidationError):
+        CardSettings(blockedBy=["../../etc/passwd"])
+    with pytest.raises(ValidationError):
+        CardSettings(mobileBootstrap={"framework": "cordova", "step": "install"})
+
+
+@pytest.mark.asyncio
+async def test_the_form_reads_the_mobile_profile_of_the_clone(tmp_path):
+    from shared_board.api import mobile_profile
+
+    pid, oid, clone = await _project(tmp_path)
+    (clone / "Api.sln").write_text("", encoding="utf-8")
+    viewer = _scope(pid, oid, clone, "viewer")
+
+    profile = await mobile_profile(viewer)
+
+    assert profile["isMobile"] is False
+    assert profile["frameworks"][0]["id"] == "dotnet-maui"

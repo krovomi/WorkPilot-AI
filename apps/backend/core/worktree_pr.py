@@ -12,12 +12,14 @@ import logging
 import os
 import re
 import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents.impact_analyzer import ImpactAnalysis
 from core.gh_executable import get_gh_executable, invalidate_gh_cache
 from core.glab_executable import get_glab_executable, invalidate_glab_cache
+from core.pr_group import append_section
 from core.worktree_common import (
     PullRequestResult,
     PushAndCreatePRResult,
@@ -314,6 +316,7 @@ class WorktreePRMixin:
         title: str | None = None,
         draft: bool = False,
         body: str | None = None,
+        body_suffix: str = "",
     ) -> PullRequestResult:
         """
         Create an Azure DevOps pull request using the REST API.
@@ -378,6 +381,9 @@ class WorktreePRMixin:
                 diff_summary=diff_summary,
                 commit_log=commit_log,
             )
+
+        # A split part's "PR group" section ends every body (core.pr_group).
+        pr_body = append_section(pr_body, body_suffix)
 
         # Extract Azure DevOps coordinates from git remote
         org = extract_azure_devops_org(self.project_dir)
@@ -592,6 +598,7 @@ class WorktreePRMixin:
         title: str | None = None,
         draft: bool = False,
         body: str | None = None,
+        body_suffix: str = "",
     ) -> PullRequestResult:
         """
         Create a GitHub pull request for a spec's branch using gh CLI with retry logic.
@@ -654,6 +661,9 @@ class WorktreePRMixin:
                 diff_summary=diff_summary,
                 commit_log=commit_log,
             )
+
+        # A split part's "PR group" section ends every body (core.pr_group).
+        pr_body = append_section(pr_body, body_suffix)
 
         # Find gh executable before attempting PR creation
         gh_executable = get_gh_executable()
@@ -782,6 +792,7 @@ class WorktreePRMixin:
         title: str | None = None,
         draft: bool = False,
         body: str | None = None,
+        body_suffix: str = "",
     ) -> PullRequestResult:
         """
         Create a GitLab merge request for a spec's branch using glab CLI with retry logic.
@@ -827,6 +838,9 @@ class WorktreePRMixin:
                 diff_summary=diff_summary,
                 commit_log=commit_log,
             )
+
+        # A split part's "PR group" section ends every body (core.pr_group).
+        mr_body = append_section(mr_body, body_suffix)
 
         # Find glab executable before attempting MR creation
         glab_executable = get_glab_executable()
@@ -1802,6 +1816,16 @@ class WorktreePRMixin:
             self.project_dir, remote_name=push_result.get("remote")
         )
 
+        # A part of a split task says which group it belongs to: title
+        # prefix and body section everywhere, label where the forge has one.
+        from core.pr_group import apply_group_label, decoration_for
+
+        marks = decoration_for(spec_dir_of(self, spec_name))
+        group_kwargs: dict = {}
+        if marks is not None:
+            title = marks.title(title or f"feat: {spec_name}")
+            group_kwargs = {"body_suffix": marks.section}
+
         # Step 3: Create the PR/MR based on provider
         if provider == "azure_devops":
             pr_result = self.create_azure_pull_request(
@@ -1810,6 +1834,7 @@ class WorktreePRMixin:
                 title=title,
                 draft=draft,
                 body=body,
+                **group_kwargs,
             )
         elif provider == "github":
             pr_result = self.create_pull_request(
@@ -1818,6 +1843,7 @@ class WorktreePRMixin:
                 title=title,
                 draft=draft,
                 body=body,
+                **group_kwargs,
             )
         elif provider == "gitlab":
             pr_result = self.create_merge_request(
@@ -1826,6 +1852,7 @@ class WorktreePRMixin:
                 title=title,
                 draft=draft,
                 body=body,
+                **group_kwargs,
             )
         else:
             # Unknown provider
@@ -1836,6 +1863,15 @@ class WorktreePRMixin:
                 branch=push_result.get("branch"),
                 provider=provider,
                 error="Unable to determine git hosting provider. Supported: GitHub, GitLab, Azure DevOps.",
+            )
+
+        if marks is not None and pr_result.get("success"):
+            apply_group_label(
+                provider,
+                get_gh_executable() if provider == "github" else get_glab_executable(),
+                Path(self.project_dir),
+                pr_result.get("pr_url"),
+                marks.group,
             )
 
         # A stacked PR on GitHub joins its parent's stack when `gh stack` is

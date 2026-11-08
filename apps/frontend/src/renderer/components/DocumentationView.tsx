@@ -1,501 +1,498 @@
+/**
+ * "Documentation" tab of Docs et dérive, in the UI charter
+ * (docs/architecture/ui-charter.md): project coverage on the left, the
+ * chosen file's symbols in the middle, drafts (doc comments or README) on
+ * the right, and the composer at the bottom. Every language of
+ * apps/backend/doc_languages is read; drafts follow each language's own doc
+ * comment convention and are never written to the project.
+ */
 import {
 	AlertTriangle,
 	BookOpenCheck,
 	Check,
-	CheckCircle2,
 	Copy,
+	FileCode2,
 	FileText,
-	Loader2,
+	FolderTree,
 	Play,
-	XCircle,
+	ScanSearch,
+	Sparkles,
+	X,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type {
+	DocSymbol,
+	DocSymbolStatus,
+	DocumentationAction,
+} from "../../shared/types/documentation";
+import { useDocumentationStore } from "../stores/documentation-store";
 import { useProjectStore } from "../stores/project-store";
-import { cn } from "../lib/utils";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	Gauge,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	Stat,
+	Stats,
+	type Tone,
+} from "./charter";
 import { FilePathAutocomplete } from "./FilePathAutocomplete";
-import { PageHeader } from "./ui/page-header";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface SymbolDoc {
-	name: string;
-	kind: string;
-	status: string;
-	existing_doc?: string;
-	generated_doc?: string;
-}
-
-interface CoverageResult {
-	coverage_pct: number;
-	total: number;
-	documented: number;
-	missing: number;
-	partial: number;
-	symbols?: SymbolDoc[];
-}
-
-interface DocGenerationResult {
-	generated_docs: SymbolDoc[];
-	readme_content?: string;
-	diagram_content?: string;
-}
 
 interface DocumentationViewProps {
 	readonly projectId: string;
 }
 
-// ---------------------------------------------------------------------------
-// Coverage gauge
-// ---------------------------------------------------------------------------
+const STATUS_TONE: Record<DocSymbolStatus, Tone> = {
+	documented: "green",
+	partial: "amber",
+	missing: "red",
+};
 
-function CoverageGauge({
-	pct,
-	t,
-}: {
-	readonly pct: number;
-	readonly t: (key: string) => string;
-}) {
-	let color: string;
-	if (pct >= 80) {
-		color = "text-success";
-	} else if (pct >= 50) {
-		color = "text-warning";
-	} else {
-		color = "text-destructive";
-	}
-	let bgColor: string;
-	if (pct >= 80) {
-		bgColor = "bg-success";
-	} else if (pct >= 50) {
-		bgColor = "bg-warning";
-	} else {
-		bgColor = "bg-destructive";
-	}
+const LANGUAGE_TONE: Record<string, Tone> = {
+	csharp: "violet",
+	typescript: "blue",
+	python: "amber",
+	java: "orange",
+	kotlin: "pink",
+	scala: "red",
+	swift: "orange",
+	go: "green",
+	rust: "orange",
+	php: "violet",
+	ruby: "red",
+	dart: "blue",
+	cpp: "muted",
+};
 
-	let coverageText: string;
-	if (pct >= 80) {
-		coverageText = t("documentation:coverage.wellDocumented");
-	} else if (pct >= 50) {
-		coverageText = t("documentation:coverage.needsImprovement");
-	} else {
-		coverageText = t("documentation:coverage.poorlyDocumented");
-	}
+export const coverageTone = (pct: number): Tone =>
+	pct >= 80 ? "green" : pct >= 50 ? "amber" : "red";
+
+function CopyButton({ text, label }: { readonly text: string; readonly label?: string }) {
+	const { t } = useTranslation("documentation");
+	const [copied, setCopied] = useState(false);
+	return (
+		<CharterButton
+			size="sm"
+			variant="ghost"
+			icon={copied ? Check : Copy}
+			onClick={async () => {
+				await navigator.clipboard.writeText(text);
+				setCopied(true);
+				setTimeout(() => setCopied(false), 1800);
+			}}
+		>
+			{copied ? t("actions.copied") : (label ?? t("actions.copy"))}
+		</CharterButton>
+	);
+}
+
+/** The draft without the declaration's indentation (copied with it). */
+export function dedent(text: string): string {
+	const lines = text.split("\n");
+	const indents = lines.filter((l) => l.trim()).map((l) => l.length - l.trimStart().length);
+	const cut = indents.length ? Math.min(...indents) : 0;
+	return lines.map((l) => l.slice(cut)).join("\n");
+}
+
+const symbolKey = (s: DocSymbol) => `${s.name}:${s.line_number}`;
+
+// ── Columns ─────────────────────────────────────────────────────────────────
+
+function ProjectColumn({ onPickFile }: { readonly onPickFile: (path: string) => void }) {
+	const { t } = useTranslation("documentation");
+	const overview = useDocumentationStore((s) => s.overview);
+	const running = useDocumentationStore((s) => s.running);
+	const status = useDocumentationStore((s) => s.status);
+	const run = useDocumentationStore((s) => s.run);
+	const selectedFile = useDocumentationStore((s) => s.file?.path);
+
+	const meta = overview
+		? t("project.meta", { files: overview.files_with_symbols, languages: overview.languages.length })
+		: undefined;
 
 	return (
-		<div className="flex items-center gap-4">
-			<div className="relative h-20 w-20">
-				{/* biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative, intentional */}
-				<svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-					<path
-						d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-						fill="none"
-						stroke="currentColor"
-						className="text-secondary"
-						strokeWidth="3"
-					/>
-					<path
-						d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-						fill="none"
-						stroke="currentColor"
-						className={color}
-						strokeWidth="3"
-						strokeDasharray={`${pct}, 100`}
-						strokeLinecap="round"
-					/>
-				</svg>
-				<div className="absolute inset-0 flex items-center justify-center">
-					<span className={cn("text-lg font-bold", color)}>
-						{pct.toFixed(0)}%
-					</span>
+		<Column
+			kicker={t("project.kicker")}
+			title={t("project.title")}
+			meta={meta}
+			tone="accent"
+		>
+			{running === "project" && <ScanLine label={status || t("progress.project")} />}
+			{!overview && running !== "project" && (
+				<EmptyStage
+					icon={BookOpenCheck}
+					title={t("project.emptyTitle")}
+					action={
+						<CharterButton variant="primary" icon={ScanSearch} onClick={() => run("project")}>
+							{t("project.analyze")}
+						</CharterButton>
+					}
+				>
+					{t("project.emptyHint")}
+				</EmptyStage>
+			)}
+			{overview && (
+				<div className="flex flex-col gap-4">
+					<Panel className="flex items-center gap-4">
+						<Gauge value={overview.coverage_pct} tone={coverageTone(overview.coverage_pct)} />
+						<div className="flex min-w-0 flex-col gap-1">
+							<span className="wp-kicker">{t("coverage.title")}</span>
+							<span className="wp-title">
+								{overview.coverage_pct >= 80
+									? t("coverage.wellDocumented")
+									: overview.coverage_pct >= 50
+										? t("coverage.needsImprovement")
+										: t("coverage.poorlyDocumented")}
+							</span>
+							<span className="wp-meta">
+								{overview.documented}/{overview.total}
+							</span>
+						</div>
+						<CharterButton
+							size="sm"
+							variant="ghost"
+							className="ml-auto self-start"
+							icon={ScanSearch}
+							disabled={running !== null}
+							onClick={() => run("project")}
+							title={t("project.reanalyze")}
+							aria-label={t("project.reanalyze")}
+						/>
+					</Panel>
+					<Stats>
+						<Stat label={t("coverage.documented")} value={overview.documented} tone="green" />
+						<Stat label={t("coverage.partial")} value={overview.partial} tone="amber" />
+						<Stat label={t("coverage.missing")} value={overview.missing} tone="red" />
+					</Stats>
+
+					{overview.languages.length > 0 && (
+						<div className="flex flex-col gap-2">
+							<span className="wp-kicker wp-faint">{t("project.languages")}</span>
+							{overview.languages.map((lang) => (
+								<div key={lang.id} className="flex flex-col gap-1">
+									<div className="flex items-center justify-between gap-2 text-xs">
+										<span className="flex items-center gap-2">
+											<span className={`wp-dot wp-tone-${LANGUAGE_TONE[lang.id] ?? "muted"}`} />
+											{lang.label}
+										</span>
+										<span className="wp-meta">
+											{lang.coverage_pct}% · {lang.files}
+										</span>
+									</div>
+									<Bar value={lang.coverage_pct} tone={coverageTone(lang.coverage_pct)} />
+								</div>
+							))}
+						</div>
+					)}
+
+					{overview.total === 0 ? (
+						<p className="wp-meta">{t("project.noSymbols")}</p>
+					) : overview.files.length === 0 ? (
+						<Notice tone="green" icon={Check}>
+							{t("project.allDocumented")}
+						</Notice>
+					) : (
+						<div className="flex flex-col gap-1.5">
+							<span className="wp-kicker wp-faint" title={t("project.priorityHint")}>
+								{t("project.priority")}
+							</span>
+							<div className="wp-rows">
+								{overview.files.map((file) => (
+									<button
+										key={file.path}
+										type="button"
+										className={`wp-row wp-tone-${coverageTone(file.coverage_pct)}`}
+										data-active={selectedFile === file.path ? "true" : undefined}
+										onClick={() => onPickFile(file.path)}
+										title={file.path}
+									>
+										<span className="wp-dot" />
+										<span className="wp-mono min-w-0 flex-1 truncate text-xs">{file.path}</span>
+										<span className="wp-meta">
+											{file.missing + file.partial}/{file.total}
+										</span>
+									</button>
+								))}
+							</div>
+						</div>
+					)}
+					{overview.truncated && <p className="wp-meta">{t("project.truncated")}</p>}
 				</div>
-			</div>
-			<div>
-				<p className="text-sm font-semibold text-foreground">
-					{t("documentation:coverage.title")}
-				</p>
-				<div className="mt-1 flex items-center gap-1.5">
-					<div className={cn("h-2 w-2 rounded-full", bgColor)} />
-					<span className="text-xs text-muted-foreground">
-						{coverageText}
-					</span>
+			)}
+		</Column>
+	);
+}
+
+function FileColumn() {
+	const { t } = useTranslation("documentation");
+	const file = useDocumentationStore((s) => s.file);
+	const running = useDocumentationStore((s) => s.running);
+	const status = useDocumentationStore((s) => s.status);
+	const selected = useDocumentationStore((s) => s.selectedSymbol);
+	const select = useDocumentationStore((s) => s.selectSymbol);
+	const current = file?.symbols.find((s) => symbolKey(s) === selected) ?? null;
+
+	return (
+		<Column
+			kicker={t("file.kicker")}
+			title={<span className="wp-mono text-sm">{file?.path ?? "—"}</span>}
+			meta={file ? t("file.meta", { pct: file.coverage_pct }) : undefined}
+			tone="blue"
+		>
+			{running === "coverage" && <ScanLine label={status || t("progress.coverage")} />}
+			{!file && running !== "coverage" && (
+				<EmptyStage icon={FileCode2} title={t("file.emptyTitle")} tone="blue">
+					{t("file.emptyHint")}
+				</EmptyStage>
+			)}
+			{file && (
+				<div className="flex flex-col gap-3">
+					<Stats>
+						<Stat label={t("coverage.documented")} value={file.documented} tone="green" />
+						<Stat label={t("coverage.partial")} value={file.partial} tone="amber" />
+						<Stat label={t("coverage.missing")} value={file.missing} tone="red" />
+					</Stats>
+					<span className="wp-meta">{t("file.symbols", { count: file.symbols.length })}</span>
+					<div className="wp-rows">
+						{file.symbols.map((sym) => (
+							<button
+								key={symbolKey(sym)}
+								type="button"
+								className={`wp-row wp-tone-${STATUS_TONE[sym.status]}`}
+								data-active={selected === symbolKey(sym) ? "true" : undefined}
+								onClick={() => select(selected === symbolKey(sym) ? null : symbolKey(sym))}
+								title={sym.status === "partial" ? t("coverage.partialHint") : undefined}
+							>
+								<span className="wp-dot" />
+								<span className="wp-mono min-w-0 flex-1 truncate text-xs">{sym.name}</span>
+								<Chip dot={false}>{t(`kinds.${sym.symbol_type}`, sym.symbol_type)}</Chip>
+								<span className="wp-meta">L{sym.line_number}</span>
+							</button>
+						))}
+					</div>
+					{current && (
+						<Panel rail tone={STATUS_TONE[current.status]}>
+							<div className="mb-2 flex items-center justify-between gap-2">
+								<span className="wp-kicker">{t("file.existing")}</span>
+								<span className="wp-meta">{t("file.line", { line: current.line_number })}</span>
+							</div>
+							{current.existing_doc ? (
+								<pre className="wp-code">{current.existing_doc}</pre>
+							) : (
+								<p className="wp-muted text-xs">{t("file.noExisting")}</p>
+							)}
+						</Panel>
+					)}
 				</div>
-			</div>
+			)}
+		</Column>
+	);
+}
+
+function DraftsColumn() {
+	const { t } = useTranslation("documentation");
+	const drafts = useDocumentationStore((s) => s.drafts);
+	const readme = useDocumentationStore((s) => s.readme);
+	const view = useDocumentationStore((s) => s.draftsView);
+	const setView = useDocumentationStore((s) => s.setDraftsView);
+	const running = useDocumentationStore((s) => s.running);
+	const status = useDocumentationStore((s) => s.status);
+	const selected = useDocumentationStore((s) => s.selectedSymbol);
+	const isReadme = view === "readme";
+	const readmeFile = readme ? [readme.source_path, "README.md"].join("/") : "";
+	const busy: DocumentationAction | null = running === "docstrings" || running === "readme" ? running : null;
+	const docs = drafts?.generated_docs ?? [];
+
+	const actions = (
+		<div className="flex items-center gap-1.5">
+			<Chip tone="violet" pressed={!isReadme} onClick={() => setView("docs")}>
+				{t("drafts.tabDocs")}
+			</Chip>
+			<Chip tone="violet" pressed={isReadme} onClick={() => setView("readme")}>
+				{t("drafts.tabReadme")}
+			</Chip>
 		</div>
 	);
-}
-
-// ---------------------------------------------------------------------------
-// Copy button
-// ---------------------------------------------------------------------------
-
-function CopyButton({ text }: { readonly text: string }) {
-	const { t } = useTranslation(["documentation"]);
-	const [copied, setCopied] = useState(false);
-
-	const handleCopy = async () => {
-		await navigator.clipboard.writeText(text);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	};
 
 	return (
-		<Button variant="ghost" size="sm" onClick={handleCopy}>
-			{copied ? (
-				<Check className="h-3.5 w-3.5 mr-1.5" />
-			) : (
-				<Copy className="h-3.5 w-3.5 mr-1.5" />
+		<Column
+			kicker={t("drafts.kicker")}
+			title={isReadme ? t("drafts.titleReadme") : t("drafts.titleDocs")}
+			tone="violet"
+			actions={actions}
+		>
+			{busy && <ScanLine label={status || t(`progress.${busy}`)} />}
+			{!isReadme && !drafts && !busy && (
+				<EmptyStage icon={Sparkles} title={t("drafts.emptyTitle")} tone="violet">
+					{t("drafts.emptyHint")}
+				</EmptyStage>
 			)}
-			{copied
-				? t("documentation:actions.copied")
-				: t("documentation:actions.copy")}
-		</Button>
+			{!isReadme && drafts && docs.length === 0 && (
+				<Notice tone="green" icon={Check}>
+					{t("drafts.noneNeeded")}
+				</Notice>
+			)}
+			{!isReadme && docs.length > 0 && (
+				<div className="flex flex-col gap-2.5">
+					<div className="flex items-center justify-between gap-2">
+						<span className="wp-meta">{t("drafts.count", { count: docs.length })}</span>
+						<CopyButton
+							text={docs.map((d) => `${d.name}\n${d.generated_doc}`).join("\n\n")}
+							label={t("actions.copyAll")}
+						/>
+					</div>
+					{docs.map((doc) => (
+						<Panel
+							key={symbolKey(doc)}
+							rail
+							tone={STATUS_TONE[doc.status]}
+							data-active={selected === symbolKey(doc) ? "true" : undefined}
+						>
+							<div className="mb-2 flex items-center justify-between gap-2">
+								<div className="min-w-0">
+									<span className="wp-kicker">
+										{t(`kinds.${doc.symbol_type}`, doc.symbol_type)} · L{doc.line_number}
+									</span>
+									<div className="wp-mono truncate text-sm font-medium">{doc.name}</div>
+								</div>
+								<CopyButton text={doc.generated_doc} />
+							</div>
+							<pre className="wp-code">{dedent(doc.generated_doc)}</pre>
+						</Panel>
+					))}
+				</div>
+			)}
+			{isReadme && !readme && !busy && (
+				<EmptyStage icon={FolderTree} title={t("drafts.emptyTitle")} tone="violet">
+					{t("drafts.readmeEmptyHint")}
+				</EmptyStage>
+			)}
+			{isReadme && readme && (
+				<Panel>
+					<div className="mb-2 flex items-center justify-between gap-2">
+						<span className="wp-mono text-xs">{readmeFile}</span>
+						<CopyButton text={readme.readme_content} />
+					</div>
+					<pre className="wp-code">{readme.readme_content}</pre>
+				</Panel>
+			)}
+		</Column>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+// ── View ────────────────────────────────────────────────────────────────────
 
 export function DocumentationView({ projectId }: DocumentationViewProps) {
-	const { t } = useTranslation(["documentation"]);
+	const { t } = useTranslation("documentation");
 	const projectPath = useProjectStore(
 		(s) => s.projects.find((p) => p.id === projectId)?.path ?? "",
 	);
-	const [filePath, setFilePath] = useState("");
+	const bindProject = useDocumentationStore((s) => s.bindProject);
+	const setStatus = useDocumentationStore((s) => s.setStatus);
+	const run = useDocumentationStore((s) => s.run);
+	const cancel = useDocumentationStore((s) => s.cancel);
+	const running = useDocumentationStore((s) => s.running);
+	const error = useDocumentationStore((s) => s.error);
+	const currentFile = useDocumentationStore((s) => s.file?.path ?? "");
+	const [filePath, setFilePath] = useState(currentFile);
 	const [dirPath, setDirPath] = useState("");
-	const [coverage, setCoverage] = useState<CoverageResult | null>(null);
-	const [generatedDocs, setGeneratedDocs] =
-		useState<DocGenerationResult | null>(null);
-	const [readmeContent, setReadmeContent] = useState<string | null>(null);
-	const [loading, setLoading] = useState(false);
-	const [loadingDocs, setLoadingDocs] = useState(false);
-	const [loadingReadme, setLoadingReadme] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
-	const handleCheckCoverage = useCallback(async () => {
-		if (!filePath.trim()) return;
-		setLoading(true);
-		setError(null);
-		setCoverage(null);
-		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(`${backendUrl}/api/documentation/coverage`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ file_path: filePath }),
-			});
-			const data = await res.json();
-			if (data.success) {
-				setCoverage(data.coverage);
-			} else {
-				setError(data.error || t("documentation:errors.coverageFailed"));
-			}
-		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("documentation:errors.networkError"),
-			);
-		} finally {
-			setLoading(false);
-		}
-	}, [filePath, t]);
+	useEffect(() => {
+		if (projectPath) bindProject(projectPath);
+	}, [projectPath, bindProject]);
 
-	const handleGenerateDocstrings = useCallback(async () => {
-		if (!filePath.trim()) return;
-		setLoadingDocs(true);
-		setError(null);
-		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(
-				`${backendUrl}/api/documentation/generate-docstrings`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ file_path: filePath }),
-				},
-			);
-			const data = await res.json();
-			if (data.success) {
-				setGeneratedDocs(data.result);
-			} else {
-				setError(data.error || t("documentation:errors.docstringFailed"));
-			}
-		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("documentation:errors.networkError"),
-			);
-		} finally {
-			setLoadingDocs(false);
-		}
-	}, [filePath, t]);
+	useEffect(() => globalThis.electronAPI?.onDocumentationProgress?.(setStatus), [setStatus]);
 
-	const handleGenerateReadme = useCallback(async () => {
-		if (!dirPath.trim()) return;
-		setLoadingReadme(true);
-		setError(null);
-		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(
-				`${backendUrl}/api/documentation/generate-readme`,
-				{
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ dir_path: dirPath }),
-				},
-			);
-			const data = await res.json();
-			if (data.success) {
-				setReadmeContent(
-					data.result?.readme_content || data.result?.readme || "",
-				);
-			} else {
-				setError(data.error || t("documentation:errors.readmeFailed"));
-			}
-		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("documentation:errors.networkError"),
-			);
-		} finally {
-			setLoadingReadme(false);
-		}
-	}, [dirPath, t]);
+	useEffect(() => {
+		if (currentFile) setFilePath(currentFile);
+	}, [currentFile]);
+
+	const pickFile = (path: string) => {
+		setFilePath(path);
+		void run("coverage", path);
+	};
+	const busy = running !== null;
+	const file = filePath.trim();
 
 	return (
-		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				<PageHeader
-					variant="inline"
-					icon={BookOpenCheck}
-					title={t("documentation:title")}
-					description={t("documentation:description")}
-				/>
-
-				{/* Coverage check */}
-				<Card>
-					<CardContent className="p-5 space-y-3">
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="text-sm font-medium text-foreground">
-							{t("documentation:coverage.checkLabel")}
-						</label>
-						<div className="flex gap-2">
-							<FilePathAutocomplete
-								value={filePath}
-								onChange={setFilePath}
-								rootPath={projectPath}
-								mode="file"
-								placeholder={t("documentation:coverage.filePathPlaceholder")}
-								className="font-mono text-xs"
-							/>
-							<Button
-								onClick={handleCheckCoverage}
-								disabled={loading || !filePath.trim()}
+		<ModuleStage data-testid="documentation-view">
+			<Columns template="minmax(280px, 30%) minmax(300px, 32%) minmax(0, 1fr)">
+				<ProjectColumn onPickFile={pickFile} />
+				<FileColumn />
+				<DraftsColumn />
+			</Columns>
+			{(error || !projectPath) && (
+				<Notice tone="red" icon={AlertTriangle} role="alert" className="relative z-[2] mx-5 mb-2">
+					{projectPath ? t("errors.failed", { error }) : t("errors.noProject")}
+				</Notice>
+			)}
+			<Composer
+				prompt={
+					<FilePathAutocomplete
+						value={filePath}
+						onChange={setFilePath}
+						rootPath={projectPath}
+						mode="file"
+						placeholder={t("composer.filePlaceholder")}
+						className="h-8 border-0 bg-transparent font-mono text-xs shadow-none focus-visible:ring-0"
+						disabled={!projectPath}
+					/>
+				}
+				actions={
+					busy ? (
+						<CharterButton icon={X} onClick={() => cancel()}>
+							{t("actions.cancel")}
+						</CharterButton>
+					) : (
+						<>
+							<CharterButton icon={Play} disabled={!file} onClick={() => run("coverage", file)}>
+								{t("actions.check")}
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={Sparkles}
+								disabled={!file}
+								onClick={() => run("docstrings", file)}
 							>
-								{loading ? (
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								) : (
-									<Play className="h-4 w-4 mr-2" />
-								)}
-								{t("documentation:actions.check")}
-							</Button>
-						</div>
-						<Button
-							variant="outline"
-							onClick={handleGenerateDocstrings}
-							disabled={loadingDocs || !filePath.trim()}
-						>
-							{loadingDocs ? (
-								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-							) : (
-								<FileText className="h-4 w-4 mr-2" />
-							)}
-							{t("documentation:actions.generateDocstrings")}
-						</Button>
-					</CardContent>
-				</Card>
-
-				{/* README generation */}
-				<Card>
-					<CardContent className="p-5 space-y-3">
-						{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-						<label className="text-sm font-medium text-foreground">
-							{t("documentation:readme.generateLabel")}
-						</label>
-						<div className="flex gap-2">
+								{t("actions.generateDocstrings")}
+							</CharterButton>
+						</>
+					)
+				}
+				options={
+					<>
+						<span className="wp-field w-full max-w-[30rem]">
+							{t("composer.folder")}
 							<FilePathAutocomplete
 								value={dirPath}
 								onChange={setDirPath}
 								rootPath={projectPath}
 								mode="directory"
-								placeholder={t("documentation:readme.dirPathPlaceholder")}
-								className="font-mono text-xs"
+								placeholder={t("composer.folderPlaceholder")}
+								className="h-6 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0"
+								disabled={!projectPath}
 							/>
-							<Button
-								onClick={handleGenerateReadme}
-								disabled={loadingReadme || !dirPath.trim()}
-							>
-								{loadingReadme ? (
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								) : (
-									<FileText className="h-4 w-4 mr-2" />
-								)}
-								{t("documentation:actions.generate")}
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Error */}
-				{error && (
-					<Card className="border-destructive/30">
-						<CardContent className="p-4 flex items-center gap-3 text-destructive">
-							<AlertTriangle className="h-5 w-5 shrink-0" />
-							<p className="text-sm">{error}</p>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Coverage results */}
-				{coverage && (
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<Card>
-							<CardContent className="p-5">
-								<CoverageGauge pct={coverage.coverage_pct} t={t} />
-								<div className="mt-4 grid grid-cols-3 gap-4 text-center">
-									<div>
-										<p className="text-lg font-bold text-foreground">
-											{coverage.documented}
-										</p>
-										<p className="text-xs text-muted-foreground">
-											{t("documentation:coverage.documented")}
-										</p>
-									</div>
-									<div>
-										<p className="text-lg font-bold text-warning">
-											{coverage.partial}
-										</p>
-										<p className="text-xs text-muted-foreground">
-											{t("documentation:coverage.partial")}
-										</p>
-									</div>
-									<div>
-										<p className="text-lg font-bold text-destructive">
-											{coverage.missing}
-										</p>
-										<p className="text-xs text-muted-foreground">
-											{t("documentation:coverage.missing")}
-										</p>
-									</div>
-								</div>
-							</CardContent>
-						</Card>
-
-						{coverage.symbols && coverage.symbols.length > 0 && (
-							<Card>
-								<CardContent className="p-5">
-									<h3 className="text-sm font-semibold text-foreground mb-3">
-										{t("documentation:symbols.title")}
-									</h3>
-									<div className="space-y-1.5 max-h-60 overflow-y-auto">
-										{coverage.symbols.map((sym) => {
-											let statusIcon: React.ReactElement;
-											if (sym.status === "documented") {
-												statusIcon = (
-													<CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
-												);
-											} else if (sym.status === "partial") {
-												statusIcon = (
-													<AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
-												);
-											} else {
-												statusIcon = (
-													<XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
-												);
-											}
-											return (
-												<div
-													key={`symbol-${sym.name}-${sym.status}`}
-													className="flex items-center gap-2 text-xs"
-												>
-													{statusIcon}
-												<span className="font-mono text-foreground">
-													{sym.name}
-												</span>
-												<Badge variant="outline" className="text-3xs">
-													{sym.kind}
-												</Badge>
-											</div>
-											);
-										})}
-									</div>
-								</CardContent>
-							</Card>
-						)}
-					</div>
-				)}
-
-				{/* Generated docstrings */}
-				{generatedDocs && generatedDocs.generated_docs.length > 0 && (
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("documentation:docstrings.title", {
-									count: generatedDocs.generated_docs.length,
-								})}
-							</h3>
-							<div className="space-y-4">
-								{generatedDocs.generated_docs.map((doc) => (
-									<div
-										key={`doc-${doc.name.slice(0, 50)}`}
-										className="rounded-lg border border-border p-4"
-									>
-										<div className="flex items-center justify-between mb-2">
-											<div className="flex items-center gap-2">
-												<span className="text-sm font-mono font-medium text-foreground">
-													{doc.name}
-												</span>
-												<Badge variant="outline" className="text-xs">
-													{doc.kind}
-												</Badge>
-											</div>
-											{doc.generated_doc && (
-												<CopyButton text={doc.generated_doc} />
-											)}
-										</div>
-										{doc.generated_doc && (
-											<pre className="mt-2 rounded-md bg-secondary/50 p-3 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap">
-												{doc.generated_doc}
-											</pre>
-										)}
-									</div>
-								))}
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Generated README */}
-				{readmeContent && (
-					<Card>
-						<CardContent className="p-5">
-							<div className="flex items-center justify-between mb-4">
-								<h3 className="text-sm font-semibold text-foreground">
-									{t("documentation:readme.title")}
-								</h3>
-								<CopyButton text={readmeContent} />
-							</div>
-							<pre className="rounded-md bg-secondary/50 p-4 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
-								{readmeContent}
-							</pre>
-						</CardContent>
-					</Card>
-				)}
-			</div>
-		</ScrollArea>
+						</span>
+						<CharterButton
+							size="sm"
+							icon={FileText}
+							disabled={busy || !projectPath}
+							onClick={() => run("readme", dirPath.trim())}
+						>
+							{t("actions.generateReadme")}
+						</CharterButton>
+					</>
+				}
+			/>
+		</ModuleStage>
 	);
 }

@@ -74,5 +74,12 @@
 		"title": "Signaux non mesurés",
 		"description": "Ces critères n'ont pas pu être évalués ; leur poids a été redistribué."
 	},
-	"noWinnerTie": "Égalité en tête — aucun gagnant n'est désigné."
+	"noWinnerTie": "Égalité en tête — aucun gagnant n'est désigné.",
+	"contestant": "Participant",
+	"kickers": {
+		"setup": "Préparation",
+		"board": "Plateau"
+	},
+	"emptyTitle": "Pas encore de manche",
+	"emptyHint": "Choisissez une spec, alignez les participants, puis lancez : chacun travaille dans son worktree et le juge désigne le gagnant."
 }

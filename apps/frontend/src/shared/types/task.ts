@@ -14,7 +14,7 @@ import type {
 	ThinkingLevel,
 } from "./settings";
 import type { TaskGoalSummary } from "./goal";
-import type { MobilePlatform } from "./mobile";
+import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
@@ -269,6 +269,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** The automatic split as set in the wizard (absent = project defaults). */
+	autoSplit?: { noSplit: boolean; maxLines: string };
 	/** Part of the title of the one window a Windows app is verified in. */
 	verifyWindow?: string;
 	/** The steps a web front end's verification follows, one per line. */
@@ -357,7 +359,8 @@ export type TaskKind =
 	| "refactoring"
 	| "test"
 	| "docs"
-	| "spike";
+	| "spike"
+	| "upgrade";
 
 export const TASK_KINDS: readonly TaskKind[] = [
 	"feature",
@@ -369,6 +372,7 @@ export const TASK_KINDS: readonly TaskKind[] = [
 	"test",
 	"docs",
 	"spike",
+	"upgrade",
 ];
 
 /** Who decided the kind. `user` is never overwritten by the backend. */
@@ -385,6 +389,34 @@ export interface AutomationOrigin {
 	ruleName: string;
 	eventKey: string;
 	url?: string;
+}
+
+/** A task's place in an automatic split (`apps/backend/task_split/`). */
+export interface TaskSplitGroup {
+	/** On a part: the task it was cut from, its title, which part of how many. */
+	parent?: string;
+	title?: string;
+	index?: number;
+	total?: number;
+	/** On a part: the phases it builds, as a short name. */
+	name?: string;
+	/** On the split task: its parts, and the ceiling the plan was measured against. */
+	children?: string[];
+	maxLines?: number;
+	source?: "card" | "project" | "default";
+	splitAt?: string;
+}
+
+/** The finished branch's real diff against the card's ceiling (`task_split/diff_check.py`). */
+export interface TaskSplitCheck {
+	/** Lines to review: code in full, tests and docs half, generated files nothing. */
+	lines: number;
+	files: number;
+	maxLines: number;
+	maxFiles: number;
+	kind?: string;
+	over: boolean;
+	checkedAt?: string;
 }
 
 export interface TaskMetadata {
@@ -442,6 +474,11 @@ export interface TaskMetadata {
 	// WORKPILOT_MOBILE_TARGETS, which narrows the platform rules the planner,
 	// the coder and QA are given.
 	mobileTargets?: MobilePlatform[];
+	// Set on the setup tasks the form adds when a platform is checked on a
+	// project with no phone app (install the framework, prepare a platform):
+	// a second task targeting the same platform reuses them instead of
+	// installing the framework twice (`renderer/lib/mobile-setup.ts`).
+	mobileBootstrap?: MobileBootstrapMark;
 
 	// Classification
 	category?: TaskCategory;
@@ -570,6 +607,19 @@ export interface TaskMetadata {
 	stackParent?: string;
 	stackParentSha?: string;
 	stackTrunk?: string;
+	/**
+	 * Automatic split (`apps/backend/task_split/`): on a part, the group it
+	 * belongs to; on the task that was split, the parts it became.
+	 */
+	splitGroup?: TaskSplitGroup;
+	/** Keep this task whole, however big its plan. */
+	noSplit?: boolean;
+	/** Changed lines per pull request for this task; the project's when absent. */
+	splitMaxLines?: number;
+	/** The real diff once the build finished, against the ceiling. */
+	splitCheck?: TaskSplitCheck;
+	/** When this part's PR was seen merged (`split-merge-watch.ts`). */
+	prMergedAt?: string;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {

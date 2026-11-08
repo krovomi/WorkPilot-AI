@@ -512,7 +512,23 @@ class TestFrameworkType:
 
     def test_all_framework_values(self):
         """Should have all expected framework types."""
-        expected = {"react", "vue", "angular", "svelte", "nextjs", "nuxt"}
+        expected = {
+            "react",
+            "vue",
+            "angular",
+            "svelte",
+            "nextjs",
+            "nuxt",
+            "blazor",
+            "html",
+            "react_native",
+            "flutter",
+            "swiftui",
+            "jetpack_compose",
+            "maui",
+            "wpf",
+            "avalonia",
+        }
         actual = {ft.value for ft in FrameworkType}
         assert expected == actual
 

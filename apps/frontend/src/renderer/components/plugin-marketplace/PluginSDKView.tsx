@@ -136,7 +136,7 @@ export function PluginSDKView() {
 					({ icon: Icon, titleKey, color, descKey, codeSnippet }) => (
 						<div
 							key={titleKey}
-							className="rounded-xl border border-border bg-card overflow-hidden"
+							className="wp-card overflow-hidden"
 						>
 							<div className="flex items-center gap-3 p-4 border-b border-border/50">
 								<div
@@ -165,7 +165,7 @@ export function PluginSDKView() {
 				)}
 
 				{/* Plugin types reference */}
-				<div className="rounded-xl border border-border bg-card p-4">
+				<div className="wp-card wp-card-pad">
 					<h3 className="font-semibold text-sm mb-3">
 						{t("common:pluginMarketplace.sdk.pluginTypes")}
 					</h3>

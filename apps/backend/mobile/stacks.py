@@ -178,10 +178,13 @@ def _read(path: Path, limit: int = 200_000) -> str:
 def _candidate_dirs(root: Path) -> list[Path]:
     """``root`` first, then the shallow subdirectories worth looking at."""
     dirs = [root]
-    for depth in range(_MAX_DEPTH):
-        frontier = dirs[len(dirs) - 1 :] if depth else [root]
+    # The whole previous level is the next frontier. It used to be the last
+    # directory listed alone, so `apps/mobile/` was found only when `apps/`
+    # sorted last at the root: a monorepo with a `tests/` folder had "no app".
+    frontier = [root]
+    for _depth in range(_MAX_DEPTH):
         next_level: list[Path] = []
-        for parent in frontier if depth else [root]:
+        for parent in frontier:
             try:
                 entries = sorted(p for p in parent.iterdir() if p.is_dir())
             except OSError:
@@ -193,6 +196,7 @@ def _candidate_dirs(root: Path) -> list[Path]:
         if not next_level:
             break
         dirs.extend(next_level)
+        frontier = next_level
     # De-duplicate while keeping order; a symlinked monorepo can list twice.
     seen: set[str] = set()
     unique: list[Path] = []

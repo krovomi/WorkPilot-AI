@@ -37,7 +37,7 @@ import {
 } from "../../agent/task-provider-env";
 import { appLog } from "../../app-logger";
 import { parsePythonCommand } from "../../python-detector";
-import { pythonEnvManager } from "../../python-env-manager";
+import { readyPythonPath } from "../../utils/ensure-python";
 import { pythonRunnerEnv } from "../../utils/python-runner-env";
 import { findTaskWorktree } from "../../worktree-paths";
 import { findTaskAndProject } from "./shared";
@@ -166,7 +166,7 @@ export function registerPrFollowupHandlers(
 			if (!worktreePath) {
 				return { success: false, error: "The task's worktree no longer exists" };
 			}
-			const pythonPath = pythonEnvManager.getPythonPath();
+			const pythonPath = await readyPythonPath();
 			if (!pythonPath) return { success: false, error: "Python environment not ready" };
 
 			const specDir = path.join(

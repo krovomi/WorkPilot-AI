@@ -61,7 +61,14 @@ import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { useShallow } from "zustand/react/shallow";
 import { useCollaborationStore } from "../stores/collaboration-store";
-import { duplicateTask, persistUpdateTask, saveTaskEdit } from "../stores/task-store";
+import { createMobileSetup, inheritedSetupMetadata } from "../lib/mobile-setup";
+import {
+	createTask,
+	duplicateTask,
+	persistUpdateTask,
+	saveTaskEdit,
+} from "../stores/task-store";
+import { useMobileSetup } from "./task-form/useMobileSetup";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
@@ -78,6 +85,16 @@ import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
 import { Button } from "./ui/button";
+import {
+	type AutoSplitValue,
+	autoSplitMetadata,
+	autoSplitValueFrom,
+	isAutoSplitValueValid,
+} from "./task-form/AutoSplitFields";
+import {
+	autoSplitCeilingFor,
+	kindFromCategory,
+} from "../../shared/utils/task-split";
 
 /**
  * Props for the TaskEditDialog component
@@ -192,6 +209,10 @@ export function TaskEditDialog({
 		() => projects.find((p) => p.id === task.projectId)?.settings?.provider,
 		[projects, task.projectId],
 	);
+	const projectAutoSplit = useMemo(
+		() => projects.find((p) => p.id === task.projectId)?.settings?.autoSplit,
+		[projects, task.projectId],
+	);
 	const engineForTask = useCallback(
 		(): TaskEngine =>
 			resolveTaskEngine(
@@ -257,6 +278,9 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(() =>
+		autoSplitValueFrom(task.metadata),
+	);
 	const [verifyWindow, setVerifyWindow] = useState(task.metadata?.verifyWindow ?? "");
 	const [verifyScenario, setVerifyScenario] = useState(task.metadata?.verifyScenario ?? "");
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
@@ -264,6 +288,20 @@ export function TaskEditDialog({
 	);
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
 		task.metadata?.mobileTargets ?? [],
+	);
+	// Only a platform checked here may need setup tasks: the ones the task
+	// already had got theirs when they were checked. A setup task itself
+	// never asks for another.
+	const addedTargets = useMemo(
+		() =>
+			mobileTargets.filter(
+				(platform) => !(task.metadata?.mobileTargets ?? []).includes(platform),
+			),
+		[mobileTargets, task.metadata?.mobileTargets],
+	);
+	const mobileSetup = useMobileSetup(
+		open && !task.metadata?.mobileBootstrap ? task.projectId : undefined,
+		addedTargets,
 	);
 
 	// Reset the form when the dialog opens, or opens on another task. A change
@@ -328,6 +366,7 @@ export function TaskEditDialog({
 		);
 		setTddMode(task.metadata?.tddMode ?? false);
 		setVerifyLoop(task.metadata?.verifyLoop ?? true);
+		setAutoSplit(autoSplitValueFrom(task.metadata));
 		setVerifyWindow(task.metadata?.verifyWindow ?? "");
 		setVerifyScenario(task.metadata?.verifyScenario ?? "");
 		setContextPolicy(resolveContextPolicy(task.metadata));
@@ -422,6 +461,11 @@ export function TaskEditDialog({
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		const splitBefore = autoSplitMetadata(autoSplitValueFrom(task.metadata));
+		const splitAfter = autoSplitMetadata(autoSplit);
+		const autoSplitChanged =
+			splitBefore.noSplit !== splitAfter.noSplit ||
+			splitBefore.splitMaxLines !== splitAfter.splitMaxLines;
 		const contextPolicyChanged = !sameContextPolicy(
 			contextPolicy,
 			resolveContextPolicy(task.metadata),
@@ -441,6 +485,7 @@ export function TaskEditDialog({
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				autoSplitChanged ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
 				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
 				contextPolicyChanged ||
@@ -476,12 +521,35 @@ export function TaskEditDialog({
 		if (!sameTargets(mobileTargets, task.metadata?.mobileTargets)) {
 			metadataUpdates.mobileTargets = mobileTargets;
 		}
+		// A platform newly checked on a project with no phone app: the setup
+		// tasks go on the board first and this task waits for them.
+		if (mobileSetup.plan && mobileSetup.profile) {
+			try {
+				const blockers = await createMobileSetup(
+					mobileSetup.plan,
+					mobileSetup.profile,
+					task.projectId,
+					inheritedSetupMetadata({ ...task.metadata, ...metadataUpdates }),
+					createTask,
+					t,
+				);
+				metadataUpdates.blockedBy = [
+					...new Set([...(task.metadata?.blockedBy ?? []), ...blockers]),
+				];
+			} catch (err) {
+				setError(err instanceof Error ? err.message : t("common:errors.unknownError"));
+				setIsSaving(false);
+				return;
+			}
+		}
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
 		}
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
 		}
+		// `undefined` removes the key: the task is back on the project's ceiling.
+		if (isDuplicate || autoSplitChanged) Object.assign(metadataUpdates, splitAfter);
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
 			metadataUpdates.verifyWindow = verifyWindow.trim();
 		}
@@ -573,7 +641,10 @@ export function TaskEditDialog({
 		await handleSave(text);
 	};
 
-	const isValid = description.trim().length > 0 && !dictationPending;
+	const isValid =
+		description.trim().length > 0 &&
+		!dictationPending &&
+		isAutoSplitValueValid(autoSplit);
 
 	// Advance to the engine step, enforcing the only hard requirement (description)
 	// before leaving the details page.
@@ -714,8 +785,17 @@ export function TaskEditDialog({
 				onRequireReviewChange={setRequireReviewBeforeCoding}
 				mobileTargets={mobileTargets}
 				onMobileTargetsChange={setMobileTargets}
+				mobileSetup={mobileSetup}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
+				autoSplit={autoSplit}
+				onAutoSplitChange={setAutoSplit}
+				autoSplitKind={task.metadata?.kind ?? kindFromCategory(category)}
+				autoSplitProjectMaxLines={autoSplitCeilingFor(
+					projectAutoSplit,
+					task.metadata?.kind ?? kindFromCategory(category),
+				)}
+				autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
 				verifyWindow={verifyWindow}

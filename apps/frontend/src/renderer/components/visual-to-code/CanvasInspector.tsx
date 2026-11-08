@@ -1,4 +1,4 @@
-import { ArrowRight, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Edge, Node } from "reactflow";
 import { blockMeta, FRAMEWORKS_BY_TYPE } from "../../lib/architecture-blocks";
@@ -6,6 +6,7 @@ import { type NodeLook, resolveLook } from "../../lib/custom-bricks";
 import type { EdgePatch } from "../DefaultEdge";
 import { Input, NativeSelect, Textarea } from "../ui";
 import { ColorSwatches } from "./ColorSwatches";
+import { RelationField } from "./RelationField";
 
 interface CanvasInspectorProps {
 	node: Node<NodeLook> | null;
@@ -16,6 +17,10 @@ interface CanvasInspectorProps {
 	edgeEnds: [string, string] | null;
 	/** The sentence the canvas writes for the edge when the person has not. */
 	defaultExplanation: string;
+	/** Relations usual between the edge's two blocks and their stacks. */
+	relationOptions?: string[];
+	/** What does not fit between the stacks of the edge's two blocks. */
+	edgeWarnings?: string[];
 	onNodeChange: (id: string, patch: Partial<NodeLook>) => void;
 	onDeleteNode: (id: string) => void;
 	onEdgeChange: (id: string, patch: EdgePatch) => void;
@@ -36,6 +41,8 @@ export function CanvasInspector({
 	edge,
 	edgeEnds,
 	defaultExplanation,
+	relationOptions = [],
+	edgeWarnings = [],
 	onNodeChange,
 	onDeleteNode,
 	onEdgeChange,
@@ -212,13 +219,32 @@ export function CanvasInspector({
 				<label htmlFor="inspector-relation" className={LABEL}>
 					{t("edgeRelation", "Relation")}
 				</label>
-				<Input
+				<RelationField
+					key={edge.id}
 					id="inspector-relation"
 					value={String(edge.data?.label ?? "")}
-					onChange={(e) => onEdgeChange(edge.id, { label: e.target.value })}
-					placeholder={t("edgeRelationPlaceholder", "ex. HTTP / REST")}
-					className="h-auto w-full px-2 py-1 font-mono text-xs uppercase"
+					options={relationOptions}
+					onChange={(label) => onEdgeChange(edge.id, { label })}
+					className="h-auto w-full px-2 py-1 font-mono text-xs"
 				/>
+				{edgeWarnings.map((w) => (
+					<p
+						key={w}
+						role="alert"
+						className="mt-1.5 flex gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1.5 text-3xs leading-snug text-foreground"
+					>
+						<AlertTriangle className="mt-px h-3 w-3 shrink-0 text-warning" />
+						{w}
+					</p>
+				))}
+				{edge.data?.forced ? (
+					<p className="mt-1 text-3xs leading-snug text-muted-foreground">
+						{t(
+							"edgeForcedHint",
+							"Reliés à votre demande, hors des règles d'architecture : choisissez ou saisissez la relation.",
+						)}
+					</p>
+				) : null}
 			</div>
 			<div>
 				<span className={LABEL}>{t("edgeColor", "Couleur du connecteur")}</span>

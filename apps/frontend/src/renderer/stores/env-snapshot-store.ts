@@ -47,7 +47,7 @@ export const useEnvSnapshotStore = create<EnvSnapshotState>((set, get) => ({
 			const { snapshots } = await globalThis.electronAPI.listEnvSnapshots(
 				projectPath,
 			);
-			set({ snapshots });
+			set({ snapshots: snapshots ?? [] });
 		} catch (e) {
 			set({ error: String(e) });
 		}

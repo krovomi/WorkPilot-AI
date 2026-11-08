@@ -5,7 +5,12 @@ import path from "node:path";
 import { app } from "electron";
 import { pythonRunnerEnv } from "./utils/python-runner-env";
 
-export type CiPlatform = "github" | "gitlab" | "circleci";
+/** CI/CD platforms the runner writes a pipeline for. */
+export const SUPPORTED_CI_PLATFORMS = ["github", "gitlab", "circleci", "azure", "bitbucket"] as const;
+export type CiPlatform = (typeof SUPPORTED_CI_PLATFORMS)[number];
+
+const isCiPlatform = (value: unknown): value is CiPlatform =>
+	typeof value === "string" && (SUPPORTED_CI_PLATFORMS as readonly string[]).includes(value);
 
 export interface PipelineGeneratorRequest {
 	projectDir: string;
@@ -98,16 +103,30 @@ export class PipelineGeneratorService extends EventEmitter {
 			return;
 		}
 
-		this.emit("status", "Analyzing project stack...");
+		// The request comes from the renderer: check it again here.
+		const requested = Array.isArray(request.platforms) ? request.platforms : ["github", "gitlab"];
+		const platforms = requested.filter(isCiPlatform);
+		if (platforms.length === 0) {
+			this.emit("error", "No supported CI/CD platform requested");
+			return;
+		}
+		if (
+			typeof request.projectDir !== "string" ||
+			!path.isAbsolute(request.projectDir) ||
+			!existsSync(request.projectDir)
+		) {
+			this.emit("error", "Project folder not found");
+			return;
+		}
 
-		const platforms = request.platforms?.join(",") ?? "github,gitlab";
+		this.emit("status", "Analyzing project stack...");
 
 		const args = [
 			runnerPath,
 			"--project",
 			request.projectDir,
 			"--platforms",
-			platforms,
+			[...new Set(platforms)].join(","),
 		];
 
 		if (request.model) args.push("--model", request.model);

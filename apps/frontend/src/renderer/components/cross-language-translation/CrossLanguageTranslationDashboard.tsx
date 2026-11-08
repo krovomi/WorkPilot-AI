@@ -1,4 +1,9 @@
-import { ArrowDownUp, Check, Copy, Languages, Square } from "lucide-react";
+/**
+ * Traduction inter-langages, in the UI charter (docs/architecture/ui-charter.md):
+ * the history on the left, the source and the result side by side, the
+ * languages, options and the translate action in the composer.
+ */
+import { ArrowLeftRight, Check, Copy, History, Languages, Square, TriangleAlert } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,10 +12,21 @@ import {
 	useCrossLangTranslationStore,
 } from "../../stores/cross-language-translation-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	ScanLine,
+	StepCard,
+	type Tone,
+} from "../charter";
 import { Checkbox } from "../ui/checkbox";
-import { PageHeader } from "../ui/page-header";
 import {
 	Select,
 	SelectContent,
@@ -18,16 +34,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
-import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 
-const HISTORY_STATUS_VARIANTS: Record<
-	TranslationHistoryEntry["status"],
-	"warning" | "success" | "destructive" | "muted"
-> = {
-	pending: "warning",
-	complete: "success",
-	failed: "destructive",
+const HISTORY_STATUS_TONE: Record<TranslationHistoryEntry["status"], Tone> = {
+	pending: "amber",
+	complete: "green",
+	failed: "red",
 	cancelled: "muted",
 };
 
@@ -39,8 +51,7 @@ function CopyButton({ text, label }: Readonly<{ text: string; label: string }>) 
 		return () => clearTimeout(timer);
 	}, [copied]);
 	return (
-		<Button
-			type="button"
+		<CharterButton
 			variant="ghost"
 			size="sm"
 			disabled={!text}
@@ -56,20 +67,20 @@ function CopyButton({ text, label }: Readonly<{ text: string; label: string }>) 
 			title={label}
 		>
 			{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-		</Button>
+		</CharterButton>
 	);
 }
 
 function CodePane({ code }: Readonly<{ code: string }>) {
 	return (
-		<pre className="h-full overflow-auto rounded-lg border border-border bg-card p-3 text-xs font-mono text-foreground whitespace-pre">
+		<pre className="wp-code h-full overflow-auto !whitespace-pre">
 			{code}
 		</pre>
 	);
 }
 
 export function CrossLanguageTranslationDashboard(): React.ReactElement {
-	const { t, i18n } = useTranslation(["crossLanguageTranslation"]);
+	const { t, i18n } = useTranslation(["crossLanguageTranslation", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 
@@ -141,7 +152,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 	): React.ReactElement {
 		return (
 			<Select value={value} onValueChange={onChange} disabled={isTranslating}>
-				<SelectTrigger id={id} className="h-9">
+				<SelectTrigger id={id} className="h-7 w-auto min-w-[8rem] border-0 bg-transparent px-1 text-xs font-medium shadow-none">
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
@@ -158,263 +169,193 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 	function renderResult(): React.ReactElement {
 		if (outputCode) return <CodePane code={showTests ? testCode : outputCode} />;
 		if (isTranslating && streamBuffer) return <CodePane code={streamBuffer} />;
+		if (isTranslating) return <ScanLine label={t("crossLanguageTranslation:editor.translating")} />;
 		return (
-			<div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-6 text-center">
-				<p className="text-sm text-muted-foreground">
-					{isTranslating
-						? t("crossLanguageTranslation:editor.translating")
-						: t("crossLanguageTranslation:editor.resultEmpty")}
-				</p>
-			</div>
+			<EmptyStage icon={Languages} title={t("crossLanguageTranslation:kickers.result")} tone="green">
+				{t("crossLanguageTranslation:editor.resultEmpty")}
+			</EmptyStage>
 		);
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
-				icon={Languages}
+		<ModuleStage data-testid="cross-language-translation-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.development")}
 				title={t("crossLanguageTranslation:title")}
 				description={t("crossLanguageTranslation:subtitle")}
+				icon={Languages}
+			/>
+			<Columns template="minmax(220px, 20%) minmax(0, 1fr) minmax(0, 1fr)">
+				<Column
+					kicker={t("crossLanguageTranslation:kickers.history")}
+					title={t("crossLanguageTranslation:history.heading")}
+					tone="muted"
+					actions={
+						history.length > 0 ? (
+							<CharterButton size="sm" variant="ghost" onClick={() => projectPath && clearHistory(projectPath)}>
+								{t("crossLanguageTranslation:history.clear")}
+							</CharterButton>
+						) : undefined
+					}
+				>
+					{history.length === 0 ? (
+						<EmptyStage icon={History} title={t("crossLanguageTranslation:history.heading")} tone="muted">
+							{t("crossLanguageTranslation:history.empty")}
+						</EmptyStage>
+					) : (
+						<ul className="flex flex-col gap-2">
+							{history.map((entry) => (
+								<li key={entry.id}>
+									<StepCard
+										tone={HISTORY_STATUS_TONE[entry.status] ?? "muted"}
+										kicker={t(`crossLanguageTranslation:historyStatus.${entry.status}`, entry.status)}
+										title={`${languageLabel(entry.source_lang)} → ${languageLabel(entry.target_lang)}`}
+										meta={`${formatDate(entry.started_at)}${
+											entry.lines
+												? ` · ${t("crossLanguageTranslation:history.lines", { count: entry.lines })}`
+												: ""
+										}`}
+									/>
+								</li>
+							))}
+						</ul>
+					)}
+				</Column>
+
+				<Column
+					kicker={t("crossLanguageTranslation:kickers.source")}
+					title={t("crossLanguageTranslation:editor.source", { language: languageLabel(sourceLang) })}
+					meta={sourceLines > 0 ? t("crossLanguageTranslation:history.lines", { count: sourceLines }) : undefined}
+					tone="blue"
+				>
+					<label htmlFor="translation-input" className="sr-only">
+						{t("crossLanguageTranslation:editor.source", { language: languageLabel(sourceLang) })}
+					</label>
+					<Textarea
+						id="translation-input"
+						value={inputCode}
+						onChange={(e) => setInputCode(e.target.value)}
+						disabled={isTranslating}
+						spellCheck={false}
+						placeholder={t("crossLanguageTranslation:editor.placeholder")}
+						className="wp-code min-h-[16rem] flex-1 resize-none !whitespace-pre"
+					/>
+				</Column>
+
+				<Column
+					kicker={t("crossLanguageTranslation:kickers.result")}
+					title={t("crossLanguageTranslation:editor.result", {
+						language: languageLabel(outputCode ? resultLang : targetLang),
+					})}
+					tone="green"
+					actions={
+						<>
+							{outputCode && testCode && (
+								<>
+									<Chip tone="green" pressed={resultTab === "code"} onClick={() => setResultTab("code")}>
+										{t("crossLanguageTranslation:editor.tabs.code")}
+									</Chip>
+									<Chip tone="violet" pressed={resultTab === "tests"} onClick={() => setResultTab("tests")}>
+										{t("crossLanguageTranslation:editor.tabs.tests")}
+									</Chip>
+								</>
+							)}
+							<CopyButton
+								text={showTests ? testCode : outputCode}
+								label={t("crossLanguageTranslation:actions.copy")}
+							/>
+						</>
+					}
+				>
+					<div className="flex min-h-0 flex-1 flex-col">{renderResult()}</div>
+				</Column>
+			</Columns>
+
+			{error && (
+				<Notice tone="red" icon={TriangleAlert} role="alert" className="relative z-[2] mx-5 mb-2">
+					<div className="flex items-start justify-between gap-3">
+						<span className="min-w-0 break-words">{error}</span>
+						<CharterButton size="sm" variant="ghost" onClick={clearError}>
+							{t("crossLanguageTranslation:actions.dismiss")}
+						</CharterButton>
+					</div>
+				</Notice>
+			)}
+			{sameLanguage && (
+				<Notice tone="amber" className="relative z-[2] mx-5 mb-2">
+					{t("crossLanguageTranslation:languages.same")}
+				</Notice>
+			)}
+			<Composer
+				prompt={
+					<span className="flex min-w-0 flex-wrap items-center gap-2">
+						<span className="wp-field">
+							<label htmlFor="translation-source">{t("crossLanguageTranslation:languages.source")}</label>
+							{languageSelect("translation-source", sourceLang, setSourceLang)}
+						</span>
+						<CharterButton
+							size="sm"
+							variant="ghost"
+							icon={ArrowLeftRight}
+							onClick={swapLanguages}
+							disabled={isTranslating}
+							aria-label={t("crossLanguageTranslation:languages.swap")}
+							title={t("crossLanguageTranslation:languages.swap")}
+						/>
+						<span className="wp-field">
+							<label htmlFor="translation-target">{t("crossLanguageTranslation:languages.target")}</label>
+							{languageSelect("translation-target", targetLang, setTargetLang)}
+						</span>
+					</span>
+				}
+				options={
+					<>
+						<span className="wp-field">
+							<Checkbox
+								id="translation-preserve-comments"
+								checked={preserveComments}
+								onCheckedChange={(v) => setPreserveComments(v === true)}
+								disabled={isTranslating}
+							/>
+							<label htmlFor="translation-preserve-comments" className="cursor-pointer">
+								{t("crossLanguageTranslation:options.preserveComments")}
+							</label>
+						</span>
+						<span className="wp-field">
+							<Checkbox
+								id="translation-generate-tests"
+								checked={generateTests}
+								onCheckedChange={(v) => setGenerateTests(v === true)}
+								disabled={isTranslating}
+							/>
+							<label htmlFor="translation-generate-tests" className="cursor-pointer">
+								{t("crossLanguageTranslation:options.generateTests")}
+							</label>
+						</span>
+					</>
+				}
 				actions={
 					isTranslating ? (
-						<Button
-							type="button"
-							variant="outline"
+						<CharterButton
+							variant="danger"
+							icon={Square}
 							onClick={() => projectPath && cancelTranslation(projectPath)}
-							className="shrink-0 gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
 						>
-							<Square className="h-3.5 w-3.5" />
 							{t("crossLanguageTranslation:actions.cancel")}
-						</Button>
+						</CharterButton>
 					) : (
-						<Button
-							type="button"
+						<CharterButton
+							variant="primary"
+							icon={Languages}
 							onClick={() => projectPath && translate(projectPath)}
 							disabled={!canTranslate}
-							className="shrink-0 gap-2"
 						>
-							<Languages className="h-4 w-4" />
 							{t("crossLanguageTranslation:actions.translate")}
-						</Button>
+						</CharterButton>
 					)
 				}
 			/>
-
-			<div className="flex flex-1 overflow-hidden">
-				{/* Left: languages, options, history */}
-				<aside className="w-64 shrink-0 border-r border-border p-4 flex flex-col gap-6 overflow-auto">
-					<section>
-						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-							{t("crossLanguageTranslation:languages.heading")}
-						</h3>
-						<label
-							htmlFor="translation-source"
-							className="block text-xs text-muted-foreground mb-1"
-						>
-							{t("crossLanguageTranslation:languages.source")}
-						</label>
-						{languageSelect("translation-source", sourceLang, setSourceLang)}
-						<div className="flex justify-center my-1.5">
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								onClick={swapLanguages}
-								disabled={isTranslating}
-								aria-label={t("crossLanguageTranslation:languages.swap")}
-								title={t("crossLanguageTranslation:languages.swap")}
-							>
-								<ArrowDownUp className="h-3.5 w-3.5" />
-							</Button>
-						</div>
-						<label
-							htmlFor="translation-target"
-							className="block text-xs text-muted-foreground mb-1"
-						>
-							{t("crossLanguageTranslation:languages.target")}
-						</label>
-						{languageSelect("translation-target", targetLang, setTargetLang)}
-						{sameLanguage && (
-							<p className="mt-2 text-xs text-warning">
-								{t("crossLanguageTranslation:languages.same")}
-							</p>
-						)}
-					</section>
-
-					<section>
-						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-							{t("crossLanguageTranslation:options.heading")}
-						</h3>
-						<div className="flex flex-col gap-2.5">
-							<div className="flex items-center gap-2">
-								<Checkbox
-									id="translation-preserve-comments"
-									checked={preserveComments}
-									onCheckedChange={(v) => setPreserveComments(v === true)}
-									disabled={isTranslating}
-								/>
-								<label
-									htmlFor="translation-preserve-comments"
-									className="text-sm cursor-pointer"
-								>
-									{t("crossLanguageTranslation:options.preserveComments")}
-								</label>
-							</div>
-							<div className="flex items-center gap-2">
-								<Checkbox
-									id="translation-generate-tests"
-									checked={generateTests}
-									onCheckedChange={(v) => setGenerateTests(v === true)}
-									disabled={isTranslating}
-								/>
-								<label
-									htmlFor="translation-generate-tests"
-									className="text-sm cursor-pointer"
-								>
-									{t("crossLanguageTranslation:options.generateTests")}
-								</label>
-							</div>
-						</div>
-					</section>
-
-					<section className="flex-1">
-						<div className="flex items-center justify-between mb-2">
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-								{t("crossLanguageTranslation:history.heading")}
-							</h3>
-							{history.length > 0 && (
-								<Button
-									type="button"
-									variant="link"
-									size="sm"
-									className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
-									onClick={() => projectPath && clearHistory(projectPath)}
-								>
-									{t("crossLanguageTranslation:history.clear")}
-								</Button>
-							)}
-						</div>
-						{history.length === 0 ? (
-							<p className="text-xs text-muted-foreground">
-								{t("crossLanguageTranslation:history.empty")}
-							</p>
-						) : (
-							<ul className="flex flex-col gap-1.5">
-								{history.map((entry) => (
-									<li
-										key={entry.id}
-										className="rounded-lg border border-border bg-card p-2"
-									>
-										<div className="flex items-center justify-between gap-2">
-											<span className="text-xs font-medium truncate">
-												{languageLabel(entry.source_lang)} →{" "}
-												{languageLabel(entry.target_lang)}
-											</span>
-											<Badge
-												variant={HISTORY_STATUS_VARIANTS[entry.status] ?? "muted"}
-												className="shrink-0 px-1.5 py-0 text-2xs font-medium"
-											>
-												{t(
-													`crossLanguageTranslation:historyStatus.${entry.status}`,
-													entry.status,
-												)}
-											</Badge>
-										</div>
-										<div className="mt-0.5 text-2xs text-muted-foreground">
-											{formatDate(entry.started_at)}
-											{entry.lines
-												? ` · ${t("crossLanguageTranslation:history.lines", { count: entry.lines })}`
-												: ""}
-										</div>
-									</li>
-								))}
-							</ul>
-						)}
-					</section>
-				</aside>
-
-				{/* Right: source and result */}
-				<div className="flex-1 flex flex-col overflow-hidden">
-					{error && (
-						<div
-							role="alert"
-							className="m-4 mb-0 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm flex items-start justify-between gap-3"
-						>
-							<span className="break-words min-w-0">{error}</span>
-							<button
-								type="button"
-								onClick={clearError}
-								className="shrink-0 text-xs underline"
-							>
-								{t("crossLanguageTranslation:actions.dismiss")}
-							</button>
-						</div>
-					)}
-
-					<div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden">
-						<div className="flex flex-col overflow-hidden">
-							<div className="flex h-8 items-center justify-between mb-1">
-								<label htmlFor="translation-input" className="text-sm font-semibold">
-									{t("crossLanguageTranslation:editor.source", {
-										language: languageLabel(sourceLang),
-									})}
-								</label>
-								{sourceLines > 0 && (
-									<span className="text-xs text-muted-foreground">
-										{t("crossLanguageTranslation:history.lines", {
-											count: sourceLines,
-										})}
-									</span>
-								)}
-							</div>
-							<Textarea
-								id="translation-input"
-								value={inputCode}
-								onChange={(e) => setInputCode(e.target.value)}
-								disabled={isTranslating}
-								spellCheck={false}
-								placeholder={t("crossLanguageTranslation:editor.placeholder")}
-								className="flex-1 min-h-0 p-3 text-xs font-mono whitespace-pre"
-							/>
-						</div>
-
-						<div className="flex flex-col overflow-hidden">
-							<div className="flex h-8 items-center justify-between mb-1">
-								<h2 className="text-sm font-semibold">
-									{t("crossLanguageTranslation:editor.result", {
-										language: languageLabel(outputCode ? resultLang : targetLang),
-									})}
-								</h2>
-								<div className="flex items-center gap-2">
-									{outputCode && testCode && (
-										<Tabs
-											value={resultTab}
-											onValueChange={(v) => setResultTab(v === "tests" ? "tests" : "code")}
-										>
-											<TabsList className="h-8 p-0.5">
-												<TabsTrigger value="code" className="h-7 px-2.5 text-xs">
-													{t("crossLanguageTranslation:editor.tabs.code")}
-												</TabsTrigger>
-												<TabsTrigger value="tests" className="h-7 px-2.5 text-xs">
-													{t("crossLanguageTranslation:editor.tabs.tests")}
-												</TabsTrigger>
-											</TabsList>
-										</Tabs>
-									)}
-									<CopyButton
-										text={showTests ? testCode : outputCode}
-										label={t("crossLanguageTranslation:actions.copy")}
-									/>
-								</div>
-							</div>
-							<div className="flex flex-1 flex-col overflow-hidden">
-								{renderResult()}
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+		</ModuleStage>
 	);
 }
 

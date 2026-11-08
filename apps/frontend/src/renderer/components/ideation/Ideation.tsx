@@ -1,21 +1,21 @@
 import { Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { IDEATION_TYPE_DESCRIPTIONS } from "../../../shared/constants";
+import type { Idea, IdeationType } from "../../../shared/types";
 import { useViewState } from "../../contexts/ViewStateContext";
 import { useServerViewLive } from "../../hooks/useServerViewLive";
+import { CharterButton, ModuleStage, Notice, Page, Panel } from "../charter";
 import { EnvConfigModal } from "../EnvConfigModal";
-import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
-import { TabsContent } from "../ui/tabs";
-import { ALL_IDEATION_TYPES } from "./constants";
+import { ALL_IDEATION_TYPES, IDEATION_TYPE_TONES } from "./constants";
 import { GenerationProgressScreen } from "./GenerationProgressScreen";
 import { useIdeation } from "./hooks/useIdeation";
 import { IdeaCard } from "./IdeaCard";
 import { IdeaDetailPanel } from "./IdeaDetailPanel";
 import { IdeationDialogs } from "./IdeationDialogs";
 import { IdeationEmptyState } from "./IdeationEmptyState";
-import { IdeationFilters } from "./IdeationFilters";
+import { type IdeationTab, IdeationFilters } from "./IdeationFilters";
 import { IdeationHeader } from "./IdeationHeader";
+import { IDEATION_TYPE_ICONS } from "./TypeIcon";
 
 interface IdeationProps {
 	readonly projectId: string;
@@ -110,8 +110,22 @@ export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 	const showEmptyState =
 		isLoadingSession || !session || session.ideas.length === 0;
 
+	const visibleIdeasOf = (type: IdeationType): Idea[] =>
+		getIdeasByType(type).filter((idea) => {
+			if (!showDismissed && idea.status === "dismissed") return false;
+			if (!showArchived && idea.status === "archived") return false;
+			return true;
+		});
+	const counts = Object.fromEntries([
+		["all", activeIdeas.length],
+		...ALL_IDEATION_TYPES.map((type) => [type, visibleIdeasOf(type).length]),
+	]) as Record<IdeationTab, number>;
+	const activeType =
+		activeTab === "all" ? null : (activeTab as IdeationType);
+	const listedIdeas = activeType ? visibleIdeasOf(activeType) : activeIdeas;
+
 	return (
-		<div className="h-full flex flex-col overflow-hidden">
+		<ModuleStage scroll="page" data-testid="ideation-view">
 			{showEmptyState ? (
 				<IdeationEmptyState
 					config={config}
@@ -123,7 +137,6 @@ export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 				/>
 			) : (
 				<>
-					{/* Header */}
 					<IdeationHeader
 						totalIdeas={summary.totalIdeas}
 						ideaCountByType={summary.byType}
@@ -144,115 +157,80 @@ export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 						hasActiveIdeas={activeIdeas.length > 0}
 						canAddMore={getAvailableTypesToAdd().length > 0}
 					/>
+					<IdeationFilters
+						activeTab={activeTab}
+						onTabChange={setActiveTab}
+						counts={counts}
+					/>
 
-					{/* Content */}
-					<div className="flex-1 overflow-hidden">
-						<IdeationFilters activeTab={activeTab} onTabChange={setActiveTab}>
-							{/* All Ideas View */}
-							<TabsContent value="all" className="flex-1 overflow-auto p-4">
-								{activeIdeas.length > 0 && (
-									<div className="flex items-center gap-2 mb-3 pl-4">
-										<Checkbox
-											checked={getCheckboxState(
-												selectedIds.size,
-												activeIdeas.length,
-											)}
-											onCheckedChange={(checked) => {
-												if (checked) {
-													handleSelectAll(activeIdeas);
-												} else {
-													clearSelection();
-												}
-											}}
-											className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-											aria-label={t("header.selectAll")}
-										/>
-										<span className="text-sm text-muted-foreground select-none">
-											{t("header.selectAll")}
-										</span>
-										<Button
-											variant="outline"
-											size="sm"
-											className="ml-auto text-primary hover:bg-primary hover:text-primary-foreground"
-											onClick={async () => {
-												handleSelectAll(activeIdeas);
-												await handleConvertSelectedToTasks();
-											}}
-										>
-											<Play className="h-4 w-4 mr-1" />
-											{t("header.importAll")}
-										</Button>
-									</div>
-								)}
-								<div className="grid gap-3">
-									{activeIdeas.map((idea) => (
-										<IdeaCard
-											key={idea.id}
-											idea={idea}
-											isSelected={selectedIds.has(idea.id)}
-											onClick={() =>
-												setSelectedIdea(
-													selectedIdea?.id === idea.id ? null : idea,
-												)
-											}
-											onConvert={handleConvertToTask}
-											onGoToTask={handleGoToTask}
-											onDismiss={handleDismiss}
-											onToggleSelect={toggleSelectIdea}
-										/>
-									))}
-									{activeIdeas.length === 0 && (
-										<div className="text-center py-8 text-muted-foreground">
-											{t("noIdeas")}
-										</div>
+					<Page className="max-w-none space-y-3 pt-1">
+						{activeType && (
+							<Notice
+								tone={IDEATION_TYPE_TONES[activeType]}
+								icon={IDEATION_TYPE_ICONS[activeType]}
+							>
+								{t(`typeDescriptions.${activeType}`)}
+							</Notice>
+						)}
+						{!activeType && activeIdeas.length > 0 && (
+							<Panel className="flex items-center gap-3 py-2.5">
+								<Checkbox
+									checked={getCheckboxState(
+										selectedIds.size,
+										activeIdeas.length,
 									)}
-								</div>
-							</TabsContent>
+									onCheckedChange={(checked) => {
+										if (checked) {
+											handleSelectAll(activeIdeas);
+										} else {
+											clearSelection();
+										}
+									}}
+									aria-label={t("header.selectAll")}
+								/>
+								<span className="wp-muted select-none text-sm">
+									{t("header.selectAll")}
+								</span>
+								<CharterButton
+									size="sm"
+									icon={Play}
+									className="ml-auto"
+									onClick={async () => {
+										handleSelectAll(activeIdeas);
+										await handleConvertSelectedToTasks();
+									}}
+								>
+									{t("header.importAll")}
+								</CharterButton>
+							</Panel>
+						)}
+						<div className="grid gap-2.5">
+							{listedIdeas.map((idea) => (
+								<IdeaCard
+									key={idea.id}
+									idea={idea}
+									isSelected={selectedIds.has(idea.id)}
+									onClick={() =>
+										setSelectedIdea(
+											selectedIdea?.id === idea.id ? null : idea,
+										)
+									}
+									onConvert={handleConvertToTask}
+									onGoToTask={handleGoToTask}
+									onDismiss={handleDismiss}
+									onToggleSelect={toggleSelectIdea}
+								/>
+							))}
+							{listedIdeas.length === 0 && (
+								<p className="wp-muted py-8 text-center text-sm">
+									{activeType
+										? t("generation.noIdeasCategory")
+										: t("noIdeas")}
+								</p>
+							)}
+						</div>
+					</Page>
 
-							{/* Type-specific Views */}
-							{ALL_IDEATION_TYPES.map((type) => {
-								const typeIdeas = getIdeasByType(type).filter((idea) => {
-									if (!showDismissed && idea.status === "dismissed")
-										return false;
-									if (!showArchived && idea.status === "archived") return false;
-									return true;
-								});
-								return (
-									<TabsContent
-										key={type}
-										value={type}
-										className="flex-1 overflow-auto p-4"
-									>
-										<div className="mb-4 p-3 bg-muted/50 rounded-lg">
-											<p className="text-sm text-muted-foreground">
-												{IDEATION_TYPE_DESCRIPTIONS[type]}
-											</p>
-										</div>
-										<div className="grid gap-3">
-											{typeIdeas.map((idea) => (
-												<IdeaCard
-													key={idea.id}
-													idea={idea}
-													isSelected={selectedIds.has(idea.id)}
-													onClick={() =>
-														setSelectedIdea(
-															selectedIdea?.id === idea.id ? null : idea,
-														)
-													}
-													onConvert={handleConvertToTask}
-													onGoToTask={handleGoToTask}
-													onDismiss={handleDismiss}
-													onToggleSelect={toggleSelectIdea}
-												/>
-											))}
-										</div>
-									</TabsContent>
-								);
-							})}
-						</IdeationFilters>
-					</div>
-
-					{/* Idea Detail Panel */}
 					{selectedIdea && (
 						<IdeaDetailPanel
 							idea={selectedIdea}
@@ -302,6 +280,6 @@ export function Ideation({ projectId, onGoToTask }: IdeationProps) {
 				description={t("auth.description")}
 				projectId={projectId}
 			/>
-		</div>
+		</ModuleStage>
 	);
 }

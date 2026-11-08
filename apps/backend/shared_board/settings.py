@@ -1,4 +1,5 @@
-"""A server card's settings: its engine, priority, category and goal.
+"""A server card's settings: its engine, priority, category, goal, phone targets
+and blockers.
 
 On the desktop a card carries the provider, model and effort it runs with
 (``task_metadata.json``, ``engineLocked``), a priority and a category, and a
@@ -7,6 +8,12 @@ A server card had none of them: the app dropped them when it created the card
 on the server, and an edit made in the task panel landed in the app's mirror,
 which the server never reads. These are the same fields, validated here and
 written where the build reads them.
+
+``mobileTargets`` (the Android / iOS boxes of the task form), ``blockedBy``
+(the cards that must finish first) and ``mobileBootstrap`` (the mark of a
+setup card the form created for a project with no phone app, see
+``mobile.bootstrap``) are plain ``task_metadata.json`` fields, as on the
+desktop; the run reads the targets (``run_manager``), the board the rest.
 
 The engine names a provider of the capability matrix
 (``capabilities/providers.yaml``); its credentials are the deployment's, as
@@ -23,7 +30,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -112,6 +119,30 @@ class CardEngine(BaseModel):
         return data
 
 
+MobileTarget = Literal["android", "ios"]
+#: A task id as the app names a card: ``server:<project>:<card>`` or a spec id.
+TaskRef = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$")]
+#: Metadata keys this module writes as they are given (``None`` removes them).
+PLAIN_KEYS = ("priority", "category", "mobileTargets", "blockedBy", "mobileBootstrap")
+
+
+class MobileBootstrap(BaseModel):
+    """Which setup step of a phone app a card is (``mobile.bootstrap``)."""
+
+    framework: str = Field(min_length=1, max_length=40)
+    step: Literal["install", "platform"]
+    platform: MobileTarget | None = None
+
+    @field_validator("framework")
+    @classmethod
+    def _framework(cls, value: str) -> str:
+        from mobile.bootstrap import FRAMEWORKS
+
+        if value not in FRAMEWORKS:
+            raise ValueError(f"unknown mobile framework {value!r}")
+        return value
+
+
 class CardSettings(BaseModel):
     """What a card may set besides its text. A field left out is kept; ``null`` clears it."""
 
@@ -119,6 +150,22 @@ class CardSettings(BaseModel):
     priority: Priority | None = None
     category: Category | None = None
     goal: dict[str, Any] | None = None
+    mobileTargets: list[MobileTarget] | None = Field(default=None, max_length=2)
+    blockedBy: list[TaskRef] | None = Field(default=None, max_length=50)
+    mobileBootstrap: MobileBootstrap | None = None
+
+    def plain_value(self, key: str) -> Any:
+        """The value written to ``task_metadata.json``; ``None`` removes the key."""
+        value = getattr(self, key)
+        if isinstance(value, BaseModel):
+            return value.model_dump(exclude_none=True)
+        if key == "mobileTargets" and value is not None:
+            # Android then iOS, as `mobile.stacks.normalise_targets` orders them.
+            value = [p for p in ("android", "ios") if p in value]
+        if isinstance(value, list):
+            # An empty list means "none": the desktop never stores one either.
+            return list(dict.fromkeys(value)) or None
+        return value
 
 
 def _goal_json(raw: dict[str, Any]) -> dict[str, Any]:
@@ -189,9 +236,9 @@ def apply_settings(root: Path, directory: Path, settings: CardSettings) -> None:
                 metadata.pop(key, None)
             if settings.engine is not None:
                 metadata.update(settings.engine.as_metadata())
-        for key in ("priority", "category"):
+        for key in PLAIN_KEYS:
             if key in given:
-                value = getattr(settings, key)
+                value = settings.plain_value(key)
                 if value is None:
                     metadata.pop(key, None)
                 else:
@@ -217,6 +264,9 @@ def read_settings(root: Path, directory: Path) -> dict[str, Any]:
         "engine": engine,
         "priority": metadata.get("priority"),
         "category": metadata.get("category"),
+        "mobileTargets": metadata.get("mobileTargets"),
+        "blockedBy": metadata.get("blockedBy"),
+        "mobileBootstrap": metadata.get("mobileBootstrap"),
         "goal": None,
         "goalError": None,
     }

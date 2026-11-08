@@ -3,8 +3,7 @@
 	"duplicate": "Duplicate",
 	"viewTest": "View Test",
 	"noTest": "No test generated",
-	"noData": "No incidents found in .workpilot/incidents/",
-	"incidentsDetected": "{{count}} incident(s) detected",
+	"noData": "Drop APM incident payloads (JSON) in .workpilot/incidents/, then run the analysis.",
 	"stats": {
 		"incidents": "Incidents",
 		"testsGenerated": "Tests Generated",
@@ -20,5 +19,36 @@
 		"noProject": "Select a project to run the Regression Guardian scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"unknownException": "unknown"
+	"unknownException": "unknown",
+	"description": "Turns the incidents saved in .workpilot/incidents/ (Sentry, Datadog, CloudWatch…) into skeleton regression tests in the framework of the failing stack.",
+	"idleTitle": "No analysis yet",
+	"emptyTitle": "No incident found",
+	"kickers": {
+		"incidents": "Incidents"
+	},
+	"severities": {
+		"critical": "Critical",
+		"error": "Error",
+		"warning": "Warning",
+		"info": "Info"
+	},
+	"frameworks": {
+		"pytest": "pytest",
+		"unittest": "unittest",
+		"jest": "Jest",
+		"vitest": "Vitest",
+		"mocha": "Mocha",
+		"junit5": "JUnit 5",
+		"testng": "TestNG",
+		"go_test": "Go test",
+		"xunit": "xUnit",
+		"nunit": "NUnit",
+		"cargo_test": "cargo test",
+		"phpunit": "PHPUnit",
+		"rspec": "RSpec",
+		"dart_test": "Dart test",
+		"xctest": "XCTest"
+	},
+	"incidentsDetected_one": "{{count}} incident detected",
+	"incidentsDetected_other": "{{count}} incidents detected"
 }

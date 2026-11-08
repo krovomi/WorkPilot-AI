@@ -303,9 +303,15 @@ is absent; the « Outils CLI » panel is where a person looks for the agent CLIs
 `HermesStatusBadge` closes that list (`CliToolBadges`). It reads the same status as the
 card: the state, each condition with the command that meets it (the doctor's `remedy`,
 the official install script included), how many candidates wait for review, and the
-persona install. It runs nothing else: installing hermes and `hermes skills trust` stay
-the person's to type. It is not an `AgentCliStatusBadge`, because hermes is not a
-provider WorkPilot hands a task to, and it renders nothing in server mode.
+persona install. Its one command is the update: the badge compares the installed release
+with the latest GitHub release (`main/ipc-handlers/cli-update.ts`, shared with the agent
+CLIs' badges) and, behind a « Mise à jour » button, runs `hermes update --yes` (`--yes`
+accepts hermes's migration prompts instead of waiting on a stdin nobody types into); the
+status is then read again with `fresh`, which drops `version.py`'s per-binary cache, since a
+git install updates the checkout behind an unchanged launcher. Installing hermes and
+`hermes skills trust` stay the person's to type. It is not an `AgentCliStatusBadge`,
+because hermes is not a provider WorkPilot hands a task to, and it renders nothing in
+server mode.
 
 ### Portability of a candidate
 

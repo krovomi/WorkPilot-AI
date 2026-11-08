@@ -7,7 +7,8 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../ui/button";
+import { Sparkles } from "lucide-react";
+import { ModuleHeader, ModuleStage, Page, Tabs } from "../charter";
 import { AgentHealthPanel } from "./AgentHealthPanel";
 import { ArchDriftPanel } from "./ArchDriftPanel";
 import { AuditTrailPanel } from "./AuditTrailPanel";
@@ -40,7 +41,7 @@ type TabId =
 	| "pair";
 
 export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
-	const { t } = useTranslation("phase35");
+	const { t } = useTranslation(["phase35", "navigation"]);
 	const [tab, setTab] = useState<TabId>("longevity");
 
 	const tabs: { id: TabId; titleKey: string }[] = [
@@ -59,24 +60,22 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 	];
 
 	return (
-		<div className="flex h-full">
-			<aside className="w-56 border-r bg-muted/20 p-2 overflow-y-auto">
-				<nav className="space-y-1">
-					{tabs.map((tabItem) => (
-						<Button
-							key={tabItem.id}
-							variant={tab === tabItem.id ? "secondary" : "ghost"}
-							size="sm"
-							className="w-full justify-start text-left"
-							onClick={() => setTab(tabItem.id)}
-						>
-							{t(tabItem.titleKey as never)}
-						</Button>
-					))}
-				</nav>
-			</aside>
-
-			<main className="flex-1 p-4 overflow-y-auto">
+		<ModuleStage scroll="page" data-testid="phase35-hub-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.workspace")}
+				title={t("navigation:items.phase35Hub")}
+				description={t("phase35:hubDescription")}
+				icon={Sparkles}
+				tone="violet"
+			/>
+			<Page className="space-y-4">
+				<Tabs
+					label={t("navigation:items.phase35Hub")}
+					value={tab}
+					onChange={setTab}
+					className="flex-wrap"
+					tabs={tabs.map((item) => ({ id: item.id, label: t(`phase35:${item.titleKey}` as never) }))}
+				/>
 				{tab === "longevity" && <LongevityPanel projectPath={projectPath} />}
 				{tab === "agentHealth" && <AgentHealthPanel />}
 				{tab === "modelRouter" && <ModelRouterPanel />}
@@ -89,7 +88,7 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 				{tab === "cogContext" && <CogContextPanel />}
 				{tab === "audit" && <AuditTrailPanel projectPath={projectPath} />}
 				{tab === "pair" && <PairProgrammingPanel />}
-			</main>
-		</div>
+			</Page>
+		</ModuleStage>
 	);
 }

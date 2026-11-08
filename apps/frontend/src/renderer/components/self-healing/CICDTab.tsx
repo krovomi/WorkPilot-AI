@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { HealingTimeline } from "./HealingTimeline";
 import { IncidentCard } from "./IncidentCard";
@@ -27,8 +28,8 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 	return (
 		<div className="space-y-4">
 			{/* Config panel */}
-			<div className="rounded-lg border border-border bg-card p-4">
-				<h3 className="text-sm font-medium text-foreground mb-3">
+			<Panel>
+				<h3 className="wp-kicker mb-3 block">
 					{t("selfHealing:cicdConfig")}
 				</h3>
 				<div className="grid grid-cols-2 gap-4">
@@ -66,12 +67,12 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 						{t("selfHealing:autoCreatePR")}
 					</label>
 				</div>
-			</div>
+			</Panel>
 
 			{/* Active operations */}
 			{cicdOperations.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-foreground mb-2">
+					<h3 className="wp-kicker mb-2 block">
 						{t("selfHealing:activeOperations")}
 					</h3>
 					<div className="space-y-2">
@@ -84,18 +85,18 @@ export function CICDTab({ projectPath }: CICDTabProps) {
 
 			{/* Incident list */}
 			<div>
-				<h3 className="text-sm font-medium text-foreground mb-2">
+				<h3 className="wp-kicker mb-2 block">
 					{t("selfHealing:incidents")} ({cicdIncidents.length})
 				</h3>
 				{cicdIncidents.length === 0 ? (
-					<div className="rounded-lg border border-border bg-card p-6 text-center">
-						<p className="text-sm text-muted-foreground">
+					<Panel className="text-center">
+						<p className="wp-muted text-sm">
 							{t("selfHealing:noIncidents")}
 						</p>
-						<p className="text-xs text-muted-foreground mt-1">
+						<p className="wp-meta mt-1">
 							{t("selfHealing:cicdDescription")}
 						</p>
-					</div>
+					</Panel>
 				) : (
 					<div className="space-y-2">
 						{cicdIncidents.map((incident) => (

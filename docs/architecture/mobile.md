@@ -50,6 +50,26 @@ Naming *no* platform means every platform the project has, not none: a card that
 says nothing is not asking for nothing. Asking for a platform the project lacks
 is ignored rather than obeyed.
 
+**A project with no phone app.** The task form's *Mobile platforms* box first
+asks `mobile.bootstrap.mobile_profile` (runner action `profile`, or
+`GET /api/board/mobile-profile` on a server project): files only, no device
+call. When `detect_stack` finds an app, the box names it and greys out a
+platform it lacks. When it finds none — a .NET Web API, a Go service, a CLI —
+the box says up front that checking Android or iOS adds setup tasks to the
+board: one installs the framework and creates the app (next to the other apps
+of a monorepo, else `mobile/`), then one per platform checked prepares it, and
+the task waits for them (`metadata.blockedBy`). The framework proposed follows
+the stacks already in the repository, two levels deep: .NET → .NET MAUI,
+React/Next → Expo, Angular/Vue/Svelte → Capacitor, Java/Kotlin → Kotlin
+Multiplatform, Swift → native iOS, Dart → Flutter, and Flutter for a stack with
+no phone framework of its own (Python, Go, Rust, PHP, Ruby, Elixir…), which
+talks to its app over HTTP. The setup tasks carry `metadata.mobileBootstrap`,
+so a second task asking for the same platform joins the open ones instead of
+installing the framework twice (`renderer/lib/mobile-setup.ts`). On a server,
+`mobileTargets`, `blockedBy` and `mobileBootstrap` are card settings
+(`shared_board/settings.py`), and the run gets the targets as the desktop does
+(`run_manager.card_environment`).
+
 **In the Kanban.** The task panel's *Mobile* tab detects the stack, lists the
 real devices (`adb devices`, `emulator -list-avds`, `xcrun simctl list`), boots
 the one you pick, builds, installs, launches, and shows a captured frame beside

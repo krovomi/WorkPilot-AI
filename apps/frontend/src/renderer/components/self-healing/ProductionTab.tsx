@@ -1,5 +1,6 @@
 import type { IncidentSource } from "@shared/types/self-healing";
 import { useTranslation } from "react-i18next";
+import { Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { IncidentCard } from "./IncidentCard";
 
@@ -35,8 +36,8 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 	return (
 		<div className="space-y-4">
 			{/* Config panel */}
-			<div className="rounded-lg border border-border bg-card p-4">
-				<h3 className="text-sm font-medium text-foreground mb-3">
+			<Panel>
+				<h3 className="wp-kicker mb-3 block">
 					{t("selfHealing:productionConfig")}
 				</h3>
 				<div className="grid grid-cols-2 gap-4 mb-4">
@@ -76,11 +77,11 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 						{t("selfHealing:autoFixProduction")}
 					</label>
 				</div>
-			</div>
+			</Panel>
 
 			{/* Connected sources panel */}
-			<div className="rounded-lg border border-border bg-card p-4">
-				<h3 className="text-sm font-medium text-foreground mb-3">
+			<Panel>
+				<h3 className="wp-kicker mb-3 block">
 					{t("selfHealing:connectedSources")}
 				</h3>
 				<div className="grid grid-cols-5 gap-2">
@@ -91,11 +92,8 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 							<button
 								key={source}
 								type="button"
-								className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors ${
-									isConnected
-										? "border-primary bg-primary/10"
-										: "border-border bg-muted hover:border-primary/50"
-								}`}
+								className="wp-card wp-card-pad wp-rail wp-step flex flex-col items-center gap-1"
+								data-active={isConnected ? "true" : undefined}
 							>
 								<span className="text-xl">{icon}</span>
 								<span className="text-xs text-muted-foreground">
@@ -112,22 +110,22 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 						);
 					})}
 				</div>
-				<p className="text-xs text-muted-foreground mt-3">
+				<p className="wp-meta mt-3">
 					{t("selfHealing:productionDescription")}
 				</p>
-			</div>
+			</Panel>
 
 			{/* Live incidents */}
 			<div>
-				<h3 className="text-sm font-medium text-foreground mb-2">
+				<h3 className="wp-kicker mb-2 block">
 					{t("selfHealing:liveIncidents")} ({productionIncidents.length})
 				</h3>
 				{productionIncidents.length === 0 ? (
-					<div className="rounded-lg border border-border bg-card p-6 text-center">
-						<p className="text-sm text-muted-foreground">
+					<Panel className="text-center">
+						<p className="wp-muted text-sm">
 							{t("selfHealing:noProductionIncidents")}
 						</p>
-					</div>
+					</Panel>
 				) : (
 					<div className="space-y-2">
 						{productionIncidents.map((incident) => (

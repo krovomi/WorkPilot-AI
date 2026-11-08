@@ -2,12 +2,8 @@ import {
 	Activity,
 	AlertTriangle,
 	BarChart3,
-	CheckCircle2,
-	Coins,
-	DollarSign,
 	FolderOpen,
 	GitMerge,
-	Loader2,
 	RefreshCw,
 	Target,
 	TrendingDown,
@@ -17,12 +13,24 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useServerProjectId } from "../hooks/useServerProjectId";
-import { cn } from "../lib/utils";
 import { loadCostSummary, loadDashboardSnapshot } from "../lib/workspace-data";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Stat,
+	Stats,
+	Tabs,
+	type Tone,
+	toneClass,
+} from "./charter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,7 +62,6 @@ interface SnapshotData {
 }
 
 interface AnalyticsDashboardProps {
-	readonly className?: string;
 	readonly projectPath?: string;
 }
 
@@ -68,47 +75,55 @@ function formatTokens(n: number): string {
 	return `${(n / 1_000_000).toFixed(2)}M`;
 }
 
-// ---------------------------------------------------------------------------
-// KPI Card
-// ---------------------------------------------------------------------------
+const formatCost = (v: number) => `$${v.toFixed(4)}`;
 
-function KpiCard({
+function formatDuration(seconds: number): string {
+	if (seconds < 60) return `${seconds.toFixed(0)}s`;
+	if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
+	return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+const STATUS_TONES: Record<string, Tone> = {
+	completed: "green",
+	complete: "green",
+	done: "green",
+	in_progress: "blue",
+	pending: "amber",
+	failed: "red",
+	cancelled: "muted",
+};
+
+const BREAKDOWN_TONES: Tone[] = ["accent", "blue", "green", "amber", "violet", "pink"];
+
+type AnalyticsTab = "overview" | "costs" | "performance";
+
+/** A panel of the dashboard: kicker, title, then its figures. */
+function Card({
+	icon: Icon,
 	title,
-	value,
-	subtitle,
-	icon,
-	className,
+	children,
 }: {
+	readonly icon?: typeof Activity;
 	readonly title: string;
-	readonly value: string;
-	readonly subtitle?: string;
-	readonly icon: React.ReactNode;
-	readonly className?: string;
+	readonly children: React.ReactNode;
 }) {
 	return (
-		<Card className={cn("relative overflow-hidden", className)}>
-			<CardContent className="p-5">
-				<div className="flex items-start justify-between">
-					<div className="flex-1 min-w-0 space-y-1">
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-							{title}
-						</p>
-						<p className="text-2xl font-bold text-foreground">{value}</p>
-						{subtitle && (
-							<p className="text-xs text-muted-foreground">{subtitle}</p>
-						)}
-					</div>
-					<div className="p-2.5 bg-muted rounded-lg">{icon}</div>
-				</div>
-			</CardContent>
-		</Card>
+		<Panel className="space-y-3">
+			<h3 className="wp-title flex items-center gap-2 text-sm">
+				{Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+				{title}
+			</h3>
+			{children}
+		</Panel>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Breakdown bar list (provider / model)
-// ---------------------------------------------------------------------------
+function NoData() {
+	const { t } = useTranslation("analytics");
+	return <p className="wp-muted text-xs">{t("status.noData")}</p>;
+}
 
+/** Share of each provider or model, largest first. */
 function BreakdownList({
 	data,
 	formatValue,
@@ -119,20 +134,8 @@ function BreakdownList({
 	const entries = Object.entries(data)
 		.sort(([, a], [, b]) => b - a)
 		.filter(([, v]) => v > 0);
-	const total = entries.reduce((s, [, v]) => s + v, 0);
-
-	if (entries.length === 0) {
-		return <p className="text-xs text-muted-foreground">—</p>;
-	}
-
-	const colors = [
-		"bg-primary",
-		"bg-blue-500",
-		"bg-success",
-		"bg-warning",
-		"bg-purple-500",
-		"bg-pink-500",
-	];
+	const total = entries.reduce((sum, [, v]) => sum + v, 0);
+	if (entries.length === 0) return <NoData />;
 
 	return (
 		<div className="space-y-2.5">
@@ -140,23 +143,13 @@ function BreakdownList({
 				const pct = total > 0 ? (value / total) * 100 : 0;
 				return (
 					<div key={name} className="space-y-1">
-						<div className="flex items-center justify-between text-xs">
-							<span className="text-foreground font-medium capitalize truncate">
-								{name}
-							</span>
-							<span className="text-muted-foreground shrink-0 ml-2">
+						<div className="flex items-center justify-between gap-2 text-xs">
+							<span className="truncate font-medium">{name}</span>
+							<span className="wp-muted shrink-0 font-mono">
 								{formatValue(value)} ({pct.toFixed(0)}%)
 							</span>
 						</div>
-						<div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-							<div
-								className={cn(
-									"h-full rounded-full transition-all",
-									colors[idx % colors.length],
-								)}
-								style={{ width: `${pct}%` }}
-							/>
-						</div>
+						<Bar value={pct} tone={BREAKDOWN_TONES[idx % BREAKDOWN_TONES.length]} />
 					</div>
 				);
 			})}
@@ -164,131 +157,56 @@ function BreakdownList({
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Status bar (task statuses)
-// ---------------------------------------------------------------------------
-
+/** Tasks per status: one stacked bar, then a chip per status. */
 function StatusBar({ data }: { readonly data: Record<string, number> }) {
 	const { t } = useTranslation("analytics");
-	const total = Object.values(data).reduce((a, b) => a + b, 0);
+	const entries = Object.entries(data).filter(([, count]) => count > 0);
+	const total = entries.reduce((a, [, b]) => a + b, 0);
+	if (total === 0) return <NoData />;
 
-	if (total === 0) {
-		return (
-			<p className="text-xs text-muted-foreground">{t("status.noData")}</p>
-		);
-	}
-
-	const statusColors: Record<string, string> = {
-		completed: "bg-success",
-		complete: "bg-success",
-		in_progress: "bg-blue-500",
-		pending: "bg-warning",
-		failed: "bg-destructive",
-		cancelled: "bg-gray-400",
-	};
+	const label = (status: string) =>
+		t(`statuses.${status}`, { defaultValue: status.replaceAll("_", " ") });
 
 	return (
 		<div className="space-y-3">
-			<div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
-				{Object.entries(data).map(([status, count]) => {
-					const pct = (count / total) * 100;
-					if (pct === 0) return null;
-					return (
-						<div
-							key={status}
-							className={cn(
-								"h-full transition-all",
-								statusColors[status] ?? "bg-gray-300",
-							)}
-							style={{ width: `${pct}%` }}
-							title={`${status}: ${count}`}
-						/>
-					);
-				})}
+			<div className="wp-stack">
+				{entries.map(([status, count]) => (
+					<i
+						key={status}
+						className={toneClass(STATUS_TONES[status] ?? "muted")}
+						style={{ width: `${(count / total) * 100}%` }}
+						title={`${label(status)}: ${count}`}
+					/>
+				))}
 			</div>
-			<div className="flex flex-wrap gap-3">
-				{Object.entries(data).map(([status, count]) => (
-					<div key={status} className="flex items-center gap-1.5 text-xs">
-						<div
-							className={cn(
-								"h-2 w-2 rounded-full",
-								statusColors[status] ?? "bg-gray-300",
-							)}
-						/>
-						<span className="text-muted-foreground capitalize">
-							{status.replace("_", " ")}
-						</span>
-						<span className="font-semibold text-foreground">{count}</span>
-					</div>
+			<div className="wp-chips">
+				{entries.map(([status, count]) => (
+					<Chip key={status} tone={STATUS_TONES[status] ?? "muted"}>
+						{label(status)} <b>{count}</b>
+					</Chip>
 				))}
 			</div>
 		</div>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Helper functions
-// ---------------------------------------------------------------------------
-
-function formatDuration(seconds: number): string {
-	if (seconds < 60) {
-		return `${seconds.toFixed(0)}s`;
-	} else if (seconds < 3600) {
-		return `${(seconds / 60).toFixed(1)}m`;
-	} else {
-		return `${(seconds / 3600).toFixed(1)}h`;
-	}
-}
-
-function getTokensByProviderContent(
-	sn: SnapshotData | null,
-	cs: CostSummaryData | null,
-	t: (key: string) => string,
-) {
-	if (sn && Object.keys(sn.tokens_by_provider).length > 0) {
-		return (
-			<BreakdownList
-				data={sn.tokens_by_provider}
-				formatValue={(v) => formatTokens(v)}
-			/>
-		);
-	} else if (cs) {
-		return (
-			<BreakdownList
-				data={cs.cost_by_provider}
-				formatValue={(_v) => formatTokens(cs.total_tokens)}
-			/>
-		);
-	} else {
-		return (
-			<p className="text-xs text-muted-foreground">{t("status.noData")}</p>
-		);
-	}
-}
-
-function getTrendColor(trendPct: number): string {
-	if (trendPct > 20) {
-		return "text-destructive";
-	} else if (trendPct > 0) {
-		return "text-warning";
-	} else {
-		return "text-success";
-	}
+function trendTone(trendPct: number): Tone {
+	if (trendPct > 20) return "red";
+	if (trendPct > 0) return "amber";
+	return "green";
 }
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AnalyticsDashboard({
-	className,
-	projectPath,
-}: AnalyticsDashboardProps) {
-	const { t } = useTranslation("analytics");
+export function AnalyticsDashboard({ projectPath }: AnalyticsDashboardProps) {
+	const { t } = useTranslation(["analytics", "navigation"]);
 	const [costSummary, setCostSummary] = useState<CostSummaryData | null>(null);
 	const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [tab, setTab] = useState<AnalyticsTab>("overview");
 	const serverProjectId = useServerProjectId({ path: projectPath });
 
 	const fetchAnalytics = useCallback(async () => {
@@ -314,9 +232,9 @@ export function AnalyticsDashboard({
 			const bothFailed =
 				(costRes.status === "rejected" || !costRes.value?.success) &&
 				(snapRes.status === "rejected" || !snapRes.value?.success);
-			if (bothFailed) setError(t("status.error"));
+			if (bothFailed) setError(t("analytics:status.error"));
 		} catch (e) {
-			setError(e instanceof Error ? e.message : t("status.error"));
+			setError(e instanceof Error ? e.message : t("analytics:status.error"));
 		} finally {
 			setLoading(false);
 		}
@@ -326,378 +244,185 @@ export function AnalyticsDashboard({
 		fetchAnalytics();
 	}, [fetchAnalytics]);
 
-	// ── No project selected ────────────────────────────────────────────────
-	if (!projectPath) {
+	const header = (
+		<ModuleHeader
+			kicker={t("navigation:groups.planning")}
+			title={t("analytics:title")}
+			description={serverProjectId ? t("analytics:serverSubtitle") : t("analytics:subtitle")}
+			icon={BarChart3}
+			tone="blue"
+			actions={
+				projectPath && (
+					<CharterButton variant="ghost" icon={RefreshCw} busy={loading} onClick={fetchAnalytics}>
+						{t("analytics:actions.refresh")}
+					</CharterButton>
+				)
+			}
+		/>
+	);
+
+	if (!projectPath || loading || (error && !costSummary && !snapshot)) {
 		return (
-			<div className="flex items-center justify-center h-96">
-				<div className="flex flex-col items-center gap-3 text-muted-foreground">
-					<FolderOpen className="h-10 w-10" />
-					<p className="text-sm">{t("empty.noProject")}</p>
+			<ModuleStage data-testid="analytics-view">
+				{header}
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					{!projectPath ? (
+						<EmptyStage icon={FolderOpen} title={t("analytics:title")} tone="blue">
+							{t("analytics:empty.noProject")}
+						</EmptyStage>
+					) : loading ? (
+						<ScanLine label={t("analytics:status.loading")} />
+					) : (
+						<EmptyStage
+							icon={AlertTriangle}
+							title={error}
+							tone="red"
+							action={
+								<CharterButton icon={RefreshCw} onClick={fetchAnalytics}>
+									{t("analytics:status.retry")}
+								</CharterButton>
+							}
+						/>
+					)}
 				</div>
-			</div>
+			</ModuleStage>
 		);
 	}
 
-	// ── Loading ────────────────────────────────────────────────────────────
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-96">
-				<div className="flex items-center space-x-2">
-					<Loader2 className="h-6 w-6 animate-spin" />
-					<span className="text-sm text-muted-foreground">
-						{t("status.loading")}
-					</span>
-				</div>
-			</div>
-		);
-	}
-
-	// ── Error ──────────────────────────────────────────────────────────────
-	if (error && !costSummary && !snapshot) {
-		return (
-			<div className="flex flex-col items-center justify-center h-96 gap-4 text-muted-foreground">
-				<AlertTriangle className="h-8 w-8" />
-				<p className="text-sm">{error}</p>
-				<Button variant="outline" size="sm" onClick={fetchAnalytics}>
-					<RefreshCw className="h-3.5 w-3.5 mr-2" />
-					{t("status.retry")}
-				</Button>
-			</div>
-		);
-	}
-
-	// ── Derived values ─────────────────────────────────────────────────────
 	const cs = costSummary;
 	const sn = snapshot;
 
-	const totalTasks = sn
-		? Object.values(sn.tasks_by_status).reduce((a, b) => a + b, 0)
-		: 0;
+	const totalTasks = sn ? Object.values(sn.tasks_by_status).reduce((a, b) => a + b, 0) : 0;
 	const completedTasks = sn
 		? (sn.tasks_by_status.completed ?? sn.tasks_by_status.complete ?? 0)
 		: 0;
 	const successRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 	const totalCost = cs?.total_cost ?? sn?.total_cost ?? 0;
 	const totalTokens = cs?.total_tokens ?? sn?.total_tokens ?? 0;
-	const _qaPassRate = sn?.qa_first_pass_rate ?? 0;
-
 	const trendPct = cs?.trend_pct ?? 0;
 	const TrendIcon = trendPct >= 0 ? TrendingUp : TrendingDown;
-	const trendColor = getTrendColor(trendPct);
+
+	const tabs = [
+		{ id: "overview", label: t("analytics:tabs.overview"), icon: Target },
+		{ id: "costs", label: t("analytics:tabs.costs"), icon: Activity },
+		{ id: "performance", label: t("analytics:tabs.performance"), icon: Zap },
+	] as const;
 
 	return (
-		<ScrollArea className={cn("h-full", className)}>
-			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div>
-						<h2 className="text-2xl font-bold tracking-tight text-foreground">
-							{t("title")}
-						</h2>
-						<p className="text-sm text-muted-foreground">
-							{serverProjectId ? t("serverSubtitle") : t("subtitle")}
-						</p>
-					</div>
-					<Button onClick={fetchAnalytics} variant="outline" size="sm">
-						<RefreshCw className="h-3.5 w-3.5 mr-2" />
-						{t("actions.refresh")}
-					</Button>
-				</div>
-
-				{/* KPI cards */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-					<KpiCard
-						title={t("kpis.totalBuilds.title")}
-						value={String(totalTasks)}
-						subtitle={`${completedTasks} ${t("kpis.successfulBuilds.title").toLowerCase()}`}
-						icon={<BarChart3 className="h-5 w-5 text-blue-500" />}
-					/>
-					<KpiCard
-						title={t("kpis.successRate.title")}
+		<ModuleStage scroll="page" data-testid="analytics-view">
+			{header}
+			<Page className="max-w-none space-y-4">
+				{error && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{error}
+					</Notice>
+				)}
+				<Stats>
+					<Stat label={t("analytics:kpis.totalBuilds.title")} value={String(totalTasks)} />
+					<Stat
+						label={t("analytics:kpis.successRate.title")}
 						value={`${successRate.toFixed(1)}%`}
-						subtitle={t("kpis.successRate.description")}
-						icon={<CheckCircle2 className="h-5 w-5 text-success" />}
+						tone="green"
 					/>
-					<KpiCard
-						title={t("kpis.totalTokens.title")}
-						value={formatTokens(totalTokens)}
-						subtitle={t("kpis.totalTokens.description")}
-						icon={<Coins className="h-5 w-5 text-orange-500" />}
-					/>
-					<KpiCard
-						title={t("kpis.totalCost.title")}
-						value={`$${totalCost.toFixed(4)}`}
-						subtitle={
-							cs
-								? `${t("fields.dailyAvg")}: $${cs.daily_avg.toFixed(4)}`
-								: t("kpis.totalCost.description")
-						}
-						icon={<DollarSign className="h-5 w-5 text-purple-500" />}
-					/>
-				</div>
+					<Stat label={t("analytics:kpis.totalTokens.title")} value={formatTokens(totalTokens)} tone="orange" />
+					<Stat label={t("analytics:kpis.totalCost.title")} value={formatCost(totalCost)} tone="violet" />
+				</Stats>
 
-				{/* Tabs */}
-				<Tabs defaultValue="overview" className="space-y-4">
-					<TabsList>
-						<TabsTrigger value="overview">{t("tabs.overview")}</TabsTrigger>
-						<TabsTrigger value="costs">{t("tabs.costs")}</TabsTrigger>
-						<TabsTrigger value="performance">
-							{t("tabs.performance")}
-						</TabsTrigger>
-					</TabsList>
+				<Tabs tabs={tabs} value={tab} onChange={setTab} label={t("analytics:title")} />
 
-					{/* ── Overview tab ──────────────────────────────────────────── */}
-					<TabsContent value="overview" className="space-y-4">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-							{/* Task status */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="flex items-center gap-2 text-sm font-semibold">
-										<Target className="h-4 w-4" />
-										{t("sections.tasksByStatus")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{sn ? (
-										<StatusBar data={sn.tasks_by_status} />
-									) : (
-										<p className="text-xs text-muted-foreground">
-											{t("status.noData")}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-
-							{/* QA + Merge stats */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="flex items-center gap-2 text-sm font-semibold">
-										<Activity className="h-4 w-4" />
-										{t("sections.qaMetrics")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{sn ? (
-										<div className="space-y-4">
-											<div className="space-y-1">
-												<div className="flex justify-between text-xs">
-													<span className="text-muted-foreground">
-														{t("fields.qaPassRate")}
-													</span>
-													<span className="font-semibold text-foreground">
-														{sn.qa_first_pass_rate.toFixed(1)}%
-													</span>
-												</div>
-												<div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-													<div
-														className="h-full rounded-full bg-success transition-all"
-														style={{
-															width: `${Math.min(sn.qa_first_pass_rate, 100)}%`,
-														}}
-													/>
-												</div>
-											</div>
-											<div className="grid grid-cols-2 gap-3 pt-1">
-												<div className="text-xs">
-													<p className="text-muted-foreground">
-														{t("fields.mergeAuto")}
-													</p>
-													<p className="font-semibold text-foreground text-base">
-														{sn.merge_auto_count}
-													</p>
-												</div>
-												<div className="text-xs">
-													<p className="text-muted-foreground">
-														{t("fields.mergeManual")}
-													</p>
-													<p className="font-semibold text-foreground text-base">
-														{sn.merge_manual_count}
-													</p>
-												</div>
-											</div>
+				{tab === "overview" && (
+					<div className="grid gap-4 lg:grid-cols-2">
+						<Card icon={Target} title={t("analytics:sections.tasksByStatus")}>
+							{sn ? <StatusBar data={sn.tasks_by_status} /> : <NoData />}
+						</Card>
+						<Card icon={Activity} title={t("analytics:sections.qaMetrics")}>
+							{sn ? (
+								<div className="space-y-4">
+									<div className="space-y-1">
+										<div className="flex justify-between text-xs">
+											<span className="wp-muted">{t("analytics:fields.qaPassRate")}</span>
+											<span className="font-semibold">{sn.qa_first_pass_rate.toFixed(1)}%</span>
 										</div>
-									) : (
-										<p className="text-xs text-muted-foreground">
-											{t("status.noData")}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-						</div>
-					</TabsContent>
-
-					{/* ── Costs tab ─────────────────────────────────────────────── */}
-					<TabsContent value="costs" className="space-y-4">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-							{/* Cost by provider */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="text-sm font-semibold">
-										{t("sections.costByProvider")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{cs ? (
-										<BreakdownList
-											data={cs.cost_by_provider}
-											formatValue={(v) => `$${v.toFixed(4)}`}
-										/>
-									) : (
-										<p className="text-xs text-muted-foreground">
-											{t("status.noData")}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-
-							{/* Cost by model */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="text-sm font-semibold">
-										{t("sections.costByModel")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{cs ? (
-										<BreakdownList
-											data={cs.cost_by_model}
-											formatValue={(v) => `$${v.toFixed(4)}`}
-										/>
-									) : (
-										<p className="text-xs text-muted-foreground">
-											{t("status.noData")}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-						</div>
-
-						{/* Daily avg + trend card */}
-						{cs && (
-							<Card>
-								<CardContent className="p-5">
-									<div className="flex items-center justify-between">
-										<div>
-											<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-												{t("fields.dailyAvg")}
-											</p>
-											<p className="mt-1 text-xl font-bold text-foreground">
-												${cs.daily_avg.toFixed(4)}
-											</p>
-											<p className="text-xs text-muted-foreground">
-												{t("fields.overDays", { days: cs.period_days })}
-											</p>
-										</div>
-										<div
-											className={cn(
-												"flex items-center gap-1 text-sm font-medium",
-												trendColor,
-											)}
-										>
-											<TrendIcon className="h-4 w-4" />
-											<span>
-												{trendPct >= 0 ? "+" : ""}
-												{trendPct.toFixed(0)}% {t("fields.trend")}
-											</span>
-										</div>
+										<Bar value={sn.qa_first_pass_rate} tone="green" />
 									</div>
-								</CardContent>
+									<Stats>
+										<Stat label={t("analytics:fields.mergeAuto")} value={sn.merge_auto_count} tone="green" />
+										<Stat label={t("analytics:fields.mergeManual")} value={sn.merge_manual_count} tone="amber" />
+									</Stats>
+								</div>
+							) : (
+								<NoData />
+							)}
+						</Card>
+					</div>
+				)}
+
+				{tab === "costs" && (
+					<>
+						<div className="grid gap-4 lg:grid-cols-2">
+							<Card title={t("analytics:sections.costByProvider")}>
+								{cs ? <BreakdownList data={cs.cost_by_provider} formatValue={formatCost} /> : <NoData />}
+							</Card>
+							<Card title={t("analytics:sections.costByModel")}>
+								{cs ? <BreakdownList data={cs.cost_by_model} formatValue={formatCost} /> : <NoData />}
+							</Card>
+						</div>
+						{cs && (
+							<Panel rail tone={trendTone(trendPct)} className="flex flex-wrap items-center justify-between gap-3">
+								<div>
+									<span className="wp-kicker">{t("analytics:fields.dailyAvg")}</span>
+									<div className="mt-1 text-xl font-bold">{formatCost(cs.daily_avg)}</div>
+									<div className="wp-meta">{t("analytics:fields.overDays", { days: cs.period_days })}</div>
+								</div>
+								<Chip tone={trendTone(trendPct)} dot={false}>
+									<TrendIcon className="h-3.5 w-3.5" aria-hidden="true" />
+									{trendPct >= 0 ? "+" : ""}
+									{trendPct.toFixed(0)}% {t("analytics:fields.trend")}
+								</Chip>
+							</Panel>
+						)}
+					</>
+				)}
+
+				{tab === "performance" && (
+					<>
+						<div className="grid gap-4 lg:grid-cols-2">
+							<Card icon={Zap} title={t("analytics:sections.tokensByProvider")}>
+								{sn && Object.keys(sn.tokens_by_provider).length > 0 ? (
+									<BreakdownList data={sn.tokens_by_provider} formatValue={formatTokens} />
+								) : (
+									<NoData />
+								)}
+							</Card>
+							<Card icon={GitMerge} title={t("analytics:sections.completionByComplexity")}>
+								{sn && Object.keys(sn.avg_completion_by_complexity).length > 0 ? (
+									<div className="space-y-2">
+										{Object.entries(sn.avg_completion_by_complexity)
+											.sort(([, a], [, b]) => a - b)
+											.map(([complexity, avgSecs]) => (
+												<div key={complexity} className="flex items-center justify-between text-xs">
+													<span className="font-medium capitalize">{complexity}</span>
+													<span className="wp-muted font-mono">{formatDuration(avgSecs)}</span>
+												</div>
+											))}
+									</div>
+								) : (
+									<NoData />
+								)}
+							</Card>
+						</div>
+						{cs && (
+							<Card title={t("analytics:sections.tokenSplit")}>
+								<Stats>
+									<Stat label={t("analytics:fields.totalTokens")} value={formatTokens(cs.total_tokens)} />
+									<Stat label={t("analytics:fields.inputTokens")} value={formatTokens(cs.tokens_input)} tone="blue" />
+									<Stat label={t("analytics:fields.outputTokens")} value={formatTokens(cs.tokens_output)} tone="violet" />
+								</Stats>
 							</Card>
 						)}
-					</TabsContent>
-
-					{/* ── Performance tab ────────────────────────────────────────── */}
-					<TabsContent value="performance" className="space-y-4">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-							{/* Tokens by provider */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="flex items-center gap-2 text-sm font-semibold">
-										<Zap className="h-4 w-4" />
-										{t("sections.tokensByProvider")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{getTokensByProviderContent(sn, cs, t)}
-								</CardContent>
-							</Card>
-
-							{/* Completion by complexity */}
-							<Card>
-								<CardHeader className="pb-3">
-									<CardTitle className="flex items-center gap-2 text-sm font-semibold">
-										<GitMerge className="h-4 w-4" />
-										{t("sections.completionByComplexity")}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{sn &&
-									Object.keys(sn.avg_completion_by_complexity).length > 0 ? (
-										<div className="space-y-2">
-											{Object.entries(sn.avg_completion_by_complexity)
-												.sort(([, a], [, b]) => a - b)
-												.map(([complexity, avgSecs]) => (
-													<div
-														key={complexity}
-														className="flex items-center justify-between text-xs"
-													>
-														<span className="text-foreground capitalize font-medium">
-															{complexity}
-														</span>
-														<span className="text-muted-foreground">
-															{formatDuration(avgSecs)}
-														</span>
-													</div>
-												))}
-										</div>
-									) : (
-										<p className="text-xs text-muted-foreground">
-											{t("status.noData")}
-										</p>
-									)}
-								</CardContent>
-							</Card>
-						</div>
-
-						{/* Input / Output tokens split */}
-						{cs && (
-							<Card>
-								<CardContent className="p-5">
-									<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-										{t("sections.tokenSplit")}
-									</p>
-									<div className="grid grid-cols-3 gap-4 text-sm">
-										<div>
-											<p className="text-muted-foreground text-xs">
-												{t("fields.totalTokens")}
-											</p>
-											<p className="font-bold text-foreground">
-												{formatTokens(cs.total_tokens)}
-											</p>
-										</div>
-										<div>
-											<p className="text-muted-foreground text-xs">
-												{t("fields.inputTokens")}
-											</p>
-											<p className="font-bold text-foreground">
-												{formatTokens(cs.tokens_input)}
-											</p>
-										</div>
-										<div>
-											<p className="text-muted-foreground text-xs">
-												{t("fields.outputTokens")}
-											</p>
-											<p className="font-bold text-foreground">
-												{formatTokens(cs.tokens_output)}
-											</p>
-										</div>
-									</div>
-								</CardContent>
-							</Card>
-						)}
-					</TabsContent>
-				</Tabs>
-			</div>
-		</ScrollArea>
+					</>
+				)}
+			</Page>
+		</ModuleStage>
 	);
 }

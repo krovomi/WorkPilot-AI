@@ -225,9 +225,9 @@ export function McpBuilder() {
 	}
 
 	return (
-		<div className="flex-1 flex overflow-hidden">
+		<div className="relative z-[1] flex flex-1 overflow-hidden">
 			{/* Sidebar: project list */}
-			<div className="w-64 shrink-0 border-r border-border bg-muted/20 flex flex-col">
+			<div className="w-64 shrink-0 border-r border-dashed border-border flex flex-col">
 				<div className="p-3 border-b border-border">
 					<Button
 						onClick={handleNewProject}

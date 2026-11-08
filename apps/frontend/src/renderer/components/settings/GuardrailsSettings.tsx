@@ -1,376 +1,375 @@
-import { AlertTriangle, Check, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, Check, FlaskConical, Plus, Save, ShieldHalf, Trash2, X } from "lucide-react";
+import type React from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { GuardrailAction } from "../../../preload/api/modules/guardrails-api";
+import type {
+	GuardrailAction,
+	GuardrailRuleDoc,
+} from "../../../preload/api/modules/guardrails-api";
 import { useGuardrailsStore } from "../../stores/guardrails-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	Section,
+	Tabs,
+	type Tone,
+} from "../charter";
+import "../charter/charter.css";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
 import { SettingsSection } from "./SettingsSection";
 
-import { Textarea } from "../ui/textarea";
-const SELECT_CLASS =
-	"h-10 rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+const ACTIONS: GuardrailAction[] = ["allow", "warn", "deny", "require_approval"];
 
-const ACTIONS: GuardrailAction[] = [
-	"allow",
-	"warn",
-	"deny",
-	"require_approval",
-];
+const ACTION_TONES: Record<GuardrailAction, Tone> = {
+	allow: "green",
+	warn: "amber",
+	deny: "red",
+	require_approval: "violet",
+};
 
-const TOOLS = ["Write", "Edit", "Bash"];
+const TOOLS = ["Write", "Edit", "Bash"] as const;
+type TestTool = (typeof TOOLS)[number];
 
-export function GuardrailsSettings() {
+/** The guardrails page of the toolbox: the rules and the tester, on a stage. */
+export function GuardrailsView(): React.ReactElement {
+	const { t } = useTranslation(["settings", "navigation", "common"]);
+	const activeProject = useProjectStore((s) => s.getActiveProject());
+	const { doc, dirty, loading, addRule, save } = useGuardrailsStore();
+	const projectPath = activeProject?.path;
+
+	return (
+		<ModuleStage scroll="page" data-testid="guardrails-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("settings:guardrails.title")}
+				description={t("settings:guardrails.description")}
+				icon={ShieldHalf}
+				tone="red"
+				actions={
+					projectPath && (
+						<>
+							<Chip tone="red" dot={false}>
+								{t("settings:guardrails.activeCount", { count: doc.rules.length })}
+							</Chip>
+							<CharterButton variant="ghost" icon={Plus} onClick={addRule}>
+								{t("settings:guardrails.addRule")}
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={Save}
+								onClick={() => save(projectPath)}
+								disabled={!dirty || loading}
+							>
+								{t("common:save")}
+							</CharterButton>
+						</>
+					)
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{projectPath ? (
+					<GuardrailsEditor projectPath={projectPath} />
+				) : (
+					<EmptyStage icon={ShieldHalf} tone="red" title={t("settings:guardrails.title")}>
+						{t("settings:guardrails.selectProject")}
+					</EmptyStage>
+				)}
+			</Page>
+		</ModuleStage>
+	);
+}
+
+/** The same editor inside the Settings dialog. */
+export function GuardrailsSettings(): React.ReactElement {
 	const { t } = useTranslation(["settings", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
-	const {
-		doc,
-		dirty,
-		loading,
-		error,
-		lastTest,
-		load,
-		save,
-		addRule,
-		updateRule,
-		deleteRule,
-		runTest,
-		reset,
-	} = useGuardrailsStore();
-
-	const [testTool, setTestTool] = useState("Write");
-	const [testPath, setTestPath] = useState("");
-	const [testContent, setTestContent] = useState("");
-	const [testCommand, setTestCommand] = useState("");
-
-	useEffect(() => {
-		if (activeProject?.path) load(activeProject.path);
-	}, [activeProject?.path, load]);
-
-	const handleSave = () => {
-		if (activeProject?.path) save(activeProject.path);
-	};
-
-	const handleTest = () => {
-		if (!activeProject?.path) return;
-		const input: Record<string, unknown> =
-			testTool === "Bash"
-				? { command: testCommand }
-				: { file_path: testPath, content: testContent };
-		runTest(activeProject.path, testTool, input);
-	};
-
-	if (!activeProject) {
-		return (
-			<SettingsSection
-				title={t("settings:guardrails.title", "Agent Guardrails")}
-				description={t(
-					"settings:guardrails.selectProject",
-					"Select a project to manage its guardrails.",
-				)}
-			>
-				<p className="text-sm text-muted-foreground">
-					{t(
-						"settings:guardrails.selectProject",
-						"Select a project to manage its guardrails.",
-					)}
-				</p>
-			</SettingsSection>
-		);
-	}
+	const { dirty, loading, addRule, save } = useGuardrailsStore();
+	const projectPath = activeProject?.path;
 
 	return (
 		<SettingsSection
-			title={t("settings:guardrails.title", "Agent Guardrails")}
+			title={t("settings:guardrails.title")}
 			description={t(
-				"settings:guardrails.description",
-				"Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
+				projectPath ? "settings:guardrails.description" : "settings:guardrails.selectProject",
 			)}
 		>
-			<div className="flex items-center justify-between mb-4">
-				<Badge variant="secondary">
-					{t("settings:guardrails.activeCount", {
-						count: doc.rules.length,
-						defaultValue: "{{count}} active rule(s)",
-					})}
-				</Badge>
-				<div className="flex gap-2">
-					<Button size="sm" variant="outline" onClick={addRule}>
-						<Plus className="w-3 h-3 mr-1" />
-						{t("settings:guardrails.addRule", "Add rule")}
-					</Button>
-					<Button
-						size="sm"
-						onClick={handleSave}
-						disabled={!dirty || loading}
-					>
-						{t("common:save", "Save")}
-					</Button>
-				</div>
-			</div>
-
-			{error && (
-				<p className="text-sm text-destructive mb-2">{error}</p>
-			)}
-
-			<div className="space-y-3">
-				{doc.rules.length === 0 && (
-					<p className="text-sm text-muted-foreground">
-						{t(
-							"settings:guardrails.empty",
-							"No rules yet. Add one to start enforcing policies.",
-						)}
-					</p>
-				)}
-				{doc.rules.map((rule, idx) => (
-					<div
-						key={rule.id || `rule-${idx}`}
-						className="border rounded-md p-3 space-y-2 bg-card"
-					>
-						<div className="flex items-center gap-2">
-							<Input
-								className="flex-1"
-								value={rule.id}
-								onChange={(e) =>
-									updateRule(idx, { id: e.target.value })
-								}
-								placeholder={t("settings:guardrails.ruleId", "rule id")}
-							/>
-							<select
-								className={SELECT_CLASS}
-								value={rule.action}
-								onChange={(e) =>
-									updateRule(idx, {
-										action: e.target.value as GuardrailAction,
-									})
-								}
-							>
-								{ACTIONS.map((a) => (
-									<option key={a} value={a}>
-										{t(`settings:guardrails.actions.${a}`, a)}
-									</option>
-								))}
-							</select>
-							<Button
-								size="icon"
-								variant="ghost"
-								onClick={() => deleteRule(idx)}
-							>
-								<Trash2 className="w-4 h-4" />
-							</Button>
-						</div>
-						<Input
-							value={rule.description}
-							onChange={(e) =>
-								updateRule(idx, { description: e.target.value })
-							}
-							placeholder={t(
-								"settings:guardrails.description_placeholder",
-								"What does this rule enforce?",
-							)}
-						/>
-						<div className="grid grid-cols-2 gap-2">
-							<div>
-								<Label className="text-xs">
-									{t("settings:guardrails.tool", "Tool(s)")}
-								</Label>
-								<Input
-									value={
-										Array.isArray(rule.when.tool)
-											? rule.when.tool.join(",")
-											: (rule.when.tool ?? "")
-									}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: {
-												tool: e.target.value
-													.split(",")
-													.map((s) => s.trim())
-													.filter(Boolean),
-											},
-										})
-									}
-									placeholder="Write,Edit,Bash"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs">
-									{t("settings:guardrails.pathPrefix", "Path prefix")}
-								</Label>
-								<Input
-									value={rule.when.path_prefix ?? ""}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: { path_prefix: e.target.value || undefined },
-										})
-									}
-									placeholder="migrations/"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs">
-									{t("settings:guardrails.pathRegex", "Path regex")}
-								</Label>
-								<Input
-									value={rule.when.path_regex ?? ""}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: { path_regex: e.target.value || undefined },
-										})
-									}
-									placeholder="\\.sql$"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs">
-									{t(
-										"settings:guardrails.contentRegex",
-										"Content regex",
-									)}
-								</Label>
-								<Input
-									value={rule.when.content_regex ?? ""}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: { content_regex: e.target.value || undefined },
-										})
-									}
-									placeholder="^def "
-								/>
-							</div>
-							<div>
-								<Label className="text-xs">
-									{t(
-										"settings:guardrails.maxLines",
-										"Max content lines",
-									)}
-								</Label>
-								<Input
-									type="number"
-									value={rule.when.content_max_lines ?? ""}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: {
-												content_max_lines: e.target.value
-													? Number(e.target.value)
-													: undefined,
-											},
-										})
-									}
-									placeholder="500"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs">
-									{t(
-										"settings:guardrails.commandPattern",
-										"Bash command pattern",
-									)}
-								</Label>
-								<Input
-									value={rule.when.command_pattern ?? ""}
-									onChange={(e) =>
-										updateRule(idx, {
-											when: {
-												command_pattern: e.target.value || undefined,
-											},
-										})
-									}
-									placeholder="(pip|npm) install .*gpl"
-								/>
-							</div>
-						</div>
+			{projectPath && (
+				<div className="wp-scope space-y-4">
+					<div className="flex justify-end gap-2">
+						<CharterButton variant="ghost" icon={Plus} onClick={addRule}>
+							{t("settings:guardrails.addRule")}
+						</CharterButton>
+						<CharterButton
+							variant="primary"
+							icon={Save}
+							onClick={() => save(projectPath)}
+							disabled={!dirty || loading}
+						>
+							{t("common:save")}
+						</CharterButton>
 					</div>
+					<GuardrailsEditor projectPath={projectPath} />
+				</div>
+			)}
+		</SettingsSection>
+	);
+}
+
+function GuardrailsEditor({ projectPath }: { readonly projectPath: string }): React.ReactElement {
+	const { t } = useTranslation("settings");
+	const { doc, error, load, addRule, updateRule, deleteRule } = useGuardrailsStore();
+	// Rules have no stable identity (their id is editable): each card keeps a
+	// key of its own, so deleting a rule never hands its inputs to the next one.
+	const keys = useRef<number[]>([]);
+	const nextKey = useRef(0);
+	while (keys.current.length < doc.rules.length) keys.current.push(nextKey.current++);
+	keys.current.length = doc.rules.length;
+
+	useEffect(() => {
+		load(projectPath);
+	}, [projectPath, load]);
+
+	return (
+		<>
+			{error && (
+				<Notice tone="red" icon={AlertTriangle} role="alert">
+					{error}
+				</Notice>
+			)}
+			<Section kicker={t("guardrails.kickers.rules")} title={t("guardrails.rulesTitle")}>
+				{doc.rules.length === 0 ? (
+					<EmptyStage
+						icon={ShieldHalf}
+						tone="red"
+						title={t("guardrails.emptyTitle")}
+						action={
+							<CharterButton variant="primary" icon={Plus} onClick={addRule}>
+								{t("guardrails.addRule")}
+							</CharterButton>
+						}
+					>
+						{t("guardrails.empty")}
+					</EmptyStage>
+				) : (
+					<div className="grid gap-3 xl:grid-cols-2">
+						{doc.rules.map((rule, idx) => (
+							<RuleCard
+								key={keys.current[idx]}
+								rule={rule}
+								onChange={(patch) => updateRule(idx, patch)}
+								onDelete={() => {
+									keys.current.splice(idx, 1);
+									deleteRule(idx);
+								}}
+							/>
+						))}
+					</div>
+				)}
+			</Section>
+			<Tester projectPath={projectPath} />
+		</>
+	);
+}
+
+function RuleCard({
+	rule,
+	onChange,
+	onDelete,
+}: {
+	readonly rule: GuardrailRuleDoc;
+	readonly onChange: (patch: Partial<GuardrailRuleDoc>) => void;
+	readonly onDelete: () => void;
+}): React.ReactElement {
+	const { t } = useTranslation("settings");
+	const uid = useId();
+	const tone = ACTION_TONES[rule.action] ?? "muted";
+	const tools = Array.isArray(rule.when.tool) ? rule.when.tool.join(", ") : (rule.when.tool ?? "");
+	const text = (key: keyof GuardrailRuleDoc["when"], label: string, placeholder: string) => (
+		<div className="space-y-1">
+			<label className="wp-kicker block" htmlFor={`${uid}-${key}`}>
+				{label}
+			</label>
+			<Input
+				id={`${uid}-${key}`}
+				className="h-8 font-mono text-xs"
+				value={String(rule.when[key] ?? "")}
+				onChange={(e) => onChange({ when: { [key]: e.target.value || undefined } })}
+				placeholder={placeholder}
+			/>
+		</div>
+	);
+
+	return (
+		<Panel rail tone={tone} className="space-y-3">
+			<div className="flex items-center gap-2">
+				<Input
+					aria-label={t("guardrails.ruleId")}
+					className="h-8 flex-1 font-mono text-xs"
+					value={rule.id}
+					onChange={(e) => onChange({ id: e.target.value })}
+					placeholder={t("guardrails.ruleId")}
+				/>
+				<CharterButton
+					variant="ghost"
+					size="sm"
+					icon={Trash2}
+					onClick={onDelete}
+					aria-label={t("guardrails.deleteRule")}
+					title={t("guardrails.deleteRule")}
+				/>
+			</div>
+			<div className="wp-chips">
+				{ACTIONS.map((a) => (
+					<Chip key={a} tone={ACTION_TONES[a]} pressed={rule.action === a} onClick={() => onChange({ action: a })}>
+						{t(`guardrails.actions.${a}`)}
+					</Chip>
 				))}
 			</div>
-
-			<div className="mt-6 border-t pt-4">
-				<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-					<AlertTriangle className="w-4 h-4" />
-					{t("settings:guardrails.tester", "Test a tool call")}
-				</h4>
-				<div className="space-y-2">
-					<div className="flex gap-2">
-						<select
-							className={SELECT_CLASS}
-							value={testTool}
-							onChange={(e) => setTestTool(e.target.value)}
-						>
-							{TOOLS.map((t0) => (
-								<option key={t0} value={t0}>
-									{t0}
-								</option>
-							))}
-						</select>
-						<Button size="sm" variant="outline" onClick={handleTest}>
-							{t("settings:guardrails.runTest", "Run test")}
-						</Button>
-					</div>
-					{testTool === "Bash" ? (
-						<Input
-							value={testCommand}
-							onChange={(e) => setTestCommand(e.target.value)}
-							placeholder="rm -rf /"
-						/>
-					) : (
-						<>
-							<Input
-								value={testPath}
-								onChange={(e) => setTestPath(e.target.value)}
-								placeholder="migrations/001.sql"
-							/>
-							<Textarea
-								spellCheck={false}
-								className="w-full p-2 text-sm font-mono min-h-20"
-								value={testContent}
-								onChange={(e) => setTestContent(e.target.value)}
-								placeholder={t("settings:guardrails.fileContentPlaceholder")}
-							/>
-						</>
-					)}
-					{lastTest && (
-						<div
-							className={`text-sm p-2 rounded-md flex items-start gap-2 ${
-								lastTest.action === "allow"
-									? "bg-success/10 text-success"
-									: lastTest.action === "warn"
-										? "bg-warning/10 text-warning"
-										: "bg-destructive/10 text-destructive"
-							}`}
-						>
-							{lastTest.action === "allow" ? (
-								<Check className="w-4 h-4 mt-0.5" />
-							) : (
-								<X className="w-4 h-4 mt-0.5" />
-							)}
-							<div>
-								<div className="font-medium">
-									{t(
-										`settings:guardrails.actions.${lastTest.action}`,
-										lastTest.action,
-									)}
-								</div>
-								{lastTest.message && (
-									<pre className="text-xs whitespace-pre-wrap">
-										{lastTest.message}
-									</pre>
-								)}
-							</div>
-							<Button
-								size="icon"
-								variant="ghost"
-								className="ml-auto"
-								onClick={reset}
-							>
-								<X className="w-3 h-3" />
-							</Button>
-						</div>
-					)}
+			<Input
+				aria-label={t("guardrails.description_placeholder")}
+				className="h-8 text-sm"
+				value={rule.description}
+				onChange={(e) => onChange({ description: e.target.value })}
+				placeholder={t("guardrails.description_placeholder")}
+			/>
+			<div className="grid gap-2 sm:grid-cols-2">
+				<div className="space-y-1">
+					<label className="wp-kicker block" htmlFor={`${uid}-tool`}>
+						{t("guardrails.tool")}
+					</label>
+					<Input
+						id={`${uid}-tool`}
+						className="h-8 font-mono text-xs"
+						value={tools}
+						onChange={(e) =>
+							onChange({
+								when: {
+									tool: e.target.value
+										.split(",")
+										.map((s) => s.trim())
+										.filter(Boolean),
+								},
+							})
+						}
+						placeholder="Write, Edit, Bash"
+					/>
 				</div>
+				{text("path_prefix", t("guardrails.pathPrefix"), "migrations/")}
+				{text("path_regex", t("guardrails.pathRegex"), "\\.sql$")}
+				{text("content_regex", t("guardrails.contentRegex"), "TODO|FIXME")}
+				<div className="space-y-1">
+					<label className="wp-kicker block" htmlFor={`${uid}-lines`}>
+						{t("guardrails.maxLines")}
+					</label>
+					<Input
+						id={`${uid}-lines`}
+						type="number"
+						className="h-8 font-mono text-xs"
+						value={rule.when.content_max_lines ?? ""}
+						onChange={(e) =>
+							onChange({
+								when: { content_max_lines: e.target.value ? Number(e.target.value) : undefined },
+							})
+						}
+						placeholder="500"
+					/>
+				</div>
+				{text("command_pattern", t("guardrails.commandPattern"), "git push.*--force")}
 			</div>
-		</SettingsSection>
+		</Panel>
+	);
+}
+
+function Tester({ projectPath }: { readonly projectPath: string }): React.ReactElement {
+	const { t } = useTranslation("settings");
+	const { lastTest, runTest, reset } = useGuardrailsStore();
+	const [tool, setTool] = useState<TestTool>("Write");
+	const [path, setPath] = useState("");
+	const [content, setContent] = useState("");
+	const [command, setCommand] = useState("");
+
+	const handleTest = () => {
+		const input: Record<string, unknown> =
+			tool === "Bash" ? { command } : { file_path: path, content };
+		runTest(projectPath, tool, input);
+	};
+	const verdictTone: Tone = lastTest ? ACTION_TONES[lastTest.action] : "muted";
+
+	return (
+		<Section
+			kicker={t("guardrails.kickers.tester")}
+			title={t("guardrails.tester")}
+			description={t("guardrails.testerHint")}
+		>
+			<Panel className="space-y-3">
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<Tabs
+						label={t("guardrails.tool")}
+						tabs={TOOLS.map((id) => ({ id, label: id }))}
+						value={tool}
+						onChange={setTool}
+					/>
+					<CharterButton variant="primary" icon={FlaskConical} onClick={handleTest}>
+						{t("guardrails.runTest")}
+					</CharterButton>
+				</div>
+				{tool === "Bash" ? (
+					<Input
+						aria-label={t("guardrails.commandPattern")}
+						className="h-8 font-mono text-xs"
+						value={command}
+						onChange={(e) => setCommand(e.target.value)}
+						placeholder="git push --force origin main"
+					/>
+				) : (
+					<>
+						<Input
+							aria-label={t("guardrails.filePath")}
+							className="h-8 font-mono text-xs"
+							value={path}
+							onChange={(e) => setPath(e.target.value)}
+							placeholder="migrations/001.sql"
+						/>
+						<Textarea
+							aria-label={t("guardrails.fileContentPlaceholder")}
+							spellCheck={false}
+							className="min-h-20 w-full font-mono text-xs"
+							value={content}
+							onChange={(e) => setContent(e.target.value)}
+							placeholder={t("guardrails.fileContentPlaceholder")}
+						/>
+					</>
+				)}
+				{lastTest && (
+					<Notice tone={verdictTone} icon={lastTest.action === "allow" ? Check : X} role="status">
+						<div className="flex items-start gap-2">
+							<div className="min-w-0 flex-1">
+								<b>{t(`guardrails.actions.${lastTest.action}`)}</b>
+								{lastTest.triggered.length > 0 && (
+									<span className="wp-meta ml-2 font-mono">{lastTest.triggered.join(", ")}</span>
+								)}
+								{lastTest.message && <p className="mt-1 whitespace-pre-wrap text-xs">{lastTest.message}</p>}
+							</div>
+							<CharterButton
+								variant="ghost"
+								size="sm"
+								icon={X}
+								onClick={reset}
+								aria-label={t("guardrails.clearTest")}
+								title={t("guardrails.clearTest")}
+							/>
+						</div>
+					</Notice>
+				)}
+			</Panel>
+		</Section>
 	);
 }

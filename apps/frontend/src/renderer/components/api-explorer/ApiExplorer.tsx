@@ -33,7 +33,7 @@ import { EnvironmentManager } from "./EnvironmentManager";
 import { ExportDialog } from "./ExportDialog";
 import { RequestPanel, CustomSelect } from "./RequestPanel";
 import { formatAppTime } from "@/lib/date-format";
-import { EmptyState as SharedEmptyState } from "../ui/empty-state";
+import { CharterButton, Chip, EmptyStage, ModuleHeader, ModuleStage } from "../charter";
 
 import { Input } from "../ui/input";
 // ── Endpoint Detail ──────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ function buildGroups(spec: OpenApiSpec, search: string): EndpointGroup[] {
 // ── Main ApiExplorer Component ───────────────────────────────────────────────
 
 export function ApiExplorer() {
-	const { t } = useTranslation(["apiExplorer"]);
+	const { t } = useTranslation(["apiExplorer", "navigation"]);
 
 	const spec = useApiExplorerStore((s) => s.spec);
 	const specUrl = useApiExplorerStore((s) => s.specUrl);
@@ -348,9 +348,23 @@ export function ApiExplorer() {
 		emulatorBtnLabel = t("apiExplorer:emulator.running");
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
+		<ModuleStage data-testid="api-explorer-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("apiExplorer:title")}
+				description={t("apiExplorer:description")}
+				icon={Globe}
+				tone="blue"
+				actions={
+					spec ? (
+						<CharterButton icon={Download} onClick={() => setShowExport(true)}>
+							{t("apiExplorer:actions.export")}
+						</CharterButton>
+					) : undefined
+				}
+			/>
 			{/* Top bar */}
-			<div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0 bg-background">
+			<div className="relative z-[1] flex items-center gap-3 px-4 py-3 border-b border-[var(--wp-border)] shrink-0">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					<Globe
 						size={16}
@@ -440,23 +454,12 @@ export function ApiExplorer() {
 					</button>
 				</div>
 
-				{/* Export */}
-				{spec && (
-					<button
-						type="button"
-						onClick={() => setShowExport(true)}
-						className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card border border-[var(--color-border)] rounded-md transition-colors shrink-0"
-					>
-						<Download size={13} />
-						{t("apiExplorer:actions.export")}
-					</button>
-				)}
 			</div>
 
 			{/* Main layout */}
-			<div className="flex flex-1 min-h-0">
+			<div className="relative z-[1] flex flex-1 min-h-0">
 				{/* Sidebar */}
-				<div className="w-64 shrink-0 flex flex-col border-r border-[var(--color-border)] bg-background">
+				<div className="w-64 shrink-0 flex flex-col border-r border-[var(--wp-border)]">
 					{/* Spec info + scan status + search */}
 					<div className="p-3 border-b border-[var(--color-border)]">
 						{/* Scan status banner */}
@@ -474,8 +477,8 @@ export function ApiExplorer() {
 									size={11}
 									className="text-warning shrink-0 mt-0.5"
 								/>
-								<span className="text-3xs text-warning/80 break-all">
-									{projectScanError}
+								<span className="text-3xs text-warning/80 break-words">
+									{t(projectScanError, { defaultValue: projectScanError })}
 								</span>
 							</div>
 						)}
@@ -488,22 +491,15 @@ export function ApiExplorer() {
 									</div>
 									{/* Source badge */}
 									{specSource === "scan" && (
-										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-success/10 text-success border border-success/20">
-											{t("apiExplorer:scan.sourceBadge")}
-										</span>
+										<Chip tone="green">{t("apiExplorer:scan.sourceBadge")}</Chip>
 									)}
 									{specSource === "file" && (
-										<span
-											className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-violet-400/10 text-violet-400 border border-violet-400/20"
-											title={specFilePath ?? undefined}
-										>
+										<Chip tone="violet" title={specFilePath ?? undefined}>
 											{t("apiExplorer:scan.fileBadge")}
-										</span>
+										</Chip>
 									)}
 									{specSource === "url" && (
-										<span className="shrink-0 text-3xs font-medium px-1.5 py-0.5 rounded bg-blue-400/10 text-blue-400 border border-blue-400/20">
-											URL
-										</span>
+										<Chip tone="blue">{t("apiExplorer:scan.urlBadge")}</Chip>
 									)}
 								</div>
 								<div className="text-3xs text-muted-foreground font-mono">
@@ -698,7 +694,7 @@ export function ApiExplorer() {
 			{showExport && spec && (
 				<ExportDialog spec={spec} onClose={() => setShowExport(false)} />
 			)}
-		</div>
+		</ModuleStage>
 	);
 }
 
@@ -713,19 +709,14 @@ function EmptyState({
 }) {
 	if (isLoading) return null;
 	return (
-		<SharedEmptyState
-			className="h-full"
-			icon={ExternalLink}
-			title={
-				spec
-					? t("apiExplorer:empty.selectEndpoint")
-					: t("apiExplorer:empty.noSpec")
-			}
-			description={
-				spec
-					? t("apiExplorer:empty.selectEndpointHint")
-					: t("apiExplorer:empty.noSpecHint")
-			}
-		/>
+		<div className="flex h-full items-center justify-center p-8">
+			<EmptyStage
+				icon={ExternalLink}
+				tone="blue"
+				title={spec ? t("apiExplorer:empty.selectEndpoint") : t("apiExplorer:empty.noSpec")}
+			>
+				{spec ? t("apiExplorer:empty.selectEndpointHint") : t("apiExplorer:empty.noSpecHint")}
+			</EmptyStage>
+		</div>
 	);
 }

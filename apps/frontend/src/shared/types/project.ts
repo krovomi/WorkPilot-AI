@@ -2,7 +2,7 @@
  * Project-related types
  */
 
-import type { EngineTrio } from "./task";
+import type { EngineTrio, TaskKind } from "./task";
 
 export interface Project {
 	id: string;
@@ -75,10 +75,27 @@ export interface ProjectSettings {
 	specByExample?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
+	/**
+	 * Split a task whose plan is too big for one small pull request into
+	 * several tasks (`apps/backend/task_split/`). On by default; the ceilings
+	 * default to 400 changed lines and 25 files per pull request, and a task
+	 * can set its own line ceiling (`splitMaxLines`) or opt out (`noSplit`).
+	 */
+	autoSplit?: AutoSplitSettings;
 	/** Description utilisateur du projet (optionnel) */
 	description?: string;
 	/** Provider IA sélectionné (optionnel) */
 	provider?: string;
+}
+
+/** The kinds of task the automatic split measures (the others stay whole). */
+export type SplitKind = Exclude<TaskKind, "investigation" | "spike" | "run">;
+
+export interface AutoSplitSettings {
+	enabled?: boolean;
+	/** Lines to review per pull request, by kind; a missing kind is the default. */
+	maxLinesByKind?: Partial<Record<SplitKind, number>>;
+	maxFiles?: number;
 }
 
 export interface NotificationSettings {

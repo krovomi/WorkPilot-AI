@@ -74,6 +74,25 @@ def _json_file(path: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+#: Read by ``mobile.prompt`` (the desktop sets it in ``agent/env-utils.ts``).
+MOBILE_TARGETS_ENV = "WORKPILOT_MOBILE_TARGETS"
+
+
+def card_environment(server_path: str, spec_name: str) -> dict[str, str]:
+    """What a card's own settings add to its run, as the desktop does.
+
+    Today the phone targets of the task form: without them a server run of
+    an "Android only" card built every platform the app has.
+    """
+    metadata = _json_file(
+        Path(server_path) / ".workpilot" / "specs" / spec_name / "task_metadata.json"
+    )
+    raw = metadata.get("mobileTargets")
+    chosen = raw if isinstance(raw, list) else []
+    targets = [p for p in ("android", "ios") if p in chosen]
+    return {MOBILE_TARGETS_ENV: ",".join(targets)}
+
+
 def pr_arguments(options: dict | None, scratch: Path) -> list[str]:
     """``run.py --create-pr`` arguments for the PR dialog's edits.
 
@@ -446,6 +465,9 @@ class RunManager:
                         phase, spec_name, server_path, model, Path(scratch), pr
                     )
                     env = await self._build_env(user_id, run_id)
+                    # Always set, empty for "every platform": the server's own
+                    # environment must not choose for a card.
+                    env.update(card_environment(server_path, spec_name))
                     cmd = confine(cmd, project_id, server_path, Path(scratch), env)
                     logger.info("Run %s starting: %s", run_id, " ".join(cmd[:6]))
                     proc = await asyncio.create_subprocess_exec(

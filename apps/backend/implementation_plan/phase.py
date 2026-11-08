@@ -22,6 +22,8 @@ class Phase:
     subtasks: list[Subtask] = field(default_factory=list)
     depends_on: list[int] = field(default_factory=list)
     parallel_safe: bool = False  # Can subtasks in this phase run in parallel?
+    # Phases with the same name share a pull request when the task is split.
+    slice: str | None = None
 
     # Backwards compatibility: chunks is an alias for subtasks
     @property
@@ -48,6 +50,8 @@ class Phase:
             result["depends_on"] = self.depends_on
         if self.parallel_safe:
             result["parallel_safe"] = True
+        if self.slice:
+            result["slice"] = self.slice
         return result
 
     @classmethod
@@ -62,6 +66,7 @@ class Phase:
             subtasks=[Subtask.from_dict(s) for s in subtask_data],
             depends_on=data.get("depends_on", []),
             parallel_safe=data.get("parallel_safe", False),
+            slice=data.get("slice") if isinstance(data.get("slice"), str) else None,
         )
 
     def is_complete(self) -> bool:

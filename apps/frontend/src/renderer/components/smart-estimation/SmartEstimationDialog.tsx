@@ -4,7 +4,6 @@ import {
 	Copy,
 	DollarSign,
 	Info,
-	Loader2,
 	RotateCcw,
 	Shield,
 	Target,
@@ -21,6 +20,8 @@ import {
 	startSmartEstimation,
 	useSmartEstimationStore,
 } from "../../stores/smart-estimation-store";
+import { CharterButton, Notice, ScanLine } from "../charter";
+import "../charter/charter.css";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -53,7 +54,7 @@ import { Textarea } from "../ui/textarea";
  *   <SmartEstimationDialog />
  */
 export function SmartEstimationDialog() {
-	const { t } = useTranslation(["smartEstimation", "common"]);
+	const { t } = useTranslation(["smartEstimation", "common", "navigation"]);
 	const [copied, setCopied] = useState(false);
 	const streamOutputRef = useRef<HTMLPreElement>(null);
 
@@ -156,9 +157,10 @@ export function SmartEstimationDialog() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+			<DialogContent className="wp-scope sm:max-w-[800px] max-h-[90vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
+					<span className="wp-kicker">{t("navigation:groups.planning")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
 						<TrendingUp className="h-5 w-5 text-primary" />
 						{t("smartEstimation:title")}
 					</DialogTitle>
@@ -185,20 +187,15 @@ export function SmartEstimationDialog() {
 
 					{/* No Project Warning */}
 					{!selectedProjectId && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-							<p className="text-sm text-destructive">
-								{t("smartEstimation:errors.noProject")}
-							</p>
-						</div>
+						<Notice tone="red" icon={AlertTriangle} role="alert">
+							{t("smartEstimation:errors.noProject")}
+						</Notice>
 					)}
 
 					{/* Status / Streaming Output during analysis */}
 					{isAnalyzing && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin text-primary" />
-								<span>{status || t("smartEstimation:status.analyzing")}</span>
-							</div>
+							<ScanLine label={status || t("smartEstimation:status.analyzing")} />
 							{streamingOutput && (
 								<div className="space-y-1">
 									<Label className="text-xs text-muted-foreground">
@@ -206,7 +203,7 @@ export function SmartEstimationDialog() {
 									</Label>
 									<pre
 										ref={streamOutputRef}
-										className="bg-muted/50 rounded-lg p-3 text-xs font-mono max-h-[150px] overflow-y-auto whitespace-pre-wrap wrap-break-word"
+										className="wp-code max-h-[150px] overflow-y-auto whitespace-pre-wrap wrap-break-word"
 									>
 										{streamingOutput}
 									</pre>
@@ -217,14 +214,10 @@ export function SmartEstimationDialog() {
 
 					{/* Error state */}
 					{isError && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
-							<p className="text-sm font-medium text-destructive">
-								{t("smartEstimation:status.error")}
-							</p>
-							<p className="text-sm text-destructive/80">
-								{error || t("smartEstimation:errors.generic")}
-							</p>
-						</div>
+						<Notice tone="red" icon={AlertTriangle} role="alert">
+							<span className="font-medium">{t("smartEstimation:status.error")}</span>{" "}
+							{error || t("smartEstimation:errors.generic")}
+						</Notice>
 					)}
 
 					{/* Result */}
@@ -239,49 +232,48 @@ export function SmartEstimationDialog() {
 				</div>
 
 				{/* Footer Buttons */}
-				<DialogFooter className="gap-2 sm:gap-0">
+				<DialogFooter className="gap-2">
 					{/* Idle / Input state */}
 					{phase === "idle" && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<CharterButton onClick={handleClose}>
 								{t("smartEstimation:actions.close")}
-							</Button>
-							<Button
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={TrendingUp}
 								onClick={handleEstimate}
 								disabled={!canEstimate}
-								className="gap-2"
 							>
-								<TrendingUp className="h-4 w-4" />
 								{t("smartEstimation:actions.estimate")}
-							</Button>
+							</CharterButton>
 						</>
 					)}
 
 					{/* Analyzing state */}
 					{isAnalyzing && (
-						<Button variant="outline" onClick={handleClose}>
+						<CharterButton onClick={handleClose}>
 							{t("smartEstimation:actions.close")}
-						</Button>
+						</CharterButton>
 					)}
 
 					{/* Error state */}
 					{isError && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<CharterButton onClick={handleClose}>
 								{t("smartEstimation:actions.close")}
-							</Button>
-							<Button onClick={handleTryAgain} className="gap-2">
-								<RotateCcw className="h-4 w-4" />
+							</CharterButton>
+							<CharterButton variant="primary" icon={RotateCcw} onClick={handleTryAgain}>
 								{t("smartEstimation:actions.tryAgain")}
-							</Button>
+							</CharterButton>
 						</>
 					)}
 
 					{/* Complete state */}
 					{isComplete && (
-						<Button variant="outline" onClick={handleClose}>
+						<CharterButton onClick={handleClose}>
 							{t("smartEstimation:actions.close")}
-						</Button>
+						</CharterButton>
 					)}
 				</DialogFooter>
 			</DialogContent>

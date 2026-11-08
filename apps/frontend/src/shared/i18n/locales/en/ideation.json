@@ -4,7 +4,8 @@
 		"description": "Generate AI-powered feature ideas based on your project's context, existing patterns, and target audience.",
 		"enabledTypes": "Enabled Ideation Types",
 		"generateIdeas": "Generate Ideas",
-		"tokenMissing": "Claude token not configured. You'll be prompted to enter it when generating."
+		"tokenMissing": "Claude token not configured. You'll be prompted to enter it when generating.",
+		"enabledCount": "{{count}} of {{total}} enabled"
 	},
 	"types": {
 		"code_improvements": "Code Improvements",
@@ -28,11 +29,7 @@
 	},
 	"filters": {
 		"all": "All",
-		"code": "Code",
-		"uiux": "UI/UX",
-		"docs": "Docs",
-		"security": "Security",
-		"performance": "Performance"
+		"label": "Idea types"
 	},
 	"config": {
 		"title": "Ideation Configuration",
@@ -109,5 +106,13 @@
 		"compliance": "Compliance",
 		"userBenefit": "User Benefit",
 		"affectedComponents": "Affected Components"
+	},
+	"typeDescriptions": {
+		"code_improvements": "Code-revealed opportunities from patterns, architecture, and infrastructure analysis",
+		"ui_ux_improvements": "Visual and interaction improvements identified through app analysis",
+		"documentation_gaps": "Missing or outdated documentation that needs attention",
+		"security_hardening": "Security vulnerabilities and hardening opportunities",
+		"performance_optimizations": "Performance bottlenecks and optimization opportunities",
+		"code_quality": "Refactoring opportunities, large files, code smells, and best practice violations"
 	}
 }

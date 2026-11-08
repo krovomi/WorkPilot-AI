@@ -8,14 +8,9 @@
 	"history": "Historique",
 	"empty": "Aucun snapshot capturé pour l'instant.",
 	"selectPrompt": "Sélectionnez un snapshot pour voir les détails.",
-	"dirty": "modifié",
-	"osLabel": "OS",
-	"commit": "Commit",
 	"lockfiles": "Lockfiles",
 	"noLockfiles": "Aucun lockfile détecté.",
-	"format": "Format de replay",
 	"replayTargetLabel": "Cible de replay",
-	"targetHint": "Cible :",
 	"formats": {
 		"docker": {
 			"label": "Docker",
@@ -23,7 +18,7 @@
 		},
 		"nix": {
 			"label": "Nix",
-			"description": "Génère un shell flake.nix avec Node/Python/Git alignés pour un point d'entrée reproductible."
+			"description": "Génère un shell Nix avec les chaînes d'outils capturées, pour un point d'entrée reproductible."
 		},
 		"script": {
 			"label": "Shell",
@@ -34,5 +29,20 @@
 	"export": "Exporter",
 	"exporting": "Export en cours…",
 	"exportedTo": "Exporté dans",
-	"copy": "Copier"
+	"copy": "Copier",
+	"description": "Capture les chaînes d'outils de chaque pile, les lockfiles et l'état git, puis les rejoue en Dockerfile, en shell Nix ou en script de vérification.",
+	"emptyTitle": "Pas encore de snapshot",
+	"selectTitle": "Choisissez un snapshot",
+	"toolsTitle": "Chaînes d'outils",
+	"noTools": "Aucune chaîne d'outils trouvée sur cette machine.",
+	"captureHint": "Donnez un libellé au snapshot, puis capturez : les secrets des variables d'environnement sont masqués.",
+	"dirtyCount_one": "{{count}} fichier modifié",
+	"dirtyCount_other": "{{count}} fichiers modifiés",
+	"kickers": {
+		"history": "Historique",
+		"detail": "Snapshot",
+		"tools": "Outils",
+		"lockfiles": "Verrous",
+		"replay": "Rejeu"
+	}
 }

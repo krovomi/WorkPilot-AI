@@ -6,13 +6,26 @@ import {
 	Map as MapIcon,
 	MessageCircleQuestion,
 	RotateCcw,
+	TriangleAlert,
 } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import type { OnboardingAgentTab } from "../../stores/onboarding-agent-store";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Column,
+	Columns,
+	Composer,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	ScanLine,
+	StepCard,
+	type Tone,
+} from "../charter";
 import { useGeneratedText } from "./shared";
 import { ArchitecturePanel } from "./ArchitecturePanel";
 import { FirstTasksPanel } from "./FirstTasksPanel";
@@ -44,60 +57,76 @@ export function OnboardingPackageView({
 
 	const isScanning = phase === "scanning";
 
-	if (!pkg && !isScanning && phase !== "error") {
-		return (
-			<div className="p-6 space-y-3 max-w-2xl">
-				<h2 className="text-lg font-semibold flex items-center gap-2">
-					<BookOpen className="w-5 h-5" />
-					{t("onboardingAgent:packageTitle")}
-				</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("onboardingAgent:packageIntro")}
-				</p>
-				<ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-					<li>{t("onboardingAgent:pitch.overview")}</li>
-					<li>{t("onboardingAgent:pitch.tour")}</li>
-					<li>{t("onboardingAgent:pitch.quiz")}</li>
-					<li>{t("onboardingAgent:pitch.tasks")}</li>
-					<li>{t("onboardingAgent:pitch.glossary")}</li>
-				</ul>
-				<Button
-					onClick={() => projectPath && startScan(projectPath)}
-					disabled={!projectPath}
-				>
-					{t("onboardingAgent:actions.runScan")}
-				</Button>
-				{!projectPath && (
-					<p className="text-sm text-muted-foreground">
-						{t("onboardingAgent:errors.noProject")}
-					</p>
-				)}
-			</div>
-		);
-	}
+	const runButton = (
+		<CharterButton
+			variant="primary"
+			icon={BookOpen}
+			onClick={() => projectPath && startScan(projectPath)}
+			disabled={!projectPath}
+		>
+			{t("onboardingAgent:actions.runScan")}
+		</CharterButton>
+	);
 
-	if (isScanning) {
+	if (!pkg) {
+		const pitches: Array<{ key: string; tone: Tone }> = [
+			{ key: "overview", tone: "blue" },
+			{ key: "tour", tone: "violet" },
+			{ key: "quiz", tone: "amber" },
+			{ key: "tasks", tone: "green" },
+			{ key: "glossary", tone: "pink" },
+		];
 		return (
-			<div className="p-6">
-				<p className="text-sm text-muted-foreground">
-					{generated(statusI18n, status) || t("onboardingAgent:actions.scanning")}
-				</p>
-			</div>
-		);
-	}
-
-	if (phase === "error") {
-		return (
-			<div className="p-6 space-y-3">
-				<p className="text-sm text-destructive">
-					{errorKey
-						? t(`onboardingAgent:${errorKey}`)
-						: t("onboardingAgent:errors.failed", { error: error ?? "" })}
-				</p>
-				<Button variant="outline" onClick={reset}>
-					{t("common:buttons.retry")}
-				</Button>
-			</div>
+			<ModuleStage data-testid="onboarding-package-view">
+				<Columns template="minmax(0, 1fr)">
+					<Column kicker={t("onboardingAgent:kickers.package")} title={t("onboardingAgent:packageTitle")}>
+						<div className="flex max-w-3xl flex-col gap-3">
+							<p className="wp-header-desc">{t("onboardingAgent:packageIntro")}</p>
+							{isScanning && (
+								<ScanLine
+									label={generated(statusI18n, status) || t("onboardingAgent:actions.scanning")}
+								/>
+							)}
+							{phase === "error" && (
+								<Notice tone="red" icon={TriangleAlert} role="alert">
+									{errorKey
+										? t(`onboardingAgent:${errorKey}`)
+										: t("onboardingAgent:errors.failed", { error: error ?? "" })}
+								</Notice>
+							)}
+							{pitches.map((p, i) => (
+								<StepCard
+									key={p.key}
+									index={i + 1}
+									tone={p.tone}
+									kicker={t(`onboardingAgent:tabs.${p.key === "tasks" ? "firstTasks" : p.key}`)}
+									title={t(`onboardingAgent:pitch.${p.key}`)}
+								/>
+							))}
+						</div>
+					</Column>
+				</Columns>
+				<Composer
+					prompt={
+						<span className="wp-muted truncate text-xs">
+							{projectPath ?? t("onboardingAgent:errors.noProject")}
+						</span>
+					}
+					hint={t("onboardingAgent:packageIntro")}
+					actions={
+						phase === "error" ? (
+							<>
+								<CharterButton icon={RotateCcw} onClick={reset}>
+									{t("common:buttons.retry")}
+								</CharterButton>
+								{runButton}
+							</>
+						) : (
+							!isScanning && runButton
+						)
+					}
+				/>
+			</ModuleStage>
 		);
 	}
 
@@ -111,102 +140,106 @@ export function OnboardingPackageView({
 	}> = [
 		{
 			id: "overview",
-			icon: <LayoutDashboard className="w-4 h-4" />,
+			icon: <LayoutDashboard className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.overview"),
 		},
 		{
 			id: "tour",
-			icon: <MapIcon className="w-4 h-4" />,
+			icon: <MapIcon className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.tour"),
 			badge: pkg.tour.length,
 		},
 		{
 			id: "architecture",
-			icon: <FolderTree className="w-4 h-4" />,
+			icon: <FolderTree className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.architecture"),
 			badge: pkg.guide.architecture?.length ?? 0,
 		},
 		{
 			id: "quiz",
-			icon: <MessageCircleQuestion className="w-4 h-4" />,
+			icon: <MessageCircleQuestion className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.quiz"),
 			badge: pkg.quiz.length,
 		},
 		{
 			id: "tasks",
-			icon: <ListChecks className="w-4 h-4" />,
+			icon: <ListChecks className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.firstTasks"),
 			badge: pkg.first_tasks.length,
 		},
 		{
 			id: "glossary",
-			icon: <BookOpen className="w-4 h-4" />,
+			icon: <BookOpen className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.glossary"),
 			badge: pkg.glossary.length,
 		},
 	];
 
 	return (
-		<div className="flex flex-col h-full">
-			<div className="flex items-start justify-between gap-4 p-4 border-b">
-				<div className="min-w-0">
-					<h2 className="text-lg font-semibold flex items-center gap-2">
-						<BookOpen className="w-5 h-5" />
-						{pkg.guide.project_name}
-					</h2>
-					<div className="flex flex-wrap items-center gap-1.5 mt-1">
+		<ModuleStage data-testid="onboarding-package-view">
+			<ModuleHeader
+				kicker={t("onboardingAgent:kickers.package")}
+				title={pkg.guide.project_name}
+				icon={BookOpen}
+				description={
+					<Chips>
 						{pkg.guide.tech_stack.slice(0, 6).map((tech) => (
-							<Badge key={tech} variant="info">
+							<Chip key={tech} tone="blue">
 								{tech}
-							</Badge>
+							</Chip>
 						))}
-						{pkg.guide.tech_stack.length > 6 && (
-							<Badge variant="muted">
-								+{pkg.guide.tech_stack.length - 6}
-							</Badge>
-						)}
-					</div>
-				</div>
-				<div className="flex gap-2 shrink-0">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => projectPath && startScan(projectPath)}
-						disabled={!projectPath}
-					>
-						<RotateCcw className="w-4 h-4 mr-1" />
-						{t("onboardingAgent:actions.regenerate")}
-					</Button>
-					<Button variant="outline" size="sm" onClick={reset}>
-						{t("common:buttons.reset")}
-					</Button>
-				</div>
-			</div>
+						{pkg.guide.tech_stack.length > 6 && <Chip tone="muted">+{pkg.guide.tech_stack.length - 6}</Chip>}
+					</Chips>
+				}
+				actions={
+					<>
+						<CharterButton
+							size="sm"
+							icon={RotateCcw}
+							onClick={() => projectPath && startScan(projectPath)}
+							disabled={!projectPath}
+						>
+							{t("onboardingAgent:actions.regenerate")}
+						</CharterButton>
+						<CharterButton size="sm" variant="ghost" onClick={reset}>
+							{t("common:buttons.reset")}
+						</CharterButton>
+					</>
+				}
+			/>
 
-			<div className="flex border-b text-sm overflow-x-auto">
+			<div className="relative z-[1] flex gap-1.5 overflow-x-auto px-5 pt-3" role="tablist">
 				{tabs.map((entry) => (
 					<button
 						type="button"
+						role="tab"
+						aria-selected={tab === entry.id}
 						key={entry.id}
 						onClick={() => setTab(entry.id)}
-						className={`flex items-center gap-2 px-4 py-2 border-b-2 whitespace-nowrap ${
-							tab === entry.id
-								? "border-primary text-primary"
-								: "border-transparent text-muted-foreground hover:text-foreground"
-						}`}
+						className="wp-chip !gap-2 !px-3 !py-1"
+						data-dot="false"
+						style={tab === entry.id ? { color: "var(--wp-title)", borderColor: "var(--wp-accent)" } : undefined}
 					>
 						{entry.icon}
 						<span>{entry.label}</span>
-						{entry.badge !== undefined && (
-							<span className="text-xs bg-muted px-1.5 rounded">
-								{entry.badge}
-							</span>
-						)}
+						{entry.badge !== undefined && <span className="wp-faint">{entry.badge}</span>}
 					</button>
 				))}
 			</div>
 
-			<div className="flex-1 overflow-auto p-4">
+			<div className="relative z-[1] min-h-0 flex-1 overflow-auto px-5 py-4">
+				{isScanning && (
+					<div className="mb-3">
+						<ScanLine label={generated(statusI18n, status) || t("onboardingAgent:actions.scanning")} />
+					</div>
+				)}
+				{phase === "error" && (
+					<Notice tone="red" icon={TriangleAlert} role="alert" className="mb-3">
+						{errorKey
+							? t(`onboardingAgent:${errorKey}`)
+							: t("onboardingAgent:errors.failed", { error: error ?? "" })}
+					</Notice>
+				)}
 				{tab === "overview" && <OverviewPanel />}
 				{tab === "tour" && <TourPanel />}
 				{tab === "architecture" && <ArchitecturePanel />}
@@ -214,6 +247,6 @@ export function OnboardingPackageView({
 				{tab === "tasks" && <FirstTasksPanel />}
 				{tab === "glossary" && <GlossaryPanel />}
 			</div>
-		</div>
+		</ModuleStage>
 	);
 }

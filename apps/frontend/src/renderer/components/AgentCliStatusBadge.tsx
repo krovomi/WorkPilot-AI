@@ -27,6 +27,7 @@ import {
 	type CliPresence,
 	useReportCliPresence,
 } from "./cli-tool-order";
+import { CliUpdateChip, CliUpdateSection, useCliUpdate } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -216,11 +217,13 @@ export function AgentCliStatusBadge({
 	}, [tool, name, t, refresh]);
 
 	const status = toBadgeStatus(result);
+	const updates = useCliUpdate(tool, name, status === "installed", refresh);
+	const outdated = status === "installed" && Boolean(updates.info?.isOutdated);
 	const version = result?.version;
 
 	const statusColor = {
 		loading: "bg-muted-foreground",
-		installed: "bg-success",
+		installed: outdated ? "bg-warning" : "bg-success",
 		"not-found": "bg-destructive",
 		error: "bg-destructive",
 	}[status];
@@ -234,16 +237,20 @@ export function AgentCliStatusBadge({
 
 	const tooltip = {
 		loading: t("navigation:agentCli.checking", { name }),
-		installed: version
-			? t("navigation:agentCli.installedWithVersion", { name, version })
-			: t("navigation:agentCli.installed", { name }),
+		installed: outdated
+			? t("navigation:agentCli.update.availableFor", { name })
+			: version
+				? t("navigation:agentCli.installedWithVersion", { name, version })
+				: t("navigation:agentCli.installed", { name }),
 		"not-found": t("navigation:agentCli.notFound", { name }),
 		error: t("navigation:agentCli.error", { name }),
 	}[status];
 
 	const statusLabel = {
 		loading: t("navigation:agentCli.checkingShort"),
-		installed: t("navigation:agentCli.installedShort"),
+		installed: outdated
+			? t("navigation:agentCli.update.availableFor", { name })
+			: t("navigation:agentCli.installedShort"),
 		"not-found": t("navigation:agentCli.notInstalledShort"),
 		error: t("common:labels.error"),
 	}[status];
@@ -268,6 +275,7 @@ export function AgentCliStatusBadge({
 									? "justify-center"
 									: "w-full justify-start gap-2 text-xs",
 								missing ? "text-muted-foreground" : "",
+								outdated ? "text-warning" : "",
 								className,
 							)}
 						>
@@ -286,6 +294,7 @@ export function AgentCliStatusBadge({
 										{AGENT_CLI_SHORT_NAMES[tool]}
 										{version ? ` (${version})` : ""}
 									</span>
+									{outdated && <CliUpdateChip isUpdating={updates.isUpdating} />}
 									{missing && canInstall && (
 										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded flex items-center gap-1">
 											{isInstalling && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
@@ -317,13 +326,18 @@ export function AgentCliStatusBadge({
 						</div>
 					</div>
 
-					{status === "installed" && version && (
-						<div className="text-xs p-2 bg-muted rounded-md flex justify-between">
-							<span className="text-muted-foreground">
-								{t("navigation:agentCli.version")}:
-							</span>
-							<span className="font-mono">{version}</span>
-						</div>
+					{status === "installed" && updates.info?.installed ? (
+						<CliUpdateSection state={updates} name={name} />
+					) : (
+						status === "installed" &&
+						version && (
+							<div className="text-xs p-2 bg-muted rounded-md flex justify-between">
+								<span className="text-muted-foreground">
+									{t("navigation:agentCli.version")}:
+								</span>
+								<span className="font-mono">{version}</span>
+							</div>
+						)
 					)}
 
 					{status === "installed" && isOpen && ACP_AGENT_ARGS[tool] && (
@@ -383,7 +397,7 @@ export function AgentCliStatusBadge({
 						onClick={() => {
 							void refresh();
 						}}
-						disabled={status === "loading" || isInstalling}
+						disabled={status === "loading" || isInstalling || updates.isUpdating}
 					>
 						<RefreshCw
 							className={cn("h-3 w-3", status === "loading" && "animate-spin")}

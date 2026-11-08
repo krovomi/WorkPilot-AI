@@ -2,8 +2,9 @@
 
 Lot L11 (audit F26) moved four detectors behind `project/stack.py` and pointed
 their callers at it. The answers are pinned here on fixture projects, captured
-from the detectors before the move (`fixtures/project_stack/golden.json`): a
-facade that changed a single verdict would change a roster, a validation
+from the detectors before the move (`fixtures/project_stack/golden.json`; the
+`manifest` and `languages` answers were widened on purpose for PHP, Ruby, Dart, Swift, Elixir
+and per-language test runners): a facade that changed a single verdict would change a roster, a validation
 strategy or an API test draft somewhere downstream.
 """
 

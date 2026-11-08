@@ -1,3 +1,9 @@
+/**
+ * Profileur de performance, in the UI charter (docs/architecture/ui-charter.md):
+ * the run and its summary on the left, the bottlenecks in the middle, the
+ * optimizations on the right, the analyse action in the composer.
+ */
+import { Activity, Gauge as GaugeIcon, Lightbulb, Play, X, Zap } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,18 +13,33 @@ import {
 	usePerformanceProfilerStore,
 } from "../../stores/performance-profiler-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Activity } from "lucide-react";
-import { PageHeader } from "../ui/page-header";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	Stat,
+	Stats,
+	StepCard,
+	type Tone,
+} from "../charter";
 
-const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-destructive bg-destructive/10 border-destructive/20",
-	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	medium: "text-warning bg-warning/10 border-warning/20",
-	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+const SEVERITY_TONE: Record<string, Tone> = {
+	critical: "red",
+	high: "orange",
+	medium: "amber",
+	low: "blue",
 };
 
 export function PerformanceProfilerDashboard(): React.ReactElement {
-	const { t } = useTranslation(["performanceProfiler"]);
+	const { t } = useTranslation(["performanceProfiler", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const {
 		phase,
@@ -48,308 +69,171 @@ export function PerformanceProfilerDashboard(): React.ReactElement {
 		result?.report?.bottlenecks.filter((b) => b.severity === "high").length ??
 		0;
 
+	const report = isComplete ? result?.report : undefined;
+	const bottlenecks = report?.bottlenecks ?? [];
+	const suggestions = report?.suggestions ?? [];
+	const benchmarks = report?.benchmarks ?? [];
+
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
-				icon={Activity}
+		<ModuleStage data-testid="performance-profiler-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.development")}
 				title={t("performanceProfiler:title")}
 				description={t("performanceProfiler:subtitle")}
-				actions={isRunning ? (
-							<button
-								type="button"
-								onClick={cancelPerformanceProfiling}
-								className="px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
-							>
-								{t("performanceProfiler:actions.cancel")}
-							</button>
-						) : (
-							<button
-								type="button"
-								onClick={handleStart}
-								disabled={!activeProject}
-								className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
-							>
-								{isComplete
-										? t("performanceProfiler:actions.reanalyze")
-										: t("performanceProfiler:actions.analyze")}
-							</button>
-						)}
+				icon={Activity}
 			/>
-
-			<div className="flex flex-1 overflow-hidden">
-				{/* Left sidebar */}
-				<div className="w-56 border-r border-border p-4 flex flex-col gap-4">
-					{/* Options */}
-					<div>
-						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-							{t("performanceProfiler:options.heading")}
-						</h3>
-						<label className="flex items-center gap-2 cursor-pointer">
-							<input
-								type="checkbox"
-								checked={autoImplement}
-								onChange={(e) => setAutoImplement(e.target.checked)}
-								disabled={isRunning}
-								className="rounded accent-[var(--accent)]"
-							/>
-							<div>
-								<div className="text-sm font-medium">
-									{t("performanceProfiler:options.autoImplement")}
-								</div>
-								<div className="text-xs text-muted-foreground">
-									{t("performanceProfiler:options.autoImplementHint")}
-								</div>
-							</div>
-						</label>
-					</div>
-
-					{/* Summary stats */}
-					{isComplete && result?.report?.summary && (
-						<div>
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("performanceProfiler:summary.heading")}
-							</h3>
-							<div className="flex flex-col gap-2">
-								<div className="bg-card rounded-lg p-2.5">
-									<div className="text-lg font-bold">
-										{result.report.summary.total_bottlenecks}
-									</div>
-									<div className="text-xs text-muted-foreground">
-										{t("performanceProfiler:summary.bottlenecks")}
-									</div>
-								</div>
-								{criticalCount > 0 && (
-									<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2.5">
-										<div className="text-lg font-bold text-destructive">
-											{criticalCount}
-										</div>
-										<div className="text-xs text-destructive/70">
-											{t("performanceProfiler:summary.critical")}
-										</div>
-									</div>
-								)}
-								{highCount > 0 && (
-									<div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-2.5">
-										<div className="text-lg font-bold text-orange-400">
-											{highCount}
-										</div>
-										<div className="text-xs text-orange-400/70">
-											{t("performanceProfiler:summary.highPriority")}
-										</div>
-									</div>
-								)}
-								<div className="bg-card rounded-lg p-2.5">
-									<div className="text-lg font-bold">
-										{result.report.summary.total_suggestions}
-									</div>
-									<div className="text-xs text-muted-foreground">
-										{t("performanceProfiler:summary.optimizations")}
-									</div>
-								</div>
-							</div>
-						</div>
-					)}
-
-					{/* Phase indicator */}
-					{phase !== "idle" && (
-						<div className="mt-auto">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								{isRunning && (
-									// biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative
-									<svg
-										className="animate-spin w-3.5 h-3.5 text-[var(--accent)] shrink-0"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										/>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-										/>
-									</svg>
-								)}
-								<span className="text-xs">{phaseLabel(phase)}</span>
-							</div>
-							{status && status !== phaseLabel(phase) && (
-								<div className="text-xs text-muted-foreground mt-1 ml-5">
-									{status}
-								</div>
-							)}
-						</div>
-					)}
-				</div>
-
-				{/* Main content */}
-				<div className="flex-1 flex flex-col overflow-hidden">
-					{/* Error */}
-					{error && (
-						<div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-							{error}
-						</div>
-					)}
-
-					{/* Results */}
-					{isComplete && result && (
-						<div className="flex-1 overflow-auto p-4 flex flex-col gap-4">
-							{/* Implementation result banner */}
-							{Boolean(implementationResult) && (
-								<div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm">
-									✅ {t("performanceProfiler:results.autoImplemented")}
-								</div>
-							)}
-
-							{/* Benchmarks */}
-							{(result.report?.benchmarks?.length ?? 0) > 0 && (
-								<div>
-									<h2 className="text-sm font-semibold mb-2">
-										{t("performanceProfiler:results.benchmarks")}
-									</h2>
-									<div className="grid grid-cols-2 gap-2">
-										{result.report.benchmarks.map((b, i) => (
-											<div
-												// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
-												key={i}
-												className="bg-card rounded-lg p-3"
-											>
-												<div className="text-xs text-muted-foreground mb-1">
-													{b.name}
-												</div>
-												<div className="text-sm font-mono">
-													{b.duration_ms != null
-														? `${b.duration_ms.toFixed(1)}ms`
-														: t("performanceProfiler:results.notAvailable")}
-												</div>
-											</div>
-										))}
-									</div>
-								</div>
-							)}
-
-							{/* Bottlenecks */}
-							{(result.report?.bottlenecks?.length ?? 0) > 0 ? (
-								<div>
-									<h2 className="text-sm font-semibold mb-2">
-										{t("performanceProfiler:results.bottlenecks", {
-											count: result.report.bottlenecks.length,
-										})}
-									</h2>
-									<div className="flex flex-col gap-2">
-										{result.report.bottlenecks.map((b, i) => (
-											<div
-												// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-												key={i}
-												className={`rounded-lg p-3 border ${SEVERITY_COLORS[b.severity] ?? "border-border"}`}
-											>
-												<div className="flex items-start justify-between gap-2 mb-1">
-													<div className="font-medium text-sm">
-														{b.description}
-													</div>
-													<span
-														className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${SEVERITY_COLORS[b.severity] ?? ""}`}
-													>
-														{b.severity}
-													</span>
-												</div>
-												{b.file_path && (
-													<div className="text-xs opacity-70 font-mono mb-1">
-														{b.file_path}
-														{b.line_start ? `:${b.line_start}` : ""}
-													</div>
-												)}
-												<div className="text-xs opacity-80">
-													{b.type.replace(/_/g, " ")}
-												</div>
-											</div>
-										))}
-									</div>
-								</div>
-							) : (
-								<div className="text-sm text-muted-foreground text-center py-8">
-									{t("performanceProfiler:results.noBottlenecks")}
-								</div>
-							)}
-
-							{/* Suggestions */}
-							{(result.report?.suggestions?.length ?? 0) > 0 && (
-								<div>
-									<h2 className="text-sm font-semibold mb-2">
-										{t("performanceProfiler:results.optimizations", {
-											count: result.report.suggestions.length,
-										})}
-									</h2>
-									<div className="flex flex-col gap-3">
-										{result.report.suggestions.map((s, i) => (
-											<div
-												// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
-												key={i}
-												className="bg-card rounded-lg p-3"
-											>
-												<div className="flex items-start justify-between gap-2 mb-1">
-													<div className="font-medium text-sm">{s.title}</div>
-													<span className="text-xs text-muted-foreground shrink-0">
-														{t(`performanceProfiler:effort.${s.effort}`, s.effort)}
-													</span>
-												</div>
-												<div className="text-xs text-muted-foreground mb-2">
-													{s.description}
-												</div>
-												{s.estimated_improvement && (
-													<div className="text-xs text-success">
-														↑ {s.estimated_improvement}
-													</div>
-												)}
-												{s.implementation && (
-													<details className="mt-2">
-														<summary className="text-xs text-[var(--accent)] cursor-pointer">
-															{t("performanceProfiler:results.viewImplementation")}
-														</summary>
-														<pre className="mt-1 text-xs font-mono text-muted-foreground whitespace-pre-wrap overflow-x-auto bg-background rounded p-2">
-															{s.implementation}
-														</pre>
-													</details>
-												)}
-											</div>
-										))}
-									</div>
-								</div>
-							)}
-						</div>
-					)}
-
-					{/* Streaming output */}
-					{(isRunning || (!isComplete && streamingOutput)) && (
-						<div className="flex-1 overflow-auto p-4">
-							<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-								{streamingOutput}
-							</pre>
-						</div>
-					)}
-
-					{/* Empty state */}
-					{phase === "idle" && !result && (
-						<div className="flex-1 flex items-center justify-center text-center p-8">
-							<div>
-								<div className="text-5xl mb-4">⚡</div>
-								<h3 className="text-lg font-medium mb-2">
-									{t("performanceProfiler:empty.title")}
-								</h3>
-								<p className="text-sm text-muted-foreground max-w-sm">
+			<Columns template="minmax(240px, 24%) minmax(0, 1fr) minmax(0, 1fr)">
+				<Column
+					kicker={t("performanceProfiler:kickers.run")}
+					title={phaseLabel(phase)}
+					tone="blue"
+				>
+					<div className="flex flex-col gap-3">
+						{isRunning && <ScanLine label={status && status !== phaseLabel(phase) ? status : phaseLabel(phase)} />}
+						{report?.summary ? (
+							<Stats>
+								<Stat label={t("performanceProfiler:summary.bottlenecks")} value={report.summary.total_bottlenecks} />
+								<Stat label={t("performanceProfiler:summary.critical")} value={criticalCount} tone={criticalCount ? "red" : "green"} />
+								<Stat label={t("performanceProfiler:summary.highPriority")} value={highCount} tone={highCount ? "orange" : "green"} />
+								<Stat label={t("performanceProfiler:summary.optimizations")} value={report.summary.total_suggestions} tone="green" />
+							</Stats>
+						) : (
+							!isRunning && (
+								<EmptyStage icon={Zap} title={t("performanceProfiler:empty.title")} tone="blue">
 									{t("performanceProfiler:empty.body")}
-								</p>
-							</div>
-						</div>
+								</EmptyStage>
+							)
+						)}
+						{benchmarks.length > 0 && (
+							<Panel>
+								<span className="wp-kicker">{t("performanceProfiler:results.benchmarks")}</span>
+								<ul className="mt-2 flex flex-col gap-1">
+									{benchmarks.map((b, i) => (
+										// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
+										<li key={i} className="flex justify-between gap-2 text-xs">
+											<span className="truncate">{b.name}</span>
+											<span className="wp-meta">
+												{b.duration_ms != null
+													? `${b.duration_ms.toFixed(1)}ms`
+													: t("performanceProfiler:results.notAvailable")}
+											</span>
+										</li>
+									))}
+								</ul>
+							</Panel>
+						)}
+						{(isRunning || (!isComplete && streamingOutput)) && streamingOutput && (
+							<pre className="wp-code max-h-72 overflow-auto">{streamingOutput}</pre>
+						)}
+					</div>
+				</Column>
+
+				<Column
+					kicker={t("performanceProfiler:kickers.bottlenecks")}
+					title={t("performanceProfiler:results.bottlenecks", { count: bottlenecks.length })}
+					tone="red"
+				>
+					{isComplete && bottlenecks.length === 0 && (
+						<Notice tone="green" icon={GaugeIcon}>
+							{t("performanceProfiler:results.noBottlenecks")}
+						</Notice>
 					)}
-				</div>
-			</div>
-		</div>
+					{!isComplete && (
+						<EmptyStage icon={GaugeIcon} title={t("performanceProfiler:kickers.bottlenecks")} tone="red">
+							{t("performanceProfiler:empty.body")}
+						</EmptyStage>
+					)}
+					<div className="flex flex-col gap-2">
+						{bottlenecks.map((b, i) => (
+							<StepCard
+								// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
+								key={i}
+								tone={SEVERITY_TONE[b.severity] ?? "muted"}
+								kicker={b.type.replace(/_/g, " ")}
+								title={b.description}
+								meta={b.file_path ? `${b.file_path}${b.line_start ? `:${b.line_start}` : ""}` : undefined}
+								status={
+									<Chip tone={SEVERITY_TONE[b.severity] ?? "muted"}>
+										{t(`performanceProfiler:severity.${b.severity}`, b.severity)}
+									</Chip>
+								}
+							/>
+						))}
+					</div>
+				</Column>
+
+				<Column
+					kicker={t("performanceProfiler:kickers.fixes")}
+					title={t("performanceProfiler:results.optimizations", { count: suggestions.length })}
+					tone="green"
+				>
+					<div className="flex flex-col gap-2">
+						{Boolean(implementationResult) && (
+							<Notice tone="green">{t("performanceProfiler:results.autoImplemented")}</Notice>
+						)}
+						{suggestions.length === 0 && (
+							<EmptyStage icon={Lightbulb} title={t("performanceProfiler:kickers.fixes")} tone="green">
+								{t("performanceProfiler:emptyFixes")}
+							</EmptyStage>
+						)}
+						{suggestions.map((s, i) => (
+							// biome-ignore lint/suspicious/noArrayIndexKey: list is static and never reordered
+							<Panel key={i} rail tone="green">
+								<div className="mb-1 flex items-start justify-between gap-2">
+									<span className="text-sm font-semibold">{s.title}</span>
+									<span className="wp-meta">{t(`performanceProfiler:effort.${s.effort}`, s.effort)}</span>
+								</div>
+								<p className="wp-muted text-xs">{s.description}</p>
+								{s.estimated_improvement && (
+									<p className="mt-1 text-xs text-success">↑ {s.estimated_improvement}</p>
+								)}
+								{s.implementation && (
+									<details className="mt-2">
+										<summary className="cursor-pointer text-xs text-primary">
+											{t("performanceProfiler:results.viewImplementation")}
+										</summary>
+										<pre className="wp-code mt-1">{s.implementation}</pre>
+									</details>
+								)}
+							</Panel>
+						))}
+					</div>
+				</Column>
+			</Columns>
+
+			{error && (
+				<Notice tone="red" role="alert" className="relative z-[2] mx-5 mb-2">
+					{error}
+				</Notice>
+			)}
+			<Composer
+				prompt={<span className="wp-muted truncate text-xs">{activeProject?.path ?? "—"}</span>}
+				options={
+					<label className="wp-field cursor-pointer" title={t("performanceProfiler:options.autoImplementHint")}>
+						<input
+							type="checkbox"
+							checked={autoImplement}
+							onChange={(e) => setAutoImplement(e.target.checked)}
+							disabled={isRunning}
+							className="accent-[var(--wp-accent)]"
+						/>
+						<b>{t("performanceProfiler:options.autoImplement")}</b>
+						{t("performanceProfiler:options.autoImplementHint")}
+					</label>
+				}
+				actions={
+					isRunning ? (
+						<CharterButton variant="danger" icon={X} onClick={cancelPerformanceProfiling}>
+							{t("performanceProfiler:actions.cancel")}
+						</CharterButton>
+					) : (
+						<CharterButton variant="primary" icon={Play} onClick={handleStart} disabled={!activeProject}>
+							{isComplete ? t("performanceProfiler:actions.reanalyze") : t("performanceProfiler:actions.analyze")}
+						</CharterButton>
+					)
+				}
+			/>
+		</ModuleStage>
 	);
 }
 

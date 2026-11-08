@@ -164,6 +164,10 @@
 		},
 		"qa_unverified": {
 			"title": "Ready for review — QA could not verify"
+		},
+		"split": {
+			"title": "Task split into smaller tasks",
+			"description": "“{{title}}” became {{count}} tasks, one small pull request each. They are in the queue."
 		}
 	},
 	"columns": {
@@ -313,6 +317,8 @@
 			"button": "Filter",
 			"title": "Filters",
 			"clear": "Reset",
+			"groupActive": "Group {{group}}",
+			"groupClear": "Show every task",
 			"clearSearch": "Clear search",
 			"searchPlaceholder": "Search tasks…",
 			"sourceLabel": "Source",
@@ -648,7 +654,8 @@
 			"refactoring": "Refactoring",
 			"test": "Tests",
 			"docs": "Documentation",
-			"spike": "Spike / study"
+			"spike": "Spike / study",
+			"upgrade": "Version upgrade"
 		},
 		"source": {
 			"user": "chosen by you",
@@ -840,6 +847,16 @@
 					"critical": "Critical Impact"
 				}
 			}
+		},
+		"autoSplit": {
+			"label": "Split automatically when the task is too big",
+			"description": "Once the plan is written, a task above the line ceiling becomes several tasks, one small pull request each, chained by their dependencies.",
+			"projectOff": "Automatic splitting is turned off in the project settings.",
+			"maxLinesLabel": "Max lines to review per PR",
+			"maxLinesPlaceholder": "{{count}} (project, {{kind}})",
+			"maxLinesHelp": "Leave empty to use the project's ceiling for this kind of task. Tests and docs count half, lockfiles don't count.",
+			"maxLinesInvalid": "Enter a whole number between {{min}} and {{max}}.",
+			"maxLinesPlaceholderNever": "never split ({{kind}})"
 		}
 	},
 	"testGen": {
@@ -2353,5 +2370,16 @@
 			"pr_url_unreadable": "The pull request link could not be read: change its base on the forge.",
 			"unknown": "The operation failed."
 		}
+	},
+	"split": {
+		"groupBadge": "Part {{index}}/{{total}} · {{title}}",
+		"showGroup": "Click to show only this group",
+		"showAll": "Click to show every task",
+		"partTooltip": "Part {{index}} of {{total}} of “{{title}}”: {{name}}",
+		"parentBadge": "Split into {{count}} tasks",
+		"parentTooltip": "The plan was larger than {{lines}} lines to review per pull request: this task became {{count}} tasks.",
+		"overBadge": "{{lines}} / {{max}} lines",
+		"overFilesBadge": "{{files}} / {{max}} files",
+		"overTooltip": "The real diff has about {{lines}} lines to review in {{files}} files, above the ceiling of {{max}} lines and {{maxFiles}} files for this kind of task: the review will take longer."
 	}
 }

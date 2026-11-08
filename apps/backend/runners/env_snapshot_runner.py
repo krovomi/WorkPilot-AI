@@ -3,9 +3,9 @@ Environment Snapshot Runner
 ===========================
 
 Captures a reproducible snapshot of a project's runtime environment:
-tool versions (Node/Python/Git/OS), lockfile contents, environment
-variables (secrets stripped), and git state (commit, branch, dirty
-files).
+the toolchain versions of every stack (``analysis.env_stacks.TOOLS``),
+lockfile hashes, environment variables (secret names and secret-looking
+values masked), and git state (commit, branch, dirty files).
 
 Snapshots are stored under ``<projectPath>/.workpilot/env-snapshots/``,
 one JSON file per snapshot keyed by id.
@@ -44,25 +44,19 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from analysis.env_stacks import LOCKFILES, REPLAYS, TOOLS  # noqa: E402
+from foundation.log_redaction import redact_text  # noqa: E402
+
 SECRET_PATTERNS = re.compile(
-    r"(TOKEN|SECRET|PASSWORD|PASSWD|KEY|AUTH|CREDENTIAL|PRIVATE)",
+    r"(TOKEN|SECRET|PASSWORD|PASSWD|KEY|AUTH|CREDENTIAL|PRIVATE|DSN|"
+    r"CONNECTION|CONN_STR|COOKIE|SESSION|CERT)",
     re.IGNORECASE,
 )
-
-LOCKFILES = [
-    "package-lock.json",
-    "pnpm-lock.yaml",
-    "yarn.lock",
-    "bun.lockb",
-    "poetry.lock",
-    "uv.lock",
-    "Pipfile.lock",
-    "requirements.txt",
-    "Cargo.lock",
-    "go.sum",
-    "composer.lock",
-    "Gemfile.lock",
-]
+# user:password@ inside a URL value (DATABASE_URL, REDIS_URL, proxies…).
+_URL_CREDENTIALS = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
+_SNAP_ID = re.compile(r"snap-\d+-[0-9a-f]{6}")
 
 
 def _snapshots_dir(project_path: Path) -> Path:
@@ -91,7 +85,11 @@ def _tool_version(name: str, arg: str = "--version") -> str | None:
     if not exe:
         return None
     out = _run_cmd([exe, arg])
-    return out.splitlines()[0] if out else None
+    # Gradle opens with a blank line and a rule: keep the first line with a digit.
+    lines = [
+        line.strip() for line in out.splitlines() if any(c.isdigit() for c in line)
+    ]
+    return lines[0] if lines else None
 
 
 def _safe_env() -> dict[str, str]:
@@ -100,7 +98,7 @@ def _safe_env() -> dict[str, str]:
         if SECRET_PATTERNS.search(k):
             safe[k] = "<redacted>"
         else:
-            safe[k] = v
+            safe[k] = redact_text(_URL_CREDENTIALS.sub(r"\1<redacted>@", v))
     return safe
 
 
@@ -145,6 +143,13 @@ def _capture_lockfiles(project_path: Path) -> list[dict[str, str | None]]:
     return entries
 
 
+def _tool_versions() -> dict[str, str | None]:
+    versions = {key: _tool_version(exe, arg) for key, exe, arg in TOOLS}
+    # Windows ships `python`, not `python3`.
+    versions["python"] = versions["python"] or _tool_version("python")
+    return versions
+
+
 def _capture(project_path: Path, spec_id: str | None, label: str | None) -> dict:
     now = datetime.now(UTC).isoformat()
     snap_id = f"snap-{int(datetime.now(UTC).timestamp())}-{uuid.uuid4().hex[:6]}"
@@ -161,19 +166,7 @@ def _capture(project_path: Path, spec_id: str | None, label: str | None) -> dict
             "machine": platform.machine(),
             "python": platform.python_version(),
         },
-        "tools": {
-            "node": _tool_version("node"),
-            "npm": _tool_version("npm"),
-            "pnpm": _tool_version("pnpm"),
-            "yarn": _tool_version("yarn"),
-            "python": _tool_version("python") or _tool_version("python3"),
-            "uv": _tool_version("uv"),
-            "git": _tool_version("git"),
-            "docker": _tool_version("docker"),
-            "dotnet": _tool_version("dotnet"),
-            "go": _tool_version("go", "version"),
-            "cargo": _tool_version("cargo"),
-        },
+        "tools": _tool_versions(),
         "lockfiles": _capture_lockfiles(project_path),
         "git": _git_state(project_path),
         "env": _safe_env(),
@@ -197,6 +190,9 @@ def _list(project_path: Path) -> list[dict]:
 
 
 def _get(project_path: Path, snap_id: str) -> dict | None:
+    # The id comes from the renderer: never let it name a path.
+    if not _SNAP_ID.fullmatch(snap_id):
+        return None
     p = _snapshots_dir(project_path) / f"{snap_id}.json"
     if not p.is_file():
         return None
@@ -207,47 +203,9 @@ def _get(project_path: Path, snap_id: str) -> dict | None:
 
 
 def _replay_payload(snapshot: dict, fmt: str) -> str:
-    tools = snapshot.get("tools", {})
-    node = tools.get("node") or "node"
-    python = tools.get("python") or "python"
-    git = snapshot.get("git", {})
-    commit = git.get("commit") or "HEAD"
-    remote = git.get("remote") or "<remote-url>"
-
-    if fmt == "dockerfile":
-        return (
-            f"# Reproduces snapshot {snapshot['id']} ({snapshot['createdAt']})\n"
-            f"FROM ubuntu:24.04\n"
-            f"# Tools at capture: node={node}, python={python}\n"
-            f"RUN apt-get update && apt-get install -y curl git python3 python3-pip\n"
-            f"RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs\n"
-            f"WORKDIR /work\n"
-            f"RUN git clone {remote} repo && cd repo && git checkout {commit}\n"
-            f"WORKDIR /work/repo\n"
-            f'CMD ["bash"]\n'
-        )
-    if fmt == "nix":
-        return (
-            f"# Reproduces snapshot {snapshot['id']}\n"
-            "{ pkgs ? import <nixpkgs> {} }:\n"
-            "pkgs.mkShell {\n"
-            "  buildInputs = [ pkgs.nodejs_20 pkgs.python3 pkgs.git ];\n"
-            f"  shellHook = ''\n"
-            f'    echo "Snapshot {snapshot["id"]} — commit {commit}"\n'
-            f"  '';\n"
-            "}\n"
-        )
-    if fmt == "script":
-        return (
-            f"#!/usr/bin/env bash\n"
-            f"# Replay snapshot {snapshot['id']}\n"
-            f"set -euo pipefail\n"
-            f"echo '— Expected tools —'\n"
-            f"echo 'node : {node}'\n"
-            f"echo 'python: {python}'\n"
-            f"git checkout {commit}\n"
-        )
-    raise ValueError(f"Unknown replay format: {fmt}")
+    if fmt not in REPLAYS:
+        raise ValueError(f"Unknown replay format: {fmt}")
+    return REPLAYS[fmt](snapshot)
 
 
 def main() -> None:
@@ -310,7 +268,9 @@ def main() -> None:
                 "nix": "flake.nix",
                 "script": "replay.sh",
             }
-            filename = args.output or f"{snap['id']}.{ext[args.format]}"
+            # A bare file name: --output never leaves the exports folder.
+            filename = Path(args.output).name if args.output else ""
+            filename = filename or f"{snap['id']}.{ext[args.format]}"
             target = out_dir / filename
             target.write_text(payload, encoding="utf-8")
             print(
@@ -324,8 +284,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # Launched without PYTHONPATH: put the backend on the path for core.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()

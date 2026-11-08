@@ -22,22 +22,12 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from i18n_agent.catalogs import (  # noqa: E402
+    SOURCE_EXTENSIONS,
+    discover_catalogs,
+    iter_files,
+)
 from i18n_agent.i18n_scanner import I18nScanner  # noqa: E402
-
-SCAN_EXTENSIONS = {".jsx", ".tsx", ".vue", ".svelte", ".py", ".html", ".htm"}
-DEFAULT_IGNORES = {
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    ".next",
-    "__pycache__",
-    ".venv",
-    "venv",
-    ".workpilot",
-    "out",
-    "coverage",
-}
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -49,50 +39,7 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
 
 
 def _iter_source_files(root: Path) -> list[Path]:
-    files: list[Path] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in SCAN_EXTENSIONS:
-            continue
-        if any(part in DEFAULT_IGNORES for part in path.parts):
-            continue
-        files.append(path)
-    return files
-
-
-def _discover_locales(root: Path) -> dict[str, dict[str, Any]]:
-    """Find {locale: merged_dict} from common i18n folder layouts."""
-    locales: dict[str, dict[str, Any]] = {}
-    candidates = [
-        root / "src" / "shared" / "i18n" / "locales",
-        root / "apps" / "frontend" / "src" / "shared" / "i18n" / "locales",
-        root / "src" / "i18n" / "locales",
-        root / "locales",
-        root / "i18n",
-    ]
-    locales_root: Path | None = None
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_dir():
-            locales_root = candidate
-            break
-    if locales_root is None:
-        return locales
-
-    for locale_dir in sorted(locales_root.iterdir()):
-        if not locale_dir.is_dir():
-            continue
-        merged: dict[str, Any] = {}
-        for json_file in sorted(locale_dir.glob("*.json")):
-            try:
-                data = json.loads(json_file.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    merged[json_file.stem] = data
-            except (OSError, json.JSONDecodeError):
-                continue
-        if merged:
-            locales[locale_dir.name] = merged
-    return locales
+    return iter_files(root, SOURCE_EXTENSIONS)
 
 
 def _issue_to_dict(issue: Any) -> dict[str, Any]:
@@ -126,7 +73,7 @@ def run_scan(project_path: Path, reference_locale: str) -> dict[str, Any]:
         issues.extend(scanner.scan_file_for_hardcoded(rel, content))
 
     _emit_event("progress", {"status": "Comparing locale files..."})
-    locales = _discover_locales(project_path)
+    locales = discover_catalogs(project_path, reference_locale)
     coverage: dict[str, float] = {}
     locale_names = sorted(locales.keys())
 

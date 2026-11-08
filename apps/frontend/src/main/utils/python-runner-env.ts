@@ -126,3 +126,21 @@ export async function pythonRunnerEnv(
 		},
 	);
 }
+
+/**
+ * The environment of a runner that only reads code it is given and never
+ * calls a model (static review, code smells): the tool paths and the managed
+ * Python, no backend `.env`, no provider and no Claude profile (S1).
+ */
+export function pythonStaticRunnerEnv(backendPath: string): Record<string, string> {
+	const pythonEnv = pythonEnvManager.getPythonEnv();
+	return envWithoutCredentials(
+		{ ...getAugmentedEnv(), ...pythonEnv },
+		{
+			PYTHONPATH: pythonPath(backendPath, pythonEnv.PYTHONPATH),
+			PYTHONUNBUFFERED: "1",
+			PYTHONIOENCODING: "utf-8",
+			PYTHONUTF8: "1",
+		},
+	);
+}

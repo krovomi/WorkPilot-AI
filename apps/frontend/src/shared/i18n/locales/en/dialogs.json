@@ -145,6 +145,7 @@
 		"repositoryNote": "You can select the repository in the project settings after this step."
 	},
 	"worktrees": {
+		"count": "{{count}} worktrees",
 		"title": "Worktrees",
 		"description": "Manage isolated workspaces for your WorkPilot AI tasks",
 		"empty": "No Worktrees",
@@ -336,16 +337,14 @@
 		"retry": "Retry"
 	},
 	"dependencySentinel": {
-		"title": "Dependency Sentinel",
-		"description": "Monitor dependencies for security vulnerabilities and outdated packages",
-		"searchPlaceholder": "Search dependencies...",
-		"dependencies": "Dependencies",
-		"vulnerabilities": "Vulnerabilities",
-		"noDependenciesFound": "No dependencies found matching your search",
-		"noDependencies": "No dependencies found",
-		"noVulnerabilitiesFound": "No vulnerabilities found matching your search",
-		"noVulnerabilities": "No vulnerabilities found",
-		"close": "Close"
+		"title": "Dependency sentinel",
+		"description": "What WorkPilot checks in your dependencies.",
+		"close": "Close",
+		"kicker": "Toolbox",
+		"descriptionFor": "What WorkPilot checks in the dependencies of {{name}}.",
+		"guardTitle": "Every package a task adds is checked",
+		"guardBody": "Before a task is merged, the dependency guard reads the manifests it changed and asks each public registry about the packages it added. A package that does not exist (an invented name an attacker could publish) blocks the task; a private feed or an unreachable registry never does.",
+		"auditPending": "A full audit of the existing dependencies (known vulnerabilities, outdated versions) is not connected yet: this window no longer shows sample data in its place."
 	},
 	"providerSelector": {
 		"updateFailed": "Unable to change provider",

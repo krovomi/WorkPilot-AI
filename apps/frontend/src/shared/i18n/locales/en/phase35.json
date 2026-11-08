@@ -369,5 +369,6 @@
 			"messageEmpty": "Message is empty",
 			"messageTooLong": "Message too long (limit: {{max}} characters)"
 		}
-	}
+	},
+	"hubDescription": "Twelve advanced tools in one place: codebase longevity, agent health, model routing, domain agents, CI/CD anomalies, licenses, architecture drift, generated tests, i18n at scale, cognitive context, audit trail and pair programming."
 }

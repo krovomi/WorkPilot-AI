@@ -338,6 +338,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			};
 			const NON_CLONED_METADATA_KEYS: (keyof TaskMetadata)[] = [
 				"prUrl",
+				"prMergedAt",
+				"splitCheck",
 				"visualProof",
 				"archivedAt",
 				"archivedInVersion",

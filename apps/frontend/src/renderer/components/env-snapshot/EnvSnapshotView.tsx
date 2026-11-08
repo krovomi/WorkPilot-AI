@@ -1,10 +1,11 @@
 import {
+	AlertTriangle,
 	Camera,
 	Container,
 	Copy,
 	Download,
 	FileCode2,
-	Package,
+	History,
 	Snowflake,
 	Terminal,
 } from "lucide-react";
@@ -12,44 +13,40 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { EnvSnapshotFormat } from "../../../preload/api/modules/env-snapshot-api";
 import { useEnvSnapshotStore } from "../../stores/env-snapshot-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 import { formatAppDateTime } from "@/lib/date-format";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	Section,
+	Tabs,
+} from "../charter";
+import { Input } from "../ui/input";
 
-const FORMAT_OPTIONS: {
-	value: EnvSnapshotFormat;
+const FORMAT_TABS: ReadonlyArray<{
+	id: EnvSnapshotFormat;
 	icon: typeof Container;
-	labelKey: string;
-	descriptionKey: string;
-}[] = [
-	{
-		value: "dockerfile",
-		icon: Container,
-		labelKey: "formats.docker.label",
-		descriptionKey: "formats.docker.description",
-	},
-	{
-		value: "nix",
-		icon: Snowflake,
-		labelKey: "formats.nix.label",
-		descriptionKey: "formats.nix.description",
-	},
-	{
-		value: "script",
-		icon: Terminal,
-		labelKey: "formats.script.label",
-		descriptionKey: "formats.script.description",
-	},
+	key: "docker" | "nix" | "script";
+}> = [
+	{ id: "dockerfile", icon: Container, key: "docker" },
+	{ id: "nix", icon: Snowflake, key: "nix" },
+	{ id: "script", icon: Terminal, key: "script" },
 ];
 
 interface Props {
 	readonly projectPath?: string;
 }
 
+/** Captured environments of the project, and their replay as code. */
 export function EnvSnapshotView({ projectPath }: Props) {
-	const { t } = useTranslation(["envSnapshot", "common"]);
+	const { t } = useTranslation(["envSnapshot", "navigation"]);
 	const {
 		snapshots,
 		selectedId,
@@ -73,12 +70,28 @@ export function EnvSnapshotView({ projectPath }: Props) {
 	}, [projectPath, load]);
 
 	const selected = snapshots.find((s) => s.id === selectedId) ?? null;
+	const activeFormat = FORMAT_TABS.find((f) => f.id === format) ?? FORMAT_TABS[0];
+
+	const header = (
+		<ModuleHeader
+			kicker={t("navigation:groups.planning")}
+			title={t("envSnapshot:title")}
+			description={t("envSnapshot:description")}
+			icon={Camera}
+			tone="blue"
+		/>
+	);
 
 	if (!projectPath) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground">
-				{t("envSnapshot:noProject", "Select a project to view snapshots.")}
-			</div>
+			<ModuleStage data-testid="env-snapshot-view">
+				{header}
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					<EmptyStage icon={Camera} title={t("envSnapshot:title")} tone="blue">
+						{t("envSnapshot:noProject")}
+					</EmptyStage>
+				</div>
+			</ModuleStage>
 		);
 	}
 
@@ -87,251 +100,194 @@ export function EnvSnapshotView({ projectPath }: Props) {
 		setLabel("");
 	};
 
-	const handleReplay = () => {
-		if (selected) void replay(projectPath, selected.id, format);
-	};
-
-	const handleExport = () => {
-		if (selected) void exportSnapshot(projectPath, selected.id, format);
-	};
-
-	const handleCopy = () => {
-		if (replayPayload) void navigator.clipboard.writeText(replayPayload.payload);
-	};
-
-	const activeFormat = FORMAT_OPTIONS.find((f) => f.value === format) ?? FORMAT_OPTIONS[0];
+	const tools = selected
+		? Object.entries(selected.tools).filter((entry): entry is [string, string] => !!entry[1])
+		: [];
 
 	return (
-		<div className="flex flex-col gap-4 p-4">
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<div className="flex items-center gap-2">
-					<Camera className="w-4 h-4" />
-					<h3 className="text-base font-semibold">
-						{t("envSnapshot:title", "Environment Snapshots")}
-					</h3>
-				</div>
-
-				<div className="flex flex-col items-end gap-1">
-					<Label className="text-xs text-muted-foreground">
-						{t("envSnapshot:replayTargetLabel", "Replay target")}
-					</Label>
-					<div
-						role="radiogroup"
-						aria-label={t("envSnapshot:replayTargetLabel", "Replay target")}
-						className="inline-flex rounded-md border border-border bg-background p-0.5"
-					>
-						{FORMAT_OPTIONS.map((opt) => {
-							const Icon = opt.icon;
-							const active = opt.value === format;
-							return (
-								<label
-									key={opt.value}
-									className={`flex items-center gap-1 px-3 py-1 text-xs rounded-sm transition-colors cursor-pointer ${
-										active
-											? "bg-primary text-primary-foreground"
-											: "text-muted-foreground hover:text-foreground"
-									}`}
-									title={t(`envSnapshot:${opt.descriptionKey}`)}
-								>
-									<input
-										type="radio"
-										name="format"
-										value={opt.value}
-										checked={active}
-										onChange={() => setFormat(opt.value)}
-										className="sr-only"
-									/>
-									<Icon className="w-3 h-3" />
-									{t(`envSnapshot:${opt.labelKey}`)}
-								</label>
-							);
-						})}
-					</div>
-					<span className="text-2xs text-muted-foreground">
-						{t(`envSnapshot:${activeFormat.descriptionKey}`)}
-					</span>
-				</div>
-			</div>
-
-			<section className="border rounded-md p-3 bg-card flex items-end gap-2">
-				<div className="flex-1">
-					<Label className="text-xs">
-						{t("envSnapshot:labelField", "Label (optional)")}
-					</Label>
-					<Input
-						value={label}
-						onChange={(e) => setLabel(e.target.value)}
-						placeholder={t("envSnapshot:labelPlaceholder", "Pre-migration baseline")}
-					/>
-				</div>
-				<Button onClick={handleCapture} disabled={capturing} size="sm">
-					<Camera className="w-3 h-3 mr-1" />
-					{capturing
-						? t("envSnapshot:capturing", "Capturing…")
-						: t("envSnapshot:capture", "Capture snapshot")}
-				</Button>
-			</section>
-
+		<ModuleStage data-testid="env-snapshot-view">
+			{header}
 			{error && (
-				<p className="text-sm text-destructive" role="alert">
-					{error}
-				</p>
+				<div className="relative z-[1] px-5 pb-2">
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{error}
+					</Notice>
+				</div>
 			)}
-
-			<div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
-				<aside className="border rounded-md bg-card overflow-y-auto max-h-[60vh]">
-					<header className="px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground border-b">
-						{t("envSnapshot:history", "History")} ({snapshots.length})
-					</header>
+			<Columns template="minmax(16rem, 1fr) minmax(0, 2.5fr)">
+				<Column
+					kicker={t("envSnapshot:kickers.history")}
+					title={t("envSnapshot:history")}
+					meta={snapshots.length}
+					tone="blue"
+				>
 					{snapshots.length === 0 ? (
-						<p className="p-3 text-sm text-muted-foreground">
-							{t("envSnapshot:empty", "No snapshots captured yet.")}
-						</p>
+						<EmptyStage icon={History} title={t("envSnapshot:emptyTitle")} tone="blue">
+							{t("envSnapshot:empty")}
+						</EmptyStage>
 					) : (
-						<ul className="divide-y">
+						<div className="grid gap-2">
 							{snapshots.map((s) => (
-								<li key={s.id}>
-									<button
-										type="button"
-										onClick={() => select(s.id)}
-										className={`w-full text-left px-3 py-2 text-sm hover:bg-accent/60 ${selectedId === s.id ? "bg-accent/80" : ""}`}
-									>
-										<div className="font-medium">{s.label || s.id}</div>
-										<div className="text-xs text-muted-foreground">
-											{formatAppDateTime(s.createdAt)}
-										</div>
-										<div className="text-xs text-muted-foreground truncate">
-											{s.git.branch} @ {s.git.commit.slice(0, 8) || "—"}
-										</div>
-									</button>
-								</li>
+								<button
+									key={s.id}
+									type="button"
+									onClick={() => select(s.id)}
+									className="wp-card wp-card-pad wp-rail wp-step wp-tone-blue text-left"
+									data-active={selectedId === s.id ? "true" : undefined}
+								>
+									<div className="wp-title text-sm">{s.label || s.id}</div>
+									<div className="wp-meta mt-0.5">{formatAppDateTime(s.createdAt)}</div>
+									<div className="wp-muted mt-0.5 truncate font-mono text-xs">
+										{s.git.branch} @ {s.git.commit.slice(0, 8) || "—"}
+									</div>
+								</button>
 							))}
-						</ul>
+						</div>
 					)}
-				</aside>
+				</Column>
 
-				<section className="border rounded-md bg-card p-3 space-y-3 min-h-[200px]">
+				<Column
+					kicker={t("envSnapshot:kickers.detail")}
+					title={selected ? selected.label || selected.id : t("envSnapshot:selectTitle")}
+					meta={selected ? formatAppDateTime(selected.createdAt) : undefined}
+				>
 					{selected ? (
-						<>
-							<header className="flex items-start justify-between gap-2">
-								<div>
-									<h4 className="font-semibold text-sm flex items-center gap-2">
-										<Package className="w-4 h-4" />
-										{selected.label || selected.id}
-									</h4>
-									<p className="text-xs text-muted-foreground">
-										{formatAppDateTime(selected.createdAt)} — {selected.id}
-									</p>
-								</div>
-								<div className="flex gap-2">
-									<Badge variant="outline">{selected.os.system}</Badge>
-									{selected.git.dirty.length > 0 && (
-										<Badge variant="destructive">
-											{t("envSnapshot:dirty", "dirty")}
-										</Badge>
-									)}
-								</div>
-							</header>
-
-							<div className="grid grid-cols-2 gap-2 text-xs">
-								<div>
-									<span className="text-muted-foreground">
-										{t("envSnapshot:osLabel", "OS")}
-									</span>
-									<div>
-										{selected.os.system} {selected.os.release}
-									</div>
-								</div>
-								<div>
-									<span className="text-muted-foreground">
-										{t("envSnapshot:commit", "Commit")}
-									</span>
-									<div className="font-mono">
-										{selected.git.commit.slice(0, 12) || "—"}
-									</div>
-								</div>
-								<div>
-									<span className="text-muted-foreground">Node</span>
-									<div>{selected.tools.node ?? "—"}</div>
-								</div>
-								<div>
-									<span className="text-muted-foreground">Python</span>
-									<div>{selected.tools.python ?? "—"}</div>
-								</div>
-							</div>
-
-							<div>
-								<h5 className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-									{t("envSnapshot:lockfiles", "Lockfiles")}
-								</h5>
-								{selected.lockfiles.length === 0 ? (
-									<p className="text-xs text-muted-foreground">
-										{t("envSnapshot:noLockfiles", "No lockfiles detected.")}
-									</p>
-								) : (
-									<ul className="text-xs font-mono space-y-0.5">
-										{selected.lockfiles.map((l) => (
-											<li key={l.name} className="flex justify-between gap-2">
-												<span>{l.name}</span>
-												<span className="text-muted-foreground truncate">
-													{l.sha256?.slice(0, 12) ?? "—"}
-												</span>
-											</li>
-										))}
-									</ul>
+						<div className="space-y-4">
+							<div className="wp-chips">
+								<Chip tone="muted" dot={false}>
+									{selected.os.system} {selected.os.release}
+								</Chip>
+								<Chip tone="muted" dot={false}>
+									<span className="font-mono">{selected.git.commit.slice(0, 12) || "—"}</span>
+								</Chip>
+								{selected.git.dirty.length > 0 && (
+									<Chip tone="amber">
+										{t("envSnapshot:dirtyCount", { count: selected.git.dirty.length })}
+									</Chip>
 								)}
 							</div>
 
-							<div className="flex items-center gap-2 pt-2 border-t">
-								<span className="text-xs text-muted-foreground mr-auto">
-									{t("envSnapshot:targetHint", "Target:")}{" "}
-									<span className="font-medium text-foreground">
-										{t(`envSnapshot:${activeFormat.labelKey}`)}
-									</span>
-								</span>
-								<Button size="sm" variant="outline" onClick={handleReplay}>
-									<FileCode2 className="w-3 h-3 mr-1" />
-									{t("envSnapshot:preview", "Preview")}
-								</Button>
-								<Button size="sm" onClick={handleExport} disabled={exporting}>
-									<Download className="w-3 h-3 mr-1" />
-									{exporting
-										? t("envSnapshot:exporting", "Exporting…")
-										: t("envSnapshot:export", "Export")}
-								</Button>
-							</div>
-
-							{lastExportedPath && (
-								<p className="text-xs text-success">
-									{t("envSnapshot:exportedTo", "Exported to")}{" "}
-									<span className="font-mono">{lastExportedPath}</span>
-								</p>
-							)}
-
-							{replayPayload?.snapId === selected.id && (
-								<div className="border rounded-md bg-background">
-									<div className="flex items-center justify-between px-2 py-1 border-b">
-										<span className="text-xs text-muted-foreground">
-											{replayPayload.format}
-										</span>
-										<Button size="sm" variant="ghost" onClick={handleCopy}>
-											<Copy className="w-3 h-3 mr-1" />
-											{t("envSnapshot:copy", "Copy")}
-										</Button>
+							<Section kicker={t("envSnapshot:kickers.tools")} title={t("envSnapshot:toolsTitle")}>
+								{tools.length === 0 ? (
+									<p className="wp-muted text-sm">{t("envSnapshot:noTools")}</p>
+								) : (
+									<div className="wp-chips">
+										{tools.map(([name, version]) => (
+											<Chip key={name} tone="blue" dot={false} title={version}>
+												<span className="font-semibold">{name}</span>
+												<span className="max-w-[12rem] truncate font-mono">{version}</span>
+											</Chip>
+										))}
 									</div>
-									<pre className="text-xs p-2 overflow-auto max-h-[220px] font-mono whitespace-pre-wrap">
-										{replayPayload.payload}
-									</pre>
-								</div>
-							)}
-						</>
+								)}
+							</Section>
+
+							<Section kicker={t("envSnapshot:kickers.lockfiles")} title={t("envSnapshot:lockfiles")}>
+								{selected.lockfiles.length === 0 ? (
+									<p className="wp-muted text-sm">{t("envSnapshot:noLockfiles")}</p>
+								) : (
+									<Panel className="grid gap-1 font-mono text-xs">
+										{selected.lockfiles.map((l) => (
+											<div key={l.name} className="flex justify-between gap-2">
+												<span>{l.name}</span>
+												<span className="wp-muted truncate">{l.sha256?.slice(0, 12) ?? "—"}</span>
+											</div>
+										))}
+									</Panel>
+								)}
+							</Section>
+
+							<Section
+								kicker={t("envSnapshot:kickers.replay")}
+								title={t("envSnapshot:replayTargetLabel")}
+								description={t(`envSnapshot:formats.${activeFormat.key}.description`)}
+								actions={
+									<>
+										<CharterButton
+											size="sm"
+											icon={FileCode2}
+											onClick={() => void replay(projectPath, selected.id, format)}
+										>
+											{t("envSnapshot:preview")}
+										</CharterButton>
+										<CharterButton
+											size="sm"
+											icon={Download}
+											busy={exporting}
+											disabled={exporting}
+											onClick={() => void exportSnapshot(projectPath, selected.id, format)}
+										>
+											{exporting ? t("envSnapshot:exporting") : t("envSnapshot:export")}
+										</CharterButton>
+									</>
+								}
+							>
+								<Tabs
+									tabs={FORMAT_TABS.map((f) => ({
+										id: f.id,
+										icon: f.icon,
+										label: t(`envSnapshot:formats.${f.key}.label`),
+									}))}
+									value={format}
+									onChange={setFormat}
+									label={t("envSnapshot:replayTargetLabel")}
+								/>
+								{lastExportedPath && (
+									<Notice tone="green" icon={Download} className="mt-3">
+										{t("envSnapshot:exportedTo")} <span className="font-mono">{lastExportedPath}</span>
+									</Notice>
+								)}
+								{replayPayload?.snapId === selected.id && (
+									<div className="mt-3">
+										<div className="mb-1 flex items-center justify-between">
+											<span className="wp-kicker">{replayPayload.format}</span>
+											<CharterButton
+												size="sm"
+												variant="ghost"
+												icon={Copy}
+												onClick={() => void navigator.clipboard.writeText(replayPayload.payload)}
+											>
+												{t("envSnapshot:copy")}
+											</CharterButton>
+										</div>
+										<pre className="wp-code max-h-[22rem] overflow-auto whitespace-pre-wrap">
+											{replayPayload.payload}
+										</pre>
+									</div>
+								)}
+							</Section>
+						</div>
 					) : (
-						<p className="text-sm text-muted-foreground">
-							{t("envSnapshot:selectPrompt", "Select a snapshot to see details.")}
-						</p>
+						<EmptyStage icon={Camera} title={t("envSnapshot:selectTitle")} tone="blue">
+							{t("envSnapshot:selectPrompt")}
+						</EmptyStage>
 					)}
-				</section>
-			</div>
-		</div>
+				</Column>
+			</Columns>
+
+			<Composer
+				prompt={
+					<Input
+						value={label}
+						onChange={(e) => setLabel(e.target.value)}
+						placeholder={t("envSnapshot:labelPlaceholder")}
+						aria-label={t("envSnapshot:labelField")}
+						className="h-8 min-w-0 flex-1 text-sm"
+					/>
+				}
+				actions={
+					<CharterButton
+						variant="primary"
+						icon={Camera}
+						busy={capturing}
+						disabled={capturing}
+						onClick={handleCapture}
+					>
+						{capturing ? t("envSnapshot:capturing") : t("envSnapshot:capture")}
+					</CharterButton>
+				}
+				hint={t("envSnapshot:captureHint")}
+			/>
+		</ModuleStage>
 	);
 }

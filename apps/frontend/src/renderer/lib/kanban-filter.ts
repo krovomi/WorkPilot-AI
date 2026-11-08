@@ -12,6 +12,7 @@ import type {
 	TaskCategory,
 	TaskPriority,
 } from "../../shared/types";
+import { splitGroupId } from "../../shared/utils/task-split";
 import { extractTextFromHtml } from "./utils";
 
 /**
@@ -47,6 +48,8 @@ export interface KanbanFilters {
 	sources: TaskSource[];
 	categories: TaskCategory[];
 	priorities: TaskPriority[];
+	/** One split group (the split task's spec id): only its parts are shown. */
+	group?: string;
 }
 
 export interface KanbanSort {
@@ -114,7 +117,8 @@ export function hasActiveFilters(filters: KanbanFilters): boolean {
 		filters.search.trim().length > 0 ||
 		filters.sources.length > 0 ||
 		filters.categories.length > 0 ||
-		filters.priorities.length > 0
+		filters.priorities.length > 0 ||
+		Boolean(filters.group)
 	);
 }
 
@@ -125,6 +129,7 @@ export function activeFilterCount(filters: KanbanFilters): number {
 	count += filters.sources.length;
 	count += filters.categories.length;
 	count += filters.priorities.length;
+	if (filters.group) count++;
 	return count;
 }
 
@@ -133,6 +138,8 @@ export function taskMatchesFilters(
 	task: Task,
 	filters: KanbanFilters,
 ): boolean {
+	if (filters.group && splitGroupId(task) !== filters.group) return false;
+
 	if (filters.sources.length > 0) {
 		if (!filters.sources.includes(getTaskSource(task))) return false;
 	}

@@ -1,10 +1,10 @@
 /**
- * AI Pair Programming View (Feature 10)
+ * AI Pair Programming View (Feature 10), in the UI charter
+ * (docs/architecture/ui-charter.md).
  *
- * Split-view interface for real parallel coordinated development:
- * - Left panel: Developer's scope summary
- * - Center panel: Bidirectional chat
- * - Right panel: AI work log (live actions + streaming output)
+ * Before a session: the three scopes as numbered steps, the start action in
+ * the composer. During a session: your work, the coordination chat and the
+ * AI's work side by side, the message box in the composer.
  */
 
 import {
@@ -13,7 +13,8 @@ import {
 	ChevronRight,
 	FileCode2,
 	FilePlus,
-	Loader2,
+	MessagesSquare,
+	RotateCcw,
 	Send,
 	Square,
 	Terminal as TerminalIcon,
@@ -21,9 +22,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -36,137 +34,108 @@ import {
 	stopPairSession,
 	usePairProgrammingStore,
 } from "@/stores/pair-programming-store";
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	StepCard,
+	type Tone,
+} from "./charter";
 
 interface PairProgrammingProps {
 	readonly projectId: string;
 }
 
-// ---------------------------------------------------------------------------
-// Status badge
-// ---------------------------------------------------------------------------
+const STATUS_TONE: Record<PairStatus, Tone> = {
+	idle: "muted",
+	planning: "blue",
+	active: "accent",
+	paused: "amber",
+	completed: "green",
+	error: "red",
+};
 
-function StatusBadge({ status }: { status: PairStatus }) {
+function StatusChip({ status }: { readonly status: PairStatus }) {
 	const { t } = useTranslation("pairProgramming");
-	const variants: Record<
-		PairStatus,
-		"default" | "secondary" | "destructive" | "outline"
-	> = {
-		idle: "outline",
-		planning: "secondary",
-		active: "default",
-		paused: "outline",
-		completed: "secondary",
-		error: "destructive",
-	};
-	return (
-		<Badge variant={variants[status]}>
-			{status === "active" && (
-				<span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-			)}
-			{t(`status.${status}`)}
-		</Badge>
-	);
+	return <Chip tone={STATUS_TONE[status]}>{t(`status.${status}`)}</Chip>;
 }
 
 // ---------------------------------------------------------------------------
-// Setup form
+// Setup: the three scopes as steps, the start action in the composer
 // ---------------------------------------------------------------------------
 
-interface SetupFormProps {
-	onStart: (params: StartSessionParams) => void;
-}
-
-function SetupForm({ onStart }: SetupFormProps) {
-	const { t } = useTranslation("pairProgramming");
+function SetupView({ onStart }: { readonly onStart: (params: StartSessionParams) => void }) {
+	const { t } = useTranslation(["pairProgramming", "navigation"]);
 	const [goal, setGoal] = useState("");
 	const [devScope, setDevScope] = useState("");
 	const [aiScope, setAiScope] = useState("");
+	const ready = Boolean(goal.trim() && devScope.trim() && aiScope.trim());
 
-	const handleSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!goal.trim() || !devScope.trim() || !aiScope.trim()) return;
-		onStart({
-			projectId: "",
-			goal: goal.trim(),
-			devScope: devScope.trim(),
-			aiScope: aiScope.trim(),
-		});
+	const start = () => {
+		if (!ready) return;
+		onStart({ projectId: "", goal: goal.trim(), devScope: devScope.trim(), aiScope: aiScope.trim() });
 	};
 
+	const fields = [
+		{ key: "goal", tone: "accent", label: t("setup.goalLabel"), value: goal, set: setGoal, placeholder: t("setup.goalPlaceholder") },
+		{ key: "you", tone: "blue", label: t("setup.devScopeLabel"), value: devScope, set: setDevScope, placeholder: t("setup.devScopePlaceholder") },
+		{ key: "ai", tone: "violet", label: t("setup.aiScopeLabel"), value: aiScope, set: setAiScope, placeholder: t("setup.aiScopePlaceholder") },
+	] as const;
+
 	return (
-		<div className="flex flex-col items-center justify-center h-full max-w-xl mx-auto px-4 py-8">
-			{/* Hero */}
-			<div className="text-center mb-8">
-				<div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
-					<Users className="w-7 h-7 text-primary" />
-				</div>
-				<h2 className="text-xl font-semibold mb-1">{t("empty.title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("empty.description")}
-				</p>
-			</div>
-
-			{/* Feature bullets */}
-			<div className="flex flex-col gap-2 text-sm text-muted-foreground mb-8 self-stretch">
-				{(["feature1", "feature2", "feature3"] as const).map((f) => (
-					<div key={f} className="flex items-center gap-2">
-						<ChevronRight className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-						{t(`empty.${f}`)}
+		<ModuleStage data-testid="pair-programming-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.development")}
+				title={t("title")}
+				description={t("empty.description")}
+				icon={Users}
+			/>
+			<Columns template="minmax(260px, 30%) minmax(0, 1fr)">
+				<Column kicker={t("steps.how")} title={t("subtitle")} tone="blue">
+					<div className="flex flex-col gap-2">
+						{(["feature1", "feature2", "feature3"] as const).map((f) => (
+							<Panel key={f} className="flex items-start gap-2 text-sm">
+								<ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+								{t(`empty.${f}`)}
+							</Panel>
+						))}
 					</div>
-				))}
-			</div>
-
-			{/* Form */}
-			<form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
-				<div className="flex flex-col gap-1.5">
-					{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-					<label className="text-sm font-medium">{t("setup.goalLabel")}</label>
-					<Textarea
-						value={goal}
-						onChange={(e) => setGoal(e.target.value)}
-						placeholder={t("setup.goalPlaceholder")}
-						rows={2}
-					/>
-				</div>
-				<div className="flex flex-col gap-1.5">
-					{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-					<label className="text-sm font-medium">
-						{t("setup.devScopeLabel")}
-					</label>
-					<Textarea
-						value={devScope}
-						onChange={(e) => setDevScope(e.target.value)}
-						placeholder={t("setup.devScopePlaceholder")}
-						rows={2}
-					/>
-				</div>
-				<div className="flex flex-col gap-1.5">
-					{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-					<label className="text-sm font-medium">
-						{t("setup.aiScopeLabel")}
-					</label>
-					<Textarea
-						value={aiScope}
-						onChange={(e) => setAiScope(e.target.value)}
-						placeholder={t("setup.aiScopePlaceholder")}
-						rows={2}
-					/>
-				</div>
-				<p className="text-xs text-muted-foreground">{t("setup.hint")}</p>
-				<Button
-					type="submit"
-					disabled={!goal.trim() || !devScope.trim() || !aiScope.trim()}
-					className="w-full"
-				>
-					<Users className="w-4 h-4 mr-2" />
-					{t("setup.startButton")}
-				</Button>
-			</form>
-		</div>
+				</Column>
+				<Column kicker={t("startSession")} title={t("setup.title")}>
+					<div className="flex flex-col gap-3">
+						{fields.map((f, i) => (
+							<StepCard key={f.key} index={i + 1} kicker={t(`steps.${f.key}`)} title={f.label} tone={f.tone}>
+								<Textarea
+									className="mt-1.5"
+									value={f.value}
+									onChange={(e) => f.set(e.target.value)}
+									placeholder={f.placeholder}
+									aria-label={f.label}
+									rows={2}
+								/>
+							</StepCard>
+						))}
+					</div>
+				</Column>
+			</Columns>
+			<Composer
+				prompt={<span className="wp-muted truncate text-xs">{goal.trim() || t("setup.goalPlaceholder")}</span>}
+				hint={t("setup.hint")}
+				actions={
+					<CharterButton variant="primary" icon={Users} disabled={!ready} onClick={start}>
+						{t("setup.startButton")}
+					</CharterButton>
+				}
+			/>
+		</ModuleStage>
 	);
 }
 
@@ -179,7 +148,7 @@ function ActionIcon({ type }: { type: string }) {
 		case "file_created":
 			return <FilePlus className="w-3.5 h-3.5 text-success" />;
 		case "file_modified":
-			return <FileCode2 className="w-3.5 h-3.5 text-blue-500" />;
+			return <FileCode2 className="w-3.5 h-3.5 text-info" />;
 		case "command_run":
 			return <TerminalIcon className="w-3.5 h-3.5 text-warning" />;
 		default:
@@ -197,7 +166,7 @@ function ActionEntry({ action }: { action: AiAction }) {
 		defaultValue: action.actionType,
 	});
 	return (
-		<div className="flex items-start gap-2 py-1.5 border-b border-border/50 last:border-0">
+		<div className="flex items-start gap-2 border-b border-dashed border-border/60 py-1.5 last:border-0">
 			<ActionIcon type={action.actionType} />
 			<div className="min-w-0 flex-1">
 				<span className="text-xs font-medium text-muted-foreground mr-1">
@@ -232,7 +201,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 				isUser ? "items-end" : "items-start",
 			)}
 		>
-			<span className="text-3xs text-muted-foreground px-1">
+			<span className="wp-kicker px-1">
 				{isUser
 					? t("chat.you")
 					: message.isQuestion
@@ -246,7 +215,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 						? "bg-primary text-primary-foreground"
 						: message.isQuestion
 							? "bg-warning/10 border border-warning/30 text-foreground"
-							: "bg-muted text-foreground",
+							: "wp-card text-foreground",
 				)}
 			>
 				{message.content}
@@ -260,7 +229,7 @@ function MessageBubble({ message }: { message: PairMessage }) {
 // ---------------------------------------------------------------------------
 
 export function PairProgramming({ projectId }: PairProgrammingProps) {
-	const { t } = useTranslation("pairProgramming");
+	const { t } = useTranslation(["pairProgramming", "navigation"]);
 
 	const session = usePairProgrammingStore((s) => s.session);
 	const status = usePairProgrammingStore((s) => s.status);
@@ -307,195 +276,132 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 
 	const isRunning = status === "planning" || status === "active";
 
-	// Show setup form when no active session
 	if (status === "idle" && !session) {
-		return (
-			<div className="h-full overflow-auto">
-				<SetupForm onStart={handleStart} />
-			</div>
-		);
+		return <SetupView onStart={handleStart} />;
 	}
 
 	return (
-		<div className="flex flex-col h-full overflow-hidden">
-			{/* Header */}
-			<div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-				<div className="flex items-center gap-2.5">
-					<Users className="w-4 h-4 text-primary" />
-					<span className="font-semibold text-sm">{t("title")}</span>
-					{session && <StatusBadge status={status} />}
-					{statusMessage && (
-						<span className="text-xs text-muted-foreground">
-							{statusMessage}
-						</span>
-					)}
-				</div>
-				<div className="flex items-center gap-2">
-					{isRunning && (
-						<Button size="sm" variant="outline" onClick={handleStop}>
-							<Square className="w-3.5 h-3.5 mr-1.5" />
-							{t("stopSession")}
-						</Button>
-					)}
-					{(status === "completed" || status === "error") && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => usePairProgrammingStore.getState().reset()}
-						>
-							{t("newSession")}
-						</Button>
-					)}
-				</div>
-			</div>
+		<ModuleStage data-testid="pair-programming-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.development")}
+				title={session?.goal || t("title")}
+				description={statusMessage || t("subtitle")}
+				icon={Users}
+				actions={
+					<>
+						{session && <StatusChip status={status} />}
+						{isRunning && (
+							<CharterButton size="sm" variant="danger" icon={Square} onClick={handleStop}>
+								{t("stopSession")}
+							</CharterButton>
+						)}
+						{(status === "completed" || status === "error") && (
+							<CharterButton
+								size="sm"
+								icon={RotateCcw}
+								onClick={() => usePairProgrammingStore.getState().reset()}
+							>
+								{t("newSession")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
 
-			{/* Conflicts banner */}
 			{conflicts.length > 0 && (
-				<div className="flex items-center gap-2 px-4 py-2 bg-warning/10 border-b border-warning/30 text-warning text-xs flex-shrink-0">
-					<AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-					<span>{t("conflicts.description")}</span>
-					<span className="font-mono">
-						{conflicts.map((c) => c.filePath).join(", ")}
-					</span>
-				</div>
+				<Notice tone="amber" icon={AlertTriangle} role="alert" className="relative z-[1] mx-5 mt-3">
+					{t("conflicts.description")}{" "}
+					<span className="wp-mono">{conflicts.map((c) => c.filePath).join(", ")}</span>
+				</Notice>
 			)}
 
-			{/* Three-panel layout */}
-			<div className="flex flex-1 min-h-0 divide-x divide-border">
-				{/* LEFT — Developer scope */}
-				<div className="w-56 flex-shrink-0 flex flex-col">
-					<div className="px-3 py-2 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-						{t("sections.yourWork")}
-					</div>
-					<ScrollArea className="flex-1">
-						<div className="p-3 space-y-3">
-							{session && (
-								<>
-									<div>
-										<div className="text-xs font-medium text-muted-foreground mb-1">
-											{t("devWork.scope")}
-										</div>
-										<p className="text-xs text-foreground leading-relaxed">
-											{session.devScope}
-										</p>
-									</div>
-									<div className="rounded-md bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
-										{t("devWork.reminder")}
-									</div>
-									{session.goal && (
-										<div>
-											<div className="text-xs font-medium text-muted-foreground mb-1">
-												{t("pairProgramming:session.goal")}
-											</div>
-											<p className="text-xs text-foreground leading-relaxed">
-												{session.goal}
-											</p>
-										</div>
-									)}
-								</>
-							)}
-						</div>
-					</ScrollArea>
-				</div>
-
-				{/* CENTER — Chat */}
-				<div className="flex-1 flex flex-col min-w-0">
-					<div className="px-3 py-2 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-						{t("sections.chat")}
-					</div>
-
-					<ScrollArea className="flex-1 px-3 py-3">
-						{messages.length === 0 ? (
-							<p className="text-xs text-muted-foreground text-center py-8">
-								{t("chat.empty")}
-							</p>
-						) : (
-							<div className="space-y-3">
-								{messages.map((msg) => (
-									<MessageBubble key={msg.id} message={msg} />
-								))}
-								<div ref={chatEndRef} />
-							</div>
-						)}
-					</ScrollArea>
-
-					{/* Input */}
-					<div className="p-3 border-t border-border flex-shrink-0">
-						<div className="flex gap-2">
-							<Textarea
-								value={pendingMessage}
-								onChange={(e) => setPendingMessage(e.target.value)}
-								onKeyDown={handleKeyDown}
-								placeholder={t("messagePlaceholder")}
-								rows={2}
-								className="resize-none text-sm"
-								disabled={!isRunning}
-							/>
-							<Button
-								size="sm"
-								onClick={handleSendMessage}
-								disabled={!isRunning || !pendingMessage.trim()}
-								className="self-end"
-							>
-								<Send className="w-3.5 h-3.5" />
-							</Button>
-						</div>
-					</div>
-				</div>
-
-				{/* RIGHT — AI work */}
-				<div className="w-72 flex-shrink-0 flex flex-col">
-					<div className="px-3 py-2 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center justify-between">
-						<span>{t("sections.aiWork")}</span>
-						{isRunning && (
-							<Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-						)}
-						{status === "completed" && (
-							<CheckCircle2 className="w-3 h-3 text-success" />
-						)}
-					</div>
-
-					{/* AI scope */}
+			<Columns template="minmax(220px, 22%) minmax(0, 1fr) minmax(260px, 28%)">
+				<Column kicker={t("steps.you")} title={t("sections.yourWork")} tone="blue">
 					{session && (
-						<div className="px-3 py-2 border-b border-border/50 bg-muted/30">
-							<p className="text-xs text-muted-foreground leading-relaxed">
-								{session.aiScope}
-							</p>
+						<div className="flex flex-col gap-3">
+							<Panel rail tone="blue">
+								<span className="wp-kicker">{t("devWork.scope")}</span>
+								<p className="mt-1.5 text-sm leading-relaxed">{session.devScope}</p>
+							</Panel>
+							<Notice tone="muted">{t("devWork.reminder")}</Notice>
 						</div>
 					)}
+				</Column>
 
-					{/* Streaming output */}
-					{(streamingContent || isRunning) && (
-						<div className="border-b border-border/50 max-h-40">
-							<ScrollArea className="h-full">
-								<pre className="p-3 text-xs text-foreground font-mono whitespace-pre-wrap leading-relaxed">
-									{streamingContent}
-									{isRunning && <span className="animate-pulse">▌</span>}
-								</pre>
-								<div ref={streamEndRef} />
-							</ScrollArea>
+				<Column kicker={t("chat.ai")} title={t("sections.chat")}>
+					{messages.length === 0 ? (
+						<EmptyStage icon={MessagesSquare} title={t("sections.chat")}>
+							{t("chat.empty")}
+						</EmptyStage>
+					) : (
+						<div className="flex flex-col gap-3">
+							{messages.map((msg) => (
+								<MessageBubble key={msg.id} message={msg} />
+							))}
+							<div ref={chatEndRef} />
 						</div>
 					)}
+				</Column>
 
-					{/* Action log */}
-					<div className="px-3 py-2 border-b border-border/50 text-3xs font-semibold text-muted-foreground uppercase tracking-wide">
-						{t("aiWork.actionLog")}
+				<Column
+					kicker={t("steps.ai")}
+					title={t("sections.aiWork")}
+					tone="violet"
+					meta={status === "completed" ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : undefined}
+				>
+					<div className="flex flex-col gap-3">
+						{session && (
+							<Panel rail tone="violet">
+								<p className="text-sm leading-relaxed">{session.aiScope}</p>
+							</Panel>
+						)}
+						{isRunning && <ScanLine label={t(`aiWork.${status}`)} />}
+						{streamingContent && (
+							<pre className="wp-code max-h-48 overflow-y-auto">
+								{streamingContent}
+								{isRunning && <span className="animate-pulse">▌</span>}
+								<span ref={streamEndRef} />
+							</pre>
+						)}
+						<Panel>
+							<span className="wp-kicker">{t("aiWork.actionLog")}</span>
+							<div className="mt-1.5">
+								{aiActions.length === 0 ? (
+									<p className="wp-meta py-3 text-center">{t("aiWork.noActions")}</p>
+								) : (
+									aiActions.map((action) => <ActionEntry key={action.id} action={action} />)
+								)}
+							</div>
+						</Panel>
 					</div>
-					<ScrollArea className="flex-1">
-						<div className="px-3 py-2">
-							{aiActions.length === 0 ? (
-								<p className="text-xs text-muted-foreground py-4 text-center">
-									{t("aiWork.noActions")}
-								</p>
-							) : (
-								aiActions.map((action) => (
-									<ActionEntry key={action.id} action={action} />
-								))
-							)}
-						</div>
-					</ScrollArea>
-				</div>
-			</div>
-		</div>
+				</Column>
+			</Columns>
+
+			<Composer
+				prompt={
+					<Textarea
+						value={pendingMessage}
+						onChange={(e) => setPendingMessage(e.target.value)}
+						onKeyDown={handleKeyDown}
+						placeholder={t("messagePlaceholder")}
+						aria-label={t("messagePlaceholder")}
+						rows={1}
+						className="min-h-0 resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+						disabled={!isRunning}
+					/>
+				}
+				hint={t("setup.hint")}
+				actions={
+					<CharterButton
+						variant="primary"
+						icon={Send}
+						onClick={handleSendMessage}
+						disabled={!isRunning || !pendingMessage.trim()}
+					>
+						{t("sendMessage")}
+					</CharterButton>
+				}
+			/>
+		</ModuleStage>
 	);
 }

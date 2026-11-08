@@ -1,5 +1,5 @@
 {
-  "apps/backend/agents/coder.py": 2791,
+  "apps/backend/agents/coder.py": 2789,
   "apps/backend/agents/session.py": 2437,
   "apps/backend/core/client.py": 3033,
   "apps/backend/core/workspace.py": 2249,
@@ -13,10 +13,9 @@
   "apps/frontend/src/main/services/credential-manager.ts": 2476,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2706,
-  "apps/frontend/src/renderer/App.tsx": 2419,
-  "apps/frontend/src/renderer/components/AgentTools.tsx": 2037,
+  "apps/frontend/src/renderer/App.tsx": 2314,
+  "apps/frontend/src/renderer/components/AgentTools.tsx": 2024,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3247,
   "apps/frontend/src/renderer/components/Sidebar.tsx": 2556,
-  "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2167,
-  "apps/frontend/src/renderer/components/visual-to-code/CanvasPanel.tsx": 2031
+  "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2167
 }

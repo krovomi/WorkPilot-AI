@@ -83,6 +83,7 @@ export const IPC_CHANNELS = {
 	TASK_PIPELINE_FIX: "task:pipelineFix", // Launch the agent to repair a red build (writes BUILD_FAILURE.md + fix subtask)
 	TASK_PIPELINE_STATUS_EVENT: "task:pipelineStatus", // Event (main -> renderer): pipeline status changed for a task
 	TASK_UPDATED_EVENT: "task:updated", // Event (main -> renderer): fields of a task changed in main (PR URL, visual proof)
+	TASK_SPLIT_EVENT: "task:split", // Event (main -> renderer): a task too big for one PR became its parts, or a part's PR was merged (task_split); reload the board and start the queue
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
@@ -600,6 +601,7 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_INSIGHTS_RUN: "codeInsights:run",
 	CODE_REVIEW_FILES: "codeReview:files",
 	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",
@@ -983,6 +985,8 @@ export const IPC_CHANNELS = {
 	// ("what URL" vs "which device"), and a `start` meaning one thing for a web
 	// project and another for a phone one is a channel nobody can reason about.
 	MOBILE_DETECT: "mobile:detect",
+	// The task form's "Mobile platforms" box: the app found, or how to add one.
+	MOBILE_PROFILE: "mobile:profile",
 	MOBILE_DEVICES: "mobile:devices",
 	MOBILE_LAUNCH: "mobile:launch",
 	MOBILE_SCREENSHOT: "mobile:screenshot",
@@ -1007,6 +1011,8 @@ export const IPC_CHANNELS = {
 	AGENT_CLI_CHECK: "agentCli:check",
 	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
 	AGENT_CLI_INSTALL: "agentCli:install",
+	AGENT_CLI_UPDATE_CHECK: "agentCli:updateCheck",
+	AGENT_CLI_UPDATE: "agentCli:update",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",
@@ -1123,12 +1129,18 @@ export const IPC_CHANNELS = {
 	CROSS_LANG_TRANSLATION_STREAM_CHUNK: "crossLangTranslation:streamChunk",
 	CROSS_LANG_TRANSLATION_TRANSLATE: "crossLangTranslation:translate",
 	DASHBOARD_GET_SNAPSHOT: "dashboard:getSnapshot",
+	DESIGN_TO_CODE_DETECT_STACK: "designToCode:detectStack",
+	DESIGN_TO_CODE_PROGRESS: "designToCode:progress",
 	DESIGN_TO_CODE_RUN: "designToCode:run",
+	DESIGN_TO_CODE_WRITE_FILES: "designToCode:writeFiles",
 	DOC_DRIFT_CANCEL: "docDrift:cancel",
 	DOC_DRIFT_ERROR: "doc-drift-error",
 	DOC_DRIFT_EVENT: "doc-drift-event",
 	DOC_DRIFT_RESULT: "doc-drift-result",
 	DOC_DRIFT_RUN: "docDrift:run",
+	DOCUMENTATION_CANCEL: "documentation:cancel",
+	DOCUMENTATION_PROGRESS: "documentation:progress",
+	DOCUMENTATION_RUN: "documentation:run",
 	ENV_SNAPSHOT_CAPTURE: "envSnapshot:capture",
 	ENV_SNAPSHOT_EXPORT: "envSnapshot:export",
 	ENV_SNAPSHOT_GET: "envSnapshot:get",

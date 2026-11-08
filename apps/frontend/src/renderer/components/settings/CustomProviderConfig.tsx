@@ -15,9 +15,9 @@ import { NativeSelect } from "../ui/native-select";
 function getTierClasses(tier: ProviderModel["tier"]): string {
 	const tierClassMap: Record<ProviderModel["tier"], string> = {
 		flagship: "bg-primary/10 text-primary",
-		standard: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+		standard: "bg-info/10 text-info",
 		fast: "bg-success/10 text-success ",
-		local: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+		local: "bg-warning/10 text-warning",
 	};
 	return tierClassMap[tier];
 }
@@ -394,7 +394,7 @@ export function CustomProviderConfig() {
 													)}
 												</span>
 												{model.supportsThinking && (
-													<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-3xs font-medium text-violet-600 dark:text-violet-400">
+													<span className="inline-flex items-center rounded bg-[color-mix(in_srgb,var(--wp-violet)_12%,transparent)] px-1 py-0.5 text-3xs font-medium text-[var(--wp-violet)]">
 														{t("agentProfile.supportsThinking")}
 													</span>
 												)}

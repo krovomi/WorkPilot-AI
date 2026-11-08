@@ -37,6 +37,7 @@ import {
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AutomationBadge } from "./kanban/AutomationBadge";
+import { ReviewLoadBadge, SplitPartBadge } from "./kanban/SplitPartBadge";
 import { TaskLockBadge } from "./collaboration/TaskLockBadge";
 import { useFormatRelativeTime } from "@/hooks/useFormatRelativeTime";
 import AzureDevOpsLogo from "../assets/logos/azure-devops.svg";
@@ -650,6 +651,10 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 					{t(`tasks:crossReview.cardBadge.${task.crossReview.verdict}`)}
 				</Badge>
 			) : null}
+
+			{/* Part of a split task (or the task that was split) */}
+			<SplitPartBadge task={task} />
+			<ReviewLoadBadge task={task} />
 
 			{/* Kind of work (bug, hotfix, RUN…), decided without a model */}
 			<TaskKindBadge task={task} className="text-3xs px-1.5 py-0" />

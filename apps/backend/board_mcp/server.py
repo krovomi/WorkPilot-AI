@@ -164,12 +164,37 @@ def summary(directory: Path) -> dict[str, Any]:
     title = (
         plan.get("feature") or plan.get("title") or requirements.get("task_description")
     )
-    return {
+    card = {
         "id": directory.name,
         "title": _clip(title or directory.name, MAX_TITLE),
         "column": COLUMNS.get(str(plan.get("status") or ""), "backlog"),
         "kind": meta.get("kind") if meta.get("kind") in KINDS else None,
         "updatedAt": plan.get("updated_at") or None,
+    }
+    group = _split_group(meta.get("splitGroup"))
+    if group:
+        card["group"] = group
+    return card
+
+
+def _split_group(value: Any) -> dict[str, Any] | None:
+    """A part of a split task (``task_split``): its group, for its colour and mark."""
+    if not isinstance(value, dict):
+        return None
+    parent, index, total = value.get("parent"), value.get("index"), value.get("total")
+    if not (
+        isinstance(parent, str)
+        and CARD_ID.match(parent)
+        and isinstance(index, int)
+        and isinstance(total, int)
+        and 1 <= index <= total <= 50
+    ):
+        return None
+    return {
+        "id": parent,
+        "title": _clip(value.get("title") or parent, MAX_TITLE),
+        "index": index,
+        "total": total,
     }
 
 

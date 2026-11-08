@@ -1,5 +1,5 @@
 {
-	"noData": "No compliance report data available",
+	"noData": "Pick a framework, then run the analysis to see which controls have evidence.",
 	"title": "Compliance Evidence Collector",
 	"evidenceItems": "evidence items",
 	"coverage": "coverage",
@@ -18,5 +18,36 @@
 	"errors": {
 		"noProject": "Select a project to run a compliance scan.",
 		"failed": "Scan failed: {{error}}"
+	},
+	"description": "Collects audit evidence from the repository (code reviews, security scans, policies, CI and deployments, task provenance) and maps it to the controls of a framework.",
+	"emptyTitle": "No report yet",
+	"frameworks": {
+		"SOC2": "SOC 2",
+		"ISO_27001": "ISO 27001",
+		"HIPAA": "HIPAA",
+		"PCI_DSS": "PCI DSS",
+		"GDPR": "GDPR",
+		"CCPA": "CCPA"
+	},
+	"kickers": {
+		"gaps": "Gaps",
+		"evidence": "Evidence"
+	},
+	"statuses": {
+		"collected": "Collected",
+		"verified": "Verified",
+		"missing": "Missing",
+		"expired": "Expired"
+	},
+	"evidenceTypes": {
+		"code_review": "Code review",
+		"test_results": "Test results",
+		"security_scan": "Security scan",
+		"access_log": "Access policy",
+		"change_log": "Change log",
+		"approval_record": "Approval",
+		"deployment_log": "Deployment",
+		"policy_document": "Policy",
+		"training_record": "Training"
 	}
 }

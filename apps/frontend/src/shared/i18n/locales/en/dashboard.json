@@ -38,5 +38,38 @@
 		"automatic": "Automatic",
 		"manual": "Manual",
 		"autoResolutionRate": "Auto-resolution rate"
+	},
+	"loading": "Loading the metrics…",
+	"costShare": "{{cost}} ({{pct}}%)",
+	"export": {
+		"json": "JSON",
+		"csv": "CSV"
+	},
+	"errors": {
+		"loadFailed": "Could not load the dashboard.",
+		"exportFailed": "Could not export the dashboard."
+	},
+	"kickers": {
+		"tasks": "Tasks",
+		"time": "Time",
+		"costs": "Costs",
+		"tokens": "Tokens",
+		"merges": "Merges"
+	},
+	"status": {
+		"completed": "Completed",
+		"in_progress": "In progress",
+		"pending": "Pending",
+		"failed": "Failed",
+		"cancelled": "Cancelled"
+	},
+	"complexity": {
+		"trivial": "Trivial",
+		"simple": "Simple",
+		"small": "Small",
+		"medium": "Medium",
+		"standard": "Standard",
+		"large": "Large",
+		"complex": "Complex"
 	}
 }

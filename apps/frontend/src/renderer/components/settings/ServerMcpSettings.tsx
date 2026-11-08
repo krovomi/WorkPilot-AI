@@ -31,6 +31,8 @@ import {
 } from "../../../shared/types/board-mcp";
 import { httpSnippet } from "../../../shared/utils/board-mcp-http";
 import { formatAppDate } from "../../lib/date-format";
+import { Notice } from "../charter";
+import { SettingsSection } from "./SettingsSection";
 
 const DURATIONS = [30, 90, 365] as const;
 type Scope = ServerAccessToken["scope"];
@@ -175,19 +177,18 @@ export function ServerMcpSettings() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="space-y-1">
-				<h3 className="text-lg font-semibold">{t("serverMcp.title")}</h3>
-				<p className="text-sm text-muted-foreground">{t("serverMcp.description")}</p>
-				<p className="text-xs text-muted-foreground">{t("serverMcp.limits")}</p>
-			</div>
+		<SettingsSection
+			title={t("serverMcp.title")}
+			description={t("serverMcp.description")}
+		>
+			<p className="wp-meta">{t("serverMcp.limits")}</p>
 			{error && (
-				<p role="alert" className="text-sm text-destructive">
+				<Notice tone="red" role="alert">
 					{error}
-				</p>
+				</Notice>
 			)}
 			{created && <CreatedToken created={created} onDone={() => setCreated(null)} />}
-			<div className="space-y-3 rounded-lg border border-border p-4">
+			<div className="wp-card space-y-3 p-4">
 				<div className="space-y-2">
 					<Label htmlFor="server-mcp-name">{t("serverMcp.form.name")}</Label>
 					<Input
@@ -279,6 +280,6 @@ export function ServerMcpSettings() {
 					</ul>
 				)}
 			</div>
-		</div>
+		</SettingsSection>
 	);
 }

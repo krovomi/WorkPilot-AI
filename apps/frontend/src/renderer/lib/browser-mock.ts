@@ -682,6 +682,8 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	checkAgentCli: async (tool) => ({ tool, installed: false }),
 	probeAcpAgent: async (tool) => ({ tool, error: "not_installed" }),
 	installAgentCli: async (tool) => ({ tool, success: false, error: "node_required" }),
+	checkCliUpdate: async (tool) => ({ tool, installed: false, isOutdated: false }),
+	updateCli: async (tool) => ({ tool, success: false, error: "not_installed" }),
 	listTaskPermissions: async () => [],
 	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
 	onTaskPermissionRequest: () => () => {

@@ -12,8 +12,7 @@
 		"analyzing": "Analyzing..."
 	},
 	"errors": {
-		"reviewFailed": "Review failed",
-		"networkError": "Network error"
+		"reviewFailed": "Review failed"
 	},
 	"score": {
 		"qualityScore": "Quality Score",

@@ -1,9 +1,9 @@
 {
-	"noData": "Aucune donnée de rapport de conformité disponible",
-	"title": "Collecteur de Preuves de Conformité",
+	"noData": "Choisissez un référentiel, puis lancez l'analyse pour voir quels contrôles ont une preuve.",
+	"title": "Collecteur de preuves de conformité",
 	"evidenceItems": "éléments de preuve",
 	"coverage": "couverture",
-	"missingControls": "Contrôles Manquants",
+	"missingControls": "Contrôles manquants",
 	"evidence": "Preuves",
 	"summary": "Résumé",
 	"controlId": "ID de Contrôle",
@@ -18,5 +18,36 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour lancer une analyse de conformité.",
 		"failed": "Échec de l'analyse : {{error}}"
+	},
+	"description": "Rassemble les preuves d'audit du dépôt (revues de code, analyses de sécurité, politiques, CI et déploiements, provenance des tâches) et les rattache aux contrôles d'un référentiel.",
+	"emptyTitle": "Pas encore de rapport",
+	"frameworks": {
+		"SOC2": "SOC 2",
+		"ISO_27001": "ISO 27001",
+		"HIPAA": "HIPAA",
+		"PCI_DSS": "PCI DSS",
+		"GDPR": "RGPD",
+		"CCPA": "CCPA"
+	},
+	"kickers": {
+		"gaps": "Écarts",
+		"evidence": "Preuves"
+	},
+	"statuses": {
+		"collected": "Collectée",
+		"verified": "Vérifiée",
+		"missing": "Manquante",
+		"expired": "Expirée"
+	},
+	"evidenceTypes": {
+		"code_review": "Revue de code",
+		"test_results": "Résultats de tests",
+		"security_scan": "Analyse de sécurité",
+		"access_log": "Politique d'accès",
+		"change_log": "Journal des changements",
+		"approval_record": "Approbation",
+		"deployment_log": "Déploiement",
+		"policy_document": "Politique",
+		"training_record": "Formation"
 	}
 }

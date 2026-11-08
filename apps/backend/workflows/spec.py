@@ -91,6 +91,7 @@ _FACT_VALUES: dict[str, frozenset[str]] = {
             "test",
             "docs",
             "spike",
+            "upgrade",
         }
     ),
     "complexity": frozenset({"simple", "standard", "complex"}),

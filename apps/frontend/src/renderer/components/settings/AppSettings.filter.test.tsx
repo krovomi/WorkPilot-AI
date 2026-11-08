@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import i18n from "../../../shared/i18n";
 import { AppSettingsDialog } from "./AppSettings";
 
 /**
@@ -32,6 +33,14 @@ async function openFilter(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("AppSettings — barre de filtre", () => {
+	// Les libellés de la navigation sont traduits : ces cas lisent l'interface en français.
+	beforeAll(async () => {
+		await i18n.changeLanguage("fr");
+	});
+	afterAll(async () => {
+		await i18n.changeLanguage("en");
+	});
+
 	it("n'affiche qu'un bouton tant que le filtre n'est pas ouvert", () => {
 		renderSettings();
 		expect(

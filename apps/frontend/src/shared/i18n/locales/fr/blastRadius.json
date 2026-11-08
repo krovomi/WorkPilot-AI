@@ -9,5 +9,22 @@
 	"tests": "tests",
 	"flags": "Feature flags référencés",
 	"dependentFiles": "Fichiers dépendants",
-	"testFiles": "Tests dans le périmètre"
+	"testFiles": "Tests dans le périmètre",
+	"description": "Avant de modifier un fichier, voyez quels fichiers en dépendent, quels tests les couvrent et le risque du changement.",
+	"kickers": {
+		"targets": "Cibles",
+		"impact": "Impact"
+	},
+	"targetsTitle": "Fichiers que vous comptez modifier",
+	"impactTitle": "Ce que le changement atteint",
+	"emptyTitle": "Pas encore d'analyse",
+	"emptyHint": "Listez les fichiers que vous comptez modifier, puis lancez l'analyse.",
+	"scoreLevels": {
+		"low": "Risque faible",
+		"medium": "Risque moyen",
+		"high": "Risque élevé"
+	},
+	"prompt": "Chaque import des cibles est suivi dans le projet, quel que soit son langage.",
+	"hint": "Les chemins sont relatifs à la racine du projet.",
+	"noValidTargets": "Aucun de ces chemins n'est un fichier du projet. Vérifiez-les par rapport à la racine du projet."
 }

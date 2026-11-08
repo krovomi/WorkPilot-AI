@@ -33,6 +33,14 @@ import {
 	type LineSelection,
 } from "./excerpts";
 import { PageHeader } from "../ui/page-header";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+} from "../charter";
 
 import { NativeSelect } from "../ui/native-select";
 interface Props {
@@ -478,15 +486,14 @@ export function ReviewWorkspace({
 				))}
 			</div>
 			{!active ? (
-				<div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-					<FileCode2 className="h-12 w-12 opacity-25" />
-					<h2 className="font-medium text-foreground">
-						{t("workspace.emptyTitle")}
-					</h2>
-					<p className="max-w-sm text-sm">{t("workspace.emptyHint")}</p>
-					<kbd className="rounded border px-2 py-1 text-xs">
-						{t("workspace.searchShortcut")}
-					</kbd>
+				<div className="flex flex-1 p-5">
+					<EmptyStage
+						icon={FileCode2}
+						title={t("workspace.emptyTitle")}
+						action={<kbd className="wp-chip">{t("workspace.searchShortcut")}</kbd>}
+					>
+						{t("workspace.emptyHint")}
+					</EmptyStage>
 				</div>
 			) : (
 				<>
@@ -640,15 +647,11 @@ export function ReviewWorkspace({
 		</div>
 	);
 	const sidebar = (
-		<aside className="flex h-full min-w-0 flex-col bg-card/50">
-			<div className="space-y-3 border-b p-4">
+		<aside className="flex h-full min-w-0 flex-col">
+			<div className="space-y-3 border-b border-dashed p-4">
 				<div className="flex items-center justify-between">
-					<h2 className="text-sm font-semibold">
-						{t("workspace.reviewBasket")}
-					</h2>
-					<span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-						{items.length}
-					</span>
+					<h2 className="wp-kicker">{t("workspace.reviewBasket")}</h2>
+					<Chip>{items.length}</Chip>
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{t("workspace.snapshotHint")}
@@ -694,30 +697,27 @@ export function ReviewWorkspace({
 					</div>
 				)}
 				{payloadBytes > 2 * 1024 * 1024 && (
-					<p role="alert" className="text-xs text-destructive">
+					<Notice tone="red" role="alert">
 						{t("workspace.tooMuch")}
-					</p>
+					</Notice>
 				)}
-				<Button className="w-full" disabled={!canReview} onClick={runReview}>
-					{loading ? (
-						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-					) : (
-						<GitCompareArrows className="mr-2 h-4 w-4" />
-					)}
+				<CharterButton
+					variant="primary"
+					className="w-full"
+					disabled={!canReview}
+					onClick={runReview}
+					icon={loading ? Loader2 : GitCompareArrows}
+					busy={loading}
+				>
 					{t(loading ? "actions.analyzing" : "actions.runReview")}
-				</Button>
-				<p className="text-center text-3xs text-muted-foreground">
-					{t("workspace.reviewShortcut")}
-				</p>
+				</CharterButton>
+				<p className="wp-meta text-center">{t("workspace.reviewShortcut")}</p>
 			</div>
 			<div className="flex-1 overflow-auto p-4">
 				{error && reviewedPayload === payload && (
-					<p
-						role="alert"
-						className="mb-3 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-					>
+					<Notice tone="red" role="alert" className="mb-3">
 						{error}
-					</p>
+					</Notice>
 				)}
 				{result && reviewedPayload === payload ? (
 					<ReviewResults
@@ -731,38 +731,42 @@ export function ReviewWorkspace({
 						}
 					/>
 				) : (
-					<p className="py-8 text-center text-sm text-muted-foreground">
+					<EmptyStage icon={GitCompareArrows} title={t("workspace.panel.review")}>
 						{t("workspace.resultsHint")}
-					</p>
+					</EmptyStage>
 				)}
 			</div>
 		</aside>
 	);
 	return (
-		<div ref={container} className="flex h-full min-h-0 flex-col bg-background">
+		<ModuleStage data-testid="code-review-view">
+		<div ref={container} className="relative z-[1] flex h-full min-h-0 flex-col">
 			<PageHeader
+				kicker={t("navigation:groups.development")}
 				icon={GitCompareArrows}
 				title={t("title")}
 				description={t("workspace.subtitle")}
 				actions={
 					<>
-					<Button
-						size="sm"
-						variant={source === "project" ? "secondary" : "ghost"}
-						onClick={() => setSource("project")}
-					>
-						{t("workspace.project")}
-					</Button>
-					<Button
-						size="sm"
-						variant={source === "paste" ? "secondary" : "ghost"}
-						onClick={() => {
-							setSource("paste");
-							setPanel("code");
-						}}
-					>
-						{t("workspace.paste")}
-					</Button>
+					<Chips>
+						<Chip
+							tone="blue"
+							pressed={source === "project"}
+							onClick={() => setSource("project")}
+						>
+							{t("workspace.project")}
+						</Chip>
+						<Chip
+							tone="violet"
+							pressed={source === "paste"}
+							onClick={() => {
+								setSource("paste");
+								setPanel("code");
+							}}
+						>
+							{t("workspace.paste")}
+						</Chip>
+					</Chips>
 					<NativeSelect
 						aria-label={t("workspace.comparison")}
 						value={scope}
@@ -794,22 +798,21 @@ export function ReviewWorkspace({
 				}
 			/>
 			{localError && (
-				<div
-					role="alert"
-					className="flex items-center justify-between gap-3 bg-destructive/10 px-5 py-2 text-sm text-destructive"
-				>
-					<span>{localError}</span>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => {
-							setSnapshot(null);
-							setRefresh((value) => value + 1);
-						}}
-					>
-						{t("workspace.retry")}
-					</Button>
-				</div>
+				<Notice tone="red" role="alert" className="mx-5 mt-3">
+					<div className="flex items-center justify-between gap-3">
+						<span>{localError}</span>
+						<CharterButton
+							variant="ghost"
+							size="sm"
+							onClick={() => {
+								setSnapshot(null);
+								setRefresh((value) => value + 1);
+							}}
+						>
+							{t("workspace.retry")}
+						</CharterButton>
+					</div>
+				</Notice>
 			)}
 			{compact && (
 				<nav
@@ -884,5 +887,6 @@ export function ReviewWorkspace({
 				)}
 			</div>
 		</div>
+		</ModuleStage>
 	);
 }

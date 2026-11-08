@@ -1,3 +1,4 @@
+import { AlertTriangle, Play, RotateCcw, ShieldCheck, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useInjectionGuardStore } from "../../stores/injection-guard-store";
@@ -6,79 +7,44 @@ import type {
 	ScanFinding,
 	ThreatLevel,
 } from "../../../shared/types/injection-guard";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 
-const THREAT_STYLES: Record<ThreatLevel, string> = {
-	safe: "text-success bg-success/10 border-success/20",
-	suspect: "text-warning bg-warning/10 border-warning/20",
-	blocked: "text-destructive bg-destructive/10 border-destructive/20",
+const THREAT_TONES: Record<ThreatLevel, Tone> = {
+	safe: "green",
+	suspect: "amber",
+	blocked: "red",
 };
 
-const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-destructive",
-	high: "text-orange-400",
-	medium: "text-warning",
-	low: "text-blue-400",
+const SEVERITY_TONES: Record<ScanFinding["severity"], Tone> = {
+	critical: "red",
+	high: "orange",
+	medium: "amber",
+	low: "blue",
 };
 
 interface InjectionGuardViewProps {
 	readonly projectPath?: string;
 }
 
-function FindingRow({
-	finding,
-}: {
-	readonly finding: ScanFinding;
-}): React.ReactElement {
-	return (
-		<div className="flex items-center gap-2 text-xs">
-			<span className="opacity-70 w-20 shrink-0">{finding.layer}</span>
-			<span
-				className={`font-medium w-20 shrink-0 ${SEVERITY_COLORS[finding.severity] ?? ""}`}
-			>
-				{finding.severity}
-			</span>
-			<span className="flex-1 truncate">{finding.description}</span>
-			<span className="opacity-70">
-				{(finding.confidence * 100).toFixed(0)}%
-			</span>
-		</div>
-	);
-}
-
-function ResultCard({
-	result,
-	t,
-}: {
-	readonly result: InjectionScanResult;
-	readonly t: (key: string) => string;
-}): React.ReactElement {
-	return (
-		<div
-			className={`px-4 py-3 rounded-lg border ${THREAT_STYLES[result.threatLevel]}`}
-		>
-			<div className="flex items-center justify-between mb-2">
-				<p className="text-sm font-medium truncate">{result.source}</p>
-				<span className="text-xs font-medium uppercase">
-					{t(`threat.${result.threatLevel}`)}
-				</span>
-			</div>
-			{result.findings.length > 0 ? (
-				<div className="space-y-1">
-					{result.findings.map((f) => (
-						<FindingRow key={`${f.layer}-${f.description}`} finding={f} />
-					))}
-				</div>
-			) : (
-				<p className="text-xs opacity-70">{t("noFindings")}</p>
-			)}
-		</div>
-	);
-}
-
+/** Saved prompts checked for injection attempts, layer by layer. */
 export function InjectionGuardView({
 	projectPath,
 }: InjectionGuardViewProps): React.ReactElement {
-	const { t } = useTranslation("injectionGuard");
+	const { t } = useTranslation(["injectionGuard", "navigation"]);
 
 	const phase = useInjectionGuardStore((s) => s.phase);
 	const status = useInjectionGuardStore((s) => s.status);
@@ -88,107 +54,113 @@ export function InjectionGuardView({
 	const cancelScan = useInjectionGuardStore((s) => s.cancelScan);
 	const reset = useInjectionGuardStore((s) => s.reset);
 
-	const handleRun = (): void => {
-		if (!projectPath) return;
-		void startScan(projectPath);
-	};
-
 	const isScanning = phase === "scanning";
-
-	const blocked = results.filter((r) => r.threatLevel === "blocked").length;
-	const suspect = results.filter((r) => r.threatLevel === "suspect").length;
-	const safe = results.filter((r) => r.threatLevel === "safe").length;
+	const count = (level: ThreatLevel) => results.filter((r) => r.threatLevel === level).length;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<div className="flex gap-2">
-					{!isScanning && (
-						<button
-							type="button"
-							onClick={handleRun}
-							disabled={!projectPath}
-							className="px-3 py-1.5 rounded-md bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+		<ModuleStage scroll="page" data-testid="injection-guard-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("injectionGuard:title")}
+				description={t("injectionGuard:description")}
+				icon={ShieldCheck}
+				tone="orange"
+				actions={
+					<>
+						{phase === "complete" && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("injectionGuard:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => void cancelScan()}>
+								{t("injectionGuard:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && void startScan(projectPath)}
+								disabled={!projectPath}
+							>
+								{t("injectionGuard:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("injectionGuard:errors.noProject")}
+					</Notice>
+				)}
+				{isScanning && <ScanLine label={status || t("injectionGuard:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("injectionGuard:errors.failed", { error })}
+					</Notice>
+				)}
+				{results.length > 0 ? (
+					<>
+						<Stats>
+							<Stat label={t("injectionGuard:stats.blocked")} value={count("blocked")} tone="red" />
+							<Stat label={t("injectionGuard:stats.suspect")} value={count("suspect")} tone="amber" />
+							<Stat label={t("injectionGuard:stats.safe")} value={count("safe")} tone="green" />
+						</Stats>
+						<Section kicker={t("injectionGuard:kickers.prompts")} title={t("injectionGuard:promptsTitle")}>
+							<div className="grid gap-2.5 lg:grid-cols-2">
+								{results.map((result) => (
+									<ResultPanel key={result.source} result={result} />
+								))}
+							</div>
+						</Section>
+					</>
+				) : (
+					!isScanning && (
+						<EmptyStage
+							icon={ShieldCheck}
+							tone="orange"
+							title={t(
+								phase === "complete" ? "injectionGuard:emptyTitle" : "injectionGuard:idleTitle",
+							)}
 						>
-							{t("actions.runScan")}
-						</button>
-					)}
-					{isScanning && (
-						<button
-							type="button"
-							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
-						>
-							{t("actions.cancel")}
-						</button>
-					)}
-					{phase === "complete" && (
-						<button
-							type="button"
-							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
-						>
-							{t("actions.reset")}
-						</button>
-					)}
-				</div>
+							{t("injectionGuard:noData")}
+						</EmptyStage>
+					)
+				)}
+			</Page>
+		</ModuleStage>
+	);
+}
+
+function ResultPanel({ result }: { readonly result: InjectionScanResult }): React.ReactElement {
+	const { t } = useTranslation("injectionGuard");
+	const tone = THREAT_TONES[result.threatLevel];
+	return (
+		<Panel rail tone={tone}>
+			<div className="flex items-start justify-between gap-2">
+				<span className="wp-title truncate font-mono text-sm" title={result.source}>
+					{result.source}
+				</span>
+				<Chip tone={tone}>{t(`threat.${result.threatLevel}`)}</Chip>
 			</div>
-
-			{!projectPath && (
-				<p className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</p>
+			{result.findings.length > 0 ? (
+				<ul className="mt-2 grid gap-1.5">
+					{result.findings.map((f) => (
+						<li key={`${f.layer}-${f.description}`} className="flex items-center gap-2 text-xs">
+							<Chip tone={SEVERITY_TONES[f.severity]} dot={false}>
+								{t(`severities.${f.severity}`, { defaultValue: f.severity })}
+							</Chip>
+							<span className="wp-meta shrink-0">{t(`layers.${f.layer}`, { defaultValue: f.layer })}</span>
+							<span className="min-w-0 flex-1 truncate">{f.description}</span>
+							<span className="wp-meta font-mono">{(f.confidence * 100).toFixed(0)}%</span>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p className="wp-muted mt-1.5 text-xs">{t("noFindings")}</p>
 			)}
-
-			{isScanning && (
-				<p className="text-sm text-muted-foreground">
-					{status || t("actions.scanning")}
-				</p>
-			)}
-
-			{phase === "error" && error && (
-				<p className="text-sm text-destructive">{error}</p>
-			)}
-
-			{phase === "complete" && results.length === 0 && (
-				<p className="text-sm text-muted-foreground">{t("noData")}</p>
-			)}
-
-			{results.length > 0 && (
-				<>
-					<div className="grid grid-cols-3 gap-3">
-						<div className="p-3 rounded-lg bg-card border border-border">
-							<p className="text-xs text-muted-foreground">
-								{t("stats.blocked")}
-							</p>
-							<p className="text-2xl font-bold text-destructive">{blocked}</p>
-						</div>
-						<div className="p-3 rounded-lg bg-card border border-border">
-							<p className="text-xs text-muted-foreground">
-								{t("stats.suspect")}
-							</p>
-							<p className="text-2xl font-bold text-warning">{suspect}</p>
-						</div>
-						<div className="p-3 rounded-lg bg-card border border-border">
-							<p className="text-xs text-muted-foreground">
-								{t("stats.safe")}
-							</p>
-							<p className="text-2xl font-bold text-success">{safe}</p>
-						</div>
-					</div>
-
-					<div className="space-y-2">
-						{results.map((result) => (
-							<ResultCard
-								key={result.source}
-								result={result}
-								t={t}
-							/>
-						))}
-					</div>
-				</>
-			)}
-		</div>
+		</Panel>
 	);
 }

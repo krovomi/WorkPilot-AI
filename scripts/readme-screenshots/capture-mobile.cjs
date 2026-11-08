@@ -92,14 +92,23 @@ const cards = [
 		"Alice Martin",
 	),
 	card(
-		"019-search",
-		"Typo-tolerant product search",
+		"019-search-part1",
+		"Typo-tolerant product search (1/2): fuzzy index",
 		"in_progress",
 		"feature",
 		1,
 		3,
 		6,
 		"Bob Durand",
+		// A part of an automatic split (apps/backend/task_split/).
+		{
+			group: {
+				id: "019-search",
+				title: "Typo-tolerant product search",
+				index: 1,
+				total: 2,
+			},
+		},
 	),
 	card(
 		"020-csv-export",
@@ -235,6 +244,8 @@ function answer(url, method) {
 				forge: "github",
 			},
 		];
+	if (p.endsWith("/steering")) return { messages: [] };
+	if (p === "/users/me/preferences") return {};
 	if (p.startsWith("/projects/") && p.includes("/runs")) return runs;
 	if (p.startsWith("/projects/"))
 		return {

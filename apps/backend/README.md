@@ -1,6 +1,6 @@
 # WorkPilot AI Backend
 
-Autonomous coding framework. Builds software features through coordinated multi-agent sessions, and is **provider-agnostic** — drive it with Claude, OpenAI, Gemini, Grok, GitHub Copilot, Azure OpenAI, a local Ollama model, or any OpenAI-compatible endpoint.
+Autonomous coding framework. Builds software features through coordinated multi-agent sessions, and is **provider-agnostic** — drive it with Claude, OpenAI (API or Codex CLI), Gemini (API or Gemini CLI), Grok, Mistral, DeepSeek, GitHub Copilot, Windsurf, a local model (Ollama, LM Studio, llama.cpp), or the OpenCode, Antigravity and pi CLIs. What each one can do is declared in [`capabilities/providers.yaml`](../../capabilities/providers.yaml).
 
 ## Getting Started
 
@@ -17,9 +17,8 @@ run `pnpm run lock:python` from the repository root.
 
 ### 2. Configure
 
-```bash
-cp .env-files/.env.example .env-files/.env
-```
+Optional settings go in `.env-files/.env` at the **repository root** (`run.py` reads it from
+there, not from `apps/backend/`); `.env-files/.env.example` lists some of them.
 
 Authenticate with Claude Code (token auto-saved to Keychain):
 ```bash
@@ -43,7 +42,7 @@ python run.py --spec 001
 ## Requirements
 
 - Python 3.12+
-- An API key or OAuth login for at least one supported provider (Claude, OpenAI, Gemini, Grok, Copilot, Azure OpenAI, Ollama, or a custom endpoint)
+- A sign-in or an API key for at least one supported provider (Claude, OpenAI, Gemini, Grok, Mistral, DeepSeek, Copilot, Windsurf), a local model server, or a signed-in agent CLI
 
 ## Commands
 
@@ -66,7 +65,7 @@ Optional `.env-files/.env` settings:
 
 | Variable | Description |
 |----------|-------------|
-| `AUTO_BUILD_MODEL` | Override Claude model |
+| `AUTO_BUILD_MODEL` | Model for every phase, like `--model` |
 | `DEBUG=true` | Enable debug logging |
 | `LINEAR_API_KEY` | Enable Linear integration |
 | `BRAIN_ENABLED=false` | Turn memory (the shared brain) off |
@@ -82,7 +81,7 @@ The complete list is in [`docs/CONFIGURATION.md`](../../docs/CONFIGURATION.md).
 
 **"tree-sitter not available"** - Safe to ignore, uses regex fallback.
 
-**Missing module errors** - Run `python -m pip install -r requirements.txt`
+**Missing module errors** - Run `python -m pip install -r requirements.lock` (or `pnpm run install:backend` from the repository root)
 
 **Debug mode** - Set `DEBUG=true DEBUG_LEVEL=2` before running.
 
@@ -92,19 +91,20 @@ The complete list is in [`docs/CONFIGURATION.md`](../../docs/CONFIGURATION.md).
 
 ### Project Structure
 
-The backend has grown to **90+ specialized modules**. The core pipeline lives in a handful of them; the rest are opt-in subsystems (self-healing, tech debt, carbon profiling, consensus arbitration, multi-user server, etc.).
+The backend has grown to **about 120 packages**. The core pipeline lives in a handful of them; the rest are opt-in subsystems (self-healing, tech debt, carbon profiling, consensus arbitration, multi-user server, etc.).
 
 ```
 backend/
-├── agents/              # AI agent execution (planner, coder, session) + subagents/ registry
+├── agents/              # AI agent execution (planner, coder, session)
+├── subagents/           # The one subagent registry (phase defaults, language overlays, mobile, PR review)
 ├── qa/                  # QA reviewer / fixer validation loop
 ├── spec/                # Spec creation and management
 ├── core/                # Composition root: client factory, provider clients (agent_clients/, ACP included), effort plan, auth, worktree
 ├── foundation/          # Lowest layer, imports nothing back: platform/, api_safety, git, phase events
 ├── offline_policy/      # airgapStrict: every backend network call asks it first
 ├── prompts/             # Agent system prompts (~50, incl. github/)
-├── skills/              # Token-optimized dynamic skill execution
-├── integrations/        # External services (GitHub, GitLab, Azure, Linear, Jira)
+├── skills_registry/     # Builds the skill packs of skills/ and emits agents to each harness
+├── integrations/        # Azure DevOps, Linear, JEV, Windsurf (GitHub and GitLab in runners/, Jira in src/connectors/)
 ├── merge/               # Semantic git merge handling
 ├── verify/              # Launch the changed app, read its errors, keep a proof (web, mobile, API, Windows UI Automation)
 ├── pr_followup/         # The card follows its PR: red checks and review threads go to the QA fixer
@@ -128,7 +128,7 @@ backend/
 ├── release_coordinator/ # Release readiness orchestration
 ├── server/              # Multi-user server mode (auth, claims, run manager)
 ├── cli/                 # Command-line interface
-└── ...                  # ~70 more opt-in subsystems
+└── ...                  # ~90 more opt-in subsystems
 ```
 
 ### Design Principles
@@ -166,7 +166,9 @@ Providers supportés :
 - GitHub Copilot
 - Google (Gemini API, et Gemini CLI par le client ACP)
 - xAI (Grok), Mistral AI, DeepSeek
-- Ollama (modèles locaux) et tout endpoint compatible OpenAI
+- Modèles locaux : Ollama, LM Studio, llama.cpp
+- Windsurf (clé d'API ou celle de l'IDE installé)
+- Meta, AWS et Cursor se configurent mais n'ont pas encore de client : leurs builds tournent sur Claude, et la tâche le dit
 - CLI pi (pi.dev), OpenCode, Antigravity
 - Tout agent Agent Client Protocol déclaré par un bloc `acp:` de `capabilities/providers.yaml`
 

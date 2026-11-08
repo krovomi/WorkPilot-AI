@@ -1,19 +1,9 @@
-import {
-	ArrowLeft,
-	ArrowRight,
-	Camera,
-	ExternalLink,
-	Globe,
-	Loader2,
-	MonitorPlay,
-	RotateCw,
-	Wifi,
-	WifiOff,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, ExternalLink, type Globe, MonitorPlay, RotateCw, WifiOff } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
 
+import { CharterButton, Chip, EmptyStage, Panel, ScanLine } from "../charter";
 import { Input } from "../ui/input";
 interface BrowserTabProps {
 	readonly projectPath: string;
@@ -77,10 +67,9 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 		browserStatus === "launching" || browserStatus === "navigating";
 
 	return (
-		<div className="flex flex-col gap-0 h-full">
+		<Panel padded={false} className="overflow-hidden">
 			{/* Browser toolbar */}
-			<div className="flex items-center gap-1.5 p-2 rounded-t-lg bg-gradient-to-r from-card to-card border border-border border-b-0">
-				{/* Navigation buttons */}
+			<div className="flex items-center gap-1.5 border-b border-[var(--wp-border)] p-2">
 				<ToolbarButton icon={ArrowLeft} disabled title={t("common:buttons.back")} />
 				<ToolbarButton icon={ArrowRight} disabled title={t("browserAgent:browser.forward")} />
 				<ToolbarButton
@@ -89,58 +78,44 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 					disabled={!currentUrl || isCapturing}
 					title={t("browserAgent:browser.refresh")}
 					spinning={isNavigating}
-					color="blue"
 				/>
-
-				{/* URL bar */}
-				<div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-md bg-background border border-border focus-within:border-blue-400/50 focus-within:shadow-[0_0_0_1px_rgba(96,165,250,0.15)] transition-all">
-					{isNavigating ? (
-						<Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
-					) : (
-						<Globe className="w-3.5 h-3.5 text-cyan-400/70 shrink-0" />
-					)}
-					<input
+				<div className="wp-prompt flex-1">
+					<Input
 						type="text"
 						value={urlInput}
 						onChange={(e) => setUrlInput(e.target.value)}
 						onKeyDown={handleKeyDown}
+						aria-label={t("browserAgent:browser.urlPlaceholder")}
 						placeholder={t("browserAgent:browser.urlPlaceholder")}
-						className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+						className="h-7 min-w-0 flex-1 border-0 bg-transparent p-0 font-mono text-xs shadow-none focus-visible:ring-0"
 					/>
-					{urlInput.trim() && (
-						<button
-							type="button"
-							onClick={handleNavigate}
-							disabled={isCapturing}
-							className="px-2.5 py-0.5 rounded text-xs font-medium bg-blue-500 text-white hover:bg-blue-400 disabled:opacity-50 transition-colors"
-						>
-							{t("browserAgent:browser.navigate")}
-						</button>
-					)}
 				</div>
-
-				{/* Action buttons */}
+				<CharterButton
+					size="sm"
+					onClick={handleNavigate}
+					disabled={isCapturing || !urlInput.trim()}
+					busy={isNavigating}
+				>
+					{t("browserAgent:browser.navigate")}
+				</CharterButton>
 				<ToolbarButton
 					icon={Camera}
 					onClick={() => setShowCaptureBar(!showCaptureBar)}
 					disabled={!currentUrl || isCapturing}
 					title={t("browserAgent:browser.captureScreenshot")}
 					active={showCaptureBar}
-					color="purple"
 				/>
 				<ToolbarButton
 					icon={ExternalLink}
 					onClick={handleOpenExternal}
 					disabled={!currentUrl}
 					title={t("browserAgent:browser.openExternal")}
-					color="cyan"
 				/>
 			</div>
 
 			{/* Screenshot capture bar (collapsible) */}
 			{showCaptureBar && (
-				<div className="flex items-center gap-2 px-3 py-2 bg-purple-500/8 border-x border-purple-500/20">
-					<Camera className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+				<div className="wp-tone-violet flex items-center gap-2 border-b border-[var(--wp-border)] px-3 py-2">
 					<Input
 						type="text"
 						value={screenshotName}
@@ -148,120 +123,69 @@ export function BrowserTab({ projectPath }: BrowserTabProps) {
 						onKeyDown={(e) => {
 							if (e.key === "Enter") handleCapture();
 						}}
+						aria-label={t("browserAgent:browser.screenshotNamePlaceholder")}
 						placeholder={t("browserAgent:browser.screenshotNamePlaceholder")}
-						className="flex-1 px-2.5 py-1 text-sm h-auto"
+						className="h-8 flex-1 text-sm"
 					/>
-					<button
-						type="button"
-						onClick={handleCapture}
-						disabled={isCapturing}
-						className="px-3 py-1 rounded text-xs font-medium bg-purple-500 text-white hover:bg-purple-400 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-					>
-						{isCapturing && <Loader2 className="w-3 h-3 animate-spin" />}
-						{isCapturing
-							? t("browserAgent:browser.capturing")
-							: t("browserAgent:browser.captureScreenshot")}
-					</button>
+					<CharterButton size="sm" icon={Camera} busy={isCapturing} onClick={handleCapture} disabled={isCapturing}>
+						{isCapturing ? t("browserAgent:browser.capturing") : t("browserAgent:browser.captureScreenshot")}
+					</CharterButton>
 				</div>
 			)}
 
 			{/* Browser viewport */}
-			<div className="flex-1 rounded-b-lg border border-border bg-muted overflow-hidden flex items-center justify-center min-h-[400px] relative">
-				{/* Loading overlay */}
+			<div className="relative flex min-h-[400px] items-center justify-center overflow-hidden p-4">
 				{isNavigating && browserScreenshot && (
-					<div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10 backdrop-blur-[2px]">
-						<div className="flex flex-col items-center gap-2 px-5 py-4 rounded-xl bg-card/95 backdrop-blur-sm border border-blue-500/20 shadow-lg shadow-blue-500/10">
-							<Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-							<p className="text-xs text-muted-foreground">
-								{browserStatus === "launching"
+					<div className="absolute inset-x-4 top-4 z-10">
+						<ScanLine
+							label={
+								browserStatus === "launching"
 									? t("browserAgent:browser.launching")
-									: t("browserAgent:browser.navigating")}
-							</p>
-						</div>
+									: t("browserAgent:browser.navigating")
+							}
+						/>
 					</div>
 				)}
-
-				{/* Idle state */}
 				{browserStatus === "idle" && !browserScreenshot && (
-					<div className="flex flex-col items-center gap-5 text-center max-w-xs">
-						<div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/15 to-cyan-500/15 border border-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/5">
-							<MonitorPlay className="w-10 h-10 text-blue-400/70" />
-						</div>
-						<div>
-							<p className="text-sm font-medium text-muted-foreground mb-1.5">
-								{t("browserAgent:browser.idleTitle")}
-							</p>
-							<p className="text-xs text-muted-foreground leading-relaxed">
-								{t("browserAgent:browser.idleDescription")}
-							</p>
-						</div>
-					</div>
+					<EmptyStage icon={MonitorPlay} tone="blue" title={t("browserAgent:browser.idleTitle")}>
+						{t("browserAgent:browser.idleDescription")}
+					</EmptyStage>
 				)}
-
-				{/* Loading without existing screenshot */}
 				{isNavigating && !browserScreenshot && (
-					<div className="flex flex-col items-center gap-3">
-						<div className="w-14 h-14 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-							<Loader2 className="w-7 h-7 text-blue-400 animate-spin" />
-						</div>
-						<p className="text-sm text-blue-300">
-							{browserStatus === "launching"
+					<ScanLine
+						label={
+							browserStatus === "launching"
 								? t("browserAgent:browser.launching")
-								: t("browserAgent:browser.navigating")}
-						</p>
-					</div>
+								: t("browserAgent:browser.navigating")
+						}
+					/>
 				)}
-
-				{/* Screenshot display */}
 				{browserScreenshot && (
 					<img
 						src={browserScreenshot}
 						alt={t("browserAgent:browser.screenshotAlt")}
-						className="max-w-full max-h-full object-contain"
+						className="max-h-full max-w-full rounded-md object-contain"
 					/>
 				)}
-
-				{/* Error state */}
 				{browserStatus === "error" && !browserScreenshot && (
-					<div className="flex flex-col items-center gap-3 text-center max-w-xs">
-						<div className="w-14 h-14 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
-							<WifiOff className="w-7 h-7 text-destructive" />
-						</div>
-						<p className="text-sm font-medium text-destructive">
-							{t("browserAgent:errors.screenshotFailed")}
-						</p>
-						<p className="text-xs text-muted-foreground">
-							{t("browserAgent:browser.errorHint")}
-						</p>
-					</div>
+					<EmptyStage icon={WifiOff} tone="red" title={t("browserAgent:errors.screenshotFailed")}>
+						{t("browserAgent:browser.errorHint")}
+					</EmptyStage>
 				)}
 			</div>
 
 			{/* Status bar */}
-			{currentUrl && (
-				<div className="flex items-center gap-2 px-3 py-1.5 text-2xs">
+			{currentUrl && (browserStatus === "ready" || browserStatus === "error") && (
+				<div className="flex items-center gap-2 border-t border-[var(--wp-border)] px-3 py-1.5">
 					{browserStatus === "ready" ? (
-						<>
-							<Wifi className="w-3 h-3 text-success" />
-							<span className="text-success/80 font-medium">
-								{t("browserAgent:browser.ready")}
-							</span>
-							<span className="text-muted-foreground">·</span>
-							<span className="text-muted-foreground truncate">
-								{currentUrl}
-							</span>
-						</>
-					) : browserStatus === "error" ? (
-						<>
-							<WifiOff className="w-3 h-3 text-destructive" />
-							<span className="text-destructive/80 font-medium">
-								{t("browserAgent:errors.screenshotFailed")}
-							</span>
-						</>
-					) : null}
+						<Chip tone="green">{t("browserAgent:browser.ready")}</Chip>
+					) : (
+						<Chip tone="red">{t("browserAgent:errors.screenshotFailed")}</Chip>
+					)}
+					<span className="wp-meta truncate font-mono">{currentUrl}</span>
 				</div>
 			)}
-		</div>
+		</Panel>
 	);
 }
 
@@ -274,7 +198,6 @@ function ToolbarButton({
 	title,
 	spinning = false,
 	active = false,
-	color = "default",
 }: {
 	readonly icon: typeof Globe;
 	readonly onClick?: () => void;
@@ -282,28 +205,20 @@ function ToolbarButton({
 	readonly title: string;
 	readonly spinning?: boolean;
 	readonly active?: boolean;
-	readonly color?: "default" | "blue" | "purple" | "cyan";
 }) {
-	const activeColors: Record<string, string> = {
-		default: "bg-blue-500/10 text-blue-400",
-		blue: "bg-blue-500/10 text-blue-400",
-		purple: "bg-purple-500/10 text-purple-400",
-		cyan: "bg-cyan-500/10 text-cyan-400",
-	};
-
 	return (
 		<button
 			type="button"
 			onClick={onClick}
 			disabled={disabled}
 			title={title}
-			className={`p-1.5 rounded-md transition-colors ${
-				active
-					? activeColors[color]
-					: "text-muted-foreground hover:text-foreground hover:bg-accent"
-			} disabled:opacity-30 disabled:cursor-not-allowed`}
+			aria-label={title}
+			aria-pressed={active || undefined}
+			className={`rounded-md p-1.5 transition-colors ${
+				active ? "wp-tone-violet wp-ink bg-[var(--wp-code-bg)]" : "wp-muted hover:text-foreground"
+			} disabled:cursor-not-allowed disabled:opacity-30`}
 		>
-			<Icon className={`w-4 h-4 ${spinning ? "animate-spin" : ""}`} />
+			<Icon className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`} />
 		</button>
 	);
 }

@@ -240,6 +240,23 @@
 				"shell_launcher": "Son lanceur passe par un shell : ce qu'il déclare n'est pas lu d'ici.",
 				"failed": "Impossible d'interroger l'agent."
 			}
+		},
+		"update": {
+			"availableFor": "Mise à jour {{name}} disponible",
+			"latest": "Dernière version",
+			"unknown": "inconnue",
+			"updating": "Mise à jour en cours, merci de patienter…",
+			"updatingShort": "Mise à jour…",
+			"checkAndUpdate": "Mettre à jour si besoin",
+			"done": "{{name}} est à jour.",
+			"doneWithVersion": "{{name}} est à jour ({{version}}).",
+			"error": {
+				"not_installed": "{{name}} n'est pas installé : installez-le d'abord.",
+				"no_method": "WorkPilot ne sait pas comment cette copie de {{name}} a été installée. Mettez-la à jour comme vous l'avez installée :",
+				"failed": "La mise à jour de {{name}} a échoué.",
+				"still_outdated": "La mise à jour s'est exécutée mais {{name}} indique toujours {{version}} (dernière : {{latest}}). La copie lancée par l'app est sans doute gérée autrement ; mettez-la à jour comme vous l'avez installée :",
+				"busy": "Une installation ou une mise à jour de {{name}} est déjà en cours."
+			}
 		}
 	},
 	"codex": {

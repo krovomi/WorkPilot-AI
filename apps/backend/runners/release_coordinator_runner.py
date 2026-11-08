@@ -1,7 +1,7 @@
 """
 Release Coordinator Runner
 
-Discovers services in a project (package.json, pyproject.toml, Cargo.toml),
+Discovers services in a project, whatever their stack (release_coordinator.manifests),
 analyses recent commits against each service path, and builds a coordinated
 release plan with semantic version bumps and changelog entries.
 
@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -25,6 +24,7 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from release_coordinator.manifests import discover_services  # noqa: E402
 from release_coordinator.release_engine import (  # noqa: E402
     ReleaseEngine,
     ReleaseTrainPlan,
@@ -39,140 +39,6 @@ def _emit(prefix: str, payload: Any) -> None:
 
 def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("RELEASE_COORDINATOR_EVENT", {"type": event_type, "data": data})
-
-
-def _read_package_json(path: Path) -> dict[str, Any] | None:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict) and data.get("name"):
-            return {
-                "name": data["name"],
-                "version": data.get("version", "0.0.0"),
-                "dependencies": list((data.get("dependencies") or {}).keys()),
-            }
-    except (OSError, json.JSONDecodeError):
-        return None
-    return None
-
-
-def _read_pyproject(path: Path) -> dict[str, Any] | None:
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-
-    name = ""
-    version = "0.0.0"
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("name") and "=" in stripped:
-            name = stripped.split("=", 1)[1].strip().strip('"').strip("'")
-        elif stripped.startswith("version") and "=" in stripped:
-            version = stripped.split("=", 1)[1].strip().strip('"').strip("'")
-    if not name:
-        return None
-    return {"name": name, "version": version, "dependencies": []}
-
-
-def _read_csproj(path: Path) -> dict[str, Any] | None:
-    """Read a .NET project file (SDK-style or legacy .csproj)."""
-    try:
-        content = path.read_text(encoding="utf-8-sig")
-    except OSError:
-        return None
-
-    def _tag(tag: str) -> str:
-        match = re.search(rf"<{tag}>\s*([^<]+?)\s*</{tag}>", content, re.IGNORECASE)
-        return match.group(1).strip() if match else ""
-
-    # Version precedence: <Version> > <VersionPrefix> > <AssemblyVersion>.
-    version = _tag("Version") or _tag("VersionPrefix") or _tag("AssemblyVersion")
-    # AssemblyVersion is 4-part (a.b.c.d); SemVer.parse keeps the first three.
-    name = _tag("AssemblyName") or path.stem
-
-    # Referenced projects → dependency names (by referenced .csproj stem).
-    dependencies = [
-        Path(ref.replace("\\", "/")).stem
-        for ref in re.findall(
-            r'<ProjectReference\s+Include\s*=\s*"([^"]+)"', content, re.IGNORECASE
-        )
-    ]
-    return {
-        "name": name,
-        "version": version or "0.0.0",
-        "dependencies": dependencies,
-    }
-
-
-def _read_cargo_toml(path: Path) -> dict[str, Any] | None:
-    """Read a Rust Cargo.toml (only the [package] table)."""
-    try:
-        content = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-
-    name = ""
-    version = "0.0.0"
-    in_package = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("["):
-            in_package = stripped == "[package]"
-            continue
-        if not in_package or "=" not in stripped:
-            continue
-        key, _, raw = stripped.partition("=")
-        value = raw.split("#", 1)[0].strip().strip('"').strip("'")
-        if key.strip() == "name":
-            name = value
-        elif key.strip() == "version":
-            version = value
-    if not name:
-        return None
-    return {"name": name, "version": version, "dependencies": []}
-
-
-def _discover_services(project_path: Path) -> list[tuple[Path, dict[str, Any]]]:
-    services: list[tuple[Path, dict[str, Any]]] = []
-    seen_names: set[str] = set()
-
-    for pkg_json in project_path.glob("**/package.json"):
-        if any(
-            part in {"node_modules", ".git", "dist", "build"} for part in pkg_json.parts
-        ):
-            continue
-        info = _read_package_json(pkg_json)
-        if info and info["name"] not in seen_names:
-            services.append((pkg_json.parent, info))
-            seen_names.add(info["name"])
-
-    for pyproj in project_path.glob("**/pyproject.toml"):
-        if any(
-            part in {".venv", "venv", ".git", "__pycache__"} for part in pyproj.parts
-        ):
-            continue
-        info = _read_pyproject(pyproj)
-        if info and info["name"] not in seen_names:
-            services.append((pyproj.parent, info))
-            seen_names.add(info["name"])
-
-    for csproj in project_path.glob("**/*.csproj"):
-        if any(part in {"bin", "obj", ".git"} for part in csproj.parts):
-            continue
-        info = _read_csproj(csproj)
-        if info and info["name"] not in seen_names:
-            services.append((csproj.parent, info))
-            seen_names.add(info["name"])
-
-    for cargo in project_path.glob("**/Cargo.toml"):
-        if any(part in {"target", ".git"} for part in cargo.parts):
-            continue
-        info = _read_cargo_toml(cargo)
-        if info and info["name"] not in seen_names:
-            services.append((cargo.parent, info))
-            seen_names.add(info["name"])
-
-    return services
 
 
 def _git_log_for_path(
@@ -243,7 +109,7 @@ def _plan_to_dict(plan: ReleaseTrainPlan) -> dict[str, Any]:
 
 def run_plan(project_path: Path, max_commits: int) -> dict[str, Any]:
     _emit_event("start", {"status": "Discovering services..."})
-    discovered = _discover_services(project_path)
+    discovered = discover_services(project_path)
     if not discovered:
         _emit_event("complete", {"status": "No services found"})
         empty_plan = ReleaseTrainPlan(id="release-empty")

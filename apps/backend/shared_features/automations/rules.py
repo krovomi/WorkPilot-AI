@@ -35,6 +35,7 @@ TASK_KINDS = (
     "test",
     "docs",
     "spike",
+    "upgrade",
 )
 TRIGGERS = ("issue_labeled", "ci_failed", "schedule", "pr_opened")
 

@@ -1,23 +1,249 @@
+/**
+ * "Détecteur de dérive de documentation" tab of Docs et dérive, in the UI
+ * charter (docs/architecture/ui-charter.md): the scan as three steps on the
+ * left, the gaps found in the middle (filtered by severity), the selected
+ * gap on the right, the composer at the bottom. The scan reads every
+ * language of apps/backend/doc_languages; a server project's last report
+ * comes from the server.
+ */
+import {
+	AlertTriangle,
+	Check,
+	CheckCircle2,
+	Copy,
+	FileSearch,
+	FileWarning,
+	MousePointerClick,
+	RotateCcw,
+	ScanSearch,
+	X,
+} from "lucide-react";
 import type React from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { DriftIssue, DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
-import { SharedReportNote } from "../analyses/SharedReportNote";
 import { useDocDriftStore } from "../../stores/doc-drift-store";
-import type { DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
+import { SharedReportNote } from "../analyses/SharedReportNote";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	StepCard,
+	type Tone,
+} from "../charter";
 
-const SEVERITY_STYLES: Record<DriftSeverity, string> = {
-	high: "text-destructive bg-destructive/10 border-destructive/20",
-	medium: "text-warning bg-warning/10 border-warning/20",
-	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+const SEVERITY_TONE: Record<DriftSeverity, Tone> = {
+	high: "red",
+	medium: "amber",
+	low: "blue",
 };
+const SEVERITIES: DriftSeverity[] = ["high", "medium", "low"];
+
+const issueKey = (i: DriftIssue) => `${i.docFile}:${i.docLine}:${i.referencedSymbol}:${i.driftType}`;
 
 interface DocDriftReportProps {
 	readonly projectPath?: string;
 }
 
-export function DocDriftReport({
-	projectPath,
-}: DocDriftReportProps): React.ReactElement {
+type StepState = "pending" | "running" | "done";
+
+function stepStatus(state: StepState, t: (k: string) => string): React.ReactNode {
+	if (state === "done") return <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "var(--wp-tone)" }} />;
+	return <span className="wp-meta">{t(state === "running" ? "scan.running" : "scan.pending")}</span>;
+}
+
+function ScanColumn({ report, scanning, status }: {
+	readonly report: DriftReport | null;
+	readonly scanning: boolean;
+	readonly status: string;
+}) {
+	const { t } = useTranslation("docDrift");
+	const done: StepState = report ? "done" : scanning ? "running" : "pending";
+	return (
+		<Column kicker={t("scan.kicker")} title={t("scan.title")} meta={report ? `${report.docsScanned} docs` : undefined}>
+			<div className="flex flex-col gap-3">
+				<StepCard
+					index={1}
+					kicker={t("scan.stepDocsKicker")}
+					title={t("scan.stepDocs")}
+					tone="blue"
+					status={stepStatus(done, t)}
+					meta={report ? t("scan.stepDocsMeta", { count: report.docsScanned }) : undefined}
+				/>
+				<StepCard
+					index={2}
+					kicker={t("scan.stepCodeKicker")}
+					title={t("scan.stepCode")}
+					tone="violet"
+					status={stepStatus(done, t)}
+					meta={
+						report
+							? t("scan.stepCodeMeta", {
+									files: report.codeFilesIndexed,
+									symbols: report.symbolsIndexed ?? "—",
+								})
+							: undefined
+					}
+				>
+					{report?.languages && report.languages.length > 0 && (
+						<div className="mt-1.5">
+							<Chips>
+								{report.languages.slice(0, 6).map((lang) => (
+									<Chip key={lang.label} tone="violet">
+										{lang.label} · {lang.files}
+									</Chip>
+								))}
+							</Chips>
+						</div>
+					)}
+				</StepCard>
+				<StepCard
+					index={3}
+					kicker={t("scan.stepCompareKicker")}
+					title={t("scan.stepCompare")}
+					tone="accent"
+					active={scanning}
+					status={stepStatus(done, t)}
+					meta={report ? t("scan.stepCompareMeta", { count: report.issues.length }) : undefined}
+				/>
+				{scanning && <ScanLine label={status || t("actions.scanning")} />}
+			</div>
+		</Column>
+	);
+}
+
+function IssuesColumn({ report, selected, onSelect }: {
+	readonly report: DriftReport | null;
+	readonly selected: string | null;
+	readonly onSelect: (key: string) => void;
+}) {
+	const { t } = useTranslation("docDrift");
+	const [filter, setFilter] = useState<DriftSeverity | "all">("all");
+	const issues = report?.issues ?? [];
+	const shown = filter === "all" ? issues : issues.filter((i) => i.severity === filter);
+	const counts = useMemo(() => {
+		const c: Record<DriftSeverity, number> = { high: 0, medium: 0, low: 0 };
+		for (const i of issues) c[i.severity] += 1;
+		return c;
+	}, [issues]);
+
+	return (
+		<Column
+			kicker={t("issues.kicker")}
+			title={report ? (issues.length ? t("issues.title", { count: issues.length }) : t("issues.titleNone")) : "—"}
+			tone="red"
+		>
+			{!report && (
+				<EmptyStage icon={FileSearch} title={t("issues.emptyTitle")} tone="red">
+					{t("issues.emptyHint")}
+				</EmptyStage>
+			)}
+			{report && issues.length === 0 && (
+				<Notice tone="green" icon={Check}>
+					{t("issues.clean")}
+				</Notice>
+			)}
+			{issues.length > 0 && (
+				<div className="flex flex-col gap-3">
+					<Chips>
+						<Chip tone="muted" pressed={filter === "all"} onClick={() => setFilter("all")}>
+							{t("all")} · {issues.length}
+						</Chip>
+						{SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
+							<Chip key={s} tone={SEVERITY_TONE[s]} pressed={filter === s} onClick={() => setFilter(s)}>
+								{t(s)} · {counts[s]}
+							</Chip>
+						))}
+					</Chips>
+					{shown.length === 0 && <p className="wp-meta">{t("issues.filtered")}</p>}
+					{shown.map((issue) => {
+						const key = issueKey(issue);
+						return (
+							<StepCard
+								key={key}
+								tone={SEVERITY_TONE[issue.severity]}
+								kicker={t(`types.${issue.driftType}.label`, issue.driftType.replaceAll("_", " "))}
+								title={<span className="wp-mono text-[0.8rem]">{issue.referencedSymbol}</span>}
+								meta={`${issue.docFile}:${issue.docLine}`}
+								status={<span className="wp-meta">{t(issue.severity)}</span>}
+								active={selected === key}
+								onClick={() => onSelect(key)}
+							/>
+						);
+					})}
+				</div>
+			)}
+		</Column>
+	);
+}
+
+function DetailColumn({ issue }: { readonly issue: DriftIssue | null }) {
+	const { t } = useTranslation("docDrift");
+	const [copied, setCopied] = useState(false);
+	return (
+		<Column kicker={t("detail.kicker")} title={t("detail.title")} tone="violet">
+			{!issue && (
+				<EmptyStage icon={MousePointerClick} title={t("detail.emptyTitle")} tone="violet">
+					{t("detail.emptyHint")}
+				</EmptyStage>
+			)}
+			{issue && (
+				<div className="flex flex-col gap-3">
+					<Panel rail tone={SEVERITY_TONE[issue.severity]}>
+						<span className="wp-kicker">
+							{t(`types.${issue.driftType}.label`, issue.driftType)} · {t(issue.severity)}
+						</span>
+						<p className="mt-1.5 text-sm leading-relaxed">
+							{t(`types.${issue.driftType}.message`, {
+								symbol: issue.referencedSymbol,
+								defaultValue: issue.message,
+							})}
+						</p>
+					</Panel>
+					<Panel>
+						<div className="flex items-center justify-between gap-2">
+							<span className="wp-kicker wp-faint">{t("detail.where")}</span>
+							<CharterButton
+								size="sm"
+								variant="ghost"
+								icon={copied ? Check : Copy}
+								onClick={async () => {
+									await navigator.clipboard.writeText(`${issue.docFile}:${issue.docLine}`);
+									setCopied(true);
+									setTimeout(() => setCopied(false), 1800);
+								}}
+							>
+								{copied ? t("actions.copied") : t("detail.copyRef")}
+							</CharterButton>
+						</div>
+						<p className="wp-mono mt-1 text-xs">
+							{issue.docFile}:{issue.docLine}
+						</p>
+						<span className="wp-kicker wp-faint mt-3 block">{t("detail.cited")}</span>
+						<pre className="wp-code mt-1">{issue.referencedSymbol}</pre>
+					</Panel>
+					<Panel rail tone="green">
+						<span className="wp-kicker">{t("detail.fix")}</span>
+						<p className="mt-1.5 text-sm">
+							{t(`types.${issue.driftType}.fix`, { defaultValue: issue.suggestion })}
+						</p>
+					</Panel>
+				</div>
+			)}
+		</Column>
+	);
+}
+
+export function DocDriftReport({ projectPath }: DocDriftReportProps): React.ReactElement {
 	const { t } = useTranslation("docDrift");
 
 	const phase = useDocDriftStore((s) => s.phase);
@@ -27,133 +253,69 @@ export function DocDriftReport({
 	const startScan = useDocDriftStore((s) => s.startScan);
 	const cancelScan = useDocDriftStore((s) => s.cancelScan);
 	const reset = useDocDriftStore((s) => s.reset);
+	const setReport = useDocDriftStore((s) => s.setReport);
+	const [selected, setSelected] = useState<string | null>(null);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
-	const setReport = useDocDriftStore((s) => s.setReport);
 	// A server project's last report, saved on the server by any member.
 	const shared = useSharedAnalysisReport("doc-drift", projectPath, setReport, isScanning);
+	const selectedIssue = report?.issues.find((i) => issueKey(i) === selected) ?? null;
+	const cleanError = error?.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center gap-3 flex-wrap">
-				{isScanning ? (
-					<button
-						type="button"
-						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-					>
-						{t("actions.cancel")}
-					</button>
-				) : (
-					<button
-						type="button"
-						onClick={() => projectPath && startScan(projectPath)}
-						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-					>
-						{t("actions.runScan")}
-					</button>
-				)}
-				{report && !isScanning && (
-					<button
-						type="button"
-						onClick={reset}
-						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-					>
-						{t("actions.reset")}
-					</button>
-				)}
-			</div>
-
-			{!isScanning && <SharedReportNote saved={shared} />}
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
+		<ModuleStage data-testid="doc-drift-view">
+			<Columns template="minmax(260px, 26%) minmax(320px, 38%) minmax(0, 1fr)">
+				<ScanColumn report={report} scanning={isScanning} status={status} />
+				<IssuesColumn report={report} selected={selected} onSelect={setSelected} />
+				<DetailColumn issue={selectedIssue} />
+			</Columns>
+			{(!projectPath || (phase === "error" && cleanError)) && (
+				<Notice tone="red" icon={AlertTriangle} role="alert" className="relative z-[2] mx-5 mb-2">
+					{projectPath ? t("errors.failed", { error: cleanError }) : t("errors.noProject")}
+				</Notice>
 			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{report ? (
-				<ReportBody report={report} t={t} />
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
-	);
-}
-
-function ReportBody({
-	report,
-	t,
-}: {
-	readonly report: DriftReport;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-}): React.ReactElement {
-	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("info", {
-						docs: report.docsScanned,
-						files: report.codeFilesIndexed,
-					})}
-				</p>
-			</div>
-
-			<div className="space-y-2">
-				{report.issues.map((issue) => (
-					<div
-						key={`${issue.docFile}-${issue.docLine}-${issue.severity}`}
-						className={`px-4 py-3 rounded-lg border ${SEVERITY_STYLES[issue.severity]}`}
-					>
-						<div className="flex items-center gap-2 mb-1">
-							<span className="text-xs font-medium uppercase">
-								{t(issue.severity)}
-							</span>
-							<span className="text-xs opacity-70">
-								{issue.driftType.replaceAll("_", " ")}
-							</span>
-						</div>
-						<p className="text-sm">{issue.message}</p>
-						<p className="text-xs mt-1 opacity-70 font-mono">
-							{issue.docFile}:{issue.docLine} → {issue.referencedSymbol}
-						</p>
-						{issue.suggestion && (
-							<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
-						)}
-					</div>
-				))}
-			</div>
-
-			{report.issues.length === 0 ? (
-				<p className="text-sm text-muted-foreground italic mt-2">
-					{t("noDriftDetected")}
-				</p>
-			) : (
-				report.summary && (
-					<p className="text-sm text-muted-foreground italic mt-2">
-						{report.summary}
-					</p>
-				)
-			)}
-		</div>
+			<Composer
+				prompt={
+					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+						<FileWarning className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{t("description")}</span>
+						{!isScanning && <SharedReportNote saved={shared} />}
+					</span>
+				}
+				hint={t("scan.ignored")}
+				actions={
+					isScanning ? (
+						<CharterButton icon={X} variant="danger" onClick={() => cancelScan()}>
+							{t("actions.cancel")}
+						</CharterButton>
+					) : (
+						<>
+							{report && (
+								<CharterButton
+									icon={RotateCcw}
+									onClick={() => {
+										setSelected(null);
+										reset();
+									}}
+								>
+									{t("actions.reset")}
+								</CharterButton>
+							)}
+							<CharterButton
+								variant="primary"
+								icon={ScanSearch}
+								disabled={!projectPath}
+								onClick={() => {
+									setSelected(null);
+									if (projectPath) void startScan(projectPath);
+								}}
+							>
+								{report ? t("actions.rescan") : t("actions.runScan")}
+							</CharterButton>
+						</>
+					)
+				}
+			/>
+		</ModuleStage>
 	);
 }

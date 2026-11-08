@@ -38,5 +38,38 @@
 		"automatic": "Automatique",
 		"manual": "Manuel",
 		"autoResolutionRate": "Taux de résolution auto"
+	},
+	"loading": "Chargement des métriques…",
+	"costShare": "{{cost}} ({{pct}} %)",
+	"export": {
+		"json": "JSON",
+		"csv": "CSV"
+	},
+	"errors": {
+		"loadFailed": "Impossible de charger le tableau de bord.",
+		"exportFailed": "Impossible d’exporter le tableau de bord."
+	},
+	"kickers": {
+		"tasks": "Tâches",
+		"time": "Durée",
+		"costs": "Coûts",
+		"tokens": "Tokens",
+		"merges": "Fusions"
+	},
+	"status": {
+		"completed": "Terminées",
+		"in_progress": "En cours",
+		"pending": "En attente",
+		"failed": "Échouées",
+		"cancelled": "Annulées"
+	},
+	"complexity": {
+		"trivial": "Triviale",
+		"simple": "Simple",
+		"small": "Petite",
+		"medium": "Moyenne",
+		"standard": "Standard",
+		"large": "Grande",
+		"complex": "Complexe"
 	}
 }

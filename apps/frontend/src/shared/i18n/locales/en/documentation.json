@@ -1,40 +1,83 @@
 {
-	"title": "Documentation Agent",
-	"description": "Check coverage, generate docstrings, and create READMEs",
+	"title": "Documentation",
+	"description": "Documentation coverage, proposed doc comments and READMEs, for every language in the project",
+	"project": {
+		"kicker": "Project",
+		"title": "Project coverage",
+		"meta": "{{files}} files · {{languages}} languages",
+		"analyze": "Analyze the project",
+		"reanalyze": "Analyze again",
+		"emptyTitle": "Measure the project's documentation",
+		"emptyHint": "Every source file is read, whatever its language: C#, Java, Kotlin, Go, Rust, Swift, PHP, Ruby, Dart, C/C++, TypeScript, Python…",
+		"languages": "Languages",
+		"priority": "Document these first",
+		"priorityHint": "Click a file to see its symbols",
+		"truncated": "Analysis limited to the first 4,000 files.",
+		"noSymbols": "No symbol found in this project's source files.",
+		"allDocumented": "Everything is documented. Nothing to catch up on."
+	},
+	"file": {
+		"kicker": "File",
+		"emptyTitle": "Pick a file",
+		"emptyHint": "Click a file on the left or type its path below, then “Check”.",
+		"meta": "{{pct}}% documented",
+		"symbols": "{{count}} symbols",
+		"line": "line {{line}}",
+		"existing": "Current comment",
+		"noExisting": "No doc comment above this symbol."
+	},
+	"drafts": {
+		"kicker": "Drafts",
+		"titleDocs": "Proposed doc comments",
+		"titleReadme": "Proposed README",
+		"tabDocs": "Comments",
+		"tabReadme": "README",
+		"emptyTitle": "Nothing proposed yet",
+		"emptyHint": "“Propose comments” drafts a doc comment in the language's own convention (XML doc, KDoc, rustdoc, godoc, JSDoc, docstring…). Nothing is written to your files.",
+		"count": "{{count}} to complete",
+		"noneNeeded": "Every symbol in this file is already documented.",
+		"readmeEmptyHint": "Pick a folder below, then “Generate README”."
+	},
 	"coverage": {
-		"title": "Documentation Coverage",
-		"checkLabel": "Check Documentation Coverage",
-		"filePathPlaceholder": "Path to Python file (e.g., src/connectors/jira/connector.py)",
+		"title": "Documentation coverage",
 		"wellDocumented": "Well documented",
 		"needsImprovement": "Needs improvement",
 		"poorlyDocumented": "Poorly documented",
 		"documented": "Documented",
 		"partial": "Partial",
-		"missing": "Missing"
+		"missing": "Missing",
+		"partialHint": "A comment exists but the parameters are not described"
+	},
+	"composer": {
+		"filePlaceholder": "File to check, e.g. src/Orders/OrderService.cs",
+		"folder": "Folder",
+		"folderPlaceholder": "Module folder, e.g. src/Orders",
+		"language": "Language"
 	},
 	"actions": {
 		"check": "Check",
-		"generateDocstrings": "Generate Docstrings",
-		"generate": "Generate",
+		"generateDocstrings": "Propose comments",
+		"generateReadme": "Generate README",
+		"cancel": "Cancel",
 		"copied": "Copied",
-		"copy": "Copy"
+		"copy": "Copy",
+		"copyAll": "Copy all"
 	},
-	"readme": {
-		"generateLabel": "Generate README",
-		"dirPathPlaceholder": "Path to module directory (e.g., src/connectors/jira/)",
-		"title": "Generated README.md"
+	"progress": {
+		"project": "Reading source files…",
+		"coverage": "Reading the file…",
+		"docstrings": "Drafting comments…",
+		"readme": "Drafting the README…"
 	},
 	"errors": {
-		"coverageFailed": "Coverage check failed",
-		"docstringFailed": "Docstring generation failed",
-		"readmeFailed": "README generation failed",
-		"networkError": "Network error"
+		"failed": "Failed: {{error}}",
+		"noProject": "Select a project first."
 	},
-	"symbols": {
-		"title": "Symbols"
-	},
-	"docstrings": {
-		"title": "Generated Docstrings ({{count}})"
+	"kinds": {
+		"class": "type",
+		"function": "function",
+		"method": "method",
+		"type": "type"
 	},
 	"autocomplete": {
 		"searching": "Searching…",

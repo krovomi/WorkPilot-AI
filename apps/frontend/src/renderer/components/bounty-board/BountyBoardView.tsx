@@ -4,14 +4,26 @@ import { AirgapBanner } from "../offline-mode/AirgapBanner";
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { buildModelSelectOptions } from "../../../shared/utils/task-thinking";
 import { isLocalProvider } from "../../../shared/utils/local-models";
-import { Plus, Swords, Trash2 } from "lucide-react";
+import { Plus, Swords, Trash2, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PROVIDER_MODELS_MAP } from "@shared/constants/models";
 import { useBountyBoardStore } from "../../stores/bounty-board-store";
 import { useProjectStore } from "../../stores/project-store";
 import { useTaskStore } from "../../stores/task-store";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+} from "../charter";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import {
@@ -72,7 +84,7 @@ interface Props {
 }
 
 export function BountyBoardView({ projectPath, specId }: Props) {
-	const { t } = useTranslation(["bountyBoard", "common"]);
+	const { t } = useTranslation(["bountyBoard", "common", "navigation"]);
 	const {
 		contestants,
 		current,
@@ -186,240 +198,220 @@ export function BountyBoardView({ projectPath, specId }: Props) {
 	};
 
 	return (
-		<div className="flex flex-col gap-4 p-4">
-			<header className="flex items-center gap-2">
-				<Swords className="w-5 h-5" />
-				<h2 className="text-lg font-semibold">
-					{t("bountyBoard:title", "Bounty Board")}
-				</h2>
-			</header>
-
-			<p className="text-sm text-muted-foreground">
-				{t(
+		<ModuleStage data-testid="bounty-board-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.agents")}
+				icon={Swords}
+				title={t("bountyBoard:title", "Bounty Board")}
+				description={t(
 					"bountyBoard:description",
 					"Run N contestants in parallel with different provider/model combinations. An impartial judge picks the winner.",
 				)}
-			</p>
-
-			<AirgapBanner
-				status={airgap}
-				blockedLabel={t("bountyBoard:airgapBody")}
+				tone="orange"
 			/>
-
-			<section className="grid grid-cols-1 md:grid-cols-2 gap-2">
-				<div>
-					<Label className="text-xs">
-						{t("bountyBoard:projectPath", "Project path")}
-					</Label>
-					<Input
-						value={projectInput}
-						readOnly
-						disabled
-						placeholder="/path/to/repo"
-						className="bg-muted cursor-not-allowed"
-					/>
-				</div>
-				<div>
-					<Label className="text-xs" htmlFor="bounty-spec">
-						{t("bountyBoard:specId", "Spec")}
-					</Label>
-					<Select
-						value={specInput}
-						onValueChange={setSpecInput}
-						disabled={availableSpecs.length === 0}
-					>
-						<SelectTrigger id="bounty-spec" data-testid="bounty-spec-select">
-							<SelectValue
-								placeholder={
-									availableSpecs.length === 0
-										? t("bountyBoard:noSpecs", "No spec in this project")
-										: t("bountyBoard:selectSpec", "Select a spec")
-								}
-							/>
-						</SelectTrigger>
-						<SelectContent searchable={availableSpecs.length > 8}>
-							{availableSpecs.map((s) => (
-								<SelectItem key={s.id} value={s.id}>
-									{s.title === s.id ? s.id : `${s.title} (${s.id})`}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-			</section>
-
-			<section className="space-y-2">
-				<div className="flex items-center justify-between">
-					<h3 className="text-sm font-semibold">
-						{t("bountyBoard:contestants", "Contestants")}
-					</h3>
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={() =>
-							addContestant({
-								provider: "anthropic",
-								model: firstModelFor("anthropic"),
-							})
-						}
-					>
-						<Plus className="w-3 h-3 mr-1" />
-						{t("bountyBoard:addContestant", "Add contestant")}
-					</Button>
-				</div>
-
-				<div className="space-y-2">
-					{contestants.map((c, idx) => (
-						<div
-							key={`${c.provider}-${c.model}-${idx}`}
-							className="grid grid-cols-12 gap-2 items-end border rounded-md p-2 bg-card"
+			<div className="relative z-[2] px-5">
+				<AirgapBanner status={airgap} blockedLabel={t("bountyBoard:airgapBody")} />
+			</div>
+			<Columns template="minmax(340px, 42%) minmax(300px, 1fr)">
+				<Column
+					kicker={t("bountyBoard:kickers.setup", "Setup")}
+					title={t("bountyBoard:contestants", "Contestants")}
+					meta={String(contestants.length)}
+					tone="orange"
+					actions={
+						<CharterButton
+							size="sm"
+							icon={Plus}
+							onClick={() =>
+								addContestant({
+									provider: "anthropic",
+									model: firstModelFor("anthropic"),
+								})
+							}
 						>
-							<div className="col-span-4">
-								<Label className="text-3xs">
-									{t("bountyBoard:field.provider", "Provider")}
-								</Label>
-								<Select
-									value={c.provider}
-									onValueChange={(provider) =>
-										updateContestant(idx, {
-											provider,
-											model: firstModelFor(provider),
-										})
-									}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent searchable>
-										{PROVIDERS.map((p) => (
-											<SelectItem key={p} value={p}>
-												{degradesTo(p)
-													? t("bountyBoard:noAdapterOption", {
-															provider: p,
-															target: degradesTo(p),
-															defaultValue: "{{provider}} — runs on {{target}}",
-														})
-													: p}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+							{t("bountyBoard:addContestant", "Add contestant")}
+						</CharterButton>
+					}
+				>
+					<div className="flex flex-col gap-3">
+						<Panel>
+							<Label className="wp-kicker mb-1 block" htmlFor="bounty-spec">
+								{t("bountyBoard:specId", "Spec")}
+							</Label>
+							<Select value={specInput} onValueChange={setSpecInput} disabled={availableSpecs.length === 0}>
+								<SelectTrigger id="bounty-spec" data-testid="bounty-spec-select">
+									<SelectValue
+										placeholder={
+											availableSpecs.length === 0
+												? t("bountyBoard:noSpecs", "No spec in this project")
+												: t("bountyBoard:selectSpec", "Select a spec")
+										}
+									/>
+								</SelectTrigger>
+								<SelectContent searchable={availableSpecs.length > 8}>
+									{availableSpecs.map((s) => (
+										<SelectItem key={s.id} value={s.id}>
+											{s.title === s.id ? s.id : `${s.title} (${s.id})`}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							{projectInput && (
+								<p className="wp-meta mt-2 truncate" title={projectInput}>
+									{t("bountyBoard:projectPath", "Project path")} · {projectInput}
+								</p>
+							)}
+						</Panel>
+						{contestants.map((c, idx) => (
+							<Panel key={`${c.provider}-${c.model}-${idx}`} rail tone={degradesTo(c.provider) ? "red" : "orange"}>
+								<div className="mb-2 flex items-center justify-between">
+									<span className="wp-kicker">
+										{String(idx + 1).padStart(2, "0")} · {t("bountyBoard:contestant", "Contestant")}
+									</span>
+									<CharterButton
+										size="sm"
+										variant="ghost"
+										icon={Trash2}
+										onClick={() => removeContestant(idx)}
+										disabled={contestants.length <= 1}
+										aria-label={t("bountyBoard:remove", "Remove contestant")}
+									/>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
+									<div>
+										<Label className="text-3xs">{t("bountyBoard:field.provider", "Provider")}</Label>
+										<Select
+											value={c.provider}
+											onValueChange={(provider) =>
+												updateContestant(idx, {
+													provider,
+													model: firstModelFor(provider),
+												})
+											}
+										>
+											<SelectTrigger>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent searchable>
+												{PROVIDERS.map((p) => (
+													<SelectItem key={p} value={p}>
+														{degradesTo(p)
+															? t("bountyBoard:noAdapterOption", {
+																	provider: p,
+																	target: degradesTo(p),
+																	defaultValue: "{{provider}} — runs on {{target}}",
+																})
+															: p}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div>
+										<Label className="text-3xs">{t("bountyBoard:field.model", "Model")}</Label>
+										<ContestantModelSelect
+											provider={c.provider}
+											value={c.model}
+											onChange={(model) => updateContestant(idx, { model })}
+										/>
+									</div>
+									<div className="col-span-2">
+										<Label className="text-3xs">{t("bountyBoard:field.profile", "Profile (optional)")}</Label>
+										<Input
+											value={c.profileId ?? ""}
+											onChange={(e) => updateContestant(idx, { profileId: e.target.value })}
+										/>
+									</div>
+								</div>
 								{degradesTo(c.provider) && (
-									<p className="text-3xs text-destructive mt-1">
+									<p className="mt-2 text-3xs text-destructive">
 										{t("bountyBoard:noAdapter", {
 											provider: c.provider,
 											target: degradesTo(c.provider),
-											defaultValue:
-												"No agentic adapter: this entry would run on {{target}} and is refused.",
+											defaultValue: "No agentic adapter: this entry would run on {{target}} and is refused.",
 										})}
 									</p>
 								)}
-							</div>
-							<div className="col-span-4">
-								<Label className="text-3xs">
-									{t("bountyBoard:field.model", "Model")}
-								</Label>
-								<ContestantModelSelect
-									provider={c.provider}
-									value={c.model}
-									onChange={(model) => updateContestant(idx, { model })}
-								/>
-							</div>
-							<div className="col-span-3">
-								<Label className="text-3xs">
-									{t("bountyBoard:field.profile", "Profile (optional)")}
-								</Label>
-								<Input
-									value={c.profileId ?? ""}
-									onChange={(e) =>
-										updateContestant(idx, { profileId: e.target.value })
-									}
-								/>
-							</div>
-							<div className="col-span-1 flex justify-end">
-								<Button
-									size="icon"
-									variant="ghost"
-									onClick={() => removeContestant(idx)}
-									disabled={contestants.length <= 1}
-									aria-label={t("bountyBoard:remove", "Remove contestant")}
-								>
-									<Trash2 className="w-4 h-4" />
-								</Button>
-							</div>
-						</div>
-					))}
-				</div>
-			</section>
-
-			<div className="flex items-center gap-3">
-				<Button onClick={handleStart} disabled={!canStart}>
-					<Swords className="w-4 h-4 mr-1" />
-					{loading
-						? t("bountyBoard:running", "Running…")
-						: t("bountyBoard:start", "Start bounty")}
-				</Button>
-				{disabledReason && (
-					<span className="text-xs text-muted-foreground">
-						{disabledReason}
-					</span>
-				)}
-			</div>
-
-			{error && <p className="text-sm text-destructive">{error}</p>}
-
-			{current && (
-				<section>
-					<h3 className="text-sm font-semibold mb-2">
-						{t("bountyBoard:liveBoard", "Live board")}
-					</h3>
-					<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-						{current.contestants.map((c) => (
-							<ContestantCard
-								key={c.id}
-								contestant={c}
-								isWinner={c.id === current.winnerId}
-								rationale={current.judgeRationale?.[c.id]}
-							/>
+							</Panel>
 						))}
 					</div>
-				</section>
+				</Column>
+				<Column
+					kicker={t("bountyBoard:kickers.board", "Board")}
+					title={t("bountyBoard:liveBoard", "Live board")}
+					tone="green"
+				>
+					{loading && <ScanLine label={t("bountyBoard:running", "Running…")} />}
+					{!current && !loading && (
+						<EmptyStage icon={Trophy} title={t("bountyBoard:emptyTitle", "No round yet")} tone="green">
+							{t(
+								"bountyBoard:emptyHint",
+								"Pick a spec, line up the contestants, then start: each one works in its own worktree and the judge picks the winner.",
+							)}
+						</EmptyStage>
+					)}
+					{current && (
+						<div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+							{current.contestants.map((c) => (
+								<ContestantCard
+									key={c.id}
+									contestant={c}
+									isWinner={c.id === current.winnerId}
+									rationale={current.judgeRationale?.[c.id]}
+								/>
+							))}
+						</div>
+					)}
+					{archives.length > 0 && (
+						<div className="mt-4">
+							<span className="wp-kicker mb-2 block">{t("bountyBoard:archives", "Previous rounds")}</span>
+							<div className="flex flex-col gap-2">
+								{archives.slice(0, 10).map((a) => (
+									<Panel key={a.id} className="flex flex-wrap items-center gap-3 text-xs">
+										<span className="wp-mono">{formatAppDateTime(a.createdAt)}</span>
+										<span className="wp-muted">
+											{t("bountyBoard:contestantsCount", {
+												count: a.contestants.length,
+												defaultValue: "{{count}} contestants",
+											})}
+										</span>
+										{a.winnerId ? (
+											<Chip tone="green">{a.contestants.find((c) => c.id === a.winnerId)?.label}</Chip>
+										) : (
+											<span className="wp-faint">—</span>
+										)}
+									</Panel>
+								))}
+							</div>
+						</div>
+					)}
+				</Column>
+			</Columns>
+			{error && (
+				<Notice tone="red" role="alert" className="relative z-[2] mx-5 mb-2">
+					{error}
+				</Notice>
 			)}
-
-			{archives.length > 0 && (
-				<section>
-					<h3 className="text-sm font-semibold mb-2">
-						{t("bountyBoard:archives", "Previous rounds")}
-					</h3>
-					<ul className="text-xs space-y-1">
-						{archives.slice(0, 10).map((a) => (
-							<li key={a.id} className="flex gap-3 text-muted-foreground">
-								<span className="font-mono">
-									{formatAppDateTime(a.createdAt)}
-								</span>
-								<span>
-									{t("bountyBoard:contestantsCount", {
-										count: a.contestants.length,
-										defaultValue: "{{count}} contestants",
-									})}
-								</span>
-								<span>
-									{a.winnerId
-										? a.contestants.find((c) => c.id === a.winnerId)?.label
-										: "—"}
-								</span>
-							</li>
-						))}
-					</ul>
-				</section>
-			)}
-
-			{current && verdictOpen && (
-				<JudgeVerdictModal
-					result={current}
-					onClose={() => setVerdictOpen(false)}
-				/>
-			)}
-		</div>
+			<Composer
+				prompt={
+					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+						<Swords className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">
+							{t("bountyBoard:contestantsCount", {
+								count: contestants.length,
+								defaultValue: "{{count}} contestants",
+							})}
+						</span>
+					</span>
+				}
+				hint={disabledReason ?? undefined}
+				actions={
+					<CharterButton variant="primary" icon={Swords} busy={loading} onClick={handleStart} disabled={!canStart}>
+						{loading ? t("bountyBoard:running", "Running…") : t("bountyBoard:start", "Start bounty")}
+					</CharterButton>
+				}
+			/>
+			{current && verdictOpen && <JudgeVerdictModal result={current} onClose={() => setVerdictOpen(false)} />}
+		</ModuleStage>
 	);
 }

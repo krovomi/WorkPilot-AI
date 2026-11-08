@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { app, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { credentialManager } from "../services/credential-manager.js";
 import { getRunnerEnv } from "./github/utils/runner-env.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
@@ -151,8 +151,7 @@ export function registerBountyBoardHandlers(): void {
 			}
 
 			const { backendPath, runnerPath } = resolveBackendPaths();
-			const pythonExe = pythonEnvManager.getPythonPath();
-			if (!pythonExe) throw new Error("Python environment not ready");
+			const pythonExe = await requirePythonPath();
 
 			const contestantsArg = req.contestants
 				.map((c) => `${c.provider}:${c.model}`)

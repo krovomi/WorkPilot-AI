@@ -14,6 +14,62 @@
 	} catch {
 		/* storage unavailable */
 	}
+	// Visual to Code: one architecture on the canvas (the store persists it
+	// under "visual-to-code-canvas", version 2).
+	(() => {
+		const N = (id, x, y, type, label, framework) => ({
+			id,
+			position: { x, y },
+			type: "editable",
+			data: { label, type, framework },
+		});
+		const E = (id, s, t, label) => ({
+			id,
+			source: s,
+			target: t,
+			data: { label },
+		});
+		const nodes = [
+			N("web", 0, 40, "frontend", "Storefront Next.js", "Next.js"),
+			N("mob", 0, 300, "mobile", "Shopper app Flutter", "Flutter"),
+			N("gw", 360, 170, "gateway", "API Gateway YARP", "YARP"),
+			N("api", 720, 40, "backend", "Orders API .NET", "ASP.NET Core"),
+			N("auth", 720, 320, "auth", "Identity Entra ID", "Microsoft Entra ID"),
+			N("wk", 1440, 170, "worker", "Invoice worker .NET", "Worker Service"),
+			N("db", 1080, -80, "database", "Orders PostgreSQL", "PostgreSQL"),
+			N("mq", 1080, 170, "messagebroker", "Events RabbitMQ", "RabbitMQ"),
+			N("cache", 1080, 420, "cache", "Prices Redis", "Redis"),
+		];
+		const edges = [
+			E("e1", "web", "gw", "HTTPS / REST"),
+			E("e2", "mob", "gw", "HTTPS / REST"),
+			E("e3", "gw", "api", "reverse proxy"),
+			E("e4", "gw", "auth", "OIDC"),
+			E("e5", "api", "db", "EF Core"),
+			E("e6", "api", "mq", "MassTransit"),
+			E("e7", "mq", "wk", "AMQP"),
+			E("e8", "api", "cache", "read-through cache"),
+		];
+		const now = new Date().toISOString();
+		const arch = {
+			id: "demo-arch",
+			name: "acme-storefront",
+			diagramType: "architecture",
+			nodes,
+			edges,
+			createdAt: now,
+			updatedAt: now,
+		};
+		try {
+			localStorage.setItem(
+				"visual-to-code-canvas",
+				JSON.stringify({
+					state: { architectures: [arch], activeArchitectureId: "demo-arch" },
+					version: 2,
+				}),
+			);
+		} catch {}
+	})();
 	const ok = (data) => async () => ({ success: true, data });
 
 	const sub = (id, title, status, files = []) => ({
@@ -143,8 +199,8 @@
 		},
 		{
 			id: "t-06",
-			specId: "019-search",
-			title: "Typo-tolerant product search",
+			specId: "019-search-part1",
+			title: "Typo-tolerant product search (1/2): fuzzy index",
 			description:
 				"Fuzzy matching and synonyms on the catalogue search, with highlighted results.",
 			status: "in_progress",
@@ -164,9 +220,42 @@
 				priority: "medium",
 				complexity: "medium",
 				impact: "high",
+				// An automatic split (apps/backend/task_split/): part 1 of 2.
+				splitGroup: {
+					parent: "019-search",
+					title: "Typo-tolerant product search",
+					index: 1,
+					total: 2,
+					name: "fuzzy index",
+				},
 			},
 			createdAt: ago(7 * hour),
 			updatedAt: ago(6 * min),
+		},
+		{
+			id: "t-06b",
+			specId: "019-search-part2",
+			title: "Typo-tolerant product search (2/2): highlighted results",
+			description:
+				"Highlight the matched terms and show synonyms in the result list.",
+			status: "queue",
+			subtasks: [],
+			logs: [],
+			metadata: {
+				category: "feature",
+				priority: "medium",
+				complexity: "small",
+				impact: "high",
+				splitGroup: {
+					parent: "019-search",
+					title: "Typo-tolerant product search",
+					index: 2,
+					total: 2,
+					name: "highlighted results",
+				},
+			},
+			createdAt: ago(7 * hour),
+			updatedAt: ago(7 * hour),
 		},
 		{
 			id: "t-07",

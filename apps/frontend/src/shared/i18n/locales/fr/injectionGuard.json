@@ -1,6 +1,6 @@
 {
 	"title": "Garde Anti-Injection",
-	"noData": "Aucun prompt trouvé dans .workpilot/prompts/",
+	"noData": "Enregistrez des prompts dans .workpilot/prompts/, puis lancez l'analyse.",
 	"noFindings": "Aucun résultat",
 	"threat": {
 		"safe": "Sûr",
@@ -21,5 +21,23 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour lancer la Garde Anti-Injection.",
 		"failed": "Échec de l'analyse : {{error}}"
+	},
+	"description": "Vérifie les prompts enregistrés dans .workpilot/prompts/ (txt, md, json) : motifs connus, classifieur et contenus encodés.",
+	"idleTitle": "Pas encore d'analyse",
+	"emptyTitle": "Aucun prompt trouvé",
+	"promptsTitle": "Prompts analysés",
+	"kickers": {
+		"prompts": "Prompts"
+	},
+	"severities": {
+		"critical": "Critique",
+		"high": "Élevée",
+		"medium": "Moyenne",
+		"low": "Faible"
+	},
+	"layers": {
+		"regex": "Motif",
+		"classifier": "Classifieur",
+		"decode": "Décodage"
 	}
 }

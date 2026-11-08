@@ -1,10 +1,17 @@
 import { AlertCircle, Lightbulb, Settings2, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { IdeationConfig, IdeationType } from "../../../shared/types";
-import { Button } from "../ui/button";
-import { Card } from "../ui/card";
+import { cn } from "../../lib/utils";
+import {
+	CharterButton,
+	ModuleHeader,
+	Notice,
+	Page,
+	Section,
+	toneClass,
+} from "../charter";
 import { Switch } from "../ui/switch";
-import { ALL_IDEATION_TYPES } from "./constants";
+import { ALL_IDEATION_TYPES, IDEATION_TYPE_TONES } from "./constants";
 import { TypeIcon } from "./TypeIcon";
 
 interface IdeationEmptyStateProps {
@@ -16,6 +23,7 @@ interface IdeationEmptyStateProps {
 	readonly onToggleIdeationType: (type: IdeationType) => void;
 }
 
+/** Before the first run: pick the kinds of ideas, then generate. */
 export function IdeationEmptyState({
 	config,
 	hasToken,
@@ -24,56 +32,87 @@ export function IdeationEmptyState({
 	onOpenConfig,
 	onToggleIdeationType,
 }: IdeationEmptyStateProps) {
-	const { t } = useTranslation("ideation");
+	const { t } = useTranslation(["ideation", "common", "navigation"]);
 
 	return (
-		<div className="flex h-full items-center justify-center">
-			<Card className="w-full max-w-lg p-8 text-center">
-				<Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-				<h2 className="text-xl font-semibold mb-2">{t("emptyState.title")}</h2>
-				<p className="text-muted-foreground mb-6">
-					{t("emptyState.description")}
-				</p>
-
-				{/* Configuration Preview */}
-				<div className="mb-6 p-4 bg-muted/50 rounded-lg text-left">
-					<div className="flex items-center justify-between mb-3">
-						<span className="text-sm font-medium">
-							{t("emptyState.enabledTypes")}
-						</span>
-						<Button variant="ghost" size="sm" onClick={onOpenConfig}>
-							<Settings2 className="h-4 w-4" />
-						</Button>
-					</div>
-					<div className="space-y-2">
-						{ALL_IDEATION_TYPES.map((type) => (
-							<div key={type} className="flex items-center justify-between">
-								<div className="flex items-center gap-2">
-									<TypeIcon type={type} />
-									<span className="text-sm">{t(`types.${type}`)}</span>
-								</div>
-								<Switch
-									checked={config.enabledTypes.includes(type)}
-									onCheckedChange={() => onToggleIdeationType(type)}
-								/>
-							</div>
-						))}
-					</div>
-				</div>
-
-				<Button onClick={onGenerate} size="lg" disabled={isCheckingToken}>
-					<Sparkles className="h-4 w-4 mr-2" />
-					{t("emptyState.generateIdeas")}
-				</Button>
-
-				{/* Show warning if token is missing */}
+		<>
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
+				title={t("ideation:header.title")}
+				description={t("ideation:emptyState.description")}
+				icon={Lightbulb}
+				tone="amber"
+				actions={
+					<CharterButton
+						variant="primary"
+						icon={Sparkles}
+						onClick={onGenerate}
+						disabled={isCheckingToken}
+					>
+						{t("ideation:emptyState.generateIdeas")}
+					</CharterButton>
+				}
+			/>
+			<Page className="space-y-4 pt-1">
 				{hasToken === false && !isCheckingToken && (
-					<p className="mt-3 text-sm text-muted-foreground">
-						<AlertCircle className="h-4 w-4 inline-block mr-1 text-warning" />
-						{t("emptyState.tokenMissing")}
-					</p>
+					<Notice tone="amber" icon={AlertCircle}>
+						{t("ideation:emptyState.tokenMissing")}
+					</Notice>
 				)}
-			</Card>
-		</div>
+				<Section
+					kicker={t("ideation:emptyState.title")}
+					title={t("ideation:emptyState.enabledTypes")}
+					meta={t("ideation:emptyState.enabledCount", {
+						count: config.enabledTypes.length,
+						total: ALL_IDEATION_TYPES.length,
+					})}
+					actions={
+						<CharterButton
+							size="sm"
+							variant="ghost"
+							icon={Settings2}
+							onClick={onOpenConfig}
+							aria-label={t("common:accessibility.configureAriaLabel")}
+							title={t("common:accessibility.configureAriaLabel")}
+						/>
+					}
+				>
+					<div className="grid gap-2.5 sm:grid-cols-2">
+						{ALL_IDEATION_TYPES.map((type) => {
+							const enabled = config.enabledTypes.includes(type);
+							return (
+								<label
+									key={type}
+									htmlFor={`ideation-type-${type}`}
+									className={cn(
+										"wp-card wp-card-pad wp-rail flex cursor-pointer items-start gap-3",
+										toneClass(IDEATION_TYPE_TONES[type]),
+										!enabled && "opacity-60",
+									)}
+								>
+									<span className="wp-empty-glyph h-8 w-8 shrink-0">
+										<TypeIcon type={type} className="h-4 w-4" />
+									</span>
+									<span className="min-w-0 flex-1">
+										<span className="wp-title block text-sm">
+											{t(`ideation:types.${type}`)}
+										</span>
+										<span className="wp-muted mt-0.5 block text-xs">
+											{t(`ideation:typeDescriptions.${type}`)}
+										</span>
+									</span>
+									<Switch
+										id={`ideation-type-${type}`}
+										checked={enabled}
+										onCheckedChange={() => onToggleIdeationType(type)}
+										aria-label={t(`ideation:types.${type}`)}
+									/>
+								</label>
+							);
+						})}
+					</div>
+				</Section>
+			</Page>
+		</>
 	);
 }

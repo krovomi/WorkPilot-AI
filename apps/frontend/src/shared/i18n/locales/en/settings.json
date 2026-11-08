@@ -855,7 +855,16 @@
 			"specByExampleDescription": "On an ASP.NET Core Web API, the spec's acceptance criteria are written as integration tests before any code. When they fail as expected, `dotnet test` becomes the task's goal and the build ends when it passes. A goal you set yourself is kept.",
 			"crossReview": "Cross review by a second engine",
 			"crossReviewDescription": "After QA, another provider reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you.",
-			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run."
+			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run.",
+			"autoSplit": {
+				"label": "Split big tasks automatically",
+				"description": "Once a task's plan is written, a task over these ceilings becomes several tasks, one small PR each. A task can keep its own line ceiling or stay whole.",
+				"maxFiles": "Max files per pull request",
+				"invalid": "Enter a whole number between {{min}} and {{max}}; until then the default applies.",
+				"byKindTitle": "Lines to review per PR, by kind of task",
+				"byKindHelp": "Code counts in full, tests and documentation count half, generated files and lockfiles don't count. Defaults follow code review studies: past 200 to 400 lines or an hour, a reviewer finds fewer defects. Leave empty for the default.",
+				"neverSplit": "Investigations, spikes and operations are never split: they open no code to review."
+			}
 		},
 		"autoBuild": {
 			"title": "WorkPilot AI Integration",
@@ -2520,7 +2529,6 @@
 		"title": "Agent Guardrails",
 		"description": "Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
 		"selectProject": "Select a project to manage its guardrails.",
-		"activeCount": "{{count}} active rule(s)",
 		"addRule": "Add rule",
 		"empty": "No rules yet. Add one to start enforcing policies.",
 		"ruleId": "rule id",
@@ -2539,7 +2547,19 @@
 			"deny": "Deny",
 			"require_approval": "Require approval"
 		},
-		"fileContentPlaceholder": "file content…"
+		"fileContentPlaceholder": "file content…",
+		"kickers": {
+			"rules": "Rules",
+			"tester": "Tester"
+		},
+		"rulesTitle": "Rules agents respect",
+		"emptyTitle": "No rule yet",
+		"deleteRule": "Delete the rule",
+		"testerHint": "Simulate a Write, Edit or Bash call: the strongest matching rule decides.",
+		"filePath": "File path",
+		"clearTest": "Clear the result",
+		"activeCount_one": "{{count}} active rule",
+		"activeCount_other": "{{count}} active rules"
 	},
 	"search": {
 		"placeholder": "Search settings...",
@@ -2945,5 +2965,49 @@
 		"approve": "Approve",
 		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
 		"saveDetected": "Save as worktree.toml"
+	},
+	"kicker": "WorkPilot · Configuration",
+	"headerDescription": "Application and project settings, grouped by theme.",
+	"nav": {
+		"themes": {
+			"project": {
+				"title": "Project",
+				"description": "Settings of the current project"
+			},
+			"integrations": {
+				"title": "Integrations & Connections",
+				"description": "AI accounts and external integrations"
+			},
+			"interface": {
+				"title": "Interface & Appearance",
+				"description": "Personalise the interface"
+			},
+			"development": {
+				"title": "Development & Tools",
+				"description": "Developer tools and configuration"
+			},
+			"security": {
+				"title": "Security & Performance",
+				"description": "System security and performance"
+			},
+			"system": {
+				"title": "System & Maintenance",
+				"description": "Maintenance and system"
+			}
+		},
+		"sections": {
+			"general": "General",
+			"accounts": "AI accounts",
+			"appearance": "Appearance",
+			"display": "Display",
+			"language": "Language",
+			"terminal-fonts": "Terminal fonts",
+			"devtools": "Developer tools",
+			"agent": "Agent",
+			"notifications": "Notifications",
+			"debug": "Debug",
+			"scheduler": "Scheduling",
+			"updates": "Updates"
+		}
 	}
 }

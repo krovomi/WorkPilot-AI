@@ -44,6 +44,8 @@ const TERMINAL_EVENTS = new Set<string>([
 	"CODING_FAILED",
 	"QA_MAX_ITERATIONS",
 	"QA_AGENT_ERROR",
+	// The build stops after the split, exit 0: not a missed QA_PASSED.
+	"TASK_SPLIT",
 ]);
 
 export interface NeedsYouListener {

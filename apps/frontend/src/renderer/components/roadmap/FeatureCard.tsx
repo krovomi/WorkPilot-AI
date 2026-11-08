@@ -32,7 +32,9 @@ export function FeatureCard({
 							variant="outline"
 							className={ROADMAP_PRIORITY_COLORS[feature.priority]}
 						>
-							{ROADMAP_PRIORITY_LABELS[feature.priority]}
+							{t(`roadmap:priorityLabels.${feature.priority}`, {
+								defaultValue: ROADMAP_PRIORITY_LABELS[feature.priority],
+							})}
 						</Badge>
 						<Badge
 							variant="outline"

@@ -136,7 +136,7 @@ export function MemoriesTab({
 
 	return (
 		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6">
+			<div className="mx-auto max-w-5xl space-y-5 px-5 pt-2 pb-6">
 				{/* Memory Status */}
 				<Card>
 					<CardHeader className="pb-3">

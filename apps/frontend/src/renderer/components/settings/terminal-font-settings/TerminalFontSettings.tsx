@@ -8,13 +8,15 @@ import {
 	Type,
 	Upload,
 } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useContext, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../../../hooks/use-toast";
 import { MAX_IMPORT_FILE_SIZE } from "../../../lib/terminal-font-constants";
 import { cn } from "../../../lib/utils";
 import type { TerminalFontSettings } from "../../../stores/terminal-font-settings-store";
 import { useTerminalFontSettingsStore } from "../../../stores/terminal-font-settings-store";
+import { toneClass } from "../../charter";
+import { SettingsPageContext } from "../SettingsSection";
 import { CursorConfigPanel } from "./CursorConfigPanel";
 // Child components
 import { FontConfigPanel } from "./FontConfigPanel";
@@ -38,6 +40,7 @@ import { SettingsCard } from "./SettingsCard";
 // biome-ignore lint/suspicious/noRedeclare: redeclaration is intentional in this context
 export function TerminalFontSettings() {
 	const { t } = useTranslation("settings");
+	const page = useContext(SettingsPageContext);
 	const { toast } = useToast();
 	const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -258,16 +261,17 @@ export function TerminalFontSettings() {
 			{/* Header: identity on the left, configuration actions on the right.
 			    Both halves wrap, so the actions drop under the title on a narrow
 			    pane instead of being pushed out of the panel. */}
-			<div className="flex flex-wrap items-start justify-between gap-4">
+			<div className={cn("flex flex-wrap items-start justify-between gap-4", toneClass(page.tone))}>
 				<div className="flex min-w-0 items-start gap-3">
-					<span className="shrink-0 rounded-lg bg-primary/10 p-2">
-						<Terminal className="h-5 w-5 text-primary" aria-hidden="true" />
+					<span className="wp-empty-glyph h-9 w-9 shrink-0" aria-hidden="true">
+						<Terminal className="h-4 w-4" />
 					</span>
 					<div className="min-w-0">
-						<h2 className="text-lg font-semibold text-foreground">
+						{page.kicker && <span className="wp-kicker">{page.kicker}</span>}
+						<h2 className="wp-title">
 							{t("terminalFonts.title", { defaultValue: "Terminal Fonts" })}
 						</h2>
-						<p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">
+						<p className="wp-header-desc mt-1 max-w-prose">
 							{t("terminalFonts.description", {
 								defaultValue:
 									"Customize terminal font appearance, cursor behavior, and performance settings. Changes apply immediately to all active terminals.",

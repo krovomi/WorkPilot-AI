@@ -106,8 +106,8 @@ export function ConfigurationPanel({
 	const versionBumpDescription = getVersionBumpDescription(versionReason);
 
 	return (
-		<div className="w-80 shrink-0 border-r border-border overflow-y-auto">
-			<div className="p-6 space-y-6">
+		<div className="wp-card w-80 shrink-0 overflow-y-auto">
+			<div className="space-y-5 p-4">
 				{/* Back button and summary */}
 				<div className="space-y-4">
 					<Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">

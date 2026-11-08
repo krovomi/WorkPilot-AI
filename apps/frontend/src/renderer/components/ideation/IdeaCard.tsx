@@ -1,29 +1,18 @@
 import { ExternalLink, Play, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
-	CODE_QUALITY_SEVERITY_COLORS,
 	DOCUMENTATION_CATEGORY_LABELS,
-	IDEATION_EFFORT_COLORS,
-	IDEATION_IMPACT_COLORS,
-	IDEATION_STATUS_COLORS,
-	IDEATION_TYPE_COLORS,
-	SECURITY_SEVERITY_COLORS,
 	UIUX_CATEGORY_LABELS,
 } from "../../../shared/constants";
-import type {
-	CodeImprovementIdea,
-	CodeQualityIdea,
-	DocumentationGapIdea,
-	Idea,
-	PerformanceOptimizationIdea,
-	SecurityHardeningIdea,
-	UIUXImprovementIdea,
-} from "../../../shared/types";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Card } from "../ui/card";
+import type { Idea } from "../../../shared/types";
+import { cn } from "../../lib/utils";
+import { CharterButton, Chip, toneClass } from "../charter";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import {
+	IDEA_LEVEL_TONES,
+	IDEA_STATUS_TONES,
+	IDEATION_TYPE_TONES,
+} from "./constants";
 import { TypeIcon } from "./TypeIcon";
 import {
 	isCodeImprovementIdea,
@@ -34,16 +23,59 @@ import {
 	isUIUXIdea,
 } from "./type-guards";
 
-interface IdeaCardProps {
-	idea: Idea;
-	isSelected: boolean;
-	onClick: () => void;
-	onConvert: (idea: Idea) => void;
-	onGoToTask?: (taskId: string) => void;
-	onDismiss: (idea: Idea) => void;
-	onToggleSelect: (ideaId: string) => void;
+/** The chips of an idea: its type, status, then the level its type carries. */
+export function IdeaChips({ idea }: { readonly idea: Idea }) {
+	const { t } = useTranslation("ideation");
+	return (
+		<div className="wp-chips">
+			<Chip tone={IDEATION_TYPE_TONES[idea.type]} dot={false}>
+				<TypeIcon type={idea.type} className="h-3 w-3" />
+				{t(`types.${idea.type}`)}
+			</Chip>
+			{idea.status !== "draft" && (
+				<Chip tone={IDEA_STATUS_TONES[idea.status]}>{idea.status}</Chip>
+			)}
+			{isCodeImprovementIdea(idea) && (
+				<Chip tone={IDEA_LEVEL_TONES[idea.estimatedEffort]}>
+					{idea.estimatedEffort}
+				</Chip>
+			)}
+			{isUIUXIdea(idea) && (
+				<Chip tone="muted" dot={false}>
+					{UIUX_CATEGORY_LABELS[idea.category]}
+				</Chip>
+			)}
+			{isDocumentationGapIdea(idea) && (
+				<Chip tone="muted" dot={false}>
+					{DOCUMENTATION_CATEGORY_LABELS[idea.category]}
+				</Chip>
+			)}
+			{isSecurityHardeningIdea(idea) && (
+				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>{idea.severity}</Chip>
+			)}
+			{isPerformanceOptimizationIdea(idea) && (
+				<Chip tone={IDEA_LEVEL_TONES[idea.impact]}>
+					{t("details.impactLevel", { level: idea.impact })}
+				</Chip>
+			)}
+			{isCodeQualityIdea(idea) && (
+				<Chip tone={IDEA_LEVEL_TONES[idea.severity]}>{idea.severity}</Chip>
+			)}
+		</div>
+	);
 }
 
+interface IdeaCardProps {
+	readonly idea: Idea;
+	readonly isSelected: boolean;
+	readonly onClick: () => void;
+	readonly onConvert: (idea: Idea) => void;
+	readonly onGoToTask?: (taskId: string) => void;
+	readonly onDismiss: (idea: Idea) => void;
+	readonly onToggleSelect: (ideaId: string) => void;
+}
+
+/** One idea: a card railed in its type's tone; the body opens the details. */
 export function IdeaCard({
 	idea,
 	isSelected,
@@ -58,220 +90,74 @@ export function IdeaCard({
 	const isArchived = idea.status === "archived";
 	const isConverted = idea.status === "converted";
 	const isInactive = isDismissed || isArchived;
+	const taskId = idea.taskId;
+	const showTaskLink = (isArchived || isConverted) && taskId && onGoToTask;
 
 	return (
-		<Card
-			className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors ${
-				isInactive ? "opacity-50" : ""
-			} ${isSelected ? "ring-2 ring-primary bg-primary/5" : ""}`}
-			onClick={onClick}
+		<div
+			className={cn(
+				"wp-card wp-card-pad wp-rail flex items-start gap-3",
+				toneClass(IDEATION_TYPE_TONES[idea.type]),
+				isInactive && "opacity-55",
+			)}
+			data-active={isSelected ? "true" : undefined}
 		>
-			<div className="flex items-start gap-3">
-				{/* Selection checkbox */}
-				{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: checkbox toggle proxy */}
-				{/* biome-ignore lint/a11y/noStaticElementInteractions: checkbox toggle proxy */}
-				{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled by card */}
-				<div
-					className="pt-0.5"
-					onClick={(e) => {
-						e.stopPropagation();
-						onToggleSelect(idea.id);
-					}}
+			<Checkbox
+				checked={isSelected}
+				onCheckedChange={() => onToggleSelect(idea.id)}
+				className="mt-0.5"
+				aria-label={t("accessibility.selectIdeaAriaLabel", {
+					title: idea.title,
+				})}
+			/>
+			<button
+				type="button"
+				className="min-w-0 flex-1 cursor-pointer text-left"
+				onClick={onClick}
+			>
+				<IdeaChips idea={idea} />
+				<h3
+					className={cn(
+						"wp-title mt-2 text-sm",
+						isInactive && "line-through",
+					)}
 				>
-					<Checkbox
-						checked={isSelected}
-						className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-						aria-label={t("accessibility.selectIdeaAriaLabel", {
-							title: idea.title,
-						})}
+					{idea.title}
+				</h3>
+				<p className="wp-muted mt-1 line-clamp-2 text-xs">
+					{idea.description}
+				</p>
+			</button>
+			{!isInactive && !isConverted && (
+				<div className="flex shrink-0 items-center gap-1">
+					<CharterButton
+						size="sm"
+						variant="ghost"
+						icon={Play}
+						onClick={() => onConvert(idea)}
+						aria-label={t("accessibility.convertToTaskAriaLabel")}
+						title={t("accessibility.convertToTaskAriaLabel")}
+					/>
+					<CharterButton
+						size="sm"
+						variant="ghost"
+						icon={X}
+						onClick={() => onDismiss(idea)}
+						aria-label={t("accessibility.dismissAriaLabel")}
+						title={t("accessibility.dismissAriaLabel")}
 					/>
 				</div>
-
-				<div className="flex-1 flex items-start justify-between">
-					<div className="flex-1">
-						<div className="flex items-center gap-2 mb-1">
-							<Badge
-								variant="outline"
-								className={IDEATION_TYPE_COLORS[idea.type]}
-							>
-								<TypeIcon type={idea.type} />
-								<span className="ml-1">{t(`ideation:types.${idea.type}`)}</span>
-							</Badge>
-							{idea.status !== "draft" && (
-								<Badge
-									variant="outline"
-									className={IDEATION_STATUS_COLORS[idea.status]}
-								>
-									{idea.status}
-								</Badge>
-							)}
-							{isCodeImprovementIdea(idea) && (
-								<Badge
-									variant="outline"
-									className={
-										IDEATION_EFFORT_COLORS[
-											(idea as CodeImprovementIdea).estimatedEffort
-										]
-									}
-								>
-									{(idea as CodeImprovementIdea).estimatedEffort}
-								</Badge>
-							)}
-							{isUIUXIdea(idea) && (
-								<Badge variant="outline">
-									{UIUX_CATEGORY_LABELS[(idea as UIUXImprovementIdea).category]}
-								</Badge>
-							)}
-							{isDocumentationGapIdea(idea) && (
-								<Badge variant="outline">
-									{
-										DOCUMENTATION_CATEGORY_LABELS[
-											(idea as DocumentationGapIdea).category
-										]
-									}
-								</Badge>
-							)}
-							{isSecurityHardeningIdea(idea) && (
-								<Badge
-									variant="outline"
-									className={
-										SECURITY_SEVERITY_COLORS[
-											(idea as SecurityHardeningIdea).severity
-										]
-									}
-								>
-									{(idea as SecurityHardeningIdea).severity}
-								</Badge>
-							)}
-							{isPerformanceOptimizationIdea(idea) && (
-								<Badge
-									variant="outline"
-									className={
-										IDEATION_IMPACT_COLORS[
-											(idea as PerformanceOptimizationIdea).impact
-										]
-									}
-								>
-									{t("ideation:details.impactLevel", {
-									level: (idea as PerformanceOptimizationIdea).impact,
-								})}
-								</Badge>
-							)}
-							{isCodeQualityIdea(idea) && (
-								<Badge
-									variant="outline"
-									className={
-										CODE_QUALITY_SEVERITY_COLORS[
-											(idea as CodeQualityIdea).severity
-										]
-									}
-								>
-									{(idea as CodeQualityIdea).severity}
-								</Badge>
-							)}
-						</div>
-						<h3 className={`font-medium ${isInactive ? "line-through" : ""}`}>
-							{idea.title}
-						</h3>
-						<p className="text-sm text-muted-foreground line-clamp-2">
-							{idea.description}
-						</p>
-					</div>
-					{/* Action buttons */}
-					{!isInactive && !isConverted && (
-						<div className="flex items-center gap-1 ml-2">
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0"
-										onClick={(e) => {
-											e.stopPropagation();
-											onConvert(idea);
-										}}
-										aria-label={t("accessibility.convertToTaskAriaLabel")}
-									>
-										<Play className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.convertToTaskAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-										onClick={(e) => {
-											e.stopPropagation();
-											onDismiss(idea);
-										}}
-										aria-label={t("accessibility.dismissAriaLabel")}
-									>
-										<X className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.dismissAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-					{/* Archived ideas show link to task */}
-					{isArchived && idea.taskId && onGoToTask && (
-						<div className="flex items-center gap-1 ml-2">
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0 text-primary"
-										onClick={(e) => {
-											e.stopPropagation();
-											// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-											onGoToTask(idea.taskId!);
-										}}
-										aria-label={t("accessibility.goToTaskAriaLabel")}
-									>
-										<ExternalLink className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.goToTaskAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-					{/* Legacy: converted status also shows link to task */}
-					{isConverted && idea.taskId && onGoToTask && (
-						<div className="flex items-center gap-1 ml-2">
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0 text-primary"
-										onClick={(e) => {
-											e.stopPropagation();
-											// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-											onGoToTask(idea.taskId!);
-										}}
-										aria-label={t("accessibility.goToTaskAriaLabel")}
-									>
-										<ExternalLink className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.goToTaskAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-				</div>
-			</div>
-		</Card>
+			)}
+			{showTaskLink && (
+				<CharterButton
+					size="sm"
+					variant="ghost"
+					icon={ExternalLink}
+					onClick={() => onGoToTask(taskId)}
+					aria-label={t("accessibility.goToTaskAriaLabel")}
+					title={t("accessibility.goToTaskAriaLabel")}
+				/>
+			)}
+		</div>
 	);
 }

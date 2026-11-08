@@ -164,6 +164,10 @@
 		},
 		"qa_unverified": {
 			"title": "Prête pour révision — QA non vérifiée"
+		},
+		"split": {
+			"title": "Tâche découpée en plus petites tâches",
+			"description": "« {{title}} » est devenue {{count}} tâches, une petite PR chacune. Elles sont dans la file d'attente."
 		}
 	},
 	"columns": {
@@ -313,6 +317,8 @@
 			"button": "Filtrer",
 			"title": "Filtres",
 			"clear": "Réinitialiser",
+			"groupActive": "Groupe {{group}}",
+			"groupClear": "Afficher toutes les tâches",
 			"clearSearch": "Effacer la recherche",
 			"searchPlaceholder": "Rechercher une tâche…",
 			"sourceLabel": "Source",
@@ -648,7 +654,8 @@
 			"refactoring": "Refactoring",
 			"test": "Tests",
 			"docs": "Documentation",
-			"spike": "Étude / POC"
+			"spike": "Étude / POC",
+			"upgrade": "Mise à jour de version"
 		},
 		"source": {
 			"user": "choisi par vous",
@@ -840,6 +847,16 @@
 					"critical": "Impact critique"
 				}
 			}
+		},
+		"autoSplit": {
+			"label": "Découper automatiquement si la tâche est trop grosse",
+			"description": "Une fois le plan écrit, une tâche au-delà du plafond de lignes devient plusieurs tâches, une petite PR chacune, enchaînées selon leurs dépendances.",
+			"projectOff": "Le découpage automatique est désactivé dans les paramètres du projet.",
+			"maxLinesLabel": "Lignes à relire max par PR",
+			"maxLinesPlaceholder": "{{count}} (projet, {{kind}})",
+			"maxLinesHelp": "Laisser vide pour utiliser le plafond du projet pour ce type de tâche. Tests et doc comptent pour moitié, les lockfiles pas du tout.",
+			"maxLinesInvalid": "Saisis un nombre entier entre {{min}} et {{max}}.",
+			"maxLinesPlaceholderNever": "jamais découpée ({{kind}})"
 		}
 	},
 	"testGen": {
@@ -2353,5 +2370,16 @@
 			"pr_url_unreadable": "Le lien de la pull request est illisible : changez sa base sur la forge.",
 			"unknown": "L'opération a échoué."
 		}
+	},
+	"split": {
+		"groupBadge": "Partie {{index}}/{{total}} · {{title}}",
+		"showGroup": "Cliquer pour n'afficher que ce groupe",
+		"showAll": "Cliquer pour afficher toutes les tâches",
+		"partTooltip": "Partie {{index}} sur {{total}} de « {{title}} » : {{name}}",
+		"parentBadge": "Découpée en {{count}} tâches",
+		"parentTooltip": "Le plan dépassait {{lines}} lignes à relire par PR : cette tâche est devenue {{count}} tâches.",
+		"overBadge": "{{lines}} / {{max}} lignes",
+		"overFilesBadge": "{{files}} / {{max}} fichiers",
+		"overTooltip": "Le diff réel compte environ {{lines}} lignes à relire dans {{files}} fichiers, au-delà du plafond de {{max}} lignes et {{maxFiles}} fichiers pour ce type de tâche : la relecture sera plus longue."
 	}
 }

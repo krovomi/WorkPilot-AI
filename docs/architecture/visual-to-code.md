@@ -128,13 +128,68 @@ technologie d'un bloc restent les siens. Tout ce qui revient du stockage
 repasse par `normalizeBrick` (nom requis, longueurs bornées, icône connue,
 couleur hexadécimale).
 
+## Les connexions : règles, relations, connexions forcées
+
+`architecture-connections.ts` tient la table des paires cohérentes (`RULES`),
+dans le sens de la requête ou du flux de données : un client appelle un
+service, un service lit sa base, déclenche un worker ou pousse vers ses
+clients (SignalR, WebSocket), une file est consommée par un worker, un
+fournisseur rappelle un backend par webhook, une base diffuse ses changements
+(CDC) ou se réplique, et tout bloc typé remonte vers le monitoring. Les
+sources qui se ressemblent partagent leurs lignes (`CLIENT_COMMON`,
+`SERVICE_COMMON`) pour qu'un backend et un microservice ne divergent plus.
+
+Une paire hors table n'est pas interdite, elle est **inhabituelle** :
+`useConnectBlocks` affiche « Connexion inhabituelle » avec la raison tirée de
+`connection-verdicts.ts` et « Relier quand même ». Chaque type de bloc y a un
+rôle (client, point d'entrée, CDN, service, worker, stockage, messagerie,
+identité, tiers, livraison, observation) et chaque famille de paires refusées
+une raison — un client ne touche jamais un stockage ni une file, un stockage
+et une file sont passifs, la gateway est réservée aux clients, un worker ne
+parle pas à l'utilisateur… — avec les blocs à intercaler. Quand le sens
+inverse est un lien connu, la flèche était à l'envers : « Inverser le sens »
+la retourne. Un test vérifie qu'aucune des 361 paires de blocs typés ne
+tombe sur la raison générique. Le fil forcé porte `data.forced` et se dessine
+en pointillés ; sa relation est générique jusqu'à ce que la personne en
+choisisse une. Les blocs libres et « custom » n'ont pas de règle.
+
+## La cohérence au-delà de la paire
+
+- **Stacks** (`stack-rules.ts`) : un lien valide peut ne pas marcher avec les
+  technologies choisies (Celery ne consomme pas Kafka, BullMQ et Sidekiq ne
+  vivent que sur Redis, un mobile n'embarque pas PostgreSQL, Elasticsearch ne
+  s'expose pas au navigateur, SendGrid ne pousse pas vers une app…). C'est un
+  avertissement : le lien reste, l'inspecteur et une notification le disent.
+- **Schéma entier** (`architecture-lint.ts`) : une base par microservice, pas
+  de cycle d'appels synchrones entre services, un seul point d'entrée quand
+  une gateway existe (un BFF conseillé au-delà de trois services appelés par
+  un client), pas de client lourd qui écrit la base *et* passe par le backend,
+  toute file consommée et alimentée, tout stockage possédé, identité utilisée,
+  worker déclenché, aucun bloc isolé, et les liens forcés.
+- Où on les voit : « Points d'attention » dans la barre d'état
+  (`ArchitectureChecks`, un clic sélectionne les blocs et liens concernés), et
+  la section « Points d'architecture à régler » de la spécification de build,
+  pour que l'agent ne reproduise pas une base partagée ou un cycle.
+
+La **relation** de l'inspecteur (`RelationField`) est une liste déroulante :
+le libellé du canvas, puis ce qui relie habituellement ces deux blocs *avec
+leurs stacks* (`relationOptions` → `connection-protocols.ts`) — gRPC-Web
+depuis un navigateur, SignalR dès qu'un bout est .NET, tRPC entre TypeScript
+et Node, EF Core / JPA / Prisma / Eloquent / Active Record vers une base SQL,
+le protocole du broker et la bibliothèque de messagerie de la stack
+(MassTransit, Spring Kafka, Celery…), FCM / APNs vers un mobile. Elle finit par
+« Autre (saisie libre)… » ; une relation inconnue de la liste s'ouvre dans ce
+champ libre, gardée telle quelle. `connection-protocols.test.ts` vérifie que
+chaque stack de la palette a sa bibliothèque d'accès aux données.
+
 ## Les explications des interactions (`explainConnection`)
 
 Chaque connexion porte sa relation (« lit / écrit ») et une phrase. La phrase
-est écrite par le canvas depuis les deux blocs (`EXPLAIN` dans
-`architecture-connections.ts`, une par relation, testé) **tant que la personne
+est écrite par le canvas depuis les deux blocs (`VERBS` dans
+`architecture-connections.ts`, une par paire connue, testé) **tant que la personne
 n'a pas écrit la sienne** (`data.description`). Garder la phrase automatique
 comme texte figerait les noms : renommer un bloc ne la mettrait plus à jour.
+La phrase ne nomme jamais de protocole : la personne peut en choisir un autre.
 C'est pourquoi l'éditeur ne stocke un texte que s'il diffère de l'automatique,
 et qu'un texte vidé revient à l'automatique. Les deux partent dans la
 spécification de build, une ligne par connexion.
@@ -142,3 +197,48 @@ spécification de build, une ligne par connexion.
 **Écart de colonnes de 520 px** (`canvas-layout.ts`) : une carte (jusqu'à
 280 px) plus la phrase posée sur ses fils (jusqu'à 240 px) ; plus serré, la
 phrase tombe sur la carte suivante.
+
+## Import Design (`visual-to-code/design-import/`)
+
+L'onglet « Import Design » transforme une image (maquette, capture, export
+Figma) en composants de la stack du projet. Avant la refonte, il ne marchait
+pas de bout en bout : le runner plantait à la première ligne (`debug_section`
+sans module, `aiofiles` absent), le projet transmis était un dossier
+temporaire, et sans clé d'API la page montrait un exemple inventé comme s'il
+était une analyse.
+
+| Où | Quoi |
+|---|---|
+| `apps/backend/services/design_to_code_stacks.py` | une fiche par stack (15 : web, mobile, desktop) : prompt, fichier d'exemple, ce qu'est un composant, test visuel |
+| `apps/backend/services/design_to_code_service.py` | le pipeline : vision, jetons du design system, spec, code, tests ; une ligne de progression par phase |
+| `apps/backend/runners/design_to_code_runner.py` | le runner ; `--no-write` quand l'app l'appelle |
+| `main/design-to-code-service.ts` | le pont : requête revalidée, projet nommé par son id, écriture confinée |
+| `main/design-to-code-stack.ts` | la stack du projet lue dans ses manifestes (racine et sous-dossiers directs) |
+| `stores/design-to-code-store.ts`, `lib/design-import-steps.ts` | l'état de la page et l'état de chaque étape |
+
+**Le run lit le projet, il n'écrit rien.** Le runner reçoit toujours
+`--no-write` ; la page montre les fichiers (« nouveau » ou « remplace ») et
+seul `writeDesignFiles`, sur un clic, écrit ceux que la personne a acceptés.
+Chaque chemin passe par `resolveWritableUnder` (liens compris) ; `.git`,
+`.workpilot*`, `.claude*`, `.env*` et `.github/workflows` sont refusés, quel
+que soit ce que le modèle a proposé. Un fichier refusé est listé avec sa
+raison, pas ignoré en silence.
+
+**La vision passe par l'abonnement Claude quand il n'y a pas de clé.** Le
+client SDK de l'agent `commit_message` (sans outil) reçoit l'image comme bloc
+de contenu. Un agent qui lirait l'image avec l'outil `Read` pourrait suivre un
+texte injecté dans la maquette ; sans outil, ce texte reste une donnée. Sans
+aucun modèle, le résultat porte `simulated: true` et la page l'annonce.
+
+**Toutes les stacks, pas seulement React.** La cible se choisit dans le
+composer, et la stack détectée est proposée sans écraser un choix déjà fait.
+Les tests visuels suivent la stack (Playwright sur trois tailles d'écran,
+golden Flutter, SnapshotTesting, Paparazzi, Jest pour React Native) ; MAUI,
+WPF/WinUI et Avalonia n'en ont pas d'outil commun, et l'étape l'affiche comme
+« non prise en charge » au lieu de produire un fichier qui ne tournerait pas.
+
+**Les blocs et les phrases ne se confondent pas.** Les six étapes sont des
+cartes ; la phrase entre deux étapes est du texte en italique sans cadre,
+modifiable, gardé dans `localStorage` (`design-import-notes`). C'est la
+demande qui a lancé la refonte : avec un cadre, les phrases se lisaient comme
+des blocs.

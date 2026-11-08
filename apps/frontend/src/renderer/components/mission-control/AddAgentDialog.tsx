@@ -17,6 +17,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
+import "../charter/charter.css";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import {
@@ -74,7 +75,7 @@ export function AddAgentDialog({
 	onOpenChange,
 	onAdd,
 }: AddAgentDialogProps) {
-	const { t } = useTranslation(["missionControl"]);
+	const { t } = useTranslation(["missionControl", "navigation"]);
 	const [name, setName] = useState("");
 	const [role, setRole] = useState("coder");
 	const [provider, setProvider] = useState("anthropic");
@@ -115,8 +116,9 @@ export function AddAgentDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className="wp-scope sm:max-w-md">
 				<DialogHeader>
+					<span className="wp-kicker">{t("navigation:items.missionControl")}</span>
 					<DialogTitle className="flex items-center gap-2">
 						<Rocket className="h-5 w-5 text-primary" />
 						{t("missionControl:addAgentTitle", "Add Agent")}

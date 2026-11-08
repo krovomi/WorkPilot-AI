@@ -9,7 +9,9 @@ this test keeps new views on it.
 The screens left out are not views of the main window: the onboarding wizard
 steps, the welcome screen and the Mission Control launch hero are full-screen
 layouts with their own large title, and ``PRHeader`` titles one pull request
-inside the PR view.
+inside the PR view. ``charter/index.tsx`` holds ``ModuleHeader``, the UI
+charter's shared header (docs/architecture/ui-charter.md), which views use in
+the same way.
 """
 
 from __future__ import annotations
@@ -22,9 +24,9 @@ COMPONENTS = ROOT / "apps" / "frontend" / "src" / "renderer" / "components"
 
 ALLOWED = {
     "ui/page-header.tsx",
+    "charter/index.tsx",
     "WelcomeScreen.tsx",
     "github-prs/components/PRHeader.tsx",
-    "mission-control/MissionControlDashboard.tsx",
 }
 ALLOWED_DIRS = ("onboarding/",)
 

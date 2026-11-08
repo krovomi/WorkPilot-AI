@@ -40,19 +40,21 @@ to that path is stale and should point at `config/`.
 {
   "providers": [
     {
-      "id": "anthropic",
+      "name": "anthropic",
       "label": "Anthropic (Claude)",
-      "models": ["claude-3-5-sonnet-20241022", "claude-opus-4-7"],
-      "default_model": "claude-opus-4-7",
-      "capabilities": ["chat", "tools", "streaming"]
+      "description": "Claude, focalisé sur la sécurité et l’IA d’entreprise."
     }
   ]
 }
 ```
 
+Each entry has exactly these three fields. The models a provider offers come from the model
+catalog (below), and what it can do when it drives a task (agent client, subagents, MCP, sandbox,
+effort) from [`capabilities/providers.yaml`](../capabilities/providers.yaml).
+
 If you add a new provider field, update both consumers in the same PR:
 - backend: `apps/backend/provider_api.py`
-- frontend: `apps/frontend/src/renderer/services/providers.*` (or equivalent)
+- frontend: `apps/frontend/src/shared/services/providerService.ts`
 
 ---
 
@@ -547,6 +549,19 @@ it is missing, the Claude provider's commands run without isolation and the task
 `Sandbox (claude): commands are NOT isolated: … socat … install it with …`. On Debian, Ubuntu or
 WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
 command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
+
+## Automatic split of big tasks (`task_split`)
+
+After planning, a task whose plan is bigger than the ceiling becomes several smaller tasks, one
+pull request each, see [architecture/task-split.md](architecture/task-split.md). The app sets these
+from Project settings → General; a task's own `noSplit` / `splitMaxLines` (task form) wins.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_AUTO_SPLIT` | `1` | `0` keeps every task whole. |
+| `WORKPILOT_SPLIT_MAX_LINES_BY_KIND` | — | JSON object, kind of task to lines to review per part, e.g. `{"bug_fix":150,"feature":500}`. Kinds: `feature` (400), `bug_fix` (200), `hotfix` (100), `refactoring` (300), `upgrade` (200), `test` (400), `docs` (400); `investigation`, `spike` and `run` are never split. |
+| `WORKPILOT_SPLIT_MAX_LINES` | per kind | Lines to review per part for every kind the JSON above leaves out (50 to 20000; out of range is ignored). Code counts 1, tests and docs 0.5, generated files and lockfiles 0. |
+| `WORKPILOT_SPLIT_MAX_FILES` | `25` | Files per part (2 to 1000; out of range is ignored). |
 
 ## RUN tasks — `.workpilot/environments.toml`
 

@@ -1,39 +1,15 @@
 import { JevSettings } from "./JevSettings";
 import { BrainSettings } from "./BrainSettings";
 import {
-	Bell,
-	Bot,
-	Brain,
-	Bug,
-	CalendarClock,
+	AlertTriangle,
 	ChevronRight,
-	Cloud,
-	Code,
 	Compass,
-	FolderOpen,
-	Globe,
-	KeyRound,
 	Loader2,
-	MessageSquare,
-	Mic,
-	Monitor,
-	Package,
-	Palette,
-	Plug,
-	Repeat,
 	Save,
 	Search,
 	Settings,
-	Settings2,
-	Shield,
-	ShieldAlert,
 	Sparkles,
-	Terminal,
-	UserPlus,
-	Users,
-	Workflow,
 	X,
-	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,6 +26,7 @@ import { CollaborationSettings } from "../collaboration/CollaborationSettings";
 import { ServerMcpSettings } from "./ServerMcpSettings";
 import { ServerNeedsYouSettings } from "./ServerNeedsYouSettings";
 import { ServerTokensSettings } from "./ServerTokensSettings";
+import { ModuleStage, Notice, toneClass } from "../charter";
 import { Button } from "../ui/button";
 import {
 	FullScreenDialog,
@@ -74,40 +51,12 @@ import { ProjectSettingsContent } from "./ProjectSettingsContent";
 import { GuardrailsSettings } from "./GuardrailsSettings";
 import { SandboxSettings } from "./SandboxSettings";
 import { SchedulerSettings } from "./SchedulerSettings";
+import { SettingsPageContext } from "./SettingsSection";
 import { resolveSettingsLanding } from "./settings-landing";
 import { filterSettingsThemes } from "./settings-search";
+import { createSettingsThemes, type SettingsTheme, themeOfSection } from "./settings-themes";
 import { SwarmModeSettings } from "./SwarmModeSettings";
 import { ThemeSettings } from "./ThemeSettings";
-
-// GitLab icon component (lucide-react doesn't have one)
-function GitLabIcon({ className }: { readonly className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox="0 0 24 24"
-			fill="currentColor"
-			aria-label="GitLab"
-		>
-			<title>GitLab</title>
-			<path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z" />
-		</svg>
-	);
-}
-
-// Jira icon component (lucide-react doesn't include one)
-function JiraIcon({ className }: { readonly className?: string }) {
-	return (
-		<svg
-			className={className}
-			viewBox="0 0 24 24"
-			fill="currentColor"
-			aria-label="Jira"
-		>
-			<title>Jira</title>
-			<path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84h-9.63zM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.83-.83H6.77zM2 11.6a4.35 4.35 0 0 0 4.34 4.34h1.8v1.72a4.35 4.35 0 0 0 4.34 4.34v-9.57a.84.84 0 0 0-.84-.84H2z" />
-		</svg>
-	);
-}
 
 interface AppSettingsDialogProps {
 	readonly open: boolean;
@@ -169,228 +118,7 @@ export type ProjectSettingsSection =
 	| "linear"
 	| "teams";
 
-export type SettingsTheme =
-	| "project" // Projet
-	| "integrations" // Intégrations & Connexions
-	| "interface" // Interface & Apparence
-	| "development" // Développement & Outils
-	| "security" // Sécurité & Performance
-	| "system"; // Système & Maintenance
-
-// Configuration des thèmes de paramètres avec leurs sections
-const createSettingsThemes = (t: {
-	(key: string): string;
-	(key: string, fallback: string): string;
-	(key: string, options: Record<string, unknown>): string;
-}): Record<
-	SettingsTheme,
-	{
-		title: string;
-		icon: React.ElementType;
-		color: string;
-		sections: Array<{
-			id: string;
-			icon: React.ElementType;
-			label: string;
-			type: "app" | "project";
-		}>;
-		description: string;
-		priority: number;
-	}
-> => ({
-	project: {
-		title: "Projet",
-		icon: Settings2,
-		color: "text-blue-600",
-		sections: [
-			{ id: "general", icon: Settings2, label: "Général", type: "project" },
-		],
-		description: "Configuration du projet actuel",
-		priority: 1,
-	},
-	integrations: {
-		title: "Intégrations & Connexions",
-		icon: Users,
-		color: "text-purple-600",
-		sections: [
-			{ id: "accounts", icon: Users, label: "Comptes IA", type: "app" },
-			{ id: "github", icon: Globe, label: "GitHub", type: "project" },
-			{ id: "gitlab", icon: GitLabIcon, label: "GitLab", type: "project" },
-			{
-				id: "azure-devops",
-				icon: Cloud,
-				label: "Azure DevOps",
-				type: "project",
-			},
-			{ id: "jev", icon: Zap, label: t("jev.title"), type: "app" },
-			{
-				id: "brain",
-				icon: Brain,
-				label: t("brain:settings.title"),
-				type: "app",
-			},
-			{ id: "jira", icon: JiraIcon, label: "Jira", type: "project" },
-			{ id: "figma", icon: Palette, label: "Figma", type: "project" },
-			{ id: "linear", icon: Zap, label: "Linear", type: "project" },
-			{
-				id: "cicd",
-				icon: Workflow,
-				label: t("cicd.title", "Pipeline CI/CD"),
-				type: "project",
-			},
-			{
-				id: "automations",
-				icon: Repeat,
-				label: t("automations.title"),
-				type: "project",
-			},
-			{
-				id: "board-mcp",
-				icon: Plug,
-				label: t("boardMcp.navLabel"),
-				type: "project",
-			},
-			{
-				id: "teams",
-				icon: MessageSquare,
-				label: t(
-					"channelNotifications.navLabel",
-					"Notifications (Teams, Slack…)",
-				),
-				type: "project",
-			},
-			{
-				id: "team-invitations",
-				icon: UserPlus,
-				label: t("invitationsAdmin.navLabel", "Invitations (équipe)"),
-				type: "app",
-			},
-			{
-				id: "server-tokens",
-				icon: KeyRound,
-				label: t("serverTokens.navLabel"),
-				type: "app",
-			},
-			{
-				id: "server-mcp",
-				icon: Plug,
-				label: t("serverMcp.navLabel"),
-				type: "app",
-			},
-			{
-				id: "server-needs-you",
-				icon: Bell,
-				label: t("serverNeedsYou.navLabel"),
-				type: "app",
-			},
-			{
-				id: "server-collaboration",
-				icon: Users,
-				label: t("serverCollaboration.navLabel"),
-				type: "app",
-			},
-		],
-		description: "Comptes IA et intégrations externes",
-		priority: 2,
-	},
-	interface: {
-		title: "Interface & Apparence",
-		icon: Palette,
-		color: "text-pink-600",
-		sections: [
-			{ id: "appearance", icon: Palette, label: "Apparence", type: "app" },
-			{ id: "display", icon: Monitor, label: "Affichage", type: "app" },
-			{ id: "language", icon: Globe, label: "Langue", type: "app" },
-			{
-				id: "voice-assistant",
-				icon: Mic,
-				label: t("voiceAssistant:settings.title"),
-				type: "app",
-			},
-			{
-				id: "terminal-fonts",
-				icon: Terminal,
-				label: "Polices terminal",
-				type: "app",
-			},
-		],
-		description: "Personnalisation de l'interface",
-		priority: 3,
-	},
-	development: {
-		title: "Développement & Outils",
-		icon: Code,
-		color: "text-success",
-		sections: [
-			{
-				id: "devtools",
-				icon: Code,
-				label: "Outils de développement",
-				type: "app",
-			},
-			{
-				id: "paths",
-				icon: FolderOpen,
-				label: t("sections.paths.title"),
-				type: "app",
-			},
-			{ id: "agent", icon: Bot, label: "Agent", type: "app" },
-			{
-				id: "swarm-mode",
-				icon: Zap,
-				label: t("swarm:title", "Swarm Mode"),
-				type: "app",
-			},
-		],
-		description: "Outils de développement et configuration",
-		priority: 4,
-	},
-	security: {
-		title: "Sécurité & Performance",
-		icon: Shield,
-		color: "text-orange-600",
-		sections: [
-			{
-				id: "guardrails",
-				icon: Shield,
-				label: t("guardrails.title", "Agent Guardrails"),
-				type: "app",
-			},
-			{
-				id: "anomaly-detection",
-				icon: ShieldAlert,
-				label: t("sections.anomaly-detection.title"),
-				type: "app",
-			},
-			{
-				id: "sandbox",
-				icon: Shield,
-				label: t("sections.sandbox.title"),
-				type: "app",
-			},
-		],
-		description: "Sécurité et performance du système",
-		priority: 5,
-	},
-	system: {
-		title: "Système & Maintenance",
-		icon: Package,
-		color: "text-gray-600",
-		sections: [
-			{ id: "notifications", icon: Bell, label: "Notifications", type: "app" },
-			{ id: "debug", icon: Bug, label: "Debug", type: "app" },
-			{
-				id: "scheduler",
-				icon: CalendarClock,
-				label: "Planification",
-				type: "app",
-			},
-			{ id: "updates", icon: Package, label: "Mises à jour", type: "app" },
-		],
-		description: "Maintenance et système",
-		priority: 6,
-	},
-});
+export type { SettingsTheme };
 
 /**
  * App sections that manage their own multi-column layout and are rendered at the
@@ -759,6 +487,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 		setIsSearchOpen(false);
 	}, []);
 
+	// The group of the page on screen: its title is the kicker above the page.
+	const activeTheme = themeOfSection(
+		SETTINGS_THEMES,
+		activeTopLevel === "app" ? appSection : projectSection,
+	);
+	const pageContext = { kicker: activeTheme?.title, tone: activeTheme?.tone };
+
 	const isSearching = searchQuery.trim().length > 0;
 	const filteredThemes = filterSettingsThemes(SETTINGS_THEMES, searchQuery);
 
@@ -778,6 +513,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			}}
 		>
 			<FullScreenDialogContent
+				className="wp-scope"
 				onEscapeKeyDown={(event) => {
 					// Échap vide d'abord le filtre, et ne ferme les paramètres
 					// qu'ensuite. Radix écoute le clavier en phase de capture,
@@ -794,21 +530,26 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 					}
 				}}
 			>
-				<FullScreenDialogHeader>
-					<FullScreenDialogTitle className="flex items-center gap-3">
-						<Settings className="h-6 w-6" />
-						{t("title")}
-					</FullScreenDialogTitle>
-					<FullScreenDialogDescription>
-						{t("tabs.app")} & {t("tabs.project")}
-					</FullScreenDialogDescription>
+				<FullScreenDialogHeader className="flex-row items-center gap-3 space-y-0 border-dashed">
+					<span className="wp-empty-glyph h-9 w-9 shrink-0" aria-hidden="true">
+						<Settings className="h-4 w-4" />
+					</span>
+					<div className="wp-header-text">
+						<span className="wp-kicker">{t("kicker")}</span>
+						<FullScreenDialogTitle className="wp-title wp-title-lg">
+							{t("title")}
+						</FullScreenDialogTitle>
+						<FullScreenDialogDescription className="wp-header-desc">
+							{t("headerDescription")}
+						</FullScreenDialogDescription>
+					</div>
 				</FullScreenDialogHeader>
 				<FullScreenDialogBody>
 					<div className="flex h-full">
 						{/* Navigation sidebar */}
 						<nav
 							className={cn(
-								"border-r border-border bg-muted/30 transition-all duration-300",
+								"wp-nav transition-all duration-300",
 								isNavigationCollapsed ? "w-16 p-2" : "w-80 p-4",
 							)}
 						>
@@ -924,8 +665,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 											}}
 											title={t("setupHub:navLabel")}
 											className={cn(
-												"w-full flex items-center rounded-lg transition-all",
-												"bg-primary/10 text-primary hover:bg-primary/20",
+												"wp-card wp-rail wp-tone-accent w-full flex items-center transition-all hover:bg-primary/10",
 												isNavigationCollapsed
 													? "justify-center p-2"
 													: "gap-3 p-3",
@@ -937,7 +677,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 													<div className="font-medium text-sm">
 														{t("setupHub:navLabel")}
 													</div>
-													<div className="text-xs text-primary/70 truncate">
+													<div className="wp-meta truncate">
 														{t("setupHub:navDescription")}
 													</div>
 												</div>
@@ -948,6 +688,9 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									{/* Thematic Navigation */}
 									{filteredThemes.map(([themeKey, theme]) => {
 										const Icon = theme.icon;
+										const tone = toneClass(
+											SETTINGS_THEMES[themeKey as SettingsTheme].tone,
+										);
 										const isThemeActive = theme.sections.some((section) => {
 											if (section.type === "app") {
 												return (
@@ -962,7 +705,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 										});
 
 										return (
-											<div key={themeKey} className="space-y-1">
+											<div key={themeKey} className={cn("space-y-1", tone)}>
 												{/* Theme Header */}
 												{isNavigationCollapsed ? (
 													<button
@@ -1002,7 +745,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 														)}
 														title={theme.title}
 													>
-														<Icon className={cn("h-5 w-5", theme.color)} />
+														<Icon className="wp-ink h-5 w-5" />
 													</button>
 												) : (
 													<div className="px-3 py-2">
@@ -1012,15 +755,12 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 																toggleThemeCollapse(themeKey as SettingsTheme)
 															}
 															className={cn(
-																"w-full flex items-center justify-between text-sm font-medium transition-all",
-																isThemeActive
-																	? "text-foreground"
-																	: "text-muted-foreground",
-																"hover:text-foreground",
+																"wp-kicker w-full flex items-center justify-between transition-all",
+																!isThemeActive && "opacity-80 hover:opacity-100",
 															)}
 														>
 															<div className="flex items-center gap-2">
-																<Icon className={cn("h-4 w-4", theme.color)} />
+																<Icon className="h-3.5 w-3.5" />
 																{theme.title}
 															</div>
 															<ChevronRight
@@ -1035,7 +775,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 																)}
 															/>
 														</button>
-														<div className="text-xs text-muted-foreground mt-1">
+														<div className="wp-muted mt-1 text-xs">
 															{theme.description}
 														</div>
 													</div>
@@ -1064,23 +804,6 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 																	section.type === "project" &&
 																	!selectedProjectId;
 
-																let activeOrDisabledClassName: string;
-																if (isActive) {
-																	activeOrDisabledClassName =
-																		"bg-accent text-accent-foreground";
-																} else if (isDisabled) {
-																	activeOrDisabledClassName =
-																		"opacity-50 cursor-not-allowed text-muted-foreground";
-																} else {
-																	activeOrDisabledClassName =
-																		"hover:bg-accent/50 text-muted-foreground hover:text-foreground";
-																}
-
-																const buttonClassName = cn(
-																	"w-full flex items-center gap-3 p-2 rounded-md text-left transition-all",
-																	activeOrDisabledClassName,
-																);
-
 																return (
 																	<button
 																		type="button"
@@ -1097,14 +820,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 																			}
 																		}}
 																		disabled={isDisabled}
-																		className={buttonClassName}
+																		aria-current={isActive ? "page" : undefined}
+																		className="wp-navitem"
 																	>
 																		<SectionIcon className="h-4 w-4 shrink-0" />
-																		<div className="min-w-0">
-																			<div className="font-medium text-xs">
-																				{section.label}
-																			</div>
-																		</div>
+																		<span className="min-w-0 truncate">
+																			{section.label}
+																		</span>
 																	</button>
 																);
 															})}
@@ -1117,7 +839,7 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									{isSearching &&
 										!isNavigationCollapsed &&
 										filteredThemes.length === 0 && (
-											<div className="px-3 py-6 text-center text-xs text-muted-foreground">
+											<div className="wp-meta px-3 py-6 text-center">
 												{t("search.noResults")}
 											</div>
 										)}
@@ -1125,25 +847,21 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 									{/* Re-run Wizard button - seulement si non replié, et
 									    hors filtrage, pour la même raison que le Setup Hub */}
 									{!isNavigationCollapsed && !isSearching && onRerunWizard && (
-										<div className="pt-4 border-t border-border">
+										<div className="pt-4 border-t border-dashed border-border">
 											<button
 												type="button"
 												onClick={() => {
 													onOpenChange(false);
 													onRerunWizard();
 												}}
-												className={cn(
-													"w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all",
-													"border border-dashed border-muted-foreground/30",
-													"hover:bg-accent/50 text-muted-foreground hover:text-foreground",
-												)}
+												className="wp-navitem items-start gap-3 border-dashed border-border p-3"
 											>
 												<Sparkles className="h-5 w-5 mt-0.5 shrink-0" />
 												<div className="min-w-0">
-													<div className="font-medium text-sm">
+													<div className="wp-title text-sm">
 														{t("actions.rerunWizard")}
 													</div>
-													<div className="text-xs text-muted-foreground truncate">
+													<div className="wp-meta truncate">
 														{t("actions.rerunWizardDescription")}
 													</div>
 												</div>
@@ -1155,8 +873,8 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 						</nav>
 
 						{/* Main content */}
-						<div className="flex-1 overflow-hidden">
-							<ScrollArea className="h-full">
+						<ModuleStage className="flex-1">
+							<ScrollArea className="relative z-[1] h-full">
 								<div
 									className={cn(
 										"p-8",
@@ -1166,18 +884,20 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 										!WIDE_APP_SECTIONS.has(appSection) && "max-w-2xl",
 									)}
 								>
-									{renderContent()}
+									<SettingsPageContext.Provider value={pageContext}>
+										{renderContent()}
+									</SettingsPageContext.Provider>
 								</div>
 							</ScrollArea>
-						</div>
+						</ModuleStage>
 					</div>
 				</FullScreenDialogBody>
 
-				<FullScreenDialogFooter>
+				<FullScreenDialogFooter className="border-dashed">
 					{(error || projectError) && (
-						<div className="flex-1 rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-2 text-sm text-destructive">
+						<Notice tone="red" icon={AlertTriangle} role="alert" className="flex-1">
 							{error || projectError}
-						</div>
+						</Notice>
 					)}
 					<Button variant="outline" onClick={handleCancel}>
 						{t("common:buttons.cancel", "Cancel")}

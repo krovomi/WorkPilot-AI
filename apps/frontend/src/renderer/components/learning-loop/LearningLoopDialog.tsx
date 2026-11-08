@@ -28,8 +28,16 @@ import {
 	useLearningLoopStore,
 } from "../../stores/learning-loop-store";
 import { useProjectStore } from "../../stores/project-store";
+import {
+	CharterButton,
+	EmptyStage,
+	Notice,
+	ScanLine,
+	Stat,
+	Stats,
+} from "../charter";
+import "../charter/charter.css";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -62,7 +70,7 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
  * and manage (enable/disable/delete) individual patterns.
  */
 export function LearningLoopDialog() {
-	const { t } = useTranslation(["learningLoop", "common"]);
+	const { t } = useTranslation(["learningLoop", "common", "navigation"]);
 	const streamOutputRef = useRef<HTMLPreElement>(null);
 	const [expandedPatterns, setExpandedPatterns] = useState<Set<string>>(
 		new Set(),
@@ -158,9 +166,10 @@ export function LearningLoopDialog() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
+			<DialogContent className="wp-scope sm:max-w-[900px] max-h-[90vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
+					<span className="wp-kicker">{t("navigation:groups.explore")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
 						<Brain className="h-5 w-5 text-primary" />
 						{t("learningLoop:title")}
 					</DialogTitle>
@@ -170,70 +179,51 @@ export function LearningLoopDialog() {
 				<div className="flex-1 overflow-y-auto space-y-4 py-2">
 					{/* Summary Cards */}
 					{summary && summary.total_patterns > 0 && (
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-							<div className="bg-muted/50 rounded-lg p-3 text-center">
-								<div className="text-2xl font-bold">
-									{summary.total_patterns}
-								</div>
-								<div className="text-xs text-muted-foreground">
-									{t("learningLoop:summary.totalPatterns")}
-								</div>
-							</div>
-							<div className="bg-muted/50 rounded-lg p-3 text-center">
-								<div className="text-2xl font-bold">
-									{summary.enabled_count}
-								</div>
-								<div className="text-xs text-muted-foreground">
-									{t("learningLoop:summary.enabled")}
-								</div>
-							</div>
-							<div className="bg-muted/50 rounded-lg p-3 text-center">
-								<div className="text-2xl font-bold">
-									{(summary.average_confidence * 100).toFixed(0)}%
-								</div>
-								<div className="text-xs text-muted-foreground">
-									{t("learningLoop:summary.avgConfidence")}
-								</div>
-							</div>
-							<div className="bg-muted/50 rounded-lg p-3 text-center">
-								<div className="text-2xl font-bold">
-									{summary.total_builds_analyzed}
-								</div>
-								<div className="text-xs text-muted-foreground">
-									{t("learningLoop:summary.buildsAnalyzed")}
-								</div>
-							</div>
-						</div>
+						<Stats>
+							<Stat
+								label={t("learningLoop:summary.totalPatterns")}
+								value={summary.total_patterns}
+							/>
+							<Stat
+								label={t("learningLoop:summary.enabled")}
+								value={summary.enabled_count}
+								tone="green"
+							/>
+							<Stat
+								label={t("learningLoop:summary.avgConfidence")}
+								value={`${(summary.average_confidence * 100).toFixed(0)}%`}
+								tone="violet"
+							/>
+							<Stat
+								label={t("learningLoop:summary.buildsAnalyzed")}
+								value={summary.total_builds_analyzed}
+								tone="blue"
+							/>
+						</Stats>
 					)}
 
 					{/* No Project Warning */}
 					{!selectedProjectId && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-							<p className="text-sm text-destructive">
-								{t("learningLoop:errors.noProject")}
-							</p>
-						</div>
+						<Notice tone="amber" icon={AlertTriangle}>
+							{t("learningLoop:errors.noProject")}
+						</Notice>
 					)}
 
 					{/* Error display */}
 					{isError && error && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 flex items-start gap-2">
-							<AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-							<p className="text-sm text-destructive">{error}</p>
-						</div>
+						<Notice tone="red" icon={AlertTriangle} role="alert">
+							{error}
+						</Notice>
 					)}
 
 					{/* Analyzing state */}
 					{isAnalyzing && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin text-primary" />
-								<span>{status || t("learningLoop:status.analyzing")}</span>
-							</div>
+							<ScanLine label={status || t("learningLoop:status.analyzing")} />
 							{streamingOutput && (
 								<pre
 									ref={streamOutputRef}
-									className="bg-muted/50 rounded-lg p-3 text-xs font-mono max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-words"
+									className="wp-code max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-words p-3 text-xs"
 								>
 									{streamingOutput}
 								</pre>
@@ -243,10 +233,9 @@ export function LearningLoopDialog() {
 
 					{/* Complete state */}
 					{isComplete && (
-						<div className="flex items-center gap-2 text-sm text-success ">
-							<Check className="h-4 w-4" />
-							<span>{t("learningLoop:status.complete")}</span>
-						</div>
+						<Notice tone="green" icon={Check} role="status">
+							{t("learningLoop:status.complete")}
+						</Notice>
 					)}
 
 					{/* Rules learned from reviews: candidates to adopt, adopted rules */}
@@ -257,7 +246,7 @@ export function LearningLoopDialog() {
 					{/* Patterns List */}
 					{!isAnalyzing && patterns.length > 0 && (
 						<div className="space-y-2">
-							<h3 className="text-sm font-medium">
+							<h3 className="wp-kicker block">
 								{t("learningLoop:patterns.title", { count: patterns.length })}
 							</h3>
 							<ScrollArea className="max-h-[400px]">
@@ -283,12 +272,14 @@ export function LearningLoopDialog() {
 
 					{/* Empty state */}
 					{!isAnalyzing && !isLoading && patterns.length === 0 && !isError && (
-						<div className="text-center py-8 text-muted-foreground">
-							<Brain className="h-12 w-12 mx-auto mb-3 opacity-30" />
-							<p className="text-sm">{t("learningLoop:empty.title")}</p>
-							<p className="text-xs mt-1">
+						<div className="flex justify-center py-4">
+							<EmptyStage
+								icon={Brain}
+								title={t("learningLoop:empty.title")}
+								tone="violet"
+							>
 								{t("learningLoop:empty.description")}
-							</p>
+							</EmptyStage>
 						</div>
 					)}
 
@@ -301,23 +292,26 @@ export function LearningLoopDialog() {
 				</div>
 
 				<DialogFooter className="flex justify-between sm:justify-between">
-					<Button variant="outline" onClick={handleClose}>
+					<CharterButton variant="ghost" onClick={handleClose}>
 						{t("common:actions.close")}
-					</Button>
+					</CharterButton>
 					<div className="flex gap-2">
 						{isAnalyzing && (
-							<Button variant="destructive" onClick={handleCancel}>
-								<X className="h-4 w-4 mr-1" />
+							<CharterButton variant="danger" icon={X} onClick={handleCancel}>
 								{t("common:actions.cancel")}
-							</Button>
+							</CharterButton>
 						)}
 						{!isAnalyzing && (
-							<Button onClick={handleStartAnalysis} disabled={!canStart}>
-								<RefreshCw className="h-4 w-4 mr-1" />
+							<CharterButton
+								variant="primary"
+								icon={RefreshCw}
+								onClick={handleStartAnalysis}
+								disabled={!canStart}
+							>
 								{patterns.length > 0
 									? t("learningLoop:actions.reanalyze")
 									: t("learningLoop:actions.analyze")}
-							</Button>
+							</CharterButton>
 						)}
 					</div>
 				</DialogFooter>
