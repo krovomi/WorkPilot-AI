@@ -307,6 +307,13 @@ const VERBS = {
 			fr: "{s} copie ses données vers {t}, qui en garde une réplique",
 		},
 	},
+	feeds: {
+		label: { en: "feeds", fr: "alimente" },
+		explain: {
+			en: "{s} copies each message it receives into {t}",
+			fr: "{s} recopie chaque message reçu dans {t}",
+		},
+	},
 	mirrorsTo: {
 		label: { en: "mirrors to", fr: "recopie vers" },
 		explain: {
@@ -410,6 +417,9 @@ const RULES: Record<string, Record<string, Rule>> = {
 		database: ["readsWrites", "data"],
 		storage: ["storesFiles", "storage"],
 		cache: ["cachesIn", "cache"],
+		// Industrial / enterprise thick clients publish to a broker directly.
+		queue: ["publishesTo", "publish"],
+		messagebroker: ["publishesTo", "publish"],
 	},
 	gateway: {
 		backend: ["routesTo", "route"],
@@ -417,6 +427,7 @@ const RULES: Record<string, Record<string, Rule>> = {
 		frontend: ["routesTo", "route"],
 		thirdparty: ["routesTo", "route"],
 		gateway: ["routesTo", "route"],
+		storage: ["routesTo", "route"],
 		auth: ["verifiesToken", "authServer"],
 		cache: ["cachesIn", "cache"],
 	},
@@ -437,6 +448,7 @@ const RULES: Record<string, Record<string, Rule>> = {
 		notification: ["sendsVia", "notify"],
 		auth: ["getsToken", "authMachine"],
 		analytics: ["sendsEvents", "analytics"],
+		cdn: ["purges", "purge"],
 	},
 	queue: {
 		worker: ["consumedBy", "consume"],
@@ -450,6 +462,10 @@ const RULES: Record<string, Record<string, Rule>> = {
 		microservice: ["deliversTo", "consume"],
 		queue: ["deliversTo", "brokerRoute"],
 		messagebroker: ["mirrorsTo", "brokerMirror"],
+		// Sink connectors (Kafka Connect, Logstash…) fill a store from a topic.
+		search: ["feeds", "brokerSink"],
+		database: ["feeds", "brokerSink"],
+		storage: ["feeds", "brokerSink"],
 	},
 	database: {
 		search: ["streamsChanges", "cdc"],
@@ -457,7 +473,11 @@ const RULES: Record<string, Record<string, Rule>> = {
 		messagebroker: ["streamsChanges", "cdc"],
 		database: ["replicatesTo", "replication"],
 	},
+	cache: {
+		cache: ["replicatesTo", "replication"],
+	},
 	storage: {
+		storage: ["replicatesTo", "replication"],
 		queue: ["emitsEvents", "objectEvents"],
 		messagebroker: ["emitsEvents", "objectEvents"],
 		worker: ["emitsEvents", "objectEvents"],
@@ -473,6 +493,9 @@ const RULES: Record<string, Record<string, Rule>> = {
 		cache: ["cachesIn", "cache"],
 		notification: ["sendsVia", "notify"],
 		thirdparty: ["federatesWith", "federation"],
+		// Identity events (sign-up, login) for the rest of the system.
+		queue: ["publishesTo", "publish"],
+		messagebroker: ["publishesTo", "publish"],
 	},
 	thirdparty: {
 		backend: ["callsBack", "webhook"],
@@ -486,6 +509,9 @@ const RULES: Record<string, Record<string, Rule>> = {
 		mobile: ["pushesTo", "push"],
 		desktop: ["pushesTo", "push"],
 		thirdparty: ["sendsVia", "notify"],
+		// Delivery and bounce statuses come back by webhook.
+		backend: ["callsBack", "webhook"],
+		microservice: ["callsBack", "webhook"],
 	},
 	monitoring: {
 		notification: ["alertsVia", "alerting"],
@@ -494,6 +520,7 @@ const RULES: Record<string, Record<string, Rule>> = {
 	analytics: {
 		database: ["exportsTo", "export"],
 		storage: ["exportsTo", "export"],
+		thirdparty: ["exportsTo", "export"],
 	},
 };
 
