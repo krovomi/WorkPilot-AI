@@ -24,6 +24,7 @@ const KIND_COLORS: Record<TaskKind, string> = {
 	test: "border-success/40 text-success ",
 	docs: "border-slate-500/40 text-slate-700 dark:text-slate-300",
 	spike: "border-fuchsia-500/40 text-fuchsia-700 dark:text-fuchsia-300",
+	upgrade: "border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
 };
 
 interface TaskKindBadgeProps {

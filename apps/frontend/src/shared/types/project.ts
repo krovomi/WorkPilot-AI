@@ -2,7 +2,7 @@
  * Project-related types
  */
 
-import type { EngineTrio } from "./task";
+import type { EngineTrio, TaskKind } from "./task";
 
 export interface Project {
 	id: string;
@@ -88,9 +88,13 @@ export interface ProjectSettings {
 	provider?: string;
 }
 
+/** The kinds of task the automatic split measures (the others stay whole). */
+export type SplitKind = Exclude<TaskKind, "investigation" | "spike" | "run">;
+
 export interface AutoSplitSettings {
 	enabled?: boolean;
-	maxLines?: number;
+	/** Lines to review per pull request, by kind; a missing kind is the default. */
+	maxLinesByKind?: Partial<Record<SplitKind, number>>;
 	maxFiles?: number;
 }
 

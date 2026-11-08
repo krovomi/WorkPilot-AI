@@ -28,6 +28,7 @@ import type {
 	TaskCategory,
 	TaskComplexity,
 	TaskImpact,
+	TaskKind,
 	TaskPriority,
 	ThinkingLevel,
 } from "../../../shared/types";
@@ -142,6 +143,7 @@ interface TaskFormFieldsProps {
 	onAutoSplitChange?: (value: AutoSplitValue) => void;
 	/** The project's ceiling of changed lines per PR, for the placeholder. */
 	autoSplitProjectMaxLines?: number;
+	autoSplitKind?: TaskKind;
 	/** The project turned the split off. */
 	autoSplitProjectDisabled?: boolean;
 	/** The verification loop for this task; omitted, the field is not shown. */
@@ -237,6 +239,7 @@ export function TaskFormFields({
 	autoSplit,
 	onAutoSplitChange,
 	autoSplitProjectMaxLines,
+	autoSplitKind,
 	autoSplitProjectDisabled,
 	verifyLoop,
 	onVerifyLoopChange,
@@ -834,6 +837,7 @@ export function TaskFormFields({
 							value={autoSplit}
 							onChange={onAutoSplitChange}
 							projectMaxLines={autoSplitProjectMaxLines}
+							kind={autoSplitKind}
 							projectDisabled={autoSplitProjectDisabled}
 							disabled={disabled}
 							idPrefix={idPrefix}

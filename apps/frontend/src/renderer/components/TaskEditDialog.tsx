@@ -91,6 +91,10 @@ import {
 	autoSplitValueFrom,
 	isAutoSplitValueValid,
 } from "./task-form/AutoSplitFields";
+import {
+	autoSplitCeilingFor,
+	kindFromCategory,
+} from "../../shared/utils/task-split";
 
 /**
  * Props for the TaskEditDialog component
@@ -786,7 +790,11 @@ export function TaskEditDialog({
 				onTddModeChange={setTddMode}
 				autoSplit={autoSplit}
 				onAutoSplitChange={setAutoSplit}
-				autoSplitProjectMaxLines={projectAutoSplit?.maxLines}
+				autoSplitKind={task.metadata?.kind ?? kindFromCategory(category)}
+				autoSplitProjectMaxLines={autoSplitCeilingFor(
+					projectAutoSplit,
+					task.metadata?.kind ?? kindFromCategory(category),
+				)}
 				autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}

@@ -92,6 +92,10 @@ import {
 	autoSplitMetadata,
 	isAutoSplitValueValid,
 } from "./task-form/AutoSplitFields";
+import {
+	autoSplitCeilingFor,
+	kindFromCategory,
+} from "../../shared/utils/task-split";
 
 interface TaskCreationWizardProps {
 	projectId: string;
@@ -976,7 +980,11 @@ export function TaskCreationWizard({
 					onTddModeChange={setTddMode}
 					autoSplit={autoSplit}
 					onAutoSplitChange={setAutoSplit}
-					autoSplitProjectMaxLines={projectAutoSplit?.maxLines}
+					autoSplitKind={kindFromCategory(category)}
+					autoSplitProjectMaxLines={autoSplitCeilingFor(
+						projectAutoSplit,
+						kindFromCategory(category),
+					)}
 					autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}

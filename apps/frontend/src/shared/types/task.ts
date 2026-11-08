@@ -359,7 +359,8 @@ export type TaskKind =
 	| "refactoring"
 	| "test"
 	| "docs"
-	| "spike";
+	| "spike"
+	| "upgrade";
 
 export const TASK_KINDS: readonly TaskKind[] = [
 	"feature",
@@ -371,6 +372,7 @@ export const TASK_KINDS: readonly TaskKind[] = [
 	"test",
 	"docs",
 	"spike",
+	"upgrade",
 ];
 
 /** Who decided the kind. `user` is never overwritten by the backend. */

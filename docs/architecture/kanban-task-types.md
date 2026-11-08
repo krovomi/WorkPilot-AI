@@ -66,6 +66,7 @@ Le plan branche ces pièces. Il n'ajoute un module que là où rien n'existe.
 | `test` | catégorie `testing`, mots-clés (couvrir, tests pour) | des tests qui passent sur le code existant, et échouent si on casse la cible | planner léger, QA remplacée par mutation-check déterministe |
 | `docs` | catégorie `documentation` | le document, relu contre le code | tout le reste ; roster `solo` |
 | `spike` | mots-clés (POC, prototype, évaluer, comparer), `intent` = spike | une branche jetable et un verdict | QA, verify, merge |
+| `upgrade` (mise à jour de version) | mots-clés (montée de version, mettre à jour les dépendances, upgrade, bump, migrer vers .NET/Angular/…), label `dependencies` (Dependabot, Renovate) | construit comme une feature ; plafond de découpage plus bas ([task-split.md](task-split.md)) | — |
 
 Un type non reconnu est `feature`. Un type reconnu avec confiance < 0.6 est **proposé**, pas
 imposé : le modal le montre, le build attend la confirmation si `gate: human` est actif.

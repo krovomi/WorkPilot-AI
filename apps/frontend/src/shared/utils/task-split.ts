@@ -9,10 +9,48 @@
  * its merge.
  */
 
-import type { AutoSplitSettings, Task } from "../types";
+import type {
+	AutoSplitSettings,
+	SplitKind,
+	Task,
+	TaskCategory,
+	TaskKind,
+} from "../types";
 
-/** The backend's defaults (`task_split/policy.py`). */
-export const AUTO_SPLIT_DEFAULT_MAX_LINES = 400;
+/**
+ * The backend's defaults (`task_split/policy.py`): lines a person reviews per
+ * pull request, by kind of task. Code counts in full, tests and docs half,
+ * generated files and lockfiles nothing (`task_split/review_load.py`).
+ */
+export const AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND: Readonly<
+	Record<SplitKind, number>
+> = {
+	hotfix: 100,
+	bug_fix: 200,
+	feature: 400,
+	refactoring: 300,
+	upgrade: 200,
+	test: 400,
+	docs: 400,
+};
+/** The kinds the settings list, in this order. */
+export const SPLIT_KINDS: readonly SplitKind[] = [
+	"feature",
+	"bug_fix",
+	"hotfix",
+	"refactoring",
+	"upgrade",
+	"test",
+	"docs",
+];
+/** Kinds with no code to review: never split, unless the task sets a ceiling. */
+export const NEVER_SPLIT_KINDS: readonly TaskKind[] = [
+	"investigation",
+	"spike",
+	"run",
+];
+export const AUTO_SPLIT_DEFAULT_MAX_LINES =
+	AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND.feature;
 export const AUTO_SPLIT_DEFAULT_MAX_FILES = 25;
 /** The ranges the backend accepts; a value outside is ignored there. */
 export const SPLIT_MAX_LINES_RANGE = [50, 20_000] as const;
@@ -38,11 +76,53 @@ export function autoSplitEnv(
 	if (!settings) return {};
 	const env: Record<string, string> = {};
 	if (settings.enabled === false) env.WORKPILOT_AUTO_SPLIT = "0";
-	const lines = wholeInRange(settings.maxLines, SPLIT_MAX_LINES_RANGE);
-	if (lines !== undefined) env.WORKPILOT_SPLIT_MAX_LINES = String(lines);
+	const byKind: Partial<Record<SplitKind, number>> = {};
+	for (const kind of SPLIT_KINDS) {
+		const lines = wholeInRange(
+			settings.maxLinesByKind?.[kind],
+			SPLIT_MAX_LINES_RANGE,
+		);
+		if (lines !== undefined) byKind[kind] = lines;
+	}
+	if (Object.keys(byKind).length > 0) {
+		env.WORKPILOT_SPLIT_MAX_LINES_BY_KIND = JSON.stringify(byKind);
+	}
 	const files = wholeInRange(settings.maxFiles, SPLIT_MAX_FILES_RANGE);
 	if (files !== undefined) env.WORKPILOT_SPLIT_MAX_FILES = String(files);
 	return env;
+}
+
+/** The kind a category means (`tasks/classify.py`, `_BY_CATEGORY`). */
+const KIND_BY_CATEGORY: Partial<Record<TaskCategory, TaskKind>> = {
+	feature: "feature",
+	bug_fix: "bug_fix",
+	refactoring: "refactoring",
+	documentation: "docs",
+	testing: "test",
+	infrastructure: "run",
+};
+
+export function kindFromCategory(category?: TaskCategory | ""): TaskKind {
+	return (category && KIND_BY_CATEGORY[category]) || "feature";
+}
+
+/**
+ * The project's ceiling for a task of `kind`, or undefined when that kind is
+ * never split.
+ */
+export function autoSplitCeilingFor(
+	settings: AutoSplitSettings | undefined,
+	kind: TaskKind | undefined,
+): number | undefined {
+	const k = kind ?? "feature";
+	if (NEVER_SPLIT_KINDS.includes(k)) return undefined;
+	const splitKind = (k in AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND
+		? k
+		: "feature") as SplitKind;
+	return (
+		wholeInRange(settings?.maxLinesByKind?.[splitKind], SPLIT_MAX_LINES_RANGE) ??
+		AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND[splitKind]
+	);
 }
 
 export interface SplitPart {

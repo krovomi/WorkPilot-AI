@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from review.state import ReviewState
+from tasks.classify import classify
 
 from .policy import resolve_policy
 from .slices import Slice, plan_slices
@@ -307,7 +308,11 @@ def split_spec(
     if metadata.get("splitGroup") or metadata.get("bestOfN"):
         return None
     plan = _read_json((plan_dir or spec_dir) / PLAN_FILE)
-    policy = resolve_policy(metadata, env)
+    kind = (
+        metadata.get("kind")
+        or classify(_title(spec_dir, plan), "", metadata).kind.value
+    )
+    policy = resolve_policy(metadata, env, kind=str(kind))
     slices = plan_slices(plan, policy)
     if not slices:
         return None
@@ -344,6 +349,7 @@ def split_spec(
         "total": total,
         "maxLines": policy.max_lines,
         "source": policy.source,
+        "kind": policy.kind,
         "splitAt": now,
     }
     metadata["archivedAt"] = now

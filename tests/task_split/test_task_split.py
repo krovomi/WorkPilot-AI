@@ -60,8 +60,8 @@ def _plan(*phases: dict) -> dict:
 
 def test_the_card_ceiling_wins_over_the_project_and_the_default():
     env = {"WORKPILOT_SPLIT_MAX_LINES": "800", "WORKPILOT_SPLIT_MAX_FILES": "40"}
-    assert resolve_policy({}, {}) == SplitPolicy(True, 400, 25, "default")
-    assert resolve_policy({}, env) == SplitPolicy(True, 800, 40, "project")
+    assert resolve_policy({}, {}) == SplitPolicy(True, 400, 25, "default", "feature")
+    assert resolve_policy({}, env) == SplitPolicy(True, 800, 40, "project", "feature")
     card = resolve_policy({"splitMaxLines": 250}, env)
     assert (card.max_lines, card.max_files, card.source) == (250, 40, "card")
 
@@ -108,7 +108,7 @@ def test_phases_are_kept_whole_and_dependent_ones_chained():
             _subtask("2", 300, "src/app.component.ts"),
             depends_on=["backend"],
         ),
-        _phase("docs", _subtask("3", 200, "README.md"), depends_on=[]),
+        _phase("docs", _subtask("3", 200, "scripts/seed.py"), depends_on=[]),
     )
     slices = plan_slices(plan, POLICY)
     assert [s.index for s in slices] == [1, 2, 3]
