@@ -164,10 +164,6 @@ export const FILE_EXEMPTIONS: Readonly<
 		{ text: "git add -A", reason: SHELL },
 		{ text: 'git commit -m "Initial commit"', reason: SHELL },
 	],
-	"components/agent-debugger/AgentDebuggerPanel.tsx": [
-		{ text: "path≈", reason: "filter field key, typed as is" },
-		{ text: "cmd≈", reason: "filter field key, typed as is" },
-	],
 	"components/phase35/AuditTrailPanel.tsx": [
 		{ text: "actor=", reason: "audit record field key" },
 		{ text: "cid=", reason: "audit record field key" },

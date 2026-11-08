@@ -1,217 +1,102 @@
-import {
-	AlertTriangle,
-	BarChart3,
-	CheckCircle2,
-	Clock,
-	Download,
-	GitMerge,
-	Loader2,
-	RefreshCw,
-	Target,
-	TrendingUp,
-	Zap,
-} from "lucide-react";
+import { AlertTriangle, BarChart3, Download, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { DashboardSnapshot } from "@shared/types";
 import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
-import { cn } from "../lib/utils";
 import { loadDashboardSnapshot } from "../lib/workspace-data";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
-import type { DashboardSnapshot } from "@shared/types";
-import { PageHeader } from "./ui/page-header";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	Gauge,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	type Tone,
+} from "./charter";
 
 interface DashboardMetricsProps {
-	projectPath: string;
+	readonly projectPath: string;
 }
 
-// ---------------------------------------------------------------------------
-// KPI Card
-// ---------------------------------------------------------------------------
+const STATUS_TONE: Record<string, Tone> = {
+	completed: "green",
+	in_progress: "blue",
+	pending: "amber",
+	failed: "red",
+	cancelled: "muted",
+};
 
-function KpiCard({
-	title,
+const EMPTY_SNAPSHOT: DashboardSnapshot = {
+	tasks_by_status: { pending: 0, in_progress: 0, completed: 0, failed: 0 },
+	avg_completion_by_complexity: {},
+	qa_first_pass_rate: 0,
+	qa_avg_score: 0,
+	total_tokens: 0,
+	tokens_by_provider: {},
+	total_cost: 0,
+	cost_by_model: {},
+	merge_auto_count: 0,
+	merge_manual_count: 0,
+} as DashboardSnapshot;
+
+function formatSeconds(seconds: number): string {
+	return seconds < 3600 ? `${Math.round(seconds / 60)}m` : `${(seconds / 3600).toFixed(1)}h`;
+}
+
+/** A key figure with its explanation underneath. */
+function Kpi({
+	label,
 	value,
-	subtitle,
-	icon: Icon,
-	trend,
-	color = "primary",
+	hint,
+	tone,
 }: {
-	title: string;
-	value: string | number;
-	subtitle?: string;
-	icon: React.ElementType;
-	trend?: string;
-	color?: "primary" | "green" | "amber" | "red" | "blue";
+	readonly label: string;
+	readonly value: React.ReactNode;
+	readonly hint: string;
+	readonly tone: Tone;
 }) {
-	const colorClasses = {
-		primary: "text-primary bg-primary/10",
-		green: "text-success bg-success/10",
-		amber: "text-warning bg-warning/10",
-		red: "text-destructive bg-destructive/10",
-		blue: "text-blue-500 bg-blue-500/10",
-	};
-
 	return (
-		<Card className="relative overflow-hidden">
-			<CardContent className="p-5">
-				<div className="flex items-start justify-between">
-					<div className="flex-1 min-w-0">
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-							{title}
-						</p>
-						<p className="mt-1.5 text-2xl font-bold text-foreground">{value}</p>
-						{subtitle && (
-							<p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
-						)}
-						{trend && (
-							<div className="mt-2 flex items-center gap-1">
-								<TrendingUp className="h-3 w-3 text-success" />
-								<span className="text-xs text-success font-medium">
-									{trend}
-								</span>
-							</div>
-						)}
-					</div>
-					<div className={cn("rounded-lg p-2.5", colorClasses[color])}>
-						<Icon className="h-5 w-5" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<Panel rail tone={tone}>
+			<span className="wp-kicker block">{label}</span>
+			<span className="wp-stat-value wp-ink mt-1 block">{value}</span>
+			<p className="wp-meta mt-0.5">{hint}</p>
+		</Panel>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Status bar (horizontal)
-// ---------------------------------------------------------------------------
-
-function StatusBar({ data }: { data: Record<string, number> }) {
-	const { t } = useTranslation("dashboard");
-	const total = Object.values(data).reduce((a, b) => a + b, 0);
-	if (total === 0)
-		return (
-			<div className="text-xs text-muted-foreground">{t("empty.noTasks")}</div>
-		);
-
-	const statusColors: Record<string, string> = {
-		completed: "bg-success",
-		in_progress: "bg-blue-500",
-		pending: "bg-warning",
-		failed: "bg-destructive",
-		cancelled: "bg-gray-400",
-	};
-
+/** One labelled row with a bar: a status, a model, a provider. */
+function BarRow({
+	label,
+	value,
+	pct,
+	tone,
+}: {
+	readonly label: React.ReactNode;
+	readonly value: React.ReactNode;
+	readonly pct: number;
+	readonly tone: Tone;
+}) {
 	return (
-		<div className="space-y-2">
-			<div className="flex h-3 w-full overflow-hidden rounded-full bg-secondary">
-				{Object.entries(data).map(([status, count]) => {
-					const pct = (count / total) * 100;
-					if (pct === 0) return null;
-					return (
-						<div
-							key={status}
-							className={cn(
-								"h-full transition-all",
-								statusColors[status] || "bg-gray-300",
-							)}
-							style={{ width: `${pct}%` }}
-							title={`${status}: ${count} (${pct.toFixed(0)}%)`}
-						/>
-					);
-				})}
+		<div className="space-y-1">
+			<div className="flex items-center justify-between gap-2 text-xs">
+				<span className="wp-title min-w-0 truncate">{label}</span>
+				<span className="wp-meta font-mono">{value}</span>
 			</div>
-			<div className="flex flex-wrap gap-3">
-				{Object.entries(data).map(([status, count]) => (
-					<div key={status} className="flex items-center gap-1.5 text-xs">
-						<div
-							className={cn(
-								"h-2.5 w-2.5 rounded-full",
-								statusColors[status] || "bg-gray-300",
-							)}
-						/>
-						<span className="text-muted-foreground capitalize">
-							{status.replace("_", " ")}
-						</span>
-						<span className="font-medium text-foreground">{count}</span>
-					</div>
-				))}
-			</div>
+			<Bar value={pct} tone={tone} />
 		</div>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Cost breakdown
-// ---------------------------------------------------------------------------
-
-function CostBreakdown({
-	costByModel,
-	fmtCost,
-}: {
-	costByModel: Record<string, number>;
-	fmtCost: (usd: number, decimals?: number) => string;
-}) {
-	const { t } = useTranslation("dashboard");
-	if (!costByModel || typeof costByModel !== "object") {
-		return (
-			<div className="text-xs text-muted-foreground">
-				{t("empty.noCostData")}
-			</div>
-		);
-	}
-
-	const entries = Object.entries(costByModel).sort(([, a], [, b]) => b - a);
-	const total = entries.reduce((sum, [, v]) => sum + v, 0);
-
-	if (entries.length === 0) {
-		return (
-			<div className="text-xs text-muted-foreground">
-				{t("empty.noCostData")}
-			</div>
-		);
-	}
-
-	return (
-		<div className="space-y-2">
-			{entries.map(([model, cost]) => {
-				const pct = total > 0 ? (cost / total) * 100 : 0;
-				return (
-					<div key={model} className="space-y-1">
-						<div className="flex items-center justify-between text-xs">
-							<span className="text-foreground font-medium truncate">
-								{model}
-							</span>
-							<span className="text-muted-foreground">
-								{fmtCost(cost)} ({pct.toFixed(0)}%)
-							</span>
-						</div>
-						<div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-							<div
-								className="h-full rounded-full bg-primary transition-all"
-								style={{ width: `${pct}%` }}
-							/>
-						</div>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
+/** Project KPIs: tasks, QA, tokens, costs and merges, local or from the server. */
 export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
-	const { t, i18n } = useTranslation("dashboard");
+	const { t, i18n } = useTranslation(["dashboard", "common", "navigation"]);
 	const lang = i18n.language;
 	const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -229,34 +114,27 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 		setError(null);
 		try {
 			const result = await loadDashboardSnapshot(projectPath, serverProjectId);
-			if (result.success) {
-				setSnapshot(result.snapshot ?? null);
-			} else {
-				setError(result.error || "Failed to load dashboard");
-			}
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Network error");
+			if (result.success) setSnapshot(result.snapshot ?? null);
+			else setError(result.error || t("dashboard:errors.loadFailed"));
+		} catch {
+			setError(t("dashboard:errors.loadFailed"));
 		} finally {
 			setLoading(false);
 		}
-	}, [projectPath, serverProjectId]);
+	}, [projectPath, serverProjectId, t]);
 
 	useEffect(() => {
-		fetchSnapshot();
-		getEurRate().then(setEurRate);
+		void fetchSnapshot();
+		void getEurRate().then(setEurRate);
 	}, [fetchSnapshot]);
 
-	// Subscribe to real-time updates when dashboard_snapshot.json changes
-	// (this computer's file; a server project is read again on refresh)
+	// Real-time updates when this computer's dashboard_snapshot.json changes;
+	// a server project is read again on refresh.
 	useEffect(() => {
 		if (serverProjectId) return;
-		const unsubscribe = window.electronAPI.onDashboardSnapshotUpdated(
-			(updatedPath: string) => {
-				if (updatedPath === projectPath) {
-					fetchSnapshot();
-				}
-			},
-		);
+		const unsubscribe = window.electronAPI.onDashboardSnapshotUpdated((updatedPath: string) => {
+			if (updatedPath === projectPath) void fetchSnapshot();
+		});
 		return () => unsubscribe();
 	}, [projectPath, fetchSnapshot, serverProjectId]);
 
@@ -275,26 +153,15 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 					["qa_avg_score", String(snap.qa_avg_score)],
 					["merge_auto_count", String(snap.merge_auto_count)],
 					["merge_manual_count", String(snap.merge_manual_count)],
-					...Object.entries(snap.tasks_by_status).map(([k, v]) => [
-						`tasks_${k}`,
-						String(v),
-					]),
-					...Object.entries(snap.tokens_by_provider).map(([k, v]) => [
-						`tokens_${k}`,
-						String(v),
-					]),
-					...Object.entries(snap.cost_by_model).map(([k, v]) => [
-						`cost_${k}`,
-						String(v),
-					]),
+					...Object.entries(snap.tasks_by_status ?? {}).map(([k, v]) => [`tasks_${k}`, String(v)]),
+					...Object.entries(snap.tokens_by_provider ?? {}).map(([k, v]) => [`tokens_${k}`, String(v)]),
+					...Object.entries(snap.cost_by_model ?? {}).map(([k, v]) => [`cost_${k}`, String(v)]),
 				];
 				content = rows.map((r) => r.join(",")).join("\n");
 			} else {
 				content = JSON.stringify(snap, null, 2);
 			}
-			const blob = new Blob([content], {
-				type: fmt === "csv" ? "text/csv" : "application/json",
-			});
+			const blob = new Blob([content], { type: fmt === "csv" ? "text/csv" : "application/json" });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement("a");
 			a.href = url;
@@ -302,270 +169,185 @@ export function DashboardMetrics({ projectPath }: DashboardMetricsProps) {
 			a.click();
 			URL.revokeObjectURL(url);
 		} catch {
-			// silently fail export
+			setError(t("dashboard:errors.exportFailed"));
 		}
 	};
 
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-full">
-				<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-			</div>
-		);
-	}
+	// Missing maps (an older snapshot, a partial server answer) read as empty.
+	const snap = { ...EMPTY_SNAPSHOT, ...(snapshot ?? {}) };
+	const byStatus = snap.tasks_by_status ?? {};
+	const byComplexity = snap.avg_completion_by_complexity ?? {};
+	const byModel = Object.entries(snap.cost_by_model ?? {}).sort(([, a], [, b]) => b - a);
+	const byProvider = Object.entries(snap.tokens_by_provider ?? {}).sort(([, a], [, b]) => b - a);
 
-	if (error) {
-		return (
-			<div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
-				<AlertTriangle className="h-8 w-8" />
-				<p className="text-sm">{error}</p>
-				<Button variant="outline" size="sm" onClick={fetchSnapshot}>
-					<RefreshCw className="h-3.5 w-3.5 mr-2" />
-					{t("common:buttons.retry")}
-				</Button>
-			</div>
-		);
-	}
-
-	// Default values when no data yet
-	const snap = snapshot || {
-		tasks_by_status: { pending: 0, in_progress: 0, completed: 0, failed: 0 },
-		avg_completion_by_complexity: {},
-		qa_first_pass_rate: 0,
-		qa_avg_score: 0,
-		total_tokens: 0,
-		tokens_by_provider: {},
-		total_cost: 0,
-		cost_by_model: {},
-		merge_auto_count: 0,
-		merge_manual_count: 0,
-	};
-
-	const totalTasks = Object.values(snap.tasks_by_status).reduce(
-		(a, b) => a + b,
-		0,
-	);
-	const completedTasks = snap.tasks_by_status.completed || 0;
-	const mergeTotal = snap.merge_auto_count + snap.merge_manual_count;
-	const mergeAutoRate =
-		mergeTotal > 0
-			? ((snap.merge_auto_count / mergeTotal) * 100).toFixed(0)
-			: "0";
+	const totalTasks = Object.values(byStatus).reduce((a, b) => a + b, 0);
+	const completedTasks = byStatus.completed || 0;
+	const totalCost = byModel.reduce((sum, [, v]) => sum + v, 0);
+	const maxTokens = byProvider[0]?.[1] ?? 0;
+	const mergeAuto = snap.merge_auto_count ?? 0;
+	const mergeManual = snap.merge_manual_count ?? 0;
+	const mergeTotal = mergeAuto + mergeManual;
+	const mergeAutoRate = mergeTotal > 0 ? (mergeAuto / mergeTotal) * 100 : 0;
+	const qaRate = snap.qa_first_pass_rate ?? 0;
+	const statusLabel = (status: string) =>
+		t(`dashboard:status.${status}`, { defaultValue: status.replace(/_/g, " ") });
 
 	return (
-		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6 max-w-6xl mx-auto">
-				<PageHeader
-					variant="inline"
-					icon={BarChart3}
-					title={t("title")}
-					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
-					actions={
+		<ModuleStage scroll="page" data-testid="dashboard-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.workspace")}
+				title={t("dashboard:title")}
+				description={serverProjectId ? t("dashboard:serverSubtitle") : t("dashboard:subtitle")}
+				icon={BarChart3}
+				tone="blue"
+				actions={
 					<>
-						<Button variant="outline" size="sm" onClick={fetchSnapshot}>
-							<RefreshCw className="h-3.5 w-3.5 mr-2" />
+						<CharterButton icon={RefreshCw} busy={loading} onClick={() => void fetchSnapshot()}>
 							{t("common:buttons.refresh")}
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => handleExport("json")}
-						>
-							<Download className="h-3.5 w-3.5 mr-2" />
-							JSON
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => handleExport("csv")}
-						>
-							<Download className="h-3.5 w-3.5 mr-2" />
-							CSV
-						</Button>
+						</CharterButton>
+						<CharterButton icon={Download} onClick={() => void handleExport("json")}>
+							{t("dashboard:export.json")}
+						</CharterButton>
+						<CharterButton icon={Download} onClick={() => void handleExport("csv")}>
+							{t("dashboard:export.csv")}
+						</CharterButton>
 					</>
-					}
-				/>
-
-				{/* KPI Cards */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-					<KpiCard
-						title={t("kpi.totalTasks.title")}
-						value={totalTasks}
-						subtitle={t("kpi.totalTasks.completed", { count: completedTasks })}
-						icon={Target}
-						color="primary"
-					/>
-					<KpiCard
-						title={t("kpi.qaFirstPassRate.title")}
-						value={`${snap.qa_first_pass_rate.toFixed(1)}%`}
-						subtitle={t("kpi.qaFirstPassRate.avgScore", {
-							score: snap.qa_avg_score.toFixed(1),
-						})}
-						icon={CheckCircle2}
-						color="green"
-					/>
-					<KpiCard
-						title={t("kpi.totalTokens.title")}
-						value={snap.total_tokens.toLocaleString()}
-						subtitle={t("kpi.totalTokens.totalCost", {
-							cost: fmtCost(snap.total_cost),
-						})}
-						icon={Zap}
-						color="amber"
-					/>
-					<KpiCard
-						title={t("kpi.autoMerges.title")}
-						value={`${mergeAutoRate}%`}
-						subtitle={t("kpi.autoMerges.autoManual", {
-							auto: snap.merge_auto_count,
-							manual: snap.merge_manual_count,
-						})}
-						icon={GitMerge}
-						color="blue"
-					/>
-				</div>
-
-				{/* Task Status & Completion Times */}
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("sections.tasksByStatus")}
-							</h3>
-							<StatusBar data={snap.tasks_by_status} />
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("sections.avgCompletionTime")}
-							</h3>
-							{Object.keys(snap.avg_completion_by_complexity).length === 0 ? (
-								<div className="text-xs text-muted-foreground">
-									{t("empty.noCompletionData")}
-								</div>
-							) : (
-								<div className="space-y-3">
-									{Object.entries(snap.avg_completion_by_complexity).map(
-										([complexity, seconds]) => (
-											<div
-												key={complexity}
-												className="flex items-center justify-between"
-											>
-												<div className="flex items-center gap-2">
-													<Clock className="h-3.5 w-3.5 text-muted-foreground" />
-													<span className="text-sm capitalize text-foreground">
-														{complexity}
-													</span>
-												</div>
-												<Badge variant="secondary" className="text-xs">
-													{seconds < 3600
-														? `${Math.round(seconds / 60)}m`
-														: `${(seconds / 3600).toFixed(1)}h`}
-												</Badge>
-											</div>
-										),
-									)}
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				</div>
-
-				{/* Costs & Tokens */}
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("sections.costByModel")}
-							</h3>
-							<CostBreakdown
-								costByModel={snap.cost_by_model}
-								fmtCost={fmtCost}
+				}
+			/>
+			<Page className="space-y-4">
+				{error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{error}
+					</Notice>
+				)}
+				{loading && !snapshot ? (
+					<ScanLine label={t("dashboard:loading")} />
+				) : (
+					<>
+						<div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+							<Kpi
+								label={t("dashboard:kpi.totalTasks.title")}
+								value={totalTasks}
+								hint={t("dashboard:kpi.totalTasks.completed", { count: completedTasks })}
+								tone="violet"
 							/>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("sections.tokensByProvider")}
-							</h3>
-							{Object.keys(snap.tokens_by_provider).length === 0 ? (
-								<div className="text-xs text-muted-foreground">
-									{t("empty.noTokenData")}
-								</div>
-							) : (
-								<div className="space-y-2">
-									{Object.entries(snap.tokens_by_provider)
-										.sort(([, a], [, b]) => b - a)
-										.map(([provider, tokens]) => (
-											<div
-												key={provider}
-												className="flex items-center justify-between text-sm"
-											>
-												<span className="text-foreground capitalize">
-													{provider}
-												</span>
-												<span className="text-muted-foreground font-mono">
-													{tokens.toLocaleString()}
-												</span>
-											</div>
-										))}
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				</div>
-
-				{/* Merge Resolution */}
-				<Card>
-					<CardContent className="p-5">
-						<h3 className="text-sm font-semibold text-foreground mb-4">
-							{t("sections.mergeResolution")}
-						</h3>
-						<div className="flex items-center gap-8">
-							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
-									<Zap className="h-5 w-5 text-success" />
-								</div>
-								<div>
-									<p className="text-lg font-bold text-foreground">
-										{snap.merge_auto_count}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{t("merge.automatic")}
-									</p>
-								</div>
-							</div>
-							<div className="flex items-center gap-3">
-								<div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
-									<GitMerge className="h-5 w-5 text-warning" />
-								</div>
-								<div>
-									<p className="text-lg font-bold text-foreground">
-										{snap.merge_manual_count}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{t("merge.manual")}
-									</p>
-								</div>
-							</div>
-							{mergeTotal > 0 && (
-								<div className="ml-auto text-right">
-									<p className="text-sm text-muted-foreground">
-										{t("merge.autoResolutionRate")}
-									</p>
-									<p className="text-xl font-bold text-foreground">
-										{mergeAutoRate}%
-									</p>
-								</div>
-							)}
+							<Kpi
+								label={t("dashboard:kpi.qaFirstPassRate.title")}
+								value={`${qaRate.toFixed(1)}%`}
+								hint={t("dashboard:kpi.qaFirstPassRate.avgScore", {
+									score: (snap.qa_avg_score ?? 0).toFixed(1),
+								})}
+								tone="green"
+							/>
+							<Kpi
+								label={t("dashboard:kpi.totalTokens.title")}
+								value={(snap.total_tokens ?? 0).toLocaleString()}
+								hint={t("dashboard:kpi.totalTokens.totalCost", { cost: fmtCost(snap.total_cost ?? 0) })}
+								tone="amber"
+							/>
+							<Kpi
+								label={t("dashboard:kpi.autoMerges.title")}
+								value={`${mergeAutoRate.toFixed(0)}%`}
+								hint={t("dashboard:kpi.autoMerges.autoManual", { auto: mergeAuto, manual: mergeManual })}
+								tone="blue"
+							/>
 						</div>
-					</CardContent>
-				</Card>
-			</div>
-		</ScrollArea>
+
+						<div className="wp-split grid gap-4 lg:grid-cols-2">
+							<Section
+								kicker={t("dashboard:kickers.tasks")}
+								title={t("dashboard:sections.tasksByStatus")}
+								meta={String(totalTasks)}
+							>
+								<Panel className="space-y-3">
+									{totalTasks === 0 ? (
+										<p className="wp-meta">{t("dashboard:empty.noTasks")}</p>
+									) : (
+										Object.entries(byStatus).map(([status, count]) => (
+											<BarRow
+												key={status}
+												label={statusLabel(status)}
+												value={count}
+												pct={(count / totalTasks) * 100}
+												tone={STATUS_TONE[status] ?? "muted"}
+											/>
+										))
+									)}
+								</Panel>
+							</Section>
+
+							<Section kicker={t("dashboard:kickers.time")} title={t("dashboard:sections.avgCompletionTime")}>
+								<Panel className="space-y-2">
+									{Object.keys(byComplexity).length === 0 ? (
+										<p className="wp-meta">{t("dashboard:empty.noCompletionData")}</p>
+									) : (
+										Object.entries(byComplexity).map(([complexity, seconds]) => (
+											<div key={complexity} className="flex items-center justify-between gap-2">
+												<span className="wp-title text-sm">
+													{t(`dashboard:complexity.${complexity.toLowerCase()}`, { defaultValue: complexity })}
+												</span>
+												<Chip tone="blue" dot={false}>
+													<span className="font-mono">{formatSeconds(seconds)}</span>
+												</Chip>
+											</div>
+										))
+									)}
+								</Panel>
+							</Section>
+
+							<Section kicker={t("dashboard:kickers.costs")} title={t("dashboard:sections.costByModel")}>
+								<Panel className="space-y-3">
+									{byModel.length === 0 ? (
+										<p className="wp-meta">{t("dashboard:empty.noCostData")}</p>
+									) : (
+										byModel.map(([model, cost]) => {
+											const pct = totalCost > 0 ? (cost / totalCost) * 100 : 0;
+											return (
+												<BarRow
+													key={model}
+													label={model}
+													value={t("dashboard:costShare", { cost: fmtCost(cost), pct: pct.toFixed(0) })}
+													pct={pct}
+													tone="amber"
+												/>
+											);
+										})
+									)}
+								</Panel>
+							</Section>
+
+							<Section kicker={t("dashboard:kickers.tokens")} title={t("dashboard:sections.tokensByProvider")}>
+								<Panel className="space-y-3">
+									{byProvider.length === 0 ? (
+										<p className="wp-meta">{t("dashboard:empty.noTokenData")}</p>
+									) : (
+										byProvider.map(([provider, tokens]) => (
+											<BarRow
+												key={provider}
+												label={<span className="capitalize">{provider}</span>}
+												value={tokens.toLocaleString()}
+												pct={maxTokens > 0 ? (tokens / maxTokens) * 100 : 0}
+												tone="violet"
+											/>
+										))
+									)}
+								</Panel>
+							</Section>
+						</div>
+
+						<Section kicker={t("dashboard:kickers.merges")} title={t("dashboard:sections.mergeResolution")}>
+							<div className="grid items-stretch gap-2.5 sm:grid-cols-3">
+								<Panel className="flex items-center gap-3">
+									<Gauge value={mergeAutoRate} tone="green" size={64} />
+									<span className="wp-meta min-w-0">{t("dashboard:merge.autoResolutionRate")}</span>
+								</Panel>
+								<Stat label={t("dashboard:merge.automatic")} value={mergeAuto} tone="green" />
+								<Stat label={t("dashboard:merge.manual")} value={mergeManual} tone="amber" />
+							</div>
+						</Section>
+					</>
+				)}
+			</Page>
+		</ModuleStage>
 	);
 }
