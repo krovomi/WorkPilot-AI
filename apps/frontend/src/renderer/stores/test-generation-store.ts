@@ -71,6 +71,9 @@ export interface PostBuildResult {
 	test_file_content: string;
 }
 
+/** What the current (or last) run was asked to do. */
+export type TestRunKind = "analyze" | "unit" | "e2e" | "tdd";
+
 export type TestGenerationPhase =
 	| "idle"
 	| "analyzing"
@@ -128,6 +131,15 @@ interface TestGenerationState {
 	coverageTarget: number;
 	tddLanguage: string;
 	tddSnippetType: string;
+	/** The mode the current/last run belongs to; null before the first run. */
+	runKind: TestRunKind | null;
+	/**
+	 * Gaps found by the last coverage analysis. Kept apart from `result`: an
+	 * analysis has no test file, and before this field existed its answer was
+	 * resolved to nobody — the dialog waited on `result.coverage_gaps`, which
+	 * an analysis never set, so a finished analysis showed nothing at all.
+	 */
+	coverageGaps: CoverageGap[] | null;
 
 	// Live streaming state
 	liveStages: LiveStage[];
@@ -215,8 +227,10 @@ const initialState = {
 	selectedFile: "",
 	existingTestPath: null,
 	coverageTarget: 80,
-	tddLanguage: "typescript",
+	tddLanguage: "",
 	tddSnippetType: "function",
+	runKind: null as TestRunKind | null,
+	coverageGaps: null as CoverageGap[] | null,
 	liveStages: [] as LiveStage[],
 	streamedCode: "",
 	liveMeta: {} as LiveMeta,
@@ -294,6 +308,8 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				phase: "idle",
 				status: "",
 				result: null,
+				coverageGaps: null,
+				runKind: null,
 				error: null,
 				errorDetail: null,
 			});
@@ -305,6 +321,8 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				phase: "idle",
 				status: "",
 				result: null,
+				coverageGaps: null,
+				runKind: null,
 				error: null,
 				errorDetail: null,
 			});
@@ -350,6 +368,10 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				isLiveRun: true,
 				error: null,
 				errorDetail: null,
+				// A new run replaces the last answer: showing the previous file
+				// under a pipeline that is starting over reads as its result.
+				result: null,
+				coverageGaps: null,
 			}),
 
 		applyStageEvent: (event: TestGenStageEvent) =>
@@ -434,18 +456,21 @@ export const useTestGenerationStore = create<TestGenerationState>(
 		},
 
 		analyzeCoverage: async (filePath: string, existingTestPath?: string) => {
-			const { setPhase, setStatus } = get();
+			const { setPhase, setStatus, resetLive } = get();
 			setPhase("analyzing");
 			setStatus("Analyzing test coverage...");
+			resetLive();
 			set({
+				// Not a streaming generation: no code arrives, only stages.
 				isLiveRun: false,
-				error: null,
-				errorDetail: null,
+				runKind: "analyze",
 				lastRun: () => get().analyzeCoverage(filePath, existingTestPath),
 			});
 
 			return new Promise<CoverageGap[]>((resolve, reject) => {
 				const onStatus = (status: string) => setStatus(status);
+				const onProgress = (event: TestGenStageEvent) =>
+					get().applyStageEvent(event);
 				const cleanup = get().createCleanupHandler([
 					() =>
 						globalThis.electronAPI.removeTestGenerationStatusListener(onStatus),
@@ -453,20 +478,25 @@ export const useTestGenerationStore = create<TestGenerationState>(
 						globalThis.electronAPI.removeTestGenerationResultListener(onResult),
 					() =>
 						globalThis.electronAPI.removeTestGenerationErrorListener(onError),
+					() =>
+						globalThis.electronAPI.removeTestGenerationProgressListener(
+							onProgress,
+						),
 				]);
-				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-				const onResult = (data: any) => {
+				const onResult = (data: unknown) => {
 					cleanup();
-					set({ genEndedAt: Date.now() });
+					const gaps = (data as { gaps?: CoverageGap[] } | null)?.gaps ?? [];
+					set({ genEndedAt: Date.now(), coverageGaps: gaps });
 					setPhase("complete");
 					setStatus("Coverage analysis complete");
-					resolve((data as { gaps?: CoverageGap[] }).gaps || []);
+					resolve(gaps);
 				};
 				const onError = get().createErrorHandler(cleanup, reject);
 				const projectPath = useProjectStore.getState().getActiveProject()?.path;
 				globalThis.electronAPI.onTestGenerationStatus(onStatus);
 				globalThis.electronAPI.onTestGenerationResult(onResult);
 				globalThis.electronAPI.onTestGenerationError(onError);
+				globalThis.electronAPI.onTestGenerationProgress(onProgress);
 				globalThis.electronAPI.analyzeTestCoverage(
 					filePath,
 					existingTestPath,
@@ -487,6 +517,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setStatus("Generating unit tests...");
 			resetLive();
 			set({
+				runKind: "unit",
 				lastRun: () =>
 					get().generateUnitTests(
 						filePath,
@@ -557,6 +588,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setStatus("Generating E2E tests...");
 			resetLive();
 			set({
+				runKind: "e2e",
 				lastRun: () =>
 					get().generateE2ETests(
 						userStory,
@@ -628,6 +660,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			setStatus("Generating TDD tests...");
 			resetLive();
 			set({
+				runKind: "tdd",
 				lastRun: () => get().generateTDDTests(spec, testDir, testLibraries),
 			});
 

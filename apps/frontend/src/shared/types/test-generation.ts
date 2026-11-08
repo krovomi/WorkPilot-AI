@@ -9,7 +9,13 @@
  */
 
 /** Pipeline steps, in the order the runner walks them. */
-export type TestGenStageId = "detect" | "read" | "generate" | "write" | "done";
+export type TestGenStageId =
+	| "detect"
+	| "read"
+	| "analyze"
+	| "generate"
+	| "write"
+	| "done";
 
 /** A live pipeline-stage event streamed during generation. */
 export interface TestGenStageEvent {
@@ -139,7 +145,17 @@ export type LibraryCategory =
 	| "snapshot"
 	| "coverage";
 
-export type PackageEcosystem = "nuget" | "npm" | "pypi" | "maven";
+export type PackageEcosystem =
+	| "nuget"
+	| "npm"
+	| "pypi"
+	| "maven"
+	| "go"
+	| "cargo"
+	| "composer"
+	| "rubygems"
+	| "pub"
+	| "swiftpm";
 
 export interface TestLibrary {
 	id: string;

@@ -227,7 +227,6 @@
   "apps/frontend/src/renderer/components/terminal/TerminalTitle.tsx": 4,
   "apps/frontend/src/renderer/components/terminal/WorktreeSelector.tsx": 2,
   "apps/frontend/src/renderer/components/terminal/__tests__/useXterm.test.ts": 1,
-  "apps/frontend/src/renderer/components/test-generation/LiveGenerationSurface.tsx": 4,
   "apps/frontend/src/renderer/components/test-generation/SmartFilePicker.tsx": 1,
   "apps/frontend/src/renderer/components/ui/KanbanSkeleton.tsx": 1,
   "apps/frontend/src/renderer/components/ui/code-editor.tsx": 1,
@@ -253,7 +252,7 @@
   "apps/frontend/src/renderer/stores/project-store.ts": 1,
   "apps/frontend/src/renderer/stores/settings-store.ts": 3,
   "apps/frontend/src/renderer/stores/task-store.ts": 2,
-  "apps/frontend/src/renderer/stores/test-generation-store.ts": 4,
+  "apps/frontend/src/renderer/stores/test-generation-store.ts": 3,
   "apps/frontend/src/renderer/utils/repositoryDetector.ts": 1,
   "apps/frontend/src/shared/utils/ansi-sanitizer.ts": 3,
   "apps/frontend/src/shared/utils/frontend-colored-logs.ts": 8

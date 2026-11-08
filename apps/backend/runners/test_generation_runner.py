@@ -238,8 +238,12 @@ def _run_analyze_coverage(agent, args) -> None:
             args.file_path,
             existing_test_path=args.existing_test_path,
             project_path=args.project_path,
+            on_event=_emit_event,
         )
         _status(f"Found {len(gaps)} coverage gap(s)")
+        _emit_event(
+            {"type": "stage", "stage": "done", "status": "done", "tests": len(gaps)}
+        )
         _print_result({"success": True, "gaps": _serialize(gaps)})
     except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
         _fail(exc)
@@ -262,6 +266,7 @@ def _run_generate_unit(agent, args) -> None:
             project_path=args.project_path,
             on_event=_emit_event,
             test_libraries=_selected_library_ids(args),
+            coverage_target=args.coverage_target,
         )
         _status(f"Generated {result.tests_generated} test(s)")
         _emit_event({"type": "stage", "stage": "write"})
@@ -339,6 +344,7 @@ def _run_generate_tdd(agent, args) -> None:
     spec: dict = {
         "name": args.snippet_type,
         "description": args.description,
+        # None lets the generator read the project's own language.
         "language": args.language,
         "snippet_type": args.snippet_type,
         "module": "",
@@ -385,15 +391,27 @@ def _selected_library_ids(args) -> list[str] | None:
 
 
 def _resolve_language(args, source: str) -> str:
-    """The language of *source*, detected the same way the generator does."""
-    from test_generation.generator import ProjectAnalyzer
+    """The language the tests are written in.
 
+    A language the caller names wins: the TDD and E2E modes have no source
+    file, and their libraries must follow the language picked, not whatever
+    file was last open in another tab. Then the source's extension, then the
+    project's manifests — a TDD run used to be resolved as Python in a .NET
+    solution because ``--language`` defaulted to "python".
+    """
+    from test_generation.stacks import (
+        SUPPORTED_LANGUAGES,
+        detect_project_language,
+        language_for_path,
+    )
+
+    if args.language in SUPPORTED_LANGUAGES:
+        return args.language
     if source:
-        detected = ProjectAnalyzer().detect(source, args.project_path)
-        language = detected.get("language")
-        if language and language != "unknown":
+        language = language_for_path(source)
+        if language != "unknown":
             return language
-    return args.language
+    return detect_project_language(args.project_path) or "python"
 
 
 def _run_resolve_libraries(agent, args) -> None:  # noqa: ARG001 — no LLM needed
@@ -482,7 +500,9 @@ def _run_resolve_destination(agent, args) -> None:  # noqa: ARG001 — no LLM ne
         )
         sys.exit(1)
 
-    language = args.language
+    from test_generation.stacks import detect_project_language
+
+    language = args.language or detect_project_language(args.project_path) or "python"
     framework = None
     if source:
         detected = ProjectAnalyzer().detect(source, args.project_path)
@@ -544,7 +564,12 @@ def main() -> None:
         "--description", default=None, help="Function description for TDD"
     )
     parser.add_argument(
-        "--language", default="python", help="Programming language for TDD"
+        "--language",
+        default=None,
+        help=(
+            "Language of the tests (TDD, or to pin the libraries). Omitted, the "
+            "source file's extension, then the project's manifests decide."
+        ),
     )
     parser.add_argument(
         "--snippet-type", default="function", help="Snippet type for TDD"
