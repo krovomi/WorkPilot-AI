@@ -1,6 +1,6 @@
 {
 	"name": "workpilot-ai-mobile",
-	"version": "1.3.4",
+	"version": "1.4.0",
 	"main": "expo-router/entry",
 	"dependencies": {
 		"@expo/metro-runtime": "~58.0.16",
