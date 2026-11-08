@@ -762,6 +762,11 @@ cd apps/frontend && npm test && npm run lint && npm run typecheck
 **PR size:**
 - Keep PRs small (<400 lines changed ideally)
 - Split large features into stacked PRs if possible
+- Stacked PRs to `develop` merge themselves in order: enable auto-merge (or add the `autopilot`
+  label) and say in the description what the PR is built on ("built on #123"). The stack
+  autopilot (`.github/workflows/stack-autopilot.yml`) merges `develop` into the next PR,
+  resolves conflicts, waits for every check to be green, then merges it. Rules:
+  [`docs/rules/workflow.md`](rules/workflow.md#branches-commits-pr).
 
 ## Pull Request Process
 

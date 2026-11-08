@@ -44,6 +44,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `readme-screenshots/` | Régénère les captures du README dans `.github/assets/screenshots/` : `capture-desktop.cjs` (aperçu navigateur du renderer), `capture-mobile.cjs` (bundle web de l'app mobile), avec les données inventées de `demo-data.js` ; sans backend ni compte. | à la main |
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
 | `mobile_device_check.py` | Installe une app mobile sur un appareil réel et rend compte. | `mobile-device-check.yml`, à la main |
+| `stack_autopilot.py` | Fusionne les PR inscrites vers `develop` dans l'ordre de leur pile : merge de `develop`, conflits résolus (Claude Code), fusion quand tous les checks sont verts. | `stack-autopilot.yml` ; `--dry-run` à la main |
 
 ## Fusion intelligente des worktrees
 
