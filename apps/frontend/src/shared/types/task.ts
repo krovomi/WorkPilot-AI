@@ -407,6 +407,18 @@ export interface TaskSplitGroup {
 	splitAt?: string;
 }
 
+/** The finished branch's real diff against the card's ceiling (`task_split/diff_check.py`). */
+export interface TaskSplitCheck {
+	/** Lines to review: code in full, tests and docs half, generated files nothing. */
+	lines: number;
+	files: number;
+	maxLines: number;
+	maxFiles: number;
+	kind?: string;
+	over: boolean;
+	checkedAt?: string;
+}
+
 export interface TaskMetadata {
 	// Origin tracking
 	sourceType?:
@@ -604,6 +616,10 @@ export interface TaskMetadata {
 	noSplit?: boolean;
 	/** Changed lines per pull request for this task; the project's when absent. */
 	splitMaxLines?: number;
+	/** The real diff once the build finished, against the ceiling. */
+	splitCheck?: TaskSplitCheck;
+	/** When this part's PR was seen merged (`split-merge-watch.ts`). */
+	prMergedAt?: string;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {

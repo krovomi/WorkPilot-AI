@@ -2373,6 +2373,9 @@
 		"partBadge": "Part {{index}}/{{total}}",
 		"partTooltip": "Part {{index}} of {{total}} of “{{title}}”: {{name}}",
 		"parentBadge": "Split into {{count}} tasks",
-		"parentTooltip": "The plan was larger than {{lines}} changed lines per pull request: this task became {{count}} tasks."
+		"parentTooltip": "The plan was larger than {{lines}} lines to review per pull request: this task became {{count}} tasks.",
+		"overBadge": "{{lines}} / {{max}} lines",
+		"overFilesBadge": "{{files}} / {{max}} files",
+		"overTooltip": "The real diff has about {{lines}} lines to review in {{files}} files, above the ceiling of {{max}} lines and {{maxFiles}} files for this kind of task: the review will take longer."
 	}
 }
