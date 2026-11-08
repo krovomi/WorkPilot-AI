@@ -6,6 +6,7 @@ import type { BoardCard, Column } from "../../../../api/types";
 import { useSession } from "../../../../auth/session";
 import { groupByColumn } from "../../../../board/columns";
 import { initialColumn } from "../../../../board/pickColumn";
+import { groupColor, inGroup } from "../../../../board/splitGroup";
 import { useBoard } from "../../../../board/useBoard";
 import { forgeKind, useProject } from "../../../../forge/useForge";
 import { describeError } from "../../../../i18n";
@@ -25,10 +26,13 @@ export default function Board() {
 		...(forge && can("vcs.read") ? (["forge"] as const) : []),
 		...(can("analytics.read") ? (["dashboard"] as const) : []),
 	];
-	const groups = useMemo(() => groupByColumn(cards ?? []), [cards]);
+	// One split group shown alone, from a tap on a part's mark.
+	const [splitGroup, setSplitGroup] = useState<string | null>(null);
+	const groups = useMemo(() => groupByColumn(inGroup(cards ?? [], splitGroup)), [cards, splitGroup]);
 	const [chosen, setChosen] = useState<Column | null>(null);
 	const column = chosen ?? initialColumn(groups);
 	const shown = groups.find((g) => g.column === column)?.cards ?? [];
+	const toggleGroup = (id: string) => setSplitGroup((current) => (current === id ? null : id));
 
 	const addCard = () =>
 		can("task.write") ? (
@@ -108,6 +112,18 @@ export default function Board() {
 					);
 				})}
 			</ScrollView>
+			{splitGroup ? (
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel={t("board.showAll")}
+					onPress={() => setSplitGroup(null)}
+					style={[styles.groupFilter, { borderColor: groupColor(splitGroup, theme.dark) }]}
+				>
+					<Text style={{ color: groupColor(splitGroup, theme.dark), fontWeight: "600" }} numberOfLines={1}>
+						{t("board.groupFilter", { group: splitGroup })}
+					</Text>
+				</Pressable>
+			) : null}
 			<FlatList<BoardCard>
 				data={shown}
 				keyExtractor={(c) => c.id}
@@ -122,6 +138,7 @@ export default function Board() {
 				renderItem={({ item }) => (
 					<CardRow
 						card={item}
+						onGroup={toggleGroup}
 						onPress={() =>
 							router.push({
 								pathname: "/projects/[projectId]/cards/[cardId]",
@@ -135,7 +152,15 @@ export default function Board() {
 	);
 }
 
-function CardRow({ card, onPress }: { card: BoardCard; onPress: () => void }) {
+function CardRow({
+	card,
+	onPress,
+	onGroup,
+}: {
+	card: BoardCard;
+	onPress: () => void;
+	onGroup: (group: string) => void;
+}) {
 	const { t } = useTranslation();
 	const theme = useTheme();
 	const { completed, total } = card.subtasks;
@@ -157,6 +182,7 @@ function CardRow({ card, onPress }: { card: BoardCard; onPress: () => void }) {
 					</Text>
 				) : null}
 			</View>
+			{card.group ? <GroupMark group={card.group} onPress={() => onGroup(card.group?.id ?? "")} /> : null}
 			<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{card.title}</Text>
 			{total > 0 ? (
 				<View style={{ gap: 4 }}>
@@ -173,6 +199,29 @@ function CardRow({ card, onPress }: { card: BoardCard; onPress: () => void }) {
 					{t("board.claimedBy", { name: card.claimedByName })}
 				</Text>
 			) : null}
+		</Pressable>
+	);
+}
+
+/** « Partie 2/4 · OAuth » in the group's colour: written, so colour is never the only sign. */
+function GroupMark({ group, onPress }: { group: NonNullable<BoardCard["group"]>; onPress: () => void }) {
+	const { t } = useTranslation();
+	const theme = useTheme();
+	const color = groupColor(group.id, theme.dark);
+	const label = t("board.groupMark", { index: group.index, total: group.total, title: group.title });
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			accessibilityHint={t("board.groupHint")}
+			hitSlop={8}
+			onPress={onPress}
+			style={[styles.groupMark, { borderColor: color }]}
+		>
+			<View style={[styles.dot, { backgroundColor: color }]} />
+			<Text style={{ color, fontSize: 12, fontWeight: "600", flexShrink: 1 }} numberOfLines={1}>
+				{label}
+			</Text>
 		</Pressable>
 	);
 }
@@ -204,6 +253,26 @@ const styles = StyleSheet.create({
 	list: { paddingHorizontal: SPACE.lg, paddingBottom: SPACE.xl, gap: SPACE.md },
 	card: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SPACE.lg, gap: SPACE.sm },
 	cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+	groupMark: {
+		flexDirection: "row",
+		alignItems: "center",
+		alignSelf: "flex-start",
+		gap: SPACE.xs,
+		borderWidth: 1,
+		borderRadius: 999,
+		paddingHorizontal: SPACE.sm,
+		paddingVertical: 2,
+		maxWidth: "100%",
+	},
+	groupFilter: {
+		alignSelf: "flex-start",
+		marginHorizontal: SPACE.lg,
+		marginBottom: SPACE.sm,
+		borderWidth: 1,
+		borderRadius: 999,
+		paddingHorizontal: SPACE.md,
+		paddingVertical: SPACE.xs,
+	},
 	kind: { fontSize: 11, paddingHorizontal: SPACE.sm, paddingVertical: 2, borderRadius: RADIUS.sm, overflow: "hidden" },
 	track: { height: 4, borderRadius: 2, overflow: "hidden" },
 	fill: { height: 4 },

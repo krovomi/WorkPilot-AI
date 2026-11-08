@@ -226,3 +226,30 @@ export function partsToMoveOntoBase<
 		);
 	});
 }
+
+/**
+ * The charter tones a split group can take, in the order the hash indexes
+ * them; the backend (`task_split/group.py`) and the phone use the same list
+ * and the same hash, so a group has one colour on the board, the phone and
+ * its forge label.
+ */
+export const SPLIT_GROUP_TONES = ["blue", "violet", "green", "amber", "pink", "orange"] as const;
+export type SplitGroupTone = (typeof SPLIT_GROUP_TONES)[number];
+
+/** FNV-1a (32 bits) of the group id's UTF-8 bytes, modulo the six tones. */
+export function splitGroupTone(groupId: string): SplitGroupTone {
+	let value = 0x811c9dc5;
+	for (const byte of new TextEncoder().encode(groupId)) {
+		value ^= byte;
+		value = Math.imul(value, 0x01000193) >>> 0;
+	}
+	return SPLIT_GROUP_TONES[value % SPLIT_GROUP_TONES.length];
+}
+
+/** The group a card belongs to: a part's split task, or the split task itself. */
+export function splitGroupId(task: Pick<Task, "specId" | "metadata">): string | null {
+	const group = task.metadata?.splitGroup;
+	if (group?.parent) return group.parent;
+	if (group?.children?.length) return task.specId;
+	return null;
+}

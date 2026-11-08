@@ -4,6 +4,7 @@ import {
 	Bookmark,
 	Check,
 	Plus,
+	Scissors,
 	SlidersHorizontal,
 	Search,
 	Trash2,
@@ -25,7 +26,9 @@ import {
 	TASK_SOURCES,
 	type TaskSource,
 } from "../../lib/kanban-filter";
+import { splitGroupTone } from "../../../shared/utils/task-split";
 import { cn } from "../../lib/utils";
+import { toneClass } from "../charter";
 import { TeamRoomBar } from "../collaboration";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
 import { useProjectStore } from "../../stores/project-store";
@@ -123,6 +126,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 	const toggleSource = useKanbanFilterStore((s) => s.toggleSource);
 	const toggleCategory = useKanbanFilterStore((s) => s.toggleCategory);
 	const togglePriority = useKanbanFilterStore((s) => s.togglePriority);
+	const toggleGroup = useKanbanFilterStore((s) => s.toggleGroup);
 	const setSortField = useKanbanFilterStore((s) => s.setSortField);
 	const toggleSortDirection = useKanbanFilterStore((s) => s.toggleSortDirection);
 	const clearFilters = useKanbanFilterStore((s) => s.clearFilters);
@@ -171,6 +175,30 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 					</button>
 				)}
 			</div>
+
+			{/* One split group shown alone (a click on a part's badge) */}
+			{filters.group && (
+				<button
+					type="button"
+					onClick={() => toggleGroup(filters.group as string)}
+					className={cn(
+						"wp-scope flex h-7 max-w-64 items-center gap-1.5 rounded-full border px-2.5 text-xs",
+						toneClass(splitGroupTone(filters.group)),
+					)}
+					style={{
+						color: "var(--wp-tone)",
+						borderColor: "color-mix(in srgb, var(--wp-tone) 45%, transparent)",
+						background: "color-mix(in srgb, var(--wp-tone) 10%, transparent)",
+					}}
+					title={t("kanban.filter.groupClear")}
+				>
+					<Scissors className="h-3 w-3 shrink-0" aria-hidden />
+					<span className="truncate">
+						{t("kanban.filter.groupActive", { group: filters.group })}
+					</span>
+					<X className="h-3 w-3 shrink-0" aria-hidden />
+				</button>
+			)}
 
 			<Separator orientation="vertical" className="h-5" />
 

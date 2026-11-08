@@ -54,7 +54,11 @@
 		"newCard": "Nouvelle carte",
 		"emptyColumn": "Aucune carte ici.",
 		"subtasks": "{{completed}}/{{total}} sous-tâches",
-		"claimedBy": "Réservée par {{name}}"
+		"claimedBy": "Réservée par {{name}}",
+		"groupMark": "Partie {{index}}/{{total}} · {{title}}",
+		"groupHint": "N'affiche que les cartes de ce groupe",
+		"groupFilter": "Groupe {{group}} · tout afficher",
+		"showAll": "Afficher toutes les cartes"
 	},
 	"columns": {
 		"backlog": "Planification",

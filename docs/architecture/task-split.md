@@ -14,12 +14,15 @@ apps/backend/task_split/
   children.py   écrit les cartes enfants, clôt et archive la tâche découpée
   step.py       le point d'appel du build ; une erreur garde la tâche entière
   diff_check.py après la QA : le diff réel de la branche contre le plafond (splitCheck)
+  group.py      couleur (hash), label, préfixe de titre, section « Groupe de PR » (pur)
+apps/backend/core/pr_group.py  ces marques posées à la création de la PR ; label gh / glab
 apps/frontend/src/shared/utils/task-split.ts               lecture des métadonnées, plafonds
 apps/frontend/src/main/ipc-handlers/task/split-events.ts   TASK_SPLIT → tableau rechargé
 apps/frontend/src/main/ipc-handlers/task/split-stack.ts    une part dépendante empilée (F6)
 apps/frontend/src/main/ipc-handlers/task/split-merge-watch.ts  PR fusionnée → part terminée, parts empilées déplacées
 apps/frontend/src/main/pr-state.ts                         état d'une PR : GitHub (gh), GitLab (glab), Azure DevOps (REST)
-apps/frontend/src/renderer/components/kanban/SplitPartBadge.tsx   badge de part, badge « 620 / 400 lignes »
+apps/frontend/src/renderer/components/kanban/SplitPartBadge.tsx   badge de groupe (filtre au clic), « 620 / 400 lignes »
+apps/mobile/src/board/splitGroup.ts                        la même couleur sur le téléphone
 ```
 
 ## Le plafond, selon le type de tâche
@@ -143,7 +146,21 @@ maxLines, maxFiles, kind, over}` des deux copies des métadonnées, et la carte 
 porte « 620 / 400 lignes » (ou « 31 / 25 fichiers »). Rien n'est redécoupé : le code est écrit. Une
 carte jamais découpée (son type, `noSplit`, le projet) n'est pas mesurée.
 
-## Ce qui reste à faire
+## Reconnaître les PR d'un groupe
 
-- Couleur de groupe et étiquette `groupe/<nom>` sur le Kanban, le mobile, GitHub, GitLab ; préfixe
-  `[Tâche k/N]` et section « Groupe de PR » sur Azure DevOps aussi.
+Le groupe est la tâche découpée (son dossier de spec). Sa couleur est l'un des six tons de la
+charte (bleu, violet, vert, ambre, rose, orange ; le rouge reste aux erreurs), choisi par un hash
+FNV-1a de cet id : le bureau (`splitGroupTone`), le téléphone (`groupTone`) et le backend
+(`group_tone`) calculent le même, sans rien stocker. La couleur n'est jamais le seul signe : la
+marque est aussi écrite.
+
+| Surface | Marque |
+|---|---|
+| Kanban | badge « Partie 2/4 · OAuth Google » dans la couleur du groupe ; un clic n'affiche que le groupe (`filters.group`), un second clic ou la puce de la barre d'outils affiche tout |
+| Téléphone | la même marque sur la carte (`group` de `GET /api/board/cards`), un appui filtre la colonne |
+| GitHub, GitLab | titre `[OAuth Google 2/4] API`, label `groupe/<id du groupe>` créé dans la couleur du groupe, section « Groupe de PR » en fin de description |
+| Azure DevOps | titre et section (pas de label de PR fiable) |
+
+La section dit quelle part relire d'abord et liste les parts avec leur PR quand elle est ouverte.
+Elle suit la langue de l'app (`APP_LANGUAGE`). Le label est posé après la création de la PR : un
+échec est écrit au journal et n'annule jamais la PR.
