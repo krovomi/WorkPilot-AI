@@ -23,6 +23,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from test_generation.stacks import (
+    DEFAULT_UNIT_FRAMEWORK,
+    LANGUAGE_BY_EXTENSION,
+    detect_framework,
+    detect_project_language,
+    language_for_path,
+    suggested_test_path,
+)
+
 logger = logging.getLogger(__name__)
 
 _TEST_GEN_SYSTEM_PROMPT = (
@@ -257,33 +266,20 @@ class TestGenerationResult:
 
 
 class ProjectAnalyzer:
-    """Detects project language and test framework from config files."""
+    """Detects a file's language and the test framework its project uses.
 
-    EXTENSION_TO_LANGUAGE: dict[str, str] = {
-        ".py": "python",
-        ".ts": "typescript",
-        ".tsx": "typescript",
-        ".js": "javascript",
-        ".jsx": "javascript",
-        ".mjs": "javascript",
-        ".cjs": "javascript",
-        ".cs": "csharp",
-        ".java": "java",
-        ".rb": "ruby",
-        ".go": "go",
-        ".rs": "rust",
-        ".kt": "kotlin",
-        ".kts": "kotlin",
-        ".swift": "swift",
-        ".php": "php",
-        ".vue": "javascript",
-        ".svelte": "javascript",
-    }
+    The rules live in ``test_generation.stacks``: the language comes from the
+    file, and only that language's manifests are read, so a ``package.json``
+    beside a solution cannot make a C# file a Vitest one.
+    """
+
+    EXTENSION_TO_LANGUAGE: dict[str, str] = LANGUAGE_BY_EXTENSION
 
     def detect(
         self,
         file_path: str,
         project_path: str | None = None,
+        kind: str = "unit",
     ) -> dict[str, str]:
         """Detect language and test framework for a source file.
 
@@ -291,26 +287,34 @@ class ProjectAnalyzer:
             file_path: Path to the source file.
             project_path: Optional explicit project root. When None, walks up
                 the directory tree looking for config file markers.
+            kind: ``"unit"`` or ``"e2e"`` — which kind of framework to look for.
 
         Returns:
             Dict with keys ``language``, ``test_framework``, ``project_root``,
             ``details``.
         """
-        ext = Path(file_path).suffix.lower()
-        language = self.EXTENSION_TO_LANGUAGE.get(ext, "unknown")
-
+        language = language_for_path(file_path)
         root = project_path or self._find_project_root(file_path)
-
-        if root:
-            framework, details = self._scan_framework(root, language)
-        else:
-            framework = self._default_framework(language)
-            details = ""
-
+        framework, details = detect_framework(root, language, kind)
         return {
             "language": language,
             "test_framework": framework,
             "project_root": root or str(Path(file_path).parent),
+            "details": details,
+        }
+
+    def detect_language(
+        self,
+        language: str,
+        project_path: str | None,
+        kind: str = "unit",
+    ) -> dict[str, str]:
+        """The same answer for a language with no file yet (TDD, E2E)."""
+        framework, details = detect_framework(project_path, language, kind)
+        return {
+            "language": language,
+            "test_framework": framework,
+            "project_root": project_path or "",
             "details": details,
         }
 
@@ -325,6 +329,11 @@ class ProjectAnalyzer:
             "build.gradle.kts",
             "Cargo.toml",
             "go.mod",
+            "composer.json",
+            "Gemfile",
+            "pubspec.yaml",
+            "Package.swift",
+            "CMakeLists.txt",
             ".git",
         ]
         current = Path(file_path).resolve().parent
@@ -332,172 +341,17 @@ class ProjectAnalyzer:
             for marker in markers:
                 if (current / marker).exists():
                     return str(current)
+            if any(current.glob("*.sln")) or any(current.glob("*.csproj")):
+                return str(current)
             parent = current.parent
             if parent == current:
                 break
             current = parent
         return None
 
-    def _scan_framework(self, project_root: str, language: str) -> tuple[str, str]:
-        """Scan config files to detect the test framework in use."""
-        root = Path(project_root)
-        for detector in (
-            self._detect_js_framework,
-            self._detect_python_framework,
-            self._detect_java_framework,
-            self._detect_csharp_framework,
-            self._detect_ruby_framework,
-        ):
-            result = detector(root, language)
-            if result:
-                return result
-        return self._default_framework(language), ""
-
-    def _detect_js_framework(self, root: Path, language: str) -> tuple[str, str] | None:
-        pkg_json = root / "package.json"
-        if not pkg_json.exists():
-            return None
-        try:
-            pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
-            deps: dict[str, str] = {
-                **pkg.get("dependencies", {}),
-                **pkg.get("devDependencies", {}),
-            }
-            for fw, dep in [
-                ("vitest", "vitest"),
-                ("jest", "jest"),
-                ("mocha", "mocha"),
-                ("jasmine", "jasmine"),
-                ("playwright", "@playwright/test"),
-                ("cypress", "cypress"),
-            ]:
-                if dep in deps:
-                    return fw, f"{dep} {deps[dep]}"
-            if language in ("typescript", "javascript"):
-                return "jest", "(no test framework detected in package.json)"
-        except Exception:
-            pass
-        return None
-
-    def _detect_python_framework(
-        self,
-        root: Path,
-        language: str,  # noqa: ARG002
-    ) -> tuple[str, str] | None:
-        for fname in (
-            "requirements.txt",
-            "requirements-dev.txt",
-            "requirements-test.txt",
-        ):
-            req_path = root / fname
-            if req_path.exists():
-                try:
-                    content = req_path.read_text(encoding="utf-8").lower()
-                    if "pytest" in content:
-                        return "pytest", f"pytest ({fname})"
-                    if "nose2" in content:
-                        return "nose2", f"nose2 ({fname})"
-                except Exception:
-                    pass
-        pyproject = root / "pyproject.toml"
-        if pyproject.exists():
-            try:
-                content = pyproject.read_text(encoding="utf-8").lower()
-                if "pytest" in content:
-                    return "pytest", "pytest (pyproject.toml)"
-                if "unittest" in content:
-                    return "unittest", "unittest (pyproject.toml)"
-            except Exception:
-                pass
-        return None
-
-    def _detect_java_framework(
-        self,
-        root: Path,
-        language: str,  # noqa: ARG002
-    ) -> tuple[str, str] | None:
-        pom = root / "pom.xml"
-        if pom.exists():
-            try:
-                content = pom.read_text(encoding="utf-8")
-                lower = content.lower()
-                if "junit" in lower:
-                    if "junit-jupiter" in content or "org.junit.jupiter" in content:
-                        return "junit5", "JUnit 5 (pom.xml)"
-                    return "junit4", "JUnit 4 (pom.xml)"
-                if "testng" in lower:
-                    return "testng", "TestNG (pom.xml)"
-            except Exception:
-                pass
-        for gradle_file in ("build.gradle", "build.gradle.kts"):
-            gradle = root / gradle_file
-            if gradle.exists():
-                try:
-                    if "junit" in gradle.read_text(encoding="utf-8").lower():
-                        return "junit5", f"JUnit ({gradle_file})"
-                except Exception:
-                    pass
-        return None
-
-    def _detect_csharp_framework(
-        self,
-        root: Path,
-        language: str,  # noqa: ARG002
-    ) -> tuple[str, str] | None:
-        try:
-            for entry in root.iterdir():
-                if entry.is_file() and entry.suffix == ".csproj":
-                    try:
-                        content = entry.read_text(encoding="utf-8")
-                        if "NUnit" in content:
-                            return "nunit", f"NUnit ({entry.name})"
-                        if "xunit" in content.lower():
-                            return "xunit", f"xUnit ({entry.name})"
-                        if "MSTest" in content:
-                            return "mstest", f"MSTest ({entry.name})"
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        return None
-
-    def _detect_ruby_framework(
-        self,
-        root: Path,
-        language: str,  # noqa: ARG002
-    ) -> tuple[str, str] | None:
-        gemfile = root / "Gemfile"
-        if not gemfile.exists():
-            return None
-        try:
-            content = gemfile.read_text(encoding="utf-8").lower()
-            if "rspec" in content:
-                return "rspec", "RSpec (Gemfile)"
-            if "minitest" in content:
-                return "minitest", "Minitest (Gemfile)"
-        except Exception:
-            pass
-        return None
-
     def default_framework(self, language: str) -> str:
         """Return the conventional default test framework for a language."""
-        return self._default_framework(language)
-
-    def _default_framework(self, language: str) -> str:
-        defaults: dict[str, str] = {
-            "python": "pytest",
-            "typescript": "jest",
-            "javascript": "jest",
-            "csharp": "xunit",
-            "java": "junit5",
-            "go": "testing",
-            "rust": "built-in",
-            "ruby": "rspec",
-            "kotlin": "junit5",
-            "swift": "xctest",
-            "php": "phpunit",
-        }
-        return defaults.get(language, "unknown")
+        return DEFAULT_UNIT_FRAMEWORK.get(language, "unknown")
 
 
 # ── Code analyzer ────────────────────────────────────────────────────
@@ -633,10 +487,18 @@ class TestGeneratorAgent:
         file_path: str,
         existing_test_path: str | None = None,
         project_path: str | None = None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> list[CoverageGap]:
-        """Identify functions/methods in *file_path* that lack test coverage."""
+        """Identify functions/methods in *file_path* that lack test coverage.
+
+        ``on_event`` receives the same ``stage`` events as a generation
+        (``detect``, ``read``, ``analyze``), so the analysis shows its progress
+        on the pipeline instead of a bare spinner.
+        """
         return asyncio.run(
-            self._analyze_coverage_async(file_path, existing_test_path, project_path)
+            self._analyze_coverage_async(
+                file_path, existing_test_path, project_path, on_event
+            )
         )
 
     def generate_unit_tests(
@@ -647,6 +509,7 @@ class TestGeneratorAgent:
         project_path: str | None = None,
         on_event: Callable[[GenEvent], None] | None = None,
         test_libraries: list[str] | None = None,
+        coverage_target: int | None = None,
     ) -> TestGenerationResult:
         """Generate a complete unit test file for *file_path*.
 
@@ -658,6 +521,9 @@ class TestGeneratorAgent:
         the project's own manifests decide; a project that references
         FluentAssertions and Moq gets tests written with them without anyone
         having to say so.
+
+        ``coverage_target`` — the line coverage the file should reach, in
+        percent. The slider in the UI used to be sent and then dropped here.
         """
         return asyncio.run(
             self._generate_unit_async(
@@ -667,6 +533,7 @@ class TestGeneratorAgent:
                 project_path,
                 on_event,
                 test_libraries,
+                coverage_target,
             )
         )
 
@@ -728,6 +595,31 @@ class TestGeneratorAgent:
             logger.debug("could not resolve test libraries", exc_info=True)
             return ""
 
+    def _e2e_framework_info(
+        self, target_module: str, project_path: str | None
+    ) -> dict[str, str]:
+        """Language and E2E framework for a scenario aimed at *target_module*.
+
+        The target is usually typed relative to the project ("src/auth/login.py")
+        and the runner's working directory is not the project, so it is
+        resolved against the project first. Without a file to read an
+        extension from, the project's own manifests name the language: the
+        old fallback built a ``dummy.ts`` path, so every .NET, Go or PHP
+        scenario was written as TypeScript.
+        """
+        candidate = Path(target_module) if target_module else None
+        if candidate is not None and not candidate.is_absolute() and project_path:
+            candidate = Path(project_path) / candidate
+        language = "unknown"
+        if candidate is not None:
+            language = language_for_path(str(candidate))
+        if language == "unknown":
+            language = detect_project_language(project_path) or "unknown"
+        root = project_path
+        if not root and candidate is not None and candidate.exists():
+            root = self._project_analyzer._find_project_root(str(candidate))
+        return self._project_analyzer.detect_language(language, root, kind="e2e")
+
     @staticmethod
     def _emit(on_event: Callable[[GenEvent], None] | None, event: GenEvent) -> None:
         """Fire a progress event, swallowing any consumer error."""
@@ -783,12 +675,39 @@ class TestGeneratorAgent:
         return await self._call_llm(prompt, project_path, on_delta=on_delta)
 
     async def _analyze_coverage_async(
-        self, file_path: str, existing_test_path: str | None, project_path: str | None
+        self,
+        file_path: str,
+        existing_test_path: str | None,
+        project_path: str | None,
+        on_event: Callable[[GenEvent], None] | None = None,
     ) -> list[CoverageGap]:
+        self._emit(on_event, {"type": "stage", "stage": "detect"})
         framework_info = self._project_analyzer.detect(file_path, project_path)
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "detect",
+                "status": "done",
+                "detail": f"{framework_info['language']} · {framework_info['test_framework']}",
+                "language": framework_info["language"],
+                "framework": framework_info["test_framework"],
+            },
+        )
+        self._emit(on_event, {"type": "stage", "stage": "read"})
         source, read_error = self._read_file_or_reason(file_path)
         if not source:
             raise self._unreadable_source(file_path, read_error)
+        self._emit(
+            on_event,
+            {
+                "type": "stage",
+                "stage": "read",
+                "status": "done",
+                "lines": len(source.splitlines()),
+                "detail": f"{len(source.splitlines())} lines",
+            },
+        )
 
         existing = (
             self._read_file(existing_test_path)
@@ -802,11 +721,17 @@ class TestGeneratorAgent:
         )
         print("Asking the model to analyse coverage gaps...", flush=True)
 
+        self._emit(on_event, {"type": "stage", "stage": "analyze"})
         prompt = self._analyze_coverage_prompt(
             source, file_path, framework_info, existing
         )
         response = await self._call_llm(prompt, project_path)
-        return self._parse_gaps(response, file_path, existing)
+        gaps = self._parse_gaps(response, file_path, existing)
+        self._emit(
+            on_event,
+            {"type": "stage", "stage": "analyze", "status": "done", "tests": len(gaps)},
+        )
+        return gaps
 
     async def _generate_unit_async(
         self,
@@ -816,6 +741,7 @@ class TestGeneratorAgent:
         project_path: str | None,
         on_event: Callable[[GenEvent], None] | None = None,
         test_libraries: list[str] | None = None,
+        coverage_target: int | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
         framework_info = self._project_analyzer.detect(file_path, project_path)
@@ -870,6 +796,7 @@ class TestGeneratorAgent:
             existing,
             max_tests_per_function,
             self._libraries_section(project_path, framework_info, test_libraries),
+            coverage_target,
         )
         response = await self._generate_with_events(prompt, project_path, on_event)
         return self._parse_generation_result(
@@ -885,20 +812,7 @@ class TestGeneratorAgent:
         test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
-        # Try to detect framework from target module; fall back to project_path
-        if os.path.exists(target_module):
-            framework_info = self._project_analyzer.detect(target_module, project_path)
-        elif project_path:
-            framework_info = self._project_analyzer.detect(
-                os.path.join(project_path, "dummy.ts"), project_path
-            )
-        else:
-            framework_info = {
-                "language": "unknown",
-                "test_framework": "jest",
-                "project_root": "",
-                "details": "",
-            }
+        framework_info = self._e2e_framework_info(target_module, project_path)
         self._emit(
             on_event,
             {
@@ -937,34 +851,11 @@ class TestGeneratorAgent:
         test_libraries: list[str] | None = None,
     ) -> TestGenerationResult:
         self._emit(on_event, {"type": "stage", "stage": "detect"})
-        language = spec.get("language", "python")
-
-        # Detect framework from project if possible
-        framework = self._project_analyzer.default_framework(language)
-        if project_path:
-            # Build a dummy file path with the right extension to trigger detection
-            ext_map = {
-                "typescript": ".ts",
-                "javascript": ".js",
-                "python": ".py",
-                "csharp": ".cs",
-                "java": ".java",
-                "ruby": ".rb",
-                "go": ".go",
-                "kotlin": ".kt",
-                "rust": ".rs",
-            }
-            ext = ext_map.get(language, f".{language[:2]}")
-            dummy_path = os.path.join(project_path, f"dummy{ext}")
-            detected = self._project_analyzer.detect(dummy_path, project_path)
-            framework = detected.get("test_framework", framework)
-
-        framework_info = {
-            "language": language,
-            "test_framework": framework,
-            "project_root": project_path or "",
-            "details": "",
-        }
+        language = (
+            spec.get("language") or detect_project_language(project_path) or "python"
+        )
+        framework_info = self._project_analyzer.detect_language(language, project_path)
+        framework = framework_info["test_framework"]
         self._emit(
             on_event,
             {
@@ -1144,6 +1035,7 @@ Only include items NOT already covered by the existing test file."""
         existing: str,
         max_tests_per_function: int,
         libraries_section: str = "",
+        coverage_target: int | None = None,
     ) -> str:
         language = framework_info["language"]
         framework = framework_info["test_framework"]
@@ -1153,23 +1045,19 @@ Only include items NOT already covered by the existing test file."""
             else ""
         )
         stem = Path(file_path).stem
-        # Convention hints per language
-        path_convention = {
-            "python": f"tests/test_{stem}.py",
-            "typescript": f"src/__tests__/{stem}.test.ts",
-            "javascript": f"src/__tests__/{stem}.test.js",
-            "csharp": f"tests/{stem}Tests.cs",
-            "java": f"tests/{stem}Test.java",
-            "go": f"{stem}_test.go",
-            "ruby": f"spec/{stem}_spec.rb",
-            "kotlin": f"tests/{stem}Test.kt",
-        }.get(language, f"tests/{stem}_test")
+        path_convention = suggested_test_path(language, stem, "unit")
+        coverage_line = (
+            f"\nTarget line coverage for this file: {coverage_target}% — add tests "
+            "until the branches needed to reach it are exercised."
+            if coverage_target
+            else ""
+        )
 
         return f"""Generate a complete, production-quality test file for this {language} source file.
 
 Source file: {file_path}
 Test framework: {framework}
-Max tests per function: {max_tests_per_function}{libraries_section}
+Max tests per function: {max_tests_per_function}{coverage_line}{libraries_section}
 
 Source code:
 ```{language}
@@ -1227,7 +1115,7 @@ Requirements:
 Return ONLY a raw JSON object (no markdown) matching this schema:
 {{
   "test_file_content": "<complete test file as a single escaped string>",
-  "test_file_path": "e2e/test_{stem}.{language == "typescript" and "ts" or language == "python" and "py" or "js"}",
+  "test_file_path": "{suggested_test_path(language, stem or "scenario", "e2e")}",
   "tests_generated": <integer>,
   "functions_analyzed": 0,
   "generated_tests": [
@@ -1270,7 +1158,7 @@ Requirements:
 Return ONLY a raw JSON object (no markdown) matching this schema:
 {{
   "test_file_content": "<complete test file as a single escaped string>",
-  "test_file_path": "tests/test_{slug}.{language == "python" and "py" or language in ("typescript",) and "ts" or "js"}",
+  "test_file_path": "{suggested_test_path(language, slug.strip("_") or "feature", "unit")}",
   "tests_generated": <integer>,
   "functions_analyzed": 0,
   "generated_tests": [
