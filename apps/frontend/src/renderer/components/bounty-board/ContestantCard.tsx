@@ -1,5 +1,6 @@
 import { FlaskConical, GitCompare, Trophy, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Chip, type Tone, toneClass } from "../charter";
 import type {
 	BountyContestant,
 	BountyEvidence,
@@ -11,13 +12,13 @@ interface Props {
 	readonly rationale?: string;
 }
 
-const STATUS_STYLES: Record<BountyContestant["status"], string> = {
-	queued: "bg-muted text-muted-foreground",
-	running: "bg-blue-500/15 text-blue-500",
-	completed: "bg-success/15 text-success",
-	archived: "bg-zinc-500/15 text-zinc-500",
-	error: "bg-destructive/15 text-destructive",
-	winner: "bg-warning/15 text-warning",
+const STATUS_TONE: Record<BountyContestant["status"], Tone> = {
+	queued: "muted",
+	running: "blue",
+	completed: "green",
+	archived: "muted",
+	error: "red",
+	winner: "amber",
 };
 
 /**
@@ -74,29 +75,28 @@ function EvidenceRow({ evidence }: { readonly evidence: BountyEvidence }) {
 
 export function ContestantCard({ contestant, isWinner, rationale }: Props) {
 	const { t } = useTranslation(["bountyBoard", "common"]);
-	const statusClass = STATUS_STYLES[contestant.status] ?? STATUS_STYLES.queued;
+	const tone = isWinner ? "amber" : (STATUS_TONE[contestant.status] ?? "muted");
 	const breakdown = Object.entries(contestant.quality_breakdown ?? {});
 
 	return (
 		<div
-			className={`border rounded-md p-3 bg-card flex flex-col gap-2 ${isWinner ? "ring-2 ring-warning/60" : ""}`}
+			className={`wp-card wp-card-pad wp-rail flex flex-col gap-2 ${toneClass(tone) ?? ""}`}
+			data-active={isWinner ? "true" : undefined}
 		>
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-2">
-					<span className="text-sm font-semibold">{contestant.label}</span>
+					<span className="wp-step-title">{contestant.label}</span>
 					{isWinner && <Trophy className="w-4 h-4 text-warning" />}
 					{contestant.status === "error" && (
 						<X className="w-4 h-4 text-destructive" />
 					)}
 				</div>
-				<span
-					className={`text-3xs uppercase tracking-wider px-2 py-0.5 rounded-full ${statusClass}`}
-				>
+				<Chip tone={STATUS_TONE[contestant.status] ?? "muted"}>
 					{t(`bountyBoard:status.${contestant.status}`, contestant.status)}
-				</span>
+				</Chip>
 			</div>
 
-			<div className="text-xs text-muted-foreground">
+			<div className="wp-meta">
 				{contestant.provider}:{contestant.model}
 			</div>
 

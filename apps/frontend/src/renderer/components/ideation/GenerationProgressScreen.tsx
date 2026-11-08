@@ -1,7 +1,6 @@
-import { FileCode, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, FileCode, Sparkles, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { IDEATION_TYPE_COLORS } from "../../../shared/constants";
 import type {
 	Idea,
 	IdeationGenerationStatus,
@@ -9,16 +8,31 @@ import type {
 	IdeationType,
 } from "../../../shared/types";
 import type { IdeationTypeState } from "../../stores/ideation-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Progress } from "../ui/progress";
-import { ScrollArea } from "../ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	Chips,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	Section,
+	type Tone,
+} from "../charter";
+import { IDEATION_TYPE_TONES } from "./constants";
 import { IdeaCard } from "./IdeaCard";
 import { IdeaDetailPanel } from "./IdeaDetailPanel";
 import { IdeaSkeletonCard } from "./IdeaSkeletonCard";
-import { TypeIcon } from "./TypeIcon";
 import { TypeStateIcon } from "./TypeStateIcon";
+
+const STATE_TONES: Record<IdeationTypeState, Tone> = {
+	pending: "muted",
+	generating: "accent",
+	completed: "green",
+	failed: "red",
+};
 
 interface GenerationProgressScreenProps {
 	readonly generationStatus: IdeationGenerationStatus;
@@ -47,7 +61,7 @@ export function GenerationProgressScreen({
 	onDismiss,
 	onStop,
 }: GenerationProgressScreenProps) {
-	const { t } = useTranslation("ideation");
+	const { t } = useTranslation(["ideation", "navigation"]);
 	const logsEndRef = useRef<HTMLDivElement>(null);
 	const [showLogs, setShowLogs] = useState(false);
 	const [isStopping, setIsStopping] = useState(false);
@@ -85,203 +99,151 @@ export function GenerationProgressScreen({
 		);
 	};
 
-	// Count how many types are still generating
-	const _generatingCount = enabledTypes.filter(
-		(t) => typeStates[t] === "generating",
-	).length;
 	const completedCount = enabledTypes.filter(
 		(t) => typeStates[t] === "completed",
 	).length;
 
 	return (
-		<div className="h-full flex flex-col overflow-hidden">
-			{/* Header */}
-			<div className="shrink-0 border-b border-border p-4 bg-card/50">
-				<div className="flex items-start justify-between">
-					<div>
-						<div className="flex items-center gap-2 mb-1">
-							<Sparkles className="h-5 w-5 text-primary animate-pulse" />
-							<h2 className="text-lg font-semibold">{t("generation.title")}</h2>
-							<Badge variant="outline">
-								{t("generation.complete", {
-									completed: completedCount,
-									total: enabledTypes.length,
-								})}
-							</Badge>
-						</div>
-						<p className="text-sm text-muted-foreground">
-							{generationStatus.message}
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
+		<ModuleStage scroll="page" data-testid="ideation-generation">
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
+				title={t("generation.title")}
+				description={generationStatus.message}
+				icon={Sparkles}
+				tone="amber"
+				actions={
+					<>
+						<CharterButton
 							size="sm"
+							variant="ghost"
+							icon={FileCode}
+							aria-pressed={showLogs}
 							onClick={() => setShowLogs(!showLogs)}
 						>
-							<FileCode className="h-4 w-4 mr-1" />
 							{showLogs ? t("generation.hideLogs") : t("generation.showLogs")}
-						</Button>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="destructive"
-									size="sm"
-									onClick={handleStopClick}
-									disabled={isStopping}
-								>
-									<Square className="h-4 w-4 mr-1" />
-									{isStopping ? t("generation.stopping") : t("generation.stop")}
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>{t("generation.stopTooltip")}</TooltipContent>
-						</Tooltip>
+						</CharterButton>
+						<CharterButton
+							size="sm"
+							variant="danger"
+							icon={Square}
+							onClick={handleStopClick}
+							disabled={isStopping}
+							title={t("generation.stopTooltip")}
+						>
+							{isStopping ? t("generation.stopping") : t("generation.stop")}
+						</CharterButton>
+					</>
+				}
+			/>
+
+			<Page className="space-y-4 pt-1">
+				<Panel className="space-y-3">
+					<div className="flex items-center justify-between gap-3">
+						<span className="wp-kicker">
+							{t("generation.complete", {
+								completed: completedCount,
+								total: enabledTypes.length,
+							})}
+						</span>
+						<span className="wp-meta">
+							{Math.round(generationStatus.progress)}%
+						</span>
 					</div>
-				</div>
-				<Progress value={generationStatus.progress} className="mt-3" />
-
-				{/* Type Status Indicators */}
-				<div className="mt-3 flex flex-wrap gap-2">
-					{enabledTypes.map((type) => {
-						const isCompleted = typeStates[type] === "completed";
-						const isFailed = typeStates[type] === "failed";
-						const isGenerating = typeStates[type] === "generating";
-
-						let stateClass = "bg-muted text-muted-foreground";
-						if (isCompleted) {
-							stateClass = "bg-success/10 text-success";
-						} else if (isFailed) {
-							stateClass = "bg-destructive/10 text-destructive";
-						} else if (isGenerating) {
-							stateClass = "bg-primary/10 text-primary";
-						}
-
-						return (
-							<div
-								key={type}
-								className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs ${stateClass}`}
-							>
+					<Bar value={generationStatus.progress} tone="amber" />
+					<Chips>
+						{enabledTypes.map((type) => (
+							<Chip key={type} tone={STATE_TONES[typeStates[type]]} dot={false}>
 								<TypeStateIcon state={typeStates[type]} />
-								<TypeIcon type={type} />
-								<span>{t(`ideation:types.${type}`)}</span>
+								{t(`types.${type}`)}
 								{typeStates[type] === "completed" && session && (
-									<span className="ml-1 font-medium">
-										({getStreamingIdeasByType(type).length})
+									<span className="font-semibold">
+										{getStreamingIdeasByType(type).length}
 									</span>
 								)}
+							</Chip>
+						))}
+					</Chips>
+				</Panel>
+
+				{showLogs && logs.length > 0 && (
+					<pre className="wp-code max-h-40 overflow-auto p-3 text-xs">
+						{logs.map((log, index) => (
+							<div key={log.slice(0, 50)} className="leading-relaxed">
+								<span className="wp-muted mr-2 select-none">
+									{String(index + 1).padStart(3, "0")}
+								</span>
+								{log}
 							</div>
-						);
-					})}
-				</div>
-			</div>
-
-			{/* Logs Panel (collapsible) */}
-			{showLogs && logs.length > 0 && (
-				<div className="shrink-0 border-b border-border p-4 bg-muted/20">
-					<ScrollArea className="h-32 rounded-md border border-border bg-muted/30">
-						<div className="p-3 space-y-1 font-mono text-xs">
-							{logs.map((log) => (
-								<div
-									key={log.slice(0, 50)}
-									className="text-muted-foreground leading-relaxed"
-								>
-									<span className="text-muted-foreground/50 mr-2 select-none">
-										{String(logs.indexOf(log) + 1).padStart(3, "0")}
-									</span>
-									{log}
-								</div>
-							))}
-							<div ref={logsEndRef} />
-						</div>
-					</ScrollArea>
-				</div>
-			)}
-
-			{/* Streaming Ideas View */}
-			<div className="flex-1 overflow-auto p-4">
-				{generationStatus.error && (
-					<div className="mb-4 p-3 bg-destructive/10 rounded-md text-destructive text-sm">
-						{generationStatus.error}
-					</div>
+						))}
+						<div ref={logsEndRef} />
+					</pre>
 				)}
 
-				<div className="space-y-6">
-					{enabledTypes.map((type) => {
-						const ideas = getStreamingIdeasByType(type);
-						const state = typeStates[type];
+				{generationStatus.error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{generationStatus.error}
+					</Notice>
+				)}
 
-						return (
-							<div key={type}>
-								<div className="flex items-center gap-2 mb-3">
-									<div
-										className={`p-1.5 rounded-md ${IDEATION_TYPE_COLORS[type]}`}
-									>
-										<TypeIcon type={type} />
-									</div>
-									<h3 className="font-medium">{t(`ideation:types.${type}`)}</h3>
-									<TypeStateIcon state={state} />
-									{ideas.length > 0 && (
-										<Badge variant="outline" className="ml-auto">
-											{t("generation.ideasCount", { count: ideas.length })}
-										</Badge>
-									)}
-								</div>
-
-								<div className="grid gap-3">
-									{/* Show actual ideas if available */}
-									{ideas.map((idea) => (
-										<IdeaCard
-											key={idea.id}
-											idea={idea}
-											isSelected={false}
-											onClick={() =>
-												onSelectIdea(selectedIdea?.id === idea.id ? null : idea)
-											}
-											onConvert={onConvert}
-											onGoToTask={onGoToTask}
-											onDismiss={onDismiss}
-											onToggleSelect={() => {
-												/* Selection disabled during generation */
-											}}
-										/>
-									))}
-
-									{/* Show skeleton placeholders while generating */}
-									{state === "generating" && (
-										<>
-											<IdeaSkeletonCard />
-											<IdeaSkeletonCard />
-										</>
-									)}
-
-									{/* Show pending message */}
-									{state === "pending" && (
-										<div className="text-sm text-muted-foreground py-2">
-											{t("generation.waitingToStart")}
-										</div>
-									)}
-
-									{/* Show failed message */}
-									{state === "failed" && ideas.length === 0 && (
-										<div className="text-sm text-destructive py-2">
-											{t("generation.failedCategory")}
-										</div>
-									)}
-
-									{/* Show empty message if completed with no ideas */}
-									{state === "completed" && ideas.length === 0 && (
-										<div className="text-sm text-muted-foreground py-2">
-											{t("generation.noIdeasCategory")}
-										</div>
-									)}
-								</div>
+				{enabledTypes.map((type) => {
+					const ideas = getStreamingIdeasByType(type);
+					const state = typeStates[type];
+					return (
+						<Section
+							key={type}
+							kicker={<TypeStateIcon state={state} />}
+							title={t(`types.${type}`)}
+							tone={IDEATION_TYPE_TONES[type]}
+							meta={
+								ideas.length > 0
+									? t("generation.ideasCount", { count: ideas.length })
+									: undefined
+							}
+						>
+							<div className="grid gap-2.5">
+								{ideas.map((idea) => (
+									<IdeaCard
+										key={idea.id}
+										idea={idea}
+										isSelected={false}
+										onClick={() =>
+											onSelectIdea(selectedIdea?.id === idea.id ? null : idea)
+										}
+										onConvert={onConvert}
+										onGoToTask={onGoToTask}
+										onDismiss={onDismiss}
+										onToggleSelect={() => {
+											/* Selection disabled during generation */
+										}}
+									/>
+								))}
+								{state === "generating" && (
+									<>
+										<IdeaSkeletonCard />
+										<IdeaSkeletonCard />
+									</>
+								)}
+								{state === "pending" && (
+									<p className="wp-muted py-2 text-sm">
+										{t("generation.waitingToStart")}
+									</p>
+								)}
+								{state === "failed" && ideas.length === 0 && (
+									<p className="py-2 text-sm text-destructive">
+										{t("generation.failedCategory")}
+									</p>
+								)}
+								{state === "completed" && ideas.length === 0 && (
+									<p className="wp-muted py-2 text-sm">
+										{t("generation.noIdeasCategory")}
+									</p>
+								)}
 							</div>
-						);
-					})}
-				</div>
-			</div>
+						</Section>
+					);
+				})}
+			</Page>
 
-			{/* Idea Detail Panel */}
 			{selectedIdea && (
 				<IdeaDetailPanel
 					idea={selectedIdea}
@@ -291,6 +253,6 @@ export function GenerationProgressScreen({
 					onDismiss={onDismiss}
 				/>
 			)}
-		</div>
+		</ModuleStage>
 	);
 }

@@ -20,5 +20,21 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour analyser son historique d'exécution d'agents.",
 		"failed": "Échec de l'analyse : {{error}}"
+	},
+	"description": "Lit les exécutions passées de vos agents et dit quoi changer : modèles, prompts, budgets.",
+	"overviewTitle": "Vos exécutions d'agents",
+	"tipsTitle": "Conseils ({{count}})",
+	"emptyTitle": "Pas encore de rapport",
+	"emptyHint": "Générez un rapport pour analyser les exécutions d'agents de ce projet.",
+	"tipsEmptyTitle": "Pas encore de conseil",
+	"tipsEmptyHint": "Les conseils, classés par priorité avec leurs preuves, s'affichent ici.",
+	"kickers": {
+		"overview": "Vue d'ensemble",
+		"tips": "Conseils"
+	},
+	"priority": {
+		"high": "Haute",
+		"medium": "Moyenne",
+		"low": "Basse"
 	}
 }

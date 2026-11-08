@@ -520,3 +520,45 @@ export function Field({ label, children }: { readonly label: React.ReactNode; re
 		</span>
 	);
 }
+
+export interface TabItem<T extends string> {
+	readonly id: T;
+	readonly label: React.ReactNode;
+	readonly icon?: LucideIcon;
+	readonly count?: number;
+}
+
+/** A module's tabs: a row of pill chips, the selected one in the accent. */
+export function Tabs<T extends string>({
+	tabs,
+	value,
+	onChange,
+	label,
+	className,
+}: {
+	readonly tabs: ReadonlyArray<TabItem<T>>;
+	readonly value: T;
+	readonly onChange: (id: T) => void;
+	readonly label: string;
+	readonly className?: string;
+}): React.ReactElement {
+	return (
+		<div role="tablist" aria-label={label} className={cn("wp-tabs", className)}>
+			{tabs.map(({ id, label: tabLabel, icon: Icon, count }) => (
+				<button
+					type="button"
+					role="tab"
+					key={id}
+					aria-selected={value === id}
+					onClick={() => onChange(id)}
+					className="wp-chip wp-tab"
+					data-dot="false"
+				>
+					{Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+					{tabLabel}
+					{count !== undefined && <span className="wp-tab-count">{count}</span>}
+				</button>
+			))}
+		</div>
+	);
+}

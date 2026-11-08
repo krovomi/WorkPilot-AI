@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, Network, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Network, RefreshCw, X } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -9,11 +9,21 @@ import {
 	useArchitectureVisualizerStore,
 } from "../../stores/architecture-visualizer-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Button } from "../ui/button";
-import { PageHeader } from "../ui/page-header";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+} from "../charter";
 
 export function ArchitectureVisualizer(): React.ReactElement {
-	const { t } = useTranslation(["architectureVisualizer"]);
+	const { t } = useTranslation(["architectureVisualizer", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 
@@ -41,137 +51,105 @@ export function ArchitectureVisualizer(): React.ReactElement {
 	const canRun = Boolean(projectPath) && blockers.length === 0;
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
+		<ModuleStage data-testid="architecture-visualizer-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
 				icon={Network}
 				title={t("architectureVisualizer:title")}
-				description={
-					<>
-						{t("architectureVisualizer:subtitle")}
-					{baseline && (
-						<span className="mt-1 block text-xs">
-							{t("architectureVisualizer:model.components", {
-								count: baseline.components ?? 0,
-							})}
-							{" • "}
-							{t("architectureVisualizer:model.connections", {
-								count: baseline.connections ?? 0,
-							})}
-							{baseline.revision && (
-								<>
-									{" • "}
-									{t("architectureVisualizer:model.revision", {
-										revision: baseline.revision.slice(0, 12),
-									})}
-								</>
-							)}
-						</span>
-					)}
-					</>
-				}
+				description={t("architectureVisualizer:subtitle")}
+				tone="blue"
 				actions={
-					isRunning ? (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={cancelArchitectureVisualization}
-						>
-							<X className="mr-2 h-4 w-4" aria-hidden />
-							{t("architectureVisualizer:actions.cancel")}
-						</Button>
-					) : (
-						<Button
-							size="sm"
-							disabled={!canRun}
-							onClick={() =>
-								projectPath && generateArchitectureMap(projectPath)
-							}
-						>
-							<RefreshCw className="mr-2 h-4 w-4" aria-hidden />
-							{baseline
-								? t("architectureVisualizer:actions.regenerate")
-								: t("architectureVisualizer:actions.generate")}
-						</Button>
+					baseline && (
+						<Chips>
+							<Chip tone="blue">
+								{t("architectureVisualizer:model.components", { count: baseline.components ?? 0 })}
+							</Chip>
+							<Chip tone="violet">
+								{t("architectureVisualizer:model.connections", { count: baseline.connections ?? 0 })}
+							</Chip>
+							{baseline.revision && (
+								<Chip tone="muted" dot={false}>
+									{t("architectureVisualizer:model.revision", { revision: baseline.revision.slice(0, 12) })}
+								</Chip>
+							)}
+						</Chips>
 					)
 				}
 			/>
 
 			{blockers.length > 0 && (
-				<section className="border-b border-warning/30 bg-warning/5 px-6 py-3">
-					<div className="flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
-						<span className="text-sm font-medium">
-							{t("architectureVisualizer:readiness.heading")}
-						</span>
-					</div>
-					<p className="mt-1 text-xs text-muted-foreground">
-						{t("architectureVisualizer:readiness.body")}
-					</p>
+				<Notice tone="amber" icon={AlertTriangle} className="relative z-[2] mx-5 mb-3">
+					<span className="font-medium">{t("architectureVisualizer:readiness.heading")}</span>
+					<span className="mt-1 block text-xs">{t("architectureVisualizer:readiness.body")}</span>
 					<ul className="mt-2 space-y-1">
 						{blockers.map((condition) => (
 							<li key={condition.name} className="text-xs">
 								<span className="font-medium">{condition.name}</span>
 								{" — "}
-								<span className="text-muted-foreground">
-									{condition.remedy || condition.detail}
-								</span>
+								<span className="wp-muted">{condition.remedy || condition.detail}</span>
 							</li>
 						))}
 					</ul>
-				</section>
+				</Notice>
 			)}
 
 			{error && (
-				<section className="border-b border-destructive/30 bg-destructive/5 px-6 py-3">
-					<div className="flex items-center gap-2">
-						<AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />
-						<span className="text-sm font-medium">
-							{t("architectureVisualizer:error.heading")}
-						</span>
-					</div>
-					<p className="mt-1 text-xs text-muted-foreground">{error}</p>
-				</section>
+				<Notice tone="red" icon={AlertTriangle} role="alert" className="relative z-[2] mx-5 mb-3">
+					<span className="font-medium">{t("architectureVisualizer:error.heading")}</span>
+					<span className="mt-1 block text-xs">{error}</span>
+				</Notice>
 			)}
 
-			<div className="flex-1 min-h-0">
+			<div className="relative z-[1] mx-5 mb-3 min-h-0 flex-1 overflow-hidden">
 				{isRunning ? (
-					<div className="flex h-full flex-col">
-						<div className="flex items-center gap-2 border-b border-border px-6 py-2">
-							<Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-							<span className="text-sm">
-								{status || t("architectureVisualizer:progress.checking")}
-							</span>
-						</div>
-						<pre className="flex-1 overflow-auto whitespace-pre-wrap px-6 py-3 font-mono text-xs text-muted-foreground">
+					<Panel className="flex h-full flex-col gap-2">
+						<ScanLine label={status || t("architectureVisualizer:progress.checking")} />
+						<pre className="wp-code min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 text-xs">
 							{streamingOutput}
 						</pre>
-					</div>
+					</Panel>
 				) : artifactUrl ? (
 					// The artifact is a self-contained 0.8-2.2 MB HTML document with
 					// its own theming, pan/zoom and search. A webview keeps it out of
 					// the renderer's document rather than inlining it.
-					<webview
-						key={artifactUrl}
-						src={artifactUrl}
-						className="h-full w-full border-0"
-					/>
+					<div className="wp-card h-full overflow-hidden">
+						<webview key={artifactUrl} src={artifactUrl} className="h-full w-full border-0" />
+					</div>
 				) : (
-					<div className="flex h-full items-center justify-center p-8">
-						<div className="max-w-md text-center">
-							<Network
-								className="mx-auto h-10 w-10 text-muted-foreground"
-								aria-hidden
-							/>
-							<h2 className="mt-3 text-base font-medium">
-								{t("architectureVisualizer:empty.title")}
-							</h2>
-							<p className="mt-2 text-sm text-muted-foreground">
-								{t("architectureVisualizer:empty.body")}
-							</p>
-						</div>
+					<div className="flex h-full items-center justify-center">
+						<EmptyStage icon={Network} title={t("architectureVisualizer:empty.title")} tone="blue">
+							{t("architectureVisualizer:empty.body")}
+						</EmptyStage>
 					</div>
 				)}
 			</div>
-		</div>
+
+			<Composer
+				prompt={
+					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+						<Network className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{t("architectureVisualizer:subtitle")}</span>
+					</span>
+				}
+				actions={
+					isRunning ? (
+						<CharterButton variant="danger" icon={X} onClick={cancelArchitectureVisualization}>
+							{t("architectureVisualizer:actions.cancel")}
+						</CharterButton>
+					) : (
+						<CharterButton
+							variant="primary"
+							icon={RefreshCw}
+							disabled={!canRun}
+							onClick={() => projectPath && generateArchitectureMap(projectPath)}
+						>
+							{baseline
+								? t("architectureVisualizer:actions.regenerate")
+								: t("architectureVisualizer:actions.generate")}
+						</CharterButton>
+					)
+				}
+			/>
+		</ModuleStage>
 	);
 }

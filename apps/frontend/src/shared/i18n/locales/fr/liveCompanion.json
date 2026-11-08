@@ -34,7 +34,8 @@
 			"medium": "Moyenne",
 			"low": "Basse",
 			"info": "Info"
-		}
+		},
+		"emptyTitle": "Pas encore de suggestion"
 	},
 	"takeover": {
 		"title": "Prise en charge IA",
@@ -44,7 +45,9 @@
 		"accept": "Laisser l'IA aider",
 		"decline": "Non merci",
 		"inProgress": "L'IA travaille sur {{file}}...",
-		"completed": "L'IA a termine le travail sur {{file}}"
+		"completed": "L'IA a termine le travail sur {{file}}",
+		"emptyTitle": "Aucune reprise proposée",
+		"emptyHint": "Quand le compagnon vous voit bloqué sur un fichier, il propose ici de prendre le relais."
 	},
 	"config": {
 		"title": "Parametres du compagnon",
@@ -75,5 +78,11 @@
 		"noProject": "Veuillez selectionner un projet avant de demarrer le compagnon.",
 		"startFailed": "Impossible de demarrer le compagnon en direct. Verifiez que chokidar est disponible.",
 		"analysisFailed": "L'analyse a echoue pour {{file}}."
-	}
+	},
+	"kickers": {
+		"session": "Session",
+		"takeovers": "Reprises",
+		"suggestions": "Suggestions"
+	},
+	"sessionTitle": "À l'écoute de vos modifications"
 }

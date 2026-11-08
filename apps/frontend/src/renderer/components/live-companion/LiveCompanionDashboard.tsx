@@ -17,15 +17,30 @@ import {
 	useLiveCompanionStore,
 } from "../../stores/live-companion-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Radio } from "lucide-react";
-import { PageHeader } from "../ui/page-header";
+import { Check, Hand, Lightbulb, Play, Radio, Square, X } from "lucide-react";
+import {
+	CharterButton,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	Stat,
+	Stats,
+	Chip,
+	StepCard,
+	type Tone,
+} from "../charter";
 
-const PRIORITY_COLORS: Record<SuggestionPriority, string> = {
-	critical: "text-destructive bg-destructive/10 border-destructive/20",
-	high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	medium: "text-warning bg-warning/10 border-warning/20",
-	low: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-	info: "text-muted-foreground bg-card border-border",
+const PRIORITY_TONE: Record<SuggestionPriority, Tone> = {
+	critical: "red",
+	high: "orange",
+	medium: "amber",
+	low: "blue",
+	info: "muted",
 };
 
 /** The companion watches files in the main process and pushes nothing to the
@@ -33,7 +48,7 @@ const PRIORITY_COLORS: Record<SuggestionPriority, string> = {
 const REFRESH_INTERVAL_MS = 5000;
 
 export function LiveCompanionDashboard(): React.ReactElement {
-	const { t } = useTranslation(["liveCompanion"]);
+	const { t } = useTranslation(["liveCompanion", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 
@@ -73,295 +88,224 @@ export function LiveCompanionDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
+		<ModuleStage data-testid="live-companion-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.agents")}
 				icon={Radio}
 				title={t("liveCompanion:title")}
 				description={t("liveCompanion:description")}
+				tone="green"
 				actions={
-					<>
-						<span
-							className={`text-xs px-2 py-1 rounded border font-medium ${
-								companionState.active
-									? "text-success bg-success/10 border-success/20"
-									: "text-muted-foreground bg-card border-border"
-							}`}
-						>
-							{companionState.active
-								? t("liveCompanion:state.active")
-								: t("liveCompanion:state.inactive")}
-						</span>
-						<button
-							type="button"
-							onClick={handleToggle}
-							disabled={isLoading || (!companionState.active && !projectPath)}
-							className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-								companionState.active
-									? "bg-destructive/20 text-destructive hover:bg-destructive/30"
-									: "bg-[var(--accent)] text-white hover:opacity-90"
-							}`}
-						>
-							{companionState.active
-								? t("liveCompanion:actions.stop")
-								: t("liveCompanion:actions.start")}
-						</button>
-					</>
+					<Chip tone={companionState.active ? "green" : "muted"}>
+						{companionState.active ? t("liveCompanion:state.active") : t("liveCompanion:state.inactive")}
+					</Chip>
 				}
-			>
-				{!projectPath && !companionState.active && (
-					<p className="text-xs text-muted-foreground">
-						{t("liveCompanion:errors.noProject")}
-					</p>
-				)}
-			</PageHeader>
-
-			<div className="flex flex-1 overflow-hidden">
-				{/* Left: session, options, recent changes */}
-				<div className="w-64 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
-					{companionState.active && companionState.watching_project && (
-						<div className="text-xs text-muted-foreground">
-							{t("liveCompanion:state.watching", {
-								project: companionState.watching_project,
-							})}
-						</div>
-					)}
-
-					<div className="flex flex-col gap-2">
-						<div className="bg-card rounded-lg p-2.5">
-							<div className="text-lg font-bold">
-								{companionState.changes_detected}
-							</div>
-							<div className="text-xs text-muted-foreground">
-								{t("liveCompanion:state.changesDetected", {
-									count: companionState.changes_detected,
-								})}
-							</div>
-						</div>
-						<div className="bg-card rounded-lg p-2.5">
-							<div className="text-lg font-bold">
-								{companionState.suggestions_generated}
-							</div>
-							<div className="text-xs text-muted-foreground">
-								{t("liveCompanion:state.suggestionsGenerated", {
+			/>
+			<Columns template="minmax(240px, 22%) minmax(280px, 1fr) minmax(320px, 1.3fr)">
+				<Column
+					kicker={t("liveCompanion:kickers.session")}
+					title={t("liveCompanion:sessionTitle")}
+					tone="green"
+				>
+					<div className="flex flex-col gap-3">
+						{companionState.active && companionState.watching_project && (
+							<p className="wp-meta truncate" title={companionState.watching_project}>
+								{t("liveCompanion:state.watching", { project: companionState.watching_project })}
+							</p>
+						)}
+						<Stats>
+							<Stat
+								label={t("liveCompanion:state.changesDetected", { count: companionState.changes_detected })}
+								value={companionState.changes_detected}
+								tone="blue"
+							/>
+							<Stat
+								label={t("liveCompanion:state.suggestionsGenerated", {
 									count: companionState.suggestions_generated,
 								})}
+								value={companionState.suggestions_generated}
+								tone="amber"
+							/>
+							<Stat
+								label={t("liveCompanion:state.takeoversPending", { count: companionState.takeovers_proposed })}
+								value={companionState.takeovers_proposed}
+								tone="violet"
+							/>
+						</Stats>
+						{config && (
+							<Panel>
+								<span className="wp-kicker mb-2 block">{t("liveCompanion:config.title")}</span>
+								<label className="mb-2 flex cursor-pointer items-center gap-2">
+									<input
+										type="checkbox"
+										checked={config.suggestion_enabled}
+										onChange={(e) => updateCompanionConfig({ suggestion_enabled: e.target.checked })}
+										className="rounded accent-[var(--wp-accent)]"
+									/>
+									<span className="text-sm">{t("liveCompanion:config.suggestions")}</span>
+								</label>
+								<label className="flex cursor-pointer items-center gap-2">
+									<input
+										type="checkbox"
+										checked={config.takeover_enabled}
+										onChange={(e) => updateCompanionConfig({ takeover_enabled: e.target.checked })}
+										className="rounded accent-[var(--wp-accent)]"
+									/>
+									<span className="text-sm">{t("liveCompanion:config.takeover")}</span>
+								</label>
+							</Panel>
+						)}
+						{recentChanges.length > 0 && (
+							<div>
+								<span className="wp-kicker mb-2 block">{t("liveCompanion:fileChange.title")}</span>
+								<div className="flex flex-col gap-1">
+									{recentChanges.slice(0, 10).map((change) => (
+										<div key={`${change.file_path}-${change.timestamp}`} className="text-xs">
+											<div className="wp-mono truncate">{change.file_path}</div>
+											<div className="wp-faint">{t(`liveCompanion:fileChange.${change.change_type}`)}</div>
+										</div>
+									))}
+								</div>
 							</div>
-						</div>
-						<div className="bg-card rounded-lg p-2.5">
-							<div className="text-lg font-bold">
-								{companionState.takeovers_proposed}
-							</div>
-							<div className="text-xs text-muted-foreground">
-								{t("liveCompanion:state.takeoversPending", {
-									count: companionState.takeovers_proposed,
-								})}
-							</div>
-						</div>
+						)}
 					</div>
+				</Column>
 
-					{config && (
-						<div>
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("liveCompanion:config.title")}
-							</h3>
-							<label className="flex items-center gap-2 cursor-pointer mb-2">
-								<input
-									type="checkbox"
-									checked={config.suggestion_enabled}
-									onChange={(e) =>
-										updateCompanionConfig({
-											suggestion_enabled: e.target.checked,
-										})
-									}
-									className="rounded accent-[var(--accent)]"
-								/>
-								<span className="text-sm">
-									{t("liveCompanion:config.suggestions")}
-								</span>
-							</label>
-							<label className="flex items-center gap-2 cursor-pointer">
-								<input
-									type="checkbox"
-									checked={config.takeover_enabled}
-									onChange={(e) =>
-										updateCompanionConfig({ takeover_enabled: e.target.checked })
-									}
-									className="rounded accent-[var(--accent)]"
-								/>
-								<span className="text-sm">
-									{t("liveCompanion:config.takeover")}
-								</span>
-							</label>
+				<Column
+					kicker={t("liveCompanion:kickers.takeovers")}
+					title={t("liveCompanion:takeover.title")}
+					meta={String(takeovers.length)}
+					tone="violet"
+				>
+					{takeovers.length === 0 ? (
+						<EmptyStage icon={Hand} title={t("liveCompanion:takeover.emptyTitle")} tone="violet">
+							{t("liveCompanion:takeover.emptyHint")}
+						</EmptyStage>
+					) : (
+						<div className="flex flex-col gap-3">
+							{takeovers.map((proposal) => (
+								<StepCard
+									key={proposal.proposal_id}
+									tone="violet"
+									kicker={t("liveCompanion:takeover.proposal")}
+									title={<span className="wp-mono text-[0.8rem]">{proposal.file_path}</span>}
+									meta={`${t("liveCompanion:takeover.reason")}: ${proposal.reason}`}
+								>
+									<span className="wp-muted mt-1 text-xs whitespace-normal">{proposal.description}</span>
+									{proposal.ai_plan && (
+										<details className="mt-2">
+											<summary className="cursor-pointer text-xs text-primary">
+												{t("liveCompanion:actions.viewDetails")}
+											</summary>
+											<pre className="wp-code mt-1 whitespace-pre-wrap p-2 text-xs">{proposal.ai_plan}</pre>
+										</details>
+									)}
+									<span className="mt-2 flex items-center gap-2">
+										<CharterButton size="sm" icon={Check} onClick={() => acceptTakeover(proposal.proposal_id)}>
+											{t("liveCompanion:takeover.accept")}
+										</CharterButton>
+										<CharterButton
+											size="sm"
+											variant="ghost"
+											icon={X}
+											onClick={() => declineTakeover(proposal.proposal_id)}
+										>
+											{t("liveCompanion:takeover.decline")}
+										</CharterButton>
+									</span>
+								</StepCard>
+							))}
 						</div>
 					)}
+				</Column>
 
-					{recentChanges.length > 0 && (
-						<div>
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("liveCompanion:fileChange.title")}
-							</h3>
-							<div className="flex flex-col gap-1">
-								{recentChanges.slice(0, 10).map((change) => (
-									<div
-										key={`${change.file_path}-${change.timestamp}`}
-										className="text-xs"
-									>
-										<div className="font-mono truncate">{change.file_path}</div>
-										<div className="text-muted-foreground">
-											{t(`liveCompanion:fileChange.${change.change_type}`)}
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-				</div>
-
-				{/* Right: takeovers + suggestions */}
-				<div className="flex-1 overflow-auto p-4 flex flex-col gap-5">
-					{takeovers.length > 0 && (
-						<section>
-							<h2 className="text-sm font-semibold mb-2">
-								{t("liveCompanion:takeover.title")}
-							</h2>
-							<div className="flex flex-col gap-2">
-								{takeovers.map((proposal) => (
-									<div
-										key={proposal.proposal_id}
-										className="rounded-lg p-3 border border-[var(--accent)]/30 bg-[var(--accent)]/5"
-									>
-										<div className="font-medium text-sm mb-1">
-											{t("liveCompanion:takeover.proposal")}
-										</div>
-										<div className="text-xs font-mono opacity-70 mb-1">
-											{proposal.file_path}
-										</div>
-										<div className="text-xs text-muted-foreground mb-1">
-											{t("liveCompanion:takeover.reason")}: {proposal.reason}
-										</div>
-										<div className="text-xs text-muted-foreground mb-2">
-											{proposal.description}
-										</div>
-										{proposal.ai_plan && (
-											<details className="mb-2">
-												<summary className="text-xs text-[var(--accent)] cursor-pointer">
-													{t("liveCompanion:actions.viewDetails")}
-												</summary>
-												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded p-2">
-													{proposal.ai_plan}
-												</pre>
-											</details>
-										)}
-										<div className="flex items-center gap-2">
-											<button
-												type="button"
-												onClick={() => acceptTakeover(proposal.proposal_id)}
-												className="px-3 py-1.5 rounded-lg bg-success/20 text-success hover:bg-success/30 transition-colors text-xs font-medium"
-											>
-												{t("liveCompanion:takeover.accept")}
-											</button>
-											<button
-												type="button"
-												onClick={() => declineTakeover(proposal.proposal_id)}
-												className="px-3 py-1.5 rounded-lg bg-card hover:bg-accent transition-colors text-xs"
-											>
-												{t("liveCompanion:takeover.decline")}
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</section>
-					)}
-
-					<section className="flex-1">
-						<h2 className="text-sm font-semibold mb-2">
-							{t("liveCompanion:suggestions.title")}
-						</h2>
-						{suggestions.length === 0 ? (
-							<div className="flex-1 flex items-center justify-center text-center py-12">
-								<p className="text-sm text-muted-foreground max-w-sm">
-									{t("liveCompanion:suggestions.empty")}
-								</p>
-							</div>
-						) : (
-							<div className="flex flex-col gap-2">
-								{suggestions.map((suggestion) => (
-									<div
-										key={suggestion.suggestion_id}
-										className={`rounded-lg p-3 border ${PRIORITY_COLORS[suggestion.priority] ?? ""}`}
-									>
-										<div className="flex items-start justify-between gap-2 mb-1">
-											<div className="font-medium text-sm">
-												{suggestion.title}
-											</div>
-											<div className="flex items-center gap-2 shrink-0 text-xs">
-												<span>
-													{t(
-														`liveCompanion:suggestions.types.${suggestion.suggestion_type}`,
-													)}
-												</span>
-												<span className="px-1.5 py-0.5 rounded font-medium">
-													{t(
-														`liveCompanion:suggestions.priorities.${suggestion.priority}`,
-													)}
-												</span>
-											</div>
-										</div>
-										<div className="text-xs font-mono opacity-70 mb-1">
-											{suggestion.file_path}
-											{suggestion.line_start ? `:${suggestion.line_start}` : ""}
-										</div>
-										<div className="text-xs opacity-80 mb-1">
-											{suggestion.description}
-										</div>
-										<div className="text-xs opacity-70 mb-2">
+				<Column
+					kicker={t("liveCompanion:kickers.suggestions")}
+					title={t("liveCompanion:suggestions.title")}
+					meta={String(suggestions.length)}
+					tone="amber"
+				>
+					{suggestions.length === 0 ? (
+						<EmptyStage icon={Lightbulb} title={t("liveCompanion:suggestions.emptyTitle")} tone="amber">
+							{t("liveCompanion:suggestions.empty")}
+						</EmptyStage>
+					) : (
+						<div className="flex flex-col gap-3">
+							{suggestions.map((suggestion) => (
+								<StepCard
+									key={suggestion.suggestion_id}
+									tone={PRIORITY_TONE[suggestion.priority] ?? "muted"}
+									kicker={`${t(`liveCompanion:suggestions.priorities.${suggestion.priority}`)} · ${t(
+										`liveCompanion:suggestions.types.${suggestion.suggestion_type}`,
+									)}`}
+									title={suggestion.title}
+									meta={`${suggestion.file_path}${suggestion.line_start ? `:${suggestion.line_start}` : ""}`}
+									status={
+										<span className="wp-meta">
 											{t("liveCompanion:suggestions.confidence", {
 												value: Math.round(suggestion.confidence * 100),
 											})}
-										</div>
-										{suggestion.related_files.length > 0 && (
-											<div className="text-xs opacity-70 mb-2">
-												{t("liveCompanion:suggestions.relatedFiles")}:{" "}
-												{suggestion.related_files.join(", ")}
-											</div>
-										)}
-										{suggestion.code_fix && (
-											<details className="mb-2">
-												<summary className="text-xs cursor-pointer underline">
-													{t("liveCompanion:suggestions.codeFix")}
-												</summary>
-												<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-background rounded p-2">
-													{suggestion.code_fix}
-												</pre>
-											</details>
-										)}
-										<div className="flex items-center gap-2">
-											<button
-												type="button"
-												onClick={() => applySuggestion(suggestion.suggestion_id)}
-												className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity text-xs font-medium"
-											>
-												{t("liveCompanion:actions.apply")}
-											</button>
-											<button
-												type="button"
-												onClick={() =>
-													dismissSuggestion(suggestion.suggestion_id)
-												}
-												className="px-3 py-1.5 rounded-lg bg-card hover:bg-accent transition-colors text-xs"
-											>
-												{t("liveCompanion:actions.dismiss")}
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</section>
-				</div>
-			</div>
-		</div>
+										</span>
+									}
+								>
+									<span className="wp-muted mt-1 text-xs whitespace-normal">{suggestion.description}</span>
+									{suggestion.related_files.length > 0 && (
+										<span className="wp-meta mt-1 whitespace-normal">
+											{t("liveCompanion:suggestions.relatedFiles")}: {suggestion.related_files.join(", ")}
+										</span>
+									)}
+									{suggestion.code_fix && (
+										<details className="mt-2">
+											<summary className="cursor-pointer text-xs text-primary">
+												{t("liveCompanion:suggestions.codeFix")}
+											</summary>
+											<pre className="wp-code mt-1 whitespace-pre-wrap p-2 text-xs">{suggestion.code_fix}</pre>
+										</details>
+									)}
+									<span className="mt-2 flex items-center gap-2">
+										<CharterButton size="sm" icon={Check} onClick={() => applySuggestion(suggestion.suggestion_id)}>
+											{t("liveCompanion:actions.apply")}
+										</CharterButton>
+										<CharterButton
+											size="sm"
+											variant="ghost"
+											icon={X}
+											onClick={() => dismissSuggestion(suggestion.suggestion_id)}
+										>
+											{t("liveCompanion:actions.dismiss")}
+										</CharterButton>
+									</span>
+								</StepCard>
+							))}
+						</div>
+					)}
+				</Column>
+			</Columns>
+			{!projectPath && !companionState.active && (
+				<Notice tone="amber" className="relative z-[2] mx-5 mb-2">
+					{t("liveCompanion:errors.noProject")}
+				</Notice>
+			)}
+			<Composer
+				prompt={
+					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+						<Radio className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{t("liveCompanion:description")}</span>
+					</span>
+				}
+				actions={
+					<CharterButton
+						variant={companionState.active ? "danger" : "primary"}
+						icon={companionState.active ? Square : Play}
+						busy={isLoading}
+						onClick={handleToggle}
+						disabled={isLoading || (!companionState.active && !projectPath)}
+					>
+						{companionState.active ? t("liveCompanion:actions.stop") : t("liveCompanion:actions.start")}
+					</CharterButton>
+				}
+			/>
+		</ModuleStage>
 	);
 }
 

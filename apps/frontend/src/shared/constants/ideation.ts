@@ -19,19 +19,6 @@ export const IDEATION_TYPE_LABELS: Record<string, string> = {
 	code_quality: "Code Quality",
 };
 
-export const IDEATION_TYPE_DESCRIPTIONS: Record<string, string> = {
-	code_improvements:
-		"Code-revealed opportunities from patterns, architecture, and infrastructure analysis",
-	ui_ux_improvements:
-		"Visual and interaction improvements identified through app analysis",
-	documentation_gaps: "Missing or outdated documentation that needs attention",
-	security_hardening: "Security vulnerabilities and hardening opportunities",
-	performance_optimizations:
-		"Performance bottlenecks and optimization opportunities",
-	code_quality:
-		"Refactoring opportunities, large files, code smells, and best practice violations",
-};
-
 // Ideation type colors
 export const IDEATION_TYPE_COLORS: Record<string, string> = {
 	code_improvements: "bg-success/10 text-success border-success/30",

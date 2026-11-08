@@ -42,6 +42,17 @@ import {
 	useInsightsStore,
 } from "../stores/insights-store";
 import { loadTasks } from "../stores/task-store";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	ScanLine,
+} from "./charter";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
 import { InsightsModelSelector } from "./InsightsModelSelector";
 import { LearningExplanationCard } from "./LearningExplanationCard";
@@ -98,7 +109,7 @@ interface InsightsProps {
 }
 
 export function Insights({ projectId }: InsightsProps) {
-	const { t } = useTranslation(["common", "insights"]);
+	const { t } = useTranslation(["common", "insights", "navigation"]);
 	const session = useInsightsStore((state) => state.session);
 	const sessions = useInsightsStore((state) => state.sessions);
 	const status = useInsightsStore((state) => state.status);
@@ -261,64 +272,34 @@ export function Insights({ projectId }: InsightsProps) {
 	const readOnly = session?.readOnly === true;
 
 	return (
-		<div className="flex h-full">
-			{/* Chat History Sidebar */}
-			{showSidebar && (
-				<ChatHistorySidebar
-					sessions={sessions}
-					currentSessionId={session?.id || null}
-					isLoading={isLoadingSessions}
-					onNewSession={handleNewSession}
-					onSelectSession={handleSelectSession}
-					onDeleteSession={handleDeleteSession}
-					onRenameSession={handleRenameSession}
-				/>
-			)}
-
-			{/* Main Chat Area */}
-			<div className="flex flex-1 flex-col">
-				{/* Header */}
-				<div className="flex items-center justify-between border-b border-border px-6 py-4">
-					<div className="flex items-center gap-3">
-						<Button
+		<ModuleStage data-testid="insights-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
+				title={t("insights:title")}
+				description={t("insights:description")}
+				icon={Sparkles}
+				actions={
+					<>
+						<CharterButton
+							size="sm"
 							variant="ghost"
-							size="icon"
-							className="h-8 w-8"
+							icon={showSidebar ? PanelLeftClose : PanelLeft}
 							onClick={() => setShowSidebar(!showSidebar)}
+							aria-label={
+								showSidebar
+									? t("insights:sidebar.hide")
+									: t("insights:sidebar.show")
+							}
 							title={
 								showSidebar
 									? t("insights:sidebar.hide")
 									: t("insights:sidebar.show")
 							}
-						>
-							{showSidebar ? (
-								<PanelLeftClose className="h-4 w-4" />
-							) : (
-								<PanelLeft className="h-4 w-4" />
-							)}
-						</Button>
-						<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-							<Sparkles className="h-5 w-5 text-primary" />
-						</div>
-						<div>
-							<h2 className="font-semibold text-foreground">
-								{t("insights:title")}
-							</h2>
-							<p className="text-sm text-muted-foreground">
-								{t("insights:description")}
-							</p>
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
+						/>
 						<LearningModeToggle
 							config={session?.learningModeConfig}
 							onConfigChange={async (config) => {
 								setLearningModeEnabled(config.enabled);
-								// Save to session if exists
-								if (session?.id) {
-									// Update session with new learning mode config
-									// This will be handled by the backend when sending messages
-								}
 							}}
 							disabled={isLoading}
 						/>
@@ -327,159 +308,156 @@ export function Insights({ projectId }: InsightsProps) {
 							onConfigChange={handleModelConfigChange}
 							disabled={isLoading}
 						/>
-						<Button variant="outline" size="sm" onClick={handleNewSession}>
-							<Plus className="mr-2 h-4 w-4" />
+						<CharterButton size="sm" icon={Plus} onClick={handleNewSession}>
 							{t("insights:actions.newChat")}
-						</Button>
-					</div>
-				</div>
+						</CharterButton>
+					</>
+				}
+			/>
 
-				{/* Messages */}
-				<ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-4">
-					{messages.length === 0 && !streamingContent ? (
-						<div className="flex h-full flex-col items-center justify-center text-center">
-							<div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-								<MessageSquare className="h-8 w-8 text-muted-foreground" />
-							</div>
-							<h3 className="mb-2 text-lg font-medium text-foreground">
-								{t("insights:welcome.title")}
-							</h3>
-							<p className="max-w-md text-sm text-muted-foreground">
-								{t("insights:welcome.description")}
-							</p>
-							<div className="mt-6 flex flex-wrap justify-center gap-2">
-								{[
-									t("insights:suggestions.architecture"),
-									t("insights:suggestions.quality"),
-									t("insights:suggestions.features"),
-									t("insights:suggestions.security"),
-								].map((suggestion) => (
-									<Button
-										key={suggestion}
-										variant="outline"
-										size="sm"
-										className="text-xs"
-										onClick={() => {
-											setInputValue(suggestion);
-											textareaRef.current?.focus();
-										}}
-									>
-										{suggestion}
-									</Button>
-								))}
-							</div>
-						</div>
-					) : (
-						<div className="space-y-6">
-							{messages.map((message) => (
-								<MessageBubble
-									key={message.id}
-									message={message}
-									markdownComponents={markdownComponents}
-									onCreateTask={() => handleCreateTask(message)}
-									isCreatingTask={creatingTask === message.id}
-									taskCreated={taskCreated.has(message.id)}
-								/>
-							))}
+			<div className="relative z-[1] mx-5 mb-3 flex min-h-0 flex-1 gap-3">
+				{showSidebar && (
+					<ChatHistorySidebar
+						sessions={sessions}
+						currentSessionId={session?.id || null}
+						isLoading={isLoadingSessions}
+						onNewSession={handleNewSession}
+						onSelectSession={handleSelectSession}
+						onDeleteSession={handleDeleteSession}
+						onRenameSession={handleRenameSession}
+					/>
+				)}
 
-							{/* Streaming message */}
-							{(streamingContent || currentTool || currentExplanation) && (
-								<div className="flex gap-3">
-									<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-										<Bot className="h-4 w-4 text-primary" />
-									</div>
-									<div className="flex-1 space-y-3">
-										<div className="mb-1 text-sm font-medium text-foreground">
-											{t("insights:messages.assistant")}
-										</div>
-										{streamingContent && (
-											<div className="prose prose-sm dark:prose-invert max-w-none">
-												<ReactMarkdown
-													remarkPlugins={[remarkGfm]}
-													components={markdownComponents}
+				<div className="wp-card flex min-w-0 flex-1 flex-col overflow-hidden">
+					<ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-4">
+						{messages.length === 0 && !streamingContent ? (
+							<div className="flex h-full items-center justify-center py-10">
+								<EmptyStage
+									icon={MessageSquare}
+									title={t("insights:welcome.title")}
+									action={
+										<Chips>
+											{[
+												t("insights:suggestions.architecture"),
+												t("insights:suggestions.quality"),
+												t("insights:suggestions.features"),
+												t("insights:suggestions.security"),
+											].map((suggestion) => (
+												<Chip
+													key={suggestion}
+													dot={false}
+													onClick={() => {
+														setInputValue(suggestion);
+														textareaRef.current?.focus();
+													}}
 												>
-													{streamingContent}
-												</ReactMarkdown>
-											</div>
-										)}
-										{/* Tool usage indicator */}
-										{currentTool && (
-											<ToolIndicator
-												name={currentTool.name}
-												input={currentTool.input}
-											/>
-										)}
-										{/* Learning Mode explanation */}
-										{currentExplanation && learningModeEnabled && (
-											<LearningExplanationCard
-												explanation={currentExplanation}
-												defaultExpanded={true}
-											/>
-										)}
-									</div>
-								</div>
-							)}
+													{suggestion}
+												</Chip>
+											))}
+										</Chips>
+									}
+								>
+									{t("insights:welcome.description")}
+								</EmptyStage>
+							</div>
+						) : (
+							<div className="space-y-6">
+								{messages.map((message) => (
+									<MessageBubble
+										key={message.id}
+										message={message}
+										markdownComponents={markdownComponents}
+										onCreateTask={() => handleCreateTask(message)}
+										isCreatingTask={creatingTask === message.id}
+										taskCreated={taskCreated.has(message.id)}
+									/>
+								))}
 
-							{/* Thinking indicator */}
-							{status.phase === "thinking" &&
-								!streamingContent &&
-								!currentTool && (
+								{(streamingContent || currentTool || currentExplanation) && (
 									<div className="flex gap-3">
 										<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
 											<Bot className="h-4 w-4 text-primary" />
 										</div>
-										<div className="flex items-center gap-2 text-sm text-muted-foreground">
-											<Loader2 className="h-4 w-4 animate-spin" />
-											{t("insights:status.thinking")}
+										<div className="flex-1 space-y-3">
+											<div className="mb-1 text-sm font-medium text-foreground">
+												{t("insights:messages.assistant")}
+											</div>
+											{streamingContent && (
+												<div className="prose prose-sm dark:prose-invert max-w-none">
+													<ReactMarkdown
+														remarkPlugins={[remarkGfm]}
+														components={markdownComponents}
+													>
+														{streamingContent}
+													</ReactMarkdown>
+												</div>
+											)}
+											{currentTool && (
+												<ToolIndicator
+													name={currentTool.name}
+													input={currentTool.input}
+												/>
+											)}
+											{currentExplanation && learningModeEnabled && (
+												<LearningExplanationCard
+													explanation={currentExplanation}
+													defaultExpanded={true}
+												/>
+											)}
 										</div>
 									</div>
 								)}
 
-							{/* Error message */}
-							{status.phase === "error" && status.error && (
-								<div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-									<AlertCircle className="h-4 w-4 shrink-0" />
-									{status.error}
-								</div>
-							)}
-						</div>
-					)}
-				</ScrollArea>
+								{status.phase === "thinking" &&
+									!streamingContent &&
+									!currentTool && (
+										<ScanLine label={t("insights:status.thinking")} />
+									)}
 
-				{/* Input */}
-				<div className="shrink-0 border-t border-border p-4">
-					<div className="flex gap-2">
-						<Textarea
-							ref={textareaRef}
-							value={inputValue}
-							onChange={(e) => setInputValue(e.target.value)}
-							onKeyDown={handleKeyDown}
-							placeholder={
-								readOnly
-									? t("insights:input.readOnly", { name: session?.ownerName ?? "?" })
-									: t("insights:input.placeholder")
-							}
-							className="min-h-[80px] resize-none"
-							disabled={isLoading || readOnly}
-						/>
-						<Button
-							onClick={handleSend}
-							disabled={!inputValue.trim() || isLoading || readOnly}
-							className="self-end"
-						>
-							{isLoading ? (
-								<Loader2 className="h-4 w-4 animate-spin" />
-							) : (
-								<Send className="h-4 w-4" />
-							)}
-						</Button>
-					</div>
-					<p className="mt-2 text-xs text-muted-foreground">
-						{t("insights:input.hint")}
-					</p>
+								{status.phase === "error" && status.error && (
+									<Notice tone="red" icon={AlertCircle} role="alert">
+										{status.error}
+									</Notice>
+								)}
+							</div>
+						)}
+					</ScrollArea>
 				</div>
 			</div>
-		</div>
+
+			<Composer
+				prompt={
+					<Textarea
+						ref={textareaRef}
+						value={inputValue}
+						onChange={(e) => setInputValue(e.target.value)}
+						onKeyDown={handleKeyDown}
+						placeholder={
+							readOnly
+								? t("insights:input.readOnly", {
+										name: session?.ownerName ?? "?",
+									})
+								: t("insights:input.placeholder")
+						}
+						aria-label={t("insights:input.placeholder")}
+						className="min-h-[64px] flex-1 resize-none"
+						disabled={isLoading || readOnly}
+					/>
+				}
+				actions={
+					<CharterButton
+						variant="primary"
+						icon={isLoading ? Loader2 : Send}
+						busy={isLoading}
+						onClick={handleSend}
+						disabled={!inputValue.trim() || isLoading || readOnly}
+					>
+						{t("insights:actions.send")}
+					</CharterButton>
+				}
+				hint={t("insights:input.hint")}
+			/>
+		</ModuleStage>
 	);
 }
 

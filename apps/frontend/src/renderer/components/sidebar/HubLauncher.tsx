@@ -6,7 +6,7 @@ import { openContextAwareSnippetsDialog } from "@/stores/context-aware-snippets-
 import { useNaturalLanguageGitStore } from "@/stores/natural-language-git-store";
 import { openSmartEstimation } from "@/stores/smart-estimation-store";
 import type { SidebarView } from "../Sidebar";
-import { Button } from "../ui/button";
+import { CharterButton, EmptyStage, ModuleStage } from "../charter";
 import type { HubTab } from "./hubs";
 
 /**
@@ -27,18 +27,24 @@ export function HubLauncher({ tab }: { readonly tab: HubTab }) {
 	const Icon = tab.icon;
 	const name = t(tab.labelKey);
 	return (
-		<div className="flex h-full items-center justify-center p-8">
-			<div className="flex max-w-md flex-col items-center gap-4 text-center">
-				<Icon className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
-				<h2 className="text-lg font-semibold">{name}</h2>
-				<p className="text-sm text-muted-foreground">
+		<ModuleStage>
+			<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+				<EmptyStage
+					icon={Icon}
+					title={name}
+					action={
+						<CharterButton
+							variant="primary"
+							icon={ExternalLink}
+							onClick={() => HUB_DIALOG_OPENERS[tab.view]?.()}
+						>
+							{t("navigation:hubs.open", { name })}
+						</CharterButton>
+					}
+				>
 					{t(`navigation:hubs.launchers.${tab.view}`)}
-				</p>
-				<Button onClick={() => HUB_DIALOG_OPENERS[tab.view]?.()}>
-					<ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
-					{t("navigation:hubs.open", { name })}
-				</Button>
+				</EmptyStage>
 			</div>
-		</div>
+		</ModuleStage>
 	);
 }

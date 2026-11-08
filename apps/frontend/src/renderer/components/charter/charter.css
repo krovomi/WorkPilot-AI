@@ -160,6 +160,11 @@
 		white-space: nowrap;
 	}
 
+	/* A paragraph of meta text is a sentence: it wraps. */
+	p.wp-meta {
+		white-space: normal;
+	}
+
 	/* ── Header ─────────────────────────────────────────────────────────── */
 
 	.wp-header {
@@ -391,10 +396,33 @@
 		cursor: pointer;
 	}
 
-	button.wp-chip[aria-pressed="true"] {
+	button.wp-chip[aria-pressed="true"],
+	button.wp-chip[aria-selected="true"] {
 		color: var(--wp-title);
 		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 60%, var(--wp-border));
 		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 12%, var(--wp-card-solid));
+	}
+
+	.wp-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		position: relative;
+		z-index: 2;
+		padding: 0 1.25rem 0.75rem;
+	}
+
+	.wp-tab {
+		gap: 0.45rem;
+		padding: 0.3rem 0.8rem;
+		font-family: inherit;
+		font-size: 0.78rem;
+	}
+
+	.wp-tab-count {
+		font-family: var(--wp-mono);
+		font-size: 0.65rem;
+		color: var(--wp-faint);
 	}
 
 	.wp-btn {
