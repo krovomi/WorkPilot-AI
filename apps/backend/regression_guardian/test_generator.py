@@ -9,16 +9,12 @@ occurs. Incident text is sanitized before it reaches any template.
 
 from __future__ import annotations
 
-import logging
-
 from .incident_parser import Incident, StackFrame
 from .stacks import EXTRA_GENERATORS, sanitized
 from .test_model import GeneratedTest, TestFramework, TestStatus
 from .test_model import safe_function_name as _safe_function_name
 
 __all__ = ["GeneratedTest", "TestFramework", "TestGenerator", "TestStatus"]
-
-logger = logging.getLogger(__name__)
 
 
 class TestGenerator:
