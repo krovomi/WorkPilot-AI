@@ -1,0 +1,97 @@
+name: Stack autopilot
+
+# Merges the opted-in pull requests into develop in stack order (#771, then
+# the one built on it…): merges develop into the next one, resolves the
+# conflicts (Claude Code for the ones a rule cannot settle), pushes, and
+# merges once every check of that commit is green. Opt-in: GitHub auto-merge
+# enabled on the pull request, or the `autopilot` label.
+# Logic and rules: scripts/stack_autopilot.py; docs: docs/rules/workflow.md.
+#
+# Secrets (all optional, the run says what is missing):
+#   PAT_TOKEN                 pushes and merges. A push made with the default
+#                             token never starts CI, so without it nothing is
+#                             pushed. Fine-grained: Contents, Pull requests and
+#                             Workflows read/write on this repository.
+#   CLAUDE_CODE_OAUTH_TOKEN   (or ANTHROPIC_API_KEY) resolves the conflicts.
+#   vars.STACK_AUTOPILOT_MODEL  optional model for the resolution.
+
+on:
+  push:
+    branches: [develop]
+  workflow_run:
+    workflows: [CI, Lint, "CodeQL Advanced", Quality Security, Mobile]
+    types: [completed]
+  pull_request:
+    types: [auto_merge_enabled, labeled, reopened, ready_for_review]
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only say what would be done
+        type: boolean
+        default: false
+
+# One run at a time: each run re-reads every pull request, so a queued run
+# replacing an older queued one loses nothing.
+concurrency:
+  group: stack-autopilot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  stack-autopilot:
+    name: Stack autopilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # A pull request event from a fork has no secrets and must not drive
+    # pushes; of the labels, only `autopilot` is an opt-in (the run's own
+    # labels must not start another run).
+    if: >-
+      github.event_name != 'pull_request' || (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (github.event.action != 'labeled' || github.event.label.name == 'autopilot'))
+    env:
+      HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      # Always develop's copy of the script, never the pull request's.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        if: env.HAS_CLAUDE == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        if: env.HAS_CLAUDE == 'true'
+        run: npm install -g @anthropic-ai/claude-code@2.1.314
+
+      - name: Merge the ready pull requests, sync the next ones
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          STACK_AUTOPILOT_MODEL: ${{ vars.STACK_AUTOPILOT_MODEL }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            python scripts/stack_autopilot.py --dry-run
+          else
+            python scripts/stack_autopilot.py
+          fi
