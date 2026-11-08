@@ -4,7 +4,8 @@
 	"pending": {
 		"heading_one": "{{count}} plan awaiting review",
 		"heading_other": "{{count}} plans awaiting review",
-		"empty": "No plan is waiting for a review."
+		"empty": "No plan is waiting for a review.",
+		"emptyTitle": "Nothing to review"
 	},
 	"content": {
 		"spec": "Specification",
@@ -29,5 +30,10 @@
 		"title": "Pick a plan",
 		"body": "Select a task on the left to read its spec and plan, then approve it to start the build, or request changes.",
 		"noProject": "Open a project to review the plans waiting on it."
+	},
+	"queueTitle": "Plans to review",
+	"kickers": {
+		"queue": "Queue",
+		"plan": "Plan"
 	}
 }

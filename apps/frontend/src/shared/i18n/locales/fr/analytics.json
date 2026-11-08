@@ -7,7 +7,9 @@
 		"last30Days": "Derniers 30 jours",
 		"last90Days": "Derniers 90 jours"
 	},
-	"actions": { "refresh": "Actualiser" },
+	"actions": {
+		"refresh": "Actualiser"
+	},
 	"kpis": {
 		"totalBuilds": {
 			"title": "Total des Tâches",
@@ -73,8 +75,13 @@
 		"builds": "builds",
 		"occurrences": "occurrences"
 	},
-	"badges": { "success": "Succès", "failed": "Échoué" },
-	"empty": { "noProject": "Sélectionnez un projet pour voir les analytiques" },
+	"badges": {
+		"success": "Succès",
+		"failed": "Échoué"
+	},
+	"empty": {
+		"noProject": "Sélectionnez un projet pour voir les analytiques"
+	},
 	"status": {
 		"loading": "Chargement des analytiques...",
 		"error": "Erreur de Chargement des Analytiques",
@@ -82,5 +89,14 @@
 		"noData": "Aucune donnée disponible",
 		"noBuilds": "Aucun build trouvé",
 		"noErrors": "Aucune erreur trouvée"
+	},
+	"statuses": {
+		"completed": "Terminées",
+		"complete": "Terminées",
+		"done": "Terminées",
+		"in_progress": "En cours",
+		"pending": "En attente",
+		"failed": "Échouées",
+		"cancelled": "Annulées"
 	}
 }

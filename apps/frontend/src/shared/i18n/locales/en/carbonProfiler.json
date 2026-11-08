@@ -17,5 +17,13 @@
 	"errors": {
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
+	},
+	"description": "Energy and CO₂ of the project's LLM calls and CI runs, read from its carbon ledger.",
+	"emptyTitle": "No scan yet",
+	"period": "From {{start}} to {{end}}",
+	"kickers": {
+		"providers": "Providers",
+		"models": "Models",
+		"records": "Ledger"
 	}
 }

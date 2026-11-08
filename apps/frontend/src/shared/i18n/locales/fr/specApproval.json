@@ -4,7 +4,8 @@
 	"pending": {
 		"heading_one": "{{count}} plan en attente de revue",
 		"heading_other": "{{count}} plans en attente de revue",
-		"empty": "Aucun plan n'attend de revue."
+		"empty": "Aucun plan n'attend de revue.",
+		"emptyTitle": "Rien à relire"
 	},
 	"content": {
 		"spec": "Spécification",
@@ -29,5 +30,10 @@
 		"title": "Choisissez un plan",
 		"body": "Sélectionnez une tâche à gauche pour lire sa spec et son plan, puis approuvez-la pour lancer le build, ou demandez des modifications.",
 		"noProject": "Ouvrez un projet pour relire les plans qui l'attendent."
+	},
+	"queueTitle": "Plans à relire",
+	"kickers": {
+		"queue": "File",
+		"plan": "Plan"
 	}
 }

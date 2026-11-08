@@ -24,7 +24,8 @@
 		"featuresCount": "{{count}} features",
 		"allFeatures": "All Features",
 		"byPriority": "By Priority",
-		"insight": "Insight"
+		"insight": "Insight",
+		"label": "Roadmap views"
 	},
 	"features": {
 		"title": "Features",
@@ -214,5 +215,23 @@
 		"viewTask": "View Task",
 		"progress": "Progress",
 		"milestones": "Milestones"
+	},
+	"priorities": {
+		"must": "must",
+		"should": "should",
+		"could": "could",
+		"wont": "won't"
+	},
+	"priorityLabels": {
+		"must": "Must have",
+		"should": "Should have",
+		"could": "Could have",
+		"wont": "Won't have"
+	},
+	"statusColumns": {
+		"under_review": "Under review",
+		"planned": "Planned",
+		"in_progress": "In progress",
+		"done": "Done"
 	}
 }

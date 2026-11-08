@@ -614,6 +614,21 @@
 		background: var(--wp-tone, var(--wp-accent));
 	}
 
+	/* A stacked bar: one segment per share, each in its own tone. */
+	.wp-stack {
+		display: flex;
+		height: 0.55rem;
+		overflow: hidden;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--foreground) 8%, transparent);
+	}
+
+	.wp-stack > i {
+		display: block;
+		height: 100%;
+		background: var(--wp-tone, var(--wp-accent));
+	}
+
 	/* ── Composer (the bottom bar: prompt, options, actions) ────────────── */
 
 	.wp-composer {

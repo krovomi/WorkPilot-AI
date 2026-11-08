@@ -85,7 +85,7 @@ export function Step2ConfigureGenerate(props: Step2ConfigureGenerateProps) {
 	});
 
 	return (
-		<div className="flex flex-1 overflow-hidden">
+		<div className="relative z-[1] flex min-h-0 flex-1 gap-4 px-5 pb-4">
 			<ConfigurationPanel
 				sourceMode={sourceMode}
 				summaryInfo={summaryInfo}

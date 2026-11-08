@@ -8,14 +8,9 @@
 	"history": "History",
 	"empty": "No snapshots captured yet.",
 	"selectPrompt": "Select a snapshot to see details.",
-	"dirty": "dirty",
-	"osLabel": "OS",
-	"commit": "Commit",
 	"lockfiles": "Lockfiles",
 	"noLockfiles": "No lockfiles detected.",
-	"format": "Replay format",
 	"replayTargetLabel": "Replay target",
-	"targetHint": "Target:",
 	"formats": {
 		"docker": {
 			"label": "Docker",
@@ -23,7 +18,7 @@
 		},
 		"nix": {
 			"label": "Nix",
-			"description": "Generate a flake.nix shell with matching Node/Python/Git for reproducible entry."
+			"description": "Generates a Nix shell with the captured toolchains, for a reproducible entry point."
 		},
 		"script": {
 			"label": "Shell",
@@ -34,5 +29,20 @@
 	"export": "Export",
 	"exporting": "Exporting…",
 	"exportedTo": "Exported to",
-	"copy": "Copy"
+	"copy": "Copy",
+	"description": "Captures the toolchains of every stack, the lockfiles and the git state, then replays them as a Dockerfile, a Nix shell or a check script.",
+	"emptyTitle": "No snapshot yet",
+	"selectTitle": "Choose a snapshot",
+	"toolsTitle": "Toolchains",
+	"noTools": "No toolchain found on this machine.",
+	"captureHint": "Give the snapshot a label, then capture: secrets in environment variables are masked.",
+	"dirtyCount_one": "{{count}} modified file",
+	"dirtyCount_other": "{{count}} modified files",
+	"kickers": {
+		"history": "History",
+		"detail": "Snapshot",
+		"tools": "Tools",
+		"lockfiles": "Locks",
+		"replay": "Replay"
+	}
 }

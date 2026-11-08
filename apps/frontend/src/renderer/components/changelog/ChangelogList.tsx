@@ -5,6 +5,7 @@ import type {
 	ChangelogTask,
 	GitCommit as GitCommitType,
 } from "../../../shared/types";
+import { CharterButton } from "../charter";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { CommitCard, TaskCard } from "./ChangelogEntry";
@@ -40,14 +41,14 @@ export function ChangelogList({
 	const { t } = useTranslation(["changelog", "errors", "common"]);
 
 	return (
-		<div className="flex-1 flex flex-col overflow-hidden">
+		<div className="wp-card flex min-w-0 flex-1 flex-col overflow-hidden">
 			{/* Tasks Mode - Task Selection */}
 			{sourceMode === "tasks" && (
 				<>
 					{/* Task selection header */}
-					<div className="flex items-center justify-between border-b border-border px-6 py-3 bg-muted/30">
+					<div className="flex items-center justify-between border-b border-border px-4 py-3">
 						<div className="flex items-center gap-4">
-							<span className="text-sm font-medium">
+							<span className="wp-title text-sm">
 								{t("changelog:configuration.tasksSelectedCount", {
 									selected: selectedTaskIds.length,
 									total: doneTasks.length,
@@ -75,7 +76,7 @@ export function ChangelogList({
 					</div>
 
 					{/* Task grid */}
-					<ScrollArea className="flex-1 p-6">
+					<ScrollArea className="flex-1 p-4">
 						{doneTasks.length === 0 ? (
 							<div className="flex h-full items-center justify-center">
 								<div className="text-center py-12">
@@ -108,9 +109,9 @@ export function ChangelogList({
 			{(sourceMode === "git-history" || sourceMode === "branch-diff") && (
 				<>
 					{/* Commit preview header */}
-					<div className="flex items-center justify-between border-b border-border px-6 py-3 bg-muted/30">
+					<div className="flex items-center justify-between border-b border-border px-4 py-3">
 						<div className="flex items-center gap-4">
-							<span className="text-sm font-medium">
+							<span className="wp-title text-sm">
 								{t("changelog:gitHistory.commitsFound", {
 									count: previewCommits.length,
 								})}
@@ -122,7 +123,7 @@ export function ChangelogList({
 					</div>
 
 					{/* Commit list */}
-					<ScrollArea className="flex-1 p-6">
+					<ScrollArea className="flex-1 p-4">
 						{(() => {
 							if (isLoadingCommits) {
 								return (
@@ -171,11 +172,10 @@ export function ChangelogList({
 			)}
 
 			{/* Footer with the Continue button */}
-			<div className="flex items-center justify-end border-t border-border px-6 py-4 bg-background">
-				<Button onClick={onContinue} disabled={!canContinue} size="lg">
+			<div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3 pr-[16rem]">
+				<CharterButton variant="primary" icon={ArrowRight} onClick={onContinue} disabled={!canContinue}>
 					{t("common:actions.next")}
-					<ArrowRight className="ml-2 h-4 w-4" />
-				</Button>
+				</CharterButton>
 			</div>
 		</div>
 	);

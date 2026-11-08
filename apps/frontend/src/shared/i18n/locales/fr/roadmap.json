@@ -24,7 +24,8 @@
 		"featuresCount": "{{count}} fonctionnalités",
 		"allFeatures": "Toutes les fonctionnalités",
 		"byPriority": "Par priorité",
-		"insight": "Info"
+		"insight": "Info",
+		"label": "Vues de la feuille de route"
 	},
 	"features": {
 		"title": "Fonctionnalités",
@@ -214,5 +215,23 @@
 		"viewTask": "Voir la tâche",
 		"progress": "Avancement",
 		"milestones": "Jalons"
+	},
+	"priorities": {
+		"must": "indispensables",
+		"should": "souhaitables",
+		"could": "optionnelles",
+		"wont": "exclues"
+	},
+	"priorityLabels": {
+		"must": "Indispensable",
+		"should": "Souhaitable",
+		"could": "Optionnelle",
+		"wont": "Exclue"
+	},
+	"statusColumns": {
+		"under_review": "À l'étude",
+		"planned": "Planifiées",
+		"in_progress": "En cours",
+		"done": "Terminées"
 	}
 }

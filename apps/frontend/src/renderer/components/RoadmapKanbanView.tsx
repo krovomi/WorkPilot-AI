@@ -103,7 +103,7 @@ function DroppableStatusColumn({
 		<div
 			ref={setNodeRef}
 			className={cn(
-				"flex min-w-80 max-w-lg flex-1 flex-col rounded-xl border border-white/5 bg-linear-to-b from-secondary/30 to-transparent backdrop-blur-sm transition-all duration-200",
+				"wp-card flex min-w-80 max-w-lg flex-1 flex-col transition-all duration-200",
 				column.color,
 				"border-t-2",
 				isOver && "drop-zone-highlight",
@@ -120,8 +120,8 @@ function DroppableStatusColumn({
 					>
 						{getStatusIcon(column.icon)}
 					</div>
-					<h2 className="font-semibold text-sm text-foreground">
-						{column.label}
+					<h2 className="wp-title text-sm">
+						{t(`roadmap:statusColumns.${column.id}`, { defaultValue: column.label })}
 					</h2>
 					<span className="column-count-badge">{features.length}</span>
 				</div>
@@ -190,6 +190,7 @@ export function RoadmapKanbanView({
 	onGoToTask,
 	onSave,
 }: RoadmapKanbanViewProps) {
+	const { t } = useTranslation();
 	const [activeFeature, setActiveFeature] = useState<RoadmapFeature | null>(
 		null,
 	);
@@ -301,7 +302,9 @@ export function RoadmapKanbanView({
 		const statusColumn = ROADMAP_STATUS_COLUMNS.find(
 			(c) => c.id === feature.status,
 		);
-		return statusColumn?.label || "Unknown Status";
+		return statusColumn
+			? t(`roadmap:statusColumns.${statusColumn.id}`, { defaultValue: statusColumn.label })
+			: feature.status;
 	};
 
 	return (
@@ -314,7 +317,7 @@ export function RoadmapKanbanView({
 				onDragOver={handleDragOver}
 				onDragEnd={handleDragEnd}
 			>
-				<div className="flex flex-1 gap-4 overflow-x-auto p-6">
+				<div className="flex flex-1 gap-4 overflow-x-auto px-5 pb-4">
 					{ROADMAP_STATUS_COLUMNS.map((column) => (
 						<DroppableStatusColumn
 							key={column.id}

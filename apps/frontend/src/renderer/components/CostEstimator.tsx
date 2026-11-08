@@ -2,25 +2,32 @@ import {
 	AlertTriangle,
 	Bell,
 	Coins,
-	DollarSign,
-	Loader2,
-	PieChart,
 	RefreshCw,
 	TrendingDown,
 	TrendingUp,
-	Zap,
+	Wallet,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
-import { cn } from "../lib/utils";
 import { loadCostSummary } from "../lib/workspace-data";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
-import { PageHeader } from "./ui/page-header";
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "./charter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,234 +58,111 @@ interface CostEstimatorProps {
 	readonly projectPath: string;
 }
 
-// ---------------------------------------------------------------------------
-// KPI Card
-// ---------------------------------------------------------------------------
+type FormatAmount = (usd: number, decimals?: number) => string;
 
-function CostKpiCard({
-	title,
-	value,
-	subtitle,
-	icon: Icon,
-	color = "primary",
-}: {
-	readonly title: string;
-	readonly value: string;
-	readonly subtitle?: string;
-	readonly icon: React.ElementType;
-	readonly color?: "primary" | "green" | "amber" | "red";
-}) {
-	const colorClasses = {
-		primary: "text-primary bg-primary/10",
-		green: "text-success bg-success/10",
-		amber: "text-warning bg-warning/10",
-		red: "text-destructive bg-destructive/10",
-	};
+const BREAKDOWN_TONES: Tone[] = ["accent", "blue", "green", "amber", "violet", "pink"];
 
-	return (
-		<Card>
-			<CardContent className="p-4">
-				<div className="flex items-start justify-between">
-					<div className="flex-1 min-w-0">
-						<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-							{title}
-						</p>
-						<p className="mt-1 text-xl font-bold text-foreground">{value}</p>
-						{subtitle && (
-							<p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
-						)}
-					</div>
-					<div className={cn("rounded-lg p-2", colorClasses[color])}>
-						<Icon className="h-4 w-4" />
-					</div>
-				</div>
-			</CardContent>
-		</Card>
-	);
+function usageTone(pct: number): Tone {
+	if (pct >= 90) return "red";
+	if (pct >= 70) return "amber";
+	return "green";
 }
 
-// ---------------------------------------------------------------------------
-// Budget progress bar
-// ---------------------------------------------------------------------------
+function trendTone(trendPct: number): Tone {
+	if (trendPct > 20) return "red";
+	if (trendPct > 0) return "amber";
+	return "green";
+}
 
-function BudgetBar({
+/** The month's budget: how much is spent, what is left, where it ends. */
+function BudgetPanel({
 	budget,
 	formatAmount,
 }: {
 	readonly budget: BudgetInfo;
-	readonly formatAmount: (usd: number, decimals?: number) => string;
+	readonly formatAmount: FormatAmount;
 }) {
 	const { t } = useTranslation("costEstimator");
 	const pct = Math.min(budget.utilization_pct, 100);
-
-	// Determine bar color based on utilization percentage
-	let barColor: string;
-	if (pct >= 90) {
-		barColor = "bg-destructive";
-	} else if (pct >= 70) {
-		barColor = "bg-warning";
-	} else {
-		barColor = "bg-success";
-	}
-
-	// Determine text color based on utilization percentage
-	let textColor: string;
-	if (pct >= 90) {
-		textColor = "text-destructive";
-	} else if (pct >= 70) {
-		textColor = "text-warning";
-	} else {
-		textColor = "text-success";
-	}
+	const tone = usageTone(pct);
+	const overBudget = budget.forecast_end_of_month > budget.monthly_budget;
 
 	return (
-		<div className="space-y-3">
-			<div className="flex items-center justify-between">
-				<span className="text-sm font-medium text-foreground">
-					{t("budget.title")}
-				</span>
-				<span className={cn("text-sm font-bold", textColor)}>
-					{t("budget.pctUsed", { pct: pct.toFixed(0) })}
-				</span>
-			</div>
-			<div className="h-3 w-full rounded-full bg-secondary overflow-hidden">
-				<div
-					className={cn("h-full rounded-full transition-all", barColor)}
-					style={{ width: `${pct}%` }}
-				/>
-			</div>
-			<div className="flex justify-between text-xs text-muted-foreground">
-				<span>
-					{t("budget.spent", {
-						amount: formatAmount(budget.spent_this_month, 2),
-					})}
-				</span>
-				<span>
-					{t("budget.remaining", { amount: formatAmount(budget.remaining, 2) })}
-				</span>
-				<span>
-					{t("budget.total", {
-						amount: formatAmount(budget.monthly_budget, 2),
-					})}
-				</span>
-			</div>
-			{budget.forecast_end_of_month > 0 && (
-				<div className="flex items-center gap-2 text-xs">
-					<TrendingUp className="h-3 w-3 text-muted-foreground" />
-					<span className="text-muted-foreground">
-						{t("budget.forecast")}{" "}
-						<span className="font-medium text-foreground">
-							{formatAmount(budget.forecast_end_of_month, 2)}
-						</span>
-					</span>
-					{budget.forecast_end_of_month > budget.monthly_budget && (
-						<Badge
-							variant="outline"
-							className="text-3xs text-destructive border-destructive/20"
-						>
-							{t("budget.overBudget")}
-						</Badge>
-					)}
+		<Section
+			kicker={t("kickers.budget")}
+			title={t("budget.title")}
+			actions={<Chip tone={tone}>{t("budget.pctUsed", { pct: pct.toFixed(0) })}</Chip>}
+		>
+			<Panel rail tone={tone} className="space-y-3">
+				<Bar value={pct} tone={tone} />
+				<div className="wp-meta flex flex-wrap justify-between gap-2">
+					<span>{t("budget.spent", { amount: formatAmount(budget.spent_this_month, 2) })}</span>
+					<span>{t("budget.remaining", { amount: formatAmount(budget.remaining, 2) })}</span>
+					<span>{t("budget.total", { amount: formatAmount(budget.monthly_budget, 2) })}</span>
 				</div>
-			)}
-		</div>
+				{budget.forecast_end_of_month > 0 && (
+					<div className="flex flex-wrap items-center gap-2 text-xs">
+						<TrendingUp className="h-3 w-3" aria-hidden="true" />
+						<span className="wp-muted">{t("budget.forecast")}</span>
+						<span className="font-medium">{formatAmount(budget.forecast_end_of_month, 2)}</span>
+						{overBudget && <Chip tone="red">{t("budget.overBudget")}</Chip>}
+					</div>
+				)}
+				{budget.alerts.map((alert) => (
+					<Notice key={alert} tone="amber" icon={Bell}>
+						{alert}
+					</Notice>
+				))}
+			</Panel>
+		</Section>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Provider breakdown
-// ---------------------------------------------------------------------------
-
-function ProviderBreakdown({
+/** Cost per provider or model, largest first; unused ones as faint chips. */
+function Breakdown({
+	title,
 	data,
 	formatAmount,
 }: {
+	readonly title: string;
 	readonly data: Record<string, number>;
-	readonly formatAmount: (usd: number, decimals?: number) => string;
+	readonly formatAmount: FormatAmount;
 }) {
 	const { t } = useTranslation("costEstimator");
-	const allEntries = Object.entries(data).sort(([, a], [, b]) => b - a);
-	const used = allEntries.filter(([, v]) => v > 0);
-	const unused = allEntries.filter(([, v]) => v === 0);
+	const entries = Object.entries(data).sort(([, a], [, b]) => b - a);
+	const used = entries.filter(([, v]) => v > 0);
+	const unused = entries.filter(([, v]) => v === 0);
 	const total = used.reduce((sum, [, v]) => sum + v, 0);
 
-	if (allEntries.length === 0)
-		return (
-			<div className="text-xs text-muted-foreground">
-				{t("breakdown.noData")}
-			</div>
-		);
-
-	const colors = [
-		"bg-primary",
-		"bg-blue-500",
-		"bg-success",
-		"bg-warning",
-		"bg-purple-500",
-		"bg-pink-500",
-	];
-
 	return (
-		<div className="space-y-3">
-			{used.map(([name, cost]) => {
+		<Panel className="space-y-3">
+			<h3 className="wp-title text-sm">{title}</h3>
+			{entries.length === 0 && <p className="wp-muted text-xs">{t("breakdown.noData")}</p>}
+			{used.map(([name, cost], idx) => {
 				const pct = total > 0 ? (cost / total) * 100 : 0;
-				const colorIdx = used.findIndex((item) => item[0] === name);
 				return (
 					<div key={name} className="space-y-1">
-						<div className="flex items-center justify-between text-xs">
-							<span className="text-foreground font-medium capitalize">
-								{name}
-							</span>
-							<span className="text-muted-foreground">
+						<div className="flex items-center justify-between gap-2 text-xs">
+							<span className="truncate font-medium">{name}</span>
+							<span className="wp-muted shrink-0 font-mono">
 								{formatAmount(cost)} ({pct.toFixed(0)}%)
 							</span>
 						</div>
-						<div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-							<div
-								className={cn(
-									"h-full rounded-full transition-all",
-									colors[colorIdx % colors.length],
-								)}
-								style={{ width: `${pct}%` }}
-							/>
-						</div>
+						<Bar value={pct} tone={BREAKDOWN_TONES[idx % BREAKDOWN_TONES.length]} />
 					</div>
 				);
 			})}
 			{unused.length > 0 && (
-				<div className="pt-1 border-t border-border/40">
-					<div className="flex flex-wrap gap-x-3 gap-y-1">
-						{unused.map(([name]) => (
-							<span
-								key={name}
-								className="text-3xs text-muted-foreground/60 capitalize"
-							>
-								{name} — {formatAmount(0, 2)}
-							</span>
-						))}
-					</div>
+				<div className="wp-chips">
+					{unused.map(([name]) => (
+						<Chip key={name} tone="muted" dot={false}>
+							{name} · {formatAmount(0, 2)}
+						</Chip>
+					))}
 				</div>
 			)}
-		</div>
+		</Panel>
 	);
-}
-
-// Currency formatting — imported from ../lib/currency
-
-// ---------------------------------------------------------------------------
-// Helper functions
-// ---------------------------------------------------------------------------
-
-function getTrendColor(
-	trendPct: number,
-): "primary" | "green" | "amber" | "red" {
-	if (trendPct > 20) {
-		return "red";
-	} else if (trendPct > 0) {
-		return "amber";
-	} else {
-		return "green";
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +170,7 @@ function getTrendColor(
 // ---------------------------------------------------------------------------
 
 export function CostEstimator({ projectPath }: CostEstimatorProps) {
-	const { t, i18n } = useTranslation("costEstimator");
+	const { t, i18n } = useTranslation(["costEstimator", "common", "navigation"]);
 	const [eurRate, setEurRate] = useState(0.92);
 	const [summary, setSummary] = useState<CostSummary | null>(null);
 	const [budget, setBudget] = useState<BudgetInfo | null>(null);
@@ -406,138 +290,127 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 		return unsubscribe;
 	}, [projectPath, fetchData, serverProjectId]);
 
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-full">
-				<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-			</div>
-		);
-	}
+	const header = (
+		<ModuleHeader
+			kicker={t("navigation:groups.planning")}
+			title={t("costEstimator:title")}
+			description={serverProjectId ? t("costEstimator:serverSubtitle") : t("costEstimator:subtitle")}
+			icon={Coins}
+			tone="amber"
+			actions={
+				<CharterButton variant="ghost" icon={RefreshCw} busy={loading} onClick={() => fetchData()}>
+					{t("common:buttons.refresh")}
+				</CharterButton>
+			}
+		/>
+	);
 
-	if (error && !summary && !budget) {
+	if (loading || (!summary && !budget)) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
-				<AlertTriangle className="h-8 w-8" />
-				<p className="text-sm">{error}</p>
-				<Button variant="outline" size="sm" onClick={() => fetchData()}>
-					<RefreshCw className="h-3.5 w-3.5 mr-2" />
-					{t("retry")}
-				</Button>
-			</div>
+			<ModuleStage data-testid="cost-estimator-view">
+				{header}
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					{loading ? (
+						<ScanLine label={t("costEstimator:loading")} />
+					) : error ? (
+						<EmptyStage
+							icon={AlertTriangle}
+							title={error}
+							tone="red"
+							action={
+								<CharterButton icon={RefreshCw} onClick={() => fetchData()}>
+									{t("costEstimator:retry")}
+								</CharterButton>
+							}
+						/>
+					) : (
+						<EmptyStage icon={Wallet} title={t("costEstimator:emptyTitle")} tone="amber">
+							{t("costEstimator:emptyBody")}
+						</EmptyStage>
+					)}
+				</div>
+			</ModuleStage>
 		);
 	}
 
 	return (
-		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				<PageHeader
-					variant="inline"
-					icon={Coins}
-					title={t("title")}
-					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
-					actions={
-						<Button variant="outline" size="sm" onClick={() => fetchData()}>
-							<RefreshCw className="h-3.5 w-3.5 mr-2" />
-							{t("common:buttons.refresh")}
-						</Button>
-					}
-				/>
-
-				{/* KPI cards */}
+		<ModuleStage scroll="page" data-testid="cost-estimator-view">
+			{header}
+			<Page className="max-w-none space-y-4">
+				{error && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{error}
+					</Notice>
+				)}
 				{summary && (
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-						<CostKpiCard
-							title={t("kpi.totalCost.title")}
+					<Stats>
+						<Stat
+							label={t("costEstimator:kpi.totalCost.title")}
 							value={fmtCurrency(summary.total_cost)}
-							subtitle={t("kpi.totalCost.period", {
-								days: summary.period_days,
-							})}
-							icon={DollarSign}
-							color="primary"
+							tone="accent"
 						/>
-						<CostKpiCard
-							title={t("kpi.dailyAverage.title")}
-							value={fmtCurrency(summary.daily_avg)}
-							subtitle={
-								summary.trend_pct >= 0
-									? `↑ ${summary.trend_pct.toFixed(0)}%`
-									: `↓ ${Math.abs(summary.trend_pct).toFixed(0)}%`
+						<Stat
+							label={t("costEstimator:kpi.dailyAverage.title")}
+							value={
+								<span className="inline-flex items-center gap-2">
+									{fmtCurrency(summary.daily_avg)}
+									<Chip tone={trendTone(summary.trend_pct)} dot={false}>
+										{summary.trend_pct >= 0 ? (
+											<TrendingUp className="h-3 w-3" aria-hidden="true" />
+										) : (
+											<TrendingDown className="h-3 w-3" aria-hidden="true" />
+										)}
+										{Math.abs(summary.trend_pct).toFixed(0)}%
+									</Chip>
+								</span>
 							}
-							icon={summary.trend_pct >= 0 ? TrendingUp : TrendingDown}
-							color={getTrendColor(summary.trend_pct)}
 						/>
-						<CostKpiCard
-							title={t("kpi.totalTokens.title")}
+						<Stat
+							label={t("costEstimator:kpi.totalTokens.title")}
 							value={summary.total_tokens.toLocaleString()}
-							subtitle={t("kpi.totalTokens.inOut", {
-								input: summary.tokens_input.toLocaleString(),
-								output: summary.tokens_output.toLocaleString(),
-							})}
-							icon={Zap}
-							color="amber"
+							tone="amber"
 						/>
-						<CostKpiCard
-							title={t("kpi.providers.title")}
-							value={`${Object.values(summary.cost_by_provider).filter((v) => v > 0).length}`}
-							subtitle={t("kpi.providers.models", {
-								count: Object.keys(summary.cost_by_model).length,
-							})}
-							icon={PieChart}
-							color="green"
+						<Stat
+							label={t("costEstimator:kpi.providers.title")}
+							value={Object.values(summary.cost_by_provider).filter((v) => v > 0).length}
+							tone="green"
 						/>
-					</div>
+					</Stats>
 				)}
-
-				{/* Budget */}
-				{budget && (
-					<Card>
-						<CardContent className="p-5">
-							<BudgetBar budget={budget} formatAmount={fmtCurrency} />
-							{budget.alerts.length > 0 && (
-								<div className="mt-4 space-y-2">
-									{budget.alerts.map((alert) => (
-										<div
-											key={alert}
-											className="flex items-center gap-2 text-xs text-warning"
-										>
-											<Bell className="h-3.5 w-3.5 shrink-0" />
-											<span>{alert}</span>
-										</div>
-									))}
-								</div>
-							)}
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Breakdowns */}
 				{summary && (
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<Card>
-							<CardContent className="p-5">
-								<h3 className="text-sm font-semibold text-foreground mb-4">
-									{t("breakdown.costByProvider")}
-								</h3>
-								<ProviderBreakdown
-									data={summary.cost_by_provider}
-									formatAmount={fmtCurrency}
-								/>
-							</CardContent>
-						</Card>
-						<Card>
-							<CardContent className="p-5">
-								<h3 className="text-sm font-semibold text-foreground mb-4">
-									{t("breakdown.costByModel")}
-								</h3>
-								<ProviderBreakdown
-									data={summary.cost_by_model}
-									formatAmount={fmtCurrency}
-								/>
-							</CardContent>
-						</Card>
-					</div>
+					<p className="wp-meta">
+						{t("costEstimator:kpi.totalCost.period", { days: summary.period_days })}
+						{" · "}
+						{t("costEstimator:kpi.totalTokens.inOut", {
+							input: summary.tokens_input.toLocaleString(),
+							output: summary.tokens_output.toLocaleString(),
+						})}
+						{" · "}
+						{t("costEstimator:kpi.providers.models", {
+							count: Object.keys(summary.cost_by_model).length,
+						})}
+					</p>
 				)}
-			</div>
-		</ScrollArea>
+
+				{budget && <BudgetPanel budget={budget} formatAmount={fmtCurrency} />}
+
+				{summary && (
+					<Section kicker={t("costEstimator:kickers.breakdown")} title={t("costEstimator:breakdownTitle")}>
+						<div className="grid gap-4 lg:grid-cols-2">
+							<Breakdown
+								title={t("costEstimator:breakdown.costByProvider")}
+								data={summary.cost_by_provider}
+								formatAmount={fmtCurrency}
+							/>
+							<Breakdown
+								title={t("costEstimator:breakdown.costByModel")}
+								data={summary.cost_by_model}
+								formatAmount={fmtCurrency}
+							/>
+						</div>
+					</Section>
+				)}
+			</Page>
+		</ModuleStage>
 	);
 }

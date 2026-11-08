@@ -7,10 +7,30 @@ import {
 	useSpecApprovalStore,
 } from "../../stores/spec-approval-store";
 import { startTask, submitReview, useTaskStore } from "../../stores/task-store";
-import { ClipboardCheck } from "lucide-react";
-import { PageHeader } from "../ui/page-header";
-
+import {
+	AlertTriangle,
+	Check,
+	CheckCircle2,
+	ClipboardCheck,
+	FileText,
+	MessageSquareReply,
+} from "lucide-react";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+} from "../charter";
 import { Textarea } from "../ui/textarea";
+
+
 /**
  * The plans waiting for a person, across the project's board.
  *
@@ -20,7 +40,7 @@ import { Textarea } from "../ui/textarea";
  * task store's: a plan approved here or on the card leaves it at once.
  */
 export function SpecApprovalDashboard(): React.ReactElement {
-	const { t } = useTranslation(["specApproval"]);
+	const { t } = useTranslation(["specApproval", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 	const tasks = useTaskStore((s) => s.tasks);
@@ -86,187 +106,159 @@ export function SpecApprovalDashboard(): React.ReactElement {
 	// to act on, so the request is gated on the feedback field.
 	const canSubmitFeedback = feedback.trim().length > 0;
 
+	const pre = "wp-code mt-1 whitespace-pre-wrap";
+	const extras = [
+		["plan", content?.implementation_plan_json, true],
+		["requirements", content?.requirements_json, false],
+		["context", content?.context_json, false],
+	] as const;
+
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
-				icon={ClipboardCheck}
+		<ModuleStage data-testid="spec-approval-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.planning")}
 				title={t("specApproval:title")}
 				description={t("specApproval:subtitle")}
+				icon={ClipboardCheck}
+				tone="green"
+				actions={
+					<Chip tone={pending.length ? "amber" : "muted"}>
+						{t("specApproval:pending.heading", { count: pending.length })}
+					</Chip>
+				}
 			/>
 
 			{!activeProject ? (
-				<div className="flex-1 flex items-center justify-center text-center p-8">
-					<p className="text-sm text-muted-foreground max-w-sm">
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					<EmptyStage icon={ClipboardCheck} title={t("specApproval:title")} tone="green">
 						{t("specApproval:empty.noProject")}
-					</p>
+					</EmptyStage>
 				</div>
 			) : (
-				<div className="flex flex-1 overflow-hidden">
-					<div className="w-72 border-r border-border p-4 flex flex-col gap-5 overflow-auto">
-						<div>
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("specApproval:pending.heading", { count: pending.length })}
-							</h3>
+				<>
+					<Columns template="minmax(16rem, 1fr) minmax(0, 3fr)">
+						<Column
+							kicker={t("specApproval:kickers.queue")}
+							title={t("specApproval:queueTitle")}
+							meta={pending.length}
+							tone="amber"
+						>
 							{pending.length === 0 ? (
-								<p className="text-xs text-muted-foreground">
+								<EmptyStage icon={CheckCircle2} title={t("specApproval:pending.emptyTitle")} tone="green">
 									{t("specApproval:pending.empty")}
-								</p>
+								</EmptyStage>
 							) : (
-								<div className="flex flex-col gap-1.5">
+								<div className="grid gap-2">
 									{pending.map((task) => (
 										<button
 											key={task.id}
 											type="button"
 											onClick={() => handleSelect(task.id, task.specId)}
-											className={`text-left rounded-lg p-2.5 transition-colors ${
-												selectedId === task.id
-													? "bg-[var(--accent)]/15 border border-[var(--accent)]/40"
-													: "bg-card hover:bg-accent border border-transparent"
-											}`}
+											className="wp-card wp-card-pad wp-rail wp-step wp-tone-amber text-left"
+											data-active={selectedId === task.id ? "true" : undefined}
 										>
-											<div className="text-sm font-medium truncate">{task.title}</div>
-											<div className="text-xs text-muted-foreground font-mono">
-												{task.specId}
-											</div>
+											<div className="wp-title truncate text-sm">{task.title}</div>
+											<div className="wp-meta mt-0.5 font-mono">{task.specId}</div>
 										</button>
 									))}
 								</div>
 							)}
-						</div>
-					</div>
+						</Column>
 
-					<div className="flex-1 flex flex-col overflow-hidden">
-						{error && (
-							<div className="m-4 mb-0 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start justify-between gap-3">
-								<span>{error}</span>
-								<button
-									type="button"
-									onClick={() => setError(null)}
-									className="shrink-0 text-xs underline"
-								>
-									{t("specApproval:actions.dismiss")}
-								</button>
-							</div>
-						)}
-
-						{!selected ? (
-							<div className="flex-1 flex items-center justify-center text-center p-8">
-								<div>
-									<h3 className="text-lg font-medium mb-2">
-										{t("specApproval:empty.title")}
-									</h3>
-									<p className="text-sm text-muted-foreground max-w-sm">
-										{t("specApproval:empty.body")}
-									</p>
-								</div>
-							</div>
-						) : (
-							<>
-								<div className="flex-1 overflow-auto p-4">
-									<h2 className="text-base font-semibold mb-1">{selected.title}</h2>
-									<div className="text-xs text-muted-foreground font-mono mb-4">
-										{selected.specId}
-									</div>
-
-									{isLoading && !content ? (
-										<p className="text-sm text-muted-foreground">
-											{t("specApproval:content.loading")}
-										</p>
-									) : content?.spec_md || content?.implementation_plan_json ? (
-										<div className="flex flex-col gap-4">
-											{content.spec_md && (
-												<section>
-													<h3 className="text-sm font-semibold mb-1">
-														{t("specApproval:content.spec")}
-													</h3>
-													<pre className="text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
-														{content.spec_md}
-													</pre>
-												</section>
-											)}
-											{content.implementation_plan_json && (
-												<details open>
-													<summary className="text-sm font-semibold cursor-pointer">
-														{t("specApproval:content.plan")}
-													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
-														{content.implementation_plan_json}
-													</pre>
-												</details>
-											)}
-											{content.requirements_json && (
-												<details>
-													<summary className="text-sm font-semibold cursor-pointer">
-														{t("specApproval:content.requirements")}
-													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
-														{content.requirements_json}
-													</pre>
-												</details>
-											)}
-											{content.context_json && (
-												<details>
-													<summary className="text-sm font-semibold cursor-pointer">
-														{t("specApproval:content.context")}
-													</summary>
-													<pre className="mt-1 text-xs font-mono whitespace-pre-wrap bg-card rounded-lg p-3">
-														{content.context_json}
-													</pre>
-												</details>
-											)}
-										</div>
-									) : (
-										<p className="text-sm text-muted-foreground">
-											{t("specApproval:content.unavailable")}
-										</p>
+						<Column
+							kicker={t("specApproval:kickers.plan")}
+							title={selected ? selected.title : t("specApproval:empty.title")}
+							meta={selected ? <span className="font-mono">{selected.specId}</span> : undefined}
+						>
+							{error && (
+								<Notice tone="red" icon={AlertTriangle} role="alert">
+									<span className="flex items-start justify-between gap-3">
+										<span>{error}</span>
+										<CharterButton size="sm" variant="ghost" onClick={() => setError(null)}>
+											{t("specApproval:actions.dismiss")}
+										</CharterButton>
+									</span>
+								</Notice>
+							)}
+							{!selected ? (
+								<EmptyStage icon={FileText} title={t("specApproval:empty.title")} tone="green">
+									{t("specApproval:empty.body")}
+								</EmptyStage>
+							) : isLoading && !content ? (
+								<ScanLine label={t("specApproval:content.loading")} />
+							) : content?.spec_md || content?.implementation_plan_json ? (
+								<div className="space-y-3">
+									{content.spec_md && (
+										<Panel>
+											<span className="wp-kicker">{t("specApproval:content.spec")}</span>
+											<pre className={pre}>{content.spec_md}</pre>
+										</Panel>
+									)}
+									{extras.map(
+										([key, body, open]) =>
+											body && (
+												<Panel key={key}>
+													<details open={open}>
+														<summary className="wp-kicker cursor-pointer">
+															{t(`specApproval:content.${key}`)}
+														</summary>
+														<pre className={pre}>{body}</pre>
+													</details>
+												</Panel>
+											),
 									)}
 								</div>
+							) : (
+								<Notice tone="muted" icon={FileText}>
+									{t("specApproval:content.unavailable")}
+								</Notice>
+							)}
+						</Column>
+					</Columns>
 
-								<div className="border-t border-border p-4 flex flex-col gap-3">
-									<label
-										htmlFor="spec-approval-feedback"
-										className="text-xs text-muted-foreground"
+					{selected && (
+						<Composer
+							prompt={
+								<Textarea
+									id="spec-approval-feedback"
+									value={feedback}
+									onChange={(e) => setFeedback(e.target.value)}
+									rows={2}
+									aria-label={t("specApproval:decision.feedbackLabel")}
+									placeholder={t("specApproval:decision.feedbackPlaceholder")}
+									className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+								/>
+							}
+							actions={
+								<>
+									<CharterButton
+										icon={MessageSquareReply}
+										onClick={() => void decide(false)}
+										disabled={isSubmitting || !canSubmitFeedback}
 									>
-										{t("specApproval:decision.feedbackLabel")}
-									</label>
-									<Textarea
-										id="spec-approval-feedback"
-										value={feedback}
-										onChange={(e) => setFeedback(e.target.value)}
-										rows={3}
-										placeholder={t("specApproval:decision.feedbackPlaceholder")}
-										className="w-full resize-none p-2 text-sm min-h-0"
-									/>
-									<div className="flex items-center gap-2">
-										<button
-											type="button"
-											onClick={() => void decide(true)}
-											disabled={isSubmitting}
-											className="px-4 py-2 rounded-lg bg-success/20 text-success hover:bg-success/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-										>
-											{t("specApproval:decision.approve")}
-										</button>
-										<button
-											type="button"
-											onClick={() => void decide(false)}
-											disabled={isSubmitting || !canSubmitFeedback}
-											className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-										>
-											{t("specApproval:decision.requestChanges")}
-										</button>
-										{!canSubmitFeedback && (
-											<span className="text-xs text-muted-foreground">
-												{t("specApproval:decision.feedbackRequired")}
-											</span>
-										)}
-									</div>
-								</div>
-							</>
-						)}
-					</div>
-				</div>
+										{t("specApproval:decision.requestChanges")}
+									</CharterButton>
+									<CharterButton
+										variant="primary"
+										icon={Check}
+										busy={isSubmitting}
+										onClick={() => void decide(true)}
+										disabled={isSubmitting}
+									>
+										{t("specApproval:decision.approve")}
+									</CharterButton>
+								</>
+							}
+							hint={
+								canSubmitFeedback
+									? t("specApproval:decision.feedbackLabel")
+									: t("specApproval:decision.feedbackRequired")
+							}
+						/>
+					)}
+				</>
 			)}
-		</div>
+		</ModuleStage>
 	);
 }
 

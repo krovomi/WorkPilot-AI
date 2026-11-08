@@ -2044,24 +2044,14 @@ export function App() {
 													<GitSurgeonDashboard projectPath={selectedProject?.path} />
 												)}
 												{activeView === "release-coordinator" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<ReleasePlanView
+													<ReleasePlanView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "carbon-profiler" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<CarbonReportView
+													<CarbonReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "consensus-arbiter" && (
 													<div
@@ -2147,14 +2137,9 @@ export function App() {
 													</div>
 												)}
 												{activeView === "env-snapshot" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<EnvSnapshotView
+													<EnvSnapshotView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "offline-mode" && (
 													<div
