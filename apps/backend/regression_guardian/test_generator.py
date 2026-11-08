@@ -10,52 +10,15 @@ occurs. Incident text is sanitized before it reaches any template.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from enum import Enum
 
 from .incident_parser import Incident, StackFrame
+from .stacks import EXTRA_GENERATORS, sanitized
+from .test_model import GeneratedTest, TestFramework, TestStatus
+from .test_model import safe_function_name as _safe_function_name
+
+__all__ = ["GeneratedTest", "TestFramework", "TestGenerator", "TestStatus"]
 
 logger = logging.getLogger(__name__)
-
-
-class TestFramework(str, Enum):
-    PYTEST = "pytest"
-    UNITTEST = "unittest"
-    JEST = "jest"
-    VITEST = "vitest"
-    MOCHA = "mocha"
-    JUNIT5 = "junit5"
-    TESTNG = "testng"
-    GO_TEST = "go_test"
-    XUNIT = "xunit"
-    NUNIT = "nunit"
-    CARGO_TEST = "cargo_test"
-    PHPUNIT = "phpunit"
-    RSPEC = "rspec"
-    DART_TEST = "dart_test"
-    XCTEST = "xctest"
-
-
-class TestStatus(str, Enum):
-    RED = "red"
-    GREEN = "green"
-    SKIPPED = "skipped"
-
-
-@dataclass
-class GeneratedTest:
-    """A regression test generated from an incident."""
-
-    incident_id: str
-    framework: TestFramework
-    test_name: str
-    test_code: str
-    file_path: str
-    status: TestStatus = TestStatus.RED
-    target_file: str = ""
-    target_function: str = ""
-    fixtures: list[str] = field(default_factory=list)
-    tags: list[str] = field(default_factory=list)
 
 
 class TestGenerator:
@@ -74,8 +37,6 @@ class TestGenerator:
         project_root: str = "",
     ) -> GeneratedTest:
         """Generate a regression test for the given incident."""
-        from .stacks import EXTRA_GENERATORS, sanitized
-
         incident = sanitized(incident)
         if framework in EXTRA_GENERATORS:
             return EXTRA_GENERATORS[framework](incident)
@@ -398,15 +359,6 @@ mod regression_tests {{
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
-
-
-def _safe_function_name(incident: Incident) -> str:
-    """Derive a safe function name from the incident."""
-    import re as _re
-
-    base = incident.faulting_function or incident.exception_type or incident.id
-    safe = _re.sub(r"[^a-zA-Z0-9]", "_", base).strip("_").lower()
-    return safe[:60] or "unknown"
 
 
 def _file_to_module(filepath: str) -> str:
