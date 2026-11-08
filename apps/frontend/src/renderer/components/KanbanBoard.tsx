@@ -1160,15 +1160,15 @@ export function KanbanBoard({
 					} else {
 						_errorCount++;
 						console.error(
-							"[Import] Failed to persist task from work item:",
-							String(workItem.id).replace(/[\r\n]/g, " "),
+							"[Import] Failed to persist the task of imported item #",
+							successCount + _errorCount,
 						);
 					}
 				} catch (error) {
 					_errorCount++;
 					console.error(
-						"[Import] Failed to create task from work item:",
-						String(workItem.id).replace(/[\r\n]/g, " "),
+						"[Import] Failed to create the task of imported item #",
+						successCount + _errorCount,
 						error,
 					);
 				}
