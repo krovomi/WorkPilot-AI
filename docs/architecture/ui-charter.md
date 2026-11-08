@@ -21,6 +21,7 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 | Header band | `ModuleHeader` | Mono uppercase **kicker** in the accent, a short title, one line of description, actions on the right. Not needed inside a hub whose tabs already name the view. |
 | Columns | `Columns` + `Column` | Side by side, separated by a dashed rule; each opens with kicker / title / mono meta on the right. One column under 1100 px. |
 | Page | `Page` + `Section` | For a single scrolling page (Settings): the same head per section, a dashed rule between sections. Sections side by side in a grid take `.wp-split` on the grid: no rule between columns. |
+| Side navigation | `.wp-nav` + `.wp-navitem` | A list of pages (Settings): rows with an icon, `aria-current="page"` on the current one, which takes the tone of its group. |
 | Card | `Panel` (`rail` for the accent rail) | Solid card, radius 14, soft shadow. The rail is the canvas block: the tone of what the card is. |
 | Step | `StepCard` | `01 · KICKER` / title / mono meta; clickable steps glow when active. |
 | Chip | `Chip` / `Chips` | Mono, pill, coloured dot. A chip with `onClick` is a toggle (filters). |
@@ -138,5 +139,12 @@ Done:
   keeps its underline: it is the app's navigation, a level above a module's
   own pill `Tabs`.
 
-The Settings pages move lot by lot; each
-lot lists its views in its PR.
+- Settings: the dialog opens on the charter header (kicker, glowing icon
+  tile), its page pane is a stage (dot grid, glow) and the dialog is a
+  `wp-scope`. The navigation groups carry a tone (`settings-themes.tsx`) and
+  are translated; a page row is a `.wp-navitem`, the current one in the tone
+  of its group. `SettingsSection` is a charter `Section` whose kicker is the
+  group of the page (`SettingsPageContext`), so every page that uses it follows;
+  the pages that drew their own head (JEV, Cerveau partagé, Polices terminal,
+  server tokens, MCP, Needs you, invitations, collaboration) use it too.
+  Feedback boxes are `Notice`s; hard-coded palette classes are theme tokens.

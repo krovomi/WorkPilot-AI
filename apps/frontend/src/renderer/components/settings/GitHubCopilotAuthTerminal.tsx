@@ -485,7 +485,7 @@ export function GitHubCopilotAuthTerminal({
 						<div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
 					)}
 					{status === "authenticating" && (
-						<div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+						<div className="h-2 w-2 rounded-full bg-info animate-pulse" />
 					)}
 					{status === "success" && (
 						<CheckCircle2 className="h-4 w-4 text-success" />
@@ -536,8 +536,8 @@ export function GitHubCopilotAuthTerminal({
 
 			{/* Status bar */}
 			{status === "authenticating" && (
-				<div className="px-3 py-2 border-t border-border bg-blue-500/10">
-					<p className="text-sm text-blue-600 dark:text-blue-400">
+				<div className="px-3 py-2 border-t border-border bg-info/10">
+					<p className="text-sm text-info">
 						{t("githubCopilot.authTerminal.authenticatingMessage")}
 					</p>
 				</div>

@@ -72,7 +72,7 @@ export function SchedulerSettings() {
 	]);
 
 	const statusColor: Record<string, string> = {
-		pending: "bg-blue-500/15 text-blue-600",
+		pending: "bg-info/15 text-info",
 		running: "bg-success/15 text-success",
 		paused: "bg-warning/15 text-warning",
 		completed: "bg-success/15 text-success",
