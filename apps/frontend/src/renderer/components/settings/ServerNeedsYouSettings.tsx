@@ -8,7 +8,7 @@
  * (`main/server-needs-you.ts`).
  */
 
-import { BellRing, Check, Loader2, Send, Trash2 } from "lucide-react";
+import { Check, Loader2, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AVAILABLE_LANGUAGES } from "../../../shared/constants/i18n";
@@ -27,6 +27,8 @@ import { Switch } from "../ui/switch";
 import { randomTopic } from "./NeedsYouChannels";
 
 import { NativeSelect } from "../ui/native-select";
+import { Notice } from "../charter";
+import { SettingsSection } from "./SettingsSection";
 type Drafts = Record<NeedsYouChannelKind, Record<string, string>>;
 
 /** Each channel's fields, in order; a secret is a password field, never prefilled. */
@@ -137,14 +139,10 @@ export function ServerNeedsYouSettings() {
 		);
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h3 className="flex items-center gap-2 text-lg font-semibold">
-					<BellRing className="h-5 w-5" />
-					{t("serverNeedsYou.title")}
-				</h3>
-				<p className="text-sm text-muted-foreground">{t("serverNeedsYou.description")}</p>
-			</div>
+		<SettingsSection
+			title={t("serverNeedsYou.title")}
+			description={t("serverNeedsYou.description")}
+		>
 			{overview && !overview.available && (
 				<p className="rounded-md border border-border bg-muted/50 p-3 text-sm">
 					{t("serverNeedsYou.offOnServer")}
@@ -156,13 +154,13 @@ export function ServerNeedsYouSettings() {
 				</p>
 			)}
 			{error && (
-				<p role="alert" className="text-sm text-destructive">
+				<Notice tone="red" role="alert">
 					{error}
-				</p>
+				</Notice>
 			)}
 
 			{overview && (
-				<div className="space-y-3 rounded-lg border border-border p-4">
+				<div className="wp-card space-y-3 p-4">
 					<Label className="font-medium">{t("serverNeedsYou.moments")}</Label>
 					{NEEDS_YOU_EVENTS.map((event) => (
 						<div key={event} className="flex items-center justify-between gap-3">
@@ -204,7 +202,7 @@ export function ServerNeedsYouSettings() {
 				CHANNELS.map((channel) => {
 					const shown = overview.channels[channel];
 					return (
-						<div key={channel} className="space-y-3 rounded-lg border border-border p-4">
+						<div key={channel} className="wp-card space-y-3 p-4">
 							<div className="flex items-center justify-between gap-3">
 								<div className="space-y-1">
 									<Label className="flex items-center gap-2 font-medium">
@@ -309,6 +307,6 @@ export function ServerNeedsYouSettings() {
 						</div>
 					);
 				})}
-		</div>
+		</SettingsSection>
 	);
 }

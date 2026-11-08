@@ -110,9 +110,9 @@ export function AnomalyDetectionSettings() {
 
 	const severityColor: Record<string, string> = {
 		critical: "bg-destructive/15 text-destructive",
-		high: "bg-orange-500/15 text-orange-600",
+		high: "bg-warning/15 text-warning",
 		medium: "bg-warning/15 text-warning",
-		low: "bg-blue-500/15 text-blue-600",
+		low: "bg-info/15 text-info",
 	};
 
 	const severityTranslation: Record<string, string> = {

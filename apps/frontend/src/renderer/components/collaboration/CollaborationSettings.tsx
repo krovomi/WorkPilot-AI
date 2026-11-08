@@ -5,7 +5,6 @@
  * (`stores/collaboration-store.ts`).
  */
 
-import { Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import {
@@ -16,6 +15,7 @@ import {
 import { Label } from "../ui/label";
 import { Separator } from "../ui/separator";
 import { Switch } from "../ui/switch";
+import { SettingsSection } from "../settings/SettingsSection";
 
 const STRATEGIES: ConflictStrategy[] = ["manual", "last_write_wins", "first_write_wins"];
 
@@ -48,16 +48,10 @@ export function CollaborationSettings() {
 	const updateSettings = useCollaborationStore((s) => s.updateSettings);
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center gap-3">
-				<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-					<Users className="h-5 w-5 text-primary" />
-				</div>
-				<div>
-					<h3 className="text-base font-semibold">{t("settings.title")}</h3>
-					<p className="text-sm text-muted-foreground">{t("settings.description")}</p>
-				</div>
-			</div>
+		<SettingsSection
+			title={t("settings.title")}
+			description={t("settings.description")}
+		>
 
 			{SECTIONS.map((section) => (
 				<div key={section.key} className="space-y-3">
@@ -116,6 +110,6 @@ export function CollaborationSettings() {
 					))}
 				</div>
 			</div>
-		</div>
+		</SettingsSection>
 	);
 }

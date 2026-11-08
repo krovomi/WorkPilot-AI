@@ -43,6 +43,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import { Notice } from "../charter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 
 /**
@@ -57,7 +58,7 @@ const THRESHOLD_ELEVATED = 71; // Yellow: Moderate usage
  */
 const getColorClass = (percent: number): string => {
 	if (percent >= THRESHOLD_CRITICAL) return "text-destructive";
-	if (percent >= THRESHOLD_WARNING) return "text-orange-500";
+	if (percent >= THRESHOLD_WARNING) return "text-warning";
 	if (percent >= THRESHOLD_ELEVATED) return "text-warning";
 	return "text-success";
 };
@@ -67,7 +68,7 @@ const getColorClass = (percent: number): string => {
  */
 const getBarColorClass = (percent: number): string => {
 	if (percent >= THRESHOLD_CRITICAL) return "bg-destructive";
-	if (percent >= THRESHOLD_WARNING) return "bg-orange-500";
+	if (percent >= THRESHOLD_WARNING) return "bg-warning";
 	if (percent >= THRESHOLD_ELEVATED) return "bg-warning";
 	return "bg-success";
 };
@@ -295,7 +296,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 									statusKey === "moderate" &&
 										"bg-warning/10 text-warning",
 									statusKey === "highUsage" &&
-										"bg-orange-500/10 text-orange-600",
+										"bg-warning/10 text-warning",
 									statusKey === "nearLimit" && "bg-destructive/10 text-destructive",
 									statusKey === "rateLimited" &&
 										"bg-destructive/20 text-destructive font-medium",
@@ -521,17 +522,10 @@ export function AccountPriorityList({
 			</DndContext>
 
 			{/* Explanatory tip - provider agnostic */}
-			<div className="rounded-lg bg-info/10 border border-info/30 p-3 mt-4">
-				<div className="flex items-start gap-2">
-					<Info className="h-4 w-4 text-info shrink-0 mt-0.5" />
-					<div className="text-xs text-muted-foreground space-y-1">
-						<p className="font-medium text-foreground">
-							{t("accounts.priority.tipTitle")}
-						</p>
-						<p>{t("accounts.priority.tipDescription")}</p>
-					</div>
-				</div>
-			</div>
+			<Notice tone="blue" icon={Info} className="mt-4">
+				<p className="wp-title text-sm">{t("accounts.priority.tipTitle")}</p>
+				<p className="wp-muted mt-0.5 text-xs">{t("accounts.priority.tipDescription")}</p>
+			</Notice>
 		</div>
 	);
 }

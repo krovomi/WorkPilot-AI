@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useSwarmStore } from "../../stores/swarm-store";
+import { Notice } from "../charter";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { SettingsSection } from "./SettingsSection";
@@ -53,12 +54,9 @@ export function SwarmModeSettings() {
 
 				{/* ── Info Banner ────────────────────────────────── */}
 				{isEnabled && (
-					<div className="flex items-start gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-						<Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-						<p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-							{t("swarm:infoBanner")}
-						</p>
-					</div>
+					<Notice tone="blue" icon={Info}>
+						{t("swarm:infoBanner")}
+					</Notice>
 				)}
 
 				{/* ── Sub-options ────────────────────────────────── */}

@@ -7,6 +7,7 @@ import { useJevStore } from "../../stores/jev-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
+import { SettingsSection } from "./SettingsSection";
 export function JevSettings() {
 	const { t } = useTranslation("settings");
 	const saved = useSettingsStore((s) => s.settings.jev);
@@ -52,9 +53,7 @@ export function JevSettings() {
 		}
 	}
 	return (
-		<section className="space-y-5 p-6">
-			<h2 className="text-lg font-semibold">{t("jev.title")}</h2>
-			<p className="text-sm text-muted-foreground">{t("jev.description")}</p>
+		<SettingsSection title={t("jev.title")} description={t("jev.description")}>
 			<label className="flex gap-2">
 				<input
 					type="checkbox"
@@ -157,6 +156,6 @@ export function JevSettings() {
 				</Button>
 			</div>
 			{message && <p role="status">{t("jev." + message)}</p>}
-		</section>
+		</SettingsSection>
 	);
 }

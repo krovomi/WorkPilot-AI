@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import type { ServerSecretKind } from "../../../preload/api/modules/server-auth-api";
+import { Notice } from "../charter";
+import { SettingsSection } from "./SettingsSection";
 
 const KINDS: readonly ServerSecretKind[] = [
 	"github_token",
@@ -55,15 +57,14 @@ export function ServerTokensSettings() {
 	);
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h3 className="text-lg font-semibold">{t("serverTokens.title")}</h3>
-				<p className="text-sm text-muted-foreground">{t("serverTokens.description")}</p>
-			</div>
+		<SettingsSection
+			title={t("serverTokens.title")}
+			description={t("serverTokens.description")}
+		>
 			{error && (
-				<p role="alert" className="text-sm text-destructive">
+				<Notice tone="red" role="alert">
 					{error}
-				</p>
+				</Notice>
 			)}
 			<div className="space-y-3">
 				{KINDS.map((kind) => {
@@ -125,6 +126,6 @@ export function ServerTokensSettings() {
 					);
 				})}
 			</div>
-		</div>
+		</SettingsSection>
 	);
 }
