@@ -18,7 +18,7 @@ import os
 import re
 from pathlib import Path
 
-from .notebook_handler import CellType, NotebookCell, ParsedNotebook
+from .model import CellType, NotebookCell, ParsedNotebook
 
 NOTEBOOK_SUFFIXES = frozenset({".ipynb", ".dib", ".qmd", ".rmd"})
 
