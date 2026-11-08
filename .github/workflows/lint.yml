@@ -150,10 +150,15 @@ jobs:
         id: biome
         run: echo "version=$(jq -r '.devDependencies["@biomejs/biome"]' apps/frontend/package.json)" >> "$GITHUB_OUTPUT"
 
+      # From the npm registry, not GitHub releases: setup-biome downloads the
+      # binary from a release asset, which answered 504 for a whole morning
+      # (2026-11-08) and turned every pull request red before Biome ran.
       - name: Setup Biome
-        uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2
-        with:
-          version: ${{ steps.biome.outputs.version }}
+        env:
+          BIOME_VERSION: ${{ steps.biome.outputs.version }}
+        run: |
+          npm install --global --no-fund --no-audit "@biomejs/biome@${BIOME_VERSION}"
+          biome --version
 
       - name: Run Biome
         working-directory: apps/frontend
