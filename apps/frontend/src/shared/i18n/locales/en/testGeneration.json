@@ -250,5 +250,228 @@
 	"gap": {
 		"priority": "{{priority}} priority",
 		"details": "Line: {{line}} | Complexity: {{complexity}} | Tests needed: {{tests}}"
+	},
+	"studio": {
+		"kicker": "Test agent",
+		"modesLabel": "Agent mode",
+		"modes": {
+			"analyze": "coverage",
+			"unit": "per file",
+			"e2e": "scenario",
+			"tdd": "before the code"
+		},
+		"target": {
+			"kicker": "1 · Target",
+			"title": {
+				"analyze": "The file to analyze",
+				"unit": "The file to cover",
+				"e2e": "The scenario to check",
+				"tdd": "The expected behaviour"
+			},
+			"existingTest": "Existing tests:",
+			"coverageHint": "the branches to exercise",
+			"storyHint": "one sentence per acceptance criterion",
+			"storyPlaceholder": "As a buyer, I can pay my cart by card and I get a confirmation email. A declined payment shows a clear message.",
+			"targetHint": "the file, route or screen under test",
+			"or": "or",
+			"targetPlaceholder": "/checkout, CheckoutController, lib/screens/cart.dart…",
+			"language": "Language",
+			"languageHint": "the project's by default",
+			"auto": "Project",
+			"noLibraries": "No library to pick for this language: the tests follow the framework detected in the project."
+		},
+		"intro": {
+			"analyze": {
+				"title": "What lacks tests",
+				"body": "The agent reads the file and your existing tests, then ranks every uncovered function by priority. Nothing is written to the project."
+			},
+			"unit": {
+				"title": "A unit test file",
+				"body": "The file is written in your project's framework and libraries, then placed where your tests already live."
+			},
+			"e2e": {
+				"title": "End-to-end tests",
+				"body": "Each user story criterion becomes a Given / When / Then scenario, on the project's E2E tool (Playwright, Cypress, Capybara, Dusk, integration_test…)."
+			},
+			"tdd": {
+				"title": "Tests first",
+				"body": "Describe what the code must do: the agent writes tests that fail until the implementation exists (red phase)."
+			}
+		},
+		"pipeline": {
+			"kicker": "2 · Pipeline",
+			"title": {
+				"analyze": "Coverage analysis",
+				"unit": "Unit generation",
+				"e2e": "E2E generation",
+				"tdd": "TDD red phase"
+			},
+			"running": "running…",
+			"doneIn": "done in {{seconds}} s",
+			"stopped": "stopped",
+			"stepCount_one": "{{count}} step",
+			"stepCount_other": "{{count}} steps",
+			"skipped": "not reached",
+			"failedHere": "failed here",
+			"gapsFound_one": "{{count}} gap found",
+			"gapsFound_other": "{{count}} gaps found",
+			"highPriority_one": "{{count}} high priority",
+			"highPriority_other": "{{count}} high priority",
+			"testsWritten_one": "{{count}} test written",
+			"testsWritten_other": "{{count}} tests written",
+			"stepKicker": "{{n}} · {{name}}",
+			"legend": "Click a step to see its result on the right."
+		},
+		"steps": {
+			"scenario": {
+				"kicker": "Input",
+				"title": "User story",
+				"meta": "the scenario described"
+			},
+			"spec": {
+				"kicker": "Input",
+				"title": "Specification",
+				"meta": "the behaviour described"
+			},
+			"detect": {
+				"kicker": "Stack",
+				"title": "Language and framework",
+				"meta": "read from the project's manifests"
+			},
+			"read": {
+				"kicker": "Source",
+				"title": "Reading the file",
+				"meta": "the code and existing tests"
+			},
+			"analyze": {
+				"kicker": "Model",
+				"title": "Gap analysis",
+				"meta": "uncovered functions"
+			},
+			"gaps": {
+				"kicker": "Result",
+				"title": "Ranked gaps",
+				"meta": "high, medium, low"
+			},
+			"generate": {
+				"kicker": "Model",
+				"title": "Writing the tests",
+				"meta": {
+					"unit": "happy paths, edges, errors",
+					"e2e": "one scenario per criterion",
+					"tdd": "tests that fail first"
+				}
+			},
+			"write": {
+				"kicker": "Project",
+				"title": "File placed",
+				"meta": "in the project's test folder"
+			}
+		},
+		"stepStates": {
+			"pending": "Pending",
+			"running": "Running",
+			"done": "Done",
+			"error": "Failed",
+			"skipped": "Not reached"
+		},
+		"notes": {
+			"analyze": [
+				"The detected framework tells the model what a test already is here.",
+				"The code and your tests go to the model, nothing else.",
+				"Each untested function is ranked: business logic first."
+			],
+			"unit": [
+				"The project's framework and libraries set the idiom of the tests.",
+				"The source code and your existing tests go to the model.",
+				"The file is placed by the project's layout, never at the root."
+			],
+			"e2e": [
+				"The project's language picks the E2E tool: Playwright, Cypress, Dusk…",
+				"Each criterion becomes a Given / When / Then scenario.",
+				"The suite goes to the project's e2e folder."
+			],
+			"tdd": [
+				"The chosen language decides the framework, read from the project.",
+				"The model writes the tests, never the implementation.",
+				"The tests fail until the code exists."
+			]
+		},
+		"inspector": {
+			"kicker": "3 · Result",
+			"title": {
+				"analyze": "Coverage",
+				"unit": "Test file",
+				"e2e": "E2E suite",
+				"tdd": "Red tests"
+			},
+			"tabs": {
+				"code": "Code",
+				"tests": "Tests",
+				"gaps": "Gaps",
+				"stack": "Stack"
+			},
+			"fileComing": "file on its way…",
+			"empty": {
+				"codeTitle": "The file will be written here, live",
+				"code": {
+					"unit": "Pick a file and run the generation: the code arrives line by line.",
+					"e2e": "Describe the scenario and its target, then run the generation.",
+					"tdd": "Describe the expected behaviour, then run the generation."
+				},
+				"testsTitle": "No tests yet",
+				"tests": "The tests of the generated file show here, with what each one checks.",
+				"gapsTitle": "No analysis yet",
+				"gaps": "Pick a file and run the analysis: functions without tests show here, most important first."
+			},
+			"assertions_one": "{{count}} assertion",
+			"assertions_other": "{{count}} assertions",
+			"analyzingTitle": "Analysis running",
+			"analyzing": "The model compares the code with your existing tests.",
+			"noGapsBody": "Every function in this file already has tests.",
+			"priority": {
+				"high": "high",
+				"medium": "medium",
+				"low": "low"
+			},
+			"line": "line {{line}}",
+			"suggested_one": "{{count}} test suggested",
+			"suggested_other": "{{count}} tests suggested",
+			"generateFromGaps_one": "Generate {{count}} test for these gaps",
+			"generateFromGaps_other": "Generate {{count}} tests for these gaps",
+			"facts": {
+				"target": "Target",
+				"language": "Language",
+				"fromProject": "the project's",
+				"framework": "Framework",
+				"atRun": "read at run time",
+				"libraries": "Libraries",
+				"destination": "File",
+				"destinationLater": "decided at run time, from the project's layout"
+			},
+			"stackNote": "Language, framework and libraries are read from the project's manifests (csproj, package.json, pyproject, go.mod, Cargo.toml, composer.json, Gemfile, pubspec.yaml, Package.swift, Gradle, Maven, CMake): nothing to configure."
+		},
+		"composer": {
+			"coverage": "coverage {{value}}%",
+			"ready": "Ready. Ctrl + Enter runs the agent.",
+			"running": {
+				"analyze": "The agent is analyzing the file…",
+				"unit": "The agent is writing the tests…",
+				"e2e": "The agent is writing the scenarios…",
+				"tdd": "The agent is writing the red tests…"
+			},
+			"missing": {
+				"analyze": "Pick the file to analyze.",
+				"unit": "Pick the file to cover.",
+				"e2e": "Describe the user story and its target.",
+				"tdd": "Describe what the code must do."
+			},
+			"action": {
+				"analyze": "Analyze coverage",
+				"unit": "Generate tests",
+				"e2e": "Generate E2E tests",
+				"tdd": "Generate red tests"
+			}
+		}
 	}
 }

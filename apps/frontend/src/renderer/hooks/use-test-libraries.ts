@@ -55,6 +55,7 @@ export interface LibrariesGateway {
 	resolve: (
 		filePath: string,
 		projectPath?: string,
+		language?: string,
 	) => Promise<TestLibrarySelection | null>;
 	install: (
 		selected: string[],
@@ -65,11 +66,13 @@ export interface LibrariesGateway {
 }
 
 const defaultGateway: LibrariesGateway = {
-	resolve: async (filePath, projectPath) => {
+	resolve: async (filePath, projectPath, language) => {
 		try {
 			const response = await globalThis.electronAPI.resolveTestLibraries(
 				filePath,
 				projectPath,
+				undefined,
+				language,
 			);
 			return response?.libraries ?? null;
 		} catch {
@@ -96,6 +99,11 @@ export function useTestLibraries(
 	filePath: string,
 	projectPath?: string,
 	gateway: LibrariesGateway = defaultGateway,
+	/**
+	 * Pins the language when there is no file to read it from (TDD, a typed
+	 * E2E target). Omitted, the file's extension, then the project decides.
+	 */
+	language?: string,
 ) {
 	const [selection, setSelection] = useState<TestLibrarySelection | null>(null);
 	const [chosen, setChosen] = useState<string[]>([]);
@@ -116,7 +124,7 @@ export function useTestLibraries(
 		let cancelled = false;
 		setLoading(true);
 		void gatewayRef.current
-			.resolve(filePath, projectPath)
+			.resolve(filePath, projectPath, language)
 			.then((resolved) => {
 				if (cancelled) return;
 				setSelection(resolved);
@@ -135,7 +143,7 @@ export function useTestLibraries(
 		return () => {
 			cancelled = true;
 		};
-	}, [filePath, projectPath]);
+	}, [filePath, projectPath, language]);
 
 	const toggle = useCallback(
 		(id: string) => {
