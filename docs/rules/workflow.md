@@ -141,6 +141,10 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
   `tests/test_smoke_test_wiring.py` garde ces étapes.
 - **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
   suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
+- **Téléchargements depuis les releases GitHub** : elles ont répondu 504 toute une matinée
+  (2026-11-08). Electron passe par `.github/actions/fetch-electron` (cache Actions, 5 essais, empreintes
+  de `checksums.json` toujours vérifiées) ; Biome vient du registre npm, pas de `setup-biome`
+  (`tests/test_ci_release_downloads.py`).
 - **E2E** (lot N3) : le job `e2e` de `ci.yml` construit l'app et lance `pnpm run test:e2e` sous
   xvfb ; `ci-complete` l'attend. Chaque spec démarre l'app par `e2e/app-harness.ts` (HOME et
   profil jetables), aucun `test.skip`, et un test qui ne passe qu'au second essai fait échouer

@@ -1,0 +1,42 @@
+name: 'Fetch the Electron binary'
+description: >-
+  Download the Electron binary that apps/frontend/node_modules/electron expects,
+  from the Actions cache when present, with retries when GitHub releases answer
+  5xx. The binary is still checked against the checksums.json bundled in the
+  electron npm package.
+
+runs:
+  using: 'composite'
+  steps:
+    # GitHub release downloads answered 504 for a whole morning (2026-11-08,
+    # #784): every job that needs Electron died before its first test. The
+    # cache means one good download serves every later run of that version.
+    - name: Read the Electron version
+      id: electron
+      shell: bash
+      working-directory: apps/frontend
+      run: echo "version=$(node -p "require('electron/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the Electron download cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/electron-cache
+        key: electron-${{ runner.os }}-${{ runner.arch }}-${{ steps.electron.outputs.version }}
+
+    - name: Download Electron (with retries)
+      shell: bash
+      working-directory: apps/frontend
+      env:
+        electron_config_cache: ${{ runner.temp }}/electron-cache
+      run: |
+        for wait in 15 30 60 90 0; do
+          if node node_modules/electron/install.js; then
+            exit 0
+          fi
+          if [ "$wait" -gt 0 ]; then
+            echo "::warning::Electron download failed, new attempt in ${wait} s"
+            sleep "$wait"
+          fi
+        done
+        echo "::error::Electron could not be downloaded from GitHub releases after 5 attempts"
+        exit 1
