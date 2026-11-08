@@ -114,7 +114,8 @@ import { ArchitectureTabs } from "./ArchitectureTabs";
 import { CanvasInspector } from "./CanvasInspector";
 import { CanvasThemePicker } from "./CanvasThemePicker";
 import { GeneratedCodeDock } from "./GeneratedCodeDock";
-import { edgeRelationOptions, useConnectBlocks } from "./useConnectBlocks";
+import { ArchitectureChecks } from "./ArchitectureChecks";
+import { edgeRelationOptions, edgeStackWarnings, useConnectBlocks } from "./useConnectBlocks";
 import { useFitViewOnShow } from "./useFitViewOnShow";
 import { VisualProgrammingPalette } from "../VisualProgrammingPalette";
 import type { EdgePatch } from "../DefaultEdge";
@@ -1647,6 +1648,7 @@ export const CanvasPanel: React.FC = () => {
 					}
 					defaultExplanation={inspectedEdge ? defaultExplanation(inspectedEdge) : ""}
 					relationOptions={edgeRelationOptions(liveNodes, inspectedEdge, lang)}
+					edgeWarnings={edgeStackWarnings(liveNodes, inspectedEdge, lang, (k) => t(k, k))}
 					onNodeChange={handleNodeChange}
 					onDeleteNode={handleDeleteNode}
 					onEdgeChange={handleEdgeChange}
@@ -1693,6 +1695,7 @@ export const CanvasPanel: React.FC = () => {
 						count: edges.length,
 					})}
 				</span>
+				<ArchitectureChecks nodes={liveNodes} edges={edges} lang={lang} setNodes={setNodes} setEdges={setEdges} />
 				<span className="flex-1" />
 				{isDirty ? (
 					<span className="flex items-center gap-1 text-warning">
