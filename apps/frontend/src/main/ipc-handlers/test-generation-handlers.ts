@@ -125,6 +125,7 @@ export function setupTestGenerationHandlers(
 				filePath?: string;
 				projectPath?: string;
 				selected?: string[];
+				language?: string;
 			},
 		) => {
 			try {
@@ -132,6 +133,7 @@ export function setupTestGenerationHandlers(
 					params.filePath ?? "",
 					params.projectPath,
 					params.selected,
+					typeof params.language === "string" ? params.language : undefined,
 				);
 				return { success: true, libraries };
 			} catch (error) {

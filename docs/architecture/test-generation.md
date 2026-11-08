@@ -78,3 +78,47 @@ and npm through the project's own package manager, read from its lockfile; pip
 and Maven are *reported as commands*, never run — a pip install lands in
 whichever environment happens to be active, and that is not a guess to make on
 someone's behalf.
+
+## Every stack, from one table
+
+Detection used to be a chain of per-language functions that stopped at the
+first manifest it found. A C# solution with a `package.json` for its front end
+got Vitest; a C# project only counted when its `.csproj` sat at the root; an E2E
+run with no `.ts` target fell back to a `dummy.ts` and wrote TypeScript for
+everyone. The E2E and TDD prompts then asked for `.js`, `.ts` or `.py` paths
+whatever the language.
+
+`test_generation/stacks.py` is now the one table every caller reads:
+
+| Question | Answer |
+|---|---|
+| which language is this file? | `LANGUAGE_BY_EXTENSION` (14 languages) |
+| which language is this project? | `detect_project_language`: root markers in a fixed priority (`.sln`/`.csproj`, `go.mod`, `Cargo.toml`, `pubspec.yaml`, `Package.swift`, `composer.json`, `Gemfile`, Maven, Gradle, Python, `package.json`, CMake), then one level down |
+| which framework does it test with? | `detect_framework(root, language, kind)`: **only that language's manifests**, so a front end's `package.json` cannot decide a .NET answer |
+| where does an E2E or TDD file go? | `suggested_test_path`: `e2e/CartE2ETests.cs`, `e2e/cart.spec.ts`, `integration_test/cart_test.dart`… |
+
+C#, Java, Kotlin, Go, Rust, PHP, Ruby, Swift, Dart/Flutter, C and C++ get the
+same treatment as Python and TypeScript, including their library catalogue
+(testify, mockall, PHPUnit/Pest, RSpec, `package:test`/mocktail, Quick/Nimble…)
+and the command that would add a missing one (`go get -t`, `cargo add --dev`,
+`composer require --dev`, `bundle add --group test`, `dart pub add --dev`).
+Those are reported, never run, for the reason given above.
+`tests/test_generation/test_stacks.py` reads the renderer's language list and
+fails if it drifts from `SUPPORTED_LANGUAGES`.
+
+## The studio
+
+The dialog follows the Visual-to-Code layout: what the agent works on on the
+left, the run as four cards on wires in the middle, the result on the right,
+and one composer at the bottom. Each mode (analyse, unit, E2E, TDD) has its own
+four steps (`renderer/lib/test-studio-steps.ts`), and their states are
+*derived* from the store's live stages rather than kept beside them, so a card
+cannot say "done" for a run of another mode. Clicking a card opens the
+inspector tab that holds its part of the result (code, tests, gaps, stack).
+
+An analysis now emits stages like a generation, and its gaps land in
+`coverageGaps`: the old dialog read `result.coverage_gaps`, which nothing set,
+so an analysis finished and showed nothing. From the gaps tab, one button turns
+them into a unit-test run. TDD defaults to the project's language ("Projet",
+read by the libraries resolver) instead of Python, and the main process rejects
+a language outside the list before it reaches the runner.
