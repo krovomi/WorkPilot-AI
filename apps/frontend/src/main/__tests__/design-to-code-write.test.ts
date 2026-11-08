@@ -72,6 +72,15 @@ describe("writeFiles", () => {
 		expect(existsSync(path.join(project, "src", "components", "pricing", "Hero.tsx"))).toBe(true);
 	});
 
+	it("replaces a longer file entirely, with nothing of the old one left", () => {
+		writeFileSync(path.join(project, "Button.tsx"), "x".repeat(500));
+		const outcome = new DesignToCodeService().writeFiles("p1", [
+			{ path: "Button.tsx", content: "short" },
+		]);
+		expect(outcome.written).toEqual([{ path: "Button.tsx", created: false }]);
+		expect(readFileSync(path.join(project, "Button.tsx"), "utf-8")).toBe("short");
+	});
+
 	it("refuses paths that leave the project, even through a link", () => {
 		symlinkSync(outside, path.join(project, "linked"), "dir");
 		const outcome = new DesignToCodeService().writeFiles("p1", [
@@ -170,6 +179,11 @@ describe("detectProjectStack", () => {
 
 	it("says nothing about a project it cannot read", () => {
 		write("main.go", "package main");
+		expect(detectProjectStack(project).stack).toBeNull();
+	});
+
+	it("does not read a file larger than a manifest", () => {
+		write("package.json", JSON.stringify({ dependencies: { next: "15" }, pad: "x".repeat(600 * 1024) }));
 		expect(detectProjectStack(project).stack).toBeNull();
 	});
 
