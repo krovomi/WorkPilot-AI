@@ -336,8 +336,9 @@ export class PythonEnvManager extends EventEmitter {
 			this.fail(errorMsg);
 			return false;
 		}
-		// Vérification d'existence du binaire Python
-		const { existsSync } = require("node:fs");
+		// Vérification d'existence du binaire Python (l'import du module, pas un
+		// `require` local : celui-ci échappait au mock de node:fs des tests, qui
+		// lisaient alors le vrai disque, où /usr/bin/python3 manque sous Windows).
 		if (!existsSync(systemPython)) {
 			const errorMsg = `Le binaire Python détecté n'existe pas : ${systemPython}\nCorrigez votre installation Python ou votre PATH système.`;
 			this.fail(errorMsg);
