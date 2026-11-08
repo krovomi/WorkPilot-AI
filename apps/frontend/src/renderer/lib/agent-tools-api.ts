@@ -1177,10 +1177,16 @@ export interface HermesCycle {
 	} | null;
 }
 
+/** `fresh`: read the installed hermes version again (after an update). */
 export async function fetchHermesStatus(
 	signal?: AbortSignal,
+	fresh = false,
 ): Promise<ApiResult<{ status: HermesStatus }>> {
-	return _get<{ status: HermesStatus }>("/api/hermes/status", {}, signal);
+	return _get<{ status: HermesStatus }>(
+		"/api/hermes/status",
+		fresh ? { fresh: "1" } : {},
+		signal,
+	);
 }
 
 export async function runHermesCycle(

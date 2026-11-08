@@ -54,7 +54,7 @@ from pydantic import BaseModel, Field
 from .loop import SURFACES, run_cycle
 from .readiness import doctor
 from .soul import REFRESH_COMMAND, install_soul, refresh_prompts, soul_status
-from .version import MIN_VERSION, UPDATE_COMMAND
+from .version import MIN_VERSION, UPDATE_COMMAND, forget_installed_versions
 
 logger = logging.getLogger(__name__)
 
@@ -139,11 +139,17 @@ def _status_payload(repo_root: Path) -> dict:
 
 
 @router.get("/status")
-def hermes_status():
-    """Readiness, persona and pending candidates. Read-only, no model, no network."""
+def hermes_status(fresh: bool = False):
+    """Readiness, persona and pending candidates. Read-only, no model, no network.
+
+    ``fresh`` reads the installed version again instead of the cached one
+    (the sidebar asks for it right after updating hermes).
+    """
     if _is_server_mode():
         return _DESKTOP_ONLY
     try:
+        if fresh:
+            forget_installed_versions()
         return {"success": True, "status": _status_payload(_REPO_ROOT)}
     except Exception:  # noqa: BLE001
         logger.exception("hermes status failed")

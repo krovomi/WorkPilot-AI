@@ -1011,6 +1011,8 @@ export const IPC_CHANNELS = {
 	AGENT_CLI_CHECK: "agentCli:check",
 	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
 	AGENT_CLI_INSTALL: "agentCli:install",
+	AGENT_CLI_UPDATE_CHECK: "agentCli:updateCheck",
+	AGENT_CLI_UPDATE: "agentCli:update",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",
