@@ -187,7 +187,8 @@ const SHOTS = {
 		await page.evaluate((sessions) => {
 			const ids = window.__DEMO_TERMINALS__ || [];
 			sessions.forEach((lines, i) => {
-				if (ids[i]) window.__DEMO_TERMINAL_OUTPUT__?.(ids[i], lines.join("\r\n"));
+				if (ids[i])
+					window.__DEMO_TERMINAL_OUTPUT__?.(ids[i], lines.join("\r\n"));
 			});
 		}, TERMINAL_SESSIONS);
 		await page.waitForTimeout(1500);
