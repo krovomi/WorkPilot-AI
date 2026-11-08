@@ -127,6 +127,17 @@ const SHOTS = {
 	insights: (page) => openView(page, "Insights", "Explore"),
 	ideation: (page) => openView(page, "Ideation", "Explore"),
 	roadmap: (page) => openView(page, "Roadmap", "Planning"),
+	"visual-to-code": async (page) => {
+		await openView(page, "Visual to Code", "Development");
+		await page.getByText("Canvas", { exact: true }).first().click();
+		await page.waitForTimeout(3000);
+	},
+	"import-design": (page) => openView(page, "Visual to Code", "Development"),
+	"test-generation": (page) => openView(page, "Test Generation", "Development"),
+	settings: async (page) => {
+		await page.getByText("Settings", { exact: true }).last().click();
+		await page.waitForTimeout(2500);
+	},
 };
 
 (async () => {

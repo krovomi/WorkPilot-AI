@@ -1,0 +1,423 @@
+From 7c1393ddd22546678d4256919f8e5f0d218c68fe Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 16:10:58 +0000
+Subject: [PATCH] =?UTF-8?q?docs(wiki):=201.4.0=20=E2=80=94=20what's=20new,?=
+ =?UTF-8?q?=20roadmap,=20UI=20charter,=20new=20screenshots,=20automatic=20?=
+ =?UTF-8?q?split,=20every=20stack?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Advanced-Features.fr.md | 73 ++++++++++++++++++++++++++++++++++++-----
+ Home.md                 |  8 +++--
+ Roadmap.fr.md           | 36 +++++++++++++++++++-
+ Roadmap.md              | 15 ++++++++-
+ User-Interface.fr.md    | 51 +++++++++++++++++++++++-----
+ User-Interface.md       | 47 ++++++++++++++++++++++----
+ 6 files changed, 201 insertions(+), 29 deletions(-)
+
+diff --git a/Advanced-Features.fr.md b/Advanced-Features.fr.md
+index 17ab715..237c63e 100644
+--- a/Advanced-Features.fr.md
++++ b/Advanced-Features.fr.md
+@@ -201,17 +201,23 @@ S'appuie sur **chrome-devtools-mcp** (29 outils).
+ 
+ L'agent connaît les **breaking changes** documentés et les applique par phases avec tests.
+ 
+----
++Depuis la 1.4.0, la page analyse le projet, montre la stack source détectée et le plan, puis crée
++une tâche Kanban qui fait la migration dans un worktree isolé : plus de migration annoncée « en file
++d'attente » qui ne s'exécutait jamais.
+ 
+-## 🎨 Design-to-Code
++---
+ 
+-Transformez une **capture d'écran ou un mockup** en code :
+-- IA multimodale analyse l'image
+-- Génère du JSX/TSX idiomatique
+-- Applique le framework CSS de votre projet (Tailwind, CSS Modules…)
+-- Décomposition en sous-composants réutilisables
++## 🎨 Import Design (refait en 1.4.0)
+ 
+-Parfait pour démarrer depuis un design Figma ou un mockup papier.
++Transformez une **capture d'écran, un export Figma, un wireframe ou une photo de tableau** en
++composants de la stack du projet, détectée dans ses manifestes : React, Next.js, Vue, Nuxt, Angular,
++Svelte, Blazor, HTML + CSS, React Native, Flutter, SwiftUI, Jetpack Compose, .NET MAUI, WPF / WinUI
++ou Avalonia.
++- Six étapes visibles en direct : vision, design tokens, spec, code, tests visuels, écriture
++- Les zones reconnues sont dessinées sur l'image ; la vision passe par l'abonnement Claude quand
++  aucune clé n'est configurée
++- Rien n'est écrit dans le projet avant votre relecture ; les fichiers relus s'écrivent en un clic
++- Un résultat d'exemple, sans réponse de l'IA, est signalé comme tel
+ 
+ ---
+ 
+@@ -226,6 +232,15 @@ Dessinez une **architecture** en graphe de nœuds, puis faites-la construire :
+ - Toutes les stacks, dont un bloc « Application mobile » (Flutter, React Native, Swift, Kotlin,
+   .NET MAUI, Ionic), Nuxt, Tauri, FastAPI, Quarkus, Ktor, Laravel, Symfony, Ruby on Rails
+ 
++**Cohérence de toute l'architecture (1.4.0)** :
++- La relation d'une connexion se choisit dans une liste adaptée aux deux blocs et à leurs stacks
++  (gRPC, SignalR, MassTransit, EF Core, AMQP, FCM / APNs…) ou se saisit librement
++- Chaque paire de blocs est un lien attendu, ou refusée avec sa raison et le bloc à intercaler ;
++  une flèche à l'envers se retourne d'un clic, « Relier quand même » reste possible
++- Les technologies incompatibles sont signalées (Celery sur Kafka, PostgreSQL dans une app mobile…)
++- Le panneau « Points d'attention » relève les défauts de tout le schéma (base partagée entre
++  microservices, cycles, blocs isolés…), et la barre d'état dit si l'architecture est cohérente
++
+ ---
+ 
+ ## 🏆 Prompt Optimizer
+@@ -455,6 +470,48 @@ n'apparaissent que dans les projets concernés ; les projets WPF, WinUI, MAUI et
+ 
+ ---
+ 
++## ✂️ Découpage automatique en petites PR (1.4.0)
++
++Une tâche trop grosse pour une PR qu'on relit sans fatigue se découpe d'elle-même :
++- Après la planification, le plan est mesuré en **lignes à relire** (code en entier, tests et doc
++  pour moitié, fichiers générés et lockfiles pour rien) et comparé au plafond de son type :
++  100 pour un correctif urgent, 200 pour un bug ou une montée de version, 300 pour un refactoring,
++  400 pour une feature, des tests ou de la doc ; les investigations, spikes et runs ne sont jamais
++  découpés. Plafonds réglables dans les paramètres du projet et sur chaque tâche
++- La tâche devient des cartes « Partie k/N », une PR chacune. Les parties indépendantes démarrent
++  en parallèle ; une partie dépendante démarre dès que celle dont elle dépend a passé la QA,
++  empilée sur sa branche
++- Quand la PR d'une partie est fusionnée (GitHub, GitLab ou Azure DevOps), la partie passe en
++  terminé, les parties empilées dessus sont rebasées sur la branche de base et leur PR reciblée,
++  puis la suivante démarre
++- Après la QA, la carte mesure son diff réel et affiche « 620 / 400 lignes » quand il dépasse
++- Une couleur et une marque écrite par groupe, sur le Kanban, l'app mobile et la forge : titre
++  `[Recherche 2/4] API`, étiquette `groupe/<id>` dans la couleur du groupe, section « Groupe de PR »
++  qui dit quelle partie relire d'abord. Un clic sur la marque n'affiche que le groupe
++
++Détail : [`docs/architecture/task-split.md`](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/architecture/task-split.md).
++
++---
++
++## 🧰 Des outils pour toutes les stacks (1.4.0)
++
++- **Revue de code et refactoring** : code smells et règles de revue pour .NET, Java, Kotlin, Scala,
++  Go, Rust, Swift, PHP, Ruby, Dart, C/C++, TypeScript et Python
++- **Gardien de régression** : le test s'écrit dans le framework de la stack (pytest, Jest, Vitest,
++  JUnit 5, xUnit, NUnit, Go, cargo, PHPUnit, RSpec, Dart, XCTest…)
++- **Analyse i18n** : catalogues RESX, ARB, XLIFF, Android, iOS, gettext, Java, Rails et Laravel
++- **Train de release** et **snapshots d'environnement** : services et chaînes d'outils .NET, Java,
++  Kotlin, Go, Rust, Dart/Flutter, PHP, Ruby, Elixir, Swift, en plus de npm et Python
++- **Générateur de pipeline** : GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket et CircleCI
++- **Studio de génération de tests** : gaps, unitaires, E2E et TDD en 14 langages, framework lu dans
++  les manifestes du langage du fichier
++- **Docs et dérive** : couverture par langage, commentaires de doc dans la convention de chaque
++  langage (XML doc, KDoc, rustdoc, godoc, Swift, JSDoc, docstring…)
++- **Outils CLI** : installation et mise à jour en un clic de Claude Code, Codex, Copilot, Gemini
++  CLI, Hermes, OpenCode, Antigravity et pi
++
++---
++
+ ## Prochaine étape
+ 
+ ➡️ [Contribuer au projet](Contributing.fr)
+diff --git a/Home.md b/Home.md
+index 96ee491..93eb472 100644
+--- a/Home.md
++++ b/Home.md
+@@ -2,13 +2,15 @@
+ 
+ **WorkPilot AI** is an autonomous multi-agent coding framework that **plans, builds, and validates** software for you. Describe a goal — WorkPilot AI handles analysis, breakdown, implementation, testing, review and merge.
+ 
+-![WorkPilot AI Kanban Board](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-Kanban.png)
++![WorkPilot AI Kanban Board](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban.png)
+ 
+ ---
+ 
+-## 🆕 What's new in 1.3.4 / Nouveautés de la 1.3.4
++## 🆕 What's new in 1.4.0 / Nouveautés de la 1.4.0
+ 
+-A team server where every feature is shared, an iOS and Android app, and the agent you can steer: guide a running task, point an element of its preview, review its diff subtask by subtask, stack a task on its prerequisite. New hard gates after QA (invented packages, tests that do not bite, formal proofs), a per-stack worktree recipe, Agent Trace attribution, a proof video and a comparison with the base branch, MCP tool pinning, the Kanban reachable from other AI apps over MCP, and a global voice assistant. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++One UI charter for every module and every Settings page, taken from Visual to Code. A task too big for one small PR now splits itself into parts with one colour and one mark per group, and the parts move on by themselves as their PRs are merged. Visual to Code checks the coherence of the whole architecture, Import Design and the test generation studio are rebuilt, the analyses work on every stack (.NET, Java, Go, Rust, PHP, Ruby, Dart, Swift…), and every agent CLI installs and updates in one click. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++
++Une seule charte UI pour tous les modules et les paramètres, et les grosses tâches se découpent toutes seules en petites PR.
+ 
+ ---
+ 
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index 8e4edf9..ae5473c 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,41 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.3.4 — Stable actuelle (7 novembre 2026)
++### v1.4.0 — Stable actuelle (8 novembre 2026)
++
++*Une seule charte UI, et les grosses tâches se découpent toutes seules en petites PR.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++**Une seule charte UI**
++- Tous les modules (Espace de travail, Agents, Développement, Explorer, Git, Planification, Boîte à
++  outils) et toutes les pages de paramètres dans le style de « Visuel vers Code » : en-tête à kicker,
++  onglets en pastilles avec compteurs, cartes à rail coloré, un seul bouton principal dans une barre
++  de commande en bas ; paramètres traduits et groupés par thème coloré
++
++**Les grosses tâches se découpent en petites PR**
++- Après la planification, une tâche au-delà du plafond de son type (100 lignes à relire pour un
++  correctif urgent, 200 pour un bug ou une montée de version, 300 pour un refactoring, 400 pour une
++  feature, des tests ou de la doc) devient des cartes « Partie k/N », une PR chacune
++- Les parties indépendantes avancent en parallèle, les dépendantes s'empilent ; une partie fusionnée
++  (GitHub, GitLab, Azure DevOps) fait avancer la suivante
++- Une couleur, une marque et une étiquette `groupe/<id>` par groupe, sur le Kanban, le téléphone et la forge
++
++**Modules refaits**
++- **Visuel vers Code** vérifie toute l'architecture : liens attendus ou refusés avec leur raison,
++  relations par paire de stacks, technologies incompatibles, panneau « Points d'attention »
++- **Import Design** : 15 stacks détectées, six étapes en direct, fichiers relus écrits dans le projet
++- **Studio de génération de tests** : gaps de couverture, unitaires, E2E et TDD en 14 langages
++- **Docs et dérive** : couverture par langage, commentaires de doc dans la convention de chaque langage
++
++**Toutes les stacks** : revue de code et refactoring, tests de régression, catalogues i18n, train de
++release, snapshots d'environnement et générateur de pipeline pour .NET, Java, Kotlin, Go, Rust, PHP,
++Ruby, Dart/Flutter, Swift, Elixir et d'autres.
++
++**Et aussi** : l'encart « Plateformes mobiles » s'adapte au projet ; mise à jour en un clic de
++OpenCode, Antigravity, pi, Gemini CLI et Hermes ; environnement Python reconstruit quand son
++interpréteur a disparu ; Sentinelle de dépendances et Migration de code honnêtes.
++
++### v1.3.4 — 7 novembre 2026
+ 
+ *L'équipe partage tout, et l'agent se guide pendant qu'il travaille.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+diff --git a/Roadmap.md b/Roadmap.md
+index b531219..76f9fd4 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -27,7 +27,20 @@ In short, the Roadmap connects product strategy (vision, audience, prioritizatio
+ 
+ ## Recent releases
+ 
+-### v1.3.4 — current stable (November 7, 2026)
++### v1.4.0 — current stable (November 8, 2026)
++
++- **One UI charter**: every module (Workspace, Agents, Development, Explore, Git, Planning, Toolbox) and every Settings page in the Visual to Code style: kicker header, pill tabs with counters, cards with a coloured rail, one primary button in a bottom command bar; Settings translated and grouped by coloured theme
++- **Automatic split into small PRs**: after planning, a task over the review ceiling of its kind (100 lines for a hotfix, 200 for a bug fix or an upgrade, 300 for a refactoring, 400 for a feature, tests or docs) becomes "Part k/N" cards, one PR each; independent parts run in parallel, dependent ones stack; a merged part moves the next one on (GitHub, GitLab, Azure DevOps); one colour, mark and `groupe/<id>` label per group, on the board, the phone and the forge
++- **Visual to Code** checks the whole architecture: expected or refused links with their reason, a relation list per pair of stacks, incompatible technologies, a "Points to watch" panel
++- **Import Design** rebuilt: 15 stacks detected, six live steps, reviewed files written into the project in one click
++- **Test generation studio**: coverage gaps, unit, E2E and TDD in 14 languages, framework read from the file's own stack
++- **Docs and drift** rebuilt: coverage per language, doc comments in each language's convention, drift by severity
++- **Every stack**: code review and refactoring smells, regression tests, i18n catalogues, release train, environment snapshots and pipeline generator for .NET, Java, Kotlin, Go, Rust, PHP, Ruby, Dart/Flutter, Swift, Elixir and more
++- **Mobile platforms box** that names the project's framework, or offers setup tasks on a project without an app
++- **CLI Tools**: one-click update for OpenCode, Antigravity, pi, Gemini CLI and Hermes too
++- **Fixes**: Python environment rebuilt when its interpreter is gone, analyses no longer blocked before the first task, honest Dependency Sentinel and Code Migration
++
++### v1.3.4 — November 7, 2026
+ 
+ - **Team server, every feature shared**: board, roadmap, ideation, insights, context, changelog, analyses, GitHub and GitLab views, AI reviews and automations, live for everyone; organisations isolated, roles, groups and admins; each run sees only its own project
+ - **Mobile app** (iOS, Android) for the team server: board, cards, runs, plan approval from a notification, dashboard, insights, roadmap, GitHub and GitLab, admin
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 9f0880a..03fa9ff 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -32,22 +32,31 @@ commandes ou une notification s'ouvre dans son hub, sur son onglet. Sur un serve
+ l'[app mobile](Advanced-Features.fr#-app-mobile-ios-et-android) suit le même Kanban depuis
+ iPhone et Android.
+ 
++Depuis la 1.4.0, tous les modules et toutes les pages de paramètres partagent **une seule charte UI**, reprise de « Visuel vers Code » : un en-tête avec son groupe en kicker, des onglets en pastilles avec compteurs, des cartes à rail coloré, une barre de commande en bas avec un seul bouton principal, dans tous les thèmes et les deux langues.
++
+ ---
+ 
+ ## 📋 Kanban Board
+ 
+-![Kanban](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-Kanban.png)
++![Kanban](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban.png)
+ 
+ ### Colonnes types
+ 
+ | Colonne | Rôle |
+ |---------|------|
+-| **Backlog** | Tâches créées mais pas encore lancées |
+-| **Spec Review** | Spécifications IA en attente d'approbation humaine |
+-| **In Progress** | Pipeline multi-agents en cours |
+-| **Human Review** | Résultats prêts pour revue manuelle |
+-| **AI Review** | Passage par un agent de revue indépendant |
+-| **Done** | Fusionné ou PR créée |
++| **Planification** | Tâches créées, spec et plan en cours d'écriture ou en attente d'approbation |
++| **File d'attente** | Prêtes à démarrer, en attente d'un agent libre |
++| **En cours** | Pipeline multi-agents en cours |
++| **Revue IA** | QA et passe de revue indépendante |
++| **Revue humaine** | Résultats prêts pour votre revue |
++| **Terminé** | Fusionné ou PR créée |
++| **Build rouge** | Visible quand la CI du projet a tourné sur une branche de tâche : un run rouge y déplace la carte et lance une réparation automatique, jusqu'à trois fois |
++
++### Tâches découpées
++
++Une tâche trop grosse pour une petite PR se découpe d'elle-même après la planification en cartes « Partie k/N » (voir [Fonctionnalités avancées](Advanced-Features.fr)). Les parties d'une même tâche partagent une couleur et une marque écrite ; un clic sur la marque n'affiche que ce groupe, et la pastille de la barre d'outils réaffiche tout.
++
++![Détail d'une tâche](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/task-detail.png)
+ 
+ ### Actions disponibles sur une carte
+ 
+@@ -101,6 +110,8 @@ Chat IA dédié à l'**exploration de votre code**.
+ - Historique de conversation persistant
+ - Filtres par dossier / langage / date
+ 
++![Insights](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/insights.png)
++
+ Exemples de questions :
+ - « Où est gérée l'authentification ? »
+ - « Quels endpoints utilisent le service Redis ? »
+@@ -122,11 +133,13 @@ Découverte **proactive** d'améliorations potentielles dans votre code :
+ 
+ Chaque suggestion peut être **convertie en tâche** d'un clic.
+ 
++![Ideation](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ideation.png)
++
+ ---
+ 
+ ## 🗺 Roadmap
+ 
+-![Roadmap](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-roadmap.png)
++![Roadmap](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/roadmap.png)
+ 
+ Planification de fonctionnalités assistée par IA :
+ - Analyse de votre produit et de la concurrence
+@@ -136,6 +149,24 @@ Planification de fonctionnalités assistée par IA :
+ 
+ ---
+ 
++## 🧩 Visuel vers Code
++
++Dessinez l'architecture en graphe de blocs, puis générez le projet. Chaque bloc porte sa stack, chaque connexion une relation choisie dans une liste adaptée aux deux blocs (gRPC, SignalR, MassTransit, EF Core, AMQP…) et une phrase qui l'explique ; une paire refusée dit pourquoi et quel bloc intercaler, et la barre d'état dit si tout le schéma est cohérent. L'onglet **Import Design** transforme une capture ou un export Figma en composants de la stack du projet, en six étapes visibles.
++
++![Visuel vers Code](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/visual-to-code.png)
++
++![Import Design](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/import-design.png)
++
++---
++
++## 🧪 Studio de génération de tests
++
++Choisissez un fichier et un mode (gaps de couverture, unitaires, E2E, TDD) : les quatre étapes du run s'allument au centre et les tests s'écrivent en direct à droite, dans le framework de la stack du fichier.
++
++![Studio de génération de tests](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/test-generation.png)
++
++---
++
+ ## 🏗 Architecture Visualizer
+ 
+ Génère **interactivement** :
+@@ -180,7 +211,9 @@ Tableau de bord de **consommation et coût** :
+ 
+ ## ⚙️ Settings
+ 
+-Les paramètres sont découpés en sections :
++![Paramètres](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/settings.png)
++
++Les paramètres sont groupés par thème (projet, intégrations et connexions, interface et apparence, système et maintenance…), chaque groupe avec sa couleur ; chaque page s'ouvre sur son groupe, son titre et sa description.
+ 
+ | Section | Contenu |
+ |---------|---------|
+diff --git a/User-Interface.md b/User-Interface.md
+index c286f61..fe87d27 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -27,22 +27,31 @@ refactoring, arena): no view is removed, and a view opened from the command pale
+ notification opens in its hub, on its tab. On a team server, the iOS and Android app follows the
+ same Kanban from your phone.
+ 
++Since 1.4.0, every module and every Settings page share **one UI charter**, taken from Visual to Code: a header with its group as kicker, pill tabs with counters, cards with a coloured rail, a command bar at the bottom with a single primary button, in every theme and both languages.
++
+ ---
+ 
+ ## 📋 Kanban Board
+ 
+-![Kanban](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-Kanban.png)
++![Kanban](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/kanban.png)
+ 
+ ### Typical columns
+ 
+ | Column | Role |
+ |--------|------|
+-| **Backlog** | Tasks created but not yet started |
+-| **Spec Review** | AI-generated specs awaiting human approval |
++| **Planning** | Tasks created, spec and plan being written or awaiting approval |
++| **Queue** | Ready to start, waiting for a free agent slot |
+ | **In Progress** | Multi-agent pipeline running |
+-| **Human Review** | Results ready for manual review |
+-| **AI Review** | Pass through an independent review agent |
++| **AI Review** | QA and the independent review pass |
++| **Human Review** | Results ready for your review |
+ | **Done** | Merged or PR created |
++| **Red Build** | Shown when the project's CI has run on a task branch: a red run moves the card here and starts an automatic repair, up to three times |
++
++### Split tasks
++
++A task too big for one small PR splits itself after planning into « Part k/N » cards (see [Advanced features](Advanced-Features)). The parts of one task share a colour and a written mark; a click on the mark shows only that group, and the toolbar chip shows everything again.
++
++![Task detail](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/task-detail.png)
+ 
+ ### Actions available on a card
+ 
+@@ -96,6 +105,8 @@ AI chat dedicated to **exploring your code**.
+ - Persistent conversation history
+ - Filters by folder / language / date
+ 
++![Insights](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/insights.png)
++
+ Example questions:
+ - "Where is authentication handled?"
+ - "Which endpoints use the Redis service?"
+@@ -117,11 +128,13 @@ Example questions:
+ 
+ Each suggestion can be **converted to a task** in one click.
+ 
++![Ideation](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/ideation.png)
++
+ ---
+ 
+ ## 🗺 Roadmap
+ 
+-![Roadmap](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-roadmap.png)
++![Roadmap](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/roadmap.png)
+ 
+ AI-assisted feature planning:
+ - Product and competitor analysis
+@@ -131,6 +144,24 @@ AI-assisted feature planning:
+ 
+ ---
+ 
++## 🧩 Visual to Code
++
++Draw the architecture as a node graph, then generate the project. Each block carries its stack, each connection a relation picked from a list fitted to the two blocks (gRPC, SignalR, MassTransit, EF Core, AMQP…) and a sentence that explains it; a refused pair says why and which block to put between them, and the status bar says whether the whole diagram is coherent. The **Design Import** tab turns a screenshot or a Figma export into components of the project's stack, in six visible steps.
++
++![Visual to Code](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/visual-to-code.png)
++
++![Design Import](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/import-design.png)
++
++---
++
++## 🧪 Test Generation Studio
++
++Pick a file and a mode (coverage gaps, unit, E2E, TDD): the four steps of the run light up in the middle and the tests are written live on the right, in the framework of the file's own stack.
++
++![Test generation studio](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/test-generation.png)
++
++---
++
+ ## 🏗 Architecture Visualizer
+ 
+ **Interactively** generates:
+@@ -175,7 +206,9 @@ Auto-generates **release notes** from completed tasks over a given period.
+ 
+ ## ⚙️ Settings
+ 
+-Settings are split into sections:
++![Settings](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/settings.png)
++
++Settings are grouped by theme (project, integrations and connections, interface and appearance, system and maintenance…), each group with its colour; every page opens on its group, title and description.
+ 
+ | Section | Contents |
+ |---------|----------|
+-- 
+2.43.0
+
