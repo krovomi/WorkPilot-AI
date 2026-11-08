@@ -1,18 +1,28 @@
-import { ArrowRight, FileWarning, Gauge, RefreshCw } from "lucide-react";
+import { ArrowRight, FileWarning, Gauge, RefreshCw, TrendingDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
 import type { Lang } from "../../lib/debt-task-spec";
 import { useProjectStore } from "../../stores/project-store";
 import { useTechDebtStore } from "../../stores/tech-debt-store";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	Stat,
+	Stats,
+} from "../charter";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 import { DebtHeatmap } from "./DebtHeatmap";
 import { DebtItemsTable } from "./DebtItemsTable";
 import { DebtTrendChart } from "./DebtTrendChart";
 import { formatAppDateTime } from "@/lib/date-format";
-import { PageHeader } from "../ui/page-header";
 
 interface Props {
 	readonly projectPath?: string;
@@ -111,145 +121,125 @@ export function TechDebtDashboard({ projectPath }: Props) {
 		);
 	};
 
-	return (
-		<div className="p-6 space-y-6">
-			<PageHeader
-				variant="inline"
-				icon={Gauge}
-				title={t("techDebt:title")}
-				description={t("techDebt:description")}
-				actions={
-					<Button onClick={handleScan} disabled={!canScan}>
-						<RefreshCw
-							className={`h-4 w-4 mr-2 ${scanning ? "animate-spin" : ""}`}
-						/>
-						{t("techDebt:actions.scan")}
-					</Button>
-				}
-			/>
+	const lastScanned = lastScannedAt
+		? t("techDebt:lastScanned", { when: formatAppDateTime(lastScannedAt * 1000) })
+		: undefined;
 
-			<section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-				<div>
-					<Label htmlFor="td-project">{t("techDebt:fields.projectPath")}</Label>
+	return (
+		<ModuleStage data-testid="tech-debt-view">
+			<Columns template="minmax(300px, 40%) minmax(0, 1fr)">
+				<Column kicker={t("techDebt:kickers.overview")} title={t("techDebt:title")} meta={lastScanned}>
+					<div className="flex flex-col gap-3">
+						{scanning && <ScanLine label={t("techDebt:actions.scan")} />}
+						{summary ? (
+							<Stats>
+								<Stat label={t("techDebt:summary.total")} value={summary.total} tone="orange" />
+								<Stat label={t("techDebt:summary.totalCost")} value={summary.total_cost} />
+								<Stat label={t("techDebt:summary.totalEffort")} value={summary.total_effort} />
+								<Stat label={t("techDebt:summary.avgRoi")} value={summary.avg_roi} tone="green" />
+							</Stats>
+						) : (
+							!scanning && (
+								<EmptyStage icon={Gauge} title={t("techDebt:title")} tone="orange">
+									{t("techDebt:description")}
+								</EmptyStage>
+							)
+						)}
+						<Panel>
+							<span className="wp-kicker">{t("techDebt:sections.trend")}</span>
+							<div className="mt-2">
+								<DebtTrendChart trend={trend} />
+							</div>
+						</Panel>
+						<Panel>
+							<span className="wp-kicker">{t("techDebt:sections.heatmap")}</span>
+							<div className="mt-2">
+								<DebtHeatmap items={filteredItems} />
+							</div>
+						</Panel>
+					</div>
+				</Column>
+				<Column
+					kicker={t("techDebt:kickers.items")}
+					title={t("techDebt:sections.top", { count: topItems.length })}
+					tone="orange"
+				>
+					<div className="flex flex-col gap-3">
+						{createdTask && (
+							<Notice tone="green" icon={ArrowRight} role="status">
+								<button
+									type="button"
+									onClick={openCreatedTaskInKanban}
+									className="flex w-full items-center justify-between gap-2 text-left"
+								>
+									<span className="truncate">
+										{t("techDebt:taskCreated", { title: createdTask.title })}
+									</span>
+									<span className="shrink-0 font-medium text-primary underline-offset-2 hover:underline">
+										{t("techDebt:openInKanban")}
+									</span>
+								</button>
+							</Notice>
+						)}
+						{topItems.length === 0 && !scanning ? (
+							<EmptyStage icon={TrendingDown} title={t("techDebt:empty")} tone="orange" />
+						) : (
+							<DebtItemsTable
+								items={topItems}
+								onCreateTask={handleCreateTask}
+								creatingItemId={creatingItemId}
+							/>
+						)}
+					</div>
+				</Column>
+			</Columns>
+			{error && (
+				<Notice tone="red" icon={FileWarning} role="alert" className="relative z-[2] mx-5 mb-2">
+					{error}
+				</Notice>
+			)}
+			<Composer
+				prompt={
 					<Input
 						id="td-project"
+						aria-label={t("techDebt:fields.projectPath")}
 						value={projectInput}
 						onChange={(e) => setProjectInput(e.target.value)}
 						placeholder="/abs/path/to/project"
+						className="h-8 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0"
 					/>
-				</div>
-				<div>
-					<Label htmlFor="td-min">{t("techDebt:fields.minScore")}</Label>
-					<Input
-						id="td-min"
-						type="number"
-						step={0.1}
-						value={filters.minScore}
-						onChange={(e) =>
-							setFilter("minScore", Number(e.target.value) || 0)
-						}
-					/>
-				</div>
-				<div>
-					<Label htmlFor="td-search">{t("techDebt:fields.search")}</Label>
-					<Input
-						id="td-search"
-						value={filters.search}
-						onChange={(e) => setFilter("search", e.target.value)}
-						placeholder={t("techDebt:fields.searchPlaceholder")}
-					/>
-				</div>
-			</section>
-
-			{error && (
-				<div className="p-3 rounded-md border border-destructive/40 bg-destructive/10 text-sm flex items-center gap-2">
-					<FileWarning className="h-4 w-4" />
-					{error}
-				</div>
-			)}
-
-			{summary && (
-				<section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-					<SummaryCard
-						label={t("techDebt:summary.total")}
-						value={String(summary.total)}
-					/>
-					<SummaryCard
-						label={t("techDebt:summary.totalCost")}
-						value={String(summary.total_cost)}
-					/>
-					<SummaryCard
-						label={t("techDebt:summary.totalEffort")}
-						value={String(summary.total_effort)}
-					/>
-					<SummaryCard
-						label={t("techDebt:summary.avgRoi")}
-						value={String(summary.avg_roi)}
-					/>
-				</section>
-			)}
-
-			<section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<div className="border rounded-md p-4">
-					<h2 className="text-sm font-medium mb-3">
-						{t("techDebt:sections.trend")}
-					</h2>
-					<DebtTrendChart trend={trend} />
-				</div>
-				<div className="border rounded-md p-4">
-					<h2 className="text-sm font-medium mb-3">
-						{t("techDebt:sections.heatmap")}
-					</h2>
-					<DebtHeatmap items={filteredItems} />
-				</div>
-			</section>
-
-			<section className="border rounded-md p-4">
-				<div className="flex items-center justify-between mb-3">
-					<h2 className="text-sm font-medium">
-						{t("techDebt:sections.top", { count: topItems.length })}
-					</h2>
-					{lastScannedAt && (
-						<span className="text-xs text-muted-foreground">
-							{t("techDebt:lastScanned", {
-								when: formatAppDateTime(lastScannedAt * 1000),
-							})}
-						</span>
-					)}
-				</div>
-				<DebtItemsTable
-					items={topItems}
-					onCreateTask={handleCreateTask}
-					creatingItemId={creatingItemId}
-				/>
-			</section>
-
-			{createdTask && (
-				<button
-					type="button"
-					onClick={openCreatedTaskInKanban}
-					className="w-full text-left p-3 rounded-md border bg-muted/40 hover:bg-muted/70 transition-colors text-sm flex items-center justify-between gap-2 group"
-				>
-					<span className="flex items-center gap-2 min-w-0">
-						<ArrowRight className="h-4 w-4 shrink-0" />
-						<span className="truncate">
-							{t("techDebt:taskCreated", { title: createdTask.title })}
-						</span>
-					</span>
-					<span className="shrink-0 text-xs font-medium text-primary group-hover:underline">
-						{t("techDebt:openInKanban")}
-					</span>
-				</button>
-			)}
-		</div>
-	);
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="border rounded-md p-3">
-			<div className="text-xs text-muted-foreground">{label}</div>
-			<div className="text-lg font-semibold">{value}</div>
-		</div>
+				}
+				options={
+					<>
+						<label className="wp-field" htmlFor="td-min">
+							{t("techDebt:fields.minScore")}
+							<input
+								id="td-min"
+								type="number"
+								step={0.1}
+								className="w-14 bg-transparent font-medium text-foreground outline-none"
+								value={filters.minScore}
+								onChange={(e) => setFilter("minScore", Number(e.target.value) || 0)}
+							/>
+						</label>
+						<label className="wp-field min-w-0 flex-1" htmlFor="td-search">
+							{t("techDebt:fields.search")}
+							<input
+								id="td-search"
+								className="min-w-0 flex-1 bg-transparent font-medium text-foreground outline-none"
+								value={filters.search}
+								onChange={(e) => setFilter("search", e.target.value)}
+								placeholder={t("techDebt:fields.searchPlaceholder")}
+							/>
+						</label>
+					</>
+				}
+				actions={
+					<CharterButton variant="primary" icon={RefreshCw} busy={scanning} onClick={handleScan} disabled={!canScan}>
+						{t("techDebt:actions.scan")}
+					</CharterButton>
+				}
+			/>
+		</ModuleStage>
 	);
 }

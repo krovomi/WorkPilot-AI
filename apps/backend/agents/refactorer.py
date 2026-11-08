@@ -22,39 +22,14 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from .refactorer_smells import CodeSmell, SmellSeverity, SmellType
+
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
-
-
-class SmellType(str, Enum):
-    """Types of code smells detected."""
-
-    LONG_METHOD = "long_method"
-    GOD_CLASS = "god_class"
-    DUPLICATE_CODE = "duplicate_code"
-    LONG_PARAMETER_LIST = "long_parameter_list"
-    DEAD_CODE = "dead_code"
-    DEEP_NESTING = "deep_nesting"
-    COMPLEX_CONDITIONAL = "complex_conditional"
-    MAGIC_NUMBER = "magic_number"
-    MISSING_DOCSTRING = "missing_docstring"
-    TOO_MANY_RETURNS = "too_many_returns"
-    LARGE_FILE = "large_file"
-    UNUSED_IMPORT = "unused_import"
-
-
-class SmellSeverity(str, Enum):
-    """Severity level of a code smell."""
-
-    INFO = "info"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
 
 
 class RefactoringPattern(str, Enum):
@@ -104,46 +79,6 @@ SMELL_THRESHOLDS = {
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class CodeSmell:
-    """A detected code smell.
-
-    Attributes:
-        smell_type: Type of smell.
-        severity: Severity level.
-        file_path: File where the smell was found.
-        line_start: Starting line number.
-        line_end: Ending line number.
-        message: Human-readable description.
-        symbol_name: Name of the offending symbol (function, class, etc.).
-        metric_value: The measured metric value (e.g. line count).
-        threshold: The threshold that was exceeded.
-    """
-
-    smell_type: SmellType
-    severity: SmellSeverity
-    file_path: str
-    line_start: int = 0
-    line_end: int = 0
-    message: str = ""
-    symbol_name: str = ""
-    metric_value: int = 0
-    threshold: int = 0
-
-    def to_dict(self) -> dict:
-        return {
-            "smell_type": self.smell_type.value,
-            "severity": self.severity.value,
-            "file_path": self.file_path,
-            "line_start": self.line_start,
-            "line_end": self.line_end,
-            "message": self.message,
-            "symbol_name": self.symbol_name,
-            "metric_value": self.metric_value,
-            "threshold": self.threshold,
-        }
 
 
 @dataclass
@@ -248,16 +183,32 @@ class SmellDetector:
         self,
         source: str,
         file_path: str = "<unknown>",
+        language: str | None = None,
     ) -> list[CodeSmell]:
-        """Detect code smells in Python source code.
+        """Detect code smells in source code.
+
+        Python is read with ``ast``; any other language WorkPilot supports
+        (``language`` given, or guessed from a non-Python ``file_path``) goes
+        through the line-based reader of ``refactorer_polyglot``.
 
         Args:
-            source: Python source code string.
+            source: Source code string.
             file_path: Path for reporting.
+            language: Language id (``csharp``, ``go``...); None = Python.
 
         Returns:
             List of detected CodeSmell objects.
         """
+        if language is None and file_path and not file_path.endswith((".py", ">")):
+            from .refactorer_polyglot import language_for
+
+            detected = language_for(file_path)
+            language = detected.id if detected else None
+        if language and language != "python":
+            from .refactorer_polyglot import detect_polyglot_smells
+
+            return detect_polyglot_smells(source, language, self)
+
         smells: list[CodeSmell] = []
         lines = source.splitlines()
 
@@ -641,17 +592,19 @@ class RefactoringAgent:
         self,
         source: str,
         file_path: str = "<source>",
+        language: str | None = None,
     ) -> list[CodeSmell]:
         """Detect code smells from source code string.
 
         Args:
-            source: Python source code.
+            source: Source code, in any supported language.
             file_path: Display path for reporting.
+            language: Language id; None = Python (or the path's extension).
 
         Returns:
             List of detected code smells.
         """
-        return self.detector.detect_from_source(source, file_path)
+        return self.detector.detect_from_source(source, file_path, language)
 
     # -- Refactoring proposals -----------------------------------------------
 
@@ -660,6 +613,7 @@ class RefactoringAgent:
         file_path: str | None = None,
         source: str | None = None,
         smells: list[CodeSmell] | None = None,
+        language: str | None = None,
     ) -> list[RefactoringProposal]:
         """Propose refactoring actions based on detected smells.
 
@@ -674,7 +628,7 @@ class RefactoringAgent:
         if smells is None:
             if source:
                 smells = self.detector.detect_from_source(
-                    source, file_path or "<source>"
+                    source, file_path or "<source>", language
                 )
             elif file_path:
                 smells = self.detector.detect_from_file(file_path)

@@ -42,5 +42,10 @@
 		"cancel": "Cancel",
 		"dismiss": "Dismiss",
 		"copy": "Copy result"
+	},
+	"kickers": {
+		"history": "History",
+		"source": "Source",
+		"result": "Result"
 	}
 }

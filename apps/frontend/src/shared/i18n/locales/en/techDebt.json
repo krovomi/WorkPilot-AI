@@ -47,5 +47,10 @@
 		"duplication": "Duplication",
 		"stale_deps": "Stale deps",
 		"low_coverage": "Low coverage"
+	},
+	"kickers": {
+		"overview": "Overview",
+		"items": "Items",
+		"project": "Project"
 	}
 }

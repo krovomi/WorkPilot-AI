@@ -74,5 +74,11 @@
 	},
 	"session": {
 		"goal": "Objectif"
+	},
+	"steps": {
+		"goal": "Objectif",
+		"you": "Vous",
+		"ai": "IA",
+		"how": "Comment ça marche"
 	}
 }

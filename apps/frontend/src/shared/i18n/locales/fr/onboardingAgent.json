@@ -426,5 +426,14 @@
 			"generated": "{{tour}} étape(s) de visite, {{quiz}} question(s) de quiz, {{tasks}} première(s) tâche(s), {{glossary}} terme(s) de glossaire"
 		},
 		"summary": "{{project}} : {{technologies}} technologies, {{keyFiles}} fichiers clés, {{conventions}} conventions, {{commands}} commandes."
-	}
+	},
+	"kickers": {
+		"package": "Dossier d'intégration",
+		"contents": "Contenu",
+		"guide": "Parcours",
+		"step": "Étape"
+	},
+	"guideIntro": "Un parcours pas à pas pour démarrer sur ce projet : installation, commandes, structure.",
+	"guideEmptyTitle": "Aucun parcours pour l'instant",
+	"selectStep": "Choisissez une étape à gauche."
 }

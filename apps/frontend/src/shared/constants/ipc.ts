@@ -600,6 +600,7 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_INSIGHTS_RUN: "codeInsights:run",
 	CODE_REVIEW_FILES: "codeReview:files",
 	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",

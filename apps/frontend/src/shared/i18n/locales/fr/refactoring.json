@@ -5,7 +5,10 @@
 		"label": "Code source",
 		"labelWithLanguage": "Code source {{language}}",
 		"placeholder": "Collez le code source ici à analyser...",
-		"placeholderWithLanguage": "Collez le code source {{language}} ici à analyser..."
+		"placeholderWithLanguage": "Collez le code source {{language}} ici à analyser...",
+		"language": "Langage",
+		"auto": "Détection automatique",
+		"readAs": "Lu comme du {{language}}"
 	},
 	"actions": {
 		"paste": "Coller",
@@ -17,8 +20,7 @@
 	},
 	"errors": {
 		"detectionFailed": "La détection a échoué",
-		"proposalFailed": "La génération de proposition a échoué",
-		"networkError": "Erreur réseau"
+		"proposalFailed": "La génération de proposition a échoué"
 	},
 	"smells": {
 		"title": "Code Smells ({{count}})",
@@ -30,5 +32,29 @@
 		"title": "Propositions de Refactoring ({{count}})",
 		"risk": "Risque",
 		"impact": "Impact"
-	}
+	},
+	"kickers": {
+		"source": "Source",
+		"smells": "Problèmes",
+		"proposals": "Propositions"
+	},
+	"severity": {
+		"critical": "Critique",
+		"high": "Élevée",
+		"medium": "Moyenne",
+		"low": "Faible",
+		"info": "Info"
+	},
+	"riskLevel": {
+		"high": "élevé",
+		"medium": "moyen",
+		"low": "faible"
+	},
+	"empty": {
+		"smellsTitle": "Aucun problème pour l'instant",
+		"smellsHint": "Collez du code puis lancez la détection : fonctions trop longues, trop de paramètres, imbrication profonde, doublons…",
+		"proposalsTitle": "Aucune proposition",
+		"proposalsHint": "Les refactorings proposés pour ce code (avec leur risque) s'affichent ici."
+	},
+	"clean": "Aucun problème détecté dans ce code."
 }

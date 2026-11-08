@@ -1,72 +1,56 @@
+/**
+ * "Refactoring" tab of Dette et refactoring, in the UI charter
+ * (docs/architecture/ui-charter.md): the code on the left, the smells found
+ * in the middle, the proposed refactorings on the right, actions in the
+ * composer.
+ */
 import {
 	AlertTriangle,
 	Bug,
-	ChevronDown,
-	ChevronRight,
 	ClipboardPaste,
-	FileCode2,
 	Lightbulb,
-	Loader2,
 	Trash2,
 	Wand2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "../lib/utils";
-import { useContextStore } from "../stores/context-store";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
+import type {
+	CodeLanguage,
+	CodeSmell,
+	RefactoringProposal,
+} from "../../shared/types/code-insights";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+	ScanLine,
+	StepCard,
+	type Tone,
+} from "./charter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
-import { PageHeader } from "./ui/page-header";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface CodeSmell {
-	smell_type: string;
-	severity: string;
-	message: string;
-	line?: number;
-	symbol?: string;
-	metric_value?: number;
-	threshold?: number;
-}
-
-interface RefactoringProposal {
-	pattern: string;
-	description: string;
-	risk_level: string;
-	symbol?: string;
-	impact?: string;
-}
 
 interface RefactoringViewProps {
 	readonly projectId: string;
 }
 
-// ---------------------------------------------------------------------------
-// Severity helpers
-// ---------------------------------------------------------------------------
+const AUTO = "auto";
 
-const SEVERITY_CONFIG: Record<
-	string,
-	{ color: string; bg: string; label: string }
-> = {
-	critical: { color: "text-destructive", bg: "bg-destructive/10", label: "Critical" },
-	high: { color: "text-destructive", bg: "bg-destructive/10", label: "High" },
-	medium: { color: "text-warning", bg: "bg-warning/10", label: "Medium" },
-	low: { color: "text-blue-500", bg: "bg-blue-500/10", label: "Low" },
-	info: { color: "text-gray-400", bg: "bg-gray-400/10", label: "Info" },
+const SEVERITY_TONE: Record<string, Tone> = {
+	critical: "red",
+	high: "red",
+	medium: "amber",
+	low: "blue",
+	info: "muted",
 };
 
-const RISK_CONFIG: Record<string, { color: string; bg: string }> = {
-	high: { color: "text-destructive", bg: "bg-destructive/10" },
-	medium: { color: "text-warning", bg: "bg-warning/10" },
-	low: { color: "text-success", bg: "bg-success/10" },
-};
+const RISK_TONE: Record<string, Tone> = { high: "red", medium: "amber", low: "green" };
 
 // ---------------------------------------------------------------------------
 // Component
@@ -82,19 +66,31 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 	const [loadingProposals, setLoadingProposals] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [expandedSmells, setExpandedSmells] = useState<Set<string>>(new Set());
+	const [detected, setDetected] = useState(false);
+	// Every stack the backend reads; "auto" lets it guess from the pasted code.
+	const [languages, setLanguages] = useState<CodeLanguage[]>([]);
+	const [language, setLanguage] = useState(AUTO);
+	const [readAs, setReadAs] = useState<string | null>(null);
 
-	const projectIndex = useContextStore((s) => s.projectIndex);
-	const detectedLanguages = useMemo(() => {
-		if (!projectIndex?.services) return [];
-		return [
-			...new Set(
-				Object.values(projectIndex.services)
-					.map((s) => s.language)
-					.filter((l): l is string => Boolean(l)),
-			),
-		];
-	}, [projectIndex]);
-	const primaryLanguage = detectedLanguages[0] ?? null;
+	useEffect(() => {
+		let alive = true;
+		// Started inside a promise so that a preview without the bridge degrades, not throws.
+		Promise.resolve()
+			.then(() => window.electronAPI.runCodeInsights({ action: "languages" }))
+			.then((result) => {
+				if (alive) setLanguages(result.languages);
+			})
+			.catch(() => {
+				/* without the list the picker keeps "auto", which still works */
+			});
+		return () => {
+			alive = false;
+		};
+	}, []);
+
+	const labelOf = (id: string | null) =>
+		languages.find((lang) => lang.id === id)?.label ?? id ?? "";
+	const chosen = language === AUTO ? null : language;
 
 	const toggleSmell = (key: string) => {
 		setExpandedSmells((prev) => {
@@ -111,53 +107,41 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		setError(null);
 		setSmells([]);
 		setProposals([]);
+		setDetected(false);
 		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(`${backendUrl}/api/refactoring/detect-smells`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ source, language: primaryLanguage }),
+			const result = await window.electronAPI.runCodeInsights({
+				action: "smells",
+				text: source,
+				language: chosen ?? undefined,
 			});
-			const data = await res.json();
-			if (data.success) {
-				setSmells(data.smells || []);
-			} else {
-				setError(data.error || t("refactoring:errors.detectionFailed"));
-			}
+			setSmells(result.smells);
+			setReadAs(result.language);
+			setDetected(true);
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("refactoring:errors.networkError"),
-			);
+			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.detectionFailed"));
 		} finally {
 			setLoading(false);
 		}
-	}, [source, primaryLanguage, t]);
+	}, [source, chosen, t]);
 
 	const handleProposeRefactoring = useCallback(async () => {
 		if (!source.trim()) return;
 		setLoadingProposals(true);
 		setError(null);
 		try {
-			const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(`${backendUrl}/api/refactoring/propose`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ source, language: primaryLanguage }),
+			const result = await window.electronAPI.runCodeInsights({
+				action: "propose",
+				text: source,
+				language: chosen ?? undefined,
 			});
-			const data = await res.json();
-			if (data.success) {
-				setProposals(data.proposals || []);
-			} else {
-				setError(data.error || t("refactoring:errors.proposalFailed"));
-			}
+			setProposals(result.proposals);
+			setReadAs(result.language);
 		} catch (e) {
-			setError(
-				e instanceof Error ? e.message : t("refactoring:errors.networkError"),
-			);
+			setError(e instanceof Error && e.message ? e.message : t("refactoring:errors.proposalFailed"));
 		} finally {
 			setLoadingProposals(false);
 		}
-	}, [source, primaryLanguage, t]);
+	}, [source, chosen, t]);
 
 	const handlePaste = useCallback(async () => {
 		try {
@@ -173,267 +157,218 @@ export function RefactoringView({ projectId }: Readonly<RefactoringViewProps>) {
 		setSmells([]);
 		setProposals([]);
 		setError(null);
+		setDetected(false);
+		setReadAs(null);
 	};
 
+	const severityCounts = smells.reduce<Record<string, number>>((acc, smell) => {
+		const sev = smell.severity?.toLowerCase() || "info";
+		acc[sev] = (acc[sev] || 0) + 1;
+		return acc;
+	}, {});
+	const shownLanguage = chosen ?? readAs;
+	const sourceLabel = shownLanguage
+		? t("refactoring:input.labelWithLanguage", { language: labelOf(shownLanguage) })
+		: t("refactoring:input.label");
+	const busy = loading || loadingProposals;
+
 	return (
-		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				<PageHeader
-					variant="inline"
-					icon={Wand2}
-					title={t("refactoring:title")}
-					description={t("refactoring:description")}
-				/>
+		<ModuleStage data-testid="refactoring-view">
+			<Columns template="minmax(320px, 38%) minmax(280px, 1fr) minmax(280px, 1fr)">
+				<Column
+					kicker={t("refactoring:kickers.source")}
+					title={sourceLabel}
+					tone="blue"
+					actions={
+						<>
+							<CharterButton size="sm" variant="ghost" icon={ClipboardPaste} onClick={handlePaste}>
+								{t("refactoring:actions.paste")}
+							</CharterButton>
+							{source && (
+								<CharterButton size="sm" variant="ghost" icon={Trash2} onClick={handleClear}>
+									{t("refactoring:actions.clear")}
+								</CharterButton>
+							)}
+						</>
+					}
+				>
+					{language === AUTO && readAs && (
+						<div className="mb-2">
+							<Chips>
+								<Chip tone="blue">{t("refactoring:input.readAs", { language: labelOf(readAs) })}</Chip>
+							</Chips>
+						</div>
+					)}
+					<Textarea
+						value={source}
+						onChange={(e) => setSource(e.target.value)}
+						aria-label={sourceLabel}
+						placeholder={
+							chosen
+								? t("refactoring:input.placeholderWithLanguage", { language: labelOf(chosen) })
+								: t("refactoring:input.placeholder")
+						}
+						className="wp-code min-h-[16rem] flex-1 resize-none"
+						spellCheck={false}
+					/>
+				</Column>
 
-				{/* Source input */}
-				<Card>
-					<CardContent className="p-5 space-y-3">
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								{/* biome-ignore lint/a11y/noLabelWithoutControl: intentional */}
-								<label className="text-sm font-medium text-foreground">
-									{primaryLanguage
-										? t("refactoring:input.labelWithLanguage", {
-												language: primaryLanguage,
-											})
-										: t("refactoring:input.label")}
-								</label>
-								{detectedLanguages.length > 1 &&
-									detectedLanguages.slice(1).map((lang) => (
-										<Badge
-											key={lang}
-											variant="outline"
-											className="text-xs text-muted-foreground"
-										>
-											{lang}
-										</Badge>
+				<Column
+					kicker={t("refactoring:kickers.smells")}
+					title={t("refactoring:smells.title", { count: smells.length })}
+					tone="red"
+				>
+					{loading && <ScanLine label={t("refactoring:actions.detecting")} />}
+					{!loading && detected && smells.length === 0 && (
+						<Notice tone="green" icon={Bug}>
+							{t("refactoring:clean")}
+						</Notice>
+					)}
+					{!loading && !detected && smells.length === 0 && (
+						<EmptyStage icon={Bug} title={t("refactoring:empty.smellsTitle")} tone="red">
+							{t("refactoring:empty.smellsHint")}
+						</EmptyStage>
+					)}
+					{smells.length > 0 && (
+						<div className="flex flex-col gap-3">
+							<Chips>
+								{Object.entries(severityCounts).map(([sev, count]) => (
+									<Chip key={sev} tone={SEVERITY_TONE[sev] ?? "muted"}>
+										{t(`refactoring:severity.${sev}`, sev)} · {count}
+									</Chip>
+								))}
+							</Chips>
+							{smells.map((smell) => {
+								const sev = smell.severity?.toLowerCase() || "info";
+								const smellKey = `${smell.smell_type}-${smell.symbol || "no-symbol"}-${smell.line || "no-line"}`;
+								const expanded = expandedSmells.has(smellKey);
+								return (
+									<StepCard
+										key={smellKey}
+										tone={SEVERITY_TONE[sev] ?? "muted"}
+										kicker={smell.smell_type?.replaceAll("_", " ")}
+										title={<span className="wp-mono text-[0.8rem]">{smell.symbol || "—"}</span>}
+										meta={smell.line ? t("refactoring:smells.line", { line: smell.line }) : undefined}
+										status={<span className="wp-meta">{t(`refactoring:severity.${sev}`, sev)}</span>}
+										active={expanded}
+										onClick={() => toggleSmell(smellKey)}
+									>
+										{expanded && (
+											<span className="mt-1 flex flex-col gap-1 text-xs">
+												<span>{smell.message}</span>
+												{smell.metric_value !== undefined && smell.threshold !== undefined && (
+													<span className="wp-meta">
+														{t("refactoring:smells.measured")} {smell.metric_value} ·{" "}
+														{t("refactoring:smells.threshold")} {smell.threshold}
+													</span>
+												)}
+											</span>
+										)}
+									</StepCard>
+								);
+							})}
+						</div>
+					)}
+				</Column>
+
+				<Column
+					kicker={t("refactoring:kickers.proposals")}
+					title={t("refactoring:proposals.title", { count: proposals.length })}
+					tone="green"
+				>
+					{loadingProposals && <ScanLine label={t("refactoring:actions.generating")} />}
+					{!loadingProposals && proposals.length === 0 && (
+						<EmptyStage icon={Lightbulb} title={t("refactoring:empty.proposalsTitle")} tone="green">
+							{t("refactoring:empty.proposalsHint")}
+						</EmptyStage>
+					)}
+					{proposals.length > 0 && (
+						<div className="flex flex-col gap-3">
+							{proposals.map((p) => {
+								const risk = p.risk_level?.toLowerCase() || "low";
+								const proposalKey = `${p.pattern}-${p.symbol || "no-symbol"}-${p.risk_level || "low"}`;
+								return (
+									<StepCard
+										key={proposalKey}
+										tone={RISK_TONE[risk] ?? "green"}
+										kicker={p.pattern?.replaceAll("_", " ")}
+										title={p.description}
+										meta={p.symbol}
+										status={
+											<Chip tone={RISK_TONE[risk] ?? "green"}>
+												{t("refactoring:proposals.risk")} {t(`refactoring:riskLevel.${risk}`, risk)}
+											</Chip>
+										}
+									>
+										{p.impact && (
+											<span className="wp-meta mt-1 whitespace-normal">
+												{t("refactoring:proposals.impact")} · {p.impact}
+											</span>
+										)}
+									</StepCard>
+								);
+							})}
+						</div>
+					)}
+				</Column>
+			</Columns>
+
+			{error && (
+				<Notice tone="red" icon={AlertTriangle} role="alert" className="relative z-[2] mx-5 mb-2">
+					{error}
+				</Notice>
+			)}
+			<Composer
+				prompt={
+					<span className="flex min-w-0 flex-wrap items-center gap-3">
+						<span className="wp-field">
+							<label htmlFor="refactoring-language">{t("refactoring:input.language")}</label>
+							<Select value={language} onValueChange={setLanguage} disabled={busy}>
+								<SelectTrigger
+									id="refactoring-language"
+									className="h-7 w-auto min-w-[8rem] border-0 bg-transparent px-1 text-xs font-medium shadow-none"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value={AUTO}>{t("refactoring:input.auto")}</SelectItem>
+									{languages.map((lang) => (
+										<SelectItem key={lang.id} value={lang.id}>
+											{lang.label}
+										</SelectItem>
 									))}
-							</div>
-							<div className="flex gap-2">
-								<Button variant="ghost" size="sm" onClick={handlePaste}>
-									<ClipboardPaste className="h-3.5 w-3.5 mr-1.5" />
-									{t("refactoring:actions.paste")}
-								</Button>
-								{source && (
-									<Button variant="ghost" size="sm" onClick={handleClear}>
-										<Trash2 className="h-3.5 w-3.5 mr-1.5" />
-										{t("refactoring:actions.clear")}
-									</Button>
-								)}
-							</div>
-						</div>
-						<Textarea
-							value={source}
-							onChange={(e) => setSource(e.target.value)}
-							placeholder={
-								primaryLanguage
-									? t("refactoring:input.placeholderWithLanguage", {
-											language: primaryLanguage,
-										})
-									: t("refactoring:input.placeholder")
-							}
-							className="min-h-[200px] font-mono text-xs"
-							spellCheck={false}
-						/>
-						<div className="flex gap-2">
-							<Button
-								onClick={handleDetectSmells}
-								disabled={loading || !source.trim()}
-							>
-								{loading ? (
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								) : (
-									<Bug className="h-4 w-4 mr-2" />
-								)}
-								{loading
-									? t("refactoring:actions.detecting")
-									: t("refactoring:actions.detectSmells")}
-							</Button>
-							<Button
-								variant="outline"
-								onClick={handleProposeRefactoring}
-								disabled={loadingProposals || !source.trim()}
-							>
-								{loadingProposals ? (
-									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-								) : (
-									<Lightbulb className="h-4 w-4 mr-2" />
-								)}
-								{loadingProposals
-									? t("refactoring:actions.generating")
-									: t("refactoring:actions.proposeRefactoring")}
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Error */}
-				{error && (
-					<Card className="border-destructive/30">
-						<CardContent className="p-4 flex items-center gap-3 text-destructive">
-							<AlertTriangle className="h-5 w-5 shrink-0" />
-							<p className="text-sm">{error}</p>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Smells */}
-				{smells.length > 0 && (
-					<Card>
-						<CardContent className="p-5">
-							<div className="flex items-center justify-between mb-4">
-								<h3 className="text-sm font-semibold text-foreground">
-									{t("refactoring:smells.title", { count: smells.length })}
-								</h3>
-								<div className="flex gap-2">
-									{Object.entries(
-										smells.reduce<Record<string, number>>((acc, s) => {
-											const sev = s.severity?.toLowerCase() || "info";
-											acc[sev] = (acc[sev] || 0) + 1;
-											return acc;
-										}, {}),
-									).map(([sev, count]) => {
-										const cfg = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.info;
-										return (
-											<Badge
-												key={sev}
-												variant="outline"
-												className={cn("text-xs", cfg.color, cfg.bg)}
-											>
-												{cfg.label}: {count}
-											</Badge>
-										);
-									})}
-								</div>
-							</div>
-							<div className="space-y-2">
-								{smells.map((smell) => {
-									const sev = smell.severity?.toLowerCase() || "info";
-									const cfg = SEVERITY_CONFIG[sev] || SEVERITY_CONFIG.info;
-									const smellKey = `${smell.smell_type}-${smell.symbol || "no-symbol"}-${smell.line || "no-line"}`;
-									const expanded = expandedSmells.has(smellKey);
-
-									return (
-										<button
-											type="button"
-											key={smellKey}
-											onClick={() => toggleSmell(smellKey)}
-											className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent/30 transition-colors"
-										>
-											<div className="flex items-center gap-3">
-												{expanded ? (
-													<ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-												) : (
-													<ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-												)}
-												<div
-													className={cn(
-														"h-2 w-2 rounded-full shrink-0",
-														cfg.color.replace("text-", "bg-"),
-													)}
-												/>
-												<span className="text-sm font-medium text-foreground flex-1 truncate">
-													{smell.smell_type?.replaceAll("_", " ")}
-												</span>
-												{smell.symbol && (
-													<span className="text-xs font-mono text-muted-foreground">
-														{smell.symbol}
-													</span>
-												)}
-												{smell.line && (
-													<span className="text-xs text-muted-foreground">
-														{t("refactoring:smells.line", { line: smell.line })}
-													</span>
-												)}
-												<Badge
-													variant="outline"
-													className={cn("text-xs", cfg.color, cfg.bg)}
-												>
-													{cfg.label}
-												</Badge>
-											</div>
-											{expanded && (
-												<div className="mt-2 pl-7 space-y-1.5">
-													<p className="text-xs text-muted-foreground">
-														{smell.message}
-													</p>
-													{smell.metric_value !== undefined &&
-														smell.threshold !== undefined && (
-															<p className="text-xs text-muted-foreground">
-																{t("refactoring:smells.measured")}{" "}
-																<span className="font-mono">
-																	{smell.metric_value}
-																</span>{" "}
-																{t("refactoring:smells.threshold")}:{" "}
-																<span className="font-mono">
-																	{smell.threshold}
-																</span>
-															</p>
-														)}
-												</div>
-											)}
-										</button>
-									);
-								})}
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Proposals */}
-				{proposals.length > 0 && (
-					<Card>
-						<CardContent className="p-5">
-							<h3 className="text-sm font-semibold text-foreground mb-4">
-								{t("refactoring:proposals.title", { count: proposals.length })}
-							</h3>
-							<div className="space-y-3">
-								{proposals.map((p) => {
-									const risk = p.risk_level?.toLowerCase() || "low";
-									const rcfg = RISK_CONFIG[risk] || RISK_CONFIG.low;
-									const proposalKey = `${p.pattern}-${p.symbol || "no-symbol"}-${p.risk_level || "low"}`;
-
-									return (
-										<div
-											key={proposalKey}
-											className="rounded-lg border border-border p-4 space-y-2"
-										>
-											<div className="flex items-center gap-3">
-												<FileCode2 className="h-4 w-4 text-primary shrink-0" />
-												<span className="text-sm font-semibold text-foreground">
-													{p.pattern?.replaceAll("_", " ")}
-												</span>
-												{p.symbol && (
-													<span className="text-xs font-mono text-muted-foreground">
-														{p.symbol}
-													</span>
-												)}
-												<Badge
-													variant="outline"
-													className={cn("text-xs ml-auto", rcfg.color, rcfg.bg)}
-												>
-													{t("refactoring:proposals.risk")}: {risk}
-												</Badge>
-											</div>
-											<p className="text-sm text-muted-foreground">
-												{p.description}
-											</p>
-											{p.impact && (
-												<p className="text-xs text-muted-foreground">
-												<span className="font-medium text-foreground">
-													{t("refactoring:proposals.impact")}:
-												</span>{" "}
-												{p.impact}
-												</p>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						</CardContent>
-					</Card>
-				)}
-			</div>
-		</ScrollArea>
+								</SelectContent>
+							</Select>
+						</span>
+						<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+							<Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+							<span className="truncate">{t("refactoring:description")}</span>
+						</span>
+					</span>
+				}
+				hint={sourceLabel}
+				actions={
+					<>
+						<CharterButton
+							icon={Lightbulb}
+							busy={loadingProposals}
+							onClick={handleProposeRefactoring}
+							disabled={busy || !source.trim()}
+						>
+							{loadingProposals ? t("refactoring:actions.generating") : t("refactoring:actions.proposeRefactoring")}
+						</CharterButton>
+						<CharterButton
+							variant="primary"
+							icon={Bug}
+							busy={loading}
+							onClick={handleDetectSmells}
+							disabled={busy || !source.trim()}
+						>
+							{loading ? t("refactoring:actions.detecting") : t("refactoring:actions.detectSmells")}
+						</CharterButton>
+					</>
+				}
+			/>
+		</ModuleStage>
 	);
 }

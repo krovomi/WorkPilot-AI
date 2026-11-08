@@ -47,5 +47,10 @@
 		"duplication": "Duplication",
 		"stale_deps": "Dépendances obsolètes",
 		"low_coverage": "Faible couverture"
+	},
+	"kickers": {
+		"overview": "Vue d'ensemble",
+		"items": "Éléments",
+		"project": "Projet"
 	}
 }

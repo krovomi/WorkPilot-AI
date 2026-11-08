@@ -426,5 +426,14 @@
 			"generated": "Generated {{tour}} tour step(s), {{quiz}} quiz question(s), {{tasks}} first task(s), {{glossary}} glossary term(s)"
 		},
 		"summary": "{{project}}: {{technologies}} technologies, {{keyFiles}} key files, {{conventions}} conventions, {{commands}} commands."
-	}
+	},
+	"kickers": {
+		"package": "Onboarding package",
+		"contents": "Contents",
+		"guide": "Path",
+		"step": "Step"
+	},
+	"guideIntro": "A step-by-step path to get started on this project: setup, commands, structure.",
+	"guideEmptyTitle": "No path yet",
+	"selectStep": "Pick a step on the left."
 }

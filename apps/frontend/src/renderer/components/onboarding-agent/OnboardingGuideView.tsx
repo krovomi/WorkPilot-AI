@@ -1,102 +1,74 @@
+/**
+ * "Guide d'intégration" tab of Intégration, in the UI charter
+ * (docs/architecture/ui-charter.md): the steps of the path on the left, the
+ * selected step on the right, the generate action in the composer.
+ */
+import { BookOpen, Footprints, RotateCcw, TriangleAlert, X } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import type { OnboardingGuide } from "../../../shared/types/onboarding";
+import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
+import {
+	CharterButton,
+	Chip,
+	Chips,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	StepCard,
+} from "../charter";
 import { useGeneratedText } from "./shared";
 
 interface OnboardingGuideViewProps {
 	readonly projectPath?: string;
 }
 
-function GuideBody({
-	guide,
-	t,
-}: {
-	readonly guide: OnboardingGuide;
-	readonly t: (key: string, options?: Record<string, unknown>) => string;
-}): React.ReactElement {
+type Step = OnboardingGuide["steps"][number];
+
+function StepDetail({ step }: { readonly step: Step }): React.ReactElement {
+	const { t } = useTranslation("onboardingAgent");
 	const generated = useGeneratedText();
-
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<p className="text-sm text-muted-foreground">
-					{guide.projectName} ·{" "}
-					{t("duration", { minutes: guide.totalEstimatedMinutes })}
-				</p>
-				<div className="flex flex-wrap gap-1 mt-1">
-					{guide.techStack.map((tech) => (
-						<span
-							key={tech}
-							className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400"
-						>
-							{tech}
-						</span>
-					))}
-				</div>
-			</div>
-
-			<div className="space-y-3">
-				{guide.steps.map((step) => (
-					<div
-						key={`${step.section}-${step.title}`}
-						className="px-4 py-3 rounded-lg border border-border"
-					>
-						<div className="flex items-center justify-between mb-2">
-							<div className="flex items-center gap-2">
-								<span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">
-									{guide.steps.indexOf(step) + 1}
-								</span>
-								<p className="text-sm font-medium">
-									{generated(step.titleI18n, step.title)}
-								</p>
-							</div>
-							<span className="text-xs text-muted-foreground">
-								{t("duration", { minutes: step.estimatedMinutes })}
-							</span>
-						</div>
-						{step.lines && step.lines.length > 0 ? (
-							<ul className="text-sm text-muted-foreground mb-2 space-y-1 list-disc list-inside">
-								{step.lines.map((line) => (
-									<li key={`${line.key}:${line.fallback}`}>
-										{generated(line)}
-									</li>
-								))}
-							</ul>
-						) : (
-							<p className="text-sm text-muted-foreground mb-2 whitespace-pre-wrap">
-								{step.content}
-							</p>
-						)}
-						{step.commands.length > 0 && (
-							<div className="space-y-1">
-								{step.commands.map((cmd) => (
-									<pre
-										key={`${cmd.slice(0, 20)}`}
-										className="px-3 py-1.5 rounded bg-card text-xs font-mono text-success"
-									>
-										$ {cmd}
-									</pre>
-								))}
-							</div>
-						)}
+		<div className="flex flex-col gap-3">
+			<Panel rail tone="blue">
+				<span className="wp-kicker">{t("duration", { minutes: step.estimatedMinutes })}</span>
+				<p className="mt-1 text-sm font-semibold">{generated(step.titleI18n, step.title)}</p>
+				{step.lines && step.lines.length > 0 ? (
+					<ul className="wp-muted mt-2 list-inside list-disc space-y-1 text-sm">
+						{step.lines.map((line) => (
+							<li key={`${line.key}:${line.fallback}`}>{generated(line)}</li>
+						))}
+					</ul>
+				) : (
+					<p className="wp-muted mt-2 whitespace-pre-wrap text-sm">{step.content}</p>
+				)}
+			</Panel>
+			{step.commands.length > 0 && (
+				<Panel>
+					<span className="wp-kicker">{t("overview.commands")}</span>
+					<div className="mt-2 flex flex-col gap-1.5">
+						{step.commands.map((cmd) => (
+							<pre key={cmd} className="wp-code !py-1.5">
+								<span className="select-none text-primary">$ </span>
+								{cmd}
+							</pre>
+						))}
 					</div>
-				))}
-			</div>
-
-			{guide.summary && (
-				<p className="text-sm text-muted-foreground italic mt-2">
-					{generated(guide.summaryI18n, guide.summary)}
-				</p>
+				</Panel>
 			)}
 		</div>
 	);
 }
 
-export function OnboardingGuideView({
-	projectPath,
-}: OnboardingGuideViewProps): React.ReactElement {
+export function OnboardingGuideView({ projectPath }: OnboardingGuideViewProps): React.ReactElement {
 	const { t } = useTranslation("onboardingAgent");
+	const generated = useGeneratedText();
 
 	const phase = useOnboardingAgentStore((s) => s.phase);
 	const status = useOnboardingAgentStore((s) => s.status);
@@ -105,71 +77,103 @@ export function OnboardingGuideView({
 	const startScan = useOnboardingAgentStore((s) => s.startScan);
 	const cancelScan = useOnboardingAgentStore((s) => s.cancelScan);
 	const reset = useOnboardingAgentStore((s) => s.reset);
+	const [selected, setSelected] = useState(0);
+
+	const isScanning = phase === "scanning";
+	const steps = phase === "complete" && guide ? guide.steps : [];
+	const current = steps[selected] ?? null;
 
 	const handleRun = (): void => {
 		if (!projectPath) return;
+		setSelected(0);
 		void startScan(projectPath);
 	};
 
-	const isScanning = phase === "scanning";
-
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<div className="flex gap-2">
-					{!isScanning && (
-						<button
-							type="button"
-							onClick={handleRun}
-							disabled={!projectPath}
-							className="px-3 py-1.5 rounded-md bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-						>
-							{t("actions.runScan")}
-						</button>
+		<ModuleStage data-testid="onboarding-guide-view">
+			<Columns template="minmax(280px, 36%) minmax(0, 1fr)">
+				<Column
+					kicker={t("kickers.guide")}
+					title={guide?.projectName || t("title")}
+					meta={guide ? t("duration", { minutes: guide.totalEstimatedMinutes }) : undefined}
+					tone="blue"
+				>
+					<div className="flex flex-col gap-3">
+						{guide && guide.techStack.length > 0 && (
+							<Chips>
+								{guide.techStack.map((tech) => (
+									<Chip key={tech} tone="blue">
+										{tech}
+									</Chip>
+								))}
+							</Chips>
+						)}
+						{isScanning && <ScanLine label={status || t("actions.scanning")} />}
+						{!isScanning && steps.length === 0 && (
+							<EmptyStage icon={Footprints} title={t("guideEmptyTitle")} tone="blue">
+								{phase === "complete" ? t("noData") : t("guideIntro")}
+							</EmptyStage>
+						)}
+						{steps.map((step, index) => (
+							<StepCard
+								key={`${step.section}-${step.title}`}
+								index={index + 1}
+								tone="blue"
+								kicker={t("kickers.step")}
+								title={generated(step.titleI18n, step.title)}
+								meta={t("duration", { minutes: step.estimatedMinutes })}
+								active={index === selected}
+								onClick={() => setSelected(index)}
+							/>
+						))}
+					</div>
+				</Column>
+				<Column
+					kicker={t("kickers.step")}
+					title={current ? t("stepOfTotal", { current: selected + 1, total: steps.length }) : "—"}
+					tone="violet"
+				>
+					{current ? (
+						<div className="flex flex-col gap-3">
+							<StepDetail step={current} />
+							{guide?.summary && selected === steps.length - 1 && (
+								<p className="wp-muted text-sm italic">{generated(guide.summaryI18n, guide.summary)}</p>
+							)}
+						</div>
+					) : (
+						<EmptyStage icon={BookOpen} title={t("title")} tone="violet">
+							{t("selectStep")}
+						</EmptyStage>
 					)}
-					{isScanning && (
-						<button
-							type="button"
-							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
-						>
+				</Column>
+			</Columns>
+			{(!projectPath || (phase === "error" && error)) && (
+				<Notice tone="red" icon={TriangleAlert} role="alert" className="relative z-[2] mx-5 mb-2">
+					{projectPath ? t("errors.failed", { error }) : t("errors.noProject")}
+				</Notice>
+			)}
+			<Composer
+				prompt={<span className="wp-muted truncate text-xs">{t("guideIntro")}</span>}
+				hint={projectPath}
+				actions={
+					isScanning ? (
+						<CharterButton icon={X} variant="danger" onClick={() => void cancelScan()}>
 							{t("actions.cancel")}
-						</button>
-					)}
-					{phase === "complete" && (
-						<button
-							type="button"
-							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
-						>
-							{t("actions.reset")}
-						</button>
-					)}
-				</div>
-			</div>
-
-			{!projectPath && (
-				<p className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</p>
-			)}
-
-			{isScanning && (
-				<p className="text-sm text-muted-foreground">
-					{status || t("actions.scanning")}
-				</p>
-			)}
-
-			{phase === "error" && error && (
-				<p className="text-sm text-destructive">{t("errors.failed", { error })}</p>
-			)}
-
-			{phase === "complete" && !guide && (
-				<p className="text-sm text-muted-foreground">{t("noData")}</p>
-			)}
-
-			{phase === "complete" && guide && <GuideBody guide={guide} t={t} />}
-		</div>
+						</CharterButton>
+					) : (
+						<>
+							{phase === "complete" && (
+								<CharterButton icon={RotateCcw} onClick={reset}>
+									{t("actions.reset")}
+								</CharterButton>
+							)}
+							<CharterButton variant="primary" icon={BookOpen} onClick={handleRun} disabled={!projectPath}>
+								{phase === "complete" ? t("actions.regenerate") : t("actions.runScan")}
+							</CharterButton>
+						</>
+					)
+				}
+			/>
+		</ModuleStage>
 	);
 }

@@ -61,6 +61,10 @@ import {
 	createDocumentationAPI,
 } from "./modules/documentation-api";
 import {
+	type CodeInsightsAPI,
+	createCodeInsightsAPI,
+} from "./modules/code-insights-api";
+import {
 	type CarbonProfilerAPI,
 	createCarbonProfilerAPI,
 } from "./modules/carbon-profiler-api";
@@ -302,6 +306,7 @@ export interface ElectronAPI
 		I18nAgentAPI,
 		DocDriftAPI,
 		DocumentationAPI,
+		CodeInsightsAPI,
 		FlakyTestsAPI,
 		CarbonProfilerAPI,
 		ComplianceAPI,
@@ -453,6 +458,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createI18nAgentAPI(),
 		...createDocDriftAPI(),
 		...createDocumentationAPI(),
+		...createCodeInsightsAPI(),
 		...createFlakyTestsAPI(),
 		...createCarbonProfilerAPI(),
 		...createComplianceAPI(),

@@ -22,6 +22,13 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+try:
+    from review.polyglot_rules import POLYGLOT_RULES
+except ImportError:  # pragma: no cover - imported as apps.backend.*
+    from apps.backend.review.polyglot_rules import (  # type: ignore[no-redef]
+        POLYGLOT_RULES,
+    )
+
 logger = logging.getLogger(__name__)
 
 
@@ -382,6 +389,23 @@ BUILTIN_RULES: list[ReviewRule] = [
 ]
 
 
+# The other stacks' rules (.NET, JVM, Go, Rust, Swift, PHP, Ruby, Dart, C/C++).
+BUILTIN_RULES.extend(
+    ReviewRule(
+        rule_id=rule_id,
+        pattern=pattern,
+        message=message,
+        severity=ReviewSeverity(severity),
+        category=ReviewCategory(category),
+        suggestion=suggestion,
+        languages=list(languages),
+    )
+    for rule_id, pattern, message, severity, category, suggestion, languages in (
+        POLYGLOT_RULES
+    )
+)
+
+
 # ---------------------------------------------------------------------------
 # Diff parser
 # ---------------------------------------------------------------------------
@@ -454,38 +478,51 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
     return files
 
 
+_EXTENSION_LANGUAGE = {
+    "py": "python",
+    "js": "javascript",
+    "jsx": "javascript",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    "ts": "typescript",
+    "tsx": "typescript",
+    "mts": "typescript",
+    "cts": "typescript",
+    "java": "java",
+    "rb": "ruby",
+    "rake": "ruby",
+    "go": "go",
+    "rs": "rust",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "hpp": "cpp",
+    "c": "c",
+    "h": "c",
+    "cs": "csharp",
+    "php": "php",
+    "swift": "swift",
+    "kt": "kotlin",
+    "kts": "kotlin",
+    "scala": "scala",
+    "dart": "dart",
+    "sh": "shell",
+    "sql": "sql",
+    "html": "html",
+    "css": "css",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "json": "json",
+    "md": "markdown",
+}
+
+
 def _detect_language(file_path: str) -> str:
-    """Detect programming language from file extension."""
-    ext_map = {
-        ".py": "python",
-        ".js": "javascript",
-        ".ts": "typescript",
-        ".tsx": "typescript",
-        ".jsx": "javascript",
-        ".java": "java",
-        ".rb": "ruby",
-        ".go": "go",
-        ".rs": "rust",
-        ".cpp": "cpp",
-        ".c": "c",
-        ".cs": "csharp",
-        ".php": "php",
-        ".swift": "swift",
-        ".kt": "kotlin",
-        ".scala": "scala",
-        ".sh": "shell",
-        ".sql": "sql",
-        ".html": "html",
-        ".css": "css",
-        ".yaml": "yaml",
-        ".yml": "yaml",
-        ".json": "json",
-        ".md": "markdown",
-    }
-    for ext, lang in ext_map.items():
-        if file_path.endswith(ext):
-            return lang
-    return ""
+    """Detect programming language from the file's last extension."""
+    name = file_path.replace("\\", "/").rsplit("/", 1)[-1]
+    if "." not in name:
+        return ""
+    return _EXTENSION_LANGUAGE.get(name.rsplit(".", 1)[-1].lower(), "")
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import { ListPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DebtItem } from "../../../preload/api/modules/tech-debt-api";
-import { Button } from "../ui/button";
+import { CharterButton, Chip, Panel } from "../charter";
 
 interface Props {
 	readonly items: DebtItem[];
@@ -9,71 +9,46 @@ interface Props {
 	readonly creatingItemId?: string | null;
 }
 
+/** The debt items as charter cards: kind, location, message, cost / effort / ROI. */
 export function DebtItemsTable({ items, onCreateTask, creatingItemId }: Props) {
 	const { t } = useTranslation(["techDebt", "common"]);
 	if (!items.length) {
-		return (
-			<p className="text-sm text-muted-foreground py-6 text-center">
-				{t("techDebt:empty")}
-			</p>
-		);
+		return <p className="wp-meta py-6 text-center">{t("techDebt:empty")}</p>;
 	}
 	return (
-		<div className="overflow-x-auto">
-			<table className="w-full text-sm">
-				<thead>
-					<tr className="text-left border-b">
-						<th className="py-2 pr-2">{t("techDebt:columns.kind")}</th>
-						<th className="py-2 pr-2">{t("techDebt:columns.file")}</th>
-						<th className="py-2 pr-2">{t("techDebt:columns.message")}</th>
-						<th className="py-2 pr-2 text-right">
-							{t("techDebt:columns.cost")}
-						</th>
-						<th className="py-2 pr-2 text-right">
-							{t("techDebt:columns.effort")}
-						</th>
-						<th className="py-2 pr-2 text-right">
-							{t("techDebt:columns.roi")}
-						</th>
-						<th className="py-2 pr-2 text-right">
-							{t("techDebt:columns.actions")}
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{items.map((item) => (
-						<tr key={item.id} className="border-b last:border-0">
-							<td className="py-2 pr-2">
-								<span className="px-2 py-0.5 rounded-full bg-muted text-xs">
-									{t(`techDebt:kinds.${item.kind}`, item.kind)}
-								</span>
-							</td>
-							<td className="py-2 pr-2 font-mono text-xs">
-								{item.file_path}:{item.line}
-							</td>
-							<td className="py-2 pr-2">{item.message}</td>
-							<td className="py-2 pr-2 text-right">{item.cost.toFixed(2)}</td>
-							<td className="py-2 pr-2 text-right">{item.effort.toFixed(2)}</td>
-							<td className="py-2 pr-2 text-right font-semibold">
-								{item.roi.toFixed(2)}
-							</td>
-							<td className="py-2 pr-2 text-right">
-								<Button
-									size="sm"
-									variant="outline"
-									disabled={creatingItemId === item.id}
-									onClick={() => onCreateTask(item)}
-								>
-									<ListPlus className="h-3 w-3 mr-1" />
-									{creatingItemId === item.id
-										? t("techDebt:actions.creatingTask")
-										: t("techDebt:actions.createTask")}
-								</Button>
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		</div>
+		<ul className="flex flex-col gap-2">
+			{items.map((item) => (
+				<li key={item.id}>
+					<Panel rail tone="orange" className="flex flex-col gap-1.5">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<Chip tone="orange">{t(`techDebt:kinds.${item.kind}`, item.kind)}</Chip>
+							<span className="wp-meta">
+								{t("techDebt:columns.cost")} {item.cost.toFixed(2)} · {t("techDebt:columns.effort")}{" "}
+								{item.effort.toFixed(2)} ·{" "}
+								<b className="text-foreground">
+									{t("techDebt:columns.roi")} {item.roi.toFixed(2)}
+								</b>
+							</span>
+						</div>
+						<span className="wp-mono break-all text-xs">
+							{item.file_path}:{item.line}
+						</span>
+						<p className="text-sm">{item.message}</p>
+						<div className="flex justify-end">
+							<CharterButton
+								size="sm"
+								icon={ListPlus}
+								disabled={creatingItemId === item.id}
+								onClick={() => onCreateTask(item)}
+							>
+								{creatingItemId === item.id
+									? t("techDebt:actions.creatingTask")
+									: t("techDebt:actions.createTask")}
+							</CharterButton>
+						</div>
+					</Panel>
+				</li>
+			))}
+		</ul>
 	);
 }

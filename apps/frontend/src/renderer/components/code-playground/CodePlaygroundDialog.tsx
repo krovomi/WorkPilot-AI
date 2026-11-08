@@ -19,6 +19,7 @@ import {
 	useCodePlaygroundStore,
 } from "@/stores/code-playground-store";
 import { useProjectStore } from "@/stores/project-store";
+import "../charter/charter.css";
 import { Button } from "../ui/button";
 import {
 	Card,
@@ -74,7 +75,7 @@ interface CodePlaygroundDialogProps {
 export function CodePlaygroundDialog({
 	onIntegrate,
 }: CodePlaygroundDialogProps) {
-	const { t } = useTranslation(["codePlayground", "common"]);
+	const { t } = useTranslation(["codePlayground", "common", "navigation"]);
 	const [copied, setCopied] = useState(false);
 	const [activeTab, setActiveTab] = useState("code");
 	const previewRef = useRef<HTMLIFrameElement>(null);
@@ -174,8 +175,9 @@ export function CodePlaygroundDialog({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
+			<DialogContent className="wp-scope sm:max-w-[900px] max-h-[90vh] flex flex-col">
 				<DialogHeader>
+					<span className="wp-kicker">{t("navigation:groups.development")}</span>
 					<DialogTitle className="flex items-center gap-2">
 						<Zap className="h-5 w-5 text-primary" />
 						{t("codePlayground:title")}
