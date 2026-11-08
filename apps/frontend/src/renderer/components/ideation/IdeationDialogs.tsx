@@ -2,9 +2,9 @@ import { CheckCircle2, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
 	IDEATION_TYPE_COLORS,
-	IDEATION_TYPE_DESCRIPTIONS,
 } from "../../../shared/constants";
 import type { IdeationConfig, IdeationType } from "../../../shared/types";
+import "../charter/charter.css";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -50,7 +50,7 @@ export function IdeationDialogs({
 		<>
 			{/* Configuration Dialog */}
 			<Dialog open={showConfigDialog} onOpenChange={onCloseConfigDialog}>
-				<DialogContent>
+				<DialogContent className="wp-scope">
 					<DialogHeader>
 						<DialogTitle>{t("config.title")}</DialogTitle>
 						<DialogDescription>{t("config.description")}</DialogDescription>
@@ -75,7 +75,7 @@ export function IdeationDialogs({
 													{t(`types.${type}`)}
 												</div>
 												<div className="text-xs text-muted-foreground">
-													{IDEATION_TYPE_DESCRIPTIONS[type]}
+													{t(`typeDescriptions.${type}`)}
 												</div>
 											</div>
 										</div>
@@ -122,7 +122,7 @@ export function IdeationDialogs({
 
 			{/* Add More Ideas Dialog */}
 			<Dialog open={showAddMoreDialog} onOpenChange={onCloseAddMoreDialog}>
-				<DialogContent>
+				<DialogContent className="wp-scope">
 					<DialogHeader>
 						<DialogTitle>{t("addMore.title")}</DialogTitle>
 						<DialogDescription>{t("addMore.description")}</DialogDescription>
@@ -160,7 +160,7 @@ export function IdeationDialogs({
 													{t(`types.${type}`)}
 												</div>
 												<div className="text-xs text-muted-foreground">
-													{IDEATION_TYPE_DESCRIPTIONS[type]}
+													{t(`typeDescriptions.${type}`)}
 												</div>
 											</div>
 										</div>

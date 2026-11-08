@@ -2,7 +2,7 @@
 	"title": "Insights",
 	"description": "Ask questions about your codebase",
 	"sidebar": { "hide": "Hide sidebar", "show": "Show sidebar" },
-	"actions": { "newChat": "New Chat" },
+	"actions": { "newChat": "New Chat", "send": "Send" },
 	"welcome": {
 		"title": "Start a Conversation",
 		"description": "Ask questions about your codebase, get suggestions for improvements, or discuss features you would like to implement."

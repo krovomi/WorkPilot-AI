@@ -177,10 +177,10 @@ export function ChatHistorySidebar({
 	};
 
 	return (
-		<div className="flex h-full w-64 flex-col border-r border-border bg-muted/30">
+		<div className="wp-card flex h-full w-64 shrink-0 flex-col overflow-hidden">
 			{/* Header */}
-			<div className="flex items-center justify-between border-b border-border px-3 py-3">
-				<h3 className="text-sm font-medium text-foreground">
+			<div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+				<h3 className="wp-kicker">
 					{t("chatHistory.title")}
 				</h3>
 				<Tooltip>

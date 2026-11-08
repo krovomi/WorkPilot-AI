@@ -4,7 +4,8 @@
 		"description": "Générez des idées de fonctionnalités alimentées par l'IA basées sur le contexte de votre projet, les patterns existants et votre audience cible.",
 		"enabledTypes": "Types d'idéation activés",
 		"generateIdeas": "Générer des idées",
-		"tokenMissing": "Token Claude non configuré. Vous serez invité à le saisir lors de la génération."
+		"tokenMissing": "Token Claude non configuré. Vous serez invité à le saisir lors de la génération.",
+		"enabledCount": "{{count}} sur {{total}} activés"
 	},
 	"types": {
 		"code_improvements": "Améliorations du code",
@@ -28,11 +29,7 @@
 	},
 	"filters": {
 		"all": "Tout",
-		"code": "Code",
-		"uiux": "UI/UX",
-		"docs": "Docs",
-		"security": "Sécurité",
-		"performance": "Performance"
+		"label": "Types d'idées"
 	},
 	"config": {
 		"title": "Configuration de l'idéation",
@@ -109,5 +106,13 @@
 		"compliance": "Conformité",
 		"userBenefit": "Bénéfice utilisateur",
 		"affectedComponents": "Composants concernés"
+	},
+	"typeDescriptions": {
+		"code_improvements": "Pistes révélées par le code : motifs, architecture et infrastructure",
+		"ui_ux_improvements": "Améliorations visuelles et d'interaction relevées en analysant l'application",
+		"documentation_gaps": "Documentation manquante ou obsolète à reprendre",
+		"security_hardening": "Vulnérabilités et pistes de durcissement de la sécurité",
+		"performance_optimizations": "Goulots d'étranglement et pistes d'optimisation des performances",
+		"code_quality": "Pistes de refactoring, gros fichiers, code smells et écarts aux bonnes pratiques"
 	}
 }

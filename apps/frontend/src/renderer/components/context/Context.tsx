@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useServerViewLive } from "../../hooks/useServerViewLive";
 import { useContextStore } from "../../stores/context-store";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { ModuleHeader, ModuleStage, Tabs } from "../charter";
 import { useMemorySearch, useProjectContext, useRefreshIndex } from "./hooks";
 import { MemoriesTab } from "./MemoriesTab";
 import { ProjectIndexTab } from "./ProjectIndexTab";
@@ -11,7 +11,7 @@ import type { ContextProps } from "./types";
 
 export function Context(props: ContextProps) {
 	const { projectId } = props;
-	const { t } = useTranslation(["context"]);
+	const { t } = useTranslation(["context", "navigation"]);
 	// A server project's index and memories show a teammate's change at once.
 	useServerViewLive(projectId, "context");
 
@@ -27,7 +27,7 @@ export function Context(props: ContextProps) {
 		searchLoading,
 	} = useContextStore();
 
-	const [activeTab, setActiveTab] = useState("index");
+	const [activeTab, setActiveTab] = useState<"index" | "memories">("index");
 
 	// Custom hooks
 	useProjectContext(projectId);
@@ -35,37 +35,40 @@ export function Context(props: ContextProps) {
 	const handleSearch = useMemorySearch(projectId);
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden">
+		<ModuleStage data-testid="context-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
+				title={t("navigation:items.context")}
+				description={
+					activeTab === "index"
+						? t("context:projectIndex.description")
+						: t("context:memories.description")
+				}
+				icon={activeTab === "index" ? FolderTree : Brain}
+				tone="blue"
+			/>
 			<Tabs
+				tabs={[
+					{
+						id: "index",
+						label: t("context:tabs.projectIndex"),
+						icon: FolderTree,
+					},
+					{ id: "memories", label: t("context:tabs.memories"), icon: Brain },
+				]}
 				value={activeTab}
-				onValueChange={setActiveTab}
-				className="flex flex-col h-full"
-			>
-				<div className="border-b border-border px-6 py-3">
-					<TabsList className="grid w-full max-w-md grid-cols-2">
-						<TabsTrigger value="index" className="gap-2">
-							<FolderTree className="h-4 w-4" />
-							{t("context:tabs.projectIndex")}
-						</TabsTrigger>
-						<TabsTrigger value="memories" className="gap-2">
-							<Brain className="h-4 w-4" />
-							{t("context:tabs.memories")}
-						</TabsTrigger>
-					</TabsList>
-				</div>
-
-				{/* Project Index Tab */}
-				<TabsContent value="index" className="flex-1 overflow-hidden m-0">
+				onChange={setActiveTab}
+				label={t("navigation:items.context")}
+			/>
+			<div className="relative z-[1] min-h-0 flex-1 overflow-hidden">
+				{activeTab === "index" ? (
 					<ProjectIndexTab
 						projectIndex={projectIndex}
 						indexLoading={indexLoading}
 						indexError={indexError}
 						onRefresh={handleRefreshIndex}
 					/>
-				</TabsContent>
-
-				{/* Memories Tab */}
-				<TabsContent value="memories" className="flex-1 overflow-hidden m-0">
+				) : (
 					<MemoriesTab
 						memoryStatus={memoryStatus}
 						memoryState={memoryState}
@@ -75,8 +78,8 @@ export function Context(props: ContextProps) {
 						searchLoading={searchLoading}
 						onSearch={handleSearch}
 					/>
-				</TabsContent>
-			</Tabs>
-		</div>
+				)}
+			</div>
+		</ModuleStage>
 	);
 }

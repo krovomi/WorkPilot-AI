@@ -153,8 +153,6 @@
   "apps/frontend/src/renderer/components/gitlab-merge-requests/components/MRDetail.tsx": 1,
   "apps/frontend/src/renderer/components/gitlab-merge-requests/components/SeverityGroupHeader.tsx": 3,
   "apps/frontend/src/renderer/components/guided-tour/GuidedTourOverlay.tsx": 3,
-  "apps/frontend/src/renderer/components/ideation/IdeaCard.tsx": 5,
-  "apps/frontend/src/renderer/components/ideation/IdeaDetailPanel.tsx": 1,
   "apps/frontend/src/renderer/components/ideation/IdeationDialogs.tsx": 3,
   "apps/frontend/src/renderer/components/ideation/details/SecurityHardeningDetails.tsx": 3,
   "apps/frontend/src/renderer/components/ideation/details/UIUXDetails.tsx": 1,

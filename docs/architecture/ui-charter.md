@@ -93,7 +93,16 @@ Done:
 - Agents: Bureau Pixel (toolbar only, `wp-scope`; the canvas keeps its own
   look), Auto-Guérison, Banc de rejeu, Bounty Board, Coach personnel d'agent,
   Compagnon en direct. Terminaux keep their grid.
+- Explorer: Analyses (chat in a card, `Composer` for the question),
+  Contexte du projet (index, mémoires, Maillage de contexte, Extraits
+  contextuels as a `wp-scope` dialog), Visualiseur d'architecture, Idéation
+  (generation screen, cards railed by idea type, detail panel in `wp-scope`),
+  Boucle d'apprentissage (dialog, `wp-scope`).
+- Hubs: the launcher page of a tab whose tool is a dialog (`HubLauncher`) is
+  an `EmptyStage` with one primary button, for every hub. The hub tab bar
+  keeps its underline: it is the app's navigation, a level above a module's
+  own pill `Tabs`.
 
-The other groups (Espace de travail, Explorer, Git & Intégrations,
+The other groups (Espace de travail, Git & Intégrations,
 Planification, Boîte à outils) and the Settings pages move lot by lot; each
 lot lists its views in its PR.
