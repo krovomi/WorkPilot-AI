@@ -274,6 +274,12 @@
 		border-top: 1px dashed var(--wp-border);
 	}
 
+	/* Sections side by side in a grid: columns, not a stack, so no rule between them. */
+	.wp-split > .wp-section + .wp-section {
+		padding-top: 0;
+		border-top: 0;
+	}
+
 	/* ── Surfaces ───────────────────────────────────────────────────────── */
 
 	.wp-card {
@@ -428,6 +434,50 @@
 		font-family: var(--wp-mono);
 		font-size: 0.65rem;
 		color: var(--wp-faint);
+	}
+
+	/* Side navigation (Settings): one row per page; the current page takes the
+	   tone of its group, like a selected tab. */
+	.wp-nav {
+		background: color-mix(in srgb, var(--wp-card-solid) 70%, transparent);
+		border-right: 1px dashed var(--wp-border);
+	}
+
+	.wp-navitem {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.4rem 0.6rem;
+		border: 1px solid transparent;
+		border-radius: 0.55rem;
+		font-size: 0.78rem;
+		color: var(--wp-muted);
+		text-align: left;
+		transition:
+			background-color 0.15s,
+			color 0.15s,
+			border-color 0.15s;
+	}
+
+	.wp-navitem:hover:not(:disabled) {
+		color: var(--wp-title);
+		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 7%, transparent);
+	}
+
+	.wp-navitem[aria-current="page"] {
+		color: var(--wp-title);
+		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 55%, var(--wp-border));
+		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 12%, var(--wp-card-solid));
+	}
+
+	.wp-navitem[aria-current="page"] svg {
+		color: var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-navitem:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	.wp-btn {

@@ -18,7 +18,6 @@ export interface SettingsNavSection {
 export interface SettingsNavTheme {
 	title: string;
 	icon: ElementType;
-	color: string;
 	sections: SettingsNavSection[];
 	description: string;
 	priority: number;

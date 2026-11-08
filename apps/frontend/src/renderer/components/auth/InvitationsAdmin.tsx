@@ -14,6 +14,7 @@ import type { InvitationPublic } from "../../../preload/api/modules/server-auth-
 import { formatAppDateTime } from "@/lib/date-format";
 
 import { NativeSelect } from "../ui/native-select";
+import { SettingsSection } from "../settings/SettingsSection";
 export function InvitationsAdmin() {
 	const { t } = useTranslation("settings");
 	const [email, setEmail] = useState("");
@@ -74,20 +75,15 @@ export function InvitationsAdmin() {
 	}, [lastLink]);
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h3 className="text-lg font-semibold">
-					{t("invitationsAdmin.title", "Invitations")}
-				</h3>
-				<p className="text-sm text-muted-foreground">
-					{t(
-						"invitationsAdmin.description",
-						"Invitez de nouveaux membres. La création de compte se fait uniquement sur invitation.",
-					)}
-				</p>
-			</div>
+		<SettingsSection
+			title={t("invitationsAdmin.title", "Invitations")}
+			description={t(
+				"invitationsAdmin.description",
+				"Invitez de nouveaux membres. La création de compte se fait uniquement sur invitation.",
+			)}
+		>
 
-			<div className="space-y-3 rounded-lg border border-border p-4">
+			<div className="wp-card space-y-3 p-4">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-end">
 					<div className="flex-1 space-y-2">
 						<Label htmlFor="invite-email">
@@ -201,6 +197,6 @@ export function InvitationsAdmin() {
 					</ul>
 				)}
 			</div>
-		</div>
+		</SettingsSection>
 	);
 }

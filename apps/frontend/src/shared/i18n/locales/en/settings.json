@@ -2965,5 +2965,49 @@
 		"approve": "Approve",
 		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
 		"saveDetected": "Save as worktree.toml"
+	},
+	"kicker": "WorkPilot · Configuration",
+	"headerDescription": "Application and project settings, grouped by theme.",
+	"nav": {
+		"themes": {
+			"project": {
+				"title": "Project",
+				"description": "Settings of the current project"
+			},
+			"integrations": {
+				"title": "Integrations & Connections",
+				"description": "AI accounts and external integrations"
+			},
+			"interface": {
+				"title": "Interface & Appearance",
+				"description": "Personalise the interface"
+			},
+			"development": {
+				"title": "Development & Tools",
+				"description": "Developer tools and configuration"
+			},
+			"security": {
+				"title": "Security & Performance",
+				"description": "System security and performance"
+			},
+			"system": {
+				"title": "System & Maintenance",
+				"description": "Maintenance and system"
+			}
+		},
+		"sections": {
+			"general": "General",
+			"accounts": "AI accounts",
+			"appearance": "Appearance",
+			"display": "Display",
+			"language": "Language",
+			"terminal-fonts": "Terminal fonts",
+			"devtools": "Developer tools",
+			"agent": "Agent",
+			"notifications": "Notifications",
+			"debug": "Debug",
+			"scheduler": "Scheduling",
+			"updates": "Updates"
+		}
 	}
 }

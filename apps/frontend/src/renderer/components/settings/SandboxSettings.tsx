@@ -152,7 +152,7 @@ export function SandboxSettings() {
 										"rounded-full px-2 py-0.5 text-3xs font-medium",
 										rule.access === "write"
 											? "bg-warning/15 text-warning"
-											: "bg-blue-500/15 text-blue-600",
+											: "bg-info/15 text-info",
 									)}
 								>
 									{rule.access === "write"

@@ -2968,5 +2968,49 @@
 		"approve": "Approuver",
 		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
 		"saveDetected": "Enregistrer en worktree.toml"
+	},
+	"kicker": "WorkPilot · Configuration",
+	"headerDescription": "Paramètres de l’application et du projet, rangés par thème.",
+	"nav": {
+		"themes": {
+			"project": {
+				"title": "Projet",
+				"description": "Configuration du projet actuel"
+			},
+			"integrations": {
+				"title": "Intégrations & Connexions",
+				"description": "Comptes IA et intégrations externes"
+			},
+			"interface": {
+				"title": "Interface & Apparence",
+				"description": "Personnalisation de l’interface"
+			},
+			"development": {
+				"title": "Développement & Outils",
+				"description": "Outils de développement et configuration"
+			},
+			"security": {
+				"title": "Sécurité & Performance",
+				"description": "Sécurité et performance du système"
+			},
+			"system": {
+				"title": "Système & Maintenance",
+				"description": "Maintenance et système"
+			}
+		},
+		"sections": {
+			"general": "Général",
+			"accounts": "Comptes IA",
+			"appearance": "Apparence",
+			"display": "Affichage",
+			"language": "Langue",
+			"terminal-fonts": "Polices terminal",
+			"devtools": "Outils de développement",
+			"agent": "Agent",
+			"notifications": "Notifications",
+			"debug": "Debug",
+			"scheduler": "Planification",
+			"updates": "Mises à jour"
+		}
 	}
 }
