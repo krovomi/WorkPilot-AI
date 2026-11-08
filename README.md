@@ -4,8 +4,9 @@
 
 ![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KCXaPBr4Dj)
-[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@AndreMikalsen)
+[![Release](https://img.shields.io/github/v/release/krovomi/WorkPilot-AI?style=flat-square&label=release)](https://github.com/krovomi/WorkPilot-AI/releases/latest)
+[![Discussions](https://img.shields.io/github/discussions/krovomi/WorkPilot-AI?style=flat-square&logo=github&label=discussions)](https://github.com/krovomi/WorkPilot-AI/discussions)
+[![Wiki](https://img.shields.io/badge/docs-wiki-blue?style=flat-square&logo=github)](https://github.com/krovomi/WorkPilot-AI/wiki)
 [![CI](https://img.shields.io/github/actions/workflow/status/krovomi/WorkPilot-AI/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/krovomi/WorkPilot-AI/actions)
 
 ---
@@ -550,7 +551,7 @@ apps/frontend/src/
 - **Réseau** : Connexion internet stable
 
 #### Dépendances Logicielles
-- **Node.js 22.12+** (la CI construit sur Node 22 ; `package.json` accepte encore Node 20, mais Vitest 5 demande 22.12+ et Vite 8 au moins 20.19)
+- **Node.js 22.12+** (`engines` dans `package.json` ; la CI construit sur Node 22, et Vitest 5 refuse les versions plus anciennes)
 - **pnpm** (le dépôt est épinglé sur pnpm 12.16.1 via `packageManager` ; si Corepack échoue : `npm i -g pnpm@12.16.1`)
 - **Python 3.12+** (Pour le backend)
 - **Git** (Dépôt initialisé obligatoire)
@@ -598,7 +599,7 @@ apps/frontend/src/
    Si l'installation automatique échoue (dépendances Python manquantes, environnement corrompu, etc.), suivez ces étapes détaillées.
 
    **Prérequis communs**
-   - Node.js ≥ 20 et pnpm ≥ 8 disponibles dans le PATH
+   - Node.js 22.12+ et pnpm disponibles dans le PATH
    - Python 3.12+ installé depuis [python.org](https://www.python.org/downloads/) — sur Windows, évitez le Python du Microsoft Store, il cause fréquemment des soucis de PATH et de permissions
    - Git installé
 
@@ -831,7 +832,7 @@ cd apps/frontend && pnpm run build && pnpm run test:e2e
 #### Vérification de l'Environnement
 ```bash
 # Version Node.js
-node --version  # >= v20
+node --version  # >= v22.12
 
 # Version Python
 python --version  # 3.12+
