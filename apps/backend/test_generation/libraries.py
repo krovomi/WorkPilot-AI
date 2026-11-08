@@ -38,6 +38,24 @@ NUGET = "nuget"
 NPM = "npm"
 PYPI = "pypi"
 MAVEN = "maven"
+GO = "go"
+CARGO = "cargo"
+COMPOSER = "composer"
+RUBYGEMS = "rubygems"
+PUB = "pub"
+SWIFTPM = "swiftpm"
+
+# Ecosystems whose manifests are read by name mention rather than parsed: the
+# id we look for is the package path itself (a Go module, a crate, a gem).
+_MENTION_MANIFESTS: dict[str, tuple[str, ...]] = {
+    MAVEN: ("pom.xml", "build.gradle*"),
+    GO: ("go.mod",),
+    CARGO: ("Cargo.toml",),
+    COMPOSER: ("composer.json",),
+    RUBYGEMS: ("Gemfile", "*.gemspec"),
+    PUB: ("pubspec.yaml",),
+    SWIFTPM: ("Package.swift",),
+}
 
 
 @dataclass(frozen=True)
@@ -68,7 +86,8 @@ class TestLibrary:
 
 # The catalogue. Curated on purpose: a list of every test package on nuget.org
 # is a search box, and a search box is what the user came here to avoid. What
-# is here is what a .NET, Node, Python or Java project realistically tests with.
+# is here is what a .NET, Node, Python, Java, Go, Rust, PHP, Ruby, Dart or Swift
+# project realistically tests with.
 CATALOGUE: tuple[TestLibrary, ...] = (
     # ── .NET ─────────────────────────────────────────────────────────
     TestLibrary(
@@ -408,6 +427,250 @@ CATALOGUE: tuple[TestLibrary, ...] = (
         "collection/exception matchers.",
         recommended=True,
     ),
+    # ── Go ───────────────────────────────────────────────────────────
+    TestLibrary(
+        "testify",
+        "testify",
+        "github.com/stretchr/testify",
+        GO,
+        "go",
+        "assertions",
+        "Assert with assert.Equal(t, want, got) / require.NoError(t, err); "
+        "table-driven tests with t.Run.",
+        recommended=True,
+    ),
+    TestLibrary(
+        "gomock",
+        "gomock",
+        "go.uber.org/mock",
+        GO,
+        "go",
+        "mocking",
+        "Generate mocks with mockgen, create them with NewMockX(ctrl) and set "
+        "expectations with EXPECT().Method(...).Return(...).",
+    ),
+    TestLibrary(
+        "ginkgo",
+        "Ginkgo",
+        "github.com/onsi/ginkgo/v2",
+        GO,
+        "go",
+        "framework",
+        "Describe/Context/It blocks inside a RegisterFailHandler suite.",
+    ),
+    TestLibrary(
+        "gomega",
+        "Gomega",
+        "github.com/onsi/gomega",
+        GO,
+        "go",
+        "assertions",
+        "Assert with Expect(got).To(Equal(want)) and Eventually(...) for async.",
+    ),
+    TestLibrary(
+        "testcontainers-go",
+        "Testcontainers for Go",
+        "github.com/testcontainers/testcontainers-go",
+        GO,
+        "go",
+        "http",
+        "Start real dependencies with testcontainers.GenericContainer in the test.",
+    ),
+    # ── Rust ─────────────────────────────────────────────────────────
+    TestLibrary(
+        "pretty-assertions",
+        "pretty_assertions",
+        "pretty_assertions",
+        CARGO,
+        "rust",
+        "assertions",
+        "use pretty_assertions::assert_eq; in #[cfg(test)] mod tests for "
+        "readable diffs.",
+        recommended=True,
+    ),
+    TestLibrary(
+        "rstest",
+        "rstest",
+        "rstest",
+        CARGO,
+        "rust",
+        "framework",
+        "Parametrise with #[rstest] and #[case(...)], share setup with #[fixture].",
+    ),
+    TestLibrary(
+        "mockall",
+        "mockall",
+        "mockall",
+        CARGO,
+        "rust",
+        "mocking",
+        "Put #[automock] on the trait and set expectations with "
+        "mock.expect_method().returning(...).",
+        recommended=True,
+    ),
+    TestLibrary(
+        "proptest",
+        "proptest",
+        "proptest",
+        CARGO,
+        "rust",
+        "data",
+        "Property tests inside proptest! { #[test] fn ...(x in strategy) {} }.",
+    ),
+    TestLibrary(
+        "insta",
+        "insta",
+        "insta",
+        CARGO,
+        "rust",
+        "snapshot",
+        "Snapshot with insta::assert_snapshot!(value) / assert_debug_snapshot!.",
+    ),
+    # ── PHP ──────────────────────────────────────────────────────────
+    TestLibrary(
+        "phpunit",
+        "PHPUnit",
+        "phpunit/phpunit",
+        COMPOSER,
+        "php",
+        "framework",
+        "Classes extending PHPUnit\\Framework\\TestCase; assert with "
+        "$this->assertSame(...).",
+        recommended=True,
+    ),
+    TestLibrary(
+        "pest",
+        "Pest",
+        "pestphp/pest",
+        COMPOSER,
+        "php",
+        "framework",
+        "test('...', function () { expect($value)->toBe(...); });",
+    ),
+    TestLibrary(
+        "mockery",
+        "Mockery",
+        "mockery/mockery",
+        COMPOSER,
+        "php",
+        "mocking",
+        "Mockery::mock(Foo::class)->shouldReceive('bar')->andReturn(...).",
+        recommended=True,
+    ),
+    TestLibrary(
+        "faker-php",
+        "Faker",
+        "fakerphp/faker",
+        COMPOSER,
+        "php",
+        "data",
+        "Build inputs with Faker\\Factory::create()->name() and friends.",
+    ),
+    # ── Ruby ─────────────────────────────────────────────────────────
+    TestLibrary(
+        "rspec",
+        "RSpec",
+        "rspec",
+        RUBYGEMS,
+        "ruby",
+        "framework",
+        "describe/context/it with expect(x).to eq(y); doubles via instance_double.",
+        recommended=True,
+    ),
+    TestLibrary(
+        "minitest",
+        "Minitest",
+        "minitest",
+        RUBYGEMS,
+        "ruby",
+        "framework",
+        "Classes extending Minitest::Test with assert_equal expected, actual.",
+    ),
+    TestLibrary(
+        "factory-bot",
+        "FactoryBot",
+        "factory_bot",
+        RUBYGEMS,
+        "ruby",
+        "data",
+        "Build records with build(:user) / create(:user) from factories.",
+    ),
+    TestLibrary(
+        "webmock",
+        "WebMock",
+        "webmock",
+        RUBYGEMS,
+        "ruby",
+        "http",
+        "Stub HTTP with stub_request(:get, url).to_return(body: ...).",
+    ),
+    # ── Dart / Flutter ───────────────────────────────────────────────
+    TestLibrary(
+        "dart-test",
+        "package:test",
+        "test",
+        PUB,
+        "dart",
+        "framework",
+        "group(...) / test(...) with expect(actual, equals(expected)).",
+        recommended=True,
+    ),
+    TestLibrary(
+        "flutter-test",
+        "flutter_test",
+        "flutter_test",
+        PUB,
+        "dart",
+        "ui",
+        "testWidgets with tester.pumpWidget(...) and find.text(...) matchers.",
+    ),
+    TestLibrary(
+        "mocktail",
+        "mocktail",
+        "mocktail",
+        PUB,
+        "dart",
+        "mocking",
+        "class MockX extends Mock implements X; when(() => m.call()).thenReturn(...).",
+        recommended=True,
+    ),
+    TestLibrary(
+        "bloc-test",
+        "bloc_test",
+        "bloc_test",
+        PUB,
+        "dart",
+        "framework",
+        "blocTest<Bloc, State>('...', build: ..., act: ..., expect: () => [...]).",
+    ),
+    # ── Swift ────────────────────────────────────────────────────────
+    TestLibrary(
+        "quick",
+        "Quick",
+        "github.com/quick/quick",
+        SWIFTPM,
+        "swift",
+        "framework",
+        "QuickSpec subclasses with describe/context/it blocks.",
+    ),
+    TestLibrary(
+        "nimble",
+        "Nimble",
+        "github.com/quick/nimble",
+        SWIFTPM,
+        "swift",
+        "assertions",
+        "Assert with expect(value).to(equal(expected)); toEventually for async.",
+    ),
+    TestLibrary(
+        "snapshot-testing",
+        "SnapshotTesting",
+        "github.com/pointfreeco/swift-snapshot-testing",
+        SWIFTPM,
+        "swift",
+        "snapshot",
+        "assertSnapshot(of: view, as: .image) inside an XCTestCase.",
+    ),
 )
 
 _BY_ID = {library.id: library for library in CATALOGUE}
@@ -494,7 +757,15 @@ def detect_installed(project_dir: str | Path, language: str) -> dict[str, str]:
         return _detect_pypi(root)
     if target == "java":
         return _detect_maven(root)
-    return {}
+    ecosystem = {
+        "go": GO,
+        "rust": CARGO,
+        "php": COMPOSER,
+        "ruby": RUBYGEMS,
+        "dart": PUB,
+        "swift": SWIFTPM,
+    }.get(target)
+    return _detect_by_mention(root, ecosystem) if ecosystem else {}
 
 
 def _detect_nuget(root: Path) -> dict[str, str]:
@@ -559,7 +830,7 @@ def _detect_pypi(root: Path) -> dict[str, str]:
 
 def _detect_maven(root: Path) -> dict[str, str]:
     found: dict[str, str] = {}
-    for manifest in iter_project_files(root, ("pom.xml", "build.gradle*")):
+    for manifest in iter_project_files(root, _MENTION_MANIFESTS[MAVEN]):
         blob = read_manifest(manifest).lower()
         for library in CATALOGUE:
             if library.ecosystem != MAVEN:
@@ -567,6 +838,35 @@ def _detect_maven(root: Path) -> dict[str, str]:
             artifact = library.package.split(":")[-1]
             if artifact.lower() in blob:
                 found.setdefault(library.package.lower(), "")
+    return found
+
+
+def _detect_by_mention(root: Path, ecosystem: str) -> dict[str, str]:
+    """Catalogue packages of *ecosystem* that the project's manifests name.
+
+    go.mod, Cargo.toml, composer.json, Gemfile, pubspec.yaml and Package.swift
+    all spell a dependency as its package path, so a bounded match of that
+    path is the answer without a parser per format. "test" (Dart) only counts
+    as a key, never as a word in a description.
+    """
+    found: dict[str, str] = {}
+    blobs = [
+        read_manifest(manifest).lower()
+        for manifest in iter_project_files(root, _MENTION_MANIFESTS[ecosystem])
+    ]
+    if not blobs:
+        return found
+    blob = "\n".join(blobs)
+    for library in CATALOGUE:
+        if library.ecosystem != ecosystem:
+            continue
+        name = re.escape(library.package.lower())
+        if ecosystem == PUB:
+            pattern = rf"^\s+{name}\s*:"
+        else:
+            pattern = rf"(?<![\w/.-]){name}(?![\w-])"
+        if re.search(pattern, blob, re.M):
+            found.setdefault(library.package.lower(), "")
     return found
 
 
@@ -676,6 +976,29 @@ def install_commands(selection: LibrarySelection) -> list[str]:
             commands.append(f"pip install {' '.join(packages)}")
         elif ecosystem == MAVEN:
             commands.extend(f"add {package} to the test scope" for package in packages)
+        elif ecosystem == GO:
+            commands.append(f"go get -t {' '.join(packages)}")
+        elif ecosystem == CARGO:
+            commands.append(f"cargo add --dev {' '.join(packages)}")
+        elif ecosystem == COMPOSER:
+            commands.append(f"composer require --dev {' '.join(packages)}")
+        elif ecosystem == RUBYGEMS:
+            commands.extend(
+                f"bundle add {package} --group test" for package in packages
+            )
+        elif ecosystem == PUB:
+            # flutter_test ships with the Flutter SDK, never from pub.dev.
+            sdk = [p for p in packages if p == "flutter_test"]
+            pub = [p for p in packages if p != "flutter_test"]
+            if pub:
+                commands.append(f"dart pub add --dev {' '.join(pub)}")
+            if sdk:
+                commands.append("flutter pub add --dev flutter_test --sdk=flutter")
+        elif ecosystem == SWIFTPM:
+            commands.extend(
+                f'add .package(url: "https://{package}") to Package.swift'
+                for package in packages
+            )
     return commands
 
 
