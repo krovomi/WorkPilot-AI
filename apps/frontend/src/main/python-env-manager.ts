@@ -51,6 +51,21 @@ export class PythonEnvManager extends EventEmitter {
 	/** Set by cleanup(): the app is quitting, start no new Python process. */
 	private shuttingDown = false;
 	private static readonly VENV_CREATION_TIMEOUT_MS = 120000; // 2 minutes timeout for venv creation
+	/** Why the last initialization failed, returned in PythonEnvStatus.error. */
+	private lastError: string | null = null;
+
+	/**
+	 * Record a failure and tell the listeners, if any.
+	 *
+	 * A bare `emit("error")` throws ERR_UNHANDLED_ERROR when nobody listens —
+	 * and nobody does — which aborted the setup half-way and surfaced as
+	 * "Unhandled error. ('Python not found in virtual environment')" on every
+	 * page that needs Python (Feuille de route, Débogueur d'agent…).
+	 */
+	private fail(message: string): void {
+		this.lastError = message;
+		if (this.listenerCount("error") > 0) this.emit("error", message);
+	}
 
 	/**
 	 * Get the path where the venv should be created.
@@ -305,7 +320,7 @@ export class PythonEnvManager extends EventEmitter {
 	/**
 	 * Create the virtual environment
 	 */
-	private async createVenv(): Promise<boolean> {
+	private async createVenv(clear = false): Promise<boolean> {
 		if (!this.autoBuildSourcePath) return false;
 
 		const systemPython = this.findSystemPython();
@@ -318,14 +333,14 @@ export class PythonEnvManager extends EventEmitter {
 				: "Python 3.12+ not found. Please install Python 3.12 or higher.\n\n" +
 					"This is required for development mode. Download from:\n" +
 					"https://www.python.org/downloads/";
-			this.emit("error", errorMsg);
+			this.fail(errorMsg);
 			return false;
 		}
 		// Vérification d'existence du binaire Python
 		const { existsSync } = require("node:fs");
 		if (!existsSync(systemPython)) {
 			const errorMsg = `Le binaire Python détecté n'existe pas : ${systemPython}\nCorrigez votre installation Python ou votre PATH système.`;
-			this.emit("error", errorMsg);
+			this.fail(errorMsg);
 			console.error("[PythonEnvManager] ERREUR :", errorMsg);
 			return false;
 		}
@@ -341,7 +356,13 @@ export class PythonEnvManager extends EventEmitter {
 		);
 
 		return new Promise((resolve) => {
-			const proc = this.spawnTracked(systemPython, ["-m", "venv", venvPath], {
+			// --clear wipes a leftover venv first: without it, `python -m venv`
+			// on a venv whose interpreter link points to a removed Python exits 0
+			// and leaves the dangling link in place.
+			const venvArgs = clear
+				? ["-m", "venv", "--clear", venvPath]
+				: ["-m", "venv", venvPath];
+			const proc = this.spawnTracked(systemPython, venvArgs, {
 				// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
 				cwd: this.autoBuildSourcePath!,
 				stdio: "pipe",
@@ -364,8 +385,7 @@ export class PythonEnvManager extends EventEmitter {
 						PythonEnvManager.VENV_CREATION_TIMEOUT_MS,
 						"ms",
 					);
-					this.emit(
-						"error",
+					this.fail(
 						"Virtual environment creation timed out. This may indicate a system issue.",
 					);
 					try {
@@ -393,7 +413,7 @@ export class PythonEnvManager extends EventEmitter {
 					resolve(true);
 				} else {
 					console.error("[PythonEnvManager] Failed to create venv:", stderr);
-					this.emit("error", `Failed to create virtual environment: ${stderr}`);
+					this.fail(`Failed to create virtual environment: ${stderr}`);
 					resolve(false);
 				}
 			});
@@ -405,11 +425,82 @@ export class PythonEnvManager extends EventEmitter {
 				this.activeProcesses.delete(proc);
 
 				console.error("[PythonEnvManager] Error creating venv:", err);
-				this.emit(
-					"error",
+				this.fail(
 					`Failed to create virtual environment: ${err.message}`,
 				);
 				resolve(false);
+			});
+		});
+	}
+
+	/**
+	 * Create (or rebuild) the venv and check it really holds an interpreter.
+	 *
+	 * A venv directory can outlive its interpreter: the Python it was created
+	 * from was upgraded or removed (uv, pyenv, distro upgrade, Store Python…).
+	 * Its `bin/python` is then a dangling link (or `Scripts/python.exe` a
+	 * launcher pointing nowhere) and a plain `python -m venv` keeps it as is.
+	 * Such a venv is unusable, so it is rebuilt with --clear.
+	 */
+	private async createUsableVenv(forceClear = false): Promise<boolean> {
+		const venvBase = this.getVenvBasePath();
+		if (!venvBase) return false;
+		const leftover = forceClear || existsSync(venvBase);
+		if (leftover) {
+			console.warn(
+				"[PythonEnvManager] Unusable venv found, rebuilding it:",
+				venvBase,
+			);
+		}
+		if (!(await this.createVenv(leftover))) return false;
+		if (this.venvExists()) return true;
+		// A fresh venv without interpreter: retry once from a clean directory.
+		if (!leftover && (await this.createVenv(true)) && this.venvExists()) {
+			return true;
+		}
+		const hint = isWindows()
+			? " If Python comes from the Microsoft Store, its writes under AppData are redirected: install Python from python.org or with uv."
+			: "";
+		this.fail(
+			`Python not found in virtual environment: ${this.getVenvPythonPath()} is missing after creating ${venvBase}.${hint}`,
+		);
+		return false;
+	}
+
+	/**
+	 * Whether the venv interpreter starts at all (exit 0 on a no-op script).
+	 * Tells a venv whose base Python is gone (exists but cannot run) from one
+	 * that only lacks packages.
+	 */
+	private async interpreterRuns(): Promise<boolean> {
+		const venvPython = this.getVenvPythonPath();
+		if (!venvPython || !existsSync(venvPython)) return false;
+		return await new Promise<boolean>((resolvePromise) => {
+			const proc = this.spawnTracked(venvPython, ["-c", "pass"], {
+				stdio: "ignore",
+				windowsHide: true,
+			});
+			if (!proc) {
+				// Shutting down: no verdict, and certainly no rebuild.
+				resolvePromise(true);
+				return;
+			}
+			const timer = setTimeout(() => {
+				try {
+					proc.kill();
+				} catch {
+					/* noop */
+				}
+				// Slow is not broken: a cold start on Windows can take a while.
+				resolvePromise(true);
+			}, 30000);
+			proc.on("error", () => {
+				clearTimeout(timer);
+				resolvePromise(false);
+			});
+			proc.on("close", (code) => {
+				clearTimeout(timer);
+				resolvePromise(code === 0);
 			});
 		});
 	}
@@ -471,12 +562,12 @@ export class PythonEnvManager extends EventEmitter {
 		);
 
 		if (!venvPython || !existsSync(venvPython)) {
-			this.emit("error", "Python not found in virtual environment");
+			this.fail("Python not found in virtual environment");
 			return false;
 		}
 
 		if (!existsSync(requirementsPath)) {
-			this.emit("error", "requirements.txt not found");
+			this.fail("requirements.txt not found");
 			return false;
 		}
 
@@ -539,8 +630,7 @@ export class PythonEnvManager extends EventEmitter {
 						"[PythonEnvManager] Failed to install deps:",
 						stderr || stdout,
 					);
-					this.emit(
-						"error",
+					this.fail(
 						`Failed to install dependencies: ${stderr || stdout}`,
 					);
 					resolve(false);
@@ -549,7 +639,7 @@ export class PythonEnvManager extends EventEmitter {
 
 			proc.on("error", (err) => {
 				console.error("[PythonEnvManager] Error installing deps:", err);
-				this.emit("error", `Failed to install dependencies: ${err.message}`);
+				this.fail(`Failed to install dependencies: ${err.message}`);
 				resolve(false);
 			});
 		});
@@ -604,6 +694,7 @@ export class PythonEnvManager extends EventEmitter {
 	): Promise<PythonEnvStatus> {
 		this.isInitializing = true;
 		this.autoBuildSourcePath = autoBuildSourcePath;
+		this.lastError = null;
 
 		debugLog(
 			"[PythonEnvManager] Initializing with path:",
@@ -654,10 +745,11 @@ export class PythonEnvManager extends EventEmitter {
 			);
 			this.usingBundledPackages = false;
 
-			// Check if venv exists
+			// Check if venv exists (with an interpreter: a leftover directory
+			// whose interpreter is gone is rebuilt)
 			if (!this.venvExists()) {
 				console.warn("[PythonEnvManager] Venv not found, creating...");
-				const created = await this.createVenv();
+				const created = await this.createUsableVenv();
 				if (!created) {
 					this.isInitializing = false;
 					return {
@@ -667,7 +759,7 @@ export class PythonEnvManager extends EventEmitter {
 						venvExists: false,
 						depsInstalled: false,
 						usingBundledPackages: false,
-						error: "Failed to create virtual environment",
+						error: this.lastError ?? "Failed to create virtual environment",
 					};
 				}
 			} else {
@@ -675,7 +767,25 @@ export class PythonEnvManager extends EventEmitter {
 			}
 
 			// Check if deps are installed
-			const depsInstalled = await this.checkDepsInstalled();
+			let depsInstalled = await this.checkDepsInstalled();
+			// Missing packages, or an interpreter that no longer starts (its base
+			// Python was removed)? Only the latter needs a rebuilt venv.
+			if (!depsInstalled && !(await this.interpreterRuns())) {
+				const rebuilt = await this.createUsableVenv(true);
+				if (!rebuilt) {
+					this.isInitializing = false;
+					return {
+						ready: false,
+						pythonPath: null,
+						sitePackagesPath: null,
+						venvExists: false,
+						depsInstalled: false,
+						usingBundledPackages: false,
+						error: this.lastError ?? "Failed to create virtual environment",
+					};
+				}
+				depsInstalled = await this.checkDepsInstalled();
+			}
 			if (!depsInstalled) {
 				console.warn(
 					"[PythonEnvManager] Dependencies not installed, installing...",
@@ -690,7 +800,7 @@ export class PythonEnvManager extends EventEmitter {
 						venvExists: true,
 						depsInstalled: false,
 						usingBundledPackages: false,
-						error: "Failed to install dependencies",
+						error: this.lastError ?? "Failed to install dependencies",
 					};
 				}
 			} else {
