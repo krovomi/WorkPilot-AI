@@ -48,4 +48,6 @@ def test_biome_comes_from_the_npm_registry():
 
 def test_the_server_image_retries_its_github_cli_download():
     dockerfile = (ROOT / "deploy" / "Dockerfile.server").read_text(encoding="utf-8")
-    assert "curl -fsSL --retry 6 --retry-delay 20" in dockerfile
+    # --retry alone skips connection resets (curl exit 56), which broke the
+    # develop build on 2026-11-08: every error has to be retried.
+    assert "curl -fsSL --retry 6 --retry-delay 20 --retry-all-errors" in dockerfile
