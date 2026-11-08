@@ -129,6 +129,11 @@
 		color: var(--wp-tone, var(--wp-accent));
 	}
 
+	/* Text in the tone of its element (a suggestion, a fix, a verdict). */
+	.wp-ink {
+		color: var(--wp-tone, var(--wp-accent));
+	}
+
 	.wp-title {
 		font-size: 0.95rem;
 		font-weight: 600;
@@ -158,6 +163,11 @@
 		font-size: 0.7rem;
 		color: var(--wp-muted);
 		white-space: nowrap;
+	}
+
+	/* A paragraph of meta text is a sentence: it wraps. */
+	p.wp-meta {
+		white-space: normal;
 	}
 
 	/* ── Header ─────────────────────────────────────────────────────────── */
@@ -391,10 +401,33 @@
 		cursor: pointer;
 	}
 
-	button.wp-chip[aria-pressed="true"] {
+	button.wp-chip[aria-pressed="true"],
+	button.wp-chip[aria-selected="true"] {
 		color: var(--wp-title);
 		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 60%, var(--wp-border));
 		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 12%, var(--wp-card-solid));
+	}
+
+	.wp-tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		position: relative;
+		z-index: 2;
+		padding: 0 1.25rem 0.75rem;
+	}
+
+	.wp-tab {
+		gap: 0.45rem;
+		padding: 0.3rem 0.8rem;
+		font-family: inherit;
+		font-size: 0.78rem;
+	}
+
+	.wp-tab-count {
+		font-family: var(--wp-mono);
+		font-size: 0.65rem;
+		color: var(--wp-faint);
 	}
 
 	.wp-btn {
@@ -583,6 +616,21 @@
 		position: absolute;
 		inset: 0 auto 0 0;
 		border-radius: inherit;
+		background: var(--wp-tone, var(--wp-accent));
+	}
+
+	/* A stacked bar: one segment per share, each in its own tone. */
+	.wp-stack {
+		display: flex;
+		height: 0.55rem;
+		overflow: hidden;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--foreground) 8%, transparent);
+	}
+
+	.wp-stack > i {
+		display: block;
+		height: 100%;
 		background: var(--wp-tone, var(--wp-accent));
 	}
 

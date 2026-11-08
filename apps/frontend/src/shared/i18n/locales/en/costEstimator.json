@@ -35,5 +35,13 @@
 		"costByProvider": "Cost by Provider",
 		"costByModel": "Cost by Model",
 		"noData": "No data"
+	},
+	"loading": "Loading costs…",
+	"emptyTitle": "No cost recorded yet",
+	"emptyBody": "Costs appear here once a task has called a model for this project.",
+	"breakdownTitle": "Where the money goes",
+	"kickers": {
+		"budget": "Budget",
+		"breakdown": "Breakdown"
 	}
 }

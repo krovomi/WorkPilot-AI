@@ -1,5 +1,5 @@
 {
-	"title": "Notifications Slack / Teams",
+	"title": "Bot d’équipe",
 	"platform": "Plateforme",
 	"webhookUrl": "URL du webhook",
 	"enabled": "Activer les notifications",
@@ -7,5 +7,26 @@
 	"sending": "Envoi…",
 	"ok": "Livré",
 	"error": "Échec de la livraison",
-	"help": "Les notifications sont envoyées quand un agent termine, quand une alerte de coût se déclenche, quand un garde-fou bloque une action, ou quand une modification a un rayon d'impact élevé."
+	"help": "Les notifications sont envoyées quand un agent termine, quand une alerte de coût se déclenche, quand un garde-fou bloque une action, ou quand une modification a un rayon d'impact élevé.",
+	"description": "Votre équipe suit les agents sur Slack ou Microsoft Teams, par un webhook entrant.",
+	"platforms": {
+		"slack": "Slack",
+		"teams": "Microsoft Teams"
+	},
+	"webhookPlaceholder": {
+		"slack": "https://hooks.slack.com/services/…",
+		"teams": "https://….webhook.office.com/…"
+	},
+	"kickers": {
+		"connection": "Connexion",
+		"events": "Quand"
+	},
+	"connectionTitle": "Canal",
+	"eventsTitle": "Messages envoyés",
+	"events": {
+		"agentDone": "Agent terminé",
+		"costAlert": "Alerte de coût",
+		"guardrailBlock": "Blocage par un garde-fou",
+		"blastRadius": "Rayon d’impact élevé"
+	}
 }

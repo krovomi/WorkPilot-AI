@@ -55,7 +55,7 @@ export function PluginCard({
 	return (
 		<div
 			className={cn(
-				"group flex flex-col rounded-xl border border-border bg-card p-5 transition-all duration-200",
+				"wp-card group flex flex-col p-5 transition-colors",
 				"hover:border-primary/30 hover:shadow-md hover:shadow-primary/5",
 			)}
 		>

@@ -21,8 +21,14 @@ export type TestFramework =
 	| "mocha"
 	| "junit5"
 	| "go_test"
+	| "testng"
 	| "xunit"
-	| "cargo_test";
+	| "nunit"
+	| "cargo_test"
+	| "phpunit"
+	| "rspec"
+	| "dart_test"
+	| "xctest";
 
 export interface StackFrame {
 	file: string;

@@ -1,14 +1,9 @@
 {
-	"noData": "Aucune donnée de notebook disponible",
-	"title": "Analyse de Notebook",
+	"noData": "Lancez le contrôle : WorkPilot cherche les fichiers .ipynb, .dib, .qmd et .Rmd du projet.",
+	"title": "Contrôles de notebook",
 	"totalCells": "Cellules Totales",
-	"codeCells": "Cellules de Code",
-	"markdown": "Markdown",
 	"issues": "Problèmes",
-	"severity": "Sévérité",
 	"cellIndex": "Cellule #{{index}}",
-	"issueType": "Type de Problème",
-	"suggestion": "Suggestion",
 	"actions": {
 		"runScan": "Analyser les notebooks",
 		"cancel": "Annuler",
@@ -18,5 +13,29 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour analyser ses notebooks.",
 		"failed": "Échec de l'analyse : {{error}}"
+	},
+	"description": "Ordre d’exécution, cellules vides ou trop longues et texte manquant, dans les notebooks Jupyter (tout noyau), .NET Polyglot (.dib), Quarto et R Markdown.",
+	"idleTitle": "Aucun contrôle pour l’instant",
+	"emptyTitle": "Aucun notebook dans ce projet",
+	"notebooks": "Notebooks",
+	"notebooksTitle": "Notebooks contrôlés",
+	"noIssues": "Aucun problème dans ce notebook.",
+	"cellSummary": "{{total}} cellules · {{code}} de code · {{markdown}} de texte",
+	"kickers": {
+		"notebooks": "Résultats"
+	},
+	"severities": {
+		"error": "Erreur",
+		"warning": "Avertissement",
+		"info": "Info"
+	},
+	"issueTypes": {
+		"stale_output": "Sortie périmée",
+		"out_of_order": "Ordre d’exécution",
+		"missing_import": "Import manquant",
+		"empty_cell": "Cellule vide",
+		"long_cell": "Cellule longue",
+		"no_markdown": "Pas de texte",
+		"sensitive_output": "Sortie sensible"
 	}
 }

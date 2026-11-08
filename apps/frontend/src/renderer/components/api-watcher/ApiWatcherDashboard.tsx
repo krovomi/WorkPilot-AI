@@ -1,28 +1,44 @@
+import { AlertTriangle, BookmarkCheck, FileJson, Play, RotateCcw, Square } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApiWatcherStore } from "../../stores/api-watcher-store";
-import type {
-	ContractChange,
-	ContractDiff,
-} from "../../../shared/types/api-watcher";
+import type { ChangeCategory, ContractChange, ContractDiff } from "../../../shared/types/api-watcher";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 
-const CATEGORY_STYLES: Record<string, { color: string; icon: string }> = {
-	breaking: { color: "text-destructive bg-destructive/10", icon: "🔴" },
-	potentially_breaking: {
-		color: "text-warning bg-warning/10",
-		icon: "🟡",
-	},
-	non_breaking: { color: "text-success bg-success/10", icon: "🟢" },
+const CATEGORY_TONES: Record<ChangeCategory, Tone> = {
+	breaking: "red",
+	potentially_breaking: "amber",
+	non_breaking: "green",
+};
+
+const CATEGORY_KEYS: Record<ChangeCategory, string> = {
+	breaking: "breaking",
+	potentially_breaking: "potentiallyBreaking",
+	non_breaking: "nonBreaking",
 };
 
 interface ApiWatcherDashboardProps {
 	readonly projectPath?: string;
 }
 
-export function ApiWatcherDashboard({
-	projectPath,
-}: ApiWatcherDashboardProps): React.ReactElement {
-	const { t } = useTranslation("apiWatcher");
+/** OpenAPI, GraphQL and protobuf contracts compared with the saved baseline. */
+export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): React.ReactElement {
+	const { t } = useTranslation(["apiWatcher", "navigation"]);
 
 	const phase = useApiWatcherStore((s) => s.phase);
 	const status = useApiWatcherStore((s) => s.status);
@@ -33,172 +49,157 @@ export function ApiWatcherDashboard({
 	const reset = useApiWatcherStore((s) => s.reset);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center gap-3 flex-wrap">
-				{isScanning ? (
-					<button
-						type="button"
-						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-					>
-						{t("actions.cancel")}
-					</button>
-				) : (
+		<ModuleStage scroll="page" data-testid="api-watcher-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("apiWatcher:title")}
+				description={t("apiWatcher:description")}
+				icon={FileJson}
+				tone="blue"
+				actions={
 					<>
-						<button
-							type="button"
-							onClick={() => projectPath && startScan(projectPath, false)}
-							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-						>
-							{t("actions.runScan")}
-						</button>
-						<button
-							type="button"
-							onClick={() => projectPath && startScan(projectPath, true)}
-							disabled={!canRun}
-							className="px-3 py-1.5 rounded bg-card border border-border text-sm disabled:opacity-50 hover:bg-muted"
-						>
-							{t("actions.saveBaseline")}
-						</button>
+						{result && !isScanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("apiWatcher:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelScan()}>
+								{t("apiWatcher:actions.cancel")}
+							</CharterButton>
+						) : (
+							<>
+								<CharterButton
+									icon={BookmarkCheck}
+									onClick={() => projectPath && startScan(projectPath, true)}
+									disabled={!projectPath}
+								>
+									{t("apiWatcher:actions.saveBaseline")}
+								</CharterButton>
+								<CharterButton
+									variant="primary"
+									icon={Play}
+									onClick={() => projectPath && startScan(projectPath, false)}
+									disabled={!projectPath}
+								>
+									{t("apiWatcher:actions.runScan")}
+								</CharterButton>
+							</>
+						)}
 					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("apiWatcher:errors.noProject")}
+					</Notice>
 				)}
-				{result && !isScanning && (
-					<button
-						type="button"
-						onClick={reset}
-						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-					>
-						{t("actions.reset")}
-					</button>
+				{isScanning && <ScanLine label={status || t("apiWatcher:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("apiWatcher:errors.failed", { error })}
+					</Notice>
 				)}
-			</div>
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{result?.diff ? (
-				<ReportBody
-					diff={result.diff}
-					migrationGuideMarkdown={result.migrationGuideMarkdown}
-					summary={result.summary}
-					t={t}
-				/>
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
+				{result?.diff ? (
+					<ReportBody diff={result.diff} guide={result.migrationGuideMarkdown} summary={result.summary} />
+				) : (
+					!isScanning && (
+						<EmptyStage icon={FileJson} tone="blue" title={t("apiWatcher:idleTitle")}>
+							{t("apiWatcher:noData")}
+						</EmptyStage>
+					)
+				)}
+			</Page>
+		</ModuleStage>
 	);
 }
 
 function ReportBody({
 	diff,
-	migrationGuideMarkdown,
+	guide,
 	summary,
-	t,
 }: {
 	readonly diff: ContractDiff;
-	readonly migrationGuideMarkdown: string;
+	readonly guide: string;
 	readonly summary: string;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
-	const hasChanges = diff.changes.length > 0;
+	const { t } = useTranslation("apiWatcher");
+	const [category, setCategory] = useState<ChangeCategory | "all">("all");
+	const changes = diff.changes.filter((c) => category === "all" || c.category === category);
+	const counts: Record<ChangeCategory, number> = {
+		breaking: diff.breakingCount,
+		potentially_breaking: diff.potentiallyBreakingCount,
+		non_breaking: diff.nonBreakingCount,
+	};
+
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{summary ||
-						(hasChanges
-							? t("changesDetected", { count: diff.changes.length })
-							: t("noChanges"))}
-				</p>
-			</div>
-
-			<div className="grid grid-cols-3 gap-3">
-				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-					<p className="text-xs text-destructive">{t("categories.breaking")}</p>
-					<p className="text-2xl font-bold text-destructive">
-						{diff.breakingCount}
-					</p>
-				</div>
-				<div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
-					<p className="text-xs text-warning">
-						{t("categories.potentiallyBreaking")}
-					</p>
-					<p className="text-2xl font-bold text-warning">
-						{diff.potentiallyBreakingCount}
-					</p>
-				</div>
-				<div className="p-3 rounded-lg bg-success/10 border border-success/20">
-					<p className="text-xs text-success">
-						{t("categories.nonBreaking")}
-					</p>
-					<p className="text-2xl font-bold text-success">
-						{diff.nonBreakingCount}
-					</p>
-				</div>
-			</div>
-
-			<div className="space-y-2">
-				{diff.changes.map((change) => (
-					<ChangeRow key={change.path} change={change} />
+		<>
+			<Stats>
+				{(Object.keys(counts) as ChangeCategory[]).map((c) => (
+					<Stat
+						key={c}
+						label={t(`categories.${CATEGORY_KEYS[c]}`)}
+						value={counts[c]}
+						tone={counts[c] ? CATEGORY_TONES[c] : "muted"}
+					/>
 				))}
-			</div>
-
-			{migrationGuideMarkdown && (
-				<div className="mt-4 p-4 rounded-lg bg-card border border-border">
-					<h3 className="text-sm font-medium mb-2">{t("migrationGuide")}</h3>
-					<pre className="text-xs whitespace-pre-wrap font-mono text-muted-foreground">
-						{migrationGuideMarkdown}
-					</pre>
+			</Stats>
+			<Section
+				kicker={t("kickers.changes")}
+				title={
+					diff.changes.length ? t("changesDetected", { count: diff.changes.length }) : t("noChanges")
+				}
+				meta={diff.format !== "unknown" ? t(`formats.${diff.format}`, { defaultValue: diff.format }) : undefined}
+				description={summary || undefined}
+			>
+				{diff.changes.length > 0 && (
+					<div className="wp-chips mb-3">
+						<Chip tone="blue" pressed={category === "all"} onClick={() => setCategory("all")}>
+							{t("allCategories")} <span className="font-mono">{diff.changes.length}</span>
+						</Chip>
+						{(Object.keys(counts) as ChangeCategory[])
+							.filter((c) => counts[c] > 0)
+							.map((c) => (
+								<Chip key={c} tone={CATEGORY_TONES[c]} pressed={category === c} onClick={() => setCategory(c)}>
+									{t(`categories.${CATEGORY_KEYS[c]}`)} <span className="font-mono">{counts[c]}</span>
+								</Chip>
+							))}
+					</div>
+				)}
+				<div className="grid gap-2.5">
+					{changes.map((change) => (
+						<ChangePanel key={`${change.changeType}-${change.path}`} change={change} />
+					))}
 				</div>
+			</Section>
+			{guide && (
+				<Section kicker={t("kickers.guide")} title={t("migrationGuide")}>
+					<pre className="wp-code max-h-96 overflow-auto whitespace-pre-wrap text-xs">{guide}</pre>
+				</Section>
 			)}
-		</div>
+		</>
 	);
 }
 
-function ChangeRow({
-	change,
-}: {
-	readonly change: ContractChange;
-}): React.ReactElement {
-	const style =
-		CATEGORY_STYLES[change.category] ?? CATEGORY_STYLES.non_breaking;
+function ChangePanel({ change }: { readonly change: ContractChange }): React.ReactElement {
+	const { t } = useTranslation("apiWatcher");
+	const tone = CATEGORY_TONES[change.category] ?? "muted";
 	return (
-		<div
-			className={`flex items-center gap-3 px-3 py-2 rounded-lg ${style.color}`}
-		>
-			<span>{style.icon}</span>
-			<div className="flex-1 min-w-0">
-				<p className="text-sm">{change.description}</p>
-				<p className="text-xs opacity-70 font-mono">{change.path}</p>
+		<Panel rail tone={tone}>
+			<div className="flex flex-wrap items-center gap-2">
+				<Chip tone={tone}>{t(`categories.${CATEGORY_KEYS[change.category] ?? "nonBreaking"}`)}</Chip>
+				<span className="wp-meta">{t(`changeTypes.${change.changeType}`, { defaultValue: change.changeType })}</span>
 			</div>
-			<span className="text-xs opacity-70">
-				{change.changeType.replaceAll("_", " ")}
-			</span>
-		</div>
+			<p className="mt-1.5 text-sm">{change.description}</p>
+			<p className="wp-meta mt-1 font-mono">{change.path}</p>
+			{(change.oldValue || change.newValue) && (
+				<p className="wp-meta mt-1 font-mono">
+					{change.oldValue ?? "∅"} → {change.newValue ?? "∅"}
+				</p>
+			)}
+		</Panel>
 	);
 }

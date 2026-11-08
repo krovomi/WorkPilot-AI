@@ -4,9 +4,9 @@ import {
 	ChevronDown,
 	Code,
 	Copy,
-	Loader2,
 	Plus,
 	RotateCcw,
+	X,
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +20,8 @@ import {
 	useContextAwareSnippetsStore,
 } from "../../stores/context-aware-snippets-store";
 import { useProjectStore } from "../../stores/project-store";
+import { CharterButton, Notice, ScanLine } from "../charter";
+import "../charter/charter.css";
 import { Button } from "../ui/button";
 import {
 	Collapsible,
@@ -97,7 +99,7 @@ interface ContextAwareSnippetsDialogProps {
 export function ContextAwareSnippetsDialog({
 	onCopySnippet,
 }: ContextAwareSnippetsDialogProps) {
-	const { t } = useTranslation(["contextAwareSnippets", "common"]);
+	const { t } = useTranslation(["contextAwareSnippets", "common", "navigation"]);
 	const [copied, setCopied] = useState(false);
 	const streamOutputRef = useRef<HTMLPreElement>(null);
 
@@ -177,9 +179,10 @@ export function ContextAwareSnippetsDialog({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+			<DialogContent className="wp-scope sm:max-w-[800px] max-h-[90vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
+					<span className="wp-kicker">{t("navigation:groups.explore")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
 						<Zap className="h-5 w-5 text-primary" />
 						{t("contextAwareSnippets:title")}
 					</DialogTitle>
@@ -203,12 +206,6 @@ export function ContextAwareSnippetsDialog({
 						>
 							<SelectTrigger
 								id="snippet-type-select"
-								className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-								style={{
-									border: "2px solid rgb(250, 204, 21)",
-									borderRadius: "0.5rem",
-									outline: "none",
-								}}
 							>
 								<SelectValue />
 							</SelectTrigger>
@@ -243,12 +240,7 @@ export function ContextAwareSnippetsDialog({
 							placeholder={t(
 								"contextAwareSnippets:snippetDescription.placeholder",
 							)}
-							className="min-h-[100px] border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-							style={{
-								border: "2px solid rgb(250, 204, 21)",
-								borderRadius: "0.5rem",
-								outline: "none",
-							}}
+							className="min-h-[100px]"
 							disabled={isGenerating}
 						/>
 					</div>
@@ -278,12 +270,6 @@ export function ContextAwareSnippetsDialog({
 						>
 							<SelectTrigger
 								id="language-select"
-								className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-								style={{
-									border: "2px solid rgb(250, 204, 21)",
-									borderRadius: "0.5rem",
-									outline: "none",
-								}}
 							>
 								<SelectValue
 									placeholder={t("contextAwareSnippets:language.placeholder")}
@@ -306,22 +292,17 @@ export function ContextAwareSnippetsDialog({
 
 					{/* No Project Warning */}
 					{!selectedProjectId && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-							<p className="text-sm text-destructive">
-								{t("contextAwareSnippets:errors.noProject")}
-							</p>
-						</div>
+						<Notice tone="amber" icon={AlertTriangle}>
+							{t("contextAwareSnippets:errors.noProject")}
+						</Notice>
 					)}
 
 					{/* Status / Streaming Output during generation */}
 					{isGenerating && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin text-primary" />
-								<span>
-									{t(`contextAwareSnippets:status.${status || "context"}`)}
-								</span>
-							</div>
+							<ScanLine
+								label={t(`contextAwareSnippets:status.${status || "context"}`)}
+							/>
 							<p className="text-xs text-muted-foreground">
 								{t("contextAwareSnippets:status.backgroundHint")}
 							</p>
@@ -332,7 +313,7 @@ export function ContextAwareSnippetsDialog({
 									</Label>
 									<pre
 										ref={streamOutputRef}
-										className="bg-muted/50 rounded-lg p-3 text-xs font-mono max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word"
+										className="wp-code max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word p-3 text-xs"
 									>
 										{streamingOutput}
 									</pre>
@@ -356,79 +337,66 @@ export function ContextAwareSnippetsDialog({
 				</div>
 
 				{/* Footer Buttons */}
-				<DialogFooter className="gap-2 sm:gap-0">
-					{/* Idle / Input state */}
+				<DialogFooter className="gap-2 sm:gap-2">
 					{phase === "idle" && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<CharterButton variant="ghost" onClick={handleClose}>
 								{t("contextAwareSnippets:actions.close")}
-							</Button>
-							<Button
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={Code}
 								onClick={handleGenerate}
 								disabled={!canGenerate}
-								className="gap-2"
 							>
-								<Code className="h-4 w-4" />
 								{t("contextAwareSnippets:actions.generate")}
-							</Button>
+							</CharterButton>
 						</>
 					)}
 
-					{/* Generating state */}
 					{isGenerating && (
 						<>
-							<Button variant="ghost" onClick={handleCancel}>
+							<CharterButton variant="danger" icon={X} onClick={handleCancel}>
 								{t("contextAwareSnippets:actions.cancel")}
-							</Button>
-							<Button variant="outline" onClick={handleClose}>
+							</CharterButton>
+							<CharterButton onClick={handleClose}>
 								{t("contextAwareSnippets:actions.runInBackground")}
-							</Button>
+							</CharterButton>
 						</>
 					)}
 
-					{/* Error state */}
 					{isError && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<CharterButton variant="ghost" onClick={handleClose}>
 								{t("contextAwareSnippets:actions.close")}
-							</Button>
-							<Button onClick={handleTryAgain} className="gap-2">
-								<RotateCcw className="h-4 w-4" />
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={RotateCcw}
+								onClick={handleTryAgain}
+							>
 								{t("contextAwareSnippets:actions.tryAgain")}
-							</Button>
+							</CharterButton>
 						</>
 					)}
 
-					{/* Complete state */}
 					{isComplete && result && (
 						<>
-							<Button variant="outline" onClick={handleClose}>
+							<CharterButton variant="ghost" onClick={handleClose}>
 								{t("contextAwareSnippets:actions.close")}
-							</Button>
-							<Button
-								variant="outline"
-								onClick={handleTryAgain}
-								className="gap-2"
-							>
-								<Plus className="h-4 w-4" />
+							</CharterButton>
+							<CharterButton icon={Plus} onClick={handleTryAgain}>
 								{t("contextAwareSnippets:actions.newSnippet")}
-							</Button>
-							<Button
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={copied ? Check : Copy}
 								onClick={() => handleCopy(result.snippet)}
-								className="gap-2"
 							>
-								{copied ? (
-									<>
-										<Check className="h-4 w-4" />
-										{t("contextAwareSnippets:actions.copied")}
-									</>
-								) : (
-									<>
-										<Copy className="h-4 w-4" />
-										{t("contextAwareSnippets:actions.copy")}
-									</>
-								)}
-							</Button>
+								{copied
+									? t("contextAwareSnippets:actions.copied")
+									: t("contextAwareSnippets:actions.copy")}
+							</CharterButton>
 						</>
 					)}
 				</DialogFooter>

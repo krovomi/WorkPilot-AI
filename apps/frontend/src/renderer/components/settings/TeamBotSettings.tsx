@@ -1,95 +1,108 @@
-import { Check, MessageSquare, Send, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, MessageSquare, Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTeamBotStore } from "../../stores/team-bot-store";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	Chip,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	Section,
+} from "../charter";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
 
-const SELECT_CLASS =
-	"h-9 rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+const PLATFORMS = ["slack", "teams"] as const;
+const EVENTS = ["agentDone", "costAlert", "guardrailBlock", "blastRadius"] as const;
 
+/** Team notifications on Slack or Microsoft Teams, through an incoming webhook. */
 export function TeamBotSettings() {
-	const { t } = useTranslation(["teamBot", "common"]);
-	const { config, testing, lastResult, lastError, setConfig, sendTest } =
-		useTeamBotStore();
+	const { t } = useTranslation(["teamBot", "navigation"]);
+	const { config, testing, lastResult, lastError, setConfig, sendTest } = useTeamBotStore();
 
 	return (
-		<div className="flex flex-col gap-3 p-4">
-			<h3 className="text-base font-semibold flex items-center gap-2">
-				<MessageSquare className="w-4 h-4" />
-				{t("teamBot:title", "Slack / Teams notifications")}
-			</h3>
-
-			<div className="grid grid-cols-1 gap-2">
-				<div>
-					<Label className="text-xs">
-						{t("teamBot:platform", "Platform")}
-					</Label>
-					<select
-						className={SELECT_CLASS}
-						value={config.kind}
-						onChange={(e) =>
-							setConfig({ kind: e.target.value as "slack" | "teams" })
-						}
-					>
-						<option value="slack">Slack</option>
-						<option value="teams">Microsoft Teams</option>
-					</select>
-				</div>
-
-				<div>
-					<Label className="text-xs">
-						{t("teamBot:webhookUrl", "Webhook URL")}
-					</Label>
-					<Input
-						value={config.webhook_url}
-						onChange={(e) => setConfig({ webhook_url: e.target.value })}
-						placeholder="https://hooks.slack.com/services/…"
-						type="url"
-					/>
-				</div>
-
-				<label className="flex items-center gap-2 text-sm">
-					<input
-						type="checkbox"
-						checked={config.enabled ?? false}
-						onChange={(e) => setConfig({ enabled: e.target.checked })}
-					/>
-					{t("teamBot:enabled", "Enable notifications")}
-				</label>
-
-				<div className="flex items-center gap-2">
-					<Button
-						size="sm"
-						onClick={sendTest}
+		<ModuleStage scroll="page" data-testid="team-bot-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("teamBot:title")}
+				description={t("teamBot:description")}
+				icon={MessageSquare}
+				tone="violet"
+				actions={
+					<CharterButton
+						variant="primary"
+						icon={Send}
+						busy={testing}
+						onClick={() => void sendTest()}
 						disabled={testing || !config.webhook_url.trim()}
 					>
-						<Send className="w-3 h-3 mr-1" />
-						{testing
-							? t("teamBot:sending", "Sending…")
-							: t("teamBot:sendTest", "Send test message")}
-					</Button>
-					{lastResult === "ok" && (
-						<span className="text-xs text-success flex items-center gap-1">
-							<Check className="w-3 h-3" />
-							{t("teamBot:ok", "Delivered")}
-						</span>
-					)}
-					{lastResult === "error" && (
-						<span className="text-xs text-destructive flex items-center gap-1">
-							<X className="w-3 h-3" />
-							{lastError ?? t("teamBot:error", "Delivery failed")}
-						</span>
-					)}
-				</div>
-			</div>
-
-			<p className="text-xs text-muted-foreground">
-				{t(
-					"teamBot:help",
-					"Notifications are sent when an agent finishes, a cost alert fires, a guardrail blocks an action, or a change has a high blast radius.",
+						{testing ? t("teamBot:sending") : t("teamBot:sendTest")}
+					</CharterButton>
+				}
+			/>
+			<Page className="space-y-4">
+				{lastResult === "ok" && (
+					<Notice tone="green" icon={CheckCircle2}>
+						{t("teamBot:ok")}
+					</Notice>
 				)}
-			</p>
-		</div>
+				{lastResult === "error" && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{lastError ?? t("teamBot:error")}
+					</Notice>
+				)}
+				<Section kicker={t("teamBot:kickers.connection")} title={t("teamBot:connectionTitle")}>
+					<Panel className="space-y-4">
+						<div className="space-y-1.5">
+							<span className="wp-kicker block">{t("teamBot:platform")}</span>
+							<div className="wp-chips">
+								{PLATFORMS.map((kind) => (
+									<Chip
+										key={kind}
+										tone="violet"
+										pressed={config.kind === kind}
+										onClick={() => setConfig({ kind })}
+									>
+										{t(`teamBot:platforms.${kind}`)}
+									</Chip>
+								))}
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<label htmlFor="team-bot-webhook" className="wp-kicker block">
+								{t("teamBot:webhookUrl")}
+							</label>
+							<Input
+								id="team-bot-webhook"
+								value={config.webhook_url}
+								onChange={(e) => setConfig({ webhook_url: e.target.value })}
+								placeholder={t(`teamBot:webhookPlaceholder.${config.kind}`)}
+								type="url"
+								className="font-mono text-xs"
+							/>
+						</div>
+						<label htmlFor="team-bot-enabled" className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+							{t("teamBot:enabled")}
+							<Switch
+								id="team-bot-enabled"
+								checked={config.enabled ?? false}
+								onCheckedChange={(checked) => setConfig({ enabled: checked })}
+							/>
+						</label>
+					</Panel>
+				</Section>
+				<Section kicker={t("teamBot:kickers.events")} title={t("teamBot:eventsTitle")} description={t("teamBot:help")}>
+					<div className="wp-chips">
+						{EVENTS.map((event) => (
+							<Chip key={event} tone={config.enabled ? "green" : "muted"}>
+								{t(`teamBot:events.${event}`)}
+							</Chip>
+						))}
+					</div>
+				</Section>
+			</Page>
+		</ModuleStage>
 	);
 }

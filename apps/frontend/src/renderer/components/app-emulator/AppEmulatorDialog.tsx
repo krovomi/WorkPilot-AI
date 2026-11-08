@@ -2,13 +2,11 @@ import {
 	Check,
 	Copy,
 	ExternalLink,
-	Globe,
 	Loader2,
 	Monitor,
 	RefreshCw,
 	RotateCcw,
 	Search,
-	Server,
 	Square,
 	Terminal as TerminalIcon,
 	X,
@@ -27,12 +25,12 @@ import {
 	useAppEmulatorStore,
 } from "@/stores/app-emulator-store";
 import { useProjectStore } from "@/stores/project-store";
-import { Badge } from "../ui/badge";
 import {
 	buildLandingUrl,
 	isBrowsableUrl,
 } from "../../../shared/utils/emulator-landing";
-import { Button } from "../ui/button";
+import { CharterButton, Chip } from "../charter";
+import "../charter/charter.css";
 import {
 	Dialog,
 	DialogContent,
@@ -150,7 +148,7 @@ function renderColorizedContent(text: string) {
  * (web apps) or terminal output (CLI/desktop apps).
  */
 export function AppEmulatorDialog() {
-	const { t } = useTranslation(["appEmulator", "common"]);
+	const { t } = useTranslation(["appEmulator", "common", "navigation"]);
 	const outputRef = useRef<HTMLPreElement>(null);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [copied, setCopied] = useState(false);
@@ -325,19 +323,12 @@ export function AppEmulatorDialog() {
 
 	const isLoading = phase === "detecting" || phase === "starting";
 
-	/** Shared badge class builder for clickable tabs */
-	const tabClass = (isActive: boolean) =>
-		`gap-1 cursor-pointer select-none transition-colors ${
-			isActive
-				? "border-warning bg-warning/10 text-warning hover:bg-warning/20"
-				: "hover:border-muted-foreground/60"
-		}`;
-
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="max-w-5xl h-[80vh] flex flex-col">
+			<DialogContent className="wp-scope max-w-5xl h-[80vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
+					<span className="wp-kicker">{t("navigation:groups.toolbox")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
 						<Monitor className="h-5 w-5" />
 						{t("appEmulator:title")}
 					</DialogTitle>
@@ -346,48 +337,40 @@ export function AppEmulatorDialog() {
 
 				{/* Project Info Bar — tabs row */}
 				{config && (
-					<div className="flex items-center gap-3 text-sm flex-wrap">
+					<div className="wp-chips">
 						{isMultiService ? (
 							<>
 								{services?.map((svc) => (
-									<Badge
+									<Chip
 										key={svc.label}
-										variant="outline"
-										className={tabClass(resolvedTab === svc.label)}
+										tone="amber"
+										pressed={resolvedTab === svc.label}
 										onClick={() => setActiveTab(svc.label)}
 									>
-										<Server className="h-3 w-3" />
-										{svc.label}
-										{svc.port > 0 && (
-											<span className="opacity-70">:{svc.port}</span>
-										)}
-										{svc.isPrimary && (
-											<span className="text-xs opacity-70 ml-0.5">API</span>
-										)}
-									</Badge>
+										{svc.port > 0
+											? t("appEmulator:projectInfo.serviceWithPort", { name: svc.label, port: svc.port })
+											: svc.label}
+										{svc.isPrimary && <span className="wp-meta">{t("appEmulator:projectInfo.api")}</span>}
+									</Chip>
 								))}
 								{/* Preview tab — only shown once the server is running */}
 								{phase === "running" && isWeb && (
-									<Badge
-										variant="outline"
-										className={tabClass(resolvedTab === PREVIEW_TAB)}
+									<Chip
+										tone="blue"
+										pressed={resolvedTab === PREVIEW_TAB}
 										onClick={() => setActiveTab(PREVIEW_TAB)}
 									>
-										<Globe className="h-3 w-3" />
 										{t("appEmulator:tabs.preview")}
-									</Badge>
+									</Chip>
 								)}
 							</>
 						) : (
 							<>
-								<Badge variant="outline" className="gap-1">
-									<Server className="h-3 w-3" />
-									{config.framework}
-								</Badge>
+								<Chip tone="amber">{config.framework}</Chip>
 								{config.port > 0 && (
-									<Badge variant="secondary">
-										{t("appEmulator:projectInfo.port")}: {config.port}
-									</Badge>
+									<Chip tone="muted" dot={false}>
+										{t("appEmulator:projectInfo.portValue", { port: config.port })}
+									</Chip>
 								)}
 							</>
 						)}
@@ -395,7 +378,7 @@ export function AppEmulatorDialog() {
 				)}
 
 				{/* Main Content Area */}
-				<div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border flex flex-col">
+				<div className="wp-card flex-1 min-h-0 overflow-hidden flex flex-col">
 					{/* Loading State — step indicator + live terminal */}
 					{isLoading && (
 						<div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -480,7 +463,7 @@ export function AppEmulatorDialog() {
 							{/* Live terminal output */}
 							<pre
 								ref={outputRef}
-								className="flex-1 min-h-0 m-3 overflow-y-auto text-xs font-mono text-muted-foreground p-3 whitespace-pre-wrap bg-muted/50 rounded-lg"
+								className="wp-code flex-1 min-h-0 m-3 overflow-y-auto text-xs whitespace-pre-wrap"
 							>
 								{searchFilteredOutput ? (
 									renderColorizedContent(searchFilteredOutput)
@@ -549,7 +532,7 @@ export function AppEmulatorDialog() {
 								<div className="p-4">
 									<pre
 										ref={outputRef}
-										className="text-xs font-mono text-foreground whitespace-pre-wrap bg-muted/50 rounded-lg p-3"
+										className="wp-code text-xs whitespace-pre-wrap"
 									>
 										{(() => {
 											if (searchFilteredOutput) {
@@ -585,7 +568,7 @@ export function AppEmulatorDialog() {
 							{searchFilteredOutput && (
 								<pre
 									ref={outputRef}
-									className="flex-1 min-h-0 mx-4 mb-4 overflow-y-auto text-xs font-mono text-muted-foreground p-3 whitespace-pre-wrap bg-muted/50 rounded-lg"
+									className="wp-code flex-1 min-h-0 mx-4 mb-4 overflow-y-auto text-xs whitespace-pre-wrap"
 								>
 									{renderColorizedContent(searchFilteredOutput)}
 								</pre>
@@ -617,47 +600,34 @@ export function AppEmulatorDialog() {
 					<div className="flex gap-2">
 						{showPreview && (
 							<>
-								<Button variant="outline" size="sm" onClick={handleRefresh}>
-									<RefreshCw className="h-4 w-4 mr-1.5" />
+								<CharterButton size="sm" variant="ghost" icon={RefreshCw} onClick={handleRefresh}>
 									{t("appEmulator:actions.refresh")}
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={handleOpenInBrowser}
-								>
-									<ExternalLink className="h-4 w-4 mr-1.5" />
+								</CharterButton>
+								<CharterButton size="sm" variant="ghost" icon={ExternalLink} onClick={handleOpenInBrowser}>
 									{t("appEmulator:actions.openInBrowser")}
-								</Button>
+								</CharterButton>
 							</>
 						)}
 						{!showPreview && searchFilteredOutput && (
-							<Button variant="outline" size="sm" onClick={handleCopyLogs}>
-								{copied ? (
-									<Check className="h-4 w-4 mr-1.5 text-success" />
-								) : (
-									<Copy className="h-4 w-4 mr-1.5" />
-								)}
+							<CharterButton size="sm" variant="ghost" icon={copied ? Check : Copy} onClick={handleCopyLogs}>
 								{t("appEmulator:actions.copyLogs")}
-							</Button>
+							</CharterButton>
 						)}
 					</div>
 					<div className="flex gap-2">
 						{(phase === "error" || phase === "stopped") && (
-							<Button variant="outline" size="sm" onClick={handleRetry}>
-								<RotateCcw className="h-4 w-4 mr-1.5" />
+							<CharterButton size="sm" variant="primary" icon={RotateCcw} onClick={handleRetry}>
 								{t("appEmulator:actions.retry")}
-							</Button>
+							</CharterButton>
 						)}
 						{(phase === "running" || phase === "starting") && (
-							<Button variant="destructive" size="sm" onClick={handleStop}>
-								<Square className="h-4 w-4 mr-1.5" />
+							<CharterButton size="sm" variant="danger" icon={Square} onClick={handleStop}>
 								{t("appEmulator:actions.stop")}
-							</Button>
+							</CharterButton>
 						)}
-						<Button variant="outline" size="sm" onClick={handleClose}>
+						<CharterButton size="sm" onClick={handleClose}>
 							{t("appEmulator:actions.close")}
-						</Button>
+						</CharterButton>
 					</div>
 				</DialogFooter>
 			</DialogContent>

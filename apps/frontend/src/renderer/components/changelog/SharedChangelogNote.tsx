@@ -46,7 +46,7 @@ export function SharedChangelogNote({
 	const version = typeof report.version === "string" ? report.version : "";
 	const date = saved?.finishedAt ? new Date(saved.finishedAt) : null;
 	return (
-		<div className="flex items-center justify-between gap-4 border-b border-border bg-muted/30 px-6 py-3">
+		<div className="wp-card wp-rail wp-tone-blue relative z-[1] mx-5 mb-3 flex items-center justify-between gap-4 px-4 py-2.5">
 			<p className="flex items-center gap-2 text-sm text-muted-foreground">
 				<FileText className="h-4 w-4 shrink-0" />
 				{t("server.lastShared", {

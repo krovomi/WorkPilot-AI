@@ -27,9 +27,9 @@ from regression_guardian import (  # noqa: E402
     DedupChecker,
     Incident,
     PipelineResult,
-    TestFramework,
     WebhookHandler,
 )
+from regression_guardian.stacks import detect_framework  # noqa: E402
 
 INCIDENTS_SUBDIR = Path(".workpilot") / "incidents"
 
@@ -125,9 +125,12 @@ def run_scan(project_path: Path) -> dict[str, Any]:
         {"status": f"Processing {len(incident_files)} incident(s)..."},
     )
 
+    # Each incident gets the framework of the stack its faulting file is in.
     handler = WebhookHandler(
-        framework=TestFramework.PYTEST,
         dedup_checker=DedupChecker(),
+        framework_for=lambda incident: detect_framework(
+            project_path, incident.faulting_file
+        ),
     )
     results: list[dict[str, Any]] = []
     for file_path in incident_files:

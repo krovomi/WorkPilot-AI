@@ -16,8 +16,27 @@ import {
 } from "../../stores/context-mesh-store";
 import { useProjectStore } from "../../stores/project-store";
 import { formatAppDate } from "@/lib/date-format";
-import { Share2 } from "lucide-react";
-import { PageHeader } from "../ui/page-header";
+import {
+	AlertTriangle,
+	Info,
+	Minus,
+	Play,
+	Plus,
+	Share2,
+	Square,
+} from "lucide-react";
+import {
+	CharterButton,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	Stat,
+	Stats,
+	Tabs,
+} from "../charter";
 
 const TABS: ContextMeshTab[] = [
 	"overview",
@@ -37,7 +56,7 @@ function percent(value: number): string {
 }
 
 export function ContextMeshDashboard(): React.ReactElement {
-	const { t } = useTranslation(["contextMesh"]);
+	const { t } = useTranslation(["contextMesh", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 
@@ -91,94 +110,91 @@ export function ContextMeshDashboard(): React.ReactElement {
 	}
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
-				icon={Share2}
+		<ModuleStage data-testid="context-mesh-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
 				title={t("contextMesh:title")}
 				description={t("contextMesh:description")}
+				icon={Share2}
+				tone="violet"
 				actions={
 					<>
 						{projectPath && (
-							<button
-								type="button"
+							<CharterButton
+								size="sm"
+								icon={isRegistered ? Minus : Plus}
 								onClick={() =>
 									isRegistered
 										? unregisterProject(projectPath)
 										: registerProject(projectPath)
 								}
-								className="px-3 py-2 rounded-lg bg-card hover:bg-accent transition-colors text-sm"
 							>
 								{isRegistered
 									? t("contextMesh:projects.removeProject")
 									: t("contextMesh:projects.addProject")}
-							</button>
+							</CharterButton>
 						)}
 						{isAnalyzing ? (
-							<button
-								type="button"
+							<CharterButton
+								variant="danger"
+								icon={Square}
 								onClick={() => stopContextMeshAnalysis()}
-								className="px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
 							>
 								{t("contextMesh:actions.stop")}
-							</button>
+							</CharterButton>
 						) : (
-							<button
-								type="button"
+							<CharterButton
+								variant="primary"
+								icon={Play}
 								onClick={() => startContextMeshAnalysis()}
 								disabled={!canAnalyze}
-								className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 							>
 								{hasAnalyzed
 									? t("contextMesh:actions.reanalyze")
 									: t("contextMesh:actions.analyze")}
-							</button>
+							</CharterButton>
 						)}
 					</>
 				}
-			>
-				{!canAnalyze && !isAnalyzing && (
-					<p className="text-xs text-muted-foreground">
-						{t("contextMesh:errors.analysisRequired")}
-					</p>
-				)}
-			</PageHeader>
+			/>
 
-			{/* Tabs */}
-			<div className="px-6 border-b border-border flex items-center gap-1 overflow-x-auto">
-				{TABS.map((tab) => {
+			<Tabs
+				tabs={TABS.map((tab) => {
 					const count = tabCount(tab);
-					return (
-						<button
-							key={tab}
-							type="button"
-							onClick={() => setActiveTab(tab)}
-							className={`px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap ${
-								activeTab === tab
-									? "border-[var(--accent)] text-foreground font-medium"
-									: "border-transparent text-muted-foreground hover:text-foreground"
-							}`}
-						>
-							{t(`contextMesh:tabs.${tab}`)}
-							{count !== null && count > 0 && (
-								<span className="ml-1.5 text-xs opacity-60">{count}</span>
-							)}
-						</button>
-					);
+					return {
+						id: tab,
+						label: t(`contextMesh:tabs.${tab}`),
+						count: count !== null && count > 0 ? count : undefined,
+					};
 				})}
-			</div>
+				value={activeTab}
+				onChange={setActiveTab}
+				label={t("contextMesh:title")}
+			/>
 
-			{error && (
-				<div className="m-4 mb-0 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-					{error}
-				</div>
+			{!canAnalyze && !isAnalyzing && (
+				<Notice tone="violet" icon={Info} className="relative z-[2] mx-5 mb-3">
+					{t("contextMesh:errors.analysisRequired")}
+				</Notice>
 			)}
 
-			<div className="flex-1 overflow-auto p-4">
+			{error && (
+				<Notice
+					tone="red"
+					icon={AlertTriangle}
+					role="alert"
+					className="relative z-[2] mx-5 mb-3"
+				>
+					{error}
+				</Notice>
+			)}
+
+			<div className="relative z-[1] min-h-0 flex-1 overflow-auto px-5 pb-5">
 				{/* Overview */}
 				{activeTab === "overview" &&
 					(summary ? (
 						<div className="flex flex-col gap-4">
-							<div className="grid grid-cols-3 gap-3">
+							<Stats>
 								{(
 									[
 										["projects", summary.project_count],
@@ -189,43 +205,40 @@ export function ContextMeshDashboard(): React.ReactElement {
 										["activeRecommendations", summary.active_recommendations],
 									] as const
 								).map(([key, value]) => (
-									<div
+									<Stat
 										key={key}
-										className="bg-card rounded-lg p-3"
-									>
-										<div className="text-2xl font-bold">{value}</div>
-										<div className="text-xs text-muted-foreground">
-											{t(`contextMesh:overview.${key}`)}
-										</div>
-									</div>
+										label={t(`contextMesh:overview.${key}`)}
+										value={value}
+									/>
 								))}
-							</div>
+							</Stats>
 
 							{(isAnalyzing || streamingOutput) && (
-								<div>
-									<h2 className="text-sm font-semibold mb-2">
-										{status ||
-											t(
-												isAnalyzing
-													? "contextMesh:status.analyzing"
-													: "contextMesh:status.complete",
-											)}
-									</h2>
-									<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap bg-card rounded-lg p-3">
+								<Panel className="space-y-2">
+									{isAnalyzing ? (
+										<ScanLine
+											label={status || t("contextMesh:status.analyzing")}
+										/>
+									) : (
+										<span className="wp-kicker">
+											{status || t("contextMesh:status.complete")}
+										</span>
+									)}
+									<pre className="wp-code max-h-72 overflow-auto whitespace-pre-wrap p-3 text-xs">
 										{streamingOutput}
 									</pre>
-								</div>
+								</Panel>
 							)}
 						</div>
 					) : (
-						<div className="text-center py-12">
-							<div className="text-5xl mb-4">🕸️</div>
-							<h3 className="text-lg font-medium mb-2">
-								{t("contextMesh:empty.title")}
-							</h3>
-							<p className="text-sm text-muted-foreground max-w-md mx-auto">
+						<div className="flex justify-center py-10">
+							<EmptyStage
+								icon={Share2}
+								title={t("contextMesh:empty.title")}
+								tone="violet"
+							>
 								{t("contextMesh:empty.description")}
-							</p>
+							</EmptyStage>
 						</div>
 					))}
 
@@ -579,7 +592,7 @@ export function ContextMeshDashboard(): React.ReactElement {
 						</div>
 					))}
 			</div>
-		</div>
+		</ModuleStage>
 	);
 }
 

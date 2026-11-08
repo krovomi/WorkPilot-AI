@@ -6,7 +6,6 @@
 	"runtimes": "Local runtimes",
 	"available": "available",
 	"notFound": "server unreachable",
-	"modelsInstalled": "models installed",
 	"localModels": "Local generation models",
 	"policy": "Routing policy",
 	"airgapStrict": "Strict mode (block cloud LLM clients)",
@@ -18,20 +17,18 @@
 	"add": "Add",
 	"rescan": "Rescan",
 	"scanning": "Scanning…",
-	"catalogAge": "Cached {{age}} ago",
 	"catalogMeta": "{{total}} models detected across {{providers}} providers · cached {{age}} ago",
 	"noModelsForProvider": "No models detected",
 	"save": "Save policy",
 	"saving": "Saving…",
 	"confidentialityReport": "Confidentiality report",
-	"recentCalls": "Calls recorded",
 	"noCalls": "No routing decisions logged yet for this project.",
 	"confidentiality": {
 		"local": "local",
 		"mixed": "mixed",
 		"unknown": "unknown"
 	},
-	"description": "A local provider runs models on your computer. Only generation models detected on Ollama, LM Studio and llama.cpp are offered here.",
+	"description": "A local runtime runs the models on your computer. Only the generation models found on Ollama, LM Studio and llama.cpp are offered here.",
 	"strictDescription": "Once saved, strict mode rejects cloud LLM clients. Operations that still require a cloud client are blocked. This setting does not disable other application network access.",
 	"hybridDescription": "Strict mode is disabled: operations without a local route may still use the cloud.",
 	"defaultProvider": "Default runtime",
@@ -46,5 +43,14 @@
 	"disablingStrict": "Turning off…",
 	"disableStrictHint": "Keeps the local routing table; only the cloud block is lifted.",
 	"disableStrictFailed": "Could not turn it off: {{error}}",
-	"localAria": "local"
+	"localAria": "local",
+	"kickers": {
+		"runtimes": "Runtimes",
+		"policy": "Routing",
+		"report": "Report"
+	},
+	"modelsCount_one": "{{count}} model installed",
+	"modelsCount_other": "{{count}} models installed",
+	"callsCount_one": "{{count}} call recorded",
+	"callsCount_other": "{{count}} calls recorded"
 }

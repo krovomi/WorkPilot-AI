@@ -145,6 +145,7 @@
 		"repositoryNote": "Vous pourrez sélectionner le repository dans les paramètres du projet après cette étape."
 	},
 	"worktrees": {
+		"count": "{{count}} worktrees",
 		"title": "Arbres de travail",
 		"description": "Gérez les espaces de travail isolés pour vos tâches WorkPilot AI",
 		"empty": "Aucun arbre de travail",
@@ -336,16 +337,14 @@
 		"retry": "Réessayer"
 	},
 	"dependencySentinel": {
-		"title": "Sentinelle de Dépendances",
-		"description": "Surveiller les dépendances pour les vulnérabilités de sécurité et les packages obsolètes",
-		"searchPlaceholder": "Rechercher des dépendances...",
-		"dependencies": "Dépendances",
-		"vulnerabilities": "Vulnérabilités",
-		"noDependenciesFound": "Aucune dépendance trouvée correspondant à votre recherche",
-		"noDependencies": "Aucune dépendance trouvée",
-		"noVulnerabilitiesFound": "Aucune vulnérabilité trouvée correspondant à votre recherche",
-		"noVulnerabilities": "Aucune vulnérabilité trouvée",
-		"close": "Fermer"
+		"title": "Sentinelle de dépendances",
+		"description": "Ce que WorkPilot vérifie dans vos dépendances.",
+		"close": "Fermer",
+		"kicker": "Boîte à outils",
+		"descriptionFor": "Ce que WorkPilot vérifie dans les dépendances de {{name}}.",
+		"guardTitle": "Chaque paquet ajouté par une tâche est vérifié",
+		"guardBody": "Avant le merge d'une tâche, la garde des dépendances lit les manifestes qu'elle a modifiés et interroge le registre public de chaque paquet ajouté. Un paquet qui n'existe pas (un nom inventé qu'un attaquant pourrait publier) bloque la tâche ; un flux privé ou un registre injoignable ne bloque jamais.",
+		"auditPending": "L'audit complet des dépendances existantes (vulnérabilités connues, versions obsolètes) n'est pas encore branché : cette fenêtre n'affiche plus de données d'exemple à la place."
 	},
 	"providerSelector": {
 		"updateFailed": "Impossible de changer de fournisseur",

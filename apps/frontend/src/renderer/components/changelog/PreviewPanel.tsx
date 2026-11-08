@@ -163,9 +163,9 @@ export function PreviewPanel({
 	);
 
 	return (
-		<div className="flex-1 flex flex-col overflow-hidden">
+		<div className="wp-card flex min-w-0 flex-1 flex-col overflow-hidden">
 			{/* Preview Header */}
-			<div className="flex items-center justify-between border-b border-border px-6 py-3">
+			<div className="flex items-center justify-between border-b border-border px-4 py-3">
 				<div className="flex items-center gap-3">
 					<h2 className="font-medium">{t("changelog:previewPanel.preview")}</h2>
 					<div className="flex items-center gap-1 rounded-md border border-border p-1">

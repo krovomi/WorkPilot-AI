@@ -41,9 +41,8 @@ class _Detector(Protocol):
 
     thresholds: dict[str, int]
 
-    def _check_large_file(
-        self, lines: list[str], file_path: str
-    ) -> list[CodeSmell]: ...
+    def _check_large_file(self, lines: list[str], file_path: str) -> list[CodeSmell]:
+        """The large-file smells of ``lines`` (a stub: the detector has the body)."""
 
 
 # Words that open a control block: only these count towards nesting depth.

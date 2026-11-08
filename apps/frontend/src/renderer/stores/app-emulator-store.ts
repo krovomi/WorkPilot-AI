@@ -150,6 +150,10 @@ export async function startAppEmulator(projectDir: string): Promise<void> {
 		}
 
 		const config = result.data;
+		if (!config) {
+			store.setError("No runnable application detected in this project");
+			return;
+		}
 		store.setConfig(config);
 		store.setPhase("starting");
 		store.setStatus(`Starting: ${config.startCommand}`);

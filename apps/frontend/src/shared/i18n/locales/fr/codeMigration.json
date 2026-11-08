@@ -1,6 +1,6 @@
 {
 	"title": "Agent de migration de code",
-	"subtitle": "Migrations automatisées de framework, de version et de langage",
+	"subtitle": "Migrations de framework, de version et de langage, pour toutes les piles : analyse ici, puis une tâche Kanban fait le changement.",
 	"phases": {
 		"idle": "Prêt",
 		"analyzing": "Analyse du code…",
@@ -13,31 +13,60 @@
 	"config": {
 		"descriptionLabel": "Description de la migration",
 		"descriptionPlaceholder": "Décrivez la migration à effectuer…",
-		"examplesLabel": "Exemples :",
-		"dryRun": "Simulation",
-		"dryRunHint": "Analyser seulement, sans modifier de fichier"
+		"examplesLabel": "Un exemple par pile",
+		"hint": "L’analyse lit le projet sans le modifier. « Créer la tâche Kanban » confie la migration aux agents (spec, plan, code, QA dans un worktree)."
 	},
 	"examples": {
 		"reactHooks": "Migrer les composants de classe React vers les hooks",
 		"jsToTs": "Convertir les fichiers JavaScript en TypeScript",
 		"python312": "Remplacer les motifs Python 3.9 obsolètes par leurs équivalents 3.12",
 		"asyncAwait": "Remplacer les callbacks par async/await",
-		"dateFns": "Migrer de Moment.js vers date-fns"
+		"dateFns": "Migrer de Moment.js vers date-fns",
+		"dotnet": "Passer de .NET 8 à .NET 10 et C# 14",
+		"springBoot": "Passer de Spring Boot 2 à 3 (javax vers jakarta)",
+		"javaToKotlin": "Convertir les classes Java en Kotlin",
+		"angularJs": "Migrer l’application AngularJS vers Angular",
+		"vue3": "Migrer de Vue 2 vers Vue 3 et la Composition API",
+		"goModern": "Envelopper les erreurs Go avec %w et remplacer io/ioutil",
+		"rustEdition": "Passer les crates Rust à l’édition 2024",
+		"php8": "Passer de PHP 7.4 à PHP 8.3",
+		"rails7": "Passer de Rails 6 à Rails 7",
+		"dart3": "Passer l’application Flutter à Dart 3",
+		"swiftAsync": "Remplacer les completion handlers Swift par async/await"
 	},
 	"actions": {
-		"start": "Lancer la migration",
-		"analyze": "Analyser la migration",
-		"cancel": "Annuler la migration"
+		"analyze": "Analyser",
+		"cancel": "Annuler la migration",
+		"createTask": "Créer la tâche Kanban"
 	},
 	"results": {
-		"dryRunComplete": "Analyse en simulation terminée",
-		"migrationComplete": "Migration terminée",
-		"filesModified": "Fichiers modifiés",
 		"planStatus": "État du plan",
-		"execution": "Exécution"
+		"source": "Pile détectée",
+		"target": "Cible",
+		"log": "Journal de l’analyse",
+		"readyHint": "Le planificateur connaît cette migration. Créez la tâche Kanban pour l’appliquer : les agents suivent le plan et lancent les vérifications du projet.",
+		"unsupportedHint": "Le planificateur à règles ne connaît pas cette paire. La tâche Kanban l’applique quand même : les agents la planifient pour la pile du projet et lancent ses vérifications."
 	},
 	"empty": {
-		"title": "Agent de migration de code",
-		"body": "Décrivez la migration à effectuer puis cliquez sur Lancer. Utilisez la simulation d'abord, pour voir les changements avant de les appliquer."
+		"title": "Décrivez une migration",
+		"body": "Choisissez un exemple ou écrivez le vôtre en bas, puis analysez-le. Rien n’est modifié avant que la tâche Kanban tourne."
+	},
+	"kickers": {
+		"examples": "Exemples",
+		"analysis": "Analyse"
+	},
+	"planStatus": {
+		"ready": "Plan connu",
+		"unsupported": "Plan libre"
+	},
+	"task": {
+		"title": "Migration : {{description}}",
+		"scope": "Migrer tout le projet, pile par pile, sans changer son comportement.",
+		"acceptance": "Terminé quand le projet compile et que ses tests existants passent sur chaque pile concernée.",
+		"source": "Pile détectée par l’analyse : {{source}}.",
+		"created": "Tâche « {{title}} » créée dans le backlog du Kanban."
+	},
+	"errors": {
+		"noProject": "Sélectionnez un projet pour l’analyser ou le migrer."
 	}
 }

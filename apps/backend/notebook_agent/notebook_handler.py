@@ -9,73 +9,25 @@ between notebook and script formats.
 from __future__ import annotations
 
 import json
-import logging
-from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import Any
 
-logger = logging.getLogger(__name__)
+from .formats import parse_text_notebook
+from .model import (
+    CellType,
+    NotebookCell,
+    NotebookIssue,
+    NotebookIssueType,
+    ParsedNotebook,
+)
 
-
-class CellType(str, Enum):
-    CODE = "code"
-    MARKDOWN = "markdown"
-    RAW = "raw"
-
-
-class NotebookIssueType(str, Enum):
-    STALE_OUTPUT = "stale_output"
-    OUT_OF_ORDER = "out_of_order"
-    MISSING_IMPORT = "missing_import"
-    EMPTY_CELL = "empty_cell"
-    LONG_CELL = "long_cell"
-    NO_MARKDOWN = "no_markdown"
-    SENSITIVE_OUTPUT = "sensitive_output"
-
-
-@dataclass
-class NotebookCell:
-    """A single notebook cell."""
-
-    index: int
-    cell_type: CellType
-    source: str
-    execution_count: int | None = None
-    outputs: list[dict[str, Any]] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class NotebookIssue:
-    """An issue detected in a notebook."""
-
-    issue_type: NotebookIssueType
-    cell_index: int
-    message: str
-    severity: str = "warning"
-    suggestion: str = ""
-
-
-@dataclass
-class ParsedNotebook:
-    """Parsed representation of a Jupyter notebook."""
-
-    path: str = ""
-    cells: list[NotebookCell] = field(default_factory=list)
-    kernel: str = ""
-    language: str = ""
-    nbformat: int = 4
-    metadata: dict[str, Any] = field(default_factory=dict)
-    issues: list[NotebookIssue] = field(default_factory=list)
-
-    @property
-    def code_cells(self) -> list[NotebookCell]:
-        return [c for c in self.cells if c.cell_type == CellType.CODE]
-
-    @property
-    def markdown_cells(self) -> list[NotebookCell]:
-        return [c for c in self.cells if c.cell_type == CellType.MARKDOWN]
+__all__ = [
+    "CellType",
+    "NotebookCell",
+    "NotebookHandler",
+    "NotebookIssue",
+    "NotebookIssueType",
+    "ParsedNotebook",
+]
 
 
 class NotebookHandler:
@@ -90,7 +42,9 @@ class NotebookHandler:
     """
 
     def parse(self, path: Path) -> ParsedNotebook:
-        """Parse a .ipynb file."""
+        """Parse a notebook: Jupyter, Polyglot (.dib), Quarto or R Markdown."""
+        if path.suffix.lower() != ".ipynb":
+            return parse_text_notebook(path)
         content = path.read_text(encoding="utf-8")
         data = json.loads(content)
 
@@ -107,11 +61,17 @@ class NotebookHandler:
         )
 
         for i, cell_data in enumerate(data.get("cells", [])):
-            source = "".join(cell_data.get("source", []))
+            # nbformat allows the source as one string or as a list of lines.
+            raw_source = cell_data.get("source", [])
+            source = raw_source if isinstance(raw_source, str) else "".join(raw_source)
+            try:
+                cell_type = CellType(cell_data.get("cell_type", "code"))
+            except ValueError:
+                cell_type = CellType.RAW
             nb.cells.append(
                 NotebookCell(
                     index=i,
-                    cell_type=CellType(cell_data.get("cell_type", "code")),
+                    cell_type=cell_type,
                     source=source,
                     execution_count=cell_data.get("execution_count"),
                     outputs=cell_data.get("outputs", []),

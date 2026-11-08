@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import { EmptyStage, ModuleStage } from "../charter";
 import { TooltipProvider } from "../ui/tooltip";
 import {
 	Step2ConfigureGenerate,
@@ -90,21 +91,19 @@ export function Changelog() {
 
 	if (!selectedProjectId) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<div className="text-center">
-					<FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-					<h3 className="mt-4 text-lg font-medium">{t("changelog:noProject.title")}</h3>
-					<p className="mt-2 text-sm text-muted-foreground">
+			<ModuleStage data-testid="changelog-view">
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					<EmptyStage icon={FileText} title={t("changelog:noProject.title")} tone="green">
 						{t("changelog:noProject.description")}
-					</p>
+					</EmptyStage>
 				</div>
-			</div>
+			</ModuleStage>
 		);
 	}
 
 	return (
 		<TooltipProvider>
-			<div className="flex h-full flex-col">
+			<ModuleStage data-testid="changelog-view">
 				{/* Header */}
 				<ChangelogHeader step={step} onRefresh={handleRefresh} />
 
@@ -120,7 +119,7 @@ export function Changelog() {
 					/>
 				)}
 				{step === 1 && (
-					<div className="flex flex-1 overflow-hidden">
+					<div className="relative z-[1] flex min-h-0 flex-1 gap-4 px-5 pb-4">
 						<ChangelogFilters
 							sourceMode={sourceMode}
 							onSourceModeChange={setSourceMode}
@@ -213,7 +212,7 @@ export function Changelog() {
 						onDone={handleDone}
 					/>
 				)}
-			</div>
+			</ModuleStage>
 		</TooltipProvider>
 	);
 }

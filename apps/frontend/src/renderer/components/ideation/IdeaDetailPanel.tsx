@@ -7,20 +7,18 @@ import {
 	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-	IDEATION_STATUS_COLORS,
-	IDEATION_TYPE_COLORS,
-} from "../../../shared/constants";
 import type { Idea } from "../../../shared/types";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { cn } from "../../lib/utils";
+import { CharterButton, toneClass } from "../charter";
+import "../charter/charter.css";
+import { IDEATION_TYPE_TONES } from "./constants";
 import { CodeImprovementDetails } from "./details/CodeImprovementDetails";
 import { CodeQualityDetails } from "./details/CodeQualityDetails";
 import { DocumentationGapDetails } from "./details/DocumentationGapDetails";
 import { PerformanceOptimizationDetails } from "./details/PerformanceOptimizationDetails";
 import { SecurityHardeningDetails } from "./details/SecurityHardeningDetails";
 import { UIUXDetails } from "./details/UIUXDetails";
-import { TypeIcon } from "./TypeIcon";
+import { IdeaChips } from "./IdeaCard";
 import {
 	isCodeImprovementIdea,
 	isCodeQualityIdea,
@@ -51,62 +49,49 @@ export function IdeaDetailPanel({
 	const isDismissed = idea.status === "dismissed";
 	const isConverted = idea.status === "converted";
 
+	const taskId = idea.taskId;
+
 	return (
-		<div className="fixed inset-y-0 right-0 w-96 bg-card border-l border-border shadow-lg flex flex-col z-50">
-			{/* Header */}
-			<div className="shrink-0 p-4 border-b border-border electron-no-drag">
-				<div className="flex items-start justify-between">
-					<div className="flex-1">
-						<div className="flex items-center gap-2 mb-2">
-							<Badge
-								variant="outline"
-								className={IDEATION_TYPE_COLORS[idea.type]}
-							>
-								<TypeIcon type={idea.type} />
-								<span className="ml-1">{t(`ideation:types.${idea.type}`)}</span>
-							</Badge>
-							{idea.status !== "draft" && (
-								<Badge
-									variant="outline"
-									className={IDEATION_STATUS_COLORS[idea.status]}
-								>
-									{idea.status}
-								</Badge>
-							)}
-						</div>
-						<h2 className="font-semibold">{idea.title}</h2>
+		<aside
+			className={cn(
+				"wp-scope fixed inset-y-0 right-0 z-50 flex w-96 flex-col border-l border-border bg-card shadow-lg",
+				toneClass(IDEATION_TYPE_TONES[idea.type]),
+			)}
+			aria-label={idea.title}
+		>
+			<div className="electron-no-drag shrink-0 border-b border-border p-4">
+				<div className="flex items-start justify-between gap-2">
+					<div className="min-w-0 flex-1">
+						<IdeaChips idea={idea} />
+						<h2 className="wp-title mt-2 text-base">{idea.title}</h2>
 					</div>
-					<Button
+					<CharterButton
+						size="sm"
 						variant="ghost"
-						size="icon"
+						icon={ChevronRight}
 						onClick={onClose}
 						aria-label={t("accessibility.closePanelAriaLabel")}
-					>
-						<ChevronRight className="h-4 w-4" />
-					</Button>
+						title={t("accessibility.closePanelAriaLabel")}
+					/>
 				</div>
 			</div>
 
-			{/* Content */}
-			<div className="flex-1 overflow-auto p-4 space-y-6">
-				{/* Description */}
+			<div className="flex-1 space-y-6 overflow-auto p-4">
 				<div>
-					<h3 className="text-sm font-medium mb-2">
+					<h3 className="wp-kicker mb-2 block">
 						{t("common:ideation.description")}
 					</h3>
-					<p className="text-sm text-muted-foreground">{idea.description}</p>
+					<p className="wp-muted text-sm">{idea.description}</p>
 				</div>
 
-				{/* Rationale */}
 				<div>
-					<h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-						<Lightbulb className="h-4 w-4" />
+					<h3 className="wp-kicker mb-2 flex items-center gap-2">
+						<Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
 						{t("common:ideation.rationale")}
 					</h3>
-					<p className="text-sm text-muted-foreground">{idea.rationale}</p>
+					<p className="wp-muted text-sm">{idea.rationale}</p>
 				</div>
 
-				{/* Type-specific content */}
 				{isCodeImprovementIdea(idea) && <CodeImprovementDetails idea={idea} />}
 				{isUIUXIdea(idea) && <UIUXDetails idea={idea} />}
 				{isDocumentationGapIdea(idea) && (
@@ -121,45 +106,44 @@ export function IdeaDetailPanel({
 				{isCodeQualityIdea(idea) && <CodeQualityDetails idea={idea} />}
 			</div>
 
-			{/* Actions */}
 			{!isDismissed && !isConverted && (
-				<div className="shrink-0 p-4 border-t border-border space-y-2">
-					<Button
-						className="w-full"
+				<div className="flex shrink-0 flex-col gap-2 border-t border-border p-4">
+					<CharterButton
+						variant="primary"
+						icon={isConverting ? Loader2 : Play}
+						busy={isConverting}
+						className="w-full justify-center"
 						onClick={() => onConvert(idea)}
 						disabled={isConverting}
 					>
-						{isConverting ? (
-							<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-						) : (
-							<Play className="h-4 w-4 mr-2" />
-						)}
 						{isConverting
 							? t("common:ideation.converting")
 							: t("common:ideation.convertToTask")}
-					</Button>
-					<Button
-						variant="outline"
-						className="w-full"
+					</CharterButton>
+					<CharterButton
+						icon={X}
+						className="w-full justify-center"
 						onClick={() => {
 							onDismiss(idea);
 							onClose();
 						}}
 					>
-						<X className="h-4 w-4 mr-2" />
 						{t("common:ideation.dismissIdea")}
-					</Button>
+					</CharterButton>
 				</div>
 			)}
-			{isConverted && idea.taskId && onGoToTask && (
-				<div className="shrink-0 p-4 border-t border-border">
-					{/* biome-ignore lint/style/noNonNullAssertion: intentional */}
-					<Button className="w-full" onClick={() => onGoToTask(idea.taskId!)}>
-						<ExternalLink className="h-4 w-4 mr-2" />
+			{isConverted && taskId && onGoToTask && (
+				<div className="shrink-0 border-t border-border p-4">
+					<CharterButton
+						variant="primary"
+						icon={ExternalLink}
+						className="w-full justify-center"
+						onClick={() => onGoToTask(taskId)}
+					>
 						{t("common:ideation.goToTask")}
-					</Button>
+					</CharterButton>
 				</div>
 			)}
-		</div>
+		</aside>
 	);
 }

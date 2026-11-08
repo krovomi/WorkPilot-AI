@@ -1,6 +1,6 @@
 {
 	"title": "Code Migration Agent",
-	"subtitle": "Automated framework, version, and language migrations",
+	"subtitle": "Framework, version and language migrations, for every stack: analyse here, then let a Kanban task make the change.",
 	"phases": {
 		"idle": "Ready",
 		"analyzing": "Analyzing codebase…",
@@ -13,31 +13,60 @@
 	"config": {
 		"descriptionLabel": "Migration Description",
 		"descriptionPlaceholder": "Describe the migration you want to perform…",
-		"examplesLabel": "Examples:",
-		"dryRun": "Dry Run",
-		"dryRunHint": "Analyze only, no file changes"
+		"examplesLabel": "One example per stack",
+		"hint": "Analyse reads the project without changing it. « Create the Kanban task » hands the migration to the agents (spec, plan, code, QA in a worktree)."
 	},
 	"examples": {
 		"reactHooks": "Migrate React Class Components to Hooks",
 		"jsToTs": "Convert JavaScript files to TypeScript",
 		"python312": "Upgrade Python 3.9 deprecated patterns to 3.12",
 		"asyncAwait": "Replace callbacks with async/await",
-		"dateFns": "Migrate from Moment.js to date-fns"
+		"dateFns": "Migrate from Moment.js to date-fns",
+		"dotnet": "Upgrade from .NET 8 to .NET 10 and C# 14",
+		"springBoot": "Upgrade Spring Boot 2 to 3 (javax to jakarta)",
+		"javaToKotlin": "Convert the Java classes to Kotlin",
+		"angularJs": "Migrate the AngularJS app to Angular",
+		"vue3": "Migrate from Vue 2 to Vue 3 and the Composition API",
+		"goModern": "Wrap Go errors with %w and replace io/ioutil",
+		"rustEdition": "Move the Rust crates to the 2024 edition",
+		"php8": "Upgrade from PHP 7.4 to PHP 8.3",
+		"rails7": "Upgrade from Rails 6 to Rails 7",
+		"dart3": "Upgrade the Flutter app to Dart 3",
+		"swiftAsync": "Replace Swift completion handlers with async/await"
 	},
 	"actions": {
-		"start": "Start Migration",
-		"analyze": "Analyze Migration",
-		"cancel": "Cancel Migration"
+		"analyze": "Analyse",
+		"cancel": "Cancel Migration",
+		"createTask": "Create the Kanban task"
 	},
 	"results": {
-		"dryRunComplete": "Dry Run Analysis Complete",
-		"migrationComplete": "Migration Complete",
-		"filesModified": "Files Modified",
 		"planStatus": "Plan Status",
-		"execution": "Execution"
+		"source": "Detected stack",
+		"target": "Target",
+		"log": "Analysis log",
+		"readyHint": "The planner knows this migration. Create the Kanban task to apply it: the agents follow the plan and run the project checks.",
+		"unsupportedHint": "The rule-based planner does not know this pair. The Kanban task still applies it: the agents plan it for the project stack and run its checks."
 	},
 	"empty": {
-		"title": "Code Migration Agent",
-		"body": "Describe the migration you want to perform and click Start. Use Dry Run first to preview changes before applying them."
+		"title": "Describe a migration",
+		"body": "Pick an example or write your own below, then analyse it. Nothing is changed until the Kanban task runs."
+	},
+	"kickers": {
+		"examples": "Examples",
+		"analysis": "Analysis"
+	},
+	"planStatus": {
+		"ready": "Known plan",
+		"unsupported": "Free plan"
+	},
+	"task": {
+		"title": "Migration: {{description}}",
+		"scope": "Migrate the whole project, stack by stack, without changing behaviour.",
+		"acceptance": "Done when the project builds and its existing tests pass on every affected stack.",
+		"source": "Stack detected by the analysis: {{source}}.",
+		"created": "Task « {{title}} » created in the Kanban backlog."
+	},
+	"errors": {
+		"noProject": "Select a project to analyse or migrate it."
 	}
 }

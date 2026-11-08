@@ -1,5 +1,6 @@
 import type { HealingOperation } from "@shared/types/self-healing";
 import { useTranslation } from "react-i18next";
+import { Chip, Panel, type Tone } from "../charter";
 
 interface HealingTimelineProps {
 	readonly operation: HealingOperation;
@@ -7,46 +8,42 @@ interface HealingTimelineProps {
 
 const stepStatusColors: Record<string, string> = {
 	completed: "bg-success",
-	running: "bg-blue-500 animate-pulse",
+	running: "bg-info animate-pulse",
 	failed: "bg-destructive",
 	skipped: "bg-warning",
-	pending: "bg-gray-500",
+	pending: "bg-muted-foreground",
 };
 
 export function HealingTimeline({ operation }: HealingTimelineProps) {
 	const { t } = useTranslation(["selfHealing"]);
 
-	let statusColor: string;
+	let statusTone: Tone;
 	let statusText: string;
 
 	if (operation.success) {
-		statusColor = "bg-success/20 text-success";
+		statusTone = "green";
 		statusText = t("selfHealing:resolved");
 	} else if (
 		operation.completed_at &&
 		operation.incident?.status === "escalated"
 	) {
-		statusColor = "bg-warning/20 text-warning";
+		statusTone = "amber";
 		statusText = t("selfHealing:needsReview");
 	} else if (operation.completed_at) {
-		statusColor = "bg-destructive/20 text-destructive";
+		statusTone = "red";
 		statusText = t("selfHealing:failed");
 	} else {
-		statusColor = "bg-blue-500/20 text-blue-400";
+		statusTone = "blue";
 		statusText = t("selfHealing:inProgress");
 	}
 
 	return (
-		<div className="rounded-lg border border-border bg-card p-4">
+		<Panel rail tone={statusTone}>
 			<div className="flex items-center justify-between mb-3">
-				<h4 className="text-sm font-medium text-foreground">
+				<h4 className="wp-step-title">
 					{operation.incident?.title || t("selfHealing:healingOperation")}
 				</h4>
-				<span
-					className={`text-xs px-2 py-0.5 rounded-full ${statusColor}`}
-				>
-					{statusText}
-				</span>
+				<Chip tone={statusTone}>{statusText}</Chip>
 			</div>
 
 			<div className="relative pl-4">
@@ -90,6 +87,6 @@ export function HealingTimeline({ operation }: HealingTimelineProps) {
 					{t("selfHealing:duration")}: {operation.duration_seconds.toFixed(1)}s
 				</div>
 			)}
-		</div>
+		</Panel>
 	);
 }

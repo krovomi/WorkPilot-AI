@@ -34,7 +34,8 @@
 			"medium": "Medium",
 			"low": "Low",
 			"info": "Info"
-		}
+		},
+		"emptyTitle": "No suggestion yet"
 	},
 	"takeover": {
 		"title": "AI Takeover",
@@ -44,7 +45,9 @@
 		"accept": "Let AI help",
 		"decline": "No thanks",
 		"inProgress": "AI is working on {{file}}...",
-		"completed": "AI completed work on {{file}}"
+		"completed": "AI completed work on {{file}}",
+		"emptyTitle": "No takeover proposed",
+		"emptyHint": "When the companion sees you stuck on a file, it proposes to take over here."
 	},
 	"config": {
 		"title": "Companion Settings",
@@ -75,5 +78,11 @@
 		"noProject": "Please select a project before starting the companion.",
 		"startFailed": "Failed to start the Live Companion. Check if chokidar is available.",
 		"analysisFailed": "Analysis failed for {{file}}."
-	}
+	},
+	"kickers": {
+		"session": "Session",
+		"takeovers": "Takeovers",
+		"suggestions": "Suggestions"
+	},
+	"sessionTitle": "Watching your edits"
 }

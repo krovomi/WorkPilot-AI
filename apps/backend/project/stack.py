@@ -166,6 +166,15 @@ def detect_project_stack(project_dir: Path) -> dict:
                 stack["frameworks"].append("nextjs")
             if "vue" in deps:
                 stack["frameworks"].append("vue")
+            for dep, name in (
+                ("@angular/core", "angular"),
+                ("nuxt", "nuxt"),
+                ("svelte", "svelte"),
+                ("@nestjs/core", "nestjs"),
+                ("express", "express"),
+            ):
+                if dep in deps:
+                    stack["frameworks"].append(name)
             if "jest" in deps:
                 stack["test_runners"].append("jest")
             if "vitest" in deps:
@@ -194,9 +203,12 @@ def detect_project_stack(project_dir: Path) -> dict:
 
     # .NET. Project files can sit in subdirectories next to a solution at the
     # root, which is the usual layout, so a root-only check misses most repos.
-    dotnet_projects = (
-        list(project_dir.glob("*.sln")) or list(project_dir.glob("**/*.csproj"))[:50]
-    )
+    # F# and VB projects build and test with the same toolchain as C#.
+    dotnet_projects = list(project_dir.glob("*.sln")) + list(project_dir.glob("*.slnx"))
+    for pattern in ("**/*.csproj", "**/*.fsproj", "**/*.vbproj"):
+        if dotnet_projects:
+            break
+        dotnet_projects = list(project_dir.glob(pattern))[:50]
     if dotnet_projects:
         stack["languages"].append("c#")
         stack["package_managers"].append("nuget")
@@ -216,6 +228,8 @@ def detect_project_stack(project_dir: Path) -> dict:
         stack["languages"].append("java/kotlin")
         stack["package_managers"].append("gradle")
 
+    _detect_other_stacks(project_dir, stack)
+
     # Docker
     if (project_dir / "Dockerfile").exists():
         stack["has_docker"] = True
@@ -231,12 +245,48 @@ def detect_project_stack(project_dir: Path) -> dict:
         stack["existing_ci"].append("gitlab_ci")
     if (project_dir / ".circleci" / "config.yml").exists():
         stack["existing_ci"].append("circleci")
+    if (project_dir / "azure-pipelines.yml").exists():
+        stack["existing_ci"].append("azure_pipelines")
+    if (project_dir / "bitbucket-pipelines.yml").exists():
+        stack["existing_ci"].append("bitbucket_pipelines")
+    if (project_dir / "Jenkinsfile").exists():
+        stack["existing_ci"].append("jenkins")
 
     # Deduplicate
     for key in ["languages", "package_managers", "frameworks", "test_runners"]:
         stack[key] = list(set(stack[key]))
 
     return stack
+
+
+# Root manifests of the stacks the branches above do not cover:
+# (manifest, language, package manager, test command).
+_OTHER_STACKS = (
+    ("composer.json", "php", "composer", "phpunit"),
+    ("Gemfile", "ruby", "bundler", "rspec / rake test"),
+    ("pubspec.yaml", "dart", "pub", "flutter test / dart test"),
+    ("Package.swift", "swift", "swiftpm", "swift test"),
+    ("mix.exs", "elixir", "mix", "mix test"),
+)
+
+
+def _detect_other_stacks(project_dir: Path, stack: dict) -> None:
+    """PHP, Ruby, Dart/Flutter, Swift and Elixir, plus the test runners of
+    the stacks detected above whose runner is not read from a manifest."""
+    for manifest, language, manager, runner in _OTHER_STACKS:
+        if (project_dir / manifest).exists():
+            stack["languages"].append(language)
+            stack["package_managers"].append(manager)
+            stack["test_runners"].append(runner)
+    runners = {
+        "python": "pytest",
+        "rust": "cargo test",
+        "go": "go test ./...",
+        "java/kotlin": "junit (maven/gradle test)",
+    }
+    for language, runner in runners.items():
+        if language in stack["languages"]:
+            stack["test_runners"].append(runner)
 
 
 def detect_project_type(project_dir: Path) -> str:

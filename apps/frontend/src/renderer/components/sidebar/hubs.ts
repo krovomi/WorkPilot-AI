@@ -18,9 +18,9 @@ import {
 	Target,
 	Users,
 	Wand2,
+	type LucideIcon,
 	Wrench,
 } from "lucide-react";
-import type { ElementType } from "react";
 import type { SidebarView } from "../Sidebar";
 import { EXPERIMENTAL_VIEWS } from "./experimental-views";
 import { type ServerForge, showsView } from "./server-gates";
@@ -50,7 +50,7 @@ export type SidebarHubId =
 export interface HubTab {
 	readonly view: SidebarView;
 	readonly labelKey: string;
-	readonly icon: ElementType;
+	readonly icon: LucideIcon;
 	/** The two-letter sidebar shortcut the view had before it became a tab. */
 	readonly shortcut?: string;
 	/** A tool that opens as a dialog: its tab offers to open it. */
@@ -60,14 +60,14 @@ export interface HubTab {
 export interface SidebarHub {
 	readonly id: SidebarHubId;
 	readonly labelKey: string;
-	readonly icon: ElementType;
+	readonly icon: LucideIcon;
 	readonly tabs: readonly HubTab[];
 }
 
 function tab(
 	view: SidebarView,
 	key: string,
-	icon: ElementType,
+	icon: LucideIcon,
 	shortcut?: string,
 	dialog?: true,
 ): HubTab {

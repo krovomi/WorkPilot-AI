@@ -45,5 +45,9 @@
 		"title": "No pipeline runs yet",
 		"body": "Runs triggered from here — or automatically on a PR or a merge — show up in this list with the status the provider reports.",
 		"noProject": "Open a project to configure its CI/CD triggers."
+	},
+	"kickers": {
+		"setup": "Setup",
+		"history": "History"
 	}
 }
