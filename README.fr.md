@@ -79,12 +79,39 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 
 ## Fonctionnement
 
-```
- votre tâche ─▶ spec ─▶ planner ─▶ coder (+ sous-agents) ─▶ QA reviewer ─▶ QA fixer
-                           │                                      │
-              sous-tâches que vous pouvez approuver   vérification : lancer l'app, garder une preuve
-                                                                  │
-                                                 votre revue ─▶ merge ou pull request
+```mermaid
+flowchart LR
+    subgraph P ["1 · Planifier"]
+        direction TB
+        task(["📝 Vous décrivez une tâche"]) --> spec["📄 Spec<br/><small>objectif, périmètre, critères d'acceptation</small>"]
+        spec --> plan["🧭 Planner<br/><small>sous-tâches et fichiers touchés</small>"]
+        plan -. "si vous le souhaitez" .-> approve{{"✅ Vous approuvez le plan"}}
+    end
+
+    subgraph B ["2 · Construire et contrôler"]
+        direction TB
+        code["⌨️ Coder<br/><small>écrit le code, peut lancer des sous-agents</small>"] --> qa["🔎 QA reviewer<br/><small>vérifie chaque critère d'acceptation</small>"]
+        qa -- "problèmes trouvés" --> fix["🔧 QA fixer"]
+        fix -- "corrigé" --> qa
+    end
+
+    subgraph S ["3 · Prouver et livrer"]
+        direction TB
+        verify["▶️ Vérification<br/><small>lance l'app, garde une preuve</small>"] --> review{{"👀 Vous relisez le diff"}}
+        review --> merge(["🔀 Merge ou pull request"])
+    end
+
+    P ==> B ==> S
+
+    classDef you fill:#F59E0B,stroke:#B45309,color:#111827,font-weight:bold
+    classDef agent fill:#6366F1,stroke:#4338CA,color:#ffffff
+    classDef proof fill:#10B981,stroke:#047857,color:#ffffff
+    class task,approve,review you
+    class spec,plan,code,qa,fix agent
+    class verify,merge proof
+    style P fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style B fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style S fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
 ```
 
 - **Isolé** : chaque tâche tourne dans son propre worktree git, votre branche reste intacte jusqu'au merge.
@@ -248,23 +275,61 @@ Plusieurs comptes peuvent être enregistrés par provider ; quand l'un atteint s
 
 ## Architecture
 
+Comment les pièces communiquent :
+
+```mermaid
+flowchart TB
+    subgraph local ["💻 Votre machine"]
+        direction LR
+        desktop["🖥️ App de bureau<br/><small>Electron + React</small>"] <--> engine["🐍 Moteur Python<br/><small>agents, specs, QA, API locale</small>"]
+        engine --> repo[("📁 Votre dépôt git<br/><small>un worktree par tâche</small>")]
+    end
+
+    subgraph ext ["🌐 Ce avec quoi le moteur échange"]
+        direction TB
+        providers["🤖 Providers d'IA<br/><small>Claude, OpenAI, Gemini, Copilot,<br/>Mistral, Grok, DeepSeek,<br/>modèles locaux, agents CLI</small>"]
+        forges["🔗 Forges et outils de suivi<br/><small>GitHub, GitLab, Azure DevOps,<br/>Jira, Linear</small>"]
+        clients["🧩 Autres clients IA<br/><small>Claude Code, Codex, Cursor…<br/>via le serveur MCP<br/>workpilot-board</small>"]
+    end
+
+    subgraph team ["👥 Mode équipe, optionnel"]
+        direction TB
+        server["🏢 Serveur d'équipe<br/><small>tableau partagé, rôles,<br/>organisations</small>"] <--> mobile["📱 App mobile<br/><small>iOS et Android</small>"]
+    end
+
+    local <==> ext
+    local <-. "mode serveur" .-> team
+
+    classDef app fill:#6366F1,stroke:#4338CA,color:#ffffff
+    classDef outside fill:#0EA5E9,stroke:#0369A1,color:#ffffff
+    classDef shared fill:#10B981,stroke:#047857,color:#ffffff
+    classDef data fill:#F59E0B,stroke:#B45309,color:#111827
+    class desktop,engine app
+    class providers,forges,clients outside
+    class server,mobile shared
+    class repo data
+    style local fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style ext fill:transparent,stroke:#0EA5E9,stroke-width:2px,stroke-dasharray:6 4
+    style team fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
 ```
-WorkPilot-AI/
-├── apps/
-│   ├── backend/     # Agents Python, specs, QA, API locale, mode serveur
-│   ├── frontend/    # App de bureau Electron (React + TypeScript)
-│   └── mobile/      # App iOS et Android (Expo), cliente du mode serveur
-├── src/             # Connecteurs Python partagés (Jira, Azure DevOps…)
-├── capabilities/    # Ce que sait faire chaque provider et harness
-├── config/          # Liste des providers affichée dans les Paramètres
-├── workflows/       # Un workflow déclaratif par type de tâche
-├── skills/          # Packs de skills (.agents/skills/ est généré)
-├── deploy/          # Image serveur et docker-compose
-├── changelog.d/     # Un fragment de changelog par pull request
-├── docs/            # Règles, justifications de conception, guides
-├── tests/           # Tests Python (les tests frontend sont à côté du code)
-└── scripts/         # Scripts de build, de release et de maintenance
-```
+
+Où elles vivent dans le dépôt :
+
+| Dossier | Contenu |
+|---|---|
+| `apps/backend/` | Agents Python, specs, QA, API locale, mode serveur |
+| `apps/frontend/` | App de bureau Electron (React + TypeScript) |
+| `apps/mobile/` | App iOS et Android (Expo), cliente du mode serveur |
+| `src/` | Connecteurs Python partagés (Jira, Azure DevOps…) |
+| `capabilities/` | Ce que sait faire chaque provider et harness |
+| `config/` | Liste des providers affichée dans les Paramètres |
+| `workflows/` | Un workflow déclaratif par type de tâche |
+| `skills/` | Packs de skills (`.agents/skills/` est généré) |
+| `deploy/` | Image serveur et docker-compose |
+| `changelog.d/` | Un fragment de changelog par pull request |
+| `docs/` | Règles, justifications de conception, guides |
+| `tests/` | Tests Python (les tests frontend sont à côté du code) |
+| `scripts/` | Scripts de build, de release et de maintenance |
 
 Comment les pièces s'assemblent (agents, sous-agents, workflows, état, couches de sécurité) : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Pourquoi chaque feature est construite ainsi : [docs/architecture/](docs/architecture/). Un atlas guidé et cliquable, lisible sans bagage technique : [docs/audit/WorkPilot-architecture.html](docs/audit/WorkPilot-architecture.html). Les instructions pour les agents de code commencent à [`AGENTS.md`](AGENTS.md).
 
