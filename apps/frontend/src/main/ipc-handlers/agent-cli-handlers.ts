@@ -23,6 +23,7 @@ import {
 } from "../../shared/types/agent-cli";
 import { getAugmentedEnv } from "../env-utils";
 import { installAgentCli } from "./agent-cli-install";
+import { checkCliUpdate, updateCli } from "./cli-update";
 import {
 	findExecutable,
 	getPathDelimiter,
@@ -211,5 +212,11 @@ export function registerAgentCliHandlers(): void {
 	);
 	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_INSTALL, (_event, tool: unknown) =>
 		installAgentCli(tool, checkAgentCli),
+	);
+	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_UPDATE_CHECK, (_event, tool: unknown) =>
+		checkCliUpdate(tool, checkAgentCli),
+	);
+	ipcMain.handle(IPC_CHANNELS.AGENT_CLI_UPDATE, (_event, tool: unknown) =>
+		updateCli(tool, checkAgentCli),
 	);
 }
