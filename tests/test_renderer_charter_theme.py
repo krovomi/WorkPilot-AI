@@ -45,7 +45,9 @@ def test_charter_accent_and_status_tones_come_from_the_theme() -> None:
     declared = _declarations(CHARTER, tuple(expected))
     assert declared, "charter.css no longer declares its accent and tones"
     wrong = [f"{name}: {value}" for name, value in declared if value != expected[name]]
-    assert not wrong, "the charter must read the theme, not fix its own colour:\n" + "\n".join(wrong)
+    assert not wrong, (
+        "the charter must read the theme, not fix its own colour:\n" + "\n".join(wrong)
+    )
     assert {name for name, _ in declared} == set(expected)
 
 
@@ -115,6 +117,10 @@ def test_node_graph_screens_take_surfaces_and_wires_from_the_theme() -> None:
         missing = set(names) - {name for name, _ in declared}
         assert not missing, f"{path.name} no longer declares {sorted(missing)}"
         offenders += [
-            f"{path.name} {name}: {value}" for name, value in declared if HEX.search(value)
+            f"{path.name} {name}: {value}"
+            for name, value in declared
+            if HEX.search(value)
         ]
-    assert not offenders, "a fixed colour where the theme should show:\n" + "\n".join(offenders)
+    assert not offenders, "a fixed colour where the theme should show:\n" + "\n".join(
+        offenders
+    )
