@@ -40,7 +40,7 @@ import type { AgentManager } from "../../agent";
 import { appLog } from "../../app-logger";
 import { projectStore } from "../../project-store";
 import { parsePythonCommand } from "../../python-detector";
-import { pythonEnvManager } from "../../python-env-manager";
+import { readyPythonPath } from "../../utils/ensure-python";
 import { pythonRunnerEnv } from "../../utils/python-runner-env";
 import { findTaskAndProject } from "./shared";
 
@@ -157,7 +157,7 @@ async function runRunner(
 	specDir: string,
 	extra: string[] = [],
 ): Promise<{ state?: BestOfNState; error?: string }> {
-	const pythonPath = pythonEnvManager.getPythonPath();
+	const pythonPath = await readyPythonPath();
 	if (!pythonPath) return { error: "Python environment not ready" };
 	const backend = backendPath();
 	const env = await pythonRunnerEnv(backend, {});

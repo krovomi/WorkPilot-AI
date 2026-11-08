@@ -17,7 +17,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
@@ -65,10 +65,7 @@ export function registerOnboardingAgentHandlers(): void {
 				"onboarding_agent_runner.py",
 			);
 
-			const pythonExe = pythonEnvManager.getPythonPath();
-			if (!pythonExe) {
-				throw new Error("Python environment not ready");
-			}
+			const pythonExe = await requirePythonPath();
 
 			const child = spawn(
 				pythonExe,

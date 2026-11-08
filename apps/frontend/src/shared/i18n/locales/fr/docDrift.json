@@ -1,25 +1,90 @@
 {
-	"noData": "Aucun scan effectué. Cliquez sur « Lancer le scan » pour démarrer.",
-	"title": "Rapport de drift de documentation",
-	"info": "{{docs}} docs scannés · {{files}} fichiers de code indexés",
-	"driftDetected": "Drift détecté",
-	"driftCount": "{{count}} drifts détectés",
-	"noDriftDetected": "Aucun drift détecté",
-	"drifts": "Drifts",
-	"file": "Fichier",
-	"section": "Section",
-	"expected": "Attendu",
-	"actual": "Actuel",
-	"severity": "Sévérité",
+	"title": "Détecteur de dérive",
+	"description": "Les noms de fonctions et chemins de fichiers cités dans la documentation, comparés au code actuel",
+	"scan": {
+		"kicker": "Scan",
+		"title": "Votre documentation",
+		"stepDocs": "Lire la documentation",
+		"stepDocsKicker": "Docs",
+		"stepDocsMeta": "{{count}} fichiers .md / .rst / .adoc",
+		"stepCode": "Indexer le code",
+		"stepCodeKicker": "Code",
+		"stepCodeMeta": "{{files}} fichiers · {{symbols}} symboles",
+		"stepCompare": "Comparer",
+		"stepCompareKicker": "Comparaison",
+		"stepCompareMeta": "{{count}} écarts",
+		"pending": "en attente",
+		"running": "en cours",
+		"ignored": "Ignorés : changelogs, skills d'agent, modèles, exemples et dossiers générés (dist, build, node_modules…), qui ne décrivent pas le code actuel."
+	},
+	"issues": {
+		"kicker": "Écarts",
+		"title_one": "{{count}} écart",
+		"title_other": "{{count}} écarts",
+		"titleNone": "Aucun écart",
+		"emptyTitle": "Lancez un scan",
+		"emptyHint": "Le scan compare chaque fonction et chaque chemin cités entre `backticks` dans vos .md / .rst au code du projet, quel que soit le langage.",
+		"clean": "La documentation correspond au code.",
+		"filtered": "Aucun écart pour ce filtre."
+	},
+	"detail": {
+		"kicker": "Détail",
+		"title": "Écart sélectionné",
+		"emptyTitle": "Choisissez un écart",
+		"emptyHint": "Cliquez sur un écart pour voir où il se trouve et quoi corriger.",
+		"where": "Où",
+		"cited": "Cité",
+		"fix": "Correction proposée",
+		"copyRef": "Copier l'emplacement"
+	},
+	"types": {
+		"missing_function": {
+			"label": "Fonction introuvable",
+			"message": "La documentation appelle « {{symbol}} », que le code ne contient plus.",
+			"fix": "Renommez la référence vers la fonction actuelle ou retirez-la."
+		},
+		"stale_reference": {
+			"label": "Fichier introuvable",
+			"message": "La documentation cite le fichier « {{symbol}} », absent du projet.",
+			"fix": "Mettez à jour le chemin ou retirez la référence."
+		},
+		"outdated_example": {
+			"label": "Exemple périmé",
+			"message": "L'exemple autour de « {{symbol}} » ne correspond plus au code.",
+			"fix": "Mettez l'exemple à jour."
+		},
+		"broken_link": {
+			"label": "Lien cassé",
+			"message": "Le lien « {{symbol}} » ne mène nulle part.",
+			"fix": "Corrigez ou retirez le lien."
+		},
+		"version_mismatch": {
+			"label": "Version différente",
+			"message": "La version citée « {{symbol}} » ne correspond pas au projet.",
+			"fix": "Alignez la version citée."
+		},
+		"missing_docs": {
+			"label": "Doc manquante",
+			"message": "« {{symbol}} » n'est pas documenté.",
+			"fix": "Ajoutez sa documentation."
+		},
+		"config_mismatch": {
+			"label": "Configuration différente",
+			"message": "La configuration « {{symbol}} » ne correspond pas au code.",
+			"fix": "Alignez la configuration documentée."
+		}
+	},
 	"high": "Élevée",
 	"medium": "Moyenne",
 	"low": "Faible",
-	"summary": "Résumé",
+	"all": "Toutes",
 	"actions": {
 		"runScan": "Lancer le scan",
+		"rescan": "Relancer le scan",
 		"cancel": "Annuler",
-		"scanning": "Scan en cours...",
-		"reset": "Réinitialiser"
+		"scanning": "Scan en cours…",
+		"reset": "Réinitialiser",
+		"copied": "Copié"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
