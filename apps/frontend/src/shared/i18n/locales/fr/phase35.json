@@ -369,5 +369,6 @@
 			"messageEmpty": "Le message est vide",
 			"messageTooLong": "Message trop long (limite : {{max}} caractères)"
 		}
-	}
+	},
+	"hubDescription": "Douze outils avancés au même endroit : longévité du code, santé des agents, routage des modèles, agents de domaine, anomalies CI/CD, licences, dérive d’architecture, tests générés, i18n à grande échelle, contexte cognitif, piste d’audit et pair programming."
 }

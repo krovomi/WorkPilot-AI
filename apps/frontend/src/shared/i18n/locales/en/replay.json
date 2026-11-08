@@ -180,5 +180,16 @@
 	"defaultAgentName": "Agent",
 	"noDescription": "No description",
 	"anyCondition": "(any)",
-	"untitled": "Untitled"
+	"untitled": "Untitled",
+	"description": "Replay any agent run step by step on every provider: thinking, tool calls, diffs, tokens and cost, with A/B comparison and time travel.",
+	"kickers": {
+		"sessions": "Recordings"
+	},
+	"sessionsTitle": "Recorded sessions",
+	"loadingSessions": "Loading the recordings…",
+	"loadingSession": "Loading the session…",
+	"viewerTabs": "Replay views",
+	"errors": {
+		"backendUnreachable": "The local WorkPilot backend did not answer. Start it (or restart the app), then refresh."
+	}
 }

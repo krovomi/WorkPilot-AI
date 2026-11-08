@@ -180,5 +180,16 @@
 	"defaultAgentName": "Agent",
 	"noDescription": "Aucune description",
 	"anyCondition": "(toute)",
-	"untitled": "Sans titre"
+	"untitled": "Sans titre",
+	"description": "Rejouez pas à pas n’importe quelle exécution d’agent, quel que soit le fournisseur : réflexion, appels d’outils, diffs, tokens et coût, avec comparaison A/B et voyage dans le temps.",
+	"kickers": {
+		"sessions": "Enregistrements"
+	},
+	"sessionsTitle": "Sessions enregistrées",
+	"loadingSessions": "Chargement des enregistrements…",
+	"loadingSession": "Chargement de la session…",
+	"viewerTabs": "Vues du replay",
+	"errors": {
+		"backendUnreachable": "Le backend local de WorkPilot n’a pas répondu. Démarrez-le (ou relancez l’application), puis actualisez."
+	}
 }

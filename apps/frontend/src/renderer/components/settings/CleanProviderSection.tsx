@@ -33,6 +33,7 @@ import {
 	consumeProviderReauthRequest,
 	onProviderReauthRequest,
 } from "./reauth-request";
+import { Notice } from "../charter";
 import { SettingsSection } from "./SettingsSection";
 
 interface Provider {
@@ -930,8 +931,8 @@ export function CleanProviderSection({
 				description={t("accounts.multiConnector.description")}
 			>
 				<div className="flex flex-col items-center justify-center py-16 space-y-4">
-					<Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-					<span className="text-sm text-gray-600">
+					<Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+					<span className="text-sm text-muted-foreground">
 						{t("accounts.multiConnector.loadingProviders")}
 					</span>
 				</div>
@@ -967,12 +968,9 @@ export function CleanProviderSection({
 		>
 			<div className="space-y-6">
 				{error && (
-					<div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
-						<div className="flex items-center gap-2">
-							<AlertCircle className="w-4 h-4 text-destructive" />
-							<span className="text-sm text-destructive">{error}</span>
-						</div>
-					</div>
+					<Notice tone="red" icon={AlertCircle} role="alert">
+						{error}
+					</Notice>
 				)}
 
 				<div className="flex gap-6">

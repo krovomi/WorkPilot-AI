@@ -26,17 +26,17 @@ export function SettingsCard({
 	return (
 		<section
 			className={cn(
-				"rounded-xl border border-border bg-card overflow-hidden",
+				"wp-card overflow-hidden",
 				className,
 			)}
 		>
-			<header className="flex items-start gap-3 border-b border-border/60 bg-muted/30 px-5 py-4">
-				<span className="shrink-0 rounded-lg bg-primary/10 p-2 text-primary">
-					<Icon className="h-4 w-4" aria-hidden="true" />
+			<header className="flex items-start gap-3 border-b border-dashed border-border px-5 py-4">
+				<span className="wp-empty-glyph h-8 w-8 shrink-0" aria-hidden="true">
+					<Icon className="h-4 w-4" />
 				</span>
 				<div className="min-w-0 space-y-1">
-					<h3 className="text-sm font-semibold text-foreground">{title}</h3>
-					<p className="text-xs leading-relaxed text-muted-foreground">
+					<h3 className="wp-title text-sm">{title}</h3>
+					<p className="wp-muted text-xs leading-relaxed">
 						{description}
 					</p>
 				</div>

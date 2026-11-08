@@ -535,7 +535,7 @@ export function AgentProfileSettings() {
 																			</span>
 																		)}
 																		{m.supportsThinking && (
-																			<span className="inline-flex items-center rounded bg-violet-500/10 px-1 py-0.5 text-3xs font-medium text-violet-600 dark:text-violet-400">
+																			<span className="inline-flex items-center rounded bg-[color-mix(in_srgb,var(--wp-violet)_12%,transparent)] px-1 py-0.5 text-3xs font-medium text-[var(--wp-violet)]">
 																				{t("agentProfile.supportsThinking")}
 																			</span>
 																		)}
