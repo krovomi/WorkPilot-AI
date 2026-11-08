@@ -151,7 +151,10 @@ describe("planMobileSetup and createMobileSetup", () => {
 			}),
 		];
 		const plan = planMobileSetup(flutter, ["android", "ios"], board, t);
-		const create = vi.fn(async () => ({ id: "ios-1" }) as Task);
+		const create = vi.fn(
+			async (_p: string, _title: string, _d: string, _metadata?: TaskMetadata) =>
+				({ id: "ios-1" }) as Task,
+		);
 
 		const blockers = await createMobileSetup(plan, API, "p1", {}, create, t);
 
@@ -163,7 +166,9 @@ describe("planMobileSetup and createMobileSetup", () => {
 	it("stops at the first task that cannot be created", async () => {
 		const maui = API.frameworks?.[0] as MobileSetupFramework;
 		const plan = planMobileSetup(maui, ["android"], [], t);
-		const create = vi.fn(async () => null);
+		const create = vi.fn(
+			async (_p: string, _title: string, _d: string, _metadata?: TaskMetadata) => null,
+		);
 		await expect(createMobileSetup(plan, API, "p1", {}, create, t)).rejects.toThrow(
 			"mobile:setup.createFailed",
 		);
