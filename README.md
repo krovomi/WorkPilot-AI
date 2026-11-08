@@ -98,8 +98,10 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Steering** | Guide the agent while it works, without pausing the task: a message typed in the task's Subtasks tab, the mobile app or the CLI (`--steer`, `--steer-subtask`) goes into the prompt of the next coder or QA fixer session, and the task says which session received it. See [docs/architecture/steering.md](docs/architecture/steering.md) |
 | **Guided Review** | The review shows the diff subtask by subtask, each with what it changed and the planner's description as its explanation, then the commits no subtask recorded and what is not committed yet. Out-of-plan files, moved code and QA remarks are flagged on their file; no model is called. Comment any line: open comments go to the fixer with "Request changes" (file, line, excerpt, request), and a comment is marked handled when the diff changed its lines, not when the model says so. See [docs/architecture/guided-review.md](docs/architecture/guided-review.md) and [review-comments.md](docs/architecture/review-comments.md) |
 | **Stacked Tasks** | A task waiting on a prerequisite can start from that prerequisite's branch instead of the trunk; its PR shows only its own diff, "Update" rebases it when the prerequisite changes, and once the prerequisite is merged it moves back to the base and retargets its PR (linked as a stack with `gh stack`). See [docs/architecture/stacked-tasks.md](docs/architecture/stacked-tasks.md) |
+| **Automatic Split into Small PRs** | After planning, a task whose plan exceeds the review ceiling of its kind (lines a person has to review: 100 for a hotfix, 200 for a bug fix or a version upgrade, 300 for a refactoring, 400 for a feature, tests or docs; generated files and lockfiles count nothing) becomes "Part k/N" cards, one small PR each. Independent parts start in parallel; a dependent part starts once the one it builds on passed QA, stacked on its branch. When a part's PR is merged (GitHub, GitLab or Azure DevOps) the part is done, the parts stacked on it move to the base branch and the next one starts. The parts of a group share one colour and a written mark on the board, the phone and the forge (PR title prefix, `groupe/<id>` label, a "PR group" section). Ceilings per kind in Project settings, overridable on each task; investigations, spikes and runs are never split. See [docs/architecture/task-split.md](docs/architecture/task-split.md) |
 | **Hard Gates After QA** | Once QA approves, `deps-exist` looks up every package the task added on its public registry (npm, PyPI, NuGet, Maven, Cargo, Go, Composer, pub, RubyGems) so an invented name never ships (slopsquatting); `tests-bite` plants simple faults in the lines the task wrote and sends a fault the tests miss back to the fixer, on every stack; `proof-checks` runs the project's Dafny, Lean, Verus or F* verifiers. A checker that cannot answer says "unknown", never green. See [docs/architecture/dependency-guard.md](docs/architecture/dependency-guard.md), [mutation-gate.md](docs/architecture/mutation-gate.md), [proof-checks.md](docs/architecture/proof-checks.md) |
 | **Worktree Recipe** | Each new task worktree is prepared before the first session for its stack (`npm ci`/pnpm/yarn/bun, `dotnet restore`, `uv sync`, poetry, pip, `go mod download`, `cargo fetch`, composer, bundler, `flutter pub get`, Gradle, Maven). `.workpilot/worktree.toml` adds your own steps, ignored files to copy (`.env.local`), a port block per task and a teardown; a written recipe runs only once you approved it as it is. See [docs/architecture/worktree-recipe.md](docs/architecture/worktree-recipe.md) |
+| **Mobile Platforms That Fit the Project** | The task form's "Mobile platforms" box names the mobile framework it found in the project (Flutter, React Native/Expo, .NET MAUI, Kotlin Multiplatform, Capacitor, native Android or iOS), monorepos included, and greys out a platform the app does not have. On a project without an app (a .NET Web API, a Go service, a CLI…), ticking Android or iOS warns first, then adds the setup and scaffold tasks to the board |
 | **Agent Trace** | Which lines of the PR the AI wrote, and with which model, recorded after each session in the open Agent Trace format (`agent-trace.jsonl`) for every provider; lines you edited between sessions stay yours. The changed-files view shows the AI share per file and the PR body sums it up. No prompt or code is stored. See [docs/architecture/agent-trace.md](docs/architecture/agent-trace.md) |
 | **Provenance Dossier** | When the PR is created, the task folder gets one dossier: who wrote the code and with which model, the dependencies added and their check, a CycloneDX SBOM of the packages the diff added (every stack), the gates passed and the verification verdict. The PR body sums it up and the compliance scan uses it as evidence. See [docs/architecture/provenance.md](docs/architecture/provenance.md) |
 | **Requirement Traceability** | At the end of a build, each `FR-###` requirement of the spec is linked to the files its subtasks wrote and to the tests that cover them, on every stack, and the link stays in the project after the merge. The traceability map flags requirements without a test and requirements of other tasks that touched the same files. See [docs/architecture/requirement-links.md](docs/architecture/requirement-links.md) |
@@ -110,7 +112,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments. A PR opened by someone else gets the AI review instead, kept as an unposted draft in GitHub PRs until you post it |
 | **ACP Agents** | Any agent that speaks the Agent Client Protocol runs a task from one entry in `capabilities/providers.yaml`, Gemini CLI first. A question the agent asks before acting appears on the card with its options; the agent type's tool rights are held by the session mode, by refusing questions outside them, and by stopping a turn that runs an undeclared tool. The sidebar lists only the capabilities the agent declares — see [docs/architecture/acp.md](docs/architecture/acp.md) |
 | **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
-| **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
+| **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `upgrade`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
 | **Optional Methodologies by `fallback:`** | A phase may name a methodology that needs a runtime in the target project (BMAD's `_bmad/`) and a WorkPilot fallback; the engine substitutes the fallback when the runtime is absent and shows it in the profile. Nothing is skipped in silence |
 | **Resolved Profile Preview** | See which phases your effort setting bought — and what the next level up would add — in the task detail modal, *before* the build starts |
 
@@ -133,12 +135,12 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **Planner** | Complexity assessment, phased subtask breakdown, dependency analysis |
 | **Coder** | Context-aware implementation with parallel subagent spawning |
 | **QA Reviewer / Fixer** | Acceptance criteria validation and automated issue resolution |
-| **Test Generator** | Unit and integration test generation with live streaming of the code as it is written |
+| **Test Generator** | A studio laid out like Visual to Code: the target on the left, the four steps of the run in the middle (live state, click one to open its result), the tests written live on the right. Coverage gaps, unit tests per file, E2E scenarios and TDD in 14 languages plus the project's own; the framework is read from the manifests of the file's language (a C# project with a `package.json` gets xUnit, not Vitest), and a gap becomes tests in one click |
 | **Flaky Test Detective** | Runs your test suite several times (dotnet test, pytest, Vitest, Jest, Maven, Gradle, Go) and flags the tests whose result changes between runs; also reads existing JUnit XML and .NET TRX reports |
 | **Refactorer** | Safe code refactoring with pattern detection and API migration |
-| **Documenter** | README, API docs, and architecture documentation generation |
-| **Migration Agent** | Framework and library migration with breaking change detection |
-| **Release Coordinator** _(experimental)_ | Orchestrates release readiness, changelog, and version bumps |
+| **Documenter (Docs and drift)** | Measures the project's documentation coverage per language, lists the files to document first, proposes doc comments in each language's own convention (XML doc, KDoc, rustdoc, godoc, Swift, JSDoc, docstrings…) and folder READMEs, and the drift detector shows where the docs no longer match the code, by severity. Nothing is written to your files without you |
+| **Migration Agent** | Framework and library migration with breaking change detection: the page analyses the project, shows the source stack it found and the plan, then creates a Kanban task that migrates in an isolated worktree |
+| **Release Coordinator** _(experimental)_ | Orchestrates release readiness, changelog, and version bumps; finds the services of every stack (.NET, Java and Kotlin, Go, Rust, Dart/Flutter, PHP, Ruby, Elixir, Swift, npm, Python) |
 | **Memory Manager** | The shared brain: one Obsidian vault every agent reads and writes, across sessions |
 
 ### Integrations
@@ -166,7 +168,7 @@ See [Installation et Configuration](#installation-et-configuration) below for de
 | **GitHub Copilot** | GitHub sign-in (Copilot subscription) |
 | **Windsurf** | API key, or the key of the installed Windsurf IDE |
 | **Local models** | Ollama, LM Studio or llama.cpp endpoint, no key |
-| **Agent CLIs** | OpenCode, Antigravity and [pi](https://pi.dev) run with their own sign-in |
+| **Agent CLIs** | OpenCode, Antigravity and [pi](https://pi.dev) run with their own sign-in. The "CLI Tools" sidebar lists every agent CLI (Claude Code, Codex, Copilot, Gemini CLI, Hermes, OpenCode, Antigravity, pi), installed ones first, and installs or updates each in one click through the channel that owns the copy you run |
 
 Meta, AWS and Cursor can be configured, but they have no agent client of their own yet: their builds run on Claude, and the task says so. What each provider can do (subagents, MCP, sandbox, effort) is declared in [`capabilities/providers.yaml`](capabilities/providers.yaml); keys and variables are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md#provider-selection-and-endpoints).
 
@@ -182,7 +184,9 @@ Meta, AWS and Cursor can be configured, but they have no agent client of their o
 | **Ideation** | Discovers performance bottlenecks, security vulnerabilities, code quality issues, and UI/UX improvements |
 | **Architecture Visualizer** | Dependency graphs, module hierarchy, and component relationship diagrams |
 | **Performance Profiler** _(experimental)_ | AI-powered bottleneck identification with optimization suggestions |
-| **Dependency Sentinel** | Monitors security vulnerabilities, version conflicts, and outdated dependencies |
+| **Dependency Sentinel** | Shows what the dependency guard really checks on each task (packages added, their registry, known vulnerabilities), instead of sample data |
+| **Code Review & Refactoring** | Code smells (long method, too many parameters, deep nesting, magic numbers, missing docs, duplication…) and review rules for .NET, Java, Kotlin, Scala, Go, Rust, Swift, PHP, Ruby, Dart, C/C++, TypeScript and Python |
+| **Regression Guardian** _(experimental)_ | Writes the regression test of an incident in the framework of the stack concerned (pytest, Jest, Vitest, Mocha, JUnit 5, TestNG, xUnit, NUnit, Go, cargo, PHPUnit, RSpec, Dart, XCTest) |
 | **Self-Healing Codebase** | Automatically generates fixes when CI tests fail; integrates with Sentry, Datadog, PagerDuty for production incidents |
 | **Technical Debt Tracker** | Continuously scores code health, tracks and ages debt items, and proposes auto-fixes with PRs |
 | **Risk Classifier** | Scores code changes by risk level with impact assessment |
@@ -198,8 +202,8 @@ Meta, AWS and Cursor can be configured, but they have no agent client of their o
 | **Auto-Refactoring** | Pattern-based and architectural code transformations |
 | **Code Migration** | Large-scale codebase migrations across frameworks and libraries |
 | **Design to Code (Import Design)** | Turns a mockup, a screenshot or a Figma export into components of the project's stack, detected from its manifests: React, Next.js, Vue, Nuxt, Angular, Svelte, Blazor, HTML + CSS, React Native, Flutter, SwiftUI, Jetpack Compose, .NET MAUI, WPF / WinUI or Avalonia. Six visible steps (vision, design tokens, spec, code, visual tests, write); nothing is written into the project before you review it, and an example result shown without an AI answer is flagged as such. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) (section Import Design) |
-| **Visual to Code** | Draw an architecture as a node graph (services, databases, agents, a mobile app…) on every stack, with your own reusable bricks, a sentence explaining each connection and eight canvas themes; the bricks' descriptions and the interaction texts go into the build spec sent to the agents. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) |
-| **Pipeline Generator** _(experimental)_ | Generates GitHub Actions, GitLab CI, and Azure Pipelines configurations |
+| **Visual to Code** | Draw an architecture as a node graph (services, databases, agents, a mobile app…) on every stack, with your own reusable bricks, a sentence explaining each connection and eight canvas themes; the bricks' descriptions and the interaction texts go into the build spec sent to the agents. Each connection picks its relation from a list fitted to the two blocks and their stacks (gRPC, SignalR, MassTransit, EF Core, AMQP, FCM / APNs…) or typed freely; every pair of blocks is an expected link or refused with its reason and the block to put between them (a reversed arrow flips in one click), incompatible technologies are flagged, and a "Points to watch" panel reviews the whole diagram. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) |
+| **Pipeline Generator** _(experimental)_ | Generates GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket and CircleCI configurations for the stack it detects (.NET solutions, Java, Go, Rust, PHP, Ruby, Dart/Flutter, Swift, Elixir, Angular, Nuxt, Svelte, NestJS, Express…) |
 | **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
 | **Arena Mode** | Side-by-side comparison of different AI models on the same task |
 | **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally; a task is created only once you confirm it, locally or on a server project's board. See [docs/architecture/voice-assistant.md](docs/architecture/voice-assistant.md) |
@@ -241,6 +245,7 @@ Meta, AWS and Cursor can be configured, but they have no agent client of their o
 | **Bilingual UI** | Full French and English interface |
 | **Command Palette** | Keyboard-driven access to all features with fuzzy search |
 | **Plugin Marketplace** | Browse and install community plugins |
+| **One UI Charter** | Every module and every Settings page share one design language, taken from Visual to Code: a header with its group as kicker, pill tabs with counters, cards with a coloured rail, a command bar at the bottom with a single primary button, in all themes and both languages. Rules in [docs/architecture/ui-charter.md](docs/architecture/ui-charter.md) |
 
 ### Deployment & Team
 
@@ -259,7 +264,7 @@ Meta, AWS and Cursor can be configured, but they have no agent client of their o
 > Every screenshot below comes from the real app, filled with an invented demo project (`acme-storefront`). They are regenerated with `scripts/readme-screenshots/`.
 
 ### Kanban Board
-Describe a task, and agents take it from planning to a merged pull request. Each card shows its phase (plan, code, QA), its progress, the provider at work and what it is about (category, impact, priority). Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done, plus Red Build when the project's CI has run on a task branch (a red run moves the card there and starts an automatic repair, up to three times).
+Describe a task, and agents take it from planning to a merged pull request. Each card shows its phase (plan, code, QA), its progress, the provider at work and what it is about (category, impact, priority). A task too big for one small PR splits itself into parts that share a colour and a « Part k/N » mark; a click on the mark shows only its group. Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done, plus Red Build when the project's CI has run on a task branch (a red run moves the card there and starts an automatic repair, up to three times).
 
 ![Kanban board](.github/assets/screenshots/kanban.png)
 
@@ -283,6 +288,18 @@ Agents scan the project and propose improvements by type: code, UI/UX, documenta
 
 ![Ideation: improvement ideas by type](.github/assets/screenshots/ideation.png)
 
+### Visual to Code
+Draw the architecture, then generate the project. Each block carries its stack, each connection its relation and a sentence that explains it, and the status bar says whether the whole diagram is coherent. **Design Import**, in the next tab, turns a screenshot or a Figma export into components of the project's stack in six visible steps.
+
+![Visual to Code: an architecture drawn as a node graph, every connection explained](.github/assets/screenshots/visual-to-code.png)
+
+![Import Design: the six steps from an image to the project's components](.github/assets/screenshots/import-design.png)
+
+### Test Generation Studio
+Pick a file and a mode (coverage gaps, unit, E2E, TDD): the four steps of the run light up in the middle and the tests are written live on the right, in the framework of the file's own stack.
+
+![Test generation studio: target, four-step pipeline and live result](.github/assets/screenshots/test-generation.png)
+
 ### Dashboard
 What the agents produce and cost: tasks by status, QA first-pass rate, tokens and cost by provider and model, merges resolved automatically, completion time by complexity. Exportable as JSON or CSV.
 
@@ -301,12 +318,19 @@ The team's board in your pocket: in server mode, the phone app follows the share
 
 ![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
+### Settings
+Application and project settings grouped by theme, each group with its colour, each page opening on its group, title and description, in the same charter as the modules.
+
+![Settings: grouped navigation and the project's general page](.github/assets/screenshots/settings.png)
+
 ### Additional Views
 - **Changelog** — Generate release notes from completed tasks
 - **Architecture Visualizer** — Interactive dependency and module graphs
 - **Agent Replay** _(experimental)_ — Step-by-step session replay with breakpoints and diffs
 - **Analytics** — Usage, cost, and performance dashboards
 - **Session History** — Every agent session with its phases, tokens and cost
+- **Docs and drift** — Documentation coverage per language, doc comments proposed in each language's convention, drift between docs and code
+- **Bounty Board** — The same spec built by several provider/model contestants, an impartial judge picks the winner
 
 ---
 

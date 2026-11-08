@@ -1,6 +1,0 @@
----
-section: ✨ Nouveautés
----
-
-- **Charte UI sur le groupe Planification** : Feuille de route, Analytiques, Coûts et estimation (avec Estimation intelligente), Approbation des specs, Journal des modifications, Train de release, Profileur carbone et Snapshots d'environnement adoptent le style de « Visuel vers Code » : en-tête à kicker, onglets en pastilles, chiffres clés en cartes, colonnes et barre de commande en bas avec un seul bouton principal. Priorités, statuts du Kanban de la feuille de route et statuts des tâches sont traduits ; l'Estimateur de coûts affiche un état vide au lieu d'une page blanche, et la page Snapshots ne plante plus quand la liste arrive vide.
-- **Train de release et Snapshots d'environnement sur toutes les piles** : le train de release trouve les services .NET (C#, F#, VB), Java et Kotlin (Maven, Gradle), Go, Rust, Dart/Flutter, PHP, Ruby, Elixir et Swift en plus de npm et Python ; un snapshot relève les chaînes d'outils de chaque pile (dotnet, java, mvn, gradle, go, rustc, php, ruby, dart, flutter, swift, bun, deno…) et leurs lockfiles, et le rejeu (Dockerfile, shell Nix, script de vérification) installe exactement ces outils au lieu de Node et Python seuls. Les mots de passe glissés dans les URL des variables d'environnement sont désormais masqués dans le snapshot.

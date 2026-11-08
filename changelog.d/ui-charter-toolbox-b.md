@@ -1,7 +1,0 @@
----
-section: ✨ Nouveautés
----
-
-- **Charte UI sur la boîte à outils (seconde moitié)** : Générateur de pipeline CI, Migration de code, Vérification des notebooks, Veille des contrats d'API, Aperçu des changements, Agent navigateur (navigateur, tests, régression visuelle), Bot d'équipe, Mode hors ligne, Émulateur d'application, Optimiseur de prompt, Assistant vocal et API Studio adoptent le style de « Visuel vers Code » : en-tête à kicker, onglets et filtres en pastilles, chiffres clés en cartes, résultats en cartes à liseré coloré, un seul bouton principal.
-- **Outils de la boîte à outils sur toutes les piles** : le générateur de pipeline détecte PHP, Ruby, Dart/Flutter, Swift, Elixir, Angular, Nuxt, Svelte, NestJS, Express et les solutions .NET, propose Azure Pipelines et Bitbucket en plus de GitHub Actions, GitLab CI et CircleCI ; la vérification des notebooks lit aussi les notebooks .NET Interactive (.dib), Quarto (.qmd) et R Markdown (.Rmd) ; la veille des contrats trouve GraphQL, Protobuf et les specs OpenAPI rangées dans un dossier `api/`, `contracts/`… ; l'agent navigateur lance aussi les tests Cypress, .NET, JUnit (Maven/Gradle), Go, RSpec et PHPUnit/Dusk ; API Studio scanne les routes Laravel, NestJS et Spring en Kotlin.
-- **Migration de code honnête** : la page n'annonce plus une migration « en file d'attente » qui ne s'exécutait jamais. Elle analyse le projet, montre la pile source détectée et le plan, puis crée une tâche Kanban qui fait la migration dans un worktree isolé.
