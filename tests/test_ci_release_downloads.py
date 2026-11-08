@@ -44,3 +44,8 @@ def test_biome_comes_from_the_npm_registry():
         'npm install --global --no-fund --no-audit "@biomejs/biome@${BIOME_VERSION}"'
         in lint
     )
+
+
+def test_the_server_image_retries_its_github_cli_download():
+    dockerfile = (ROOT / "deploy" / "Dockerfile.server").read_text(encoding="utf-8")
+    assert "curl -fsSL --retry 6 --retry-delay 20" in dockerfile
