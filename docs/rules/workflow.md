@@ -99,6 +99,19 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   build`), une nouvelle annexe un fichier de `docs/audit/annexes/`. Deux PR ouvertes en même temps
   ne touchent plus les mêmes lignes ; `tests/test_changelog_fragments.py` et
   `tests/test_audit_findings.py` le gardent.
+- **PR empilées : le pilote de pile** (`stack-autopilot.yml`, `scripts/stack_autopilot.py`). Une PR
+  vers `develop` avec l'auto-merge GitHub activé, ou le label `autopilot`, est fusionnée par lui,
+  dans l'ordre de sa pile : B attend A si B est basée sur la branche de A, si sa description nomme A
+  (« built on #A », « Merge order: #A, … », « basée sur #A ») ou si les deux partagent des commits
+  absents de `develop`. Pour la première de chaque pile, il fusionne `develop` dedans (un parent
+  fusionné en squash est absorbé sans rejouer ses conflits), confie un conflit restant à Claude Code,
+  pousse avec `PAT_TOKEN` pour que la CI tourne, puis fusionne quand **tous** les checks du commit
+  sont verts, avec la méthode choisie (`autopilot:squash|merge|rebase`, squash par défaut). Il
+  remplace l'auto-merge natif par ces labels : le ruleset de `develop` n'exigeant aucun check,
+  l'auto-merge GitHub fusionnerait une PR dès qu'elle ne conflicte plus, avant la CI. Blocages :
+  `autopilot/conflit` (retiré seul au commit suivant) et `autopilot/rouge`. Secrets : `PAT_TOKEN`
+  (Contents, Pull requests, Workflows en écriture), `CLAUDE_CODE_OAUTH_TOKEN` ou `ANTHROPIC_API_KEY` ;
+  sans eux, le résumé du run dit ce qui manque. `tests/test_stack_autopilot.py` le garde.
 
 ## CI (`.github/workflows/`)
 
@@ -108,6 +121,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 | `lint.yml` | ruff (dont `scripts/`), pyright sur les paquets de `apps/backend/pyrightconfig.json`, Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
+| `stack-autopilot.yml` | rien : il fusionne les PR inscrites dans l'ordre de leur pile (push sur `develop`, fin d'un workflow, toutes les 20 min, à la main avec `dry_run`) |
 
 `ci.yml` et `lint.yml` tournent sur tout changement sauf les quelques fichiers que rien ne lit
 (`paths-ignore` : `LICENSE`, gabarits d'issue et de PR, `FUNDING.yml` ; `CHANGELOG.md` n'y est plus, un test le lit) ; une liste
