@@ -12,6 +12,9 @@ fichiers y renvoient.
 | [`architecture/`](architecture/) | pourquoi chaque feature est construite ainsi, une feature par fichier | référence |
 | [`SECURITY.md`](SECURITY.md) | politique de sécurité : versions supportées, signaler une vulnérabilité | public |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | contribuer : installation, style, tests, branches, PR | humains |
+| [`FEATURES.md`](FEATURES.md) | toutes les features de l'app, par domaine (le README n'en garde que l'essentiel) | public |
+| [`INSTALLATION.md`](INSTALLATION.md) | installer l'app ou lancer depuis les sources, providers, notes Windows, hooks, dépannage | guide |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | vue d'ensemble : agents, sous-agents, workflows, état, couches de sécurité | référence |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | providers, résolution des identifiants, variables d'environnement | référence |
 | [`CLI-USAGE.md`](CLI-USAGE.md) | utilisation en terminal et en CI | guide |
 | [`server-operations.md`](server-operations.md) | exploiter le serveur multi-utilisateurs d'une équipe : déploiement, TLS, sauvegarde, mise à jour, quotas, audit | guide |

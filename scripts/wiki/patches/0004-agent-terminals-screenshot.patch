@@ -1,0 +1,45 @@
+From 931f7a1f351ff26e096f51784f21e7552c0ad2e3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 17:33:58 +0000
+Subject: [PATCH] docs(wiki): current Agent Terminals screenshot
+
+---
+ User-Interface.fr.md | 4 ++--
+ User-Interface.md    | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/User-Interface.fr.md b/User-Interface.fr.md
+index 03fa9ff..740bbe1 100644
+--- a/User-Interface.fr.md
++++ b/User-Interface.fr.md
+@@ -72,9 +72,9 @@ Une tâche trop grosse pour une petite PR se découpe d'elle-même après la pla
+ 
+ ## 🧑‍💻 Agent Terminals
+ 
+-![Agent Terminals](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-Agents-terminals.png)
++![Agent Terminals](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/terminals.png)
+ 
+-Jusqu'à **12 terminaux IA en parallèle**, chacun étant un agent Claude indépendant.
++Jusqu'à **12 terminaux IA en parallèle**, chacun avec sa propre session d'agent (Claude Code, Codex, Copilot…) dans le worktree d'une tâche.
+ 
+ - **One-click task context injection** : bouton pour injecter automatiquement le contexte d'une tâche (spec, fichiers pertinents)
+ - **xterm.js 6 avec WebGL** pour une expérience terminal native
+diff --git a/User-Interface.md b/User-Interface.md
+index fe87d27..f169390 100644
+--- a/User-Interface.md
++++ b/User-Interface.md
+@@ -67,9 +67,9 @@ A task too big for one small PR splits itself after planning into « Part k/N »
+ 
+ ## 🧑‍💻 Agent Terminals
+ 
+-![Agent Terminals](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/WorkPilot-AI-Agents-terminals.png)
++![Agent Terminals](https://raw.githubusercontent.com/krovomi/WorkPilot-AI/develop/.github/assets/screenshots/terminals.png)
+ 
+-Up to **12 parallel AI terminals**, each an independent Claude agent.
++Up to **12 parallel AI terminals**, each running its own agent session (Claude Code, Codex, Copilot…) in a task's worktree.
+ 
+ - **One-click task context injection**: button to automatically inject task context (spec, relevant files)
+ - **xterm.js 6 with WebGL** for native terminal experience
+-- 
+2.43.0
+
