@@ -36,5 +36,7 @@
 		"serious": "Sérieuse",
 		"moderate": "Modérée",
 		"minor": "Mineure"
-	}
+	},
+	"wcagLevel": "WCAG {{level}}",
+	"wcagCriterion": "WCAG {{criterion}}"
 }

@@ -103,7 +103,7 @@ export function A11yReportView({ projectPath }: A11yReportViewProps): React.Reac
 							pressed={targetLevel === level}
 							onClick={isScanning ? undefined : () => setTargetLevel(level)}
 						>
-							WCAG {level}
+							{t("accessibility:wcagLevel", { level })}
 						</Chip>
 					))}
 					{!isScanning && <SharedReportNote saved={shared} />}
@@ -209,7 +209,7 @@ function ReportBody({ report }: { readonly report: A11yReport }): React.ReactEle
 											{t(`severities.${v.severity}`, { defaultValue: v.severity })}
 										</Chip>
 										<span className="wp-meta font-mono">
-											{v.ruleId} · WCAG {v.wcagCriteria}
+											{v.ruleId} · {t("wcagCriterion", { criterion: v.wcagCriteria })}
 										</span>
 									</div>
 									<p className="mt-1.5 text-sm">{v.description}</p>
