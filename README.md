@@ -1,13 +1,18 @@
 # WorkPilot AI
 
-**Autonomous multi-agent coding framework that plans, builds, and validates software for you.**
+**Describe what you want built. A chain of AI agents plans it, codes it, tests it and opens the pull request — each task in its own git worktree, on the AI provider you choose.**
 
-![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/krovomi/WorkPilot-AI?style=flat-square&label=release)](https://github.com/krovomi/WorkPilot-AI/releases/latest)
 [![Discussions](https://img.shields.io/github/discussions/krovomi/WorkPilot-AI?style=flat-square&logo=github&label=discussions)](https://github.com/krovomi/WorkPilot-AI/discussions)
 [![Wiki](https://img.shields.io/badge/docs-wiki-blue?style=flat-square&logo=github)](https://github.com/krovomi/WorkPilot-AI/wiki)
 [![CI](https://img.shields.io/github/actions/workflow/status/krovomi/WorkPilot-AI/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/krovomi/WorkPilot-AI/actions)
+
+![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
+
+**[Download](#download)** · **[Quick start](#quick-start)** · **[How it works](#how-it-works)** · **[Tour](#a-tour-of-the-app)** · **[Features](#features-at-a-glance)** · **[AI providers](#ai-providers)** · **[Documentation](#documentation)**
+
+WorkPilot AI is a desktop app (Windows, macOS, Linux) with a Python engine, an optional team server and a phone app. It works on any stack: .NET, Java, Kotlin, Go, Rust, Python, Node.js and TypeScript (Angular, React, Vue, Next.js, Nuxt…), PHP, Ruby, Flutter, Swift and more.
 
 ---
 
@@ -44,929 +49,222 @@ _No beta build is currently published. The table above is the latest stable rele
 
 > All releases include SHA256 checksums, a CycloneDX SBOM (`workpilot-sbom.cdx.json`) and a build provenance attestation for each file (`gh attestation verify <file> --repo krovomi/WorkPilot-AI`); VirusTotal scan results are added to the release notes when the scan is configured.
 
+
 ---
 
-## Quick Start
+## Quick start
 
-1. **Download and install** the app for your platform
-2. **Open your project** — select a git repository folder
-3. **Connect your AI provider** — a Claude subscription, an API key (OpenAI, Gemini, Grok, Mistral, DeepSeek), GitHub Copilot, a local model (Ollama, LM Studio) or an agent CLI (Codex, OpenCode, pi…)
-4. **Create a task** — describe what you want to build
-5. **Watch it work** — agents plan, code, and validate autonomously
+1. **Install** the app for your platform from the [download table](#download).
+2. **Open a project**: any folder that is a git repository.
+3. **Connect an AI provider**: a Claude subscription, an API key (OpenAI, Gemini, Grok, Mistral, DeepSeek), GitHub Copilot, a local model (Ollama, LM Studio) or an agent CLI (Codex, OpenCode, pi…).
+4. **Create a task** on the Kanban board and describe what you want.
+5. **Review the result**: the agents plan, code and validate; you approve the plan if you want to, then review the diff and merge.
 
-Or from source:
+From source (Node.js 22.12+, pnpm, Python 3.12+, Git):
 
 ```sh
+git clone https://github.com/krovomi/WorkPilot-AI.git
+cd WorkPilot-AI
 pnpm install
 pnpm run dev
 ```
 
-See [Installation et Configuration](#installation-et-configuration) below for detailed instructions.
+Step-by-step installation, provider setup, Windows notes and troubleshooting: [docs/INSTALLATION.md](docs/INSTALLATION.md) (in French).
 
 ---
 
-## Features
+## How it works
 
-> _(experimental)_ marks a view that has neither a design document nor a test yet: the sidebar shows it with a flask badge, and one button hides them all. The list is kept in `apps/frontend/src/renderer/components/sidebar/experimental-views.ts`.
+```
+ your task ─▶ spec ─▶ planner ─▶ coder (+ subagents) ─▶ QA reviewer ─▶ QA fixer
+                         │                                    │
+              subtasks you can approve            verify: run the app, keep a proof
+                                                              │
+                                              your review ─▶ merge or pull request
+```
 
-### Autonomous Development Pipeline
-
-| Feature | Description |
-|---------|-------------|
-| **Kanban Board** | Visual task management from planning through completion with real-time agent progress |
-| **Multi-Agent Pipeline** | Planner → Coder → QA Reviewer → QA Fixer pipeline runs autonomously end-to-end |
-| **Parallel Execution** | Up to 12 simultaneous agent terminals for parallel builds |
-| **Isolated Workspaces** | Every task runs in a dedicated git worktree — your main branch stays safe |
-| **AI-Powered Merge** | Semantic conflict resolution when integrating worktrees back to main |
-| **QA Auto-Fix Loop** | Agents automatically detect, fix, and revalidate failing acceptance criteria |
-| **Runtime Verification** | After QA, the `verify` phase launches the app the task changed, reads every error, fixes and relaunches, drives the app to the state the task asked for and keeps a proof: web and Electron apps through Chrome DevTools, mobile apps on an emulator, APIs through their OpenAPI schema, and WPF, WinForms or WinUI apps through Windows UI Automation, in the one window the card names and never by simulated keystrokes. A card can also list, in plain language, the steps that prove a web change: the verifier follows them in Playwright, captures each step and attaches the Playwright trace to the card; a step not carried out is never a pass |
-| **Spec Approval Workflow** | Review and approve AI-generated specifications before implementation begins |
-| **Hot-Swap LLM** | Change provider, model, or reasoning effort mid-task — the next turn resumes on the new engine with context replayed |
-| **Honest Effort** | Each provider gets the effort level on its own scale (Claude, OpenAI/Codex, Gemini, Grok, DeepSeek, Mistral, Copilot, Ollama, pi, Antigravity); the picker and the task log say what the model actually receives, and a model that refuses the setting runs on without it instead of failing the phase |
-| **Pause & Resume** | Suspend a running task and resume later with full context preserved, optionally on a different provider |
-| **Per-Phase Re-run** | Redo any phase (planning, coding, validation) on demand without restarting the whole task |
-| **PR-First Review Flow** | Guided human-review with a DoD checklist, "approve & close", and reversible task abandon |
-| **PR Follow-Through** | Once the task's PR is open, the card keeps driving it: a red check or an unresolved review thread goes to the QA fixer in the task's worktree, the commit is checked (no test skipped or deleted, no CI file edited) and pushed — never forced, never merged. A failure that is also red on the base branch is reported, not "fixed". GitHub for now — see [docs/architecture/pr-followup.md](docs/architecture/pr-followup.md) |
-| **GenAI Traces for Every Provider** | Set one OTLP endpoint and every provider's sessions show up the same way in Jaeger, Langfuse or Phoenix: an agent span, its model calls with token counts, its tool calls. No prompt or output leaves; a provider that reports no usage is marked "estimated", never counted as zero |
-| **OS Sandbox** | An agent's commands run under bubblewrap (Linux) or Seatbelt (macOS): writes stay in the task's worktree, your SSH keys and tokens are hidden, the network is the provider's hosts and the package registries through a filtering proxy. When the machine has no sandbox the card says so at launch; `WORKPILOT_SANDBOX=required` refuses to start instead. Windows is not covered yet — see [docs/architecture/os-sandbox.md](docs/architecture/os-sandbox.md) |
-| **MCP 2026: Tasks and MCP Apps** | WorkPilot's own MCP servers speak MCP 2026-07-28 and still answer older clients as before. `verify_launch`, `verify_perf_trace` and `verify_device` come back as tasks to a client that reads them: polled, cancelled when the build stops, timed out. A tool of an installed MCP server that attaches a view shows it in the task panel, on every provider including Claude, in an iframe sandboxed without `allow-same-origin` and with the view's own CSP. The view shows the call that happened and cannot act on the task. See [docs/architecture/mcp-2026.md](docs/architecture/mcp-2026.md) |
-| **Best-of-N** | Build one task 2 to 4 times, each in its own worktree with its own provider, model and effort; the card ranks them on numbers (finished build, QA, goal, diff size, cost) and you keep the one you choose. Nothing is merged on its own |
-| **Goal Mode** | A task is done when a command says so (`dotnet test` exits 0), not when a reviewer thinks so: QA keeps fixing within a pass and spending cap, and the tests it must pass are protected from edits |
-| **Spec by Example (.NET)** | On an ASP.NET Core Web API, when the project turns it on, the spec's acceptance criteria are written as HTTP integration tests (`WebApplicationFactory`) before any code. WorkPilot checks they touch only the test project, compile and fail, then makes `dotnet test` the task's goal with those tests protected. A goal you set yourself is kept. See [docs/architecture/spec-by-example.md](docs/architecture/spec-by-example.md) |
-| **.NET Upgrades, One Release at a Time** | A Kanban task that names .NET 9, 10 or 11 (or C# 13, 14, 15) gets the .NET team's migration procedures, reviewed and completed up to .NET 11 RC2, for each step between the project's version and the one asked, in order: the planner plans one step per version and QA checks the target. `/migrate-dotnet8-to-dotnet9`, `/migrate-dotnet9-to-dotnet10` and `/migrate-dotnet10-to-dotnet11` appear only in the projects concerned; other stacks pay nothing. See [docs/architecture/dotnet-upgrade.md](docs/architecture/dotnet-upgrade.md) |
-| **Cross Review** | After QA, a second engine (another provider and model, chosen per project) reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you: fix it, or create it anyway. An answer it cannot read is never taken as approval. See [docs/architecture/cross-review.md](docs/architecture/cross-review.md) |
-| **Steering** | Guide the agent while it works, without pausing the task: a message typed in the task's Subtasks tab, the mobile app or the CLI (`--steer`, `--steer-subtask`) goes into the prompt of the next coder or QA fixer session, and the task says which session received it. See [docs/architecture/steering.md](docs/architecture/steering.md) |
-| **Guided Review** | The review shows the diff subtask by subtask, each with what it changed and the planner's description as its explanation, then the commits no subtask recorded and what is not committed yet. Out-of-plan files, moved code and QA remarks are flagged on their file; no model is called. Comment any line: open comments go to the fixer with "Request changes" (file, line, excerpt, request), and a comment is marked handled when the diff changed its lines, not when the model says so. See [docs/architecture/guided-review.md](docs/architecture/guided-review.md) and [review-comments.md](docs/architecture/review-comments.md) |
-| **Stacked Tasks** | A task waiting on a prerequisite can start from that prerequisite's branch instead of the trunk; its PR shows only its own diff, "Update" rebases it when the prerequisite changes, and once the prerequisite is merged it moves back to the base and retargets its PR (linked as a stack with `gh stack`). See [docs/architecture/stacked-tasks.md](docs/architecture/stacked-tasks.md) |
-| **Automatic Split into Small PRs** | After planning, a task whose plan exceeds the review ceiling of its kind (lines a person has to review: 100 for a hotfix, 200 for a bug fix or a version upgrade, 300 for a refactoring, 400 for a feature, tests or docs; generated files and lockfiles count nothing) becomes "Part k/N" cards, one small PR each. Independent parts start in parallel; a dependent part starts once the one it builds on passed QA, stacked on its branch. When a part's PR is merged (GitHub, GitLab or Azure DevOps) the part is done, the parts stacked on it move to the base branch and the next one starts. The parts of a group share one colour and a written mark on the board, the phone and the forge (PR title prefix, `groupe/<id>` label, a "PR group" section). Ceilings per kind in Project settings, overridable on each task; investigations, spikes and runs are never split. See [docs/architecture/task-split.md](docs/architecture/task-split.md) |
-| **Hard Gates After QA** | Once QA approves, `deps-exist` looks up every package the task added on its public registry (npm, PyPI, NuGet, Maven, Cargo, Go, Composer, pub, RubyGems) so an invented name never ships (slopsquatting); `tests-bite` plants simple faults in the lines the task wrote and sends a fault the tests miss back to the fixer, on every stack; `proof-checks` runs the project's Dafny, Lean, Verus or F* verifiers. A checker that cannot answer says "unknown", never green. See [docs/architecture/dependency-guard.md](docs/architecture/dependency-guard.md), [mutation-gate.md](docs/architecture/mutation-gate.md), [proof-checks.md](docs/architecture/proof-checks.md) |
-| **Worktree Recipe** | Each new task worktree is prepared before the first session for its stack (`npm ci`/pnpm/yarn/bun, `dotnet restore`, `uv sync`, poetry, pip, `go mod download`, `cargo fetch`, composer, bundler, `flutter pub get`, Gradle, Maven). `.workpilot/worktree.toml` adds your own steps, ignored files to copy (`.env.local`), a port block per task and a teardown; a written recipe runs only once you approved it as it is. See [docs/architecture/worktree-recipe.md](docs/architecture/worktree-recipe.md) |
-| **Mobile Platforms That Fit the Project** | The task form's "Mobile platforms" box names the mobile framework it found in the project (Flutter, React Native/Expo, .NET MAUI, Kotlin Multiplatform, Capacitor, native Android or iOS), monorepos included, and greys out a platform the app does not have. On a project without an app (a .NET Web API, a Go service, a CLI…), ticking Android or iOS warns first, then adds the setup and scaffold tasks to the board |
-| **Agent Trace** | Which lines of the PR the AI wrote, and with which model, recorded after each session in the open Agent Trace format (`agent-trace.jsonl`) for every provider; lines you edited between sessions stay yours. The changed-files view shows the AI share per file and the PR body sums it up. No prompt or code is stored. See [docs/architecture/agent-trace.md](docs/architecture/agent-trace.md) |
-| **Provenance Dossier** | When the PR is created, the task folder gets one dossier: who wrote the code and with which model, the dependencies added and their check, a CycloneDX SBOM of the packages the diff added (every stack), the gates passed and the verification verdict. The PR body sums it up and the compliance scan uses it as evidence. See [docs/architecture/provenance.md](docs/architecture/provenance.md) |
-| **Requirement Traceability** | At the end of a build, each `FR-###` requirement of the spec is linked to the files its subtasks wrote and to the tests that cover them, on every stack, and the link stays in the project after the merge. The traceability map flags requirements without a test and requirements of other tasks that touched the same files. See [docs/architecture/requirement-links.md](docs/architecture/requirement-links.md) |
-| **Point and Change** | In a task's Emulator tab, "Point" turns on the DevTools element picker: click a button or a card of the page and say what to change. Each element goes to the task as a steering message with its image, its path, its style and the files that probably render it (React, Angular, Vue, Svelte, Blazor, Razor Pages, Twig, Blade, ERB…). No script is added to the page. See [docs/architecture/preview-point.md](docs/architecture/preview-point.md) |
-| **Proof Video and Base Comparison** | A verification scenario is filmed (WebM in the Verification tab) and its steps assembled into a short GIF you can attach to the PR. The Verification tab also replays the scenario and the checked calls on the code the task started from, then on the task, and lists what behaves differently: broken or fixed steps, console errors, requests and endpoint statuses. A proof for the reviewer, never a gate. See [docs/architecture/verify.md](docs/architecture/verify.md) |
-| **Board over MCP** | The `workpilot-board` MCP server gives Claude Code, Codex, Gemini CLI, GitHub Copilot (CLI and VS Code), Cursor, Claude Desktop, Windsurf or OpenCode the project's Kanban: list and read cards and their specs, add one to the backlog, fix a card's text before it starts, wait until a card is ready for your review, read the roadmap and Ideation's ideas (also as MCP resources). Add it to each app in one click from Project settings → Use from other apps. In server mode, the same tools reach the team's boards over HTTP (`<server>/mcp`) with a personal access token made in Settings → MCP access to the server. Starting a build, approving a plan and merging stay with you, on the card. See [docs/architecture/board-mcp.md](docs/architecture/board-mcp.md) |
-| **Needs You** | When a task waits for you (plan, review, QA hand-over, error), you hear about it on the desktop and, if you want, on ntfy or Telegram; a waiting plan can be approved from Telegram with a one-shot button. With `WORKPILOT_TASK_DIGEST_HOURS`, a long build also sends a periodic digest (subtasks done, what runs, what is blocked and why) to the notification channels you configured. See [docs/architecture/task-digest.md](docs/architecture/task-digest.md) |
-| **Automations** | A rule turns an event into a Kanban card: a GitHub issue labelled, the base branch's CI going red, a time of day. Cards are drafts by default, one per issue or red streak, under a daily cap; a rule never merges, pushes or comments. A PR opened by someone else gets the AI review instead, kept as an unposted draft in GitHub PRs until you post it |
-| **ACP Agents** | Any agent that speaks the Agent Client Protocol runs a task from one entry in `capabilities/providers.yaml`, Gemini CLI first. A question the agent asks before acting appears on the card with its options; the agent type's tool rights are held by the session mode, by refusing questions outside them, and by stopping a turn that runs an undeclared tool. The sidebar lists only the capabilities the agent declares — see [docs/architecture/acp.md](docs/architecture/acp.md) |
-| **Declarative Workflows** | A build is described as phases in `workflows/<name>/workflow.yaml`; the engine resolves them against your effort level, the provider's capabilities, the files the task touches and the task itself (`when: kind == … and complexity == …`). On by default |
-| **One Workflow per Task Kind** | A card's kind (`feature`, `bug_fix`, `hotfix`, `investigation`, `run`, `refactoring`, `upgrade`, `test`, `docs`, `spike`) is decided without a model from its category, imported item type or wording, shown and editable on the card, and picks the workflow that runs: a bug is reproduced before it is fixed, an investigation writes a report and no code, a RUN writes a procedure a person reads first, then plays it with Python behind the command allowlist, pausing before anything irreversible. Every implementation a workflow names resolves on a fresh clone, on every provider |
-| **Optional Methodologies by `fallback:`** | A phase may name a methodology that needs a runtime in the target project (BMAD's `_bmad/`) and a WorkPilot fallback; the engine substitutes the fallback when the runtime is absent and shows it in the profile. Nothing is skipped in silence |
-| **Resolved Profile Preview** | See which phases your effort setting bought — and what the next level up would add — in the task detail modal, *before* the build starts |
-
-### Multi-Agent Orchestration
-
-| Feature | Description |
-|---------|-------------|
-| **Mission Control** | NASA-style dashboard for orchestrating multiple agents simultaneously — live status, token consumption, file changes, and per-agent reasoning |
-| **Agent Replay & Debug** _(experimental)_ | Step-by-step replay of any agent session with timeline navigation, file diffs, breakpoints, and token heatmaps |
-| **Decision Logger** | Real-time visualization of agent decision trees and trade-off rationale |
-| **Consensus Arbiter** | Reconciles conflicting opinions from security scans and QA reviewers into a single verdict |
-| **Agent Coach** | Analyzes real usage to suggest cheaper models, better effort levels, and prompt tweaks per agent |
-| **Pair Programming** | Interactive real-time AI coding partner with live suggestions and conversation-driven development |
-| **Learning Mode** | Educational mode with step-by-step explanations of agent decisions |
-
-### Specialized Agents
-
-| Agent | Role |
-|-------|------|
-| **Planner** | Complexity assessment, phased subtask breakdown, dependency analysis |
-| **Coder** | Context-aware implementation with parallel subagent spawning |
-| **QA Reviewer / Fixer** | Acceptance criteria validation and automated issue resolution |
-| **Test Generator** | A studio laid out like Visual to Code: the target on the left, the four steps of the run in the middle (live state, click one to open its result), the tests written live on the right. Coverage gaps, unit tests per file, E2E scenarios and TDD in 14 languages plus the project's own; the framework is read from the manifests of the file's language (a C# project with a `package.json` gets xUnit, not Vitest), and a gap becomes tests in one click |
-| **Flaky Test Detective** | Runs your test suite several times (dotnet test, pytest, Vitest, Jest, Maven, Gradle, Go) and flags the tests whose result changes between runs; also reads existing JUnit XML and .NET TRX reports |
-| **Refactorer** | Safe code refactoring with pattern detection and API migration |
-| **Documenter (Docs and drift)** | Measures the project's documentation coverage per language, lists the files to document first, proposes doc comments in each language's own convention (XML doc, KDoc, rustdoc, godoc, Swift, JSDoc, docstrings…) and folder READMEs, and the drift detector shows where the docs no longer match the code, by severity. Nothing is written to your files without you |
-| **Migration Agent** | Framework and library migration with breaking change detection: the page analyses the project, shows the source stack it found and the plan, then creates a Kanban task that migrates in an isolated worktree |
-| **Release Coordinator** _(experimental)_ | Orchestrates release readiness, changelog, and version bumps; finds the services of every stack (.NET, Java and Kotlin, Go, Rust, Dart/Flutter, PHP, Ruby, Elixir, Swift, npm, Python) |
-| **Memory Manager** | The shared brain: one Obsidian vault every agent reads and writes, across sessions |
-
-### Integrations
-
-| Platform | Capabilities |
-|----------|-------------|
-| **GitHub** | Import issues, AI investigation, PR review, batch review wizard, auto-PR creation |
-| **GitLab** | Issues and merge request management with AI severity categorization |
-| **Azure DevOps** | Work item import, PR review, batch operations — _experimental: the PR details view (file list, diff stats) falls back to placeholder data when the Azure DevOps call fails, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md#mock--stub-behaviors-to-be-aware-of)_ |
-| **Linear** | Bulk issue import with team/project filtering |
-| **Jira** | Read issues, their details and attachments, and turn them into tasks |
-| **MCP Marketplace** | Browse, install, and configure Model Context Protocol servers |
-| **Custom MCPs** | Define and host custom MCP servers with local authentication. Each custom server's tools are pinned by the fingerprint of what the model reads: a new tool or a changed description waits for your approval in Agent tools → MCP servers, the old description beside the new one, and a description that reads like a hidden instruction asks for an explicit confirmation. See [docs/architecture/mcp-pins.md](docs/architecture/mcp-pins.md) |
-| **Windsurf** | Windsurf IDE integration via Connect protocol |
-| **JEV (TypeSafe)** | Optional: a classification before planning and risk/coverage hints before reviews, off by default, per workflow. See [docs/integrations/jev.md](docs/integrations/jev.md) |
-
-### AI Providers & Authentication
-
-| Provider | Auth Method |
-|----------|-------------|
-| **Anthropic Claude** | Claude Code sign-in (subscription, OAuth), or an API profile: a base URL and its token for an Anthropic-compatible endpoint |
-| **OpenAI** | API key, or the signed-in Codex CLI (`OPENAI_AUTH_MODE=codex-cli`) |
-| **Google Gemini** | API key (Gemini API), or Gemini CLI through the Agent Client Protocol |
-| **Grok / xAI**, **Mistral**, **DeepSeek** | API key |
-| **GitHub Copilot** | GitHub sign-in (Copilot subscription) |
-| **Windsurf** | API key, or the key of the installed Windsurf IDE |
-| **Local models** | Ollama, LM Studio or llama.cpp endpoint, no key |
-| **Agent CLIs** | OpenCode, Antigravity and [pi](https://pi.dev) run with their own sign-in. The "CLI Tools" sidebar lists every agent CLI (Claude Code, Codex, Copilot, Gemini CLI, Hermes, OpenCode, Antigravity, pi), installed ones first, and installs or updates each in one click through the channel that owns the copy you run |
-
-Meta, AWS and Cursor can be configured, but they have no agent client of their own yet: their builds run on Claude, and the task says so. What each provider can do (subagents, MCP, sandbox, effort) is declared in [`capabilities/providers.yaml`](capabilities/providers.yaml); keys and variables are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md#provider-selection-and-endpoints).
-
-**Multi-account switching** — Register multiple profiles per provider. WorkPilot AI automatically switches to an available account when one hits a rate limit.
-
-**Keys stay out of the interface** — Once saved, a key or token shows up masked in every screen. Connection tests run in the app's main process. If you change a profile's base URL, you are asked for its key again: a saved key is only sent to the URL it was saved for.
-
-### Code Intelligence
-
-| Feature | Description |
-|---------|-------------|
-| **Insights** | AI chat interface for exploring and understanding your codebase with semantic search |
-| **Ideation** | Discovers performance bottlenecks, security vulnerabilities, code quality issues, and UI/UX improvements |
-| **Architecture Visualizer** | Dependency graphs, module hierarchy, and component relationship diagrams |
-| **Performance Profiler** _(experimental)_ | AI-powered bottleneck identification with optimization suggestions |
-| **Dependency Sentinel** | Shows what the dependency guard really checks on each task (packages added, their registry, known vulnerabilities), instead of sample data |
-| **Code Review & Refactoring** | Code smells (long method, too many parameters, deep nesting, magic numbers, missing docs, duplication…) and review rules for .NET, Java, Kotlin, Scala, Go, Rust, Swift, PHP, Ruby, Dart, C/C++, TypeScript and Python |
-| **Regression Guardian** _(experimental)_ | Writes the regression test of an incident in the framework of the stack concerned (pytest, Jest, Vitest, Mocha, JUnit 5, TestNG, xUnit, NUnit, Go, cargo, PHPUnit, RSpec, Dart, XCTest) |
-| **Self-Healing Codebase** | Automatically generates fixes when CI tests fail; integrates with Sentry, Datadog, PagerDuty for production incidents |
-| **Technical Debt Tracker** | Continuously scores code health, tracks and ages debt items, and proposes auto-fixes with PRs |
-| **Risk Classifier** | Scores code changes by risk level with impact assessment |
-
-### Developer Productivity
-
-| Feature | Description |
-|---------|-------------|
-| **Guided Onboarding** | Setup Hub checklist plus a step-by-step coachmark tour to configure providers and integrations |
-| **Roadmap** | AI-assisted feature planning with prioritization and phased rollout |
-| **Changelog** | Auto-generates release notes from completed tasks |
-| **Natural Language Git** | AI-generated semantic commit messages from diffs |
-| **Auto-Refactoring** | Pattern-based and architectural code transformations |
-| **Code Migration** | Large-scale codebase migrations across frameworks and libraries |
-| **Design to Code (Import Design)** | Turns a mockup, a screenshot or a Figma export into components of the project's stack, detected from its manifests: React, Next.js, Vue, Nuxt, Angular, Svelte, Blazor, HTML + CSS, React Native, Flutter, SwiftUI, Jetpack Compose, .NET MAUI, WPF / WinUI or Avalonia. Six visible steps (vision, design tokens, spec, code, visual tests, write); nothing is written into the project before you review it, and an example result shown without an AI answer is flagged as such. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) (section Import Design) |
-| **Visual to Code** | Draw an architecture as a node graph (services, databases, agents, a mobile app…) on every stack, with your own reusable bricks, a sentence explaining each connection and eight canvas themes; the bricks' descriptions and the interaction texts go into the build spec sent to the agents. Each connection picks its relation from a list fitted to the two blocks and their stacks (gRPC, SignalR, MassTransit, EF Core, AMQP, FCM / APNs…) or typed freely; every pair of blocks is an expected link or refused with its reason and the block to put between them (a reversed arrow flips in one click), incompatible technologies are flagged, and a "Points to watch" panel reviews the whole diagram. See [docs/architecture/visual-to-code.md](docs/architecture/visual-to-code.md) |
-| **Pipeline Generator** _(experimental)_ | Generates GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket and CircleCI configurations for the stack it detects (.NET solutions, Java, Go, Rust, PHP, Ruby, Dart/Flutter, Swift, Elixir, Angular, Nuxt, Svelte, NestJS, Express…) |
-| **Browser Agent** | Autonomous browser interaction for E2E test generation and visual regression |
-| **Arena Mode** | Side-by-side comparison of different AI models on the same task |
-| **Voice Assistant** | A shortcut from anywhere (Ctrl+Shift+Space, configurable): say “create a task to…” or “open the feature to draw an architecture”, transcribed locally; a task is created only once you confirm it, locally or on a server project's board. See [docs/architecture/voice-assistant.md](docs/architecture/voice-assistant.md) |
-| **Multi-Repo Orchestration** | The Kanban's "Multi-repo" button runs one change across several repositories: WorkPilot orders them (libraries and APIs first), opens one card per repository and starts each once the previous one passed QA, telling it what the earlier repositories changed. See [docs/architecture/multi-repo.md](docs/architecture/multi-repo.md) |
-| **Code Playground** | Sandbox environment for testing code snippets in isolation |
-| **Prompt Optimizer** | Analyzes and rewrites prompts for better AI output |
-
-### Memory & Context
-
-| Feature | Description |
-|---------|-------------|
-| **Memory System (shared brain)** | One Obsidian vault + `graph.json`, served over MCP — agents retain insights across sessions |
-| **Skills System** | Provider-agnostic [Agent Skills](https://agentskills.io) packs under `.agents/skills/`, served to the Kanban command bar and mirrored per harness (Claude Code, Copilot, Codex, Cursor, Gemini); read natively by hermes and [pi](https://pi.dev) |
-| **Memory Search** | Three-layer progressive retrieval over past builds — an index costs ~100 tokens, timelines and full records are fetched only on demand |
-| **hermes-agent** | [hermes-agent](https://github.com/NousResearch/hermes-agent) (0.23.0 or later) skills are read from the same `.agents/skills/`; skills it authors arrive as *candidates* for review, never auto-adopted; the vendored hermes pack follows hermes releases, and the Kanban MCP server reports `wait_for_card` progress to it |
-| **pi** | [pi](https://pi.dev) reads `AGENTS.md` and `.agents/skills/` natively and joins the shared brain (`~/.pi/agent/mcp.json`); project resources stay behind its own `/trust`, which WorkPilot never grants — see [docs/architecture/pi.md](docs/architecture/pi.md) |
-| **Context Management** | Intelligent context building with file relevance ranking and dependency graph analysis |
-| **Session History** | Browse and replay past agent sessions with full statistics |
-
-### Analytics & Monitoring
-
-| Feature | Description |
-|---------|-------------|
-| **Analytics Dashboard** | Token consumption, cost tracking, success rates, and execution time metrics — live SQLite-backed API; falls back to an explicit 503 when the analytics DB is unavailable |
-| **Formula Lab** | Pre-flight cost/success estimation per Provider × Model × Effort, calibrated on your real usage history |
-| **Repo Bench** | Replays 10 to 20 of your finished cards from the commit before them, once per engine, in isolated copies that do not hold the answer, and judges each build with the tests the card landed with — tests the agent never sees, kept only when they fail before the card and pass after it. The table says which provider × model × effort resolves your project's work, and per kind of card (bug fix, feature…) which engine to use: the cheapest one close to the best measured rate, offered on the card's engine step with its evidence, never applied for you. Formula Lab and the model router read it. See [docs/architecture/repo-bench.md](docs/architecture/repo-bench.md) |
-| **Cost Estimator** | Per-task cost calculation with provider comparison and budget alerts |
-| **Carbon Profiler** _(experimental)_ | Estimates the energy (kWh) and carbon footprint of your agent runs |
-| **Rate Limit Monitor** | Real-time usage tracking with proactive warnings and auto-switching triggers |
-| **Workflow Logger** | Structured execution logs with trace IDs for all agents, skills, and hooks |
-| **Learning Loop** | Extracts patterns from completed builds and A/B-replays promoted changes, so a suggestion is backed by an observed run rather than a guess. Review comments the PR follow-up fixed and the feedback of rejected plans become rule candidates; once you adopt one, every build follows it |
-
-### Customization
-
-| Feature | Description |
-|---------|-------------|
-| **7 Color Themes** | Default, Dusk, Lime, Ocean, Retro, Neo, Forest — each with light and dark variants |
-| **Custom Theme Editor** | Color picker with live preview, export, and import |
-| **Bilingual UI** | Full French and English interface |
-| **Command Palette** | Keyboard-driven access to all features with fuzzy search |
-| **Plugin Marketplace** | Browse and install community plugins |
-| **One UI Charter** | Every module and every Settings page share one design language, taken from Visual to Code: a header with its group as kicker, pill tabs with counters, cards with a coloured rail, a command bar at the bottom with a single primary button, in all themes and both languages. Rules in [docs/architecture/ui-charter.md](docs/architecture/ui-charter.md) |
-
-### Deployment & Team
-
-| Feature | Description |
-|---------|-------------|
-| **Multi-User Server Mode** | One server for the team, with JWT / Microsoft Entra auth: every feature is shared (board, roadmap, ideation, insights, context, changelog, analyses, GitHub and GitLab views, AI reviews, automations), live for everyone, with organisations isolated from each other, roles and permissions, user groups and admins. Runs execute on the server, each one seeing only its own project. A task token reaches only its card and is revoked when the card ends. Operations guide: [docs/server-operations.md](docs/server-operations.md); design: [docs/architecture/server-mode.md](docs/architecture/server-mode.md) |
-| **Team Collaboration** | On a server project, the board shows who is there and opens a team chat (replies, search, `@name` mentions); a card someone took carries their name, and an edit that crosses a teammate's offers both versions instead of overwriting. See [docs/architecture/collaboration.md](docs/architecture/collaboration.md) |
-| **Mobile App (iOS & Android)** | The team server in your pocket: shared Kanban, card detail and creation, start, approve or stop runs, approve a plan from its notification, dashboard, Insights, roadmap, ideas, GitHub and GitLab, admin and invitations. See [docs/architecture/mobile-app.md](docs/architecture/mobile-app.md) |
-| **Invitation-Only Signup** | Self-service registration gated by admin invitations, with SMTP delivery and rate limiting |
-| **Notifications** | "PR ready" alerts on Slack, Microsoft Teams, Discord, Google Chat or a generic JSON webhook, with SSRF hardening |
+- **Isolated**: every task runs in its own git worktree, so your branch stays untouched until you merge.
+- **One workflow per kind of task**: a bug is reproduced before it is fixed, an investigation writes a report and no code, a refactoring may not touch the tests, a hotfix gets an independent review ([task kinds](docs/architecture/kanban-task-types.md)).
+- **Small pull requests**: a task bigger than the review ceiling of its kind splits itself into parts, one small PR each, stacked when they depend on each other ([task split](docs/architecture/task-split.md)).
+- **Proof, not opinion**: after QA, the app the task changed is started and driven (web, Electron, mobile emulator, API, Windows desktop), and hard gates check the dependencies added and that the tests really catch faults.
+- **Any engine**: change provider, model or effort per task, even mid-task; what each provider can do is declared in [`capabilities/providers.yaml`](capabilities/providers.yaml).
 
 ---
 
-## Interface
+## A tour of the app
 
-> Every screenshot below comes from the real app, filled with an invented demo project (`acme-storefront`). They are regenerated with `scripts/readme-screenshots/`.
+> Every screenshot comes from the real app, filled with an invented demo project (`acme-storefront`), and is regenerated by [`scripts/readme-screenshots/`](scripts/readme-screenshots/).
 
-### Kanban Board
-Describe a task, and agents take it from planning to a merged pull request. Each card shows its phase (plan, code, QA), its progress, the provider at work and what it is about (category, impact, priority). A task too big for one small PR splits itself into parts that share a colour and a « Part k/N » mark; a click on the mark shows only its group. Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done, plus Red Build when the project's CI has run on a task branch (a red run moves the card there and starts an automatic repair, up to three times).
+**Kanban board** (above): describe a task and follow it from planning to the pull request. Each card shows its phase, its progress, the provider at work and what it is about; the parts of a split task share a colour and a « Part k/N » mark. Columns follow the pipeline: Planning, Queue, In Progress, AI Review, Human Review, Done, plus Red Build when the project's CI fails on a task branch.
 
-![Kanban board](.github/assets/screenshots/kanban.png)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-### Task Detail
-Open a card to follow the agents live: the plan split into subtasks with the files each one touches, the logs, the changed files, the change graph, visual proofs and the emulator.
+**Task detail**: the plan split into subtasks with the files each touches, logs, changed files, visual proofs and the emulator.
 
 ![Task detail with its subtasks](.github/assets/screenshots/task-detail.png)
 
-### Insights
-Ask questions about your codebase. The assistant reads the code (the tools it used are listed), answers with file and line references, and turns a finding into a ready-to-run task in one click.
+</td>
+<td width="50%" valign="top">
+
+**Agent terminals**: up to 12 terminals side by side, each in a task's worktree, to run agents in parallel by hand.
+
+![Agent terminals: two sessions side by side](.github/assets/screenshots/terminals.png)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Insights**: ask about your codebase; answers cite files and lines, and a finding becomes a task in one click.
 
 ![Insights: a conversation about the codebase that ends in a suggested task](.github/assets/screenshots/insights.png)
 
-### Roadmap
-AI-assisted feature planning: product vision, target audience, phases, MoSCoW priorities, competitor analysis and votes imported from Canny or GitHub. Any feature becomes a task with **Build**.
+</td>
+<td valign="top">
+
+**Roadmap**: product vision, phases, MoSCoW priorities, competitors and votes; any feature becomes a task with **Build**.
 
 ![Roadmap as a Kanban of features](.github/assets/screenshots/roadmap.png)
 
-### Ideation
-Agents scan the project and propose improvements by type: code, UI/UX, documentation, security, performance and code quality, each with its rationale and the files concerned.
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Ideation**: agents scan the project and propose improvements by type, each with its rationale and files.
 
 ![Ideation: improvement ideas by type](.github/assets/screenshots/ideation.png)
 
-### Visual to Code
-Draw the architecture, then generate the project. Each block carries its stack, each connection its relation and a sentence that explains it, and the status bar says whether the whole diagram is coherent. **Design Import**, in the next tab, turns a screenshot or a Figma export into components of the project's stack in six visible steps.
+</td>
+<td valign="top">
 
-![Visual to Code: an architecture drawn as a node graph, every connection explained](.github/assets/screenshots/visual-to-code.png)
-
-![Import Design: the six steps from an image to the project's components](.github/assets/screenshots/import-design.png)
-
-### Test Generation Studio
-Pick a file and a mode (coverage gaps, unit, E2E, TDD): the four steps of the run light up in the middle and the tests are written live on the right, in the framework of the file's own stack.
-
-![Test generation studio: target, four-step pipeline and live result](.github/assets/screenshots/test-generation.png)
-
-### Dashboard
-What the agents produce and cost: tasks by status, QA first-pass rate, tokens and cost by provider and model, merges resolved automatically, completion time by complexity. Exportable as JSON or CSV.
+**Dashboard**: what the agents produce and cost, by status, provider and model; exportable as JSON or CSV.
 
 ![Dashboard of project metrics](.github/assets/screenshots/dashboard.png)
 
-### Agent Terminals
-AI-powered terminals with one-click task context injection. Spawn multiple agents for parallel work.
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-![Agent Terminals](.github/assets/WorkPilot-AI-Agents-terminals.png)
+**Visual to Code**: draw the architecture as a node graph, each connection explained and checked, then generate the project.
 
-### Mission Control
-NASA-style multi-agent orchestration hub with per-agent monitoring, model assignment, and live decision visualization.
+![Visual to Code: an architecture drawn as a node graph, every connection explained](.github/assets/screenshots/visual-to-code.png)
 
-### Mobile App (iOS & Android)
-The team's board in your pocket: in server mode, the phone app follows the shared Kanban, opens a card (spec, approval, runs, changes), starts, approves or stops the agents, and reads the dashboard, Insights, roadmap and ideas. The agents keep running on the team server.
+</td>
+<td valign="top">
 
-![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
+**Import Design**: a mockup, screenshot or Figma export becomes components of the project's stack, in six visible steps.
 
-### Settings
-Application and project settings grouped by theme, each group with its colour, each page opening on its group, title and description, in the same charter as the modules.
+![Import Design: the six steps from an image to the project's components](.github/assets/screenshots/import-design.png)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Test generation studio**: coverage gaps, unit, E2E or TDD, written live in the framework of the file's own stack.
+
+![Test generation studio: target, four-step pipeline and live result](.github/assets/screenshots/test-generation.png)
+
+</td>
+<td valign="top">
+
+**Settings**: application and project settings grouped by theme, in the same design charter as every module.
 
 ![Settings: grouped navigation and the project's general page](.github/assets/screenshots/settings.png)
 
-### Additional Views
-- **Changelog** — Generate release notes from completed tasks
-- **Architecture Visualizer** — Interactive dependency and module graphs
-- **Agent Replay** _(experimental)_ — Step-by-step session replay with breakpoints and diffs
-- **Analytics** — Usage, cost, and performance dashboards
-- **Session History** — Every agent session with its phases, tokens and cost
-- **Docs and drift** — Documentation coverage per language, doc comments proposed in each language's convention, drift between docs and code
-- **Bounty Board** — The same spec built by several provider/model contestants, an impartial judge picks the winner
+</td>
+</tr>
+</table>
+
+**Mobile app (iOS and Android)**: with a team server, the shared board in your pocket: open a card, approve a plan, start or stop the agents, read the dashboard, Insights, roadmap and ideas.
+
+![Mobile app: board, card and dashboard](.github/assets/screenshots/mobile.png)
 
 ---
 
-## Architecture Détaillée
+## Features at a glance
 
-> Pour une lecture guidée — y compris sans prérequis technique — ouvrez l'atlas
-> [`docs/audit/WorkPilot-architecture.html`](docs/audit/WorkPilot-architecture.html) (vue « Pour tous »,
-> schémas cliquables, constats, feuille de route ; un fichier par constat depuis F113 dans
-> [`docs/audit/findings/`](docs/audit/findings/)). Les justifications de conception sont dans
-> [`docs/architecture/`](docs/architecture/).
->
-> Les liens entre couches sont vérifiés par des tests qui lisent les sources : IPC dans les deux
-> sens et canaux nommés par constante (`ipc-channel-parity.test.ts`), imports entre unités du
-> backend et plafond du cycle principal, ramené de 81 à 10 unités par la couche `foundation/` et le port `agent_runtime`
-> (`tests/test_import_contracts.py`), une ligne par vue dans
-> [`product-overview.md`](docs/architecture/product-overview.md) (`tests/test_product_overview_views.py`).
->
-> Une vue qui n'a encore ni document de conception ni test est marquée expérimentale dans la
-> barre latérale (une fiole sur le coin de son icône). Un bouton en bas de la barre les masque toutes. Chaque script de
-> [`scripts/`](scripts/README.md) a sa ligne dans le README du dossier.
+The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**. Views marked _experimental_ in the sidebar (a flask on their icon) have no design document or test yet; one button hides them all.
 
-### Vue d'Ensemble
+**Build pipeline**
+- **Kanban board** with spec approval, pause and resume, per-phase re-run, steering messages while the agent works, and a guided review with line comments sent back to the fixer.
+- **Automatic split** of big tasks into small grouped PRs, **stacked tasks**, **Best-of-N** (build a task 2 to 4 times on different engines and keep the best) and **multi-repo** changes.
+- **Goal mode** (done when a command says so, e.g. `dotnet test` exits 0), **cross review** by a second engine, **spec by example** for ASP.NET Core Web APIs, **.NET upgrades** one release at a time up to .NET 11.
+- **Runtime verification** with proof videos and a comparison against the base branch; **hard gates** for invented packages, toothless tests and formal proofs.
+- **PR follow-through**: a red check or a review thread on the task's PR goes back to the fixer, never forced, never merged.
+- **Provenance**: which lines the AI wrote and with which model, an SBOM of the packages added, requirement-to-test traceability.
 
-WorkPilot AI est une application de bureau autonome basée sur une architecture multi-agents qui orchestre le cycle de vie complet du développement logiciel. Le système combine un backend Python puissant avec une interface utilisateur Electron moderne pour offrir une expérience de développement transparente.
+**Agents and orchestration**
+- **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
+- Specialised agents: test generator, flaky test detective, refactorer, docs and drift, migration, release coordinator, self-healing on CI failures, technical debt tracker.
+- **Shared memory**: one Obsidian vault and graph every agent reads and writes, across sessions and providers; provider-agnostic **skills** packs.
 
-### Architecture Multi-Agents
+**Understand and plan**
+- **Insights**, **Ideation**, **Roadmap**, architecture visualizer, code review rules and code smells for every major stack, risk classifier.
+- **Visual to Code**, **Import Design**, **pipeline generator** (GitHub Actions, GitLab CI, Azure Pipelines, Bitbucket, CircleCI) and a **voice assistant** (Ctrl+Shift+Space).
 
-#### Pipeline Autonome de Développement
-1. **Agent Planner** - Analyse la complexité et décompose les tâches en sous-tâches
-2. **Agent Coder** - Implémente les fonctionnalités avec des sous-agents parallèles
-3. **Agent QA Reviewer** - Valide les implémentations selon les critères d'acceptation
-4. **Agent QA Fixer** - Résout automatiquement les problèmes identifiés
+**Integrations**
+- GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
+- **Automations** turn an event (an issue labelled, CI red, a time of day) into a draft card.
+- MCP marketplace and custom MCP servers with pinned tool descriptions; the **workpilot-board** MCP server gives Claude Code, Codex, Gemini CLI, Copilot, Cursor and others your Kanban.
+- Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
-C'est le parcours d'une **fonctionnalité** (`workflows/feature-build/workflow.yaml`). Le **type de la
-carte** — décidé sans modèle à la création de la spec (`apps/backend/tasks/classify.py`), affiché et
-modifiable sur la carte — choisit le workflow réellement joué (`apps/backend/workflows/registry.py`) :
+**Team**
+- **Server mode**: one server for the team, every feature shared live, organisations isolated, roles, groups and admins, JWT or Microsoft Entra sign-in ([operations guide](docs/server-operations.md)).
+- **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
-| Type | Workflow | Ce qui change |
-|---|---|---|
-| `feature` (ou type inconnu) | `feature-build` | le parcours ci-dessus ; `prd` BMAD sur une feature complexe à `ultrathink` |
-| `bug_fix` | `bug-fix` | `reproduce` d'abord (le test rouge, la cause probable), pas de brainstorm ni de carte d'architecture |
-| `hotfix` | `hotfix` | `reproduce`, revue indépendante à tout effort, pas de préflight de docs |
-| `investigation` | `investigation` | un rapport (`investigate`, lecture seule) et **aucun code** ; le coder n'est pas lancé |
-| `run` | `run` | la procédure écrite (`runbook`), relue par une personne, puis jouée par Python derrière l'allowlist après une pause avant l'irréversible ; journal `workflow/run.md`, environnements déclarés dans `.workpilot/environments.toml` |
-| `refactoring` | `refactoring` | gate `tests-unchanged` : le diff ne touche aucun test |
-| `test` | `test` | plan, tests écrits en TDD, revue, suite verte |
-| `docs` | `docs` | le document, relu contre le code (`proofread`), sans boucle QA |
-| `spike` | `spike` | approches comparées, prototype jetable, `verdict` |
+**Cost and monitoring**
+- Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler, OpenTelemetry GenAI traces for every provider.
 
-Détail et plan par lots : [`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
-
-#### Agents Spécialisés
-- **Test Generator** - Génération de tests unitaires et d'intégration
-- **Refactorer** - Refactoring sécurisé du code avec détection de patterns
-- **Documenter** - Génération automatique de documentation
-- **Migration Agent** - Migration de frameworks et bibliothèques
-- **Memory Manager** - Le cerveau partagé : un vault Obsidian lu et écrit par tous les agents
-
-#### Sous-agents spécialisés
-Les sous-agents ne sont pas déclarés par chaque agent : ils vivent dans **un seul registre**,
-[`apps/backend/subagents/`](apps/backend/subagents/), et chaque session reçoit un
-*roster* composé par `subagents.resolve()` depuis `core/client.py` :
-
-1. **Défauts de phase** (`phases.py`) — p. ex. coder : `code-reviewer`, `test-runner`,
-   `architecture-analyst` ; planner : `architecture-analyst`, `dependency-tracer` ;
-   QA : `qa-acceptance-checker`, `test-runner` ; revue : `security-auditor`, `regression-hunter`,
-   `test-coverage-auditor` ; les appels d'une seule réponse (message de commit…) n'en ont aucun.
-2. **Overlays de langage** (`languages/` : .NET, Python, TypeScript, Java, Go, Rust) — la pile
-   détectée injecte ses commandes (`dotnet test --nologo`…) dans le prompt du `test-runner`.
-3. **Overlay mobile** — ajoute `device-runner` et `store-readiness-auditor` sur une app mobile.
-4. **Agents fournis par l'appelant** — gagnent toujours (relecteurs de PR de `pr_review.py`).
-5. **Plafond** de 7 sous-agents.
-
-Le roster atteint le modèle sur tout provider (`capabilities/providers.yaml`) :
-- `native` — Claude : `agents=` du SDK et son outil `Agent` ;
-- `emulated` — Copilot, OpenAI, Gemini, Ollama / LM Studio, Mistral, DeepSeek, Grok, Windsurf :
-  un outil `delegate` dont la description liste les spécialistes, et une **session enfant** du même
-  client par délégation, avec les seuls outils du spécialiste et un résultat borné
-  ([`docs/architecture/delegation.md`](docs/architecture/delegation.md)) ;
-- `none` — les CLI (Codex, OpenCode, Antigravity, pi) apportent leurs outils et ne reçoivent pas de roster.
-
-Ce que rend un sous-agent est borné et traité comme une donnée non fiable
-(`harness/application/subagents.py`). Le même registre, plus les personas des packs
-(`skills/dotnet/agents/net-architect.md`, `skills/mobile/agents/…`), est émis dans
-`.agents/agents/` pour les IDE (Copilot, Codex, Claude Code) ; ces personas de pack ne font pas
-partie des rosters du pipeline. Détail : [`apps/backend/agents/README.md`](apps/backend/agents/README.md#subagents).
-
-#### Méthode BMAD
-BMAD est une **capacité à la demande**, jamais une étape obligatoire : 50 skills BMAD v6.12.0
-vendorisés dans [`skills/bmad/`](skills/bmad/) par `scripts/vendor_bmad.py`. Ils ont besoin du
-runtime `_bmad/` que l'installeur BMAD écrit **dans le projet cible** (`pnpm run skills:bootstrap
---pack bmad`) ; sans lui, ils sont masqués de la barre de commandes. Dans les workflows, BMAD
-n'entre que là où sa valeur est documentaire — `brainstorm` (`bmad-brainstorming`), le `prd` d'une
-feature complexe à `ultrathink` (`bmad-prd`), la recherche d'un spike (`bmad-deep-recon`) — et
-toujours avec un `fallback:` WorkPilot que le moteur substitue quand le projet n'a pas le runtime,
-en l'écrivant dans le profil. Voir [`skills/README.md`](skills/README.md#runtime-gates) et
-[`docs/architecture/kanban-task-types.md`](docs/architecture/kanban-task-types.md).
-
-### Architecture Technique
-
-#### Backend Python (`apps/backend/`)
-```
-apps/backend/
-├── core/                # Racine de composition : fabrique de clients, authentification, worktree
-│   ├── client.py        # Client Claude Agent SDK
-│   ├── agent_clients/   # Un client par provider (OpenAI, Gemini, Copilot, Ollama, pi, ACP…)
-│   ├── effort_plan.py   # L'effort réellement envoyé à chaque provider
-│   ├── auth.py          # Gestion multi-profils OAuth
-│   └── worktree.py      # Isolation des espaces de travail Git
-├── foundation/          # Couche la plus basse, n'importe rien du backend (platform/, api_safety, git)
-├── agents/              # Logique d'exécution des agents
-│   ├── planner.py       # Agent de planification
-│   ├── coder.py         # Agent de développement
-│   └── session.py       # Gestion des sessions
-├── subagents/           # Registre des sous-agents, seule source (phases, langages, mobile, revue de PR)
-├── harness/             # Harness de contexte : budgets, pagination, résultats des sous-agents
-├── skills_registry/     # Build des skills et émission des agents vers les harnesses
-├── workflows/           # Moteur des workflows déclaratifs (workflows/*/workflow.yaml)
-├── qa/                  # Pipeline de validation QA
-│   ├── reviewer.py      # Validation des critères
-│   ├── fixer.py         # Résolution automatique
-│   └── loop.py          # Boucle de validation
-├── runners/             # Points d'entrée (spec_runner, github, gitlab, azure_devops, un runner par vue)
-├── spec/                # Création et gestion des specs
-├── cli/                 # Interface ligne de commande
-├── context/             # Construction du contexte des tâches
-├── services/            # Services d'intégration externes
-├── integrations/        # Connecteurs (Azure DevOps, Linear, JEV, Windsurf) ; Jira et grepai dans src/connectors/
-├── project/             # Analyse et détection de projets
-├── merge/               # Système de fusion sémantique
-├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation, scénario Playwright)
-├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
-├── goal/                # Mode objectif : une commande dit « fini »
-├── best_of_n/           # Une tâche construite N fois, classée sur des chiffres
-├── bench/               # Banc de rejeu des cartes terminées, tableau par provider
-├── os_sandbox/          # bubblewrap / Seatbelt autour des commandes d'agent
-├── genai_trace/         # Spans OpenTelemetry GenAI pour tous les providers
-├── mcp_tasks/           # MCP 2026-07-28 : tasks côté serveurs WorkPilot
-├── board_mcp/           # Serveur MCP workpilot-board : le Kanban depuis le terminal
-├── self_healing/        # Surveillance de santé + auto-réparation
-├── tech_debt/           # Suivi et résolution de la dette technique
-├── consensus_arbiter/   # Arbitrage des avis d'agents (sécurité/QA)
-├── agent_coach/         # Conseils coût/modèle basés sur l'usage réel
-├── carbon_profiler/     # Empreinte énergie/carbone des exécutions
-├── release_coordinator/ # Préparation des releases
-├── flaky_test_detective/# Détection des tests instables
-├── streaming/           # Diffusion temps réel des sessions d'agents
-├── server/              # Mode serveur multi-utilisateurs (auth, claims)
-└── prompts/             # Prompts système réels des agents (~50, dont github/)
-```
-
-> Le backend compte **près de 120 paquets** (accessibilité, dérive d'architecture, gouvernance de licences, orchestration multi-repo, etc.). Voir [apps/backend/README.md](apps/backend/README.md) et la [table des modules du wiki](https://github.com/krovomi/WorkPilot-AI/wiki) pour l'inventaire complet auto-généré.
-
-#### Frontend Electron (`apps/frontend/`)
-```
-apps/frontend/src/
-├── main/                # Processus principal Electron
-│   ├── agent/           # Gestion des files d'attente
-│   ├── claude-profile/  # Gestion multi-profils
-│   ├── terminal/        # Daemon PTY et cycle de vie
-│   ├── platform/        # Abstraction cross-plateforme
-│   ├── security/        # Politiques IPC : expéditeur, dossiers, chemins d'outils et du backend
-│   ├── automations/     # Règles qui créent une carte (issue étiquetée, CI rouge, horaire) ou relisent une PR en brouillon
-│   ├── needs-you/       # Notifications bureau, ntfy, Telegram ; approbation de plan à distance
-│   ├── mcp-apps/        # Vues MCP Apps servies au panneau de tâche (workpilot-mcp-app://)
-│   ├── ipc-handlers/    # 200+ modules de gestion IPC
-│   ├── services/        # Récupération de session SDK, credentials
-│   └── utils/           # Chemins, isolation git, nettoyage worktree
-├── preload/             # Pont contextIsolation (API exposée au renderer)
-├── renderer/            # Interface React
-│   ├── components/      # Kanban, terminaux, settings, task detail…
-│   ├── stores/          # État Zustand par domaine
-│   ├── contexts/        # Providers React (thème, i18n)
-│   ├── hooks/           # Hooks au niveau application
-│   ├── lib/             # Utilitaires de présentation
-│   └── locales/         # Traductions FR / EN
-└── shared/              # Partagé main/renderer
-    ├── types/           # Définitions TypeScript
-    ├── constants/       # Constantes application
-    ├── i18n/            # Configuration i18n
-    └── utils/           # Utilitaires partagés
-```
-
-### Flux de Données et État
-
-#### Flux d'Exécution des Agents
-1. **Création de Tâche** → Utilisateur crée une tâche dans l'UI/CLI
-2. **Génération de Spec** → L'AI analyse la complexité et crée une spécification
-3. **Phase de Planification** → Le Planner décompose en sous-tâches
-4. **Implémentation** → Le Coder exécute avec des sous-agents parallèles
-5. **Validation QA** → Le Reviewer valide l'implémentation
-6. **Résolution des Problèmes** → Le Fixer résout les problèmes identifiés
-7. **Phase de Fusion** → Fusion sémantique vers la branche principale
-
-#### Gestion d'État
-- **État Projet** → [`main/project-store.ts`](apps/frontend/src/main/project-store.ts)
-- **État Tâche/Spec** → [`renderer/stores/task-store.ts`](apps/frontend/src/renderer/stores/task-store.ts)
-- **État Terminal** → [`renderer/stores/terminal-store.ts`](apps/frontend/src/renderer/stores/terminal-store.ts)
-- **État Agent** → [`main/agent/agent-state.ts`](apps/frontend/src/main/agent/agent-state.ts)
-- **État Paramètres** → [`renderer/stores/settings-store.ts`](apps/frontend/src/renderer/stores/settings-store.ts)
-
-### Sécurité et Isolation
-
-#### Modèle de Sécurité à 3 Couches
-1. **Sandbox OS** → Commandes d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants cachés, réseau filtré ; sans bac à sable (Windows), la carte le dit, et `WORKPILOT_SANDBOX=required` refuse de démarrer
-2. **Restrictions Filesystem** → Opérations limitées au répertoire projet
-3. **Allowlist Dynamique** → Commandes approuvées selon la stack détectée
-
-#### Gestion des Credentials
-- **Système de Profils Claude** → Gestion OAuth multi-comptes
-- **Stockage Secure** → Keychain OS / Credential Manager
-- **Âge des clés** → Réglages > Comptes dit depuis quand chaque clé d'API est enregistrée, rappel après 90 jours
-- **Rotation Automatique** → Cycle de vie des tokens OAuth
-- **Validation Input** → Chemins et commandes sanitizées
-- **Aucun secret dans le renderer** → L'interface sait qu'une clé ou un jeton est configuré, jamais sa valeur ; les tests de connexion tournent dans le main
-- **Frontière renderer → main** → Seule la page de l'app atteint un handler IPC. Un chemin reçu de l'interface est résolu (liens compris) et doit être dans un projet enregistré ou un dossier choisi dans une boîte de dialogue ; l'interface ne choisit jamais l'exécutable lancé, et un chemin d'outil ou du backend saisi dans les réglages est vérifié avant d'être exécuté
-
-### Performance et Scalabilité
-
-#### Modèle de Concurrence
-- **Parallélisme d'Agents** → Jusqu'à 12 terminaux AI parallèles
-- **Opérations Async** → I/O non-bloquant partout
-- **Pooling de Ressources** → Connexions et sessions réutilisées
-- **Load Balancing** → Switching automatique multi-comptes
-
-#### Optimisations
-- **Optimisation Tokens** → Compression et cache du contexte
-- **Gestion Mémoire** → Cleanup agressif et checkpoints
-- **Optimisation Réseau** → Pooling de connexions et retries
-- **Performance UI** → Virtual scrolling et lazy loading
+**Look and feel**
+- One UI charter across every module, 7 colour themes in light and dark plus a theme editor, command palette, full English and French interface.
 
 ---
 
-## Installation et Configuration
-
-### Prérequis Système
-
-#### Configuration Matérielle Minimale
-- **OS** : Windows 10+, macOS 10.15+, Ubuntu 20.04+
-- **RAM** : 8GB minimum (16GB recommandé)
-- **Stockage** : 2GB d'espace libre
-- **Réseau** : Connexion internet stable
-
-#### Dépendances Logicielles
-- **Node.js 22.12+** (`engines` dans `package.json` ; la CI construit sur Node 22, et Vitest 5 refuse les versions plus anciennes)
-- **pnpm** (le dépôt est épinglé sur pnpm 12.16.1 via `packageManager` ; si Corepack échoue : `npm i -g pnpm@12.16.1`)
-- **Python 3.12+** (Pour le backend)
-- **Git** (Dépôt initialisé obligatoire)
-- **Claude Code CLI**, pour le provider Claude : `curl -fsSL https://claude.ai/install.sh | bash` (macOS, Linux, WSL) ou `irm https://claude.ai/install.ps1 | iex` (PowerShell). La barre latérale **Outils CLI** de l'app l'installe aussi en un clic, comme Codex, Copilot, Gemini CLI, OpenCode ou pi
-
-### Méthodes d'Installation
-
-#### Option 1 : Application Bureau (Recommandé)
-
-1. **Téléchargement**
-   - Prenez le fichier de votre plateforme dans le tableau [Download](#download) en haut de
-     cette page (tenu à jour à chaque release), ou sur [GitHub Releases](https://github.com/krovomi/WorkPilot-AI/releases)
-
-2. **Installation**
-   - **Windows** : exécutez `WorkPilot-AI-<version>-win32-x64.exe`
-   - **macOS** : ouvrez `WorkPilot-AI-<version>-darwin-arm64.dmg` (Apple Silicon) ou `-darwin-x64.dmg` (Intel)
-   - **Linux** : lancez `WorkPilot-AI-<version>-linux-x86_64.AppImage` (ou le `.deb` / `.flatpak`)
-
-3. **Premier Lancement**
-   - Lancez l'application
-   - Suivez l'assistant de configuration
-   - Connectez votre provider AI
-
-#### Option 2 : Développement depuis Source
-
-1. **Clonage du Dépôt**
-   ```bash
-   git clone https://github.com/krovomi/WorkPilot-AI.git
-   cd WorkPilot-AI
-   ```
-
-2. **Installation Automatique**
-   ```bash
-   pnpm install
-   pnpm run dev
-   ```
-   *Crée automatiquement l'environnement virtuel Python et installe toutes les dépendances*
-
-   Ou, sans rien installer sur la machine : ouvrez le dépôt dans le conteneur de
-   [`.devcontainer/`](.devcontainer/) (VS Code « Reopen in Container », ou Codespaces). Il porte
-   Python 3.13, uv, Node 22, pnpm et de quoi lancer Electron sous xvfb pour les tests E2E.
-
-3. **Lancement Manuel — Guide Pas à Pas par OS**
-
-   Si l'installation automatique échoue (dépendances Python manquantes, environnement corrompu, etc.), suivez ces étapes détaillées.
-
-   **Prérequis communs**
-   - Node.js 22.12+ et pnpm disponibles dans le PATH
-   - Python 3.12+ installé depuis [python.org](https://www.python.org/downloads/) — sur Windows, évitez le Python du Microsoft Store, il cause fréquemment des soucis de PATH et de permissions
-   - Git installé
-
-   **Windows (PowerShell)**
-   ```powershell
-   cd WorkPilot-AI
-
-   # Backend : créer et activer l'environnement virtuel
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   pip install -r requirements.txt
-
-   # Le backend a un SECOND venv indépendant sous apps/backend — voir
-   # "Notes Spécifiques Windows" ci-dessous, il a besoin du même traitement pywin32
-   cd apps\backend
-   python -m venv .venv
-   .venv\Scripts\python.exe -m pip install -r requirements.lock
-   cd ..\..
-
-   # Frontend
-   cd apps\frontend
-   pnpm install
-   cd ..\..
-
-   pnpm run dev
-   ```
-   > ⚠️ Sur Windows, plusieurs pièges classiques attendent ici (pywin32 sur les DEUX venvs, élévation UAC, Smart App Control qui bloque les binaires natifs npm). Lisez **[Notes Spécifiques Windows](#notes-spécifiques-windows)** juste après cette section avant de lancer `pnpm run dev` pour la première fois — ça évite la majorité des galères de premier lancement.
-
-   **macOS / Linux (bash/zsh)**
-   ```bash
-   cd WorkPilot-AI
-
-   # Backend : créer et activer l'environnement virtuel
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-
-   # Le second venv, celui des agents (apps/backend/.venv), depuis le lock
-   pnpm run install:backend
-
-   # Frontend
-   cd apps/frontend
-   pnpm install
-   cd ../..
-
-   pnpm run dev
-   ```
-
-   > Versions Python : `requirements.txt` donne des plages ; `apps/backend/requirements.lock` fige
-   > les versions exactes (avec empreintes, toutes plateformes) que la CI teste et que l'image
-   > serveur embarque. `pnpm run install:backend` installe le lock ; à la main :
-   > `pip install -r apps/backend/requirements.lock`. Après avoir modifié une plage :
-   > `pnpm run lock:python`.
-
-4. **Vérifier que le backend répond**
-   ```bash
-   curl http://127.0.0.1:9000/health
-   ```
-   *`pnpm run dev` sert l'API locale (`provider_api.py`) sur le port 9000 avec le venv racine (`.venv`) ; les
-   agents lancés par l'app utilisent `apps/backend/.venv`.*
-
-### Notes Spécifiques Windows
-
-Le setup Windows a davantage de pièges que macOS/Linux, tous rencontrés et résolus en conditions réelles. Parcourez cette liste **avant** votre premier `pnpm run dev` si vous êtes sur Windows.
-
-#### 1. `pywin32` doit être installé sur **DEUX** environnements virtuels distincts
-
-Le projet a deux venvs Python indépendants : celui à la **racine** du dépôt (`.venv`, utilisé par le serveur FastAPI principal) et celui sous **`apps/backend/.venv`** (utilisé par les commandes CLI/QA internes lancées par Electron). `pip install -r requirements.txt` n'installe pas automatiquement l'un depuis l'autre — répétez l'installation dans les deux :
-
-```powershell
-# Venv racine
-.\.venv\Scripts\python.exe -m pip install --upgrade "pywin32>=312"
-.\.venv\Scripts\python.exe .\.venv\Scripts\pywin32_postinstall.py -install
-.\.venv\Scripts\python.exe -c "import pywintypes; print('OK')"
-
-# Venv du backend
-cd apps\backend
-.venv\Scripts\python.exe -m pip install --upgrade "pywin32>=312"
-.venv\Scripts\python.exe .venv\Scripts\pywin32_postinstall.py -install
-.venv\Scripts\python.exe -c "import pywintypes; print('OK')"
-cd ..\..
-```
-
-Les deux dernières commandes doivent chacune afficher `OK`. Si `import pywintypes` échoue encore après le postinstall (les DLL sont copiées mais le module reste introuvable — signe que le fichier `.pth` de pywin32 n'a pas été traité par l'interpréteur), n'insistez pas à patcher symptôme par symptôme : **supprimez et recréez ce venv à neuf**, c'est ce qui résout le problème de façon fiable :
-
-```powershell
-Remove-Item -Recurse -Force .venv
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m pip install --upgrade "pywin32>=312"
-.venv\Scripts\python.exe .venv\Scripts\pywin32_postinstall.py -install
-.venv\Scripts\python.exe -c "import pywintypes; print('OK')"
-```
-
-Si le problème persiste même après une recréation complète du venv, c'est le signe d'une installation Python **de base** corrompue (pas seulement le venv) — voir **Dépannage Courant → Problèmes Python / venv**.
-
-#### 2. `pnpm run dev` ouvre une seconde console élevée (UAC)
-
-C'est voulu : voir `apps/frontend/scripts/dev-elevated.cjs`. WorkPilot AI relance tout le stack Electron en administrateur sur Windows, nécessaire pour une fonctionnalité de capture visuelle admin-only. Si vous n'avez pas besoin de cette fonctionnalité — ou si cette console élevée échoue à écrire `apps/frontend/.env-files/.env` (`PermissionError`) — désactivez l'élévation :
-
-```powershell
-$env:WORKPILOT_NO_ELEVATE = "1"
-pnpm run dev
-```
-
-Si vous avez déjà lancé l'app une fois **avec** élévation avant de désactiver, le fichier `apps/frontend/.env-files/.env` peut rester marqué par le process administrateur qui l'a créé (visible via `Get-Acl` : propriétaire `BUILTIN\Administrateurs`) et bloquer toute écriture ultérieure par un process non-admin, même avec des permissions NTFS qui semblent correctes. Supprimez-le pour qu'il soit régénéré proprement :
-
-```powershell
-Remove-Item "apps\frontend\.env-files\.env" -Force
-```
-
-L'app **packagée** (installeur, portable) démarre sans élévation (`asInvoker`) : les agents, terminaux
-et processus qu'elle lance n'ont que vos droits. Pour qu'une preuve visuelle pilote une application
-desktop elle-même élevée, lancez WorkPilot AI par clic droit → **Exécuter en tant qu'administrateur** ;
-sans cela, la capture d'écran reste possible et l'app indique que le pilotage demande cette élévation.
-Une version précédente demandait l'élévation à chaque lancement : si des réglages ne s'enregistrent plus
-après la mise à jour, un fichier créé par le processus administrateur est en cause, comme ci-dessus.
-
-#### 3. Smart App Control / Application Control bloque les binaires natifs npm
-
-Si `pnpm run dev` plante sur `electron-vite dev` avec une erreur du type `Error: An Application Control policy has blocked this file` (souvent sur un fichier `.node` dans `node_modules`, par exemple un binding natif de `rolldown` ou un autre paquet compilé), c'est **Smart App Control** (Windows 11) ou une politique **WDAC** qui bloque le chargement d'un binaire natif fraîchement installé et non reconnu.
-
-Vérifiez l'état :
-```powershell
-Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy" -Name "VerifiedAndReputablePolicyState" -ErrorAction SilentlyContinue
-```
-`1` = activé (bloque). Sur un **PC personnel**, désactivez-le via *Sécurité Windows → Contrôle des applications et du navigateur → Paramètres du Contrôle des applications intelligent → Désactivé*, puis **redémarrez** (le changement n'est pas pris en compte à chaud).
-
-> ⚠️ Cette désactivation est définitive sans réinstallation complète de Windows — c'est une limitation volontaire de Microsoft.
-
-Sur un **PC d'entreprise** (politique WDAC imposée), il faudra faire autoriser les binaires natifs Node par votre IT plutôt que de désactiver quoi que ce soit vous-même.
-
-#### 4. PowerShell ≠ cmd.exe
-
-Les commandes `cmd.exe` classiques (`rmdir /s /q`, `rd`, …) n'existent pas nativement en PowerShell et provoquent des erreurs `ParameterBindingException` confuses. Utilisez les équivalents PowerShell :
-
-| cmd.exe | PowerShell |
-|---------|------------|
-| `rmdir /s /q .venv` | `Remove-Item -Recurse -Force .venv` |
-| `del fichier` | `Remove-Item fichier` |
-| `copy a b` | `Copy-Item a b` |
-
-#### 5. Une installation Python de base corrompue casse tout silencieusement
-
-Si vous rencontrez `ModuleNotFoundError: No module named 'pip'`, un avertissement `Ignoring invalid distribution ~ip`, ou si `import pywintypes` échoue systématiquement même après un postinstall qui semble réussi (DLL copiées, mais import introuvable), votre installation Python de base (pas le venv) est corrompue — généralement un reliquat de mise à jour `pip` interrompue. Les symptômes se propagent à **tous** les venvs créés à partir de cette installation. Solution : désinstallez complètement Python, réinstallez-le proprement depuis [python.org](https://www.python.org/downloads/) (cochez "Add python.exe to PATH", évitez la version Microsoft Store), puis recréez tous les venvs du projet (racine **et** `apps/backend`).
-
-### Configuration des Providers AI
-
-#### Authentification Claude (Recommandé)
-```bash
-claude
-# Tapez : /login
-# Appuyez sur Entrée pour ouvrir le navigateur
-```
-*Le token est automatiquement sauvegardé dans le Keychain OS*
-
-#### Configuration Multi-Providers
-L'app écrit ces variables depuis **Réglages → Comptes** dans l'environnement de chaque tâche ; les
-poser à la main ne sert qu'à la CLI et aux exécutions sans interface.
-
-| Provider | Méthode | Configuration |
-|----------|---------|---------------|
-| **Anthropic Claude** | OAuth (abonnement) ou profil d'API | `CLAUDE_CODE_OAUTH_TOKEN` (ou le trousseau) ; profil d'API : `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`. `ANTHROPIC_API_KEY` n'est volontairement **pas** lu par ce provider |
-| **OpenAI** | Clé d'API ou CLI Codex | `OPENAI_API_KEY` ; `OPENAI_AUTH_MODE=codex-cli` pour passer par Codex |
-| **Google Gemini** | Clé d'API | `GOOGLE_API_KEY` ; `GEMINI_API_KEY` pour Gemini CLI (ACP) |
-| **Grok / xAI** | Clé d'API | `GROK_API_KEY` (`GROK_BASE_URL`) |
-| **Mistral**, **DeepSeek** | Clé d'API | `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY` (`*_BASE_URL`) |
-| **Ollama**, **LM Studio**, **llama.cpp** | Endpoint local | `OLLAMA_BASE_URL`, `LMSTUDIO_BASE_URL`, `LLAMA_CPP_BASE_URL` |
-| **GitHub Copilot** | Connexion GitHub | Via l'interface |
-| **Windsurf** | Clé d'API | `WINDSURF_API_KEY`, sinon la clé de l'IDE Windsurf installé |
-
-Liste complète, valeurs par défaut et ordre de lecture : [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
-#### Variables d'Environnement Optionnelles
-```bash
-# .env-files/.env, à la racine du dépôt (lu par l'app au démarrage et par run.py)
-AUTO_BUILD_MODEL=claude-opus-5   # CLI : modèle de toutes les phases, sauf réglage par phase de la tâche
-DEBUG=true
-LINEAR_API_KEY=votre_clé_linear
-BRAIN_ENABLED=false              # coupe la mémoire partagée (active par défaut)
-```
-
-### Configuration du Projet
-
-#### Structure de Projet Requise
-Seul un dépôt Git initialisé est obligatoire. La stack se lit dans les fichiers que le projet a déjà :
-```
-votre-projet/
-├── .git/                          # Obligatoire : dépôt Git initialisé
-├── *.sln, *.csproj, global.json   # .NET (ASP.NET Core, Blazor, MAUI, WPF…)
-├── pom.xml, build.gradle(.kts)    # Java, Kotlin
-├── go.mod · Cargo.toml            # Go · Rust
-├── package.json                   # Node.js, TypeScript (Angular, React, Vue, Next.js, Nuxt…)
-├── pyproject.toml, requirements.txt
-├── composer.json · Gemfile        # PHP · Ruby
-├── pubspec.yaml · Package.swift   # Flutter / Dart · Swift
-└── ...                            # Vos fichiers de code
-```
-
-#### Détection Automatique de Stack
-WorkPilot AI détecte (`apps/backend/project/`) :
-- **Langages** : C#, Java, Kotlin, Scala, Go, Rust, C, C++, Python, TypeScript, JavaScript, PHP, Ruby,
-  Dart, Swift, Elixir
-- **Frameworks** : Angular, React, Vue, Svelte, Next.js, Nuxt, Astro, NestJS, Express, Fastify,
-  Electron, React Native, Expo ; Django, FastAPI, Flask ; Laravel, Symfony ; Rails ; Flutter ;
-  pour .NET, la version cible et le framework de test (xUnit, NUnit, MSTest)
-- **Gestionnaires de paquets** : npm, pnpm, yarn, bun, pip, uv, Poetry, PDM, Pipenv, Cargo, Go
-  modules, Maven, Gradle, Composer, Bundler, pub
-- **Tests** : `dotnet test`, pytest, Jest, Vitest, Mocha, Playwright, Cypress, PHPUnit, RSpec…
-
-Les commandes que l'agent peut lancer suivent ce qui est détecté : l'allowlist s'agrandit avec la stack.
-
-### Validation de l'Installation
-
-#### Tests de Connexion
-```bash
-# Tests du frontend (vitest)
-pnpm test
-
-# Tests du backend (pytest, venv apps/backend/.venv)
-pnpm run test:backend
-
-# Porte locale complète : lint, pytest ciblé sur le diff, typecheck, vitest
-pnpm verify
-
-# Parcours E2E dans l'app construite (Linux sans écran : xvfb-run -a)
-cd apps/frontend && pnpm run build && pnpm run test:e2e
-```
-
-#### Vérification de l'Environnement
-```bash
-# Version Node.js
-node --version  # >= v22.12
-
-# Version Python
-python --version  # 3.12+
-
-# Configuration Claude
-claude --version
-```
-
-### Hooks Git
-
-Les hooks sont volontairement **rapides**. La CI (`ci.yml`, `lint.yml`) rejoue la suite complète sur Linux, Windows et macOS à chaque pull request et à chaque push sur `main`/`develop` : la redoubler en local coûte plusieurs minutes à chaque commit sans rien garantir de plus.
-
-| Étage | Ce qui tourne | Budget |
-|-------|---------------|--------|
-| `pre-commit` | ruff + biome **sur les fichiers stagés uniquement**, scan des secrets (bloquant), puis les tests liés à ces fichiers | quelques secondes |
-| `pre-push` | ruff check, ruff format --check, skills générés (`skills_cli build --check`), cartes d'audit et fragments de changelog, plafonds des `except` aveugles, des `biome-ignore` et de taille de fichier, biome lint | < 30 s |
-| CI | pytest (Python 3.12 en shards, 3.13 après merge), typecheck, vitest, build et démarrage de l'app — sur 3 OS ; parcours E2E Playwright, image serveur et mode serveur sous Linux | — |
-
-Le typecheck est **incrémental** (`incremental` + `tsBuildInfoFile` dans `apps/frontend/tsconfig.json`) : la première passe reste longue, les suivantes tombent à quelques secondes.
-
-#### Jouer la suite complète en local
-
-```bash
-PRE_PUSH_FULL=1 git push        # ajoute pytest (ciblé sur le diff), typecheck et vitest au pre-push
-pnpm verify                     # la même chose, sans pousser
-pnpm run test:all               # le pre-push rapide seul (lint et contrôles rapides), sans pousser
-pnpm run test:backend           # toute la suite pytest
-```
-
-#### Contourner (dépannage)
-
-| Besoin | Commande |
-|--------|----------|
-| Sauter tous les hooks d'un commit | `git commit --no-verify` |
-| Sauter le pre-push | `git push --no-verify` |
-| Garder le lint, sauter les tests au commit | `PRE_COMMIT_SKIP_TESTS=1 git commit …` |
-| Laisser plus de temps à un check lent | `PRE_PUSH_TIMEOUT_MS=900000 git push` (15 min) |
-| Refuser le push si un check expire | `PRE_PUSH_STRICT=1 git push` |
-
-Chaque job du pre-push a un **timeout** (5 min par défaut) : un check qui part en vrille est tué au lieu de bloquer le push indéfiniment, et un point d'avancement s'affiche toutes les 20 s. Un timeout avertit sans bloquer — la CI reste le garde-fou.
-
-> ⚠️ **Gardez ruff aligné sur la CI** (`ruff==0.15.7`, voir `.github/workflows/lint.yml`). Une version plus récente reformate le code Python contenu dans les blocs ```` ```python ```` des fichiers `.md`, ce qui produit des dizaines de fichiers modifiés sans rapport avec votre travail :
-> ```bash
-> pip install "ruff==0.15.7"
-> ```
-
-### Dépannage Courant
-
-#### Problèmes d'Installation
-- **Node.js non trouvé** : Réinstallez depuis https://nodejs.org avec "Add to PATH"
-- **Modules natifs** : `pnpm run rebuild` dans `apps/frontend`
-- **Python manquant** : Installez Python 3.12+ et ajoutez au PATH
-
-#### Problèmes Python / venv (Backend)
-
-> Sur Windows, la plupart des soucis Python (pywin32, venv, installation de base corrompue, syntaxe PowerShell) sont couverts en détail dans **[Notes Spécifiques Windows](#notes-spécifiques-windows)**. Résumé rapide :
-> - `pywin32` "non installé" malgré une installation réussie → réinstallez-le en ciblant explicitement le python **du venv**, sur les **deux** venvs du projet (racine et `apps/backend`)
-> - `import pywintypes` échoue encore après le postinstall → supprimez et recréez le venv à neuf plutôt que de patcher
-> - `ModuleNotFoundError: No module named 'pip'` / `Ignoring invalid distribution ~ip` → installation Python de base corrompue, réinstallez Python entièrement
-> - `Remove-Item : Impossible de trouver un paramètre positionnel...` → vous utilisez une syntaxe `cmd.exe` (`rmdir /s /q`) en PowerShell ; utilisez `Remove-Item -Recurse -Force .venv`
-
-- **`PermissionError: [Errno 13]` en écriture sur `apps/frontend/.env-files/.env`, alors que la lecture fonctionne et que les permissions NTFS semblent correctes**
-  Le fichier a probablement été créé par un run précédent avec élévation UAC (propriétaire `BUILTIN\Administrateurs` visible via `Get-Acl`) et porte une étiquette d'intégrité qui bloque l'écriture par un process non-admin, invisible dans l'ACL classique. Le plus simple est de le supprimer pour qu'il se régénère proprement :
-  ```powershell
-  Remove-Item "apps\frontend\.env-files\.env" -Force
-  ```
-  Voir aussi **Notes Spécifiques Windows → point 2** pour désactiver l'élévation UAC elle-même (`WORKPILOT_NO_ELEVATE=1`).
-
-- **`Error: An Application Control policy has blocked this file` sur un `.node` dans `node_modules` pendant `electron-vite dev`**
-  Smart App Control (Windows 11) ou une politique WDAC bloque le chargement d'un binaire natif npm non reconnu. Voir **Notes Spécifiques Windows → point 3** pour vérifier l'état et désactiver (PC personnel) ou faire autoriser le fichier par votre IT (PC d'entreprise).
-
-#### Problèmes d'Authentification
-- **Token Claude expiré** : `claude` puis `/login`
-- **API Key invalide** : Vérifiez les variables d'environnement
-- **Problèmes OAuth** : Révoquez et réautorisez l'application
-
-#### Problèmes de Performance
-- **Mémoire insuffisante** : Fermez les applications inutiles
-- **Timeout réseau** : Vérifiez votre connexion internet
-- **Lenteur UI** : Redémarrez l'application
+## AI providers
+
+| Provider | Sign-in |
+|----------|---------|
+| **Anthropic Claude** | Claude Code sign-in (subscription), or an API profile: a base URL and its token |
+| **OpenAI** | API key, or the signed-in Codex CLI |
+| **Google Gemini** | API key, or Gemini CLI through the Agent Client Protocol |
+| **Grok (xAI)**, **Mistral**, **DeepSeek** | API key |
+| **GitHub Copilot** | GitHub sign-in (Copilot subscription) |
+| **Windsurf** | API key, or the key of the installed Windsurf IDE |
+| **Local models** | Ollama, LM Studio or llama.cpp, no key |
+| **Agent CLIs** | Codex, OpenCode, Antigravity, pi, Hermes: installed and updated in one click from the **CLI Tools** sidebar |
+
+Several accounts per provider can be registered; when one hits its rate limit, the next one takes over. Keys are stored in the OS keyring and shown masked; the interface never receives their value. Meta, AWS and Cursor can be configured but have no agent client yet: their builds run on Claude, and the task says so. Variables and defaults: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ---
 
-## Project Structure
+## Architecture
 
 ```
 WorkPilot-AI/
 ├── apps/
-│   ├── backend/     # Python agents, specs, QA pipeline, local API (127.0.0.1:9000), server mode
-│   ├── frontend/    # Electron desktop application (React + TypeScript)
-│   └── mobile/      # iOS and Android app (Expo, React Native), a client of server mode
-├── src/             # Shared Python connectors (provider config, Jira, Azure DevOps, grepai…)
-├── capabilities/    # What each provider and harness can do (providers.yaml, harnesses)
-├── config/          # Provider list shown in Settings (configured_providers.json)
-├── workflows/       # One declarative workflow per task kind (feature-build, bug-fix, run…)
-├── skills/          # Skill pack sources; .agents/skills/ is generated from them
-├── deploy/          # Server image, docker-compose and environment example
+│   ├── backend/     # Python agents, specs, QA, local API, server mode
+│   ├── frontend/    # Electron desktop app (React + TypeScript)
+│   └── mobile/      # iOS and Android app (Expo), client of server mode
+├── src/             # Shared Python connectors (Jira, Azure DevOps…)
+├── capabilities/    # What each provider and harness can do
+├── config/          # Provider list shown in Settings
+├── workflows/       # One declarative workflow per task kind
+├── skills/          # Skill packs (.agents/skills/ is generated)
+├── deploy/          # Server image and docker-compose
 ├── changelog.d/     # One changelog fragment per pull request
-├── docs/            # Documentation: rules, architecture rationale, guides (see docs/README.md)
-├── tests/           # Python test suite (frontend tests live next to the code)
-└── scripts/         # Build, release, and maintenance utilities (see scripts/README.md)
+├── docs/            # Rules, design rationale, guides
+├── tests/           # Python tests (frontend tests sit next to the code)
+└── scripts/         # Build, release and maintenance scripts
 ```
 
-Instructions for coding agents start at [`AGENTS.md`](AGENTS.md).
+How the pieces fit (agents, subagents, workflows, state, security layers): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (in French). Why each feature is built the way it is: [docs/architecture/](docs/architecture/). A guided, clickable atlas readable without a technical background: [docs/audit/WorkPilot-architecture.html](docs/audit/WorkPilot-architecture.html). Instructions for coding agents start at [`AGENTS.md`](AGENTS.md).
 
----
-
-## CLI Usage
-
-For headless operation, CI/CD integration, or terminal-only workflows:
+### Command line
 
 ```bash
 cd apps/backend
@@ -976,68 +274,54 @@ python run.py --spec 001 --review             # Review
 python run.py --spec 001 --merge              # Merge
 ```
 
-See [docs/CLI-USAGE.md](docs/CLI-USAGE.md) for the full CLI reference.
+Full reference: [docs/CLI-USAGE.md](docs/CLI-USAGE.md).
 
 ---
 
 ## Security
 
-WorkPilot AI uses a three-layer security model:
+1. **OS sandbox**: agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox.
+2. **Filesystem restrictions**: operations stay inside the project directory.
+3. **Dynamic command allowlist**: only the commands of the detected stack are allowed.
 
-1. **OS Sandbox** — agent commands run under bubblewrap (Linux) or Seatbelt (macOS); Windows is not covered yet, and the card says when a task runs without a sandbox
-2. **Filesystem Restrictions** — Operations limited to project directory
-3. **Dynamic Command Allowlist** — Only approved commands based on detected project stack
+API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days. Every release ships SHA256 checksums, a CycloneDX SBOM and a build provenance attestation per file.
 
-API keys and tokens are encrypted at rest with the OS keyring; Settings > Accounts shows how long ago each API key was saved and suggests renewing it after 90 days.
-
-All releases include SHA256 checksums, a CycloneDX SBOM and a build provenance attestation for each file (`gh attestation verify <file> --repo krovomi/WorkPilot-AI`), and VirusTotal scan results once the scan is configured for the repository.
-
-To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md) — never a public issue.
-The security rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).
+To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md), never a public issue. The rules contributors and coding agents follow are in [docs/rules/security.md](docs/rules/security.md).
 
 ---
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Installation et Configuration](#installation-et-configuration) | Requirements, install methods, provider setup |
-| [Dépannage Courant](#dépannage-courant) | Common issues and fixes |
+| Document | What it covers |
+|----------|----------------|
+| [Features](docs/FEATURES.md) | Every feature, by area |
+| [Installation](docs/INSTALLATION.md) | Requirements, install methods, provider setup, Windows notes, troubleshooting (in French) |
+| [Configuration](docs/CONFIGURATION.md) | Provider registry, credential resolution, environment variables |
+| [CLI usage](docs/CLI-USAGE.md) | Headless and CI usage |
+| [Architecture](docs/ARCHITECTURE.md) | Agents, workflows, state and security layers (in French) |
+| [Design rationale](docs/architecture/) | Why each feature is built the way it is, one file per feature |
+| [Server operations](docs/server-operations.md) | Running the team server: deployment, TLS, backups, upgrades, quotas (in French) |
+| [Linux](docs/linux.md) · [Windows development](docs/windows-development.md) | Platform notes |
+| [Contributing](docs/CONTRIBUTING.md) | Development setup, code style, tests, pull requests |
+| [Release process](docs/RELEASE.md) | How releases are cut and published |
+| [Security policy](docs/SECURITY.md) | Supported versions, reporting a vulnerability |
 | [Documentation map](docs/README.md) | Where every document lives and what it is for |
-| [Configuration Reference](docs/CONFIGURATION.md) | Provider registry, credential resolution, env vars |
-| [CLI Usage](docs/CLI-USAGE.md) | Headless / CI usage |
-| [Server Operations](docs/server-operations.md) | Running the team server: deployment, TLS, backups, upgrades, quotas (in French) |
-| [Architecture rationale](docs/architecture/) | Why each feature is built the way it is, one file per feature |
-| [Contributing](docs/CONTRIBUTING.md) | Code style, testing, PR process |
-| [Linux Guide](docs/linux.md) | Flatpak, AppImage builds |
-| [Windows Development](docs/windows-development.md) | Windows-specific encoding and tooling notes |
-| [Release Process](docs/RELEASE.md) | How releases are cut and published |
-| [Security Policy](docs/SECURITY.md) | Supported versions, reporting a vulnerability |
+| [Wiki](https://github.com/krovomi/WorkPilot-AI/wiki) | User guides, refreshed after each release |
 
 ---
 
-## Contributing
+## Contributing and community
 
-We welcome contributions! Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup, code style, testing requirements, and PR process.
+Contributions are welcome: start with [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Pull requests target `develop`.
 
----
-
-## Community
-
-- **Issues** — [Report bugs or request features](https://github.com/krovomi/WorkPilot-AI/issues)
-- **Discussions** — [Ask questions](https://github.com/krovomi/WorkPilot-AI/discussions)
+- **Issues**: [report a bug or request a feature](https://github.com/krovomi/WorkPilot-AI/issues)
+- **Discussions**: [ask a question](https://github.com/krovomi/WorkPilot-AI/discussions)
 
 ---
 
 ## License
 
-**AGPL-3.0** — GNU Affero General Public License v3.0
-
-WorkPilot AI is free to use. If you modify and distribute it, or run it as a service, your code must also be open source under AGPL-3.0. Commercial licensing available for closed-source use cases.
-
----
-
-## Star History
+**AGPL-3.0**, GNU Affero General Public License v3.0. WorkPilot AI is free to use. If you modify and distribute it, or run it as a service, your code must also be open source under AGPL-3.0. Commercial licensing is available for closed-source use cases.
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/krovomi/WorkPilot-AI?style=social)](https://github.com/krovomi/WorkPilot-AI/stargazers)
 
