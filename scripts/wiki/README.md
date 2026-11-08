@@ -42,6 +42,10 @@ regenerating the AUTOGEN blocks:
   named in an `::error::` line, the other patches still go through, and the
   job fails so the stale patch gets rebased.
 
+Delete a patch once a release has applied it. A later patch or narrative
+refresh rewrites the same lines, and the old patch then neither applies nor
+reads as applied: the 1.4.0 wiki job failed on the 1.3.1 patch that way.
+
 To apply them without waiting for a release:
 `gh workflow run wiki-narrative.yml --ref develop -f mode=patches`.
 
