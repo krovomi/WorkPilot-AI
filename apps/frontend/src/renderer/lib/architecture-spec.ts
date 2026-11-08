@@ -11,6 +11,7 @@
  */
 
 import { explainConnection, type Lang } from "./architecture-connections";
+import { lintArchitecture } from "./architecture-lint";
 
 export interface DiagramNodeInput {
 	id: string;
@@ -26,12 +27,15 @@ export interface DiagramNodeInput {
 }
 
 export interface DiagramEdgeInput {
+	id?: string;
 	source: string;
 	target: string;
 	data?: {
 		label?: string;
 		/** The sentence the person wrote between the two blocks, if any. */
 		description?: string;
+		/** Linked although the architecture rules do not foresee it. */
+		forced?: boolean;
 	};
 }
 
@@ -110,6 +114,8 @@ interface SpecStrings {
 	colTech: string;
 	connections: string;
 	noConnections: string;
+	checks: string;
+	checksIntro: string;
 	requirements: string;
 	kindFlowchart: string;
 	kindArchitecture: string;
@@ -146,6 +152,9 @@ const STRINGS: Record<Lang, SpecStrings> = {
 		colTech: "Technology",
 		connections: "Connections",
 		noConnections: "_No explicit connections were drawn._",
+		checks: "Architecture points to settle",
+		checksIntro:
+			"The architecture rules flag these points on the diagram. Settle each one in the design (or explain in the README why it is kept):",
 		requirements: "Requirements",
 		kindFlowchart: "flowchart",
 		kindArchitecture: "architecture diagram",
@@ -193,6 +202,9 @@ const STRINGS: Record<Lang, SpecStrings> = {
 		colTech: "Technologie",
 		connections: "Connexions",
 		noConnections: "_Aucune connexion explicite n'a été dessinée._",
+		checks: "Points d'architecture à régler",
+		checksIntro:
+			"Les règles d'architecture relèvent ces points sur le schéma. Réglez chacun dans la conception (ou expliquez dans le README pourquoi il est conservé) :",
 		requirements: "Exigences",
 		kindFlowchart: "organigramme",
 		kindArchitecture: "diagramme d'architecture",
@@ -344,6 +356,13 @@ export function buildArchitectureSpec(
 		.filter((l): l is string => l !== null)
 		.join("\n");
 
+	// ── What the architecture rules flag on the whole diagram ───────────
+	const checkLines = lintArchitecture(
+		nodes,
+		cleanEdges.map((e, i) => ({ ...e, id: e.id ?? `edge-${i}` })),
+		lang,
+	).map((f) => `- ${f.message}`);
+
 	// ── Tailored requirements ───────────────────────────────────────────
 	const reqs: string[] = [s.reqBase1, s.reqBase2];
 	if (hasHttpBackend) {
@@ -375,6 +394,9 @@ export function buildArchitectureSpec(
 		"",
 		connectionLines || s.noConnections,
 		"",
+		...(checkLines.length > 0
+			? [`## ${s.checks}`, "", s.checksIntro, "", ...checkLines, ""]
+			: []),
 		`## ${s.requirements}`,
 		"",
 		reqs.map((r) => `- ${r}`).join("\n"),
