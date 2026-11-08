@@ -6,7 +6,6 @@
 	"runtimes": "Runtimes locaux",
 	"available": "disponible",
 	"notFound": "serveur inaccessible",
-	"modelsInstalled": "modèles installés",
 	"localModels": "Modèles locaux de génération",
 	"policy": "Politique de routage",
 	"airgapStrict": "Mode strict (bloquer les clients LLM cloud)",
@@ -18,13 +17,11 @@
 	"add": "Ajouter",
 	"rescan": "Rescanner",
 	"scanning": "Analyse en cours…",
-	"catalogAge": "Mis en cache il y a {{age}}",
 	"catalogMeta": "{{total}} modèles détectés parmi {{providers}} fournisseurs · mis en cache il y a {{age}}",
 	"noModelsForProvider": "Aucun modèle détecté",
 	"save": "Enregistrer la politique",
 	"saving": "Enregistrement…",
 	"confidentialityReport": "Rapport de confidentialité",
-	"recentCalls": "Appels enregistrés",
 	"noCalls": "Aucune décision de routage enregistrée pour ce projet.",
 	"confidentiality": {
 		"local": "local",
@@ -46,5 +43,14 @@
 	"disablingStrict": "Désactivation…",
 	"disableStrictHint": "La table de routage locale est conservée ; seul le blocage du cloud est levé.",
 	"disableStrictFailed": "Désactivation impossible : {{error}}",
-	"localAria": "local"
+	"localAria": "local",
+	"kickers": {
+		"runtimes": "Runtimes",
+		"policy": "Routage",
+		"report": "Rapport"
+	},
+	"modelsCount_one": "{{count}} modèle installé",
+	"modelsCount_other": "{{count}} modèles installés",
+	"callsCount_one": "{{count}} appel enregistré",
+	"callsCount_other": "{{count}} appels enregistrés"
 }

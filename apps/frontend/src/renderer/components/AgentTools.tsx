@@ -69,9 +69,8 @@ import {
 	DialogTitle,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { ScrollArea } from "./ui/scroll-area";
 import { Switch } from "./ui/switch";
-import { PageHeader } from "./ui/page-header";
+import { Chip, ModuleHeader, ModuleStage, Page } from "./charter";
 
 // Agent configuration data - mirrors AGENT_CONFIGS from backend
 // Model and thinking are now dynamically read from user settings
@@ -1066,7 +1065,7 @@ function AgentCard({
 }
 
 export function AgentTools() {
-	const { t } = useTranslation(["settings"]);
+	const { t } = useTranslation(["settings", "navigation"]);
 	const settings = useSettingsStore((state) => state.settings);
 	const projects = useProjectStore((state) => state.projects);
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
@@ -1572,39 +1571,28 @@ export function AgentTools() {
 	);
 
 	return (
-		<div className="h-full flex flex-col">
-			<PageHeader
-				icon={Wrench}
-				title={
-					<>
-						{t("settings:mcp.title")}
-						{selectedProject && (
-							<span className="ml-2 text-sm font-normal text-muted-foreground">
-								{t("agents.forProject", { name: selectedProject.name })}
-							</span>
-						)}
-					</>
-				}
+		<ModuleStage scroll="page" data-testid="agent-tools-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("settings:mcp.title")}
 				description={
 					selectedProject
-						? t("settings:mcp.description")
+						? `${t("agents.forProject", { name: selectedProject.name })} · ${t("settings:mcp.description")}`
 						: t("settings:mcp.descriptionNoProject")
 				}
+				icon={Wrench}
+				tone="accent"
 				actions={
 					envConfig && (
-						<span className="text-sm text-muted-foreground">
-							{t("settings:mcp.serversEnabled", { count: enabledCount })}
-						</span>
+						<Chip tone="green">{t("settings:mcp.serversEnabled", { count: enabledCount })}</Chip>
 					)
 				}
 			/>
-
 			{/* Content */}
-			<ScrollArea className="flex-1">
-				<div className="p-6 space-y-6">
+			<Page className="max-w-none space-y-6">
 					{/* No project selected message */}
 					{!selectedProject && (
-						<div className="rounded-lg border border-border bg-card p-6 text-center">
+						<div className="wp-card wp-card-pad text-center">
 							<AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
 							<h2 className="text-sm font-medium text-foreground mb-1">
 								{t("settings:mcp.noProjectSelected")}
@@ -1617,7 +1605,7 @@ export function AgentTools() {
 
 					{/* Project not initialized message */}
 					{selectedProject && !selectedProject.autoBuildPath && (
-						<div className="rounded-lg border border-border bg-card p-6 text-center">
+						<div className="wp-card wp-card-pad text-center">
 							<Info className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
 							<h2 className="text-sm font-medium text-foreground mb-1">
 								{t("settings:mcp.projectNotInitialized")}
@@ -1630,7 +1618,7 @@ export function AgentTools() {
 
 					{/* MCP Server Configuration */}
 					{envConfig && (
-						<div className="rounded-lg border border-border bg-card p-4">
+						<div className="wp-card wp-card-pad">
 							<div className="flex items-center justify-between mb-4">
 								<h2 className="text-sm font-medium text-foreground">
 									{t("settings:mcp.configuration")}
@@ -1995,8 +1983,7 @@ export function AgentTools() {
 							</div>
 						);
 					})}
-				</div>
-			</ScrollArea>
+			</Page>
 
 			{/* Custom MCP Server Dialog */}
 			<McpServerSettingsDialog
@@ -2032,6 +2019,6 @@ export function AgentTools() {
 				existingIds={(envConfig?.customMcpServers || []).map((s) => s.id)}
 				onSave={handleSaveCustomServer}
 			/>
-		</div>
+		</ModuleStage>
 	);
 }

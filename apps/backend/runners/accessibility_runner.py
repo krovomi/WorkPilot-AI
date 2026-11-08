@@ -27,21 +27,16 @@ from accessibility_agent.accessibility_scanner import (  # noqa: E402
     AccessibilityScanner,
     WcagLevel,
 )
+from i18n_agent.catalogs import iter_files  # noqa: E402
 
-SCAN_EXTENSIONS = {".html", ".htm", ".jsx", ".tsx", ".vue", ".svelte"}
-DEFAULT_IGNORES = {
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    ".next",
-    "__pycache__",
-    ".venv",
-    "venv",
-    ".workpilot",
-    "out",
-    "coverage",
-}
+# Every markup the scanner's rules read: HTML, JSX/TSX, Vue, Svelte, Astro,
+# Angular templates (.html), Blazor/Razor, PHP/Blade, Twig, ERB, Handlebars.
+SCAN_EXTENSIONS = frozenset(
+    {
+        ".html", ".htm", ".jsx", ".tsx", ".vue", ".svelte", ".astro",
+        ".razor", ".cshtml", ".php", ".twig", ".erb", ".hbs",
+    }
+)  # fmt: skip
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -53,16 +48,9 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
 
 
 def _iter_target_files(root: Path) -> list[Path]:
-    files: list[Path] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in SCAN_EXTENSIONS:
-            continue
-        if any(part in DEFAULT_IGNORES for part in path.parts):
-            continue
-        files.append(path)
-    return files
+    # Pruned relative to the project: a project under a ``build/`` folder of
+    # its own still gets scanned.
+    return iter_files(root, SCAN_EXTENSIONS)
 
 
 def _report_to_dict(report: A11yReport) -> dict[str, Any]:

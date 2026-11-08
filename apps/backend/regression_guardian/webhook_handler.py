@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -60,12 +61,14 @@ class WebhookHandler:
         framework: TestFramework = TestFramework.PYTEST,
         dedup_checker: DedupChecker | None = None,
         redact_pii: bool = True,
+        framework_for: Callable[[Incident], TestFramework] | None = None,
     ) -> None:
         self._parser = IncidentParser()
         self._generator = TestGenerator()
         self._fixture_builder = FixtureBuilder(redact_pii=redact_pii)
         self._dedup = dedup_checker
         self._framework = framework
+        self._framework_for = framework_for
         self._history: list[PipelineResult] = []
 
     @property
@@ -113,7 +116,12 @@ class WebhookHandler:
 
         # 3. Generate test
         try:
-            test = self._generator.generate(incident, self._framework)
+            framework = (
+                self._framework_for(incident)
+                if self._framework_for
+                else self._framework
+            )
+            test = self._generator.generate(incident, framework)
         except Exception as exc:
             result = PipelineResult(
                 status=PipelineStatus.FAILED,

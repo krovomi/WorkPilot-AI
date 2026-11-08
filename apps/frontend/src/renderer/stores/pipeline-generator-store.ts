@@ -12,18 +12,14 @@ export type PipelineGeneratorPhase =
 	| "complete"
 	| "error";
 
-export const CI_PLATFORMS: CiPlatform[] = ["github", "gitlab", "circleci"];
+export const CI_PLATFORMS: CiPlatform[] = ["github", "gitlab", "azure", "bitbucket", "circleci"];
 
 export const PLATFORM_LABELS: Record<CiPlatform, string> = {
 	github: "GitHub Actions",
 	gitlab: "GitLab CI/CD",
 	circleci: "CircleCI",
-};
-
-export const PLATFORM_ICONS: Record<CiPlatform, string> = {
-	github: "🐙",
-	gitlab: "🦊",
-	circleci: "⚙️",
+	azure: "Azure Pipelines",
+	bitbucket: "Bitbucket Pipelines",
 };
 
 interface PipelineGeneratorState {

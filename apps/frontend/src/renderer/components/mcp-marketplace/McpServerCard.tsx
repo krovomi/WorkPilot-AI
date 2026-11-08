@@ -171,7 +171,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 
 	return (
 		<>
-			<div className="group relative flex flex-col rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden">
+			<div className="wp-card group relative flex flex-col overflow-hidden transition-colors hover:border-[var(--wp-accent)]">
 				{/* Card header with color accent */}
 				<div
 					className="h-1.5 w-full"

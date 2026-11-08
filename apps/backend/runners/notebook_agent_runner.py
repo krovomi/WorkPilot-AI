@@ -1,7 +1,8 @@
 """
 Notebook Agent Runner
 
-Discovers .ipynb files in a project, parses them, and reports common issues
+Discovers notebooks in a project (Jupyter with any kernel, .NET Polyglot
+``.dib``, Quarto ``.qmd``, R Markdown ``.Rmd``), parses them, and reports common issues
 (stale outputs, out-of-order execution, empty cells, long cells, missing
 documentation).
 
@@ -22,19 +23,11 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from notebook_agent.formats import discover  # noqa: E402
 from notebook_agent.notebook_handler import (  # noqa: E402
     NotebookHandler,
     ParsedNotebook,
 )
-
-EXCLUDED_DIRS = {
-    ".git",
-    "node_modules",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".ipynb_checkpoints",
-}
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -45,20 +38,9 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("NOTEBOOK_EVENT", {"type": event_type, "data": data})
 
 
-def _is_excluded(path: Path, root: Path) -> bool:
-    try:
-        rel = path.relative_to(root)
-    except ValueError:
-        return True
-    return any(part in EXCLUDED_DIRS for part in rel.parts)
-
-
 def _discover_notebooks(project_path: Path) -> list[Path]:
-    found: list[Path] = []
-    for p in project_path.glob("**/*.ipynb"):
-        if p.is_file() and not _is_excluded(p, project_path):
-            found.append(p)
-    return sorted(found)
+    """Jupyter, Polyglot (.dib), Quarto and R Markdown notebooks."""
+    return discover(project_path)
 
 
 def _notebook_to_dict(nb: ParsedNotebook, project_root: Path) -> dict[str, Any]:

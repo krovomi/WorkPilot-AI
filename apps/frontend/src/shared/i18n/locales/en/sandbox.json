@@ -12,26 +12,26 @@
 		"noProject": "Select a project to preview its uncommitted changes.",
 		"failed": "Preview failed: {{error}}"
 	},
-	"dryRun": "Dry-run for spec {{specId}}",
-	"estimatedCost": "Estimated Cost",
-	"realCost": "Real Cost",
-	"savings": "Savings",
 	"steps": "Steps",
-	"approve": "Approve & Apply",
-	"reject": "Reject",
-	"summary": "Summary",
-	"passed": "passed",
 	"warnings": "Warnings",
-	"issues": "issues",
 	"cost": "Cost",
-	"savedVsReal": "% saved vs real",
-	"files": "Files",
-	"modified": "modified",
-	"executionSteps": "Execution Steps",
-	"fileChanges": "File Changes",
 	"durationAndTokens": "{{duration}}ms · {{tokens}} tokens",
 	"diffPreview": {
-		"filesChanged": "{{count}} files changed",
-		"selectFile": "Select a file to view the diff"
+		"selectFile": "Select a file to view the diff",
+		"filesChanged_one": "{{count}} file changed",
+		"filesChanged_other": "{{count}} files changed",
+		"noHunks": "No text hunk for this file (binary or empty)."
+	},
+	"description": "Every uncommitted change of the project, file by file, read from git without touching it.",
+	"emptyBody": "Run the preview to read the changes not yet committed, with their hunks.",
+	"kickers": {
+		"files": "Files",
+		"diff": "Diff"
+	},
+	"changeTypes": {
+		"added": "Added",
+		"modified": "Modified",
+		"deleted": "Deleted",
+		"renamed": "Renamed"
 	}
 }

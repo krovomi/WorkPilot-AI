@@ -199,12 +199,11 @@ export const FILE_EXEMPTIONS: Readonly<
 		},
 	],
 	"components/settings/GuardrailsSettings.tsx": [
-		{ text: "@placeholder=Write,Edit,Bash", reason: "agent tool names" },
+		{ text: "@placeholder=Write, Edit, Bash", reason: "agent tool names" },
 		{
-			text: "@placeholder=(pip|npm) install .*gpl",
-			reason: "example regular expression",
+			text: "@placeholder=git push --force origin main",
+			reason: "example shell command",
 		},
-		{ text: "@placeholder=rm -rf /", reason: "example shell command" },
 	],
 	"components/task-detail/TaskVerify.tsx": [
 		{ text: "?2xx", reason: "HTTP status class" },

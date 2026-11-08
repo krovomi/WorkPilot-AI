@@ -82,6 +82,11 @@ def _collect_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, An
             "**/trivy*.yaml",
             "**/.semgrep*",
             "SECURITY.md",
+            "renovate.json",
+            ".github/renovate.json",
+            ".github/workflows/codeql*.yml",
+            "sonar-project.properties",
+            ".gitleaks.toml",
         ],
     )
     if security_scans:
@@ -92,7 +97,14 @@ def _collect_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, An
 
     access_logs = _discover_files(
         project_path,
-        [".github/CODEOWNERS", ".github/workflows/*.yml", "docs/access*.md"],
+        [
+            ".github/CODEOWNERS",
+            "CODEOWNERS",
+            "docs/CODEOWNERS",
+            ".gitlab/CODEOWNERS",
+            ".github/workflows/*.yml",
+            "docs/access*.md",
+        ],
     )
     if access_logs:
         sources[EvidenceType.ACCESS_LOG] = [
@@ -149,7 +161,13 @@ def _collect_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, An
             ".github/workflows/deploy*.yml",
             ".github/workflows/release*.yml",
             ".gitlab-ci.yml",
+            "azure-pipelines.yml",
+            "bitbucket-pipelines.yml",
+            "Jenkinsfile",
+            ".circleci/config.yml",
             "Dockerfile",
+            "docker-compose*.yml",
+            "compose*.yaml",
         ],
     )
     if deploys:

@@ -2523,7 +2523,6 @@
 		"title": "Garde-fous des agents",
 		"description": "Règles que les agents doivent respecter avant Write / Edit / Bash. Stockées dans .workpilot/guardrails.json.",
 		"selectProject": "Sélectionnez un projet pour gérer ses garde-fous.",
-		"activeCount": "{{count}} règle(s) active(s)",
 		"addRule": "Ajouter une règle",
 		"empty": "Aucune règle pour l'instant. Ajoutez-en une pour commencer à appliquer des politiques.",
 		"ruleId": "identifiant de règle",
@@ -2542,7 +2541,19 @@
 			"deny": "Refuser",
 			"require_approval": "Demander une approbation"
 		},
-		"fileContentPlaceholder": "contenu du fichier…"
+		"fileContentPlaceholder": "contenu du fichier…",
+		"kickers": {
+			"rules": "Règles",
+			"tester": "Testeur"
+		},
+		"rulesTitle": "Règles que les agents respectent",
+		"emptyTitle": "Pas encore de règle",
+		"deleteRule": "Supprimer la règle",
+		"testerHint": "Simule un appel Write, Edit ou Bash : la règle la plus stricte qui correspond décide.",
+		"filePath": "Chemin du fichier",
+		"clearTest": "Effacer le résultat",
+		"activeCount_one": "{{count}} règle active",
+		"activeCount_other": "{{count}} règles actives"
 	},
 	"search": {
 		"placeholder": "Rechercher un paramètre...",

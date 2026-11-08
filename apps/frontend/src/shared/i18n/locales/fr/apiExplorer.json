@@ -151,7 +151,9 @@
 		"resync": "Resynchroniser",
 		"sourceBadge": "Source",
 		"fileBadge": "Fichier spec",
-		"scannedAt": "scanné à {{time}}"
+		"scannedAt": "scanné à {{time}}",
+		"urlBadge": "URL",
+		"failed": "Impossible de scanner les routes du projet."
 	},
 	"emulator": {
 		"run": "Lancer le projet",
@@ -160,5 +162,7 @@
 		"starting": "Démarrage...",
 		"running": "En cours",
 		"noProject": "Aucun projet actif sélectionné"
-	}
+	},
+	"title": "API Studio",
+	"description": "Chargez un contrat OpenAPI, ou laissez WorkPilot scanner les routes du projet sur toutes les stacks, puis envoyez des requêtes et exportez le contrat."
 }

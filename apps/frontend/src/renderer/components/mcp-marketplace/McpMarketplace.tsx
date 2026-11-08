@@ -11,7 +11,6 @@ import {
 	ArrowUpDown,
 	BadgeCheck,
 	Download,
-	Filter,
 	RefreshCw,
 	Search,
 	Store,
@@ -30,20 +29,20 @@ import {
 	useMcpMarketplaceStore,
 } from "../../stores/mcp-marketplace-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	ScanLine,
+	Tabs,
+} from "../charter";
+import { Input } from "../ui/input";
 import { McpBuilder } from "./McpBuilder";
 import { McpInstalledList } from "./McpInstalledList";
 import { McpServerCard } from "./McpServerCard";
-import { PageHeader } from "../ui/page-header";
 
 const TABS: { id: McpMarketplaceTab; labelKey: string; icon: typeof Store }[] =
 	[
@@ -84,7 +83,7 @@ const CATEGORIES: { value: McpCategory | "all"; labelKey: string }[] = [
 ];
 
 export function McpMarketplace() {
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["common", "navigation"]);
 	const {
 		activeTab,
 		setActiveTab,
@@ -117,160 +116,114 @@ export function McpMarketplace() {
 	}, [projectId]);
 
 	return (
-		<div className="flex flex-col h-full overflow-hidden">
-			<PageHeader
-				icon={Store}
+		<ModuleStage data-testid="mcp-marketplace-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
 				title={t("mcpMarketplace.title")}
 				description={t("mcpMarketplace.subtitle")}
+				icon={Store}
+				tone="blue"
 				actions={
 					<>
-						<Badge variant="secondary" className="text-xs">
+						<Chip tone="blue" dot={false}>
 							{installed.length} {t("mcpMarketplace.installedCount")}
-						</Badge>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={handleRefresh}
-							title={t("mcpMarketplace.refresh")}
-						>
-							<RefreshCw className="h-4 w-4" />
-						</Button>
+						</Chip>
+						<CharterButton variant="ghost" icon={RefreshCw} onClick={handleRefresh}>
+							{t("mcpMarketplace.refresh")}
+						</CharterButton>
 					</>
 				}
-			>
-				<div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
-					{TABS.map((tab) => {
-						const Icon = tab.icon;
-						const isActive = activeTab === tab.id;
-						return (
-							<button
-								type="button"
-								key={tab.id}
-								onClick={() => setActiveTab(tab.id)}
-								className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-									isActive
-										? "bg-background text-foreground shadow-sm"
-										: "text-muted-foreground hover:text-foreground hover:bg-background/50"
-								}`}
-							>
-								<Icon className="h-4 w-4" />
-								{t(tab.labelKey)}
-							</button>
-						);
-					})}
-				</div>
-			</PageHeader>
+			/>
+			<div className="relative z-[1] px-6 pt-3">
+				<Tabs
+					label={t("mcpMarketplace.title")}
+					tabs={TABS.map((tab) => ({
+						id: tab.id,
+						label: t(tab.labelKey),
+						icon: tab.icon,
+						count: tab.id === "installed" ? installed.length : undefined,
+					}))}
+					value={activeTab}
+					onChange={setActiveTab}
+				/>
+			</div>
 
 			{/* Catalog tab content */}
 			{activeTab === "catalog" && (
 				<>
-					{/* Filters bar */}
-					<div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-border bg-background/50">
-						<div className="relative flex-1 max-w-md">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+					<div className="relative z-[1] flex shrink-0 flex-wrap items-center gap-2 px-6 py-3">
+						<div className="relative w-72 max-w-full">
+							<Search className="wp-muted pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" aria-hidden="true" />
 							<Input
+								type="search"
+								aria-label={t("mcpMarketplace.searchPlaceholder")}
 								value={filters.search}
 								onChange={(e) => setFilters({ search: e.target.value })}
 								placeholder={t("mcpMarketplace.searchPlaceholder")}
-								className="pl-9 h-9"
+								className="h-8 pl-8 text-xs"
 							/>
 						</div>
-
-						<Select
-							value={filters.category}
-							onValueChange={(val) =>
-								setFilters({ category: val as McpCategory | "all" })
-							}
+						<Chip
+							tone="blue"
+							pressed={filters.sortBy === "featured"}
+							onClick={() => setFilters({ sortBy: "featured" })}
+							dot={false}
 						>
-							<SelectTrigger className="w-[180px] h-9">
-								<Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{CATEGORIES.map((cat) => (
-									<SelectItem key={cat.value} value={cat.value}>
-										{t(cat.labelKey)}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-
-						<Select
-							value={filters.sortBy}
-							onValueChange={(val) =>
-								setFilters({
-									sortBy: val as "featured" | "name",
-								})
-							}
+							<ArrowUpDown className="h-3 w-3" aria-hidden="true" />
+							{t("mcpMarketplace.sort.featured")}
+						</Chip>
+						<Chip
+							tone="blue"
+							pressed={filters.sortBy === "name"}
+							onClick={() => setFilters({ sortBy: "name" })}
+							dot={false}
 						>
-							<SelectTrigger className="w-[160px] h-9">
-								<ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="featured">
-									{t("mcpMarketplace.sort.featured")}
-								</SelectItem>
-								<SelectItem value="name">
-									{t("mcpMarketplace.sort.name")}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-
-						<Button
-							variant={filters.showOfficialOnly ? "default" : "outline"}
-							size="sm"
-							className="h-9 gap-1.5"
-							onClick={() =>
-								setFilters({ showOfficialOnly: !filters.showOfficialOnly })
-							}
+							{t("mcpMarketplace.sort.name")}
+						</Chip>
+						<Chip
+							tone="green"
+							pressed={filters.showOfficialOnly}
+							onClick={() => setFilters({ showOfficialOnly: !filters.showOfficialOnly })}
+							dot={false}
 						>
-							<BadgeCheck className="h-3.5 w-3.5" />
+							<BadgeCheck className="h-3 w-3" aria-hidden="true" />
 							{t("mcpMarketplace.officialOnly")}
-						</Button>
+						</Chip>
+					</div>
+					<div className="wp-chips relative z-[1] shrink-0 px-6 pb-3">
+						{CATEGORIES.map((cat) => (
+							<Chip
+								key={cat.value}
+								tone="violet"
+								dot={false}
+								pressed={filters.category === cat.value}
+								onClick={() => setFilters({ category: cat.value })}
+							>
+								{t(cat.labelKey)}
+							</Chip>
+						))}
 					</div>
 
 					{/* Catalog grid */}
-					<div className="flex-1 overflow-auto p-6">
+					<div className="relative z-[1] flex-1 overflow-auto px-6 pb-6">
 						{!projectId && (
-							<p className="mb-4 text-sm text-muted-foreground">
+							<Notice tone="amber" className="mb-4">
 								{t("mcpMarketplace.noProject")}
-							</p>
+							</Notice>
 						)}
-						{(() => {
-							if (isCatalogLoading) {
-								return (
-									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-										{Array.from({ length: 6 }).map(() => (
-											<div
-												key={`skeleton-${crypto.randomUUID()}`}
-												className="h-[220px] rounded-xl border border-border bg-muted/30 animate-pulse"
-											/>
-										))}
-									</div>
-								);
-							} else if (filteredCatalog.length === 0) {
-								return (
-									<div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-										<Search className="h-12 w-12 mb-3 opacity-30" />
-										<p className="text-lg font-medium">
-											{t("mcpMarketplace.noResults")}
-										</p>
-										<p className="text-sm mt-1">
-											{t("mcpMarketplace.noResultsHint")}
-										</p>
-									</div>
-								);
-							} else {
-								return (
-									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-										{filteredCatalog.map((server) => (
-											<McpServerCard key={server.id} server={server} />
-										))}
-									</div>
-								);
-							}
-						})()}
+						{isCatalogLoading ? (
+							<ScanLine />
+						) : filteredCatalog.length === 0 ? (
+							<EmptyStage icon={Search} tone="blue" title={t("mcpMarketplace.noResults")}>
+								{t("mcpMarketplace.noResultsHint")}
+							</EmptyStage>
+						) : (
+							<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+								{filteredCatalog.map((server) => (
+									<McpServerCard key={server.id} server={server} />
+								))}
+							</div>
+						)}
 					</div>
 				</>
 			)}
@@ -280,6 +233,6 @@ export function McpMarketplace() {
 
 			{/* Builder tab content */}
 			{activeTab === "builder" && <McpBuilder />}
-		</div>
+		</ModuleStage>
 	);
 }

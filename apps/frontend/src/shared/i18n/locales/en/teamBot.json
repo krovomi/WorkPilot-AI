@@ -1,5 +1,5 @@
 {
-	"title": "Slack / Teams notifications",
+	"title": "Team bot",
 	"platform": "Platform",
 	"webhookUrl": "Webhook URL",
 	"enabled": "Enable notifications",
@@ -7,5 +7,26 @@
 	"sending": "Sending…",
 	"ok": "Delivered",
 	"error": "Delivery failed",
-	"help": "Notifications are sent when an agent finishes, a cost alert fires, a guardrail blocks an action, or a change has a high blast radius."
+	"help": "Notifications are sent when an agent finishes, a cost alert fires, a guardrail blocks an action, or a change has a high blast radius.",
+	"description": "Your team hears about agents on Slack or Microsoft Teams, through an incoming webhook.",
+	"platforms": {
+		"slack": "Slack",
+		"teams": "Microsoft Teams"
+	},
+	"webhookPlaceholder": {
+		"slack": "https://hooks.slack.com/services/…",
+		"teams": "https://….webhook.office.com/…"
+	},
+	"kickers": {
+		"connection": "Connection",
+		"events": "When"
+	},
+	"connectionTitle": "Channel",
+	"eventsTitle": "Messages sent",
+	"events": {
+		"agentDone": "Agent finished",
+		"costAlert": "Cost alert",
+		"guardrailBlock": "Guardrail block",
+		"blastRadius": "High blast radius"
+	}
 }

@@ -2520,7 +2520,6 @@
 		"title": "Agent Guardrails",
 		"description": "Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
 		"selectProject": "Select a project to manage its guardrails.",
-		"activeCount": "{{count}} active rule(s)",
 		"addRule": "Add rule",
 		"empty": "No rules yet. Add one to start enforcing policies.",
 		"ruleId": "rule id",
@@ -2539,7 +2538,19 @@
 			"deny": "Deny",
 			"require_approval": "Require approval"
 		},
-		"fileContentPlaceholder": "file content…"
+		"fileContentPlaceholder": "file content…",
+		"kickers": {
+			"rules": "Rules",
+			"tester": "Tester"
+		},
+		"rulesTitle": "Rules agents respect",
+		"emptyTitle": "No rule yet",
+		"deleteRule": "Delete the rule",
+		"testerHint": "Simulate a Write, Edit or Bash call: the strongest matching rule decides.",
+		"filePath": "File path",
+		"clearTest": "Clear the result",
+		"activeCount_one": "{{count}} active rule",
+		"activeCount_other": "{{count}} active rules"
 	},
 	"search": {
 		"placeholder": "Search settings...",

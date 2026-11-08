@@ -63,7 +63,7 @@ export function InstalledPluginsView() {
 				{installed.map((plugin) => (
 					<div
 						key={plugin.pluginId}
-						className="flex items-center justify-between rounded-xl border border-border bg-card p-4"
+						className="wp-card wp-card-pad flex items-center justify-between"
 					>
 						<div className="min-w-0 flex-1">
 							<div className="flex items-center gap-2">

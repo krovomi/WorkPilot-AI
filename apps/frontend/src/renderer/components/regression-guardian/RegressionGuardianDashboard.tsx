@@ -1,99 +1,43 @@
+import { AlertTriangle, Play, RotateCcw, ShieldAlert, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
-import {
-	useRegressionGuardianStore,
-} from "../../stores/regression-guardian-store";
+import { useRegressionGuardianStore } from "../../stores/regression-guardian-store";
 import type {
-	Incident,
+	IncidentSeverity,
 	RegressionGuardianResult,
 } from "../../../shared/types/regression-guardian";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 
-const SEVERITY_COLORS: Record<string, string> = {
-	critical: "text-destructive bg-destructive/10 border-destructive/20",
-	error: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	warning: "text-warning bg-warning/10 border-warning/20",
-	info: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+const SEVERITY_TONES: Record<IncidentSeverity, Tone> = {
+	critical: "red",
+	error: "orange",
+	warning: "amber",
+	info: "blue",
 };
 
 interface RegressionGuardianDashboardProps {
 	readonly projectPath?: string;
-	readonly onViewTest?: (result: RegressionGuardianResult) => void;
 }
 
-function StatCard({
-	label,
-	value,
-	color,
-}: {
-	readonly label: string;
-	readonly value: number;
-	readonly color: string;
-}): React.ReactElement {
-	return (
-		<div className="p-3 rounded-lg bg-card border border-border">
-			<p className="text-xs text-muted-foreground">{label}</p>
-			<p className={`text-2xl font-bold ${color}`}>{value}</p>
-		</div>
-	);
-}
-
-function IncidentRow({
-	incident,
-	hasTest,
-	isDuplicate,
-	onView,
-	t,
-}: {
-	readonly incident: Incident;
-	readonly hasTest: boolean;
-	readonly isDuplicate: boolean;
-	readonly onView: () => void;
-	readonly t: (key: string) => string;
-}): React.ReactElement {
-	let actionContent: React.ReactNode;
-	if (isDuplicate) {
-		actionContent = (
-			<span className="text-xs text-warning">{t("duplicate")}</span>
-		);
-	} else if (hasTest) {
-		actionContent = (
-			<button
-				type="button"
-				onClick={onView}
-				className="px-3 py-1 text-xs rounded bg-success/20 text-success hover:bg-success/30 transition-colors"
-			>
-				{t("viewTest")}
-			</button>
-		);
-	} else {
-		actionContent = (
-			<span className="text-xs text-muted-foreground">{t("noTest")}</span>
-		);
-	}
-
-	return (
-		<div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors">
-			<span
-				className={`px-2 py-0.5 rounded text-xs font-medium border ${SEVERITY_COLORS[incident.severity] ?? ""}`}
-			>
-				{incident.severity}
-			</span>
-			<div className="flex-1 min-w-0">
-				<p className="text-sm font-medium truncate">{incident.title}</p>
-				<p className="text-xs text-muted-foreground">
-					{incident.source} · {incident.exceptionType || t("regressionGuardian:unknownException")}
-				</p>
-			</div>
-			{actionContent}
-		</div>
-	);
-}
-
+/** Production incidents turned into skeleton regression tests, per stack. */
 export function RegressionGuardianDashboard({
 	projectPath,
-	onViewTest,
 }: RegressionGuardianDashboardProps): React.ReactElement {
-	const { t } = useTranslation("regressionGuardian");
+	const { t } = useTranslation(["regressionGuardian", "navigation"]);
 
 	const phase = useRegressionGuardianStore((s) => s.phase);
 	const status = useRegressionGuardianStore((s) => s.status);
@@ -103,110 +47,155 @@ export function RegressionGuardianDashboard({
 	const cancelScan = useRegressionGuardianStore((s) => s.cancelScan);
 	const reset = useRegressionGuardianStore((s) => s.reset);
 
-	const handleRun = (): void => {
-		if (!projectPath) return;
-		void startScan(projectPath);
-	};
-
 	const isScanning = phase === "scanning";
 
-	const generated = results.filter((r) => r.generatedTest && !r.isDuplicate);
-	const duplicates = results.filter((r) => r.isDuplicate);
+	return (
+		<ModuleStage scroll="page" data-testid="regression-guardian-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("regressionGuardian:title")}
+				description={t("regressionGuardian:description")}
+				icon={ShieldAlert}
+				tone="red"
+				actions={
+					<>
+						{phase === "complete" && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("regressionGuardian:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => void cancelScan()}>
+								{t("regressionGuardian:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && void startScan(projectPath)}
+								disabled={!projectPath}
+							>
+								{t("regressionGuardian:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("regressionGuardian:errors.noProject")}
+					</Notice>
+				)}
+				{isScanning && (
+					<ScanLine label={status || t("regressionGuardian:actions.scanning")} />
+				)}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("regressionGuardian:errors.failed", { error })}
+					</Notice>
+				)}
+				{results.length > 0 ? (
+					<ResultsBody results={results} />
+				) : (
+					!isScanning && (
+						<EmptyStage
+							icon={ShieldAlert}
+							tone="red"
+							title={t(
+								phase === "complete"
+									? "regressionGuardian:emptyTitle"
+									: "regressionGuardian:idleTitle",
+							)}
+						>
+							{t("regressionGuardian:noData")}
+						</EmptyStage>
+					)
+				)}
+			</Page>
+		</ModuleStage>
+	);
+}
+
+function ResultsBody({
+	results,
+}: {
+	readonly results: readonly RegressionGuardianResult[];
+}): React.ReactElement {
+	const { t } = useTranslation("regressionGuardian");
+	const generated = results.filter((r) => r.generatedTest && !r.isDuplicate).length;
+	const duplicates = results.filter((r) => r.isDuplicate).length;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<div className="flex gap-2">
-					{!isScanning && (
-						<button
-							type="button"
-							onClick={handleRun}
-							disabled={!projectPath}
-							className="px-3 py-1.5 rounded-md bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-						>
-							{t("actions.runScan")}
-						</button>
-					)}
-					{isScanning && (
-						<button
-							type="button"
-							onClick={() => void cancelScan()}
-							className="px-3 py-1.5 rounded-md bg-destructive hover:bg-destructive/90 text-destructive-foreground text-sm font-medium transition-colors"
-						>
-							{t("actions.cancel")}
-						</button>
-					)}
-					{phase === "complete" && (
-						<button
-							type="button"
-							onClick={reset}
-							className="px-3 py-1.5 rounded-md border border-border hover:bg-card text-sm font-medium transition-colors"
-						>
-							{t("actions.reset")}
-						</button>
+		<>
+			<Stats>
+				<Stat label={t("stats.incidents")} value={results.length} tone="blue" />
+				<Stat label={t("stats.testsGenerated")} value={generated} tone="green" />
+				<Stat
+					label={t("stats.duplicatesSkipped")}
+					value={duplicates}
+					tone={duplicates ? "amber" : "muted"}
+				/>
+			</Stats>
+			<Section
+				kicker={t("kickers.incidents")}
+				title={t("incidentsDetected", { count: results.length })}
+			>
+				<div className="grid gap-2.5">
+					{results.map((result) => (
+						<IncidentPanel key={result.incident.id} result={result} />
+					))}
+				</div>
+			</Section>
+		</>
+	);
+}
+
+function IncidentPanel({
+	result,
+}: {
+	readonly result: RegressionGuardianResult;
+}): React.ReactElement {
+	const { t } = useTranslation("regressionGuardian");
+	const { incident, generatedTest: test } = result;
+	const tone = SEVERITY_TONES[incident.severity] ?? "muted";
+
+	return (
+		<Panel rail tone={tone}>
+			<div className="flex flex-wrap items-start justify-between gap-2">
+				<div className="min-w-0">
+					<p className="wp-title truncate text-sm">{incident.title}</p>
+					<p className="wp-meta">
+						{incident.source} · {incident.exceptionType || t("unknownException")}
+						{incident.faultingFile ? ` · ${incident.faultingFile}` : ""}
+					</p>
+				</div>
+				<div className="wp-chips">
+					<Chip tone={tone}>{t(`severities.${incident.severity}`, { defaultValue: incident.severity })}</Chip>
+					{result.isDuplicate ? (
+						<Chip tone="amber" title={result.duplicatePath || undefined}>
+							{t("duplicate")}
+						</Chip>
+					) : test ? (
+						<Chip tone="green" dot={false}>
+							{t(`frameworks.${test.framework}`, { defaultValue: test.framework })}
+						</Chip>
+					) : (
+						<Chip tone="muted">{t("noTest")}</Chip>
 					)}
 				</div>
 			</div>
-
-			{!projectPath && (
-				<p className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</p>
+			{incident.exceptionMessage && (
+				<p className="wp-muted mt-1.5 text-xs">{incident.exceptionMessage}</p>
 			)}
-
-			{isScanning && (
-				<p className="text-sm text-muted-foreground">
-					{status || t("actions.scanning")}
-				</p>
+			{test && !result.isDuplicate && (
+				<details className="mt-2">
+					<summary className="wp-meta cursor-pointer">
+						{t("viewTest")} · <span className="font-mono">{test.filePath}</span>
+					</summary>
+					<pre className="wp-code mt-2 max-h-80 overflow-auto text-xs">{test.code}</pre>
+				</details>
 			)}
-
-			{phase === "error" && error && (
-				<p className="text-sm text-destructive">{error}</p>
-			)}
-
-			{phase === "complete" && results.length === 0 && (
-				<p className="text-sm text-muted-foreground">{t("noData")}</p>
-			)}
-
-			{results.length > 0 && (
-				<>
-					<p className="text-sm text-muted-foreground">
-						{t("incidentsDetected", { count: results.length })}
-					</p>
-
-					<div className="grid grid-cols-3 gap-3">
-						<StatCard
-							label={t("stats.incidents")}
-							value={results.length}
-							color="text-blue-400"
-						/>
-						<StatCard
-							label={t("stats.testsGenerated")}
-							value={generated.length}
-							color="text-success"
-						/>
-						<StatCard
-							label={t("stats.duplicatesSkipped")}
-							value={duplicates.length}
-							color="text-warning"
-						/>
-					</div>
-
-					<div className="space-y-2">
-						{results.map((result) => (
-							<IncidentRow
-								key={result.incident.id}
-								incident={result.incident}
-								hasTest={!!result.generatedTest}
-								isDuplicate={result.isDuplicate}
-								onView={() => onViewTest?.(result)}
-								t={t}
-							/>
-						))}
-					</div>
-				</>
-			)}
-		</div>
+		</Panel>
 	);
 }

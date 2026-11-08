@@ -1,6 +1,6 @@
 {
 	"title": "Prompt Injection Guard",
-	"noData": "No prompts found in .workpilot/prompts/",
+	"noData": "Save prompts in .workpilot/prompts/, then run the analysis.",
 	"noFindings": "No findings",
 	"threat": {
 		"safe": "Safe",
@@ -21,5 +21,23 @@
 	"errors": {
 		"noProject": "Select a project to run the Injection Guard scan.",
 		"failed": "Scan failed: {{error}}"
+	},
+	"description": "Checks the prompts saved in .workpilot/prompts/ (txt, md, json) for injection attempts: patterns, classifier and encoded payloads.",
+	"idleTitle": "No analysis yet",
+	"emptyTitle": "No prompt found",
+	"promptsTitle": "Analysed prompts",
+	"kickers": {
+		"prompts": "Prompts"
+	},
+	"severities": {
+		"critical": "Critical",
+		"high": "High",
+		"medium": "Medium",
+		"low": "Low"
+	},
+	"layers": {
+		"regex": "Pattern",
+		"classifier": "Classifier",
+		"decode": "Decoding"
 	}
 }

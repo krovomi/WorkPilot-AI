@@ -1,3 +1,4 @@
+import { AlertTriangle, Copy, Layers, Play, Square, Workflow } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -5,17 +6,29 @@ import {
 	type CiPlatform,
 	cancelPipelineGeneration,
 	generatePipelines,
-	PLATFORM_ICONS,
 	PLATFORM_LABELS,
 	usePipelineGeneratorStore,
 } from "../../stores/pipeline-generator-store";
 import { useProjectStore } from "../../stores/project-store";
+import {
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	Tabs,
+	type Tone,
+} from "../charter";
 import { ProjectSelector } from "../settings/ProjectSelector";
-import { Layers } from "lucide-react";
-import { PageHeader } from "../ui/page-header";
 
+/** CI/CD pipelines written for the project's own stacks, on the chosen platforms. */
 export function PipelineGenerator(): React.ReactElement {
-	const { t } = useTranslation(["pipelineGenerator", "common"]);
+	const { t } = useTranslation(["pipelineGenerator", "navigation"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const activeProjectId = useProjectStore((s) => s.activeProjectId);
 	const setActiveProject = useProjectStore((s) => s.setActiveProject);
@@ -33,261 +46,160 @@ export function PipelineGenerator(): React.ReactElement {
 
 	const isRunning = phase === "generating";
 	const isComplete = phase === "complete";
-
-	function handleGenerate() {
-		if (!activeProject?.path) return;
-		generatePipelines(activeProject.path);
-	}
-
-	const selectedPipeline =
-		result && selectedPlatformView
-			? result.pipelines[selectedPlatformView]
-			: null;
-
-	function handleCopyPipeline() {
-		if (selectedPipeline) {
-			navigator.clipboard.writeText(selectedPipeline).catch(console.error);
-		}
-	}
+	const view = selectedPlatformView ?? result?.platforms_generated?.[0] ?? null;
+	const pipeline = isComplete && result && view ? result.pipelines[view] : null;
+	const savedTo = result && view ? result.saved_files?.[view] : undefined;
+	const stack = isComplete ? result?.stack : undefined;
 
 	return (
-		<div className="flex flex-col h-full bg-background text-foreground">
-			<PageHeader
-				icon={Layers}
+		<ModuleStage data-testid="pipeline-generator-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
 				title={t("pipelineGenerator:title")}
 				description={t("pipelineGenerator:description")}
-				actions={isRunning ? (
-						<button
-							type="button"
-							onClick={cancelPipelineGeneration}
-							className="px-4 py-2 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors text-sm font-medium"
-						>
+				icon={Layers}
+				tone="blue"
+				actions={
+					isRunning ? (
+						<CharterButton variant="danger" icon={Square} onClick={cancelPipelineGeneration}>
 							{t("pipelineGenerator:actions.cancel")}
-						</button>
+						</CharterButton>
 					) : (
-						<button
-							type="button"
-							onClick={handleGenerate}
+						<CharterButton
+							variant="primary"
+							icon={Play}
+							onClick={() => activeProject?.path && generatePipelines(activeProject.path)}
 							disabled={!activeProject || selectedPlatforms.length === 0}
-							className="px-4 py-2 rounded-lg bg-(--accent) text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity text-sm font-medium"
 						>
 							{isComplete
 								? t("pipelineGenerator:actions.regenerate")
 								: t("pipelineGenerator:actions.generate")}
-						</button>
-					)}
+						</CharterButton>
+					)
+				}
 			/>
 
-			<div className="flex flex-1 overflow-hidden">
-				{/* Left sidebar */}
-				<div className="w-56 border-r border-border p-4 flex flex-col gap-4">
-					{/* Project selection */}
-					<div>
-						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-							{t("pipelineGenerator:project")}
-						</h3>
-						<ProjectSelector
-							selectedProjectId={activeProjectId}
-							onProjectChange={(id) => {
-								if (id) setActiveProject(id);
-							}}
-						/>
-					</div>
-
-					{/* Platform selection */}
-					<div>
-						<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-							{t("pipelineGenerator:platforms")}
-						</h3>
-						<div className="flex flex-col gap-1">
-							{CI_PLATFORMS.map((platform) => (
-								<label
-									key={platform}
-									className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-card cursor-pointer"
-								>
-									<input
-										type="checkbox"
-										checked={selectedPlatforms.includes(platform)}
-										onChange={() => togglePlatform(platform)}
-										disabled={isRunning}
-										className="rounded accent-(--accent)"
-									/>
-									<span className="text-sm">
-										{PLATFORM_ICONS[platform]} {PLATFORM_LABELS[platform]}
-									</span>
-								</label>
-							))}
+			<Columns template="minmax(0, 1fr) minmax(0, 2.4fr)">
+				<Column kicker={t("pipelineGenerator:kickers.setup")} title={t("pipelineGenerator:platforms")} tone="blue">
+					<Panel className="space-y-4">
+						<div className="space-y-1.5">
+							<span className="wp-kicker block">{t("pipelineGenerator:project")}</span>
+							<ProjectSelector
+								selectedProjectId={activeProjectId}
+								onProjectChange={(id) => {
+									if (id) setActiveProject(id);
+								}}
+							/>
 						</div>
-					</div>
-
-					{/* Pipeline view selector (after generation) */}
-					{isComplete && result && (
-						<div>
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("pipelineGenerator:viewPipeline")}
-							</h3>
-							<div className="flex flex-col gap-1">
-								{result.platforms_generated.map((platform) => (
-									<button
+						<div className="space-y-1.5">
+							<span className="wp-kicker block">{t("pipelineGenerator:platforms")}</span>
+							<div className="wp-chips">
+								{CI_PLATFORMS.map((platform) => (
+									<Chip
 										key={platform}
-										type="button"
-										onClick={() =>
-											setSelectedPlatformView(platform)
-										}
-										className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors ${
-											selectedPlatformView === platform
-												? "bg-(--accent)/20 text-(--accent)"
-												: "hover:bg-card"
-										}`}
+										tone="blue"
+										pressed={selectedPlatforms.includes(platform)}
+										onClick={isRunning ? undefined : () => togglePlatform(platform)}
 									>
-										{PLATFORM_ICONS[platform]}{" "}
 										{PLATFORM_LABELS[platform]}
-									</button>
+									</Chip>
 								))}
 							</div>
 						</div>
+					</Panel>
+					{stack && (
+						<Panel className="mt-3 space-y-2.5">
+							<span className="wp-kicker block">{t("pipelineGenerator:detectedStack")}</span>
+							<StackChips label={t("pipelineGenerator:stackInfo.languages")} values={stack.languages} tone="violet" />
+							<StackChips label={t("pipelineGenerator:stackInfo.frameworks")} values={stack.frameworks} tone="blue" />
+							<StackChips label={t("pipelineGenerator:stackInfo.testRunners")} values={stack.test_runners} tone="green" />
+							{stack.has_docker && <Chip tone="blue">{t("pipelineGenerator:stackInfo.dockerDetected")}</Chip>}
+						</Panel>
 					)}
+				</Column>
 
-					{/* Detected stack info */}
-					{isComplete && result?.stack && (
-						<div className="mt-auto">
-							<h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-								{t("pipelineGenerator:detectedStack")}
-							</h3>
-							<div className="flex flex-col gap-1 text-xs text-muted-foreground">
-								{result.stack.languages.length > 0 && (
-									<div>
-										<span className="opacity-70">
-											{t("pipelineGenerator:stackInfo.languages")}:{" "}
-										</span>
-										{result.stack.languages.join(", ")}
-									</div>
-								)}
-								{result.stack.frameworks.length > 0 && (
-									<div>
-										<span className="opacity-70">
-											{t("pipelineGenerator:stackInfo.frameworks")}:{" "}
-										</span>
-										{result.stack.frameworks.join(", ")}
-									</div>
-								)}
-								{result.stack.has_docker && (
-									<div className="text-blue-400">
-										🐳 {t("pipelineGenerator:stackInfo.dockerDetected")}
-									</div>
-								)}
-							</div>
-						</div>
-					)}
-				</div>
-
-				{/* Main content */}
-				<div className="flex-1 flex flex-col overflow-hidden">
-					{/* Status bar */}
-					{(isRunning || status) && (
-						<div className="px-4 py-2 bg-card border-b border-border text-sm text-muted-foreground flex items-center gap-2">
-							{isRunning && (
-								// biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative
-								<svg
-									className="animate-spin w-4 h-4 text-(--accent)"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									/>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-									/>
-								</svg>
-							)}
-							{status}
-						</div>
-					)}
-
-					{/* Error state */}
-					{error && (
-						<div className="m-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-							{error}
-						</div>
-					)}
-
-					{/* Pipeline YAML view */}
-					{isComplete && selectedPipeline && (
-						<div className="flex-1 overflow-auto p-4">
-							<div className="mb-3 flex items-center justify-between gap-2">
-								<div className="flex items-center gap-2">
-									<span className="text-lg">
-										{PLATFORM_ICONS[selectedPlatformView as CiPlatform]}
-									</span>
-									<h2 className="text-lg font-medium">
-										{PLATFORM_LABELS[selectedPlatformView as CiPlatform]}
-									</h2>
-									<span className="text-xs text-muted-foreground ml-2 bg-card px-2 py-0.5 rounded">
-										{selectedPipeline.split("\n").length}{" "}
-										{t("pipelineGenerator:lines")}
-									</span>
-								</div>
-								<button
-									type="button"
-									onClick={handleCopyPipeline}
-									className="px-3 py-1.5 text-xs rounded-md bg-card hover:bg-border transition-colors"
-								>
-									{t("pipelineGenerator:actions.copy")}
-								</button>
-							</div>
-							<div className="bg-card rounded-lg p-4 overflow-auto">
-								<pre className="text-xs font-mono text-success whitespace-pre overflow-x-auto">
-									{selectedPipeline}
-								</pre>
-							</div>
-							{result?.saved_files?.[selectedPlatformView as CiPlatform] && (
-								<p className="text-xs text-muted-foreground mt-2">
-									{t("pipelineGenerator:savedTo")}{" "}
-									<code className="bg-card px-1 rounded">
-										{result.saved_files[selectedPlatformView as CiPlatform]}
-									</code>
-								</p>
-							)}
-						</div>
-					)}
-
-					{/* Streaming log */}
-					{(isRunning || (!isComplete && streamingOutput)) && (
-						<div className="flex-1 overflow-auto p-4">
-							<pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">
-								{streamingOutput}
-							</pre>
-						</div>
-					)}
-
-					{/* Empty state */}
-					{phase === "idle" && !result && (
-						<div className="flex-1 flex items-center justify-center text-center p-8">
-							<div>
-								<div className="text-5xl mb-4">⚙️</div>
-								<h3 className="text-lg font-medium mb-2">
-									{t("pipelineGenerator:emptyState.title")}
-								</h3>
-								<p className="text-sm text-muted-foreground max-w-sm">
-									{t("pipelineGenerator:emptyState.description")}
-								</p>
-								{!activeProject && (
-									<p className="text-sm text-warning mt-3">
-										{t("pipelineGenerator:errors.noProject")}
+				<Column
+					kicker={t("pipelineGenerator:kickers.pipeline")}
+					title={view && isComplete ? PLATFORM_LABELS[view] : t("pipelineGenerator:viewPipeline")}
+					meta={pipeline ? t("pipelineGenerator:lineCount", { count: pipeline.split("\n").length }) : undefined}
+					actions={
+						pipeline ? (
+							<CharterButton
+								size="sm"
+								variant="ghost"
+								icon={Copy}
+								onClick={() => navigator.clipboard.writeText(pipeline).catch(console.error)}
+							>
+								{t("pipelineGenerator:actions.copy")}
+							</CharterButton>
+						) : undefined
+					}
+				>
+					<div className="space-y-3">
+						{!activeProject && (
+							<Notice tone="amber" icon={AlertTriangle}>
+								{t("pipelineGenerator:errors.noProject")}
+							</Notice>
+						)}
+						{isRunning && <ScanLine label={status || t("pipelineGenerator:status.generating")} />}
+						{error && (
+							<Notice tone="red" icon={AlertTriangle} role="alert">
+								{error}
+							</Notice>
+						)}
+						{isComplete && result && result.platforms_generated.length > 1 && (
+							<Tabs<CiPlatform>
+								label={t("pipelineGenerator:viewPipeline")}
+								tabs={result.platforms_generated.map((p) => ({ id: p, label: PLATFORM_LABELS[p] }))}
+								value={view ?? result.platforms_generated[0]}
+								onChange={setSelectedPlatformView}
+							/>
+						)}
+						{pipeline ? (
+							<>
+								<pre className="wp-code overflow-auto text-xs">{pipeline}</pre>
+								{savedTo && (
+									<p className="wp-meta">
+										{t("pipelineGenerator:savedTo")} <span className="font-mono">{savedTo}</span>
 									</p>
 								)}
-							</div>
-						</div>
-					)}
-				</div>
+							</>
+						) : streamingOutput && !isComplete ? (
+							<pre className="wp-code overflow-auto whitespace-pre-wrap text-xs">{streamingOutput}</pre>
+						) : (
+							!isRunning &&
+							!error && (
+								<EmptyStage icon={Workflow} tone="blue" title={t("pipelineGenerator:emptyState.title")}>
+									{t("pipelineGenerator:emptyState.description")}
+								</EmptyStage>
+							)
+						)}
+					</div>
+				</Column>
+			</Columns>
+		</ModuleStage>
+	);
+}
+
+function StackChips({
+	label,
+	values,
+	tone,
+}: {
+	readonly label: string;
+	readonly values: readonly string[];
+	readonly tone: Tone;
+}): React.ReactElement | null {
+	if (values.length === 0) return null;
+	return (
+		<div>
+			<span className="wp-meta">{label}</span>
+			<div className="wp-chips mt-1">
+				{values.map((v) => (
+					<Chip key={v} tone={tone} dot={false}>
+						{v}
+					</Chip>
+				))}
 			</div>
 		</div>
 	);

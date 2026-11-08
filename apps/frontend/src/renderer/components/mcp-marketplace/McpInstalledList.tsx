@@ -24,7 +24,7 @@ export function McpInstalledList() {
 
 	if (isInstalledLoading) {
 		return (
-			<div className="flex-1 flex items-center justify-center">
+			<div className="relative z-[1] flex flex-1 items-center justify-center">
 				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
 			</div>
 		);
@@ -32,7 +32,7 @@ export function McpInstalledList() {
 
 	if (!projectId || installed.length === 0) {
 		return (
-			<div className="flex-1 flex flex-col items-center justify-center text-muted-foreground px-6">
+			<div className="relative z-[1] flex flex-1 flex-col items-center justify-center px-6 text-muted-foreground">
 				<Power className="h-16 w-16 mb-4 opacity-20" />
 				<h2 className="text-lg font-medium mb-1">
 					{projectId
@@ -49,7 +49,7 @@ export function McpInstalledList() {
 	}
 
 	return (
-		<div className="flex-1 overflow-auto p-6">
+		<div className="relative z-[1] flex-1 overflow-auto p-6">
 			<div className="space-y-3 max-w-4xl mx-auto">
 				{installed.map((server) => {
 					const catalogInfo = catalog.find((s) => s.id === server.id);
@@ -64,7 +64,7 @@ export function McpInstalledList() {
 					return (
 						<div
 							key={server.id}
-							className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:border-border/80 transition-colors"
+							className="wp-card wp-card-pad flex items-center gap-4"
 						>
 							<div
 								className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-white text-sm font-bold"
