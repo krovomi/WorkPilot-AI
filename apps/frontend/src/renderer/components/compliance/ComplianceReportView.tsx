@@ -1,3 +1,4 @@
+import { AlertTriangle, ClipboardCheck, Play, RotateCcw, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useComplianceStore } from "../../stores/compliance-store";
@@ -7,30 +8,41 @@ import type {
 	EvidenceStatus,
 } from "../../../shared/types/compliance";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
+	CharterButton,
+	Chip,
+	EmptyStage,
+	Gauge,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 
-const STATUS_STYLES: Record<EvidenceStatus, string> = {
-	collected: "text-success bg-success/10",
-	verified: "text-blue-400 bg-blue-500/10",
-	missing: "text-destructive bg-destructive/10",
-	expired: "text-warning bg-warning/10",
+const STATUS_TONES: Record<EvidenceStatus, Tone> = {
+	collected: "green",
+	verified: "blue",
+	missing: "red",
+	expired: "amber",
 };
 
+/** The frameworks whose controls the collector maps today. */
 const FRAMEWORK_OPTIONS: ComplianceFramework[] = ["SOC2", "ISO_27001"];
 
 interface ComplianceReportViewProps {
 	readonly projectPath?: string;
 }
 
+/** Audit evidence (reviews, scans, policies, deploys) mapped to a framework's controls. */
 export function ComplianceReportView({
 	projectPath,
 }: ComplianceReportViewProps): React.ReactElement {
-	const { t } = useTranslation("compliance");
+	const { t } = useTranslation(["compliance", "navigation"]);
 
 	const phase = useComplianceStore((s) => s.phase);
 	const status = useComplianceStore((s) => s.status);
@@ -43,169 +55,142 @@ export function ComplianceReportView({
 	const reset = useComplianceStore((s) => s.reset);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center gap-3 flex-wrap">
-				<div className="flex items-center gap-2">
-					<span className="text-sm text-muted-foreground">
-						{t("framework")}
-					</span>
-					<Select
-						value={framework}
-						disabled={isScanning}
-						onValueChange={(value) => setFramework(value as ComplianceFramework)}
-					>
-						<SelectTrigger className="w-32">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{FRAMEWORK_OPTIONS.map((f) => (
-								<SelectItem key={f} value={f}>
-									{f}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+		<ModuleStage scroll="page" data-testid="compliance-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("compliance:title")}
+				description={t("compliance:description")}
+				icon={ClipboardCheck}
+				tone="blue"
+				actions={
+					<>
+						{report && !isScanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("compliance:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelScan()}>
+								{t("compliance:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && startScan(projectPath)}
+								disabled={!projectPath}
+							>
+								{t("compliance:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				<div className="flex flex-wrap items-center gap-2">
+					<span className="wp-kicker">{t("compliance:framework")}</span>
+					{FRAMEWORK_OPTIONS.map((f) => (
+						<Chip
+							key={f}
+							tone="blue"
+							dot={false}
+							pressed={framework === f}
+							onClick={isScanning ? undefined : () => setFramework(f)}
+						>
+							{t(`compliance:frameworks.${f}`, { defaultValue: f })}
+						</Chip>
+					))}
 				</div>
-
-				{isScanning ? (
-					<button
-						type="button"
-						onClick={() => cancelScan()}
-						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-					>
-						{t("actions.cancel")}
-					</button>
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("compliance:errors.noProject")}
+					</Notice>
+				)}
+				{isScanning && <ScanLine label={status || t("compliance:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("compliance:errors.failed", { error })}
+					</Notice>
+				)}
+				{report ? (
+					<ReportBody report={report} />
 				) : (
-					<button
-						type="button"
-						onClick={() => projectPath && startScan(projectPath)}
-						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-					>
-						{t("actions.runScan")}
-					</button>
+					phase === "idle" && (
+						<EmptyStage icon={ClipboardCheck} title={t("compliance:emptyTitle")} tone="blue">
+							{t("compliance:noData")}
+						</EmptyStage>
+					)
 				)}
-				{report && !isScanning && (
-					<button
-						type="button"
-						onClick={reset}
-						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-					>
-						{t("actions.reset")}
-					</button>
-				)}
-			</div>
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{report ? (
-				<ReportBody report={report} t={t} />
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
+			</Page>
+		</ModuleStage>
 	);
 }
 
-function ReportBody({
-	report,
-	t,
-}: {
-	readonly report: ComplianceReport;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-}): React.ReactElement {
-	let barColor = "bg-destructive";
-	if (report.coveragePercent >= 80) {
-		barColor = "bg-success";
-	} else if (report.coveragePercent >= 50) {
-		barColor = "bg-warning";
-	}
+function ReportBody({ report }: { readonly report: ComplianceReport }): React.ReactElement {
+	const { t } = useTranslation("compliance");
+	const coverage = report.coveragePercent;
+	const tone: Tone = coverage >= 80 ? "green" : coverage >= 50 ? "amber" : "red";
 
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{report.framework} · {report.collectedCount} {t("evidenceItems")} ·{" "}
-					{report.coveragePercent}% {t("coverage")}
-				</p>
-			</div>
-
-			<div className="w-full h-3 rounded-full bg-card overflow-hidden">
-				<div
-					className={`h-full rounded-full transition-all ${barColor}`}
-					style={{ width: `${report.coveragePercent}%` }}
-				/>
+		<>
+			<div className="flex flex-wrap items-center gap-4">
+				<Gauge value={coverage} tone={tone} label={t("coverage")} />
+				<div className="min-w-0 flex-1">
+					<Stats>
+						<Stat label={t("evidence")} value={report.collectedCount} tone="blue" />
+						<Stat
+							label={t("missingControls")}
+							value={report.missingControls.length}
+							tone={report.missingControls.length ? "red" : "green"}
+						/>
+						<Stat label={t("framework")} value={t(`frameworks.${report.framework}`, { defaultValue: report.framework })} tone="muted" />
+					</Stats>
+				</div>
 			</div>
 
 			{report.missingControls.length > 0 && (
-				<div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-					<p className="text-xs font-medium text-destructive mb-1">
-						{t("missingControls")}
-					</p>
-					<div className="flex flex-wrap gap-1">
+				<Section kicker={t("kickers.gaps")} title={t("missingControls")}>
+					<div className="wp-chips">
 						{report.missingControls.map((ctrl) => (
-							<span
-								key={ctrl}
-								className="px-2 py-0.5 rounded text-xs bg-destructive/20 text-destructive"
-							>
+							<Chip key={ctrl} tone="red">
 								{ctrl}
-							</span>
+							</Chip>
 						))}
 					</div>
-				</div>
+				</Section>
 			)}
 
-			<div className="space-y-2">
-				{report.evidence.map((item) => (
-					<div
-						key={item.id}
-						className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
-					>
-						<span
-							className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLES[item.status]}`}
-						>
-							{item.status}
-						</span>
-						<div className="flex-1 min-w-0">
-							<p className="text-sm font-medium truncate">{item.title}</p>
-							<p className="text-xs text-muted-foreground">
-								{item.controlId} · {item.evidenceType.replaceAll("_", " ")}
-								{item.source ? ` · ${item.source}` : ""}
-							</p>
-						</div>
+			{report.evidence.length > 0 && (
+				<Section kicker={t("kickers.evidence")} title={t("evidence")}>
+					<div className="grid gap-2.5 lg:grid-cols-2">
+						{report.evidence.map((item) => (
+							<Panel key={item.id} rail tone={STATUS_TONES[item.status]}>
+								<div className="flex items-start justify-between gap-2">
+									<span className="wp-title truncate text-sm">{item.title}</span>
+									<Chip tone={STATUS_TONES[item.status]}>
+										{t(`statuses.${item.status}`, { defaultValue: item.status })}
+									</Chip>
+								</div>
+								<p className="wp-meta mt-1">
+									{item.controlId} ·{" "}
+									{t(`evidenceTypes.${item.evidenceType}`, {
+										defaultValue: item.evidenceType.replaceAll("_", " "),
+									})}
+									{item.source ? ` · ${item.source}` : ""}
+								</p>
+							</Panel>
+						))}
 					</div>
-				))}
-			</div>
+				</Section>
+			)}
 
 			{report.summary && (
-				<p className="text-sm text-muted-foreground italic mt-2">
+				<Notice tone={tone} icon={ClipboardCheck}>
 					{report.summary}
-				</p>
+				</Notice>
 			)}
-		</div>
+		</>
 	);
 }

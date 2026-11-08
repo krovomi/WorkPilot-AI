@@ -43,7 +43,14 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 		set({ loading: true, error: null });
 		try {
 			const doc = await globalThis.electronAPI.loadGuardrails(projectPath);
-			set({ doc, dirty: false, loading: false });
+			// A reply without a rules array (an older main, a preview) is an
+			// empty document, never a page that cannot render.
+			const rules = Array.isArray(doc?.rules) ? doc.rules : [];
+			set({
+				doc: { version: doc?.version ?? 1, rules: rules.map((r) => ({ ...r, when: r.when ?? {} })) },
+				dirty: false,
+				loading: false,
+			});
 		} catch (e) {
 			set({ error: String(e), loading: false });
 		}

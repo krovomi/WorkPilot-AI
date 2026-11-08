@@ -1,6 +1,6 @@
 {
 	"title": "Rapport d'accessibilité",
-	"noData": "Aucun scan effectué. Cliquez sur « Lancer le scan » pour démarrer.",
+	"noData": "Choisissez un niveau WCAG, puis lancez le scan.",
 	"targetInfo": "Cible : WCAG {{targetLevel}} · {{filesScanned}} fichiers scannés",
 	"search": {
 		"placeholder": "Rechercher..."
@@ -23,5 +23,18 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
+	},
+	"description": "Vérifie les règles WCAG (textes alternatifs, libellés, clavier, sous-titres…) dans tout le balisage du projet : HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars.",
+	"emptyTitle": "Pas encore de scan",
+	"findingsTitle": "Constats",
+	"noMatches": "Aucun constat ne correspond à ce filtre.",
+	"kickers": {
+		"findings": "Constats"
+	},
+	"severities": {
+		"critical": "Critique",
+		"serious": "Sérieuse",
+		"moderate": "Modérée",
+		"minor": "Mineure"
 	}
 }

@@ -104,6 +104,13 @@ _HARDCODED_PATTERNS = [
     re.compile(
         r'(?:flash|message|title|label|placeholder|error)\s*[=(]\s*["\']([A-Z][^"\']{3,60})["\']'
     ),
+    # Flutter, SwiftUI, Jetpack Compose: Text("Hardcoded"), Text(text = "...")
+    re.compile(r'\bText\(\s*(?:text\s*=\s*)?["\']([A-Z][^"\'\n$]{3,60})["\']'),
+    # Android layouts and XAML (WPF, MAUI, Avalonia): attribute literals
+    re.compile(
+        r"\b(?:android:(?:text|hint|contentDescription)|Content|Text|Header|ToolTip)"
+        r'\s*=\s*"([A-Z][^"@{]{3,60})"'
+    ),
 ]
 
 

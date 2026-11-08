@@ -129,6 +129,11 @@
 		color: var(--wp-tone, var(--wp-accent));
 	}
 
+	/* Text in the tone of its element (a suggestion, a fix, a verdict). */
+	.wp-ink {
+		color: var(--wp-tone, var(--wp-accent));
+	}
+
 	.wp-title {
 		font-size: 0.95rem;
 		font-weight: 600;

@@ -357,9 +357,9 @@ const TeamBotSettings = lazy(() =>
 		default: m.TeamBotSettings,
 	})),
 );
-const GuardrailsSettings = lazy(() =>
+const GuardrailsView = lazy(() =>
 	import("./components/settings/GuardrailsSettings").then((m) => ({
-		default: m.GuardrailsSettings,
+		default: m.GuardrailsView,
 	})),
 );
 const EnvSnapshotView = lazy(() =>
@@ -1948,24 +1948,14 @@ export function App() {
 													</div>
 												)}
 												{activeView === "regression-guardian" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<RegressionGuardianDashboard
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "injection-guard" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<InjectionGuardView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "api-watcher" && (
 													<div
@@ -1978,24 +1968,14 @@ export function App() {
 													</div>
 												)}
 												{activeView === "accessibility-agent" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<A11yReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "i18n-agent" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<I18nReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "onboarding-agent" && (
 													<div
@@ -2031,14 +2011,9 @@ export function App() {
 													<DocDriftReport projectPath={selectedProject?.path} />
 												)}
 												{activeView === "compliance" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<ComplianceReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "git-surgeon" && (
 													<GitSurgeonDashboard projectPath={selectedProject?.path} />
@@ -2128,14 +2103,7 @@ export function App() {
 														<TeamBotSettings />
 													</div>
 												)}
-												{activeView === "guardrails" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<GuardrailsSettings />
-													</div>
-												)}
+												{activeView === "guardrails" && <GuardrailsView />}
 												{activeView === "env-snapshot" && (
 													<EnvSnapshotView
 															projectPath={selectedProject?.path}

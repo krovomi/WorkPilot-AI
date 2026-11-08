@@ -2,8 +2,9 @@
 Test Generator — Generate regression tests from parsed incidents.
 
 Produces framework-appropriate test code (pytest, Jest, Vitest, JUnit,
-Go testing, xUnit, cargo test) that reproduces the incident state and
-asserts the error occurs.
+Go testing, xUnit, cargo test here; PHPUnit, RSpec, Dart, XCTest, NUnit and
+TestNG in ``stacks``) that reproduces the incident state and asserts the error
+occurs. Incident text is sanitized before it reaches any template.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ class TestFramework(str, Enum):
     XUNIT = "xunit"
     NUNIT = "nunit"
     CARGO_TEST = "cargo_test"
+    PHPUNIT = "phpunit"
+    RSPEC = "rspec"
+    DART_TEST = "dart_test"
+    XCTEST = "xctest"
 
 
 class TestStatus(str, Enum):
@@ -69,6 +74,11 @@ class TestGenerator:
         project_root: str = "",
     ) -> GeneratedTest:
         """Generate a regression test for the given incident."""
+        from .stacks import EXTRA_GENERATORS, sanitized
+
+        incident = sanitized(incident)
+        if framework in EXTRA_GENERATORS:
+            return EXTRA_GENERATORS[framework](incident)
         generators = {
             TestFramework.PYTEST: self._gen_pytest,
             TestFramework.UNITTEST: self._gen_unittest,

@@ -1,3 +1,4 @@
+import { Accessibility, AlertTriangle, Play, RotateCcw, Search, Square } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,25 +8,32 @@ import {
 	useAccessibilityStore,
 	type WcagTargetLevel,
 } from "../../stores/accessibility-store";
-import type {
-	A11yReport,
-	A11ySeverity,
-} from "../../../shared/types/accessibility";
+import type { A11yReport, A11ySeverity } from "../../../shared/types/accessibility";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
-
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 import { Input } from "../ui/input";
-const SEVERITY_STYLES: Record<A11ySeverity, string> = {
-	critical: "text-destructive bg-destructive/10 border-destructive/20",
-	serious: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-	moderate: "text-warning bg-warning/10 border-warning/20",
-	minor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+
+const SEVERITY_TONES: Record<A11ySeverity, Tone> = {
+	critical: "red",
+	serious: "orange",
+	moderate: "amber",
+	minor: "blue",
 };
+
+const LEVELS: WcagTargetLevel[] = ["A", "AA", "AAA"];
 
 type FilterType = "all" | "critical" | "serious" | "passed";
 
@@ -33,10 +41,9 @@ interface A11yReportViewProps {
 	readonly projectPath?: string;
 }
 
-export function A11yReportView({
-	projectPath,
-}: A11yReportViewProps): React.ReactElement {
-	const { t } = useTranslation("accessibility");
+/** WCAG checks over every markup the project ships (HTML, JSX, Vue, Razor, Blade…). */
+export function A11yReportView({ projectPath }: A11yReportViewProps): React.ReactElement {
+	const { t } = useTranslation(["accessibility", "navigation"]);
 
 	const phase = useAccessibilityStore((s) => s.phase);
 	const status = useAccessibilityStore((s) => s.status);
@@ -47,295 +54,178 @@ export function A11yReportView({
 	const startScan = useAccessibilityStore((s) => s.startScan);
 	const cancelScan = useAccessibilityStore((s) => s.cancelScan);
 	const reset = useAccessibilityStore((s) => s.reset);
+	const setReport = useAccessibilityStore((s) => s.setReport);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
-	const setReport = useAccessibilityStore((s) => s.setReport);
 	// A server project's last report, saved on the server by any member.
 	const shared = useSharedAnalysisReport("accessibility", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<Toolbar
-				targetLevel={targetLevel}
-				onTargetLevelChange={setTargetLevel}
-				disabled={isScanning}
-				canRun={canRun}
-				isScanning={isScanning}
-				hasReport={!!report}
-				onRun={() => projectPath && startScan(projectPath)}
-				onCancel={() => cancelScan()}
-				onReset={reset}
-				t={t}
-			/>
-
-			{!isScanning && <SharedReportNote saved={shared} />}
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{report ? (
-				<div className="flex-1 min-h-0">
-					<ReportBody report={report} t={t} />
-				</div>
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
-	);
-}
-
-function Toolbar({
-	targetLevel,
-	onTargetLevelChange,
-	disabled,
-	canRun,
-	isScanning,
-	hasReport,
-	onRun,
-	onCancel,
-	onReset,
-	t,
-}: {
-	readonly targetLevel: WcagTargetLevel;
-	readonly onTargetLevelChange: (level: WcagTargetLevel) => void;
-	readonly disabled: boolean;
-	readonly canRun: boolean;
-	readonly isScanning: boolean;
-	readonly hasReport: boolean;
-	readonly onRun: () => void;
-	readonly onCancel: () => void;
-	readonly onReset: () => void;
-	readonly t: (key: string) => string;
-}): React.ReactElement {
-	return (
-		<div className="flex items-center gap-3 flex-wrap">
-			<div className="flex items-center gap-2">
-				<span className="text-sm text-muted-foreground">{t("levels.label")}</span>
-				<Select
-					value={targetLevel}
-					disabled={disabled}
-					onValueChange={(value) => onTargetLevelChange(value as WcagTargetLevel)}
-				>
-					<SelectTrigger className="w-24">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="A">A</SelectItem>
-						<SelectItem value="AA">AA</SelectItem>
-						<SelectItem value="AAA">AAA</SelectItem>
-					</SelectContent>
-				</Select>
-			</div>
-
-			{isScanning ? (
-				<button
-					type="button"
-					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-				>
-					{t("actions.cancel")}
-				</button>
-			) : (
-				<button
-					type="button"
-					onClick={onRun}
-					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-				>
-					{t("actions.runScan")}
-				</button>
-			)}
-
-			{hasReport && !isScanning && (
-				<button
-					type="button"
-					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-				>
-					{t("actions.reset")}
-				</button>
-			)}
-		</div>
-	);
-}
-
-function ReportBody({
-	report,
-	t,
-}: {
-	readonly report: A11yReport;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-}): React.ReactElement {
-	const [filter, setFilter] = useState<FilterType>("all");
-	const [searchQuery, setSearchQuery] = useState("");
-
-	const criticalCount = report.violations.filter(
-		(v) => v.severity === "critical",
-	).length;
-	const seriousCount = report.violations.filter(
-		(v) => v.severity === "serious",
-	).length;
-
-	const filteredViolations = report.violations.filter((v) => {
-		const matchesFilter =
-			filter === "all" ||
-			(filter === "critical" && v.severity === "critical") ||
-			(filter === "serious" && v.severity === "serious");
-
-		const matchesSearch =
-			searchQuery === "" ||
-			v.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			v.ruleId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			v.file.toLowerCase().includes(searchQuery.toLowerCase());
-
-		return matchesFilter && matchesSearch;
-	});
-
-	const filteredPassedRules = report.passedRules.filter((rule) =>
-		searchQuery === "" || rule.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
-
-	return (
-		<div className="flex flex-col flex-1 gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("targetInfo", {
-						targetLevel: report.targetLevel,
-						filesScanned: report.filesScanned,
-					})}
-				</p>
-			</div>
-
-			<div>
-				<Input
-					type="text"
-					placeholder={t("search.placeholder")}
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-					className="w-full px-3 py-2 h-auto"
-				/>
-			</div>
-
-			<div className="grid grid-cols-4 gap-3">
-				<StatCard
-					label={t("stats.violations")}
-					value={report.violations.length}
-					color="text-destructive"
-					isActive={filter === "all"}
-					onClick={() => setFilter("all")}
-				/>
-				<StatCard
-					label={t("stats.critical")}
-					value={criticalCount}
-					color="text-destructive"
-					isActive={filter === "critical"}
-					onClick={() => setFilter("critical")}
-				/>
-				<StatCard
-					label={t("stats.serious")}
-					value={seriousCount}
-					color="text-orange-400"
-					isActive={filter === "serious"}
-					onClick={() => setFilter("serious")}
-				/>
-				<StatCard
-					label={t("stats.rulesPassed")}
-					value={report.passedRules.length}
-					color="text-success"
-					isActive={filter === "passed"}
-					onClick={() => setFilter("passed")}
-				/>
-			</div>
-
-			<div className="space-y-2">
-				{filter === "passed" ? (
-					<div className="space-y-2">
-						{filteredPassedRules.map((rule) => (
-							<div
-								key={`passed-${rule}`}
-								className="px-4 py-3 rounded-lg border border-success/20 bg-success/10 text-success"
+		<ModuleStage scroll="page" data-testid="accessibility-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("accessibility:title")}
+				description={t("accessibility:description")}
+				icon={Accessibility}
+				tone="violet"
+				actions={
+					<>
+						{report && !isScanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("accessibility:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelScan()}>
+								{t("accessibility:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && startScan(projectPath)}
+								disabled={!projectPath}
 							>
-								<p className="text-sm">{rule}</p>
-							</div>
-						))}
-					</div>
-				) : (
-					filteredViolations.map((v) => (
-						<div
-							key={`${v.ruleId}-${v.file}-${v.line}`}
-							className={`px-4 py-3 rounded-lg border ${SEVERITY_STYLES[v.severity]}`}
+								{t("accessibility:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				<div className="flex flex-wrap items-center gap-2">
+					<span className="wp-kicker">{t("accessibility:levels.label")}</span>
+					{LEVELS.map((level) => (
+						<Chip
+							key={level}
+							tone="violet"
+							dot={false}
+							pressed={targetLevel === level}
+							onClick={isScanning ? undefined : () => setTargetLevel(level)}
 						>
-							<div className="flex items-center gap-2 mb-1">
-								<span className="text-xs font-medium uppercase">{v.severity}</span>
-								<span className="text-xs opacity-70">
-									{v.ruleId} · {v.wcagCriteria}
-								</span>
-							</div>
-							<p className="text-sm">{v.description}</p>
-							<p className="text-xs mt-1 opacity-70 font-mono">
-								{v.file}:{v.line}
-							</p>
-							{v.suggestion && (
-								<p className="text-xs mt-1 text-success">{v.suggestion}</p>
-							)}
-						</div>
-					))
+							WCAG {level}
+						</Chip>
+					))}
+					{!isScanning && <SharedReportNote saved={shared} />}
+				</div>
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("accessibility:errors.noProject")}
+					</Notice>
 				)}
-			</div>
-
-			{report.summary && (
-				<p className="text-sm text-muted-foreground italic mt-2">
-					{report.summary}
-				</p>
-			)}
-		</div>
+				{isScanning && <ScanLine label={status || t("accessibility:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("accessibility:errors.failed", { error })}
+					</Notice>
+				)}
+				{report ? (
+					<ReportBody report={report} />
+				) : (
+					phase === "idle" && (
+						<EmptyStage icon={Accessibility} title={t("accessibility:emptyTitle")} tone="violet">
+							{t("accessibility:noData")}
+						</EmptyStage>
+					)
+				)}
+			</Page>
+		</ModuleStage>
 	);
 }
 
-function StatCard({
-	label,
-	value,
-	color,
-	isActive = false,
-	onClick,
-}: {
-	readonly label: string;
-	readonly value: number;
-	readonly color: string;
-	readonly isActive?: boolean;
-	readonly onClick?: () => void;
-}): React.ReactElement {
+function ReportBody({ report }: { readonly report: A11yReport }): React.ReactElement {
+	const { t } = useTranslation("accessibility");
+	const [filter, setFilter] = useState<FilterType>("all");
+	const [query, setQuery] = useState("");
+	const q = query.toLowerCase();
+
+	const critical = report.violations.filter((v) => v.severity === "critical").length;
+	const serious = report.violations.filter((v) => v.severity === "serious").length;
+
+	const violations = report.violations.filter(
+		(v) =>
+			(filter === "all" || v.severity === filter) &&
+			(!q ||
+				v.description.toLowerCase().includes(q) ||
+				v.ruleId.toLowerCase().includes(q) ||
+				v.file.toLowerCase().includes(q)),
+	);
+	const passed = report.passedRules.filter((rule) => !q || rule.toLowerCase().includes(q));
+
+	const filters: ReadonlyArray<{ id: FilterType; label: string; count: number; tone: Tone }> = [
+		{ id: "all", label: t("stats.violations"), count: report.violations.length, tone: "violet" },
+		{ id: "critical", label: t("stats.critical"), count: critical, tone: "red" },
+		{ id: "serious", label: t("stats.serious"), count: serious, tone: "orange" },
+		{ id: "passed", label: t("stats.rulesPassed"), count: report.passedRules.length, tone: "green" },
+	];
+
 	return (
-		<button
-			type="button"
-			className={`p-3 rounded-lg bg-card border border-border cursor-pointer transition-colors hover:bg-muted text-left ${
-				isActive ? "ring-2 ring-primary" : ""
-			}`}
-			onClick={onClick}
-		>
-			<p className="text-xs text-muted-foreground">{label}</p>
-			<p className={`text-2xl font-bold ${color}`}>{value}</p>
-		</button>
+		<>
+			<Stats>
+				<Stat label={t("stats.violations")} value={report.violations.length} tone={report.violations.length ? "red" : "green"} />
+				<Stat label={t("stats.critical")} value={critical} tone={critical ? "red" : "muted"} />
+				<Stat label={t("stats.serious")} value={serious} tone={serious ? "orange" : "muted"} />
+				<Stat label={t("stats.rulesPassed")} value={report.passedRules.length} tone="green" />
+			</Stats>
+			<p className="wp-meta">
+				{t("targetInfo", { targetLevel: report.targetLevel, filesScanned: report.filesScanned })}
+			</p>
+
+			<Section
+				kicker={t("kickers.findings")}
+				title={t("findingsTitle")}
+				actions={
+					<div className="relative w-64 max-w-full">
+						<Search className="wp-muted pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" aria-hidden="true" />
+						<Input
+							type="search"
+							aria-label={t("search.placeholder")}
+							placeholder={t("search.placeholder")}
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							className="h-8 pl-8 text-xs"
+						/>
+					</div>
+				}
+			>
+				<div className="wp-chips mb-3">
+					{filters.map((f) => (
+						<Chip key={f.id} tone={f.tone} pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+							{f.label} <span className="font-mono">{f.count}</span>
+						</Chip>
+					))}
+				</div>
+				<div className="grid gap-2.5">
+					{filter === "passed"
+						? passed.map((rule) => (
+								<Panel key={`passed-${rule}`} rail tone="green" className="text-sm">
+									{rule}
+								</Panel>
+							))
+						: violations.map((v) => (
+								<Panel key={`${v.ruleId}-${v.file}-${v.line}`} rail tone={SEVERITY_TONES[v.severity]}>
+									<div className="flex flex-wrap items-center gap-2">
+										<Chip tone={SEVERITY_TONES[v.severity]}>
+											{t(`severities.${v.severity}`, { defaultValue: v.severity })}
+										</Chip>
+										<span className="wp-meta font-mono">
+											{v.ruleId} · WCAG {v.wcagCriteria}
+										</span>
+									</div>
+									<p className="mt-1.5 text-sm">{v.description}</p>
+									<p className="wp-meta mt-1 font-mono">
+										{v.file}:{v.line}
+									</p>
+									{v.suggestion && <p className="wp-tone-green wp-ink mt-1 text-xs">{v.suggestion}</p>}
+								</Panel>
+							))}
+					{filter !== "passed" && violations.length === 0 && (
+						<p className="wp-muted text-sm">{t("noMatches")}</p>
+					)}
+				</div>
+			</Section>
+
+			{report.summary && <Notice tone="violet" icon={Accessibility}>{report.summary}</Notice>}
+		</>
 	);
 }

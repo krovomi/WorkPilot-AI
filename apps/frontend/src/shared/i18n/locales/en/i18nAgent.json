@@ -1,11 +1,8 @@
 {
-	"title": "i18n Report",
-	"noData": "No scan run yet. Click \"Run scan\" to start.",
-	"filesInfo": "{{count}} files scanned · locales: {{locales}}",
+	"title": "i18n analysis",
+	"noData": "Run the scan to list hard-coded text and missing translations.",
 	"coverage": "Coverage",
 	"issues": "Issues",
-	"locale": "locale",
-	"localeLabel": "locale",
 	"severity": {
 		"error": "Error",
 		"warning": "Warning",
@@ -16,7 +13,9 @@
 		"missing_key": "Missing key",
 		"unused_key": "Unused key",
 		"inconsistent_interpolation": "Inconsistent interpolation",
-		"missing_plural": "Missing plural"
+		"missing_plural": "Missing plural",
+		"inconsistent_params": "Inconsistent parameters",
+		"locale_file_mismatch": "Catalog mismatch"
 	},
 	"search": {
 		"placeholder": "Search issues...",
@@ -32,7 +31,14 @@
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"report": {
-		"globeIconTitle": "Global network icon"
+	"description": "Finds hard-coded UI text (JSX, Vue, Angular, Razor, XAML, Flutter, SwiftUI, Compose, Android layouts…) and compares every locale with the reference one, whatever the catalog format: JSON, RESX, ARB, XLIFF, Android strings.xml, iOS .strings, gettext, .properties, Rails YAML, Laravel.",
+	"emptyTitle": "No scan yet",
+	"filesScanned": "Files scanned",
+	"localesTitle": "Locales",
+	"issuesTitle": "Issues",
+	"allTypes": "All",
+	"kickers": {
+		"coverage": "Coverage",
+		"issues": "Issues"
 	}
 }
