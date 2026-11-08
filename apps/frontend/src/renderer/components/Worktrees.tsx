@@ -33,6 +33,15 @@ import type {
 import { useToast } from "../hooks/use-toast";
 import { useProjectStore } from "../stores/project-store";
 import { useTaskStore } from "../stores/task-store";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	ScanLine,
+} from "./charter";
 import { CreatePRDialog } from "./task-detail/task-review/CreatePRDialog";
 import {
 	AlertDialog,
@@ -74,7 +83,7 @@ interface WorktreesProps {
 }
 
 export function Worktrees({ projectId }: WorktreesProps) {
-	const { t } = useTranslation(["common", "dialogs"]);
+	const { t } = useTranslation(["common", "dialogs", "navigation"]);
 	const { toast } = useToast();
 	const projects = useProjectStore((state) => state.projects);
 	const selectedProject = projects.find((p) => p.id === projectId);
@@ -563,59 +572,59 @@ export function Worktrees({ projectId }: WorktreesProps) {
 
 	if (!selectedProject) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<p className="text-muted-foreground">
-					{t("dialogs:worktrees.selectProject")}
-				</p>
-			</div>
+			<ModuleStage>
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					<EmptyStage icon={GitBranch} title={t("dialogs:worktrees.title")} tone="green">
+						{t("dialogs:worktrees.selectProject")}
+					</EmptyStage>
+				</div>
+			</ModuleStage>
 		);
 	}
 
 	return (
-		<div className="flex h-full flex-col p-6">
-			{/* Header */}
-			<div className="mb-6 flex items-center justify-between">
-				<div>
-					<h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-						<GitBranch className="h-6 w-6" />
-						{t("dialogs:worktrees.title")}
-					</h2>
-					<p className="text-sm text-muted-foreground mt-1">
-						{t("dialogs:worktrees.description")}
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Button
-						variant={isSelectionMode ? "default" : "outline"}
-						size="sm"
-						onClick={() => {
-							if (isSelectionMode) {
-								setIsSelectionMode(false);
-								setSelectedWorktreeIds(new Set());
-							} else {
-								setIsSelectionMode(true);
-							}
-						}}
-					>
-						<CheckSquare2 className="h-4 w-4 mr-2" />
-						{isSelectionMode
-							? t("common:selection.done")
-							: t("common:selection.select")}
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={loadWorktrees}
-						disabled={isLoading}
-					>
-						<RefreshCw
-							className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
-						/>
-						{t("common:buttons.refresh")}
-					</Button>
-				</div>
-			</div>
-
+		<ModuleStage data-testid="worktrees-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.gitIntegrations")}
+				title={t("dialogs:worktrees.title")}
+				description={t("dialogs:worktrees.description")}
+				icon={GitBranch}
+				tone="green"
+				actions={
+					<>
+						<Chip tone="green" dot={false}>
+							{t("dialogs:worktrees.count", { count: totalWorktrees })}
+						</Chip>
+						<CharterButton
+							variant={isSelectionMode ? "default" : "ghost"}
+							icon={CheckSquare2}
+							aria-pressed={isSelectionMode}
+							onClick={() => {
+								if (isSelectionMode) {
+									setIsSelectionMode(false);
+									setSelectedWorktreeIds(new Set());
+								} else {
+									setIsSelectionMode(true);
+								}
+							}}
+						>
+							{isSelectionMode
+								? t("common:selection.done")
+								: t("common:selection.select")}
+						</CharterButton>
+						<CharterButton
+							variant="ghost"
+							icon={RefreshCw}
+							busy={isLoading}
+							onClick={loadWorktrees}
+							disabled={isLoading}
+						>
+							{t("common:buttons.refresh")}
+						</CharterButton>
+					</>
+				}
+			/>
+			<div className="relative z-[1] flex min-h-0 flex-1 flex-col px-5 pb-4">
 			{/* Selection controls bar - visible when selection mode is enabled */}
 			{isSelectionMode && totalWorktrees > 0 && (
 				<div className="flex items-center justify-between py-2 mb-4 border-b border-border shrink-0">
@@ -658,47 +667,33 @@ export function Worktrees({ projectId }: WorktreesProps) {
 				</div>
 			)}
 
-			{/* Error message */}
 			{error && (
-				<div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
-					<div className="flex items-start gap-2">
-						<AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-						<div>
-							<p className="font-medium text-destructive">
-								{t("common:labels.error")}
-							</p>
-							<p className="text-muted-foreground mt-1 whitespace-pre-line">
-								{error}
-							</p>
-						</div>
-					</div>
-				</div>
+				<Notice tone="red" icon={AlertCircle} role="alert" className="mb-4">
+					<span className="font-medium">{t("common:labels.error")}</span>
+					<span className="mt-1 block whitespace-pre-line text-xs">{error}</span>
+				</Notice>
 			)}
 
 			{/* Loading state */}
 			{isLoading &&
 				worktrees.length === 0 &&
 				terminalWorktrees.length === 0 && (
-					<div className="flex h-full items-center justify-center">
-						<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
+					<ScanLine label={t("common:buttons.refresh")} />
 				)}
 
 			{/* Empty state */}
 			{!isLoading &&
 				worktrees.length === 0 &&
 				terminalWorktrees.length === 0 && (
-					<div className="flex h-full flex-col items-center justify-center text-center">
-						<div className="rounded-full bg-muted p-4 mb-4">
-							<GitBranch className="h-8 w-8 text-muted-foreground" />
-						</div>
-						<h3 className="text-lg font-semibold text-foreground">
-							{t("dialogs:worktrees.empty")}
-						</h3>
-						<p className="text-sm text-muted-foreground mt-2 max-w-md">
+					<div className="flex flex-1 items-center justify-center">
+						<EmptyStage
+							icon={GitBranch}
+							title={t("dialogs:worktrees.empty")}
+							tone="green"
+						>
 							{t("dialogs:worktrees.emptyDescription")}{" "}
 							{t("dialogs:worktrees.emptyDescriptionTerminal")}
-						</p>
+						</EmptyStage>
 					</div>
 				)}
 
@@ -1220,6 +1215,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 					onCreatePR={handleCreatePR}
 				/>
 			)}
-		</div>
+			</div>
+		</ModuleStage>
 	);
 }

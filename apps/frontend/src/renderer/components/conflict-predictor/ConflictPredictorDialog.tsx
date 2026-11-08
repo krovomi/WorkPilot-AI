@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Notice } from "../charter";
+import "../charter/charter.css";
 import {
 	startConflictPrediction,
 	useConflictPredictorStore,
@@ -52,7 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
  *   <ConflictPredictorDialog />
  */
 export function ConflictPredictorDialog() {
-	const { t } = useTranslation(["conflictPredictor", "common"]);
+	const { t } = useTranslation(["conflictPredictor", "common", "navigation"]);
 	const [copied, setCopied] = useState(false);
 	const streamOutputRef = useRef<HTMLPreElement>(null);
 
@@ -224,10 +226,13 @@ export function ConflictPredictorDialog() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={handleClose}>
-			<DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+			<DialogContent className="wp-scope max-w-4xl max-h-[90vh] overflow-hidden">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<GitBranch className="h-5 w-5" />
+					<span className="wp-kicker">
+						{t("navigation:groups.gitIntegrations")}
+					</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
+						<GitBranch className="h-5 w-5 text-primary" />
 						{t("conflictPredictor:title")}
 					</DialogTitle>
 					<DialogDescription>
@@ -549,14 +554,9 @@ export function ConflictPredictorDialog() {
 
 					{/* Error */}
 					{error && (
-						<Card className="border-destructive/30 bg-destructive/10">
-							<CardContent className="pt-6">
-								<div className="flex items-center gap-2 text-destructive">
-									<AlertTriangle className="h-4 w-4" />
-									<span className="text-sm">{error}</span>
-								</div>
-							</CardContent>
-						</Card>
+						<Notice tone="red" icon={AlertTriangle} role="alert">
+							{error}
+						</Notice>
 					)}
 
 					{/* Streaming Output (for debugging) */}
@@ -570,7 +570,7 @@ export function ConflictPredictorDialog() {
 							<CardContent>
 								<pre
 									ref={streamOutputRef}
-									className="text-xs bg-muted p-2 rounded overflow-auto max-h-32"
+									className="wp-code max-h-32 overflow-auto p-2 text-xs"
 								>
 									{streamingOutput}
 								</pre>

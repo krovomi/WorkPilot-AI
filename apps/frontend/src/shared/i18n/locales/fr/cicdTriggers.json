@@ -45,5 +45,9 @@
 		"title": "Aucune exécution pour l'instant",
 		"body": "Les exécutions lancées d'ici — ou automatiquement sur une PR ou une fusion — apparaissent dans cette liste avec le statut rapporté par le fournisseur.",
 		"noProject": "Ouvrez un projet pour configurer ses déclencheurs CI/CD."
+	},
+	"kickers": {
+		"setup": "Réglages",
+		"history": "Historique"
 	}
 }

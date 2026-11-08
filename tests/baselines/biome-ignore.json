@@ -178,8 +178,6 @@
   "apps/frontend/src/renderer/components/prompt-optimizer/PromptOptimizerDialog.tsx": 2,
   "apps/frontend/src/renderer/components/roadmap/FeatureCard.tsx": 1,
   "apps/frontend/src/renderer/components/roadmap/PhaseCard.tsx": 4,
-  "apps/frontend/src/renderer/components/roadmap/RoadmapEmptyState.tsx": 1,
-  "apps/frontend/src/renderer/components/roadmap/RoadmapTabs.tsx": 3,
   "apps/frontend/src/renderer/components/settings/AccountPriorityList.tsx": 1,
   "apps/frontend/src/renderer/components/settings/AgentProfileSettings.tsx": 1,
   "apps/frontend/src/renderer/components/settings/AnomalyDetectionSettings.tsx": 1,

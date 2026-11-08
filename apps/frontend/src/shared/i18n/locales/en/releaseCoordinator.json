@@ -34,5 +34,23 @@
 	"errors": {
 		"noProject": "Select a project to plan a release.",
 		"failed": "Plan failed: {{error}}"
+	},
+	"description": "Plans the next version of every service of the project (npm, Python, .NET, Java, Kotlin, Go, Rust, Dart, PHP, Ruby, Elixir, Swift) from its commits, with the gates to pass.",
+	"emptyTitle": "No plan yet",
+	"servicesTitle": "Next versions",
+	"noServicesTitle": "No service found",
+	"noServices": "No manifest with a name was found (package.json, pyproject.toml, .csproj, pom.xml, build.gradle, go.mod, Cargo.toml, pubspec.yaml, composer.json…).",
+	"changelogCount_one": "{{count}} changelog entry",
+	"changelogCount_other": "{{count}} changelog entries",
+	"gateStatuses": {
+		"passed": "Passed",
+		"failed": "Failed",
+		"pending": "Pending",
+		"skipped": "Skipped"
+	},
+	"kickers": {
+		"bumped": "To release",
+		"gates": "Go / no-go",
+		"services": "Services"
 	}
 }

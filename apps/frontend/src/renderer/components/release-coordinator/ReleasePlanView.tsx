@@ -1,28 +1,51 @@
+import { AlertTriangle, Calendar, Package, Play, RotateCcw, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
-import {
-	useReleaseCoordinatorStore,
-} from "../../stores/release-coordinator-store";
+import { useReleaseCoordinatorStore } from "../../stores/release-coordinator-store";
 import type {
+	BumpType,
 	GateStatus,
 	ReleaseTrainPlan,
 } from "../../../shared/types/release-coordinator";
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 
-const GATE_STYLES: Record<GateStatus, { color: string; icon: string }> = {
-	passed: { color: "text-success", icon: "✅" },
-	failed: { color: "text-destructive", icon: "❌" },
-	pending: { color: "text-warning", icon: "⏳" },
-	skipped: { color: "text-gray-400", icon: "⏭️" },
+const GATE_TONES: Record<GateStatus, Tone> = {
+	passed: "green",
+	failed: "red",
+	pending: "amber",
+	skipped: "muted",
+};
+
+const BUMP_TONES: Record<BumpType, Tone> = {
+	major: "red",
+	minor: "amber",
+	patch: "blue",
+	none: "muted",
 };
 
 interface ReleasePlanViewProps {
 	readonly projectPath?: string;
 }
 
+/** The release train: each service's next version, its gates, its changelog. */
 export function ReleasePlanView({
 	projectPath,
 }: ReleasePlanViewProps): React.ReactElement {
-	const { t } = useTranslation("releaseCoordinator");
+	const { t } = useTranslation(["releaseCoordinator", "navigation"]);
 
 	const phase = useReleaseCoordinatorStore((s) => s.phase);
 	const status = useReleaseCoordinatorStore((s) => s.status);
@@ -33,142 +56,136 @@ export function ReleasePlanView({
 	const reset = useReleaseCoordinatorStore((s) => s.reset);
 
 	const isPlanning = phase === "planning";
-	const canRun = !!projectPath && !isPlanning;
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<div className="flex items-center gap-3 flex-wrap">
-				{isPlanning ? (
-					<button
-						type="button"
-						onClick={() => cancelPlan()}
-						className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-					>
-						{t("actions.cancel")}
-					</button>
+		<ModuleStage scroll="page" data-testid="release-coordinator-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.planning")}
+				title={t("releaseCoordinator:title")}
+				description={t("releaseCoordinator:description")}
+				icon={Calendar}
+				tone="violet"
+				actions={
+					<>
+						{plan && !isPlanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("releaseCoordinator:actions.reset")}
+							</CharterButton>
+						)}
+						{isPlanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelPlan()}>
+								{t("releaseCoordinator:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && startPlan(projectPath)}
+								disabled={!projectPath}
+							>
+								{t("releaseCoordinator:actions.runPlan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("releaseCoordinator:errors.noProject")}
+					</Notice>
+				)}
+				{isPlanning && <ScanLine label={status || t("releaseCoordinator:actions.planning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("releaseCoordinator:errors.failed", { error })}
+					</Notice>
+				)}
+				{plan ? (
+					<PlanBody plan={plan} />
 				) : (
-					<button
-						type="button"
-						onClick={() => projectPath && startPlan(projectPath)}
-						disabled={!canRun}
-						className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-					>
-						{t("actions.runPlan")}
-					</button>
+					phase === "idle" && (
+						<EmptyStage icon={Calendar} title={t("releaseCoordinator:emptyTitle")} tone="violet">
+							{t("releaseCoordinator:noData")}
+						</EmptyStage>
+					)
 				)}
-				{plan && !isPlanning && (
-					<button
-						type="button"
-						onClick={reset}
-						className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-					>
-						{t("actions.reset")}
-					</button>
-				)}
-			</div>
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isPlanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.planning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{plan ? (
-				<PlanBody plan={plan} t={t} />
-			) : (
-				phase === "idle" && (
-					<div className="flex items-center justify-center h-40 text-muted-foreground">
-						<p>{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
+			</Page>
+		</ModuleStage>
 	);
 }
 
-function PlanBody({
-	plan,
-	t,
-}: {
-	readonly plan: ReleaseTrainPlan;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-}): React.ReactElement {
-	const hasVersionChanges = plan.services.some((s) => s.bumpType !== "none");
-	const statusLabel = t(`statuses.${plan.status}`, { defaultValue: plan.status });
+const semver = (v: { major: number; minor: number; patch: number }) =>
+	`${v.major}.${v.minor}.${v.patch}`;
+
+function PlanBody({ plan }: { readonly plan: ReleaseTrainPlan }): React.ReactElement {
+	const { t } = useTranslation("releaseCoordinator");
+	const bumped = plan.services.filter((s) => s.bumpType !== "none").length;
+	const passed = plan.gates.filter((g) => g.status === "passed").length;
 
 	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{plan.services.length} {t("services")} · {t("status")}: {statusLabel}
-				</p>
-			</div>
+		<>
+			<Stats>
+				<Stat label={t("services")} value={plan.services.length} />
+				<Stat label={t("kickers.bumped")} value={bumped} tone={bumped ? "amber" : "muted"} />
+				<Stat
+					label={t("gates")}
+					value={`${passed}/${plan.gates.length}`}
+					tone={passed === plan.gates.length ? "green" : "amber"}
+				/>
+				<Stat label={t("status")} value={t(`statuses.${plan.status}`, { defaultValue: plan.status })} tone="violet" />
+			</Stats>
 
-			<div className="grid grid-cols-4 gap-2">
-				{plan.gates.map((gate) => {
-					const style = GATE_STYLES[gate.status];
-					return (
-						<div
-							key={gate.name}
-							className={`p-2 rounded-lg border border-border ${style.color}`}
-						>
-							<div className="flex items-center gap-1 text-xs">
-								<span>{style.icon}</span>
-								<span className="font-medium">{gate.name}</span>
-							</div>
-							{gate.message && (
-								<p className="text-xs opacity-70 mt-0.5">{gate.message}</p>
-							)}
-						</div>
-					);
-				})}
-			</div>
+			{plan.gates.length > 0 && (
+				<Section kicker={t("kickers.gates")} title={t("gates")}>
+					<div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+						{plan.gates.map((gate) => (
+							<Panel key={gate.name} rail tone={GATE_TONES[gate.status]}>
+								<div className="flex items-start justify-between gap-2">
+									<span className="wp-title text-sm">{gate.name}</span>
+									<Chip tone={GATE_TONES[gate.status]}>
+										{t(`gateStatuses.${gate.status}`, { defaultValue: gate.status })}
+									</Chip>
+								</div>
+								{gate.message && <p className="wp-muted mt-1 text-xs">{gate.message}</p>}
+							</Panel>
+						))}
+					</div>
+				</Section>
+			)}
 
-			<div className="space-y-2">
-				{plan.services.map((svc) => {
-					const version = `${svc.nextVersion.major}.${svc.nextVersion.minor}.${svc.nextVersion.patch}`;
-					const current = `${svc.currentVersion.major}.${svc.currentVersion.minor}.${svc.currentVersion.patch}`;
-					return (
-						<div
-							key={svc.name}
-							className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
-						>
-							<div className="flex items-center justify-between mb-1">
-								<p className="text-sm font-medium">{svc.name}</p>
-								<span className="text-xs font-mono text-blue-400">
-									{current} → {version}
-								</span>
-							</div>
-							<div className="flex items-center gap-2 text-xs text-muted-foreground">
-								<span className="uppercase">
-									{t(`bumpTypes.${svc.bumpType}`, { defaultValue: svc.bumpType })}
-								</span>
-								<span>·</span>
-								<span>
-									{svc.changelogEntries.length} {t("changelogEntries")}
-								</span>
-							</div>
-						</div>
-					);
-				})}
-			</div>
+			<Section kicker={t("kickers.services")} title={t("servicesTitle")}>
+				{plan.services.length === 0 ? (
+					<EmptyStage icon={Package} title={t("noServicesTitle")} tone="violet">
+						{t("noServices")}
+					</EmptyStage>
+				) : (
+					<div className="grid gap-2.5">
+						{plan.services.map((svc) => (
+							<Panel key={svc.name} rail tone={BUMP_TONES[svc.bumpType]}>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<span className="wp-title text-sm">{svc.name}</span>
+									<span className="font-mono text-xs">
+										{semver(svc.currentVersion)} → {semver(svc.nextVersion)}
+									</span>
+								</div>
+								<div className="wp-chips mt-2">
+									<Chip tone={BUMP_TONES[svc.bumpType]}>
+										{t(`bumpTypes.${svc.bumpType}`, { defaultValue: svc.bumpType })}
+									</Chip>
+									<Chip tone="muted" dot={false}>
+										{t("changelogCount", { count: svc.changelogEntries.length })}
+									</Chip>
+								</div>
+							</Panel>
+						))}
+					</div>
+				)}
+			</Section>
 
-			<p className="text-sm text-muted-foreground italic mt-2">
-				{hasVersionChanges ? plan.summary : t("noVersionChanges")}
-			</p>
-		</div>
+			<Notice tone={bumped ? "violet" : "muted"} icon={Calendar}>
+				{bumped ? plan.summary : t("noVersionChanges")}
+			</Notice>
+		</>
 	);
 }

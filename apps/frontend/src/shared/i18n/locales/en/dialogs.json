@@ -145,6 +145,7 @@
 		"repositoryNote": "You can select the repository in the project settings after this step."
 	},
 	"worktrees": {
+		"count": "{{count}} worktrees",
 		"title": "Worktrees",
 		"description": "Manage isolated workspaces for your WorkPilot AI tasks",
 		"empty": "No Worktrees",

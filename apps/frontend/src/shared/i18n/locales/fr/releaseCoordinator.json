@@ -34,5 +34,23 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour planifier une release.",
 		"failed": "Échec du plan : {{error}}"
+	},
+	"description": "Planifie la prochaine version de chaque service du projet (npm, Python, .NET, Java, Kotlin, Go, Rust, Dart, PHP, Ruby, Elixir, Swift) à partir de ses commits, avec les portes à franchir.",
+	"emptyTitle": "Pas encore de plan",
+	"servicesTitle": "Prochaines versions",
+	"noServicesTitle": "Aucun service trouvé",
+	"noServices": "Aucun manifeste nommé n'a été trouvé (package.json, pyproject.toml, .csproj, pom.xml, build.gradle, go.mod, Cargo.toml, pubspec.yaml, composer.json…).",
+	"changelogCount_one": "{{count}} entrée de changelog",
+	"changelogCount_other": "{{count}} entrées de changelog",
+	"gateStatuses": {
+		"passed": "Franchie",
+		"failed": "Échouée",
+		"pending": "En attente",
+		"skipped": "Ignorée"
+	},
+	"kickers": {
+		"bumped": "À publier",
+		"gates": "Go / no-go",
+		"services": "Services"
 	}
 }

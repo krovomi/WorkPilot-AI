@@ -7,7 +7,10 @@ computing:
 
 - **Dependents graph** — files that import/require the targets (reverse
   dependency graph), discovered via regex-based import scanning (Python,
-  JS/TS, Go, Rust, Java-ish). Fully deterministic; no LLM calls.
+  JS/TS, Vue, Svelte, Go, Rust, PHP, Ruby, Dart, C/C++ includes). Stacks
+  that reach a type without importing its file (C#, F#, VB.NET, Java,
+  Kotlin, Scala, Swift) are matched on the type names the target declares.
+  Fully deterministic; no LLM calls.
 - **Tests in scope** — test files that exercise the target files.
 - **Feature flags referenced** — ``FEATURE_*`` / ``flag(...)`` strings found
   in the targets.
@@ -38,8 +41,54 @@ _CODE_SUFFIXES = {
     ".java",
     ".kt",
     ".rb",
+    ".mjs",
+    ".cjs",
+    ".mts",
+    ".cts",
+    ".vue",
+    ".svelte",
+    ".kts",
+    ".scala",
+    ".cs",
+    ".fs",
+    ".vb",
+    ".razor",
+    ".cshtml",
+    ".php",
+    ".swift",
+    ".dart",
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".hpp",
 }
-_TEST_HINTS = ("test_", "_test.", ".test.", ".spec.", "__tests__")
+# Stacks where a file reaches a type by name (namespace or package import,
+# or none at all), so the dependents are found by the type names.
+_TYPE_REFERENCE_SUFFIXES = {
+    ".cs",
+    ".fs",
+    ".vb",
+    ".razor",
+    ".cshtml",
+    ".java",
+    ".kt",
+    ".kts",
+    ".scala",
+    ".swift",
+}
+_TYPE_DECLARATION = re.compile(
+    r"\b(?:class|interface|record|struct|enum|object|protocol|trait|"
+    r"Class|Interface|Structure|Enum|Module|type)\s+([A-Z][A-Za-z0-9_]{2,})"
+)
+# A test file: in a test folder, or named like one in any stack
+# (test_x.py, x_test.go, x.test.ts, x.spec.js, XTests.cs, XTest.java, XSpec.swift).
+_TEST_DIR = re.compile(
+    r"(?:^|/)(?:tests?|__tests__|specs?|[\w.-]+\.Tests?)/", re.IGNORECASE
+)
+_TEST_NAME = re.compile(
+    r"(?:^test_|_test\.|\.test\.|\.spec\.|[a-z0-9_](?:Tests?|Spec)\.\w+$)"
+)
 _IGNORED_DIRS = {
     ".git",
     "node_modules",
@@ -66,7 +115,11 @@ _IMPORT_PATTERNS = (
         re.MULTILINE,
     ),
     re.compile(
-        r"""^\s*use\s+([\w:]+)""",
+        r"""^\s*use\s+([\w:\\]+)""",
+        re.MULTILINE,
+    ),
+    re.compile(
+        r"""^\s*#\s*include\s*[<"]([^>"]+)[>"]""",
         re.MULTILINE,
     ),
 )
@@ -153,9 +206,20 @@ def _extract_imports(text: str) -> list[str]:
     return out
 
 
+def _declared_types(target: Path) -> set[str]:
+    """The type names a type-reference target declares (C#, Java, Swift...)."""
+    if target.suffix.lower() not in _TYPE_REFERENCE_SUFFIXES:
+        return set()
+    try:
+        text = target.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    return set(_TYPE_DECLARATION.findall(text))
+
+
 def _is_test_file(rel_path: str) -> bool:
-    lower = rel_path.lower()
-    return any(hint in lower for hint in _TEST_HINTS)
+    name = rel_path.rsplit("/", 1)[-1]
+    return bool(_TEST_DIR.search(rel_path) or _TEST_NAME.search(name))
 
 
 def analyze_blast_radius(
@@ -174,8 +238,9 @@ def analyze_blast_radius(
             resolved_targets.append(p)
 
     if not resolved_targets:
+        # ``targets`` lists the files analysed: none of the requested paths is one.
         return BlastRadiusReport(
-            targets=targets,
+            targets=[],
             dependents=[],
             tests=[],
             flags=[],
@@ -187,6 +252,13 @@ def analyze_blast_radius(
     candidates_by_target: dict[Path, list[str]] = {
         t: _module_candidates(project_root, t) for t in resolved_targets
     }
+    types_by_target: dict[Path, re.Pattern[str]] = {}
+    for t in resolved_targets:
+        names = _declared_types(t)
+        if names:
+            types_by_target[t] = re.compile(
+                r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\b"
+            )
 
     dependents: list[DependentEdge] = []
     tests: set[str] = set()
@@ -198,7 +270,8 @@ def analyze_blast_radius(
         except OSError:
             continue
         imports = _extract_imports(text)
-        if not imports:
+        by_type = path.suffix.lower() in _TYPE_REFERENCE_SUFFIXES
+        if not imports and not by_type:
             continue
 
         rel_source = str(path.relative_to(project_root)).replace("\\", "/")
@@ -206,6 +279,8 @@ def analyze_blast_radius(
             if path == target:
                 continue
             hit = any(any(v and v in imp for v in variants) for imp in imports)
+            if not hit and by_type and target in types_by_target:
+                hit = bool(types_by_target[target].search(text))
             if not hit:
                 continue
             rel_target = str(target.relative_to(project_root)).replace("\\", "/")
