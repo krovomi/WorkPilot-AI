@@ -430,7 +430,7 @@
   "apps/backend/task_logger/storage.py": {"blind": 1, "silent": 0},
   "apps/backend/task_logger/streaming.py": {"blind": 1, "silent": 0},
   "apps/backend/test_generation/api.py": {"blind": 5, "silent": 0},
-  "apps/backend/test_generation/generator.py": {"blind": 14, "silent": 8},
+  "apps/backend/test_generation/generator.py": {"blind": 6, "silent": 0},
   "apps/backend/timeline/api.py": {"blind": 1, "silent": 0},
   "apps/backend/timeline/builder.py": {"blind": 1, "silent": 0},
   "apps/backend/ui/menu.py": {"blind": 1, "silent": 0},
