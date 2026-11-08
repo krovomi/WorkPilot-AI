@@ -2,7 +2,7 @@
 
 The "Revue de code" and "Refactoring" views of the Development group read code
 the user pastes (a patch, a snippet) and return findings without calling a
-model. Audit finding F163.
+model. Audit finding F164.
 
 ## Path
 
