@@ -111,6 +111,31 @@ const taskStatusChangeListeners = new Set<
 >();
 
 /**
+ * Who starts queued tasks when new ones appear without any task leaving
+ * `in_progress` (the parts of a split task): the board registers its queue.
+ */
+const queueKickListeners = new Set<() => void>();
+
+/** Ask the board to start the queued tasks it has room for. */
+export function kickQueue(): void {
+	for (const listener of queueKickListeners) {
+		try {
+			listener();
+		} catch (error) {
+			console.error("[TaskStore] Error in queue kick listener:", error);
+		}
+	}
+}
+
+/** Register the board's queue; returns the unregister function. */
+export function onQueueKick(listener: () => void): () => void {
+	queueKickListeners.add(listener);
+	return () => {
+		queueKickListeners.delete(listener);
+	};
+}
+
+/**
  * Track last activity timestamp per task for stuck detection.
  * If we've received activity (execution progress, status update) within a threshold,
  * the task is considered active even if the process check fails.

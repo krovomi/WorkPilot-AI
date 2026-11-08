@@ -88,10 +88,8 @@ from prompts_pkg.prompts import (
 )
 from security.constants import PROJECT_DIR_ENV_VAR
 from services.recovery import RecoveryManager
-from task_logger import (
-    LogPhase,
-    get_task_logger,
-)
+from task_logger import LogPhase, get_task_logger
+from task_split.step import raise_if_split
 from ui import (
     BuildState,
     Icons,
@@ -1514,11 +1512,10 @@ async def _run_post_planning_phases(
 ) -> None:
     """The workflow phases declared between `planning` and `coding`.
 
-    The three existing windows are (start → planning), (coding → qa) and
-    (qa → end): a phase declared between planning and coding was resolved,
-    printed in the profile, and then run by nobody. It belongs here rather
-    than in `build_commands` because this function owns both of the phases
-    it sits between — the window has no other place it could open.
+    The other windows are (start → planning), (coding → qa) and (qa → end): a
+    phase declared between planning and coding was resolved, printed, and run
+    by nobody. It belongs here, not in `build_commands`: this function owns
+    both phases it sits between, the window has no other place to open.
     """
     if profile is None:
         return
@@ -2639,6 +2636,7 @@ async def run_autonomous_agent(
 
                 write_progress_header(spec_dir)
                 _report_traceability(spec_dir)
+                raise_if_split(source_spec_dir or spec_dir, TaskEventEmitter, spec_dir)
                 await _run_post_planning_phases(
                     profile,
                     project_dir=project_dir,

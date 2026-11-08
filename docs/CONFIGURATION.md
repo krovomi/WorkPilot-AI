@@ -550,6 +550,18 @@ it is missing, the Claude provider's commands run without isolation and the task
 WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
 command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
 
+## Automatic split of big tasks (`task_split`)
+
+After planning, a task whose plan is bigger than the ceiling becomes several smaller tasks, one
+pull request each, see [architecture/task-split.md](architecture/task-split.md). The app sets these
+from Project settings → General; a task's own `noSplit` / `splitMaxLines` (task form) wins.
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_AUTO_SPLIT` | `1` | `0` keeps every task whole. |
+| `WORKPILOT_SPLIT_MAX_LINES` | `400` | Changed lines per part (50 to 20000; out of range is ignored). |
+| `WORKPILOT_SPLIT_MAX_FILES` | `25` | Files per part (2 to 1000; out of range is ignored). |
+
 ## RUN tasks — `.workpilot/environments.toml`
 
 A card of kind `run` (an operation on something that runs: restart, purge, migrate data,

@@ -15,7 +15,7 @@ import { useAuthFailureStore } from "../stores/auth-failure-store";
 import { useProjectStore } from "../stores/project-store";
 import { useRateLimitStore } from "../stores/rate-limit-store";
 import { useRoadmapStore } from "../stores/roadmap-store";
-import { useTaskStore } from "../stores/task-store";
+import { kickQueue, loadTasks, useTaskStore } from "../stores/task-store";
 
 /**
  * Batched update queue for IPC events.
@@ -255,6 +255,15 @@ export function useIpcListeners(): void {
 			},
 		);
 
+		// A task became its parts (task_split): they are on disk, queued. Reload
+		// the board, then let the queue start the ones that wait for nothing.
+		const cleanupTaskSplit = window.electronAPI.onTaskSplit(
+			(_taskId: string, projectId?: string) => {
+				if (!projectId || !isTaskForCurrentProject(projectId)) return;
+				void loadTasks(projectId, { forceRefresh: true }).then(kickQueue);
+			},
+		);
+
 		const cleanupExecutionProgress = window.electronAPI.onTaskExecutionProgress(
 			(taskId: string, progress: ExecutionProgress, projectId?: string) => {
 				// Filter by project to prevent multi-project interference
@@ -424,6 +433,7 @@ export function useIpcListeners(): void {
 			cleanupLog();
 			cleanupStatus();
 			cleanupTaskUpdated();
+			cleanupTaskSplit();
 			cleanupExecutionProgress();
 			cleanupPipelineStatus();
 			cleanupRoadmapProgress();

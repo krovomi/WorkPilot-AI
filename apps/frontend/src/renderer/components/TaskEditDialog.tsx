@@ -78,6 +78,12 @@ import { TaskFormFields } from "./task-form/TaskFormFields";
 import { TaskModalLayout } from "./task-form/TaskModalLayout";
 import type { FileReferenceData } from "./task-form/useImageUpload";
 import { Button } from "./ui/button";
+import {
+	type AutoSplitValue,
+	autoSplitMetadata,
+	autoSplitValueFrom,
+	isAutoSplitValueValid,
+} from "./task-form/AutoSplitFields";
 
 /**
  * Props for the TaskEditDialog component
@@ -192,6 +198,10 @@ export function TaskEditDialog({
 		() => projects.find((p) => p.id === task.projectId)?.settings?.provider,
 		[projects, task.projectId],
 	);
+	const projectAutoSplit = useMemo(
+		() => projects.find((p) => p.id === task.projectId)?.settings?.autoSplit,
+		[projects, task.projectId],
+	);
 	const engineForTask = useCallback(
 		(): TaskEngine =>
 			resolveTaskEngine(
@@ -257,6 +267,9 @@ export function TaskEditDialog({
 	// TDD override (per-task)
 	const [tddMode, setTddMode] = useState(task.metadata?.tddMode ?? false);
 	const [verifyLoop, setVerifyLoop] = useState(task.metadata?.verifyLoop ?? true);
+	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(() =>
+		autoSplitValueFrom(task.metadata),
+	);
 	const [verifyWindow, setVerifyWindow] = useState(task.metadata?.verifyWindow ?? "");
 	const [verifyScenario, setVerifyScenario] = useState(task.metadata?.verifyScenario ?? "");
 	const [contextPolicy, setContextPolicy] = useState<ContextPolicy>(() =>
@@ -328,6 +341,7 @@ export function TaskEditDialog({
 		);
 		setTddMode(task.metadata?.tddMode ?? false);
 		setVerifyLoop(task.metadata?.verifyLoop ?? true);
+		setAutoSplit(autoSplitValueFrom(task.metadata));
 		setVerifyWindow(task.metadata?.verifyWindow ?? "");
 		setVerifyScenario(task.metadata?.verifyScenario ?? "");
 		setContextPolicy(resolveContextPolicy(task.metadata));
@@ -422,6 +436,11 @@ export function TaskEditDialog({
 		// The engine is "changed" only when it differs from what the dialog
 		// opened with, so plain edits rewrite none of it.
 		const engineChanged = JSON.stringify(engine) !== initialEngineRef.current;
+		const splitBefore = autoSplitMetadata(autoSplitValueFrom(task.metadata));
+		const splitAfter = autoSplitMetadata(autoSplit);
+		const autoSplitChanged =
+			splitBefore.noSplit !== splitAfter.noSplit ||
+			splitBefore.splitMaxLines !== splitAfter.splitMaxLines;
 		const contextPolicyChanged = !sameContextPolicy(
 			contextPolicy,
 			resolveContextPolicy(task.metadata),
@@ -441,6 +460,7 @@ export function TaskEditDialog({
 					(task.metadata?.requireReviewBeforeCoding ?? false) ||
 				tddMode !== (task.metadata?.tddMode ?? false) ||
 				verifyLoop !== (task.metadata?.verifyLoop ?? true) ||
+				autoSplitChanged ||
 				verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "") ||
 				verifyScenario.trim() !== (task.metadata?.verifyScenario ?? "") ||
 				contextPolicyChanged ||
@@ -482,6 +502,8 @@ export function TaskEditDialog({
 		if (verifyLoop !== (task.metadata?.verifyLoop ?? true)) {
 			metadataUpdates.verifyLoop = verifyLoop;
 		}
+		// `undefined` removes the key: the task is back on the project's ceiling.
+		if (isDuplicate || autoSplitChanged) Object.assign(metadataUpdates, splitAfter);
 		if (verifyWindow.trim() !== (task.metadata?.verifyWindow ?? "")) {
 			metadataUpdates.verifyWindow = verifyWindow.trim();
 		}
@@ -573,7 +595,10 @@ export function TaskEditDialog({
 		await handleSave(text);
 	};
 
-	const isValid = description.trim().length > 0 && !dictationPending;
+	const isValid =
+		description.trim().length > 0 &&
+		!dictationPending &&
+		isAutoSplitValueValid(autoSplit);
 
 	// Advance to the engine step, enforcing the only hard requirement (description)
 	// before leaving the details page.
@@ -716,6 +741,10 @@ export function TaskEditDialog({
 				onMobileTargetsChange={setMobileTargets}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
+				autoSplit={autoSplit}
+				onAutoSplitChange={setAutoSplit}
+				autoSplitProjectMaxLines={projectAutoSplit?.maxLines}
+				autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 				verifyLoop={verifyLoop}
 				onVerifyLoopChange={setVerifyLoop}
 				verifyWindow={verifyWindow}

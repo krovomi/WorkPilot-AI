@@ -45,6 +45,7 @@ import { forwardTaskEventToHooks } from "./hook-bridge";
 import { PERMISSION_CHANNEL_ENV } from "../task-permissions";
 import { parseTaskEvent } from "./task-event-parser";
 import type { ExecutionProgressData, ProcessType } from "./types";
+import { autoSplitEnv } from "../../shared/utils/task-split";
 
 /**
  * Détermine si l'arrêt du processus backend doit être signalé comme un échec.
@@ -709,6 +710,9 @@ export class AgentProcessManager {
 
 			// Integration tests before code, for an ASP.NET Core API (off when absent).
 			Object.assign(env, specByExampleEnv(project.settings.specByExample));
+
+			// The ceilings a task's plan is split against (on when absent).
+			Object.assign(env, autoSplitEnv(project.settings.autoSplit));
 		}
 
 		return env;

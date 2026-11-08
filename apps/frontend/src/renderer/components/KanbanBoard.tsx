@@ -96,6 +96,7 @@ import {
 	createTask,
 	deleteTasks,
 	forceCompleteTask,
+	onQueueKick,
 	persistTaskStatus,
 	restoreTask,
 	useTaskStore,
@@ -731,14 +732,12 @@ export function KanbanBoard({
 		return columns.size === 1 ? [...columns][0] : null;
 	}, [selectedTasks, selectedTaskIds.size]);
 
-	// Handle opening the bulk PR dialog
 	const handleOpenBulkPRDialog = useCallback(() => {
 		if (selectedTaskIds.size > 0) {
 			setBulkPRDialogOpen(true);
 		}
 	}, [selectedTaskIds.size]);
 
-	// Handle opening the delete confirmation dialog
 	const handleOpenDeleteConfirm = useCallback(() => {
 		setDeleteConfirmOpen(true);
 	}, []);
@@ -1804,8 +1803,8 @@ export function KanbanBoard({
 		};
 	}, []);
 
-	// Register task status change listener for queue auto-promotion
-	// This ensures processQueue() is called whenever a task leaves in_progress
+	// Queue auto-promotion: whenever a task leaves in_progress, and when queued
+	// tasks appear on their own (the parts of a split task, `kickQueue`).
 	useEffect(() => {
 		const unregister = useTaskStore
 			.getState()
@@ -1815,12 +1814,13 @@ export function KanbanBoard({
 					processQueue();
 				}
 			});
-
-		// Cleanup: unregister listener when component unmounts
-		return unregister;
+		const unregisterKick = onQueueKick(processQueue);
+		return () => {
+			unregister();
+			unregisterKick();
+		};
 	}, [processQueue]);
 
-	// Get task order actions from store
 	const reorderTasksInColumn = useTaskStore(
 		(state) => state.reorderTasksInColumn,
 	);

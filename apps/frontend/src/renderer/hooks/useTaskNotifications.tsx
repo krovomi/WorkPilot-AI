@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TaskStatus } from "../../shared/types";
 import type { SidebarView } from "../components/Sidebar";
 import { ToastAction } from "../components/ui/toast";
+import { splitChildCount } from "../../shared/utils/task-split";
 import { useTaskStore } from "../stores/task-store";
 import { toast } from "./use-toast";
 
@@ -72,6 +73,19 @@ export function useTaskNotifications({
 					newStatus === "human_review" &&
 					task?.reviewReason === "qa_unverified";
 				const failureDetail = task?.errorMessage?.trim();
+				// A task split into parts settles "done" with no build behind it.
+				const parts = task ? splitChildCount(task) : 0;
+				if (parts > 0 && newStatus === "done") {
+					toast({
+						title: translate("statusNotifications.split.title"),
+						description: translate("statusNotifications.split.description", {
+							title: taskTitle,
+							count: parts,
+						}),
+						onClick: handleView,
+					});
+					return;
+				}
 
 				toast({
 					title: isFailure

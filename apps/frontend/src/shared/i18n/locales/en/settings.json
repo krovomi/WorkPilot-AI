@@ -855,7 +855,14 @@
 			"specByExampleDescription": "On an ASP.NET Core Web API, the spec's acceptance criteria are written as integration tests before any code. When they fail as expected, `dotnet test` becomes the task's goal and the build ends when it passes. A goal you set yourself is kept.",
 			"crossReview": "Cross review by a second engine",
 			"crossReviewDescription": "After QA, another provider reads the diff against the spec and the goal. If it names a blocking problem, the pull request waits for you.",
-			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run."
+			"crossReviewSameProvider": "This is the provider tasks are built with ({{provider}}). Pick another one: a model rereading its own work is not a second look, and the review will not run.",
+			"autoSplit": {
+				"label": "Split big tasks automatically",
+				"description": "Once a task's plan is written, a task above these ceilings becomes several tasks, one small pull request each. A task can set its own line ceiling or stay whole.",
+				"maxLines": "Max changed lines per pull request",
+				"maxFiles": "Max files per pull request",
+				"invalid": "Enter a whole number between {{min}} and {{max}}; until then the default applies."
+			}
 		},
 		"autoBuild": {
 			"title": "WorkPilot AI Integration",

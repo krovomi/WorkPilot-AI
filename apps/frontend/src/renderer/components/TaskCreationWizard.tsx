@@ -84,6 +84,12 @@ import type { FileReferenceData } from "./task-form/useImageUpload";
 import { Button } from "./ui/button";
 import { Combobox } from "./ui/combobox";
 import { Label } from "./ui/label";
+import {
+	type AutoSplitValue,
+	DEFAULT_AUTO_SPLIT_VALUE,
+	autoSplitMetadata,
+	isAutoSplitValueValid,
+} from "./task-form/AutoSplitFields";
 
 interface TaskCreationWizardProps {
 	projectId: string;
@@ -133,6 +139,10 @@ export function TaskCreationWizard({
 	}, [projects, projectId]);
 	const projectProvider = useMemo(
 		() => projects.find((p) => p.id === projectId)?.settings?.provider,
+		[projects, projectId],
+	);
+	const projectAutoSplit = useMemo(
+		() => projects.find((p) => p.id === projectId)?.settings?.autoSplit,
 		[projects, projectId],
 	);
 	// The engine this task will own: provider × model × effort per phase.
@@ -208,6 +218,10 @@ export function TaskCreationWizard({
 	// TDD override (per-task) - default false (inherit project setting)
 	const [tddMode, setTddMode] = useState(false);
 	const [verifyLoop, setVerifyLoop] = useState(true);
+	// The automatic split: on, at the project's ceiling, unless the task says.
+	const [autoSplit, setAutoSplit] = useState<AutoSplitValue>(
+		DEFAULT_AUTO_SPLIT_VALUE,
+	);
 	const [verifyWindow, setVerifyWindow] = useState("");
 	const [verifyScenario, setVerifyScenario] = useState("");
 	// Context-window management (compact / new thread at a threshold).
@@ -277,6 +291,7 @@ export function TaskCreationWizard({
 				setRequireReviewBeforeCoding(draft.requireReviewBeforeCoding ?? false);
 				setTddMode(draft.tddMode ?? false);
 				setVerifyLoop(draft.verifyLoop ?? true);
+				setAutoSplit(draft.autoSplit ?? DEFAULT_AUTO_SPLIT_VALUE);
 				setVerifyWindow(draft.verifyWindow ?? "");
 				setVerifyScenario(draft.verifyScenario ?? "");
 				setContextPolicy(normalizeContextPolicy(draft.contextPolicy));
@@ -416,6 +431,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			autoSplit,
 			verifyWindow,
 			verifyScenario,
 			contextPolicy,
@@ -443,6 +459,7 @@ export function TaskCreationWizard({
 			requireReviewBeforeCoding,
 			tddMode,
 			verifyLoop,
+			autoSplit,
 			verifyWindow,
 			verifyScenario,
 			contextPolicy,
@@ -647,6 +664,9 @@ export function TaskCreationWizard({
 			if (tddMode) metadata.tddMode = true;
 			// Only an explicit "off" is stored: absent means the project default.
 			if (!verifyLoop) metadata.verifyLoop = false;
+			const split = autoSplitMetadata(autoSplit);
+			if (split.noSplit) metadata.noSplit = true;
+			if (split.splitMaxLines !== undefined) metadata.splitMaxLines = split.splitMaxLines;
 			if (verifyLoop && verifyWindow.trim()) metadata.verifyWindow = verifyWindow.trim();
 			if (verifyLoop && verifyScenario.trim()) metadata.verifyScenario = verifyScenario.trim();
 			// Absent means the defaults (auto, 50%, handoff prepared): only a
@@ -718,6 +738,7 @@ export function TaskCreationWizard({
 		setImages([]);
 		setReferencedFiles([]);
 		setRequireReviewBeforeCoding(false);
+		setAutoSplit(DEFAULT_AUTO_SPLIT_VALUE);
 		setContextPolicy({ ...DEFAULT_CONTEXT_POLICY });
 		setAcceptanceCriteria(ensureAtLeastOne([]));
 		setExtraNote("");
@@ -849,7 +870,12 @@ export function TaskCreationWizard({
 						</Button>
 						<Button
 							onClick={handleCreate}
-							disabled={isCreating || dictationPending || !description.trim()}
+							disabled={
+								isCreating ||
+								dictationPending ||
+								!description.trim() ||
+								!isAutoSplitValueValid(autoSplit)
+							}
 						>
 							{isCreating ? (
 								<>
@@ -930,6 +956,10 @@ export function TaskCreationWizard({
 					onRequireReviewChange={setRequireReviewBeforeCoding}
 					tddMode={tddMode}
 					onTddModeChange={setTddMode}
+					autoSplit={autoSplit}
+					onAutoSplitChange={setAutoSplit}
+					autoSplitProjectMaxLines={projectAutoSplit?.maxLines}
+					autoSplitProjectDisabled={projectAutoSplit?.enabled === false}
 					verifyLoop={verifyLoop}
 					onVerifyLoopChange={setVerifyLoop}
 					verifyWindow={verifyWindow}
