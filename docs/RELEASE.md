@@ -155,7 +155,8 @@ The `main` ruleset refuses the other methods. Once merged, GitHub Actions will a
    notice that the release was not announced), `wiki-narrative.yml`. A release published
    with `GITHUB_TOKEN` raises no event other workflows can listen to, so `release: published`
    alone would never start them.
-9. **Update README** with new version badge and download links: one commit, built on `main`,
+9. **Update README** (`README.md` and its French twin `README.fr.md`) with new version badge and
+   download links: one commit, built on `main`,
    merged into `develop` and carried to `main` by a pull request that auto-merges with a merge
    commit (`chore/readme-vX.Y.Z`). Both branches get the same commit, so neither drifts.
 

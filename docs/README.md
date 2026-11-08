@@ -12,7 +12,7 @@ fichiers y renvoient.
 | [`architecture/`](architecture/) | pourquoi chaque feature est construite ainsi, une feature par fichier | référence |
 | [`SECURITY.md`](SECURITY.md) | politique de sécurité : versions supportées, signaler une vulnérabilité | public |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | contribuer : installation, style, tests, branches, PR | humains |
-| [`FEATURES.md`](FEATURES.md) | toutes les features de l'app, par domaine (le README n'en garde que l'essentiel) | public |
+| [`FEATURES.md`](FEATURES.md) | toutes les features de l'app, par domaine (le README, en anglais [`../README.md`](../README.md) et en français [`../README.fr.md`](../README.fr.md), n'en garde que l'essentiel ; tout changement de l'un se reporte dans l'autre) | public |
 | [`INSTALLATION.md`](INSTALLATION.md) | installer l'app ou lancer depuis les sources, providers, notes Windows, hooks, dépannage | guide |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | vue d'ensemble : agents, sous-agents, workflows, état, couches de sécurité | référence |
 | [`CONFIGURATION.md`](CONFIGURATION.md) | providers, résolution des identifiants, variables d'environnement | référence |

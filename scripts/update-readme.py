@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Update README.md version badges and download links.
+Update the version badges and download links of README.md and README.fr.md.
+
+Both READMEs carry the same markers. The release assets are read once and the
+download table is written in the language of each file.
 
 Usage:
     python scripts/update-readme.py <version> [--prerelease]
@@ -57,7 +60,20 @@ PLATFORM_ASSETS = [
     ("Linux (Flatpak)", "-linux-x86_64.flatpak"),
 ]
 
-_TABLE_HEADER = "| Platform | Download |\n|----------|----------|\n"
+# Every README the release refreshes, with its language. The French one is
+# optional so that a checkout without it (an old branch, a fork) still works.
+README_FILES = [("README.md", "en"), ("README.fr.md", "fr")]
+
+_TABLE_HEADERS = {
+    "en": "| Platform | Download |\n|----------|----------|\n",
+    "fr": "| Plateforme | Téléchargement |\n|------------|----------------|\n",
+}
+_NO_BINARIES = {
+    "en": "_No binaries are attached to this release yet. "
+    "See [the release page]({url})._\n",
+    "fr": "_Aucun binaire n'est encore attaché à cette version. "
+    "Voir [la page de la version]({url})._\n",
+}
 
 
 def fetch_release_assets(version: str) -> list[str] | None:
@@ -84,7 +100,9 @@ def fetch_release_assets(version: str) -> list[str] | None:
     return [asset.get("name", "") for asset in payload.get("assets", [])]
 
 
-def build_download_table(version: str, assets: list[str] | None) -> str:
+def build_download_table(
+    version: str, assets: list[str] | None, lang: str = "en"
+) -> str:
     """The download table, listing only what the release actually carries."""
     if assets is None:
         print("Listing every platform: the release assets could not be read.")
@@ -111,17 +129,14 @@ def build_download_table(version: str, assets: list[str] | None) -> str:
             )
 
     if not wanted:
-        return (
-            "_No binaries are attached to this release yet. "
-            f"See [the release page]({REPO_URL}/releases/tag/v{version})._\n"
-        )
+        return _NO_BINARIES[lang].format(url=f"{REPO_URL}/releases/tag/v{version}")
 
     rows = "".join(
         f"| **{label}** | [WorkPilot-AI-{version}{suffix}]"
         f"({REPO_URL}/releases/download/v{version}/WorkPilot-AI-{version}{suffix}) |\n"
         for label, suffix in wanted
     )
-    return _TABLE_HEADER + rows
+    return _TABLE_HEADERS[lang] + rows
 
 
 def validate_version(version: str) -> bool:
@@ -166,18 +181,17 @@ def section_has_links(text: str, start_marker: str, end_marker: str) -> bool:
     return "WorkPilot-AI-" in match.group(1)
 
 
-def _update_or_generate_downloads(content, start, end, version, semver):
+def _update_or_generate_downloads(content, start, end, table):
     """Rewrite the download table from the assets the release actually has.
 
     Deliberately a regeneration and not a version substitution. Substituting
     carried every row forward untouched, so one release built without a
     platform left a dead link in the README for every release after it.
     """
-    table = build_download_table(version, fetch_release_assets(version))
     return replace_section_content(content, start, end, table)
 
 
-def _update_beta(content, version, version_badge, semver, semver_badge):
+def _update_beta(content, version, version_badge, semver, semver_badge, table):
     """Update beta sections of README."""
     print(f"Updating BETA section to {version} (badge: {version_badge})")
 
@@ -197,13 +211,11 @@ def _update_beta(content, version, version_badge, semver, semver_badge):
             content, BETA_BADGE_START, BETA_BADGE_END, badge_line
         )
 
-    content = _update_or_generate_downloads(
-        content, BETA_DL_START, BETA_DL_END, version, semver
-    )
+    content = _update_or_generate_downloads(content, BETA_DL_START, BETA_DL_END, table)
     return content
 
 
-def _update_stable(content, version, version_badge, semver, semver_badge):
+def _update_stable(content, version, version_badge, semver, semver_badge, table):
     """Update stable sections of README."""
     print(f"Updating STABLE section to {version} (badge: {version_badge})")
 
@@ -226,7 +238,7 @@ def _update_stable(content, version, version_badge, semver, semver_badge):
 
     # Download links
     content = _update_or_generate_downloads(
-        content, STABLE_DL_START, STABLE_DL_END, version, semver
+        content, STABLE_DL_START, STABLE_DL_END, table
     )
 
     # Remove "no stable release yet" notice
@@ -235,41 +247,63 @@ def _update_stable(content, version, version_badge, semver, semver_badge):
     return content
 
 
-def update_readme(version: str, is_prerelease: bool) -> bool:
+def update_readme(
+    version: str,
+    is_prerelease: bool,
+    path: str = "README.md",
+    lang: str = "en",
+    assets: list[str] | None = None,
+) -> bool:
     """
-    Update README.md with new version.
+    Update one README with the new version.
+
+    `assets` are the release's asset names (None: unknown, every platform is
+    listed); the caller reads them once for every README.
 
     Returns:
         True if changes were made, False otherwise
     """
     version_badge = version.replace("-", "--")
+    table = build_download_table(version, assets, lang)
 
-    with open("README.md", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         original_content = f.read()
 
     if is_prerelease:
         content = _update_beta(
-            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE
+            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE, table
         )
     else:
         content = _update_stable(
-            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE
+            original_content, version, version_badge, SEMVER_RE, SEMVER_BADGE_RE, table
         )
 
     if content == original_content:
-        print("No changes needed")
+        print(f"{path}: no changes needed")
         return False
 
-    with open("README.md", "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"README.md updated for {version} (prerelease={is_prerelease})")
+    print(f"{path} updated for {version} (prerelease={is_prerelease})")
     return True
+
+
+def update_all_readmes(version: str, is_prerelease: bool) -> bool:
+    """Update every README of README_FILES; README.md must exist."""
+    assets = fetch_release_assets(version)
+    changed = False
+    for path, lang in README_FILES:
+        if path != "README.md" and not os.path.exists(path):
+            print(f"{path} not found, skipped")
+            continue
+        changed |= update_readme(version, is_prerelease, path, lang, assets)
+    return changed
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Update README.md version badges and download links"
+        description="Update README.md and README.fr.md version badges and download links"
     )
     parser.add_argument("version", help="Version string (e.g., 2.8.0 or 2.8.0-beta.1)")
     parser.add_argument(
@@ -288,7 +322,7 @@ def main():
     is_prerelease = args.prerelease or ("-" in args.version)
 
     try:
-        update_readme(args.version, is_prerelease)
+        update_all_readmes(args.version, is_prerelease)
     except FileNotFoundError:
         print("ERROR: README.md not found", file=sys.stderr)
         sys.exit(1)

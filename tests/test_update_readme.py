@@ -14,6 +14,7 @@ asset does.
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -127,3 +128,93 @@ class TestFetchIsForgiving:
 
         monkeypatch.setattr(ur.urllib.request, "urlopen", boom)
         assert ur.fetch_release_assets("2.0.0") is None
+
+
+class TestBothLanguages:
+    """README.md and README.fr.md are refreshed together, each in its language."""
+
+    def test_french_table_has_french_header(self, ur):
+        table = ur.build_download_table(
+            "2.0.0", _assets("2.0.0", "-win32-x64.exe"), "fr"
+        )
+        assert table.startswith("| Plateforme | Téléchargement |")
+        assert "WorkPilot-AI-2.0.0-win32-x64.exe" in table
+
+    def test_french_no_binaries_sentence(self, ur):
+        table = ur.build_download_table("1.1.0", [], "fr")
+        assert "Aucun binaire" in table
+        assert "releases/tag/v1.1.0" in table
+
+    def test_every_readme_is_updated_with_one_asset_read(
+        self, ur, tmp_path, monkeypatch
+    ):
+        section = (
+            f"{ur.STABLE_BADGE_START}\n{ur.STABLE_BADGE_END}\n"
+            f"{ur.STABLE_DL_START}\nold\n{ur.STABLE_DL_END}\n"
+        )
+        (tmp_path / "README.md").write_text(section, encoding="utf-8")
+        (tmp_path / "README.fr.md").write_text(section, encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        calls = []
+
+        def fake_fetch(version):
+            calls.append(version)
+            return _assets(version, "-win32-x64.exe")
+
+        monkeypatch.setattr(ur, "fetch_release_assets", fake_fetch)
+        assert ur.update_all_readmes("2.0.0", False)
+        assert calls == ["2.0.0"]
+        en = (tmp_path / "README.md").read_text(encoding="utf-8")
+        fr = (tmp_path / "README.fr.md").read_text(encoding="utf-8")
+        assert "| Platform | Download |" in en
+        assert "| Plateforme | Téléchargement |" in fr
+        for text in (en, fr):
+            assert "stable-2.0.0-blue" in text
+            assert "WorkPilot-AI-2.0.0-win32-x64.exe" in text
+
+    def test_a_missing_french_readme_is_skipped(self, ur, tmp_path, monkeypatch):
+        (tmp_path / "README.md").write_text(
+            f"{ur.STABLE_DL_START}\nold\n{ur.STABLE_DL_END}\n", encoding="utf-8"
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(ur, "fetch_release_assets", lambda _v: None)
+        assert ur.update_all_readmes("2.0.0", False)
+        assert not (tmp_path / "README.fr.md").exists()
+
+
+class TestTheTwoReadmesStayTwins:
+    """The French README must not drift from the English one."""
+
+    EN = REPO_ROOT / "README.md"
+    FR = REPO_ROOT / "README.fr.md"
+
+    @staticmethod
+    def _images(text: str) -> list[str]:
+        return re.findall(r"\]\((\.github/assets/screenshots/[^)]+)\)", text)
+
+    def test_each_links_to_the_other(self):
+        assert "(README.fr.md)" in self.EN.read_text(encoding="utf-8")
+        assert "(README.md)" in self.FR.read_text(encoding="utf-8")
+
+    def test_same_screenshots_in_the_same_order(self):
+        en = self._images(self.EN.read_text(encoding="utf-8"))
+        fr = self._images(self.FR.read_text(encoding="utf-8"))
+        assert en and en == fr
+        for image in en:
+            assert (REPO_ROOT / image).is_file(), image
+
+    def test_same_release_markers(self, ur):
+        markers = [
+            ur.STABLE_BADGE_START,
+            ur.STABLE_BADGE_END,
+            ur.STABLE_DL_START,
+            ur.STABLE_DL_END,
+            ur.BETA_BADGE_START,
+            ur.BETA_BADGE_END,
+            ur.BETA_DL_START,
+            ur.BETA_DL_END,
+        ]
+        for path in (self.EN, self.FR):
+            text = path.read_text(encoding="utf-8")
+            for marker in markers:
+                assert text.count(marker) == 1, (path.name, marker)
