@@ -1,14 +1,16 @@
 import {
+	AlertTriangle,
 	Check,
 	Copy,
 	GitBranch,
-	Loader2,
 	RotateCcw,
 	Terminal,
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Notice, ScanLine } from "../charter";
+import "../charter/charter.css";
 import {
 	executeGitCommand,
 	useNaturalLanguageGitStore,
@@ -37,7 +39,7 @@ import { Textarea } from "../ui/textarea";
  *   <NaturalLanguageGitDialog />
  */
 export function NaturalLanguageGitDialog() {
-	const { t } = useTranslation(["naturalLanguageGit", "common"]);
+	const { t } = useTranslation(["naturalLanguageGit", "common", "navigation"]);
 	const [copied, setCopied] = useState(false);
 	const streamOutputRef = useRef<HTMLPreElement>(null);
 
@@ -109,9 +111,12 @@ export function NaturalLanguageGitDialog() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-			<DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
+			<DialogContent className="wp-scope sm:max-w-[700px] max-h-[85vh] flex flex-col">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
+					<span className="wp-kicker">
+						{t("navigation:groups.gitIntegrations")}
+					</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
 						<GitBranch className="h-5 w-5 text-primary" />
 						{t("naturalLanguageGit:title")}
 					</DialogTitle>
@@ -131,12 +136,7 @@ export function NaturalLanguageGitDialog() {
 							value={naturalLanguageCommand}
 							onChange={(e) => setNaturalLanguageCommand(e.target.value)}
 							placeholder={t("naturalLanguageGit:command.placeholder")}
-							className="min-h-[100px] border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-							style={{
-								border: "2px solid rgb(250, 204, 21)",
-								borderRadius: "0.5rem",
-								outline: "none",
-							}}
+							className="min-h-[100px]"
 							disabled={isProcessing}
 						/>
 						<div className="text-xs text-muted-foreground">
@@ -146,22 +146,17 @@ export function NaturalLanguageGitDialog() {
 
 					{/* No Project Warning */}
 					{!selectedProjectId && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-							<p className="text-sm text-destructive">
-								{t("naturalLanguageGit:errors.noProject")}
-							</p>
-						</div>
+						<Notice tone="amber" icon={AlertTriangle}>
+							{t("naturalLanguageGit:errors.noProject")}
+						</Notice>
 					)}
 
 					{/* Status / Streaming Output during processing */}
 					{isProcessing && (
 						<div className="space-y-3">
-							<div className="flex items-center gap-2 text-sm text-muted-foreground">
-								<Loader2 className="h-4 w-4 animate-spin text-primary" />
-								<span>
-									{status || t("naturalLanguageGit:status.processing")}
-								</span>
-							</div>
+							<ScanLine
+								label={status || t("naturalLanguageGit:status.processing")}
+							/>
 							{streamingOutput && (
 								<div className="space-y-1">
 									<Label className="text-xs text-muted-foreground">
@@ -169,7 +164,7 @@ export function NaturalLanguageGitDialog() {
 									</Label>
 									<pre
 										ref={streamOutputRef}
-										className="bg-muted/50 rounded-lg p-3 text-xs font-mono max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word"
+										className="wp-code max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word p-3 text-xs"
 									>
 										{streamingOutput}
 									</pre>
@@ -180,14 +175,14 @@ export function NaturalLanguageGitDialog() {
 
 					{/* Error state */}
 					{isError && (
-						<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
-							<p className="text-sm font-medium text-destructive">
+						<Notice tone="red" icon={AlertTriangle} role="alert">
+							<span className="font-medium">
 								{t("naturalLanguageGit:status.error")}
-							</p>
-							<p className="text-sm text-destructive/80">
+							</span>
+							<span className="mt-1 block text-xs">
 								{error || t("naturalLanguageGit:errors.generic")}
-							</p>
-						</div>
+							</span>
+						</Notice>
 					)}
 
 					{/* Result */}

@@ -2041,14 +2041,7 @@ export function App() {
 													</div>
 												)}
 												{activeView === "git-surgeon" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<GitSurgeonDashboard
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<GitSurgeonDashboard projectPath={selectedProject?.path} />
 												)}
 												{activeView === "release-coordinator" && (
 													<div
@@ -2135,14 +2128,7 @@ export function App() {
 													</div>
 												)}
 												{activeView === "blast-radius" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<BlastRadiusView
-															projectRoot={selectedProject?.path}
-														/>
-													</div>
+													<BlastRadiusView projectRoot={selectedProject?.path} />
 												)}
 												{activeView === "team-bot" && (
 													<div
