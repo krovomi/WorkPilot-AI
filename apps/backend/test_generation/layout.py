@@ -45,6 +45,8 @@ TEST_DIR_NAMES: tuple[str, ...] = (
 # The name proposed when no test directory exists yet, per language.
 _PROPOSED_DIR_BY_LANGUAGE: dict[str, str] = {
     "ruby": "spec",
+    "dart": "test",
+    "swift": "Tests",
 }
 _DEFAULT_PROPOSED_DIR = "tests"
 
@@ -65,6 +67,10 @@ _PROJECT_MARKERS: tuple[str, ...] = (
     "build.gradle.kts",
     "Cargo.toml",
     "go.mod",
+    "composer.json",
+    "Gemfile",
+    "pubspec.yaml",
+    "Package.swift",
 )
 
 # How many levels to walk up before giving up on finding a project root.
@@ -131,12 +137,12 @@ def _language_for(source_file: str, language: str | None) -> str:
     if language and language != "unknown":
         return language
     # Imported here rather than at module import time: the map lives with the
-    # analyser that owns it, and a second copy is how two answers to "what
+    # stack rules that own it, and a second copy is how two answers to "what
     # language is this" start.
-    from test_generation.generator import ProjectAnalyzer
+    from test_generation.stacks import LANGUAGE_BY_EXTENSION
 
     ext = Path(source_file).suffix.lower()
-    return ProjectAnalyzer.EXTENSION_TO_LANGUAGE.get(ext, "unknown")
+    return LANGUAGE_BY_EXTENSION.get(ext, "unknown")
 
 
 def conventional_test_file_name(source_file: str, language: str | None = None) -> str:
@@ -167,6 +173,12 @@ def conventional_test_file_name(source_file: str, language: str | None = None) -
         return f"{stem}_spec.rb"
     if lang == "php":
         return f"{_pascal(stem)}Test.php"
+    if lang == "dart":
+        return f"{stem}_test.dart"
+    if lang == "c":
+        return f"test_{stem}.c"
+    if lang == "cpp":
+        return f"{stem}_test{suffix if suffix in {'.cpp', '.cc', '.cxx'} else '.cpp'}"
     return f"test_{stem}{suffix}"
 
 

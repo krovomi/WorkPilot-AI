@@ -1,76 +1,40 @@
-import {
-	Check,
-	ChevronDown,
-	Copy,
-	FlaskConical,
-	Loader2,
-	Play,
-	Search,
-	Zap,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { FlaskConical, Play, Search, Square, X, Zap } from "lucide-react";
+import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+	isTestStudioLanguage,
+	testStudioLanguage,
+} from "../../../shared/constants/test-studio-languages";
 import { useTestDestinationPrompt } from "../../hooks/use-test-destination-prompt";
 import { useTestLibraries } from "../../hooks/use-test-libraries";
+import {
+	type InspectorTab,
+	inspectorTabForStep,
+	STUDIO_MODES,
+	type StudioMode,
+	type StudioStep,
+	studioStepStates,
+} from "../../lib/test-studio-steps";
 import { useProjectStore } from "../../stores/project-store";
-import {
-	type CoverageGap,
-	type GeneratedTest,
-	useTestGenerationStore,
-} from "../../stores/test-generation-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Card, CardContent } from "../ui/card";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "../ui/dialog";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "../ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Textarea } from "../ui/textarea";
-import { GenerationErrorPanel } from "./GenerationErrorPanel";
-import { LiveGenerationSurface } from "./LiveGenerationSurface";
-import { SmartFilePicker } from "./SmartFilePicker";
+import { useTestGenerationStore } from "../../stores/test-generation-store";
+import { Dialog, DialogOverlay, DialogPortal } from "../ui/dialog";
+import { StudioInspector, tabsForMode } from "./studio/StudioInspector";
+import { StudioPipeline } from "./studio/StudioPipeline";
+import { looksLikeFile, TargetColumn } from "./studio/TargetColumn";
 import { TestDestinationDialog } from "./TestDestinationDialog";
-import { TestLibrariesPicker } from "./TestLibrariesPicker";
+import "./studio/test-studio.css";
 
-const PRIORITY_COLORS = {
-	high: "bg-destructive/15 text-destructive",
-	medium: "bg-warning/15 text-warning",
-	low: "bg-success/15 text-success",
+const MODE_ACCENT: Record<StudioMode, string> = {
+	analyze: "var(--tg-analyze)",
+	unit: "var(--tg-unit)",
+	e2e: "var(--tg-e2e)",
+	tdd: "var(--tg-tdd)",
 };
 
-/** Count assertion-like calls in a test body, for the per-test summary chip. */
-function countAssertions(code: string): number {
-	if (!code) return 0;
-	const matches = code.match(
-		/\b(assert|expect|Assert|should|verify|Verify)\b|\.toBe|\.toEqual|\.Should\(/g,
-	);
-	return matches ? matches.length : 0;
-}
+/** Used when neither the person nor the project names a TDD language. */
+const FALLBACK_TDD_LANGUAGE = "typescript";
 
-/**
- * TestGenerationDialog — AI-powered test generation dialog.
- *
- * Shows a dialog where users can analyze coverage gaps and generate
- * comprehensive test suites for their code.
- *
- * Usage:
- *   const { openDialog, closeDialog, isOpen } = useTestGenerationStore();
- *   <TestGenerationDialog />
- */
 interface TestGenerationDialogProps {
 	/** Called when tests are generated and should be applied */
 	readonly onApplyTests?: (
@@ -79,15 +43,28 @@ interface TestGenerationDialogProps {
 	) => void;
 }
 
+/**
+ * The test generation agent, as a studio in the look of Visual-to-Code and
+ * Import Design: what to test on the left, the run as cards on glowing wires
+ * in the middle, the result on the right, and the action of the moment in the
+ * bar at the bottom.
+ *
+ * Four modes share the layout — coverage analysis, unit tests, E2E from a
+ * user story, TDD from a description — and every one of them works for the
+ * project's own stack: the language and the test framework come from the
+ * project's manifests, not from a list of two.
+ */
 export function TestGenerationDialog({
 	onApplyTests,
 }: TestGenerationDialogProps) {
 	const { t } = useTranslation(["testGeneration", "common"]);
-	const [copied, setCopied] = useState(false);
-	const [activeTab, setActiveTab] = useState("analyze");
+	const [mode, setMode] = useState<StudioMode>("analyze");
+	const [tab, setTab] = useState<InspectorTab>("gaps");
+	const [selectedStep, setSelectedStep] = useState<StudioStep | null>(null);
 	const [userStory, setUserStory] = useState("");
 	const [targetModule, setTargetModule] = useState("");
 	const [tddDescription, setTddDescription] = useState("");
+	const [projectLanguage, setProjectLanguage] = useState<string>();
 	// Where the tests go is settled before the run starts: asking after a
 	// generation would mean holding a finished file hostage to a question.
 	const destinationPrompt = useTestDestinationPrompt();
@@ -97,9 +74,9 @@ export function TestGenerationDialog({
 		isOpen,
 		closeDialog,
 		phase,
-		isLiveRun,
-		status,
-		result,
+		runKind,
+		liveStages,
+		liveMeta,
 		selectedFile,
 		existingTestPath,
 		coverageTarget,
@@ -114,31 +91,67 @@ export function TestGenerationDialog({
 		generateUnitTests,
 		generateE2ETests,
 		generateTDDTests,
+		cancelGeneration,
 	} = useTestGenerationStore();
 
-	// What the tests are written against — the project's own stack, unless the
-	// user says otherwise. Resolved from the manifests, so the common case
-	// needs no interaction.
-	const libraries = useTestLibraries(selectedFile, projectPath);
+	// What the tests are written against follows the mode: the TDD language
+	// picked (or the project's), the E2E target, or the file of the moment.
+	// It used to follow `selectedFile` everywhere, so a C# TDD run was offered
+	// the libraries of whatever file the Unit tab had open.
+	const librariesFile =
+		mode === "tdd" ? "" : mode === "e2e" ? (looksLikeFile(targetModule) ? targetModule : "") : selectedFile;
+	const libraries = useTestLibraries(
+		librariesFile,
+		projectPath,
+		undefined,
+		mode === "tdd" && tddLanguage ? tddLanguage : undefined,
+	);
 
-	// Reset state when dialog closes
+	// With no language pinned, the backend answers with the project's own:
+	// remember it for the "auto" chip and the run.
+	useEffect(() => {
+		if (mode === "tdd" && !tddLanguage && libraries.selection?.language) {
+			setProjectLanguage(libraries.selection.language);
+		}
+	}, [mode, tddLanguage, libraries.selection?.language]);
+
 	useEffect(() => {
 		if (!isOpen) {
 			reset();
-			setActiveTab("analyze");
+			setMode("analyze");
+			setTab("gaps");
+			setSelectedStep(null);
 			setUserStory("");
 			setTargetModule("");
 			setTddDescription("");
-			setCopied(false);
 		}
 	}, [isOpen, reset]);
 
+	const running = phase === "analyzing" || phase === "generating";
+	const states = studioStepStates({ mode, runKind, phase, liveStages });
+
+	const switchMode = (next: StudioMode) => {
+		if (running || next === mode) return;
+		setMode(next);
+		setTab(tabsForMode(next)[0]);
+		setSelectedStep(null);
+	};
+
+	const selectStep = (step: StudioStep | null) => {
+		setSelectedStep(step);
+		if (step) {
+			const wanted = inspectorTabForStep(step);
+			if (tabsForMode(mode).includes(wanted)) setTab(wanted);
+		}
+	};
+
 	const handleAnalyzeCoverage = useCallback(async () => {
 		if (!selectedFile) return;
+		setTab("gaps");
 		try {
 			await analyzeCoverage(selectedFile, existingTestPath || undefined);
 		} catch {
-			// Error is surfaced via the store's error state (rendered in the UI).
+			// Surfaced through the store's error state, in the inspector.
 		}
 	}, [selectedFile, existingTestPath, analyzeCoverage]);
 
@@ -148,6 +161,7 @@ export function TestGenerationDialog({
 			existingTestPath: existingTestPath || undefined,
 		});
 		if (choice.cancelled) return;
+		setTab("code");
 		try {
 			await generateUnitTests(
 				selectedFile,
@@ -157,7 +171,7 @@ export function TestGenerationDialog({
 				libraries.chosen,
 			);
 		} catch {
-			// Error is surfaced via the store's error state (rendered in the UI).
+			// Surfaced through the store's error state, in the inspector.
 		}
 	}, [
 		selectedFile,
@@ -171,630 +185,267 @@ export function TestGenerationDialog({
 
 	const handleGenerateE2ETests = useCallback(async () => {
 		if (!userStory.trim() || !targetModule.trim()) return;
+		setTab("code");
 		try {
-			await generateE2ETests(userStory, targetModule, undefined, libraries.chosen);
+			await generateE2ETests(userStory, targetModule.trim(), undefined, libraries.chosen);
 		} catch {
-			// Error is surfaced via the store's error state (rendered in the UI).
+			// Surfaced through the store's error state, in the inspector.
 		}
 	}, [userStory, targetModule, generateE2ETests, libraries.chosen]);
 
+	// TDD has no source file to resolve a layout from, so there is nothing to
+	// ask about: the backend falls back to the project's own test directory.
+	const tddRunLanguage =
+		tddLanguage || (isTestStudioLanguage(projectLanguage) ? projectLanguage : FALLBACK_TDD_LANGUAGE);
 	const handleGenerateTDDTests = useCallback(async () => {
 		if (!tddDescription.trim()) return;
+		setTab("code");
 		try {
 			await generateTDDTests(
 				{
 					description: tddDescription,
-					language: tddLanguage,
+					language: tddRunLanguage,
 					snippet_type: tddSnippetType,
 				},
 				undefined,
 				libraries.chosen,
 			);
 		} catch {
-			// Error is surfaced via the store's error state (rendered in the UI).
+			// Surfaced through the store's error state, in the inspector.
 		}
-	}, [
-		tddDescription,
-		tddLanguage,
-		tddSnippetType,
-		generateTDDTests,
-		libraries.chosen,
-	]);
-	// TDD has no source file to resolve a layout from, so there is nothing to
-	// ask about: the backend falls back to the project's own test directory.
+	}, [tddDescription, tddRunLanguage, tddSnippetType, generateTDDTests, libraries.chosen]);
 
-	const handleCopyToClipboard = useCallback((content: string) => {
-		navigator.clipboard.writeText(content);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	}, []);
+	const ready: Record<StudioMode, boolean> = {
+		analyze: Boolean(selectedFile),
+		unit: Boolean(selectedFile),
+		e2e: Boolean(userStory.trim() && targetModule.trim()),
+		tdd: Boolean(tddDescription.trim()),
+	};
+	const run: Record<StudioMode, () => Promise<void>> = {
+		analyze: handleAnalyzeCoverage,
+		unit: handleGenerateUnitTests,
+		e2e: handleGenerateE2ETests,
+		tdd: handleGenerateTDDTests,
+	};
 
-	const handleApplyTests = useCallback(() => {
-		if (result && onApplyTests) {
-			onApplyTests(result.test_file_content, result.test_file_path);
-			closeDialog();
+	const launch = () => {
+		if (!running && ready[mode]) void run[mode]();
+	};
+
+	const onKeyDown = (event: KeyboardEvent) => {
+		if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+			event.preventDefault();
+			launch();
 		}
-	}, [result, onApplyTests, closeDialog]);
+	};
 
-	const renderCoverageGaps = (gaps: CoverageGap[]) => (
-		<div className="space-y-3">
-			{gaps.map((gap) => (
-				<Card key={`${gap.function.full_name}-${gap.function.line_number}`}>
-					<CardContent className="pt-4">
-						<div className="flex items-center justify-between mb-2">
-							<h4 className="font-mono text-sm">{gap.function.full_name}</h4>
-							<Badge className={PRIORITY_COLORS[gap.priority]}>
-								{t("testGeneration:gap.priority", { priority: gap.priority })}
-							</Badge>
-						</div>
-						<p className="mb-2 text-sm text-muted-foreground">{gap.reason}</p>
-						<div className="text-xs text-muted-foreground">
-							{t("testGeneration:gap.details", {
-									line: gap.function.line_number,
-									complexity: gap.function.complexity,
-									tests: gap.suggested_test_count,
-								})}
-						</div>
-					</CardContent>
-				</Card>
-			))}
-		</div>
-	);
+	const generateFromGaps = () => {
+		setMode("unit");
+		setTab("code");
+		setSelectedStep(null);
+		void handleGenerateUnitTests();
+	};
 
-	const renderGeneratedTests = (tests: GeneratedTest[]) => (
-		<div className="space-y-3">
-			{tests.map((test) => {
-				const asserts = countAssertions(test.test_code);
-				const hasCode = Boolean(test.test_code?.trim());
-				return (
-					<Card key={test.test_name} className="overflow-hidden">
-						<CardContent className="flex flex-col gap-2 pt-4">
-							<div className="flex items-center gap-2">
-								<span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-success/15 text-success">
-									<Check className="h-3 w-3" />
-								</span>
-								<span className="flex-1 break-all font-mono text-sm font-medium">
-									{test.test_name}
-								</span>
-								<Badge variant="outline" className="flex-none">
-									{test.test_type}
-								</Badge>
-							</div>
-							{test.description && (
-								<p className="text-sm text-muted-foreground">
-									{test.description}
-								</p>
-							)}
-							{asserts > 0 && (
-								<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-									<Check className="h-3 w-3 text-primary" />
-									<span className="font-medium text-primary">{asserts}</span>
-									{t("testGeneration:live.assertions", {
-										defaultValue: "assertions",
-									})}
-								</div>
-							)}
-							{hasCode && (
-								<details className="group">
-									<summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-										<ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-										{t("testGeneration:live.viewCode", {
-											defaultValue: "View code",
-										})}
-									</summary>
-									<div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950 p-3">
-										<pre className="whitespace-pre font-mono text-2xs leading-relaxed text-zinc-300">
-											{test.test_code}
-										</pre>
-									</div>
-								</details>
-							)}
-						</CardContent>
-					</Card>
-				);
-			})}
-		</div>
+	const target =
+		mode === "tdd"
+			? tddDescription.trim()
+			: mode === "e2e"
+				? targetModule
+				: selectedFile;
+	const inputPreview = (mode === "e2e" ? userStory : tddDescription).trim().slice(0, 60);
+	const ours = runKind === mode;
+	const stackLanguage = testStudioLanguage(
+		(ours && liveMeta.language) ||
+			(mode === "tdd" ? tddRunLanguage : libraries.selection?.language),
 	);
+	const fileName = selectedFile ? selectedFile.split(/[\\/]/).pop() : "";
 
 	return (
 		<>
-		<TestDestinationDialog
-			destination={destinationPrompt.pending}
-			onConfirm={destinationPrompt.confirm}
-			onCancel={destinationPrompt.cancel}
-		/>
-		<Dialog open={isOpen} onOpenChange={closeDialog}>
-			<DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<FlaskConical className="w-5 h-5" />
-						{t("testGeneration:title", {
-							defaultValue: "Test Generation Agent",
-						})}
-					</DialogTitle>
-					<DialogDescription>
-						{t("testGeneration:description", {
-							defaultValue:
-								"Analyze coverage gaps and generate comprehensive test suites for your code.",
-						})}
-					</DialogDescription>
-				</DialogHeader>
-
-				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-					<TabsList className="grid w-full grid-cols-4">
-						<TabsTrigger value="analyze">
-							{t("testGeneration:tabs.analyze", { defaultValue: "Analyze" })}
-						</TabsTrigger>
-						<TabsTrigger value="unit">
-							{t("testGeneration:tabs.unit", { defaultValue: "Unit Tests" })}
-						</TabsTrigger>
-						<TabsTrigger value="e2e">
-							{t("testGeneration:tabs.e2e", { defaultValue: "E2E Tests" })}
-						</TabsTrigger>
-						<TabsTrigger value="tdd">
-							{t("testGeneration:tabs.tdd", { defaultValue: "TDD Mode" })}
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="analyze" className="space-y-4">
-						<div className="space-y-4">
-							<div>
-								<Label>
-									{t("testGeneration:sourceFile.label", {
-										defaultValue: "Source File",
-									})}
-								</Label>
-								<SmartFilePicker
-									value={selectedFile}
-									onChange={setSelectedFile}
-									tabType="analyze"
-									placeholder={t("testGeneration:filePicker.selectFile")}
-								/>
-							</div>
-
-							{existingTestPath && (
+			<TestDestinationDialog
+				destination={destinationPrompt.pending}
+				onConfirm={destinationPrompt.confirm}
+				onCancel={destinationPrompt.cancel}
+			/>
+			<Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
+				<DialogPortal>
+					<DialogOverlay />
+					<DialogPrimitive.Content
+						className="tg-root"
+						data-testid="test-studio"
+						style={{ ["--tg-mode" as string]: MODE_ACCENT[mode] }}
+						onKeyDown={onKeyDown}
+					>
+						<div className="tg-ambient" />
+						<header className="tg-header">
+							<div className="tg-brand">
+								<span className="tg-glyph">
+									<FlaskConical className="h-4 w-4" />
+								</span>
 								<div>
-									<Label htmlFor="existing-test">
-										{t("testGeneration:existingTest.label", {
-											defaultValue: "Existing Test File",
-										})}
-									</Label>
-									<Input id="existing-test" value={existingTestPath} readOnly />
+									<div className="tg-kicker">{t("studio.kicker")}</div>
+									<DialogPrimitive.Title asChild>
+										<h2>{t("title")}</h2>
+									</DialogPrimitive.Title>
+									<DialogPrimitive.Description className="sr-only">
+										{t("description")}
+									</DialogPrimitive.Description>
 								</div>
-							)}
-
-							<div className="flex gap-2">
-								<Button
-									onClick={handleAnalyzeCoverage}
-									disabled={phase === "analyzing" || !selectedFile}
-								>
-									{phase === "analyzing" ? (
-										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-									) : (
-										<Search className="w-4 h-4 mr-2" />
-									)}
-									{t("testGeneration:analyzeCoverage", {
-										defaultValue: "Analyze Coverage",
-									})}
-								</Button>
-								<Button
-									onClick={handleGenerateUnitTests}
-									disabled={phase === "generating" || !selectedFile}
-									variant="outline"
-								>
-									{phase === "generating" ? (
-										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-									) : (
-										<Zap className="w-4 h-4 mr-2" />
-									)}
-									{t("testGeneration:generateTests", {
-										defaultValue: "Generate Tests",
-									})}
-								</Button>
 							</div>
 
-							{status && (
-								<div className="flex items-center text-sm text-muted-foreground">
-									{phase === "analyzing" && (
-										<Loader2 className="w-3 h-3 inline mr-2 animate-spin" />
-									)}
-									{phase === "generating" && (
-										<Loader2 className="w-3 h-3 inline mr-2 animate-spin" />
-									)}
-									{status}
-								</div>
-							)}
-
-							{result && result.coverage_gaps.length > 0 && (
-								<div>
-									<h3 className="text-lg font-semibold mb-3">
-										{t("testGeneration:result.coverageGapsFound", {
-											defaultValue: "Coverage Gaps Found",
-										})}
-									</h3>
-									{renderCoverageGaps(result.coverage_gaps)}
-								</div>
-							)}
-
-							{result && result.generated_tests.length > 0 && (
-								<div>
-									<h3 className="text-lg font-semibold mb-3">
-										{t("testGeneration:result.generatedTests", {
-											defaultValue: "Generated Tests",
-										})}
-									</h3>
-									{renderGeneratedTests(result.generated_tests)}
-								</div>
-							)}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="unit" className="space-y-4">
-						<div className="space-y-4">
-							<div>
-								<Label>
-									{t("testGeneration:sourceFile.label", {
-										defaultValue: "Source File",
-									})}
-								</Label>
-								<SmartFilePicker
-									value={selectedFile}
-									onChange={setSelectedFile}
-									tabType="unit"
-									placeholder={t("testGeneration:filePicker.selectFile")}
-								/>
+							<div className="tg-modes" role="tablist" aria-label={t("studio.modesLabel")}>
+								{STUDIO_MODES.map((id) => (
+									<button
+										key={id}
+										type="button"
+										role="tab"
+										className="tg-mode"
+										aria-selected={mode === id}
+										disabled={running && mode !== id}
+										data-testid={`test-studio-mode-${id}`}
+										style={{ ["--tg-accent" as string]: MODE_ACCENT[id] }}
+										onClick={() => switchMode(id)}
+									>
+										<i />
+										{t(`tabs.${id}`)}
+										<small>{t(`studio.modes.${id}`)}</small>
+									</button>
+								))}
 							</div>
 
-							<div>
-								<Label htmlFor="coverage-target">
-									{t("testGeneration:coverageTarget.label", {
-										defaultValue: "Coverage Target (%)",
-									})}
-									<span className="ml-2 font-semibold">{coverageTarget}%</span>
-								</Label>
-								<Input
-									id="coverage-target"
-									type="range"
-									min="10"
-									max="100"
-									step="5"
-									value={coverageTarget}
-									onChange={(e) =>
-										setCoverageTarget(Number.parseInt(e.target.value, 10))
-									}
-									className="mt-1"
-								/>
+							<div className="tg-header-tools">
+								{stackLanguage && (
+									<span
+										className="tg-chip"
+										style={{ ["--tg-accent" as string]: stackLanguage.color }}
+									>
+										<i />
+										<b>{stackLanguage.label}</b>
+										{ours && liveMeta.framework ? `· ${liveMeta.framework}` : ""}
+									</span>
+								)}
+								<DialogPrimitive.Close className="tg-icon-btn" aria-label={t("common:buttons.close")}>
+									<X className="h-4 w-4" />
+								</DialogPrimitive.Close>
 							</div>
+						</header>
 
-							<TestLibrariesPicker
-								selection={libraries.selection}
-								chosen={libraries.chosen}
-								missing={libraries.missing}
-								loading={libraries.loading}
-								installing={libraries.installing}
-								report={libraries.report}
-								error={libraries.error}
-								onToggle={libraries.toggle}
-								onReset={libraries.resetToProject}
-								onAddPackages={() => void libraries.addMissingPackages()}
+						<div className="tg-stage">
+							<TargetColumn
+								mode={mode}
+								running={running}
+								selectedFile={selectedFile}
+								onSelectFile={setSelectedFile}
+								existingTestPath={existingTestPath}
+								coverageTarget={coverageTarget}
+								onCoverageTarget={setCoverageTarget}
+								userStory={userStory}
+								onUserStory={setUserStory}
+								targetModule={targetModule}
+								onTargetModule={setTargetModule}
+								tddDescription={tddDescription}
+								onTddDescription={setTddDescription}
+								tddLanguage={tddLanguage}
+								projectLanguage={projectLanguage}
+								onTddLanguage={setTddLanguage}
+								tddSnippetType={tddSnippetType}
+								onTddSnippetType={setTddSnippetType}
+								libraries={libraries}
 								canInstall={Boolean(projectPath)}
 							/>
-
-							<Button
-								onClick={handleGenerateUnitTests}
-								disabled={phase === "generating" || !selectedFile}
-								className="w-full"
-							>
-								{phase === "generating" ? (
-									<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-								) : (
-									<Play className="w-4 h-4 mr-2" />
-								)}
-								{t("testGeneration:actions.generateUnitTests")}
-							</Button>
-
-							{result && result.generated_tests.length > 0 && (
-								<div>
-									<div className="flex items-center justify-between mb-3">
-										<h3 className="text-lg font-semibold">
-											{t("testGeneration:result.generatedUnitTests", {
-												defaultValue: "Generated Unit Tests",
-											})}
-										</h3>
-										<div className="flex gap-2">
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													handleCopyToClipboard(result.test_file_content)
-												}
-											>
-												{copied ? (
-													<Check className="w-3 h-3" />
-												) : (
-													<Copy className="w-3 h-3" />
-												)}
-												{t("testGeneration:actions.copyAll", {
-													defaultValue: "Copy All",
-												})}
-											</Button>
-											{onApplyTests && (
-												<Button size="sm" onClick={handleApplyTests}>
-													{t("testGeneration:actions.applyTests", {
-														defaultValue: "Apply Tests",
-													})}
-												</Button>
-											)}
-										</div>
-									</div>
-									{renderGeneratedTests(result.generated_tests)}
-								</div>
-							)}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="e2e" className="space-y-4">
-						<div className="space-y-4">
-							<div>
-								<Label htmlFor="user-story">
-									{t("testGeneration:userStory.label", {
-										defaultValue: "User Story",
-									})}
-								</Label>
-								<Textarea
-									id="user-story"
-									value={userStory}
-									onChange={(e) => setUserStory(e.target.value)}
-									placeholder={t("testGeneration:userStory.placeholder", {
-										defaultValue: "Describe the user story or scenario...",
-									})}
-									rows={4}
-									className="border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-									style={{
-										border: "2px solid rgb(250, 204, 21)",
-										borderRadius: "0.5rem",
-										outline: "none",
-									}}
-								/>
-							</div>
-
-							<div>
-								<Label htmlFor="target-module">
-									{t("testGeneration:targetModule.label", {
-										defaultValue: "Target Module",
-									})}
-								</Label>
-								<Input
-									id="target-module"
-									value={targetModule}
-									onChange={(e) => setTargetModule(e.target.value)}
-									placeholder={t("testGeneration:targetModule.placeholder", {
-										defaultValue: "e.g., src/auth/login.py",
-									})}
-								/>
-							</div>
-
-							<Button
-								onClick={handleGenerateE2ETests}
-								disabled={
-									phase === "generating" ||
-									!userStory.trim() ||
-									!targetModule.trim()
+							<StudioPipeline
+								mode={mode}
+								states={states}
+								selected={selectedStep}
+								onSelect={selectStep}
+								inputPreview={inputPreview}
+								tddLanguage={tddRunLanguage}
+							/>
+							<StudioInspector
+								mode={mode}
+								tab={tab}
+								onTab={setTab}
+								selection={libraries.selection}
+								chosenLibraries={libraries.chosen}
+								target={target}
+								onApplyTests={
+									onApplyTests
+										? (content, path) => {
+												onApplyTests(content, path);
+												closeDialog();
+											}
+										: undefined
 								}
-								className="w-full"
-							>
-								{phase === "generating" ? (
-									<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-								) : (
-									<Play className="w-4 h-4 mr-2" />
+								onGenerateFromGaps={generateFromGaps}
+							/>
+						</div>
+
+						<footer className="tg-composer">
+							<div className="tg-composer-summary">
+								<span className="tg-prompt">❯</span>
+								{ready[mode] && (mode === "analyze" || mode === "unit") && fileName && (
+									<span className="tg-chip" title={selectedFile}>
+										<b>{fileName}</b>
+									</span>
 								)}
-								{t("testGeneration:actions.generateE2ETests")}
-							</Button>
-
-							{result && result.generated_tests.length > 0 && (
-								<div>
-									<div className="flex items-center justify-between mb-3">
-										<h3 className="text-lg font-semibold">
-											{t("testGeneration:result.generatedE2ETests", {
-												defaultValue: "Generated E2E Tests",
-											})}
-										</h3>
-										<div className="flex gap-2">
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													handleCopyToClipboard(result.test_file_content)
-												}
+								{ready[mode] && mode === "unit" && (
+									<span className="tg-chip">
+										{t("studio.composer.coverage", { value: coverageTarget })}
+									</span>
+								)}
+								<span className="tg-hint">
+									{running
+										? t(`studio.composer.running.${mode}`)
+										: ready[mode]
+											? t("studio.composer.ready")
+											: t(`studio.composer.missing.${mode}`)}
+								</span>
+							</div>
+							<div className="tg-actions">
+								{running ? (
+									<button type="button" className="tg-btn" onClick={cancelGeneration}>
+										<Square className="h-3.5 w-3.5" />
+										{t("live.cancel")}
+									</button>
+								) : (
+									<>
+										{mode === "analyze" && (
+											<button
+												type="button"
+												className="tg-btn"
+												disabled={!selectedFile}
+												onClick={() => {
+													setMode("unit");
+													setTab("code");
+													void handleGenerateUnitTests();
+												}}
 											>
-												{copied ? (
-													<Check className="w-3 h-3" />
-												) : (
-													<Copy className="w-3 h-3" />
-												)}
-												{t("testGeneration:actions.copyAll", {
-													defaultValue: "Copy All",
-												})}
-											</Button>
-											{onApplyTests && (
-												<Button size="sm" onClick={handleApplyTests}>
-													{t("testGeneration:actions.applyTests", {
-														defaultValue: "Apply Tests",
-													})}
-												</Button>
+												<Zap className="h-3.5 w-3.5" />
+												{t("generateTests")}
+											</button>
+										)}
+										<button
+											type="button"
+											className="tg-btn tg-btn-primary"
+											disabled={!ready[mode]}
+											data-testid="test-studio-run"
+											onClick={launch}
+										>
+											{mode === "analyze" ? (
+												<Search className="h-3.5 w-3.5" />
+											) : (
+												<Play className="h-3.5 w-3.5" />
 											)}
-										</div>
-									</div>
-									{renderGeneratedTests(result.generated_tests)}
-								</div>
-							)}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="tdd" className="space-y-4">
-						<div className="space-y-4">
-							<div>
-								<Label>
-									{t("testGeneration:snippetType.label", {
-										defaultValue: "Snippet Type",
-									})}
-								</Label>
-								<Select
-									value={tddSnippetType}
-									onValueChange={setTddSnippetType}
-								>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent className="z-200">
-										<SelectItem value="function">
-											{t("testGeneration:snippetType.options.function", {
-												defaultValue: "Function",
-											})}
-										</SelectItem>
-										<SelectItem value="class">
-											{t("testGeneration:snippetType.options.class", {
-												defaultValue: "Class",
-											})}
-										</SelectItem>
-										<SelectItem value="component">
-											{t("testGeneration:snippetType.options.component", {
-												defaultValue: "Component",
-											})}
-										</SelectItem>
-										<SelectItem value="api">
-											{t("testGeneration:snippetType.options.api", {
-												defaultValue: "API Endpoint",
-											})}
-										</SelectItem>
-									</SelectContent>
-								</Select>
+											{t(`studio.composer.action.${mode}`)}
+											<kbd>Ctrl ↵</kbd>
+										</button>
+									</>
+								)}
 							</div>
-
-							<div>
-								<Label>
-									{t("testGeneration:language.label", {
-										defaultValue: "Language",
-									})}
-								</Label>
-								<Select value={tddLanguage} onValueChange={setTddLanguage}>
-									<SelectTrigger>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent className="z-200">
-										<SelectItem value="typescript">TypeScript</SelectItem>
-										<SelectItem value="javascript">JavaScript</SelectItem>
-										<SelectItem value="python">Python</SelectItem>
-										<SelectItem value="java">Java</SelectItem>
-										<SelectItem value="csharp">C#</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-
-							<div>
-								<Label htmlFor="tdd-description">
-									{t("testGeneration:tdd.description.label", {
-										defaultValue: "What should this code do?",
-									})}
-								</Label>
-								<Textarea
-									id="tdd-description"
-									value={tddDescription}
-									onChange={(e) => setTddDescription(e.target.value)}
-									placeholder={t("testGeneration:tdd.description.placeholder", {
-										defaultValue:
-											"Describe the behaviour to implement. Example: a function that calculates the total price of a cart including taxes and discounts, handling empty carts and negative quantities.",
-									})}
-									rows={5}
-								/>
-							</div>
-
-							<div className="flex gap-2">
-								<Button
-									onClick={handleGenerateTDDTests}
-									disabled={phase === "generating" || !tddDescription.trim()}
-									className="flex-1"
-								>
-									{phase === "generating" ? (
-										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-									) : (
-										<Play className="w-4 h-4 mr-2" />
-									)}
-									{t("testGeneration:actions.generate", {
-										defaultValue: "Generate",
-									})}
-								</Button>
-								<Button variant="outline" onClick={closeDialog}>
-									{t("common:buttons.close", { defaultValue: "Close" })}
-								</Button>
-							</div>
-
-							{result && result.generated_tests.length > 0 && (
-								<div>
-									<div className="flex items-center justify-between mb-3">
-										<h3 className="text-lg font-semibold">
-											{t("testGeneration:result.generatedTDDTests", {
-												defaultValue: "Generated TDD Tests",
-											})}
-										</h3>
-										<div className="flex gap-2">
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() =>
-													handleCopyToClipboard(result.test_file_content)
-												}
-											>
-												{copied ? (
-													<Check className="w-3 h-3" />
-												) : (
-													<Copy className="w-3 h-3" />
-												)}
-												{t("testGeneration:actions.copyAll", {
-													defaultValue: "Copy All",
-												})}
-											</Button>
-											{onApplyTests && (
-												<Button size="sm" onClick={handleApplyTests}>
-													{t("testGeneration:actions.applyTests", {
-														defaultValue: "Apply Tests",
-													})}
-												</Button>
-											)}
-										</div>
-									</div>
-									{renderGeneratedTests(result.generated_tests)}
-								</div>
-							)}
-						</div>
-					</TabsContent>
-				</Tabs>
-
-				{isLiveRun &&
-					(phase === "generating" ||
-						phase === "complete" ||
-						phase === "error") && (
-						<div className="mt-4">
-							<LiveGenerationSurface />
-						</div>
-					)}
-
-				{/* Coverage analysis has no live surface to host the failure, so the
-				    panel stands on its own — the tab it was launched from does not
-				    matter, and a failure must never be silent. */}
-				{!isLiveRun && phase === "error" && (
-					<div className="mt-4">
-						<GenerationErrorPanel />
-					</div>
-				)}
-
-				<DialogFooter>
-					<Button variant="outline" onClick={closeDialog}>
-						{t("common:buttons.close", { defaultValue: "Close" })}
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+						</footer>
+					</DialogPrimitive.Content>
+				</DialogPortal>
+			</Dialog>
 		</>
 	);
 }
