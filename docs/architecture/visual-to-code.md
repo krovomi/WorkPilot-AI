@@ -140,10 +140,36 @@ sources qui se ressemblent partagent leurs lignes (`CLIENT_COMMON`,
 `SERVICE_COMMON`) pour qu'un backend et un microservice ne divergent plus.
 
 Une paire hors table n'est pas interdite, elle est **inhabituelle** :
-`useConnectBlocks` affiche « Connexion inhabituelle » avec « Relier quand
-même ». Le fil forcé porte `data.forced` et se dessine en pointillés ; sa
-relation est générique jusqu'à ce que la personne en choisisse une. Les blocs
-libres et « custom » n'ont pas de règle.
+`useConnectBlocks` affiche « Connexion inhabituelle » avec la raison tirée de
+`connection-verdicts.ts` et « Relier quand même ». Chaque type de bloc y a un
+rôle (client, point d'entrée, CDN, service, worker, stockage, messagerie,
+identité, tiers, livraison, observation) et chaque famille de paires refusées
+une raison — un client ne touche jamais un stockage ni une file, un stockage
+et une file sont passifs, la gateway est réservée aux clients, un worker ne
+parle pas à l'utilisateur… — avec les blocs à intercaler. Quand le sens
+inverse est un lien connu, la flèche était à l'envers : « Inverser le sens »
+la retourne. Un test vérifie qu'aucune des 361 paires de blocs typés ne
+tombe sur la raison générique. Le fil forcé porte `data.forced` et se dessine
+en pointillés ; sa relation est générique jusqu'à ce que la personne en
+choisisse une. Les blocs libres et « custom » n'ont pas de règle.
+
+## La cohérence au-delà de la paire
+
+- **Stacks** (`stack-rules.ts`) : un lien valide peut ne pas marcher avec les
+  technologies choisies (Celery ne consomme pas Kafka, BullMQ et Sidekiq ne
+  vivent que sur Redis, un mobile n'embarque pas PostgreSQL, Elasticsearch ne
+  s'expose pas au navigateur, SendGrid ne pousse pas vers une app…). C'est un
+  avertissement : le lien reste, l'inspecteur et une notification le disent.
+- **Schéma entier** (`architecture-lint.ts`) : une base par microservice, pas
+  de cycle d'appels synchrones entre services, un seul point d'entrée quand
+  une gateway existe (un BFF conseillé au-delà de trois services appelés par
+  un client), pas de client lourd qui écrit la base *et* passe par le backend,
+  toute file consommée et alimentée, tout stockage possédé, identité utilisée,
+  worker déclenché, aucun bloc isolé, et les liens forcés.
+- Où on les voit : « Points d'attention » dans la barre d'état
+  (`ArchitectureChecks`, un clic sélectionne les blocs et liens concernés), et
+  la section « Points d'architecture à régler » de la spécification de build,
+  pour que l'agent ne reproduise pas une base partagée ou un cycle.
 
 La **relation** de l'inspecteur (`RelationField`) est une liste déroulante :
 le libellé du canvas, puis ce qui relie habituellement ces deux blocs *avec
