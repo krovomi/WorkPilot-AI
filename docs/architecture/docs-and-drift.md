@@ -65,4 +65,4 @@ another repository). A server project runs the scan on the server
 Both runners (and every analysis runner of the app) get the interpreter from
 `main/utils/ensure-python.ts`: it starts or joins the managed environment's
 initialization instead of failing with "Python environment not ready" when no
-task has run yet (F162).
+task has run yet (F163).
