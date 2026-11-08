@@ -12,8 +12,7 @@
 		"analyzing": "Analyse..."
 	},
 	"errors": {
-		"reviewFailed": "La revue a échoué",
-		"networkError": "Erreur réseau"
+		"reviewFailed": "La revue a échoué"
 	},
 	"score": {
 		"qualityScore": "Score de Qualité",

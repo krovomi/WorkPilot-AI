@@ -14,7 +14,7 @@ import { app, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { logger } from "../app-logger";
 import { projectStore } from "../project-store";
-import { pythonEnvManager } from "../python-env-manager";
+import { requirePythonPath } from "../utils/ensure-python";
 import { envWithoutCredentials } from "../utils/child-env";
 
 const RESULT = "QUALITY_RESULT:";
@@ -66,8 +66,7 @@ export function parseQualityOutput(stdout: string): unknown {
 
 async function runQualityAnalysis(projectId: unknown, files: unknown): Promise<unknown> {
 	const projectDir = projectFolder(projectId);
-	const python = pythonEnvManager.getPythonPath();
-	if (!python) throw new Error("Python environment not ready");
+	const python = await requirePythonPath();
 	const backend = backendPath();
 	const args = [
 		path.join(backend, "runners", "quality_score_runner.py"),

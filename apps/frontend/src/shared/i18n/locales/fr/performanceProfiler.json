@@ -44,5 +44,17 @@
 	"empty": {
 		"title": "Profileur de performance",
 		"body": "Analysez votre code à la recherche de goulots d'étranglement : complexité algorithmique, fuites mémoire, requêtes lentes, rendus React coûteux, et le reste."
-	}
+	},
+	"kickers": {
+		"run": "Analyse",
+		"bottlenecks": "Goulots",
+		"fixes": "Optimisations"
+	},
+	"severity": {
+		"critical": "Critique",
+		"high": "Élevée",
+		"medium": "Moyenne",
+		"low": "Faible"
+	},
+	"emptyFixes": "Les optimisations proposées pour les goulots trouvés apparaîtront ici."
 }

@@ -601,6 +601,7 @@ export const IPC_CHANNELS = {
 	INSIGHTS_SESSION_UPDATED: "insights:sessionUpdated", // Event: session updated (main -> renderer)
 
 	// File explorer operations
+	CODE_INSIGHTS_RUN: "codeInsights:run",
 	CODE_REVIEW_FILES: "codeReview:files",
 	CODE_REVIEW_FILE: "codeReview:file",
 	FILE_EXPLORER_LIST: "fileExplorer:list",
@@ -1133,6 +1134,9 @@ export const IPC_CHANNELS = {
 	DOC_DRIFT_EVENT: "doc-drift-event",
 	DOC_DRIFT_RESULT: "doc-drift-result",
 	DOC_DRIFT_RUN: "docDrift:run",
+	DOCUMENTATION_CANCEL: "documentation:cancel",
+	DOCUMENTATION_PROGRESS: "documentation:progress",
+	DOCUMENTATION_RUN: "documentation:run",
 	ENV_SNAPSHOT_CAPTURE: "envSnapshot:capture",
 	ENV_SNAPSHOT_EXPORT: "envSnapshot:export",
 	ENV_SNAPSHOT_GET: "envSnapshot:get",

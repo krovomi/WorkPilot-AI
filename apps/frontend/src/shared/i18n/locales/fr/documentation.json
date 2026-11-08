@@ -1,40 +1,83 @@
 {
-	"title": "Agent de Documentation",
-	"description": "Vérifiez la couverture, générez des docstrings et créez des READMEs",
+	"title": "Documentation",
+	"description": "Couverture de la documentation, commentaires de doc proposés et README, pour tous les langages du projet",
+	"project": {
+		"kicker": "Projet",
+		"title": "Couverture du projet",
+		"meta": "{{files}} fichiers · {{languages}} langages",
+		"analyze": "Analyser le projet",
+		"reanalyze": "Relancer l'analyse",
+		"emptyTitle": "Mesurez la documentation du projet",
+		"emptyHint": "Chaque fichier source est lu, quel que soit son langage : C#, Java, Kotlin, Go, Rust, Swift, PHP, Ruby, Dart, C/C++, TypeScript, Python…",
+		"languages": "Langages",
+		"priority": "À documenter en priorité",
+		"priorityHint": "Cliquez sur un fichier pour voir ses symboles",
+		"truncated": "Analyse limitée aux 4 000 premiers fichiers.",
+		"noSymbols": "Aucun symbole trouvé dans les fichiers source de ce projet.",
+		"allDocumented": "Tout est documenté. Rien à rattraper."
+	},
+	"file": {
+		"kicker": "Fichier",
+		"emptyTitle": "Choisissez un fichier",
+		"emptyHint": "Cliquez sur un fichier à gauche ou saisissez son chemin en bas, puis « Vérifier ».",
+		"meta": "{{pct}} % documenté",
+		"symbols": "{{count}} symboles",
+		"line": "ligne {{line}}",
+		"existing": "Commentaire actuel",
+		"noExisting": "Aucun commentaire de doc au-dessus de ce symbole."
+	},
+	"drafts": {
+		"kicker": "Brouillons",
+		"titleDocs": "Commentaires de doc proposés",
+		"titleReadme": "README proposé",
+		"tabDocs": "Commentaires",
+		"tabReadme": "README",
+		"emptyTitle": "Rien de proposé pour l'instant",
+		"emptyHint": "« Proposer les commentaires » rédige un commentaire de doc dans la convention du langage (XML doc, KDoc, rustdoc, godoc, JSDoc, docstring…). Rien n'est écrit dans vos fichiers.",
+		"count": "{{count}} à compléter",
+		"noneNeeded": "Tous les symboles de ce fichier sont déjà documentés.",
+		"readmeEmptyHint": "Choisissez un dossier en bas puis « Générer le README »."
+	},
 	"coverage": {
-		"title": "Couverture de Documentation",
-		"checkLabel": "Vérifier la Couverture de Documentation",
-		"filePathPlaceholder": "Chemin vers le fichier Python (ex: src/connectors/jira/connector.py)",
+		"title": "Couverture de la documentation",
 		"wellDocumented": "Bien documenté",
 		"needsImprovement": "À améliorer",
-		"poorlyDocumented": "Mal documenté",
+		"poorlyDocumented": "Peu documenté",
 		"documented": "Documentés",
 		"partial": "Partiels",
-		"missing": "Manquants"
+		"missing": "Manquants",
+		"partialHint": "Commentaire présent mais paramètres non décrits"
+	},
+	"composer": {
+		"filePlaceholder": "Fichier à vérifier, ex. src/Orders/OrderService.cs",
+		"folder": "Dossier",
+		"folderPlaceholder": "Dossier du module, ex. src/Orders",
+		"language": "Langage"
 	},
 	"actions": {
 		"check": "Vérifier",
-		"generateDocstrings": "Générer les Docstrings",
-		"generate": "Générer",
+		"generateDocstrings": "Proposer les commentaires",
+		"generateReadme": "Générer le README",
+		"cancel": "Annuler",
 		"copied": "Copié",
-		"copy": "Copier"
+		"copy": "Copier",
+		"copyAll": "Tout copier"
 	},
-	"readme": {
-		"generateLabel": "Générer README",
-		"dirPathPlaceholder": "Chemin du répertoire du module (ex: src/connectors/jira/)",
-		"title": "README.md généré"
+	"progress": {
+		"project": "Lecture des fichiers source…",
+		"coverage": "Lecture du fichier…",
+		"docstrings": "Rédaction des commentaires…",
+		"readme": "Rédaction du README…"
 	},
 	"errors": {
-		"coverageFailed": "La vérification de couverture a échoué",
-		"docstringFailed": "La génération de docstring a échoué",
-		"readmeFailed": "La génération de README a échoué",
-		"networkError": "Erreur réseau"
+		"failed": "Échec : {{error}}",
+		"noProject": "Sélectionnez d'abord un projet."
 	},
-	"symbols": {
-		"title": "Symboles"
-	},
-	"docstrings": {
-		"title": "Docstrings générés ({{count}})"
+	"kinds": {
+		"class": "type",
+		"function": "fonction",
+		"method": "méthode",
+		"type": "type"
 	},
 	"autocomplete": {
 		"searching": "Recherche…",

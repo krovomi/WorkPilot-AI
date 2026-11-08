@@ -44,5 +44,17 @@
 	"empty": {
 		"title": "Performance Profiler",
 		"body": "Analyze your codebase for performance bottlenecks — algorithm complexity, memory leaks, slow queries, React render issues, and more."
-	}
+	},
+	"kickers": {
+		"run": "Analysis",
+		"bottlenecks": "Bottlenecks",
+		"fixes": "Optimizations"
+	},
+	"severity": {
+		"critical": "Critical",
+		"high": "High",
+		"medium": "Medium",
+		"low": "Low"
+	},
+	"emptyFixes": "The optimizations proposed for the bottlenecks found show up here."
 }

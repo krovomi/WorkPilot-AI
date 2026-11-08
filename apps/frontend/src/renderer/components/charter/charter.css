@@ -1,0 +1,768 @@
+/*
+ * WorkPilot UI charter: the look of "Visuel vers Code" and "Import Design"
+ * made shared, for every feature module and every Settings page.
+ *
+ *   - a stage: the theme's background with a faint dot grid and a warm
+ *     ambient glow in the corners;
+ *   - columns separated by a dashed rule, each opened by a mono uppercase
+ *     kicker in an accent colour, a short title and a mono meta on the right;
+ *   - solid cards with a soft shadow, steps numbered "01 · NAME" with an
+ *     accent rail, mono chips with a coloured dot;
+ *   - one warm accent (the glowing wire of the canvas) for the primary action
+ *     and the active state, six tones for categories, never raw red/green.
+ *
+ * Surfaces derive from the theme tokens (--background, --card, --border,
+ * --foreground) so the eight themes and the custom theme keep working; only
+ * the accent and the tones are the charter's own, as on the canvas.
+ * Sizes are in rem so the UI scale setting applies. Docs:
+ * docs/architecture/ui-charter.md.
+ */
+
+@layer theme, base, components, utilities;
+
+@layer components {
+	/* .wp-scope gives the charter's colours to a surface that is not a stage
+	   (a dialog, a popover) without the stage's layout. */
+	.wp-stage,
+	.wp-scope {
+		--wp-accent: #e8642a;
+		--wp-blue: #2f6fd6;
+		--wp-amber: #b07a00;
+		--wp-violet: #7b55e0;
+		--wp-orange: #d9581f;
+		--wp-green: #0f8f6a;
+		--wp-pink: #c2416b;
+		--wp-red: #c0392b;
+		--wp-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
+		--wp-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		--wp-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+	}
+
+	.dark .wp-stage,
+	.dark.wp-stage,
+	.dark .wp-scope {
+		--wp-accent: #f26b2d;
+		--wp-blue: #7cb4ff;
+		--wp-amber: #f2c46d;
+		--wp-violet: #b8a1ff;
+		--wp-orange: #ff9a5c;
+		--wp-green: #6fdab4;
+		--wp-pink: #ff8fb0;
+		--wp-red: #ff7a6b;
+		--wp-grid: color-mix(in srgb, var(--foreground) 4%, transparent);
+		--wp-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
+	}
+
+	.wp-stage,
+	.wp-scope {
+		--wp-bg: var(--background);
+		--wp-card: color-mix(in srgb, var(--card) 94%, transparent);
+		--wp-card-solid: var(--card);
+		--wp-border: color-mix(in srgb, var(--foreground) 11%, transparent);
+		--wp-title: var(--foreground);
+		--wp-muted: color-mix(in srgb, var(--foreground) 62%, transparent);
+		--wp-faint: color-mix(in srgb, var(--foreground) 40%, transparent);
+		--wp-ambient: color-mix(in srgb, var(--wp-accent) 13%, transparent);
+		--wp-code-bg: color-mix(in srgb, var(--background) 70%, var(--card));
+
+		/* The shared ui/ components (Button, Badge, text-primary...) read the
+		   Tailwind colour tokens: inside a stage they take the charter's
+		   accent and tones, so a view keeps its components and still matches. */
+		--color-primary: var(--wp-accent);
+		--color-primary-foreground: #fff;
+		--color-ring: var(--wp-accent);
+		--color-destructive: var(--wp-red);
+		--color-destructive-foreground: #fff;
+		--color-success: var(--wp-green);
+		--color-warning: var(--wp-amber);
+		--color-info: var(--wp-blue);
+	}
+
+	.wp-stage {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+		overflow: hidden;
+		background-color: var(--wp-bg);
+		background-image: radial-gradient(var(--wp-grid) 1px, transparent 1px);
+		background-size: 22px 22px;
+		color: var(--wp-title);
+	}
+
+	/* A stage that scrolls as one page (Settings, single-column modules). */
+	.wp-stage-page {
+		overflow-y: auto;
+	}
+
+	.wp-ambient {
+		pointer-events: none;
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		background:
+			radial-gradient(50% 55% at 100% 100%, var(--wp-ambient), transparent 70%),
+			radial-gradient(35% 40% at 0% 0%, color-mix(in srgb, var(--wp-ambient) 45%, transparent), transparent 70%);
+	}
+
+	/* Tones: set --wp-tone on any element, children read it. */
+	.wp-tone-accent { --wp-tone: var(--wp-accent); }
+	.wp-tone-blue { --wp-tone: var(--wp-blue); }
+	.wp-tone-amber { --wp-tone: var(--wp-amber); }
+	.wp-tone-violet { --wp-tone: var(--wp-violet); }
+	.wp-tone-orange { --wp-tone: var(--wp-orange); }
+	.wp-tone-green { --wp-tone: var(--wp-green); }
+	.wp-tone-pink { --wp-tone: var(--wp-pink); }
+	.wp-tone-red { --wp-tone: var(--wp-red); }
+	.wp-tone-muted { --wp-tone: var(--wp-faint); }
+
+	/* ── Type ───────────────────────────────────────────────────────────── */
+
+	.wp-kicker {
+		font-family: var(--wp-mono);
+		font-size: 0.625rem;
+		font-weight: 600;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		line-height: 1.2;
+		color: var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-title {
+		font-size: 0.95rem;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		line-height: 1.3;
+		color: var(--wp-title);
+	}
+
+	.wp-title-lg {
+		font-size: 1.15rem;
+	}
+
+	.wp-muted {
+		color: var(--wp-muted);
+	}
+
+	.wp-faint {
+		color: var(--wp-faint);
+	}
+
+	.wp-mono {
+		font-family: var(--wp-mono);
+	}
+
+	.wp-meta {
+		font-family: var(--wp-mono);
+		font-size: 0.7rem;
+		color: var(--wp-muted);
+		white-space: nowrap;
+	}
+
+	/* ── Header ─────────────────────────────────────────────────────────── */
+
+	.wp-header {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1rem 1.25rem 0.85rem;
+		border-bottom: 1px dashed var(--wp-border);
+	}
+
+	.wp-header-text {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.wp-header-desc {
+		font-size: 0.78rem;
+		color: var(--wp-muted);
+		max-width: 60rem;
+	}
+
+	.wp-header-actions {
+		display: flex;
+		flex-shrink: 0;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.5rem;
+	}
+
+	/* ── Columns ────────────────────────────────────────────────────────── */
+
+	.wp-columns {
+		position: relative;
+		z-index: 1;
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		grid-template-columns: var(--wp-cols, repeat(3, minmax(0, 1fr)));
+	}
+
+	.wp-col {
+		position: relative;
+		min-height: 0;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 1.1rem 1.25rem 0.9rem;
+		overflow-y: auto;
+	}
+
+	.wp-col + .wp-col {
+		border-left: 1px dashed var(--wp-border);
+	}
+
+	@media (max-width: 1100px) {
+		.wp-columns {
+			grid-template-columns: minmax(0, 1fr);
+			overflow-y: auto;
+		}
+		.wp-col {
+			overflow: visible;
+		}
+		.wp-col + .wp-col {
+			border-left: 0;
+			border-top: 1px dashed var(--wp-border);
+		}
+	}
+
+	.wp-colhead {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.wp-colhead .wp-title {
+		margin-top: 0.2rem;
+	}
+
+	/* A single scrolling page with sections (Settings, simple modules). */
+	.wp-page {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 64rem;
+		margin: 0 auto;
+		padding: 1.1rem 1.25rem 2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.wp-section + .wp-section {
+		padding-top: 1.25rem;
+		border-top: 1px dashed var(--wp-border);
+	}
+
+	/* ── Surfaces ───────────────────────────────────────────────────────── */
+
+	.wp-card {
+		position: relative;
+		border: 1px solid var(--wp-border);
+		background: var(--wp-card);
+		border-radius: 14px;
+		box-shadow: var(--wp-shadow);
+	}
+
+	.wp-card-pad {
+		padding: 0.85rem 1rem;
+	}
+
+	/* A card with the accent rail on its left, the canvas block look. */
+	.wp-rail {
+		overflow: hidden;
+	}
+
+	.wp-rail::before {
+		content: "";
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 3px;
+		background: var(--wp-tone, var(--wp-accent));
+		opacity: 0.85;
+	}
+
+	button.wp-card,
+	.wp-card-interactive {
+		text-align: left;
+		cursor: pointer;
+		transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+	}
+
+	button.wp-card:hover,
+	.wp-card-interactive:hover {
+		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 45%, var(--wp-border));
+	}
+
+	.wp-card[data-active="true"] {
+		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 80%, transparent);
+		box-shadow:
+			0 0 0 1px color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 40%, transparent),
+			0 0 28px -8px var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-code {
+		font-family: var(--wp-mono);
+		font-size: 0.72rem;
+		line-height: 1.55;
+		background: var(--wp-code-bg);
+		border: 1px solid var(--wp-border);
+		border-radius: 10px;
+		padding: 0.75rem 0.85rem;
+		white-space: pre-wrap;
+		overflow-x: auto;
+		color: var(--wp-title);
+	}
+
+	/* ── Step card ("01 · VISION" / title / mono meta) ──────────────────── */
+
+	.wp-step {
+		display: flex;
+		width: 100%;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding: 0.75rem 0.95rem 0.8rem 1.05rem;
+	}
+
+	.wp-step-top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.wp-step-title {
+		font-size: 0.86rem;
+		font-weight: 600;
+		line-height: 1.3;
+	}
+
+	.wp-step-meta {
+		font-family: var(--wp-mono);
+		font-size: 0.68rem;
+		color: var(--wp-muted);
+	}
+
+	/* ── Chips, buttons ─────────────────────────────────────────────────── */
+
+	.wp-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.wp-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		border: 1px solid var(--wp-border);
+		background: var(--wp-card-solid);
+		border-radius: 999px;
+		padding: 0.15rem 0.55rem;
+		font-family: var(--wp-mono);
+		font-size: 0.68rem;
+		color: var(--wp-muted);
+		white-space: nowrap;
+	}
+
+	.wp-chip::before {
+		content: "";
+		width: 0.4rem;
+		height: 0.4rem;
+		border-radius: 999px;
+		background: var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-chip[data-dot="false"]::before {
+		display: none;
+	}
+
+	button.wp-chip {
+		cursor: pointer;
+	}
+
+	button.wp-chip[aria-pressed="true"] {
+		color: var(--wp-title);
+		border-color: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 60%, var(--wp-border));
+		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 12%, var(--wp-card-solid));
+	}
+
+	.wp-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		border: 1px solid var(--wp-border);
+		background: var(--wp-card-solid);
+		color: var(--wp-title);
+		border-radius: 9px;
+		padding: 0.42rem 0.75rem;
+		font-size: 0.78rem;
+		font-weight: 500;
+		line-height: 1.2;
+		white-space: nowrap;
+		transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+	}
+
+	.wp-btn:hover:not(:disabled) {
+		border-color: color-mix(in srgb, var(--wp-accent) 55%, var(--wp-border));
+	}
+
+	.wp-btn:focus-visible,
+	.wp-chip:focus-visible,
+	.wp-card:focus-visible {
+		outline: 2px solid var(--wp-accent);
+		outline-offset: 2px;
+	}
+
+	.wp-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.wp-btn-primary {
+		background: var(--wp-accent);
+		border-color: var(--wp-accent);
+		color: #fff;
+		box-shadow: 0 0 24px -6px var(--wp-accent);
+	}
+
+	.wp-btn-primary:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--wp-accent) 88%, white);
+	}
+
+	.wp-btn-danger {
+		color: var(--wp-red);
+		border-color: color-mix(in srgb, var(--wp-red) 40%, var(--wp-border));
+	}
+
+	.wp-btn-ghost {
+		background: transparent;
+		border-color: transparent;
+		color: var(--wp-muted);
+	}
+
+	.wp-btn-ghost:hover:not(:disabled) {
+		color: var(--wp-title);
+		background: color-mix(in srgb, var(--foreground) 6%, transparent);
+	}
+
+	.wp-btn-sm {
+		padding: 0.25rem 0.5rem;
+		font-size: 0.72rem;
+		border-radius: 7px;
+	}
+
+	/* ── Notices, stats, empty states ───────────────────────────────────── */
+
+	.wp-notice {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		border: 1px solid color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 35%, var(--wp-border));
+		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 8%, var(--wp-card-solid));
+		border-radius: 12px;
+		padding: 0.6rem 0.8rem;
+		font-size: 0.78rem;
+		line-height: 1.45;
+	}
+
+	.wp-notice > svg {
+		flex-shrink: 0;
+		margin-top: 0.1rem;
+		color: var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-stats {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+		gap: 0.5rem;
+	}
+
+	.wp-stat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: 0.6rem 0.75rem;
+	}
+
+	.wp-stat-value {
+		font-size: 1.2rem;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+		color: var(--wp-tone, var(--wp-title));
+	}
+
+	.wp-empty {
+		display: flex;
+		flex: 1;
+		min-height: 10rem;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 1.5rem;
+		text-align: center;
+		border: 1px dashed var(--wp-border);
+		border-radius: 14px;
+		color: var(--wp-muted);
+		font-size: 0.8rem;
+	}
+
+	.wp-empty-glyph {
+		display: grid;
+		width: 2.5rem;
+		height: 2.5rem;
+		place-items: center;
+		border-radius: 12px;
+		border: 1px solid var(--wp-border);
+		background: var(--wp-card-solid);
+		color: var(--wp-tone, var(--wp-accent));
+		box-shadow: 0 0 22px -8px var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-empty-title {
+		font-size: 0.86rem;
+		font-weight: 600;
+		color: var(--wp-title);
+	}
+
+	/* ── Rows (lists of files, symbols, issues) ─────────────────────────── */
+
+	.wp-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.wp-row {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		gap: 0.55rem;
+		border-radius: 8px;
+		padding: 0.35rem 0.5rem;
+		font-size: 0.78rem;
+		text-align: left;
+		color: var(--wp-title);
+	}
+
+	button.wp-row:hover,
+	.wp-row[data-active="true"] {
+		background: color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 10%, transparent);
+	}
+
+	.wp-dot {
+		width: 0.45rem;
+		height: 0.45rem;
+		flex-shrink: 0;
+		border-radius: 999px;
+		background: var(--wp-tone, var(--wp-accent));
+	}
+
+	.wp-bar {
+		position: relative;
+		height: 0.3rem;
+		overflow: hidden;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--foreground) 8%, transparent);
+	}
+
+	.wp-bar > i {
+		position: absolute;
+		inset: 0 auto 0 0;
+		border-radius: inherit;
+		background: var(--wp-tone, var(--wp-accent));
+	}
+
+	/* ── Composer (the bottom bar: prompt, options, actions) ────────────── */
+
+	.wp-composer {
+		position: relative;
+		z-index: 2;
+		margin: 0 1.25rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		padding: 0.65rem 0.75rem;
+		border: 1px solid color-mix(in srgb, var(--wp-accent) 35%, var(--wp-border));
+		box-shadow: 0 0 32px -18px var(--wp-accent), var(--wp-shadow);
+	}
+
+	.wp-composer-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.wp-prompt {
+		display: flex;
+		flex: 1;
+		min-width: 14rem;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.wp-prompt::before {
+		content: ">";
+		font-family: var(--wp-mono);
+		font-weight: 700;
+		color: var(--wp-accent);
+	}
+
+	.wp-field {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		border: 1px solid var(--wp-border);
+		background: var(--wp-card-solid);
+		border-radius: 8px;
+		padding: 0.25rem 0.55rem;
+		font-size: 0.72rem;
+		color: var(--wp-muted);
+	}
+
+	.wp-field > b {
+		font-weight: 500;
+		color: var(--wp-title);
+	}
+
+	/* ── Gauge ──────────────────────────────────────────────────────────── */
+
+	.wp-gauge {
+		position: relative;
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+	}
+
+	.wp-gauge svg {
+		transform: rotate(-90deg);
+	}
+
+	.wp-gauge-track {
+		stroke: color-mix(in srgb, var(--foreground) 9%, transparent);
+	}
+
+	.wp-gauge-value {
+		stroke: var(--wp-tone, var(--wp-accent));
+		filter: drop-shadow(0 0 6px color-mix(in srgb, var(--wp-tone, var(--wp-accent)) 60%, transparent));
+		transition: stroke-dasharray 400ms ease;
+	}
+
+	.wp-gauge-label {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		font-size: 1.05rem;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* ── Progress (a scan running) ──────────────────────────────────────── */
+
+	.wp-scanline {
+		position: relative;
+		height: 2px;
+		overflow: hidden;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--wp-accent) 15%, transparent);
+	}
+
+	.wp-scanline::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		width: 35%;
+		background: linear-gradient(90deg, transparent, var(--wp-accent), transparent);
+		animation: wp-scan 1.4s ease-in-out infinite;
+	}
+
+	@keyframes wp-scan {
+		from { transform: translateX(-100%); }
+		to { transform: translateX(300%); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.wp-scanline::after {
+			animation: none;
+			width: 100%;
+			opacity: 0.6;
+		}
+	}
+}
+
+/*
+ * Bridge: the shared ui/ components inside a stage. Unlayered on purpose, so
+ * it wins over the Tailwind utilities those components carry; it only touches
+ * surfaces (border, background, radius, shadow), never sizes or layout.
+ * Components mark themselves with data-slot (ui/card, ui/button, ui/badge,
+ * ui/page-header).
+ */
+:is(.wp-stage, .wp-scope) [data-slot="card"] {
+	border-color: var(--wp-border);
+	background: var(--wp-card);
+	border-radius: 14px;
+	box-shadow: var(--wp-shadow);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="button"][data-variant="default"] {
+	box-shadow: 0 0 20px -8px var(--wp-accent);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="button"][data-variant="outline"],
+:is(.wp-stage, .wp-scope) [data-slot="button"][data-variant="secondary"] {
+	border: 1px solid var(--wp-border);
+	background: var(--wp-card-solid);
+	color: var(--wp-title);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="button"][data-variant="outline"]:hover:not(:disabled),
+:is(.wp-stage, .wp-scope) [data-slot="button"][data-variant="secondary"]:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--wp-accent) 55%, var(--wp-border));
+	background: var(--wp-card-solid);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="badge"] {
+	border-radius: 999px;
+	font-family: var(--wp-mono);
+	font-weight: 500;
+	letter-spacing: 0.01em;
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="page-header"][data-variant="bar"] {
+	position: relative;
+	z-index: 1;
+	background: transparent;
+	border-bottom: 1px dashed var(--wp-border);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="page-header"] h1 {
+	font-size: 1.15rem;
+	letter-spacing: -0.01em;
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="page-header-icon"] {
+	border: 1px solid var(--wp-border);
+	background: var(--wp-card-solid);
+	border-radius: 12px;
+	box-shadow: 0 0 22px -8px var(--wp-accent);
+}
+
+:is(.wp-stage, .wp-scope) [data-slot="page-header-icon"] > svg {
+	width: 1rem;
+	height: 1rem;
+}

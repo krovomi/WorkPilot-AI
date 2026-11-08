@@ -1,14 +1,25 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, FlaskConical, Play, RotateCcw, ScanSearch, X } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
 import { SharedReportNote } from "../analyses/SharedReportNote";
-import { Button } from "../ui/button";
+import {
+	Bar,
+	CharterButton,
+	Chip,
+	Column,
+	Columns,
+	Composer,
+	EmptyStage,
+	ModuleStage,
+	Notice,
+	Panel,
+	ScanLine,
+	type Tone,
+} from "../charter";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { PageHeader } from "../ui/page-header";
-import { Progress } from "../ui/progress";
 import {
 	Select,
 	SelectContent,
@@ -30,10 +41,10 @@ import {
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
-const CONFIDENCE_STYLES: Record<FlakyConfidence, string> = {
-	high: "text-destructive bg-destructive/10",
-	medium: "text-warning bg-warning/10",
-	low: "text-muted-foreground bg-card",
+const CONFIDENCE_TONE: Record<FlakyConfidence, Tone> = {
+	high: "red",
+	medium: "amber",
+	low: "muted",
 };
 
 const ERROR_CODES = ["no_command", "no_results", "start_failed"] as const;
@@ -93,65 +104,98 @@ export function FlakyTestReport({
 		}
 	}, [projectPath, detectedFor, detectCommands]);
 
+	const commands = useFlakyTestsStore((s) => s.commands);
+	const remote = useFlakyTestsStore((s) => s.remote);
+	const runs = useFlakyTestsStore((s) => s.runs);
+	const canRun = Boolean(projectPath) && !isScanning && (remote || commands.length > 0);
+
 	return (
-		<div className="flex flex-col gap-5 p-6 max-w-5xl bg-background text-foreground">
-			<PageHeader
-				variant="inline"
-				icon={AlertTriangle}
-				title={t("title")}
-				description={t("description")}
+		<ModuleStage data-testid="flaky-tests-view">
+			<Columns template="minmax(300px, 36%) minmax(0, 1fr)">
+				<Column kicker={t("kickers.run")} title={t("run.title")} tone="blue">
+					<div className="flex flex-col gap-3">
+						{projectPath ? (
+							<RunPanel projectPath={projectPath} isScanning={isScanning} t={t} />
+						) : (
+							<Notice tone="red" icon={AlertTriangle}>
+								{t("errors.noProject")}
+							</Notice>
+						)}
+						{isScanning && <ActivityView activity={activity} status={status} t={t} />}
+					</div>
+				</Column>
+				<Column
+					kicker={t("kickers.report")}
+					title={report ? t("reportTitle") : t("title")}
+					meta={report ? `${report.flakyCount} / ${report.totalTests}` : undefined}
+					tone="red"
+				>
+					<div className="flex flex-col gap-3">
+						{phase === "error" && error && <ErrorView error={error} t={t} />}
+						{report && !isScanning ? (
+							<ReportBody report={report} t={t} />
+						) : (
+							!isScanning &&
+							phase !== "error" && (
+								<EmptyStage icon={FlaskConical} title={t("emptyReportTitle")} tone="red">
+									{t("noData")}
+								</EmptyStage>
+							)
+						)}
+					</div>
+				</Column>
+			</Columns>
+			<Composer
+				prompt={
+					<span className="wp-muted flex min-w-0 items-center gap-2 text-xs">
+						<AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{t("description")}</span>
+						{!isScanning && <SharedReportNote saved={shared} />}
+					</span>
+				}
+				hint={t("run.help")}
+				actions={
+					isScanning ? (
+						<CharterButton variant="danger" icon={X} onClick={() => cancelScan()}>
+							{t("actions.cancel")}
+						</CharterButton>
+					) : (
+						<>
+							{report && (
+								<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+									{t("actions.reset")}
+								</CharterButton>
+							)}
+							<CharterButton
+								icon={ScanSearch}
+								disabled={!projectPath}
+								onClick={() => projectPath && startScan(projectPath)}
+							>
+								{t("actions.runScan")}
+							</CharterButton>
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								disabled={!canRun}
+								onClick={() => projectPath && startRuns(projectPath)}
+							>
+								{t("run.start", { count: runs })}
+							</CharterButton>
+						</>
+					)
+				}
 			/>
-
-			{projectPath ? (
-				<RunPanel
-					projectPath={projectPath}
-					isScanning={isScanning}
-					hasReport={!!report}
-					onRun={() => startRuns(projectPath)}
-					onScan={() => startScan(projectPath)}
-					onCancel={() => cancelScan()}
-					onReset={reset}
-					t={t}
-				/>
-			) : (
-				<p className="text-sm text-muted-foreground">{t("errors.noProject")}</p>
-			)}
-
-			{!isScanning && <SharedReportNote saved={shared} />}
-
-			{isScanning && <ActivityView activity={activity} status={status} t={t} />}
-
-			{phase === "error" && error && <ErrorView error={error} t={t} />}
-
-			{report && !isScanning ? (
-				<ReportBody report={report} t={t} />
-			) : (
-				phase === "idle" &&
-				projectPath && (
-					<p className="text-sm text-muted-foreground">{t("noData")}</p>
-				)
-			)}
-		</div>
+		</ModuleStage>
 	);
 }
 
 function RunPanel({
 	projectPath,
 	isScanning,
-	hasReport,
-	onRun,
-	onScan,
-	onCancel,
-	onReset,
 	t,
 }: {
 	readonly projectPath: string;
 	readonly isScanning: boolean;
-	readonly hasReport: boolean;
-	readonly onRun: () => void;
-	readonly onScan: () => void;
-	readonly onCancel: () => void;
-	readonly onReset: () => void;
 	readonly t: T;
 }): React.ReactElement {
 	const detecting = useFlakyTestsStore((s) => s.detecting);
@@ -164,26 +208,22 @@ function RunPanel({
 	const setRuns = useFlakyTestsStore((s) => s.setRuns);
 
 	const known = detectedFor === projectPath && !detecting;
-	const canRun = !isScanning && (remote || commands.length > 0);
 
 	return (
-		<section className="rounded-lg border border-border p-4 flex flex-col gap-4">
-			<h2 className="text-sm font-semibold">{t("run.title")}</h2>
-
-			{!known && (
-				<p className="text-sm text-muted-foreground">{t("run.detecting")}</p>
-			)}
-			{known && remote && (
-				<p className="text-sm text-muted-foreground">{t("run.remote")}</p>
-			)}
+		<>
+			{!known && <ScanLine label={t("run.detecting")} />}
+			{known && remote && <Notice tone="blue">{t("run.remote")}</Notice>}
 			{known && !remote && commands.length === 0 && (
-				<p className="text-sm text-warning">{t("run.noCommand")}</p>
+				<Notice tone="amber" icon={AlertTriangle}>
+					{t("run.noCommand")}
+				</Notice>
 			)}
-
-			<div className="flex flex-wrap items-end gap-4">
+			<Panel className="flex flex-col gap-3">
 				{known && commands.length > 0 && (
-					<div className="flex flex-col gap-1.5 min-w-64">
-						<Label htmlFor="flaky-command">{t("run.command")}</Label>
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="flaky-command" className="wp-kicker">
+							{t("run.command")}
+						</Label>
 						<Select
 							value={commandId === "auto" ? commands[0].id : commandId}
 							onValueChange={(value) => setCommandId(value as FlakyCommandId)}
@@ -202,11 +242,14 @@ function RunPanel({
 						</Select>
 					</div>
 				)}
-				<div className="flex flex-col gap-1.5 w-36">
-					<Label htmlFor="flaky-runs">{t("run.runs")}</Label>
+				<div className="flex flex-col gap-1.5">
+					<Label htmlFor="flaky-runs" className="wp-kicker">
+						{t("run.runs")}
+					</Label>
 					<Input
 						id="flaky-runs"
 						type="number"
+						className="w-28"
 						min={FLAKY_MIN_RUNS}
 						max={FLAKY_MAX_RUNS}
 						value={runs}
@@ -218,32 +261,8 @@ function RunPanel({
 						}}
 					/>
 				</div>
-			</div>
-
-			<p className="text-xs text-muted-foreground">{t("run.help")}</p>
-
-			<div className="flex flex-wrap items-center gap-3">
-				{isScanning ? (
-					<Button variant="destructive" size="sm" onClick={onCancel}>
-						{t("actions.cancel")}
-					</Button>
-				) : (
-					<>
-						<Button size="sm" onClick={onRun} disabled={!canRun}>
-							{t("run.start", { count: runs })}
-						</Button>
-						<Button variant="outline" size="sm" onClick={onScan}>
-							{t("actions.runScan")}
-						</Button>
-						{hasReport && (
-							<Button variant="ghost" size="sm" onClick={onReset}>
-								{t("actions.reset")}
-							</Button>
-						)}
-					</>
-				)}
-			</div>
-		</section>
+			</Panel>
+		</>
 	);
 }
 
@@ -282,14 +301,12 @@ function ActivityView({
 	const done = activity.finished.length;
 	return (
 		<section className="flex flex-col gap-3" aria-live="polite">
-			<p className="text-sm text-muted-foreground animate-pulse">
-				{activityText(activity, status, t)}
-			</p>
+			<ScanLine label={activityText(activity, status, t)} />
 			{activity.mode === "run" && activity.runs > 0 && (
-				<Progress value={(done / activity.runs) * 100} animated />
+				<Bar value={(done / activity.runs) * 100} tone="blue" />
 			)}
 			{done > 0 && (
-				<ul className="text-xs text-muted-foreground space-y-1 font-mono">
+				<ul className="wp-meta flex flex-col gap-1 whitespace-normal">
 					{activity.finished.map((r) => (
 						<li key={r.run}>
 							{r.passed + r.failed === 0
@@ -318,19 +335,19 @@ function ErrorView({
 }): React.ReactElement {
 	const { code, detail } = parseRunnerError(error);
 	if (!code) {
-		return <p className="text-sm text-destructive">{t("errors.failed", { error })}</p>;
+		return (
+			<Notice tone="red" icon={AlertTriangle} role="alert">
+				{t("errors.failed", { error })}
+			</Notice>
+		);
 	}
 	// The first line repeats the code in English; the rest is the tool's output.
 	const output = detail.split("\n").slice(code === "no_results" ? 1 : 0).join("\n");
 	return (
-		<section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 flex flex-col gap-2">
-			<p className="text-sm text-destructive">{t(`errors.${code}`)}</p>
-			{output.trim() && (
-				<pre className="text-xs font-mono whitespace-pre-wrap max-h-64 overflow-auto text-muted-foreground">
-					{output.trim()}
-				</pre>
-			)}
-		</section>
+		<Notice tone="red" icon={AlertTriangle} role="alert">
+			<p>{t(`errors.${code}`)}</p>
+			{output.trim() && <pre className="wp-code mt-2 max-h-64 overflow-auto">{output.trim()}</pre>}
+		</Notice>
 	);
 }
 
@@ -364,14 +381,9 @@ function ReportBody({
 	if (code === "no_reports") {
 		const command = report.detectedCommands?.[0]?.command;
 		return (
-			<section className="rounded-lg border border-dashed border-border p-6 text-center flex flex-col gap-2">
-				<p className="text-sm font-medium">{t("empty.noReports")}</p>
-				<p className="text-sm text-muted-foreground">
-					{command
-						? t("empty.noReportsHint", { command })
-						: t("empty.noReportsHintGeneric")}
-				</p>
-			</section>
+			<EmptyStage icon={FlaskConical} title={t("empty.noReports")} tone="amber">
+				{command ? t("empty.noReportsHint", { command }) : t("empty.noReportsHintGeneric")}
+			</EmptyStage>
 		);
 	}
 
@@ -381,32 +393,29 @@ function ReportBody({
 
 	return (
 		<div className="flex flex-col gap-4">
-			<p className="text-sm text-muted-foreground">{summaryText(report, t)}</p>
+			<p className="wp-muted text-sm">{summaryText(report, t)}</p>
 
 			{fewRuns && (
-				<p className="text-sm text-warning">
+				<Notice tone="amber" icon={AlertTriangle}>
 					{t("empty.fewRuns", { runs: report.runCount, min: minRuns })}
-				</p>
+				</Notice>
 			)}
 			{code === "no_flaky" && !fewRuns && (
-				<p className="text-sm text-success">{t("empty.noFlaky")}</p>
+				<Notice tone="green" icon={Check}>
+					{t("empty.noFlaky")}
+				</Notice>
 			)}
 
-			<div className="space-y-2">
+			<div className="flex flex-col gap-2">
 				{report.flakyTests.map((test) => (
-					<div
-						key={test.testName}
-						className="px-4 py-3 rounded-lg border border-border hover:bg-card transition-colors"
-					>
-						<div className="flex items-start justify-between gap-3 mb-1">
-							<p className="text-sm font-medium font-mono break-all">{test.testName}</p>
-							<span
-								className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${CONFIDENCE_STYLES[test.confidence]}`}
-							>
+					<Panel key={test.testName} rail tone={CONFIDENCE_TONE[test.confidence]}>
+						<div className="mb-1 flex items-start justify-between gap-3">
+							<p className="wp-mono break-all text-sm font-medium">{test.testName}</p>
+							<Chip tone={CONFIDENCE_TONE[test.confidence]}>
 								{t(`confidenceLevel.${test.confidence}`)}
-							</span>
+							</Chip>
 						</div>
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+						<div className="wp-meta flex flex-wrap items-center gap-x-4 gap-y-1 whitespace-normal">
 							<span>
 								{t("failedRuns", {
 									failures: test.failures,
@@ -418,25 +427,21 @@ function ReportBody({
 								{t("cause")} {t(`causes.${test.probableCause}`)}
 							</span>
 						</div>
-						<p className="text-xs mt-2 text-success">
-							{t(`fixes.${test.probableCause}`)}
-						</p>
+						<p className="mt-2 text-xs text-success">{t(`fixes.${test.probableCause}`)}</p>
 						{test.errorPatterns[0] && (
 							<details className="mt-2 text-xs">
 								<summary className="cursor-pointer text-muted-foreground">
 									{t("errorSample")}
 								</summary>
-								<pre className="mt-1 font-mono whitespace-pre-wrap text-muted-foreground">
-									{test.errorPatterns[0]}
-								</pre>
+								<pre className="wp-code mt-1">{test.errorPatterns[0]}</pre>
 							</details>
 						)}
-					</div>
+					</Panel>
 				))}
 			</div>
 
 			{alwaysFailing.length > 0 && (
-				<details className="rounded-lg border border-border px-4 py-3">
+				<details className="wp-card wp-card-pad">
 					<summary className="cursor-pointer text-sm font-medium">
 						{t("alwaysFailing.title", { count: alwaysFailing.length })}
 					</summary>

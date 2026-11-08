@@ -1,25 +1,90 @@
 {
-	"noData": "No scan run yet. Click \"Run scan\" to start.",
-	"title": "Documentation Drift Report",
-	"info": "{{docs}} docs scanned · {{files}} code files indexed",
-	"driftDetected": "Drift Detected",
-	"driftCount": "{{count}} drifts detected",
-	"noDriftDetected": "No drift detected",
-	"drifts": "Drifts",
-	"file": "File",
-	"section": "Section",
-	"expected": "Expected",
-	"actual": "Actual",
-	"severity": "Severity",
+	"title": "Drift detector",
+	"description": "Function names and file paths cited in the documentation, compared with the current code",
+	"scan": {
+		"kicker": "Scan",
+		"title": "Your documentation",
+		"stepDocs": "Read the documentation",
+		"stepDocsKicker": "Docs",
+		"stepDocsMeta": "{{count}} .md / .rst / .adoc files",
+		"stepCode": "Index the code",
+		"stepCodeKicker": "Code",
+		"stepCodeMeta": "{{files}} files · {{symbols}} symbols",
+		"stepCompare": "Compare",
+		"stepCompareKicker": "Comparison",
+		"stepCompareMeta": "{{count}} gaps",
+		"pending": "pending",
+		"running": "running",
+		"ignored": "Skipped: changelogs, agent skills, templates, examples and generated folders (dist, build, node_modules…), which do not describe the current code."
+	},
+	"issues": {
+		"kicker": "Gaps",
+		"title_one": "{{count}} gap",
+		"title_other": "{{count}} gaps",
+		"titleNone": "No gap",
+		"emptyTitle": "Run a scan",
+		"emptyHint": "The scan compares every function and path cited in `backticks` in your .md / .rst with the project's code, whatever the language.",
+		"clean": "The documentation matches the code.",
+		"filtered": "No gap for this filter."
+	},
+	"detail": {
+		"kicker": "Detail",
+		"title": "Selected gap",
+		"emptyTitle": "Pick a gap",
+		"emptyHint": "Click a gap to see where it is and what to fix.",
+		"where": "Where",
+		"cited": "Cited",
+		"fix": "Suggested fix",
+		"copyRef": "Copy location"
+	},
+	"types": {
+		"missing_function": {
+			"label": "Function not found",
+			"message": "The documentation calls “{{symbol}}”, which the code no longer contains.",
+			"fix": "Point the reference at the current function or remove it."
+		},
+		"stale_reference": {
+			"label": "File not found",
+			"message": "The documentation cites the file “{{symbol}}”, which is not in the project.",
+			"fix": "Update the path or remove the reference."
+		},
+		"outdated_example": {
+			"label": "Outdated example",
+			"message": "The example around “{{symbol}}” no longer matches the code.",
+			"fix": "Update the example."
+		},
+		"broken_link": {
+			"label": "Broken link",
+			"message": "The link “{{symbol}}” leads nowhere.",
+			"fix": "Fix or remove the link."
+		},
+		"version_mismatch": {
+			"label": "Version mismatch",
+			"message": "The cited version “{{symbol}}” does not match the project.",
+			"fix": "Align the cited version."
+		},
+		"missing_docs": {
+			"label": "Missing docs",
+			"message": "“{{symbol}}” is not documented.",
+			"fix": "Add its documentation."
+		},
+		"config_mismatch": {
+			"label": "Config mismatch",
+			"message": "The configuration “{{symbol}}” does not match the code.",
+			"fix": "Align the documented configuration."
+		}
+	},
 	"high": "High",
 	"medium": "Medium",
 	"low": "Low",
-	"summary": "Summary",
+	"all": "All",
 	"actions": {
 		"runScan": "Run scan",
+		"rescan": "Scan again",
 		"cancel": "Cancel",
-		"scanning": "Scanning...",
-		"reset": "Reset"
+		"scanning": "Scanning…",
+		"reset": "Reset",
+		"copied": "Copied"
 	},
 	"errors": {
 		"noProject": "Select a project before running a scan.",

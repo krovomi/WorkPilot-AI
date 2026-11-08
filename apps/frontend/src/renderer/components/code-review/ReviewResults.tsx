@@ -2,9 +2,7 @@ import ReactMarkdown from "react-markdown";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/utils";
-import { Badge } from "../ui/badge";
-import { Card, CardContent } from "../ui/card";
+import { Chip, Gauge, Panel, Stat, Stats, type Tone } from "../charter";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,121 +24,26 @@ export interface ReviewResult {
 	passed: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Severity badge
-// ---------------------------------------------------------------------------
+const SEVERITY: Record<string, { tone: Tone; icon: React.ElementType }> = {
+	critical: { tone: "red", icon: XCircle },
+	high: { tone: "red", icon: XCircle },
+	medium: { tone: "amber", icon: AlertTriangle },
+	low: { tone: "blue", icon: Info },
+	info: { tone: "muted", icon: Info },
+};
 
-function SeverityBadge({ severity }: { severity: string }) {
-	const { t } = useTranslation("codeReview");
-	const variants: Record<
-		string,
-		{ className: string; icon: React.ElementType }
-	> = {
-		critical: {
-			className: "bg-destructive/10 text-destructive border-destructive/20",
-			icon: XCircle,
-		},
-		high: {
-			className: "bg-destructive/10 text-destructive border-destructive/20",
-			icon: XCircle,
-		},
-		medium: {
-			className: "bg-warning/10 text-warning border-warning/20",
-			icon: AlertTriangle,
-		},
-		low: {
-			className: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-			icon: Info,
-		},
-		info: {
-			className: "bg-gray-500/10 text-gray-500 border-gray-500/20",
-			icon: Info,
-		},
-	};
-	const v = variants[severity.toLowerCase()] || variants.info;
-	const Icon = v.icon;
+const severityOf = (severity: string) => SEVERITY[severity.toLowerCase()] ?? SEVERITY.info;
 
-	return (
-		<Badge variant="outline" className={cn("gap-1 text-xs", v.className)}>
-			<Icon className="h-3 w-3" />
-			{t(`severity.${severity}`)}
-		</Badge>
-	);
+function scoreTone(score: number, blocked: boolean): Tone {
+	if (blocked) return "red";
+	if (score >= 80) return "green";
+	return score >= 60 ? "amber" : "red";
 }
 
-// ---------------------------------------------------------------------------
-// Score gauge
-// ---------------------------------------------------------------------------
-
-function ScoreGauge({
-	score,
-	blocked,
-	t,
-}: {
-	score: number;
-	blocked: boolean;
-	t: (key: string) => string;
-}) {
-	const color = blocked
-		? "text-destructive"
-		: score >= 80
-			? "text-success"
-			: score >= 60
-				? "text-warning"
-				: "text-destructive";
-	const bgColor = blocked
-		? "bg-destructive"
-		: score >= 80
-			? "bg-success"
-			: score >= 60
-				? "bg-warning"
-				: "bg-destructive";
-
-	return (
-		<div className="flex items-center gap-4">
-			<div className="relative h-20 w-20">
-				{/* biome-ignore lint/a11y/noSvgWithoutTitle: SVG is decorative */}
-				<svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-					<path
-						d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-						fill="none"
-						stroke="currentColor"
-						className="text-secondary"
-						strokeWidth="3"
-					/>
-					<path
-						d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-						fill="none"
-						stroke="currentColor"
-						className={color}
-						strokeWidth="3"
-						strokeDasharray={`${score}, 100`}
-						strokeLinecap="round"
-					/>
-				</svg>
-				<div className="absolute inset-0 flex items-center justify-center">
-					<span className={cn("text-lg font-bold", color)}>{score}</span>
-				</div>
-			</div>
-			<div>
-				<p className="text-sm font-semibold text-foreground">
-					{t("codeReview:score.qualityScore")}
-				</p>
-				<div className="mt-1 flex items-center gap-1.5">
-					<div className={cn("h-2 w-2 rounded-full", bgColor)} />
-					<span className="text-xs text-muted-foreground">
-						{blocked
-							? t("codeReview:score.blocked")
-							: score >= 80
-								? t("codeReview:score.good")
-								: score >= 60
-									? t("codeReview:score.needsImprovement")
-									: t("codeReview:score.poor")}
-					</span>
-				</div>
-			</div>
-		</div>
-	);
+function scoreLabel(score: number, blocked: boolean): string {
+	if (blocked) return "codeReview:score.blocked";
+	if (score >= 80) return "codeReview:score.good";
+	return score >= 60 ? "codeReview:score.needsImprovement" : "codeReview:score.poor";
 }
 
 export function ReviewResults({
@@ -151,122 +54,78 @@ export function ReviewResults({
 	onNavigate: (file: string, line: number) => void;
 }) {
 	const { t } = useTranslation(["codeReview"]);
+	if (!result) return null;
+	const blocked = !result.passed;
+	const tone = scoreTone(result.score, blocked);
+	const severe = result.issues.filter((i) => i.severity === "critical" || i.severity === "high").length;
 	return (
-		<div>
-			{result && (
-				<div className="space-y-6">
-					{/* Score & Summary */}
-					<div className="grid grid-cols-1 gap-6">
-						<Card>
-							<CardContent className="p-5">
-								<ScoreGauge
-									score={result.score}
-									blocked={!result.passed}
-									t={t}
-								/>
-							</CardContent>
-						</Card>
-						<Card>
-							<CardContent className="p-5">
-								<div className="flex items-center gap-2 mb-3">
-									{result.passed ? (
-										<CheckCircle2 className="h-5 w-5 text-success" />
-									) : (
-										<XCircle className="h-5 w-5 text-destructive" />
-									)}
-									<span
-										className={cn(
-											"text-sm font-semibold",
-											result.passed ? "text-success" : "text-destructive",
-										)}
-									>
-										{result.passed
-											? t("codeReview:result.passed")
-											: t("codeReview:result.failed")}
-									</span>
-								</div>
-								{result.summary && (
-									<div className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground">
-										<ReactMarkdown>{result.summary}</ReactMarkdown>
-									</div>
-								)}
-								<div className="mt-3 flex gap-3 text-xs text-muted-foreground">
-									<span>
-										{result.issues.length}{" "}
-										{t("codeReview:result.issues", {
-											count: result.issues.length,
-										})}
-									</span>
-									<span>
-										{
-											result.issues.filter(
-												(i) =>
-													i.severity === "critical" || i.severity === "high",
-											).length
-										}{" "}
-										{t("codeReview:result.criticalHigh")}
-									</span>
-								</div>
-							</CardContent>
-						</Card>
+		<div className="flex flex-col gap-3">
+			<Panel rail tone={tone} className="flex items-center gap-4">
+				<Gauge value={result.score} tone={tone} size={72} label={String(result.score)} />
+				<div className="min-w-0">
+					<span className="wp-kicker">{t("codeReview:score.qualityScore")}</span>
+					<p className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
+						{result.passed ? (
+							<CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+						) : (
+							<XCircle className="h-4 w-4 text-destructive" aria-hidden="true" />
+						)}
+						{result.passed ? t("codeReview:result.passed") : t("codeReview:result.failed")}
+					</p>
+					<p className="wp-meta mt-0.5">{t(scoreLabel(result.score, blocked))}</p>
+				</div>
+			</Panel>
+			<Stats>
+				<Stat label={t("codeReview:issues.title")} value={result.issues.length} />
+				<Stat label={t("codeReview:result.criticalHigh")} value={severe} tone={severe ? "red" : "green"} />
+			</Stats>
+			{result.summary && (
+				<Panel>
+					<div className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground">
+						<ReactMarkdown>{result.summary}</ReactMarkdown>
 					</div>
-
-					{/* Issues list */}
-					{result.issues.length > 0 && (
-						<Card>
-							<CardContent className="p-5">
-								<h3 className="text-sm font-semibold text-foreground mb-4">
-									{t("codeReview:issues.title")}
-								</h3>
-								<div className="space-y-3">
-									{result.issues.map((issue, idx) => (
-										<div
-											// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-											key={idx}
-											className="rounded-lg border border-border p-4 space-y-2"
+				</Panel>
+			)}
+			{result.issues.length > 0 && (
+				<div className="flex flex-col gap-2">
+					<h3 className="wp-kicker">{t("codeReview:issues.title")}</h3>
+					{result.issues.map((issue, idx) => {
+						const sev = severityOf(issue.severity);
+						const Icon = sev.icon;
+						return (
+							<Panel
+								// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
+								key={idx}
+								rail
+								tone={sev.tone}
+								className="flex flex-col gap-1.5"
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									<Chip tone={sev.tone} dot={false}>
+										<Icon className="h-3 w-3" aria-hidden="true" />
+										{t(`severity.${issue.severity}`)}
+									</Chip>
+									<span className="wp-meta">{issue.rule}</span>
+									{issue.file && (
+										<button
+											type="button"
+											className="wp-mono break-all text-left text-xs text-primary underline underline-offset-2"
+											onClick={() => issue.file && onNavigate(issue.file, issue.line || 1)}
 										>
-											<div className="flex items-start justify-between gap-3">
-												<div className="flex items-center gap-2 flex-wrap">
-													<SeverityBadge severity={issue.severity} />
-													<span className="text-xs font-mono text-muted-foreground">
-														{issue.rule}
-													</span>
-													{issue.file && (
-														<button
-															type="button"
-															className="text-xs text-primary underline underline-offset-2 text-left break-all"
-															onClick={() =>
-																issue.file &&
-																onNavigate(issue.file, issue.line || 1)
-															}
-														>
-															{issue.file}:{issue.line || 1}
-														</button>
-													)}
-													{issue.line && (
-														<span className="text-xs text-muted-foreground">
-															{t("codeReview:issues.line", {
-																line: issue.line,
-															})}
-														</span>
-													)}
-												</div>
-											</div>
-											<p className="text-sm text-foreground">{issue.message}</p>
-											{issue.suggestion && (
-												<div className="rounded-md bg-secondary/50 p-3 text-xs text-muted-foreground">
-													<span className="font-medium text-foreground">
-														{t("codeReview:issues.suggestion")}:{" "}
-													</span>
-													{issue.suggestion}
-												</div>
-											)}
-										</div>
-									))}
+											{issue.file}:{issue.line || 1}
+										</button>
+									)}
 								</div>
-							</CardContent>
-						</Card>
-					)}
+								<p className="text-sm">{issue.message}</p>
+								{issue.suggestion && (
+									<p className="wp-code">
+										<span className="wp-kicker mr-1">{t("codeReview:issues.suggestion")}</span>
+										{issue.suggestion}
+									</p>
+								)}
+							</Panel>
+						);
+					})}
 				</div>
 			)}
 		</div>

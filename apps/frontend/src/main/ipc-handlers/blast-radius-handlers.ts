@@ -13,8 +13,9 @@ import { app, ipcMain } from "electron";
 import { getPathDelimiter } from "../platform/index.js";
 import { pythonEnvManager } from "../python-env-manager.js";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import { requirePythonPath } from "../utils/ensure-python";
 
-function runAnalysis(
+async function runAnalysis(
 	projectRoot: string,
 	targets: string[],
 ): Promise<unknown> {
@@ -26,8 +27,7 @@ function runAnalysis(
 		"runners",
 		"blast_radius_runner.py",
 	);
-	const pythonExe = pythonEnvManager.getPythonPath();
-	if (!pythonExe) return Promise.reject(new Error("Python env not ready"));
+	const pythonExe = await requirePythonPath();
 
 	// Convert absolute target paths to relative paths if needed
 	// Also auto-detect project root if targets are outside the specified root

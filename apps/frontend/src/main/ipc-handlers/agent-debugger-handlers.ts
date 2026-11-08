@@ -21,7 +21,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
-import { pythonEnvManager } from "../python-env-manager.js";
+import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
@@ -40,8 +40,7 @@ async function runRunner(req: RunnerArgs): Promise<unknown> {
 		"runners",
 		"agent_debugger_runner.py",
 	);
-	const pythonExe = pythonEnvManager.getPythonPath();
-	if (!pythonExe) return Promise.reject(new Error("Python env not ready"));
+	const pythonExe = await requirePythonPath();
 
 	const args = [
 		runnerPath,

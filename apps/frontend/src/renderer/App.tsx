@@ -2028,14 +2028,7 @@ export function App() {
 													</div>
 												)}
 												{activeView === "doc-drift" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<DocDriftReport
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<DocDriftReport projectPath={selectedProject?.path} />
 												)}
 												{activeView === "compliance" && (
 													<div

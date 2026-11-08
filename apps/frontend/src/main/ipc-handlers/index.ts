@@ -74,6 +74,8 @@ import { registerCredentialHandlers } from "./credential-handlers";
 import { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 import { registerDebugHandlers } from "./debug-handlers";
 import { registerDocDriftHandlers } from "./doc-drift-handlers";
+import { registerDocumentationHandlers } from "./documentation-handlers";
+import { registerCodeInsightsHandlers } from "./code-insights-handlers";
 import { registerEnvHandlers } from "./env-handlers";
 import { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 import { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -193,6 +195,8 @@ export { registerCredentialHandlers } from "./credential-handlers";
 export { registerCrossLanguageTranslationHandlers } from "./cross-language-translation-handlers";
 export { registerDebugHandlers } from "./debug-handlers";
 export { registerDocDriftHandlers } from "./doc-drift-handlers";
+export { registerDocumentationHandlers } from "./documentation-handlers";
+export { registerCodeInsightsHandlers } from "./code-insights-handlers";
 export { registerEnvHandlers } from "./env-handlers";
 export { registerEnvSnapshotHandlers } from "./env-snapshot-handlers";
 export { registerOfflineModeHandlers } from "./offline-mode-handlers";
@@ -530,6 +534,12 @@ export function setupIpcHandlers(
 
 	// Doc Drift handlers (documentation vs code drift detection)
 	registerDocDriftHandlers();
+
+	// Documentation agent (coverage, draft doc comments, README; every language)
+	registerDocumentationHandlers();
+
+	// Code review and refactoring of the Development views (every stack)
+	registerCodeInsightsHandlers();
 
 	// Flaky Tests handlers (JUnit report analysis)
 	registerFlakyTestsHandlers();

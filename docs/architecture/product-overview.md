@@ -107,7 +107,7 @@ it, inside its hub. The hubs are listed in
 | `code-playground` | Code Playground | Development | — |  |
 | `code-review` | Code Review | Development | — |  |
 | `cross-language-translation` | Cross-Language Translation | Development | — | yes |
-| `documentation` | Documentation | Development › Docs and drift | — |  |
+| `documentation` | Documentation | Development › Docs and drift | [docs-and-drift.md](docs-and-drift.md) |  |
 | `flaky-tests` | Flaky Test Detective | Development | — |  |
 | `onboarding-guide` | Onboarding Guide | Development › Onboarding | — |  |
 | `pair-programming` | Pair Programming | Development | — |  |
@@ -146,7 +146,7 @@ it, inside its hub. The hubs are listed in
 | `compliance` | Compliance Evidence Collector | Toolbox | — | yes |
 | `context-aware-snippets` | Context-Aware Snippets | Explore › Project context | — |  |
 | `dependency-sentinel` | Dependency Sentinel | Toolbox | — |  |
-| `doc-drift` | Documentation Drift Detector | Development › Docs and drift | — | yes |
+| `doc-drift` | Documentation Drift Detector | Development › Docs and drift | [docs-and-drift.md](docs-and-drift.md) |  |
 | `guardrails` | Agent Guardrails | Toolbox | — |  |
 | `i18n-agent` | i18n Scan | Toolbox | — |  |
 | `injection-guard` | Injection Guard | Toolbox | — |  |

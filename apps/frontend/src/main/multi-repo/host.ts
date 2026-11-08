@@ -17,7 +17,7 @@ import { safeSendToRenderer } from "../ipc-handlers/utils";
 import { initializeProject } from "../project-initializer";
 import { projectStore } from "../project-store";
 import { parsePythonCommand } from "../python-detector";
-import { pythonEnvManager } from "../python-env-manager";
+import { readyPythonPath } from "../utils/ensure-python";
 import { taskStateManager } from "../task-state-manager";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 import { findTaskWorktree } from "../worktree-paths";
@@ -49,7 +49,7 @@ async function runStep(
 	args: readonly string[],
 	signal: AbortSignal,
 ): Promise<{ ok: boolean; events: RunnerEvent[] }> {
-	const pythonPath = pythonEnvManager.getPythonPath();
+	const pythonPath = await readyPythonPath();
 	if (!pythonPath) return { ok: false, events: [] };
 	const backend = backendPath();
 	const env = await pythonRunnerEnv(backend, {});
