@@ -8,12 +8,13 @@ import {
 	TerminalSquare,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useHermesStore } from "../stores/hermes-store";
 import { CheckRow, SoulInstallNote } from "./task-detail/HermesLearningCard";
 import { type CliPresence, useReportCliPresence } from "./cli-tool-order";
+import { CliUpdateChip, CliUpdateSection, useCliUpdate } from "./CliUpdateSection";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -49,7 +50,7 @@ export function HermesStatusBadge({
 	isCollapsed = false,
 	onPresenceChange,
 }: HermesStatusBadgeProps) {
-	const { t } = useTranslation(["hermes", "common"]);
+	const { t } = useTranslation(["hermes", "common", "navigation"]);
 	const [isOpen, setIsOpen] = useState(false);
 	const status = useHermesStore((s) => s.status);
 	const loading = useHermesStore((s) => s.loading);
@@ -66,6 +67,13 @@ export function HermesStatusBadge({
 	// A degraded hermes is installed; an unreachable doctor reads as missing,
 	// as the badge itself shows it.
 	const installed = status?.readiness.installed;
+
+	// After an update the doctor reads the version again (`fresh`): it caches
+	// it per binary, and an update does not always rewrite the launcher.
+	const reloadAfterUpdate = useCallback(() => void load(true), [load]);
+	const updates = useCliUpdate("hermes", NAME, installed === true, reloadAfterUpdate);
+	const outdated = installed === true && Boolean(updates.info?.isOutdated);
+	const version = updates.info?.version;
 	useReportCliPresence(
 		onPresenceChange,
 		loading || (installed === undefined && !error)
@@ -91,7 +99,7 @@ export function HermesStatusBadge({
 
 	const statusColor = {
 		loading: "bg-muted-foreground",
-		ready: "bg-success",
+		ready: outdated ? "bg-warning" : "bg-success",
 		degraded: "bg-warning",
 		absent: "bg-destructive",
 		error: "bg-destructive",
@@ -110,7 +118,9 @@ export function HermesStatusBadge({
 			? t("hermes:sidebar.checking")
 			: state === "error"
 				? t("common:labels.error")
-				: t(`hermes:state.${state}`);
+				: outdated
+					? t("navigation:agentCli.update.availableFor", { name: NAME })
+					: t(`hermes:state.${state}`);
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -123,6 +133,7 @@ export function HermesStatusBadge({
 							className={cn(
 								isCollapsed ? "justify-center" : "w-full justify-start gap-2 text-xs",
 								missing ? "text-muted-foreground" : "",
+								outdated ? "text-warning" : "",
 							)}
 						>
 							<div className="relative">
@@ -136,8 +147,12 @@ export function HermesStatusBadge({
 							</div>
 							{!isCollapsed && (
 								<>
-									<span className="truncate">{SHORT_NAME}</span>
-									{pending > 0 && (
+									<span className="truncate">
+										{SHORT_NAME}
+										{version ? ` (${version})` : ""}
+									</span>
+									{outdated && <CliUpdateChip isUpdating={updates.isUpdating} />}
+									{!outdated && pending > 0 && (
 										<span className="ml-auto text-3xs bg-primary/15 text-primary px-1.5 py-0.5 rounded">
 											{pending}
 										</span>
@@ -177,6 +192,8 @@ export function HermesStatusBadge({
 						</ul>
 					)}
 
+					<CliUpdateSection state={updates} name={NAME} />
+
 					{pending > 0 && (
 						<p className="text-xs p-2 bg-muted rounded-md">
 							{t("hermes:sidebar.pending", { count: pending })}
@@ -213,8 +230,11 @@ export function HermesStatusBadge({
 						variant="outline"
 						size="sm"
 						className="w-full gap-1"
-						onClick={() => void load(true)}
-						disabled={state === "loading" || running}
+						onClick={() => {
+							void load(true);
+							void updates.check();
+						}}
+						disabled={state === "loading" || running || updates.isUpdating}
 					>
 						<RefreshCw className={cn("h-3 w-3", state === "loading" && "animate-spin")} />
 						{t("common:refresh")}
