@@ -1161,14 +1161,14 @@ export function KanbanBoard({
 						_errorCount++;
 						console.error(
 							"[Import] Failed to persist task from work item:",
-							workItem.id,
+							String(workItem.id).replace(/[\r\n]/g, " "),
 						);
 					}
 				} catch (error) {
 					_errorCount++;
 					console.error(
 						"[Import] Failed to create task from work item:",
-						workItem.id,
+						String(workItem.id).replace(/[\r\n]/g, " "),
 						error,
 					);
 				}

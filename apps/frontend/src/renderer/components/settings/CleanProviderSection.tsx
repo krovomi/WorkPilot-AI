@@ -33,7 +33,6 @@ import {
 	consumeProviderReauthRequest,
 	onProviderReauthRequest,
 } from "./reauth-request";
-import { Notice } from "../charter";
 import { SettingsSection } from "./SettingsSection";
 
 interface Provider {
@@ -967,11 +966,6 @@ export function CleanProviderSection({
 			description={t("settings:accounts.multiConnector.description")}
 		>
 			<div className="space-y-6">
-				{error && (
-					<Notice tone="red" icon={AlertCircle} role="alert">
-						{error}
-					</Notice>
-				)}
 
 				<div className="flex gap-6">
 					{/* Colonne de gauche - Providers (prend toute la largeur si auto-switching fermé) */}

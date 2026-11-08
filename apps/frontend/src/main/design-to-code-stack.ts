@@ -1,4 +1,11 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+	closeSync,
+	existsSync,
+	openSync,
+	readdirSync,
+	readSync,
+	statSync,
+} from "node:fs";
 import path from "node:path";
 import type {
 	DesignStack,
@@ -27,12 +34,27 @@ const SKIPPED_DIRS = new Set([
 	"vendor",
 ]);
 
+/**
+ * The manifest's text, or null when it is missing or larger than a manifest.
+ * One open descriptor, no stat-then-read: the size is what was actually read.
+ */
 function readSmall(file: string): string | null {
+	let fd: number | null = null;
 	try {
-		if (statSync(file).size > MAX_MANIFEST_BYTES) return null;
-		return readFileSync(file, "utf-8");
+		fd = openSync(file, "r");
+		const buffer = Buffer.alloc(MAX_MANIFEST_BYTES + 1);
+		let total = 0;
+		while (total < buffer.length) {
+			const read = readSync(fd, buffer, total, buffer.length - total, null);
+			if (read === 0) break;
+			total += read;
+		}
+		if (total > MAX_MANIFEST_BYTES) return null;
+		return buffer.toString("utf-8", 0, total);
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) closeSync(fd);
 	}
 }
 

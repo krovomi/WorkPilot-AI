@@ -66,6 +66,7 @@ toutes les stacks (.NET, Java, Go, Rust, PHP, Ruby, Dart, Swift…).
 
 ### 🛠️ Qualité
 
+- **Alertes CodeQL de la release corrigées** : Import Design écrit un fichier relu et lit un manifeste par un seul descripteur (plus de vérification puis écriture séparées), les identifiants d'éléments importés sont nettoyés avant d'entrer dans le journal, et une condition morte disparaît des paramètres des fournisseurs.
 - **Les PR empilées se fusionnent seules, dans l'ordre.** Une PR vers `develop` avec l'auto-merge
   activé attend celles sur lesquelles elle est construite ; le pilote de pile fusionne ensuite
   `develop` dedans, résout les conflits (Claude Code pour ceux qu'une règle ne tranche pas) et ne la

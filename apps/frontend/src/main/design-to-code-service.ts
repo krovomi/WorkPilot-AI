@@ -1,10 +1,14 @@
 import { spawn } from "node:child_process";
 import {
+	closeSync,
+	constants,
 	existsSync,
+	fstatSync,
+	ftruncateSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -321,16 +325,50 @@ export class DesignToCodeService {
 				outcome.refused.push({ path: relative, reason: "protected" });
 				continue;
 			}
-			const created = !existsSync(target);
-			if (!created && !statSync(target).isFile()) {
+			mkdirSync(path.dirname(target), { recursive: true });
+			const created = writeReviewedFile(target, content);
+			if (created === null) {
 				outcome.refused.push({ path: relative, reason: "invalid" });
 				continue;
 			}
-			mkdirSync(path.dirname(target), { recursive: true });
-			writeFileSync(target, content, "utf-8");
 			outcome.written.push({ path: relative, created });
 		}
 		return outcome;
+	}
+}
+
+/**
+ * Writes a reviewed file through one descriptor: created when it does not
+ * exist yet, otherwise replaced only when the file that was opened is a plain
+ * file (never a link, a directory or a device). No check-then-write: what is
+ * checked is what is written. Returns whether it was created, or null when
+ * the target is not a plain file.
+ */
+function writeReviewedFile(target: string, content: string): boolean | null {
+	const noFollow = constants.O_NOFOLLOW ?? 0;
+	let fd: number;
+	let created = true;
+	try {
+		fd = openSync(
+			target,
+			constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | noFollow,
+		);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+		created = false;
+		try {
+			fd = openSync(target, constants.O_WRONLY | noFollow);
+		} catch {
+			return null;
+		}
+	}
+	try {
+		if (!fstatSync(fd).isFile()) return null;
+		ftruncateSync(fd, 0);
+		writeFileSync(fd, content, "utf-8");
+		return created;
+	} finally {
+		closeSync(fd);
 	}
 }
 
