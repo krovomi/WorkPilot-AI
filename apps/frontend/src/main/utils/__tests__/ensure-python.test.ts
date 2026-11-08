@@ -24,7 +24,7 @@ describe("ensure-python", () => {
 		expect(manager.initialize).not.toHaveBeenCalled();
 	});
 
-	it("initializes the environment when no task has run yet (F162)", async () => {
+	it("initializes the environment when no task has run yet (F163)", async () => {
 		manager.getPythonPath.mockReturnValue(null);
 		manager.initialize.mockResolvedValue({ ready: true, pythonPath: "/venv/bin/python" });
 		await expect(requirePythonPath()).resolves.toBe("/venv/bin/python");
