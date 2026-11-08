@@ -1,5 +1,5 @@
 {
-	"noData": "No git surgeon plan data available",
+	"noData": "Analyse the history of the selected project to see what to clean up.",
 	"title": "Git History Surgeon",
 	"issues": "issues",
 	"potentialSavings": "~{{mb}} MB potential savings",
@@ -18,5 +18,20 @@
 	"errors": {
 		"noProject": "Select a project to analyse its git history.",
 		"failed": "Analysis failed: {{error}}"
+	},
+	"description": "Finds what weighs on the repository history (large files, secrets, messy commits) and plans the clean-up.",
+	"emptyTitle": "No analysis yet",
+	"savings": "Potential savings",
+	"issuesTitle": "What the history carries",
+	"kickers": {
+		"issues": "Findings",
+		"actions": "Plan"
+	},
+	"issueTypes": {
+		"large_blob": "Large file",
+		"sensitive_data": "Sensitive data",
+		"messy_commits": "Messy commits",
+		"force_push_risk": "Force push risk",
+		"duplicate_commits": "Duplicate commits"
 	}
 }

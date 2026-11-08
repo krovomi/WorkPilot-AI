@@ -130,8 +130,8 @@ describe("AnalyticsDashboard", () => {
 			expect(screen.getByText("Build Analytics")).toBeInTheDocument();
 		});
 
-		// Radix UI Tabs triggers on mouseDown, not click
-		fireEvent.mouseDown(screen.getByText("Costs"));
+		// The charter tabs switch on click
+		fireEvent.click(screen.getByText("Costs"));
 
 		await waitFor(() => {
 			expect(screen.getByText("Cost by Provider")).toBeInTheDocument();
@@ -147,8 +147,8 @@ describe("AnalyticsDashboard", () => {
 			expect(screen.getByText("Build Analytics")).toBeInTheDocument();
 		});
 
-		// Radix UI Tabs triggers on mouseDown, not click
-		fireEvent.mouseDown(screen.getByText("Performance"));
+		// The charter tabs switch on click
+		fireEvent.click(screen.getByText("Performance"));
 
 		await waitFor(() => {
 			expect(screen.getByText("Tokens by Provider")).toBeInTheDocument();

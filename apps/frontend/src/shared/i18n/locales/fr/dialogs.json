@@ -145,6 +145,7 @@
 		"repositoryNote": "Vous pourrez sélectionner le repository dans les paramètres du projet après cette étape."
 	},
 	"worktrees": {
+		"count": "{{count}} worktrees",
 		"title": "Arbres de travail",
 		"description": "Gérez les espaces de travail isolés pour vos tâches WorkPilot AI",
 		"empty": "Aucun arbre de travail",

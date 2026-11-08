@@ -3,7 +3,6 @@ import type {
 	ChangelogTask,
 	GitCommit as GitCommitType,
 } from "../../../shared/types";
-import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Checkbox } from "../ui/checkbox";
 import { useTranslation } from "react-i18next";
@@ -22,12 +21,8 @@ export function TaskCard({ task, isSelected, onToggle }: TaskCardProps) {
 	return (
 		<label
 			htmlFor={`task-${task.id}`}
-			className={cn(
-				"flex flex-col rounded-lg border p-4 cursor-pointer transition-all",
-				isSelected
-					? "border-primary bg-primary/5 ring-1 ring-primary"
-					: "border-border hover:border-primary/50 hover:bg-muted/30",
-			)}
+			className="wp-card wp-card-pad wp-rail wp-step wp-tone-green flex cursor-pointer flex-col"
+			data-active={isSelected ? "true" : undefined}
 		>
 			<div className="flex items-start gap-3">
 				<Checkbox
@@ -68,7 +63,7 @@ export function CommitCard({ commit }: CommitCardProps) {
 	const commitDate = formatAppDate(commit.date);
 
 	return (
-		<div className="flex items-start gap-3 rounded-lg border border-border p-3 bg-background">
+		<div className="wp-card wp-card-pad flex items-start gap-3">
 			<div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
 				<GitCommit className="h-4 w-4 text-muted-foreground" />
 			</div>

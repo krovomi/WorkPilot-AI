@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { RoadmapFeature } from "../../shared/types";
 import { useServerViewLive } from "../hooks/useServerViewLive";
 import { AddFeatureDialog } from "./AddFeatureDialog";
+import { ModuleStage } from "./charter";
 import { CompetitorAnalysisDialog } from "./CompetitorAnalysisDialog";
 import { CompetitorAnalysisViewer } from "./CompetitorAnalysisViewer";
 import { ExistingCompetitorAnalysisDialog } from "./ExistingCompetitorAnalysisDialog";
@@ -77,13 +78,15 @@ export function Roadmap({ projectId, onGoToTask }: Readonly<RoadmapProps>) {
 		generationStatus.phase !== "complete"
 	) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<RoadmapGenerationProgress
-					generationStatus={generationStatus}
-					className="w-full max-w-md"
-					onStop={handleStop}
-				/>
-			</div>
+			<ModuleStage data-testid="roadmap-view">
+				<div className="relative z-[1] flex flex-1 items-center justify-center p-8">
+					<RoadmapGenerationProgress
+						generationStatus={generationStatus}
+						className="w-full max-w-md"
+						onStop={handleStop}
+					/>
+				</div>
+			</ModuleStage>
 		);
 	}
 
@@ -114,7 +117,7 @@ export function Roadmap({ projectId, onGoToTask }: Readonly<RoadmapProps>) {
 
 	// Main roadmap view
 	return (
-		<div className="h-full flex flex-col overflow-hidden">
+		<ModuleStage data-testid="roadmap-view">
 			{/* Header */}
 			<RoadmapHeader
 				roadmap={roadmap}
@@ -125,7 +128,7 @@ export function Roadmap({ projectId, onGoToTask }: Readonly<RoadmapProps>) {
 			/>
 
 			{/* Content */}
-			<div className="flex-1 min-h-0 overflow-hidden">
+			<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 				<RoadmapTabs
 					roadmap={roadmap}
 					activeTab={activeTab}
@@ -183,6 +186,6 @@ export function Roadmap({ projectId, onGoToTask }: Readonly<RoadmapProps>) {
 				open={showAddFeatureDialog}
 				onOpenChange={setShowAddFeatureDialog}
 			/>
-		</div>
+		</ModuleStage>
 	);
 }

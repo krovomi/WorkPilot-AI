@@ -2041,34 +2041,17 @@ export function App() {
 													</div>
 												)}
 												{activeView === "git-surgeon" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<GitSurgeonDashboard
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<GitSurgeonDashboard projectPath={selectedProject?.path} />
 												)}
 												{activeView === "release-coordinator" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<ReleasePlanView
+													<ReleasePlanView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "carbon-profiler" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<CarbonReportView
+													<CarbonReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "consensus-arbiter" && (
 													<div
@@ -2135,14 +2118,7 @@ export function App() {
 													</div>
 												)}
 												{activeView === "blast-radius" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<BlastRadiusView
-															projectRoot={selectedProject?.path}
-														/>
-													</div>
+													<BlastRadiusView projectRoot={selectedProject?.path} />
 												)}
 												{activeView === "team-bot" && (
 													<div
@@ -2161,14 +2137,9 @@ export function App() {
 													</div>
 												)}
 												{activeView === "env-snapshot" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<EnvSnapshotView
+													<EnvSnapshotView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "offline-mode" && (
 													<div

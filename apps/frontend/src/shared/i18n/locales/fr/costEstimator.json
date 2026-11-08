@@ -35,5 +35,13 @@
 		"costByProvider": "Coût par fournisseur",
 		"costByModel": "Coût par modèle",
 		"noData": "Aucune donnée"
+	},
+	"loading": "Chargement des coûts…",
+	"emptyTitle": "Aucun coût enregistré",
+	"emptyBody": "Les coûts apparaissent ici dès qu'une tâche a appelé un modèle pour ce projet.",
+	"breakdownTitle": "Où part l'argent",
+	"kickers": {
+		"budget": "Budget",
+		"breakdown": "Répartition"
 	}
 }

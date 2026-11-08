@@ -1,22 +1,18 @@
-import { TrendingUp } from "lucide-react";
-import {
-	ROADMAP_COMPLEXITY_COLORS,
-	ROADMAP_IMPACT_COLORS,
-	ROADMAP_PRIORITY_COLORS,
-	ROADMAP_PRIORITY_LABELS,
-} from "../../../shared/constants";
+import { Columns3, Flag, ListChecks, Milestone, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { RoadmapFeature, RoadmapPhase } from "../../../shared/types";
 import { getFeaturesByPhase } from "../../stores/roadmap-store";
+import { Chip, Panel, Tabs } from "../charter";
 import { RoadmapKanbanView } from "../RoadmapKanbanView";
-import { Badge } from "../ui/badge";
-import { Card } from "../ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { FeatureCard } from "./FeatureCard";
 import { PhaseCard } from "./PhaseCard";
+import { ROADMAP_PRIORITIES, ROADMAP_PRIORITY_TONES } from "./tones";
 import type { RoadmapTabsProps } from "./types";
 import { hasCompetitorInsight } from "./utils";
-import { useTranslation } from "react-i18next";
 
+type RoadmapTab = "kanban" | "phases" | "features" | "priorities";
+
+/** The four views of a roadmap, switched by the charter's pill tabs. */
 export function RoadmapTabs({
 	roadmap,
 	activeTab,
@@ -26,35 +22,40 @@ export function RoadmapTabs({
 	onGoToTask,
 	onSave,
 }: Readonly<RoadmapTabsProps>) {
-	const { t } = useTranslation();
+	const { t } = useTranslation("roadmap");
+	const tab = activeTab as RoadmapTab;
+	const tabs = [
+		{ id: "kanban", label: t("tabs.kanban"), icon: Columns3 },
+		{ id: "phases", label: t("phases.title"), icon: Milestone, count: roadmap.phases.length },
+		{ id: "features", label: t("tabs.allFeatures"), icon: ListChecks, count: roadmap.features.length },
+		{ id: "priorities", label: t("tabs.byPriority"), icon: Flag },
+	] as const;
+
 	return (
-		<Tabs
-			value={activeTab}
-			onValueChange={onTabChange}
-			className="h-full flex flex-col"
-		>
-			<TabsList className="shrink-0 mx-4 mt-4">
-				<TabsTrigger value="kanban">Kanban</TabsTrigger>
-				<TabsTrigger value="phases">{t("roadmap:phases.title")}</TabsTrigger>
-				<TabsTrigger value="features">{t("roadmap:tabs.allFeatures")}</TabsTrigger>
-				<TabsTrigger value="priorities">{t("roadmap:tabs.byPriority")}</TabsTrigger>
-			</TabsList>
+		<div className="flex h-full min-h-0 flex-col">
+			<Tabs
+				tabs={tabs}
+				value={tab}
+				onChange={(id) => onTabChange(id)}
+				label={t("tabs.label")}
+				className="relative z-[1] shrink-0 px-5 pb-3"
+			/>
 
-			{/* Kanban View */}
-			<TabsContent value="kanban" className="flex-1 min-h-0 overflow-hidden">
-				<RoadmapKanbanView
-					key={roadmap.updatedAt?.toString()}
-					roadmap={roadmap}
-					onFeatureClick={onFeatureSelect}
-					onConvertToSpec={onConvertToSpec}
-					onGoToTask={onGoToTask}
-					onSave={onSave}
-				/>
-			</TabsContent>
+			{tab === "kanban" && (
+				<div className="relative z-[1] min-h-0 flex-1 overflow-hidden">
+					<RoadmapKanbanView
+						key={roadmap.updatedAt?.toString()}
+						roadmap={roadmap}
+						onFeatureClick={onFeatureSelect}
+						onConvertToSpec={onConvertToSpec}
+						onGoToTask={onGoToTask}
+						onSave={onSave}
+					/>
+				</div>
+			)}
 
-			{/* Phases View */}
-			<TabsContent value="phases" className="flex-1 min-h-0 overflow-auto p-4">
-				<div className="space-y-6">
+			{tab === "phases" && (
+				<div className="relative z-[1] min-h-0 flex-1 space-y-4 overflow-auto px-5 pb-4">
 					{roadmap.phases.map((phase: RoadmapPhase, index: number) => (
 						<PhaseCard
 							key={phase.id}
@@ -67,14 +68,10 @@ export function RoadmapTabs({
 						/>
 					))}
 				</div>
-			</TabsContent>
+			)}
 
-			{/* All Features View */}
-			<TabsContent
-				value="features"
-				className="flex-1 min-h-0 overflow-auto p-4"
-			>
-				<div className="grid gap-3">
+			{tab === "features" && (
+				<div className="relative z-[1] grid min-h-0 flex-1 content-start gap-3 overflow-auto px-5 pb-4">
 					{roadmap.features.map((feature: RoadmapFeature) => (
 						<FeatureCard
 							key={feature.id}
@@ -86,73 +83,48 @@ export function RoadmapTabs({
 						/>
 					))}
 				</div>
-			</TabsContent>
+			)}
 
-			{/* By Priority View */}
-			<TabsContent
-				value="priorities"
-				className="flex-1 min-h-0 overflow-auto p-4"
-			>
-				<div className="grid grid-cols-2 gap-4">
-					{["must", "should", "could", "wont"].map((priority: string) => {
-						const features = roadmap.features.filter(
-							(f: RoadmapFeature) => f.priority === priority,
-						);
+			{tab === "priorities" && (
+				<div className="relative z-[1] grid min-h-0 flex-1 content-start gap-4 overflow-auto px-5 pb-4 md:grid-cols-2">
+					{ROADMAP_PRIORITIES.map((priority) => {
+						const features = roadmap.features.filter((f: RoadmapFeature) => f.priority === priority);
+						const tone = ROADMAP_PRIORITY_TONES[priority];
 						return (
-							<Card key={priority} className="p-4">
-								<div className="flex items-center gap-2 mb-3">
-									<Badge
-										variant="outline"
-										className={ROADMAP_PRIORITY_COLORS[priority]}
+							<Panel key={priority} rail tone={tone} className="space-y-2">
+								<div className="flex items-center gap-2">
+									<Chip tone={tone}>{t(`priorityLabels.${priority}`)}</Chip>
+									<span className="wp-meta">{t("tabs.featuresCount", { count: features.length })}</span>
+								</div>
+								{features.map((feature: RoadmapFeature) => (
+									<button
+										key={feature.id}
+										type="button"
+										className="wp-card wp-card-pad wp-step block w-full text-left"
+										onClick={() => onFeatureSelect(feature)}
 									>
-										{ROADMAP_PRIORITY_LABELS[priority]}
-									</Badge>
-									<span className="text-sm text-muted-foreground">
-										{t("roadmap:tabs.featuresCount", { count: features.length })}
-									</span>
-								</div>
-								<div className="space-y-2">
-									{features.map((feature: RoadmapFeature) => (
-										// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-										// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
-										// biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable feature row
-										<div
-											key={feature.id}
-											className="p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-											onClick={() => onFeatureSelect(feature)}
-										>
-											<div className="font-medium text-sm">{feature.title}</div>
-											<div className="flex items-center gap-2 mt-1 flex-wrap">
-												<Badge
-													variant="outline"
-													className={`text-xs ${ROADMAP_COMPLEXITY_COLORS[feature.complexity]}`}
-												>
-													{feature.complexity}
-												</Badge>
-												<Badge
-													variant="outline"
-													className={`text-xs ${ROADMAP_IMPACT_COLORS[feature.impact]}`}
-												>
-													{t("roadmap:featureCard.impact", { impact: feature.impact })}
-												</Badge>
-												{hasCompetitorInsight(feature) && (
-													<Badge
-														variant="outline"
-														className="text-xs text-primary border-primary/50"
-													>
-														<TrendingUp className="h-3 w-3 mr-1" />
-														{t("roadmap:tabs.insight")}
-													</Badge>
-												)}
-											</div>
+										<div className="wp-title text-sm">{feature.title}</div>
+										<div className="wp-chips mt-1">
+											<Chip tone="muted" dot={false}>
+												{feature.complexity}
+											</Chip>
+											<Chip tone="muted" dot={false}>
+												{t("featureCard.impact", { impact: feature.impact })}
+											</Chip>
+											{hasCompetitorInsight(feature) && (
+												<Chip tone="accent" dot={false}>
+													<TrendingUp className="h-3 w-3" aria-hidden="true" />
+													{t("tabs.insight")}
+												</Chip>
+											)}
 										</div>
-									))}
-								</div>
-							</Card>
+									</button>
+								))}
+							</Panel>
 						);
 					})}
 				</div>
-			</TabsContent>
-		</Tabs>
+			)}
+		</div>
 	);
 }

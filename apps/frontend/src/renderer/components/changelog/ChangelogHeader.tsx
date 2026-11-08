@@ -1,93 +1,44 @@
 import { Check, FileText, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
+import { CharterButton, Chip, ModuleHeader } from "../charter";
 import type { WizardStep } from "./hooks/useChangelog";
-import { PageHeader } from "../ui/page-header";
 
 interface ChangelogHeaderProps {
-	step: WizardStep;
-	onRefresh: () => void;
+	readonly step: WizardStep;
+	readonly onRefresh: () => void;
 }
 
+const STEPS: ReadonlyArray<{ step: WizardStep; key: "select" | "generate" | "release" }> = [
+	{ step: 1, key: "select" },
+	{ step: 2, key: "generate" },
+	{ step: 3, key: "release" },
+];
+
+/** The module band of the changelog: title, current step, the three steps. */
 export function ChangelogHeader({ step, onRefresh }: ChangelogHeaderProps) {
-	const { t } = useTranslation("changelog");
+	const { t } = useTranslation(["changelog", "navigation"]);
+	const description = t(`changelog:steps.step${step}`);
 
 	return (
-		<PageHeader
+		<ModuleHeader
+			kicker={t("navigation:groups.planning")}
+			title={t("changelog:title")}
+			description={description}
 			icon={FileText}
-			title={t("title")}
-			description={
-				step === 1
-					? t("steps.step1")
-					: step === 2
-						? t("steps.step2")
-						: t("steps.step3")
-			}
+			tone="green"
 			actions={
 				<>
-				{/* Step indicators */}
-				<div className="flex items-center gap-2 mr-4">
-					<StepIndicator
-						step={1}
-						currentStep={step}
-						label={t("stepLabels.select")}
-					/>
-					<div className="w-6 h-px bg-border" />
-					<StepIndicator
-						step={2}
-						currentStep={step}
-						label={t("stepLabels.generate")}
-					/>
-					<div className="w-6 h-px bg-border" />
-					<StepIndicator
-						step={3}
-						currentStep={step}
-						label={t("stepLabels.release")}
-					/>
-				</div>
-				<Button variant="outline" size="sm" onClick={onRefresh}>
-					<RefreshCw className="mr-2 h-4 w-4" />
-					{t("actions.refresh")}
-				</Button>
+					{STEPS.map(({ step: s, key }) => (
+						<Chip key={key} tone={s <= step ? "green" : "muted"} pressed={s === step} dot={false}>
+							{s < step ? <Check className="h-3 w-3" aria-hidden="true" /> : <span>{s}</span>}
+							{t(`changelog:stepLabels.${key}`)}
+						</Chip>
+					))}
+					<CharterButton variant="ghost" icon={RefreshCw} onClick={onRefresh}>
+						{t("changelog:actions.refresh")}
+					</CharterButton>
 				</>
 			}
 		/>
-	);
-}
-
-interface StepIndicatorProps {
-	step: WizardStep;
-	currentStep: WizardStep;
-	label: string;
-}
-
-function StepIndicator({ step, currentStep, label }: StepIndicatorProps) {
-	const isActive = step === currentStep;
-	const isComplete = step < currentStep;
-
-	return (
-		<div className="flex items-center gap-2">
-			<div
-				className={cn(
-					"flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors",
-					isComplete
-						? "bg-primary text-primary-foreground"
-						: isActive
-							? "bg-primary text-primary-foreground"
-							: "bg-muted text-muted-foreground",
-				)}
-			>
-				{isComplete ? <Check className="h-3 w-3" /> : step}
-			</div>
-			<span
-				className={cn(
-					"text-sm",
-					isActive ? "text-foreground font-medium" : "text-muted-foreground",
-				)}
-			>
-				{label}
-			</span>
-		</div>
 	);
 }

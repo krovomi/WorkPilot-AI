@@ -1,5 +1,5 @@
 {
-	"noData": "Aucune donnée de plan chirurgien git disponible",
+	"noData": "Analysez l'historique du projet sélectionné pour voir quoi nettoyer.",
 	"title": "Chirurgien de l'Historique Git",
 	"issues": "problèmes",
 	"potentialSavings": "~{{mb}} MB d'économies potentielles",
@@ -18,5 +18,20 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour analyser son historique git.",
 		"failed": "Échec de l'analyse : {{error}}"
+	},
+	"description": "Repère ce qui alourdit l'historique du dépôt (gros fichiers, secrets, commits brouillons) et planifie le nettoyage.",
+	"emptyTitle": "Pas encore d'analyse",
+	"savings": "Gain possible",
+	"issuesTitle": "Ce que l'historique contient",
+	"kickers": {
+		"issues": "Constats",
+		"actions": "Plan"
+	},
+	"issueTypes": {
+		"large_blob": "Gros fichier",
+		"sensitive_data": "Donnée sensible",
+		"messy_commits": "Commits brouillons",
+		"force_push_risk": "Risque de force push",
+		"duplicate_commits": "Commits en double"
 	}
 }

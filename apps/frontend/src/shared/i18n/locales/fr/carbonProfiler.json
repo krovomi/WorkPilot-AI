@@ -17,5 +17,13 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
+	},
+	"description": "Énergie et CO₂ des appels LLM et des runs CI du projet, lus dans son registre carbone.",
+	"emptyTitle": "Pas encore de scan",
+	"period": "Du {{start}} au {{end}}",
+	"kickers": {
+		"providers": "Fournisseurs",
+		"models": "Modèles",
+		"records": "Registre"
 	}
 }

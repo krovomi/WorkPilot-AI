@@ -393,7 +393,7 @@ describe("SmartEstimationDialog", () => {
 
 			render(<SmartEstimationDialog />);
 
-			expect(screen.getByTestId("loader-icon")).toBeInTheDocument();
+			expect(screen.getByRole("status")).toBeInTheDocument();
 			expect(screen.getByText("Analyzing complexity...")).toBeInTheDocument();
 		});
 

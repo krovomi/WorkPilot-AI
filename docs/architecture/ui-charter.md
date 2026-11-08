@@ -27,7 +27,7 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 | Tabs | `Tabs` | A module's tabs: pill chips (`role="tab"`), the selected one in the tone of the accent, an optional icon and count. |
 | Button | `CharterButton` | `primary` = the glowing warm action, **one per screen**; `default`, `ghost`, `danger`; `sm` in lists. |
 | Feedback | `Notice`, `ScanLine`, `EmptyStage` | Errors and successes are notices with a tone, never raw red text; a running job is the scan line with its status; an empty column says what will appear and how. |
-| Figures | `Stat`, `Gauge`, `Bar` | Tabular numbers in the tone of what they count. |
+| Figures | `Stat`, `Gauge`, `Bar`, `.wp-stack` | Tabular numbers in the tone of what they count; `.wp-stack` holds one `<i>` per share (stacked bar). |
 | Composer | `Composer` + `Field` | The bottom bar: `> prompt` and the actions on top, options or a hint underneath (the second row keeps the actions clear of the activity pill at the bottom right). |
 
 ## Colours
@@ -98,11 +98,20 @@ Done:
   contextuels as a `wp-scope` dialog), Visualiseur d'architecture, Idéation
   (generation screen, cards railed by idea type, detail panel in `wp-scope`),
   Boucle d'apprentissage (dialog, `wp-scope`).
+- Git & Intégrations: Arbres de travail, Chirurgien d'historique Git, Rayon
+  d'impact (two columns, `Composer` for the analysis), Déclencheurs CI/CD
+  (settings and history columns, `Composer` to trigger), Git en langage
+  naturel and Prédicteur de conflits (dialogs, `wp-scope`).
+- Planification: Feuille de route (pill `Tabs`, Kanban columns as cards),
+  Analytiques, Coûts et estimation (Estimation intelligente as a `wp-scope`
+  dialog), Approbation des specs (queue and plan columns, `Composer` for the
+  decision), Journal des modifications (wizard steps as chips, panels as
+  cards), Train de release, Profileur carbone, Snapshots d'environnement
+  (`Composer` to capture).
 - Hubs: the launcher page of a tab whose tool is a dialog (`HubLauncher`) is
   an `EmptyStage` with one primary button, for every hub. The hub tab bar
   keeps its underline: it is the app's navigation, a level above a module's
   own pill `Tabs`.
 
-The other groups (Espace de travail, Git & Intégrations,
-Planification, Boîte à outils) and the Settings pages move lot by lot; each
+The other groups (Espace de travail, Boîte à outils) and the Settings pages move lot by lot; each
 lot lists its views in its PR.

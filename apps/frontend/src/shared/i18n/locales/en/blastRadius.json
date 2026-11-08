@@ -9,5 +9,22 @@
 	"tests": "tests",
 	"flags": "Feature flags referenced",
 	"dependentFiles": "Dependent files",
-	"testFiles": "Tests in scope"
+	"testFiles": "Tests in scope",
+	"description": "Before you change a file, see which files depend on it, which tests cover them and how risky the change is.",
+	"kickers": {
+		"targets": "Targets",
+		"impact": "Impact"
+	},
+	"targetsTitle": "Files you plan to change",
+	"impactTitle": "What the change reaches",
+	"emptyTitle": "No analysis yet",
+	"emptyHint": "List the files you plan to change, then run the analysis.",
+	"scoreLevels": {
+		"low": "Low risk",
+		"medium": "Medium risk",
+		"high": "High risk"
+	},
+	"prompt": "Every import of the targets is followed through the project, whatever its language.",
+	"hint": "Paths are relative to the project root.",
+	"noValidTargets": "None of these paths is a file of the project. Check them against the project root."
 }
