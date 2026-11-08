@@ -74,6 +74,24 @@ describe("resolveBlockers", () => {
 		expect(state).toEqual({ pending: [], resolved: [], missing: [] });
 	});
 
+	it("lets a part of a split start once the part it builds on passed QA", () => {
+		const group = { parent: "012-oauth", title: "OAuth", total: 2 };
+		const first = makeTask("012-oauth-part1", "human_review");
+		first.reviewReason = "completed";
+		first.metadata = { splitGroup: { ...group, index: 1 } };
+		const second = makeTask("012-oauth-part2", "queue", ["012-oauth-part1"]);
+		second.metadata = { ...second.metadata, splitGroup: { ...group, index: 2 } };
+		const byId = indexTasksById([first, second]);
+		expect(isBlocked(second, byId)).toBe(false);
+
+		// An ordinary task still waits for its blocker to finish.
+		const plain = makeTask("b", "queue", ["012-oauth-part1"]);
+		expect(isBlocked(plain, indexTasksById([first, plain]))).toBe(true);
+		// And so does a part whose sibling has not passed QA yet.
+		first.reviewReason = "errors";
+		expect(isBlocked(second, indexTasksById([first, second]))).toBe(true);
+	});
+
 	it("reports no blockers when the field is absent", () => {
 		const task = makeTask("a");
 		expect(isBlocked(task, indexTasksById([task]))).toBe(false);

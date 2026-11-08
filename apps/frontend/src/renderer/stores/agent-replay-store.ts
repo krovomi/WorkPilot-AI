@@ -11,6 +11,7 @@
  * - Token timeline data
  */
 
+import i18n from "i18next";
 import { create } from "zustand";
 
 // ---------------------------------------------------------------------------
@@ -224,14 +225,24 @@ async function replayFetch<T = Record<string, unknown>>(
 	options?: RequestInit,
 ): Promise<T> {
 	const url = `${getBackendUrl()}/replay${path}`;
-	const res = await fetch(url, {
-		headers: { "Content-Type": "application/json" },
-		...options,
-	});
+	const unreachable = () => new Error(i18n.t("replay:errors.backendUnreachable"));
+	let res: Response;
+	try {
+		res = await fetch(url, {
+			headers: { "Content-Type": "application/json" },
+			...options,
+		});
+	} catch (e) {
+		if ((e as { name?: string })?.name === "AbortError") throw e;
+		throw unreachable();
+	}
 	if (!res.ok) {
 		const err = await res.text();
 		throw new Error(err || `HTTP ${res.status}`);
 	}
+	// A page served without the backend answers 200 with HTML: say so instead
+	// of surfacing a JSON parser error.
+	if (!res.headers.get("content-type")?.includes("application/json")) throw unreachable();
 	return res.json();
 }
 

@@ -37,8 +37,9 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 
 	listSessions: async () => {
 		try {
-			const { sessions } = await window.electronAPI.listDebugSessions();
-			set({ sessions });
+			const result = await window.electronAPI.listDebugSessions();
+			// A runner that answers without a list must not crash the panel.
+			set({ sessions: Array.isArray(result?.sessions) ? result.sessions : [] });
 		} catch (e) {
 			set({ error: (e as Error).message });
 		}
@@ -73,9 +74,11 @@ export const useAgentDebuggerStore = create<AgentDebuggerState>((set, get) => ({
 		// transient runner failure during polling doesn't spam unhandled
 		// rejections.
 		try {
-			const { breakpoints, frames } =
-				await window.electronAPI.getDebugState(sessionId);
-			set({ breakpoints, frames });
+			const state = await window.electronAPI.getDebugState(sessionId);
+			set({
+				breakpoints: Array.isArray(state?.breakpoints) ? state.breakpoints : [],
+				frames: Array.isArray(state?.frames) ? state.frames : [],
+			});
 		} catch (e) {
 			set({ error: (e as Error).message });
 		}

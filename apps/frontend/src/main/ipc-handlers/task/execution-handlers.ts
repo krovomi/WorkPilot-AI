@@ -54,6 +54,7 @@ import { registerTaskStatusHandlers } from "./execution-status-handlers";
 import { registerTaskResumeHandlers } from "./execution-resume-handlers";
 import { registerTaskRecoveryHandlers } from "./execution-recovery-handlers";
 import { registerSubtaskUnblockHandlers } from "./subtask-unblock-handlers";
+import { splitStackError, stackSplitPartBeforeStart } from "./split-stack";
 
 /** Starting and stopping a task from the main process, as the board does. */
 export interface TaskControl {
@@ -201,6 +202,16 @@ export function registerTaskExecutionHandlers(
 		}
 
 		const { task, project } = validation;
+		// A part of a split starts on the part it builds on, not the trunk.
+		const stacked = await stackSplitPartBeforeStart(task, project);
+		if (!stacked.ok) {
+			mainWindow.webContents.send(
+				IPC_CHANNELS.TASK_ERROR,
+				taskId,
+				splitStackError(task, stacked.error),
+			);
+			return false;
+		}
 		console.warn(
 			"[TASK_START] Found task:",
 			task.specId,

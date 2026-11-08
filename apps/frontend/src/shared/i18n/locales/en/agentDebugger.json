@@ -1,14 +1,9 @@
 {
 	"title": "Agent Debugger",
-	"attach": "Attach",
 	"detach": "Detach",
 	"attachedTo": "Attached to",
 	"attachTitle": "Attach to a session",
 	"attachHint": "Pick an agent session from the list to set breakpoints.",
-	"sessionId": "Session id",
-	"selectSession": "Select a session…",
-	"attachPlaceholder": "e.g. 001-my-task",
-	"existingSessions": "Sessions",
 	"noSessions": "No sessions yet.",
 	"sessionMeta": "{{bp}} breakpoints · {{frames}} paused",
 	"live": "Live run",
@@ -22,5 +17,20 @@
 	"pausedFrames": "Paused frames",
 	"noFrames": "No paused frames.",
 	"continue": "Continue",
-	"skip": "Skip"
+	"skip": "Skip",
+	"description": "Pause an agent before a tool call that matches a breakpoint, inspect its input, then let it continue or skip it. Works with every provider and stack.",
+	"kickers": {
+		"sessions": "Sessions",
+		"breakpoints": "Rules",
+		"frames": "Paused"
+	},
+	"noSessionsHint": "A session appears here as soon as an agent runs a task, on any provider.",
+	"noFramesHint": "When an agent hits a breakpoint, the call waits here for your decision.",
+	"anyTool": "Any tool",
+	"remove": "Remove the breakpoint",
+	"placeholders": {
+		"ruleId": "no-writes-to-secrets",
+		"path": "secrets/",
+		"command": "rm -rf"
+	}
 }

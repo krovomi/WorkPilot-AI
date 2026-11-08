@@ -1,3 +1,6 @@
+import { AlertCircle } from "lucide-react";
+import { Notice } from "../../charter";
+
 interface ErrorDisplayProps {
 	error: string | null;
 	envError?: string | null;
@@ -15,8 +18,8 @@ export function ErrorDisplay({ error, envError }: ErrorDisplayProps) {
 	}
 
 	return (
-		<div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+		<Notice tone="red" icon={AlertCircle} role="alert" className="mt-4">
 			{displayError}
-		</div>
+		</Notice>
 	);
 }

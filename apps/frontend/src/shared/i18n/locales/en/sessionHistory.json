@@ -24,9 +24,19 @@
 		"ended": "Ended"
 	},
 	"phases": "Phases",
-	"error": "Error",
 	"tokensCount_one": "{{formatted}} token",
 	"tokensCount_other": "{{formatted}} tokens",
 	"filesCount_one": "{{count}} file",
-	"filesCount_other": "{{count}} files"
+	"filesCount_other": "{{count}} files",
+	"kickers": {
+		"list": "Sessions"
+	},
+	"listTitle": "Agent sessions",
+	"loading": "Loading sessions…",
+	"noSessionsHint": "Every agent run records a session here: Kanban tasks, replays and server jobs.",
+	"costValue": "${{value}}",
+	"errors": {
+		"loadFailed": "Could not load the sessions.",
+		"backendUnreachable": "The local WorkPilot backend did not answer. Start it (or restart the app), then refresh."
+	}
 }

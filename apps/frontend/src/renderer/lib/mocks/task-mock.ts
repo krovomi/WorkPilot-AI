@@ -128,6 +128,9 @@ export const taskMock = {
 	onTaskUpdated: () => () => {
 		/* noop */
 	},
+	onTaskSplit: () => () => {
+		/* noop */
+	},
 	onTaskExecutionProgress: () => () => {
 		/* noop */
 	},

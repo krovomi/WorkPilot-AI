@@ -351,7 +351,7 @@ export function CleanProviderCard({
 	};
 
 	const ProviderIcon = providerIcons[provider.id] || (
-		<div className="w-4 h-4 bg-gray-400 rounded" />
+		<div className="w-4 h-4 bg-muted-foreground/40 rounded" />
 	);
 
 	// An account whose token can no longer be auto-refreshed (revoked/expired
@@ -402,16 +402,16 @@ export function CleanProviderCard({
 	const renderUsageSection = () => {
 		if (provider.realUsageData) {
 			return (
-				<div className="flex items-center justify-between text-xs text-gray-500">
+				<div className="flex items-center justify-between text-xs text-muted-foreground">
 					<span>{t("sections.accounts.providerCard.usage")}</span>
 					<div className="text-right">
-						<div className="font-medium text-gray-700">
+						<div className="font-medium text-foreground">
 							{provider.realUsageData.sessionPercent !== null
 								? `${Math.round(provider.realUsageData.sessionPercent)}%`
 								: "N/A"}
 						</div>
 						{Boolean(provider.realUsageData.weeklyPercent) && (
-							<div className="text-gray-400 text-3xs">
+							<div className="text-muted-foreground text-3xs">
 								{t("sections.accounts.providerCard.week")}:{" "}
 								{Math.round(provider.realUsageData.weeklyPercent)}%
 							</div>
@@ -423,9 +423,9 @@ export function CleanProviderCard({
 
 		if (provider.usageCount) {
 			return (
-				<div className="flex items-center justify-between text-xs text-gray-500">
+				<div className="flex items-center justify-between text-xs text-muted-foreground">
 					<span>{t("sections.accounts.providerCard.usageThisMonth")}</span>
-					<span className="font-medium text-gray-700">
+					<span className="font-medium text-foreground">
 						{provider.usageCount}
 					</span>
 				</div>
@@ -433,7 +433,7 @@ export function CleanProviderCard({
 		}
 
 		return (
-			<div className="flex items-center justify-between text-xs text-gray-400">
+			<div className="flex items-center justify-between text-xs text-muted-foreground">
 				<span>{t("sections.accounts.providerCard.usage")}</span>
 				<span className="italic">
 					{t("sections.accounts.providerCard.notAvailable")}
@@ -485,7 +485,7 @@ export function CleanProviderCard({
 
 		if (!provider.realApiKeyInfo?.hasKey) {
 			return (
-				<span className="text-gray-400 italic">
+				<span className="text-muted-foreground italic">
 					{t("sections.accounts.providerCard.notConfigured")}
 				</span>
 			);
@@ -495,7 +495,7 @@ export function CleanProviderCard({
 
 		if (authMethod === "cli") {
 			return (
-				<div className="px-2 py-1 bg-blue-50 rounded text-xs font-medium text-blue-700 border border-blue-200">
+				<div className="px-2 py-1 bg-info/10 rounded text-xs font-medium text-info border border-info/30">
 					{t("sections.accounts.providerCard.cliAuthenticated")}
 				</div>
 			);
@@ -511,7 +511,7 @@ export function CleanProviderCard({
 
 		if (authMethod === "local") {
 			return (
-				<div className="px-2 py-1 bg-purple-50 rounded text-xs font-medium text-purple-700 border border-purple-200">
+				<div className="px-2 py-1 wp-tone-violet rounded text-xs font-medium border border-[color-mix(in_srgb,var(--wp-violet)_35%,transparent)] bg-[color-mix(in_srgb,var(--wp-violet)_10%,transparent)] text-[var(--wp-violet)]">
 					{t("sections.accounts.providerCard.localRunning")}
 				</div>
 			);
@@ -520,7 +520,7 @@ export function CleanProviderCard({
 		// Default case: API key with show/hide functionality
 		return (
 			<>
-				<code className="px-2 py-1 bg-gray-50 rounded text-xs font-mono text-gray-600 break-all min-w-0 flex-1 select-all cursor-text">
+				<code className="px-2 py-1 bg-muted rounded text-xs font-mono text-muted-foreground break-all min-w-0 flex-1 select-all cursor-text">
 					{showApiKey && provider.realApiKeyInfo.keyPreview
 						? provider.realApiKeyInfo.keyPreview
 						: provider.realApiKeyInfo.keyPreview
@@ -634,7 +634,7 @@ export function CleanProviderCard({
 			</div>
 
 			{/* Actions principales */}
-			<div className="flex items-center justify-between pt-2 border-t border-gray-100">
+			<div className="flex items-center justify-between pt-2 border-t border-border">
 				<div className="flex items-center gap-2">
 					{provider.isConfigured ? (
 						<>
@@ -693,10 +693,10 @@ export function CleanProviderCard({
 
 			{/* Détails étendus */}
 			{isExpanded && provider.isConfigured && (
-				<div className="pt-2 border-t border-gray-100 space-y-2">
+				<div className="pt-2 border-t border-border space-y-2">
 					{/* Authentication method */}
 					<div className="flex items-center justify-between text-xs">
-						<span className="text-gray-500 shrink-0">
+						<span className="text-muted-foreground shrink-0">
 							{getAuthMethodText()}
 						</span>
 						<div className="flex items-center gap-2 min-w-0 flex-1 max-w-[60%]">
@@ -711,7 +711,7 @@ export function CleanProviderCard({
 								"flex items-center justify-between text-xs",
 								keyNeedsRenewal
 									? "text-warning "
-									: "text-gray-500",
+									: "text-muted-foreground",
 							)}
 						>
 							<span>{t("sections.accounts.providerCard.keySaved")}</span>
@@ -729,7 +729,7 @@ export function CleanProviderCard({
 
 					{/* Dernier test */}
 					{provider.lastTested ? (
-						<div className="flex items-center justify-between text-xs text-gray-500">
+						<div className="flex items-center justify-between text-xs text-muted-foreground">
 							<span>{t("sections.accounts.providerCard.lastTest")}</span>
 							<span>
 								{formatAppDateTime(provider.lastTested, {
@@ -743,7 +743,7 @@ export function CleanProviderCard({
 							</span>
 						</div>
 					) : (
-						<div className="flex items-center justify-between text-xs text-gray-400">
+						<div className="flex items-center justify-between text-xs text-muted-foreground">
 							<span>{t("sections.accounts.providerCard.lastTest")}</span>
 							<span className="italic">
 								{t("sections.accounts.providerCard.neverTested")}
@@ -756,9 +756,9 @@ export function CleanProviderCard({
 
 					{/* Provider source */}
 					{provider.realApiKeyInfo?.provider && (
-						<div className="flex items-center justify-between text-xs text-gray-500">
+						<div className="flex items-center justify-between text-xs text-muted-foreground">
 							<span>{t("sections.accounts.providerCard.source")}</span>
-							<span className="text-gray-600">
+							<span className="text-muted-foreground">
 								{provider.realApiKeyInfo.provider}
 							</span>
 						</div>
@@ -766,7 +766,7 @@ export function CleanProviderCard({
 
 					{/* Statut du provider */}
 					{provider.realUsageData?.isRateLimited && (
-						<div className="flex items-center justify-between text-xs text-orange-600">
+						<div className="flex items-center justify-between text-xs text-warning">
 							<span>{t("sections.accounts.providerCard.statusLabel")}</span>
 							<span className="font-medium">
 								{t("sections.accounts.providerCard.rateLimited")}
