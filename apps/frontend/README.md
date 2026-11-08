@@ -6,8 +6,8 @@ A modern Electron + React desktop application for the WorkPilot AI autonomous co
 
 ### Node.js 22.12+
 
-CI builds and tests on **Node.js 22**. Vitest 5 needs 22.12+ (or 24), Vite 8 at least 20.19, so
-Node 20 no longer runs the tests even though `package.json` still accepts it. The package manager is
+`engines` in `package.json` asks for **Node.js 22.12+**, and CI builds and tests on Node 22:
+Vitest 5 refuses older versions. The package manager is
 **pnpm**, pinned to 12.16.1 by `packageManager` in the root `package.json`.
 
 **Download:** https://nodejs.org/en/download/

@@ -3,6 +3,6 @@ contact_links:
   - name: 💡 Feature Request
     url: https://github.com/krovomi/WorkPilot-AI/discussions
     about: Suggest new features in GitHub Discussions
-  - name: 💬 Discord Community
-    url: https://discord.gg/QhRnz9m5HE
-    about: Questions and discussions - join our Discord!
+  - name: 💬 Questions and discussions
+    url: https://github.com/krovomi/WorkPilot-AI/discussions
+    about: Ask a question in GitHub Discussions

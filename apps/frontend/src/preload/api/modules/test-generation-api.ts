@@ -51,6 +51,8 @@ export interface TestGenerationAPI {
 		filePath?: string,
 		projectPath?: string,
 		selected?: string[],
+		/** Pin the language (TDD, E2E); omitted, the file or the project decides. */
+		language?: string,
 	) => Promise<{
 		success: boolean;
 		libraries?: TestLibrarySelection | null;
@@ -200,6 +202,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 		filePath?: string,
 		projectPath?: string,
 		selected?: string[],
+		language?: string,
 	): Promise<{
 		success: boolean;
 		libraries?: TestLibrarySelection | null;
@@ -209,6 +212,7 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 			filePath,
 			projectPath,
 			selected,
+			language,
 		});
 	},
 

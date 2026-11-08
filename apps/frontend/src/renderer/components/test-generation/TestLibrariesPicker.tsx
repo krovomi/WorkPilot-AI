@@ -25,6 +25,8 @@ interface TestLibrariesPickerProps {
 	readonly onAddPackages: () => void;
 	/** Hides the install button where there is no project to install into. */
 	readonly canInstall?: boolean;
+	/** One column of categories, for a narrow side panel. */
+	readonly compact?: boolean;
 }
 
 const CATEGORY_LABELS: Record<LibraryCategory, string> = {
@@ -71,6 +73,7 @@ export function TestLibrariesPicker({
 	onReset,
 	onAddPackages,
 	canInstall = true,
+	compact = false,
 }: TestLibrariesPickerProps) {
 	const { t } = useTranslation(["testGeneration", "common"]);
 
@@ -111,7 +114,7 @@ export function TestLibrariesPicker({
 				</Button>
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-2">
+			<div className={compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-2"}>
 				{groups.map(([category, libraries]) => (
 					<div key={category} className="space-y-1.5">
 						<span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
