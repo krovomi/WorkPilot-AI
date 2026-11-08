@@ -1,12 +1,15 @@
 import { AlertCircle, FolderTree, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ProjectIndex } from "../../../shared/types";
-import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import {
+	CharterButton,
+	EmptyStage,
+	Notice,
+	ScanLine,
+} from "../charter";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { ScrollArea } from "../ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { InfoItem } from "./InfoItem";
 import { ServiceCard } from "./ServiceCard";
 
@@ -27,71 +30,59 @@ export function ProjectIndexTab({
 
 	return (
 		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6">
-				{/* Header with refresh */}
-				<div className="flex items-center justify-between">
+			<div className="mx-auto max-w-5xl space-y-5 px-5 pt-2 pb-6">
+				<div className="flex items-center justify-between gap-3">
 					<div>
-						<h2 className="text-lg font-semibold text-foreground">
+						<span className="wp-kicker">
+							{t("context:tabs.projectIndex")}
+						</span>
+						<h2 className="wp-title text-base">
 							{t("context:projectIndex.title")}
 						</h2>
-						<p className="text-sm text-muted-foreground">
-							{t("context:projectIndex.description")}
-						</p>
 					</div>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={onRefresh}
-								disabled={indexLoading}
-							>
-								<RefreshCw
-									className={cn("h-4 w-4 mr-2", indexLoading && "animate-spin")}
-								/>
-								{t("context:projectIndex.refresh")}
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{t("context:projectIndex.refreshTooltip")}
-						</TooltipContent>
-					</Tooltip>
+					<CharterButton
+						size="sm"
+						icon={RefreshCw}
+						busy={indexLoading}
+						onClick={onRefresh}
+						disabled={indexLoading}
+						title={t("context:projectIndex.refreshTooltip")}
+					>
+						{t("context:projectIndex.refresh")}
+					</CharterButton>
 				</div>
 
-				{/* Error state */}
 				{indexError && (
-					<div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
-						<AlertCircle className="h-5 w-5 shrink-0" />
-						<div>
-							<p className="font-medium">
-								{t("context:projectIndex.errorTitle")}
-							</p>
-							<p className="text-sm opacity-80">{indexError}</p>
-						</div>
-					</div>
+					<Notice tone="red" icon={AlertCircle} role="alert">
+						<span className="font-medium">
+							{t("context:projectIndex.errorTitle")}
+						</span>
+						<span className="mt-1 block text-xs">{indexError}</span>
+					</Notice>
 				)}
 
-				{/* Loading state */}
 				{indexLoading && !projectIndex && (
-					<div className="flex items-center justify-center py-12">
-						<RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
+					<ScanLine label={t("context:projectIndex.refresh")} />
 				)}
 
-				{/* No index state */}
 				{!indexLoading && !projectIndex && !indexError && (
-					<div className="flex flex-col items-center justify-center py-12 text-center">
-						<FolderTree className="h-12 w-12 text-muted-foreground mb-4" />
-						<h3 className="text-lg font-medium text-foreground">
-							{t("context:projectIndex.noIndexTitle")}
-						</h3>
-						<p className="text-sm text-muted-foreground mt-2 max-w-sm">
+					<div className="flex justify-center py-8">
+						<EmptyStage
+							icon={FolderTree}
+							title={t("context:projectIndex.noIndexTitle")}
+							tone="blue"
+							action={
+								<CharterButton
+									variant="primary"
+									icon={RefreshCw}
+									onClick={onRefresh}
+								>
+									{t("context:projectIndex.analyzeProject")}
+								</CharterButton>
+							}
+						>
 							{t("context:projectIndex.noIndexDescription")}
-						</p>
-						<Button onClick={onRefresh} className="mt-4">
-							<RefreshCw className="h-4 w-4 mr-2" />
-							{t("context:projectIndex.analyzeProject")}
-						</Button>
+						</EmptyStage>
 					</div>
 				)}
 

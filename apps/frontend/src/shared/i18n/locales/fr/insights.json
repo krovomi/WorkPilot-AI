@@ -5,7 +5,7 @@
 		"hide": "Masquer la barre latérale",
 		"show": "Afficher la barre latérale"
 	},
-	"actions": { "newChat": "Nouveau Chat" },
+	"actions": { "newChat": "Nouveau Chat", "send": "Envoyer" },
 	"welcome": {
 		"title": "Commencer une Conversation",
 		"description": "Posez des questions sur votre base de code, obtenez des suggestions d améliorations, ou discutez des fonctionnalités que vous aimeriez implémenter."

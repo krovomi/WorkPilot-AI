@@ -11,11 +11,9 @@ import {
 	X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { IDEATION_TYPE_COLORS } from "../../../shared/constants";
 import type { IdeationType } from "../../../shared/types";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { CharterButton, Chip, ModuleHeader } from "../charter";
+import { IDEATION_TYPE_TONES } from "./constants";
 import { TypeIcon } from "./TypeIcon";
 
 interface IdeationHeaderProps {
@@ -36,6 +34,7 @@ interface IdeationHeaderProps {
 	readonly canAddMore: boolean;
 }
 
+/** The module band of Ideation: title, counts per type, then the actions. */
 export function IdeationHeader({
 	totalIdeas,
 	ideaCountByType,
@@ -53,194 +52,128 @@ export function IdeationHeader({
 	hasActiveIdeas,
 	canAddMore,
 }: IdeationHeaderProps) {
-	const { t } = useTranslation(["common", "ideation"]);
+	const { t } = useTranslation(["common", "ideation", "navigation"]);
 	const hasSelection = selectedCount > 0;
+	const dismissedLabel = showDismissed
+		? t("accessibility.hideDismissedAriaLabel")
+		: t("accessibility.showDismissedAriaLabel");
+
 	return (
-		<div className="shrink-0 border-b border-border p-4 bg-card/50">
-			<div className="flex items-start justify-between">
-				<div>
-					<div className="flex items-center gap-2 mb-1">
-						<Lightbulb className="h-5 w-5 text-primary" />
-						<h2 className="text-lg font-semibold">
-							{t("ideation:header.title")}
-						</h2>
-						<Badge variant="outline">
-							{t("ideation:header.ideasCount", { count: totalIdeas })}
-						</Badge>
-					</div>
-					<p className="text-sm text-muted-foreground">
-						{t("ideation:header.subtitle")}
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					{/* Selection controls */}
-					{hasSelection ? (
-						<>
-							<Badge variant="secondary" className="mr-1">
-								{t("ideation:header.selectedCount", { count: selectedCount })}
-							</Badge>
-							<Button
-								variant="outline"
-								size="sm"
-								className="text-primary hover:bg-primary hover:text-primary-foreground"
-								onClick={onConvertSelected}
-							>
-								<Play className="h-4 w-4 mr-1" />
-								{t("ideation:header.convertSelected")}
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-								onClick={onDeleteSelected}
-							>
-								<Trash2 className="h-4 w-4 mr-1" />
-								{t("ideation:header.delete")}
-							</Button>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={onClearSelection}
-										aria-label={t("accessibility.clearSelectionAriaLabel")}
-									>
-										<X className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.clearSelectionAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-							<div className="w-px h-6 bg-border mx-1" />
-						</>
-					) : (
-						hasActiveIdeas && (
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={onSelectAll}
-										aria-label={t("accessibility.selectAllAriaLabel")}
-									>
-										<CheckSquare className="h-4 w-4" />
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>
-									{t("accessibility.selectAllAriaLabel")}
-								</TooltipContent>
-							</Tooltip>
-						)
-					)}
-
-					{/* View toggles */}
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant={showDismissed ? "secondary" : "outline"}
-								size="icon"
-								onClick={onToggleShowDismissed}
-								aria-label={
-									showDismissed
-										? t("accessibility.hideDismissedAriaLabel")
-										: t("accessibility.showDismissedAriaLabel")
-								}
-							>
-								{showDismissed ? (
-									<Eye className="h-4 w-4" />
-								) : (
-									<EyeOff className="h-4 w-4" />
-								)}
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{showDismissed
-								? t("accessibility.hideDismissedAriaLabel")
-								: t("accessibility.showDismissedAriaLabel")}
-						</TooltipContent>
-					</Tooltip>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant="outline"
-								size="icon"
-								onClick={onOpenConfig}
-								aria-label={t("accessibility.configureAriaLabel")}
-							>
-								<Settings2 className="h-4 w-4" />
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{t("accessibility.configureAriaLabel")}
-						</TooltipContent>
-					</Tooltip>
-					{canAddMore && (
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="outline"
-									onClick={onOpenAddMore}
-									aria-label={t("accessibility.addMoreAriaLabel")}
+		<>
+			<ModuleHeader
+				kicker={t("navigation:groups.explore")}
+				title={t("ideation:header.title")}
+				description={t("ideation:header.subtitle")}
+				icon={Lightbulb}
+				tone="amber"
+				actions={
+					<>
+						{hasSelection ? (
+							<>
+								<Chip tone="accent">
+									{t("ideation:header.selectedCount", { count: selectedCount })}
+								</Chip>
+								<CharterButton
+									size="sm"
+									variant="primary"
+									icon={Play}
+									onClick={onConvertSelected}
 								>
-									<Plus className="h-4 w-4 mr-1" />
-									{t("ideation:header.addMore")}
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>
-								{t("accessibility.addMoreAriaLabel")}
-							</TooltipContent>
-						</Tooltip>
-					)}
-					{hasActiveIdeas && !hasSelection && (
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="outline"
-									size="icon"
-									className="text-muted-foreground hover:text-destructive"
-									onClick={onDismissAll}
-									aria-label={t("accessibility.dismissAllAriaLabel")}
+									{t("ideation:header.convertSelected")}
+								</CharterButton>
+								<CharterButton
+									size="sm"
+									variant="danger"
+									icon={Trash2}
+									onClick={onDeleteSelected}
 								>
-									<Trash2 className="h-4 w-4" />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>
-								{t("accessibility.dismissAllAriaLabel")}
-							</TooltipContent>
-						</Tooltip>
-					)}
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant="outline"
-								size="icon"
-								onClick={onRefresh}
-								aria-label={t("accessibility.regenerateIdeasAriaLabel")}
+									{t("ideation:header.delete")}
+								</CharterButton>
+								<CharterButton
+									size="sm"
+									variant="ghost"
+									icon={X}
+									onClick={onClearSelection}
+									aria-label={t("accessibility.clearSelectionAriaLabel")}
+									title={t("accessibility.clearSelectionAriaLabel")}
+								/>
+							</>
+						) : (
+							hasActiveIdeas && (
+								<CharterButton
+									size="sm"
+									variant="ghost"
+									icon={CheckSquare}
+									onClick={onSelectAll}
+									aria-label={t("accessibility.selectAllAriaLabel")}
+									title={t("accessibility.selectAllAriaLabel")}
+								/>
+							)
+						)}
+						<CharterButton
+							size="sm"
+							variant={showDismissed ? "default" : "ghost"}
+							icon={showDismissed ? Eye : EyeOff}
+							onClick={onToggleShowDismissed}
+							aria-pressed={showDismissed}
+							aria-label={dismissedLabel}
+							title={dismissedLabel}
+						/>
+						<CharterButton
+							size="sm"
+							variant="ghost"
+							icon={Settings2}
+							onClick={onOpenConfig}
+							aria-label={t("accessibility.configureAriaLabel")}
+							title={t("accessibility.configureAriaLabel")}
+						/>
+						{hasActiveIdeas && !hasSelection && (
+							<CharterButton
+								size="sm"
+								variant="ghost"
+								icon={Trash2}
+								onClick={onDismissAll}
+								aria-label={t("accessibility.dismissAllAriaLabel")}
+								title={t("accessibility.dismissAllAriaLabel")}
+							/>
+						)}
+						<CharterButton
+							size="sm"
+							variant="ghost"
+							icon={RefreshCw}
+							onClick={onRefresh}
+							aria-label={t("accessibility.regenerateIdeasAriaLabel")}
+							title={t("accessibility.regenerateIdeasAriaLabel")}
+						/>
+						{canAddMore && (
+							<CharterButton
+								size="sm"
+								icon={Plus}
+								onClick={onOpenAddMore}
+								title={t("accessibility.addMoreAriaLabel")}
 							>
-								<RefreshCw className="h-4 w-4" />
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{t("accessibility.regenerateIdeasAriaLabel")}
-						</TooltipContent>
-					</Tooltip>
-				</div>
-			</div>
-
-			{/* Stats */}
-			<div className="mt-4 flex items-center gap-4">
+								{t("ideation:header.addMore")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<div className="wp-chips relative z-[2] px-5 pb-3">
+				<Chip tone="muted" dot={false}>
+					{t("ideation:header.ideasCount", { count: totalIdeas })}
+				</Chip>
 				{Object.entries(ideaCountByType).map(([type, count]) => (
-					<Badge
+					<Chip
 						key={type}
-						variant="outline"
-						className={IDEATION_TYPE_COLORS[type]}
+						tone={IDEATION_TYPE_TONES[type as IdeationType]}
+						dot={false}
+						title={t(`ideation:types.${type}`)}
 					>
-						<TypeIcon type={type as IdeationType} />
-						<span className="ml-1">{count}</span>
-					</Badge>
+						<TypeIcon type={type as IdeationType} className="h-3 w-3" />
+						{count}
+					</Chip>
 				))}
 			</div>
-		</div>
+		</>
 	);
 }
