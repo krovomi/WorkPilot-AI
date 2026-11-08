@@ -15,7 +15,9 @@ RUN apt-get update \
 # runs (runners/github, as a job on the clone, with the GitHub token of whoever
 # started it). A release pinned by version and by the SHA-256 GitHub publishes
 # for it, for the image's architecture; any other architecture stops the build.
-# Retried: GitHub release downloads answered 5xx for a whole morning (2026-11-08).
+# Retried: GitHub release downloads answered 5xx for a whole morning (2026-11-08),
+# then reset the connection mid-transfer (curl exit 56, develop CI 2026-11-08),
+# which plain --retry does not count as transient: hence --retry-all-errors.
 RUN set -eu; \
     version=2.83.0; \
     arch="$(dpkg --print-architecture)"; \
@@ -25,7 +27,7 @@ RUN set -eu; \
       *) echo "No pinned GitHub CLI for $arch" >&2; exit 1 ;; \
     esac; \
     name="gh_${version}_linux_${arch}"; \
-    curl -fsSL --retry 6 --retry-delay 20 -o "/tmp/$name.tar.gz" \
+    curl -fsSL --retry 6 --retry-delay 20 --retry-all-errors -o "/tmp/$name.tar.gz" \
       "https://github.com/cli/cli/releases/download/v${version}/$name.tar.gz"; \
     echo "$sum  /tmp/$name.tar.gz" | sha256sum -c -; \
     tar -xzf "/tmp/$name.tar.gz" -C /tmp "$name/bin/gh"; \
