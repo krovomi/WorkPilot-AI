@@ -74,5 +74,12 @@
 		"title": "Unmeasured signals",
 		"description": "These criteria could not be evaluated; their weight was redistributed."
 	},
-	"noWinnerTie": "Tied at the top — no winner is declared."
+	"noWinnerTie": "Tied at the top — no winner is declared.",
+	"contestant": "Contestant",
+	"kickers": {
+		"setup": "Setup",
+		"board": "Board"
+	},
+	"emptyTitle": "No round yet",
+	"emptyHint": "Pick a spec, line up the contestants, then start: each one works in its own worktree and the judge picks the winner."
 }

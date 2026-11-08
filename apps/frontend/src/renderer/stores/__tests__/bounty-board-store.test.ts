@@ -57,6 +57,15 @@ describe("bounty-board-store", () => {
 		expect(result.current.contestants.length).toBe(before);
 	});
 
+	it("keeps an empty archive list when the reply carries none", async () => {
+		mockListArchives.mockResolvedValueOnce({});
+		const { result } = renderHook(() => useBountyBoardStore());
+		await act(async () => {
+			await result.current.loadArchives("/repo", "001-setup");
+		});
+		expect(result.current.archives).toEqual([]);
+	});
+
 	it("calls the IPC start bridge with current contestants and stores the result", async () => {
 		const fakeResult: BountyResult = {
 			id: "b1",

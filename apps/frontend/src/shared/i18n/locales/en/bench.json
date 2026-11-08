@@ -120,5 +120,11 @@
 		"hintAll": "On this project's cards, the bench recommends",
 		"use": "Use it",
 		"inUse": "In use"
+	},
+	"kickers": {
+		"results": "Results",
+		"recommend": "Recommendation",
+		"new": "New bench",
+		"runs": "Runs"
 	}
 }

@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { Radar } from "lucide-react";
+import { CharterButton, Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { FragilityChart } from "./FragilityChart";
 import { IncidentCard } from "./IncidentCard";
@@ -27,19 +29,19 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 	return (
 		<div className="space-y-4">
 			{/* Config + scan trigger */}
-			<div className="rounded-lg border border-border bg-card p-4">
+			<Panel>
 				<div className="flex items-center justify-between mb-3">
-					<h3 className="text-sm font-medium text-foreground">
-						{t("selfHealing:proactiveConfig")}
-					</h3>
-					<button
-						type="button"
+					<h3 className="wp-kicker">{t("selfHealing:proactiveConfig")}</h3>
+					<CharterButton
+						variant="primary"
+						size="sm"
+						icon={Radar}
+						busy={isScanning}
 						onClick={() => triggerProactiveScan(projectPath)}
 						disabled={isScanning}
-						className="text-xs px-3 py-1.5 rounded bg-primary text-white hover:opacity-80 disabled:opacity-50"
 					>
 						{isScanning ? t("selfHealing:scanning") : t("selfHealing:runScan")}
-					</button>
+					</CharterButton>
 				</div>
 				<div className="grid grid-cols-2 gap-4">
 					<label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -101,17 +103,17 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 						</NativeSelect>
 					</div>
 				</div>
-			</div>
+			</Panel>
 
 			{/* Fragility chart */}
 			<FragilityChart reports={fragilityReports} />
 
 			{/* Fragility table */}
 			{fragilityReports.length > 0 && (
-				<div className="rounded-lg border border-border bg-card overflow-hidden">
+				<Panel padded={false} className="overflow-hidden">
 					<table className="w-full text-sm">
 						<thead>
-							<tr className="border-b border-border bg-muted">
+							<tr className="border-b border-border">
 								<th className="text-left p-2 text-xs font-medium text-muted-foreground">
 									{t("selfHealing:file")}
 								</th>
@@ -154,13 +156,13 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 							))}
 						</tbody>
 					</table>
-				</div>
+				</Panel>
 			)}
 
 			{/* Proactive incidents */}
 			{proactiveIncidents.length > 0 && (
 				<div>
-					<h3 className="text-sm font-medium text-foreground mb-2">
+					<h3 className="wp-kicker mb-2 block">
 						{t("selfHealing:suggestedFixes")} ({proactiveIncidents.length})
 					</h3>
 					<div className="space-y-2">
