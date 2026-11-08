@@ -114,10 +114,20 @@ Done:
   `Gauge` for coverage), Garde-fous des agents (rules railed by action; the
   same editor in Settings under `wp-scope`), Analyse d'accessibilité, Analyse
   i18n, Sentinelle de dépendances (dialog, `wp-scope`).
+- Boîte à outils (second half): Générateur de pipeline CI (setup and pipeline
+  columns, platforms as chips, one pill `Tabs` per generated file), Migration
+  de code (examples as `StepCard`s, `Composer` for the request, "create the
+  Kanban task" as the primary action), Vérification des notebooks, Veille des
+  contrats d'API (change categories as chips), Aperçu des changements (files
+  as `StepCard`s, hunks as panels), Agent navigateur (pill `Tabs`, results
+  railed by status, `Bar` for the visual match), Bot d'équipe and Mode hors
+  ligne (pages, `Switch` rows), API Studio (charter header over its own
+  two-pane layout), Émulateur d'application, Optimiseur de prompt and
+  Assistant vocal (dialogs, `wp-scope`).
 - Hubs: the launcher page of a tab whose tool is a dialog (`HubLauncher`) is
   an `EmptyStage` with one primary button, for every hub. The hub tab bar
   keeps its underline: it is the app's navigation, a level above a module's
   own pill `Tabs`.
 
-The other groups (Espace de travail, the rest of Boîte à outils) and the Settings pages move lot by lot; each
+The last group (Espace de travail) and the Settings pages move lot by lot; each
 lot lists its views in its PR.

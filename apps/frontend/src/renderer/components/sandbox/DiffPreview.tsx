@@ -1,141 +1,96 @@
 import type React from "react";
 import { useState } from "react";
-import type { FileDiff } from "../../../shared/types/sandbox";
 import { useTranslation } from "react-i18next";
+import type { DiffHunk, FileDiff } from "../../../shared/types/sandbox";
+import { Chip, Column, Columns, Panel, StepCard, type Tone } from "../charter";
+
+const CHANGE_TONES: Record<FileDiff["changeType"], Tone> = {
+	added: "green",
+	modified: "blue",
+	deleted: "red",
+	renamed: "violet",
+};
 
 interface DiffPreviewProps {
-	readonly diffs: FileDiff[];
-	readonly onFileSelect?: (filePath: string) => void;
+	readonly diffs: readonly FileDiff[];
+	/** Shown above the file list (stats, steps of a run). */
+	readonly aside?: React.ReactNode;
 }
 
-const CHANGE_ICON: Record<string, string> = {
-	added: "A",
-	modified: "M",
-	deleted: "D",
-	renamed: "R",
-};
-
-const CHANGE_COLORS: Record<string, string> = {
-	added: "text-success",
-	modified: "text-blue-400",
-	deleted: "text-destructive",
-	renamed: "text-purple-400",
-};
-
-export function DiffPreview({
-	diffs,
-	onFileSelect,
-}: DiffPreviewProps): React.ReactElement {
-	const { t } = useTranslation();
-	const [selectedFile, setSelectedFile] = useState<string | null>(
-		diffs[0]?.filePath ?? null,
-	);
-
-	const activeDiff = diffs.find((d) => d.filePath === selectedFile);
-
-	const totalAdditions = diffs.reduce((sum, d) => sum + d.additions, 0);
-	const totalDeletions = diffs.reduce((sum, d) => sum + d.deletions, 0);
-
-	function handleSelect(filePath: string) {
-		setSelectedFile(filePath);
-		onFileSelect?.(filePath);
-	}
+/** Changed files on the left, the selected file's hunks on the right. */
+export function DiffPreview({ diffs, aside }: DiffPreviewProps): React.ReactElement {
+	const { t } = useTranslation("sandbox");
+	const [selected, setSelected] = useState<string | null>(diffs[0]?.filePath ?? null);
+	const active = diffs.find((d) => d.filePath === selected) ?? diffs[0];
+	const additions = diffs.reduce((sum, d) => sum + d.additions, 0);
+	const deletions = diffs.reduce((sum, d) => sum + d.deletions, 0);
 
 	return (
-		<div className="flex h-full bg-background text-foreground">
-			{/* File list sidebar */}
-			<div className="w-64 border-r border-border overflow-y-auto">
-				<div className="px-3 py-2 border-b border-border">
-					<p className="text-xs text-muted-foreground">
-						{t("sandbox:diffPreview.filesChanged", { count: diffs.length })}
-					</p>
-					<p className="text-xs">
-						<span className="text-success">+{totalAdditions}</span>
-						{" / "}
-						<span className="text-destructive">-{totalDeletions}</span>
-					</p>
+		<Columns template="minmax(0, 1fr) minmax(0, 2.4fr)">
+			<Column
+				kicker={t("kickers.files")}
+				title={t("diffPreview.filesChanged", { count: diffs.length })}
+				meta={`+${additions} −${deletions}`}
+				tone="violet"
+			>
+				{aside}
+				<div className="grid gap-2">
+					{diffs.map((diff) => (
+						<StepCard
+							key={diff.filePath}
+							kicker={t(`changeTypes.${diff.changeType}`)}
+							title={<span className="break-all font-mono text-xs">{diff.filePath}</span>}
+							meta={`+${diff.additions} −${diff.deletions}`}
+							tone={CHANGE_TONES[diff.changeType] ?? "muted"}
+							active={diff.filePath === active?.filePath}
+							onClick={() => setSelected(diff.filePath)}
+						/>
+					))}
 				</div>
-				{diffs.map((diff) => (
-					<button
-						key={diff.filePath}
-						type="button"
-						onClick={() => handleSelect(diff.filePath)}
-						className={`w-full text-left px-3 py-2 text-xs hover:bg-card flex items-center gap-2 transition-colors ${
-							diff.filePath === selectedFile
-								? "bg-card"
-								: ""
-						}`}
-					>
-						<span
-							className={`font-mono font-bold ${CHANGE_COLORS[diff.changeType] ?? ""}`}
-						>
-							{CHANGE_ICON[diff.changeType] ?? "?"}
-						</span>
-						<span className="truncate font-mono">
-							{diff.filePath.split("/").pop()}
-						</span>
-						<span className="ml-auto text-success">
-							+{diff.additions}
-						</span>
-						<span className="text-destructive">-{diff.deletions}</span>
-					</button>
-				))}
-			</div>
+			</Column>
+			<Column
+				kicker={t("kickers.diff")}
+				title={<span className="font-mono text-sm">{active?.filePath ?? t("diffPreview.selectFile")}</span>}
+				meta={
+					active ? (
+						<Chip tone={CHANGE_TONES[active.changeType] ?? "muted"}>{t(`changeTypes.${active.changeType}`)}</Chip>
+					) : undefined
+				}
+			>
+				<div className="grid gap-2.5">
+					{active?.hunks.map((hunk) => (
+						<Hunk key={`${hunk.oldStart}-${hunk.oldCount}-${hunk.newStart}-${hunk.newCount}`} hunk={hunk} />
+					))}
+					{active && active.hunks.length === 0 && <p className="wp-muted text-sm">{t("diffPreview.noHunks")}</p>}
+				</div>
+			</Column>
+		</Columns>
+	);
+}
 
-			{/* Diff content */}
-			<div className="flex-1 overflow-y-auto">
-				{activeDiff ? (
-					<div className="p-4">
-						<div className="flex items-center gap-2 mb-3">
-							<span
-								className={`font-mono font-bold text-sm ${CHANGE_COLORS[activeDiff.changeType] ?? ""}`}
-							>
-								{CHANGE_ICON[activeDiff.changeType]}
-							</span>
-							<span className="font-mono text-sm">
-								{activeDiff.filePath}
-							</span>
-						</div>
-						<div className="space-y-2">
-							{activeDiff.hunks.map((hunk, _idx) => (
-								<div
-									key={`${activeDiff.filePath}-hunk-${hunk.oldStart}-${hunk.oldCount}-${hunk.newStart}-${hunk.newCount}`}
-									className="rounded-lg border border-border overflow-hidden"
-								>
-									<div className="px-3 py-1 text-xs bg-card text-muted-foreground font-mono">
-										@@ -{hunk.oldStart},{hunk.oldCount} +
-										{hunk.newStart},{hunk.newCount} @@
-									</div>
-									<pre className="px-3 py-2 text-xs font-mono leading-5 overflow-x-auto">
-										{hunk.content.split("\n").map((line) => {
-											let lineClass: string;
-											if (line.startsWith("+")) {
-												lineClass = "bg-success/10 text-success";
-											} else if (line.startsWith("-")) {
-												lineClass = "bg-destructive/10 text-destructive";
-											} else {
-												lineClass = "text-muted-foreground";
-											}
-											return (
-												<div
-													key={line}
-													className={lineClass}
-												>
-													{line}
-												</div>
-											);
-										})}
-									</pre>
-								</div>
-							))}
-						</div>
-					</div>
-				) : (
-					<div className="flex items-center justify-center h-full text-muted-foreground">
-						{t("sandbox:diffPreview.selectFile")}
-					</div>
-				)}
+function Hunk({ hunk }: { readonly hunk: DiffHunk }): React.ReactElement {
+	const rows = hunk.content.split("\n").map((text, i) => ({ id: `${hunk.newStart}:${i}`, text }));
+	return (
+		<Panel padded={false} className="overflow-hidden">
+			<div className="wp-meta border-b border-[var(--wp-border)] px-3 py-1 font-mono">
+				@@ −{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
 			</div>
-		</div>
+			<pre className="overflow-x-auto px-3 py-2 font-mono text-xs leading-5">
+				{rows.map((row) => (
+					<div
+						key={row.id}
+						className={
+							row.text.startsWith("+")
+								? "wp-tone-green wp-ink"
+								: row.text.startsWith("-")
+									? "wp-tone-red wp-ink"
+									: "wp-muted"
+						}
+					>
+						{row.text || " "}
+					</div>
+				))}
+			</pre>
+		</Panel>
 	);
 }

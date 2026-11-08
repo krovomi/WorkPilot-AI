@@ -20,7 +20,9 @@
    "package_managers": [
     "gradle"
    ],
-   "test_runners": []
+   "test_runners": [
+    "junit (maven/gradle test)"
+   ]
   },
   "mobile": [
    "android-native",
@@ -69,7 +71,9 @@
    "package_managers": [
     "pip"
    ],
-   "test_runners": []
+   "test_runners": [
+    "pytest"
+   ]
   },
   "mobile": null,
   "project_type": "python_api",
@@ -206,7 +210,9 @@
   "manifest": {
    "build_scripts": [],
    "existing_ci": [],
-   "frameworks": [],
+   "frameworks": [
+    "express"
+   ],
    "has_docker": false,
    "has_docker_compose": false,
    "languages": [
@@ -255,7 +261,9 @@
    "package_managers": [
     "uv/poetry/pip"
    ],
-   "test_runners": []
+   "test_runners": [
+    "pytest"
+   ]
   },
   "mobile": null,
   "project_type": "python_api",
@@ -278,16 +286,24 @@
   "frameworks": [
    "flutter"
   ],
-  "languages": [],
+  "languages": [
+   "dart"
+  ],
   "manifest": {
    "build_scripts": [],
    "existing_ci": [],
    "frameworks": [],
    "has_docker": false,
    "has_docker_compose": false,
-   "languages": [],
-   "package_managers": [],
-   "test_runners": []
+   "languages": [
+    "dart"
+   ],
+   "package_managers": [
+    "pub"
+   ],
+   "test_runners": [
+    "flutter test / dart test"
+   ]
   },
   "mobile": [
    "flutter",
@@ -332,7 +348,9 @@
    "package_managers": [
     "go mod"
    ],
-   "test_runners": []
+   "test_runners": [
+    "go test ./..."
+   ]
   },
   "mobile": null,
   "project_type": "go",
@@ -422,7 +440,9 @@
    "package_managers": [
     "uv/poetry/pip"
    ],
-   "test_runners": []
+   "test_runners": [
+    "pytest"
+   ]
   },
   "mobile": null,
   "project_type": "python_cli",
@@ -499,16 +519,24 @@
   "frameworks": [
    "rails"
   ],
-  "languages": [],
+  "languages": [
+   "ruby"
+  ],
   "manifest": {
    "build_scripts": [],
    "existing_ci": [],
    "frameworks": [],
    "has_docker": false,
    "has_docker_compose": false,
-   "languages": [],
-   "package_managers": [],
-   "test_runners": []
+   "languages": [
+    "ruby"
+   ],
+   "package_managers": [
+    "bundler"
+   ],
+   "test_runners": [
+    "rspec / rake test"
+   ]
   },
   "mobile": null,
   "project_type": "ruby",
@@ -546,7 +574,9 @@
    "package_managers": [
     "cargo"
    ],
-   "test_runners": []
+   "test_runners": [
+    "cargo test"
+   ]
   },
   "mobile": null,
   "project_type": "rust",
@@ -582,7 +612,9 @@
    "package_managers": [
     "maven"
    ],
-   "test_runners": []
+   "test_runners": [
+    "junit (maven/gradle test)"
+   ]
   },
   "mobile": null,
   "project_type": "unknown",

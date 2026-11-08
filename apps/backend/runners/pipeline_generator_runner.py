@@ -41,18 +41,22 @@ if env_file.exists():
 from core.client import create_client
 from core.workflow_logger import workflow_logger
 
-SUPPORTED_PLATFORMS = ["github", "gitlab", "circleci"]
+SUPPORTED_PLATFORMS = ["github", "gitlab", "circleci", "azure", "bitbucket"]
 
 PLATFORM_LABELS = {
     "github": "GitHub Actions",
     "gitlab": "GitLab CI/CD",
     "circleci": "CircleCI",
+    "azure": "Azure Pipelines",
+    "bitbucket": "Bitbucket Pipelines",
 }
 
 PLATFORM_OUTPUT_FILES = {
     "github": ".github/workflows/ci.yml",
     "gitlab": ".gitlab-ci.yml",
     "circleci": ".circleci/config.yml",
+    "azure": "azure-pipelines.yml",
+    "bitbucket": "bitbucket-pipelines.yml",
 }
 
 
@@ -96,18 +100,21 @@ __PIPELINE_START__:<platform_id>
 __PIPELINE_END__:<platform_id>
 ```
 
-Where <platform_id> is one of: github, gitlab, circleci
+Where <platform_id> is one of: {", ".join(platforms)}
 
 Important rules:
 - Use the correct YAML syntax for each platform
-- Add caching for dependencies (node_modules, pip cache, cargo registry, etc.)
-- Use matrix builds if multiple Node/Python versions make sense
+- Use the official setup step of each detected stack (Node, Python, .NET SDK, JDK, Go, Rust, PHP, Ruby, Flutter/Dart, Swift, Elixir) and its own build and test commands
+- Add caching for the dependencies of each detected stack (npm/pnpm/yarn, pip/uv, NuGet, Maven/Gradle, Go modules, cargo registry, Composer, Bundler, pub, SwiftPM, Hex)
+- Use matrix builds if several runtime versions or operating systems make sense
 - Add branch protection: run full pipeline on main/master, lighter on feature branches
-- Include environment variable placeholders for secrets (use ${{ secrets.X }} syntax)
+- Include environment variable placeholders for secrets, in the syntax of each platform (GitHub: ${{{{ secrets.X }}}})
 - Add job dependencies properly (test depends on build, deploy depends on test)
 - For GitHub Actions: use ubuntu-latest runners
 - For GitLab CI: use appropriate Docker images
 - For CircleCI: use appropriate orbs or Docker executors
+- For Azure Pipelines: use stages, jobs and steps with the built-in tasks (UseDotNet, NodeTool, UsePythonVersion, JavaToolInstaller…) and `$(variable)` secrets
+- For Bitbucket Pipelines: use per-step Docker images, caches and `$VARIABLE` repository variables
 - Add comments explaining key decisions
 - Make the pipeline production-ready, not a toy example
 

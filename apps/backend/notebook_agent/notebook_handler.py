@@ -90,7 +90,11 @@ class NotebookHandler:
     """
 
     def parse(self, path: Path) -> ParsedNotebook:
-        """Parse a .ipynb file."""
+        """Parse a notebook: Jupyter, Polyglot (.dib), Quarto or R Markdown."""
+        if path.suffix.lower() != ".ipynb":
+            from .formats import parse_text_notebook
+
+            return parse_text_notebook(path)
         content = path.read_text(encoding="utf-8")
         data = json.loads(content)
 
@@ -107,11 +111,17 @@ class NotebookHandler:
         )
 
         for i, cell_data in enumerate(data.get("cells", [])):
-            source = "".join(cell_data.get("source", []))
+            # nbformat allows the source as one string or as a list of lines.
+            raw_source = cell_data.get("source", [])
+            source = raw_source if isinstance(raw_source, str) else "".join(raw_source)
+            try:
+                cell_type = CellType(cell_data.get("cell_type", "code"))
+            except ValueError:
+                cell_type = CellType.RAW
             nb.cells.append(
                 NotebookCell(
                     index=i,
-                    cell_type=CellType(cell_data.get("cell_type", "code")),
+                    cell_type=cell_type,
                     source=source,
                     execution_count=cell_data.get("execution_count"),
                     outputs=cell_data.get("outputs", []),

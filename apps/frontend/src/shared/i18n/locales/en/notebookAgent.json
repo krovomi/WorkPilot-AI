@@ -1,14 +1,9 @@
 {
-	"noData": "No notebook data available",
-	"title": "Notebook Analysis",
+	"noData": "Run the check: WorkPilot looks for .ipynb, .dib, .qmd and .Rmd files in the project.",
+	"title": "Notebook checks",
 	"totalCells": "Total Cells",
-	"codeCells": "Code Cells",
-	"markdown": "Markdown",
 	"issues": "Issues",
-	"severity": "Severity",
 	"cellIndex": "Cell #{{index}}",
-	"issueType": "Issue Type",
-	"suggestion": "Suggestion",
 	"actions": {
 		"runScan": "Analyze Notebooks",
 		"cancel": "Cancel",
@@ -18,5 +13,29 @@
 	"errors": {
 		"noProject": "Select a project to analyse its notebooks.",
 		"failed": "Analysis failed: {{error}}"
+	},
+	"description": "Execution order, empty or long cells and missing prose, in Jupyter notebooks (any kernel), .NET Polyglot (.dib), Quarto and R Markdown.",
+	"idleTitle": "No check yet",
+	"emptyTitle": "No notebook in this project",
+	"notebooks": "Notebooks",
+	"notebooksTitle": "Notebooks checked",
+	"noIssues": "No issue in this notebook.",
+	"cellSummary": "{{total}} cells · {{code}} code · {{markdown}} prose",
+	"kickers": {
+		"notebooks": "Results"
+	},
+	"severities": {
+		"error": "Error",
+		"warning": "Warning",
+		"info": "Info"
+	},
+	"issueTypes": {
+		"stale_output": "Stale output",
+		"out_of_order": "Out of order",
+		"missing_import": "Missing import",
+		"empty_cell": "Empty cell",
+		"long_cell": "Long cell",
+		"no_markdown": "No prose",
+		"sensitive_output": "Sensitive output"
 	}
 }

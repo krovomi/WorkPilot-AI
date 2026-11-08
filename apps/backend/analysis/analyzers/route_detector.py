@@ -8,8 +8,10 @@ Detects API routes and endpoints across different frameworks:
 - Go: Gin, Echo, Chi, Fiber
 - Rust: Axum, Actix
 - C#: ASP.NET Core (controllers + minimal API)
-- Java: Spring Boot (RestController, RequestMapping)
+- Java and Kotlin: Spring Boot (RestController, RequestMapping)
 - Ruby: Rails routes.rb
+- PHP: Laravel routes/*.php; TypeScript: NestJS controllers
+  (both in ``route_detector_extra``)
 """
 
 from __future__ import annotations
@@ -18,20 +20,41 @@ import re
 from pathlib import Path
 
 from .base import BaseAnalyzer
+from .route_detector_extra import detect_laravel_routes, detect_nestjs_routes
 
 
 class RouteDetector(BaseAnalyzer):
     """Detects API routes across multiple web frameworks."""
 
     # Directories to exclude from route detection
-    EXCLUDED_DIRS = {"node_modules", ".venv", "venv", "__pycache__", ".git"}
+    EXCLUDED_DIRS = {
+        "node_modules",
+        ".venv",
+        "venv",
+        "__pycache__",
+        ".git",
+        "bin",
+        "obj",
+        "target",
+        "build",
+        "dist",
+        "vendor",
+    }
 
     def __init__(self, path: Path):
         super().__init__(path)
 
     def _should_include_file(self, file_path: Path) -> bool:
-        """Check if file should be included (not in excluded directories)."""
-        return not any(part in self.EXCLUDED_DIRS for part in file_path.parts)
+        """Check if file should be included (not in excluded directories).
+
+        Only the parts under the project count: a project kept in a folder
+        named ``build`` or ``bin`` must not lose all its routes.
+        """
+        try:
+            parts = file_path.relative_to(self.path).parts
+        except ValueError:
+            parts = file_path.parts
+        return not any(part in self.EXCLUDED_DIRS for part in parts)
 
     def detect_all_routes(self) -> list[dict]:
         """Detect all API routes across different frameworks."""
@@ -66,6 +89,10 @@ class RouteDetector(BaseAnalyzer):
 
         # Ruby on Rails
         routes.extend(self._detect_rails_routes())
+
+        # PHP Laravel and TypeScript NestJS
+        routes.extend(detect_laravel_routes(self.path, self._should_include_file))
+        routes.extend(detect_nestjs_routes(self.path, self._should_include_file))
 
         return routes
 
@@ -531,10 +558,13 @@ class RouteDetector(BaseAnalyzer):
         return routes
 
     def _detect_spring_routes(self) -> list[dict]:
-        """Detect Spring Boot routes from Java files."""
+        """Detect Spring Boot routes from Java and Kotlin files."""
         routes = []
         java_files = [
-            f for f in self.path.glob("**/*.java") if self._should_include_file(f)
+            f
+            for pattern in ("**/*.java", "**/*.kt")
+            for f in self.path.glob(pattern)
+            if self._should_include_file(f)
         ]
 
         verb_map = {

@@ -28,6 +28,7 @@ import { Textarea } from "../ui/textarea";
 import { useVoiceCapture } from "./use-voice-capture";
 import { VIEW_HINTS } from "./voice-destinations";
 import { readVoiceCommand } from "./voice-intent";
+import "../charter/charter.css";
 
 const LANGUAGES = ["auto", "fr-FR", "en-US", "en-GB", "es-ES", "de-DE", "it-IT", "pt-BR", "nl-NL"];
 const LANGUAGE_KEY = "voice-assistant-language";
@@ -67,7 +68,7 @@ export function VoiceAssistant({
 	onNewTask,
 	onOpenSettings,
 }: VoiceAssistantProps) {
-	const { t, i18n } = useTranslation(["voiceAssistant", "common"]);
+	const { t, i18n } = useTranslation(["voiceAssistant", "common", "navigation"]);
 	const id = useId();
 	const isOpen = useVoiceAssistantStore((s) => s.isOpen);
 	const pressCount = useVoiceAssistantStore((s) => s.pressCount);
@@ -93,10 +94,11 @@ export function VoiceAssistant({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-			<DialogContent className="max-w-xl">
+			<DialogContent className="wp-scope max-w-xl">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<Sparkles className="h-5 w-5 text-primary" />
+					<span className="wp-kicker">{t("navigation:groups.toolbox")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
+						<Sparkles className="wp-ink h-5 w-5" />
 						{t("voiceAssistant:title")}
 					</DialogTitle>
 					<DialogDescription>

@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -40,31 +42,57 @@ from api_watcher.migration_guide_generator import (  # noqa: E402
     MigrationGuideGenerator,
 )
 
-SPEC_PATTERNS = [
-    "**/openapi.yaml",
-    "**/openapi.yml",
-    "**/openapi.json",
-    "**/swagger.yaml",
-    "**/swagger.yml",
-    "**/swagger.json",
-    "**/*.openapi.yaml",
-    "**/*.openapi.yml",
-    "**/schema.graphql",
-    "**/*.graphql",
-    "**/*.gql",
-    "**/*.proto",
-]
+# Contract files by name, whatever the stack that serves them: OpenAPI and
+# Swagger (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…), GraphQL SDL
+# (Apollo, Hot Chocolate, Spring GraphQL ``.graphqls``, gqlgen) and protobuf.
+SPEC_NAMES = frozenset(
+    {
+        "openapi.yaml",
+        "openapi.yml",
+        "openapi.json",
+        "swagger.yaml",
+        "swagger.yml",
+        "swagger.json",
+        "schema.graphql",
+    }
+)
+SPEC_SUFFIXES = frozenset({".graphql", ".graphqls", ".gql", ".proto"})
+SPEC_NAME_SUFFIXES = (
+    ".openapi.yaml",
+    ".openapi.yml",
+    ".openapi.json",
+    ".swagger.yaml",
+    ".swagger.yml",
+    ".swagger.json",
+)
+# Folders where an OpenAPI document often has a free name (api/v1.yaml,
+# contracts/orders.yml); their YAML/JSON files are read to check.
+SPEC_FOLDERS = frozenset(
+    {"api", "apis", "openapi", "swagger", "spec", "specs", "contracts", "contract"}
+)
+_OPENAPI_HEAD = re.compile(r"""^\s*["']?(openapi|swagger)["']?\s*:""", re.MULTILINE)
 
-EXCLUDED_DIRS = {
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    "venv",
-    ".venv",
-    "__pycache__",
-    "target",
-}
+EXCLUDED_DIRS = frozenset(
+    {
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        "venv",
+        ".venv",
+        "__pycache__",
+        "target",
+        "bin",
+        "obj",
+        "vendor",
+        "Pods",
+        ".dart_tool",
+        ".gradle",
+        ".next",
+        ".nuxt",
+        "coverage",
+    }
+)
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -75,20 +103,35 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("API_WATCHER_EVENT", {"type": event_type, "data": data})
 
 
-def _is_excluded(path: Path, project_root: Path) -> bool:
-    try:
-        rel = path.relative_to(project_root)
-    except ValueError:
+def _is_spec(path: Path) -> bool:
+    name = path.name.lower()
+    if name in SPEC_NAMES or path.suffix.lower() in SPEC_SUFFIXES:
         return True
-    return any(part in EXCLUDED_DIRS for part in rel.parts)
+    if name.endswith(SPEC_NAME_SUFFIXES):
+        return True
+    if path.parent.name.lower() in SPEC_FOLDERS and path.suffix.lower() in {
+        ".yaml",
+        ".yml",
+        ".json",
+    }:
+        try:
+            with path.open(encoding="utf-8", errors="replace") as handle:
+                head = handle.read(4096)
+        except OSError:
+            return False
+        return bool(_OPENAPI_HEAD.search(head))
+    return False
 
 
 def _discover_specs(project_path: Path) -> list[Path]:
+    """Every contract file, dependency and build folders pruned on the way."""
     found: set[Path] = set()
-    for pattern in SPEC_PATTERNS:
-        for p in project_path.glob(pattern):
-            if p.is_file() and not _is_excluded(p, project_path):
-                found.add(p.resolve())
+    for current, dirs, files in os.walk(project_path):
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+        for name in files:
+            path = Path(current) / name
+            if _is_spec(path):
+                found.add(path.resolve())
     return sorted(found)
 
 

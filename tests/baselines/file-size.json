@@ -13,7 +13,7 @@
   "apps/frontend/src/main/services/credential-manager.ts": 2476,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2706,
-  "apps/frontend/src/renderer/App.tsx": 2351,
+  "apps/frontend/src/renderer/App.tsx": 2321,
   "apps/frontend/src/renderer/components/AgentTools.tsx": 2024,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3247,
   "apps/frontend/src/renderer/components/Sidebar.tsx": 2556,

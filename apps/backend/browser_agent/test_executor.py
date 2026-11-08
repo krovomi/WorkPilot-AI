@@ -2,7 +2,8 @@
 Test Executor
 ==============
 
-Discovers and executes E2E tests using Playwright or pytest.
+Discovers and executes E2E tests: Playwright (JS/TS) and pytest here, the
+other stacks (.NET, JVM, Cypress, Go, RSpec, PHPUnit) through ``e2e_stacks``.
 Returns structured results for the Browser Agent dashboard.
 """
 
@@ -13,7 +14,12 @@ import subprocess
 import time
 from pathlib import Path
 
+from .e2e_stacks import KIND_BY_TYPE, KINDS, classify, run_kind
 from .models import TestInfo, TestResult, TestRunResult
+
+_SKIPPED_PARTS = frozenset(
+    {"node_modules", "bin", "obj", "target", "build", "dist", "vendor", ".gradle"}
+)
 
 
 def _resolve_npx() -> str:
@@ -37,7 +43,18 @@ class TestExecutor:
     __test__ = False  # Exclude from pytest collection
 
     # Common E2E test directories
-    TEST_DIRS = ["e2e", "tests/e2e", "test/e2e", "browser-tests", "tests/browser"]
+    TEST_DIRS = [
+        "e2e",
+        "tests/e2e",
+        "test/e2e",
+        "browser-tests",
+        "tests/browser",
+        "cypress/e2e",
+    ]
+    # Folders also searched at the root and under these: .NET and JVM
+    # solutions name their E2E projects ("Shop.E2ETests", "ui-tests").
+    TEST_DIR_PARENTS = ["", "tests", "test", "src"]
+    TEST_DIR_MARKERS = ("e2e", "endtoend", "uitest", "ui-test", "playwright", "browser")
 
     # Common test file patterns
     TEST_PATTERNS = [
@@ -49,6 +66,7 @@ class TestExecutor:
         "*.e2e.js",
         "*_test.py",
         "test_*.py",
+        *(pattern for kind in KINDS for pattern in kind.patterns),
     ]
 
     def __init__(self, project_dir: Path):
@@ -59,20 +77,21 @@ class TestExecutor:
         tests = []
         seen_paths = set()
 
-        for test_dir_name in self.TEST_DIRS:
-            test_dir = self.project_dir / test_dir_name
-            if not test_dir.exists():
-                continue
-
+        for test_dir in self._test_dirs():
             for pattern in self.TEST_PATTERNS:
                 for test_file in test_dir.rglob(pattern):
-                    rel_path = str(test_file.relative_to(self.project_dir))
+                    if _SKIPPED_PARTS & set(test_file.relative_to(test_dir).parts):
+                        continue
+                    rel_path = test_file.relative_to(self.project_dir).as_posix()
                     if rel_path in seen_paths:
                         continue
                     seen_paths.add(rel_path)
 
                     # Determine test type
-                    if test_file.suffix in (".ts", ".js"):
+                    stack_type = classify(test_file)
+                    if stack_type:
+                        test_type = stack_type
+                    elif test_file.suffix in (".ts", ".js"):
                         test_type = "playwright"
                     elif test_file.suffix == ".py":
                         test_type = "pytest"
@@ -89,6 +108,29 @@ class TestExecutor:
 
         return tests
 
+    def _test_dirs(self) -> list[Path]:
+        """The E2E folders: the usual names, plus any folder named like one."""
+        dirs: list[Path] = []
+        for name in self.TEST_DIRS:
+            candidate = self.project_dir / name
+            if candidate.is_dir():
+                dirs.append(candidate)
+        for parent_name in self.TEST_DIR_PARENTS:
+            parent = self.project_dir / parent_name
+            if not parent.is_dir():
+                continue
+            for child in sorted(parent.iterdir()):
+                lowered = child.name.lower()
+                if (
+                    child.is_dir()
+                    and child not in dirs
+                    and child.name not in _SKIPPED_PARTS
+                    and any(marker in lowered for marker in self.TEST_DIR_MARKERS)
+                    and not any(d in child.parents for d in dirs)
+                ):
+                    dirs.append(child)
+        return dirs
+
     def run_tests(self, test_files: list[str] | None = None) -> TestRunResult:
         """Run E2E tests and return structured results."""
         discovered = self.discover_tests()
@@ -100,6 +142,9 @@ class TestExecutor:
         # Separate by type
         playwright_tests = [t for t in discovered if t.type == "playwright"]
         pytest_tests = [t for t in discovered if t.type == "pytest"]
+        stack_tests = {
+            kind: [t for t in discovered if t.type == kind] for kind in KIND_BY_TYPE
+        }
 
         # Filter if specific files requested. Discovered paths are relative
         # to project_dir; callers may pass absolute paths. Normalize both
@@ -115,6 +160,9 @@ class TestExecutor:
 
             playwright_tests = [t for t in playwright_tests if _matches(t)]
             pytest_tests = [t for t in pytest_tests if _matches(t)]
+            stack_tests = {
+                k: [t for t in v if _matches(t)] for k, v in stack_tests.items()
+            }
 
         all_results: list[TestResult] = []
         start_time = time.time()
@@ -124,6 +172,10 @@ class TestExecutor:
 
         if pytest_tests:
             all_results.extend(self._run_pytest_tests(pytest_tests))
+
+        for kind, tests in stack_tests.items():
+            if tests:
+                all_results.extend(run_kind(self.project_dir, kind, tests))
 
         total_duration = (time.time() - start_time) * 1000
 

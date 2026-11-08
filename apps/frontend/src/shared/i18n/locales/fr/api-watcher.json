@@ -1,8 +1,7 @@
 {
 	"title": "Surveillant de contrat API",
-	"noData": "Aucune donnée de diff de contrat disponible",
+	"noData": "Enregistrez les contrats actuels comme référence, puis lancez l’analyse après un changement pour voir ce qui casse les clients.",
 	"noChanges": "Aucun changement de contrat détecté",
-	"changesDetected": "{{count}} modifications détectées",
 	"categories": {
 		"breaking": "Cassante",
 		"potentiallyBreaking": "Potentiellement cassante",
@@ -19,5 +18,32 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet pour lancer une analyse de contrats API.",
 		"failed": "Échec de l'analyse : {{error}}"
-	}
+	},
+	"description": "Contrats OpenAPI, GraphQL et protobuf de tout backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) comparés à la référence enregistrée.",
+	"idleTitle": "Aucune comparaison pour l’instant",
+	"allCategories": "Toutes",
+	"kickers": {
+		"changes": "Changements",
+		"guide": "Pour les clients"
+	},
+	"formats": {
+		"openapi": "OpenAPI",
+		"graphql": "GraphQL",
+		"protobuf": "Protobuf"
+	},
+	"changeTypes": {
+		"endpoint_removed": "Endpoint supprimé",
+		"endpoint_added": "Endpoint ajouté",
+		"endpoint_deprecated": "Endpoint déprécié",
+		"parameter_added_required": "Paramètre obligatoire ajouté",
+		"parameter_removed": "Paramètre supprimé",
+		"type_removed": "Type supprimé",
+		"type_added": "Type ajouté",
+		"field_removed": "Champ supprimé",
+		"field_added": "Champ ajouté",
+		"field_type_changed": "Type de champ modifié",
+		"field_required_added": "Champ devenu obligatoire"
+	},
+	"changesDetected_one": "{{count}} modification détectée",
+	"changesDetected_other": "{{count}} modifications détectées"
 }

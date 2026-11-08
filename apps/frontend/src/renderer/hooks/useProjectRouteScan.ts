@@ -98,7 +98,7 @@ export function useProjectRouteScan() {
 						if (live.url) setSpecUrl(live.url);
 					}
 				} else {
-					setProjectScanError(result.error ?? "Failed to scan project routes");
+					setProjectScanError(result.error ?? "apiExplorer:scan.failed");
 				}
 			} catch (err) {
 				const projectState = useProjectStore.getState();

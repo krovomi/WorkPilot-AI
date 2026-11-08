@@ -58,6 +58,7 @@ import {
 import { Label } from "../ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
+import "../charter/charter.css";
 
 const AGENT_TYPES: ReadonlyArray<{
 	value: AgentType;
@@ -112,7 +113,7 @@ interface PromptOptimizerDialogProps {
 export function PromptOptimizerDialog({
 	onUsePrompt,
 }: PromptOptimizerDialogProps) {
-	const { t } = useTranslation(["promptOptimizer", "common", "dialogs"]);
+	const { t } = useTranslation(["promptOptimizer", "common", "dialogs", "navigation"]);
 
 	const {
 		isOpen,
@@ -214,11 +215,12 @@ export function PromptOptimizerDialog({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && closeDialog()}>
-			<DialogContent className="sm:max-w-[760px] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
-				<DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-					<DialogTitle className="flex items-center gap-2">
-						<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-							<WandSparkles className="h-4 w-4 text-primary" />
+			<DialogContent className="wp-scope sm:max-w-[760px] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
+				<DialogHeader className="px-6 pt-6 pb-4 border-b border-[var(--wp-border)]">
+					<span className="wp-kicker">{t("navigation:groups.toolbox")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2">
+						<span className="wp-empty-glyph h-8 w-8" aria-hidden="true">
+							<WandSparkles className="h-4 w-4" />
 						</span>
 						{t("promptOptimizer:title")}
 					</DialogTitle>
@@ -304,7 +306,7 @@ export function PromptOptimizerDialog({
 					)}
 				</div>
 
-				<DialogFooter className="px-6 py-4 border-t border-border bg-muted/30 gap-2 sm:gap-2">
+				<DialogFooter className="px-6 py-4 border-t border-[var(--wp-border)] gap-2 sm:gap-2">
 					{isIdle && (
 						<>
 							<Button variant="ghost" onClick={closeDialog}>

@@ -5,12 +5,12 @@
 	"platforms": "Plateformes CI/CD",
 	"viewPipeline": "Voir le Pipeline",
 	"detectedStack": "Stack Détecté",
-	"lines": "lignes",
 	"savedTo": "Enregistré dans",
 	"stackInfo": {
 		"languages": "Langages",
 		"frameworks": "Frameworks",
-		"dockerDetected": "Docker détecté"
+		"dockerDetected": "Docker détecté",
+		"testRunners": "Lanceurs de tests"
 	},
 	"status": {
 		"analyzing": "Analyse du stack projet...",
@@ -31,6 +31,12 @@
 	},
 	"emptyState": {
 		"title": "Générateur de Pipeline",
-		"description": "Sélectionnez les plateformes CI/CD et cliquez sur \"Générer les Pipelines\" pour analyser automatiquement votre projet et générer des configurations de pipeline prêtes pour la production."
-	}
+		"description": "Choisissez les plateformes CI/CD puis cliquez sur « Générer les Pipelines » : WorkPilot lit les piles du projet (.NET, Java, Go, Rust, Node, Python, PHP, Ruby, Flutter…) et écrit un pipeline pour chacune."
+	},
+	"kickers": {
+		"setup": "Paramétrage",
+		"pipeline": "Pipeline"
+	},
+	"lineCount_one": "{{count}} ligne",
+	"lineCount_other": "{{count}} lignes"
 }

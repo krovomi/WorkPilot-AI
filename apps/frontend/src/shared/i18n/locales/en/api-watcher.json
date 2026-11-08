@@ -1,8 +1,7 @@
 {
 	"title": "API Contract Watcher",
-	"noData": "No contract diff data available",
+	"noData": "Save the current contracts as the baseline, then run the check after a change to see what breaks clients.",
 	"noChanges": "No contract changes detected",
-	"changesDetected": "{{count}} changes detected",
 	"categories": {
 		"breaking": "Breaking",
 		"potentiallyBreaking": "Potentially Breaking",
@@ -19,5 +18,32 @@
 	"errors": {
 		"noProject": "Select a project to run an API contract scan.",
 		"failed": "Scan failed: {{error}}"
-	}
+	},
+	"description": "OpenAPI, GraphQL and protobuf contracts of any backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) compared with the saved baseline.",
+	"idleTitle": "No comparison yet",
+	"allCategories": "All",
+	"kickers": {
+		"changes": "Changes",
+		"guide": "For clients"
+	},
+	"formats": {
+		"openapi": "OpenAPI",
+		"graphql": "GraphQL",
+		"protobuf": "Protobuf"
+	},
+	"changeTypes": {
+		"endpoint_removed": "Endpoint removed",
+		"endpoint_added": "Endpoint added",
+		"endpoint_deprecated": "Endpoint deprecated",
+		"parameter_added_required": "Required parameter added",
+		"parameter_removed": "Parameter removed",
+		"type_removed": "Type removed",
+		"type_added": "Type added",
+		"field_removed": "Field removed",
+		"field_added": "Field added",
+		"field_type_changed": "Field type changed",
+		"field_required_added": "Field now required"
+	},
+	"changesDetected_one": "{{count}} change detected",
+	"changesDetected_other": "{{count}} changes detected"
 }
