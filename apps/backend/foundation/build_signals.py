@@ -48,3 +48,17 @@ class BuildHalted(Exception):
         self.message = message
         self.recoverable = recoverable
         super().__init__(message)
+
+
+class BuildSplit(Exception):
+    """The plan was too big for one pull request and became several cards.
+
+    Not a failure: the card's work moved to its parts (``task_split``), which
+    are queued, and the card itself is settled. Nothing of this build is run
+    further: no coding, no QA, no finalization of a worktree with no commits.
+    """
+
+    def __init__(self, parent: str, children: list[str]) -> None:
+        self.parent = parent
+        self.children = children
+        super().__init__(f"{parent} split into {len(children)} cards")

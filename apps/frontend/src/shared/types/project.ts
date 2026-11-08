@@ -75,10 +75,23 @@ export interface ProjectSettings {
 	specByExample?: boolean;
 	/** Maximum parallel tasks allowed (default: 3) */
 	maxParallelTasks?: number;
+	/**
+	 * Split a task whose plan is too big for one small pull request into
+	 * several tasks (`apps/backend/task_split/`). On by default; the ceilings
+	 * default to 400 changed lines and 25 files per pull request, and a task
+	 * can set its own line ceiling (`splitMaxLines`) or opt out (`noSplit`).
+	 */
+	autoSplit?: AutoSplitSettings;
 	/** Description utilisateur du projet (optionnel) */
 	description?: string;
 	/** Provider IA sélectionné (optionnel) */
 	provider?: string;
+}
+
+export interface AutoSplitSettings {
+	enabled?: boolean;
+	maxLines?: number;
+	maxFiles?: number;
 }
 
 export interface NotificationSettings {

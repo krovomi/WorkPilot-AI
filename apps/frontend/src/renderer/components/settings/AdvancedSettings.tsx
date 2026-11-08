@@ -26,6 +26,7 @@ import { Label } from "../ui/label";
 import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
 import { NeedsYouChannels } from "./NeedsYouChannels";
+import { Notice } from "../charter";
 import { SettingsSection } from "./SettingsSection";
 import { formatAppDate } from "@/lib/date-format";
 
@@ -384,33 +385,24 @@ export function AdvancedSettings({
 
 							{/* Update Error */}
 							{appUpdateError && (
-								<div className="flex items-center gap-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-									<AlertCircle className="h-5 w-5 shrink-0" />
-									<span>{appUpdateError}</span>
-								</div>
+								<Notice tone="red" icon={AlertCircle} role="alert">
+									{appUpdateError}
+								</Notice>
 							)}
 
 							{/* Downloaded Success */}
 							{isAppUpdateDownloaded && !showReadOnlyWarning && (
-								<div className="flex items-center gap-3 text-sm text-success bg-success/10 border border-success/30 rounded-lg p-3">
-									<CheckCircle2 className="h-5 w-5 shrink-0" />
-									<span>{t("updates.updateDownloaded")}</span>
-								</div>
+								<Notice tone="green" icon={CheckCircle2}>
+									{t("updates.updateDownloaded")}
+								</Notice>
 							)}
 
 							{/* Read-Only Volume Warning */}
 							{showReadOnlyWarning && (
-								<div className="flex items-start gap-3 text-sm text-warning bg-warning/10 border border-warning/30 rounded-lg p-3">
-									<AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-									<div className="space-y-1">
-										<p className="font-medium text-warning">
-											{t("updates.readOnlyVolumeTitle")}
-										</p>
-										<p className="text-muted-foreground">
-											{t("updates.readOnlyVolumeDescription")}
-										</p>
-									</div>
-								</div>
+								<Notice tone="amber" icon={AlertTriangle}>
+									<p className="wp-title text-sm">{t("updates.readOnlyVolumeTitle")}</p>
+									<p className="wp-muted mt-0.5">{t("updates.readOnlyVolumeDescription")}</p>
+								</Notice>
 							)}
 
 							{/* Action Buttons */}

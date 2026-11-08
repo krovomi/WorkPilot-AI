@@ -1938,7 +1938,14 @@
 			"specByExampleDescription": "Sur une Web API ASP.NET Core, les critères d'acceptation de la spec sont écrits en tests d'intégration avant tout code. S'ils échouent comme prévu, `dotnet test` devient l'objectif de la tâche et le build se termine quand il passe. Un objectif que tu as posé toi-même est conservé.",
 			"crossReview": "Revue croisée par un second moteur",
 			"crossReviewDescription": "Après la QA, un autre fournisseur relit le diff au regard de la spec et de l'objectif. S'il signale un problème bloquant, la pull request t'attend.",
-			"crossReviewSameProvider": "C'est le fournisseur avec lequel les tâches sont construites ({{provider}}). Choisis-en un autre : un modèle qui relit son propre travail n'apporte pas de second regard, et la revue ne se lancera pas."
+			"crossReviewSameProvider": "C'est le fournisseur avec lequel les tâches sont construites ({{provider}}). Choisis-en un autre : un modèle qui relit son propre travail n'apporte pas de second regard, et la revue ne se lancera pas.",
+			"autoSplit": {
+				"label": "Découper automatiquement les grosses tâches",
+				"description": "Une fois le plan d'une tâche écrit, une tâche au-delà de ces plafonds devient plusieurs tâches, une petite PR chacune. Une tâche peut garder son propre plafond de lignes ou rester entière.",
+				"maxLines": "Lignes modifiées max par PR",
+				"maxFiles": "Fichiers max par PR",
+				"invalid": "Saisis un nombre entier entre {{min}} et {{max}} ; d'ici là, la valeur par défaut s'applique."
+			}
 		},
 		"github": {
 			"authenticatedAs": "Authentifié en tant que {{username}}",
@@ -2959,5 +2966,49 @@
 		"approve": "Approuver",
 		"saveHint": "Enregistrez-la en .workpilot/worktree.toml pour la modifier (fichiers à copier, ports, nettoyage).",
 		"saveDetected": "Enregistrer en worktree.toml"
+	},
+	"kicker": "WorkPilot · Configuration",
+	"headerDescription": "Paramètres de l’application et du projet, rangés par thème.",
+	"nav": {
+		"themes": {
+			"project": {
+				"title": "Projet",
+				"description": "Configuration du projet actuel"
+			},
+			"integrations": {
+				"title": "Intégrations & Connexions",
+				"description": "Comptes IA et intégrations externes"
+			},
+			"interface": {
+				"title": "Interface & Apparence",
+				"description": "Personnalisation de l’interface"
+			},
+			"development": {
+				"title": "Développement & Outils",
+				"description": "Outils de développement et configuration"
+			},
+			"security": {
+				"title": "Sécurité & Performance",
+				"description": "Sécurité et performance du système"
+			},
+			"system": {
+				"title": "Système & Maintenance",
+				"description": "Maintenance et système"
+			}
+		},
+		"sections": {
+			"general": "Général",
+			"accounts": "Comptes IA",
+			"appearance": "Apparence",
+			"display": "Affichage",
+			"language": "Langue",
+			"terminal-fonts": "Polices terminal",
+			"devtools": "Outils de développement",
+			"agent": "Agent",
+			"notifications": "Notifications",
+			"debug": "Debug",
+			"scheduler": "Planification",
+			"updates": "Mises à jour"
+		}
 	}
 }

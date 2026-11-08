@@ -18,7 +18,6 @@ function theme(
 		description,
 		priority,
 		icon: Icon,
-		color: "text-blue-600",
 		sections: labels.map((label) => ({
 			id: label.toLowerCase(),
 			icon: Icon,

@@ -14,6 +14,13 @@ from .enums import SubtaskStatus
 from .verification import Verification
 
 
+def _whole(value) -> int | None:
+    """A positive whole number, or None (a planner may write anything)."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
+
 @dataclass
 class Subtask:
     """A single unit of implementation work."""
@@ -30,6 +37,8 @@ class Subtask:
     files_to_modify: list[str] = field(default_factory=list)
     files_to_create: list[str] = field(default_factory=list)
     patterns_from: list[str] = field(default_factory=list)
+    # Lines the planner expects this subtask to change (task_split reads it).
+    estimated_lines: int | None = None
 
     # Verification
     verification: Verification | None = None
@@ -61,6 +70,8 @@ class Subtask:
             result["files_to_modify"] = self.files_to_modify
         if self.files_to_create:
             result["files_to_create"] = self.files_to_create
+        if self.estimated_lines:
+            result["estimated_lines"] = self.estimated_lines
         if self.patterns_from:
             result["patterns_from"] = self.patterns_from
         if self.verification:
@@ -95,6 +106,7 @@ class Subtask:
             files_to_modify=data.get("files_to_modify", []),
             files_to_create=data.get("files_to_create", []),
             patterns_from=data.get("patterns_from", []),
+            estimated_lines=_whole(data.get("estimated_lines")),
             verification=verification,
             expected_output=data.get("expected_output"),
             actual_output=data.get("actual_output"),

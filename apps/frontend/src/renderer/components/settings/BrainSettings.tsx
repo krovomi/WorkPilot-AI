@@ -1,5 +1,4 @@
 import {
-	Brain,
 	CircleAlert,
 	CircleCheck,
 	FolderOpen,
@@ -12,6 +11,7 @@ import { useBrainStore } from "../../stores/brain-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
+import { SettingsSection } from "./SettingsSection";
 
 /**
  * Le cerveau partagé dans les réglages : où il est, d'où il vient.
@@ -86,23 +86,22 @@ export function BrainSettings() {
 
 	if (unavailable) {
 		return (
-			<section className="space-y-3 p-6">
-				<h2 className="text-lg font-semibold">{t("brain:settings.title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("brain:settings.unavailable")}
-				</p>
-			</section>
+			<SettingsSection
+				title={t("brain:settings.title")}
+				description={t("brain:settings.unavailable")}
+			>
+				{null}
+			</SettingsSection>
 		);
 	}
 
 	if (!settings) {
 		return (
-			<section className="space-y-3 p-6">
-				<h2 className="text-lg font-semibold">{t("brain:settings.title")}</h2>
-				<p className="text-sm text-muted-foreground" role="status">
+			<SettingsSection title={t("brain:settings.title")} description={t("brain:settings.description")}>
+				<p className="wp-meta" role="status">
 					{error ? errorText(error) : t("brain:settings.loading")}
 				</p>
-			</section>
+			</SettingsSection>
 		);
 	}
 
@@ -132,14 +131,7 @@ export function BrainSettings() {
 	};
 
 	return (
-		<section className="space-y-5 p-6">
-			<div className="flex items-center gap-2">
-				<Brain className="h-5 w-5 text-violet-500" aria-hidden />
-				<h2 className="text-lg font-semibold">{t("brain:settings.title")}</h2>
-			</div>
-			<p className="text-sm text-muted-foreground">
-				{t("brain:settings.description")}
-			</p>
+		<SettingsSection title={t("brain:settings.title")} description={t("brain:settings.description")}>
 
 			<div className="flex items-center justify-between gap-4">
 				<div>
@@ -310,7 +302,7 @@ export function BrainSettings() {
 					/>
 				)}
 			</div>
-		</section>
+		</SettingsSection>
 	);
 }
 

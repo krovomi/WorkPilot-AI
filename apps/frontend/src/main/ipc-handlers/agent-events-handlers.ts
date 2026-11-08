@@ -41,6 +41,7 @@ import { parseMcpAppViewEvent } from "./task/mcp-app-handlers";
 import { isBestOfNVariant } from "./task/best-of-n-handlers";
 import { isBenchBuild } from "./bench-handlers";
 import { findTaskAndProject } from "./task/shared";
+import { announceSplit } from "./task/split-events";
 import {
 	clearTaskPermissions,
 	handlePermissionTaskEvent,
@@ -525,6 +526,11 @@ export function registerAgenteventsHandlers(
 		const { task, project } = findTaskAndProject(taskId, projectId);
 		if (!task || !project) {
 			return;
+		}
+
+		// The task became its parts: the board drops it and shows them.
+		if (event.type === "TASK_SPLIT") {
+			announceSplit(getMainWindow, task, project, event);
 		}
 
 		const accepted = taskStateManager.handleTaskEvent(

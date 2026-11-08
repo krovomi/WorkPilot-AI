@@ -27,7 +27,6 @@ ALLOWED = {
     "charter/index.tsx",
     "WelcomeScreen.tsx",
     "github-prs/components/PRHeader.tsx",
-    "mission-control/MissionControlDashboard.tsx",
 }
 ALLOWED_DIRS = ("onboarding/",)
 

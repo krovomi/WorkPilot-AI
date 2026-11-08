@@ -2064,14 +2064,7 @@ export function App() {
 														/>
 													</div>
 												)}
-												{activeView === "agent-debugger" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<AgentDebuggerPanel />
-													</div>
-												)}
+												{activeView === "agent-debugger" && <AgentDebuggerPanel />}
 												{activeView === "blast-radius" && (
 													<BlastRadiusView projectRoot={selectedProject?.path} />
 												)}

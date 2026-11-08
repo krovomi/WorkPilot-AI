@@ -34,5 +34,21 @@
 		"noModel": "No model",
 		"working": "Working..."
 	},
-	"noDecisions": "No decisions recorded yet"
+	"noDecisions": "No decisions recorded yet",
+	"session": "Session",
+	"agentsRunning": "{{running}}/{{total}}",
+	"costValue": "${{value}}",
+	"whatTitle": "Several agents on one goal",
+	"kickers": {
+		"what": "What it does",
+		"agents": "Crew",
+		"reasoning": "Reasoning",
+		"live": "Live"
+	},
+	"featureHints": {
+		"featureMultiAgent": "Run several agents side by side, each with its own task.",
+		"featureModelMixing": "Pick a provider and a model per agent: Claude, OpenAI, Gemini, Ollama…",
+		"featureDecisionTree": "Follow why each agent chose its next step.",
+		"featureLiveView": "Tokens, cost and events as they happen."
+	}
 }

@@ -62,6 +62,7 @@ import { ImagePreviewModal } from "./ImagePreviewModal";
 import { RichTextEditor } from "./RichTextEditor";
 import { TaskDictation } from "./TaskDictation";
 import { type FileReferenceData, useImageUpload } from "./useImageUpload";
+import { type AutoSplitValue, AutoSplitFields } from "./AutoSplitFields";
 
 interface TaskFormFieldsProps {
 	onDictationPendingChange?: (pending: boolean) => void;
@@ -137,6 +138,13 @@ interface TaskFormFieldsProps {
 	// TDD override (per-task)
 	tddMode: boolean;
 	onTddModeChange: (tdd: boolean) => void;
+	/** The task's say on the automatic split; omitted, the field is not shown. */
+	autoSplit?: AutoSplitValue;
+	onAutoSplitChange?: (value: AutoSplitValue) => void;
+	/** The project's ceiling of changed lines per PR, for the placeholder. */
+	autoSplitProjectMaxLines?: number;
+	/** The project turned the split off. */
+	autoSplitProjectDisabled?: boolean;
 	/** The verification loop for this task; omitted, the field is not shown. */
 	verifyLoop?: boolean;
 	onVerifyLoopChange?: (enabled: boolean) => void;
@@ -225,6 +233,10 @@ export function TaskFormFields({
 	onRequireReviewChange,
 	tddMode,
 	onTddModeChange,
+	autoSplit,
+	onAutoSplitChange,
+	autoSplitProjectMaxLines,
+	autoSplitProjectDisabled,
 	verifyLoop,
 	onVerifyLoopChange,
 	verifyWindow,
@@ -814,6 +826,17 @@ export function TaskFormFields({
 							</p>
 						</div>
 					</div>
+
+					{autoSplit && onAutoSplitChange && (
+						<AutoSplitFields
+							value={autoSplit}
+							onChange={onAutoSplitChange}
+							projectMaxLines={autoSplitProjectMaxLines}
+							projectDisabled={autoSplitProjectDisabled}
+							disabled={disabled}
+							idPrefix={idPrefix}
+						/>
+					)}
 
 					{onVerifyLoopChange && (
 						<VerifyLoopFields

@@ -348,6 +348,10 @@ export interface TaskAPI {
 	onTaskUpdated: (
 		callback: (taskId: string, updates: Partial<Task>, projectId?: string) => void,
 	) => () => void;
+	/** A task too big for one PR became its parts (`task_split`), now on disk. */
+	onTaskSplit: (
+		callback: (taskId: string, projectId: string | undefined, total: number) => void,
+	) => () => void;
 	onTaskExecutionProgress: (
 		callback: (
 			taskId: string,
@@ -976,6 +980,23 @@ export const createTaskAPI = (): TaskAPI => ({
 		ipcRenderer.on(IPC_CHANNELS.TASK_UPDATED_EVENT, handler);
 		return () => {
 			ipcRenderer.removeListener(IPC_CHANNELS.TASK_UPDATED_EVENT, handler);
+		};
+	},
+
+	onTaskSplit: (
+		callback: (taskId: string, projectId: string | undefined, total: number) => void,
+	): (() => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			taskId: string,
+			projectId: string | undefined,
+			total: number,
+		): void => {
+			callback(taskId, projectId, total);
+		};
+		ipcRenderer.on(IPC_CHANNELS.TASK_SPLIT_EVENT, handler);
+		return () => {
+			ipcRenderer.removeListener(IPC_CHANNELS.TASK_SPLIT_EVENT, handler);
 		};
 	},
 

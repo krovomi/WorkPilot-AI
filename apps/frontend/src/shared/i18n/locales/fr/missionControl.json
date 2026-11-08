@@ -34,5 +34,21 @@
 		"noModel": "Aucun modèle",
 		"working": "En cours..."
 	},
-	"noDecisions": "Aucune décision enregistrée pour l'instant"
+	"noDecisions": "Aucune décision enregistrée pour l'instant",
+	"session": "Session",
+	"agentsRunning": "{{running}}/{{total}}",
+	"costValue": "{{value}} $",
+	"whatTitle": "Plusieurs agents sur un même objectif",
+	"kickers": {
+		"what": "Ce que ça fait",
+		"agents": "Équipage",
+		"reasoning": "Raisonnement",
+		"live": "En direct"
+	},
+	"featureHints": {
+		"featureMultiAgent": "Lancez plusieurs agents côte à côte, chacun avec sa tâche.",
+		"featureModelMixing": "Un fournisseur et un modèle par agent : Claude, OpenAI, Gemini, Ollama…",
+		"featureDecisionTree": "Suivez pourquoi chaque agent a choisi son étape suivante.",
+		"featureLiveView": "Tokens, coût et événements au fil de l’eau."
+	}
 }

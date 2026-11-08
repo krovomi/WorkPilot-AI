@@ -5,7 +5,6 @@ import {
 	Brain,
 	Bug,
 	CheckCircle,
-	ChevronRight,
 	Code,
 	DollarSign,
 	Eye,
@@ -13,7 +12,6 @@ import {
 	Flame,
 	GitCompare,
 	History,
-	Loader2,
 	Maximize2,
 	Minimize2,
 	Pause,
@@ -56,7 +54,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tabs, TabsContent } from "../ui/tabs";
+import {
+	CharterButton,
+	Tabs as CharterTabs,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+} from "../charter";
 import { TimeTravelPanel } from "./TimeTravelPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
@@ -132,7 +143,7 @@ const SessionListView: React.FC<{
 	onDelete: (id: string) => void;
 	onCompare: (a: string, b: string) => void;
 }> = ({ sessions, loading, onSelect, onDelete, onCompare }) => {
-	const { t } = useTranslation();
+	const { t } = useTranslation(["replay", "common"]);
 	const [compareA, setCompareA] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 
@@ -141,155 +152,119 @@ const SessionListView: React.FC<{
 		const q = searchQuery.toLowerCase();
 		return sessions.filter(
 			(s) =>
-				s.agent_name.toLowerCase().includes(q) ||
-				s.task_description.toLowerCase().includes(q) ||
-				s.model_label.toLowerCase().includes(q),
+				(s.agent_name ?? "").toLowerCase().includes(q) ||
+				(s.task_description ?? "").toLowerCase().includes(q) ||
+				(s.model_label ?? "").toLowerCase().includes(q),
 		);
 	}, [sessions, searchQuery]);
 
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-64">
-				<Loader2 className="h-8 w-8 animate-spin" />
-			</div>
-		);
-	}
+	const pick = (sessionId: string) => {
+		if (compareA) {
+			onCompare(compareA, sessionId);
+			setCompareA(null);
+		} else {
+			onSelect(sessionId);
+		}
+	};
 
 	return (
-		<div className="space-y-4 p-4 h-full overflow-auto">
-			<div className="flex items-center justify-between">
-				<h2 className="text-xl font-semibold flex items-center gap-2">
-					<RotateCcw className="h-5 w-5" />
-					{t("replay:title")}
-				</h2>
-				<div className="flex items-center gap-2">
-					<div className="relative">
-						<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-						<Input
-							placeholder={t("replay:searchSessions")}
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-8 w-64"
-						/>
-					</div>
+		<Section
+			kicker={t("replay:kickers.sessions")}
+			title={t("replay:sessionsTitle")}
+			meta={String(sessions.length)}
+			actions={
+				<div className="relative">
+					<Search className="wp-muted pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5" aria-hidden="true" />
+					<Input
+						placeholder={t("replay:searchSessions")}
+						aria-label={t("replay:searchSessions")}
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="h-8 w-64 pl-8 text-xs"
+					/>
 				</div>
-			</div>
-
+			}
+		>
 			{compareA && (
-				<div className="p-3 rounded-lg border border-primary bg-primary/5 flex items-center justify-between">
-					<span className="text-sm">
-						{t("replay:compareSelectSecond")}{" "}
-						<strong>{compareA.slice(0, 8)}...</strong>
+				<Notice tone="violet" icon={GitCompare} className="mb-3">
+					<span className="flex items-center justify-between gap-2">
+						<span>
+							{t("replay:compareSelectSecond")} <span className="font-mono">{compareA.slice(0, 8)}</span>
+						</span>
+						<CharterButton size="sm" variant="ghost" icon={X} onClick={() => setCompareA(null)}>
+							{t("common:buttons.cancel")}
+						</CharterButton>
 					</span>
-					<Button variant="ghost" size="sm" onClick={() => setCompareA(null)}>
-						<X className="h-4 w-4" />
-					</Button>
-				</div>
+				</Notice>
 			)}
 
-			{filtered.length === 0 ? (
-				<Card>
-					<CardContent className="py-12 text-center">
-						<RotateCcw className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-						<p className="text-muted-foreground">
-							{t("replay:noSessionsRecorded")}
-						</p>
-						<p className="text-sm text-muted-foreground mt-1">
-							{t("replay:sessionsAutoRecorded")}
-						</p>
-					</CardContent>
-				</Card>
+			{loading ? (
+				<ScanLine label={t("replay:loadingSessions")} />
+			) : filtered.length === 0 ? (
+				<EmptyStage icon={RotateCcw} tone="violet" title={t("replay:noSessionsRecorded")}>
+					{t("replay:sessionsAutoRecorded")}
+				</EmptyStage>
 			) : (
 				<div className="space-y-2">
-					{filtered.map((session) => (
-						<Card
-							key={session.session_id}
-							className="cursor-pointer hover:border-primary/50 transition-colors"
-							onClick={() => {
-								if (compareA) {
-									onCompare(compareA, session.session_id);
-									setCompareA(null);
-								} else {
-									onSelect(session.session_id);
-								}
-							}}
-						>
-							<CardContent className="py-3 px-4">
-								<div className="flex items-center justify-between">
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center gap-2">
-											<span className="font-medium truncate">
-												{session.agent_name || t("replay:defaultAgentName")}
-											</span>
-											<Badge variant="secondary" className="text-xs">
+					{filtered.map((session) => {
+						const tone = session.status === "completed" ? "green" : "red";
+						return (
+							<Panel key={session.session_id} rail tone={tone} className="flex items-center gap-2">
+								<button
+									type="button"
+									className="min-w-0 flex-1 text-left"
+									onClick={() => pick(session.session_id)}
+								>
+									<div className="flex flex-wrap items-center gap-2">
+										<span className="wp-title truncate text-sm">
+											{session.agent_name || t("replay:defaultAgentName")}
+										</span>
+										{session.agent_role && (
+											<Chip tone="muted" dot={false}>
 												{session.agent_role}
-											</Badge>
-											<Badge
-												variant={
-													session.status === "completed"
-														? "default"
-														: "destructive"
-												}
-												className="text-xs"
-											>
-												{session.status}
-											</Badge>
-										</div>
-										<p className="text-sm text-muted-foreground truncate mt-0.5">
-											{session.task_description || t("replay:noDescription")}
-										</p>
-										<div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-											<span>{formatDate(session.start_time)}</span>
-											<span>{t("replay:stepsCount", { count: session.step_count })}</span>
-						<span>
-							{t("replay:tokensCount", {
-								value: formatTokens(session.total_tokens),
-							})}
-						</span>
-											<span>{formatCost(session.total_cost_usd)}</span>
-											<span>{t("replay:toolsCount", { count: session.total_tool_calls })}</span>
-						<span>
-							{t("replay:filesCount", { count: session.total_file_changes })}
-						</span>
-											{session.model_label && (
-												<Badge variant="outline" className="text-xs">
-													{session.model_label}
-												</Badge>
-											)}
-										</div>
+											</Chip>
+										)}
+										<Chip tone={tone}>{session.status}</Chip>
+										{session.model_label && (
+											<Chip tone="violet" dot={false}>
+												{session.model_label}
+											</Chip>
+										)}
 									</div>
-									<div className="flex items-center gap-1 ml-2">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={(e) => {
-												e.stopPropagation();
-												setCompareA(session.session_id);
-											}}
-											title={t("replay:abCompareTitle")}
-										>
-											<GitCompare className="h-4 w-4" />
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={(e) => {
-												e.stopPropagation();
-												onDelete(session.session_id);
-											}}
-											title={t("common:buttons.delete")}
-										>
-											<Trash2 className="h-4 w-4 text-destructive" />
-										</Button>
-										<ChevronRight className="h-4 w-4 text-muted-foreground" />
-									</div>
-								</div>
-							</CardContent>
-						</Card>
-					))}
+									<p className="wp-muted mt-0.5 truncate text-sm">
+										{session.task_description || t("replay:noDescription")}
+									</p>
+									<p className="wp-meta mt-1 flex flex-wrap gap-x-3">
+										<span>{formatDate(session.start_time)}</span>
+										<span>{t("replay:stepsCount", { count: session.step_count })}</span>
+										<span>{t("replay:tokensCount", { value: formatTokens(session.total_tokens) })}</span>
+										<span>{formatCost(session.total_cost_usd)}</span>
+										<span>{t("replay:toolsCount", { count: session.total_tool_calls })}</span>
+										<span>{t("replay:filesCount", { count: session.total_file_changes })}</span>
+									</p>
+								</button>
+								<CharterButton
+									size="sm"
+									variant="ghost"
+									icon={GitCompare}
+									aria-label={t("replay:abCompareTitle")}
+									title={t("replay:abCompareTitle")}
+									onClick={() => setCompareA(session.session_id)}
+								/>
+								<CharterButton
+									size="sm"
+									variant="ghost"
+									icon={Trash2}
+									aria-label={t("common:buttons.delete")}
+									title={t("common:buttons.delete")}
+									onClick={() => onDelete(session.session_id)}
+								/>
+							</Panel>
+						);
+					})}
 				</div>
 			)}
-		</div>
+		</Section>
 	);
 };
 
@@ -741,33 +716,47 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 	// --- Session list view ---
 	if (!activeSession && !activeSessionLoading) {
 		return (
-			<div className={`h-full ${className}`}>
-				<SessionListView
-					sessions={sessions}
-					loading={sessionsLoading}
-					onSelect={(id) => loadSession(id)}
-					onDelete={(id) => deleteSession(id)}
-					onCompare={(a, b) => compareSessionsAction(a, b)}
+			<ModuleStage scroll="page" className={className} data-testid="agent-replay-view">
+				<ModuleHeader
+					kicker={t("navigation:groups.workspace")}
+					title={t("replay:title")}
+					description={t("replay:description")}
+					icon={RotateCcw}
+					tone="violet"
 				/>
-				{comparison && comparisonSessionA && comparisonSessionB && (
-					<div className="p-4">
+				<Page className="space-y-4">
+					{error && (
+						<Notice tone="red" role="alert">
+							{error}
+						</Notice>
+					)}
+					{comparison && comparisonSessionA && comparisonSessionB && (
 						<ComparisonPanel
 							comparison={comparison}
 							sessionA={comparisonSessionA}
 							sessionB={comparisonSessionB}
 							onClose={clearComparison}
 						/>
-					</div>
-				)}
-			</div>
+					)}
+					<SessionListView
+						sessions={sessions}
+						loading={sessionsLoading}
+						onSelect={(id) => loadSession(id)}
+						onDelete={(id) => deleteSession(id)}
+						onCompare={(a, b) => compareSessionsAction(a, b)}
+					/>
+				</Page>
+			</ModuleStage>
 		);
 	}
 
 	if (activeSessionLoading) {
 		return (
-			<div className="flex items-center justify-center h-64">
-				<Loader2 className="h-8 w-8 animate-spin" />
-			</div>
+			<ModuleStage scroll="page" className={className} data-testid="agent-replay-view">
+				<Page>
+					<ScanLine label={t("replay:loadingSession")} />
+				</Page>
+			</ModuleStage>
 		);
 	}
 
@@ -775,11 +764,12 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 
 	// --- Replay viewer ---
 	return (
-		<div
-			className={`flex flex-col h-full ${className} ${isFullscreen ? "fixed inset-0 z-50 bg-background p-4" : ""}`}
+		<ModuleStage
+			className={`${className} ${isFullscreen ? "fixed inset-0 z-50" : ""}`}
+			data-testid="agent-replay-view"
 		>
 			{/* Top bar */}
-			<div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
+			<div className="relative z-[1] flex items-center justify-between border-b border-[var(--wp-border)] px-4 py-2 shrink-0">
 				<div className="flex items-center gap-3">
 					<Button variant="ghost" size="sm" onClick={closeSession}>
 						<ArrowLeft className="h-4 w-4 mr-1" /> {t("replay:back")}
@@ -827,7 +817,7 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 			</div>
 
 			{/* Playback controls */}
-			<div className="flex items-center gap-3 px-4 py-2 border-b shrink-0">
+			<div className="relative z-[1] flex items-center gap-3 border-b border-[var(--wp-border)] px-4 py-2 shrink-0">
 				<Button
 					variant="outline"
 					size="sm"
@@ -890,16 +880,18 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 
 			{/* Error banner */}
 			{error && (
-				<div className="px-4 py-1.5 bg-destructive/10 text-destructive text-xs">
-					{error}
+				<div className="relative z-[1] px-4 pt-2">
+					<Notice tone="red" role="alert">
+						{error}
+					</Notice>
 				</div>
 			)}
 
 			{/* Main content area */}
-			<div className="flex-1 overflow-hidden flex">
+			<div className="relative z-[1] flex flex-1 overflow-hidden">
 				{/* Left: Timeline */}
-				<div className="w-[400px] border-r flex flex-col shrink-0">
-					<div className="p-2 border-b flex items-center gap-2">
+				<div className="flex w-[400px] shrink-0 flex-col border-r border-[var(--wp-border)]">
+					<div className="flex items-center gap-2 border-b border-[var(--wp-border)] p-2">
 						<div className="relative flex-1">
 							<Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
 							<Input
@@ -976,8 +968,9 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 										)}
 										{step.input_tokens + step.output_tokens > 0 && (
 											<span>
-												{formatTokens(step.input_tokens + step.output_tokens)}{" "}
-												tok
+												{t("replay:tokensCount", {
+													value: formatTokens(step.input_tokens + step.output_tokens),
+												})}
 											</span>
 										)}
 									</div>
@@ -994,31 +987,21 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 						onValueChange={(v) => setActiveTab(v as typeof activeTab)}
 						className="flex flex-col h-full"
 					>
-						<TabsList className="mx-4 mt-2 shrink-0">
-							<TabsTrigger value="timeline" className="text-xs">
-								<Eye className="h-3.5 w-3.5 mr-1" /> {t("replay:details")}
-							</TabsTrigger>
-							<TabsTrigger value="diff" className="text-xs">
-								<Code className="h-3.5 w-3.5 mr-1" /> {t("replay:diff")}
-							</TabsTrigger>
-							<TabsTrigger value="heatmap" className="text-xs">
-								<Flame className="h-3.5 w-3.5 mr-1" /> {t("replay:heatmap")}
-							</TabsTrigger>
-							<TabsTrigger value="tokens" className="text-xs">
-								<DollarSign className="h-3.5 w-3.5 mr-1" /> {t("replay:tokens")}
-							</TabsTrigger>
-							<TabsTrigger value="debug" className="text-xs">
-								<Bug className="h-3.5 w-3.5 mr-1" /> {t("replay:debug")}
-							</TabsTrigger>
-							<TabsTrigger value="compare" className="text-xs">
-								<GitCompare className="h-3.5 w-3.5 mr-1" />{" "}
-								{t("replay:compare")}
-							</TabsTrigger>
-							<TabsTrigger value="timeTravel" className="text-xs">
-								<History className="h-3.5 w-3.5 mr-1" />{" "}
-								{t("replay:timeTravel")}
-							</TabsTrigger>
-						</TabsList>
+						<CharterTabs
+							className="mx-4 mt-2 shrink-0"
+							label={t("replay:viewerTabs")}
+							value={activeTab}
+							onChange={(v) => setActiveTab(v)}
+							tabs={[
+								{ id: "timeline", label: t("replay:details"), icon: Eye },
+								{ id: "diff", label: t("replay:diff"), icon: Code },
+								{ id: "heatmap", label: t("replay:heatmap"), icon: Flame },
+								{ id: "tokens", label: t("replay:tokens"), icon: DollarSign },
+								{ id: "debug", label: t("replay:debug"), icon: Bug },
+								{ id: "compare", label: t("replay:compare"), icon: GitCompare },
+								{ id: "timeTravel", label: t("replay:timeTravel"), icon: History },
+							]}
+						/>
 
 						<div className="flex-1 overflow-auto">
 							{/* Step details */}
@@ -1348,6 +1331,6 @@ export const AgentReplayDashboard: React.FC<AgentReplayDashboardProps> = ({
 					</Tabs>
 				</div>
 			</div>
-		</div>
+		</ModuleStage>
 	);
 };
