@@ -77,12 +77,39 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 ## How it works
 
-```
- your task ─▶ spec ─▶ planner ─▶ coder (+ subagents) ─▶ QA reviewer ─▶ QA fixer
-                         │                                    │
-              subtasks you can approve            verify: run the app, keep a proof
-                                                              │
-                                              your review ─▶ merge or pull request
+```mermaid
+flowchart LR
+    subgraph P ["1 · Plan"]
+        direction TB
+        task(["📝 You describe a task"]) --> spec["📄 Spec<br/><small>goal, scope, acceptance criteria</small>"]
+        spec --> plan["🧭 Planner<br/><small>subtasks and the files each touches</small>"]
+        plan -. "if you want" .-> approve{{"✅ You approve the plan"}}
+    end
+
+    subgraph B ["2 · Build and check"]
+        direction TB
+        code["⌨️ Coder<br/><small>writes the code, can start subagents</small>"] --> qa["🔎 QA reviewer<br/><small>checks every acceptance criterion</small>"]
+        qa -- "issues found" --> fix["🔧 QA fixer"]
+        fix -- "fixed" --> qa
+    end
+
+    subgraph S ["3 · Prove and ship"]
+        direction TB
+        verify["▶️ Verify<br/><small>runs the app, keeps a proof</small>"] --> review{{"👀 You review the diff"}}
+        review --> merge(["🔀 Merge or pull request"])
+    end
+
+    P ==> B ==> S
+
+    classDef you fill:#F59E0B,stroke:#B45309,color:#111827,font-weight:bold
+    classDef agent fill:#6366F1,stroke:#4338CA,color:#ffffff
+    classDef proof fill:#10B981,stroke:#047857,color:#ffffff
+    class task,approve,review you
+    class spec,plan,code,qa,fix agent
+    class verify,merge proof
+    style P fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style B fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style S fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
 ```
 
 - **Isolated**: every task runs in its own git worktree, so your branch stays untouched until you merge.
@@ -246,23 +273,61 @@ Several accounts per provider can be registered; when one hits its rate limit, t
 
 ## Architecture
 
+How the pieces talk to each other:
+
+```mermaid
+flowchart TB
+    subgraph local ["💻 Your machine"]
+        direction LR
+        desktop["🖥️ Desktop app<br/><small>Electron + React</small>"] <--> engine["🐍 Python engine<br/><small>agents, specs, QA, local API</small>"]
+        engine --> repo[("📁 Your git repository<br/><small>one worktree per task</small>")]
+    end
+
+    subgraph ext ["🌐 What the engine talks to"]
+        direction TB
+        providers["🤖 AI providers<br/><small>Claude, OpenAI, Gemini, Copilot,<br/>Mistral, Grok, DeepSeek,<br/>local models, agent CLIs</small>"]
+        forges["🔗 Forges and trackers<br/><small>GitHub, GitLab, Azure DevOps,<br/>Jira, Linear</small>"]
+        clients["🧩 Other AI clients<br/><small>Claude Code, Codex, Cursor…<br/>via the workpilot-board MCP server</small>"]
+    end
+
+    subgraph team ["👥 Team mode, optional"]
+        direction TB
+        server["🏢 Team server<br/><small>shared board, roles,<br/>organisations</small>"] <--> mobile["📱 Mobile app<br/><small>iOS and Android</small>"]
+    end
+
+    local <==> ext
+    local <-. "server mode" .-> team
+
+    classDef app fill:#6366F1,stroke:#4338CA,color:#ffffff
+    classDef outside fill:#0EA5E9,stroke:#0369A1,color:#ffffff
+    classDef shared fill:#10B981,stroke:#047857,color:#ffffff
+    classDef data fill:#F59E0B,stroke:#B45309,color:#111827
+    class desktop,engine app
+    class providers,forges,clients outside
+    class server,mobile shared
+    class repo data
+    style local fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
+    style ext fill:transparent,stroke:#0EA5E9,stroke-width:2px,stroke-dasharray:6 4
+    style team fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
 ```
-WorkPilot-AI/
-├── apps/
-│   ├── backend/     # Python agents, specs, QA, local API, server mode
-│   ├── frontend/    # Electron desktop app (React + TypeScript)
-│   └── mobile/      # iOS and Android app (Expo), client of server mode
-├── src/             # Shared Python connectors (Jira, Azure DevOps…)
-├── capabilities/    # What each provider and harness can do
-├── config/          # Provider list shown in Settings
-├── workflows/       # One declarative workflow per task kind
-├── skills/          # Skill packs (.agents/skills/ is generated)
-├── deploy/          # Server image and docker-compose
-├── changelog.d/     # One changelog fragment per pull request
-├── docs/            # Rules, design rationale, guides
-├── tests/           # Python tests (frontend tests sit next to the code)
-└── scripts/         # Build, release and maintenance scripts
-```
+
+Where they live in the repository:
+
+| Folder | What it holds |
+|---|---|
+| `apps/backend/` | Python agents, specs, QA, local API, server mode |
+| `apps/frontend/` | Electron desktop app (React + TypeScript) |
+| `apps/mobile/` | iOS and Android app (Expo), client of server mode |
+| `src/` | Shared Python connectors (Jira, Azure DevOps…) |
+| `capabilities/` | What each provider and harness can do |
+| `config/` | Provider list shown in Settings |
+| `workflows/` | One declarative workflow per task kind |
+| `skills/` | Skill packs (`.agents/skills/` is generated) |
+| `deploy/` | Server image and docker-compose |
+| `changelog.d/` | One changelog fragment per pull request |
+| `docs/` | Rules, design rationale, guides |
+| `tests/` | Python tests (frontend tests sit next to the code) |
+| `scripts/` | Build, release and maintenance scripts |
 
 How the pieces fit (agents, subagents, workflows, state, security layers): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (in French). Why each feature is built the way it is: [docs/architecture/](docs/architecture/). A guided, clickable atlas readable without a technical background: [docs/audit/WorkPilot-architecture.html](docs/audit/WorkPilot-architecture.html). Instructions for coding agents start at [`AGENTS.md`](AGENTS.md).
 

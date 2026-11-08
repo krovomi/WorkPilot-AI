@@ -203,6 +203,14 @@ class TestTheTwoReadmesStayTwins:
         for image in en:
             assert (REPO_ROOT / image).is_file(), image
 
+    def test_same_diagrams(self):
+        """Both READMEs draw the same Mermaid diagrams, not ASCII arrows."""
+        en = self.EN.read_text(encoding="utf-8")
+        fr = self.FR.read_text(encoding="utf-8")
+        assert en.count("```mermaid") == fr.count("```mermaid") >= 2
+        for text in (en, fr):
+            assert "─▶" not in text
+
     def test_same_release_markers(self, ur):
         markers = [
             ur.STABLE_BADGE_START,
