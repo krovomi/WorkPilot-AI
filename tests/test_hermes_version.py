@@ -114,6 +114,16 @@ class TestProbe:
         assert installed_version(str(fake_binary)) is None
         assert installed_version(str(fake_binary)) == "0.23.0"
 
+    def test_forgetting_asks_again_after_an_update(self, fake_binary, monkeypatch):
+        # An update from the sidebar may leave the launcher untouched (git
+        # install): the status asked with `fresh` must not answer the old one.
+        answers = [_completed("Hermes Agent v0.21.1\n"), _completed(REAL_0_23)]
+        monkeypatch.setattr(version.subprocess, "run", lambda cmd, **kw: answers.pop(0))
+        assert installed_version(str(fake_binary)) == "0.21.1"
+        assert installed_version(str(fake_binary)) == "0.21.1"
+        version.forget_installed_versions()
+        assert installed_version(str(fake_binary)) == "0.23.0"
+
     def test_no_binary_no_subprocess(self, monkeypatch):
         monkeypatch.setattr(version.subprocess, "run", pytest.fail)
         assert installed_version(None) is None

@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "MIN_VERSION",
     "UPDATE_COMMAND",
+    "forget_installed_versions",
     "installed_version",
     "parse_version",
     "satisfies",
@@ -86,6 +87,17 @@ def satisfies(version: str | None, minimum: str = MIN_VERSION) -> bool | None:
         return _key(version) >= _key(minimum)
     except ValueError:
         return None
+
+
+def forget_installed_versions() -> None:
+    """Drop the cached versions: the next status runs ``hermes --version`` again.
+
+    For the status a person asks for right after updating hermes from the
+    sidebar. The cache key is the binary's modification time, and an update
+    does not always rewrite the launcher (a git install updates the checkout
+    behind an unchanged venv script).
+    """
+    _cache.clear()
 
 
 def installed_version(binary: str | None) -> str | None:

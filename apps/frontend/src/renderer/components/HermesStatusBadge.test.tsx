@@ -147,4 +147,73 @@ describe("HermesStatusBadge", () => {
 		fireEvent.click(screen.getByRole("button", { name: /hermes:soul.install/ }));
 		await waitFor(() => expect(mockInstallSoul).toHaveBeenCalledWith(false));
 	});
+
+	describe("update", () => {
+		const checkCliUpdate = vi.fn();
+		const updateCli = vi.fn();
+		const outdated = {
+			tool: "hermes",
+			installed: true,
+			version: "0.21.1",
+			latest: "0.23.0",
+			isOutdated: true,
+		};
+
+		beforeEach(() => {
+			checkCliUpdate.mockReset();
+			updateCli.mockReset();
+			(globalThis as { electronAPI?: unknown }).electronAPI = { checkCliUpdate, updateCli };
+		});
+		afterEach(() => {
+			(globalThis as { electronAPI?: unknown }).electronAPI = undefined;
+		});
+
+		it("flags an outdated hermes, updates it and reads the doctor again", async () => {
+			mockFetchStatus.mockResolvedValue({ ok: true, data: { status: status() } });
+			checkCliUpdate.mockResolvedValue(outdated);
+			updateCli.mockResolvedValue({
+				tool: "hermes",
+				success: true,
+				method: "self",
+				status: { ...outdated, version: "0.23.0", isOutdated: false },
+			});
+			renderBadge();
+			expect(await screen.findByText("common:update")).toBeInTheDocument();
+			expect(screen.getByText(/0\.21\.1/)).toBeInTheDocument();
+			openPopover();
+			expect(
+				await screen.findByText("navigation:agentCli.update.availableFor"),
+			).toBeInTheDocument();
+			fireEvent.click(screen.getByRole("button", { name: "common:update" }));
+			await waitFor(() => expect(updateCli).toHaveBeenCalledWith("hermes"));
+			// The doctor caches the version per binary: it is asked to read it again.
+			await waitFor(() =>
+				expect(mockFetchStatus).toHaveBeenLastCalledWith(expect.anything(), true),
+			);
+			expect(
+				await screen.findByText("navigation:agentCli.update.doneWithVersion"),
+			).toBeInTheDocument();
+		});
+
+		it("checks no release for a hermes that is not installed", async () => {
+			mockFetchStatus.mockResolvedValue({
+				ok: true,
+				data: {
+					status: status({
+						readiness: {
+							state: "absent",
+							installed: false,
+							ready: false,
+							degraded: false,
+							home: "",
+							checks: [],
+						},
+					}),
+				},
+			});
+			renderBadge();
+			await waitFor(() => expect(mockFetchStatus).toHaveBeenCalled());
+			expect(checkCliUpdate).not.toHaveBeenCalled();
+		});
+	});
 });
