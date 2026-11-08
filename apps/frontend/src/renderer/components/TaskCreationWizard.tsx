@@ -58,6 +58,7 @@ import type {
 	PhaseThinkingConfig,
 } from "../../shared/types/settings";
 import { buildBranchOptions } from "../lib/branch-utils";
+import { createMobileSetup, inheritedSetupMetadata } from "../lib/mobile-setup";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
@@ -70,6 +71,7 @@ import {
 	saveDraft,
 } from "../stores/task-store";
 import { FileAutocomplete } from "./FileAutocomplete";
+import { useMobileSetup } from "./task-form/useMobileSetup";
 import { TaskFileExplorerDrawer } from "./TaskFileExplorerDrawer";
 import {
 	type CriterionDraft,
@@ -231,6 +233,8 @@ export function TaskCreationWizard({
 	// Empty is the default and means "every platform the project has":
 	// a card that names none on a mobile repo is not asking for none.
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>([]);
+	// On a project with no phone app, the checked platforms need setup tasks.
+	const mobileSetup = useMobileSetup(open ? projectId : undefined, mobileTargets);
 	// Critères d'acceptation et note supplémentaire : les mêmes champs que le
 	// panneau d'une tâche créée, remplis avant qu'elle ne parte.
 	const [acceptanceCriteria, setAcceptanceCriteria] = useState<
@@ -692,6 +696,20 @@ export function TaskCreationWizard({
 			// This preserves gitignored files (.env, configs) by not switching to origin
 			if (isSelectedBranchLocal) metadata.useLocalBranch = true;
 
+			// No phone app yet: the setup tasks go on the board first, and this
+			// task waits for them. A failure here creates nothing more.
+			if (mobileSetup.plan && mobileSetup.profile) {
+				const blockers = await createMobileSetup(
+					mobileSetup.plan,
+					mobileSetup.profile,
+					projectId,
+					inheritedSetupMetadata(metadata),
+					createTask,
+					t,
+				);
+				metadata.blockedBy = [...new Set([...(metadata.blockedBy ?? []), ...blockers])];
+			}
+
 			const task = await createTask(
 				projectId,
 				title.trim(),
@@ -971,6 +989,7 @@ export function TaskCreationWizard({
 					contextProvider={engine.coding?.provider}
 					mobileTargets={mobileTargets}
 					onMobileTargetsChange={setMobileTargets}
+					mobileSetup={mobileSetup}
 					disabled={isCreating}
 					error={error}
 					onError={setError}

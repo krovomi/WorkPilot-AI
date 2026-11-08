@@ -4,6 +4,7 @@ import type {
 	MobileDevice,
 	MobilePlan,
 	MobilePlatform,
+	MobileProfile,
 	MobileSessionPhase,
 } from "../../../shared/types/mobile";
 
@@ -24,6 +25,15 @@ export interface MobileAPI {
 	detectMobileProject: (
 		projectDir: string,
 	) => Promise<{ success: boolean; data?: MobilePlan; error?: string }>;
+
+	/**
+	 * The task form's "Mobile platforms" box: the phone app the project has,
+	 * or the frameworks the setup tasks can install. By project id, so a
+	 * server project is answered by the server.
+	 */
+	getMobileProfile: (
+		projectId: string,
+	) => Promise<{ success: boolean; data?: MobileProfile; error?: string }>;
 
 	/** Re-read the device list; it changes as emulators boot. */
 	refreshMobileDevices: (
@@ -72,6 +82,9 @@ export function createMobileAPI(): MobileAPI {
 	return {
 		detectMobileProject: (projectDir) =>
 			ipcRenderer.invoke(IPC_CHANNELS.MOBILE_DETECT, { projectDir }),
+
+		getMobileProfile: (projectId) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MOBILE_PROFILE, { projectId }),
 
 		refreshMobileDevices: (projectDir, platforms) =>
 			ipcRenderer.invoke(IPC_CHANNELS.MOBILE_DEVICES, { projectDir, platforms }),

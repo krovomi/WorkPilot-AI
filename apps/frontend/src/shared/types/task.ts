@@ -14,7 +14,7 @@ import type {
 	ThinkingLevel,
 } from "./settings";
 import type { TaskGoalSummary } from "./goal";
-import type { MobilePlatform } from "./mobile";
+import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
@@ -460,6 +460,11 @@ export interface TaskMetadata {
 	// WORKPILOT_MOBILE_TARGETS, which narrows the platform rules the planner,
 	// the coder and QA are given.
 	mobileTargets?: MobilePlatform[];
+	// Set on the setup tasks the form adds when a platform is checked on a
+	// project with no phone app (install the framework, prepare a platform):
+	// a second task targeting the same platform reuses them instead of
+	// installing the framework twice (`renderer/lib/mobile-setup.ts`).
+	mobileBootstrap?: MobileBootstrapMark;
 
 	// Classification
 	category?: TaskCategory;

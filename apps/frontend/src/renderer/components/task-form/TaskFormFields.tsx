@@ -20,10 +20,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MAX_IMAGES_PER_TASK } from "../../../shared/constants";
-import {
-	MOBILE_PLATFORMS,
-	type MobilePlatform,
-} from "../../../shared/types/mobile";
+import type { MobilePlatform } from "../../../shared/types/mobile";
 import { providerRegistry } from "../../../shared/services/providerRegistry";
 import type {
 	ContextPolicy,
@@ -59,6 +56,8 @@ import { ClassificationFields } from "./ClassificationFields";
 import { ContextPolicyFields } from "./ContextPolicyFields";
 import { VerifyLoopFields } from "./VerifyLoopFields";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import { MobileTargetsFields } from "./MobileTargetsFields";
+import type { MobileSetupState } from "./useMobileSetup";
 import { RichTextEditor } from "./RichTextEditor";
 import { TaskDictation } from "./TaskDictation";
 import { type FileReferenceData, useImageUpload } from "./useImageUpload";
@@ -162,6 +161,8 @@ interface TaskFormFieldsProps {
 	/** Smartphone platforms this task targets. Empty means "whatever the project has". */
 	mobileTargets: MobilePlatform[];
 	onMobileTargetsChange: (targets: MobilePlatform[]) => void;
+	/** The project's mobile profile and the setup checking a platform needs. */
+	mobileSetup?: MobileSetupState;
 
 	// Form state
 	disabled?: boolean;
@@ -248,6 +249,7 @@ export function TaskFormFields({
 	contextProvider,
 	mobileTargets,
 	onMobileTargetsChange,
+	mobileSetup,
 	disabled = false,
 	error,
 	onError,
@@ -865,40 +867,15 @@ export function TaskFormFields({
 					)}
 
 					{/* Smartphone targets. Checking neither is the default and means
-				    "every platform the project has" — the agents narrow to what
-				    is checked only when something is. */}
-					<fieldset className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
-						<legend className="text-sm font-medium text-foreground">
-							{t("mobile:targets.label")}
-						</legend>
-						<p className="text-xs text-muted-foreground">
-							{t("mobile:targets.description")}
-						</p>
-						<div className="flex flex-wrap gap-4 pt-1">
-							{MOBILE_PLATFORMS.map((platform) => (
-								<div key={platform} className="flex items-center gap-2">
-									<Checkbox
-										id={`${prefix}mobile-${platform}`}
-										checked={mobileTargets.includes(platform)}
-										disabled={disabled}
-										onCheckedChange={(checked) =>
-											onMobileTargetsChange(
-												checked === true
-													? [...mobileTargets, platform]
-													: mobileTargets.filter((entry) => entry !== platform),
-											)
-										}
-									/>
-									<Label
-										htmlFor={`${prefix}mobile-${platform}`}
-										className="cursor-pointer text-sm text-foreground"
-									>
-										{t(`mobile:targets.${platform}`)}
-									</Label>
-								</div>
-							))}
-						</div>
-					</fieldset>
+					    "every platform the project has"; on a project with no phone
+					    app, checking one adds the setup tasks (mobile-setup.ts). */}
+					<MobileTargetsFields
+						targets={mobileTargets}
+						onTargetsChange={onMobileTargetsChange}
+						setup={mobileSetup}
+						disabled={disabled}
+						idPrefix={prefix}
+					/>
 				</div>
 
 				{/* Error Display — always visible regardless of the active step */}

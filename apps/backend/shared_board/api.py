@@ -23,6 +23,7 @@ task description, never as an instruction to this server.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 from pathlib import Path
@@ -71,7 +72,8 @@ class CardCreate(BaseModel):
     # As on the desktop card: when true, the build waits for someone to
     # approve the spec and plan; when false, spec creation approves them.
     require_review: bool = True
-    # Engine, priority, category and goal, as the desktop card carries them.
+    # Engine, priority, category, goal, phone targets and blockers, as the
+    # desktop card carries them.
     settings: card_settings.CardSettings | None = None
     # Images from the New Task dialog, stored in the card's attachments/.
     attachments: list[card_images.ImageUpload] = Field(
@@ -161,6 +163,20 @@ async def board_snapshot(
         if directory.is_dir() and directory.resolve().is_relative_to(root):
             worktrees[card_id] = _card_files(directory)
     return {"cards": cards, "worktrees": worktrees}
+
+
+@router.get("/mobile-profile")
+async def mobile_profile(
+    scope: ProjectScope = Depends(resolve_project_scope),
+) -> dict[str, Any]:
+    """The task form's "Mobile platforms" box for this project's clone.
+
+    The phone app the clone has, or the frameworks the setup cards can install
+    when it has none (``mobile.bootstrap``). Files only: no toolchain, no run.
+    """
+    from mobile.bootstrap import mobile_profile as profile
+
+    return await asyncio.to_thread(profile, scope.path.resolve())
 
 
 @router.post("/cards", status_code=201)
