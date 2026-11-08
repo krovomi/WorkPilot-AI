@@ -29,6 +29,7 @@ from core.workspace import (
 from foundation.build_signals import BuildHalted, BuildPaused, BuildSplit
 from review import ReviewState
 from services.notifications.digest import start_digest_heartbeat
+from task_split.diff_check import record_diff_check
 from task_split.step import split_before_build
 from ui import (
     BuildState,
@@ -120,6 +121,20 @@ def _changed_files(worktree_manager, spec_name: str) -> list[str] | None:
 
         debug_warning("run.py", f"Could not list changed files: {exc}")
         return None
+
+
+def _check_review_load(
+    source_spec_dir: Path | None, spec_dir: Path, working_dir: Path, base: str
+) -> None:
+    """Record the branch's lines to review on the card; say so when above."""
+    check = record_diff_check([source_spec_dir, spec_dir], working_dir, base)
+    if check is not None and check.over:
+        print_status(
+            f"This branch has about {check.lines} lines to review in "
+            f"{check.files} files, above the ceiling of {check.max_lines} lines "
+            f"and {check.max_files} files for a {check.kind} task",
+            "warning",
+        )
 
 
 def _resolve_workflow_profile(
@@ -1237,6 +1252,14 @@ def handle_build_command(
         # architecture delta's head model — never reach the spec directory the
         # Kanban reads, and are deleted with the worktree at merge.
         _sync_spec_back(spec_dir, source_spec_dir, "after the post-QA phases")
+
+        # The real diff against the card's ceiling (task_split): the split
+        # decided on the plan's estimate, the board now shows what a person
+        # will really read.
+        if worktree_manager:
+            _check_review_load(
+                source_spec_dir, spec_dir, working_dir, worktree_manager.base_branch
+            )
 
         # Hard gates. `verify` declares `hard_gate: tests-pass`, which until
         # now only kept the phase out of the effort pruner — nothing checked

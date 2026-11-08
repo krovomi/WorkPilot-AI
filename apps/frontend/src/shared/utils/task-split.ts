@@ -181,3 +181,48 @@ export function canStartOnSibling(
 		blocker.status === "human_review" && blocker.reviewReason === "completed"
 	);
 }
+
+/** The PR a task opened, from the task or its metadata. */
+export function prUrlOf(task: Pick<Task, "prUrl" | "metadata">): string | undefined {
+	return task.prUrl ?? task.metadata?.prUrl ?? undefined;
+}
+
+/**
+ * The parts whose PR may have been merged since the last look: a local part
+ * with a PR, still on the board, not done. Server cards are left to the
+ * server, which runs no git here.
+ */
+export function partsAwaitingMerge<
+	T extends Pick<Task, "id" | "status" | "prUrl" | "metadata">,
+>(tasks: readonly T[]): T[] {
+	return tasks.filter(
+		(task) =>
+			splitPartOf(task) !== null &&
+			!isServerTask(task) &&
+			!task.metadata?.archivedAt &&
+			(task.status === "pr_created" || task.status === "human_review") &&
+			Boolean(prUrlOf(task)),
+	);
+}
+
+/**
+ * The parts stacked on a part of the same split that is now done: each one
+ * moves onto that part's base, and its PR is retargeted (`stackUpdate`).
+ */
+export function partsToMoveOntoBase<
+	T extends Pick<Task, "id" | "specId" | "status" | "metadata">,
+>(tasks: readonly T[]): T[] {
+	return tasks.filter((task) => {
+		const mine = splitPartOf(task);
+		const parentSpec = task.metadata?.stackParent;
+		if (!mine || !parentSpec || isServerTask(task)) return false;
+		const parent = tasks.find(
+			(t) => t.specId === parentSpec || t.id === parentSpec,
+		);
+		return (
+			parent !== undefined &&
+			parent.status === "done" &&
+			splitPartOf(parent)?.parent === mine.parent
+		);
+	});
+}

@@ -68,6 +68,8 @@ _PARENT_ONLY_KEYS = (
     "prUrl",
     "paused",
     "splitGroup",
+    "splitCheck",
+    "prMergedAt",
     "bestOfN",
     "blockedBy",
     "stackParent",

@@ -9,6 +9,9 @@ import {
 	canStartOnSibling,
 	kindFromCategory,
 	NEVER_SPLIT_KINDS,
+	partsAwaitingMerge,
+	partsToMoveOntoBase,
+	prUrlOf,
 	SPLIT_KINDS,
 	splitChildCount,
 	splitPartOf,
@@ -147,5 +150,55 @@ describe("TASK_SPLIT", () => {
 		actor.send({ type: "TASK_SPLIT", total: 3 });
 		expect(actor.getSnapshot().value).toBe("done");
 		actor.stop();
+	});
+});
+
+describe("following the parts' PRs", () => {
+	const pr = "https://github.com/acme/shop/pull/12";
+
+	it("watches a local part with a PR, waiting for review", () => {
+		const open = part("012-oauth-part1", 1, {
+			status: "pr_created",
+			metadata: { ...part("x", 1).metadata, prUrl: pr },
+		});
+		const reviewed = part("012-oauth-part2", 2, { status: "human_review", prUrl: pr });
+		expect(partsAwaitingMerge([open, reviewed]).map((t) => t.id)).toEqual([
+			"012-oauth-part1",
+			"012-oauth-part2",
+		]);
+		expect(prUrlOf(open)).toBe(pr);
+	});
+
+	it("leaves out a part without a PR, a done or archived part, a whole task, a server card", () => {
+		const noPr = part("012-oauth-part1", 1, { status: "pr_created" });
+		const done = part("012-oauth-part2", 2, { status: "done", prUrl: pr });
+		const archived = part("012-oauth-part3", 3, {
+			status: "pr_created",
+			prUrl: pr,
+			metadata: { ...part("x", 3).metadata, archivedAt: "2026-11-08" },
+		});
+		const whole = { id: "020-x", specId: "020-x", status: "pr_created", prUrl: pr } as Task;
+		const server = part("server:p:012-oauth-part1", 1, { status: "pr_created", prUrl: pr });
+		expect(partsAwaitingMerge([noPr, done, archived, whole, server])).toEqual([]);
+	});
+
+	it("moves a part stacked on a done part of the same split, and only that one", () => {
+		const first = part("012-oauth-part1", 1, { status: "done" });
+		const stacked = part("012-oauth-part2", 2, {
+			metadata: { ...part("x", 2).metadata, stackParent: "012-oauth-part1" },
+		});
+		const notYet = part("012-oauth-part3", 3, {
+			metadata: { ...part("x", 3).metadata, stackParent: "012-oauth-part2" },
+		});
+		const otherSplit = {
+			...part("020-x-part2", 2),
+			metadata: {
+				splitGroup: { parent: "020-x", index: 2, total: 2 },
+				stackParent: "012-oauth-part1",
+			},
+		} as Task;
+		expect(partsToMoveOntoBase([first, stacked, notYet, otherSplit]).map((t) => t.id)).toEqual([
+			"012-oauth-part2",
+		]);
 	});
 });

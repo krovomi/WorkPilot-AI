@@ -13,10 +13,13 @@ apps/backend/task_split/
   slices.py     découpe pure du plan en parts (aucune E/S)
   children.py   écrit les cartes enfants, clôt et archive la tâche découpée
   step.py       le point d'appel du build ; une erreur garde la tâche entière
+  diff_check.py après la QA : le diff réel de la branche contre le plafond (splitCheck)
 apps/frontend/src/shared/utils/task-split.ts               lecture des métadonnées, plafonds
 apps/frontend/src/main/ipc-handlers/task/split-events.ts   TASK_SPLIT → tableau rechargé
 apps/frontend/src/main/ipc-handlers/task/split-stack.ts    une part dépendante empilée (F6)
-apps/frontend/src/renderer/components/kanban/SplitPartBadge.tsx
+apps/frontend/src/main/ipc-handlers/task/split-merge-watch.ts  PR fusionnée → part terminée, parts empilées déplacées
+apps/frontend/src/main/pr-state.ts                         état d'une PR : GitHub (gh), GitLab (glab), Azure DevOps (REST)
+apps/frontend/src/renderer/components/kanban/SplitPartBadge.tsx   badge de part, badge « 620 / 400 lignes »
 ```
 
 ## Le plafond, selon le type de tâche
@@ -112,9 +115,35 @@ démarrage est refusé avec un message qui dit quoi faire. Une part dont le pré
 part de la base comme une tâche ordinaire. Une carte serveur n'est pas empilée (git tourne sur ce
 poste) : elle attend la fusion de son prérequis.
 
+## Quand la PR d'une part est fusionnée
+
+Toutes les 3 minutes (la première minute après le lancement), l'app lit l'état de la PR de chaque
+part locale qui attend sa revue (`pr_created` ou `human_review`, avec une `prUrl`) : `gh pr view`
+sur GitHub, l'API de `glab` sur GitLab, l'API REST avec le jeton du projet sur Azure DevOps. L'URL
+vient des métadonnées, qu'un agent écrit : elle doit avoir la forme exacte de son forge et passe en
+un seul argument. Une réponse illisible vaut « inconnu », jamais « fusionnée ».
+
+- **Fusionnée** : la part passe `done` (`prMergedAt` dans ses métadonnées).
+- **Les parts empilées dessus** passent sur sa base par `stackUpdate` (F6) : `git rebase --onto
+  <base> <ancien commit de la part>`, qui tient après une fusion squash, puis `gh pr edit --base`.
+  Pas pendant qu'un agent tourne, ni sur un worktree modifié : le passage suivant réessaie. Un
+  conflit annule le rebase et n'est retenté qu'une fois la part déplacée ; la personne le résout
+  depuis le panneau d'empilement de la carte.
+- Le tableau est rechargé et la file relancée (`TASK_SPLIT`) : une part qui attendait cette fusion
+  démarre depuis la base.
+- **Fermée sans fusion**, forge muet : rien ne change. Une carte serveur n'est pas suivie ici, ni un
+  projet en mode hors-ligne strict (`.workpilot/offline-mode.json`, illisible compris).
+
+## Le diff réel, après la QA (`diff_check.py`)
+
+Le découpage décide sur l'estimation du plan. Une fois la QA passée, `git diff --numstat -z -M
+<base>...HEAD` du worktree est pesé comme le plan (`review_load.py`, un fichier supprimé compte
+pour 1) et comparé au plafond de la carte. Le résultat va dans `splitCheck {lines, files,
+maxLines, maxFiles, kind, over}` des deux copies des métadonnées, et la carte au-delà du plafond
+porte « 620 / 400 lignes » (ou « 31 / 25 fichiers »). Rien n'est redécoupé : le code est écrit. Une
+carte jamais découpée (son type, `noSplit`, le projet) n'est pas mesurée.
+
 ## Ce qui reste à faire
 
-- Détecter la fusion d'une PR de part et mettre à jour les parts empilées dessus.
-- Mesurer le diff réel après le code et le comparer au plafond.
 - Couleur de groupe et étiquette `groupe/<nom>` sur le Kanban, le mobile, GitHub, GitLab ; préfixe
   `[Tâche k/N]` et section « Groupe de PR » sur Azure DevOps aussi.

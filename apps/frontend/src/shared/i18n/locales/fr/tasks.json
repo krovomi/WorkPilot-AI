@@ -2373,6 +2373,9 @@
 		"partBadge": "Partie {{index}}/{{total}}",
 		"partTooltip": "Partie {{index}} sur {{total}} de « {{title}} » : {{name}}",
 		"parentBadge": "Découpée en {{count}} tâches",
-		"parentTooltip": "Le plan dépassait {{lines}} lignes modifiées par PR : cette tâche est devenue {{count}} tâches."
+		"parentTooltip": "Le plan dépassait {{lines}} lignes à relire par PR : cette tâche est devenue {{count}} tâches.",
+		"overBadge": "{{lines}} / {{max}} lignes",
+		"overFilesBadge": "{{files}} / {{max}} fichiers",
+		"overTooltip": "Le diff réel compte environ {{lines}} lignes à relire dans {{files}} fichiers, au-delà du plafond de {{max}} lignes et {{maxFiles}} fichiers pour ce type de tâche : la relecture sera plus longue."
 	}
 }

@@ -13,6 +13,7 @@ import type { AgentManager } from "../../agent";
 import type { PythonEnvManager } from "../../python-env-manager";
 import { registerTaskArchiveHandlers } from "./archive-handlers";
 import { registerBestOfNHandlers } from "./best-of-n-handlers";
+import { startSplitMergeWatch } from "./split-merge-watch";
 import { registerStackHandlers } from "./stack-handlers";
 import { registerTaskContextHandlers } from "./context-handlers";
 import { registerTaskCRUDHandlers } from "./crud-handlers";
@@ -61,6 +62,8 @@ export function registerTaskHandlers(
 	registerBestOfNHandlers(agentManager, getMainWindow);
 	// Register stacked-task handlers (start from a blocker's branch, F6)
 	registerStackHandlers(agentManager);
+	// Follow the PRs of split parts: a merge closes the part, the next ones move.
+	startSplitMergeWatch(agentManager, getMainWindow);
 }
 
 // Export shared utilities for use by other modules if needed

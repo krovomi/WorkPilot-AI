@@ -83,7 +83,7 @@ export const IPC_CHANNELS = {
 	TASK_PIPELINE_FIX: "task:pipelineFix", // Launch the agent to repair a red build (writes BUILD_FAILURE.md + fix subtask)
 	TASK_PIPELINE_STATUS_EVENT: "task:pipelineStatus", // Event (main -> renderer): pipeline status changed for a task
 	TASK_UPDATED_EVENT: "task:updated", // Event (main -> renderer): fields of a task changed in main (PR URL, visual proof)
-	TASK_SPLIT_EVENT: "task:split", // Event (main -> renderer): a task too big for one PR became its parts (task_split); reload the board
+	TASK_SPLIT_EVENT: "task:split", // Event (main -> renderer): a task too big for one PR became its parts, or a part's PR was merged (task_split); reload the board and start the queue
 	TASK_SPEC_INTERVIEW: "task:specInterview", // Generate 3-5 clarifying questions about the spec before planning (answers are appended to the description)
 	TASK_LOAD_IMAGE_THUMBNAIL: "task:loadImageThumbnail",
 
