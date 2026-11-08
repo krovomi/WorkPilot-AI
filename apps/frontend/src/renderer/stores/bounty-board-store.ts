@@ -82,11 +82,13 @@ export const useBountyBoardStore = create<BountyBoardState>((set, get) => ({
 		const api = globalThis.electronAPI;
 		if (!api?.listBountyArchives) return;
 		try {
-			const { archives } = await api.listBountyArchives({
+			const result = await api.listBountyArchives({
 				projectPath,
 				specId,
 			});
-			set({ archives });
+			// A reply without a list (older main process, preview) leaves the
+			// board empty instead of crashing the whole view on `.length`.
+			set({ archives: Array.isArray(result?.archives) ? result.archives : [] });
 		} catch (e) {
 			set({ error: String(e) });
 		}

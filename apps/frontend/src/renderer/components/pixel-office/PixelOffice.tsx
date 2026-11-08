@@ -10,9 +10,6 @@ import {
 	Building2,
 	Grid3X3,
 	Hourglass,
-	LayoutDashboard,
-	Network,
-	Users,
 	Volume2,
 	VolumeX,
 	ZoomIn,
@@ -28,8 +25,9 @@ import {
 import { useSwarmStore } from "../../stores/swarm-store";
 import { useTaskStore } from "../../stores/task-store";
 import { useTerminalStore } from "../../stores/terminal-store";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import "../charter/charter.css";
+import { Chip, Chips } from "../charter";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { AddAgentButton, AgentBubble } from "./AgentBubble";
 import { closeChimes, playChime } from "./office-sounds";
@@ -242,7 +240,7 @@ export function PixelOffice({
 	onNavigateToTerminals,
 	onNavigateToKanban,
 }: PixelOfficeProps) {
-	const { t } = useTranslation(["pixelOffice", "common"]);
+	const { t } = useTranslation(["pixelOffice", "common", "navigation"]);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 	const [bubblePos, setBubblePos] = useState<{ x: number; y: number } | null>(
@@ -554,59 +552,28 @@ export function PixelOffice({
 	}, [agents]);
 
 	return (
-		<div ref={containerRef} className="flex flex-col h-full overflow-hidden">
+		<div ref={containerRef} className="wp-scope flex flex-col h-full overflow-hidden">
 			{/* Toolbar */}
-			<div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
-				<div className="flex items-center gap-2">
-					<Building2 className="h-4 w-4 text-muted-foreground" aria-hidden />
-					<span className="text-base font-bold tracking-tight font-mono">
-						{t("pixelOffice:title")}
+			<div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-dashed border-[var(--wp-border)] bg-background/80 backdrop-blur-sm shrink-0">
+				<div className="flex min-w-0 items-center gap-3">
+					<span className="wp-empty-glyph h-8 w-8 shrink-0" aria-hidden="true">
+						<Building2 className="h-4 w-4" />
 					</span>
-
-					{counts.terminals > 0 && (
-						<Badge variant="secondary" className="font-mono text-xs gap-1">
-							<Users className="h-3 w-3" />
-							{t("pixelOffice:badges.terminals", { count: counts.terminals })}
-						</Badge>
-					)}
-					{counts.tasks > 0 && (
-						<Badge
-							variant="secondary"
-							className="font-mono text-xs gap-1 border-orange-500/40 text-orange-400"
-						>
-							<LayoutDashboard className="h-3 w-3" />
-							{t("pixelOffice:badges.tasks", { count: counts.tasks })}
-						</Badge>
-					)}
-					{counts.swarm > 0 && (
-						<Badge
-							variant="secondary"
-							className="font-mono text-xs gap-1 border-violet-500/40 text-violet-300"
-						>
-							<Network className="h-3 w-3" />
-							{t("pixelOffice:badges.swarm", { count: counts.swarm })}
-						</Badge>
-					)}
-					{counts.active > 0 && (
-						<Badge
-							variant="default"
-							className="font-mono text-xs bg-success"
-						>
-							{t("pixelOffice:badges.active", { count: counts.active })}
-						</Badge>
-					)}
-					{pendingAgents.length > 0 && (
-						<Badge
-							variant="secondary"
-							className="font-mono text-xs gap-1"
-							style={{ borderColor: "rgba(139,92,246,0.4)", color: "#A78BFA" }}
-						>
-							<Hourglass className="h-3 w-3" />
-							{t("pixelOffice:badges.pending", {
-								count: pendingAgents.length,
-							})}
-						</Badge>
-					)}
+					<span className="wp-header-text mr-2">
+						<span className="wp-kicker">{t("navigation:groups.agents")}</span>
+						<span className="wp-title">{t("pixelOffice:title")}</span>
+					</span>
+					<Chips>
+						{counts.terminals > 0 && (
+							<Chip tone="blue">{t("pixelOffice:badges.terminals", { count: counts.terminals })}</Chip>
+						)}
+						{counts.tasks > 0 && <Chip tone="orange">{t("pixelOffice:badges.tasks", { count: counts.tasks })}</Chip>}
+						{counts.swarm > 0 && <Chip tone="violet">{t("pixelOffice:badges.swarm", { count: counts.swarm })}</Chip>}
+						{counts.active > 0 && <Chip tone="green">{t("pixelOffice:badges.active", { count: counts.active })}</Chip>}
+						{pendingAgents.length > 0 && (
+							<Chip tone="pink">{t("pixelOffice:badges.pending", { count: pendingAgents.length })}</Chip>
+						)}
+					</Chips>
 				</div>
 
 				<div className="flex items-center gap-1">

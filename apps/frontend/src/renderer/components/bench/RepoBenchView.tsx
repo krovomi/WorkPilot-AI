@@ -8,7 +8,7 @@
  * (main/ipc-handlers/bench-handlers.ts, docs/architecture/repo-bench.md).
  */
 
-import { FlaskConical, Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { FlaskConical, Loader2, Play, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -29,6 +29,16 @@ import {
 import { useConfiguredProviders } from "../../hooks/useConfiguredProviders";
 import { useBenchStore } from "../../stores/bench-store";
 import { useSettingsStore } from "../../stores/settings-store";
+import {
+	CharterButton,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	Section,
+} from "../charter";
 import { EngineTrioPicker } from "../task-engine/EngineTrioPicker";
 import { BenchRecommendationList } from "./BenchRecommendation";
 import { dollars, minutes, percent } from "./format";
@@ -37,7 +47,6 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
-import { PageHeader } from "../ui/page-header";
 import { Textarea } from "../ui/textarea";
 
 export const MAX_CASES = 20;
@@ -53,7 +62,7 @@ function ResultsTable({ rows }: { rows: BenchTableRow[] }) {
 		return <p className="text-sm text-muted-foreground">{t("table.empty")}</p>;
 	}
 	return (
-		<div className="overflow-x-auto rounded-lg border border-border">
+		<div className="wp-card overflow-x-auto">
 			<table className="w-full text-sm">
 				<thead className="bg-muted/50 text-left text-xs text-muted-foreground">
 					<tr>
@@ -181,7 +190,7 @@ function RunCard({
 		(isActive && status.busy !== "discarding") ||
 		(!isActive && (run.phase === "running" || run.phase === "calibrating"));
 	return (
-		<div className="space-y-3 rounded-lg border border-border p-4">
+		<div className="wp-card wp-card-pad space-y-3">
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="font-mono text-xs">{run.runId}</span>
 				<Badge variant="secondary">{t(`phase.${run.phase}`)}</Badge>
@@ -272,7 +281,7 @@ function RuleVerdictLine({ run }: { run: BenchManifest }) {
 	const verdict = ruleVerdict(run);
 	if (!verdict) return null;
 	return (
-		<div className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-xs">
+		<div className="wp-card wp-card-pad wp-rail wp-tone-violet space-y-1 text-xs">
 			<p className="font-semibold">{t("run.rule.title")}</p>
 			<p className="italic text-muted-foreground">{verdict.rule}</p>
 			{verdict.pairs > 0 && (
@@ -293,7 +302,7 @@ function RuleVerdictLine({ run }: { run: BenchManifest }) {
 }
 
 export function RepoBenchView({ projectId }: Props) {
-	const { t } = useTranslation(["bench", "common"]);
+	const { t } = useTranslation(["bench", "common", "navigation"]);
 	const settings = useSettingsStore((s) => s.settings);
 	const { providers } = useConfiguredProviders();
 	const status = useBenchStore((s) =>
@@ -426,59 +435,63 @@ export function RepoBenchView({ projectId }: Props) {
 
 	if (!projectId) {
 		return (
-			<div className="p-6 text-sm text-muted-foreground">{t("bench:noProject")}</div>
+			<ModuleStage scroll="page">
+				<Page>
+					<EmptyStage icon={FlaskConical} title={t("bench:title")}>
+						{t("bench:noProject")}
+					</EmptyStage>
+				</Page>
+			</ModuleStage>
 		);
 	}
 
 	return (
-		<div className="mx-auto max-w-6xl space-y-6 p-6">
-			<PageHeader
-				variant="inline"
+		<ModuleStage scroll="page" data-testid="repo-bench-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.agents")}
 				icon={FlaskConical}
 				title={t("bench:title")}
 				description={t("bench:description")}
+				tone="blue"
 			/>
+			<Page className="!max-w-6xl">
 
 			{error && (
-				<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+				<Notice tone="red" role="alert">
 					{error}
-				</div>
+				</Notice>
 			)}
-			{status?.error && (
-				<div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-					{status.error}
-				</div>
-			)}
+			{status?.error && <Notice tone="amber">{status.error}</Notice>}
 
-			<section className="space-y-2">
-				<h2 className="text-sm font-semibold">{t("bench:table.title")}</h2>
+			<Section kicker={t("bench:kickers.results")} title={t("bench:table.title")} tone="blue">
 				<ResultsTable rows={status?.table ?? []} />
-				<p className="text-xs text-muted-foreground">{t("bench:table.readers")}</p>
-			</section>
+				<p className="wp-meta mt-2">{t("bench:table.readers")}</p>
+			</Section>
 
-			<section className="space-y-2">
-				<h2 className="text-sm font-semibold">{t("bench:recommend.title")}</h2>
+			<Section kicker={t("bench:kickers.recommend")} title={t("bench:recommend.title")} tone="green">
 				<BenchRecommendationList recommendations={status?.recommendations ?? {}} />
-				<p className="text-xs text-muted-foreground">{t("bench:recommend.rule")}</p>
-			</section>
+				<p className="wp-meta mt-2">{t("bench:recommend.rule")}</p>
+			</Section>
 
-			<section className="space-y-3 rounded-lg border border-border p-4">
-				<div className="flex items-center gap-2">
-					<h2 className="text-sm font-semibold">{t("bench:new.title")}</h2>
-					<Button
+			<Section
+				kicker={t("bench:kickers.new")}
+				title={t("bench:new.title")}
+				tone="accent"
+				actions={
+					<CharterButton
 						size="sm"
 						variant="ghost"
-						className="ml-auto"
+						icon={RefreshCw}
+						busy={loadingCandidates}
 						onClick={() => void loadCandidates()}
 						disabled={loadingCandidates}
 					>
-						<RefreshCw
-							className={`mr-1 h-3.5 w-3.5 ${loadingCandidates ? "animate-spin" : ""}`}
-						/>
 						{t("bench:new.refresh")}
-					</Button>
-				</div>
-				<p className="text-xs text-muted-foreground">
+					</CharterButton>
+				}
+			>
+			<Panel className="space-y-3">
+				<p className="wp-meta">
 					{t("bench:new.cardsHelp", { max: MAX_CASES })}
 				</p>
 				<div className="max-h-72 space-y-1 overflow-y-auto">
@@ -540,9 +553,7 @@ export function RepoBenchView({ projectId }: Props) {
 				</div>
 
 				<div className="space-y-2">
-					<h3 className="text-xs font-semibold text-muted-foreground">
-						{t("bench:new.engines", { max: MAX_ENGINES })}
-					</h3>
+					<h3 className="wp-kicker">{t("bench:new.engines", { max: MAX_ENGINES })}</h3>
 					{engines.map((engine, index) => (
 						<div
 							// biome-ignore lint/suspicious/noArrayIndexKey: engines are edited in place
@@ -576,22 +587,19 @@ export function RepoBenchView({ projectId }: Props) {
 						</div>
 					))}
 					{engines.length < MAX_ENGINES && (
-						<Button
+						<CharterButton
 							size="sm"
-							variant="outline"
+							icon={Plus}
 							disabled={busy}
 							onClick={() => setEngines((current) => [...current, seedTrio()])}
 						>
-							<Plus className="mr-1 h-3.5 w-3.5" />
 							{t("bench:new.addEngine")}
-						</Button>
+						</CharterButton>
 					)}
 				</div>
 
 				<div className="space-y-2">
-					<h3 className="text-xs font-semibold text-muted-foreground">
-						{t("bench:new.rule.title")}
-					</h3>
+					<h3 className="wp-kicker">{t("bench:new.rule.title")}</h3>
 					<p className="text-xs text-muted-foreground">{t("bench:new.rule.help")}</p>
 					{lessons.length > 0 && (
 						<NativeSelect
@@ -636,31 +644,34 @@ export function RepoBenchView({ projectId }: Props) {
 							builds,
 						})}
 					</span>
-					<Button
+					<CharterButton
+						variant="primary"
 						className="ml-auto"
+						icon={starting ? Loader2 : Play}
+						busy={starting}
 						disabled={
 							busy || starting || selected.length === 0 || engines.length === 0 || tooManyArms
 						}
 						onClick={() => void start()}
 					>
-						{starting && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
 						{t("bench:new.start")}
-					</Button>
+					</CharterButton>
 				</div>
-				{busy && <p className="text-xs text-muted-foreground">{t("bench:new.oneAtATime")}</p>}
-				<p className="text-xs text-muted-foreground">{t("bench:new.costWarning")}</p>
-			</section>
+				{busy && <p className="wp-meta">{t("bench:new.oneAtATime")}</p>}
+				<p className="wp-meta">{t("bench:new.costWarning")}</p>
+			</Panel>
+			</Section>
 
 			{runs.length > 0 && (
-				<section className="space-y-3">
-					<h2 className="text-sm font-semibold">{t("bench:run.title")}</h2>
-					{runs.map((run) =>
-						status ? (
-							<RunCard key={run.runId} run={run} status={status} onDiscard={discard} />
-						) : null,
-					)}
-				</section>
+				<Section kicker={t("bench:kickers.runs")} title={t("bench:run.title")} meta={String(runs.length)} tone="violet">
+					<div className="space-y-3">
+						{runs.map((run) =>
+							status ? <RunCard key={run.runId} run={run} status={status} onDiscard={discard} /> : null,
+						)}
+					</div>
+				</Section>
 			)}
-		</div>
+			</Page>
+		</ModuleStage>
 	);
 }

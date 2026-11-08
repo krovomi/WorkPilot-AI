@@ -1,5 +1,6 @@
 import type { FragilityReport } from "@shared/types/self-healing";
 import { useTranslation } from "react-i18next";
+import { Panel } from "../charter";
 
 interface FragilityChartProps {
 	readonly reports: FragilityReport[];
@@ -10,14 +11,14 @@ function getRiskColor(score: number): string {
 	if (score >= 80) return "bg-destructive";
 	if (score >= 60) return "bg-orange-500";
 	if (score >= 40) return "bg-warning";
-	return "bg-blue-500";
+	return "bg-info";
 }
 
 function getRiskBgColor(score: number): string {
 	if (score >= 80) return "bg-destructive/10";
 	if (score >= 60) return "bg-orange-500/10";
 	if (score >= 40) return "bg-warning/10";
-	return "bg-blue-500/10";
+	return "bg-info/10";
 }
 
 export function FragilityChart({
@@ -29,17 +30,17 @@ export function FragilityChart({
 
 	if (displayReports.length === 0) {
 		return (
-			<div className="rounded-lg border border-border bg-card p-6 text-center">
-				<p className="text-sm text-muted-foreground">
+			<Panel className="text-center">
+				<p className="wp-muted text-sm">
 					{t("selfHealing:noFragilityData")}
 				</p>
-			</div>
+			</Panel>
 		);
 	}
 
 	return (
-		<div className="rounded-lg border border-border bg-card p-4">
-			<h4 className="text-sm font-medium text-foreground mb-3">
+		<Panel>
+			<h4 className="wp-kicker mb-3 block">
 				{t("selfHealing:fragilityRiskMap")}
 			</h4>
 			<div className="space-y-2">
@@ -93,6 +94,6 @@ export function FragilityChart({
 					);
 				})}
 			</div>
-		</div>
+		</Panel>
 	);
 }

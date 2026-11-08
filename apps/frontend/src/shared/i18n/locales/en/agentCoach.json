@@ -20,5 +20,21 @@
 	"errors": {
 		"noProject": "Select a project to analyze its agent run history.",
 		"failed": "Analysis failed: {{error}}"
+	},
+	"description": "Reads your agents' past runs and tells you what to change: models, prompts, budgets.",
+	"overviewTitle": "Your agent runs",
+	"tipsTitle": "Coaching tips ({{count}})",
+	"emptyTitle": "No report yet",
+	"emptyHint": "Generate a report to analyze the agent runs of this project.",
+	"tipsEmptyTitle": "No tips yet",
+	"tipsEmptyHint": "The tips, ranked by priority with their evidence, show up here.",
+	"kickers": {
+		"overview": "Overview",
+		"tips": "Tips"
+	},
+	"priority": {
+		"high": "High",
+		"medium": "Medium",
+		"low": "Low"
 	}
 }
