@@ -1,5 +1,7 @@
 # WorkPilot AI
 
+**English** · [Français](README.fr.md)
+
 **Describe what you want built. A chain of AI agents plans it, codes it, tests it and opens the pull request — each task in its own git worktree, on the AI provider you choose.**
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](./LICENSE)
@@ -172,7 +174,7 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 </td>
 <td valign="top">
 
-**Settings**: application and project settings grouped by theme, in the same design charter as every module.
+**Settings**: application and project settings grouped by theme, in the same design charter as every module, in the colours of the active theme.
 
 ![Settings: grouped navigation and the project's general page](.github/assets/screenshots/settings.png)
 
@@ -221,7 +223,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**
-- One UI charter across every module, 7 colour themes in light and dark plus a theme editor, command palette, full English and French interface.
+- One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, command palette, full English and French interface.
 
 ---
 
