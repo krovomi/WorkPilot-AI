@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Protocol
 
 try:
     from doc_languages import LANGUAGES, extract_symbols, language_for
@@ -32,7 +33,18 @@ except ImportError:  # pragma: no cover - imported as apps.backend.*
         doc_status,
     )
 
-from .refactorer import CodeSmell, SmellDetector, SmellSeverity, SmellType
+from .refactorer_smells import CodeSmell, SmellSeverity, SmellType
+
+
+class _Detector(Protocol):
+    """What the polyglot pass reuses from ``refactorer.SmellDetector``."""
+
+    thresholds: dict[str, int]
+
+    def _check_large_file(
+        self, lines: list[str], file_path: str
+    ) -> list[CodeSmell]: ...
+
 
 # Words that open a control block: only these count towards nesting depth.
 _CONTROL = re.compile(
@@ -302,7 +314,7 @@ def _magic_numbers(lines: list[str], lang_hash: bool, path: str) -> list[CodeSme
 
 
 def detect_polyglot_smells(
-    source: str, language: str, detector: SmellDetector
+    source: str, language: str, detector: _Detector
 ) -> list[CodeSmell]:
     """The smells of a non-Python source, with the detector's thresholds."""
     path = snippet_path(language)
