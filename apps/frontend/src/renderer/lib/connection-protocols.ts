@@ -57,6 +57,7 @@ export type InteractionKind =
 	| "replication"
 	| "brokerRoute" // a broker feeds a queue
 	| "brokerMirror"
+	| "brokerSink" // a connector copies a topic into a store
 	| "deadLetter"
 	| "objectEvents" // object storage emits events
 	| "alerting"
@@ -457,6 +458,9 @@ const BUILDERS: Record<InteractionKind, Builder> = {
 		...(fw(tgt, "Kafka") ? ["Kafka Connect"] : []),
 	],
 	replication: (src) => [
+		...(fw(src, "Redis", "Valkey") ? [{ en: "Redis replication", fr: "Réplication Redis" } as Option] : []),
+		...(fw(src, "S3", "MinIo") ? ["S3 Replication"] : []),
+		...(fw(src, "AzureBlob") ? ["Object replication (Azure)"] : []),
 		...(fw(src, "Postgres") ? [{ en: "Streaming replication", fr: "Réplication en streaming" } as Option] : []),
 		...(fw(src, "MySql") ? [{ en: "Binlog replication", fr: "Réplication binlog" } as Option] : []),
 		...(fw(src, "SqlServer") ? ["Always On"] : []),
@@ -474,6 +478,11 @@ const BUILDERS: Record<InteractionKind, Builder> = {
 		...(fw(src, "RabbitMq") ? ["Shovel / Federation"] : []),
 		...(fw(src, "Nats") ? [{ en: "Leaf node", fr: "Nœud feuille" } as Option] : []),
 		{ en: "Replication", fr: "Réplication" },
+	],
+	brokerSink: (src, tgt) => [
+		...(fw(src, "Kafka") ? ["Kafka Connect (sink)"] : []),
+		...(fw(tgt, "Elasticsearch", "OpenSearch") ? ["Logstash"] : []),
+		{ en: "Sink connector", fr: "Connecteur sink" },
 	],
 	deadLetter: () => [
 		{ en: "Dead-letter queue", fr: "File de lettres mortes" },

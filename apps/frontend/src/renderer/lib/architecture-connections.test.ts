@@ -76,7 +76,8 @@ describe("canConnect", () => {
 	it("accepts only the self-edges that mean something", () => {
 		expect(canConnect("microservice", "microservice")).toBe(true);
 		expect(canConnect("custom", "custom")).toBe(true);
-		expect(canConnect("cache", "cache")).toBe(false);
+		expect(canConnect("cache", "cache")).toBe(true); // replication
+		expect(canConnect("worker", "worker")).toBe(false);
 		expect(canConnect("auth", "auth")).toBe(false);
 	});
 
