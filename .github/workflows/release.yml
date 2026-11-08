@@ -82,7 +82,7 @@ jobs:
           fi
 
       - name: Package macOS (Intel)
-        run: cd apps/frontend && pnpm run package:mac -- --x64
+        run: cd apps/frontend && pnpm run package:mac -- --x64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -165,7 +165,7 @@ jobs:
           fi
 
       - name: Package macOS (Apple Silicon)
-        run: cd apps/frontend && pnpm run package:mac -- --arm64
+        run: cd apps/frontend && pnpm run package:mac -- --arm64 --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -240,7 +240,7 @@ jobs:
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
 
       - name: Package Windows
-        run: cd apps/frontend && pnpm run package:win
+        run: cd apps/frontend && pnpm run package:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Disable electron-builder's built-in signing (we use Azure Trusted Signing instead)
@@ -420,7 +420,7 @@ jobs:
           SENTRY_PROFILES_SAMPLE_RATE: ${{ secrets.SENTRY_PROFILES_SAMPLE_RATE }}
 
       - name: Package Linux
-        run: cd apps/frontend && pnpm run package:linux
+        run: cd apps/frontend && pnpm run package:linux -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
