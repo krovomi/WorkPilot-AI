@@ -209,9 +209,9 @@ def test_contracts_of_every_backend_are_found(tmp_path: Path) -> None:
     )
     _write(tmp_path, "api/v1.yaml", "# Orders\nopenapi: 3.1.0\ninfo: {}\n")
     _write(tmp_path, "contracts/notes.yml", "name: not a contract\n")
-    _write(tmp_path, "Api/wwwroot/orders.swagger.json", '{"swagger": "2.0"}')
+    _write(tmp_path, "Orders.Api/wwwroot/orders.swagger.json", '{"swagger": "2.0"}')
     _write(tmp_path, "proto/orders.proto", 'syntax = "proto3";')
-    _write(tmp_path, "Api/bin/Debug/swagger.json", '{"swagger": "2.0"}')
+    _write(tmp_path, "Orders.Api/bin/Debug/swagger.json", '{"swagger": "2.0"}')
     _write(tmp_path, "vendor/lib/openapi.yaml", "openapi: 3.0.0")
     found = {
         p.relative_to(tmp_path.resolve()).as_posix()
@@ -220,7 +220,7 @@ def test_contracts_of_every_backend_are_found(tmp_path: Path) -> None:
     assert found == {
         "src/main/resources/graphql/schema.graphqls",
         "api/v1.yaml",
-        "Api/wwwroot/orders.swagger.json",
+        "Orders.Api/wwwroot/orders.swagger.json",
         "proto/orders.proto",
     }
 
