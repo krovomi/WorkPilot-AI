@@ -1,25 +1,9 @@
-import {
-	AlertTriangle,
-	CheckCircle,
-	Loader2,
-	Package,
-	RefreshCw,
-	Search,
-	Shield,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Info, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDependencySentinelStore } from "../../stores/dependency-sentinel-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "../ui/card";
+import { CharterButton, Chip, Notice, Panel } from "../charter";
+import "../charter/charter.css";
 import {
 	Dialog,
 	DialogContent,
@@ -28,381 +12,70 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
-import { Input } from "../ui/input";
-import { ScrollArea } from "../ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
-interface Dependency {
-	name: string;
-	version: string;
-	type: "production" | "development" | "peer";
-	status: "secure" | "vulnerable" | "outdated" | "unknown";
-	severity?: "low" | "medium" | "high" | "critical";
-	description?: string;
-	recommendation?: string;
-}
-
-interface Vulnerability {
-	id: string;
-	title: string;
-	severity: "low" | "medium" | "high" | "critical";
-	package: string;
-	version: string;
-	description: string;
-	recommendation: string;
-	cve?: string;
-}
-
-const STATUS_COLORS = {
-	secure: "bg-success/10 text-success",
-	vulnerable: "bg-destructive/10 text-destructive",
-	outdated: "bg-warning/10 text-warning",
-	unknown: "bg-gray-100 text-gray-800",
-};
-
-const SEVERITY_COLORS = {
-	low: "bg-blue-100 text-blue-800",
-	medium: "bg-warning/10 text-warning",
-	high: "bg-orange-100 text-orange-800",
-	critical: "bg-destructive/10 text-destructive",
-};
+/** The ecosystems whose manifests the dependency guard reads. */
+const ECOSYSTEMS = [
+	"npm",
+	"PyPI",
+	"NuGet",
+	"Maven Central",
+	"Go",
+	"crates.io",
+	"Packagist",
+	"pub.dev",
+	"RubyGems",
+] as const;
 
 /**
- * DependencySentinelDialog — AI-powered dependency monitoring dialog.
- *
- * Shows a dialog where users can analyze their project dependencies for
- * security vulnerabilities, outdated packages, and compatibility issues.
+ * The dependency sentinel. It used to list a fixed set of packages and one
+ * invented vulnerability whatever the project; it now says what WorkPilot
+ * really checks: the packages a task adds, on every stack, against their
+ * public registry (docs/architecture/dependency-guard.md).
  */
 export function DependencySentinelDialog() {
 	const { t } = useTranslation(["dialogs", "common"]);
 	const { isOpen, closeDialog } = useDependencySentinelStore();
-	const selectedProject = useProjectStore((state) =>
-		state.projects.find((p) => p.id === state.selectedProjectId),
+	const projectName = useProjectStore(
+		(state) => state.projects.find((p) => p.id === state.selectedProjectId)?.name,
 	);
-
-	const [dependencies, setDependencies] = useState<Dependency[]>([]);
-	const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [activeTab, setActiveTab] = useState("dependencies");
-
-	// Mock data for demonstration
-	const mockVulnerabilities = useMemo<Vulnerability[]>(() => [
-		{
-			id: "VULN-001",
-			title: "Prototype Pollution in Axios",
-			severity: "medium",
-			package: "axios",
-			version: "1.4.0",
-			description:
-				"Axios versions before 1.6.0 are vulnerable to prototype pollution.",
-			recommendation: "Update to axios 1.6.0 or later",
-			cve: "CVE-2023-45678",
-		},
-	], []);
-
-	const mockDependencies = useMemo<Dependency[]>(() => [
-		{
-			name: "react",
-			version: "18.2.0",
-			type: "production",
-			status: "secure",
-			description: "React is a JavaScript library for building user interfaces.",
-			recommendation: undefined,
-		},
-		{
-			name: "axios",
-			version: "1.4.0",
-			type: "production",
-			status: "vulnerable",
-			severity: "medium",
-			description: "Promise based HTTP client for the browser and node.js.",
-			recommendation: "Update to version 1.6.0 or later",
-		},
-		{
-			name: "typescript",
-			version: "5.0.0",
-			type: "development",
-			status: "outdated",
-			description: "TypeScript is a language for application-scale JavaScript.",
-			recommendation: "Update to version 5.2.0 or later",
-		},
-	], []);
-
-	const loadDependencies = useCallback(async () => {
-		if (!selectedProject) return;
-
-		setIsLoading(true);
-		try {
-			// In a real implementation, this would call the backend API
-			// For now, we'll use mock data
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			setDependencies(mockDependencies);
-			setVulnerabilities(mockVulnerabilities);
-		} catch (error) {
-			console.error("Failed to load dependencies:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	}, [selectedProject, mockVulnerabilities, mockDependencies]);
-
-	useEffect(() => {
-		if (isOpen && selectedProject) {
-			loadDependencies();
-		}
-	}, [isOpen, selectedProject, loadDependencies]);
-
-	const filteredDependencies = dependencies.filter((dep) =>
-		dep.name.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
-
-	const filteredVulnerabilities = vulnerabilities.filter(
-		(vuln) =>
-			vuln.package.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			vuln.title.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
-
-	const handleRefresh = () => {
-		loadDependencies();
-	};
 
 	return (
 		<Dialog open={isOpen} onOpenChange={closeDialog}>
-			<DialogContent className="max-w-4xl max-h-[80vh]">
+			<DialogContent className="wp-scope max-w-2xl">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<Shield className="h-5 w-5" />
-						{t("dialogs:dependencySentinel.title", "Dependency Sentinel")}
+					<span className="wp-kicker">{t("dialogs:dependencySentinel.kicker")}</span>
+					<DialogTitle className="wp-title flex items-center gap-2 text-lg">
+						<ShieldCheck className="h-5 w-5" aria-hidden="true" />
+						{t("dialogs:dependencySentinel.title")}
 					</DialogTitle>
 					<DialogDescription>
-						{t(
-							"dialogs:dependencySentinel.description",
-							"Monitor dependencies for security vulnerabilities and outdated packages",
-						)}
+						{projectName
+							? t("dialogs:dependencySentinel.descriptionFor", { name: projectName })
+							: t("dialogs:dependencySentinel.description")}
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="flex flex-col gap-4 py-4">
-					{/* Search and Refresh */}
-					<div className="flex items-center gap-2">
-						<div className="relative flex-1">
-							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-							<Input
-								placeholder={t(
-									"dialogs:dependencySentinel.searchPlaceholder",
-									"Search dependencies...",
-								)}
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-10 border-2 border-warning focus:border-warning focus-visible:border-warning focus:outline-none focus:ring-2 focus:ring-warning/30"
-								style={{
-									border: "2px solid rgb(250, 204, 21)",
-									borderRadius: "0.5rem",
-									outline: "none",
-								}}
-							/>
+				<div className="space-y-3">
+					<Panel rail tone="green">
+						<p className="wp-title text-sm">{t("dialogs:dependencySentinel.guardTitle")}</p>
+						<p className="wp-muted mt-1 text-xs">{t("dialogs:dependencySentinel.guardBody")}</p>
+						<div className="wp-chips mt-2">
+							{ECOSYSTEMS.map((name) => (
+								<Chip key={name} tone="green" dot={false}>
+									{name}
+								</Chip>
+							))}
 						</div>
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={handleRefresh}
-							disabled={isLoading}
-						>
-							<RefreshCw
-								className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
-							/>
-						</Button>
-					</div>
-
-					{/* Tabs */}
-					<Tabs
-						value={activeTab}
-						onValueChange={setActiveTab}
-						className="flex-1"
-					>
-						<TabsList className="grid w-full grid-cols-2">
-							<TabsTrigger
-								value="dependencies"
-								className="flex items-center gap-2"
-							>
-								<Package className="h-4 w-4" />
-								{t("dialogs:dependencySentinel.dependencies", "Dependencies")}
-								<Badge variant="secondary">{dependencies.length}</Badge>
-							</TabsTrigger>
-							<TabsTrigger
-								value="vulnerabilities"
-								className="flex items-center gap-2"
-							>
-								<AlertTriangle className="h-4 w-4" />
-								{t(
-									"dialogs:dependencySentinel.vulnerabilities",
-									"Vulnerabilities",
-								)}
-								<Badge variant="destructive">{vulnerabilities.length}</Badge>
-							</TabsTrigger>
-						</TabsList>
-
-						<TabsContent value="dependencies" className="mt-4">
-							<ScrollArea className="h-[400px]">
-								<div className="space-y-3">
-									{(() => {
-										if (isLoading) {
-											return (
-												<div className="flex items-center justify-center py-8">
-													<Loader2 className="h-6 w-6 animate-spin" />
-													<span className="ml-2">
-														{t("common:loading", "Loading...")}
-													</span>
-												</div>
-											);
-										}
-
-										if (filteredDependencies.length === 0) {
-											const emptyMessage = searchQuery
-												? t(
-														"dialogs:dependencySentinel.noDependenciesFound",
-														"No dependencies found matching your search",
-													)
-												: t(
-														"dialogs:dependencySentinel.noDependencies",
-														"No dependencies found",
-													);
-
-											return (
-												<div className="text-center py-8 text-muted-foreground">
-													{emptyMessage}
-												</div>
-											);
-										}
-
-										return filteredDependencies.map((dep) => (
-											<Card key={dep.name}>
-												<CardHeader className="pb-3">
-													<div className="flex items-center justify-between">
-														<CardTitle className="text-lg">
-															{dep.name}
-														</CardTitle>
-														<div className="flex items-center gap-2">
-															<Badge
-																variant={
-																	dep.type === "production"
-																		? "default"
-																		: "secondary"
-																}
-															>
-																{dep.type}
-															</Badge>
-															<Badge className={STATUS_COLORS[dep.status]}>
-																{dep.status}
-															</Badge>
-															{dep.severity && (
-																<Badge
-																	className={SEVERITY_COLORS[dep.severity]}
-																>
-																	{dep.severity}
-																</Badge>
-															)}
-														</div>
-													</div>
-													<CardDescription>{dep.version}</CardDescription>
-												</CardHeader>
-												<CardContent>
-													<p className="text-sm text-muted-foreground mb-2">
-														{dep.description}
-													</p>
-													{dep.recommendation && (
-														<div className="flex items-start gap-2 text-sm">
-															<CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
-															<span className="text-success">
-																{dep.recommendation}
-															</span>
-														</div>
-													)}
-												</CardContent>
-											</Card>
-										));
-									})()}
-								</div>
-							</ScrollArea>
-						</TabsContent>
-
-						<TabsContent value="vulnerabilities" className="mt-4">
-							<ScrollArea className="h-[400px]">
-								<div className="space-y-3">
-									{(() => {
-										if (isLoading) {
-											return (
-												<div className="flex items-center justify-center py-8">
-													<Loader2 className="h-6 w-6 animate-spin" />
-													<span className="ml-2">
-														{t("common:loading", "Loading...")}
-													</span>
-												</div>
-											);
-										}
-
-										if (filteredVulnerabilities.length === 0) {
-											const emptyMessage = searchQuery
-												? t(
-														"dialogs:dependencySentinel.noVulnerabilitiesFound",
-														"No vulnerabilities found matching your search",
-													)
-												: t(
-														"dialogs:dependencySentinel.noVulnerabilities",
-														"No vulnerabilities found",
-													);
-
-											return (
-												<div className="text-center py-8 text-muted-foreground">
-													{emptyMessage}
-												</div>
-											);
-										}
-
-										return filteredVulnerabilities.map((vuln) => (
-											<Card key={vuln.id}>
-												<CardHeader className="pb-3">
-													<div className="flex items-center justify-between">
-														<CardTitle className="text-lg">
-															{vuln.title}
-														</CardTitle>
-														<div className="flex items-center gap-2">
-															<Badge className={SEVERITY_COLORS[vuln.severity]}>
-																{vuln.severity}
-															</Badge>
-															{vuln.cve && (
-																<Badge variant="outline">{vuln.cve}</Badge>
-															)}
-														</div>
-													</div>
-													<CardDescription>
-														{vuln.package}@{vuln.version}
-													</CardDescription>
-												</CardHeader>
-												<CardContent>
-													<p className="text-sm text-muted-foreground mb-2">
-														{vuln.description}
-													</p>
-													<div className="flex items-start gap-2 text-sm">
-														<AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
-														<span className="text-orange-700">
-															{vuln.recommendation}
-														</span>
-													</div>
-												</CardContent>
-											</Card>
-										));
-									})()}
-								</div>
-							</ScrollArea>
-						</TabsContent>
-					</Tabs>
+					</Panel>
+					<Notice tone="amber" icon={Info}>
+						{t("dialogs:dependencySentinel.auditPending")}
+					</Notice>
 				</div>
 
 				<DialogFooter>
-					<Button variant="outline" onClick={closeDialog}>
-						{t("common:buttons.close", "Close")}
-					</Button>
+					<CharterButton variant="ghost" onClick={closeDialog}>
+						{t("dialogs:dependencySentinel.close")}
+					</CharterButton>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

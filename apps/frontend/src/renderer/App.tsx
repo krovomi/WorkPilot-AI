@@ -240,11 +240,6 @@ const SimulationReport = lazy(() =>
 		default: m.SimulationReport,
 	})),
 );
-const _DiffPreview = lazy(() =>
-	import("./components/sandbox/DiffPreview").then((m) => ({
-		default: m.DiffPreview,
-	})),
-);
 const RegressionGuardianDashboard = lazy(() =>
 	import("./components/regression-guardian/RegressionGuardianDashboard").then(
 		(m) => ({
@@ -357,9 +352,9 @@ const TeamBotSettings = lazy(() =>
 		default: m.TeamBotSettings,
 	})),
 );
-const GuardrailsSettings = lazy(() =>
+const GuardrailsView = lazy(() =>
 	import("./components/settings/GuardrailsSettings").then((m) => ({
-		default: m.GuardrailsSettings,
+		default: m.GuardrailsView,
 	})),
 );
 const EnvSnapshotView = lazy(() =>
@@ -1938,64 +1933,34 @@ export function App() {
 														<PipelineGeneratorView />
 													)}
 												{activeView === "sandbox" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<SimulationReport
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<SimulationReport
+														projectPath={selectedProject?.path}
+													/>
 												)}
 												{activeView === "regression-guardian" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<RegressionGuardianDashboard
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "injection-guard" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<InjectionGuardView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "api-watcher" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<ApiWatcherDashboard
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<ApiWatcherDashboard
+														projectPath={selectedProject?.path}
+													/>
 												)}
 												{activeView === "accessibility-agent" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<A11yReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "i18n-agent" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<I18nReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "onboarding-agent" && (
 													<div
@@ -2031,14 +1996,9 @@ export function App() {
 													<DocDriftReport projectPath={selectedProject?.path} />
 												)}
 												{activeView === "compliance" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
 														<ComplianceReportView
 															projectPath={selectedProject?.path}
 														/>
-													</div>
 												)}
 												{activeView === "git-surgeon" && (
 													<GitSurgeonDashboard projectPath={selectedProject?.path} />
@@ -2064,12 +2024,7 @@ export function App() {
 													</div>
 												)}
 												{activeView === "notebook-agent" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<NotebookView projectPath={selectedProject?.path} />
-													</div>
+													<NotebookView projectPath={selectedProject?.path} />
 												)}
 												{activeView === "agent-coach" && (
 													<div
@@ -2121,35 +2076,18 @@ export function App() {
 													<BlastRadiusView projectRoot={selectedProject?.path} />
 												)}
 												{activeView === "team-bot" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<TeamBotSettings />
-													</div>
+													<TeamBotSettings />
 												)}
-												{activeView === "guardrails" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<GuardrailsSettings />
-													</div>
-												)}
+												{activeView === "guardrails" && <GuardrailsView />}
 												{activeView === "env-snapshot" && (
 													<EnvSnapshotView
 															projectPath={selectedProject?.path}
 														/>
 												)}
 												{activeView === "offline-mode" && (
-													<div
-														className="overflow-auto"
-														style={{ height: "calc(100vh - 100px)" }}
-													>
-														<OfflineModeSettings
-															projectPath={selectedProject?.path}
-														/>
-													</div>
+													<OfflineModeSettings
+														projectPath={selectedProject?.path}
+													/>
 												)}
 											</>
 										) : (

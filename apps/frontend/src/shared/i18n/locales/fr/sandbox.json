@@ -12,26 +12,26 @@
 		"noProject": "Sélectionnez un projet pour prévisualiser ses changements non commités.",
 		"failed": "L'aperçu a échoué : {{error}}"
 	},
-	"dryRun": "Test à blanc pour la spec {{specId}}",
-	"estimatedCost": "Coût Estimé",
-	"realCost": "Coût Réel",
-	"savings": "Économies",
 	"steps": "Étapes",
-	"approve": "Approuver & Appliquer",
-	"reject": "Rejeter",
-	"summary": "Résumé",
-	"passed": "réussies",
 	"warnings": "Avertissements",
-	"issues": "problèmes",
 	"cost": "Coût",
-	"savedVsReal": "% économisé vs réel",
-	"files": "Fichiers",
-	"modified": "modifiés",
-	"executionSteps": "Étapes d'exécution",
-	"fileChanges": "Modifications de fichiers",
 	"durationAndTokens": "{{duration}}ms · {{tokens}} tokens",
 	"diffPreview": {
-		"filesChanged": "{{count}} fichiers modifiés",
-		"selectFile": "Choisissez un fichier pour voir le diff"
+		"selectFile": "Choisissez un fichier pour voir le diff",
+		"filesChanged_one": "{{count}} fichier modifié",
+		"filesChanged_other": "{{count}} fichiers modifiés",
+		"noHunks": "Aucun bloc texte pour ce fichier (binaire ou vide)."
+	},
+	"description": "Chaque changement non commité du projet, fichier par fichier, lu dans git sans y toucher.",
+	"emptyBody": "Lancez l’aperçu pour lire les changements pas encore commités, avec leurs blocs de diff.",
+	"kickers": {
+		"files": "Fichiers",
+		"diff": "Diff"
+	},
+	"changeTypes": {
+		"added": "Ajouté",
+		"modified": "Modifié",
+		"deleted": "Supprimé",
+		"renamed": "Renommé"
 	}
 }

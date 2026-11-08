@@ -26,7 +26,7 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 | Chip | `Chip` / `Chips` | Mono, pill, coloured dot. A chip with `onClick` is a toggle (filters). |
 | Tabs | `Tabs` | A module's tabs: pill chips (`role="tab"`), the selected one in the tone of the accent, an optional icon and count. |
 | Button | `CharterButton` | `primary` = the glowing warm action, **one per screen**; `default`, `ghost`, `danger`; `sm` in lists. |
-| Feedback | `Notice`, `ScanLine`, `EmptyStage` | Errors and successes are notices with a tone, never raw red text; a running job is the scan line with its status; an empty column says what will appear and how. |
+| Feedback | `Notice`, `ScanLine`, `EmptyStage`, `.wp-ink` | Errors and successes are notices with a tone, never raw red text; a running job is the scan line with its status; an empty column says what will appear and how. A line in the tone of its element (a suggested fix) is `.wp-ink` under a `wp-tone-*`. |
 | Figures | `Stat`, `Gauge`, `Bar`, `.wp-stack` | Tabular numbers in the tone of what they count; `.wp-stack` holds one `<i>` per share (stacked bar). |
 | Composer | `Composer` + `Field` | The bottom bar: `> prompt` and the actions on top, options or a hint underneath (the second row keeps the actions clear of the activity pill at the bottom right). |
 
@@ -108,10 +108,26 @@ Done:
   decision), Journal des modifications (wizard steps as chips, panels as
   cards), Train de release, Profileur carbone, Snapshots d'environnement
   (`Composer` to capture).
+- Boîte à outils (first half): Aperçu MCP, Marketplace MCP and Marketplace de
+  Plugins (pill `Tabs`, filters as chips), Gardien de régression, Garde
+  d'injection, Collecteur de preuves de conformité (framework as chips,
+  `Gauge` for coverage), Garde-fous des agents (rules railed by action; the
+  same editor in Settings under `wp-scope`), Analyse d'accessibilité, Analyse
+  i18n, Sentinelle de dépendances (dialog, `wp-scope`).
+- Boîte à outils (second half): Générateur de pipeline CI (setup and pipeline
+  columns, platforms as chips, one pill `Tabs` per generated file), Migration
+  de code (examples as `StepCard`s, `Composer` for the request, "create the
+  Kanban task" as the primary action), Vérification des notebooks, Veille des
+  contrats d'API (change categories as chips), Aperçu des changements (files
+  as `StepCard`s, hunks as panels), Agent navigateur (pill `Tabs`, results
+  railed by status, `Bar` for the visual match), Bot d'équipe and Mode hors
+  ligne (pages, `Switch` rows), API Studio (charter header over its own
+  two-pane layout), Émulateur d'application, Optimiseur de prompt and
+  Assistant vocal (dialogs, `wp-scope`).
 - Hubs: the launcher page of a tab whose tool is a dialog (`HubLauncher`) is
   an `EmptyStage` with one primary button, for every hub. The hub tab bar
   keeps its underline: it is the app's navigation, a level above a module's
   own pill `Tabs`.
 
-The other groups (Espace de travail, Boîte à outils) and the Settings pages move lot by lot; each
+The last group (Espace de travail) and the Settings pages move lot by lot; each
 lot lists its views in its PR.

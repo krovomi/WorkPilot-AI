@@ -99,12 +99,15 @@ class ContractParser:
         suffix = path.suffix.lower()
         name = path.name.lower()
 
-        if suffix in (".graphql", ".gql") or "schema.graphql" in name:
+        if suffix in (".graphql", ".graphqls", ".gql") or "schema.graphql" in name:
             return ContractFormat.GRAPHQL
         if suffix == ".proto":
             return ContractFormat.PROTOBUF
         if suffix in (".yaml", ".yml", ".json"):
-            if "openapi" in content[:500].lower() or "swagger" in content[:500].lower():
+            # A long info block or leading comments can push the version key
+            # past the first lines, so look a little further.
+            head = content[:4096].lower()
+            if "openapi" in head or "swagger" in head:
                 return ContractFormat.OPENAPI
         return ContractFormat.UNKNOWN
 

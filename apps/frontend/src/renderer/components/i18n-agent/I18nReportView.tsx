@@ -1,37 +1,46 @@
+import { AlertTriangle, Globe, Play, RotateCcw, Search, Square } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
 import { SharedReportNote } from "../analyses/SharedReportNote";
+import { setupI18nAgentListeners, useI18nAgentStore } from "../../stores/i18n-agent-store";
+import type { I18nReport, I18nSeverity } from "../../../shared/types/i18n-agent";
 import {
-	setupI18nAgentListeners,
-	useI18nAgentStore,
-} from "../../stores/i18n-agent-store";
-import type {
-	I18nReport,
-	I18nSeverity,
-} from "../../../shared/types/i18n-agent";
-
+	CharterButton,
+	Chip,
+	EmptyStage,
+	Gauge,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	type Tone,
+} from "../charter";
 import { Input } from "../ui/input";
-const SEVERITY_STYLES: Record<I18nSeverity, string> = {
-	error: "text-destructive bg-destructive/10 border-destructive/20",
-	warning: "text-warning bg-warning/10 border-warning/20",
-	info: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+
+const SEVERITY_TONES: Record<I18nSeverity, Tone> = {
+	error: "red",
+	warning: "amber",
+	info: "blue",
 };
+
+const coverageTone = (pct: number): Tone => (pct >= 90 ? "green" : pct >= 70 ? "amber" : "red");
 
 interface I18nReportViewProps {
 	readonly projectPath?: string;
 }
 
-export function I18nReportView({
-	projectPath,
-}: I18nReportViewProps): React.ReactElement {
-	const { t } = useTranslation("i18nAgent");
+/** Hard-coded UI text and catalog gaps, across every stack's catalog format. */
+export function I18nReportView({ projectPath }: I18nReportViewProps): React.ReactElement {
+	const { t } = useTranslation(["i18nAgent", "navigation"]);
 
-	useEffect(() => {
-		const cleanup = setupI18nAgentListeners();
-		return cleanup;
-	}, []);
+	useEffect(() => setupI18nAgentListeners(), []);
 
 	const phase = useI18nAgentStore((s) => s.phase);
 	const status = useI18nAgentStore((s) => s.status);
@@ -40,230 +49,174 @@ export function I18nReportView({
 	const startScan = useI18nAgentStore((s) => s.startScan);
 	const cancelScan = useI18nAgentStore((s) => s.cancelScan);
 	const reset = useI18nAgentStore((s) => s.reset);
-	const [searchQuery, setSearchQuery] = useState("");
+	const setReport = useI18nAgentStore((s) => s.setReport);
 
 	const isScanning = phase === "scanning";
-	const canRun = !!projectPath && !isScanning;
-	const setReport = useI18nAgentStore((s) => s.setReport);
 	// A server project's last report, saved on the server by any member.
 	const shared = useSharedAnalysisReport("i18n", projectPath, setReport, isScanning);
 
 	return (
-		<div className="flex flex-col gap-4 p-6 bg-background text-foreground">
-			<Toolbar
-				canRun={canRun}
-				isScanning={isScanning}
-				hasReport={!!report}
-				onRun={() => projectPath && startScan(projectPath)}
-				onCancel={() => cancelScan()}
-				onReset={reset}
-				t={t}
-			/>
-
-			{report && !isScanning && (
-				<Input
-					type="text"
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-					placeholder={t("search.placeholder")}
-					className="px-3 py-2 text-sm h-auto w-auto"
-				/>
-			)}
-
-			{!isScanning && <SharedReportNote saved={shared} />}
-
-			{!projectPath && (
-				<div className="text-sm text-muted-foreground">
-					{t("errors.noProject")}
-				</div>
-			)}
-
-			{isScanning && (
-				<div className="text-sm text-muted-foreground animate-pulse">
-					{status || t("actions.scanning")}
-				</div>
-			)}
-
-			{phase === "error" && error && (
-				<div className="text-sm text-destructive">
-					{t("errors.failed", { error })}
-				</div>
-			)}
-
-			{report ? (
-				<ReportBody report={report} t={t} searchQuery={searchQuery} />
-			) : (
-				phase === "idle" && (
-					<div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							strokeWidth={1.5}
-							stroke="currentColor"
-							className="w-16 h-16 mb-4 opacity-50"
-						>
-							<title>{t("i18nAgent:report.globeIconTitle")}</title>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
-							/>
-						</svg>
-						<p className="text-center">{t("noData")}</p>
-					</div>
-				)
-			)}
-		</div>
-	);
-}
-
-function Toolbar({
-	canRun,
-	isScanning,
-	hasReport,
-	onRun,
-	onCancel,
-	onReset,
-	t,
-}: {
-	readonly canRun: boolean;
-	readonly isScanning: boolean;
-	readonly hasReport: boolean;
-	readonly onRun: () => void;
-	readonly onCancel: () => void;
-	readonly onReset: () => void;
-	readonly t: (key: string) => string;
-}): React.ReactElement {
-	return (
-		<div className="flex items-center gap-3 flex-wrap">
-			{isScanning ? (
-				<button
-					type="button"
-					onClick={onCancel}
-					className="px-3 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/20 text-sm hover:bg-destructive/20"
-				>
-					{t("actions.cancel")}
-				</button>
-			) : (
-				<button
-					type="button"
-					onClick={onRun}
-					disabled={!canRun}
-					className="px-3 py-1.5 rounded bg-primary text-white text-sm disabled:opacity-50"
-				>
-					{t("actions.runScan")}
-				</button>
-			)}
-
-			{hasReport && !isScanning && (
-				<button
-					type="button"
-					onClick={onReset}
-					className="px-3 py-1.5 rounded bg-card border border-border text-sm hover:bg-muted"
-				>
-					{t("actions.reset")}
-				</button>
-			)}
-		</div>
-	);
-}
-
-function ReportBody({
-	report,
-	t,
-	searchQuery,
-}: {
-	readonly report: I18nReport;
-	readonly t: (key: string, opts?: Record<string, unknown>) => string;
-	readonly searchQuery: string;
-}): React.ReactElement {
-	const filteredIssues = searchQuery
-		? report.issues.filter(
-				(issue) =>
-					issue.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					issue.file.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					issue.issueType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					(issue.locale?.toLowerCase().includes(searchQuery.toLowerCase())),
-			)
-		: report.issues;
-
-	return (
-		<div className="flex flex-col gap-4">
-			<div>
-				<h2 className="text-lg font-semibold">{t("title")}</h2>
-				<p className="text-sm text-muted-foreground">
-					{t("filesInfo", {
-						count: report.filesScanned,
-						locales: report.localesCompared.join(", ") || "—",
-					})}
-				</p>
-			</div>
-
-			{Object.keys(report.coverageByLocale).length > 0 && (
-				<div className="grid grid-cols-4 gap-3">
-					{Object.entries(report.coverageByLocale).map(([locale, pct]) => {
-						let coverageColor: string;
-						if (pct >= 90) {
-							coverageColor = "text-success";
-						} else if (pct >= 70) {
-							coverageColor = "text-warning";
-						} else {
-							coverageColor = "text-destructive";
-						}
-						return (
-							<div
-								key={locale}
-								className="p-3 rounded-lg bg-card border border-border"
+		<ModuleStage scroll="page" data-testid="i18n-agent-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
+				title={t("i18nAgent:title")}
+				description={t("i18nAgent:description")}
+				icon={Globe}
+				tone="blue"
+				actions={
+					<>
+						{report && !isScanning && (
+							<CharterButton variant="ghost" icon={RotateCcw} onClick={reset}>
+								{t("i18nAgent:actions.reset")}
+							</CharterButton>
+						)}
+						{isScanning ? (
+							<CharterButton variant="danger" icon={Square} onClick={() => cancelScan()}>
+								{t("i18nAgent:actions.cancel")}
+							</CharterButton>
+						) : (
+							<CharterButton
+								variant="primary"
+								icon={Play}
+								onClick={() => projectPath && startScan(projectPath)}
+								disabled={!projectPath}
 							>
-								<p className="text-xs text-muted-foreground">
-									{t("locale")}: {locale}
-								</p>
-								<p className={`text-xl font-bold ${coverageColor}`}>{pct}%</p>
-							</div>
-						);
-					})}
-				</div>
+								{t("i18nAgent:actions.runScan")}
+							</CharterButton>
+						)}
+					</>
+				}
+			/>
+			<Page className="max-w-none space-y-4">
+				{!isScanning && <SharedReportNote saved={shared} />}
+				{!projectPath && (
+					<Notice tone="amber" icon={AlertTriangle}>
+						{t("i18nAgent:errors.noProject")}
+					</Notice>
+				)}
+				{isScanning && <ScanLine label={status || t("i18nAgent:actions.scanning")} />}
+				{phase === "error" && error && (
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{t("i18nAgent:errors.failed", { error })}
+					</Notice>
+				)}
+				{report ? (
+					<ReportBody report={report} />
+				) : (
+					phase === "idle" && (
+						<EmptyStage icon={Globe} title={t("i18nAgent:emptyTitle")} tone="blue">
+							{t("i18nAgent:noData")}
+						</EmptyStage>
+					)
+				)}
+			</Page>
+		</ModuleStage>
+	);
+}
+
+function ReportBody({ report }: { readonly report: I18nReport }): React.ReactElement {
+	const { t } = useTranslation("i18nAgent");
+	const [query, setQuery] = useState("");
+	const [type, setType] = useState<string>("all");
+	const q = query.toLowerCase();
+
+	const byType = new Map<string, number>();
+	for (const issue of report.issues) byType.set(issue.issueType, (byType.get(issue.issueType) ?? 0) + 1);
+
+	const issues = report.issues.filter(
+		(issue) =>
+			(type === "all" || issue.issueType === type) &&
+			(!q ||
+				issue.message.toLowerCase().includes(q) ||
+				issue.file.toLowerCase().includes(q) ||
+				issue.key.toLowerCase().includes(q) ||
+				issue.locale?.toLowerCase().includes(q)),
+	);
+	const coverage = Object.entries(report.coverageByLocale);
+	const errors = report.issues.filter((i) => i.severity === "error").length;
+
+	return (
+		<>
+			<Stats>
+				<Stat label={t("issues")} value={report.issues.length} tone={report.issues.length ? "amber" : "green"} />
+				<Stat label={t("severity.error")} value={errors} tone={errors ? "red" : "muted"} />
+				<Stat label={t("filesScanned")} value={report.filesScanned} tone="blue" />
+				<Stat label={t("localesTitle")} value={report.localesCompared.length} tone="violet" />
+			</Stats>
+
+			{coverage.length > 0 && (
+				<Section kicker={t("kickers.coverage")} title={t("coverage")}>
+					<div className="flex flex-wrap gap-4">
+						{coverage.map(([locale, pct]) => (
+							<Gauge key={locale} value={pct} tone={coverageTone(pct)} size={72} label={locale} />
+						))}
+					</div>
+				</Section>
 			)}
 
-			<div className="space-y-2">
-				{filteredIssues.length === 0 && searchQuery ? (
-					<div className="text-sm text-muted-foreground text-center py-4">
-						{t("search.noResults")}
+			<Section
+				kicker={t("kickers.issues")}
+				title={t("issuesTitle")}
+				actions={
+					<div className="relative w-64 max-w-full">
+						<Search className="wp-muted pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" aria-hidden="true" />
+						<Input
+							type="search"
+							aria-label={t("search.placeholder")}
+							placeholder={t("search.placeholder")}
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							className="h-8 pl-8 text-xs"
+						/>
 					</div>
+				}
+			>
+				<div className="wp-chips mb-3">
+					<Chip tone="blue" pressed={type === "all"} onClick={() => setType("all")}>
+						{t("allTypes")} <span className="font-mono">{report.issues.length}</span>
+					</Chip>
+					{[...byType.entries()].map(([id, count]) => (
+						<Chip key={id} tone="blue" pressed={type === id} onClick={() => setType(id)}>
+							{t(`issueType.${id}`, { defaultValue: id })} <span className="font-mono">{count}</span>
+						</Chip>
+					))}
+				</div>
+				{issues.length === 0 ? (
+					<p className="wp-muted text-sm">{t("search.noResults")}</p>
 				) : (
-					filteredIssues.map((issue) => (
-						<div
-							key={`${issue.file}-${issue.line}-${issue.key}`}
-							className={`px-4 py-3 rounded-lg border ${SEVERITY_STYLES[issue.severity]}`}
-						>
-							<div className="flex items-center gap-2 mb-1">
-								<span className="text-xs font-medium uppercase">
-									{t(`severity.${issue.severity}`)}
-								</span>
-								<span className="text-xs opacity-70">
-									{t(`issueType.${issue.issueType}`)}
-								</span>
-							</div>
-							<p className="text-sm">{issue.message}</p>
-							<p className="text-xs mt-1 opacity-70 font-mono">
-								{issue.file}
-								{issue.line ? `:${issue.line}` : ""}
-								{issue.locale ? ` · ${t("localeLabel")}: ${issue.locale}` : ""}
-							</p>
-							{issue.suggestion && (
-								<p className="text-xs mt-1 text-success">{issue.suggestion}</p>
-							)}
-						</div>
-					))
+					<div className="grid gap-2.5">
+						{issues.map((issue) => (
+							<Panel
+								key={`${issue.file}-${issue.line}-${issue.key}-${issue.locale}`}
+								rail
+								tone={SEVERITY_TONES[issue.severity]}
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									<Chip tone={SEVERITY_TONES[issue.severity]}>{t(`severity.${issue.severity}`)}</Chip>
+									<span className="wp-meta">{t(`issueType.${issue.issueType}`, { defaultValue: issue.issueType })}</span>
+									{issue.locale && (
+										<Chip tone="muted" dot={false}>
+											{issue.locale}
+										</Chip>
+									)}
+								</div>
+								<p className="mt-1.5 text-sm">{issue.message}</p>
+								<p className="wp-meta mt-1 font-mono">
+									{issue.file}
+									{issue.line ? `:${issue.line}` : ""}
+								</p>
+								{issue.suggestion && <p className="wp-tone-green wp-ink mt-1 text-xs">{issue.suggestion}</p>}
+							</Panel>
+						))}
+					</div>
 				)}
-			</div>
+			</Section>
 
 			{report.summary && (
-				<p className="text-sm text-muted-foreground italic mt-2">
+				<Notice tone="blue" icon={Globe}>
 					{report.summary}
-				</p>
+				</Notice>
 			)}
-		</div>
+		</>
 	);
 }

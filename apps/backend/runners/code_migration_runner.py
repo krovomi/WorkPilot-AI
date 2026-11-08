@@ -14,6 +14,7 @@ Analyzes the code, plans the migration, executes in batches, and validates with 
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -70,6 +71,8 @@ class CodeMigrationRunner:
             f"   Source tech detected, target: {target_framework or 'auto'} / {target_language or 'auto'}"
         )
 
+        source = self._describe_source_stack()
+
         print("\n📝 Phase 2: Generating migration plan...")
         try:
             context = self.orchestrator.start_migration(
@@ -80,9 +83,7 @@ class CodeMigrationRunner:
                 "migration_id": context.migration_id
                 if hasattr(context, "migration_id")
                 else "unknown",
-                "source": str(context.source_stack)
-                if hasattr(context, "source_stack")
-                else "detected",
+                "source": source,
                 "target": f"{target_framework or 'modern'} / {target_language or 'auto'}",
                 "description": self.migration_description,
             }
@@ -90,6 +91,8 @@ class CodeMigrationRunner:
             print(f"⚠️  Migration start warning: {e}")
             plan_summary = {
                 "migration_id": "fallback",
+                "source": source,
+                "target": f"{target_framework or 'auto'} / {target_language or 'auto'}",
                 "description": self.migration_description,
                 "note": str(e),
             }
@@ -99,9 +102,13 @@ class CodeMigrationRunner:
             print("   [DRY RUN] Skipping actual file modifications")
             execution_summary = {"status": "dry_run", "files_modified": 0}
         else:
+            # This runner analyses and plans; the change itself is made by a
+            # Kanban task (spec, planner, coder, QA in a worktree), which the
+            # page creates from the same description, for any stack.
             execution_summary = {
-                "status": "queued",
-                "note": "Migration queued for AI agent execution",
+                "status": "not_run",
+                "files_modified": 0,
+                "note": "Create a Kanban task from this migration to apply it",
             }
 
         result = {
@@ -113,6 +120,20 @@ class CodeMigrationRunner:
             "summary": self._generate_summary(plan_summary, execution_summary),
         }
         return result
+
+    def _describe_source_stack(self) -> str:
+        """The project's languages and frameworks, for every stack.
+
+        Read from the shared stack facade rather than the migration analyzer,
+        which only knows the JavaScript and Python ecosystems.
+        """
+        from project.stack import detect_project_stack
+
+        stack = detect_project_stack(self.project_dir)
+        parts = sorted(stack.get("languages") or []) + sorted(
+            stack.get("frameworks") or []
+        )
+        return ", ".join(parts) or "unknown"
 
     def _parse_migration_description(self):
         """Parse migration description to infer target framework and language."""
@@ -131,13 +152,35 @@ class CodeMigrationRunner:
             "angular": "angular",
             "next.js": "nextjs",
             "tailwind": "tailwindcss",
+            ".net": "dotnet",
+            "asp.net": "aspnetcore",
+            "spring boot": "spring-boot",
+            "jakarta": "jakarta-ee",
+            "laravel": "laravel",
+            "symfony": "symfony",
+            "rails": "rails",
+            "flutter": "flutter",
+            "swiftui": "swiftui",
+            "jetpack compose": "jetpack-compose",
+            "fastapi": "fastapi",
+            "vite": "vite",
+            "vitest": "vitest",
         }
         language_keywords = {
             "typescript": "typescript",
             "python": "python",
             "javascript": "javascript",
+            "kotlin": "kotlin",
             "java": "java",
+            "c#": "csharp",
+            "f#": "fsharp",
+            "rust": "rust",
+            "golang": "go",
             "go": "go",
+            "php": "php",
+            "ruby": "ruby",
+            "swift": "swift",
+            "dart": "dart",
         }
 
         for keyword, target in framework_keywords.items():
@@ -145,7 +188,8 @@ class CodeMigrationRunner:
                 framework = target
                 break
         for keyword, lang in language_keywords.items():
-            if keyword in desc:
+            # Whole words: "go" must not match "google", nor "rust" "trust".
+            if re.search(rf"(?<![\w]){re.escape(keyword)}(?![\w#])", desc):
                 language = lang
                 break
 
@@ -157,7 +201,9 @@ class CodeMigrationRunner:
             "migration_id": plan.get("migration_id", "unknown"),
             "description": self.migration_description,
             "dry_run": self.dry_run,
-            "plan_status": "success",
+            # A pair the rule-based planner does not know is not a failure:
+            # the Kanban task still migrates it, with the agents' own plan.
+            "plan_status": "unsupported" if plan.get("note") else "ready",
             "execution_status": execution.get("status", "unknown"),
             "files_modified": execution.get("files_modified", 0),
         }

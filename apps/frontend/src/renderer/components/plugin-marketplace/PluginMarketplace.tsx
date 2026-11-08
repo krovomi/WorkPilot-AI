@@ -1,8 +1,7 @@
 import type { PluginMarketplaceTab } from "@shared/types/plugin-marketplace";
-import { BookOpen, Package, Puzzle } from "lucide-react";
+import { AlertTriangle, BookOpen, Package, Puzzle, type LucideIcon } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
 import {
 	loadInstalledPlugins,
 	loadPluginCatalog,
@@ -12,12 +11,12 @@ import { useProjectStore } from "@/stores/project-store";
 import { InstalledPluginsView } from "./InstalledPluginsView";
 import { PluginCatalogView } from "./PluginCatalogView";
 import { PluginSDKView } from "./PluginSDKView";
-import { PageHeader } from "../ui/page-header";
+import { Chip, ModuleHeader, ModuleStage, Notice, Tabs } from "../charter";
 
 const TABS: Array<{
 	id: PluginMarketplaceTab;
 	labelKey: string;
-	icon: React.ElementType;
+	icon: LucideIcon;
 }> = [
 	{
 		id: "catalog",
@@ -33,7 +32,7 @@ const TABS: Array<{
 ];
 
 export function PluginMarketplace() {
-	const { t } = useTranslation(["common"]);
+	const { t } = useTranslation(["common", "navigation"]);
 	const { activeTab, setActiveTab, installed, error } =
 		usePluginMarketplaceStore();
 
@@ -49,60 +48,46 @@ export function PluginMarketplace() {
 	}, [projectId]);
 
 	return (
-		<div className="flex flex-col h-full overflow-hidden bg-background">
-			<PageHeader
-				className="pb-0"
-				icon={Puzzle}
+		<ModuleStage data-testid="plugin-marketplace-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.toolbox")}
 				title={t("common:pluginMarketplace.title")}
 				description={t("common:pluginMarketplace.subtitle")}
+				icon={Puzzle}
+				tone="violet"
 				actions={
 					installed.length > 0 && (
-						<span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-							{t("common:pluginMarketplace.installedBadge", {
-								count: installed.length,
-							})}
-						</span>
+						<Chip tone="violet" dot={false}>
+							{t("common:pluginMarketplace.installedBadge", { count: installed.length })}
+						</Chip>
 					)
 				}
-			>
-				<div className="flex gap-0">
-					{TABS.map(({ id, labelKey, icon: Icon }) => (
-						<button
-							key={id}
-							type="button"
-							onClick={() => setActiveTab(id)}
-							className={cn(
-								"flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
-								activeTab === id
-									? "border-primary text-primary"
-									: "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
-							)}
-						>
-							<Icon className="h-4 w-4" />
-							{t(labelKey)}
-							{id === "installed" && installed.length > 0 && (
-								<span className="ml-1 rounded-full bg-primary/10 px-1.5 text-3xs font-medium text-primary">
-									{installed.length}
-								</span>
-							)}
-						</button>
-					))}
-				</div>
-			</PageHeader>
-
-			{/* Error banner */}
+			/>
+			<div className="relative z-[1] px-6 pt-3">
+				<Tabs
+					label={t("common:pluginMarketplace.title")}
+					tabs={TABS.map(({ id, labelKey, icon }) => ({
+						id,
+						label: t(labelKey),
+						icon,
+						count: id === "installed" && installed.length > 0 ? installed.length : undefined,
+					}))}
+					value={activeTab}
+					onChange={setActiveTab}
+				/>
+			</div>
 			{error && (
-				<div className="shrink-0 bg-destructive/10 border-b border-destructive/20 px-6 py-2 text-xs text-destructive">
-					{error}
+				<div className="relative z-[1] px-6 pt-3">
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{error}
+					</Notice>
 				</div>
 			)}
-
-			{/* Content */}
-			<div className="flex-1 overflow-hidden">
+			<div className="relative z-[1] flex-1 overflow-hidden">
 				{activeTab === "catalog" && <PluginCatalogView />}
 				{activeTab === "installed" && <InstalledPluginsView />}
 				{activeTab === "sdk" && <PluginSDKView />}
 			</div>
-		</div>
+		</ModuleStage>
 	);
 }

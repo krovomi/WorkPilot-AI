@@ -1,6 +1,6 @@
 {
 	"title": "Accessibility Report",
-	"noData": "No scan run yet. Click \"Run scan\" to start.",
+	"noData": "Pick a WCAG level, then run the scan.",
 	"targetInfo": "Target: WCAG {{targetLevel}} · {{filesScanned}} files scanned",
 	"search": {
 		"placeholder": "Search..."
@@ -23,5 +23,20 @@
 	"errors": {
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
-	}
+	},
+	"description": "Checks WCAG rules (alt text, labels, keyboard, contrast hints, captions…) in every markup the project ships: HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars.",
+	"emptyTitle": "No scan yet",
+	"findingsTitle": "Findings",
+	"noMatches": "No finding matches this filter.",
+	"kickers": {
+		"findings": "Findings"
+	},
+	"severities": {
+		"critical": "Critical",
+		"serious": "Serious",
+		"moderate": "Moderate",
+		"minor": "Minor"
+	},
+	"wcagLevel": "WCAG {{level}}",
+	"wcagCriterion": "WCAG {{criterion}}"
 }

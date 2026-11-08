@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createTask } from "./task-store";
 import type { CodeMigrationResult } from "../../main/code-migration-service";
 
 export type CodeMigrationPhase =
@@ -24,7 +25,6 @@ interface CodeMigrationState {
 	error: string | null;
 	isOpen: boolean;
 	migrationDescription: string;
-	dryRun: boolean;
 	taskProgress: TaskProgress | null;
 	model?: string;
 	thinkingLevel?: string;
@@ -37,7 +37,6 @@ interface CodeMigrationState {
 	setResult: (result: CodeMigrationResult) => void;
 	setError: (error: string) => void;
 	setMigrationDescription: (desc: string) => void;
-	setDryRun: (dryRun: boolean) => void;
 	setTaskProgress: (progress: TaskProgress) => void;
 	setModel: (model?: string) => void;
 	setThinkingLevel: (level?: string) => void;
@@ -52,7 +51,6 @@ const initialState = {
 	error: null,
 	isOpen: false,
 	migrationDescription: "",
-	dryRun: true,
 	taskProgress: null,
 	model: undefined,
 	thinkingLevel: undefined,
@@ -79,7 +77,6 @@ export const useCodeMigrationStore = create<CodeMigrationState>((set) => ({
 	setError: (error) => set({ error, phase: "error" }),
 	setMigrationDescription: (migrationDescription) =>
 		set({ migrationDescription }),
-	setDryRun: (dryRun) => set({ dryRun }),
 	setTaskProgress: (taskProgress) => set({ taskProgress }),
 	setModel: (model) => set({ model }),
 	setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
@@ -103,7 +100,9 @@ export function startCodeMigration(projectDir: string): void {
 		migrationDescription: store.migrationDescription,
 		model: store.model,
 		thinkingLevel: store.thinkingLevel,
-		dryRun: store.dryRun,
+		// The page analyses; a Kanban task created from the same description
+		// makes the change, so the runner never writes here.
+		dryRun: true,
 	});
 }
 
@@ -170,4 +169,16 @@ export function setupCodeMigrationListeners(): () => void {
 		unsubComplete();
 		unsubProgress();
 	};
+}
+
+/**
+ * Turn the migration into a Kanban task: spec, planner, coder and QA in an
+ * isolated worktree, which migrates any stack. Returns whether it was created.
+ */
+export async function createMigrationTask(
+	projectId: string,
+	title: string,
+	description: string,
+): Promise<boolean> {
+	return (await createTask(projectId, title, description)) !== null;
 }
