@@ -44,7 +44,8 @@ def split_before_build(
     except SplitError as exc:
         print_status(f"Task kept whole: {exc}", "warning")
         return []
-    except Exception as exc:  # noqa: BLE001 - a split never fails a build
+    except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        # A split never fails a build: unreadable plan, odd shape, disk error.
         logger.warning("split step failed, building the task whole: %s", exc)
         return []
     if result is None:

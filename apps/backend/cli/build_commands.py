@@ -1318,7 +1318,7 @@ def handle_build_command(
         if worktree_manager:
             try:
                 worktree_manager.remove_worktree(spec_dir.name, delete_branch=True)
-            except Exception as exc:  # noqa: BLE001 - leftover worktree, not a failure
+            except (OSError, RuntimeError) as exc:  # leftover worktree, not a failure
                 debug("run.py", f"Could not remove the split task's worktree: {exc}")
         return
     except BuildHalted as halted:
