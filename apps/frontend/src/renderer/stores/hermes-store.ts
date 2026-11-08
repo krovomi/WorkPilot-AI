@@ -112,7 +112,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 		inFlight = controller;
 		set({ loading: true, error: null });
 
-		const res = await fetchHermesStatus(controller.signal);
+		const res = await fetchHermesStatus(controller.signal, force);
 		if (controller.signal.aborted) return;
 		inFlight = null;
 

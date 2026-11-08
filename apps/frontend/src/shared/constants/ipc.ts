@@ -985,6 +985,8 @@ export const IPC_CHANNELS = {
 	// ("what URL" vs "which device"), and a `start` meaning one thing for a web
 	// project and another for a phone one is a channel nobody can reason about.
 	MOBILE_DETECT: "mobile:detect",
+	// The task form's "Mobile platforms" box: the app found, or how to add one.
+	MOBILE_PROFILE: "mobile:profile",
 	MOBILE_DEVICES: "mobile:devices",
 	MOBILE_LAUNCH: "mobile:launch",
 	MOBILE_SCREENSHOT: "mobile:screenshot",
@@ -1009,6 +1011,8 @@ export const IPC_CHANNELS = {
 	AGENT_CLI_CHECK: "agentCli:check",
 	AGENT_CLI_PROBE_ACP: "agentCli:probeAcp",
 	AGENT_CLI_INSTALL: "agentCli:install",
+	AGENT_CLI_UPDATE_CHECK: "agentCli:updateCheck",
+	AGENT_CLI_UPDATE: "agentCli:update",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",

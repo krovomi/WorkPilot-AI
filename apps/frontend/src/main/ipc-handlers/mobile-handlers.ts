@@ -6,6 +6,7 @@ import type {
 	MobilePlatform,
 	MobileSessionPhase,
 } from "../../shared/types/mobile";
+import { getMobileProfile } from "../mobile-profile";
 import { mobileService } from "../mobile-service";
 
 /**
@@ -24,6 +25,20 @@ export function registerMobileHandlers(
 		async (_event, { projectDir }: { projectDir: string }) => {
 			try {
 				return { success: true, data: await mobileService.detect(projectDir) };
+			} catch (error: unknown) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.MOBILE_PROFILE,
+		async (_event, { projectId }: { projectId: unknown }) => {
+			try {
+				return { success: true, data: await getMobileProfile(projectId) };
 			} catch (error: unknown) {
 				return {
 					success: false,

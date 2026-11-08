@@ -61,7 +61,14 @@ import { useProjectStore } from "../stores/project-store";
 import { useSettingsStore } from "../stores/settings-store";
 import { useShallow } from "zustand/react/shallow";
 import { useCollaborationStore } from "../stores/collaboration-store";
-import { duplicateTask, persistUpdateTask, saveTaskEdit } from "../stores/task-store";
+import { createMobileSetup, inheritedSetupMetadata } from "../lib/mobile-setup";
+import {
+	createTask,
+	duplicateTask,
+	persistUpdateTask,
+	saveTaskEdit,
+} from "../stores/task-store";
+import { useMobileSetup } from "./task-form/useMobileSetup";
 import {
 	buildEngineMetadata,
 	defaultEngineProvider,
@@ -282,6 +289,20 @@ export function TaskEditDialog({
 	const [mobileTargets, setMobileTargets] = useState<MobilePlatform[]>(
 		task.metadata?.mobileTargets ?? [],
 	);
+	// Only a platform checked here may need setup tasks: the ones the task
+	// already had got theirs when they were checked. A setup task itself
+	// never asks for another.
+	const addedTargets = useMemo(
+		() =>
+			mobileTargets.filter(
+				(platform) => !(task.metadata?.mobileTargets ?? []).includes(platform),
+			),
+		[mobileTargets, task.metadata?.mobileTargets],
+	);
+	const mobileSetup = useMobileSetup(
+		open && !task.metadata?.mobileBootstrap ? task.projectId : undefined,
+		addedTargets,
+	);
 
 	// Reset the form when the dialog opens, or opens on another task. A change
 	// of the same task while the dialog is open (a teammate's, on a server
@@ -499,6 +520,27 @@ export function TaskEditDialog({
 		// "inherit project default" (undefined) is preserved unless explicitly changed.
 		if (!sameTargets(mobileTargets, task.metadata?.mobileTargets)) {
 			metadataUpdates.mobileTargets = mobileTargets;
+		}
+		// A platform newly checked on a project with no phone app: the setup
+		// tasks go on the board first and this task waits for them.
+		if (mobileSetup.plan && mobileSetup.profile) {
+			try {
+				const blockers = await createMobileSetup(
+					mobileSetup.plan,
+					mobileSetup.profile,
+					task.projectId,
+					inheritedSetupMetadata({ ...task.metadata, ...metadataUpdates }),
+					createTask,
+					t,
+				);
+				metadataUpdates.blockedBy = [
+					...new Set([...(task.metadata?.blockedBy ?? []), ...blockers]),
+				];
+			} catch (err) {
+				setError(err instanceof Error ? err.message : t("common:errors.unknownError"));
+				setIsSaving(false);
+				return;
+			}
 		}
 		if (tddMode !== (task.metadata?.tddMode ?? false)) {
 			metadataUpdates.tddMode = tddMode;
@@ -743,6 +785,7 @@ export function TaskEditDialog({
 				onRequireReviewChange={setRequireReviewBeforeCoding}
 				mobileTargets={mobileTargets}
 				onMobileTargetsChange={setMobileTargets}
+				mobileSetup={mobileSetup}
 				tddMode={tddMode}
 				onTddModeChange={setTddMode}
 				autoSplit={autoSplit}

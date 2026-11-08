@@ -153,7 +153,7 @@ export function isPermissionError(output: string): boolean {
 	return /\bEACCES\b|\bEPERM\b|permission denied/i.test(output);
 }
 
-function tail(text: string): string {
+export function tail(text: string): string {
 	const trimmed = text.trim();
 	return trimmed.length > DETAIL_MAX_CHARS
 		? `…${trimmed.slice(-DETAIL_MAX_CHARS)}`
@@ -161,8 +161,8 @@ function tail(text: string): string {
 }
 
 /** Run one step; resolves with its exit status and combined output. */
-function runStep(
-	step: InstallStep,
+export function runStep(
+	step: Pick<InstallStep, "command" | "args" | "shell">,
 	env: Record<string, string>,
 ): Promise<{ ok: boolean; output: string }> {
 	return new Promise((resolve) => {
@@ -218,7 +218,7 @@ async function readNodeVersion(
 	}
 }
 
-async function readHost(env: Record<string, string>): Promise<InstallHost> {
+export async function readHost(env: Record<string, string>): Promise<InstallHost> {
 	const platform = getCurrentOS() as InstallHost["platform"];
 	const extraPaths = (env.PATH || "").split(getPathDelimiter()).filter(Boolean);
 	let npm = findExecutable("npm", extraPaths);
@@ -236,7 +236,7 @@ async function readHost(env: Record<string, string>): Promise<InstallHost> {
  * a running process never sees: merge the registry PATH into ours so the
  * check that follows (and every later launch of the CLI) finds it.
  */
-async function refreshWindowsPath(): Promise<void> {
+export async function refreshWindowsPath(): Promise<void> {
 	if (!isWindows()) return;
 	try {
 		const { stdout } = await execFileAsync(
@@ -264,7 +264,11 @@ async function refreshWindowsPath(): Promise<void> {
 	}
 }
 
-const running = new Set<AgentCliTool>();
+/**
+ * CLIs being installed or updated right now: one at a time per CLI, whichever
+ * button started it (`cli-update.ts` shares the set).
+ */
+export const busyCliTools = new Set<string>();
 
 /**
  * Install `tool`, then check it. `check` is the same `checkAgentCli` the
@@ -277,8 +281,8 @@ export async function installAgentCli(
 	if (!isAgentCliTool(tool)) {
 		return { tool: "opencode", success: false, error: "failed", detail: "unknown tool" };
 	}
-	if (running.has(tool)) return { tool, success: false, error: "busy" };
-	running.add(tool);
+	if (busyCliTools.has(tool)) return { tool, success: false, error: "busy" };
+	busyCliTools.add(tool);
 	try {
 		const env = getAugmentedEnv();
 		const host = await readHost(env);
@@ -312,6 +316,6 @@ export async function installAgentCli(
 		}
 		return { tool, success: false, error: "failed", detail: tail(lastOutput) };
 	} finally {
-		running.delete(tool);
+		busyCliTools.delete(tool);
 	}
 }

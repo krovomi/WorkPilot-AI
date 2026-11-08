@@ -7,6 +7,7 @@ import type {
 	MobileDevice,
 	MobilePlan,
 	MobilePlatform,
+	MobileProfile,
 	MobileSessionPhase,
 } from "../shared/types/mobile";
 import { envWithoutCredentials } from "./utils/child-env";
@@ -173,7 +174,28 @@ export class MobileService extends EventEmitter {
 		return this.runRunner(backend, args);
 	}
 
-	private runRunner(backend: string, args: string[]): Promise<MobilePlan> {
+	/**
+	 * What the task form's "Mobile platforms" box shows: the app the project
+	 * has, or the frameworks the setup tasks can install. Files only, no
+	 * device call, and not the preview's detection: it never cancels one.
+	 */
+	async profile(projectDir: string): Promise<MobileProfile> {
+		const backend = this.resolveBackendPath();
+		if (!backend) {
+			return { success: false, isMobile: false, error: "Backend not found" };
+		}
+		return this.runRunner(
+			backend,
+			["--project-dir", projectDir, "--action", "profile"],
+			false,
+		);
+	}
+
+	private runRunner(
+		backend: string,
+		args: string[],
+		track = true,
+	): Promise<MobilePlan> {
 		const runner = path.join(backend, "runners", "mobile_runner.py");
 		return new Promise((resolve) => {
 			const proc = spawn(this.pythonPath, [runner, ...args], {
@@ -184,7 +206,7 @@ export class MobileService extends EventEmitter {
 					PYTHONUTF8: "1",
 				}),
 			});
-			this.detectionProcess = proc;
+			if (track) this.detectionProcess = proc;
 
 			let stdout = "";
 			let stderr = "";
@@ -198,12 +220,12 @@ export class MobileService extends EventEmitter {
 			});
 			proc.on("error", (err) => {
 				clearTimeout(timer);
-				this.detectionProcess = null;
+				if (track) this.detectionProcess = null;
 				resolve({ success: false, isMobile: false, error: err.message });
 			});
 			proc.on("close", () => {
 				clearTimeout(timer);
-				this.detectionProcess = null;
+				if (track) this.detectionProcess = null;
 				resolve(parseRunnerOutput(stdout, stderr));
 			});
 		});

@@ -1,5 +1,6 @@
 /**
- * A server card's engine, priority, category and goal (server mode).
+ * A server card's engine, priority, category, goal, phone targets and
+ * blockers (server mode).
  *
  * On a local card they live in `task_metadata.json` and `.workpilot-goal.json`
  * of the spec folder. For a server card those files are the server's: the
@@ -28,7 +29,16 @@ export interface ServerCardSettings {
 	priority?: string | null;
 	category?: string | null;
 	goal?: TaskGoal | null;
+	/** The task form's Android / iOS boxes; the server run reads them. */
+	mobileTargets?: string[] | null;
+	/** Cards that must finish first (`metadata.blockedBy`). */
+	blockedBy?: string[] | null;
+	/** The mark of a phone-app setup card (`mobile-setup.ts`). */
+	mobileBootstrap?: TaskMetadata["mobileBootstrap"] | null;
 }
+
+/** Metadata fields the server stores as they are given (`shared_board/settings.py`). */
+const LIST_KEYS = ["mobileTargets", "blockedBy"] as const;
 
 interface CardRef {
 	project: { id: string };
@@ -66,6 +76,15 @@ export function settingsFromMetadata(
 	}
 	if ("priority" in metadata) settings.priority = metadata.priority || null;
 	if ("category" in metadata) settings.category = metadata.category || null;
+	for (const key of LIST_KEYS) {
+		if (key in metadata) {
+			const value = metadata[key];
+			settings[key] = Array.isArray(value) && value.length > 0 ? [...value] : null;
+		}
+	}
+	if ("mobileBootstrap" in metadata) {
+		settings.mobileBootstrap = metadata.mobileBootstrap ?? null;
+	}
 	return Object.keys(settings).length > 0 ? settings : null;
 }
 

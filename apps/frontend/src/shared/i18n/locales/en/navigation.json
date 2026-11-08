@@ -240,6 +240,23 @@
 				"shell_launcher": "Its launcher needs a shell; what it declares is not read from here.",
 				"failed": "Could not ask the agent."
 			}
+		},
+		"update": {
+			"availableFor": "{{name}} update available",
+			"latest": "Latest",
+			"unknown": "unknown",
+			"updating": "Updating, please wait…",
+			"updatingShort": "Updating…",
+			"checkAndUpdate": "Update if needed",
+			"done": "{{name}} is up to date.",
+			"doneWithVersion": "{{name}} is up to date ({{version}}).",
+			"error": {
+				"not_installed": "{{name}} is not installed: install it first.",
+				"no_method": "WorkPilot does not know how this copy of {{name}} was installed. Update it the way you installed it:",
+				"failed": "Updating {{name}} failed.",
+				"still_outdated": "The update ran but {{name}} still reports {{version}} (latest: {{latest}}). The copy the app runs is probably managed another way; update it the way you installed it:",
+				"busy": "{{name}} is already being installed or updated."
+			}
 		}
 	},
 	"codex": {

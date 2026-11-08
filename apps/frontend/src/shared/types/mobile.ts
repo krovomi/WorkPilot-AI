@@ -101,6 +101,45 @@ export interface MobilePlan {
 	unavailable?: Partial<Record<MobilePlatform, string>>;
 }
 
+/**
+ * A framework the setup tasks can install when the project has no phone app
+ * yet (`apps/backend/mobile/bootstrap.py`). The commands are for the agents,
+ * already filled with the directory and the app name.
+ */
+export interface MobileSetupFramework {
+	id: string;
+	label: string;
+	platforms: MobilePlatform[];
+	install: string[];
+	scaffold: string[];
+	platformSetup: Partial<Record<MobilePlatform, string[]>>;
+	docs: string;
+	notes: string;
+}
+
+/**
+ * What the task form's "Mobile platforms" box needs: the app the project has,
+ * or — when it has none — the stacks it is written in and the frameworks the
+ * setup tasks can install, best fit first.
+ */
+export interface MobileProfile {
+	success: boolean;
+	isMobile: boolean;
+	error?: string;
+	stack?: { framework: MobileFramework | string; platforms: MobilePlatform[] };
+	hostStacks?: string[];
+	mobileDir?: string;
+	appName?: string;
+	frameworks?: MobileSetupFramework[];
+}
+
+/** Marks a task the form created to set up a phone app (`metadata.mobileBootstrap`). */
+export interface MobileBootstrapMark {
+	framework: string;
+	step: "install" | "platform";
+	platform?: MobilePlatform;
+}
+
 /** Where a preview session is in its lifecycle. */
 export type MobileSessionPhase =
 	| "idle"
