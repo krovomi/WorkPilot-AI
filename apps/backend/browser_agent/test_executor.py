@@ -37,6 +37,28 @@ def _resolve_npx() -> str:
     return "npx.cmd" if os.name == "nt" else "npx"
 
 
+def _on_disk(root: Path, rel: str) -> Path | None:
+    """``rel`` under ``root`` spelled as the disk spells it, or None.
+
+    On a case-insensitive disk (Windows, macOS) ``tests/browser`` also opens
+    ``tests/Browser``: the reported paths, and the folders already searched,
+    must not depend on the system, so every name is matched to the real entry.
+    """
+    current = root
+    for part in Path(rel).parts:
+        try:
+            entries = [c for c in current.iterdir() if c.is_dir()]
+        except OSError:
+            return None
+        match = next((c for c in entries if c.name == part), None) or next(
+            (c for c in entries if c.name.lower() == part.lower()), None
+        )
+        if match is None:
+            return None
+        current = match
+    return current
+
+
 class TestExecutor:
     """Discovers and runs E2E tests, returning structured results."""
 
@@ -112,8 +134,8 @@ class TestExecutor:
         """The E2E folders: the usual names, plus any folder named like one."""
         dirs: list[Path] = []
         for name in self.TEST_DIRS:
-            candidate = self.project_dir / name
-            if candidate.is_dir():
+            candidate = _on_disk(self.project_dir, name)
+            if candidate is not None and candidate not in dirs:
                 dirs.append(candidate)
         for parent_name in self.TEST_DIR_PARENTS:
             parent = self.project_dir / parent_name
