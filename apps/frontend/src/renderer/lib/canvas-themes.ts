@@ -40,24 +40,14 @@ export interface CanvasPreset {
 }
 
 /**
- * Accent-only presets keep the stylesheet's surfaces, so they follow the
- * app's light or dark mode; `app` borrows the app's own colour theme, so a
- * canvas can match whichever of the app's themes is on.
+ * `app`, the default, is the stylesheet's own look: the app's colour theme,
+ * light or dark, so a canvas matches whichever of the app's themes is on.
+ * Accent-only presets keep those surfaces and only recolour the connectors;
+ * `midnight` and `paper` bring their own surfaces.
  */
 export const CANVAS_PRESETS: CanvasPreset[] = [
-	{ id: "ember", labelKey: "canvasThemeEmber", swatch: "#f26b2d", tokens: {} },
-	{
-		id: "app",
-		labelKey: "canvasThemeApp",
-		swatch: "var(--primary)",
-		tokens: {
-			background: "var(--background)",
-			card: "var(--card)",
-			border: "var(--border)",
-			text: "var(--foreground)",
-			flow: "var(--primary)",
-		},
-	},
+	{ id: "app", labelKey: "canvasThemeApp", swatch: "var(--primary)", tokens: {} },
+	{ id: "ember", labelKey: "canvasThemeEmber", swatch: "#f26b2d", tokens: { flow: "#f26b2d" } },
 	{ id: "ocean", labelKey: "canvasThemeOcean", swatch: "#38bdf8", tokens: { flow: "#38bdf8" } },
 	{ id: "violet", labelKey: "canvasThemeViolet", swatch: "#a78bfa", tokens: { flow: "#a78bfa" } },
 	{ id: "emerald", labelKey: "canvasThemeEmerald", swatch: "#34d399", tokens: { flow: "#34d399" } },
@@ -90,7 +80,7 @@ export const CANVAS_PRESETS: CanvasPreset[] = [
 	},
 ];
 
-export const DEFAULT_CANVAS_PRESET = "ember";
+export const DEFAULT_CANVAS_PRESET = "app";
 
 export interface CanvasTheme {
 	preset?: string;

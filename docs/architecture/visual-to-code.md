@@ -91,8 +91,13 @@ phrase est en italique libre, suspendue sous le fil, lisible sur la grille
 grâce à un halo de la couleur du fond. Avec un cadre, les phrases se lisaient
 comme des blocs de plus.
 
-**Des jetons, pas le thème de l'app.** Tout se dessine depuis quelques
-variables `--vtc-*` posées sur `.vtc-flow`. Le reste (cœur du trait, lumière,
+**Des jetons, nourris par le thème de l'app.** Tout se dessine depuis quelques
+variables `--vtc-*` posées sur `.vtc-flow`. Par défaut elles prennent le thème
+de couleurs actif, clair ou sombre (`--background`, `--card`, `--foreground`),
+et les fils prennent `--primary` tiré un peu vers `--foreground`, pour qu'un
+accent pâle (Default clair) reste lisible comme un trait. Avant le 2026-11-08
+le canvas avait ses propres surfaces pierre et un orange fixe : sur Ocean,
+Forest ou Neo il jurait avec le reste de l'app. Le reste (cœur du trait, lumière,
 lueur d'angle, texte secondaire) en est *dérivé* par `color-mix` dans la feuille :
 une couleur de connecteur choisie recolore tout ce qui lui appartient. Ces
 dérivées sont redéclarées sur `.vtc-tint`, parce qu'une propriété personnalisée
@@ -109,8 +114,10 @@ n'est pas dans une couche et gagnerait à toute spécificité.
 thème est un préréglage plus les couleurs choisies à la main, qui gagnent ; il
 est rangé sur l'architecture (`theme`), donc chaque document garde son allure.
 Seules des couleurs `#rrggbb` sont gardées (`normalizeCanvasTheme`) : la valeur
-finit dans un attribut `style`. Le préréglage « Thème de l'app » emprunte les
-variables du thème de couleurs actif.
+finit dans un attribut `style`. « Thème de l'app » est le préréglage par
+défaut (aucune variable posée) ; « Braise » ne garde que les fils orange sur les
+surfaces du thème, comme les autres préréglages d'accent ; « Minuit » et
+« Papier » apportent leurs propres surfaces.
 
 ## Les briques personnalisées (`lib/custom-bricks.ts`, `stores/custom-bricks-store.ts`)
 

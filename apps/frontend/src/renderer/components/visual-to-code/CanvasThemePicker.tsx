@@ -32,8 +32,8 @@ const ROWS: { key: CanvasColorKey; labelKey: string; swatches: string[] }[] = [
 ];
 
 /**
- * The canvas' colours, per architecture: a preset (the warm default, the app's
- * own theme, a few accents, two full palettes) and any colour picked by hand
+ * The canvas' colours, per architecture: a preset (the app's own theme by
+ * default, a few accents, two full palettes) and any colour picked by hand
  * on top of it — background, cards, their borders, the grid, the text and the
  * connectors. A block or a single connection can also be given its own colour
  * from the inspector.
