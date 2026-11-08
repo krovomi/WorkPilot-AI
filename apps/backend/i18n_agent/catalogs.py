@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from defusedxml import ElementTree
+from defusedxml import DefusedXmlException, ElementTree
 
 # Sources whose UI text can be hard-coded, for every front-end and native stack.
 SOURCE_EXTENSIONS = frozenset(
@@ -83,7 +83,8 @@ def _json(text: str) -> dict[str, Any]:
 def _xml_strings(text: str, tag: str, key_attr: str) -> dict[str, Any]:
     try:
         root = ElementTree.fromstring(text)
-    except Exception:  # noqa: BLE001 - a broken catalog is skipped, not fatal
+    except (ElementTree.ParseError, DefusedXmlException, ValueError):
+        # A broken or hostile catalog is skipped, not fatal.
         return {}
     out: dict[str, Any] = {}
     for node in root.iter():

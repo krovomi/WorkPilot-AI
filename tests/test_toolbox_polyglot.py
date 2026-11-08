@@ -216,3 +216,16 @@ def test_compliance_reads_evidence_from_every_ci_platform(tmp_path: Path) -> Non
         "renovate.json",
         "CODEOWNERS",
     } <= found
+
+
+def test_i18n_skips_broken_and_entity_catalogs(tmp_path: Path) -> None:
+    _write(tmp_path, "Api/Strings.fr.resx", "<root><data name=")
+    entity = '<!DOCTYPE r [<!ENTITY a "x">]><root><data name="k">&a;</data></root>'
+    _write(tmp_path, "Api/Other.fr.resx", entity)
+    _write(
+        tmp_path,
+        "Api/Ok.fr.resx",
+        '<root><data name="k"><value>v</value></data></root>',
+    )
+
+    assert discover_catalogs(tmp_path) == {"fr": {"Ok": {"k": "v"}}}
