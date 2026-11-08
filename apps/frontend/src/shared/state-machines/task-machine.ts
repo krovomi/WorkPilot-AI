@@ -15,6 +15,8 @@ export type TaskEvent =
 			requireReviewBeforeCoding: boolean;
 	  }
 	| { type: "PLAN_APPROVED" }
+	/** The plan was too big for one PR: the task became its parts (`task_split`). */
+	| { type: "TASK_SPLIT"; total: number }
 	| { type: "CODING_STARTED"; subtaskId: string; subtaskDescription: string }
 	| {
 			type: "SUBTASK_COMPLETED";
@@ -78,6 +80,8 @@ export const taskMachine = createMachine(
 					PLANNING_STARTED: "planning",
 					// Fallback: if coding starts from backlog (e.g., resumed task), go to coding
 					CODING_STARTED: "coding",
+					// A build started on an existing plan splits before it emits anything.
+					TASK_SPLIT: { target: "done", actions: "clearReviewReason" },
 					USER_STOPPED: "backlog",
 				},
 			},
@@ -93,6 +97,8 @@ export const taskMachine = createMachine(
 					],
 					// Fallback: if CODING_STARTED arrives while in planning, transition to coding
 					CODING_STARTED: { target: "coding", actions: "clearReviewReason" },
+					// The work moved to the parts; the task itself is settled.
+					TASK_SPLIT: { target: "done", actions: "clearReviewReason" },
 					// Fallback: if ALL_SUBTASKS_DONE arrives while in planning, go directly to qa_review
 					ALL_SUBTASKS_DONE: "qa_review",
 					// Fallback: if QA_STARTED arrives while in planning, go to qa_review
@@ -134,6 +140,7 @@ export const taskMachine = createMachine(
 			},
 			coding: {
 				on: {
+					TASK_SPLIT: { target: "done", actions: "clearReviewReason" },
 					QA_STARTED: "qa_review",
 					// ALL_SUBTASKS_DONE means coder finished but QA hasn't started yet
 					// Transition to qa_review - QA will emit QA_PASSED or QA_FAILED

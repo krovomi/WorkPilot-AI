@@ -164,6 +164,10 @@
 		},
 		"qa_unverified": {
 			"title": "Ready for review — QA could not verify"
+		},
+		"split": {
+			"title": "Task split into smaller tasks",
+			"description": "“{{title}}” became {{count}} tasks, one small pull request each. They are in the queue."
 		}
 	},
 	"columns": {
@@ -840,6 +844,15 @@
 					"critical": "Critical Impact"
 				}
 			}
+		},
+		"autoSplit": {
+			"label": "Split automatically when the task is too big",
+			"description": "Once the plan is written, a task above the line ceiling becomes several tasks, one small pull request each, chained by their dependencies.",
+			"projectOff": "Automatic splitting is turned off in the project settings.",
+			"maxLinesLabel": "Max changed lines per pull request",
+			"maxLinesPlaceholder": "{{count}} (project)",
+			"maxLinesHelp": "Leave empty to use the project's ceiling.",
+			"maxLinesInvalid": "Enter a whole number between {{min}} and {{max}}."
 		}
 	},
 	"testGen": {
@@ -2353,5 +2366,11 @@
 			"pr_url_unreadable": "The pull request link could not be read: change its base on the forge.",
 			"unknown": "The operation failed."
 		}
+	},
+	"split": {
+		"partBadge": "Part {{index}}/{{total}}",
+		"partTooltip": "Part {{index}} of {{total}} of “{{title}}”: {{name}}",
+		"parentBadge": "Split into {{count}} tasks",
+		"parentTooltip": "The plan was larger than {{lines}} changed lines per pull request: this task became {{count}} tasks."
 	}
 }

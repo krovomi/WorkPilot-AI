@@ -26,9 +26,10 @@ from core.workspace import (
     handle_workspace_choice,
     setup_workspace,
 )
-from foundation.build_signals import BuildHalted, BuildPaused
+from foundation.build_signals import BuildHalted, BuildPaused, BuildSplit
 from review import ReviewState
 from services.notifications.digest import start_digest_heartbeat
+from task_split.step import split_before_build
 from ui import (
     BuildState,
     Icons,
@@ -908,8 +909,16 @@ def handle_build_command(
             "run.py", "Review approval validated", approved_by=review_state.approved_by
         )
 
+    # A plan too big for one small pull request becomes several cards, before
+    # any workspace exists: spec creation has already written it.
+    from core.task_event import TaskEventEmitter
+
+    existing_build = get_existing_build_worktree(project_dir, spec_dir.name)
+    if not existing_build and split_before_build(spec_dir, TaskEventEmitter):
+        return
+
     # Check for existing build
-    if get_existing_build_worktree(project_dir, spec_dir.name):
+    if existing_build:
         if auto_continue:
             # Non-interactive mode: auto-continue with existing build
             debug("run.py", "Auto-continue mode: continuing with existing build")
@@ -1302,6 +1311,15 @@ def handle_build_command(
             f"  python workpilot/run.py --spec {spec_dir.name}\n"
         )
         StatusManager(project_dir).update(state=BuildState.PAUSED)
+        return
+    except BuildSplit:
+        # The plan the planner just wrote became several cards (task_split).
+        # Nothing was built in this workspace: it goes, with its empty branch.
+        if worktree_manager:
+            try:
+                worktree_manager.remove_worktree(spec_dir.name, delete_branch=True)
+            except Exception as exc:  # noqa: BLE001 - leftover worktree, not a failure
+                debug("run.py", f"Could not remove the split task's worktree: {exc}")
         return
     except BuildHalted as halted:
         # A phase established it cannot produce its output. The frontend has

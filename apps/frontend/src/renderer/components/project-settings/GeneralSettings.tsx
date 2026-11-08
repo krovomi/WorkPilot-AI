@@ -20,6 +20,7 @@ import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
 import { useProviderContext } from "../ProviderContext";
+import { AutoSplitSettings } from "./AutoSplitSettings";
 import { CrossReviewSettings } from "./CrossReviewSettings";
 import { RepositorySection } from "./RepositorySection";
 import { WorktreeRecipeSection } from "./WorktreeRecipeSection";
@@ -357,6 +358,7 @@ export function GeneralSettings({
 								}
 							/>
 						</div>
+						<AutoSplitSettings settings={settings} setSettings={setSettings} />
 						<CrossReviewSettings settings={settings} setSettings={setSettings} />
 					</section>
 

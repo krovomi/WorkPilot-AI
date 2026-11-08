@@ -292,6 +292,7 @@ All file paths in `files_to_modify`, `files_to_create`, `files_to_reference`, `p
           "files_to_modify": ["src/models/user.py"],
           "files_to_create": ["src/models/analytics.py"],
           "patterns_from": ["src/models/existing_model.py"],
+          "estimated_lines": 90,
           "verification": {
             "type": "command",
             "command": "python -c \"from src.models.analytics import Analytics; print('OK')\"",
@@ -378,6 +379,24 @@ Use ONLY these values for the `type` field in phases:
    run the tests **with coverage** (e.g. `pytest --cov=. --cov-branch`,
    `vitest run --coverage`). The QA stage enforces this threshold and will reject
    the task otherwise (e2e coverage is best-effort).
+8. **Estimate the size** - give every subtask `"estimated_lines"`: the lines it
+   will add, change or delete, tests included (a whole number, e.g. `120`).
+
+### Size of the change: small pull requests
+
+A plan larger than the project's ceiling of changed lines per pull request (400
+by default) is split by WorkPilot into several tasks, one pull request each, at
+**phase boundaries**. Help it cut in the right place:
+
+- Make each phase a piece a reviewer can read on its own: it builds, and its
+  tests pass, without the phases after it.
+- Declare `depends_on` honestly. A phase with `"depends_on": []` may be built
+  from the trunk in parallel with the others; a phase that needs another's code
+  must list it. A phase with no `depends_on` at all is treated as needing the
+  one before it.
+- Optionally give phases that belong in the same pull request the same
+  `"slice": "<short name>"`, e.g. `"slice": "API"`; phases with different
+  slice names never share a pull request. Omit it when you have no preference.
 
 ### Requirement Coverage
 

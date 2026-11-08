@@ -269,6 +269,8 @@ export interface TaskDraft {
 	requireReviewBeforeCoding?: boolean;
 	tddMode?: boolean;
 	verifyLoop?: boolean;
+	/** The automatic split as set in the wizard (absent = project defaults). */
+	autoSplit?: { noSplit: boolean; maxLines: string };
 	/** Part of the title of the one window a Windows app is verified in. */
 	verifyWindow?: string;
 	/** The steps a web front end's verification follows, one per line. */
@@ -385,6 +387,22 @@ export interface AutomationOrigin {
 	ruleName: string;
 	eventKey: string;
 	url?: string;
+}
+
+/** A task's place in an automatic split (`apps/backend/task_split/`). */
+export interface TaskSplitGroup {
+	/** On a part: the task it was cut from, its title, which part of how many. */
+	parent?: string;
+	title?: string;
+	index?: number;
+	total?: number;
+	/** On a part: the phases it builds, as a short name. */
+	name?: string;
+	/** On the split task: its parts, and the ceiling the plan was measured against. */
+	children?: string[];
+	maxLines?: number;
+	source?: "card" | "project" | "default";
+	splitAt?: string;
 }
 
 export interface TaskMetadata {
@@ -570,6 +588,15 @@ export interface TaskMetadata {
 	stackParent?: string;
 	stackParentSha?: string;
 	stackTrunk?: string;
+	/**
+	 * Automatic split (`apps/backend/task_split/`): on a part, the group it
+	 * belongs to; on the task that was split, the parts it became.
+	 */
+	splitGroup?: TaskSplitGroup;
+	/** Keep this task whole, however big its plan. */
+	noSplit?: boolean;
+	/** Changed lines per pull request for this task; the project's when absent. */
+	splitMaxLines?: number;
 
 	// Pause/Resume state (from implementation_plan.json)
 	paused?: {

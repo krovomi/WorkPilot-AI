@@ -49,6 +49,7 @@ import {
 	recordReviewVerdictForLearning,
 	requiresClaudeAuth,
 } from "./execution-utils";
+import { splitStackError, stackSplitPartBeforeStart } from "./split-stack";
 
 export function registerTaskStatusHandlers(ctx: ExecutionHandlerContext): void {
 	const { agentManager, getMainWindow } = ctx;
@@ -530,6 +531,14 @@ print(json.dumps(result))
 							);
 						}
 						return { success: false, error: "Claude authentication required" };
+					}
+
+					// A part of a split starts on the part it builds on, not the trunk.
+					const stacked = await stackSplitPartBeforeStart(task, project);
+					if (!stacked.ok) {
+						const message = splitStackError(task, stacked.error);
+						mainWindow?.webContents.send(IPC_CHANNELS.TASK_ERROR, taskId, message);
+						return { success: false, error: message };
 					}
 
 					console.warn("[TASK_UPDATE_STATUS] Auto-starting task:", taskId);
