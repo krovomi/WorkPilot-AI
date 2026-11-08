@@ -317,6 +317,8 @@
 			"button": "Filter",
 			"title": "Filters",
 			"clear": "Reset",
+			"groupActive": "Group {{group}}",
+			"groupClear": "Show every task",
 			"clearSearch": "Clear search",
 			"searchPlaceholder": "Search tasks…",
 			"sourceLabel": "Source",
@@ -2370,7 +2372,9 @@
 		}
 	},
 	"split": {
-		"partBadge": "Part {{index}}/{{total}}",
+		"groupBadge": "Part {{index}}/{{total}} · {{title}}",
+		"showGroup": "Click to show only this group",
+		"showAll": "Click to show every task",
 		"partTooltip": "Part {{index}} of {{total}} of “{{title}}”: {{name}}",
 		"parentBadge": "Split into {{count}} tasks",
 		"parentTooltip": "The plan was larger than {{lines}} lines to review per pull request: this task became {{count}} tasks.",

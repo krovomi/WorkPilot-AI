@@ -150,6 +150,8 @@ interface KanbanFilterState {
 	toggleSource: (source: TaskSource) => void;
 	toggleCategory: (category: TaskCategory) => void;
 	togglePriority: (priority: TaskPriority) => void;
+	/** Show only one split group, or everything again for the same group. */
+	toggleGroup: (group: string) => void;
 	setSortField: (field: TaskSortField) => void;
 	setSortDirection: (direction: TaskSortDirection) => void;
 	toggleSortDirection: () => void;
@@ -270,6 +272,14 @@ export const useKanbanFilterStore = create<KanbanFilterState>((set, get) => {
 					priorities: toggleInArray(state.filters.priorities, priority),
 				},
 			}));
+			persist();
+		},
+
+		toggleGroup: (group) => {
+			set((state) => {
+				const { group: current, ...rest } = state.filters;
+				return { filters: current === group ? rest : { ...rest, group } };
+			});
 			persist();
 		},
 

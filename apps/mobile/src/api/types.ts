@@ -87,6 +87,8 @@ export interface BoardCard {
 	specId: string | null;
 	claimedBy: string | null;
 	claimedByName: string | null;
+	/** A part of a task split into small PRs (`task_split`): its group. */
+	group?: { id: string; title: string; index: number; total: number };
 }
 
 /** `GET /api/board/cards/{id}`. */

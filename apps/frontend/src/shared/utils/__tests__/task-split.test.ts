@@ -12,8 +12,11 @@ import {
 	partsAwaitingMerge,
 	partsToMoveOntoBase,
 	prUrlOf,
+	SPLIT_GROUP_TONES,
 	SPLIT_KINDS,
 	splitChildCount,
+	splitGroupId,
+	splitGroupTone,
 	splitPartOf,
 	wholeInRange,
 } from "../task-split";
@@ -200,5 +203,30 @@ describe("following the parts' PRs", () => {
 		expect(partsToMoveOntoBase([first, stacked, notYet, otherSplit]).map((t) => t.id)).toEqual([
 			"012-oauth-part2",
 		]);
+	});
+});
+
+describe("split group colour", () => {
+	// The same fixtures as tests/task_split/test_group_marks.py and the phone.
+	it.each([
+		["012-add-oauth", "green"],
+		["001-x", "violet"],
+		["abc", "orange"],
+		["é-123", "blue"],
+		["999-very-long-name-here", "orange"],
+	])("%s is %s, as on the backend", (group, tone) => {
+		expect(splitGroupTone(group)).toBe(tone);
+		expect(SPLIT_GROUP_TONES).toContain(tone);
+	});
+
+	it("names a part's group by its split task, and the split task by itself", () => {
+		expect(splitGroupId(part("012-oauth-part2", 2))).toBe("012-oauth");
+		expect(
+			splitGroupId({
+				specId: "012-oauth",
+				metadata: { splitGroup: { children: ["012-oauth-part1"] } },
+			} as Task),
+		).toBe("012-oauth");
+		expect(splitGroupId({ specId: "001-x", metadata: {} } as Task)).toBeNull();
 	});
 });

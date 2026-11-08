@@ -76,7 +76,7 @@ does (`tests/test_entrypoints_redaction.py`).
 
 | Tool | Reads or writes |
 |---|---|
-| `list_cards(column?)` | each card's id, title, column, kind; newest first, 100 at most |
+| `list_cards(column?)` | each card's id, title, column, kind, and for a part of a split task its `group` (id, title, index, total); newest first, 100 at most |
 | `get_card(card_id)` | the card's description, subtasks done, QA verdict, goal, verification and cross review, scalars only |
 | `create_card(title, description?, kind?)` | a new card in the backlog |
 | `wait_for_card(card_id, columns?, timeout_seconds?)` | the card once it reaches a column (`human_review` by default), or as it is when time runs out (1 hour by default, 4 at most) |

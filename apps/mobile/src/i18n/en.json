@@ -54,7 +54,11 @@
 		"newCard": "New card",
 		"emptyColumn": "No card here.",
 		"subtasks": "{{completed}}/{{total}} subtasks",
-		"claimedBy": "Claimed by {{name}}"
+		"claimedBy": "Claimed by {{name}}",
+		"groupMark": "Part {{index}}/{{total}} · {{title}}",
+		"groupHint": "Shows only this group's cards",
+		"groupFilter": "Group {{group}} · show all",
+		"showAll": "Show every card"
 	},
 	"columns": {
 		"backlog": "Planning",

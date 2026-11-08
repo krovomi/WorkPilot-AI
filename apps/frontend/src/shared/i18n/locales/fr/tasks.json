@@ -317,6 +317,8 @@
 			"button": "Filtrer",
 			"title": "Filtres",
 			"clear": "Réinitialiser",
+			"groupActive": "Groupe {{group}}",
+			"groupClear": "Afficher toutes les tâches",
 			"clearSearch": "Effacer la recherche",
 			"searchPlaceholder": "Rechercher une tâche…",
 			"sourceLabel": "Source",
@@ -2370,7 +2372,9 @@
 		}
 	},
 	"split": {
-		"partBadge": "Partie {{index}}/{{total}}",
+		"groupBadge": "Partie {{index}}/{{total}} · {{title}}",
+		"showGroup": "Cliquer pour n'afficher que ce groupe",
+		"showAll": "Cliquer pour afficher toutes les tâches",
 		"partTooltip": "Partie {{index}} sur {{total}} de « {{title}} » : {{name}}",
 		"parentBadge": "Découpée en {{count}} tâches",
 		"parentTooltip": "Le plan dépassait {{lines}} lignes à relire par PR : cette tâche est devenue {{count}} tâches.",
