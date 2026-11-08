@@ -264,8 +264,7 @@ jobs:
       # Dependencies are installed with --ignore-scripts, so the Electron
       # binary is fetched here.
       - name: Fetch the Electron binary
-        working-directory: apps/frontend
-        run: node node_modules/electron/install.js
+        uses: ./.github/actions/fetch-electron
 
       - name: Start the app once (smoke test)
         working-directory: apps/frontend
@@ -298,8 +297,7 @@ jobs:
           ignore-scripts: 'true'
 
       - name: Fetch the Electron binary
-        working-directory: apps/frontend
-        run: node node_modules/electron/install.js
+        uses: ./.github/actions/fetch-electron
 
       - name: Build application
         working-directory: apps/frontend
@@ -450,8 +448,7 @@ jobs:
           ignore-scripts: 'true'
 
       - name: Fetch the Electron binary
-        working-directory: apps/frontend
-        run: node node_modules/electron/install.js
+        uses: ./.github/actions/fetch-electron
 
       - name: Build application
         working-directory: apps/frontend
