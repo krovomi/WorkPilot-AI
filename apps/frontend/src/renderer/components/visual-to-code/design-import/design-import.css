@@ -1,36 +1,39 @@
 /*
  * Import Design: the design → code pipeline drawn as a small node graph, in
- * the look of the Visual-to-Code canvas (flow-canvas.css): dark cards, warm
+ * the look of the Visual-to-Code canvas (flow-canvas.css): solid cards,
  * glowing wires, a mono kicker above each title. The sentences between two
  * steps are plain italic text on the wire, never a card, so the steps read
  * as the only blocks on screen.
  *
- * Colours are tokens, not the theme's: the graph reads by contrast between
- * the cards and the wires, and a theme accent that turns lime or blue would
- * make the wires the least visible thing on screen. Sizes are in rem so the
- * UI scale setting applies.
+ * Surfaces, wires and danger come from the active colour theme (light or
+ * dark), like the UI charter; the wires are --primary pulled a little toward
+ * the foreground so a pale theme accent still reads as a line. The step hues
+ * are categories and stay fixed. Sizes are in rem so the UI scale setting
+ * applies.
  */
 
 @layer theme, base, components, utilities;
 
 @layer components {
 	.di-root {
-		--di-bg: #f7f4f1;
-		--di-grid: rgba(41, 37, 36, 0.06);
-		--di-card: rgba(255, 255, 255, 0.94);
-		--di-card-solid: #ffffff;
-		--di-border: rgba(41, 37, 36, 0.12);
-		--di-title: #1c1917;
-		--di-flow: #e8642a;
-		--di-code-bg: #fbf9f7;
-		--di-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		--di-bg: var(--background);
+		--di-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
+		--di-card: color-mix(in srgb, var(--card) 94%, transparent);
+		--di-card-solid: var(--card);
+		--di-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+		--di-title: var(--foreground);
+		--di-flow: color-mix(in oklab, var(--primary) 85%, var(--foreground));
+		--di-code-bg: color-mix(in srgb, var(--background) 70%, var(--card));
+		--di-shadow:
+			0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent),
+			0 8px 24px -12px color-mix(in srgb, var(--foreground) 18%, transparent);
 		--di-vision: #2f6fd6;
 		--di-tokens: #b07a00;
 		--di-spec: #7b55e0;
 		--di-code: #d9581f;
 		--di-tests: #0f8f6a;
 		--di-project: #c2416b;
-		--di-danger: #c0392b;
+		--di-danger: var(--destructive);
 		--di-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 
 		position: relative;
@@ -46,14 +49,9 @@
 	}
 
 	.dark .di-root {
-		--di-bg: #0c0b0a;
-		--di-grid: rgba(255, 255, 255, 0.035);
-		--di-card: rgba(26, 24, 23, 0.92);
-		--di-card-solid: #1a1817;
-		--di-border: rgba(255, 255, 255, 0.09);
-		--di-title: #f5f1ed;
-		--di-flow: #f26b2d;
-		--di-code-bg: #100f0e;
+		--di-grid: color-mix(in srgb, var(--foreground) 4%, transparent);
+		--di-card: color-mix(in srgb, var(--card) 92%, transparent);
+		--di-border: color-mix(in srgb, var(--foreground) 9%, transparent);
 		--di-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
 		--di-vision: #7cb4ff;
 		--di-tokens: #f2c46d;
@@ -61,7 +59,6 @@
 		--di-code: #ff9a5c;
 		--di-tests: #6fdab4;
 		--di-project: #ff8fb0;
-		--di-danger: #ff7a6b;
 	}
 
 	.di-root {
@@ -179,9 +176,9 @@
 	}
 
 	.di-btn-primary {
-		background: var(--di-flow);
-		border-color: var(--di-flow);
-		color: #fff;
+		background: var(--primary);
+		border-color: var(--primary);
+		color: var(--primary-foreground);
 		box-shadow: 0 0 24px -6px var(--di-flow);
 	}
 
@@ -1034,12 +1031,12 @@
 
 	/* Hub tabs share the accent of the pages they open. */
 	.di-hub-tab[data-active="true"] {
-		border-color: var(--di-hub-accent, #e8642a);
+		border-color: var(--di-hub-accent, var(--primary));
 	}
 
 	.di-hub-tab[data-active="true"] .di-hub-dot {
-		background: var(--di-hub-accent, #e8642a);
-		box-shadow: 0 0 10px var(--di-hub-accent, #e8642a);
+		background: var(--di-hub-accent, var(--primary));
+		box-shadow: 0 0 10px var(--di-hub-accent, var(--primary));
 	}
 
 	.di-hub-dot {

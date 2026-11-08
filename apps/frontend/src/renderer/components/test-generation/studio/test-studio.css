@@ -1,28 +1,31 @@
 /*
  * Test studio: the test generation agent laid out like the Visual-to-Code
- * canvas and Import Design (flow-canvas.css, design-import.css): dark cards,
- * warm glowing wires, a mono kicker above each title, and the sentences
- * between two steps as plain italic text, never a card.
+ * canvas and Import Design (flow-canvas.css, design-import.css): solid cards,
+ * glowing wires, a mono kicker above each title, and the sentences between
+ * two steps as plain italic text, never a card.
  *
- * Colours are the studio's own tokens rather than the theme's: the graph
- * reads by contrast between cards and wires, and a theme accent that turns
- * lime would make the wires the least visible thing on screen. Sizes are in
- * rem so the UI scale setting applies.
+ * Surfaces, wires, success and danger come from the active colour theme
+ * (light or dark), like the UI charter; the wires are --primary pulled a
+ * little toward the foreground so a pale theme accent still reads as a line.
+ * The mode and step hues are categories and stay fixed, as do the syntax
+ * colours. Sizes are in rem so the UI scale setting applies.
  */
 
 @layer theme, base, components, utilities;
 
 @layer components {
 	.tg-root {
-		--tg-bg: #f7f4f1;
-		--tg-grid: rgba(41, 37, 36, 0.06);
-		--tg-card: rgba(255, 255, 255, 0.94);
-		--tg-card-solid: #ffffff;
-		--tg-border: rgba(41, 37, 36, 0.12);
-		--tg-title: #1c1917;
-		--tg-flow: #e8642a;
-		--tg-code-bg: #fbf9f7;
-		--tg-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		--tg-bg: var(--background);
+		--tg-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
+		--tg-card: color-mix(in srgb, var(--card) 94%, transparent);
+		--tg-card-solid: var(--card);
+		--tg-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+		--tg-title: var(--foreground);
+		--tg-flow: color-mix(in oklab, var(--primary) 85%, var(--foreground));
+		--tg-code-bg: color-mix(in srgb, var(--background) 70%, var(--card));
+		--tg-shadow:
+			0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent),
+			0 8px 24px -12px color-mix(in srgb, var(--foreground) 18%, transparent);
 		--tg-analyze: #b07a00;
 		--tg-unit: #d9581f;
 		--tg-e2e: #7b55e0;
@@ -33,8 +36,8 @@
 		--tg-write: #0f8f6a;
 		--tg-gaps: #c2416b;
 		--tg-input: #b07a00;
-		--tg-danger: #c0392b;
-		--tg-ok: #0f8f6a;
+		--tg-danger: var(--destructive);
+		--tg-ok: var(--success);
 		--tg-tok-keyword: #2f6fd6;
 		--tg-tok-string: #a15c00;
 		--tg-tok-type: #0f8f6a;
@@ -60,14 +63,9 @@
 	}
 
 	.dark .tg-root {
-		--tg-bg: #0c0b0a;
-		--tg-grid: rgba(255, 255, 255, 0.035);
-		--tg-card: rgba(26, 24, 23, 0.92);
-		--tg-card-solid: #1a1817;
-		--tg-border: rgba(255, 255, 255, 0.09);
-		--tg-title: #f5f1ed;
-		--tg-flow: #f26b2d;
-		--tg-code-bg: #100f0e;
+		--tg-grid: color-mix(in srgb, var(--foreground) 4%, transparent);
+		--tg-card: color-mix(in srgb, var(--card) 92%, transparent);
+		--tg-border: color-mix(in srgb, var(--foreground) 9%, transparent);
 		--tg-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
 		--tg-analyze: #f2c46d;
 		--tg-unit: #ff9a5c;
@@ -79,8 +77,6 @@
 		--tg-write: #6fdab4;
 		--tg-gaps: #ff8fb0;
 		--tg-input: #f2c46d;
-		--tg-danger: #ff7a6b;
-		--tg-ok: #6fdab4;
 		--tg-tok-keyword: #7cb4ff;
 		--tg-tok-string: #f2c46d;
 		--tg-tok-type: #6fdab4;

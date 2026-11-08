@@ -1,12 +1,13 @@
 /*
- * The Visual-to-Code canvas: a dark node graph with warm, glowing connectors.
+ * The Visual-to-Code canvas: a node graph with glowing connectors.
  *
  * Scoped to `.vtc-flow` so ReactFlow keeps its defaults everywhere else in the
- * app (the architecture visualizer draws its own). The colours are tokens, not
- * the theme's: a node graph reads by contrast between the cards and the lines
- * between them, and an accent that turns lime or blue with the colour theme
- * would make the connectors the least visible thing on screen. Light mode keeps
- * the same idea on paper.
+ * app (the architecture visualizer draws its own). By default it wears the
+ * app's colour theme, light or dark: surfaces from --background / --card /
+ * --foreground, the connectors in --primary pulled a little toward the
+ * foreground so a pale theme accent still reads as a line. A canvas theme
+ * (lib/canvas-themes.ts) or a colour picked by the person overrides these
+ * tokens inline.
  */
 
 /*
@@ -19,14 +20,16 @@
 
 @layer components {
 	.vtc-flow {
-		--vtc-bg: #f7f4f1;
-		--vtc-grid: rgba(41, 37, 36, 0.06);
-		--vtc-card: rgba(255, 255, 255, 0.94);
-		--vtc-card-solid: #ffffff;
-		--vtc-card-border: rgba(41, 37, 36, 0.12);
-		--vtc-title: #1c1917;
-		--vtc-flow: #e8642a;
-		--vtc-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		--vtc-bg: var(--background);
+		--vtc-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
+		--vtc-card: color-mix(in srgb, var(--card) 94%, transparent);
+		--vtc-card-solid: var(--card);
+		--vtc-card-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+		--vtc-title: var(--foreground);
+		--vtc-flow: color-mix(in oklab, var(--primary) 85%, var(--foreground));
+		--vtc-shadow:
+			0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent),
+			0 8px 24px -12px color-mix(in srgb, var(--foreground) 18%, transparent);
 		background: var(--vtc-bg);
 		color: var(--vtc-title);
 	}
@@ -46,13 +49,9 @@
 	}
 
 	.dark .vtc-flow {
-		--vtc-bg: #0c0b0a;
-		--vtc-grid: rgba(255, 255, 255, 0.035);
-		--vtc-card: rgba(26, 24, 23, 0.92);
-		--vtc-card-solid: #1a1817;
-		--vtc-card-border: rgba(255, 255, 255, 0.09);
-		--vtc-title: #f5f1ed;
-		--vtc-flow: #f26b2d;
+		--vtc-grid: color-mix(in srgb, var(--foreground) 4%, transparent);
+		--vtc-card: color-mix(in srgb, var(--card) 92%, transparent);
+		--vtc-card-border: color-mix(in srgb, var(--foreground) 9%, transparent);
 		--vtc-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
 	}
 

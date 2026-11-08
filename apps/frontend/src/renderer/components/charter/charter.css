@@ -2,18 +2,22 @@
  * WorkPilot UI charter: the look of "Visuel vers Code" and "Import Design"
  * made shared, for every feature module and every Settings page.
  *
- *   - a stage: the theme's background with a faint dot grid and a warm
- *     ambient glow in the corners;
+ *   - a stage: the theme's background with a faint dot grid and an ambient
+ *     glow of the theme's accent in the corners;
  *   - columns separated by a dashed rule, each opened by a mono uppercase
  *     kicker in an accent colour, a short title and a mono meta on the right;
  *   - solid cards with a soft shadow, steps numbered "01 · NAME" with an
  *     accent rail, mono chips with a coloured dot;
- *   - one warm accent (the glowing wire of the canvas) for the primary action
- *     and the active state, six tones for categories, never raw red/green.
+ *   - one accent for the primary action and the active state, tones for
+ *     categories and status, never raw red/green.
  *
- * Surfaces derive from the theme tokens (--background, --card, --border,
- * --foreground) so the eight themes and the custom theme keep working; only
- * the accent and the tones are the charter's own, as on the canvas.
+ * Every colour comes from the active theme (eight themes, light and dark):
+ * surfaces from --background / --card / --foreground, the accent from
+ * --primary, the status tones from --success / --warning / --destructive /
+ * --info. Only violet, orange and pink, which no theme defines, are fixed
+ * hues (like the task phase hues). Text in a tone is mixed toward the
+ * foreground so a pale theme accent stays readable. Never put a hex value
+ * for the accent or a status tone here: tests/test_renderer_charter_theme.py.
  * Sizes are in rem so the UI scale setting applies. Docs:
  * docs/architecture/ui-charter.md.
  */
@@ -25,30 +29,30 @@
 	   (a dialog, a popover) without the stage's layout. */
 	.wp-stage,
 	.wp-scope {
-		--wp-accent: #e8642a;
-		--wp-blue: #2f6fd6;
-		--wp-amber: #b07a00;
+		/* The theme's own colours: Ocean stays blue, Forest green, Neo magenta. */
+		--wp-accent: var(--primary);
+		--wp-accent-fg: var(--primary-foreground);
+		--wp-blue: var(--info);
+		--wp-amber: var(--warning);
+		--wp-green: var(--success);
+		--wp-red: var(--destructive);
+		/* Category hues no theme defines, a light and a dark value each. */
 		--wp-violet: #7b55e0;
 		--wp-orange: #d9581f;
-		--wp-green: #0f8f6a;
 		--wp-pink: #c2416b;
-		--wp-red: #c0392b;
 		--wp-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
-		--wp-shadow: 0 1px 2px rgba(41, 37, 36, 0.06), 0 8px 24px -12px rgba(41, 37, 36, 0.18);
+		--wp-shadow:
+			0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent),
+			0 8px 24px -12px color-mix(in srgb, var(--foreground) 18%, transparent);
 		--wp-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 	}
 
 	.dark .wp-stage,
 	.dark.wp-stage,
 	.dark .wp-scope {
-		--wp-accent: #f26b2d;
-		--wp-blue: #7cb4ff;
-		--wp-amber: #f2c46d;
 		--wp-violet: #b8a1ff;
 		--wp-orange: #ff9a5c;
-		--wp-green: #6fdab4;
 		--wp-pink: #ff8fb0;
-		--wp-red: #ff7a6b;
 		--wp-grid: color-mix(in srgb, var(--foreground) 4%, transparent);
 		--wp-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.8);
 	}
@@ -64,18 +68,15 @@
 		--wp-faint: color-mix(in srgb, var(--foreground) 40%, transparent);
 		--wp-ambient: color-mix(in srgb, var(--wp-accent) 13%, transparent);
 		--wp-code-bg: color-mix(in srgb, var(--background) 70%, var(--card));
+		/* Text in a tone (kicker, ink, prompt): the tone pulled toward the
+		   foreground, so a pale accent (Default light olive, Dusk) stays legible
+		   on the card while keeping its hue. Fills and rails use the tone itself. */
+		--wp-ink-mix: 72%;
+		--wp-accent-ink: color-mix(in oklab, var(--wp-accent) var(--wp-ink-mix), var(--wp-title));
 
-		/* The shared ui/ components (Button, Badge, text-primary...) read the
-		   Tailwind colour tokens: inside a stage they take the charter's
-		   accent and tones, so a view keeps its components and still matches. */
-		--color-primary: var(--wp-accent);
-		--color-primary-foreground: #fff;
-		--color-ring: var(--wp-accent);
-		--color-destructive: var(--wp-red);
-		--color-destructive-foreground: #fff;
-		--color-success: var(--wp-green);
-		--color-warning: var(--wp-amber);
-		--color-info: var(--wp-blue);
+		/* No remap of the Tailwind colour tokens (--color-primary...): the
+		   shared ui/ components (Button, Badge, text-primary) already read the
+		   theme, and so does the charter now. */
 	}
 
 	.wp-stage {
@@ -126,12 +127,12 @@
 		letter-spacing: 0.09em;
 		text-transform: uppercase;
 		line-height: 1.2;
-		color: var(--wp-tone, var(--wp-accent));
+		color: color-mix(in oklab, var(--wp-tone, var(--wp-accent)) var(--wp-ink-mix), var(--wp-title));
 	}
 
 	/* Text in the tone of its element (a suggestion, a fix, a verdict). */
 	.wp-ink {
-		color: var(--wp-tone, var(--wp-accent));
+		color: color-mix(in oklab, var(--wp-tone, var(--wp-accent)) var(--wp-ink-mix), var(--wp-title));
 	}
 
 	.wp-title {
@@ -516,7 +517,7 @@
 	.wp-btn-primary {
 		background: var(--wp-accent);
 		border-color: var(--wp-accent);
-		color: #fff;
+		color: var(--wp-accent-fg);
 		box-shadow: 0 0 24px -6px var(--wp-accent);
 	}
 
@@ -584,7 +585,7 @@
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		font-variant-numeric: tabular-nums;
-		color: var(--wp-tone, var(--wp-title));
+		color: color-mix(in oklab, var(--wp-tone, var(--wp-title)) var(--wp-ink-mix), var(--wp-title));
 	}
 
 	.wp-empty {
@@ -717,7 +718,7 @@
 		content: ">";
 		font-family: var(--wp-mono);
 		font-weight: 700;
-		color: var(--wp-accent);
+		color: var(--wp-accent-ink);
 	}
 
 	.wp-field {
