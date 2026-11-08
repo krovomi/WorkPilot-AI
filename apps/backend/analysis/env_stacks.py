@@ -260,7 +260,7 @@ def check_script(snapshot: dict) -> str:
         "  local name=$1 want=$2; shift 2",
         '  local have; have=$("$@" 2>&1 | grep -oE "[0-9]+(\\.[0-9]+)+" | head -1)',
         '  if [ "$have" = "$want" ]; then echo "ok    $name $have";'
-        ' else echo "DIFF  $name: want $want, have ${have:-missing}"; fi',
+        + ' else echo "DIFF  $name: want $want, have ${have:-missing}"; fi',
         "}",
     ]
     for key, version in _versions(snapshot).items():
