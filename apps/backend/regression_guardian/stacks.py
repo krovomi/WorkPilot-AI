@@ -18,7 +18,8 @@ from dataclasses import replace
 from pathlib import Path
 
 from .incident_parser import Incident
-from .test_generator import GeneratedTest, TestFramework, _safe_function_name
+from .test_model import GeneratedTest, TestFramework
+from .test_model import safe_function_name as _safe_function_name
 
 _UNSAFE = re.compile(r"[^\w .,:;()\[\]=+\-#@!?%&|^~/]")
 _SPACES = re.compile(r"\s+")
