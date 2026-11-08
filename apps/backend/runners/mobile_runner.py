@@ -13,6 +13,7 @@ already has.
     python runners/mobile_runner.py --project-dir . --action devices --platform android
     python runners/mobile_runner.py --project-dir . --action doctor
     python runners/mobile_runner.py --project-dir . --action plan --platform ios
+    python runners/mobile_runner.py --project-dir . --action profile
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from mobile import detect_stack, doctor, list_devices  # noqa: E402
+from mobile.bootstrap import mobile_profile  # noqa: E402
 from mobile.stacks import normalise_targets  # noqa: E402
 
 RESULT_MARKER = "__MOBILE_RESULT__:"
@@ -90,8 +92,11 @@ def main() -> int:
     parser.add_argument(
         "--action",
         default="plan",
-        choices=("detect", "devices", "doctor", "plan"),
-        help="What to answer (default: plan — all three at once)",
+        choices=("detect", "devices", "doctor", "plan", "profile"),
+        help=(
+            "What to answer (default: plan — all three at once; profile — the "
+            "task form's mobile box: the app found, or the frameworks to set up)"
+        ),
     )
     parser.add_argument(
         "--platform",
@@ -117,6 +122,7 @@ def main() -> int:
         "devices": lambda: _devices(platforms),
         "doctor": lambda: _doctor(project_dir, platforms),
         "plan": lambda: _plan(project_dir, platforms),
+        "profile": lambda: mobile_profile(project_dir),
     }
 
     try:

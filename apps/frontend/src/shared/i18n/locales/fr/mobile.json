@@ -42,12 +42,69 @@
 		"description": "Les plateformes visées par cette tâche. Les agents ne construisent et ne vérifient que celles-ci, et signalent celle qui n'est pas constructible sur cette machine.",
 		"android": "Android",
 		"ios": "Apple (iOS)",
-		"badgeTitle": "Cible mobile : {{platforms}}"
+		"badgeTitle": "Cible mobile : {{platforms}}",
+		"detected": "Application détectée : {{framework}} ({{platforms}}).",
+		"notInApp": "Cette plateforme n'existe pas dans l'application du projet.",
+		"noAppTitle": "Ce projet n'a pas encore d'application mobile",
+		"noAppPreamble": "Cocher Android ou Apple (iOS) ajoute automatiquement au tableau les tâches qui créent l'application : une tâche qui installe le framework mobile et crée le projet dans le dossier {{dir}}/, puis une tâche de préparation par plateforme cochée. Cette tâche-ci attendra qu'elles soient terminées. Ne cochez rien si la tâche ne concerne pas une application mobile.",
+		"hostStacks": "Stacks détectées dans le projet : {{stacks}}. Le framework proposé en tient compte.",
+		"framework": "Framework mobile",
+		"recommended": "{{framework}} (recommandé)",
+		"frameworkLocked": "Une installation de {{framework}} est déjà prévue sur le tableau : cette tâche s'y rattache.",
+		"tasksHeading": "Tâches qui seront ajoutées au tableau :",
+		"reused": "{{title}} (déjà sur le tableau, réutilisée)",
+		"thisTaskWaits": "Cette tâche, qui démarrera une fois les précédentes terminées"
 	},
 	"review": {
 		"send": "Envoyer à la revue visuelle",
 		"hint": "Garder cette image comme capture : la QA la lit par OCR (quel écran, crash ou connexion, clés brutes, libellés coupés)",
 		"sent": "Image gardée pour la revue visuelle",
 		"failed": "L'image n'a pas pu être gardée : {{error}}"
+	},
+	"stacks": {
+		"dotnet": ".NET",
+		"react": "React",
+		"web-spa": "Angular / Vue / Svelte",
+		"javascript": "JavaScript / TypeScript",
+		"jvm": "Java / Kotlin",
+		"swift": "Swift",
+		"dart": "Dart",
+		"go": "Go",
+		"rust": "Rust",
+		"python": "Python",
+		"php": "PHP",
+		"ruby": "Ruby",
+		"elixir": "Elixir"
+	},
+	"frameworks": {
+		"android-native": "Android (Kotlin)",
+		"ios-native": "iOS (Swift)",
+		"flutter": "Flutter",
+		"react-native": "React Native",
+		"expo": "React Native (Expo)",
+		"dotnet-maui": ".NET MAUI",
+		"kotlin-multiplatform": "Kotlin Multiplatform",
+		"capacitor": "Capacitor"
+	},
+	"setup": {
+		"installTitle": "Installer {{framework}} et créer l'application mobile",
+		"platformTitle": "Préparer l'application {{framework}} pour {{platform}}",
+		"generatedNote": "Tâche créée automatiquement depuis l'encart « Plateformes mobiles » : le projet n'avait pas encore d'application mobile.",
+		"installGoal": "Objectif : installer la chaîne d'outils {{framework}} et créer l'application mobile dans {{dir}} pour {{platforms}}, sans modifier le code existant du projet.",
+		"platformGoal": "Objectif : rendre l'application {{framework}} de {{dir}} constructible et lançable sur {{platform}} (émulateur ou simulateur).",
+		"toolchainHeading": "Outils à installer :",
+		"scaffoldHeading": "Création du projet :",
+		"stepsHeading": "Étapes :",
+		"notesHeading": "À savoir :",
+		"docsHeading": "Documentation :",
+		"iosNote": "iOS ne se construit que sur macOS : sur une autre machine, le signaler sans réessayer.",
+		"createFailed": "Les tâches de mise en place de l'application mobile n'ont pas pu être créées.",
+		"criteria": {
+			"builds": "L'application se construit pour {{platforms}} (une plateforme impossible sur cette machine est signalée).",
+			"untouched": "Le code existant du projet n'est pas modifié ; les modèles et contrats existants sont réutilisés plutôt que copiés.",
+			"readme": "Le README explique comment installer les outils et lancer l'application.",
+			"platformBuilds": "L'application se construit et se lance sur {{platform}}.",
+			"screenshot": "Une capture de l'application lancée sur l'appareil est jointe comme preuve."
+		}
 	}
 }

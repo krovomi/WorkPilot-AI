@@ -42,12 +42,69 @@
 		"description": "Which platforms this task targets. Agents build and verify only these, and say so when one cannot be built on this machine.",
 		"android": "Android",
 		"ios": "Apple (iOS)",
-		"badgeTitle": "Mobile target: {{platforms}}"
+		"badgeTitle": "Mobile target: {{platforms}}",
+		"detected": "App detected: {{framework}} ({{platforms}}).",
+		"notInApp": "This platform is not part of the project's app.",
+		"noAppTitle": "This project has no mobile app yet",
+		"noAppPreamble": "Checking Android or Apple (iOS) automatically adds the tasks that create the app to the board: one task installs the mobile framework and creates the project in the {{dir}}/ folder, then one preparation task per platform checked. This task will wait until they are done. Leave both unchecked if this task is not about a mobile app.",
+		"hostStacks": "Stacks found in the project: {{stacks}}. The proposed framework follows them.",
+		"framework": "Mobile framework",
+		"recommended": "{{framework}} (recommended)",
+		"frameworkLocked": "A {{framework}} setup is already on the board: this task joins it.",
+		"tasksHeading": "Tasks that will be added to the board:",
+		"reused": "{{title}} (already on the board, reused)",
+		"thisTaskWaits": "This task, which starts once the ones above are done"
 	},
 	"review": {
 		"send": "Send to visual review",
 		"hint": "Keep this frame as a capture: QA reads it by OCR (which screen, crash or sign-in screen, raw keys, cut labels)",
 		"sent": "Frame kept for the visual review",
 		"failed": "The frame could not be kept: {{error}}"
+	},
+	"stacks": {
+		"dotnet": ".NET",
+		"react": "React",
+		"web-spa": "Angular / Vue / Svelte",
+		"javascript": "JavaScript / TypeScript",
+		"jvm": "Java / Kotlin",
+		"swift": "Swift",
+		"dart": "Dart",
+		"go": "Go",
+		"rust": "Rust",
+		"python": "Python",
+		"php": "PHP",
+		"ruby": "Ruby",
+		"elixir": "Elixir"
+	},
+	"frameworks": {
+		"android-native": "Android (Kotlin)",
+		"ios-native": "iOS (Swift)",
+		"flutter": "Flutter",
+		"react-native": "React Native",
+		"expo": "React Native (Expo)",
+		"dotnet-maui": ".NET MAUI",
+		"kotlin-multiplatform": "Kotlin Multiplatform",
+		"capacitor": "Capacitor"
+	},
+	"setup": {
+		"installTitle": "Install {{framework}} and create the mobile app",
+		"platformTitle": "Prepare the {{framework}} app for {{platform}}",
+		"generatedNote": "Task created automatically from the \"Mobile platforms\" box: the project had no mobile app yet.",
+		"installGoal": "Goal: install the {{framework}} toolchain and create the mobile app in {{dir}} for {{platforms}}, without changing the project's existing code.",
+		"platformGoal": "Goal: make the {{framework}} app in {{dir}} build and launch on {{platform}} (emulator or simulator).",
+		"toolchainHeading": "Tools to install:",
+		"scaffoldHeading": "Creating the project:",
+		"stepsHeading": "Steps:",
+		"notesHeading": "Good to know:",
+		"docsHeading": "Documentation:",
+		"iosNote": "iOS only builds on macOS: on another machine, report it and do not retry.",
+		"createFailed": "The mobile app setup tasks could not be created.",
+		"criteria": {
+			"builds": "The app builds for {{platforms}} (a platform impossible on this machine is reported).",
+			"untouched": "The project's existing code is not changed; existing models and contracts are reused rather than copied.",
+			"readme": "The README explains how to install the tools and run the app.",
+			"platformBuilds": "The app builds and launches on {{platform}}.",
+			"screenshot": "A screenshot of the app running on the device is attached as evidence."
+		}
 	}
 }
