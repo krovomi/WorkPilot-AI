@@ -32,7 +32,8 @@ class Emitter(Protocol):
     """What ``core.task_event.TaskEventEmitter`` offers this step."""
 
     @classmethod
-    def from_spec_dir(cls, spec_dir: Path) -> Any: ...
+    def from_spec_dir(cls, spec_dir: Path) -> Any:
+        pass
 
 
 def split_before_build(
