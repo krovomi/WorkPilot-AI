@@ -17,6 +17,10 @@ import {
 	parseTestDestination,
 	parseTestLibrarySelection,
 } from "../shared/types/test-generation";
+import {
+	isTestStudioLanguage,
+	TDD_SNIPPET_TYPES,
+} from "../shared/constants/test-studio-languages";
 import { getRunnerEnv } from "./ipc-handlers/github/utils/runner-env";
 
 /**
@@ -244,6 +248,17 @@ export class TestGenerationService extends EventEmitter {
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<void> {
+		// Both reach the runner as arguments: only values it knows go through.
+		if (!isTestStudioLanguage(language)) {
+			this.emitError({
+				message: `"${String(language).slice(0, 40)}" is not a language the test generator supports.`,
+				code: "invalid_input",
+			});
+			return;
+		}
+		const snippet = (TDD_SNIPPET_TYPES as readonly string[]).includes(snippetType)
+			? snippetType
+			: "function";
 		const args = [
 			"--action",
 			"generate-tdd",
@@ -252,7 +267,7 @@ export class TestGenerationService extends EventEmitter {
 			"--language",
 			language,
 			"--snippet-type",
-			snippetType,
+			snippet,
 		];
 		if (projectPath) {
 			args.push("--project-path", projectPath);
@@ -303,9 +318,13 @@ export class TestGenerationService extends EventEmitter {
 		filePath: string,
 		projectPath?: string,
 		selected?: string[],
+		language?: string,
 	): Promise<TestLibrarySelection | null> {
 		const args = ["--action", "resolve-libraries"];
 		if (filePath) args.push("--file-path", filePath);
+		// TDD and E2E name their language; without it a C# TDD run was offered
+		// the libraries of whatever file another tab had open, or Python's.
+		if (isTestStudioLanguage(language)) args.push("--language", language);
 		if (projectPath) args.push("--project-path", projectPath);
 		if (selected?.length) args.push("--test-libraries", selected.join(","));
 
