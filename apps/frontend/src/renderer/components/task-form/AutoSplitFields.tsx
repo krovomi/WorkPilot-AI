@@ -5,8 +5,9 @@
  */
 
 import { useTranslation } from "react-i18next";
+import type { TaskKind } from "../../../shared/types";
 import {
-	AUTO_SPLIT_DEFAULT_MAX_LINES,
+	autoSplitCeilingFor,
 	SPLIT_MAX_LINES_RANGE,
 	wholeInRange,
 } from "../../../shared/utils/task-split";
@@ -66,8 +67,10 @@ export function isAutoSplitValueValid(value: AutoSplitValue): boolean {
 interface AutoSplitFieldsProps {
 	value: AutoSplitValue;
 	onChange: (value: AutoSplitValue) => void;
-	/** The project's ceiling, shown as the placeholder. */
+	/** The project's ceiling for this task's kind, shown as the placeholder. */
 	projectMaxLines?: number;
+	/** The task's kind (or the one its category means), named in the placeholder. */
+	kind?: TaskKind;
 	/** The project turned the split off: the task cannot turn it on alone. */
 	projectDisabled?: boolean;
 	disabled?: boolean;
@@ -78,13 +81,15 @@ export function AutoSplitFields({
 	value,
 	onChange,
 	projectMaxLines,
+	kind = "feature",
 	projectDisabled = false,
 	disabled = false,
 	idPrefix = "",
 }: AutoSplitFieldsProps) {
 	const { t } = useTranslation(["tasks"]);
 	const prefix = idPrefix ? `${idPrefix}-` : "";
-	const ceiling = projectMaxLines ?? AUTO_SPLIT_DEFAULT_MAX_LINES;
+	const ceiling = projectMaxLines ?? autoSplitCeilingFor(undefined, kind);
+	const kindLabel = t(`tasks:kind.values.${kind}`);
 	const valid = isAutoSplitValueValid(value);
 	const enabled = !value.noSplit && !projectDisabled;
 
@@ -130,9 +135,16 @@ export function AutoSplitFields({
 						max={SPLIT_MAX_LINES_RANGE[1]}
 						step={50}
 						value={value.maxLines}
-						placeholder={t("tasks:form.autoSplit.maxLinesPlaceholder", {
-							count: ceiling,
-						})}
+						placeholder={
+							ceiling === undefined
+								? t("tasks:form.autoSplit.maxLinesPlaceholderNever", {
+										kind: kindLabel,
+									})
+								: t("tasks:form.autoSplit.maxLinesPlaceholder", {
+										count: ceiling,
+										kind: kindLabel,
+									})
+						}
 						onChange={(event) =>
 							onChange({ ...value, maxLines: event.target.value })
 						}

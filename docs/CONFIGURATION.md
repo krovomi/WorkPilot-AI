@@ -559,7 +559,8 @@ from Project settings → General; a task's own `noSplit` / `splitMaxLines` (tas
 | Variable | Default | Meaning |
 | --- | ---: | --- |
 | `WORKPILOT_AUTO_SPLIT` | `1` | `0` keeps every task whole. |
-| `WORKPILOT_SPLIT_MAX_LINES` | `400` | Changed lines per part (50 to 20000; out of range is ignored). |
+| `WORKPILOT_SPLIT_MAX_LINES_BY_KIND` | — | JSON object, kind of task to lines to review per part, e.g. `{"bug_fix":150,"feature":500}`. Kinds: `feature` (400), `bug_fix` (200), `hotfix` (100), `refactoring` (300), `upgrade` (200), `test` (400), `docs` (400); `investigation`, `spike` and `run` are never split. |
+| `WORKPILOT_SPLIT_MAX_LINES` | per kind | Lines to review per part for every kind the JSON above leaves out (50 to 20000; out of range is ignored). Code counts 1, tests and docs 0.5, generated files and lockfiles 0. |
 | `WORKPILOT_SPLIT_MAX_FILES` | `25` | Files per part (2 to 1000; out of range is ignored). |
 
 ## RUN tasks — `.workpilot/environments.toml`

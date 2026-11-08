@@ -5,10 +5,12 @@ out. Nothing here reads a file, a provider or a language: what a slice weighs
 is what the plan says it will change, so the cut is the same with every model
 and every stack.
 
-**Weight.** A subtask weighs its ``estimated_lines`` when the planner gave a
-whole number, otherwise a count from the files it names (a created file
-weighs more than a modified one). A phase weighs its subtasks, and touches the
-union of their files.
+**Weight.** A subtask weighs the lines a person will have to review
+(``review_load``): its ``estimated_lines`` when the planner gave a whole
+number, otherwise a count from the files it names (a created file weighs more
+than a modified one), each weighed by the kind of its files (code 1, tests
+and docs half, generated files and lockfiles nothing). A phase weighs its
+subtasks, and touches the union of their files that a person reviews.
 
 **Units.** A phase is the smallest unit the cut keeps whole, because its
 subtasks were planned to land together. A phase heavier than the ceiling on
@@ -32,9 +34,11 @@ plan order (each one ``after`` the previous); an independent slice has no
 from __future__ import annotations
 
 import copy
+import math
 from dataclasses import dataclass, field
 
 from .policy import SplitPolicy
+from .review_load import file_weight
 
 __all__ = [
     "LINES_PER_EMPTY_SUBTASK",
@@ -72,25 +76,34 @@ def _files(subtask: dict, key: str) -> list[str]:
 
 
 def subtask_lines(subtask: dict) -> int:
-    """The lines a subtask expects to change."""
+    """The lines of a subtask a person will have to review."""
+    created = _files(subtask, "files_to_create")
+    modified = _files(subtask, "files_to_modify")
     estimate = subtask.get("estimated_lines")
     if (
         isinstance(estimate, int)
         and not isinstance(estimate, bool)
         and 0 < estimate <= _ESTIMATE_MAX
     ):
-        return estimate
-    created = len(_files(subtask, "files_to_create"))
-    modified = len(_files(subtask, "files_to_modify"))
-    if created == 0 and modified == 0:
+        named = created + modified
+        if not named:
+            return estimate
+        factor = sum(file_weight(f) for f in named) / len(named)
+        return math.ceil(estimate * factor)
+    if not created and not modified:
         return LINES_PER_EMPTY_SUBTASK
-    return created * LINES_PER_NEW_FILE + modified * LINES_PER_MODIFIED_FILE
+    load = sum(LINES_PER_NEW_FILE * file_weight(f) for f in created) + sum(
+        LINES_PER_MODIFIED_FILE * file_weight(f) for f in modified
+    )
+    return math.ceil(load)
 
 
 def _subtask_files(subtask: dict) -> set[str]:
-    return set(_files(subtask, "files_to_create")) | set(
+    """The files of a subtask a person reviews (generated ones aside)."""
+    named = set(_files(subtask, "files_to_create")) | set(
         _files(subtask, "files_to_modify")
     )
+    return {f for f in named if file_weight(f) > 0}
 
 
 @dataclass

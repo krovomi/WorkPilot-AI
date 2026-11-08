@@ -652,7 +652,8 @@
 			"refactoring": "Refactoring",
 			"test": "Tests",
 			"docs": "Documentation",
-			"spike": "Spike / study"
+			"spike": "Spike / study",
+			"upgrade": "Version upgrade"
 		},
 		"source": {
 			"user": "chosen by you",
@@ -849,10 +850,11 @@
 			"label": "Split automatically when the task is too big",
 			"description": "Once the plan is written, a task above the line ceiling becomes several tasks, one small pull request each, chained by their dependencies.",
 			"projectOff": "Automatic splitting is turned off in the project settings.",
-			"maxLinesLabel": "Max changed lines per pull request",
-			"maxLinesPlaceholder": "{{count}} (project)",
-			"maxLinesHelp": "Leave empty to use the project's ceiling.",
-			"maxLinesInvalid": "Enter a whole number between {{min}} and {{max}}."
+			"maxLinesLabel": "Max lines to review per PR",
+			"maxLinesPlaceholder": "{{count}} (project, {{kind}})",
+			"maxLinesHelp": "Leave empty to use the project's ceiling for this kind of task. Tests and docs count half, lockfiles don't count.",
+			"maxLinesInvalid": "Enter a whole number between {{min}} and {{max}}.",
+			"maxLinesPlaceholderNever": "never split ({{kind}})"
 		}
 	},
 	"testGen": {

@@ -1942,9 +1942,11 @@
 			"autoSplit": {
 				"label": "Découper automatiquement les grosses tâches",
 				"description": "Une fois le plan d'une tâche écrit, une tâche au-delà de ces plafonds devient plusieurs tâches, une petite PR chacune. Une tâche peut garder son propre plafond de lignes ou rester entière.",
-				"maxLines": "Lignes modifiées max par PR",
 				"maxFiles": "Fichiers max par PR",
-				"invalid": "Saisis un nombre entier entre {{min}} et {{max}} ; d'ici là, la valeur par défaut s'applique."
+				"invalid": "Saisis un nombre entier entre {{min}} et {{max}} ; d'ici là, la valeur par défaut s'applique.",
+				"byKindTitle": "Lignes à relire max par PR, selon le type de tâche",
+				"byKindHelp": "Le code compte pleinement, les tests et la documentation pour moitié, les fichiers générés et les lockfiles pas du tout. Les valeurs par défaut suivent les études sur la revue de code : au-delà de 200 à 400 lignes ou d'une heure, le relecteur trouve moins de défauts. Laisser vide pour la valeur par défaut.",
+				"neverSplit": "Les investigations, les spikes et les tâches d'exploitation ne sont jamais découpées : elles n'ouvrent pas de code à relire."
 			}
 		},
 		"github": {

@@ -652,7 +652,8 @@
 			"refactoring": "Refactoring",
 			"test": "Tests",
 			"docs": "Documentation",
-			"spike": "Étude / POC"
+			"spike": "Étude / POC",
+			"upgrade": "Mise à jour de version"
 		},
 		"source": {
 			"user": "choisi par vous",
@@ -849,10 +850,11 @@
 			"label": "Découper automatiquement si la tâche est trop grosse",
 			"description": "Une fois le plan écrit, une tâche au-delà du plafond de lignes devient plusieurs tâches, une petite PR chacune, enchaînées selon leurs dépendances.",
 			"projectOff": "Le découpage automatique est désactivé dans les paramètres du projet.",
-			"maxLinesLabel": "Lignes modifiées max par PR",
-			"maxLinesPlaceholder": "{{count}} (projet)",
-			"maxLinesHelp": "Laisser vide pour utiliser le plafond du projet.",
-			"maxLinesInvalid": "Saisis un nombre entier entre {{min}} et {{max}}."
+			"maxLinesLabel": "Lignes à relire max par PR",
+			"maxLinesPlaceholder": "{{count}} (projet, {{kind}})",
+			"maxLinesHelp": "Laisser vide pour utiliser le plafond du projet pour ce type de tâche. Tests et doc comptent pour moitié, les lockfiles pas du tout.",
+			"maxLinesInvalid": "Saisis un nombre entier entre {{min}} et {{max}}.",
+			"maxLinesPlaceholderNever": "jamais découpée ({{kind}})"
 		}
 	},
 	"testGen": {

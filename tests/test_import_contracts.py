@@ -77,8 +77,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     "mcp_pins": {"foundation", "injection_guard"},
     # Splitting a task too big for one small PR (docs/architecture/task-split.md):
     # the plan's JSON, the spec approval, the build signal; the build and the
-    # coder call it and hand it their task-event emitter (it sits below core).
-    "task_split": {"foundation", "review", "ui"},
+    # coder call it and hand it their task-event emitter (it sits below core);
+    # the kind of the task (tasks.classify, pure) picks its ceiling.
+    "task_split": {"foundation", "review", "tasks", "ui"},
     # MCP 2026-07-28 and its Tasks extension, for WorkPilot's own servers:
     # the standard library only (docs/architecture/mcp-2026.md).
     "mcp_tasks": set(),

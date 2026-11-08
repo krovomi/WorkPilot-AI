@@ -2,10 +2,12 @@ import { useTranslation } from "react-i18next";
 import type {
 	AutoSplitSettings as AutoSplitSettingsType,
 	ProjectSettings as ProjectSettingsType,
+	SplitKind,
 } from "../../../shared/types";
 import {
 	AUTO_SPLIT_DEFAULT_MAX_FILES,
-	AUTO_SPLIT_DEFAULT_MAX_LINES,
+	AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND,
+	SPLIT_KINDS,
 	SPLIT_MAX_FILES_RANGE,
 	SPLIT_MAX_LINES_RANGE,
 	wholeInRange,
@@ -16,9 +18,10 @@ import { Switch } from "../ui/switch";
 
 /**
  * The automatic split of a task too big for one small pull request
- * (`apps/backend/task_split/`), for the whole project: on or off, and the
- * ceilings a plan is measured against. A task can keep its own line ceiling
- * or stay whole (task form). An empty field is the default.
+ * (`apps/backend/task_split/`), for the whole project: on or off, a ceiling
+ * of lines to review per kind of task, and a ceiling of files. A task can
+ * keep its own line ceiling or stay whole (task form). An empty field is the
+ * default of its kind.
  */
 export function AutoSplitSettings({
 	settings,
@@ -29,9 +32,10 @@ export function AutoSplitSettings({
 		React.SetStateAction<ProjectSettingsType>
 	>;
 }) {
-	const { t } = useTranslation(["settings"]);
+	const { t } = useTranslation(["settings", "tasks"]);
 	const current = settings.autoSplit ?? {};
 	const enabled = current.enabled !== false;
+	const base = "settings:projectSections.general.autoSplit";
 
 	const update = (patch: Partial<AutoSplitSettingsType>) =>
 		setSettings((previous) => ({
@@ -39,42 +43,49 @@ export function AutoSplitSettings({
 			autoSplit: { ...(previous.autoSplit ?? {}), ...patch },
 		}));
 
-	const numberField = (
-		key: "maxLines" | "maxFiles",
-		range: readonly [number, number],
-		fallback: number,
-	) => {
-		const value = current[key];
+	const setKind = (kind: SplitKind, raw: string) => {
+		const next = { ...(current.maxLinesByKind ?? {}) };
+		if (raw.trim() === "") delete next[kind];
+		else next[kind] = Number(raw.trim());
+		update({ maxLinesByKind: next });
+	};
+
+	const field = (props: {
+		id: string;
+		label: string;
+		value: number | undefined;
+		range: readonly [number, number];
+		fallback: number;
+		onChange: (raw: string) => void;
+	}) => {
 		const invalid =
-			value !== undefined && wholeInRange(value, range) === undefined;
+			props.value !== undefined &&
+			wholeInRange(props.value, props.range) === undefined;
 		return (
-			<div className="space-y-1">
+			<div className="space-y-1" key={props.id}>
 				<Label
-					htmlFor={`auto-split-${key}`}
+					htmlFor={props.id}
 					className="text-xs font-medium text-foreground"
 				>
-					{t(`projectSections.general.autoSplit.${key}`)}
+					{props.label}
 				</Label>
 				<Input
-					id={`auto-split-${key}`}
+					id={props.id}
 					type="number"
 					inputMode="numeric"
-					min={range[0]}
-					max={range[1]}
-					value={value ?? ""}
-					placeholder={String(fallback)}
-					onChange={(event) => {
-						const raw = event.target.value.trim();
-						update({ [key]: raw === "" ? undefined : Number(raw) });
-					}}
+					min={props.range[0]}
+					max={props.range[1]}
+					value={props.value ?? ""}
+					placeholder={String(props.fallback)}
+					onChange={(event) => props.onChange(event.target.value)}
 					aria-invalid={invalid}
-					className="h-8 w-32"
+					className="h-8 w-28"
 				/>
 				{invalid && (
 					<p className="text-xs text-destructive">
-						{t("projectSections.general.autoSplit.invalid", {
-							min: range[0],
-							max: range[1],
+						{t(`${base}.invalid`, {
+							min: props.range[0],
+							max: props.range[1],
 						})}
 					</p>
 				)}
@@ -87,10 +98,10 @@ export function AutoSplitSettings({
 			<div className="flex items-center justify-between">
 				<div className="space-y-0.5">
 					<Label htmlFor="auto-split" className="font-normal text-foreground">
-						{t("projectSections.general.autoSplit.label")}
+						{t(`${base}.label`)}
 					</Label>
 					<p className="text-xs text-muted-foreground">
-						{t("projectSections.general.autoSplit.description")}
+						{t(`${base}.description`)}
 					</p>
 				</div>
 				<Switch
@@ -100,17 +111,41 @@ export function AutoSplitSettings({
 				/>
 			</div>
 			{enabled && (
-				<div className="flex flex-wrap gap-6 pl-1">
-					{numberField(
-						"maxLines",
-						SPLIT_MAX_LINES_RANGE,
-						AUTO_SPLIT_DEFAULT_MAX_LINES,
-					)}
-					{numberField(
-						"maxFiles",
-						SPLIT_MAX_FILES_RANGE,
-						AUTO_SPLIT_DEFAULT_MAX_FILES,
-					)}
+				<div className="space-y-3 pl-1">
+					<div className="space-y-1">
+						<p className="text-xs font-medium text-foreground">
+							{t(`${base}.byKindTitle`)}
+						</p>
+						<p className="text-xs text-muted-foreground">
+							{t(`${base}.byKindHelp`)}
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-4">
+						{SPLIT_KINDS.map((kind) =>
+							field({
+								id: `auto-split-lines-${kind}`,
+								label: t(`tasks:kind.values.${kind}`),
+								value: current.maxLinesByKind?.[kind],
+								range: SPLIT_MAX_LINES_RANGE,
+								fallback: AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND[kind],
+								onChange: (raw) => setKind(kind, raw),
+							}),
+						)}
+					</div>
+					<p className="text-xs text-muted-foreground">
+						{t(`${base}.neverSplit`)}
+					</p>
+					{field({
+						id: "auto-split-maxFiles",
+						label: t(`${base}.maxFiles`),
+						value: current.maxFiles,
+						range: SPLIT_MAX_FILES_RANGE,
+						fallback: AUTO_SPLIT_DEFAULT_MAX_FILES,
+						onChange: (raw) =>
+							update({
+								maxFiles: raw.trim() === "" ? undefined : Number(raw.trim()),
+							}),
+					})}
 				</div>
 			)}
 		</div>

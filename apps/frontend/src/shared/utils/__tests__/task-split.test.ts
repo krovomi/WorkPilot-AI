@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createActor } from "xstate";
-import type { Task } from "../../types";
+import { TASK_KINDS, type Task } from "../../types";
 import { taskMachine } from "../../state-machines/task-machine";
 import {
+	AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND,
+	autoSplitCeilingFor,
 	autoSplitEnv,
 	canStartOnSibling,
+	kindFromCategory,
+	NEVER_SPLIT_KINDS,
+	SPLIT_KINDS,
 	splitChildCount,
 	splitPartOf,
 	wholeInRange,
@@ -30,11 +35,60 @@ describe("autoSplitEnv", () => {
 
 	it("sends the switch only when it is off, and only valid ceilings", () => {
 		expect(autoSplitEnv({ enabled: false })).toEqual({ WORKPILOT_AUTO_SPLIT: "0" });
-		expect(autoSplitEnv({ enabled: true, maxLines: 600, maxFiles: 40 })).toEqual({
-			WORKPILOT_SPLIT_MAX_LINES: "600",
+		expect(
+			autoSplitEnv({
+				enabled: true,
+				maxLinesByKind: { bug_fix: 150, feature: 600 },
+				maxFiles: 40,
+			}),
+		).toEqual({
+			WORKPILOT_SPLIT_MAX_LINES_BY_KIND: JSON.stringify({
+				feature: 600,
+				bug_fix: 150,
+			}),
 			WORKPILOT_SPLIT_MAX_FILES: "40",
 		});
-		expect(autoSplitEnv({ maxLines: 3, maxFiles: 1.5 })).toEqual({});
+		expect(
+			autoSplitEnv({ maxLinesByKind: { bug_fix: 3, docs: 1.5 }, maxFiles: 1.5 }),
+		).toEqual({});
+	});
+});
+
+describe("ceilings by kind of task", () => {
+	it("keeps the backend's defaults (task_split/policy.py)", () => {
+		expect(AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND).toEqual({
+			hotfix: 100,
+			bug_fix: 200,
+			feature: 400,
+			refactoring: 300,
+			upgrade: 200,
+			test: 400,
+			docs: 400,
+		});
+		expect([...SPLIT_KINDS].sort()).toEqual(
+			Object.keys(AUTO_SPLIT_DEFAULT_MAX_LINES_BY_KIND).sort(),
+		);
+		expect([...SPLIT_KINDS, ...NEVER_SPLIT_KINDS].sort()).toEqual(
+			[...TASK_KINDS].sort(),
+		);
+	});
+
+	it("gives the project's ceiling for the task's kind, else the default", () => {
+		const settings = { maxLinesByKind: { bug_fix: 150 } };
+		expect(autoSplitCeilingFor(settings, "bug_fix")).toBe(150);
+		expect(autoSplitCeilingFor(settings, "hotfix")).toBe(100);
+		expect(autoSplitCeilingFor(undefined, undefined)).toBe(400);
+		expect(autoSplitCeilingFor(settings, "spike")).toBeUndefined();
+		expect(autoSplitCeilingFor({ maxLinesByKind: { docs: 7 } }, "docs")).toBe(400);
+	});
+
+	it("reads a category as the backend does", () => {
+		expect(kindFromCategory("bug_fix")).toBe("bug_fix");
+		expect(kindFromCategory("documentation")).toBe("docs");
+		expect(kindFromCategory("testing")).toBe("test");
+		expect(kindFromCategory("infrastructure")).toBe("run");
+		expect(kindFromCategory("security")).toBe("feature");
+		expect(kindFromCategory("")).toBe("feature");
 	});
 });
 

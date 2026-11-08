@@ -187,6 +187,13 @@ def is_text_only_path(path: str) -> bool:
     return name in TEXT_ONLY_NAMES
 
 
+def is_generated_path(path: str) -> bool:
+    """True when ``path`` names a generated or vendored file (name only)."""
+    p = PurePosixPath(path.replace("\\", "/"))
+    parts = {part.lower() for part in p.parts[:-1]}
+    return bool(parts & _GENERATED_DIRS) or p.name.lower().endswith(_GENERATED_SUFFIXES)
+
+
 def light_qa_enabled() -> bool:
     """False when the project turned the light review off."""
     return os.environ.get(LIGHT_QA_ENV, "1").strip().lower() not in (

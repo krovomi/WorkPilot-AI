@@ -8,7 +8,8 @@ il lit seulement `implementation_plan.json`.
 
 ```
 apps/backend/task_split/
-  policy.py     plafonds : carte > paramètres du projet (env) > défauts ; on/off
+  policy.py     plafonds par type de tâche : carte > paramètres du projet (env) > défauts ; on/off
+  review_load.py  lignes à relire : poids par type de fichier, toutes stacks (pur)
   slices.py     découpe pure du plan en parts (aucune E/S)
   children.py   écrit les cartes enfants, clôt et archive la tâche découpée
   step.py       le point d'appel du build ; une erreur garde la tâche entière
@@ -18,22 +19,53 @@ apps/frontend/src/main/ipc-handlers/task/split-stack.ts    une part dépendante 
 apps/frontend/src/renderer/components/kanban/SplitPartBadge.tsx
 ```
 
-## Le plafond
+## Le plafond, selon le type de tâche
+
+Le plafond compte les **lignes à relire** (`review_load.py`), pas les lignes modifiées :
+
+| Fichier | Poids d'une ligne |
+|---|---|
+| code | 1 |
+| tests, documentation | 0,5 |
+| fichiers générés, vendorisés, lockfiles (npm, pnpm, yarn, Poetry, uv, Cargo, Go, Composer, NuGet, CocoaPods, pub…), snapshots de tests | 0 |
+| ligne supprimée | le quart du poids de son fichier ; un fichier supprimé entier compte pour 1 |
+
+Les fichiers à poids nul ne comptent pas non plus dans le plafond de fichiers. Le type de fichier se
+lit au chemin seul, avec les conventions de test de toutes les stacks (`foundation/test_conventions`).
+Le demi-poids des tests et de la doc est un choix : aucune étude ne le chiffre.
+
+Le plafond dépend du **type** de la tâche (`tasks/classify.py` : catégorie, type de l'item importé,
+mots du titre, sans token). Les valeurs viennent des études sur la revue de code. Chez SmartBear
+(équipe Cisco), au-delà de 200 à 400 lignes, de 500 lignes par heure ou de 60 minutes, le
+relecteur trouve moins de défauts. Pour Google, 100 lignes est raisonnable et 1 000 trop.
+
+| Type | Lignes à relire par PR |
+|---|---|
+| correctif urgent (`hotfix`) | 100 |
+| correction de bug (`bug_fix`) | 200 |
+| feature | 400 (une séance de revue au plus) |
+| refactoring | 300 |
+| mise à jour de version (`upgrade` : framework, SDK, dépendances) | 200 |
+| tests (`test`), documentation (`docs`) | 400 |
+| investigation, spike, exploitation (`run`) | jamais découpé : pas de code à relire |
 
 | Source | Clés | Portée |
 |---|---|---|
-| Tâche | `noSplit`, `splitMaxLines` (métadonnées de la carte, formulaire de tâche) | cette tâche |
-| Projet | `settings.autoSplit` → `WORKPILOT_AUTO_SPLIT`, `WORKPILOT_SPLIT_MAX_LINES`, `WORKPILOT_SPLIT_MAX_FILES` | toutes ses tâches |
-| Défaut | 400 lignes modifiées, 25 fichiers | partout |
+| Tâche | `noSplit`, `splitMaxLines` (métadonnées de la carte, formulaire de tâche) | cette tâche, quel que soit son type |
+| Projet | `settings.autoSplit` → `WORKPILOT_SPLIT_MAX_LINES_BY_KIND` (JSON type → lignes), `WORKPILOT_SPLIT_MAX_LINES` (tous types), `WORKPILOT_SPLIT_MAX_FILES`, `WORKPILOT_AUTO_SPLIT` | toutes ses tâches |
+| Défaut | le tableau ci-dessus, 25 fichiers | partout |
 
 Une valeur hors bornes (lignes 50 à 20 000, fichiers 2 à 1 000) est ignorée et la source suivante
 s'applique. Un projet qui coupe le découpage l'emporte : une tâche ne peut pas le rallumer seule.
+Une tâche d'un type jamais découpé l'est si elle porte son propre plafond. Le type retenu est
+écrit dans `splitGroup.kind` de la tâche découpée.
 
 ## La mesure et la découpe (`slices.py`)
 
 - **Poids d'une sous-tâche** : `estimated_lines` si le planificateur l'a donné (le prompt le
-  demande), sinon 80 par fichier créé, 30 par fichier modifié, 20 sans fichier. C'est une
-  estimation : la vérification sur le diff réel arrive dans un lot suivant.
+  demande), multiplié par le poids moyen de ses fichiers ; sinon 80 par fichier créé, 30 par
+  fichier modifié, chacun pondéré, et 20 sans fichier. C'est une estimation : la vérification sur
+  le diff réel arrive dans un lot suivant.
 - **Unités** : les phases du plan restent entières. Une phase plus lourde que le plafond est
   coupée en tronçons enchaînés « Nom (k/n) ».
 - **Dépendances** : `depends_on` du plan. Une phase sans `depends_on` dépend de la précédente ; une

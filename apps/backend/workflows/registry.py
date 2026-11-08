@@ -46,6 +46,9 @@ WORKFLOW_BY_KIND: dict[str, str] = {
     "test": "test",
     "docs": "docs",
     "spike": "spike",
+    # A version upgrade is built like a feature; only its split ceiling differs
+    # (task_split.policy). The .NET ladder has its own skills (dotnet_upgrade).
+    "upgrade": DEFAULT_WORKFLOW,
 }
 
 
