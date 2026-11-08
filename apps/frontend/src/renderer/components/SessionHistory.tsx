@@ -1,34 +1,25 @@
-import {
-	AlertTriangle,
-	CheckCircle2,
-	ChevronDown,
-	ChevronRight,
-	Clock,
-	History,
-	FileCode2,
-	Loader2,
-	Pause,
-	Play,
-	RefreshCw,
-	Timer,
-	XCircle,
-	Zap,
-} from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, History, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { WorkspaceSession } from "@shared/types";
 import { useTranslation } from "react-i18next";
 import { useServerProjectId } from "../hooks/useServerProjectId";
-import { cn } from "../lib/utils";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ScrollArea } from "./ui/scroll-area";
 import { formatAppDateTime } from "@/lib/date-format";
-import { PageHeader } from "./ui/page-header";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import {
+	CharterButton,
+	Chip,
+	EmptyStage,
+	ModuleHeader,
+	ModuleStage,
+	Notice,
+	Page,
+	Panel,
+	ScanLine,
+	Section,
+	Stat,
+	Stats,
+	Tabs,
+	type Tone,
+} from "./charter";
 
 type SessionEntry = WorkspaceSession;
 
@@ -36,31 +27,25 @@ interface SessionHistoryProps {
 	readonly projectId: string;
 }
 
-// ---------------------------------------------------------------------------
-// Status icon
-// ---------------------------------------------------------------------------
+type Filter = "all" | "completed" | "failed" | "running";
 
-function StatusIcon({ status }: { readonly status: string }) {
-	switch (status.toLowerCase()) {
-		case "completed":
-		case "success":
-			return <CheckCircle2 className="h-4 w-4 text-success" />;
-		case "failed":
-		case "error":
-			return <XCircle className="h-4 w-4 text-destructive" />;
-		case "running":
-		case "in_progress":
-			return <Play className="h-4 w-4 text-blue-500" />;
-		case "paused":
-			return <Pause className="h-4 w-4 text-warning" />;
-		default:
-			return <Clock className="h-4 w-4 text-muted-foreground" />;
-	}
+const FILTERS: readonly Filter[] = ["all", "completed", "failed", "running"];
+
+/** The status group a raw status belongs to; "other" for paused or unknown. */
+function statusGroup(status: string): Exclude<Filter, "all"> | "other" {
+	const s = status.toLowerCase();
+	if (s === "completed" || s === "success") return "completed";
+	if (s === "failed" || s === "error") return "failed";
+	if (s === "running" || s === "in_progress") return "running";
+	return "other";
 }
 
-// ---------------------------------------------------------------------------
-// Duration formatter
-// ---------------------------------------------------------------------------
+const GROUP_TONE: Record<ReturnType<typeof statusGroup>, Tone> = {
+	completed: "green",
+	failed: "red",
+	running: "blue",
+	other: "muted",
+};
 
 function formatDuration(seconds: number): string {
 	if (seconds < 60) return `${seconds}s`;
@@ -72,8 +57,7 @@ function formatDuration(seconds: number): string {
 
 function formatDateTime(iso: string): string {
 	try {
-		const d = new Date(iso);
-		return formatAppDateTime(d, {
+		return formatAppDateTime(new Date(iso), {
 			month: "short",
 			day: "numeric",
 			hour: "2-digit",
@@ -84,163 +68,108 @@ function formatDateTime(iso: string): string {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Session card
-// ---------------------------------------------------------------------------
-
 function SessionCard({ session }: { readonly session: SessionEntry }) {
 	const { t } = useTranslation("sessionHistory");
 	const [expanded, setExpanded] = useState(false);
-
-	const statusColor: Record<string, string> = {
-		completed: "border-success/30",
-		success: "border-success/30",
-		failed: "border-destructive/30",
-		error: "border-destructive/30",
-		running: "border-blue-500/30",
-		in_progress: "border-blue-500/30",
-	};
+	const tone = GROUP_TONE[statusGroup(session.status)];
+	const Chevron = expanded ? ChevronDown : ChevronRight;
 
 	return (
-		<div
-			className={cn(
-				"rounded-lg border p-4 transition-colors hover:bg-accent/20",
-				statusColor[session.status.toLowerCase()] || "border-border",
-			)}
-		>
-			{/* Header row */}
+		<Panel rail tone={tone}>
 			<button
 				type="button"
-				className="w-full flex items-center gap-3 text-left"
+				className="flex w-full items-start gap-2 text-left"
 				onClick={() => setExpanded(!expanded)}
+				aria-expanded={expanded}
 			>
-				{expanded ? (
-					<ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-				) : (
-					<ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-				)}
-				<StatusIcon status={session.status} />
-				<div className="flex-1 min-w-0">
-					<div className="flex items-center gap-2">
-						<span className="text-sm font-medium text-foreground truncate">
+				<Chevron className="wp-muted mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+				<div className="min-w-0 flex-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="wp-title truncate text-sm">
 							{session.task_title || session.task_id || session.session_id}
 						</span>
+						<Chip tone={tone}>{session.status}</Chip>
 						{session.phase && session.phase !== session.task_title && (
-							<Badge variant="secondary" className="text-3xs">
+							<Chip tone="muted" dot={false}>
 								{session.phase}
-							</Badge>
+							</Chip>
 						)}
-						<Badge variant="outline" className="text-3xs capitalize">
-							{session.status}
-						</Badge>
 					</div>
-					<div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+					<p className="wp-meta mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
 						<span>{formatDateTime(session.started_at)}</span>
-						{session.started_by && (
-							<span>
-								{t("server.startedBy", { name: session.started_by })}
-							</span>
-						)}
-						{session.duration_seconds !== undefined && (
-							<span className="flex items-center gap-1">
-								<Timer className="h-3 w-3" />
-								{formatDuration(session.duration_seconds)}
-							</span>
-						)}
+						{session.started_by && <span>{t("server.startedBy", { name: session.started_by })}</span>}
+						{session.duration_seconds !== undefined && <span>{formatDuration(session.duration_seconds)}</span>}
 						{session.tokens_used !== undefined && (
-							<span className="flex items-center gap-1">
-								<Zap className="h-3 w-3" />
-								{t("sessionHistory:tokensCount", {
-												count: session.tokens_used,
-												formatted: session.tokens_used.toLocaleString(),
-											})}
+							<span>
+								{t("tokensCount", {
+									count: session.tokens_used,
+									formatted: session.tokens_used.toLocaleString(),
+								})}
 							</span>
 						)}
 						{session.files_changed !== undefined && (
-							<span className="flex items-center gap-1">
-								<FileCode2 className="h-3 w-3" />
-								{t("sessionHistory:filesCount", {
-												count: session.files_changed,
-											})}
-							</span>
+							<span>{t("filesCount", { count: session.files_changed })}</span>
 						)}
-						{session.cost !== undefined && (
-							<span>${session.cost.toFixed(4)}</span>
-						)}
-					</div>
+						{session.cost !== undefined && <span>{t("costValue", { value: session.cost.toFixed(4) })}</span>}
+					</p>
 				</div>
 			</button>
 
-			{/* Expanded details */}
 			{expanded && (
-				<div className="mt-3 pl-9 space-y-3">
+				<div className="mt-3 space-y-3 pl-6">
 					{session.error && (
-						<div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive">
-							<span className="font-medium">{t("error")}: </span>
+						<Notice tone="red" icon={AlertTriangle}>
 							{session.error}
-						</div>
+						</Notice>
 					)}
-
 					{session.phases && session.phases.length > 0 && (
 						<div className="space-y-1.5">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-								{t("phases")}
-							</p>
+							<span className="wp-kicker block">{t("phases")}</span>
 							{session.phases.map((phase) => (
 								<div
 									key={`${session.session_id}-${phase.name}`}
 									className="flex items-center gap-2 text-xs"
 								>
-									<StatusIcon status={phase.status} />
-									<span className="text-foreground capitalize flex-1">
-										{phase.name}
-									</span>
+									<Chip tone={GROUP_TONE[statusGroup(phase.status)]}>{phase.name}</Chip>
+									<span className="flex-1" />
 									{phase.duration_seconds !== undefined && (
-										<span className="text-muted-foreground">
-											{formatDuration(phase.duration_seconds)}
-										</span>
+										<span className="wp-meta">{formatDuration(phase.duration_seconds)}</span>
 									)}
 									{phase.tokens !== undefined && (
-										<span className="text-muted-foreground font-mono">
-											{phase.tokens.toLocaleString()} tok
+										<span className="wp-meta font-mono">
+											{t("tokensCount", {
+												count: phase.tokens,
+												formatted: phase.tokens.toLocaleString(),
+											})}
 										</span>
 									)}
 								</div>
 							))}
 						</div>
 					)}
-
-					<div className="flex gap-4 text-xs text-muted-foreground">
+					<p className="wp-meta flex flex-wrap gap-x-4">
 						<span>
-							{t("session.session")}:{" "}
-							<span className="font-mono text-foreground">
-								{session.session_id}
-							</span>
+							{t("session.session")}: <span className="wp-title font-mono">{session.session_id}</span>
 						</span>
 						{session.ended_at && (
 							<span>
 								{t("session.ended")}: {formatDateTime(session.ended_at)}
 							</span>
 						)}
-					</div>
+					</p>
 				</div>
 			)}
-		</div>
+		</Panel>
 	);
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
+/** Agent sessions of the project: replay store locally, runs and jobs on a server. */
 export function SessionHistory({ projectId }: SessionHistoryProps) {
-	const { t } = useTranslation("sessionHistory");
+	const { t } = useTranslation(["sessionHistory", "navigation"]);
 	const [sessions, setSessions] = useState<SessionEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [filter, setFilter] = useState<
-		"all" | "completed" | "failed" | "running"
-	>("all");
+	const [filter, setFilter] = useState<Filter>("all");
 	const serverProjectId = useServerProjectId({ id: projectId });
 
 	const fetchSessions = useCallback(
@@ -250,32 +179,35 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 			try {
 				// A server project's sessions are its runs and jobs on the server.
 				if (serverProjectId) {
-					const result =
-						await globalThis.electronAPI.getServerSessions(serverProjectId);
+					const result = await globalThis.electronAPI.getServerSessions(serverProjectId);
 					if (signal?.aborted) return;
 					if (result.success) setSessions(result.data ?? []);
-					else setError(result.error || "Failed to load sessions");
+					else setError(result.error || t("sessionHistory:errors.loadFailed"));
 					return;
 				}
 				const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-				const res = await fetch(
-					`${backendUrl}/api/sessions/${projectId}`,
-					{ signal },
-				);
-				const data = await res.json();
-				if (data.success) {
-					setSessions(data.sessions || []);
-				} else {
-					setError(data.error || "Failed to load sessions");
+				const res = await fetch(`${backendUrl}/api/sessions/${encodeURIComponent(projectId)}`, { signal });
+				// No backend answering (stopped, or a page served without one): an
+				// empty or HTML body, never JSON. Say so instead of a parser error.
+				if (!res.ok) {
+					setError(t("sessionHistory:errors.loadFailed"));
+					return;
 				}
+				if (!res.headers.get("content-type")?.includes("application/json")) {
+					setError(t("sessionHistory:errors.backendUnreachable"));
+					return;
+				}
+				const data = await res.json();
+				if (data.success) setSessions(data.sessions || []);
+				else setError(data.error || t("sessionHistory:errors.loadFailed"));
 			} catch (e) {
 				if ((e as { name?: string })?.name === "AbortError") return;
-				setError(e instanceof Error ? e.message : "Network error");
+				setError(t("sessionHistory:errors.backendUnreachable"));
 			} finally {
 				setLoading(false);
 			}
 		},
-		[projectId, serverProjectId],
+		[projectId, serverProjectId, t],
 	);
 
 	useEffect(() => {
@@ -284,152 +216,69 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 		return () => controller.abort();
 	}, [fetchSessions]);
 
-	const filtered = sessions.filter((s) => {
-		if (filter === "all") return true;
-		const status = s.status.toLowerCase();
-		if (filter === "completed")
-			return status === "completed" || status === "success";
-		if (filter === "failed") return status === "failed" || status === "error";
-		if (filter === "running")
-			return status === "running" || status === "in_progress";
-		return true;
-	});
-
-	const stats = {
-		total: sessions.length,
-		completed: sessions.filter((s) =>
-			["completed", "success"].includes(s.status.toLowerCase()),
-		).length,
-		failed: sessions.filter((s) =>
-			["failed", "error"].includes(s.status.toLowerCase()),
-		).length,
-		running: sessions.filter((s) =>
-			["running", "in_progress"].includes(s.status.toLowerCase()),
-		).length,
-		totalTokens: sessions.reduce((sum, s) => sum + (s.tokens_used || 0), 0),
-		totalCost: sessions.reduce((sum, s) => sum + (s.cost || 0), 0),
-	};
-
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center h-full">
-				<Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-			</div>
-		);
+	const counts: Record<Filter, number> = { all: sessions.length, completed: 0, failed: 0, running: 0 };
+	for (const s of sessions) {
+		const group = statusGroup(s.status);
+		if (group !== "other") counts[group] += 1;
 	}
+	const totalTokens = sessions.reduce((sum, s) => sum + (s.tokens_used || 0), 0);
+	const filtered = filter === "all" ? sessions : sessions.filter((s) => statusGroup(s.status) === filter);
 
 	return (
-		<ScrollArea className="h-full">
-			<div className="p-6 space-y-6 max-w-5xl mx-auto">
-				<PageHeader
-					variant="inline"
-					icon={History}
-					title={t("title")}
-					description={serverProjectId ? t("serverSubtitle") : t("subtitle")}
-					actions={
-						<Button variant="outline" size="sm" onClick={() => fetchSessions()}>
-							<RefreshCw className="h-3.5 w-3.5 mr-2" />
-							{t("refresh")}
-						</Button>
-					}
-				/>
+		<ModuleStage scroll="page" data-testid="session-history-view">
+			<ModuleHeader
+				kicker={t("navigation:groups.workspace")}
+				title={t("sessionHistory:title")}
+				description={serverProjectId ? t("sessionHistory:serverSubtitle") : t("sessionHistory:subtitle")}
+				icon={History}
+				tone="blue"
+				actions={
+					<CharterButton icon={RefreshCw} busy={loading} onClick={() => void fetchSessions()}>
+						{t("sessionHistory:refresh")}
+					</CharterButton>
+				}
+			/>
+			<Page className="space-y-4">
+				<Stats>
+					<Stat label={t("sessionHistory:stats.total")} value={counts.all} />
+					<Stat label={t("sessionHistory:stats.completed")} value={counts.completed} tone="green" />
+					<Stat label={t("sessionHistory:stats.failed")} value={counts.failed} tone="red" />
+					<Stat label={t("sessionHistory:stats.tokens")} value={totalTokens.toLocaleString()} tone="violet" />
+				</Stats>
 
-				{/* Stats */}
-				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-					<Card>
-						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-foreground">{stats.total}</p>
-							<p className="text-xs text-muted-foreground">
-								{t("stats.total")}
-							</p>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-success">
-								{stats.completed}
-							</p>
-							<p className="text-xs text-muted-foreground">
-								{t("stats.completed")}
-							</p>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-destructive">{stats.failed}</p>
-							<p className="text-xs text-muted-foreground">
-								{t("stats.failed")}
-							</p>
-						</CardContent>
-					</Card>
-					<Card>
-						<CardContent className="p-3 text-center">
-							<p className="text-lg font-bold text-foreground">
-								{stats.totalTokens.toLocaleString()}
-							</p>
-							<p className="text-xs text-muted-foreground">
-								{t("stats.tokens")}
-							</p>
-						</CardContent>
-					</Card>
-				</div>
-
-				{/* Filter tabs */}
-				<div className="flex gap-2">
-					{(["all", "completed", "failed", "running"] as const).map((f) => {
-						const getFilterCount = () => {
-							switch (f) {
-								case "all":
-									return stats.total;
-								case "completed":
-									return stats.completed;
-								case "failed":
-									return stats.failed;
-								case "running":
-									return stats.running;
-								default:
-									return 0;
-							}
-						};
-
-						return (
-							<Button
-								key={f}
-								variant={filter === f ? "default" : "outline"}
-								size="sm"
-								onClick={() => setFilter(f)}
-								className="capitalize"
-							>
-								{t(`filters.${f}`)} ({getFilterCount()})
-							</Button>
-						);
-					})}
-				</div>
-
-				{/* Error */}
 				{error && (
-					<Card className="border-destructive/30">
-						<CardContent className="p-4 flex items-center gap-3 text-destructive">
-							<AlertTriangle className="h-5 w-5 shrink-0" />
-							<p className="text-sm">{error}</p>
-						</CardContent>
-					</Card>
+					<Notice tone="red" icon={AlertTriangle} role="alert">
+						{error}
+					</Notice>
 				)}
 
-				{/* Sessions list */}
-				{filtered.length === 0 ? (
-					<div className="text-center py-12 text-muted-foreground">
-						<Clock className="h-8 w-8 mx-auto mb-3 opacity-50" />
-						<p className="text-sm">{t("noSessions")}</p>
-					</div>
-				) : (
-					<div className="space-y-2">
-						{filtered.map((session) => (
-							<SessionCard key={session.session_id} session={session} />
-						))}
-					</div>
-				)}
-			</div>
-		</ScrollArea>
+				<Section
+					kicker={t("sessionHistory:kickers.list")}
+					title={t("sessionHistory:listTitle")}
+					actions={
+						<Tabs
+							label={t("sessionHistory:listTitle")}
+							value={filter}
+							onChange={setFilter}
+							tabs={FILTERS.map((f) => ({ id: f, label: t(`sessionHistory:filters.${f}`), count: counts[f] }))}
+						/>
+					}
+				>
+					{loading ? (
+						<ScanLine label={t("sessionHistory:loading")} />
+					) : filtered.length === 0 ? (
+						<EmptyStage icon={History} tone="blue" title={t("sessionHistory:noSessions")}>
+							{t("sessionHistory:noSessionsHint")}
+						</EmptyStage>
+					) : (
+						<div className="space-y-2">
+							{filtered.map((session) => (
+								<SessionCard key={session.session_id} session={session} />
+							))}
+						</div>
+					)}
+				</Section>
+			</Page>
+		</ModuleStage>
 	);
 }

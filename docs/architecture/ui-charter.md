@@ -20,7 +20,7 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 | Stage | `ModuleStage` | The theme background, a faint dot grid, a warm glow in two corners. Every module and Settings page opens on one. |
 | Header band | `ModuleHeader` | Mono uppercase **kicker** in the accent, a short title, one line of description, actions on the right. Not needed inside a hub whose tabs already name the view. |
 | Columns | `Columns` + `Column` | Side by side, separated by a dashed rule; each opens with kicker / title / mono meta on the right. One column under 1100 px. |
-| Page | `Page` + `Section` | For a single scrolling page (Settings): the same head per section, a dashed rule between sections. |
+| Page | `Page` + `Section` | For a single scrolling page (Settings): the same head per section, a dashed rule between sections. Sections side by side in a grid take `.wp-split` on the grid: no rule between columns. |
 | Card | `Panel` (`rail` for the accent rail) | Solid card, radius 14, soft shadow. The rail is the canvas block: the tone of what the card is. |
 | Step | `StepCard` | `01 · KICKER` / title / mono meta; clickable steps glow when active. |
 | Chip | `Chip` / `Chips` | Mono, pill, coloured dot. A chip with `onClick` is a toggle (filters). |
@@ -124,10 +124,19 @@ Done:
   ligne (pages, `Switch` rows), API Studio (charter header over its own
   two-pane layout), Émulateur d'application, Optimiseur de prompt and
   Assistant vocal (dialogs, `wp-scope`).
+- Espace de travail: Tableau de bord (KPIs as railed panels, `Bar` rows per
+  status, model and provider, `Gauge` for auto merges), Contrôle de Mission
+  (launch page with one primary action; crew, reasoning and live log as
+  sections), Historique des sessions, Agent de Replay (charter list; the
+  viewer keeps its timeline and playback under charter `Tabs`), Débogueur
+  d'agent (sessions as `StepCard`s, tools as chips), Fonctionnalités avancées
+  (pill `Tabs`; `PanelShell` is a `Section`, so its twelve panels follow).
+  The Kanban board keeps its own design: its columns and cards already use
+  tone rails and chips, and it is the app's home screen.
 - Hubs: the launcher page of a tab whose tool is a dialog (`HubLauncher`) is
   an `EmptyStage` with one primary button, for every hub. The hub tab bar
   keeps its underline: it is the app's navigation, a level above a module's
   own pill `Tabs`.
 
-The last group (Espace de travail) and the Settings pages move lot by lot; each
+The Settings pages move lot by lot; each
 lot lists its views in its PR.
