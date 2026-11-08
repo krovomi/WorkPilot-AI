@@ -9,7 +9,6 @@ between notebook and script formats.
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 
 from .formats import parse_text_notebook
@@ -29,8 +28,6 @@ __all__ = [
     "NotebookIssueType",
     "ParsedNotebook",
 ]
-
-logger = logging.getLogger(__name__)
 
 
 class NotebookHandler:
