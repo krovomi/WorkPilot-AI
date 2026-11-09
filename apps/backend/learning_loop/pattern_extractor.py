@@ -1,8 +1,8 @@
 """
 Pattern Extractor for the Autonomous Agent Learning Loop.
 
-Uses Claude Agent SDK to analyze completed build data and extract
-actionable success/failure patterns.
+Gathers the records of completed builds, builds the analysis prompt and parses
+the model's answer; ``model_analysis`` makes the call, on the user's provider.
 """
 
 import json
@@ -26,7 +26,9 @@ class PatternExtractor:
     ):
         self.project_dir = Path(project_dir)
         self.specs_dir = self.project_dir / ".workpilot" / "specs"
-        self.model = model or "sonnet"
+        # None: the provider's own default model (the analysis runs on
+        # whatever provider is selected, not only Claude).
+        self.model = model or None
         self.thinking_level = thinking_level or "medium"
 
     def gather_build_data(self, spec_dir: Path) -> dict[str, Any]:
@@ -188,7 +190,11 @@ class PatternExtractor:
                     confidence=float(raw.get("confidence", 0.5)),
                     occurrence_count=int(raw.get("occurrence_count", 1)),
                     agent_phase=raw.get("agent_phase", "coding"),
-                    context_tags=raw.get("context_tags", list(all_tags)[:10]),
+                    context_tags=(
+                        raw["context_tags"]
+                        if isinstance(raw.get("context_tags"), list)
+                        else list(all_tags)[:10]
+                    ),
                     actionable_instruction=raw.get("actionable_instruction", ""),
                     source_build_ids=source_ids,
                 )
