@@ -15,7 +15,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
 | `KanbanColumn.tsx` | ~1 080 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
-| `QuickCommandBar.tsx` | ~360 | palette `/slash` — lit `.agents/skills/` via le backend |
+| `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F181) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
 | `../../stores/mobile-store.ts` | ~200 | plateforme / appareil / dernière capture sélectionnés |

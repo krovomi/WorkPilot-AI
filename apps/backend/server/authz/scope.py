@@ -4,8 +4,8 @@ The legacy API let a client send ``project_dir`` — an absolute path — and re
 it. That was sound for a desktop app: the backend ran as the person who picked
 the directory, so there was no boundary to cross. On a shared server the same
 parameter is a cross-tenant read and write, and it is the single most dangerous
-thing in the surface, because ``POST /api/slash-commands/run`` executes an agent
-with file and network tools rooted at whatever it is given.
+thing in the surface, because a route that runs an agent (``/api/verify/run``)
+gives it file and network tools rooted at whatever it is given.
 
 So the direction is inverted. The client names a *project*; the server decides
 where that project lives. Three checks stand between the two, and all three

@@ -352,7 +352,7 @@
 			"placeholder": "Commande rapide (ex. /review, /help)",
 			"buttonLabel": "Exécuter",
 			"running": "Exécution…",
-			"hint": "Tape / puis le nom de la commande. Tab pour autocompléter.",
+			"hint": "Tape / puis le nom de la commande. Tab pour autocompléter. Ce que la commande écrit part sur une branche de revue, jamais dans ton dossier de projet.",
 			"noResults": "Aucune commande correspondante",
 			"sourceProject": "Projet",
 			"sourceUser": "Utilisateur",
@@ -362,8 +362,12 @@
 			"successTitle": "Commande terminée",
 			"ariaListLabel": "Commandes slash disponibles",
 			"runAsTaskLabel": "Lancer en tâche",
-			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'un tir unique.",
-			"taskCreated": "Tâche créée : {{name}}"
+			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'une exécution directe.",
+			"taskCreated": "Tâche créée : {{name}}",
+			"uncommitted": "Les fichiers écrits n'ont pas pu être commités sur la branche de revue ; ils sont restés dans {{path}}.",
+			"reviewCard_other": "{{count}} fichiers commités sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
+			"reviewCard_one": "{{count}} fichier commité sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
+			"helpTitle": "Commandes disponibles"
 		},
 		"blockers": {
 			"label_one": "1 bloqueur",

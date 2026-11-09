@@ -352,7 +352,7 @@
 			"placeholder": "Quick command (e.g. /review, /help)",
 			"buttonLabel": "Run command",
 			"running": "Running…",
-			"hint": "Type / then a command name. Tab to autocomplete.",
+			"hint": "Type / then a command name. Tab to autocomplete. What the command writes goes to a review branch, never into your project folder.",
 			"noResults": "No matching command",
 			"sourceProject": "Project",
 			"sourceUser": "User",
@@ -362,8 +362,12 @@
 			"successTitle": "Slash command completed",
 			"ariaListLabel": "Available slash commands",
 			"runAsTaskLabel": "Run as task",
-			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a one-shot.",
-			"taskCreated": "Task created: {{name}}"
+			"runAsTaskHint": "Run as an interactive Kanban task (planning, review, conversation) instead of a direct run.",
+			"taskCreated": "Task created: {{name}}",
+			"uncommitted": "The files written could not be committed on the review branch; they are still in {{path}}.",
+			"reviewCard_other": "{{count}} files committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
+			"reviewCard_one": "{{count}} file committed on {{branch}} (card “{{card}}”, in Human Review). Review the diff, then create the PR from the card.",
+			"helpTitle": "Available commands"
 		},
 		"blockers": {
 			"label_one": "1 blocker",

@@ -15,8 +15,8 @@ The required permission is derived from the HTTP method:
 * everything else                 → ``<domain>.write``
 
 Method-derivation is a floor, not a ceiling. A route whose blast radius exceeds
-its verb — ``POST /api/slash-commands/run`` executes an LLM agent with file and
-network tools — is listed in :data:`ROUTE_OVERRIDES` and checked against the
+its verb — ``POST /api/verify/run`` launches the task's app and may run fixer
+sessions with file and network tools — is listed in :data:`ROUTE_OVERRIDES` and checked against the
 route *template*, which FastAPI exposes as ``request.scope["route"].path`` by
 the time dependencies run.
 """
@@ -41,8 +41,6 @@ _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # The template is the path as declared, including the prefix the router was
 # mounted with and FastAPI's ``{param}`` placeholders.
 ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
-    # Runs a full agent session with read/write/web tools rooted at a project.
-    ("POST", "/api/slash-commands/run"): "agent.execute",
     # Launches the task's app and may run fixer and verifier sessions.
     ("POST", "/api/verify/run"): "agent.execute",
     # Launches the task's app twice, on its base branch and on the task.

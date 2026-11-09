@@ -16,13 +16,14 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Import Design | les fichiers du composant (« Écrire dans le projet ») | 2 |
 | Journal des modifications | `CHANGELOG.md` (« Enregistrer ») | 2 |
 | Pair programming | tout ce que l'agent codeur modifie, en direct | 3 |
+| Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F181](../audit/findings/F181.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
 Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab. N'écrivent rien
 dans le projet : la traduction inter-langages (dossier temporaire), les extraits contextuels
 (copie), le playground, le compagnon, les analyses (accessibilité, i18n, dérive de doc,
 notebooks, git surgeon), le générateur de pipelines (`.workpilot/pipelines/`). Le mode serveur
-n'offre aucune des quatre pages.
+n'offre aucune de ces pages.
 
 ## Le mécanisme
 
@@ -79,6 +80,19 @@ Par page :
   Les commits que l'agent fait lui-même comptent (`commit --since <head du create>`). Exception à
   la règle d'échec : un commit refusé par git laisse le travail dans le worktree, dont la page
   donne le chemin, car la personne l'a regardé s'écrire.
+- **Commande rapide du Kanban** (lot 5, F181) : la barre ne demande plus au serveur backend de
+  lancer la commande. Le main ouvre la carte (`main/quick-command/quick-command-run.ts`), puis
+  lance `runners/slash_command_runner.py` avec `--workdir` = le worktree et `--project-dir` = le
+  dossier du projet, d'où viennent les instructions de la commande (la palette les y a lues ;
+  `.agents/skills/` peut n'y être que non suivi). L'environnement est celui de tout runner de page
+  (`pythonRunnerEnv`) : le provider choisi dans l'app et sa clé, la connexion du profil Claude quand
+  ce provider en a besoin. Le serveur backend, lancé une fois avec l'environnement du main, n'avait
+  ni l'un ni l'autre : un abonnement Claude (OAuth) n'était pas trouvé et tout autre provider était
+  ignoré. Commit `chore: run /<commande> from the quick-command bar`, que la commande ait fini ou
+  échoué ; une commande qui n'écrit rien (question, analyse) ne laisse pas de carte et la barre
+  affiche seulement sa réponse. Une commande à la fois par projet. `/help` est répondu par la barre
+  à partir de la liste ; `/review` a des instructions que tout provider exécute
+  (`slash_commands.api._BUILT_IN_BODIES`). La route `POST /api/slash-commands/run` n'existe plus.
 
 ## Ce que le mécanisme refuse
 
@@ -106,4 +120,5 @@ fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
 - La carte, sa spec et sa PR restent : seule la copie locale part.
 
 Vérification : `pytest tests/test_review_worktree_runner.py -q` ;
-`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeButton`.
+`pytest tests/test_slash_command_runner.py -q` ;
+`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeButton quick-command-run`.

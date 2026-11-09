@@ -863,6 +863,9 @@ export const IPC_CHANNELS = {
 	/** The AI's work, committed on its review card's branch (or null: nothing written). */
 	PAIR_PROGRAMMING_REVIEW: "pairProgramming:review",
 
+	// Kanban quick-command bar: a command runs on a review card (F181)
+	QUICK_COMMAND_RUN: "quickCommand:run",
+
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
 	CONTEXT_MESH_REGISTER_PROJECT: "contextMesh:registerProject",

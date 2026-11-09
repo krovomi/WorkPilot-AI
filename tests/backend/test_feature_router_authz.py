@@ -138,16 +138,13 @@ class TestDangerousRoutesAreRaisedAboveTheirVerb:
         """A POST that runs a tooled agent must not settle for ``<domain>.write``."""
         from server.authz.mounting import ROUTE_OVERRIDES, permission_for
 
-        assert (
-            permission_for("POST", "/api/slash-commands/run", "agent")
-            == "agent.execute"
-        )
+        assert permission_for("POST", "/api/verify/run", "qa") == "agent.execute"
         executing = {
             path
             for (method, path), key in ROUTE_OVERRIDES.items()
             if key in {"agent.execute", "ops.execute"}
         }
-        assert "/api/slash-commands/run" in executing
+        assert "/api/verify/run" in executing
         assert "/api/code-playground/run" in executing
 
     def test_audit_exports_require_the_export_permission(self):
