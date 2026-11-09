@@ -190,7 +190,9 @@ class TestTheTwoReadmesStayTwins:
 
     @staticmethod
     def _images(text: str) -> list[str]:
-        return re.findall(r"\]\((\.github/assets/(?:screenshots|showcase)/[^)]+)\)", text)
+        return re.findall(
+            r"\]\((\.github/assets/(?:screenshots|showcase)/[^)]+)\)", text
+        )
 
     def test_each_links_to_the_other(self):
         assert "(README.fr.md)" in self.EN.read_text(encoding="utf-8")
@@ -215,7 +217,9 @@ class TestTheTwoReadmesStayTwins:
         assert all(".fr-" in image for image in fr_dark)
         for image in en_dark + fr_dark:
             assert (REPO_ROOT / image).is_file(), image
-            assert (REPO_ROOT / image.replace("-dark.png", "-light.png")).is_file(), image
+            assert (REPO_ROOT / image.replace("-dark.png", "-light.png")).is_file(), (
+                image
+            )
         for text in (en, fr):
             assert "─▶" not in text
 

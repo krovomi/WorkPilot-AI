@@ -29,7 +29,9 @@ const OUT = process.env.OUT || path.join(REPO, ".github", "assets", "showcase");
 
 // ---------------------------------------------------------------- icons
 const LUCIDE = path.join(
-	path.dirname(require.resolve("lucide-react/package.json", { paths: [FRONTEND] })),
+	path.dirname(
+		require.resolve("lucide-react/package.json", { paths: [FRONTEND] }),
+	),
 	"dist",
 	"esm",
 	"icons",
@@ -154,7 +156,8 @@ const COPY = {
 		review: ["You review the diff", "guided, line comments to the fixer"],
 		merge: ["Merge or pull request", "worktree removed once merged"],
 		legend: ["You decide", "AI agents", "Proof and delivery"],
-		worktree: "Each task in its own git worktree · any provider, model and effort",
+		worktree:
+			"Each task in its own git worktree · any provider, model and effort",
 		archKicker: "Architecture",
 		archTitle: "Runs on <em>your machine</em>, talks to your tools",
 		local: "Your machine",
@@ -162,9 +165,18 @@ const COPY = {
 		engine: ["Python engine", "agents, specs, QA, local API"],
 		repo: ["Your git repository", "one worktree per task"],
 		ext: "What the engine talks to",
-		providers: ["AI providers", "Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, local models, agent CLIs"],
-		forges: ["Forges and trackers", "GitHub, GitLab, Azure DevOps, Jira, Linear"],
-		clients: ["Other AI clients", "Claude Code, Codex, Cursor… via the workpilot-board MCP server"],
+		providers: [
+			"AI providers",
+			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, local models, agent CLIs",
+		],
+		forges: [
+			"Forges and trackers",
+			"GitHub, GitLab, Azure DevOps, Jira, Linear",
+		],
+		clients: [
+			"Other AI clients",
+			"Claude Code, Codex, Cursor… via the workpilot-board MCP server",
+		],
 		team: "Team mode",
 		optional: "OPTIONAL",
 		server: ["Team server", "shared board, roles, organisations"],
@@ -186,10 +198,14 @@ const COPY = {
 		fix: ["Correcteur QA", "corrige ce que la QA a trouvé"],
 		loop: "jusqu'à l'accord de la QA",
 		verify: ["Vérification", "lance l'app, garde une preuve"],
-		review: ["Vous relisez le diff", "guidé, commentaires de ligne au correcteur"],
+		review: [
+			"Vous relisez le diff",
+			"guidé, commentaires de ligne au correcteur",
+		],
 		merge: ["Fusion ou pull request", "worktree supprimé après la fusion"],
 		legend: ["Vous décidez", "Agents IA", "Preuve et livraison"],
-		worktree: "Chaque tâche dans son worktree git · provider, modèle et effort au choix",
+		worktree:
+			"Chaque tâche dans son worktree git · provider, modèle et effort au choix",
 		archKicker: "Architecture",
 		archTitle: "Tourne sur <em>votre machine</em>, parle à vos outils",
 		local: "Votre machine",
@@ -197,9 +213,15 @@ const COPY = {
 		engine: ["Moteur Python", "agents, specs, QA, API locale"],
 		repo: ["Votre dépôt git", "un worktree par tâche"],
 		ext: "Ce à quoi parle le moteur",
-		providers: ["Fournisseurs d'IA", "Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, modèles locaux, CLI d'agents"],
+		providers: [
+			"Fournisseurs d'IA",
+			"Claude, OpenAI, Gemini, Copilot, Mistral, Grok, DeepSeek, modèles locaux, CLI d'agents",
+		],
 		forges: ["Forges et suivi", "GitHub, GitLab, Azure DevOps, Jira, Linear"],
-		clients: ["Autres clients IA", "Claude Code, Codex, Cursor… via le serveur MCP workpilot-board"],
+		clients: [
+			"Autres clients IA",
+			"Claude Code, Codex, Cursor… via le serveur MCP workpilot-board",
+		],
 		team: "Mode équipe",
 		optional: "OPTIONNEL",
 		server: ["Serveur d'équipe", "tableau partagé, rôles, organisations"],
@@ -294,8 +316,13 @@ const FRAME_TITLES = {
 };
 
 async function shoot(browser, html, file, scale) {
-	const p = await browser.newPage({ deviceScaleFactor: scale, viewport: { width: 800, height: 600 } });
-	await p.setContent(html, { waitUntil: "networkidle" }).catch(() => p.setContent(html));
+	const p = await browser.newPage({
+		deviceScaleFactor: scale,
+		viewport: { width: 800, height: 600 },
+	});
+	await p
+		.setContent(html, { waitUntil: "networkidle" })
+		.catch(() => p.setContent(html));
 	await p.evaluate(() => document.fonts.ready);
 	await p.waitForTimeout(300);
 	const el = await p.$(".stage");
@@ -317,8 +344,18 @@ async function shoot(browser, html, file, scale) {
 			for (const [lang, c] of Object.entries(COPY)) {
 				const suffix = lang === "en" ? "" : `.${lang}`;
 				for (const [mode, t] of Object.entries(THEMES)) {
-					await shoot(browser, page(t, howItWorks(t, c)), path.join(OUT, `how-it-works${suffix}-${mode}.png`), 2);
-					await shoot(browser, page(t, architecture(t, c)), path.join(OUT, `architecture${suffix}-${mode}.png`), 2);
+					await shoot(
+						browser,
+						page(t, howItWorks(t, c)),
+						path.join(OUT, `how-it-works${suffix}-${mode}.png`),
+						2,
+					);
+					await shoot(
+						browser,
+						page(t, architecture(t, c)),
+						path.join(OUT, `architecture${suffix}-${mode}.png`),
+						2,
+					);
 				}
 			}
 		}
@@ -326,7 +363,12 @@ async function shoot(browser, html, file, scale) {
 			for (const [name, title] of Object.entries(FRAME_TITLES)) {
 				const png = path.join(SHOTS, `${name}.png`);
 				if (!fs.existsSync(png)) continue;
-				await shoot(browser, framePage(png, title), path.join(OUT, `${name}.png`), 1);
+				await shoot(
+					browser,
+					framePage(png, title),
+					path.join(OUT, `${name}.png`),
+					1,
+				);
 			}
 		}
 	} finally {

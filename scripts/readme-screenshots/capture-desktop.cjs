@@ -79,7 +79,10 @@ async function openApp(browser) {
 		await page.waitForTimeout(800);
 	}
 	// First run of the spaces menu: take the "Essential" menu (pinned pages).
-	const essential = page.getByRole("button", { name: "Essential", exact: true });
+	const essential = page.getByRole("button", {
+		name: "Essential",
+		exact: true,
+	});
 	if (await essential.count()) {
 		await essential.first().click();
 		await page.waitForTimeout(400);
@@ -202,7 +205,10 @@ const SHOTS = {
 		await page.waitForTimeout(1500);
 	},
 	settings: async (page) => {
-		await page.getByRole("button", { name: "Application Settings" }).first().click();
+		await page
+			.getByRole("button", { name: "Application Settings" })
+			.first()
+			.click();
 		await page.waitForTimeout(2500);
 	},
 };
