@@ -2532,7 +2532,7 @@
 	},
 	"guardrails": {
 		"title": "Garde-fous des agents",
-		"description": "Règles que les agents doivent respecter avant Write / Edit / Bash. Stockées dans .workpilot/guardrails.json.",
+		"description": "Règles que les agents respectent avant Write / Edit / Bash, sur tous les providers. Enregistrées dans .workpilot/guardrails.json ; workpilot.policy.yaml dans le dépôt et votre fichier global ajoutent les leurs.",
 		"selectProject": "Sélectionnez un projet pour gérer ses garde-fous.",
 		"addRule": "Ajouter une règle",
 		"empty": "Aucune règle pour l'instant. Ajoutez-en une pour commencer à appliquer des politiques.",
@@ -2555,7 +2555,11 @@
 		"fileContentPlaceholder": "contenu du fichier…",
 		"kickers": {
 			"rules": "Règles",
-			"tester": "Testeur"
+			"tester": "Testeur",
+			"policy": "Politique",
+			"approvals": "Approbations",
+			"activity": "Activité",
+			"dryRun": "Essai à blanc"
 		},
 		"rulesTitle": "Règles que les agents respectent",
 		"emptyTitle": "Pas encore de règle",
@@ -2564,7 +2568,49 @@
 		"filePath": "Chemin du fichier",
 		"clearTest": "Effacer le résultat",
 		"activeCount_one": "{{count}} règle active",
-		"activeCount_other": "{{count}} règles actives"
+		"activeCount_other": "{{count}} règles actives",
+		"pathGlob": "Motif de chemin (glob)",
+		"addsRegex": "Motif que le changement ajoute",
+		"newFileMaxLines": "Nouveau fichier : lignes maximum",
+		"branch": "Branche(s)",
+		"branchPlaceholder": "ex. main, release/*",
+		"meaning": "Ce que fait le changement",
+		"deletesTests": "Supprime un test",
+		"addsDependency": "Ajoute une dépendance",
+		"agentMessage": "Message à l'agent (que faire à la place)",
+		"refresh": "Actualiser",
+		"policyTitle": "Ce que les agents doivent respecter",
+		"policyHint": "Chaque couche lue par le backend, dans l'ordre. Une couche suivante ajoute des règles ; elle ne peut pas en affaiblir une précédente.",
+		"invalidPolicy": "Les garde-fous sont invalides : aucun agent ne peut écrire ni lancer de commande tant que ce n'est pas corrigé.",
+		"layers": {
+			"global": "Global",
+			"repository": "Dépôt",
+			"project": "Projet"
+		},
+		"layerRules_one": "{{count}} règle",
+		"layerRules_other": "{{count}} règles",
+		"noLayers": "Aucun fichier de garde-fous : les agents n'ont que les protections par défaut.",
+		"approvalsTitle_one": "{{count}} action attend votre approbation",
+		"approvalsTitle_other": "{{count}} actions attendent votre approbation",
+		"noPending": "Rien n'attend votre approbation.",
+		"approveOnce": "Approuver une fois",
+		"refuse": "Refuser",
+		"activityTitle": "Ce que les règles ont fait",
+		"noActivity": "Aucune règle ne s'est déclenchée pour l'instant.",
+		"noisy": "{{count}} actions bloquées ces 10 dernières minutes : une règle empêche peut-être les agents de travailler au lieu de les guider.",
+		"outcomes": {
+			"warn": "Averti",
+			"deny": "Refusé",
+			"pending": "En attente",
+			"approved": "Approuvé"
+		},
+		"dryRunTitle": "Vérifier les changements en cours",
+		"dryRunHint": "Applique les règles à chaque fichier modifié depuis la référence, sans rien bloquer : un test supprimé, une dépendance ajoutée, un chemin protégé.",
+		"compareWith": "Comparer avec",
+		"compareWithPlaceholder": "HEAD",
+		"checkChanges": "Vérifier les changements",
+		"dryRunClean_one": "{{count}} fichier modifié vérifié par rapport à {{ref}} : aucune règle ne se déclenche.",
+		"dryRunClean_other": "{{count}} fichiers modifiés vérifiés par rapport à {{ref}} : aucune règle ne se déclenche."
 	},
 	"search": {
 		"placeholder": "Rechercher un paramètre...",

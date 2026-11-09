@@ -2529,7 +2529,7 @@
 	},
 	"guardrails": {
 		"title": "Agent Guardrails",
-		"description": "Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
+		"description": "Rules agents must respect before Write / Edit / Bash, on every provider. Saved in .workpilot/guardrails.json; workpilot.policy.yaml in the repository and your global file add theirs.",
 		"selectProject": "Select a project to manage its guardrails.",
 		"addRule": "Add rule",
 		"empty": "No rules yet. Add one to start enforcing policies.",
@@ -2552,7 +2552,11 @@
 		"fileContentPlaceholder": "file content…",
 		"kickers": {
 			"rules": "Rules",
-			"tester": "Tester"
+			"tester": "Tester",
+			"policy": "Policy",
+			"approvals": "Approvals",
+			"activity": "Activity",
+			"dryRun": "Dry run"
 		},
 		"rulesTitle": "Rules agents respect",
 		"emptyTitle": "No rule yet",
@@ -2561,7 +2565,49 @@
 		"filePath": "File path",
 		"clearTest": "Clear the result",
 		"activeCount_one": "{{count}} active rule",
-		"activeCount_other": "{{count}} active rules"
+		"activeCount_other": "{{count}} active rules",
+		"pathGlob": "Path glob",
+		"addsRegex": "Pattern the change adds",
+		"newFileMaxLines": "New file: max lines",
+		"branch": "Branch(es)",
+		"branchPlaceholder": "e.g. main, release/*",
+		"meaning": "What the change does",
+		"deletesTests": "Removes a test",
+		"addsDependency": "Adds a dependency",
+		"agentMessage": "Message to the agent (what to do instead)",
+		"refresh": "Refresh",
+		"policyTitle": "What the agents are held to",
+		"policyHint": "Every layer the backend reads, in order. A later layer adds rules; it cannot weaken an earlier one.",
+		"invalidPolicy": "The guardrails are invalid: no agent can write or run a command until this is fixed.",
+		"layers": {
+			"global": "Global",
+			"repository": "Repository",
+			"project": "Project"
+		},
+		"layerRules_one": "{{count}} rule",
+		"layerRules_other": "{{count}} rules",
+		"noLayers": "No guardrails file yet: agents only have the default protections.",
+		"approvalsTitle_one": "{{count}} action waiting for your approval",
+		"approvalsTitle_other": "{{count}} actions waiting for your approval",
+		"noPending": "Nothing is waiting for your approval.",
+		"approveOnce": "Approve once",
+		"refuse": "Refuse",
+		"activityTitle": "What the rules did",
+		"noActivity": "No rule has been triggered yet.",
+		"noisy": "{{count}} actions blocked in the last 10 minutes: a rule may be stopping the agents rather than guiding them.",
+		"outcomes": {
+			"warn": "Warned",
+			"deny": "Refused",
+			"pending": "Waiting",
+			"approved": "Approved"
+		},
+		"dryRunTitle": "Check the current changes",
+		"dryRunHint": "Applies the rules to every file changed since the reference, without blocking anything: a test removed, a dependency added, a protected path.",
+		"compareWith": "Compare with",
+		"compareWithPlaceholder": "HEAD",
+		"checkChanges": "Check the changes",
+		"dryRunClean_one": "{{count}} changed file checked against {{ref}}: no rule is triggered.",
+		"dryRunClean_other": "{{count}} changed files checked against {{ref}}: no rule is triggered."
 	},
 	"search": {
 		"placeholder": "Search settings...",
