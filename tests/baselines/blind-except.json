@@ -25,7 +25,6 @@
   "apps/backend/analysis/insight_extractor.py": {"blind": 8, "silent": 0},
   "apps/backend/analysis/security_scanner.py": {"blind": 4, "silent": 0},
   "apps/backend/analytics/database.py": {"blind": 1, "silent": 0},
-  "apps/backend/api_watcher/contract_parser.py": {"blind": 2, "silent": 0},
   "apps/backend/architecture/ai_reviewer.py": {"blind": 2, "silent": 0},
   "apps/backend/architecture/validator.py": {"blind": 1, "silent": 0},
   "apps/backend/architecture_drift/api.py": {"blind": 3, "silent": 0},
