@@ -11,6 +11,9 @@ export const SEVERITY_TONES: Record<I18nSeverity, Tone> = {
 	info: "blue",
 };
 
+/** `missing_plural` would read as an i18next plural suffix: its messages are `plural_forms`. */
+const messageKey = (type: string): string => (type === "missing_plural" ? "plural_forms" : type);
+
 /** The message in the app's language, built from the issue's fields (the runner's own is English). */
 export function issueMessage(t: (key: string, options?: Record<string, unknown>) => string, issue: I18nIssue, rtl: string[]): string {
 	const values = {
@@ -22,7 +25,7 @@ export function issueMessage(t: (key: string, options?: Record<string, unknown>)
 	};
 	if (issue.issueType === "missing_plural" && !issue.key) return t("messages.missing_plural_many", values);
 	if (issue.issueType === "orphan_key" && issue.possibly) return t("messages.orphan_key_possibly", values);
-	return t(`messages.${issue.issueType}`, values);
+	return t(`messages.${messageKey(issue.issueType)}`, values);
 }
 
 function issueSuggestion(t: (key: string, options?: Record<string, unknown>) => string, issue: I18nIssue): string {
@@ -36,7 +39,7 @@ function issueSuggestion(t: (key: string, options?: Record<string, unknown>) => 
 	if (issue.issueType === "hardcoded_string") return t(issue.reused ? "suggestions.reuse" : "suggestions.add", values);
 	if (issue.issueType === "rtl_side" && !issue.proposedValue) return t("suggestions.rtl_side_generic", values);
 	if (issue.issueType === "missing_plural" && !issue.key) return t("suggestions.missing_plural_many", values);
-	return t(`suggestions.${issue.issueType}`, values);
+	return t(`suggestions.${messageKey(issue.issueType)}`, values);
 }
 
 function CopyButton({ value, label }: { readonly value: string; readonly label: string }): React.ReactElement {
