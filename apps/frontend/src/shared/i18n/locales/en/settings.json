@@ -2044,7 +2044,8 @@
 			"gitlab_token": "GitLab token",
 			"jira_token": "Jira API token",
 			"linear_api_key": "Linear API key",
-			"azure_pat": "Azure DevOps personal access token"
+			"azure_pat": "Azure DevOps personal access token",
+			"sentry_token": "Sentry token"
 		},
 		"stored": "Stored",
 		"placeholder": "Paste a token",
@@ -2729,13 +2730,17 @@
 			"engine": "Choose the engine",
 			"draft": "Draft cards",
 			"dailyCap": "Cards per day, at most",
-			"base": "Base branch"
+			"base": "Base branch",
+			"sentryOrg": "Sentry organisation",
+			"sentryProject": "Sentry project",
+			"sentryHost": "Sentry host"
 		},
 		"triggers": {
 			"issue_labeled": "An issue gets a label (GitHub or GitLab)",
 			"ci_failed": "The CI turns red on a branch",
 			"schedule": "At a time of day",
-			"pr_opened": "Someone else opens a GitHub PR"
+			"pr_opened": "Someone else opens a GitHub PR",
+			"prod_incident": "A production incident (Sentry or the incident inbox)"
 		},
 		"help": {
 			"issue_labeled": "Only issues labelled after the rule is created, on the project's GitHub or, without it, its GitLab. An issue that already has a card is not imported twice.",
@@ -2745,13 +2750,16 @@
 			"noDraft": "Each card starts its build as soon as it is created.",
 			"dailyCap": "Events over the cap wait for the next day; none is dropped.",
 			"pr_opened": "Only PRs opened after the rule is created, by someone other than you and not by a bot. A draft PR waits until it is ready for review. Leave the branch empty for any base branch.",
-			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews."
+			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews.",
+			"prod_incident": "Each incident becomes a bug-fix card whose first step is a regression test that reproduces it and fails, then the fix, in the card's branch and PR. The rule reads the payloads dropped in .workpilot/incidents/ after it was created (Sentry, Datadog, CloudWatch, New Relic, PagerDuty, Grafana, OpsGenie) and, when you name a Sentry project, the unresolved issues Sentry sees first after it. The Sentry token is SENTRY_AUTH_TOKEN in the project's .env (as for sentry-cli); on the server, your Sentry token in Settings › My tokens on the server. Leave the host empty for sentry.io. Nothing listens on this machine: the rule reads the sources every 5 minutes."
 		},
 		"summary": {
 			"issue_labeled": "Issue labelled “{{label}}”",
 			"ci_failed": "CI red on {{branch}}",
 			"schedule": "{{days}} at {{time}}",
-			"pr_opened": "PR opened into {{base}}"
+			"pr_opened": "PR opened into {{base}}",
+			"prod_incident": "Production incident from the inbox",
+			"prod_incident_sentry": "Production incident from Sentry {{project}} and the inbox"
 		},
 		"status": {
 			"never": "Not run yet",
@@ -2786,12 +2794,21 @@
 			"review_failed": "the review could not start",
 			"forge_not_connected": "neither GitHub nor GitLab is connected for this project",
 			"token_missing": "the person who saved this rule has no token for this forge on the server (Settings › My tokens on the server)",
-			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over"
+			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over",
+			"incident_predates_rule": "the incident was there before the rule",
+			"incident_too_large": "the incident file is over 256 KB",
+			"incident_unreadable": "the incident file is not a JSON object",
+			"sentry_token_missing": "no Sentry token: SENTRY_AUTH_TOKEN in the project's .env, or your Sentry token in Settings › My tokens on the server"
 		},
 		"anyBranch": "any branch",
 		"reviewDrafts": "reviews wait for you",
 		"serverIntro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. This project is on the server: its rules are the team's, and the server runs them every 5 minutes, even when nobody has the app open. Each rule reads GitHub or GitLab with the token of the person who saved it last, and its cards are created by Automations. Times are the server's.",
-		"runsAs": "runs with {{name}}'s tokens"
+		"runsAs": "runs with {{name}}'s tokens",
+		"placeholders": {
+			"sentryOrg": "my-org",
+			"sentryProject": "my-api",
+			"sentryHost": "sentry.io"
+		}
 	},
 	"githubOAuth": {
 		"usingCli": "Using GitHub CLI {{version}}",

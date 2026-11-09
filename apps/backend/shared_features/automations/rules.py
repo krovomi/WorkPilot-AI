@@ -37,7 +37,10 @@ TASK_KINDS = (
     "spike",
     "upgrade",
 )
-TRIGGERS = ("issue_labeled", "ci_failed", "schedule", "pr_opened")
+TRIGGERS = ("issue_labeled", "ci_failed", "schedule", "pr_opened", "prod_incident")
+#: A Sentry organisation or project slug, and a bare host name (HTTPS always).
+SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,49}$")
+HOST = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 
 
 class RuleError(ValueError):
@@ -123,6 +126,23 @@ def _trigger(raw: Any) -> dict[str, Any]:
         if not isinstance(base, str) or not BRANCH.match(base):
             raise RuleError("The trigger's base branch is not a branch name")
         return {"type": kind, "base": base}
+    if kind == "prod_incident":
+        # The project's incident inbox always; Sentry when a project is named.
+        org, project, host = raw.get("org"), raw.get("project"), raw.get("host")
+        if org in (None, "") and project in (None, ""):
+            if host not in (None, ""):
+                raise RuleError("A Sentry host needs an organisation and a project")
+            return {"type": kind}
+        if not isinstance(org, str) or not SLUG.match(org):
+            raise RuleError("The Sentry organisation is not a slug")
+        if not isinstance(project, str) or not SLUG.match(project):
+            raise RuleError("The Sentry project is not a slug")
+        trigger = {"type": kind, "org": org, "project": project}
+        if host not in (None, ""):
+            if not isinstance(host, str) or not HOST.match(host):
+                raise RuleError("The Sentry host is not a host name")
+            trigger["host"] = host
+        return trigger
     raise RuleError("Unknown trigger")
 
 
@@ -160,6 +180,9 @@ def parse_rule(
         kind = None
     elif kind not in TASK_KINDS:
         raise RuleError("Unknown card kind")
+    if kind is None and trigger["type"] == "prod_incident":
+        # An incident is a bug: its card writes the failing test first.
+        kind = "bug_fix"
     engine = _engine(raw.get("engine"))
     cap = raw.get("dailyCap", DEFAULT_DAILY_CAP)
     if cap is None:

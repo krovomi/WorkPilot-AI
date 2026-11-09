@@ -1,0 +1,5 @@
+---
+section: ✨ Nouveautés
+---
+
+- **Un incident de production devient une carte bug-fix** (F187). Une nouvelle automatisation, « Incident de production », lit à chaque passage le dossier `.workpilot/incidents/` du projet. N'importe quel outil peut y déposer un payload Sentry, Datadog, CloudWatch, New Relic, PagerDuty, Grafana ou OpsGenie. Si la règle nomme un projet Sentry, elle lit aussi les issues que Sentry voit pour la première fois après sa création, avec `SENTRY_AUTH_TOKEN` du `.env` du projet. Chaque incident crée une carte `bug_fix` : la carte écrit d'abord le test de régression qui reproduit l'incident et échoue, dans le framework de la stack fautive, puis le correctif, sur sa branche et dans sa PR. Les données personnelles sont masquées, et le texte de l'incident est traité comme une donnée. Aucun port n'est ouvert sur la machine. Sur un serveur, la règle lit Sentry avec le jeton Sentry de la personne qui l'a enregistrée (« Mes jetons sur le serveur »), sur sentry.io ou un hôte de `WORKPILOT_SENTRY_HOSTS` (#384).
