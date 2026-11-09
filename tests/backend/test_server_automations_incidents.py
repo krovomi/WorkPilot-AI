@@ -38,7 +38,11 @@ PAYLOAD = {
                     "value": "division by zero",
                     "stacktrace": {
                         "frames": [
-                            {"filename": "shop/price.py", "function": "unit", "lineno": 4}
+                            {
+                                "filename": "shop/price.py",
+                                "function": "unit",
+                                "lineno": 4,
+                            }
                         ]
                     },
                 }
@@ -74,7 +78,11 @@ def test_an_incident_rule_is_a_bug_fix_on_a_checked_sentry_project():
     rule = parse_rule(_incident_rule())
     assert rule["trigger"] == {"type": "prod_incident"} and rule["kind"] == "bug_fix"
     named = parse_rule(_incident_rule(org="acme", project="shop-api", host=""))
-    assert named["trigger"] == {"type": "prod_incident", "org": "acme", "project": "shop-api"}
+    assert named["trigger"] == {
+        "type": "prod_incident",
+        "org": "acme",
+        "project": "shop-api",
+    }
     for bad in (
         {"org": "acme"},
         {"host": "sentry.acme.test"},
@@ -108,7 +116,12 @@ def test_the_incident_patterns_are_the_desktop_s_and_the_feed_s():
 async def test_an_incident_in_the_inbox_makes_one_bug_card(world):
     await _save(world, _incident_rule())
     _drop(world, "zero.json", PAYLOAD)
-    _drop(world, "old.json", {**PAYLOAD, "event": {**PAYLOAD["event"], "event_id": "old"}}, mtime=1)
+    _drop(
+        world,
+        "old.json",
+        {**PAYLOAD, "event": {**PAYLOAD["event"], "event_id": "old"}},
+        mtime=1,
+    )
 
     assert (await _pass(world)).created == 1
     assert (await _pass(world)).created == 0
@@ -126,7 +139,9 @@ async def test_a_sentry_rule_reads_with_its_owner_s_sentry_token(world):
         "rules"
     ][0]["id"]
     await _pass(world)
-    assert (await _state(world))["statuses"][rule_id]["lastError"] == "sentry_token_missing"
+    assert (await _state(world))["statuses"][rule_id][
+        "lastError"
+    ] == "sentry_token_missing"
     assert world["forge"].sent == []
 
     await _sentry_token()
@@ -143,7 +158,9 @@ async def test_a_sentry_rule_reads_with_its_owner_s_sentry_token(world):
     }
     assert (await _pass(world)).created == 1
     assert all(r.url.host == "sentry.io" for r in forge.sent)
-    assert all(r.headers["Authorization"] == f"Bearer {_ADA_SENTRY}" for r in forge.sent)
+    assert all(
+        r.headers["Authorization"] == f"Bearer {_ADA_SENTRY}" for r in forge.sent
+    )
     status = (await _state(world))["statuses"][rule_id]
     assert "lastError" not in status
 
