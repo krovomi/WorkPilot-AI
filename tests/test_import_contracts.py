@@ -58,6 +58,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
     "mutation_gate": {"foundation", "security"},
+    # The schema guard (docs/architecture/schema-guard.md): migration rules
+    # over text, git through foundation. The QA gate that calls it is in qa.
+    "schema_guard": {"foundation"},
     # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
     # the plan's references, the Agent Trace records and the test conventions.
     # The build and the traceability route read it.

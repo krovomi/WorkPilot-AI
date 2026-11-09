@@ -323,6 +323,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # project's machine-local tooling; the router is desktop-only.
         "worktree_recipe": "settings",
         "providers": "settings",
+        # The schema guard's record and a re-check of the task's migrations.
+        # Desktop-only like verify; files and git only, no agent.
+        "schema_guard": "qa",
     }
 )
 
@@ -400,6 +403,7 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "event_hooks",
         "notifications",
         "worktree_recipe",
+        "schema_guard",
     }
 )
 

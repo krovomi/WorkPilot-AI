@@ -15,6 +15,7 @@ import { GoalCard } from "./GoalCard";
 import { HermesLearningCard } from "./HermesLearningCard";
 import { McpAppsCard } from "./McpAppsCard";
 import { PanelCardSlot } from "./PanelCardSlot";
+import { SchemaGuardCard } from "./SchemaGuardCard";
 import { PanelTabList } from "./PanelTabList";
 import {
 	PANEL_CARDS,
@@ -121,6 +122,8 @@ export function TaskOverview({
 		verifyLoop: (
 			<VerifyLoopCard task={task} projectPath={projectPath} onOpenDetails={onOpenVerify} />
 		),
+		// Ce que les migrations de la tâche font à une base en production. Rien sans migration.
+		schemaGuard: <SchemaGuardCard task={task} projectPath={projectPath} />,
 		workflowProfile: <WorkflowProfileCard task={task} projectPath={projectPath} />,
 		documents: <DocumentInsightsCard task={task} projectPath={projectPath} />,
 		hermes: <HermesLearningCard task={task} projectPath={projectPath} />,
