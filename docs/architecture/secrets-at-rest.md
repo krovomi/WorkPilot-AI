@@ -68,6 +68,7 @@ plaintext:
 | `settings.json` | `settings-utils.ts` — `readSettingsFile`, `readSettingsFileAsync`, `writeSettingsFile` | `isSecretSettingsKey`: `global…ApiKey`, `…AccessKey`, `…Token`, `…Secret`, `…Password`, `customProviderApiKey` |
 | `profiles.json` | `services/profile/profile-manager.ts` (`encodeProfilesForDisk` / `decodeProfilesFromDisk`), reused by `utils/profile-manager.ts` | `apiKey` |
 | Claude profiles | `claude-profile/token-encryption.ts` | `oauthToken` |
+| `team-bot.json` | `team-bot-config.ts` — `readTeamBotConfig`, `saveTeamBotConfig` | `webhook_url` (the Slack / Teams incoming webhook) |
 | `<project>/.workpilot/.env` | `project-env-file.ts` — `readProjectEnv`, `writeProjectEnvFile` | the `encrypted` list of `project-env-secrets.json` (below) |
 | the backend's `.env` (the "source env") | `source-env.ts`: `writeSourceEnvFile`, and `loadBackendEnv` for subprocess environments; the `AUTOBUILD_SOURCE_ENV_*` handlers read the token back | `isSourceEnvSecretKey`: `CLAUDE_CODE_OAUTH_TOKEN`, `…_API_KEY`, `…_TOKEN`, `…_SECRET`, `…_PAT`… |
 
@@ -312,6 +313,7 @@ holds both directions: `maskSecret` hands out `MASKED_SECRET`, and
 | App settings (`isSecretSettingsKey`: the global provider keys and tokens, `customProviderApiKey`) | `SETTINGS_GET` → `maskSettingsSecrets` | `SETTINGS_SAVE` → `unmaskSettingsUpdate`: the mask keeps the stored value, text typed around it replaces it |
 | API profiles (`profiles.json`) | `PROFILES_GET`, and the replies to save and update: `apiKey` masked | `PROFILES_UPDATE`: the mask keeps the stored key |
 | Claude profiles | `CLAUDE_PROFILES_GET`, the reply to a save, best profile: `oauthToken` masked | `CLAUDE_PROFILE_SAVE`: the mask keeps the stored token |
+| Team Bot (`team-bot.json`) | `TEAM_BOT_GET_CONFIG` → `maskedTeamBotConfig`: `webhook_url` masked; send and test take no URL, the runner reads the stored one on stdin | `TEAM_BOT_SAVE_CONFIG`: the mask keeps the stored URL |
 | The backend's `.env` | `AUTOBUILD_SOURCE_ENV_GET`: only `hasClaudeToken` | `AUTOBUILD_SOURCE_ENV_UPDATE` takes `claudeProfileId`: the main process copies that profile's token, decrypted |
 
 **A stored key never goes to a host the renderer names.** A masked key stands

@@ -119,6 +119,7 @@ import {
 	readSettingsFile,
 	writeSettingsFile,
 } from "./settings-utils";
+import { teamBotConfigPath } from "./team-bot-config";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 
@@ -863,6 +864,7 @@ function appSecretFiles(): string[] {
 		getSettingsPath(),
 		getProfilesFilePath(),
 		join(app.getPath("userData"), "config", "claude-profiles.json"),
+		teamBotConfigPath(),
 	];
 }
 

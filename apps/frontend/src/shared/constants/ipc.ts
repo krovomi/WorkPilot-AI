@@ -1331,6 +1331,8 @@ export const IPC_CHANNELS = {
 	SWARM_STATUS: "swarm:status",
 	TASK_PAUSE: "TASK_PAUSE",
 	TASK_RESUME: "TASK_RESUME",
+	TEAM_BOT_GET_CONFIG: "teamBot:getConfig",
+	TEAM_BOT_SAVE_CONFIG: "teamBot:saveConfig",
 	TEAM_BOT_SEND: "teamBot:send",
 	TEAM_BOT_TEST: "teamBot:test",
 	TECH_DEBT_GENERATE_SPEC: "techDebt:generateSpec",

@@ -4,7 +4,9 @@ Actions:
   - ``send``: post a notification payload to a webhook
   - ``test``: send a canned "hello from WorkPilot" payload (no LLM)
 
-Payload shape (via --payload JSON):
+Payload shape (``--payload -`` reads it from stdin, which the app always does:
+the webhook URL is a credential and a command line is visible to every local
+process; ``--payload JSON`` stays for manual runs):
   send:
     { "config": {...TeamBotConfig...}, "payload": {...NotificationPayload...} }
   test:
@@ -52,7 +54,8 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        data = json.loads(args.payload)
+        raw = sys.stdin.read() if args.payload == "-" else args.payload
+        data = json.loads(raw)
         config = _build_config(data["config"])
         if args.action == "send":
             payload = _build_payload(data["payload"])
