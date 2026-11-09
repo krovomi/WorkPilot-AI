@@ -62,7 +62,11 @@ describe("CompletionStep", () => {
 	});
 
 	it("says it is checking until the answer comes", () => {
-		getStaticProviders.mockReturnValue(new Promise(() => {}));
+		getStaticProviders.mockReturnValue(
+			new Promise(() => {
+				// Never settles: the check is still running.
+			}),
+		);
 		render(<CompletionStep onFinish={vi.fn()} />);
 		expect(screen.getByText("completion.checking")).toBeInTheDocument();
 		expect(screen.queryByText("completion.setupComplete")).not.toBeInTheDocument();
