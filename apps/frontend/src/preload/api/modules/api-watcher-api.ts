@@ -4,16 +4,27 @@
  * Renderer-side bridge to the api watcher runner.
  */
 
-import type { ContractDiff } from "../../../shared/types/api-watcher";
+import type {
+	ContractCompareReport,
+	ContractDiff,
+} from "../../../shared/types/api-watcher";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface ApiWatcherRunOptions {
 	projectPath: string;
 	saveBaseline?: boolean;
+	/** `branch` (default): against the target branch; `baseline`: the saved one. */
+	mode?: "branch" | "baseline";
+	/** The target branch; empty: detected (origin/HEAD, develop, main…). */
+	target?: string;
 }
 
 export interface ApiWatcherResult {
+	mode?: "branch" | "baseline";
+	report?: ContractCompareReport;
+	/** A GitHub Actions workflow that refuses a breaking change in CI. */
+	ciWorkflow?: string;
 	diff: ContractDiff;
 	migrationGuideMarkdown: string;
 	summary: string;

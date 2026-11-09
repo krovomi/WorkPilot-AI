@@ -1,6 +1,6 @@
 {
 	"title": "API Contract Watcher",
-	"noData": "Save the current contracts as the baseline, then run the check after a change to see what breaks clients.",
+	"noData": "Compare with the target branch to see what a pull request would break, or save a baseline for a project without git.",
 	"noChanges": "No contract changes detected",
 	"categories": {
 		"breaking": "Breaking",
@@ -13,13 +13,14 @@
 		"saveBaseline": "Save as Baseline",
 		"cancel": "Cancel",
 		"scanning": "Scanning contracts...",
-		"reset": "Reset"
+		"reset": "Reset",
+		"compareBranch": "Compare with branch"
 	},
 	"errors": {
 		"noProject": "Select a project to run an API contract scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"description": "OpenAPI, GraphQL and protobuf contracts of any backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) compared with the saved baseline.",
+	"description": "OpenAPI, GraphQL and protobuf contracts of any backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) compared with the target branch, each contract on its own, with the code that uses what breaks.",
 	"idleTitle": "No comparison yet",
 	"allCategories": "All",
 	"kickers": {
@@ -42,8 +43,51 @@
 		"field_removed": "Field removed",
 		"field_added": "Field added",
 		"field_type_changed": "Field type changed",
-		"field_required_added": "Field now required"
+		"field_required_added": "Field now required",
+		"field_deprecated": "Field deprecated",
+		"field_renamed": "Field renamed",
+		"field_number_changed": "Field number changed",
+		"parameter_became_required": "Parameter now required",
+		"parameter_type_changed": "Parameter type changed",
+		"request_body_changed": "Request body changed",
+		"response_status_added": "Response added",
+		"response_status_removed": "Response removed",
+		"response_type_changed": "Response type changed",
+		"enum_value_added": "Enum value added",
+		"enum_value_removed": "Enum value removed",
+		"contract_added": "Contract added",
+		"contract_removed": "Contract deleted"
 	},
 	"changesDetected_one": "{{count}} change detected",
-	"changesDetected_other": "{{count}} changes detected"
+	"changesDetected_other": "{{count}} changes detected",
+	"branch": {
+		"targetLabel": "Target branch",
+		"targetPlaceholder": "auto (develop, main…)",
+		"unchecked": "Not compared: {{reason}}.",
+		"status": {
+			"pass": "Compared with {{target}} (merge base {{base}}): only additions.",
+			"review": "Compared with {{target}} (merge base {{base}}): changes to review, none breaks a client without being acknowledged.",
+			"breaking_one": "Compared with {{target}} (merge base {{base}}): {{count}} breaking change not acknowledged.",
+			"breaking_other": "Compared with {{target}} (merge base {{base}}): {{count}} breaking changes not acknowledged.",
+			"unchecked": "Not compared."
+		},
+		"registryErrors": "Consumer registry {{source}}: {{errors}}",
+		"unacknowledged": "Not acknowledged",
+		"acknowledged": "Acknowledged",
+		"unsupported": "Format compared as text only (+{{added}} / -{{removed}} lines): review it by hand.",
+		"contract": {
+			"changed": "Changed",
+			"added": "Added",
+			"removed": "Deleted",
+			"unsupported": "Text only"
+		},
+		"files": "{{first}} and {{more}} more"
+	},
+	"ci": {
+		"kicker": "CI",
+		"title": "Refuse breaking changes in your CI",
+		"description": "A GitHub Actions workflow for this project's contracts: oasdiff, buf and graphql-inspector, pinned. Copy it into .github/workflows/api-contract.yml.",
+		"copy": "Copy",
+		"copied": "Copied"
+	}
 }

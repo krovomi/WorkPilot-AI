@@ -1344,11 +1344,14 @@ class WorktreePRMixin:
         # ── build rich markdown body ──────────────────────────────────
         summary_text = raw_summary or _wt("fallback_footer")
 
+        from api_watcher.guide import pr_section
+
         parts = [
             f"## 🤖 {_wt('summary_section')}",
             "",
             summary_text,
             "",
+            pr_section(spec_path.parent),  # breaking API changes, #389
             f"### ✅ {_wt('checklist_section')}",
             f"- [ ] {_wt('check_standards')}",
             f"- [ ] {_wt('check_tests')}",
