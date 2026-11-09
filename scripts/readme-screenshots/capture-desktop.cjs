@@ -87,16 +87,18 @@ async function openApp(browser) {
 	return page;
 }
 
-/** Opens a sidebar view, its group first when it is folded. */
-async function openView(page, label, group) {
-	if (group) {
-		await page.getByText(group, { exact: true }).first().click();
+/** Opens a sidebar view: its space on the rail first, then its row in the panel. */
+async function openView(page, label, group = "Workspace") {
+	// Choosing the space already shown folds the panel: only choose another.
+	const space = page.locator(`nav button[aria-label="${group}"]`).first();
+	if ((await space.getAttribute("aria-pressed")) !== "true") {
+		await space.click();
 		await page.waitForTimeout(300);
 	}
 	const candidates = page.getByText(label, { exact: false });
 	for (let i = 0; i < (await candidates.count()); i++) {
 		const box = await candidates.nth(i).boundingBox();
-		if (box && box.x < 256) {
+		if (box && box.x < 300) {
 			await candidates.nth(i).click();
 			await page.waitForTimeout(500);
 			// Leaving the board while a task runs asks first.

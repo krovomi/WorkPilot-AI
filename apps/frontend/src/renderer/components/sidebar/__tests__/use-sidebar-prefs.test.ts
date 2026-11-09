@@ -67,4 +67,33 @@ describe("useSidebarPrefs", () => {
 			sidebarPrefs: expect.objectContaining({ pinnedItems: ["kanban"] }),
 		});
 	});
+
+	it("remembers the space the panel shows", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.setActiveSpace("development"));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ activeSpace: "development" }),
+		});
+	});
+
+	it("pins the essential pages after the user's own and hides the beta views", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.toggleItemPin("insights"));
+		act(() => result.current.chooseMenuMode("essential", ["kanban", "insights"]));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({
+				menuMode: "essential",
+				pinnedItems: ["insights", "kanban"],
+				hideExperimental: true,
+			}),
+		});
+	});
+
+	it("records the full menu without pinning anything", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.chooseMenuMode("full", ["kanban"]));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ menuMode: "full", pinnedItems: [] }),
+		});
+	});
 });

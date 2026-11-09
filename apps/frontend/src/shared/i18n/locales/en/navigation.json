@@ -14,9 +14,6 @@
 		"favorites": "Favorites",
 		"administration": "Administration"
 	},
-	"favorites": {
-		"dropHint": "Drop here to pin"
-	},
 	"subGroups": {
 		"extensions": "Extensions",
 		"codeQuality": "Code Quality & Testing",
@@ -124,10 +121,8 @@
 		"expandSidebar": "Expand Sidebar",
 		"pin": "Pin to favorites",
 		"unpin": "Remove from favorites",
-		"pinGroup": "Pin group to favorites",
-		"unpinGroup": "Remove group from favorites",
 		"resetLayout": "Reset layout",
-		"clearAllFavorites": "Clear all favorites"
+		"dragToReorder": "Drag to reorder"
 	},
 	"tooltips": {
 		"settings": "Application Settings",
@@ -425,5 +420,22 @@
 		"chipTooltip": "CLI tools: {{installed}} of {{total}} installed",
 		"checking": "CLI tools: checking…",
 		"title": "CLI tools"
+	},
+	"rail": {
+		"label": "Menu spaces"
+	},
+	"spaces": {
+		"mine": "My menu",
+		"pinned": "Pinned",
+		"recent": "Recent",
+		"mineEmpty": "Pin a page with its star, or drag it onto the rail's star. Pages you opened recently show here too."
+	},
+	"menuMode": {
+		"title": "Which menu do you want?",
+		"body": "You can change it at any time, and every page stays one Ctrl K away.",
+		"essential": "Essential",
+		"essentialHint": "The {{count}} everyday pages pinned here, beta views hidden.",
+		"full": "Full",
+		"fullHint": "Every page, sorted by space in the rail."
 	}
 }

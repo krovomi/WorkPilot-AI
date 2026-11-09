@@ -139,6 +139,20 @@ The menu had grown to 61 entries for 77 pages, and people got lost in it
 | « Outils CLI » is a chip at the foot of the menu (`sidebar/CliToolsChip.tsx`): « CLI 1/8 » and a dot, opening the same badges above it; the badges stay mounted while closed | the panel was always open and took 320 px of a 1000 px window, leaving 420 px for the menu; mounted, the checks still run and the count is right |
 | rows show the icon, the name and the activity badge; the two-letter shortcut moves to the hover title, the drag grip shows on hover; group headers are plain titles; long names were shortened (« Tests instables », « Train de release ») | most names were cut (« Contrôle de … ») by the grip, the shortcut and the counter |
 
+Lot 2 splits the menu in two levels: a rail of spaces and a panel that lists
+one space.
+
+| Decision | Why |
+|---|---|
+| the rail (`sidebar/SidebarRail.tsx`) has one icon per group, « Mon menu » (the star) first; the panel beside it lists the space chosen only, its sub-groups as plain titles | seven groups open at once was the clutter; one space at a time fits a 1000 px window with room to spare |
+| a space is a group id, « Mon menu » is `__mine__` (`sidebar/spaces.ts`); the choice is saved in `sidebarPrefs.activeSpace` | an unknown or removed group falls back without a settings migration (`resolveSpace`) |
+| a page opened from the palette, a shortcut or a notification brings its space into view, unless the space shown already lists it (`spaceToFollow`); at start the space last chosen stays | the panel never shows a space that hides the page on screen, and never jumps while you use it |
+| choosing the space shown folds the panel; folded, the rail stays and hovering an icon lists its pages in its tooltip | the folded menu keeps every page two moves away, as the old icon column did |
+| « Mon menu » lists the pinned pages, then the 5 opened last (`recentNavItems`, a hub's tab counts for its hub, a pinned page is not repeated) | the pages you use are found without choosing a space |
+| while nothing is pinned and no choice was made, « Mon menu » asks once: « Essentiel » pins `ESSENTIAL_VIEWS` (10 stable pages) and hides the beta views, « Complet » keeps everything (`sidebarPrefs.menuMode`); resetting the layout asks again | a short menu by default would hide pages people use; asking in the menu, not in the wizard, lets them answer once they see it |
+| the rail and the panel share one `DndContext`: a group dragged on the rail reorders the spaces, a page or a group dropped on the star is pinned; collision tries the pointer first (`pointerFirst`) | the star is small, the nearest centre alone picked a row of the panel. The old drop zone never pinned: its id `__fav_drop__` has no kind, so the drag-end handler decoded it to nothing and stopped |
+| the stored `sidebarWidth` is the whole menu, rail included (default 296 px, minimum 240) | a width saved before the rail still gives a usable panel |
+
 ## Agent Management (`src/main/agent/`)
 
 The frontend manages agent lifecycle end-to-end:
