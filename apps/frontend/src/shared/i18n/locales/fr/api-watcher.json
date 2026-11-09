@@ -1,6 +1,6 @@
 {
 	"title": "Surveillant de contrat API",
-	"noData": "Enregistrez les contrats actuels comme référence, puis lancez l’analyse après un changement pour voir ce qui casse les clients.",
+	"noData": "Comparez avec la branche cible pour voir ce qu'une pull request casserait, ou enregistrez une base de référence pour un projet sans git.",
 	"noChanges": "Aucun changement de contrat détecté",
 	"categories": {
 		"breaking": "Cassante",
@@ -13,13 +13,14 @@
 		"saveBaseline": "Définir comme référence",
 		"cancel": "Annuler",
 		"scanning": "Analyse des contrats...",
-		"reset": "Réinitialiser"
+		"reset": "Réinitialiser",
+		"compareBranch": "Comparer avec la branche"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet pour lancer une analyse de contrats API.",
 		"failed": "Échec de l'analyse : {{error}}"
 	},
-	"description": "Contrats OpenAPI, GraphQL et protobuf de tout backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) comparés à la référence enregistrée.",
+	"description": "Contrats OpenAPI, GraphQL et protobuf de tout backend (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…) comparés avec la branche cible, contrat par contrat, avec le code qui utilise ce qui casse.",
 	"idleTitle": "Aucune comparaison pour l’instant",
 	"allCategories": "Toutes",
 	"kickers": {
@@ -42,8 +43,51 @@
 		"field_removed": "Champ supprimé",
 		"field_added": "Champ ajouté",
 		"field_type_changed": "Type de champ modifié",
-		"field_required_added": "Champ devenu obligatoire"
+		"field_required_added": "Champ devenu obligatoire",
+		"field_deprecated": "Champ déprécié",
+		"field_renamed": "Champ renommé",
+		"field_number_changed": "Numéro de champ changé",
+		"parameter_became_required": "Paramètre devenu obligatoire",
+		"parameter_type_changed": "Type de paramètre changé",
+		"request_body_changed": "Corps de requête changé",
+		"response_status_added": "Réponse ajoutée",
+		"response_status_removed": "Réponse retirée",
+		"response_type_changed": "Type de réponse changé",
+		"enum_value_added": "Valeur d'énumération ajoutée",
+		"enum_value_removed": "Valeur d'énumération retirée",
+		"contract_added": "Contrat ajouté",
+		"contract_removed": "Contrat supprimé"
 	},
 	"changesDetected_one": "{{count}} modification détectée",
-	"changesDetected_other": "{{count}} modifications détectées"
+	"changesDetected_other": "{{count}} modifications détectées",
+	"branch": {
+		"targetLabel": "Branche cible",
+		"targetPlaceholder": "auto (develop, main…)",
+		"unchecked": "Pas de comparaison : {{reason}}.",
+		"status": {
+			"pass": "Comparé avec {{target}} (base de fusion {{base}}) : uniquement des ajouts.",
+			"review": "Comparé avec {{target}} (base de fusion {{base}}) : des changements à relire, aucun ne casse un client sans être assumé.",
+			"breaking_one": "Comparé avec {{target}} (base de fusion {{base}}) : {{count}} changement cassant non assumé.",
+			"breaking_other": "Comparé avec {{target}} (base de fusion {{base}}) : {{count}} changements cassants non assumés.",
+			"unchecked": "Pas de comparaison."
+		},
+		"registryErrors": "Registre des consommateurs {{source}} : {{errors}}",
+		"unacknowledged": "Non assumés",
+		"acknowledged": "Assumé",
+		"unsupported": "Format comparé en texte seulement (+{{added}} / -{{removed}} lignes) : à relire à la main.",
+		"contract": {
+			"changed": "Modifié",
+			"added": "Ajouté",
+			"removed": "Supprimé",
+			"unsupported": "Texte seul"
+		},
+		"files": "{{first}} et {{more}} autres"
+	},
+	"ci": {
+		"kicker": "CI",
+		"title": "Refuser les changements cassants dans votre CI",
+		"description": "Un workflow GitHub Actions pour les contrats de ce projet : oasdiff, buf et graphql-inspector, en versions épinglées. Copiez-le dans .github/workflows/api-contract.yml.",
+		"copy": "Copier",
+		"copied": "Copié"
+	}
 }
