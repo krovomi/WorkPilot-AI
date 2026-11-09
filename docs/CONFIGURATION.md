@@ -206,6 +206,7 @@ in French, by [server-operations.md](server-operations.md).
 | `WORKPILOT_RUN_ISOLATION` | `required` | Each run is confined by Landlock to its own clone, its project's home (`REPOS_ROOT/.run-homes/<project>`) and its own temp directory; other projects and the server's state are out of its reach. Needs Linux 5.13+ with Landlock enabled (Docker 23+ allows it) and a server that does not run as root. Where it cannot be enforced, runs fail with the reason. `off` runs them unconfined: only for a deployment where every user may read every project. See [server-mode.md](architecture/server-mode.md#ce-quun-run-voit-sur-le-disque). |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Where the API pushes board events (projects, specs, runs) to the streaming WebSocket server. Change it only when that server is not on the API's loopback. |
 | `WORKPILOT_GITLAB_HOSTS` | — | Self-hosted GitLab instances (comma-separated host names, e.g. `git.acme.test`) whose projects show their GitLab views, relayed with each person's own GitLab token. gitlab.com is always one. A project cloned from any other host shows none: its owner chose that URL, and a member's token is never sent to a host the operator did not name. |
+| `WORKPILOT_SENTRY_HOSTS` | — | Self-hosted Sentry instances (comma-separated host names) that a « production incident » automation may read with each person's own Sentry token. sentry.io and its regional hosts are always allowed. A rule naming any other host fails before anything is sent. |
 
 Sign-in, invitations and email have their own variables, after
 [Quotas](#quotas).
@@ -802,7 +803,7 @@ message. WorkPilot's own integrations read other names, in the last column.
 | `brave-search` | `BRAVE_API_KEY` | — |
 | `jira` | `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` | `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` |
 | `azure-devops` | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_TOKEN` | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PAT` |
-| `sentry` | `SENTRY_AUTH_TOKEN` | — (error reporting uses `SENTRY_DSN`) |
+| `sentry` | `SENTRY_AUTH_TOKEN` | the same, for the « production incident » automation (the project's root `.env` or `.workpilot/.env`); on a server, each person's Sentry token. The app's own error reporting uses `SENTRY_DSN` |
 | `slack` | `SLACK_BOT_TOKEN` | — |
 | `postman` | `POSTMAN_API_KEY` | — |
 | `teams` | `TEAMS_WEBHOOK_URL` | the same, for notifications |

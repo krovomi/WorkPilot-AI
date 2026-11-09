@@ -21,6 +21,7 @@ const KINDS: readonly ServerSecretKind[] = [
 	"jira_token",
 	"linear_api_key",
 	"azure_pat",
+	"sentry_token",
 ];
 
 export function ServerTokensSettings() {

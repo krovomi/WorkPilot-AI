@@ -505,3 +505,52 @@ def schedule_events(rule: dict[str, Any], now: datetime) -> SourceResult:
             )
         ]
     )
+
+
+async def prod_incident_events(
+    rule: dict[str, Any],
+    root: Any,
+    seen: Callable[[str], bool],
+    sentry_get: Any = None,
+) -> SourceResult:
+    """The project's incident inbox, then Sentry when the rule names a project.
+
+    ``sentry_get`` is the owner's Sentry client (``live.py``), ``None`` when
+    the rule reads the inbox only. The card text is ``regression_guardian``'s:
+    the same on the desktop and here.
+    """
+    from regression_guardian.feed import (
+        FeedError,
+        inbox_events,
+        parse_sentry_target,
+        sentry_events,
+    )
+
+    since = created_at(rule)
+    feeds = [inbox_events(root, since.timestamp(), seen)]
+    target = parse_sentry_target(rule["trigger"])
+    if target is not None:
+        if sentry_get is None:
+            raise SourceError(
+                "sentry_token_missing",
+                "The rule's owner has no Sentry token on the server",
+            )
+        stamp = since.isoformat().replace("+00:00", "Z")
+        try:
+            feeds.append(await sentry_events(sentry_get, target, stamp, seen, root))
+        except FeedError as e:
+            raise SourceError(e.reason, str(e)) from None
+    result = SourceResult()
+    for feed in feeds:
+        result.events += [
+            Event(
+                key=e.key,
+                subject=e.subject,
+                title=e.title,
+                description=e.description,
+                url=e.url,
+            )
+            for e in feed.events
+        ]
+        result.ignored += feed.ignored
+    return result

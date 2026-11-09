@@ -36,6 +36,7 @@ import {
 	scheduleEvents,
 } from "./sources";
 import { type GitLabSource, gitlabIssueLabeledEvents } from "./sources-gitlab";
+import { prodIncidentEvents } from "./sources-incidents";
 import { readRules } from "./store";
 
 export const PASS_INTERVAL_MS = 5 * 60 * 1000;
@@ -111,6 +112,8 @@ export function liveDeps(
 				}
 				case "schedule":
 					return scheduleEvents({ ...rule, trigger }, new Date());
+				case "prod_incident":
+					return prodIncidentEvents({ ...rule, trigger }, project, Object.keys(ledger.seen));
 			}
 		},
 		createCard: createAutomationCard,

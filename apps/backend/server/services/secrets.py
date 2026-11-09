@@ -21,6 +21,7 @@ SECRET_KINDS = {
     "linear_api_key",
     "github_token",
     "gitlab_token",
+    "sentry_token",
 }
 
 
