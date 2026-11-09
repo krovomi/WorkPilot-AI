@@ -1,6 +1,7 @@
 import type { SidebarView } from "../Sidebar";
-import { entryIdOfView } from "./hubs";
-import { itemViews, type NavGroup, type NavItem } from "./nav-model";
+import { EXPERIMENTAL_VIEWS } from "./experimental-views";
+import { entryIdOfView, type HubTabGates } from "./hubs";
+import { hubTabItems, itemViews, type NavGroup, type NavItem } from "./nav-model";
 
 /**
  * The menu in two levels (F181, lot 2): a rail of spaces, one per group plus
@@ -104,3 +105,65 @@ export const ESSENTIAL_VIEWS: readonly SidebarView[] = [
 	"worktrees",
 	"github-prs",
 ];
+
+/** The Labo (F181, lot 3): the beta pages, apart from the stable ones. */
+export const LABO_SPACE = "__labo__";
+
+/**
+ * The groups as the rail shows them: without the entries in beta (they go to
+ * the Labo) nor the ones the user hid, and without a group left empty. An
+ * entry out of beta is back in its group, at its place.
+ */
+export function railGroupsOf(
+	groups: readonly NavGroup[],
+	hidden: ReadonlySet<string>,
+): NavGroup[] {
+	return groups
+		.map((group) => ({
+			...group,
+			items: group.items.filter(
+				(item) => (item.hub || !EXPERIMENTAL_VIEWS.has(item.id)) && !hidden.has(item.id),
+			),
+		}))
+		.filter((group) => group.items.length > 0);
+}
+
+/**
+ * The pages the Labo lists: every beta page the menu shows, a hub's beta tab
+ * included (it stays a tab of its hub too). One card each.
+ */
+export function laboItemsOf(groups: readonly NavGroup[], gates: HubTabGates): NavItem[] {
+	const out: NavItem[] = [];
+	for (const item of groups.flatMap((group) => group.items)) {
+		for (const page of hubTabItems(item, gates)) {
+			if (EXPERIMENTAL_VIEWS.has(page.id) && !out.some((p) => p.id === page.id)) out.push(page);
+		}
+	}
+	return out;
+}
+
+/** How long a page goes unopened before the menu offers to hide it. */
+export const UNUSED_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The entries of a space not opened for `UNUSED_DAYS` days, which the menu
+ * offers to hide (it never hides one by itself). Nothing is offered before
+ * the usage count is that old, and a pinned entry is never offered. A hub
+ * counts as opened when any of its tabs was.
+ */
+export function unusedEntries(
+	items: readonly NavItem[],
+	usage: Partial<Record<SidebarView, { lastVisitedAt: number }>>,
+	since: number,
+	now: number,
+	pinned: ReadonlySet<string>,
+): NavItem[] {
+	const cutoff = now - UNUSED_DAYS * DAY_MS;
+	if (since > cutoff) return [];
+	return items.filter((item) => {
+		const views = itemViews(item);
+		if (views.some((view) => pinned.has(view))) return false;
+		return !views.some((view) => (usage[view]?.lastVisitedAt ?? 0) >= cutoff);
+	});
+}

@@ -263,6 +263,11 @@ export interface SidebarPrefs {
 	// The menu chosen in « Mon menu »: the essential pages pinned and the beta
 	// views hidden, or everything. Unset until the user chooses.
 	menuMode?: "essential" | "full";
+	// Menu entries the user hid from their space (still found by Ctrl K);
+	// offered when not opened for 30 days, never hidden by the app itself.
+	hiddenItems?: string[];
+	// Until when the offer to hide unopened pages stays quiet (ms since epoch).
+	hideSuggestionsSnoozedUntil?: number;
 }
 
 export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
