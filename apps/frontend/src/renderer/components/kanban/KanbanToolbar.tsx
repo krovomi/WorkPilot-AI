@@ -38,6 +38,7 @@ import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { QuickCommandBar } from "./QuickCommandBar";
+import { WorktreePurgeButton } from "./WorktreePurgeButton";
 import { ServerBoardNotice, useSelectedServerProject } from "./ServerBoardNotice";
 
 const CATEGORY_OPTIONS = Object.keys(TASK_CATEGORY_LABELS) as TaskCategory[];
@@ -426,6 +427,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 			{!serverProject && projectId && (
 				<>
 					<MultiRepoButton projectId={projectId} />
+					<WorktreePurgeButton projectId={projectId} />
 					<Separator orientation="vertical" className="h-5" />
 				</>
 			)}

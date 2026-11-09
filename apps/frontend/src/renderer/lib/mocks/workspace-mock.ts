@@ -132,6 +132,10 @@ export const workspaceMock = {
 		},
 	}),
 
+	listPurgeableWorktrees: async () => ({ success: true, data: [] }),
+
+	purgeWorktrees: async () => ({ success: true, data: [] }),
+
 	worktreeOpenInIDE: async () => ({
 		success: true,
 		data: { opened: true },

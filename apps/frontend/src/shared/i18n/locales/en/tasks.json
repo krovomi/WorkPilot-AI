@@ -2382,5 +2382,27 @@
 		"overBadge": "{{lines}} / {{max}} lines",
 		"overFilesBadge": "{{files}} / {{max}} files",
 		"overTooltip": "The real diff has about {{lines}} lines to review in {{files}} files, above the ceiling of {{max}} lines and {{maxFiles}} files for this kind of task: the review will take longer."
+	},
+	"purge": {
+		"button": "Purge",
+		"buttonTitle": "Free the room taken by the worktrees whose work is over",
+		"title": "Purge finished worktrees",
+		"description": "Every card works in a full copy of the project. These belong to cards whose PR is merged, or that are done, archived or abandoned. Purging removes the folder and the local workpilot/… branch; the card, its spec and its PR stay. A merged PR is purged automatically.",
+		"loading": "Measuring the room they take…",
+		"empty": "No worktree to purge: nothing takes room for nothing.",
+		"dirty": "uncommitted changes, kept",
+		"failed": "The purge could not be started.",
+		"reason": {
+			"merged": "PR merged",
+			"done": "done",
+			"archived": "archived",
+			"abandoned": "abandoned"
+		},
+		"confirm_one": "Purge {{count}} worktree ({{size}})",
+		"confirm_other": "Purge {{count}} worktrees ({{size}})",
+		"done_one": "{{count}} worktree purged, {{size}} freed.",
+		"done_other": "{{count}} worktrees purged, {{size}} freed.",
+		"kept_one": "{{count}} kept: uncommitted changes or could not be removed.",
+		"kept_other": "{{count}} kept: uncommitted changes or could not be removed."
 	}
 }
