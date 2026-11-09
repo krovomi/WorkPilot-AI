@@ -612,3 +612,17 @@ class TestRunner:
             "answer", "--project-path", str(project), "--request", "nope", "--approve"
         )
         assert not result["ok"]
+
+
+def test_the_log_never_keeps_a_secret_of_a_command(tmp_path):
+    command = (
+        'curl -H "Authorization: Bearer abcDEF1234567890xyz" '
+        "https://api.example.test --data token=s3cr3tvalue "
+        "&& echo ghp_abcdefghijklmnopqrstuvwxyz0123"
+    )
+    target = ledger.target_of("Bash", {"command": command}, tmp_path)
+    summary = json.dumps(target)
+    assert "abcDEF1234567890xyz" not in summary
+    assert "s3cr3tvalue" not in summary
+    assert "ghp_abcdefghijklmnopqrstuvwxyz0123" not in summary
+    assert "https://api.example.test" in summary

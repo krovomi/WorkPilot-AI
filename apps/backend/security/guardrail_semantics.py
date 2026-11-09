@@ -18,6 +18,8 @@ import re
 import tomllib
 from pathlib import PurePosixPath
 
+import yaml
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -208,10 +210,8 @@ def _cargo(text: str) -> set[str]:
 
 def _yaml_keys(text: str, sections: tuple[str, ...]) -> set[str]:
     try:
-        import yaml
-
         data = yaml.safe_load(text) if text.strip() else {}
-    except Exception:  # noqa: BLE001 - an unreadable manifest has no dependency to compare
+    except yaml.YAMLError:  # an unreadable manifest has no dependency to compare
         return set()
     names: set[str] = set()
     if isinstance(data, dict):

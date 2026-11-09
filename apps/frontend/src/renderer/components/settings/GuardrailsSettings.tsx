@@ -319,7 +319,7 @@ function RuleCard({
 								.filter(Boolean);
 							onChange({ when: { branch: branches.length ? branches : undefined } });
 						}}
-						placeholder="main, release/*"
+						placeholder={t("guardrails.branchPlaceholder")}
 					/>
 				</div>
 			</div>

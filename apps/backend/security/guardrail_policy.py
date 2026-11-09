@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from .guardrails import ACTION_PRIORITY, GuardrailRule
 
 GLOBAL_ENV_VAR = "WORKPILOT_GUARDRAILS_GLOBAL"
@@ -103,10 +105,8 @@ def _parse(path: Path) -> tuple[dict[str, Any] | None, str | None]:
         if path.suffix == ".json":
             data = json.loads(text)
         else:
-            import yaml
-
             data = yaml.safe_load(text)
-    except Exception as exc:  # noqa: BLE001 - yaml raises many types; all mean "not valid"
+    except (ValueError, yaml.YAMLError) as exc:
         return (
             None,
             f"{path.name}: not valid {'JSON' if path.suffix == '.json' else 'YAML'} ({exc})",

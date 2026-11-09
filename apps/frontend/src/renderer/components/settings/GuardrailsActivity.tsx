@@ -188,7 +188,7 @@ export function GuardrailsActivity({ projectPath }: { readonly projectPath: stri
 								className="h-8 font-mono text-xs"
 								value={ref}
 								onChange={(e) => setRef(e.target.value)}
-								placeholder="HEAD"
+								placeholder={t("guardrails.compareWithPlaceholder")}
 							/>
 						</div>
 						<CharterButton

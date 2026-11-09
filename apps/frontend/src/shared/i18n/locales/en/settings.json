@@ -2570,6 +2570,7 @@
 		"addsRegex": "Pattern the change adds",
 		"newFileMaxLines": "New file: max lines",
 		"branch": "Branch(es)",
+		"branchPlaceholder": "e.g. main, release/*",
 		"meaning": "What the change does",
 		"deletesTests": "Removes a test",
 		"addsDependency": "Adds a dependency",
@@ -2603,6 +2604,7 @@
 		"dryRunTitle": "Check the current changes",
 		"dryRunHint": "Applies the rules to every file changed since the reference, without blocking anything: a test removed, a dependency added, a protected path.",
 		"compareWith": "Compare with",
+		"compareWithPlaceholder": "HEAD",
 		"checkChanges": "Check the changes",
 		"dryRunClean_one": "{{count}} changed file checked against {{ref}}: no rule is triggered.",
 		"dryRunClean_other": "{{count}} changed files checked against {{ref}}: no rule is triggered."

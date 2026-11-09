@@ -2573,6 +2573,7 @@
 		"addsRegex": "Motif que le changement ajoute",
 		"newFileMaxLines": "Nouveau fichier : lignes maximum",
 		"branch": "Branche(s)",
+		"branchPlaceholder": "ex. main, release/*",
 		"meaning": "Ce que fait le changement",
 		"deletesTests": "Supprime un test",
 		"addsDependency": "Ajoute une dépendance",
@@ -2606,6 +2607,7 @@
 		"dryRunTitle": "Vérifier les changements en cours",
 		"dryRunHint": "Applique les règles à chaque fichier modifié depuis la référence, sans rien bloquer : un test supprimé, une dépendance ajoutée, un chemin protégé.",
 		"compareWith": "Comparer avec",
+		"compareWithPlaceholder": "HEAD",
 		"checkChanges": "Vérifier les changements",
 		"dryRunClean_one": "{{count}} fichier modifié vérifié par rapport à {{ref}} : aucune règle ne se déclenche.",
 		"dryRunClean_other": "{{count}} fichiers modifiés vérifiés par rapport à {{ref}} : aucune règle ne se déclenche."

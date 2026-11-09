@@ -20,6 +20,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
 import uuid
@@ -44,13 +45,24 @@ def _now() -> datetime:
     return datetime.now(tz=UTC)
 
 
-def _redact(text: str) -> str:
-    try:
-        from foundation.log_redaction import redact_text
+# A value after a secret-looking name, and anything shaped like a token. The
+# security layer may not import foundation's redaction (import contracts), so
+# the log keeps its own: the summary is for a person to recognise the call, the
+# approval key is the hash of the whole command.
+_SECRET_ASSIGNMENT = re.compile(
+    r"(?i)((?:token|secret|password|passwd|pwd|api[_-]?key|authorization|bearer|"
+    r"credential|private[_-]?key)[\w-]*[\"']?\s*[:=]?\s*(?:bearer\s+)?)([^\s\"']+)"
+)
+_TOKEN_SHAPE = re.compile(
+    r"\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}"
+    r"|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+    r"|[A-Za-z0-9_+/=-]{40,})"
+)
 
-        return redact_text(text)
-    except ImportError:
-        return text
+
+def _redact(text: str) -> str:
+    text = _SECRET_ASSIGNMENT.sub(lambda m: m.group(1) + "***", text)
+    return _TOKEN_SHAPE.sub("***", text)
 
 
 def target_of(
