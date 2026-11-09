@@ -107,7 +107,7 @@ fichier-ci reste l'autorité sur les règles.
 | Moteur de tâche et LLM de page | [task-engine.md](architecture/task-engine.md) | Une tâche possède son provider × LLM × effort par phase ; une page résout le sien par `page-llm.ts`. |
 | Visual-to-code | [visual-to-code.md](architecture/visual-to-code.md) | Documents d'architecture et leur historique sur disque. |
 | Charte UI | [ui-charter.md](architecture/ui-charter.md) | `components/charter/` : scène, colonnes, cartes à rail, un seul bouton principal, pour tous les modules et Réglages. |
-| Docs et dérive | [docs-and-drift.md](architecture/docs-and-drift.md) | `doc_languages/` : symboles et commentaires de doc de tous les langages ; dérive sans faux positifs. |
+| Docs et dérive | [docs-and-drift.md](architecture/docs-and-drift.md) | Tous langages, sans modèle : doc comments, exemples, doc périmée (git) ; corrections en revue. |
 | Revue et refactoring | [code-insights.md](architecture/code-insights.md) | IPC `codeInsights:run` ; smells et règles de revue pour toutes les piles. |
 | Assistant vocal | [voice-assistant.md](architecture/voice-assistant.md) | Raccourci global (Ctrl+Shift+Espace, sans AltGr ni raccourci pris), Whisper local, commandes simples lues localement puis modèle « Assistant vocal » ; liste fermée d'actions (vue de la barre latérale, tâche après confirmation, réglages), réponse revalidée dans le main. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
