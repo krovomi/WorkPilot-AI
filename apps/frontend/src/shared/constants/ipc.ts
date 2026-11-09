@@ -1011,9 +1011,13 @@ export const IPC_CHANNELS = {
 
 	// Channels that main and preload named by their string until lot M7,
 	// sorted by name
+	ACCESSIBILITY_APP_URL: "accessibility:app-url",
 	ACCESSIBILITY_CANCEL: "accessibility:cancel",
+	ACCESSIBILITY_DYNAMIC: "accessibility:dynamic",
 	ACCESSIBILITY_ERROR: "accessibility-error",
 	ACCESSIBILITY_EVENT: "accessibility-event",
+	ACCESSIBILITY_EXPORT: "accessibility:export",
+	ACCESSIBILITY_FIX: "accessibility:fix",
 	ACCESSIBILITY_RESULT: "accessibility-result",
 	ACCESSIBILITY_RUN: "accessibility:run",
 	AGENT_CLI_CHECK: "agentCli:check",

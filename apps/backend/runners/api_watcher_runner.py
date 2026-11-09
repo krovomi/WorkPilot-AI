@@ -1,12 +1,14 @@
 """
 API Watcher Runner
 
-Scans a project for API contract specifications (OpenAPI, GraphQL, Protobuf),
-parses the current versions, and diffs them against a saved baseline to
-detect breaking changes. Generates a migration guide.
+Scans a project for API contract specifications (OpenAPI, GraphQL, Protobuf)
+and compares each one with the target branch (`api_watcher.compare`, #389):
+the merge base of HEAD and ``--target`` (detected when empty), every contract
+on its own, with the consumers that use what broke and a migration guide.
 
-Baseline is stored in `.workpilot/api-contract-baseline.json`. When absent,
-the runner saves the current contracts as baseline and returns an empty diff.
+``--mode baseline`` (or a project that is not a git repository) keeps the
+older comparison with a saved baseline, `.workpilot/api-contract-baseline.json`:
+when absent, the runner saves the current contracts and returns an empty diff.
 
 Output protocol (one JSON object per line, prefixed):
     API_WATCHER_EVENT:{"type": "progress", "data": {"status": "..."}}
@@ -18,8 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -38,60 +38,9 @@ from api_watcher.contract_parser import (  # noqa: E402
     ContractFormat,
     ContractParser,
 )
+from api_watcher.discover import discover  # noqa: E402
 from api_watcher.migration_guide_generator import (  # noqa: E402
     MigrationGuideGenerator,
-)
-
-# Contract files by name, whatever the stack that serves them: OpenAPI and
-# Swagger (ASP.NET Core, Spring, FastAPI, NestJS, Go, Laravel…), GraphQL SDL
-# (Apollo, Hot Chocolate, Spring GraphQL ``.graphqls``, gqlgen) and protobuf.
-SPEC_NAMES = frozenset(
-    {
-        "openapi.yaml",
-        "openapi.yml",
-        "openapi.json",
-        "swagger.yaml",
-        "swagger.yml",
-        "swagger.json",
-        "schema.graphql",
-    }
-)
-SPEC_SUFFIXES = frozenset({".graphql", ".graphqls", ".gql", ".proto"})
-SPEC_NAME_SUFFIXES = (
-    ".openapi.yaml",
-    ".openapi.yml",
-    ".openapi.json",
-    ".swagger.yaml",
-    ".swagger.yml",
-    ".swagger.json",
-)
-# Folders where an OpenAPI document often has a free name (api/v1.yaml,
-# contracts/orders.yml); their YAML/JSON files are read to check.
-SPEC_FOLDERS = frozenset(
-    {"api", "apis", "openapi", "swagger", "spec", "specs", "contracts", "contract"}
-)
-_OPENAPI_HEAD = re.compile(r"""^\s*["']?(openapi|swagger)["']?\s*:""", re.MULTILINE)
-
-EXCLUDED_DIRS = frozenset(
-    {
-        "node_modules",
-        ".git",
-        "dist",
-        "build",
-        "venv",
-        ".venv",
-        "__pycache__",
-        "target",
-        "bin",
-        "obj",
-        "vendor",
-        "Pods",
-        ".dart_tool",
-        ".gradle",
-        ".next",
-        ".nuxt",
-        "coverage",
-    }
 )
 
 
@@ -103,36 +52,10 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("API_WATCHER_EVENT", {"type": event_type, "data": data})
 
 
-def _is_spec(path: Path) -> bool:
-    name = path.name.lower()
-    if name in SPEC_NAMES or path.suffix.lower() in SPEC_SUFFIXES:
-        return True
-    if name.endswith(SPEC_NAME_SUFFIXES):
-        return True
-    if path.parent.name.lower() in SPEC_FOLDERS and path.suffix.lower() in {
-        ".yaml",
-        ".yml",
-        ".json",
-    }:
-        try:
-            with path.open(encoding="utf-8", errors="replace") as handle:
-                head = handle.read(4096)
-        except OSError:
-            return False
-        return bool(_OPENAPI_HEAD.search(head))
-    return False
-
-
 def _discover_specs(project_path: Path) -> list[Path]:
     """Every contract file, dependency and build folders pruned on the way."""
-    found: set[Path] = set()
-    for current, dirs, files in os.walk(project_path):
-        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
-        for name in files:
-            path = Path(current) / name
-            if _is_spec(path):
-                found.add(path.resolve())
-    return sorted(found)
+    root = project_path.resolve()
+    return [root / rel for rel in discover(root)]
 
 
 def _contract_to_dict(contract: ApiContract) -> dict[str, Any]:
@@ -330,6 +253,53 @@ def run_scan(project_path: Path) -> dict[str, Any]:
     }
 
 
+def run_branch(project_path: Path, target: str = "") -> dict[str, Any] | None:
+    """The comparison with the target branch, or None when there is no git
+    history to compare with (the caller falls back to the baseline)."""
+    from api_watcher.ci import github_actions
+    from api_watcher.compare import compare
+    from api_watcher.guide import render
+
+    _emit_event("start", {"status": "Comparing contracts with the target branch..."})
+    report = compare(project_path, target=target)
+    if report.unchecked and not target:
+        return None
+    data = report.to_dict()
+    changes = [c for contract in data["contracts"] for c in contract["changes"]]
+    _emit_event(
+        "complete",
+        {
+            "breaking": data["breakingCount"],
+            "potentiallyBreaking": data["potentiallyBreakingCount"],
+            "nonBreaking": data["nonBreakingCount"],
+        },
+    )
+    return {
+        "mode": "branch",
+        "report": data,
+        "diff": {
+            "oldVersion": report.target,
+            "newVersion": "HEAD",
+            "format": data["contracts"][0]["format"]
+            if data["contracts"]
+            else "unknown",
+            "changes": changes,
+            "breakingCount": data["breakingCount"],
+            "potentiallyBreakingCount": data["potentiallyBreakingCount"],
+            "nonBreakingCount": data["nonBreakingCount"],
+        },
+        "migrationGuideMarkdown": render(report) if data["contracts"] else "",
+        "ciWorkflow": github_actions(
+            discover(project_path), report.target or "develop"
+        ),
+        "summary": (
+            f"Not compared: {report.unchecked}"
+            if report.unchecked
+            else f"{len(data['contracts'])} contract(s) changed against {report.target}"
+        ),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="API Watcher Runner")
     parser.add_argument("--project-path", required=True, help="Project root path")
@@ -337,6 +307,15 @@ def main() -> None:
         "--save-baseline",
         action="store_true",
         help="Force overwrite baseline with current contracts",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("branch", "baseline"),
+        default="branch",
+        help="what to compare with",
+    )
+    parser.add_argument(
+        "--target", default="", help="target branch (default: detected)"
     )
     args = parser.parse_args()
 
@@ -351,7 +330,11 @@ def main() -> None:
             baseline.unlink()
 
     try:
-        result = run_scan(project_path)
+        result = None
+        if args.mode == "branch" and not args.save_baseline:
+            result = run_branch(project_path, args.target)
+        if result is None:
+            result = {"mode": "baseline", **run_scan(project_path)}
         _emit("API_WATCHER_RESULT", result)
     except Exception as exc:  # noqa: BLE001
         _emit("API_WATCHER_ERROR", str(exc))

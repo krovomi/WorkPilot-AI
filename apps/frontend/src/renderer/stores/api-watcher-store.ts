@@ -12,7 +12,8 @@ interface ApiWatcherState {
 	result: ApiWatcherResult | null;
 	error: string | null;
 
-	startScan: (projectPath: string, saveBaseline?: boolean) => Promise<void>;
+	/** Against the target branch (empty: detected), or the saved baseline. */
+	startScan: (projectPath: string, saveBaseline?: boolean, target?: string) => Promise<void>;
 	cancelScan: () => Promise<void>;
 	setStatus: (status: string) => void;
 	setResult: (result: ApiWatcherResult) => void;
@@ -26,7 +27,7 @@ export const useApiWatcherStore = create<ApiWatcherState>((set) => ({
 	result: null,
 	error: null,
 
-	startScan: async (projectPath, saveBaseline = false) => {
+	startScan: async (projectPath, saveBaseline = false, target = "") => {
 		if (!projectPath) {
 			set({ phase: "error", error: "No project selected" });
 			return;
@@ -41,6 +42,8 @@ export const useApiWatcherStore = create<ApiWatcherState>((set) => ({
 			const result = await globalThis.electronAPI.runApiWatcherScan({
 				projectPath,
 				saveBaseline,
+				mode: saveBaseline ? "baseline" : "branch",
+				target,
 			});
 			set({ phase: "complete", result, status: "" });
 		} catch (err) {

@@ -140,6 +140,13 @@ export interface DesignToCodeResult {
 	tokens_used: number;
 	/** No model answered: the result is a canned example, not an analysis. */
 	simulated?: boolean;
+	/** The generated markup scored with the Accessibility page's rules (#391). */
+	accessibility?: {
+		score: number;
+		count: number;
+		targetLevel: string;
+		violations: { ruleId: string; description: string; severity: string; wcagCriteria: string; file: string; line: number }[];
+	} | null;
 }
 
 /** A live step of the run, forwarded from the runner as it happens. */
