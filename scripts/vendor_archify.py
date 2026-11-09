@@ -103,6 +103,16 @@ EXCLUDED = (
     "scripts/check-update.mjs",
 )
 
+# Version floors laid over upstream's `overrides`, then the lockfile re-resolved.
+# The one hand change this tree carries, done here rather than in the tree so
+# that re-vendoring keeps it and `--check` stays a byte comparison. Upstream
+# pins fast-uri to 3.1.5 (3.1.7 in its 3.x line); ten advisories cover 3.0.0
+# to 3.1.8, the last of them fixed in 3.1.9 (GHSA-w74x-v6f9-j3xg among them).
+# Only upstream's own tooling reads these devDependencies (`generate:validators`);
+# the app never installs them, but Dependabot reads the lockfile all the same.
+# Drop an entry once upstream ships the fixed version.
+DEPENDENCY_FLOORS = {"fast-uri": "^3.1.9"}
+
 
 def _run(cmd: list[str], cwd: Path | None = None) -> str:
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
@@ -154,6 +164,37 @@ def _stage(src: Path, staging: Path) -> list[str]:
     return absent
 
 
+def _apply_floors(staging: Path) -> list[str]:
+    """Lay DEPENDENCY_FLOORS over upstream's overrides; return what changed."""
+    manifest_path = staging / "package.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    overrides = manifest.setdefault("overrides", {})
+    applied = []
+    for name, floor in DEPENDENCY_FLOORS.items():
+        if overrides.get(name) != floor:
+            applied.append(f"overrides.{name}: {overrides.get(name)!r} -> {floor!r}")
+            overrides[name] = floor
+    if not applied:
+        return []
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    if (staging / "package-lock.json").is_file():
+        npm = shutil.which("npm")
+        if npm is None:
+            raise FileNotFoundError("npm is needed to re-resolve package-lock.json")
+        _run(
+            [
+                npm,
+                "install",
+                "--package-lock-only",
+                "--ignore-scripts",
+                "--no-audit",
+                "--no-fund",
+            ],
+            cwd=staging,
+        )
+    return applied
+
+
 def _drifted(root: Path) -> list[str]:
     """Which files differ from the last vendoring, once the digest disagrees.
 
@@ -183,7 +224,7 @@ def _drifted(root: Path) -> list[str]:
 
 
 def _receipt(
-    ref: str, commit: str, absent: list[str], staging: Path
+    ref: str, commit: str, absent: list[str], staging: Path, floors: list[str]
 ) -> dict[str, object]:
     return {
         "source": SOURCE,
@@ -197,6 +238,7 @@ def _receipt(
         "vendored_by": "scripts/vendor_archify.py",
         "excluded": list(EXCLUDED),
         "absent_upstream": absent,
+        "dependency_floors": floors,
         "note": (
             "Committed rather than bootstrapped: this is a runtime dependency of "
             "the Architecture page and the Kanban architecture delta, not a skill "
@@ -280,11 +322,13 @@ def main(argv: list[str] | None = None) -> int:
         staging = Path(tmp) / "staged"
         try:
             absent = _stage(src, staging)
+            floors = _apply_floors(staging)
         except FileNotFoundError as exc:
             print(f"vendor_archify: {exc}", file=sys.stderr)
             return 1
         (staging / RECEIPT_NAME).write_text(
-            json.dumps(_receipt(args.ref, commit, absent, staging), indent="\t") + "\n",
+            json.dumps(_receipt(args.ref, commit, absent, staging, floors), indent="\t")
+            + "\n",
             encoding="utf-8",
         )
 
