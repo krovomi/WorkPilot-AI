@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DesignStep } from "../../../lib/design-import-steps";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import { useProjectStore } from "../../../stores/project-store";
+import { GeneratedReviewBanner } from "../../generated-review/GeneratedReviewBanner";
 
 const ACCENT: Record<DesignStep, string> = {
 	vision: "var(--di-vision)",
@@ -131,6 +133,7 @@ export function ResultInspector() {
 	const selectedStep = useDesignToCodeStore((s) => s.selectedStep);
 	const error = useDesignToCodeStore((s) => s.error);
 	const writeOutcome = useDesignToCodeStore((s) => s.writeOutcome);
+	const projectId = useProjectStore((s) => s.selectedProjectId);
 	const running = !["idle", "complete", "error"].includes(phase);
 
 	const banners = (
@@ -308,6 +311,14 @@ export function ResultInspector() {
 			title = t(writeOutcome ? "inspector.writtenTitle" : "inspector.projectTitle");
 			body = (
 				<div className="di-card di-inspector overflow-auto p-4">
+					{writeOutcome?.review && (
+						<GeneratedReviewBanner
+							key={writeOutcome.review.taskId}
+							review={writeOutcome.review}
+							projectId={projectId ?? undefined}
+							className="mb-3"
+						/>
+					)}
 					{writeOutcome ? (
 						<ul className="di-journal">
 							{writeOutcome.written.map((w) => (

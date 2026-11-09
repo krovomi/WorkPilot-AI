@@ -58,8 +58,8 @@
 			"project": "you approve before anything is written",
 			"projectReady_one": "ready · {{count}} file to write",
 			"projectReady_other": "ready · {{count}} files to write",
-			"projectWritten_one": "{{count}} file written",
-			"projectWritten_other": "{{count}} files written"
+			"projectWritten_one": "{{count}} file in review",
+			"projectWritten_other": "{{count}} files in review"
 		}
 	},
 	"steps": {
@@ -162,9 +162,9 @@
 		"testsTitle_one": "{{count}} visual test",
 		"testsTitle_other": "{{count}} visual tests",
 		"noTests": "No visual test generated.",
-		"writtenTitle": "Files written to the project",
-		"projectTitle": "Ready to write to the project",
-		"projectBody": "Review the code and the tests, then click \"Write to the project\". A file that already exists is marked \"replaces\". You can also create a Kanban task: the agent will integrate the design in its own worktree, with build, tests and review.",
+		"writtenTitle": "Files committed on the review branch",
+		"projectTitle": "Ready to write to a review branch",
+		"projectBody": "Review the code and the tests, then write them to a review branch: they go on a Kanban card's branch, never into the project folder, and you open the pull request after reading the diff. A file that already exists is marked \"replaces\". You can also create a Kanban task: the agent will integrate the design in its own worktree, with build, tests and review.",
 		"created": "created",
 		"updated": "replaced",
 		"refused": {
@@ -213,10 +213,10 @@
 		"creatingTask": "Creating…",
 		"createTask": "Create a Kanban task",
 		"regenerate": "Regenerate",
-		"written_one": "{{count}} file written",
-		"written_other": "{{count}} files written",
-		"write_one": "Write {{count}} file to the project",
-		"write_other": "Write {{count}} files to the project",
+		"written_one": "{{count}} file in review",
+		"written_other": "{{count}} files in review",
+		"write_one": "Write {{count}} file to a review branch",
+		"write_other": "Write {{count}} files to a review branch",
 		"processing": "Generating…",
 		"generateCode": "Generate code",
 		"shortcut": "Ctrl ↵"

@@ -2,6 +2,7 @@
  * Changelog-related types
  */
 
+import type { GeneratedReview } from "./generated-review";
 import type { ImplementationPlan } from "./task";
 
 // ============================================
@@ -121,6 +122,8 @@ export interface ChangelogSaveRequest {
 export interface ChangelogSaveResult {
 	filePath: string;
 	bytesWritten: number;
+	/** The review card the file was committed to (never the project folder). */
+	review?: GeneratedReview | null;
 }
 
 export interface ChangelogGenerationProgress {

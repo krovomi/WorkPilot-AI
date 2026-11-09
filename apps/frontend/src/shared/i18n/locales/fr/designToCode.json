@@ -58,8 +58,8 @@
 			"project": "vous validez avant d'écrire",
 			"projectReady_one": "prêt · {{count}} fichier à écrire",
 			"projectReady_other": "prêt · {{count}} fichiers à écrire",
-			"projectWritten_one": "{{count}} fichier écrit",
-			"projectWritten_other": "{{count}} fichiers écrits"
+			"projectWritten_one": "{{count}} fichier en revue",
+			"projectWritten_other": "{{count}} fichiers en revue"
 		}
 	},
 	"steps": {
@@ -162,9 +162,9 @@
 		"testsTitle_one": "{{count}} test visuel",
 		"testsTitle_other": "{{count}} tests visuels",
 		"noTests": "Aucun test visuel généré.",
-		"writtenTitle": "Fichiers écrits dans le projet",
-		"projectTitle": "Prêt à écrire dans le projet",
-		"projectBody": "Relisez le code et les tests, puis cliquez sur « Écrire dans le projet ». Un fichier qui existe déjà est marqué « remplace ». Vous pouvez aussi créer une tâche Kanban : l'agent intégrera le design dans son propre worktree, avec build, tests et revue.",
+		"writtenTitle": "Fichiers commités sur la branche de revue",
+		"projectTitle": "Prêt à écrire sur une branche de revue",
+		"projectBody": "Relisez le code et les tests, puis écrivez-les sur une branche de revue : ils vont sur la branche d'une carte du Kanban, jamais dans le dossier du projet, et vous ouvrez la pull request après avoir relu le diff. Un fichier qui existe déjà est marqué « remplace ». Vous pouvez aussi créer une tâche Kanban : l'agent intégrera le design dans son propre worktree, avec build, tests et revue.",
 		"created": "créé",
 		"updated": "remplacé",
 		"refused": {
@@ -213,10 +213,10 @@
 		"creatingTask": "Création…",
 		"createTask": "Créer une tâche Kanban",
 		"regenerate": "Régénérer",
-		"written_one": "{{count}} fichier écrit",
-		"written_other": "{{count}} fichiers écrits",
-		"write_one": "Écrire {{count}} fichier dans le projet",
-		"write_other": "Écrire {{count}} fichiers dans le projet",
+		"written_one": "{{count}} fichier en revue",
+		"written_other": "{{count}} fichiers en revue",
+		"write_one": "Écrire {{count}} fichier sur une branche de revue",
+		"write_other": "Écrire {{count}} fichiers sur une branche de revue",
 		"processing": "Génération…",
 		"generateCode": "Générer le code",
 		"shortcut": "Ctrl ↵"

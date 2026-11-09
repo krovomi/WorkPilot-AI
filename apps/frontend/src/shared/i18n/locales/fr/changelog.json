@@ -204,7 +204,7 @@
 		"loadingImage": "Chargement de l'image...",
 		"preview": "Aperçu",
 		"copy": "Copier dans le presse-papiers",
-		"prepend": "Ajouter en tête de CHANGELOG.md à la racine du projet",
+		"prepend": "Ajouter en tête de CHANGELOG.md, sur la branche d'une carte du Kanban à relire avant la pull request",
 		"aria": "Aperçu du changelog, glisser-déposer accepté",
 		"dropImages": "Déposez des images ici pour les ajouter au changelog",
 		"pasteImages": "Collez des images dans la description pour les enregistrer dans le changelog",
@@ -217,7 +217,7 @@
 		"saveToFile": "Enregistrer dans CHANGELOG.md"
 	},
 	"success": {
-		"description": "La version {{tag}} a été ajoutée à CHANGELOG.md",
+		"description": "La version {{tag}} a été ajoutée à CHANGELOG.md, sur la branche d'une carte en revue",
 		"title": "Changelog enregistré !",
 		"done": "Terminé"
 	}
