@@ -224,7 +224,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 
 **Pipeline de construction**
 - **Tableau Kanban** avec approbation de la spec, pause et reprise, relance par phase, messages de pilotage pendant que l'agent travaille, et une revue guidée avec des commentaires de ligne renvoyés au fixer ; des diffs aux couleurs de git, colorés selon le langage pour chaque stack, mots modifiés surlignés et disposition côte à côte « Auto ».
-- **Découpage automatique** des grosses tâches en petites PR groupées, **tâches empilées**, **Best-of-N** (construire une tâche 2 à 4 fois sur des moteurs différents et garder la meilleure) et changements **multi-dépôts**.
+- **Découpage automatique** des grosses tâches en petites PR groupées, **tâches empilées**, **Best-of-N** (construire une tâche 2 à 4 fois sur des moteurs différents et garder la meilleure) et changements **multi-dépôts**, sur le provider, le modèle et l'effort choisis pour eux.
 - **Mode objectif** (terminé quand une commande le dit, par exemple `dotnet test` qui sort en 0), **revue croisée** par un second moteur, **spec par l'exemple** pour les Web API ASP.NET Core, **montées de version .NET** une version à la fois jusqu'à .NET 11.
 - **Vérification à l'exécution** avec vidéos de preuve et comparaison avec la branche de base ; **portes strictes** contre les paquets inventés, les tests sans mordant et pour les preuves formelles.
 - **Suivi des PR** : un check rouge ou un fil de revue sur la PR de la tâche repart vers le fixer, jamais forcé, jamais fusionné.
@@ -233,7 +233,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Agents et orchestration**
 - **Mission Control** pour lancer plusieurs agents sur un même objectif, **terminaux d'agents**, **Arène** et **Bounty Board** pour comparer les moteurs, **Repo bench** pour les mesurer sur vos propres tâches passées.
 - Agents spécialisés : générateur de tests, détective de tests instables, refactoreur, docs et dérive, migration, coordinateur de release, auto-guérison sur échec de CI, suivi de la dette technique.
-- **Mémoire partagée** : un coffre Obsidian et un graphe que tous les agents lisent et écrivent, entre sessions et providers ; la boucle d'apprentissage analyse chaque build avec un modèle du provider choisi ; des packs de **skills** indépendants du provider.
+- **Mémoire partagée** : un coffre Obsidian et un graphe que tous les agents lisent et écrivent, entre sessions et providers ; la boucle d'apprentissage analyse chaque build avec un modèle du provider choisi, et ses leçons atteignent la spec, le plan, le code et la QA ; des packs de **skills** indépendants du provider.
 
 **Comprendre et planifier**
 - **Insights**, **Idéation**, **Feuille de route**, visualiseur d'architecture, règles de revue de code et code smells pour chaque grande stack, classificateur de risque.
@@ -241,7 +241,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 
 **Intégrations**
 - GitHub, GitLab, Azure DevOps, Jira et Linear : importer des tickets, les investiguer, relire des pull requests.
-- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée) en carte brouillon.
+- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée) en carte brouillon ; les **déclencheurs CI/CD** lancent votre pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la PR d'une tâche ou quand elle est fusionnée.
 - Marketplace MCP et serveurs MCP personnalisés avec descriptions d'outils épinglées ; le serveur MCP **workpilot-board** donne votre Kanban à Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres.
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 

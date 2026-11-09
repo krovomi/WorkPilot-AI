@@ -1,0 +1,107 @@
+From 3063665cac91754cd3bd0a53fab2d55507555613 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 9 Nov 2026 15:17:36 +0000
+Subject: [PATCH] =?UTF-8?q?docs(wiki):=201.4.1=20=E2=80=94=20what's=20new,?=
+ =?UTF-8?q?=20roadmap?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Home.md       |  6 +++---
+ Roadmap.fr.md | 33 ++++++++++++++++++++++++++++++++-
+ Roadmap.md    | 15 ++++++++++++++-
+ 3 files changed, 49 insertions(+), 5 deletions(-)
+
+diff --git a/Home.md b/Home.md
+index 93eb472..f209b58 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,11 +6,11 @@
+ 
+ ---
+ 
+-## 🆕 What's new in 1.4.0 / Nouveautés de la 1.4.0
++## 🆕 What's new in 1.4.1 / Nouveautés de la 1.4.1
+ 
+-One UI charter for every module and every Settings page, taken from Visual to Code. A task too big for one small PR now splits itself into parts with one colour and one mark per group, and the parts move on by themselves as their PRs are merged. Visual to Code checks the coherence of the whole architecture, Import Design and the test generation studio are rebuilt, the analyses work on every stack (.NET, Java, Go, Rust, PHP, Ruby, Dart, Swift…), and every agent CLI installs and updates in one click. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++Every page that writes code into your project (test studio, Import Design, changelog, pair programming, quick command) now works on a review branch: a « Generated code » card waits in Human Review and you open the PR from it. The left menu becomes a rail of spaces with « My menu », four Toolbox hubs and a Labo for beta pages, and Ctrl+K finds all 77 pages. The board gains an « Open PR » column and a worktree purge, diffs use git colours with syntax highlighting for every stack, the first-run wizard sets up any AI provider, multi-repo changes run on the engine you pick, CI/CD Triggers start your pipeline after an agent's PR, and the learning loop's lessons reach the spec. Dependency alerts (oauthlib, glob, minimatch, fast-uri) are fixed. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
+ 
+-Une seule charte UI pour tous les modules et les paramètres, et les grosses tâches se découpent toutes seules en petites PR.
++Tout code généré passe par une branche et une PR relue, et le menu de gauche s'allège.
+ 
+ ---
+ 
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index ae5473c..eec1e0a 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,38 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.4.0 — Stable actuelle (8 novembre 2026)
++### v1.4.1 — Stable actuelle (9 novembre 2026)
++
++*Tout code généré passe par une branche et une PR relue, et le menu de gauche s'allège.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++- **Tout passe par une revue** : le studio de tests, Import Design, le journal des modifications, le
++  pair programming et la commande rapide du Kanban écrivent sur la branche d'une carte « Code généré »
++  en Revue humaine ; vous relisez le diff, puis « Créer la PR »
++- **Un menu de gauche plus léger** : un rail d'espaces, « Mon menu » pour les pages épinglées et
++  récentes, la Boîte à outils en quatre hubs (20 entrées deviennent 9), les 14 pages en bêta dans un
++  **Labo**, une proposition de masquer les pages inutilisées depuis 30 jours ; Ctrl+K et `/`
++  trouvent les 77 pages par leur nom, leur groupe ou un mot-clé
++- **Kanban** : une colonne « PR ouverte », un filtre « Générée par une page », **Purger** les
++  worktrees des cartes terminées (une PR fusionnée supprime aussi son worktree et sa branche locale)
++- **Des diffs aux couleurs de git** dans tous les thèmes, coloration syntaxique pour toutes les
++  stacks, mots modifiés surlignés, mode côte à côte « Auto » et diffstat par fichier
++- **Premier lancement** : l'assistant configure toutes les IA (Codex, Copilot, Gemini, OpenCode,
++  Ollama, Mistral…) et son dernier écran dit honnêtement lesquelles sont connectées
++- **Multi-dépôts** sur le provider, le modèle et l'effort choisis ; les **déclencheurs CI/CD**
++  lancent le pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la
++  PR d'une tâche ou quand elle est fusionnée
++- **Boucle d'apprentissage** : les builds sont analysés par un modèle du provider choisi, et les
++  leçons atteignent aussi le rédacteur de spec et son critique
++- **La charte UI suit le thème de couleurs actif**, Import Design, le studio de tests et le canvas
++  Visuel vers Code compris
++- **Corrections** : studio de tests, commande rapide avec un abonnement Claude et tous les
++  providers, Mistral/DeepSeek/Grok hors de l'app installée, suppression d'un projet serveur qui
++  arrête d'abord ses agents, URL du webhook Slack/Teams chiffrée, « Copier le chemin » sous WSL
++- **Sécurité** : alertes de dépendances corrigées (oauthlib 4.0.1, glob, minimatch, fast-uri dans
++  le renderer archify embarqué)
++
++### v1.4.0 — 8 novembre 2026
+ 
+ *Une seule charte UI, et les grosses tâches se découpent toutes seules en petites PR.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+diff --git a/Roadmap.md b/Roadmap.md
+index 490b9d1..7da2d86 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -29,7 +29,20 @@ The Roadmap sits alongside **Ideation** (which scans the codebase for improvemen
+ 
+ ## Recent releases
+ 
+-### v1.4.0 — current stable (November 8, 2026)
++### v1.4.1 — current stable (November 9, 2026)
++
++- **Every write goes through review**: the test generation studio, Import Design, the changelog, pair programming and the Kanban quick command write on the branch of a « Generated code » card in Human Review; you read the diff, then « Create PR »
++- **A lighter left menu**: a rail of spaces with one panel at a time, « My menu » for pinned and recent pages, the Toolbox in four hubs (20 entries become 9), the 14 beta pages in a **Labo**, an offer to hide pages unused for 30 days; Ctrl+K and `/` find all 77 pages by name, group or keyword
++- **Kanban**: an « Open PR » column while a pull request waits, a « Generated by a page » filter, **Purge** of the worktrees of finished cards (a merged PR also removes its worktree and local branch)
++- **Diffs in git colours** in every theme, syntax highlighting for every stack, changed words marked, an Auto side-by-side layout and a diffstat per file
++- **First run**: the wizard sets up any AI provider (Codex, Copilot, Gemini, OpenCode, Ollama, Mistral…) and its last screen says honestly which ones are connected
++- **Multi-repo** changes run on the provider, model and effort you pick; **CI/CD Triggers** start the pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged
++- **Learning loop**: builds analysed by a model of whichever provider is selected, and the lessons now reach the spec writer and its critic too
++- **The UI charter follows the active colour theme**, Import Design, the test studio and the Visual to Code canvas included
++- **Fixes**: test generation studio runtime, the quick command with a Claude subscription and every provider, Mistral/DeepSeek/Grok outside the packaged app, deleting a server project stops its agents first, the Slack/Teams webhook URL stored encrypted, « Copy path » under WSL
++- **Security**: dependency alerts fixed (oauthlib 4.0.1, glob, minimatch, fast-uri in the bundled archify renderer)
++
++### v1.4.0 — November 8, 2026
+ 
+ - **One UI charter**: every module (Workspace, Agents, Development, Explore, Git, Planning, Toolbox) and every Settings page in the Visual to Code style: kicker header, pill tabs with counters, cards with a coloured rail, one primary button in a bottom command bar; Settings translated and grouped by coloured theme
+ - **Automatic split into small PRs**: after planning, a task over the review ceiling of its kind (100 lines for a hotfix, 200 for a bug fix or an upgrade, 300 for a refactoring, 400 for a feature, tests or docs) becomes "Part k/N" cards, one PR each; independent parts run in parallel, dependent ones stack; a merged part moves the next one on (GitHub, GitLab, Azure DevOps); one colour, mark and `groupe/<id>` label per group, on the board, the phone and the forge
+-- 
+2.43.0
+
