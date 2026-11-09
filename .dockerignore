@@ -3,6 +3,7 @@
 # secret) never reaches the Docker daemon, let alone a layer.
 *
 !apps/backend/
+!src/
 !config/
 !workflows/
 !capabilities/
