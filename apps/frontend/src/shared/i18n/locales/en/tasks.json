@@ -947,10 +947,6 @@
 			"viewDiff": "View changes",
 			"hideDiff": "Hide changes",
 			"noDiff": "No recorded changes for this file",
-			"viewMode": {
-				"unified": "Unified view",
-				"split": "Side-by-side view"
-			},
 			"stats": {
 				"files": "Files",
 				"folders": "Folders",

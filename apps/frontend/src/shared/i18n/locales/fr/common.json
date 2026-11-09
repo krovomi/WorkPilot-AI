@@ -74,7 +74,19 @@
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
 		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible",
-		"commentLine": "Commenter la ligne {{line}}"
+		"commentLine": "Commenter la ligne {{line}}",
+		"hiddenLines_one": "{{count}} ligne inchangée",
+		"hiddenLines_other": "{{count}} lignes inchangées",
+		"stat": "{{additions}} lignes ajoutées, {{deletions}} lignes supprimées",
+		"mode": {
+			"label": "Disposition du diff",
+			"auto": "Disposition automatique",
+			"autoHint": "Automatique : côte à côte quand un fichier a des lignes supprimées et ajoutées et que la fenêtre est assez large, sinon en une colonne",
+			"unified": "Vue unifiée",
+			"unifiedHint": "Unifiée : lignes supprimées et ajoutées dans une seule colonne",
+			"split": "Côte à côte",
+			"splitHint": "Côte à côte : ancienne version à gauche, nouvelle à droite (un fichier ajouté ou supprimé reste en une colonne)"
+		}
 	},
 	"buttons": {
 		"save": "Enregistrer",

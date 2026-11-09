@@ -573,6 +573,7 @@ export function ReviewWorkspace({
 							) : view === "diff" ? (
 								<DiffViewer
 									patch={file.patch}
+									filePath={active}
 									viewMode={split ? "split" : "unified"}
 								/>
 							) : (
