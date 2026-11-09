@@ -42,6 +42,7 @@ enregistrées et exécutées sur le serveur (voir
 | `ci_failed` | le fournisseur de CI du « Build rouge » (Azure DevOps, GitHub Actions, GitLab CI, Jenkins) | `ci:<fournisseur>:<branche>:<run>` | un run en cours ; un run vert, qui clôt la série rouge |
 | `schedule` | l'horloge locale, `HH:MM` et des jours de la semaine | `schedule:<règle>:<jour>` | l'heure pas encore passée ; un jour où l'app était fermée ; une règle créée après l'heure du jour |
 | `pr_opened` | API GitHub, avec le jeton du projet ; base optionnelle | `github-pr:<dépôt>#<n>` | une PR ouverte avant la règle ; une PR en brouillon (elle revient une fois prête) ; une PR de la personne elle-même ou d'un bot ; une PR qui a déjà une revue |
+| `prod_incident` | le dossier `.workpilot/incidents/` du projet ; l'API Sentry quand la règle nomme un projet (`SENTRY_AUTH_TOKEN` du `.env` du projet) | `incident:<source>:<id>` | un fichier plus vieux que la règle ; un fichier de plus de 256 Ko, qui n'est pas un objet JSON ou qui est un lien ; une issue Sentry résolue ou vue avant la règle |
 
 - **L'étiquette posée après la règle.** La liste des issues est filtrée par
   `since`, mais `since` porte sur la dernière mise à jour. Une vieille issue
@@ -64,9 +65,51 @@ enregistrées et exécutées sur le serveur (voir
   pas encore un événement : on n'ouvre pas une carte sur une CI qui va peut-être
   repasser au vert.
 
-Sentry n'est pas un déclencheur. WorkPilot n'a pas de connecteur Sentry côté
-projet (`main/sentry.ts` remonte les erreurs de l'app elle-même). Une
-alerte qui arrive dans une issue GitHub étiquetée passe par `issue_labeled`.
+## Un incident de production : une carte bug-fix
+
+Issue #384, F187. Le Regression Guardian transformait les incidents du dossier
+`.workpilot/incidents/` en squelettes de tests, sans les relier à rien. La
+règle `prod_incident` en fait des cartes : chaque incident devient une carte
+`bug_fix` (type par défaut de la règle). La phase de reproduction du workflow
+écrit d'abord le test de régression qui échoue, puis le correctif, dans le
+worktree de la carte, sur sa branche et dans sa PR. Rien n'est écrit dans le
+projet hors de ce cycle.
+
+- **Rien n'écoute.** Comme les canaux de « Besoin de toi », la machine
+  n'ouvre aucun port : il n'y a pas de webhook. La règle lit ses sources à
+  chaque passage, comme les autres.
+  - **Le dossier.** N'importe quel outil y dépose un payload : Sentry,
+    Datadog, CloudWatch, New Relic, PagerDuty, Grafana, OpsGenie, ou un
+    simple `{"title", "stack"}`. Un payload sans id est nommé par son contenu.
+  - **Sentry, quand la règle nomme une organisation et un projet.** La règle
+    lit les issues non résolues vues pour la première fois après sa création
+    (`firstSeen:>=`), puis le dernier événement de chacune. L'hôte est un nom
+    d'hôte, jamais une URL, et la requête part toujours en HTTPS (`sentry.io`
+    par défaut).
+- **Le texte de la carte vient du backend.** `regression_guardian/feed.py`
+  l'écrit, le même sur le bureau et sur le serveur. La carte donne les
+  frames du code du projet (`fichier:ligne` dans `fonction`), le service,
+  l'environnement, la release et le framework de test de la stack fautive
+  (`detect_framework`, toutes stacks). « Terminé » veut dire : un test rouge
+  d'abord, puis le correctif, sans test sauté ni affaibli.
+- **Un incident est une donnée** (S2). Chaque champ est réduit à une ligne
+  sûre et les données personnelles sont masquées (e-mails, téléphones,
+  `token=…`). Le message et les breadcrumbs entrent dans la carte délimités
+  comme contenu non fiable (`quote_untrusted`). Une URL Sentry n'est gardée
+  que sur l'hôte de la règle. Chaque URL appelée est construite depuis la
+  règle, jamais depuis la réponse.
+- **Sur le bureau**, le main lance `regression_guardian_runner.py --feed`
+  avec `pythonStaticRunnerEnv` : aucun identifiant, sauf `SENTRY_AUTH_TOKEN`.
+  Ce jeton est lu dans le `.env` racine (comme sentry-cli) ou dans
+  `.workpilot/.env` (chiffré). Le jeton passe par l'environnement, jamais par
+  la ligne de commande. La réponse du runner est revalidée
+  (`sources-incidents.ts`) : clés `incident:`, lignes simples, liens HTTPS,
+  raisons connues.
+- **Le dossier ne sort pas du projet.** `.workpilot/incidents` doit se
+  résoudre dans le projet, et un fichier qui est un lien n'est pas lu.
+
+Le moniteur de l'app (`main/sentry.ts`) reste séparé : il remonte les erreurs
+de WorkPilot lui-même.
 
 ## Une PR ouverte par quelqu'un d'autre : une revue en brouillon
 
@@ -194,6 +237,12 @@ apps/frontend/src/main/server-automations.ts   le panneau parle à ces routes
   projet et `task.write`, et `agent.execute` pour une règle qui lance un agent
   (cartes non brouillon, revue de PR). Sinon la règle s'arrête avec
   `owner_not_allowed` ; la reprendre, c'est l'enregistrer à nouveau.
+- **Sentry est lu avec le jeton Sentry de cette personne** (« Mes jetons sur
+  le serveur », type `sentry_token`), sur `sentry.io` ou sur un hôte
+  auto-hébergé que l'opérateur a listé dans `WORKPILOT_SENTRY_HOSTS`. Une
+  règle qui nomme un autre hôte échoue avant tout envoi. Sans jeton, la règle
+  s'arrête avec `sentry_token_missing`. Le dossier d'incidents est celui du
+  clone du projet.
 - **La forge est lue avec le jeton de cette personne**, celui de « Mes jetons
   sur le serveur » (`server/services/secrets.py`), sur la forge que le serveur
   lit dans le `repo_url` du projet (`server/forges.py` : github.com, ou un hôte

@@ -9,11 +9,12 @@ Project context is a different chain entirely: ``.hermes.md`` / ``HERMES.md``,
 then ``AGENTS.md``, then ``CLAUDE.md``, then ``.cursorrules`` — first one found
 wins, and this repository is already answered by its committed `AGENTS.md`.
 
-So a `SOUL.md` committed at the root of a project is read by nothing. Shipping
-one anyway is still the right move, for the reason hermes itself ships one at
-the root of its own repository: it is the persona a person installs, and a
-persona nobody can see is a persona nobody adopts. The file is the offer; the
-install is a separate, explicit act.
+So a `SOUL.md` committed at the root of a project is read by nothing. The
+persona WorkPilot offers therefore lives beside this module
+(``apps/backend/hermes/SOUL.md``), not at the root of the repository: it is
+data of this package, it ships with the backend wherever the backend goes (the
+packaged app, the server image), and the root is left to files that agents do
+read. The file is the offer; the install is a separate, explicit act.
 
 Why it is never written automatically
 -------------------------------------
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "REFRESH_COMMAND",
+    "SOUL_RELATIVE_PATH",
     "SoulStatus",
     "install_soul",
     "refresh_prompts",
@@ -55,12 +57,26 @@ REFRESH_COMMAND = "hermes sessions refresh-prompts"
 
 _REFRESH_TIMEOUT_S = 20.0
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+#: Where the offered persona sits inside a WorkPilot checkout.
+SOUL_RELATIVE_PATH = Path("apps") / "backend" / "hermes" / "SOUL.md"
+
+#: The persona shipped with this backend, beside this module.
+_BUNDLED_SOUL = Path(__file__).resolve().with_name("SOUL.md")
 
 
 def repo_soul_path(repo_root: Path | None = None) -> Path:
-    """The persona this repository offers."""
-    return (Path(repo_root) if repo_root else _REPO_ROOT) / "SOUL.md"
+    """The persona WorkPilot offers.
+
+    The one in ``repo_root`` when that checkout has one, else the one shipped
+    beside this module. The fallback is what makes the packaged app work: there
+    the backend sits under ``resources/backend`` and ``parents[3]`` of this file
+    is the install directory, which holds no checkout at all.
+    """
+    if repo_root:
+        candidate = Path(repo_root) / SOUL_RELATIVE_PATH
+        if candidate.is_file():
+            return candidate
+    return _BUNDLED_SOUL
 
 
 def _read(path: Path) -> str:

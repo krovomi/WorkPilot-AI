@@ -9,7 +9,6 @@
 !capabilities/
 !skills/
 !.agents/
-!SOUL.md
 !deploy/server-entrypoint.sh
 
 # Inside the allowed trees: local state, caches and secrets.

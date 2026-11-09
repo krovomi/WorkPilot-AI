@@ -78,6 +78,7 @@ from .dependency_gate import dependency_gate
 from .fixer import run_qa_fixer_session
 from .mutation_gate import guard_start, guard_test_only, mutation_gate
 from .proof_gate import proof_gate
+from .red_team_gate import red_team_gate
 from .report import (
     create_manual_test_plan,
     escalate_to_human,
@@ -572,6 +573,16 @@ async def run_qa_validation_loop(
                     task_logger=scope.task_logger,
                 )
             )
+            if gate is None:
+                gate = await red_team_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    model=qa_model,
+                    verbose=scope.verbose,
+                    task_logger=scope.task_logger,
+                )
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
                 if goal_gate is _Next.FAILED:

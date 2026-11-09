@@ -25,7 +25,8 @@ export type ServerSecretKind =
 	| "gitlab_token"
 	| "jira_token"
 	| "linear_api_key"
-	| "azure_pat";
+	| "azure_pat"
+	| "sentry_token";
 
 export interface ServerUser {
 	id: string;

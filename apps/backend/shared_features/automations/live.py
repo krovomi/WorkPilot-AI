@@ -40,6 +40,7 @@ from .sources import (
     ci_failed_events,
     issue_labeled_events,
     pr_opened_events,
+    prod_incident_events,
     schedule_events,
 )
 
@@ -137,6 +138,38 @@ class ServerDeps:
         host, path = gitlab  # type: ignore[misc]
         return gitlab_api(host, path, token)
 
+    async def _sentry(self, owner_id: str, host: str) -> Any:
+        """The owner's Sentry client, on a host the operator vouched for."""
+        from regression_guardian.feed import FeedError, is_sentry_cloud
+        from server.config import get_settings
+        from shared_features.forge import send
+
+        if not is_sentry_cloud(host) and host not in get_settings().sentry_hosts:
+            raise SourceError(
+                "source_failed",
+                "This Sentry host is not in WORKPILOT_SENTRY_HOSTS",
+            )
+        try:
+            token = await get_user_secret(self.db, owner_id, "sentry_token")
+        except SecretsVaultError:
+            raise SourceError("source_failed", "Tokens unavailable") from None
+        if not token:
+            return None
+        self._guard_offline()
+        headers = {"Authorization": f"Bearer {token}", "User-Agent": "WorkPilot-AI"}
+
+        async def get(url: str, params: dict[str, str] | None) -> Any:
+            try:
+                answer = await send("GET", url, headers, params=params)
+            except HTTPException as e:
+                raise FeedError("source_failed", f"Sentry: {e.detail}") from None
+            status = answer.get("status", 0)
+            if not 200 <= status < 300:
+                raise FeedError("source_failed", f"Sentry answered {status}")
+            return answer.get("body")
+
+        return get
+
     async def read_source(
         self, rule: dict[str, Any], ledger: dict[str, Any]
     ) -> SourceResult:
@@ -151,10 +184,18 @@ class ServerDeps:
         trigger = rule["trigger"]
         if trigger["type"] == "schedule":
             return schedule_events(rule, self._now)
-        forge = await self._forge(owner.id)
 
         def seen(key: str) -> bool:
             return key in ledger["seen"]
+
+        if trigger["type"] == "prod_incident":
+            sentry = (
+                await self._sentry(owner.id, trigger.get("host") or "sentry.io")
+                if trigger.get("org")
+                else None
+            )
+            return await prod_incident_events(rule, self.root, seen, sentry)
+        forge = await self._forge(owner.id)
 
         if trigger["type"] == "issue_labeled":
             return await issue_labeled_events(rule, forge, seen)

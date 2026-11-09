@@ -368,6 +368,17 @@ AGENT_CONFIGS = {
         ],
         "thinking_default": "medium",
     },
+    # The red team (`red_team/`, `qa/red_team_gate.py`): writes attack tests
+    # and runs them, in a throwaway copy of the worktree. No web and no MCP
+    # server: the inputs it needs are in its prompt, and nothing it reads in
+    # the project may reach the network.
+    "red_team": {
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS,
+        "mcp_servers": [],
+        "mcp_servers_optional": [],
+        "auto_claude_tools": [],
+        "thinking_default": "medium",
+    },
     # ═══════════════════════════════════════════════════════════════════════
     # UTILITY PHASES (Minimal, no MCP)
     # ═══════════════════════════════════════════════════════════════════════

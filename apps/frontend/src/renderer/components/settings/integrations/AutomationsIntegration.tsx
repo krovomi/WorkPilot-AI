@@ -32,7 +32,13 @@ interface AutomationsIntegrationProps {
 	readonly projectId: string;
 }
 
-const TRIGGERS: AutomationTriggerType[] = ["issue_labeled", "ci_failed", "schedule", "pr_opened"];
+const TRIGGERS: AutomationTriggerType[] = [
+	"issue_labeled",
+	"ci_failed",
+	"schedule",
+	"pr_opened",
+	"prod_incident",
+];
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 /** Reasons whose raw message says more than the translated line. */
 const RAW_DETAIL = new Set<AutomationReason>([
@@ -54,6 +60,10 @@ interface Draft {
 	days: number[];
 	title: string;
 	prompt: string;
+	/** `prod_incident`: the Sentry organisation, project and host; empty for the inbox only. */
+	sentryOrg: string;
+	sentryProject: string;
+	sentryHost: string;
 	kind: TaskKind | "";
 	engine: EngineTrio | null;
 	draft: boolean;
@@ -72,6 +82,9 @@ function emptyDraft(): Draft {
 		days: [1, 2, 3, 4, 5],
 		title: "",
 		prompt: "",
+		sentryOrg: "",
+		sentryProject: "",
+		sentryHost: "",
 		kind: "",
 		engine: null,
 		draft: true,
@@ -97,6 +110,11 @@ function draftOf(rule: AutomationRule): Draft {
 			title: trigger.title,
 			prompt: trigger.prompt,
 		}),
+		...(trigger.type === "prod_incident" && {
+			sentryOrg: trigger.org ?? "",
+			sentryProject: trigger.project ?? "",
+			sentryHost: trigger.host ?? "",
+		}),
 		kind: rule.kind ?? "",
 		engine: rule.engine ?? null,
 		draft: rule.draft,
@@ -112,7 +130,14 @@ function ruleInput(draft: Draft): Record<string, unknown> {
 				? { type: draft.type, branch: draft.branch }
 				: draft.type === "pr_opened"
 					? { type: draft.type, base: draft.base }
-					: {
+					: draft.type === "prod_incident"
+						? {
+								type: draft.type,
+								org: draft.sentryOrg.trim(),
+								project: draft.sentryProject.trim(),
+								host: draft.sentryHost.trim(),
+							}
+						: {
 							type: draft.type,
 							time: draft.time,
 							days: draft.days,
@@ -240,6 +265,12 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 				return t("automations.summary.pr_opened", {
 					base: trigger.base || t("automations.anyBranch"),
 				});
+			case "prod_incident":
+				return trigger.org
+					? t("automations.summary.prod_incident_sentry", {
+							project: `${trigger.org}/${trigger.project}`,
+						})
+					: t("automations.summary.prod_incident");
 		}
 	};
 
@@ -309,7 +340,9 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 									...editing,
 									type: e.target.value as AutomationTriggerType,
 									kind:
-										e.target.value === "ci_failed" && !editing.kind
+										(e.target.value === "ci_failed" ||
+											e.target.value === "prod_incident") &&
+										!editing.kind
 											? "bug_fix"
 											: editing.kind,
 								})
@@ -360,6 +393,46 @@ export function AutomationsIntegration({ projectId }: AutomationsIntegrationProp
 								onChange={(e) => setEditing({ ...editing, base: e.target.value })}
 							/>
 							<p className="text-xs text-muted-foreground">{t("automations.help.pr_opened")}</p>
+						</div>
+					)}
+
+					{editing.type === "prod_incident" && (
+						<div className="space-y-2">
+							<div className="grid gap-3 sm:grid-cols-3">
+								<div className="space-y-2">
+									<Label htmlFor="automation-sentry-org">{t("automations.fields.sentryOrg")}</Label>
+									<Input
+										id="automation-sentry-org"
+										value={editing.sentryOrg}
+										maxLength={50}
+										placeholder={t("automations.placeholders.sentryOrg")}
+										onChange={(e) => setEditing({ ...editing, sentryOrg: e.target.value })}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="automation-sentry-project">
+										{t("automations.fields.sentryProject")}
+									</Label>
+									<Input
+										id="automation-sentry-project"
+										value={editing.sentryProject}
+										maxLength={50}
+										placeholder={t("automations.placeholders.sentryProject")}
+										onChange={(e) => setEditing({ ...editing, sentryProject: e.target.value })}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="automation-sentry-host">{t("automations.fields.sentryHost")}</Label>
+									<Input
+										id="automation-sentry-host"
+										value={editing.sentryHost}
+										maxLength={253}
+										placeholder={t("automations.placeholders.sentryHost")}
+										onChange={(e) => setEditing({ ...editing, sentryHost: e.target.value })}
+									/>
+								</div>
+							</div>
+							<p className="text-xs text-muted-foreground">{t("automations.help.prod_incident")}</p>
 						</div>
 					)}
 

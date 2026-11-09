@@ -22,6 +22,7 @@ import {
 	Stats,
 	type Tone,
 } from "../charter";
+import { ToolResultGuardSections } from "./ToolResultGuardSections";
 
 const THREAT_TONES: Record<ThreatLevel, Tone> = {
 	safe: "green",
@@ -129,6 +130,7 @@ export function InjectionGuardView({
 						</EmptyStage>
 					)
 				)}
+				{projectPath && <ToolResultGuardSections projectPath={projectPath} />}
 			</Page>
 		</ModuleStage>
 	);

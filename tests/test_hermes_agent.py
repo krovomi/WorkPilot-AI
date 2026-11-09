@@ -160,7 +160,18 @@ class TestDoctor:
 class TestSoul:
     def test_this_repository_offers_a_persona(self):
         assert soul_status(REPO_ROOT).offered
-        assert (REPO_ROOT / "SOUL.md").is_file()
+        assert (REPO_ROOT / "apps" / "backend" / "hermes" / "SOUL.md").is_file()
+
+    def test_the_persona_is_not_left_at_the_repository_root(self):
+        """It is package data: the root is for files agents actually read."""
+        assert not (REPO_ROOT / "SOUL.md").exists()
+
+    def test_a_root_without_a_checkout_still_finds_the_shipped_persona(self, tmp_path):
+        """The packaged app: ``parents[3]`` of the module is no checkout."""
+        status = soul_status(tmp_path / "install-dir")
+        assert status.offered
+        assert status.repo_path.name == "SOUL.md"
+        assert status.repo_path.parent.name == "hermes"
 
     def test_an_empty_home_reports_not_installed(self, home):
         assert soul_status(REPO_ROOT, home).state == "not-installed"

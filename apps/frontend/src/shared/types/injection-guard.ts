@@ -19,3 +19,14 @@ export interface InjectionScanResult {
 	decodedContent: string;
 	timestamp: string;
 }
+
+/** A tool result an agent read that the guard flagged (`injection_alerts.jsonl`). */
+export interface ToolResultAlert {
+	spec: string;
+	at: string;
+	tool: string;
+	source: string;
+	level: "suspect" | "blocked";
+	findings: string[];
+	action: "fenced" | "withheld";
+}
