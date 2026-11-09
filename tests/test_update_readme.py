@@ -190,7 +190,7 @@ class TestTheTwoReadmesStayTwins:
 
     @staticmethod
     def _images(text: str) -> list[str]:
-        return re.findall(r"\]\((\.github/assets/screenshots/[^)]+)\)", text)
+        return re.findall(r"\]\((\.github/assets/(?:screenshots|showcase)/[^)]+)\)", text)
 
     def test_each_links_to_the_other(self):
         assert "(README.fr.md)" in self.EN.read_text(encoding="utf-8")
@@ -204,10 +204,18 @@ class TestTheTwoReadmesStayTwins:
             assert (REPO_ROOT / image).is_file(), image
 
     def test_same_diagrams(self):
-        """Both READMEs draw the same Mermaid diagrams, not ASCII arrows."""
+        """Both READMEs show the drawn diagrams, each in its own language and in
+        a light and a dark version, never ASCII arrows."""
         en = self.EN.read_text(encoding="utf-8")
         fr = self.FR.read_text(encoding="utf-8")
-        assert en.count("```mermaid") == fr.count("```mermaid") >= 2
+        pictures = r'srcset="(\.github/assets/showcase/[^"]+-dark\.png)"'
+        en_dark = re.findall(pictures, en)
+        fr_dark = re.findall(pictures, fr)
+        assert len(en_dark) == len(fr_dark) >= 2
+        assert all(".fr-" in image for image in fr_dark)
+        for image in en_dark + fr_dark:
+            assert (REPO_ROOT / image).is_file(), image
+            assert (REPO_ROOT / image.replace("-dark.png", "-light.png")).is_file(), image
         for text in (en, fr):
             assert "─▶" not in text
 

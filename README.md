@@ -10,7 +10,7 @@
 [![Wiki](https://img.shields.io/badge/docs-wiki-blue?style=flat-square&logo=github)](https://github.com/krovomi/WorkPilot-AI/wiki)
 [![CI](https://img.shields.io/github/actions/workflow/status/krovomi/WorkPilot-AI/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/krovomi/WorkPilot-AI/actions)
 
-![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/screenshots/kanban.png)
+![WorkPilot AI: the Kanban board, with agents planning, coding and reviewing tasks](.github/assets/showcase/kanban.png)
 
 **[Download](#download)** · **[Quick start](#quick-start)** · **[How it works](#how-it-works)** · **[Tour](#a-tour-of-the-app)** · **[Features](#features-at-a-glance)** · **[AI providers](#ai-providers)** · **[Documentation](#documentation)**
 
@@ -77,40 +77,10 @@ Step-by-step installation, provider setup, Windows notes and troubleshooting: [d
 
 ## How it works
 
-```mermaid
-flowchart LR
-    subgraph P ["1 · Plan"]
-        direction TB
-        task(["📝 You describe a task"]) --> spec["📄 Spec<br/><small>goal, scope, acceptance criteria</small>"]
-        spec --> plan["🧭 Planner<br/><small>subtasks and the files each touches</small>"]
-        plan -. "if you want" .-> approve{{"✅ You approve the plan"}}
-    end
-
-    subgraph B ["2 · Build and check"]
-        direction TB
-        code["⌨️ Coder<br/><small>writes the code, can start subagents</small>"] --> qa["🔎 QA reviewer<br/><small>checks every acceptance criterion</small>"]
-        qa -- "issues found" --> fix["🔧 QA fixer"]
-        fix -- "fixed" --> qa
-    end
-
-    subgraph S ["3 · Prove and ship"]
-        direction TB
-        verify["▶️ Verify<br/><small>runs the app, keeps a proof</small>"] --> review{{"👀 You review the diff"}}
-        review --> merge(["🔀 Merge or pull request"])
-    end
-
-    P ==> B ==> S
-
-    classDef you fill:#F59E0B,stroke:#B45309,color:#111827,font-weight:bold
-    classDef agent fill:#6366F1,stroke:#4338CA,color:#ffffff
-    classDef proof fill:#10B981,stroke:#047857,color:#ffffff
-    class task,approve,review you
-    class spec,plan,code,qa,fix agent
-    class verify,merge proof
-    style P fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
-    style B fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
-    style S fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/how-it-works-dark.png">
+  <img alt="How it works: plan (you describe a task, spec, planner, you approve), build and check (coder, QA reviewer and QA fixer until QA approves), prove and ship (verify, you review the diff, merge or pull request)" src=".github/assets/showcase/how-it-works-light.png" width="100%">
+</picture>
 
 - **Isolated**: every task runs in its own git worktree, so your branch stays untouched until you merge; the worktree is removed once the task's pull request is merged.
 - **Reviewed, always**: pages that write code (test studio, Import Design, changelog, pair programming, the Kanban's quick commands) put it on the branch of a « Generated code » card in Human Review; it reaches your project only through a pull request you review ([generated code](docs/architecture/generated-review.md)).
@@ -133,14 +103,14 @@ flowchart LR
 
 **Task detail**: the plan split into subtasks with the files each touches, logs, changed files, visual proofs and the emulator.
 
-![Task detail with its subtasks](.github/assets/screenshots/task-detail.png)
+![Task detail with its subtasks](.github/assets/showcase/task-detail.png)
 
 </td>
 <td width="50%" valign="top">
 
 **Agent terminals**: up to 12 terminals side by side, each in a task's worktree, to run agents in parallel by hand.
 
-![Agent terminals: two sessions side by side](.github/assets/screenshots/terminals.png)
+![Agent terminals: two sessions side by side](.github/assets/showcase/terminals.png)
 
 </td>
 </tr>
@@ -149,14 +119,14 @@ flowchart LR
 
 **Insights**: ask about your codebase; answers cite files and lines, and a finding becomes a task in one click.
 
-![Insights: a conversation about the codebase that ends in a suggested task](.github/assets/screenshots/insights.png)
+![Insights: a conversation about the codebase that ends in a suggested task](.github/assets/showcase/insights.png)
 
 </td>
 <td valign="top">
 
 **Roadmap**: product vision, phases, MoSCoW priorities, competitors and votes; any feature becomes a task with **Build**.
 
-![Roadmap as a Kanban of features](.github/assets/screenshots/roadmap.png)
+![Roadmap as a Kanban of features](.github/assets/showcase/roadmap.png)
 
 </td>
 </tr>
@@ -165,14 +135,14 @@ flowchart LR
 
 **Ideation**: agents scan the project and propose improvements by type, each with its rationale and files.
 
-![Ideation: improvement ideas by type](.github/assets/screenshots/ideation.png)
+![Ideation: improvement ideas by type](.github/assets/showcase/ideation.png)
 
 </td>
 <td valign="top">
 
 **Dashboard**: what the agents produce and cost, by status, provider and model; exportable as JSON or CSV.
 
-![Dashboard of project metrics](.github/assets/screenshots/dashboard.png)
+![Dashboard of project metrics](.github/assets/showcase/dashboard.png)
 
 </td>
 </tr>
@@ -181,14 +151,14 @@ flowchart LR
 
 **Visual to Code**: draw the architecture as a node graph, each connection explained and checked, then generate the project.
 
-![Visual to Code: an architecture drawn as a node graph, every connection explained](.github/assets/screenshots/visual-to-code.png)
+![Visual to Code: an architecture drawn as a node graph, every connection explained](.github/assets/showcase/visual-to-code.png)
 
 </td>
 <td valign="top">
 
 **Import Design**: a mockup, screenshot or Figma export becomes components of the project's stack, in six visible steps.
 
-![Import Design: the six steps from an image to the project's components](.github/assets/screenshots/import-design.png)
+![Import Design: the six steps from an image to the project's components](.github/assets/showcase/import-design.png)
 
 </td>
 </tr>
@@ -197,14 +167,14 @@ flowchart LR
 
 **Test generation studio**: coverage gaps, unit, E2E or TDD, written live in the framework of the file's own stack.
 
-![Test generation studio: target, four-step pipeline and live result](.github/assets/screenshots/test-generation.png)
+![Test generation studio: target, four-step pipeline and live result](.github/assets/showcase/test-generation.png)
 
 </td>
 <td valign="top">
 
 **Settings**: application and project settings grouped by theme, in the same design charter as every module, in the colours of the active theme.
 
-![Settings: grouped navigation and the project's general page](.github/assets/screenshots/settings.png)
+![Settings: grouped navigation and the project's general page](.github/assets/showcase/settings.png)
 
 </td>
 </tr>
@@ -278,41 +248,10 @@ Several accounts per provider can be registered; when one hits its rate limit, t
 
 How the pieces talk to each other:
 
-```mermaid
-flowchart TB
-    subgraph local ["💻 Your machine"]
-        direction LR
-        desktop["🖥️ Desktop app<br/><small>Electron + React</small>"] <--> engine["🐍 Python engine<br/><small>agents, specs, QA, local API</small>"]
-        engine --> repo[("📁 Your git repository<br/><small>one worktree per task</small>")]
-    end
-
-    subgraph ext ["🌐 What the engine talks to"]
-        direction TB
-        providers["🤖 AI providers<br/><small>Claude, OpenAI, Gemini, Copilot,<br/>Mistral, Grok, DeepSeek,<br/>local models, agent CLIs</small>"]
-        forges["🔗 Forges and trackers<br/><small>GitHub, GitLab, Azure DevOps,<br/>Jira, Linear</small>"]
-        clients["🧩 Other AI clients<br/><small>Claude Code, Codex, Cursor…<br/>via the workpilot-board MCP server</small>"]
-    end
-
-    subgraph team ["👥 Team mode, optional"]
-        direction TB
-        server["🏢 Team server<br/><small>shared board, roles,<br/>organisations</small>"] <--> mobile["📱 Mobile app<br/><small>iOS and Android</small>"]
-    end
-
-    local <==> ext
-    local <-. "server mode" .-> team
-
-    classDef app fill:#6366F1,stroke:#4338CA,color:#ffffff
-    classDef outside fill:#0EA5E9,stroke:#0369A1,color:#ffffff
-    classDef shared fill:#10B981,stroke:#047857,color:#ffffff
-    classDef data fill:#F59E0B,stroke:#B45309,color:#111827
-    class desktop,engine app
-    class providers,forges,clients outside
-    class server,mobile shared
-    class repo data
-    style local fill:transparent,stroke:#6366F1,stroke-width:2px,stroke-dasharray:6 4
-    style ext fill:transparent,stroke:#0EA5E9,stroke-width:2px,stroke-dasharray:6 4
-    style team fill:transparent,stroke:#10B981,stroke-width:2px,stroke-dasharray:6 4
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/showcase/architecture-dark.png">
+  <img alt="Architecture: on your machine the desktop app and the Python engine work on your git repository, one worktree per task; the engine talks to AI providers, forges and trackers, and other AI clients; an optional team server shares the board with the mobile app" src=".github/assets/showcase/architecture-light.png" width="100%">
+</picture>
 
 Where they live in the repository:
 

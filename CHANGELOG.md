@@ -150,6 +150,10 @@ les alertes de dépendances sont corrigées.
 
 ### 📚 Documentation
 
+- **Un README plus soigné, avec le nouveau menu**. Les captures sont refaites avec le menu en
+  espaces (« Mon menu », rail, Labo) et présentées dans un cadre de fenêtre sur fond dégradé. Les
+  schémas « Fonctionnement » et « Architecture » sont redessinés (cartes, icônes de l'app, légende),
+  en anglais et en français, et suivent le thème clair ou sombre de GitHub.
 - **L'atlas d'architecture et le README racontent les changements du 9 novembre**. L'atlas
   (`docs/audit/WorkPilot-architecture.html`) gagne un tableau « Ce qui a changé le 9 novembre
   2026 » lisible sans bagage technique, la carte « Code généré » dans sa topologie et les PR du jour

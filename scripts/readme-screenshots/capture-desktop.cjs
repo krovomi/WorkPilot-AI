@@ -25,7 +25,7 @@ const OUT =
 	process.env.OUT || path.join(REPO, ".github", "assets", "screenshots");
 const PORT = Number(process.env.PREVIEW_PORT || 5179);
 const URL = `http://localhost:${PORT}/`;
-const VIEWPORT = { width: 2010, height: 1080 }; // every Kanban column, sidebar open
+const VIEWPORT = { width: 2060, height: 1080 }; // every Kanban column, sidebar open
 
 function startPreview() {
 	const vite = spawn(
@@ -77,6 +77,12 @@ async function openApp(browser) {
 	if (await skip.count()) {
 		await skip.first().click();
 		await page.waitForTimeout(800);
+	}
+	// First run of the spaces menu: take the "Essential" menu (pinned pages).
+	const essential = page.getByRole("button", { name: "Essential", exact: true });
+	if (await essential.count()) {
+		await essential.first().click();
+		await page.waitForTimeout(400);
 	}
 	// The CLI install panel is noise in a screenshot.
 	const cli = page.getByText("CLI Tools", { exact: true });
@@ -196,7 +202,7 @@ const SHOTS = {
 		await page.waitForTimeout(1500);
 	},
 	settings: async (page) => {
-		await page.getByText("Settings", { exact: true }).last().click();
+		await page.getByRole("button", { name: "Application Settings" }).first().click();
 		await page.waitForTimeout(2500);
 	},
 };
