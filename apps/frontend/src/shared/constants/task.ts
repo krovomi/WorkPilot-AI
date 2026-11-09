@@ -17,16 +17,17 @@ export const TASK_STATUS_COLUMNS = [
 	"ai_review",
 	"human_review",
 	"build_failed",
+	"pr_created",
 	"done",
 ] as const;
 
 export type TaskStatusColumn = (typeof TASK_STATUS_COLUMNS)[number];
 
 // Status label translation keys (use with t() from react-i18next)
-// Note: pr_created maps to 'done' column in Kanban view (see KanbanBoard.tsx)
+// Note: pr_created has its own column (« PR ouverte »), shown once a card has an open PR
 // Note: error maps to 'human_review' column in Kanban view (errors need human attention)
 export const TASK_STATUS_LABELS: Record<
-	TaskStatusColumn | "pr_created" | "error",
+	TaskStatusColumn | "error",
 	string
 > = {
 	backlog: "columns.backlog",
@@ -35,16 +36,15 @@ export const TASK_STATUS_LABELS: Record<
 	ai_review: "columns.ai_review",
 	human_review: "columns.human_review",
 	build_failed: "columns.build_failed",
-	done: "columns.done",
 	pr_created: "columns.pr_created",
+	done: "columns.done",
 	error: "columns.error",
 };
 
 // Status colors for UI
-// Note: pr_created maps to 'done' column in Kanban view (see KanbanBoard.tsx)
 // Note: error maps to 'human_review' column in Kanban view (errors need human attention)
 export const TASK_STATUS_COLORS: Record<
-	TaskStatusColumn | "pr_created" | "error",
+	TaskStatusColumn | "error",
 	string
 > = {
 	backlog: "bg-muted text-muted-foreground",
@@ -53,8 +53,8 @@ export const TASK_STATUS_COLORS: Record<
 	ai_review: "bg-warning/10 text-warning",
 	human_review: "bg-purple-500/10 text-purple-400",
 	build_failed: "bg-destructive/10 text-destructive",
+	pr_created: "bg-indigo-500/10 text-indigo-400",
 	done: "bg-success/10 text-success",
-	pr_created: "bg-info/10 text-info",
 	error: "bg-destructive/10 text-destructive",
 };
 

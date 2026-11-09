@@ -1323,6 +1323,11 @@ body {
   border-top-color: var(--col-accent);
 }
 
+.column-pr-open {
+  --col-accent: #818CF8;
+  border-top-color: var(--col-accent);
+}
+
 .column-done {
   --col-accent: var(--success);
   border-top-color: var(--col-accent);
