@@ -2,7 +2,7 @@
 section: ✨ Nouveautés
 ---
 
-- **L'assistant de premier lancement ouvre tous les fournisseurs d'IA** (F174). Une carte
+- **L'assistant de premier lancement ouvre tous les fournisseurs d'IA** (F176). Une carte
   « Utiliser une autre IA » permet de configurer Codex, GitHub Copilot, Gemini, OpenCode, Ollama,
   Mistral et les autres dès le premier lancement, dans le même panneau que Réglages → Comptes. Le
   dernier écran nomme les IA connectées, ou dit qu'aucune ne l'est et propose d'en connecter une, au
