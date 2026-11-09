@@ -174,7 +174,7 @@ def _path_keys_in(payload: object) -> set[str]:
 
     Nested as well as top level: FastAPI embeds a model under its parameter
     name when a route takes more than one body parameter, and a route that
-    takes a bare ``dict`` (`/api/slash-commands/run`) reads whatever keys it
+    takes a bare ``dict`` reads whatever keys it
     likes. Walked with a stack, not recursion — the depth is the client's.
     """
     found: set[str] = set()
