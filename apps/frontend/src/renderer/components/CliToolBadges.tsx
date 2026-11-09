@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AgentCliStatusBadge } from "./AgentCliStatusBadge";
 import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
 import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
@@ -9,9 +9,11 @@ import { type CliPresence, type CliToolId, orderCliTools } from "./cli-tool-orde
 interface CliToolBadgesProps {
 	readonly isCollapsed: boolean;
 	readonly onNavigateToTerminals: () => void;
+	/** Each answer of a badge's check, for a summary shown elsewhere. */
+	readonly onPresenceMapChange?: (presence: Readonly<Partial<Record<CliToolId, CliPresence>>>) => void;
 }
 
-const CLI_TOOLS: readonly CliToolId[] = [
+export const CLI_TOOLS: readonly CliToolId[] = [
 	"claude-code",
 	"copilot",
 	"codex",
@@ -29,8 +31,13 @@ const CLI_TOOLS: readonly CliToolId[] = [
  * check and reports the answer here; keyed children move without remounting,
  * so an open popover or a running install survives a reorder.
  */
-export function CliToolBadges({ isCollapsed, onNavigateToTerminals }: CliToolBadgesProps) {
+export function CliToolBadges({
+	isCollapsed,
+	onNavigateToTerminals,
+	onPresenceMapChange,
+}: CliToolBadgesProps) {
 	const [presence, setPresence] = useState<Partial<Record<CliToolId, CliPresence>>>({});
+	useEffect(() => onPresenceMapChange?.(presence), [onPresenceMapChange, presence]);
 
 	const reporters = useMemo(
 		() =>
