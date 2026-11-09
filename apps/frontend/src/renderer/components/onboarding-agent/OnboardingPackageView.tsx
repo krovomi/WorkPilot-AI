@@ -1,6 +1,11 @@
 import {
 	BookOpen,
+	BookOpenText,
+	Download,
+	EyeOff,
+	FileCode,
 	FolderTree,
+	History,
 	LayoutDashboard,
 	ListChecks,
 	Map as MapIcon,
@@ -9,7 +14,10 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import type React from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { OnboardingExportFormat } from "../../../shared/types/onboarding-export";
+import { formatAppDateTime } from "../../lib/date-format";
 import type { OnboardingAgentTab } from "../../stores/onboarding-agent-store";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
 import {
@@ -28,10 +36,12 @@ import {
 } from "../charter";
 import { useGeneratedText } from "./shared";
 import { ArchitecturePanel } from "./ArchitecturePanel";
+import { buildExportDocument } from "./export-tour";
 import { FirstTasksPanel } from "./FirstTasksPanel";
 import { GlossaryPanel } from "./GlossaryPanel";
 import { OverviewPanel } from "./OverviewPanel";
 import { QuizPanel } from "./QuizPanel";
+import { StoryPanel } from "./StoryPanel";
 import { TourPanel } from "./TourPanel";
 
 interface OnboardingPackageViewProps {
@@ -41,7 +51,7 @@ interface OnboardingPackageViewProps {
 export function OnboardingPackageView({
 	projectPath,
 }: OnboardingPackageViewProps): React.ReactElement | null {
-	const { t } = useTranslation(["onboardingAgent", "common"]);
+	const { t, i18n } = useTranslation(["onboardingAgent", "common"]);
 
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
 	const phase = useOnboardingAgentStore((s) => s.phase);
@@ -54,8 +64,47 @@ export function OnboardingPackageView({
 	const setTab = useOnboardingAgentStore((s) => s.setActiveTab);
 	const startScan = useOnboardingAgentStore((s) => s.startScan);
 	const reset = useOnboardingAgentStore((s) => s.reset);
+	const checkFreshness = useOnboardingAgentStore((s) => s.checkFreshness);
+	const regenerated = useOnboardingAgentStore((s) => s.regenerated);
+	const skipTour = useOnboardingAgentStore((s) => s.skipTour);
+	const setSkipTour = useOnboardingAgentStore((s) => s.setSkipTour);
+	const role = useOnboardingAgentStore((s) => s.role);
+	const narration = useOnboardingAgentStore((s) => s.narration);
+	const [exportNotice, setExportNotice] = useState<{ tone: Tone; text: string } | null>(null);
+
+	// A tour that no longer fits the project is made again (#349): on opening
+	// the page and whenever the project changes.
+	useEffect(() => {
+		if (projectPath) void checkFreshness(projectPath);
+	}, [projectPath, checkFreshness]);
 
 	const isScanning = phase === "scanning";
+
+	const exportTour = async (format: OnboardingExportFormat): Promise<void> => {
+		if (!pkg) return;
+		setExportNotice(null);
+		const document = buildExportDocument({
+			pkg,
+			role,
+			narration,
+			skipTour,
+			lang: (i18n?.language || "en").slice(0, 2),
+			generatedAt: formatAppDateTime(new Date(), { dateStyle: "long", timeStyle: "short" }),
+			t,
+			resolve: generated,
+		});
+		try {
+			const outcome = await globalThis.electronAPI.exportOnboardingTour({ format, document });
+			if (outcome.saved && outcome.path) {
+				setExportNotice({ tone: "green", text: t("onboardingAgent:export.saved", { path: outcome.path }) });
+			}
+		} catch (err) {
+			setExportNotice({
+				tone: "red",
+				text: t("onboardingAgent:export.failed", { error: err instanceof Error ? err.message : String(err) }),
+			});
+		}
+	};
 
 	const runButton = (
 		<CharterButton
@@ -71,6 +120,7 @@ export function OnboardingPackageView({
 	if (!pkg) {
 		const pitches: Array<{ key: string; tone: Tone }> = [
 			{ key: "overview", tone: "blue" },
+			{ key: "story", tone: "orange" },
 			{ key: "tour", tone: "violet" },
 			{ key: "quiz", tone: "amber" },
 			{ key: "tasks", tone: "green" },
@@ -132,7 +182,7 @@ export function OnboardingPackageView({
 
 	if (!pkg) return null;
 
-	const tabs: Array<{
+	const allTabs: Array<{
 		id: OnboardingAgentTab;
 		icon: React.ReactNode;
 		label: string;
@@ -142,6 +192,12 @@ export function OnboardingPackageView({
 			id: "overview",
 			icon: <LayoutDashboard className="h-3.5 w-3.5" />,
 			label: t("onboardingAgent:tabs.overview"),
+		},
+		{
+			id: "story",
+			icon: <BookOpenText className="h-3.5 w-3.5" />,
+			label: t("onboardingAgent:tabs.story"),
+			badge: pkg.story?.hotspots.length,
 		},
 		{
 			id: "tour",
@@ -174,6 +230,9 @@ export function OnboardingPackageView({
 			badge: pkg.glossary.length,
 		},
 	];
+	// "I already know this project": no tour and no quiz, the map stays.
+	const tabs = skipTour ? allTabs.filter((entry) => entry.id !== "tour" && entry.id !== "quiz") : allTabs;
+	const shownTab: OnboardingAgentTab = skipTour && (tab === "tour" || tab === "quiz") ? "architecture" : tab;
 
 	return (
 		<ModuleStage data-testid="onboarding-package-view">
@@ -195,6 +254,21 @@ export function OnboardingPackageView({
 					<>
 						<CharterButton
 							size="sm"
+							variant="ghost"
+							icon={skipTour ? MapIcon : EyeOff}
+							aria-pressed={skipTour}
+							onClick={() => setSkipTour(!skipTour)}
+						>
+							{skipTour ? t("onboardingAgent:actions.showTour") : t("onboardingAgent:actions.skipTour")}
+						</CharterButton>
+						<CharterButton size="sm" icon={Download} onClick={() => void exportTour("markdown")}>
+							{t("onboardingAgent:actions.exportMarkdown")}
+						</CharterButton>
+						<CharterButton size="sm" icon={FileCode} onClick={() => void exportTour("html")}>
+							{t("onboardingAgent:actions.exportHtml")}
+						</CharterButton>
+						<CharterButton
+							size="sm"
 							icon={RotateCcw}
 							onClick={() => projectPath && startScan(projectPath)}
 							disabled={!projectPath}
@@ -213,12 +287,12 @@ export function OnboardingPackageView({
 					<button
 						type="button"
 						role="tab"
-						aria-selected={tab === entry.id}
+						aria-selected={shownTab === entry.id}
 						key={entry.id}
 						onClick={() => setTab(entry.id)}
 						className="wp-chip !gap-2 !px-3 !py-1"
 						data-dot="false"
-						style={tab === entry.id ? { color: "var(--wp-title)", borderColor: "var(--wp-accent)" } : undefined}
+						style={shownTab === entry.id ? { color: "var(--wp-title)", borderColor: "var(--wp-accent)" } : undefined}
 					>
 						{entry.icon}
 						<span>{entry.label}</span>
@@ -240,12 +314,31 @@ export function OnboardingPackageView({
 							: t("onboardingAgent:errors.failed", { error: error ?? "" })}
 					</Notice>
 				)}
-				{tab === "overview" && <OverviewPanel />}
-				{tab === "tour" && <TourPanel />}
-				{tab === "architecture" && <ArchitecturePanel />}
-				{tab === "quiz" && <QuizPanel />}
-				{tab === "tasks" && <FirstTasksPanel />}
-				{tab === "glossary" && <GlossaryPanel />}
+				{regenerated && (
+					<Notice tone="blue" icon={History} role="status" className="mb-3">
+						{t("onboardingAgent:freshness.regenerated", {
+							added: regenerated.added.join(", ") || t("onboardingAgent:freshness.none"),
+							removed: regenerated.removed.join(", ") || t("onboardingAgent:freshness.none"),
+						})}
+					</Notice>
+				)}
+				{skipTour && (
+					<Notice tone="muted" icon={EyeOff} role="status" className="mb-3">
+						{t("onboardingAgent:freshness.skipped")}
+					</Notice>
+				)}
+				{exportNotice && (
+					<Notice tone={exportNotice.tone} role={exportNotice.tone === "red" ? "alert" : "status"} className="mb-3">
+						<span className="break-all">{exportNotice.text}</span>
+					</Notice>
+				)}
+				{shownTab === "overview" && <OverviewPanel />}
+				{shownTab === "story" && <StoryPanel projectPath={projectPath} />}
+				{shownTab === "tour" && <TourPanel />}
+				{shownTab === "architecture" && <ArchitecturePanel />}
+				{shownTab === "quiz" && <QuizPanel />}
+				{shownTab === "tasks" && <FirstTasksPanel />}
+				{shownTab === "glossary" && <GlossaryPanel />}
 			</div>
 		</ModuleStage>
 	);
