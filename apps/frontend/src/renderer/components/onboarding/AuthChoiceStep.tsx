@@ -1,6 +1,5 @@
 import { Key, LogIn, Shield } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useSettingsStore } from "../../stores/settings-store";
+import { useState } from "react";
 import { ProfileEditDialog } from "../settings/ProfileEditDialog";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -79,19 +78,6 @@ export function AuthChoiceStep({
 }: AuthChoiceStepProps) {
 	const { t } = useTranslation();
 	const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-	const profiles = useSettingsStore((state) => state.profiles);
-
-	// Track initial profiles length to detect new profile creation
-	const initialProfilesLengthRef = useRef(profiles.length);
-
-	// Update the ref when profiles change (to track the initial state before dialog opened)
-	useEffect(() => {
-		// Only update the ref when dialog is NOT open
-		// This captures the state before user opens the dialog
-		if (!isProfileDialogOpen) {
-			initialProfilesLengthRef.current = profiles.length;
-		}
-	}, [profiles.length, isProfileDialogOpen]);
 
 	// OAuth button handler - proceeds to OAuth step
 	const handleOAuthChoice = () => {
@@ -101,20 +87,6 @@ export function AuthChoiceStep({
 	// API Key button handler - opens profile dialog
 	const handleAPIKeyChoice = () => {
 		setIsProfileDialogOpen(true);
-	};
-
-	// Profile dialog close handler - detects profile creation and skips oauth step
-	const handleProfileDialogClose = (open: boolean) => {
-		const wasEmpty = initialProfilesLengthRef.current === 0;
-		const hasProfilesNow = profiles.length > 0;
-
-		setIsProfileDialogOpen(open);
-
-		// If dialog closed and profile was created (was empty, now has profiles), skip the oauth step
-		if (!open && wasEmpty && hasProfilesNow && onAPIKeyPathComplete) {
-			// Call the callback to skip oauth and go directly to the completion step
-			onAPIKeyPathComplete();
-		}
 	};
 
 	return (
@@ -187,10 +159,13 @@ export function AuthChoiceStep({
 			</div>
 
 			{/* Profile Edit Dialog for API Key Path */}
+			{/* No profile prop = create mode. `onSaved` fires only after a save:
+			    the close handler used to compare a profile count captured before
+			    the save, so a created profile never skipped the OAuth step. */}
 			<ProfileEditDialog
 				open={isProfileDialogOpen}
-				onOpenChange={handleProfileDialogClose}
-				// No profile prop = create mode
+				onOpenChange={setIsProfileDialogOpen}
+				onSaved={onAPIKeyPathComplete}
 			/>
 		</>
 	);

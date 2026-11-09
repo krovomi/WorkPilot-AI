@@ -34,7 +34,16 @@
 		"errorDesc": "Could not initialize the Git repository.",
 		"skipTitle": "Git setup skipped",
 		"skipDesc": "You can initialize Git later.",
-		"setupRemote": "Set up the remote"
+		"setupRemote": "Set up the remote",
+		"identity": {
+			"title": "Git needs your name and email",
+			"body": "Git signs every commit with an author, and this computer has none set yet. Enter them once to create the first commit.",
+			"name": "Name",
+			"email": "Email",
+			"namePlaceholder": "Jane Doe",
+			"emailPlaceholder": "jane@example.com",
+			"hint": "Saved in your global git settings (git config --global): every commit made on this computer uses them, the agents' included."
+		}
 	},
 	"githubSetup": {
 		"title": "Configure GitHub",

@@ -222,9 +222,11 @@ export interface ProjectAPI {
 	detectRepoProvider: (
 		projectPath: string,
 	) => Promise<IPCResult<RepoProviderDetectionResult>>;
+	/** `identity` is saved as the global git name/email before the first commit. */
 	initializeGit: (
 		projectPath: string,
 		remoteConfig?: { url?: string; name?: string },
+		identity?: { name: string; email: string },
 	) => Promise<IPCResult<InitializationResult>>;
 	/**
 	 * Add, repoint or remove the project's git remote. An empty `remoteUrl`
@@ -617,8 +619,14 @@ export const createProjectAPI = (): ProjectAPI => ({
 	initializeGit: (
 		projectPath: string,
 		remoteConfig?: { url?: string; name?: string },
+		identity?: { name: string; email: string },
 	): Promise<IPCResult<InitializationResult>> =>
-		ipcRenderer.invoke(IPC_CHANNELS.GIT_INITIALIZE, projectPath, remoteConfig),
+		ipcRenderer.invoke(
+			IPC_CHANNELS.GIT_INITIALIZE,
+			projectPath,
+			remoteConfig,
+			identity,
+		),
 
 	setGitRemote: (
 		projectPath: string,

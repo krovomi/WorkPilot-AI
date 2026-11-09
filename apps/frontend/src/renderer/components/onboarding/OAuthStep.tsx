@@ -24,6 +24,7 @@ import { useToast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
 import { loadClaudeProfiles as loadGlobalClaudeProfiles } from "../../stores/claude-profile-store";
 import { AuthTerminal } from "../settings/AuthTerminal";
+import { isProfileSignedIn } from "./first-run";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
@@ -82,9 +83,10 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 	} | null>(null);
 
 	// Derived state: check if at least one profile is authenticated
-	const hasAuthenticatedProfile = claudeProfiles.some(
-		(profile) => profile.oauthToken || (profile.isDefault && profile.configDir),
-	);
+	// The main process checks the credentials (token or the config dir's
+	// stored login); the default profile's bare `~/.claude` path proves nothing
+	// and showed a fresh install as "Authenticated".
+	const hasAuthenticatedProfile = claudeProfiles.some(isProfileSignedIn);
 
 	// Reusable function to load Claude profiles
 	const loadClaudeProfiles = useCallback(async () => {
@@ -542,8 +544,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 																			{t("oauth.badges.active")}
 																		</span>
 																	)}
-																	{profile.oauthToken ||
-																	(profile.isDefault && profile.configDir) ? (
+																	{isProfileSignedIn(profile) ? (
 																		<span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded flex items-center gap-1">
 																			<Check className="h-3 w-3" />
 																			{t("oauth.badges.authenticated")}
@@ -566,7 +567,7 @@ export function OAuthStep({ onNext, onBack, onSkip }: OAuthStepProps) {
 												{editingProfileId !== profile.id && (
 													<div className="flex items-center gap-1">
 														{/* Authenticate button - show if not authenticated */}
-														{!profile.oauthToken && (
+														{!isProfileSignedIn(profile) && (
 															<Button
 																variant="outline"
 																size="sm"

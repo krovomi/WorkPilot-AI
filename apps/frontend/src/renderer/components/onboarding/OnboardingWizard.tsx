@@ -19,6 +19,7 @@ import { DevToolsStep } from "./DevToolsStep";
 import { OAuthStep } from "./OAuthStep";
 import { PrivacyStep } from "./PrivacyStep";
 import { WelcomeStep } from "./WelcomeStep";
+import { WIZARD_STEPS, type WizardStepId } from "./wizard-steps";
 import { WizardProgress, type WizardStep } from "./WizardProgress";
 
 interface OnboardingWizardProps {
@@ -27,27 +28,6 @@ interface OnboardingWizardProps {
 	onOpenTaskCreator?: () => void;
 	onOpenSettings?: () => void;
 }
-
-// Wizard step identifiers
-type WizardStepId =
-	| "welcome"
-	| "auth-choice"
-	| "oauth"
-	| "claude-code"
-	| "devtools"
-	| "privacy"
-	| "completion";
-
-// Step configuration with translation keys
-const WIZARD_STEPS: { id: WizardStepId; labelKey: string }[] = [
-	{ id: "welcome", labelKey: "steps.welcome" },
-	{ id: "auth-choice", labelKey: "steps.authChoice" },
-	{ id: "oauth", labelKey: "steps.auth" },
-	{ id: "claude-code", labelKey: "steps.claudeCode" },
-	{ id: "devtools", labelKey: "steps.devtools" },
-	{ id: "privacy", labelKey: "steps.privacy" },
-	{ id: "completion", labelKey: "steps.done" },
-];
 
 /**
  * Main onboarding wizard component.
@@ -133,6 +113,13 @@ export function OnboardingWizard({
 		setCurrentStepIndex(completionIndex);
 	}, []);
 
+	// "Skip" inside a step skips that step, not the rest of the wizard: on a
+	// machine with no Claude account it ended the setup at the auth step, and
+	// the CLI, dev tools and privacy steps were never shown.
+	const skipAuthentication = useCallback(() => {
+		setCurrentStepIndex(WIZARD_STEPS.findIndex((step) => step.id === "claude-code"));
+	}, []);
+
 	// Reset wizard state (for re-running) - defined before skipWizard/finishWizard that use it
 	const resetWizard = useCallback(() => {
 		setCurrentStepIndex(0);
@@ -160,11 +147,12 @@ export function OnboardingWizard({
 	// Handle opening task creator from within wizard
 	const handleOpenTaskCreator = useCallback(() => {
 		if (onOpenTaskCreator) {
-			// Close wizard first, then open task creator
-			onOpenChange(false);
+			// Finish the wizard (saved), then open the task creator: only closing
+			// it left onboardingCompleted false and it came back on the next start.
+			void completeWizard();
 			onOpenTaskCreator();
 		}
-	}, [onOpenTaskCreator, onOpenChange]);
+	}, [onOpenTaskCreator, completeWizard]);
 
 	// Handle opening settings from completion step
 	const handleOpenSettings = useCallback(() => {
@@ -187,7 +175,7 @@ export function OnboardingWizard({
 					<AuthChoiceStep
 						onNext={goToNextStep}
 						onBack={goToPreviousStep}
-						onSkip={completeWizard}
+						onSkip={skipAuthentication}
 						onAPIKeyPathComplete={handleSkipToCompletion}
 					/>
 				);
@@ -196,7 +184,7 @@ export function OnboardingWizard({
 					<OAuthStep
 						onNext={goToNextStep}
 						onBack={goToPreviousStep}
-						onSkip={completeWizard}
+						onSkip={goToNextStep}
 					/>
 				);
 			case "claude-code":
@@ -204,7 +192,7 @@ export function OnboardingWizard({
 					<ClaudeCodeStep
 						onNext={goToNextStep}
 						onBack={goToPreviousStep}
-						onSkip={completeWizard}
+						onSkip={goToNextStep}
 					/>
 				);
 			case "devtools":

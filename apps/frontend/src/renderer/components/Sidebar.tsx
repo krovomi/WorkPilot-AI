@@ -1185,10 +1185,10 @@ export function Sidebar({
 					);
 					if (result.success && result.data) {
 						setGitStatus(result.data);
-						// Show git setup modal if a project is not a git repo or has no commits,
-						// but only if the user hasn't explicitly dismissed it for this project yet
+						// Git not ready and not dismissed. A project still to initialize is left to its
+						// settings (opened on add, they repair git): a 2nd dialog on top closed them.
 						if (
-							(!result.data.isGitRepo || !result.data.hasCommits) &&
+							(!result.data.isGitRepo || !result.data.hasCommits) && selectedProject.autoBuildPath &&
 							gitSetupSkippedForProjectRef.current !== selectedProject.id
 						) {
 							setShowGitSetupModal(true);
