@@ -10,6 +10,12 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
+import {
+	EMPTY_GIT_IDENTITY,
+	GitIdentityFields,
+	type GitIdentityDraft,
+	isGitIdentityComplete,
+} from "./git-identity/GitIdentityFields";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -45,6 +51,9 @@ export function GitSetupModal({
 	const [error, setError] = useState<string | null>(null);
 	const [step, setStep] = useState<"info" | "initializing" | "success">("info");
 	const needsGitInit = gitStatus && !gitStatus.isGitRepo;
+	// Set once git answered that it has no author identity on this machine.
+	const [needsIdentity, setNeedsIdentity] = useState(false);
+	const [identity, setIdentity] = useState<GitIdentityDraft>(EMPTY_GIT_IDENTITY);
 
 	// Store remoteConfig in local state to prevent it from being lost
 	const [storedRemoteConfig, setStoredRemoteConfig] = useState(remoteConfig);
@@ -68,8 +77,15 @@ export function GitSetupModal({
 			const result = await globalThis.electronAPI.initializeGit(
 				project.path,
 				storedRemoteConfig,
+				needsIdentity ? identity : undefined,
 			);
 
+			if (!result.success && result.data?.blocker === "git-identity-missing") {
+				// Not a failure to report: the form below asks for what git needs.
+				setNeedsIdentity(true);
+				setStep("info");
+				return;
+			}
 			if (result.success) {
 				setStep("success");
 
@@ -194,6 +210,14 @@ export function GitSetupModal({
 					</div>
 				</details>
 
+				{needsIdentity && (
+					<GitIdentityFields
+						idPrefix="git-setup"
+						value={identity}
+						onChange={setIdentity}
+					/>
+				)}
+
 				{error && (
 					<div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
 						{error}
@@ -205,7 +229,12 @@ export function GitSetupModal({
 				<Button variant="outline" onClick={handleSkip}>
 					{t("gitSetup.skip")}
 				</Button>
-				<Button onClick={handleInitializeGit} disabled={isInitializing}>
+				<Button
+					onClick={handleInitializeGit}
+					disabled={
+						isInitializing || (needsIdentity && !isGitIdentityComplete(identity))
+					}
+				>
 					<GitBranch className="mr-2 h-4 w-4" />
 					{t("gitSetup.initializeGit")}
 				</Button>

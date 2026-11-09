@@ -34,7 +34,16 @@
 		"errorDesc": "Impossible d'initialiser le dépôt Git.",
 		"skipTitle": "Dépôt Git ignoré",
 		"skipDesc": "Vous pourrez initialiser Git plus tard.",
-		"setupRemote": "Configurer le remote"
+		"setupRemote": "Configurer le remote",
+		"identity": {
+			"title": "Git a besoin de votre nom et de votre e-mail",
+			"body": "Git signe chaque commit avec un auteur, et aucun n'est encore défini sur cet ordinateur. Renseignez-les une fois pour créer le premier commit.",
+			"name": "Nom",
+			"email": "E-mail",
+			"namePlaceholder": "Jeanne Dupont",
+			"emailPlaceholder": "jeanne@exemple.fr",
+			"hint": "Enregistrés dans vos réglages git globaux (git config --global) : tous les commits faits sur cet ordinateur les utilisent, y compris ceux des agents."
+		}
 	},
 	"githubSetup": {
 		"title": "Configurer GitHub",

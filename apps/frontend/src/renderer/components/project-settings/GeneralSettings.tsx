@@ -8,6 +8,7 @@ import {
 	Loader2,
 	RefreshCw,
 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DEFAULT_AGENT_PROFILES } from "../../../shared/constants";
 import type {
@@ -19,6 +20,12 @@ import type {
 import { useProviderModelCatalog } from "../../hooks/useProviderModelCatalog";
 import { cn } from "../../lib/utils";
 import { useSettingsStore } from "../../stores/settings-store";
+import {
+	EMPTY_GIT_IDENTITY,
+	GitIdentityFields,
+	type GitIdentityDraft,
+	isGitIdentityComplete,
+} from "../git-identity/GitIdentityFields";
 import { useProviderContext } from "../ProviderContext";
 import { AutoSplitSettings } from "./AutoSplitSettings";
 import { CrossReviewSettings } from "./CrossReviewSettings";
@@ -41,7 +48,7 @@ interface GeneralSettingsProps {
 	readonly handleInitialize: () => Promise<void>;
 	readonly initBlocker: InitializationBlocker | null;
 	readonly isRepairingGit: boolean;
-	readonly handleRepairGit: () => Promise<void>;
+	readonly handleRepairGit: (identity?: { name: string; email: string }) => Promise<void>;
 }
 
 export function GeneralSettings({
@@ -76,10 +83,16 @@ export function GeneralSettings({
 	// The two blockers a click can clear: a folder that is not a repository, and
 	// a repository with no commit. Everything else is reported, not offered as a
 	// button — a repair that cannot work is worse than an honest message.
+	// A third one on a fresh machine: git has no author name/email yet, and the
+	// panel asks for them before the same repair runs again.
 	const repairableBlocker =
-		initBlocker === "not-a-git-repo" || initBlocker === "no-commits"
+		initBlocker === "not-a-git-repo" ||
+		initBlocker === "no-commits" ||
+		initBlocker === "git-identity-missing"
 			? initBlocker
 			: null;
+	const needsIdentity = initBlocker === "git-identity-missing";
+	const [identity, setIdentity] = useState<GitIdentityDraft>(EMPTY_GIT_IDENTITY);
 	const blockerKey =
 		repairableBlocker === "not-a-git-repo" ? "notGitRepo" : "noCommits";
 
@@ -167,6 +180,13 @@ export function GeneralSettings({
 
 								{repairableBlocker && (
 									<div className="mt-4 rounded-lg border border-warning/40 bg-warning/5 p-4 space-y-3">
+										{needsIdentity ? (
+											<GitIdentityFields
+												idPrefix="project-settings"
+												value={identity}
+												onChange={setIdentity}
+											/>
+										) : (
 										<div className="flex items-start gap-3">
 											<FolderGit2 className="h-5 w-5 text-warning mt-0.5 shrink-0" />
 											<div className="space-y-1">
@@ -182,6 +202,7 @@ export function GeneralSettings({
 												</p>
 											</div>
 										</div>
+										)}
 
 										<div className="rounded-md border border-border bg-background/60 p-3">
 											<p className="text-xs font-medium text-foreground mb-2">
@@ -207,8 +228,14 @@ export function GeneralSettings({
 
 										<Button
 											size="sm"
-											onClick={handleRepairGit}
-											disabled={isRepairingGit || isUpdating}
+											onClick={() =>
+												handleRepairGit(needsIdentity ? identity : undefined)
+											}
+											disabled={
+												isRepairingGit ||
+												isUpdating ||
+												(needsIdentity && !isGitIdentityComplete(identity))
+											}
 										>
 											{isRepairingGit ? (
 												<>

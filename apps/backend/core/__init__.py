@@ -10,7 +10,7 @@ Core components for the WorkPilot AI autonomous coding framework.
 
 # First: `src.connectors` (provider config, Jira, Azure DevOps) is imported
 # below and by every runner; in the repository and the server image it sits
-# at the root, which no runner had on its path (F173).
+# at the root, which no runner had on its path (F174).
 from foundation.connectors_path import ensure_connectors_on_path
 
 ensure_connectors_on_path()

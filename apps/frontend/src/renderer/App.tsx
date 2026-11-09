@@ -2192,8 +2192,8 @@ export function App() {
 						open={isOnboardingWizardOpen}
 						onOpenChange={setIsOnboardingWizardOpen}
 						onOpenTaskCreator={() => {
-							setIsOnboardingWizardOpen(false);
-							setIsNewTaskDialogOpen(true);
+							// No project yet means no task creator: add a project first.
+							(activeProjectId || selectedProjectId ? setIsNewTaskDialogOpen : setShowAddProjectModal)(true);
 						}}
 						onOpenSettings={() => {
 							setIsOnboardingWizardOpen(false);
