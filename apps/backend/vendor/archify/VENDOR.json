@@ -4,7 +4,7 @@
 	"ref": "v2.16.0",
 	"commit": "c826e6c3a7abad19c0f3cd1ca57207d54b1ad8de",
 	"license": "MIT",
-	"tree_sha256": "570ef3c69f4fa87864aa2dd9023c79c1200a5f591ed97e75969153b2fed05b8d",
+	"tree_sha256": "86e2fd8f46b13fb0780f0be15ff1e02400d4fff87bce46f0764818286d2ccd41",
 	"files": {
 		"LICENSE": "2f724fa953b4eaa8ec75fa56919ce474b57adce54d2456a3791510bc53735cbd",
 		"SKILL.md": "8496cd821557d86916b814ac128b5cf70d4c6ae6d73af349b1de78dcb60f4dea",
@@ -31,8 +31,8 @@
 		"examples/release-delivery.workflow.json": "e5c880417eac1623923c3dd5461e0c78acd762e1621a28bd53fc14a84cad6a91",
 		"examples/web-app.architecture.json": "483350f5297df682aba4e4a0fa491307ce3d3abd725ae4df07fab177490752cf",
 		"migrations/workflow-v2.mjs": "77aadc38460e5e778344901f492cc00f16f74e8fe1def14b01e6d6d346b9f4c7",
-		"package-lock.json": "e11b7bd1a0a5024c044e865cbdca9cb6f322c0f168e5b73df88e68b16c22108b",
-		"package.json": "9be6428bb21d030eaf04ba685796d3a69d09a9aeeb031f6570cd11440dc89723",
+		"package-lock.json": "0f1bb60e90433adfac839ee13933a141633fe6569a39af52d76fc370fe361c11",
+		"package.json": "56a898b65bed82041e9d4df464c2999a8f72183d243156cf466ca4804fa3963a",
 		"recipes/scenarios.mjs": "e77d31d5b65b921799f4f560287fbac24feb3cd683bee8cabe49ed1ddde1a8ac",
 		"references/authoring-contract.md": "8f2b583d0d84fb315e4c4dfa685bbcb93343bf7673b92ea0e70d361f8ffca4d7",
 		"references/brand-marks.md": "8010869da70677e686ecb312d9c3eec2d20723a44f817ab2bbf5525361c8a136",
@@ -80,7 +80,7 @@
 		"scripts/update-contract.mjs": "7c5d34c5fa2e08fcd0b42e33a0f3b4685fcecf3ac88f1ed820528df8fdc46cbc",
 		"skill-release.json": "7a22e82515a7c12784b2e7b525d1846a73f4556db85d597433e98560156deab4"
 	},
-	"vendored_at": "2026-09-12T19:07:57Z",
+	"vendored_at": "2026-11-09T14:20:38Z",
 	"vendored_by": "scripts/vendor_archify.py",
 	"excluded": [
 		"test/",
@@ -89,6 +89,9 @@
 	],
 	"absent_upstream": [
 		"THIRD_PARTY_NOTICES.md"
+	],
+	"dependency_floors": [
+		"overrides.fast-uri: '3.1.5' -> '^3.1.9'"
 	],
 	"note": "Committed rather than bootstrapped: this is a runtime dependency of the Architecture page and the Kanban architecture delta, not a skill pack. Re-run the script to move the pin; never hand-edit this tree."
 }
