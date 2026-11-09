@@ -91,4 +91,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    from foundation.log_redaction import install_global_redaction
+
+    # The agent logs to stderr, which the app writes to its own log.
+    install_global_redaction()
     sys.exit(main())
