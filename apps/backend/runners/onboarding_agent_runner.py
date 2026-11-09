@@ -6,7 +6,9 @@ onboarding guide (tech stack, key files, conventions, getting started).
 
 Output protocol (one JSON object per line, prefixed):
     ONBOARDING_EVENT:{"type": "progress", "data": {"status": "..."}}
-    ONBOARDING_RESULT:{"guide": {...}}
+    ONBOARDING_RESULT:{"guide": {...}, "package": {...}, "freshness": {...}}
+    ONBOARDING_STATUS:{"known": bool, "stale": bool, "added": [...], ...}   (--status)
+    ONBOARDING_NARRATION:{"paragraphs": {chapter: text}, ...}             (--narrate)
     ONBOARDING_ERROR:<message>
 """
 
@@ -27,6 +29,12 @@ from onboarding_agent import (  # noqa: E402
     OnboardingPackageBuilder,
 )
 from onboarding_agent.messages import Text, raw, text  # noqa: E402
+from onboarding_agent.onboarding_engine import scan_project  # noqa: E402
+from onboarding_agent.story import (  # noqa: E402
+    fingerprint,
+    freshness,
+    save_fingerprint,
+)
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -195,11 +203,32 @@ def _guide_to_dict(guide: OnboardingGuide) -> dict[str, Any]:
     }
 
 
+def run_status(project_path: Path) -> dict[str, Any]:
+    """Whether the last tour still fits the project: no package is built."""
+    root = project_path.resolve()
+    scan = scan_project(root)
+    return freshness(root, scan.files, scan.code_files)
+
+
+def run_narration(project_path: Path, language: str) -> dict[str, Any]:
+    """The chapters told in prose by the active text model."""
+    from onboarding_agent.narrate import narrate
+
+    package = OnboardingPackageBuilder().build(project_path)
+    chapters = package.story.chapters if package.story is not None else []
+    return narrate(chapters, language, project_dir=str(project_path.resolve()))
+
+
 def run_scan(project_path: Path) -> dict[str, Any]:
     _emit_status("start", text("progress.analyzing"))
+    root = project_path.resolve()
+    scan = scan_project(root)
+    before = freshness(root, scan.files, scan.code_files)
     builder = OnboardingPackageBuilder()
     package = builder.build(project_path)
     guide = package.guide
+    digest, modules, manifests = fingerprint(scan.files, scan.code_files)
+    save_fingerprint(root, digest, modules, manifests)
     _emit_status(
         "progress",
         text(
@@ -213,6 +242,17 @@ def run_scan(project_path: Path) -> dict[str, Any]:
     result = {
         "guide": _guide_to_dict(guide),
         "package": package.to_dict(),
+        # The tour just made fits the project; ``changed`` is what made the last one stale.
+        "freshness": {
+            "known": True,
+            "stale": False,
+            "added": [],
+            "removed": [],
+            "generatedAt": datetime.now(tz=UTC).isoformat(),
+            "changed": {"added": before["added"], "removed": before["removed"]}
+            if before["stale"]
+            else None,
+        },
     }
     _emit_event("complete", {"steps": len(result["guide"]["steps"])})
     return result
@@ -221,16 +261,33 @@ def run_scan(project_path: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Onboarding Agent Runner")
     parser.add_argument("--project-path", required=True, help="Project root path")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--status", action="store_true", help="Only say whether the last tour is stale"
+    )
+    mode.add_argument(
+        "--narrate", action="store_true", help="Tell the chapters with the active model"
+    )
+    parser.add_argument(
+        "--language", default="en", help="Language of the narration (en, fr)"
+    )
     args = parser.parse_args()
 
     project_path = Path(args.project_path)
-    if not project_path.exists():
-        _emit("ONBOARDING_ERROR", f"Project path does not exist: {project_path}")
+    if not project_path.is_dir():
+        _emit("ONBOARDING_ERROR", "Project path does not exist")
+        sys.exit(1)
+    if args.narrate and args.language not in {"en", "fr"}:
+        _emit("ONBOARDING_ERROR", "Unsupported language")
         sys.exit(1)
 
     try:
-        result = run_scan(project_path)
-        _emit("ONBOARDING_RESULT", result)
+        if args.status:
+            _emit("ONBOARDING_STATUS", run_status(project_path))
+        elif args.narrate:
+            _emit("ONBOARDING_NARRATION", run_narration(project_path, args.language))
+        else:
+            _emit("ONBOARDING_RESULT", run_scan(project_path))
     except Exception as exc:  # noqa: BLE001
         _emit("ONBOARDING_ERROR", str(exc))
         sys.exit(1)

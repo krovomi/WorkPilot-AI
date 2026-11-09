@@ -121,9 +121,11 @@ class OnboardingPackage:
     quiz: list[QuizQuestion] = field(default_factory=list)
     first_tasks: list[FirstTask] = field(default_factory=list)
     glossary: list[GlossaryTerm] = field(default_factory=list)
+    story: Any = None
+    """The code's story (:class:`onboarding_agent.story.Story`), when it was told."""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "guide": {
                 "project_name": self.guide.project_name,
                 "tech_stack": self.guide.tech_stack,
@@ -145,6 +147,9 @@ class OnboardingPackage:
             "first_tasks": [_task_dict(t) for t in self.first_tasks],
             "glossary": [_glossary_dict(g) for g in self.glossary],
         }
+        if self.story is not None:
+            payload["story"] = self.story.to_dict()
+        return payload
 
 
 def _key_file_dict(kf: Any) -> dict[str, Any]:
@@ -1141,12 +1146,17 @@ class OnboardingPackageBuilder:
         quiz = build_quiz(tour, guide)
         first_tasks = build_first_tasks(root, guide=guide, scan=scan)
         glossary = build_glossary(root, architecture=guide.architecture, scan=scan)
+        from .story import build_story, story_quiz  # the story builds on this module
+
+        story = build_story(root, scan, guide, tour)
+        quiz.extend(story_quiz(story.hotspots, scan.code_files))
         return OnboardingPackage(
             guide=guide,
             tour=tour,
             quiz=quiz,
             first_tasks=first_tasks,
             glossary=glossary,
+            story=story,
         )
 
 
@@ -1194,6 +1204,9 @@ def render_markdown(package: OnboardingPackage) -> str:
                 out.append(f"  - {question}")
         out.append("")
 
+    if package.story is not None:
+        out.extend(_story_markdown(package.story))
+
     if g.conventions:
         out.append("\n## Conventions\n")
         for convention in g.conventions:
@@ -1226,3 +1239,26 @@ def render_markdown(package: OnboardingPackage) -> str:
             )
 
     return "\n".join(out)
+
+
+def _story_markdown(story: Any) -> list[str]:
+    """The chapters and hot spots, in English: the CLI's render."""
+    out = ["\n## The Code's Story\n"]
+    for chapter in story.chapters:
+        out.append(f"### {chapter.title.fallback}")
+        out.extend(f"- {line.fallback}" for line in chapter.lines)
+        out.append("")
+    if story.hotspots:
+        out.append("\n## Hot Spots\n")
+        out.append(
+            "| File | Risk | Commits | Authors | Decision points | Zones | Tested |"
+        )
+        out.append("|---|---|---|---|---|---|---|")
+        for spot in story.hotspots:
+            zones = ", ".join(spot.danger) or "—"
+            out.append(
+                f"| `{spot.path}` | {spot.risk} | {spot.churn} | {spot.authors} | "
+                f"{spot.complexity} | {zones} | {'yes' if spot.tested else 'no'} |"
+            )
+        out.append("")
+    return out

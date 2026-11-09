@@ -66,6 +66,7 @@ screenshots; the design of each feature is in [`architecture/`](architecture/).
 | **Consensus Arbiter** | Reconciles conflicting opinions from security scans and QA reviewers into a single verdict |
 | **Agent Coach** | Analyzes real usage to suggest cheaper models, better effort levels, and prompt tweaks per agent |
 | **Pair Programming** | Interactive real-time AI coding partner with live suggestions and conversation-driven development |
+| **Onboarding Agent** | A newcomer's tour of the repository, for their role (full stack, frontend, backend, DevOps): the code's story in five chapters, hot spots measured from git history, decision points, danger zones (security, billing, migrations, infrastructure) and missing tests, the team's decisions from ADRs, breaking commits and project memory, then a quiz. No model is needed; the active one can tell each chapter in prose. The tour is regenerated when a module appears or disappears, can be skipped, and exports to Markdown or a static web page. Every stack. |
 | **Learning Mode** | Educational mode with step-by-step explanations of agent decisions |
 
 ## Specialized Agents
