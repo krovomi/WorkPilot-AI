@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 backend_path = Path(__file__).parent.parent
@@ -79,7 +80,10 @@ def main(argv: list[str] | None = None) -> int:
     if prompt is None:
         return _fail(f"command not found: /{args.command}")
 
-    ok, text = asyncio.run(run_prompt(workdir, prompt))
+    # The agent's notes about its own run go to a folder of their own, thrown
+    # away afterwards: in the worktree they would be committed for review.
+    with tempfile.TemporaryDirectory(prefix="workpilot-quick-command-") as notes:
+        ok, text = asyncio.run(run_prompt(workdir, prompt, Path(notes)))
     if ok:
         _emit({"success": True, "result": text})
         return 0

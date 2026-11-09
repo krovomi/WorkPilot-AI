@@ -88,7 +88,9 @@ Par page :
   (`pythonRunnerEnv`) : le provider choisi dans l'app et sa clé, la connexion du profil Claude quand
   ce provider en a besoin. Le serveur backend, lancé une fois avec l'environnement du main, n'avait
   ni l'un ni l'autre : un abonnement Claude (OAuth) n'était pas trouvé et tout autre provider était
-  ignoré. Commit `chore: run /<commande> from the quick-command bar`, que la commande ait fini ou
+  ignoré. Les notes de l'agent sur sa propre exécution (contexte envoyé, trace des écritures) vont
+  dans un dossier temporaire, pas dans le worktree : sinon elles partiraient dans la PR. Commit
+  `chore: run /<commande> from the quick-command bar`, que la commande ait fini ou
   échoué ; une commande qui n'écrit rien (question, analyse) ne laisse pas de carte et la barre
   affiche seulement sa réponse. Une commande à la fois par projet. `/help` est répondu par la barre
   à partir de la liste ; `/review` a des instructions que tout provider exécute

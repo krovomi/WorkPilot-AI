@@ -91,8 +91,11 @@ class TestRunner:
         _skill(project, "create-prd", "Write the PRD.")
         seen: list[tuple[Path, str]] = []
 
-        async def fake_run(workdir: Path, prompt: str):
+        async def fake_run(workdir: Path, prompt: str, spec_dir: Path):
             seen.append((workdir, prompt))
+            # The agent's own notes never go to the worktree.
+            assert spec_dir.is_dir()
+            assert worktree.resolve() not in spec_dir.resolve().parents
             return True, "PRD written."
 
         monkeypatch.setattr(execution, "run_prompt", fake_run)
@@ -119,7 +122,7 @@ class TestRunner:
         project, worktree = dirs
         _skill(project, "create-prd", "Write the PRD.")
 
-        async def fake_run(workdir: Path, prompt: str):
+        async def fake_run(workdir: Path, prompt: str, spec_dir: Path):
             return False, "workflow run failed: boom"
 
         monkeypatch.setattr(execution, "run_prompt", fake_run)
@@ -215,6 +218,8 @@ class TestRunPrompt:
     ):
         """`SELECTED_LLM_PROVIDER` comes from the app (`pythonRunnerEnv`)."""
         _, worktree = dirs
+        notes = worktree.parent / "notes"
+        notes.mkdir()
         import core.client as client_module
 
         built: list[dict] = []
@@ -240,13 +245,14 @@ class TestRunPrompt:
         monkeypatch.setenv("SELECTED_LLM_PROVIDER", provider)
         monkeypatch.setattr(client_module, "create_agent_client", fake_create)
 
-        ok, text = asyncio.run(execution.run_prompt(worktree, "Write the PRD."))
+        ok, text = asyncio.run(execution.run_prompt(worktree, "Write the PRD.", notes))
 
         assert ok is True
         assert text == ""
         assert len(built) == 1
         assert built[0]["provider"] == provider
         assert built[0]["project_dir"] == worktree
+        assert built[0]["spec_dir"] == notes
         assert built[0]["agent_type"] == "coder"
 
     def test_falls_back_to_a_one_shot_only_when_the_agent_cannot_be_built(
@@ -255,31 +261,34 @@ class TestRunPrompt:
         _, worktree = dirs
         calls: list[str] = []
 
-        async def no_agent(workdir, prompt):
+        async def no_agent(workdir, prompt, spec_dir):
             calls.append("agent")
             return False, "failed to build agent client: no CLI"
 
-        async def oneshot(workdir, prompt):
+        async def oneshot(workdir, prompt, spec_dir):
             calls.append("oneshot")
             return True, "answer"
 
         monkeypatch.setattr(execution, "_agent_workflow_call", no_agent)
         monkeypatch.setattr(execution, "_oneshot_call", oneshot)
-        assert asyncio.run(execution.run_prompt(worktree, "p")) == (True, "answer")
+        assert asyncio.run(execution.run_prompt(worktree, "p", worktree.parent)) == (
+            True,
+            "answer",
+        )
         assert calls == ["agent", "oneshot"]
 
     def test_a_genuine_workflow_error_is_reported_as_is(self, dirs, monkeypatch):
         _, worktree = dirs
 
-        async def failing(workdir, prompt):
+        async def failing(workdir, prompt, spec_dir):
             return False, "workflow run failed: rate limited"
 
-        async def oneshot(workdir, prompt):  # pragma: no cover - must not run
+        async def oneshot(workdir, prompt, spec_dir):  # pragma: no cover - must not run
             raise AssertionError("no fallback for a genuine error")
 
         monkeypatch.setattr(execution, "_agent_workflow_call", failing)
         monkeypatch.setattr(execution, "_oneshot_call", oneshot)
-        assert asyncio.run(execution.run_prompt(worktree, "p")) == (
+        assert asyncio.run(execution.run_prompt(worktree, "p", worktree.parent)) == (
             False,
             "workflow run failed: rate limited",
         )

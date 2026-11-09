@@ -70,7 +70,9 @@ async def _guarded(
         return False, f"{failure}: {exc}"
 
 
-async def _agent_workflow_call(workdir: Path, prompt: str) -> tuple[bool, str]:
+async def _agent_workflow_call(
+    workdir: Path, prompt: str, spec_dir: Path
+) -> tuple[bool, str]:
     """Run `prompt` as a multi-turn, tool-enabled agent on the active provider.
 
     A full task-execution client (read/write/web tools, multi-turn) via
@@ -91,13 +93,12 @@ async def _agent_workflow_call(workdir: Path, prompt: str) -> tuple[bool, str]:
     async def build():
         # Peeked: a palette command is not the session a "resume with X"
         # choice was made for, and must not eat it.
-        provider = peek_active_provider(workdir)
-        model = _resolve_model(provider, None, workdir)
-        # spec_dir == workdir: the bar is project-scoped (no per-task spec).
+        provider = peek_active_provider(spec_dir)
+        model = _resolve_model(provider, None, spec_dir)
         # agent_type="coder" carries the read+write+web tool set a workflow needs.
         return create_agent_client(
             project_dir=workdir,
-            spec_dir=workdir,
+            spec_dir=spec_dir,
             model=model,
             agent_type="coder",
             provider=provider,
@@ -118,7 +119,7 @@ async def _agent_workflow_call(workdir: Path, prompt: str) -> tuple[bool, str]:
     return await _guarded("workflow run failed", converse)
 
 
-async def _oneshot_call(workdir: Path, prompt: str) -> tuple[bool, str]:
+async def _oneshot_call(workdir: Path, prompt: str, spec_dir: Path) -> tuple[bool, str]:
     """A single-turn completion on the active provider, without tools."""
     try:
         from core.oneshot import oneshot_completion
@@ -126,20 +127,26 @@ async def _oneshot_call(workdir: Path, prompt: str) -> tuple[bool, str]:
         return False, f"oneshot runner not available: {exc}"
 
     async def complete() -> str:
-        text = await oneshot_completion(prompt, project_dir=str(workdir), max_turns=1)
+        text = await oneshot_completion(
+            prompt, project_dir=str(workdir), spec_dir=str(spec_dir), max_turns=1
+        )
         return (text or "").strip()
 
     return await _guarded("command run failed", complete)
 
 
-async def run_prompt(workdir: Path, prompt: str) -> tuple[bool, str]:
+async def run_prompt(workdir: Path, prompt: str, spec_dir: Path) -> tuple[bool, str]:
     """Run the instructions in `workdir`; (success, text or error message).
+
+    `spec_dir` takes what the agent writes about its own run (context
+    snapshot, write trace): never the worktree, or it would be committed with
+    the command's work and land in the pull request.
 
     The tool-enabled agent first; a one-shot completion only when that agent
     could not be built (a genuine workflow error is reported as is).
     """
-    ok, text = await _agent_workflow_call(workdir, prompt)
+    ok, text = await _agent_workflow_call(workdir, prompt, spec_dir)
     if not ok and text.startswith(_AGENT_FALLBACK_PREFIXES):
         logger.warning("[slash-commands] %s; falling back to a one-shot", text)
-        ok, text = await _oneshot_call(workdir, prompt)
+        ok, text = await _oneshot_call(workdir, prompt, spec_dir)
     return ok, text
