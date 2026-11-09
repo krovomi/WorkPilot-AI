@@ -1,9 +1,9 @@
-import { AlertTriangle, BookmarkCheck, FileJson, Play, RotateCcw, Square } from "lucide-react";
+import { AlertTriangle, BookmarkCheck, FileJson, GitCompare, RotateCcw, Square } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApiWatcherStore } from "../../stores/api-watcher-store";
-import type { ChangeCategory, ContractChange, ContractDiff } from "../../../shared/types/api-watcher";
+import type { ChangeCategory, ContractDiff } from "../../../shared/types/api-watcher";
 import {
 	CharterButton,
 	Chip,
@@ -12,31 +12,19 @@ import {
 	ModuleStage,
 	Notice,
 	Page,
-	Panel,
 	ScanLine,
 	Section,
 	Stat,
 	Stats,
-	type Tone,
 } from "../charter";
-
-const CATEGORY_TONES: Record<ChangeCategory, Tone> = {
-	breaking: "red",
-	potentially_breaking: "amber",
-	non_breaking: "green",
-};
-
-const CATEGORY_KEYS: Record<ChangeCategory, string> = {
-	breaking: "breaking",
-	potentially_breaking: "potentiallyBreaking",
-	non_breaking: "nonBreaking",
-};
+import { Input } from "../ui/input";
+import { BranchReport, CATEGORY_KEYS, CATEGORY_TONES, ChangePanel } from "./BranchReport";
 
 interface ApiWatcherDashboardProps {
 	readonly projectPath?: string;
 }
 
-/** OpenAPI, GraphQL and protobuf contracts compared with the saved baseline. */
+/** OpenAPI, GraphQL and protobuf contracts compared with the target branch, or a saved baseline. */
 export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): React.ReactElement {
 	const { t } = useTranslation(["apiWatcher", "navigation"]);
 
@@ -49,6 +37,7 @@ export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): 
 	const reset = useApiWatcherStore((s) => s.reset);
 
 	const isScanning = phase === "scanning";
+	const [target, setTarget] = useState("");
 
 	return (
 		<ModuleStage scroll="page" data-testid="api-watcher-view">
@@ -71,6 +60,13 @@ export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): 
 							</CharterButton>
 						) : (
 							<>
+								<Input
+									aria-label={t("apiWatcher:branch.targetLabel")}
+									placeholder={t("apiWatcher:branch.targetPlaceholder")}
+									className="h-8 w-44 font-mono text-xs"
+									value={target}
+									onChange={(e) => setTarget(e.target.value)}
+								/>
 								<CharterButton
 									icon={BookmarkCheck}
 									onClick={() => projectPath && startScan(projectPath, true)}
@@ -80,11 +76,11 @@ export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): 
 								</CharterButton>
 								<CharterButton
 									variant="primary"
-									icon={Play}
-									onClick={() => projectPath && startScan(projectPath, false)}
+									icon={GitCompare}
+									onClick={() => projectPath && startScan(projectPath, false, target.trim())}
 									disabled={!projectPath}
 								>
-									{t("apiWatcher:actions.runScan")}
+									{t("apiWatcher:actions.compareBranch")}
 								</CharterButton>
 							</>
 						)}
@@ -103,7 +99,9 @@ export function ApiWatcherDashboard({ projectPath }: ApiWatcherDashboardProps): 
 						{t("apiWatcher:errors.failed", { error })}
 					</Notice>
 				)}
-				{result?.diff ? (
+				{result?.report ? (
+					<BranchReport report={result.report} guide={result.migrationGuideMarkdown} ciWorkflow={result.ciWorkflow} />
+				) : result?.diff ? (
 					<ReportBody diff={result.diff} guide={result.migrationGuideMarkdown} summary={result.summary} />
 				) : (
 					!isScanning && (
@@ -181,25 +179,5 @@ function ReportBody({
 				</Section>
 			)}
 		</>
-	);
-}
-
-function ChangePanel({ change }: { readonly change: ContractChange }): React.ReactElement {
-	const { t } = useTranslation("apiWatcher");
-	const tone = CATEGORY_TONES[change.category] ?? "muted";
-	return (
-		<Panel rail tone={tone}>
-			<div className="flex flex-wrap items-center gap-2">
-				<Chip tone={tone}>{t(`categories.${CATEGORY_KEYS[change.category] ?? "nonBreaking"}`)}</Chip>
-				<span className="wp-meta">{t(`changeTypes.${change.changeType}`, { defaultValue: change.changeType })}</span>
-			</div>
-			<p className="mt-1.5 text-sm">{change.description}</p>
-			<p className="wp-meta mt-1 font-mono">{change.path}</p>
-			{(change.oldValue || change.newValue) && (
-				<p className="wp-meta mt-1 font-mono">
-					{change.oldValue ?? "∅"} → {change.newValue ?? "∅"}
-				</p>
-			)}
-		</Panel>
 	);
 }
