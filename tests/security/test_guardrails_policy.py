@@ -621,8 +621,12 @@ def test_the_log_never_keeps_a_secret_of_a_command(tmp_path):
         "&& echo ghp_abcdefghijklmnopqrstuvwxyz0123"
     )
     target = ledger.target_of("Bash", {"command": command}, tmp_path)
+    # The command stays readable; only the secret values are masked.
+    assert target["summary"] == (
+        'curl -H "Authorization: Bearer ***" '
+        "https://api.example.test --data token=*** && echo ***"
+    )
     summary = json.dumps(target)
     assert "abcDEF1234567890xyz" not in summary
     assert "s3cr3tvalue" not in summary
     assert "ghp_abcdefghijklmnopqrstuvwxyz0123" not in summary
-    assert "https://api.example.test" in summary
