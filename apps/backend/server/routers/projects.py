@@ -33,8 +33,10 @@ from server.schemas import (
     ProjectPublic,
 )
 from server.services.events import emit_board_event
+from server.services.project_jobs import get_project_jobs
 from server.services.quotas import enforce_project_quota
 from server.services.repos import RepoError, clone_project, delete_clone
+from server.services.run_manager import get_run_manager
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -218,6 +220,11 @@ async def delete_project(
     project = await db.get(Project, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    # Before the rows and the clone go: an agent or a job still running in the
+    # clone would write into a removed directory and record its end on a row
+    # that no longer exists (F174).
+    await get_run_manager().stop_project(project_id)
+    await get_project_jobs().stop_project(project_id)
     await db.delete(project)
     db.add(
         AuditLog(

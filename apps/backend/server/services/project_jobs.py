@@ -37,9 +37,11 @@ from server.db.models import ProjectJob
 from server.services.events import emit_board_event
 from server.services.run_manager import (
     BACKEND_DIR,
+    STOP_TIMEOUT_SECONDS,
     RunManagerError,
     confine,
     get_run_manager,
+    wait_until_ended,
 )
 from sqlalchemy import select
 
@@ -208,6 +210,19 @@ class ProjectJobs:
         if proc is not None:
             proc.terminate()
         return True
+
+    async def stop_project(
+        self, project_id: str, timeout: float = STOP_TIMEOUT_SECONDS
+    ) -> int:
+        """Stop every job of a project and wait until they have ended, before
+        the project and its clone are deleted (as ``RunManager.stop_project``)."""
+        jobs = [job for (owner, _), job in self._running.items() if owner == project_id]
+        for job_id in jobs:
+            await self.cancel(job_id)
+        await wait_until_ended(
+            lambda: any(self.is_tracked(job) for job in jobs), timeout
+        )
+        return len(jobs)
 
     def _keep(self, job_id: str) -> None:
         self._output[job_id] = _Output()

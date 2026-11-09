@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 
 from server.config import get_settings
 from server.db.models import Base
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -24,6 +25,30 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def _foreign_keys_on(dbapi_connection, _record) -> None:
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
+
+
+def enforce_sqlite_foreign_keys(engine: AsyncEngine) -> None:
+    """Turn on SQLite's foreign keys on every connection of ``engine``.
+
+    SQLite ignores them unless each connection asks (``PRAGMA foreign_keys``
+    is off by default), so every ``ondelete`` of the models was a dead letter
+    there: deleting a project left its specs, runs, jobs and members behind,
+    and nothing stopped a row from pointing at a project that no longer
+    existed (F174). PostgreSQL always enforces them.
+
+    Only the application's engine: Alembic opens its own, and a batch
+    migration that recreates a table must not cascade the drop of the old
+    copy into its children.
+    """
+    event.listen(engine.sync_engine, "connect", _foreign_keys_on)
+
+
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
@@ -34,6 +59,8 @@ def get_engine() -> AsyncEngine:
             # may live in a directory that doesn't exist yet in dev.
             kwargs = {}
         _engine = create_async_engine(settings.database_url, **kwargs)
+        if settings.database_url.startswith("sqlite"):
+            enforce_sqlite_foreign_keys(_engine)
         logger.info(
             "Server DB engine created (%s)", settings.database_url.split("://")[0]
         )
