@@ -13,12 +13,12 @@ Nothing is written through a symbolic link or outside the project (S4).
 from __future__ import annotations
 
 import json
-import os
 import re
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from foundation.file_utils import atomic_write
 
 from .evidence import DAY, collect_evidence
 from .frameworks import Framework, load_frameworks
@@ -61,14 +61,8 @@ def _folder(root: Path, *parts: str, create: bool = False) -> Path | None:
 def _write_json(path: Path, data: Any) -> None:
     if path.is_symlink():
         raise OSError(f"{path.name} is a symbolic link")
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-", suffix=".json")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2, ensure_ascii=False)
-        os.replace(tmp, path)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
-        raise
+    with atomic_write(path) as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
 
 
 def _read(path: Path) -> dict | None:

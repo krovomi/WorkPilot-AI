@@ -280,7 +280,6 @@
   "apps/backend/runners/cicd_triggers_runner.py": {"blind": 3, "silent": 0},
   "apps/backend/runners/code_migration_runner.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/code_playground_runner.py": {"blind": 3, "silent": 1},
-  "apps/backend/runners/compliance_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/conflict_predictor_runner.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/consensus_arbiter_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/context_aware_snippets_runner.py": {"blind": 3, "silent": 1},
