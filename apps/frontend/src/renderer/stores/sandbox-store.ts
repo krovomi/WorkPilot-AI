@@ -13,7 +13,8 @@ interface SandboxState {
 	result: SimulationResult | null;
 	error: string | null;
 
-	startScan: (projectPath: string) => Promise<void>;
+	/** Without a spec: the uncommitted changes. With one: a rehearsal of its plan. */
+	startScan: (projectPath: string, plan?: { specId: string; baseRef?: string }) => Promise<void>;
 	cancelScan: () => Promise<void>;
 	setStatus: (status: string) => void;
 	setResult: (payload: SandboxResult) => void;
@@ -27,7 +28,7 @@ export const useSandboxStore = create<SandboxState>((set) => ({
 	result: null,
 	error: null,
 
-	startScan: async (projectPath) => {
+	startScan: async (projectPath, plan) => {
 		if (!projectPath) {
 			set({ phase: "error", error: "No project selected" });
 			return;
@@ -41,6 +42,7 @@ export const useSandboxStore = create<SandboxState>((set) => ({
 		try {
 			const payload = await globalThis.electronAPI.runSandboxScan({
 				projectPath,
+				...(plan ? { specId: plan.specId, baseRef: plan.baseRef } : {}),
 			});
 			set({ phase: "complete", result: payload.result, status: "" });
 		} catch (err) {

@@ -1,8 +1,11 @@
-import { AlertTriangle, Box, Eye, RotateCcw, Square } from "lucide-react";
+import { AlertTriangle, Box, Eye, FileDiff, ListChecks, Play, RotateCcw, Square } from "lucide-react";
 import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useProjectStore } from "../../stores/project-store";
 import { useSandboxStore } from "../../stores/sandbox-store";
-import type { SimulationResult, StepStatus } from "../../../shared/types/sandbox";
+import { useTaskStore } from "../../stores/task-store";
+import type { SandboxMode, SimulationResult, StepStatus } from "../../../shared/types/sandbox";
 import {
 	CharterButton,
 	EmptyStage,
@@ -13,9 +16,14 @@ import {
 	ScanLine,
 	Stat,
 	Stats,
+	Tabs,
 	type Tone,
 } from "../charter";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { DiffPreview } from "./DiffPreview";
+import { PlanRehearsalReport } from "./PlanRehearsalReport";
 
 const STEP_TONES: Record<StepStatus, Tone> = {
 	success: "green",
@@ -28,9 +36,47 @@ interface SimulationReportProps {
 	readonly projectPath?: string;
 }
 
-/** The uncommitted changes of the project, file by file, before they are committed. */
+/** The specs of the active project, from its loaded tasks, with their base branch. */
+function useProjectSpecs(): Array<{ id: string; title: string; baseBranch?: string }> {
+	const tasks = useTaskStore((s) => s.tasks);
+	const projectId = useProjectStore((s) => s.activeProjectId || s.selectedProjectId);
+	return useMemo(() => {
+		const seen = new Map<string, { id: string; title: string; baseBranch?: string }>();
+		for (const task of tasks) {
+			if (projectId && task.projectId !== projectId) continue;
+			if (task.specId && !seen.has(task.specId)) {
+				seen.set(task.specId, {
+					id: task.specId,
+					title: task.title || task.specId,
+					baseBranch: task.metadata?.baseBranch,
+				});
+			}
+		}
+		return Array.from(seen.values()).sort((a, b) => a.id.localeCompare(b.id));
+	}, [tasks, projectId]);
+}
+
+/**
+ * The sandbox: the uncommitted changes of the project before a commit, or the
+ * rehearsal of a spec's plan before its build spends a token.
+ */
 export function SimulationReport({ projectPath }: SimulationReportProps): React.ReactElement {
 	const { t } = useTranslation(["sandbox", "navigation"]);
+	const [mode, setMode] = useState<SandboxMode>("plan");
+	const specs = useProjectSpecs();
+	const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+	const selectedSpec = useTaskStore((s) => s.tasks.find((task) => task.id === selectedTaskId)?.specId);
+	const [specId, setSpecId] = useState("");
+	const [baseRef, setBaseRef] = useState("");
+
+	// Keep the choice inside the list: the selected task's spec, else the first.
+	useEffect(() => {
+		if (specId && specs.some((s) => s.id === specId)) return;
+		const preferred = specs.find((s) => s.id === selectedSpec)?.id ?? specs[0]?.id ?? "";
+		if (preferred !== specId) setSpecId(preferred);
+	}, [specs, specId, selectedSpec]);
+
+	const spec = specs.find((s) => s.id === specId);
 
 	const phase = useSandboxStore((s) => s.phase);
 	const status = useSandboxStore((s) => s.status);
@@ -41,6 +87,13 @@ export function SimulationReport({ projectPath }: SimulationReportProps): React.
 	const reset = useSandboxStore((s) => s.reset);
 
 	const isScanning = phase === "scanning";
+	const shown = result && (result.mode ?? "changes") === mode ? result : null;
+	const canRun = Boolean(projectPath) && (mode === "changes" || Boolean(spec));
+	const run = () => {
+		if (!projectPath) return;
+		if (mode === "changes") void startScan(projectPath);
+		else if (spec) void startScan(projectPath, { specId: spec.id, baseRef: baseRef.trim() || spec.baseBranch });
+	};
 
 	return (
 		<ModuleStage data-testid="sandbox-view">
@@ -64,19 +117,70 @@ export function SimulationReport({ projectPath }: SimulationReportProps): React.
 						) : (
 							<CharterButton
 								variant="primary"
-								icon={Eye}
-								onClick={() => projectPath && void startScan(projectPath)}
-								disabled={!projectPath}
+								icon={mode === "plan" ? Play : Eye}
+								onClick={run}
+								disabled={!canRun}
+								data-testid="sandbox-run"
 							>
-								{t("sandbox:actions.runScan")}
+								{t(mode === "plan" ? "sandbox:actions.runPlan" : "sandbox:actions.runScan")}
 							</CharterButton>
 						)}
 					</>
 				}
 			/>
 
-			{phase === "complete" && result && result.diffs.length > 0 ? (
-				<DiffPreview key={result.id} diffs={result.diffs} aside={<RunSummary result={result} />} />
+			<div className="relative z-[1] flex flex-wrap items-end gap-3 px-6 pt-3">
+				<Tabs
+					label={t("sandbox:title")}
+					tabs={[
+						{ id: "plan", label: t("sandbox:modes.plan"), icon: ListChecks },
+						{ id: "changes", label: t("sandbox:modes.changes"), icon: FileDiff },
+					]}
+					value={mode}
+					onChange={(next) => {
+						setMode(next);
+						if (!isScanning) reset();
+					}}
+				/>
+				{mode === "plan" && (
+					<>
+						<div className="min-w-[16rem]">
+							<Label className="wp-kicker mb-1 block" htmlFor="sandbox-spec">
+								{t("sandbox:plan.spec")}
+							</Label>
+							<Select value={specId} onValueChange={setSpecId} disabled={specs.length === 0 || isScanning}>
+								<SelectTrigger id="sandbox-spec" data-testid="sandbox-spec-select">
+									<SelectValue placeholder={t(specs.length === 0 ? "sandbox:plan.noSpecs" : "sandbox:plan.selectSpec")} />
+								</SelectTrigger>
+								<SelectContent searchable={specs.length > 8}>
+									{specs.map((s) => (
+										<SelectItem key={s.id} value={s.id}>
+											{s.title === s.id ? s.id : `${s.title} (${s.id})`}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="w-40">
+							<Label className="wp-kicker mb-1 block" htmlFor="sandbox-ref">
+								{t("sandbox:plan.baseRef")}
+							</Label>
+							<Input
+								id="sandbox-ref"
+								value={baseRef}
+								placeholder={spec?.baseBranch || "HEAD"}
+								onChange={(e) => setBaseRef(e.target.value)}
+								disabled={isScanning}
+							/>
+						</div>
+					</>
+				)}
+			</div>
+
+			{phase === "complete" && shown && shown.mode === "plan" ? (
+				<PlanRehearsalReport key={shown.id} result={shown} />
+			) : phase === "complete" && shown && shown.diffs.length > 0 ? (
+				<DiffPreview key={shown.id} diffs={shown.diffs} aside={<RunSummary result={shown} />} />
 			) : (
 				<div className="relative z-[1] flex flex-1 flex-col items-center justify-center gap-3 p-8">
 					{!projectPath && (
@@ -92,11 +196,15 @@ export function SimulationReport({ projectPath }: SimulationReportProps): React.
 					)}
 					{!isScanning && (
 						<EmptyStage
-							icon={Box}
+							icon={mode === "plan" ? ListChecks : Box}
 							tone="violet"
-							title={t(phase === "complete" ? "sandbox:noChanges" : "sandbox:noData")}
+							title={
+								mode === "plan"
+									? t("sandbox:plan.emptyTitle")
+									: t(phase === "complete" && shown ? "sandbox:noChanges" : "sandbox:noData")
+							}
 						>
-							{t("sandbox:emptyBody")}
+							{t(mode === "plan" ? "sandbox:plan.emptyBody" : "sandbox:emptyBody")}
 						</EmptyStage>
 					)}
 				</div>

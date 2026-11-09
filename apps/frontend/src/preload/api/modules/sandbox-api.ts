@@ -1,8 +1,8 @@
 /**
  * Sandbox API
  *
- * Renderer-side bridge to the sandbox runner which produces a dry-run
- * simulation result of uncommitted changes.
+ * Renderer-side bridge to the sandbox runner: a preview of the uncommitted
+ * changes, or a rehearsal of a spec's implementation plan.
  */
 
 import type { SimulationResult } from "../../../shared/types/sandbox";
@@ -11,6 +11,10 @@ import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 export interface SandboxRunOptions {
 	projectPath: string;
+	/** Rehearse this spec's implementation plan instead of reading the uncommitted changes. */
+	specId?: string;
+	/** The ref the build would start from (plan mode), HEAD by default. */
+	baseRef?: string;
 }
 
 export interface SandboxResult {
@@ -19,7 +23,7 @@ export interface SandboxResult {
 
 export interface SandboxEvent {
 	type: "start" | "progress" | "complete";
-	data: { status?: string; files?: number; additions?: number; deletions?: number };
+	data: { status?: string; files?: number; additions?: number; deletions?: number; steps?: number };
 }
 
 export interface SandboxAPI {

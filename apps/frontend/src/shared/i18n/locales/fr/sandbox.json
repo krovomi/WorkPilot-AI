@@ -1,12 +1,13 @@
 {
 	"noData": "Aucun aperçu pour l'instant",
 	"noChanges": "Aucune modification non commitée à prévisualiser",
-	"title": "Aperçu des changements non commités",
+	"title": "Essai à blanc",
 	"actions": {
 		"runScan": "Prévisualiser les changements",
 		"cancel": "Annuler",
 		"scanning": "Lecture des changements...",
-		"reset": "Réinitialiser"
+		"reset": "Réinitialiser",
+		"runPlan": "Répéter le plan"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet pour prévisualiser ses changements non commités.",
@@ -22,7 +23,7 @@
 		"filesChanged_other": "{{count}} fichiers modifiés",
 		"noHunks": "Aucun bloc texte pour ce fichier (binaire ou vide)."
 	},
-	"description": "Chaque changement non commité du projet, fichier par fichier, lu dans git sans y toucher.",
+	"description": "Répétez le plan d'une spec sur le dépôt avant que son build ne dépense un token, ou prévisualisez les changements non commités du projet.",
 	"emptyBody": "Lancez l’aperçu pour lire les changements pas encore commités, avec leurs blocs de diff.",
 	"kickers": {
 		"files": "Fichiers",
@@ -33,5 +34,88 @@
 		"modified": "Modifié",
 		"deleted": "Supprimé",
 		"renamed": "Renommé"
+	},
+	"modes": {
+		"plan": "Répétition du plan",
+		"changes": "Changements non commités"
+	},
+	"levels": {
+		"error": "Erreur",
+		"warning": "Attention",
+		"info": "Note"
+	},
+	"stepStatus": {
+		"success": "OK",
+		"warning": "À revoir",
+		"error": "Bloquant",
+		"skipped": "Non vérifiée"
+	},
+	"strategies": {
+		"schema_based": "D'après le contrat",
+		"llm_generated": "Générée",
+		"static": "Mock vide",
+		"error": "Erreur"
+	},
+	"verdict": {
+		"ready": "Le plan tient sur {{ref}} : chaque fichier qu'il touche existe au bon moment et chaque vérification peut tourner.",
+		"review": "Le plan peut tourner sur {{ref}}, avec des points à revoir ci-dessous.",
+		"blocked": "Le plan casse sur {{ref}} : corrigez les erreurs ci-dessous avant le build, sinon il échouera dessus."
+	},
+	"plan": {
+		"spec": "Spec",
+		"selectSpec": "Choisir une spec",
+		"noSpecs": "Aucune spec dans ce projet",
+		"baseRef": "Branche ou commit de base",
+		"emptyTitle": "Aucune répétition pour l'instant",
+		"emptyBody": "Choisissez une spec qui a un plan et répétez-le : chaque sous-tâche est vérifiée sur les fichiers de la branche de base (fichiers à modifier, ordre de création, commandes de vérification, appels d'API comparés au contrat OpenAPI). Rien n'est écrit et aucun modèle n'est appelé.",
+		"subtasksOk": "Sous-tâches OK",
+		"errors": "Erreurs",
+		"rehearsalCost": "Répétition",
+		"free": "Gratuite · 0 token",
+		"buildEstimate": "Estimation du build",
+		"unknown": "Inconnue",
+		"estimateDetail": "Estimation du vrai build, {{confidence}} : {{models}}",
+		"confidence": {
+			"high": "confiance élevée",
+			"medium": "confiance moyenne",
+			"low": "confiance faible"
+		},
+		"partial": "La répétition a manqué de temps : les dernières sous-tâches n'ont pas été vérifiées.",
+		"structure": "Structure du plan",
+		"kickers": {
+			"walk": "Parcours",
+			"footprint": "Empreinte"
+		},
+		"subtasks_one": "{{count}} sous-tâche",
+		"subtasks_other": "{{count}} sous-tâches",
+		"footprintMeta": "{{added}} nouveaux · {{modified}} modifiés",
+		"contracts": "Contrats d'API utilisés pour les mocks",
+		"noContracts": "Aucun contrat OpenAPI, GraphQL ou Protobuf dans le dépôt."
+	},
+	"findings": {
+		"plan_empty": "Le plan n'a aucune sous-tâche à exécuter.",
+		"plan_unreadable": "implementation_plan.json est illisible : {{reason}}",
+		"phase_unknown_dependency": "La phase {{phase}} dépend de la phase {{dependency}}, que le plan ne définit pas.",
+		"phase_cycle": "Les phases {{phases}} dépendent les unes des autres : aucune ne peut démarrer.",
+		"subtask_duplicate_id": "L'identifiant de sous-tâche {{id}} est utilisé plusieurs fois.",
+		"path_outside_project": "{{path}} est en dehors du projet.",
+		"file_missing": "{{path}} est modifié mais n'existe ni dans {{ref}} ni dans une sous-tâche précédente.",
+		"file_modified_before_created": "{{path}} est modifié avant que la sous-tâche {{creator}} ne le crée.",
+		"file_created_by_unrelated_phase": "{{path}} vient de la phase {{phase}}, dont cette phase ne dépend pas : cela casse si les phases tournent en parallèle.",
+		"file_already_exists": "{{path}} existe déjà dans {{ref}} : le créer l'écrase.",
+		"file_created_twice": "{{path}} est déjà créé par la sous-tâche {{creator}}.",
+		"path_is_directory": "{{path}} est un dossier, pas un fichier.",
+		"pattern_missing": "Le fichier modèle {{path}} n'existe pas.",
+		"parallel_conflict": "{{path}} est aussi modifié par la sous-tâche {{other}} dans la même phase parallèle.",
+		"binary_file": "{{path}} est un fichier binaire : il n'a pas d'aperçu de diff.",
+		"no_files": "Cette sous-tâche ne nomme aucun fichier.",
+		"no_verification": "Cette sous-tâche n'a pas de vérification.",
+		"command_dir_missing": "La vérification entre dans {{dir}}, qui n'existe pas.",
+		"command_manifest_missing": "« {{command}} » a besoin de {{manifest}}, que le projet n'a pas.",
+		"command_script_missing": "{{manifest}} n'a pas de script « {{script}} ».",
+		"api_status_undeclared": "Le contrat ne déclare pas ce statut pour {{method}} {{url}}.",
+		"api_endpoint_undeclared": "Aucun contrat du projet ne décrit {{method}} {{url}}.",
+		"api_no_contract": "Le projet n'a pas de contrat OpenAPI : {{method}} {{url}} reçoit un mock vide.",
+		"timeout": "La répétition s'est arrêtée après {{seconds}} s : les sous-tâches restantes n'ont pas été vérifiées."
 	}
 }

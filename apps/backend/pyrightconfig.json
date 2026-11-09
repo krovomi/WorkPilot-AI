@@ -7,7 +7,8 @@
     "goal",
     "mcp_tasks",
     "os_sandbox",
-    "security"
+    "security",
+    "simulation"
   ],
   "exclude": ["**/__pycache__", ".venv"],
   "venvPath": ".",
