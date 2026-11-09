@@ -72,6 +72,7 @@ const TITLE_PREFIX: Record<GeneratedReviewSource, { en: string; fr: string }> = 
 	"design-import": { en: "Imported design", fr: "Design importé" },
 	changelog: { en: "Changelog update", fr: "Mise à jour du changelog" },
 	"pair-programming": { en: "Pair programming", fr: "Pair programming" },
+	"quick-command": { en: "Quick command", fr: "Commande rapide" },
 };
 
 const DESCRIPTION: { en: string; fr: string } = {

@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "../../hooks/use-toast";
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/project-store";
-import { createTask } from "../../stores/task-store";
+import { createTask, loadTasks } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 
@@ -20,8 +20,11 @@ import { Input } from "../ui/input";
  *
  * Fetches the merged list of slash commands (project / user / built-in) from
  * the FastAPI backend and lets the user fire one against the active project.
- * The backend resolves the command through the Claude Agent SDK so existing
- * `.claude/commands/*.md` files Just Work.
+ * A command runs in the main process (`runQuickCommand`, F182): on the
+ * provider chosen in the app, with the Claude profile's sign-in when that
+ * provider needs it, in the worktree of a Kanban review card. What the agent
+ * writes is committed on the card's branch and waits for review; it never
+ * lands in the project folder. `/help` is answered here, from the list.
  *
  * The component is purely additive: when no project is active, the input is
  * disabled with a localised tooltip. All user-facing strings come from the
@@ -132,9 +135,24 @@ export function QuickCommandBar({
 		[input],
 	);
 
+	// `/help` needs no agent: the bar already has the list.
+	const showHelp = useCallback(() => {
+		const lines = commands.map((c) =>
+			c.description ? `/${c.name} — ${c.description}` : `/${c.name}`,
+		);
+		toast({
+			title: t("tasks:kanban.quickCommand.helpTitle"),
+			description: (
+				<pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs">
+					{formatOutput(lines.join("\n"))}
+				</pre>
+			),
+		});
+	}, [commands, t]);
+
 	const runCommand = useCallback(
 		async (override?: string) => {
-			if (!projectPath) {
+			if (!projectPath || !activeProjectId) {
 				toast({
 					variant: "destructive",
 					title: t("tasks:kanban.quickCommand.missingProject"),
@@ -145,33 +163,56 @@ export function QuickCommandBar({
 				? { command: override, args: "" }
 				: parseInput();
 			if (!parsed) return;
-			setIsRunning(true);
 			setOpen(false);
+			if (parsed.command === "help") {
+				showHelp();
+				setInput("");
+				return;
+			}
+			setIsRunning(true);
 			try {
-				const res = await fetch(`${BACKEND_URL}/api/slash-commands/run`, {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						project_dir: projectPath,
-						command: parsed.command,
-						args: parsed.args,
-					}),
+				const res = await globalThis.electronAPI.runQuickCommand({
+					projectId: activeProjectId,
+					command: parsed.command,
+					args: parsed.args,
 				});
-				const data = await res.json();
-				if (data?.success) {
-					const output = formatOutput(data.result);
-					toast({
-						variant: "success",
-						title: `/${parsed.command} · ${t("tasks:kanban.quickCommand.successTitle")}`,
-						description: output ? (
-							<pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs">
-								{output}
-							</pre>
-						) : undefined,
-					});
-				} else {
-					showError(data?.error ?? "unknown");
+				const outcome = res.data;
+				if (!res.success || !outcome) {
+					showError(res.error ?? "unknown");
+					return;
 				}
+				const { review } = outcome;
+				if (review) void loadTasks(activeProjectId, { forceRefresh: true });
+				let note = "";
+				if (review) {
+					note = t("tasks:kanban.quickCommand.reviewCard", {
+						count: review.files.length,
+						branch: review.branch,
+						card: review.title,
+					});
+				} else if (outcome.uncommittedIn) {
+					note = t("tasks:kanban.quickCommand.uncommitted", {
+						path: outcome.uncommittedIn,
+					});
+				}
+				const output = formatOutput(outcome.output);
+				toast({
+					variant: outcome.ok ? "success" : "destructive",
+					title: outcome.ok
+						? `/${parsed.command} · ${t("tasks:kanban.quickCommand.successTitle")}`
+						: `/${parsed.command} · ${t("tasks:kanban.quickCommand.errorTitle")}`,
+					description:
+						note || output ? (
+							<div className="space-y-2">
+								{note && <p className="text-xs">{note}</p>}
+								{output && (
+									<pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs">
+										{output}
+									</pre>
+								)}
+							</div>
+						) : undefined,
+				});
 			} catch (err) {
 				showError((err as Error).message);
 			} finally {
@@ -179,10 +220,10 @@ export function QuickCommandBar({
 				setInput("");
 			}
 		},
-		[projectPath, parseInput, showError, t],
+		[projectPath, activeProjectId, parseInput, showError, showHelp, t],
 	);
 
-	// "Run as task": instead of the one-shot run, seed a real Kanban task with
+	// "Run as task": instead of a single run, seed a real Kanban task with
 	// the command's instruction body so it flows through the interactive pipeline
 	// (planning, plan-approval, conversation). The body is resolved server-side
 	// from the agnostic .agents/skills/ source.

@@ -32,8 +32,10 @@ added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
 `.gitignore` entries in step. See [skills/README.md](../../skills/README.md).
 
 `apps/backend/slash_commands/api.py` scans `.agents/skills/` and serves the result to the
-Kanban Quick-Command bar (`GET /api/slash-commands`), then resolves a command's body
-server-side so any provider can execute it.
+Kanban Quick-Command bar (`GET /api/slash-commands`). Running a command is the Electron
+main's job (F182): it opens a review card and starts `runners/slash_command_runner.py` in the
+card's worktree, which resolves the command's body from the project and runs it on the provider
+chosen in the app, so any provider can execute it ([generated-review.md](generated-review.md)).
 
 **Reading frontmatter:** always through `skills_registry.frontmatter.parse_frontmatter`.
 It parses with PyYAML and degrades to a line parser for hand-edited blocks. Do not write

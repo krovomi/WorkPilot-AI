@@ -102,6 +102,7 @@ import { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers
 import { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
 import { registerOllamaHandlers } from "./ollama-handlers";
 import { registerPairProgrammingHandlers } from "./pair-programming-handlers";
+import { registerQuickCommandHandlers } from "./quick-command-handlers";
 import {
 	registerPerformanceProfilerHandlers,
 	setupPerformanceProfilerEventForwarding,
@@ -222,6 +223,7 @@ export { setupNaturalLanguageGitHandlers } from "./natural-language-git-handlers
 export { registerNotebookAgentHandlers } from "./notebook-agent-handlers";
 export { registerOllamaHandlers } from "./ollama-handlers";
 export { registerPairProgrammingHandlers } from "./pair-programming-handlers";
+export { registerQuickCommandHandlers } from "./quick-command-handlers";
 export {
 	registerPerformanceProfilerHandlers,
 	setupPerformanceProfilerEventForwarding,
@@ -470,6 +472,9 @@ export function setupIpcHandlers(
 
 	// AI Pair Programming handlers (Feature 10)
 	registerPairProgrammingHandlers(getMainWindow);
+
+	// Kanban quick-command bar: commands run on a review card (F182)
+	registerQuickCommandHandlers();
 
 	// Pipeline Generator handlers (Feature 23)
 	registerPipelineGeneratorHandlers();
