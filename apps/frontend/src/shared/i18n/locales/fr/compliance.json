@@ -1,53 +1,118 @@
 {
-	"noData": "Choisissez un référentiel, puis lancez l'analyse pour voir quels contrôles ont une preuve.",
 	"title": "Collecteur de preuves de conformité",
-	"evidenceItems": "éléments de preuve",
-	"coverage": "couverture",
-	"missingControls": "Contrôles manquants",
-	"evidence": "Preuves",
-	"summary": "Résumé",
-	"controlId": "ID de Contrôle",
-	"evidenceType": "Type de Preuve",
+	"description": "Rassemble des preuves d'audit datées à partir de ce que les tâches et le dépôt contiennent déjà (approbations de spec, revues QA, tests, contrôles de sécurité, fusions, versions, politiques, incidents) et juge avec elles chaque contrôle d'un référentiel. Aucun modèle n'est appelé.",
+	"emptyTitle": "Pas encore de rapport",
+	"noData": "Choisissez un référentiel et un mois, puis lancez la collecte pour voir quels contrôles ont une preuve récente.",
 	"framework": "Référentiel",
+	"period": "Mois",
+	"thisMonth": "Mois en cours",
+	"coverage": "couverts",
 	"actions": {
-		"runScan": "Lancer l'analyse",
+		"runScan": "Collecter les preuves",
+		"save": "Collecter et enregistrer",
 		"cancel": "Annuler",
-		"scanning": "Analyse du projet...",
+		"scanning": "Collecte des preuves…",
 		"reset": "Réinitialiser"
 	},
 	"errors": {
-		"noProject": "Sélectionnez un projet pour lancer une analyse de conformité.",
-		"failed": "Échec de l'analyse : {{error}}"
+		"noProject": "Sélectionnez un projet pour collecter ses preuves de conformité.",
+		"failed": "Échec de la collecte : {{error}}",
+		"frameworkFiles": "Des fichiers de référentiel du projet ont été ignorés :"
 	},
-	"description": "Rassemble les preuves d'audit du dépôt (revues de code, analyses de sécurité, politiques, CI et déploiements, provenance des tâches) et les rattache aux contrôles d'un référentiel.",
-	"emptyTitle": "Pas encore de rapport",
-	"frameworks": {
-		"SOC2": "SOC 2",
-		"ISO_27001": "ISO 27001",
-		"HIPAA": "HIPAA",
-		"PCI_DSS": "PCI DSS",
-		"GDPR": "RGPD",
-		"CCPA": "CCPA"
+	"monthly": {
+		"label": "Rapport mensuel pour ce référentiel",
+		"hint": "Le 1er de chaque mois (ou au premier démarrage qui suit), le rapport du mois écoulé est enregistré dans .workpilot/compliance/reports/, et un contrôle sans preuve depuis plus de 30 jours est signalé sur vos canaux de notification."
 	},
-	"kickers": {
-		"gaps": "Écarts",
-		"evidence": "Preuves"
+	"summary": {
+		"kicker": "Résumé",
+		"title": "{{framework}} · {{period}}",
+		"line": "{{covered}} contrôles couverts sur {{controls}} ({{percent}} %), {{gaps}} écart(s), {{alerts}} sans preuve depuis plus de 30 jours.",
+		"activity": "Sur la période : {{evidence}} preuve(s) issues de {{tasks}} tâche(s) ; {{approvals}} approbation(s) de spec, {{reviewsApproved}} revue(s) QA approuvée(s) et {{reviewsRejected}} rejetée(s), {{testsPassed}} contrôle(s) de tests réussi(s) et {{testsFailed}} en échec, {{securityFindings}} constat(s) de sécurité.",
+		"risks": "Risques : {{list}}.",
+		"noRisk": "Aucun contrôle n'est manquant ou en échec."
+	},
+	"stats": {
+		"covered": "Couverts",
+		"failing": "En échec",
+		"stale": "Périmés",
+		"missing": "Manquants",
+		"alerts": "Alertes (30 j)"
 	},
 	"statuses": {
-		"collected": "Collectée",
-		"verified": "Vérifiée",
-		"missing": "Manquante",
-		"expired": "Expirée"
+		"covered": "Couvert",
+		"failing": "En échec",
+		"stale": "Périmé",
+		"missing": "Manquant"
 	},
-	"evidenceTypes": {
-		"code_review": "Revue de code",
-		"test_results": "Résultats de tests",
-		"security_scan": "Analyse de sécurité",
-		"access_log": "Politique d'accès",
-		"change_log": "Journal des changements",
-		"approval_record": "Approbation",
-		"deployment_log": "Déploiement",
-		"policy_document": "Politique",
-		"training_record": "Formation"
+	"gaps": {
+		"kicker": "Écarts",
+		"title": "Contrôles sans preuve suffisante",
+		"needs": "Il manque : {{kinds}}",
+		"age": "Dernière preuve {{days}} jour(s) avant la fin de la période",
+		"never": "Aucune preuve trouvée",
+		"alert": "Plus de 30 jours"
+	},
+	"controls": {
+		"kicker": "Preuves par contrôle",
+		"title": "Contrôles",
+		"maxAge": "preuve de {{days}} jours au plus",
+		"inPeriod": "{{count}} sur la période",
+		"none": "Aucune preuve sur cette période."
+	},
+	"saved": {
+		"kicker": "Historique",
+		"title": "Rapports enregistrés",
+		"row": "{{coverage}} % couverts · {{gaps}} écart(s)",
+		"savedAs": "Enregistré sous {{name}}"
+	},
+	"export": {
+		"label": "Exporter",
+		"json": "JSON",
+		"csv": "CSV",
+		"html": "HTML",
+		"pdf": "PDF",
+		"saved": "Enregistré dans {{path}}",
+		"failed": "Échec de l'export : {{error}}",
+		"title": "Rapport de conformité : {{framework}}, {{period}}",
+		"generated": "Généré le {{date}}, jugé sur les contrôles de {{framework}} {{version}}.",
+		"controlsTitle": "Contrôles",
+		"gapsTitle": "Écarts et recommandations",
+		"evidenceTitle": "Preuves",
+		"columns": {
+			"control": "Contrôle",
+			"title": "Intitulé",
+			"status": "Statut",
+			"last": "Dernière preuve",
+			"count": "Preuves sur la période",
+			"needs": "Preuves manquantes",
+			"recommendation": "Recommandation",
+			"kind": "Type",
+			"date": "Date",
+			"what": "Quoi",
+			"source": "Source",
+			"outcome": "Résultat",
+			"actor": "Par"
+		}
+	},
+	"outcomes": {
+		"pass": "Réussi",
+		"fail": "Échec",
+		"info": "Consigné"
+	},
+	"kinds": {
+		"spec_approval": "Approbation de spec",
+		"code_review": "Revue QA",
+		"tests": "Tests",
+		"security": "Contrôle de sécurité",
+		"security_config": "Scanner de sécurité",
+		"change": "Changement",
+		"merge": "Fusion relue",
+		"release": "Version",
+		"deployment": "Pipeline de déploiement",
+		"access": "Propriété du code",
+		"policy": "Politique",
+		"procedure": "Procédure",
+		"incident": "Incident",
+		"monitoring": "Supervision"
 	}
 }

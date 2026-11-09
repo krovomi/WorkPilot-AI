@@ -10,7 +10,8 @@ Each test pins a rule:
   dossier carries no code;
 * the dossier is kept in the spec copy that survives the merge, never through
   a link; the gates' report is the build's, round-tripped as written;
-* the PR block and the compliance sources say the same thing as the dossier.
+* the PR block says the same thing as the dossier, and the compliance
+  collector reads it as a dated change.
 """
 
 from __future__ import annotations
@@ -26,17 +27,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "backend"))
 
 import agent_trace  # noqa: E402
-from compliance_collector import (  # noqa: E402
-    ComplianceFramework,
-    EvidenceCollector,
-    EvidenceType,
-)
+from compliance_collector import collect_evidence  # noqa: E402
 from provenance import (  # noqa: E402
     DOSSIER_DIR,
     DOSSIER_FILE,
     SBOM_FILE,
     build_dossier,
-    evidence_sources,
     pr_block,
     purl,
     write_dossier,
@@ -203,16 +199,6 @@ class TestDossier:
         assert "✓ tests-pass, ? deps-exist" in block
         assert "guard verdict `pass`" in block
 
-        sources = evidence_sources(dossier)
-        assert set(sources) == {
-            EvidenceType.CHANGE_LOG,
-            EvidenceType.CODE_REVIEW,
-            EvidenceType.SECURITY_SCAN,
-            EvidenceType.TEST_RESULTS,
-        }
-        report = EvidenceCollector().collect(ComplianceFramework.SOC2, sources)
-        assert report.coverage > 0
-
     def test_written_where_it_survives_the_merge_never_through_a_link(
         self, task, tmp_path
     ):
@@ -258,21 +244,15 @@ def test_gate_record_round_trips(tmp_path):
     assert load_gate_record(tmp_path / "missing") is None
 
 
-def test_the_compliance_scan_reads_the_dossiers(task):
+def test_the_compliance_collector_reads_the_dossiers(task):
     root, spec, _base = task
-    sys.path.insert(0, str(REPO_ROOT / "apps" / "backend" / "runners"))
-    import compliance_runner
-
     assert write_dossier(root, [spec]) is not None
     broken = root / ".workpilot" / "specs" / "002-y" / DOSSIER_DIR
     broken.mkdir(parents=True)
-    (broken / DOSSIER_FILE).write_text(
-        json.dumps({"attribution": {"totals": None}}), encoding="utf-8"
-    )
-    sources = compliance_runner._collect_sources(root)
-    change_log = sources[EvidenceType.CHANGE_LOG]
-    assert any(item["source"] == f"provenance/{DOSSIER_FILE}" for item in change_log)
-    assert any(
-        "SBOM of the diff: 3 component(s)" in item["description"]
-        for item in sources[EvidenceType.SECURITY_SCAN]
-    )
+    (broken / DOSSIER_FILE).write_text("[not a dossier", encoding="utf-8")
+    found = [
+        e
+        for e in collect_evidence(root, 0, 4_000_000_000, use_git=False)
+        if e.source.endswith(f"{DOSSIER_DIR}/{DOSSIER_FILE}")
+    ]
+    assert [(e.kind, e.task) for e in found] == [("change", spec.name)]

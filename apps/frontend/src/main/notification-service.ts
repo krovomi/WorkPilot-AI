@@ -136,6 +136,35 @@ class NotificationService {
 		}
 	}
 
+	/**
+	 * A message about a project rather than a task (the compliance gaps of the
+	 * monthly report): on the desktop and the remote channels, under the
+	 * "review needed" switch. Never throws.
+	 */
+	announce(projectId: string, text: { title: string; body: string }): void {
+		try {
+			const settings = this.projectNotificationSettings(projectId);
+			if (!settings.onReviewNeeded) return;
+			if (Notification.isSupported()) {
+				new Notification({ title: text.title, body: text.body, silent: !settings.sound }).show();
+			}
+			const app = this.appSettings();
+			const ntfy = ntfyTarget(app.needsYou, app.globalNtfyAccessToken);
+			const telegram = telegramTarget(app.needsYou, app.globalTelegramBotToken);
+			const sends = [
+				ntfy ? sendNtfy(ntfy, text.title, text.body) : null,
+				telegram ? sendTelegram(telegram, text.title, text.body) : null,
+			].filter((p): p is Promise<boolean> => p !== null);
+			void Promise.allSettled(sends).then((results) => {
+				if (results.some((r) => r.status === "rejected" || !r.value)) {
+					appLog.warn(`[NeedsYou] A remote message about project ${projectId} was not delivered`);
+				}
+			});
+		} catch (error) {
+			appLog.warn("[NeedsYou] Notification failed", error);
+		}
+	}
+
 	/** The task left the state a pending button was about. */
 	revoke(taskId: string): void {
 		this.approvals.revoke(taskId);

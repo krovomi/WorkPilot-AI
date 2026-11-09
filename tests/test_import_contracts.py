@@ -79,14 +79,12 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The build and the traceability route read it.
     "requirement_trace": {"foundation", "agent_trace"},
     # The provenance dossier of a PR (docs/architecture/provenance.md): it
-    # reads what Agent Trace, the dependency guard and the build recorded, and
-    # hands it to the compliance collector. The PR body (core) reads it.
-    "provenance": {
-        "foundation",
-        "agent_trace",
-        "dependency_guard",
-        "compliance_collector",
-    },
+    # reads what Agent Trace, the dependency guard and the build recorded.
+    # The PR body (core) and the compliance collector read it.
+    "provenance": {"foundation", "agent_trace", "dependency_guard"},
+    # The compliance evidence collector (docs/architecture/compliance-evidence.md):
+    # the records the tasks left, read as files, and git through foundation.
+    "compliance_collector": {"foundation"},
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).

@@ -203,19 +203,19 @@ def test_a11y_scans_server_and_component_markup(tmp_path: Path) -> None:
 
 
 def test_compliance_reads_evidence_from_every_ci_platform(tmp_path: Path) -> None:
-    runner = _runner("compliance_runner")
+    from compliance_collector import collect_evidence
+
     for rel in ("azure-pipelines.yml", "Jenkinsfile", "renovate.json", "CODEOWNERS"):
         _write(tmp_path, rel, "x")
 
-    sources = runner._collect_sources(tmp_path)
-    found = {item["source"] for items in sources.values() for item in items}
+    found = {e.source: e.kind for e in collect_evidence(tmp_path, 0, 4e9)}
 
-    assert {
-        "azure-pipelines.yml",
-        "Jenkinsfile",
-        "renovate.json",
-        "CODEOWNERS",
-    } <= found
+    assert found == {
+        "azure-pipelines.yml": "deployment",
+        "Jenkinsfile": "deployment",
+        "renovate.json": "security_config",
+        "CODEOWNERS": "access",
+    }
 
 
 def test_i18n_skips_broken_and_entity_catalogs(tmp_path: Path) -> None:

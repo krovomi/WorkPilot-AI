@@ -1,53 +1,118 @@
 {
-	"noData": "Pick a framework, then run the analysis to see which controls have evidence.",
 	"title": "Compliance Evidence Collector",
-	"evidenceItems": "evidence items",
-	"coverage": "coverage",
-	"missingControls": "Missing Controls",
-	"evidence": "Evidence",
-	"summary": "Summary",
-	"controlId": "Control ID",
-	"evidenceType": "Evidence Type",
+	"description": "Collects dated audit evidence from what the tasks and the repository already hold (spec approvals, QA reviews, tests, security checks, merges, releases, policies, incidents) and judges each control of a framework with it. No model is called.",
+	"emptyTitle": "No report yet",
+	"noData": "Pick a framework and a month, then run the collection to see which controls have recent evidence.",
 	"framework": "Framework",
+	"period": "Month",
+	"thisMonth": "This month to date",
+	"coverage": "covered",
 	"actions": {
-		"runScan": "Run Scan",
+		"runScan": "Collect evidence",
+		"save": "Collect and save",
 		"cancel": "Cancel",
-		"scanning": "Scanning project...",
+		"scanning": "Collecting evidence…",
 		"reset": "Reset"
 	},
 	"errors": {
-		"noProject": "Select a project to run a compliance scan.",
-		"failed": "Scan failed: {{error}}"
+		"noProject": "Select a project to collect its compliance evidence.",
+		"failed": "Collection failed: {{error}}",
+		"frameworkFiles": "Some framework files of the project were skipped:"
 	},
-	"description": "Collects audit evidence from the repository (code reviews, security scans, policies, CI and deployments, task provenance) and maps it to the controls of a framework.",
-	"emptyTitle": "No report yet",
-	"frameworks": {
-		"SOC2": "SOC 2",
-		"ISO_27001": "ISO 27001",
-		"HIPAA": "HIPAA",
-		"PCI_DSS": "PCI DSS",
-		"GDPR": "GDPR",
-		"CCPA": "CCPA"
+	"monthly": {
+		"label": "Monthly report for this framework",
+		"hint": "On the 1st of each month (or at the first start after it), the report of the month just ended is saved in .workpilot/compliance/reports/, and a control without evidence for over 30 days is announced on your notification channels."
 	},
-	"kickers": {
-		"gaps": "Gaps",
-		"evidence": "Evidence"
+	"summary": {
+		"kicker": "Executive summary",
+		"title": "{{framework}} · {{period}}",
+		"line": "{{covered}} of {{controls}} controls covered ({{percent}} %), {{gaps}} gap(s), {{alerts}} without evidence for over 30 days.",
+		"activity": "This period: {{evidence}} item(s) of evidence from {{tasks}} task(s); {{approvals}} spec approval(s), {{reviewsApproved}} QA review(s) approved and {{reviewsRejected}} rejected, {{testsPassed}} test check(s) passed and {{testsFailed}} failed, {{securityFindings}} security finding(s).",
+		"risks": "Risks: {{list}}.",
+		"noRisk": "No control is missing or failing."
+	},
+	"stats": {
+		"covered": "Covered",
+		"failing": "Failing",
+		"stale": "Stale",
+		"missing": "Missing",
+		"alerts": "Alerts (30 d)"
 	},
 	"statuses": {
-		"collected": "Collected",
-		"verified": "Verified",
-		"missing": "Missing",
-		"expired": "Expired"
+		"covered": "Covered",
+		"failing": "Failing",
+		"stale": "Stale",
+		"missing": "Missing"
 	},
-	"evidenceTypes": {
-		"code_review": "Code review",
-		"test_results": "Test results",
-		"security_scan": "Security scan",
-		"access_log": "Access policy",
-		"change_log": "Change log",
-		"approval_record": "Approval",
-		"deployment_log": "Deployment",
-		"policy_document": "Policy",
-		"training_record": "Training"
+	"gaps": {
+		"kicker": "Gaps",
+		"title": "Controls without sufficient evidence",
+		"needs": "Needs: {{kinds}}",
+		"age": "Last evidence {{days}} day(s) before the end of the period",
+		"never": "No evidence found",
+		"alert": "Over 30 days"
+	},
+	"controls": {
+		"kicker": "Evidence by control",
+		"title": "Controls",
+		"maxAge": "evidence up to {{days}} days old",
+		"inPeriod": "{{count}} this period",
+		"none": "No evidence in this period."
+	},
+	"saved": {
+		"kicker": "History",
+		"title": "Saved reports",
+		"row": "{{coverage}} % covered · {{gaps}} gap(s)",
+		"savedAs": "Saved as {{name}}"
+	},
+	"export": {
+		"label": "Export",
+		"json": "JSON",
+		"csv": "CSV",
+		"html": "HTML",
+		"pdf": "PDF",
+		"saved": "Saved to {{path}}",
+		"failed": "Export failed: {{error}}",
+		"title": "Compliance report: {{framework}}, {{period}}",
+		"generated": "Generated on {{date}}, judged on the controls of {{framework}} {{version}}.",
+		"controlsTitle": "Controls",
+		"gapsTitle": "Gaps and recommendations",
+		"evidenceTitle": "Evidence",
+		"columns": {
+			"control": "Control",
+			"title": "Title",
+			"status": "Status",
+			"last": "Last evidence",
+			"count": "Evidence in period",
+			"needs": "Missing evidence",
+			"recommendation": "Recommendation",
+			"kind": "Kind",
+			"date": "Date",
+			"what": "What",
+			"source": "Source",
+			"outcome": "Outcome",
+			"actor": "By"
+		}
+	},
+	"outcomes": {
+		"pass": "Passed",
+		"fail": "Failed",
+		"info": "Recorded"
+	},
+	"kinds": {
+		"spec_approval": "Spec approval",
+		"code_review": "QA review",
+		"tests": "Tests",
+		"security": "Security check",
+		"security_config": "Security scanner",
+		"change": "Change",
+		"merge": "Reviewed merge",
+		"release": "Release",
+		"deployment": "Deployment pipeline",
+		"access": "Code ownership",
+		"policy": "Policy",
+		"procedure": "Procedure",
+		"incident": "Incident",
+		"monitoring": "Monitoring"
 	}
 }
