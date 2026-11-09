@@ -21,8 +21,14 @@ allowBuilds:
 # Expo's config, CLI, fingerprint and Metro config, and Jest's config, runtime,
 # reporters and test-exclude call only `glob()`, `globSync()`, `sync()`,
 # `minimatch()` and `new Minimatch()`, which keep their shape on the fixed
-# lines. deepmerge (GHSA-gcqx-w48m-w2h4, low, reached through jest-config only)
-# has no fixed release yet.
+# lines.
+#
+# GHSA-gcqx-w48m-w2h4 / CVE-2026-93753 (deepmerge <= 4.3.1, prototype poisoning
+# through an own `__proto__` key) has no fixed release. Its only consumer is
+# jest-config, which merges presets and globals with `deepmerge()` and
+# `deepmerge.all()`: vendor/deepmerge is 4.3.1 with mergeObject() patched, same
+# API. Remove the folder and this line once upstream publishes a fix.
 overrides:
   'glob@>=9.0.0 <14.0.2': ^14.0.3
   'minimatch@>=7.0.0 <11.0.1': ^11.0.4
+  deepmerge: file:./vendor/deepmerge
