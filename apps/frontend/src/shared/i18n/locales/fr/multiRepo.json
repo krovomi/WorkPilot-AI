@@ -21,7 +21,9 @@
 		"start": "Démarrer",
 		"resume": "Reprendre",
 		"stop": "Arrêter",
-		"back": "Toutes les tâches multi-dépôts"
+		"back": "Toutes les tâches multi-dépôts",
+		"stepEngine": "3. Moteur des tâches",
+		"engineHint": "Chaque dépôt reçoit une tâche Kanban qui tourne sur ce fournisseur, ce modèle et cet effort, comme si on l'avait choisi sur le tableau."
 	},
 	"status": {
 		"pending": "Pas démarrée",
@@ -81,6 +83,12 @@
 		"taskCreateFailed": "La carte de {{repo}} n'a pas pu être créée.",
 		"taskStartFailed": "La carte de {{repo}} n'a pas pu démarrer : ouvrez-la dans le tableau pour voir pourquoi, puis reprenez.",
 		"taskMissing": "La carte de {{repo}} a été supprimée.",
-		"unexpected": "L'exécution s'est arrêtée sur une erreur inattendue."
+		"unexpected": "L'exécution s'est arrêtée sur une erreur inattendue.",
+		"invalidEngine": "Le moteur choisi n'est pas valide : choisissez à nouveau un fournisseur et un modèle."
+	},
+	"detail": {
+		"engine": "Moteur :",
+		"engineDefault": "le fournisseur par défaut de chaque projet",
+		"engineMixed": "{{provider}} · {{model}} (par phase)"
 	}
 }

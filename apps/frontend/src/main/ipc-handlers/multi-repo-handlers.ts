@@ -17,6 +17,7 @@ import type {
 	MultiRepoOrchestration,
 	Project,
 } from "../../shared/types";
+import { parseTaskEngine, readEngine, writeEngine } from "../multi-repo/engine";
 import { createMultiRepoHost, ensureRepoProject } from "../multi-repo/host";
 import {
 	createOrchestration,
@@ -46,9 +47,12 @@ function localProject(projectId: unknown): Project | null {
 function load(project: Project, id: string): MultiRepoOrchestration | null {
 	const dir = orchestrationDir(project, id);
 	const manifest = dir ? readManifest(dir) : null;
-	return dir && manifest
-		? toOrchestration(id, project.id, manifest, isMultiRepoRunning(dir))
-		: null;
+	if (!dir || !manifest) return null;
+	const engine = readEngine(dir);
+	return {
+		...toOrchestration(id, project.id, manifest, isMultiRepoRunning(dir)),
+		...(engine ? { engine } : {}),
+	};
 }
 
 /** A repo's name in the orchestration: its project's, unique, parseable. */
@@ -103,10 +107,14 @@ export function registerMultiRepoHandlers(getMainWindow: () => BrowserWindow | n
 			if (description.length > MAX_TASK_CHARS) {
 				return { success: false, error: "errors.descriptionTooLong" };
 			}
+			const engine = parseTaskEngine((config as MultiRepoCreateConfig | undefined)?.engine);
+			if (engine === "invalid") return { success: false, error: "errors.invalidEngine" };
 			const resolved = resolveRepos(config);
 			if ("error" in resolved) return { success: false, error: resolved.error };
 			try {
 				const id = createOrchestration(project, resolved.repos, description.trim());
+				const dir = orchestrationDir(project, id);
+				if (engine && dir) writeEngine(dir, engine);
 				const created = load(project, id);
 				return created
 					? { success: true, data: created }

@@ -1,7 +1,17 @@
 import type { MultiRepoOrchestration } from "@shared/types";
 import { ArrowLeft, Play, Plus, Square } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { useMultiRepoStore } from "@/stores/multi-repo-store";
+import { useProjectStore } from "@/stores/project-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import {
+	defaultEngineProvider,
+	isUniformEngine,
+	seedEngine,
+} from "../../../shared/utils/task-engine";
+import { TaskEngineEditor } from "../task-engine/TaskEngineEditor";
 import { Button } from "../ui/button";
 import {
 	Dialog,
@@ -58,6 +68,34 @@ function OrchestrationList() {
 	);
 }
 
+/**
+ * The engine of the repositories' tasks, seeded like a new board task: the
+ * host project's provider, else the default provider in Settings.
+ */
+function EngineSection() {
+	const { t } = useTranslation(["multiRepo"]);
+	const engine = useMultiRepoStore((s) => s.engine);
+	const setEngine = useMultiRepoStore((s) => s.setEngine);
+	const projectId = useMultiRepoStore((s) => s.projectId);
+	const projectProvider = useProjectStore(
+		(s) => s.projects.find((p) => p.id === projectId)?.settings?.provider,
+	);
+	const { settings } = useSettingsStore(useShallow((s) => ({ settings: s.settings })));
+
+	useEffect(() => {
+		if (!engine) setEngine(seedEngine(settings, defaultEngineProvider(settings, projectProvider)));
+	}, [engine, setEngine, settings, projectProvider]);
+
+	if (!engine) return null;
+	return (
+		<section className="space-y-2">
+			<h3 className="text-sm font-medium text-foreground">{t("multiRepo:dialog.stepEngine")}</h3>
+			<TaskEngineEditor engine={engine} onChange={setEngine} idPrefix="multi-repo-engine" />
+			<p className="text-xs text-muted-foreground">{t("multiRepo:dialog.engineHint")}</p>
+		</section>
+	);
+}
+
 function NewOrchestration() {
 	const { t } = useTranslation(["multiRepo"]);
 	const taskDescription = useMultiRepoStore((s) => s.taskDescription);
@@ -81,7 +119,23 @@ function NewOrchestration() {
 				/>
 				<p className="text-xs text-muted-foreground">{t("multiRepo:dialog.howItRuns")}</p>
 			</section>
+			<EngineSection />
 		</div>
+	);
+}
+
+function EngineLine({ orchestration }: { readonly orchestration: MultiRepoOrchestration }) {
+	const { t } = useTranslation(["multiRepo"]);
+	const engine = orchestration.engine;
+	const summary = engine
+		? isUniformEngine(engine)
+			? `${engine.coding.provider} · ${engine.coding.model} · ${engine.coding.effort}`
+			: t("multiRepo:detail.engineMixed", { provider: engine.coding.provider, model: engine.coding.model })
+		: t("multiRepo:detail.engineDefault");
+	return (
+		<p className="text-xs text-muted-foreground">
+			{t("multiRepo:detail.engine")} <span className="text-foreground">{summary}</span>
+		</p>
 	);
 }
 
@@ -89,6 +143,7 @@ function OrchestrationDetail({ orchestration }: { readonly orchestration: MultiR
 	return (
 		<div className="space-y-6">
 			<p className="whitespace-pre-wrap text-sm text-foreground">{orchestration.taskDescription}</p>
+			<EngineLine orchestration={orchestration} />
 			<ExecutionMonitor orchestration={orchestration} />
 			{orchestration.dependencyGraph.nodes.length > 0 && (
 				<DependencyGraphView

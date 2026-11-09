@@ -102,6 +102,35 @@ describe("multi-repo store", () => {
 		});
 	});
 
+	it("sends the engine picked in the form, and chains the editor's corrections", async () => {
+		const trio = { provider: "openai", model: "gpt-5.5", effort: "medium" } as const;
+		const engine = { spec: trio, planning: trio, coding: trio, qa: trio };
+		useMultiRepoStore.setState({ projectId: "p1", view: "new", taskDescription: "Add auth" });
+		useMultiRepoStore.getState().toggleRepo({ path: "/r/api", name: "api" });
+		useMultiRepoStore.getState().toggleRepo({ path: "/r/web", name: "web" });
+		// A state action before any engine is seeded changes nothing.
+		useMultiRepoStore.getState().setEngine((current) => ({ ...current, qa: trio }));
+		expect(useMultiRepoStore.getState().engine).toBeNull();
+		useMultiRepoStore.getState().setEngine(engine);
+		useMultiRepoStore
+			.getState()
+			.setEngine((current) => ({ ...current, qa: { ...trio, effort: "high" } }));
+
+		api.createMultiRepoOrchestration.mockResolvedValue({
+			success: true,
+			data: orchestration("001-add-auth"),
+		});
+		api.startMultiRepoOrchestration.mockResolvedValue({ success: true });
+		await useMultiRepoStore.getState().launch();
+
+		expect(api.createMultiRepoOrchestration).toHaveBeenCalledWith("p1", {
+			repos: [{ localPath: "/r/api" }, { localPath: "/r/web" }],
+			taskDescription: "Add auth",
+			engine: { ...engine, qa: { ...trio, effort: "high" } },
+		});
+		expect(useMultiRepoStore.getState().engine).toBeNull();
+	});
+
 	it("keeps the form and shows the refusal when creation fails", async () => {
 		useMultiRepoStore.setState({ projectId: "p1", view: "new", taskDescription: "t" });
 		api.createMultiRepoOrchestration.mockResolvedValue({
