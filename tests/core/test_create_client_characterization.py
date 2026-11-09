@@ -318,6 +318,7 @@ def test_the_hooks_run_in_their_documented_order(harness):
     from rtk import rtk_rewrite_hook
     from security import bash_security_hook
     from security.path_guard import GUARDED_WRITE_TOOLS
+    from security.tool_result_guard import CLAUDE_TOOLS_MATCHER
     from watermarks import CLEANED_TOOLS
 
     hooks = harness.build()["hooks"]
@@ -335,7 +336,10 @@ def test_the_hooks_run_in_their_documented_order(harness):
     assert pre[0].hooks == [bash_security_hook]
     assert pre[2].hooks == [rtk_rewrite_hook]
     assert all(len(m.hooks) == 1 for m in pre)
-    assert [m.matcher for m in hooks["PostToolUse"]] == list(SUBAGENT_TOOLS)
+    assert [m.matcher for m in hooks["PostToolUse"]] == [
+        *SUBAGENT_TOOLS,
+        CLAUDE_TOOLS_MATCHER,
+    ]
     assert len(hooks["PreCompact"]) == 1
     assert len(hooks["Stop"]) == 1
 
