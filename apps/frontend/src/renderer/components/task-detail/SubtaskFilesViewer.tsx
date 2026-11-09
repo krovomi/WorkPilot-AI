@@ -1,8 +1,6 @@
 import {
-	AlignJustify,
 	ChevronDown,
 	Code2,
-	Columns2,
 	File,
 	FileCode,
 	FileJson,
@@ -19,7 +17,13 @@ import type { WorktreeDiffFile } from "../../../shared/types";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { DiffViewer, type DiffViewMode } from "../ui/diff-viewer";
+import {
+	type DiffViewMode,
+	readStoredDiffViewMode,
+	storeDiffViewMode,
+} from "../ui/diff-model";
+import { DiffModeToggle } from "../ui/diff-mode-toggle";
+import { DiffViewer } from "../ui/diff-viewer";
 import { ScrollArea } from "../ui/scroll-area";
 
 interface SubtaskFilesViewerProps {
@@ -284,7 +288,11 @@ function FileTreeItem({
 						// (outer ScrollArea), each diff only scrolls horizontally for
 						// long lines. No vertical cap so nothing is clipped.
 						<div className="overflow-x-auto themed-scrollbar">
-							<DiffViewer patch={diff?.patch} viewMode={viewMode} />
+							<DiffViewer
+								patch={diff?.patch}
+								filePath={node.path}
+								viewMode={viewMode}
+							/>
 						</div>
 					) : (
 						<div className="px-3 py-4 text-center text-xs text-muted-foreground">
@@ -317,16 +325,6 @@ function FileTreeItem({
 	);
 }
 
-/** Persist the unified/split choice so it sticks across files and sessions. */
-const VIEW_MODE_STORAGE_KEY = "workpilot.subtaskDiff.viewMode";
-
-function readStoredViewMode(): DiffViewMode {
-	if (typeof window === "undefined") return "unified";
-	return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "split"
-		? "split"
-		: "unified";
-}
-
 export function SubtaskFilesViewer({
 	files,
 	subtaskTitle,
@@ -334,7 +332,7 @@ export function SubtaskFilesViewer({
 	onClose,
 }: SubtaskFilesViewerProps) {
 	const { t } = useTranslation(["tasks"]);
-	const [viewMode, setViewMode] = useState<DiffViewMode>(readStoredViewMode);
+	const [viewMode, setViewMode] = useState<DiffViewMode>(readStoredDiffViewMode);
 	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 	const [openDiffs, setOpenDiffs] = useState<Record<string, boolean>>({});
 	const [diffByPath, setDiffByPath] = useState<Map<string, WorktreeDiffFile>>(
@@ -410,11 +408,7 @@ export function SubtaskFilesViewer({
 
 	const handleViewModeChange = useCallback((mode: DiffViewMode) => {
 		setViewMode(mode);
-		try {
-			window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
-		} catch {
-			/* localStorage indisponible (quota / mode privé) : choix non persisté */
-		}
+		storeDiffViewMode(mode);
 	}, []);
 
 	const fetchFileDiff = useCallback(
@@ -550,37 +544,11 @@ export function SubtaskFilesViewer({
 							{t("subtasks.filesViewer.collapseAll")}
 						</Button>
 
-						{/* Unified / side-by-side toggle (GitHub-style) */}
-						<div className="flex items-center rounded-md border border-border bg-background p-0.5 flex-shrink-0">
-							<button
-								type="button"
-								onClick={() => handleViewModeChange("unified")}
-								aria-pressed={viewMode === "unified"}
-								title={t("subtasks.filesViewer.viewMode.unified")}
-								className={cn(
-									"flex items-center justify-center h-6 w-7 rounded transition-colors",
-									viewMode === "unified"
-										? "bg-secondary text-foreground"
-										: "text-muted-foreground hover:text-foreground",
-								)}
-							>
-								<AlignJustify className="h-3.5 w-3.5" />
-							</button>
-							<button
-								type="button"
-								onClick={() => handleViewModeChange("split")}
-								aria-pressed={viewMode === "split"}
-								title={t("subtasks.filesViewer.viewMode.split")}
-								className={cn(
-									"flex items-center justify-center h-6 w-7 rounded transition-colors",
-									viewMode === "split"
-										? "bg-secondary text-foreground"
-										: "text-muted-foreground hover:text-foreground",
-								)}
-							>
-								<Columns2 className="h-3.5 w-3.5" />
-							</button>
-						</div>
+						<DiffModeToggle
+							value={viewMode}
+							onChange={handleViewModeChange}
+							className="flex-shrink-0"
+						/>
 					</div>
 				)}
 			</div>

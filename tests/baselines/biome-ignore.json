@@ -227,7 +227,6 @@
   "apps/frontend/src/renderer/components/ui/KanbanSkeleton.tsx": 1,
   "apps/frontend/src/renderer/components/ui/code-editor.tsx": 1,
   "apps/frontend/src/renderer/components/ui/combobox.tsx": 1,
-  "apps/frontend/src/renderer/components/ui/diff-viewer.tsx": 3,
   "apps/frontend/src/renderer/components/ui/label.tsx": 1,
   "apps/frontend/src/renderer/components/ui/resizable-panels.tsx": 2,
   "apps/frontend/src/renderer/components/ui/toaster.tsx": 3,

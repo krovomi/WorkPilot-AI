@@ -952,10 +952,6 @@
 			"viewDiff": "Voir les modifications",
 			"hideDiff": "Masquer les modifications",
 			"noDiff": "Aucune modification enregistrée pour ce fichier",
-			"viewMode": {
-				"unified": "Vue unifiée",
-				"split": "Vue côte à côte"
-			},
 			"stats": {
 				"files": "Fichiers",
 				"folders": "Dossiers",
