@@ -96,4 +96,25 @@ describe("useSidebarPrefs", () => {
 			sidebarPrefs: expect.objectContaining({ menuMode: "full", pinnedItems: [] }),
 		});
 	});
+
+	it("hides entries once each and shows one again", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.hideItems(["ideation", "insights"]));
+		act(() => result.current.hideItems(["insights"]));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ hiddenItems: ["ideation", "insights"] }),
+		});
+		act(() => result.current.unhideItem("ideation"));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ hiddenItems: ["insights"] }),
+		});
+	});
+
+	it("snoozes the offer to hide", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.snoozeHideSuggestions(42));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ hideSuggestionsSnoozedUntil: 42 }),
+		});
+	});
 });

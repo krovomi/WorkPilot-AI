@@ -14,7 +14,7 @@ export interface NavIndexEntry {
 	readonly labelKey: string;
 	readonly icon: LucideIcon;
 	readonly shortcut?: string;
-	/** Where the page sits in the menu: its group, then its sub-group or hub. */
+	/** Where the page sits in the menu: its group, then its hub. */
 	readonly placeKeys: readonly string[];
 	readonly experimental: boolean;
 }
@@ -37,7 +37,7 @@ export function buildNavIndex(
 	};
 	for (const group of groups) {
 		for (const item of group.items) {
-			const place = [group.labelKey, ...(item.subGroup ? [item.subGroup] : [])];
+			const place = [group.labelKey];
 			if (!item.hub) {
 				if (!itemShown(item, gates)) continue;
 				push({

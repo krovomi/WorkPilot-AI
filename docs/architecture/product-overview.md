@@ -69,7 +69,10 @@ A view with neither a design file nor a test that names it is marked
 **Experimental** (lot M8): the sidebar puts a small flask on the corner of its
 icon (its tooltip says the view is in beta), the page itself opens with a
 "Beta feature" banner, and the sidebar lets the user
-hide all of them. The list lives in
+hide all of them. While a view is in beta, its entry leaves its group for the
+**Labo**, the flask at the foot of the menu's rail, which lists every beta page
+with one sentence each; the Group column below is where it returns once out of
+beta (F181). The list lives in
 `apps/frontend/src/renderer/components/sidebar/experimental-views.ts`; the last
 column below marks the same views, and the test fails when the two differ or
 when an experimental view has a design file. A view leaves the list when it
@@ -136,20 +139,20 @@ it, inside its hub. The hubs are listed in
 | `roadmap` | Roadmap | Planning | [agent-prompts.md](agent-prompts.md) |  |
 | `spec-approval` | Spec Approval | Planning | — |  |
 | `tech-debt` | Tech Debt Dashboard | Development › Debt and refactoring | — |  |
-| `accessibility-agent` | Accessibility Scan | Toolbox | — |  |
+| `accessibility-agent` | Accessibility Scan | Toolbox › Accessibility and i18n | — |  |
 | `agent-tools` | MCP Overview | Toolbox › MCP tools | — |  |
-| `api-explorer` | API Studio | Toolbox | — |  |
+| `api-explorer` | API Studio | Toolbox › API | — |  |
 | `api-watcher` | API Contract Watcher | Toolbox | — | yes |
-| `app-emulator` | App Emulator | Toolbox | [app-emulator.md](app-emulator.md) |  |
+| `app-emulator` | App Emulator | Toolbox › Automation | [app-emulator.md](app-emulator.md) |  |
 | `blast-radius` | Impact Blast Radius | Git & Integrations › Git impact | — | yes |
-| `browser-agent` | Browser Agent | Toolbox | — |  |
+| `browser-agent` | Browser Agent | Toolbox › Automation | — |  |
 | `compliance` | Compliance Evidence Collector | Toolbox | — | yes |
 | `context-aware-snippets` | Context-Aware Snippets | Explore › Project context | — |  |
-| `dependency-sentinel` | Dependency Sentinel | Toolbox | — |  |
+| `dependency-sentinel` | Dependency Sentinel | Toolbox › Quality and security | — |  |
 | `doc-drift` | Documentation Drift Detector | Development › Docs and drift | [docs-and-drift.md](docs-and-drift.md) |  |
-| `guardrails` | Agent Guardrails | Toolbox | — |  |
-| `i18n-agent` | i18n Scan | Toolbox | — |  |
-| `injection-guard` | Injection Guard | Toolbox | — |  |
+| `guardrails` | Agent Guardrails | Toolbox › Quality and security | — |  |
+| `i18n-agent` | i18n Scan | Toolbox › Accessibility and i18n | — |  |
+| `injection-guard` | Injection Guard | Toolbox › Quality and security | — |  |
 | `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `migration` | Code Migration | Toolbox | — |  |
 | `notebook-agent` | Notebook Checks | Toolbox | — | yes |
@@ -159,7 +162,7 @@ it, inside its hub. The hubs are listed in
 | `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
-| `sandbox` | Change Preview | Toolbox | — |  |
+| `sandbox` | Change Preview | Toolbox › API | — |  |
 | `team-bot` | Team Bot (Slack/Teams) | Toolbox | — | yes |
 | `voice-control` | Voice Assistant | Toolbox | [voice-assistant.md](voice-assistant.md) |  |
 | `administration` | Administration | Administration, in server mode for an administrator | — |  |

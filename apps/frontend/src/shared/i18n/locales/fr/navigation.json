@@ -14,15 +14,6 @@
 		"favorites": "Favoris",
 		"administration": "Administration"
 	},
-	"subGroups": {
-		"extensions": "Extensions",
-		"codeQuality": "Qualité de code & Tests",
-		"documentation": "Documentation & Specs",
-		"accessibility": "Accessibilité & i18n",
-		"api": "API & Données",
-		"automation": "Automatisation",
-		"utilities": "Utilitaires"
-	},
 	"items": {
 		"kanban": "Tableau Kanban",
 		"terminals": "Terminaux d'agents",
@@ -331,8 +322,14 @@
 			"context-aware-snippets": "Écrit un extrait de code qui suit le contexte et le style de ce projet.",
 			"conflict-predictor": "Cherche les conflits entre worktrees et branches avant que vous ne les fusionniez.",
 			"natural-language-git": "Transforme une phrase en commande git pour ce projet.",
-			"arena-mode": "Lance un même prompt sur deux modèles côte à côte sans dire lequel est lequel, et vous laisse voter."
-		}
+			"arena-mode": "Lance un même prompt sur deux modèles côte à côte sans dire lequel est lequel, et vous laisse voter.",
+			"dependency-sentinel": "Surveille les dépendances du projet : failles connues, versions en retard et licences.",
+			"app-emulator": "Lance l'application du projet dans un émulateur pour la voir tourner."
+		},
+		"qualitySecurity": "Qualité et sécurité",
+		"accessibilityI18n": "Accessibilité et i18n",
+		"api": "API",
+		"automation": "Automatisation"
 	},
 	"keywords": {
 		"kanban": "tâches cartes board tableau build",
@@ -428,7 +425,8 @@
 		"mine": "Mon menu",
 		"pinned": "Épinglées",
 		"recent": "Récentes",
-		"mineEmpty": "Épinglez une page avec son étoile, ou glissez-la sur l'étoile du rail. Les pages ouvertes récemment s'affichent aussi ici."
+		"mineEmpty": "Épinglez une page avec son étoile, ou glissez-la sur l'étoile du rail. Les pages ouvertes récemment s'affichent aussi ici.",
+		"labo": "Labo"
 	},
 	"menuMode": {
 		"title": "Quel menu voulez-vous ?",
@@ -437,5 +435,36 @@
 		"essentialHint": "Les {{count}} pages du quotidien épinglées ici, vues en bêta masquées.",
 		"full": "Complet",
 		"fullHint": "Toutes les pages, rangées par espace dans le rail."
+	},
+	"labo": {
+		"intro": "Pages encore en bêta : elles n'ont ni document de conception ni test, et peuvent changer ou disparaître. Une page sort du Labo dès qu'elle en a.",
+		"about": {
+			"agent-debugger": "Rejoue pas à pas les appels d'outils d'un agent pour comprendre une erreur.",
+			"agent-replay": "Revoit une session d'agent comme une vidéo, étape par étape.",
+			"api-watcher": "Compare les contrats d'API entre deux versions et signale les changements cassants.",
+			"blast-radius": "Montre les fichiers et modules touchés par un changement avant de le fusionner.",
+			"carbon-profiler": "Estime l'énergie et le carbone consommés par les builds et les agents.",
+			"compliance": "Rassemble les preuves de conformité (revues, tests, accès) pour un audit.",
+			"cross-language-translation": "Traduit du code d'un langage vers un autre, dans un worktree à relire.",
+			"env-snapshot": "Photographie l'environnement de développement pour le recréer à l'identique.",
+			"notebook-agent": "Vérifie les notebooks du projet : cellules qui échouent, sorties périmées.",
+			"performance-profiler": "Mesure les points lents du code et propose des pistes d'optimisation.",
+			"pipeline-generator": "Écrit un pipeline de CI adapté à la pile du projet.",
+			"regression-guardian": "Repère les régressions en comparant le comportement avant et après un changement.",
+			"release-coordinator": "Prépare un train de release : branches, changelog et ordre de fusion.",
+			"team-bot": "Relie WorkPilot à Slack ou Teams pour suivre et lancer des tâches depuis la messagerie."
+		}
+	},
+	"hidden": {
+		"suggestTitle": "Pages peu utilisées",
+		"suggest_one": "Une page de cet espace n'a pas été ouverte depuis {{days}} jours. La masquer allège le menu ; Ctrl K la retrouve toujours.",
+		"suggest_other": "{{count}} pages de cet espace n'ont pas été ouvertes depuis {{days}} jours. Les masquer allège le menu ; Ctrl K les retrouve toujours.",
+		"review": "Voir lesquelles",
+		"later": "Plus tard",
+		"hideOne": "Masquer {{name}}",
+		"hideAll_one": "Masquer la page",
+		"hideAll_other": "Masquer les {{count}}",
+		"count": "Pages masquées ({{count}})",
+		"show": "Réafficher"
 	}
 }

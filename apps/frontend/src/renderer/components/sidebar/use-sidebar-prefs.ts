@@ -144,6 +144,32 @@ export function useSidebarPrefs() {
 		[update],
 	);
 
+	const hideItems = useCallback(
+		(ids: readonly string[]) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			const hidden = current.hiddenItems ?? [];
+			update({ hiddenItems: [...hidden, ...ids.filter((id) => !hidden.includes(id))] });
+		},
+		[update],
+	);
+
+	const unhideItem = useCallback(
+		(id: string) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			update({ hiddenItems: (current.hiddenItems ?? []).filter((x) => x !== id) });
+		},
+		[update],
+	);
+
+	const snoozeHideSuggestions = useCallback(
+		(until: number) => update({ hideSuggestionsSnoozedUntil: until }),
+		[update],
+	);
+
 	const reset = useCallback(() => {
 		saveSettings({ sidebarPrefs: DEFAULT_SIDEBAR_PREFS });
 	}, []);
@@ -159,6 +185,9 @@ export function useSidebarPrefs() {
 			setHideExperimental,
 			setActiveSpace,
 			chooseMenuMode,
+			hideItems,
+			unhideItem,
+			snoozeHideSuggestions,
 			reset,
 			mergeOrder,
 		}),
@@ -172,6 +201,9 @@ export function useSidebarPrefs() {
 			setHideExperimental,
 			setActiveSpace,
 			chooseMenuMode,
+			hideItems,
+			unhideItem,
+			snoozeHideSuggestions,
 			reset,
 		],
 	);

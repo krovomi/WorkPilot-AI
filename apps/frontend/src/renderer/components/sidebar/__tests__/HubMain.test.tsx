@@ -21,6 +21,8 @@ const openers = vi.hoisted(() => ({
 	snippets: vi.fn(),
 	git: vi.fn(),
 	estimation: vi.fn(),
+	sentinel: vi.fn(),
+	emulator: vi.fn(),
 }));
 vi.mock("@/stores/arena-store", () => ({ openArenaDialog: openers.arena }));
 vi.mock("@/stores/conflict-predictor-store", () => ({
@@ -34,6 +36,12 @@ vi.mock("@/stores/natural-language-git-store", () => ({
 }));
 vi.mock("@/stores/smart-estimation-store", () => ({
 	openSmartEstimation: openers.estimation,
+}));
+vi.mock("@/stores/dependency-sentinel-store", () => ({
+	openDependencySentinelDialog: openers.sentinel,
+}));
+vi.mock("@/stores/app-emulator-store", () => ({
+	openAppEmulatorDialog: openers.emulator,
 }));
 
 import type { Project } from "@shared/types";
