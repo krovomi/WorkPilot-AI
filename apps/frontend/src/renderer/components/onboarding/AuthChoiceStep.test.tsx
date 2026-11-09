@@ -100,7 +100,7 @@ describe("AuthChoiceStep", () => {
 
 			// Check for heading
 			expect(
-				screen.getByText("Choose Your Authentication Method"),
+				screen.getByText("Choose Your AI"),
 			).toBeInTheDocument();
 
 			// Check for OAuth option
@@ -346,7 +346,7 @@ describe("AuthChoiceStep", () => {
 			expect(screen.getByText(/Bring your own API key/)).toBeInTheDocument();
 		});
 
-		it("should have helper text explaining both options", () => {
+		it("should have helper text explaining the options", () => {
 			render(
 				<AuthChoiceStep
 					onNext={mockGoToNext}
@@ -357,9 +357,28 @@ describe("AuthChoiceStep", () => {
 
 			expect(
 				screen.getByText(
-					/Both options provide full access to Claude Code features/,
+					/the other providers each keep their own sign-in/,
 				),
 			).toBeInTheDocument();
+		});
+	});
+
+	describe("Other providers", () => {
+		it("offers another AI when the wizard handles it", () => {
+			const onOtherProvider = vi.fn();
+			const { container } = render(
+				<AuthChoiceStep
+					onNext={mockGoToNext}
+					onBack={mockGoToPrevious}
+					onSkip={mockSkipWizard}
+					onOtherProvider={onOtherProvider}
+				/>,
+			);
+
+			expect(container.querySelector(".grid")?.className).toContain("lg:grid-cols-3");
+			fireEvent.click(screen.getByTestId("auth-option-other"));
+			expect(onOtherProvider).toHaveBeenCalledTimes(1);
+			expect(mockGoToNext).not.toHaveBeenCalled();
 		});
 	});
 

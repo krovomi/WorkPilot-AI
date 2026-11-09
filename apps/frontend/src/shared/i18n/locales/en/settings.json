@@ -1233,7 +1233,8 @@
 				"customized": {
 					"title": "Custom Endpoints",
 					"description": "Configure custom Anthropic-compatible API endpoints (OpenAI, Azure, etc.)",
-					"endpointCount": "{{count}} endpoint{{count > 1 ? 's' : ''}} configured",
+					"endpointCount_one": "{{count}} endpoint configured",
+					"endpointCount_other": "{{count}} endpoints configured",
 					"addButton": "Add Endpoint",
 					"empty": {
 						"title": "No endpoints configured",
@@ -2307,7 +2308,8 @@
 	"providerGrid": {
 		"search": {
 			"placeholder": "Search for a provider...",
-			"results": "{{count}} result{{count > 1 ? 's' : ''}} for \"{{query}}\"",
+			"results_one": "{{count}} result for \"{{query}}\"",
+			"results_other": "{{count}} results for \"{{query}}\"",
 			"noResults": "No providers found",
 			"noProviders": "No providers available",
 			"adjustCriteria": "Try adjusting your search criteria.",

@@ -102,16 +102,24 @@
 			"description": "Learn more about advanced features, best practices, and troubleshooting."
 		},
 		"finish": "Finish & Start Building",
-		"rerunHint": "You can always re-run this wizard from Settings → Application"
+		"rerunHint": "You can always re-run this wizard from Settings → Application",
+		"titleNotReady": "Almost There",
+		"subtitleNotReady": "One step is left before WorkPilot AI can run your tasks",
+		"checking": "Checking your AI providers…",
+		"connectedTo": "Connected: {{providers}}",
+		"noProvider": "No AI provider connected yet",
+		"noProviderDescription": "Tasks need an AI to run. Connect Claude, Codex, GitHub Copilot, Gemini, OpenCode, Ollama or another provider now, or later in Settings → Accounts.",
+		"connectProvider": "Connect a provider"
 	},
 	"steps": {
 		"welcome": "Welcome",
-		"authChoice": "Auth Method",
+		"authChoice": "Your AI",
 		"auth": "Auth",
 		"cli": "CLI",
 		"devtools": "Dev Tools",
 		"privacy": "Privacy",
-		"done": "Done"
+		"done": "Done",
+		"providers": "AI providers"
 	},
 	"privacy": {
 		"title": "Help Improve WorkPilot AI",
@@ -215,14 +223,16 @@
 		"startingDownload": "Starting download..."
 	},
 	"authChoice": {
-		"title": "Choose Your Authentication Method",
-		"description": "Select how you want to authenticate with Claude. You can change this later in Settings.",
+		"title": "Choose Your AI",
+		"description": "Pick the AI that will plan, write and review your code. You can add others or switch later in Settings → Accounts.",
 		"oauthTitle": "Sign in with Anthropic",
 		"oauthDescription": "Use your Anthropic account to authenticate. Simple and secure OAuth flow.",
 		"apiKeyTitle": "Use Custom API Key",
 		"apiKeyDescription": "Bring your own API key from Anthropic or a compatible API provider. ⚠️ Highly experimental — may incur significant costs.",
-		"footer": "Both options provide full access to Claude Code features. Choose based on your preference.",
-		"skip": "Skip for now"
+		"footer": "Claude works through your Anthropic account or an API key; the other providers each keep their own sign-in.",
+		"skip": "Skip for now",
+		"otherTitle": "Use another AI",
+		"otherDescription": "OpenAI Codex, GitHub Copilot, Gemini, OpenCode, Ollama, Mistral and more: connect an account, a CLI or an API key."
 	},
 	"firstSpec": {
 		"title": "Create Your First Task",
@@ -235,5 +245,10 @@
 		"open": "Open Task Creator",
 		"continueHint": "You can continue with the wizard now or create more tasks.",
 		"skipHint": "You can skip this step and create tasks later from the dashboard."
+	},
+	"providers": {
+		"title": "Connect Your AI Providers",
+		"description": "Configure one or more providers: sign in, install a CLI or paste an API key. This is the same panel as Settings → Accounts.",
+		"continue": "Continue"
 	}
 }
