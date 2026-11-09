@@ -4,7 +4,7 @@
 |---|---|
 | **Commit audité** | `b46a031` (`develop`, après PR #292) — comparé à l'audit précédent sur `7057b28` |
 | **Date** | 3 octobre 2026 |
-| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G ; **1.3.2** (28 octobre 2026) : F114 ; **1.3.3** (29 octobre 2026) : F115 et F116 ; **1.3.4** (7 novembre 2026) : constats F117 à F158, mode serveur multi-tenant, app mobile, idées IA de l'annexe H et killer features du 6 novembre ; **1.4.0** (8 novembre 2026) : constats F159 à F170, charte UI sur tous les modules et les paramètres, découpage automatique des tâches |
+| **Releases** | 1.3.0 (20 octobre 2026) : lots L1 à L17 et pi ; **1.3.1** (28 octobre 2026) : lots M1 à M11 (annexe F) et les onze features de l'annexe G ; **1.3.2** (28 octobre 2026) : F114 ; **1.3.3** (29 octobre 2026) : F115 et F116 ; **1.3.4** (7 novembre 2026) : constats F117 à F158, mode serveur multi-tenant, app mobile, idées IA de l'annexe H et killer features du 6 novembre ; **1.4.0** (8 novembre 2026) : constats F159 à F170, charte UI sur tous les modules et les paramètres, découpage automatique des tâches ; **1.4.1** (9 novembre 2026) : constats F171 à F182, tout code écrit par une page passe par une branche de revue, menu de gauche en espaces avec son Labo, alertes de dépendances corrigées |
 | **Compagnon visuel** | [`WorkPilot-architecture.html`](WorkPilot-architecture.html) — schémas interactifs, simulateur Kanban, inventaire filtrable |
 | **Objet** | Corriger les features cassées, supprimer le code mort et les doublons, réduire le coût en tokens et en mémoire, **sans retirer une seule feature utilisée** |
 
