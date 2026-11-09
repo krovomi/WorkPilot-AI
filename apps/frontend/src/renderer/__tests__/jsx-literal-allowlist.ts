@@ -218,5 +218,4 @@ export const FILE_EXEMPTIONS: Readonly<
 export const PENDING: Readonly<Record<string, number>> = {
 	"components/task-detail/TaskDetailModal.tsx": 1,
 	"components/task-detail/GoalCard.tsx": 1,
-	"components/sidebar/sortable-primitives.tsx": 1,
 };

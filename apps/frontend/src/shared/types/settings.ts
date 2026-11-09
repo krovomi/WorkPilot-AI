@@ -257,6 +257,12 @@ export interface SidebarPrefs {
 	favoritesExpanded: boolean;
 	// Hides the views EXPERIMENTAL_VIEWS lists (renderer/components/sidebar).
 	hideExperimental?: boolean;
+	// The space of the rail the panel last showed: a group id, or "__mine__"
+	// for « Mon menu » (renderer/components/sidebar/spaces.ts).
+	activeSpace?: string;
+	// The menu chosen in « Mon menu »: the essential pages pinned and the beta
+	// views hidden, or everything. Unset until the user chooses.
+	menuMode?: "essential" | "full";
 }
 
 export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
