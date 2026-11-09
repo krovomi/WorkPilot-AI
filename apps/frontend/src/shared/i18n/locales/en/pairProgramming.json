@@ -20,7 +20,7 @@
 		"aiScopeLabel": "AI Scope (what the AI will work on)",
 		"aiScopePlaceholder": "e.g. Backend auth API, JWT middleware, and integration tests",
 		"startButton": "Start Pair Programming",
-		"hint": "The AI will work on its scope in parallel while you focus on yours. You can chat to coordinate in real time."
+		"hint": "The AI will work on its scope in parallel, on a review card's branch, while you focus on yours. You can chat to coordinate in real time."
 	},
 	"status": {
 		"idle": "Ready to pair",
@@ -35,7 +35,8 @@
 		"planning": "Analyzing project and planning implementation...",
 		"active": "Working on your scope...",
 		"actionLog": "AI Actions",
-		"noActions": "No actions yet"
+		"noActions": "No actions yet",
+		"reviewBranch": "The AI works on a Kanban card's branch, not in your project folder. When the session ends its work is committed there: you read the diff, then open the pull request."
 	},
 	"actions": {
 		"file_created": "Created",

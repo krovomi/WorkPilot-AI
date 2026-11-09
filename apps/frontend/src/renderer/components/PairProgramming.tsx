@@ -34,6 +34,7 @@ import {
 	stopPairSession,
 	usePairProgrammingStore,
 } from "@/stores/pair-programming-store";
+import { GeneratedReviewBanner } from "./generated-review/GeneratedReviewBanner";
 import {
 	CharterButton,
 	Chip,
@@ -239,6 +240,7 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 	const streamingContent = usePairProgrammingStore((s) => s.streamingContent);
 	const aiActions = usePairProgrammingStore((s) => s.aiActions);
 	const conflicts = usePairProgrammingStore((s) => s.conflicts);
+	const review = usePairProgrammingStore((s) => s.review);
 	const setPendingMessage = usePairProgrammingStore((s) => s.setPendingMessage);
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
@@ -354,6 +356,11 @@ export function PairProgramming({ projectId }: PairProgrammingProps) {
 							<Panel rail tone="violet">
 								<p className="text-sm leading-relaxed">{session.aiScope}</p>
 							</Panel>
+						)}
+						{review ? (
+							<GeneratedReviewBanner key={review.taskId} review={review} projectId={projectId} />
+						) : (
+							session && <Notice tone="muted">{t("aiWork.reviewBranch")}</Notice>
 						)}
 						{isRunning && <ScanLine label={t(`aiWork.${status}`)} />}
 						{streamingContent && (

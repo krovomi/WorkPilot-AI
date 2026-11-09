@@ -858,6 +858,8 @@ export const IPC_CHANNELS = {
 	PAIR_PROGRAMMING_CONFLICT: "pairProgramming:conflict",
 	PAIR_PROGRAMMING_ERROR: "pairProgramming:error",
 	PAIR_PROGRAMMING_COMPLETE: "pairProgramming:complete",
+	/** The AI's work, committed on its review card's branch (or null: nothing written). */
+	PAIR_PROGRAMMING_REVIEW: "pairProgramming:review",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",

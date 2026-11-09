@@ -26,6 +26,8 @@ export interface CreatedWorktree {
 	readonly path: string;
 	readonly branch: string;
 	readonly baseBranch: string;
+	/** The branch head when the run began: what `--since` compares with. */
+	readonly head?: string;
 }
 
 export interface WorktreeCommit {
@@ -103,6 +105,7 @@ export async function createReviewWorktree(
 		path: out.path,
 		branch: out.branch,
 		baseBranch: typeof out.base_branch === "string" ? out.base_branch : baseBranch ?? "",
+		...(typeof out.head === "string" && out.head ? { head: out.head } : {}),
 	};
 }
 
@@ -112,6 +115,7 @@ export async function commitReviewWorktree(
 	baseBranch: string | undefined,
 	message: string,
 	run: RunReviewWorktree = runReviewWorktree,
+	since?: string,
 ): Promise<WorktreeCommit> {
 	const args = [
 		"--action",
@@ -124,6 +128,8 @@ export async function commitReviewWorktree(
 		message,
 	];
 	if (baseBranch) args.push("--base-branch", baseBranch);
+	// The run's own commits (a coding agent may commit) count as its work.
+	if (since) args.push("--since", since);
 	const out = await run(args);
 	return {
 		committed: out.committed === true,
