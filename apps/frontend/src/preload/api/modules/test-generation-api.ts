@@ -6,6 +6,7 @@ import type {
 	TestGenStageEvent,
 	TestLibrarySelection,
 } from "../../../shared/types/test-generation";
+import type { GeneratedReview } from "../../../shared/types/generated-review";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
 /**
@@ -70,6 +71,7 @@ export interface TestGenerationAPI {
 	) => Promise<{
 		success: boolean;
 		report?: PackageInstallReport | null;
+		review?: GeneratedReview | null;
 		error?: string;
 	}>;
 	generateUnitTests: (
@@ -224,6 +226,8 @@ export const createTestGenerationAPI = (): TestGenerationAPI => ({
 	): Promise<{
 		success: boolean;
 		report?: PackageInstallReport | null;
+		/** The review card the manifests were edited on (main/generated-review/). */
+		review?: GeneratedReview | null;
 		error?: string;
 	}> => {
 		return await ipcRenderer.invoke(IPC_CHANNELS.TEST_GENERATION_ADD_PACKAGES, {

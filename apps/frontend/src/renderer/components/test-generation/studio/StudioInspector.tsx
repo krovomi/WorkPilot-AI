@@ -12,6 +12,8 @@ import {
 	type CoverageGap,
 	useTestGenerationStore,
 } from "../../../stores/test-generation-store";
+import { useProjectStore } from "../../../stores/project-store";
+import { GeneratedReviewBanner } from "../../generated-review/GeneratedReviewBanner";
 import { GenerationErrorPanel } from "../GenerationErrorPanel";
 import { LiveCode, lineCount } from "./LiveCode";
 
@@ -54,6 +56,9 @@ export function StudioInspector(props: StudioInspectorProps) {
 	const result = useTestGenerationStore((s) => s.result);
 	const gaps = useTestGenerationStore((s) => s.coverageGaps);
 	const streamedCode = useTestGenerationStore((s) => s.streamedCode);
+	const review = useTestGenerationStore((s) => s.review);
+	const closeDialog = useTestGenerationStore((s) => s.closeDialog);
+	const projectId = useProjectStore((s) => s.getActiveProject()?.id);
 	const ours = runKind === mode;
 	const tests = ours ? (result?.generated_tests ?? []) : [];
 
@@ -100,6 +105,15 @@ export function StudioInspector(props: StudioInspectorProps) {
 						selection={props.selection}
 						chosen={props.chosenLibraries}
 						target={props.target}
+					/>
+				)}
+				{review && (
+					<GeneratedReviewBanner
+						key={`${review.taskId}:${review.files.join("|")}`}
+						review={review}
+						projectId={projectId}
+						className="m-3"
+						onOpenCard={closeDialog}
 					/>
 				)}
 			</div>

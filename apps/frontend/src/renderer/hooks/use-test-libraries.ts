@@ -3,6 +3,7 @@ import type {
 	PackageInstallReport,
 	TestLibrarySelection,
 } from "../../shared/types/test-generation";
+import { useTestGenerationStore } from "../stores/test-generation-store";
 
 /**
  * What the generated tests will be written against, and the user's say in it.
@@ -91,6 +92,9 @@ const defaultGateway: LibrariesGateway = {
 		if (!response?.success) {
 			throw new Error(response?.error || "The packages could not be added.");
 		}
+		// The manifests were edited on the review card's branch: the studio
+		// shows that card like the one its tests went to.
+		useTestGenerationStore.getState().setReview(response.review);
 		return response.report ?? null;
 	},
 };

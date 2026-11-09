@@ -3,6 +3,7 @@
  */
 
 import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
+import type { GeneratedReviewSource } from "./generated-review";
 import type {
 	CompletablePhase,
 	ExecutionPhase as ExecutionPhaseType,
@@ -432,7 +433,13 @@ export interface TaskMetadata {
 		| "gitlab"
 		| "visual-canvas"
 		| "tech-debt"
-		| "automation";
+		| "automation"
+		| "generated";
+	/**
+	 * The page whose generated code this card holds for review
+	 * (`sourceType: "generated"`, main/generated-review/).
+	 */
+	generatedBy?: GeneratedReviewSource;
 	/** The rule that created the card (shared/types/automations.ts). */
 	automation?: AutomationOrigin;
 	ideationType?: string; // e.g., 'code_improvements', 'security_hardening'
