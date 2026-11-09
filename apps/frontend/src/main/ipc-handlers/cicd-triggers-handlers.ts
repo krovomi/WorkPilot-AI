@@ -16,7 +16,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { app, ipcMain } from "electron";
-import type { Project } from "../../shared/types";
+import type { CicdAutoRun, Project } from "../../shared/types";
 import {
 	getProjectEnvPath,
 	readProjectEnv,
@@ -211,6 +211,145 @@ function saveRun(projectDir: string, run: object): void {
 	);
 }
 
+interface TriggerParams {
+	provider: string;
+	pr_url?: string;
+	branch?: string;
+	workflow?: string;
+	ref?: string;
+}
+
+/** Where a run came from, and the task an automatic one was started for. */
+interface RunOrigin {
+	source?: "manual" | "auto";
+	event?: "pr" | "merge";
+	task_id?: string;
+	spec_id?: string;
+}
+
+type RunnerResult = Awaited<ReturnType<typeof runRunner>>;
+
+/**
+ * Triggers the configured pipeline and records the run in
+ * `.workpilot/cicd_runs.json`: pending first, then triggered or failed.
+ */
+async function triggerPipeline(
+	project: Project,
+	params: TriggerParams,
+	origin: RunOrigin = {},
+): Promise<{ id: string; triggeredAt: string; result: RunnerResult }> {
+	const run = {
+		id: Date.now().toString(),
+		triggered_at: new Date().toISOString(),
+		status: "pending",
+		provider: params.provider,
+		pr_url: params.pr_url ?? "",
+		branch: params.branch ?? "",
+		source: origin.source ?? "manual",
+		...(origin.event ? { event: origin.event } : {}),
+		...(origin.task_id ? { task_id: origin.task_id } : {}),
+		...(origin.spec_id ? { spec_id: origin.spec_id } : {}),
+	};
+	saveRun(project.path, run);
+
+	const result = await runRunner(project, [
+		"--action",
+		"trigger",
+		"--provider",
+		params.provider,
+		"--project",
+		project.path,
+		...(params.pr_url ? ["--pr-url", params.pr_url] : []),
+		...(params.branch ? ["--branch", params.branch] : []),
+		...(params.workflow ? ["--workflow", params.workflow] : []),
+		"--output-json",
+	]);
+
+	// Update run status
+	const runs = loadRuns(project.path);
+	const idx = runs.findIndex((r: unknown) => (r as { id: string }).id === run.id);
+	if (idx >= 0) {
+		(runs[idx] as Record<string, unknown>).status = result.success ? "triggered" : "failed";
+		(runs[idx] as Record<string, unknown>).error = result.success ? undefined : result.error;
+		(runs[idx] as Record<string, unknown>).run_data = result.data;
+		fs.writeFileSync(getRunsLogPath(project.path), JSON.stringify(runs, null, 2), "utf-8");
+	}
+	return { id: run.id, triggeredAt: run.triggered_at, result };
+}
+
+export const CICD_PROVIDERS = ["github", "gitlab", "azure", "jenkins"] as const;
+
+/**
+ * Whether the CI/CD settings of `project` ask for a pipeline on `event` (an
+ * agent opened a task's pull request, or that pull request was merged): the
+ * provider they name, or null.
+ *
+ * `CICD_AUTO_TRIGGER` turns it on; `CICD_TRIGGER_ON_PR` and
+ * `CICD_TRIGGER_ON_MERGE` (each on unless "false") pick the events. A provider
+ * outside the four the runner knows is no provider.
+ */
+export function autoTriggerProvider(
+	config: Record<string, string>,
+	event: "pr" | "merge",
+): string | null {
+	if (config.CICD_AUTO_TRIGGER !== "true") return null;
+	const flag = event === "pr" ? config.CICD_TRIGGER_ON_PR : config.CICD_TRIGGER_ON_MERGE;
+	if (flag === "false") return null;
+	const provider = (config.CICD_PROVIDER ?? "").trim();
+	return (CICD_PROVIDERS as readonly string[]).includes(provider) ? provider : null;
+}
+
+/**
+ * After an agent opened a task's pull request (`event: "pr"`, on the PR's
+ * branch) or after that pull request was merged (`"merge"`, on the branch it
+ * went into): triggers the configured pipeline when the project's CI/CD
+ * settings ask for it, and answers what the task should show. `null` when
+ * nothing is configured. Never throws: a pipeline that cannot start must not
+ * undo the pull request or the merge.
+ */
+export async function autoTriggerForTask(
+	project: Project,
+	event: "pr" | "merge",
+	pr: { prUrl: string; branch?: string; taskId: string; specId: string },
+): Promise<CicdAutoRun | null> {
+	let provider: string | null;
+	try {
+		provider = autoTriggerProvider(readCicdConfig(project), event);
+	} catch {
+		return null;
+	}
+	if (!provider) return null;
+	try {
+		const { id, triggeredAt, result } = await triggerPipeline(
+			project,
+			{ provider, pr_url: pr.prUrl, branch: pr.branch },
+			{ source: "auto", event, task_id: pr.taskId, spec_id: pr.specId },
+		);
+		const data = (result.data ?? {}) as Record<string, unknown>;
+		const error =
+			typeof data.error === "string" ? data.error : result.success ? undefined : result.error;
+		const webUrl = typeof data.web_url === "string" ? data.web_url : undefined;
+		return {
+			id,
+			provider,
+			event,
+			status: error ? "failed" : "triggered",
+			triggeredAt,
+			...(error ? { error: error.slice(0, 500) } : {}),
+			...(webUrl && /^https:\/\//.test(webUrl) ? { webUrl } : {}),
+		};
+	} catch (err) {
+		return {
+			id: Date.now().toString(),
+			provider,
+			event,
+			status: "failed",
+			triggeredAt: new Date().toISOString(),
+			error: String(err).slice(0, 500),
+		};
+	}
+}
+
 export function registerCICDTriggersHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.CICD_TRIGGERS_GET_CONFIG, (_event, projectDir: unknown) => {
 		const project = findKnownProject(projectDir);
@@ -281,62 +420,10 @@ export function registerCICDTriggersHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.CICD_TRIGGERS_TRIGGER,
-		async (
-			_event,
-			projectDir: unknown,
-			params: {
-				provider: string;
-				pr_url?: string;
-				branch?: string;
-				workflow?: string;
-				ref?: string;
-			},
-		) => {
+		async (_event, projectDir: unknown, params: TriggerParams) => {
 			const project = findKnownProject(projectDir);
 			if (!project) return UNKNOWN_PROJECT;
-			const run = {
-				id: Date.now().toString(),
-				triggered_at: new Date().toISOString(),
-				status: "pending",
-				provider: params.provider,
-				pr_url: params.pr_url ?? "",
-				branch: params.branch ?? "",
-			};
-			saveRun(project.path, run);
-
-			const result = await runRunner(project, [
-				"--action",
-				"trigger",
-				"--provider",
-				params.provider,
-				"--project",
-				project.path,
-				...(params.pr_url ? ["--pr-url", params.pr_url] : []),
-				...(params.branch ? ["--branch", params.branch] : []),
-				...(params.workflow ? ["--workflow", params.workflow] : []),
-				"--output-json",
-			]);
-
-			// Update run status
-			const runs = loadRuns(project.path);
-			const idx = runs.findIndex(
-				(r: unknown) => (r as { id: string }).id === run.id,
-			);
-			if (idx >= 0) {
-				(runs[idx] as Record<string, unknown>).status = result.success
-					? "triggered"
-					: "failed";
-				(runs[idx] as Record<string, unknown>).error = result.success
-					? undefined
-					: result.error;
-				(runs[idx] as Record<string, unknown>).run_data = result.data;
-				fs.writeFileSync(
-					getRunsLogPath(project.path),
-					JSON.stringify(runs, null, 2),
-					"utf-8",
-				);
-			}
-
+			const { result } = await triggerPipeline(project, params);
 			return result;
 		},
 	);

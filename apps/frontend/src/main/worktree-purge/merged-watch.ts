@@ -32,6 +32,8 @@ export interface MergedWatchDeps {
 	writeMetadata: (task: Task, project: Project, patch: Record<string, unknown>) => boolean;
 	purge: (project: Project, tasks: readonly Task[], specIds: readonly string[]) => Promise<PurgeOutcome[]>;
 	reload: (project: Project) => void;
+	/** After a card is closed for its merged PR: CI/CD Triggers' "on merge". */
+	onMerged?: (task: Task, project: Project) => Promise<void>;
 	now?: () => Date;
 }
 
@@ -62,6 +64,7 @@ export async function followMergedPrs(
 		deps.writeMetadata(task, project, { prMergedAt: at });
 		deps.markDone(task, project);
 		appLog.info(`[MERGED] ${task.specId}: its PR was merged, the card is done`);
+		await deps.onMerged?.(task, project);
 		closed += 1;
 	}
 	if (closed > 0) projectStore.invalidateTasksCache(project.id);
@@ -95,6 +98,20 @@ export function startMergedWatch(getMainWindow: () => BrowserWindow | null): voi
 		},
 		writeMetadata,
 		purge: (project, tasks, specIds) => purgeWorktrees(project, tasks, specIds),
+		onMerged: async (task, project) => {
+			const url = prUrlOf(task);
+			if (!url) return;
+			// Loaded on a merge only: the CI/CD handlers pull in the env store.
+			const { autoTriggerForTask } = await import("../ipc-handlers/cicd-triggers-handlers");
+			const cicdRun = await autoTriggerForTask(project, "merge", {
+				prUrl: url,
+				// The branch the PR went into: the pipeline runs on what was merged.
+				branch: task.metadata?.baseBranch || project.settings?.mainBranch || undefined,
+				taskId: task.id,
+				specId: task.specId,
+			});
+			if (cicdRun) writeMetadata(task, project, { cicdRun });
+		},
 		reload: (project) => {
 			projectStore.invalidateTasksCache(project.id);
 			safeSendToRenderer(getMainWindow, IPC_CHANNELS.TASK_SPLIT_EVENT, "", project.id, 0);
