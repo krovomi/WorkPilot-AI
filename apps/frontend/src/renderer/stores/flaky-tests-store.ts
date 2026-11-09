@@ -54,7 +54,8 @@ interface FlakyTestsState {
 	setCommandId: (commandId: FlakyCommandId | "auto") => void;
 	setRuns: (runs: number) => void;
 	startScan: (projectPath: string) => Promise<void>;
-	startRuns: (projectPath: string) => Promise<void>;
+	/** Runs the suite N times; with `only`, just those tests (the suspects). */
+	startRuns: (projectPath: string, only?: string[]) => Promise<void>;
 	cancelScan: () => Promise<void>;
 	applyEvent: (event: FlakyTestsEvent) => void;
 	setStatus: (status: string) => void;
@@ -67,6 +68,7 @@ export const useFlakyTestsStore = create<FlakyTestsState>((set, get) => {
 	const run = async (
 		projectPath: string,
 		mode: "scan" | "run",
+		only: string[] = [],
 	): Promise<void> => {
 		if (!projectPath) {
 			set({ phase: "error", error: "No project selected" });
@@ -83,7 +85,7 @@ export const useFlakyTestsStore = create<FlakyTestsState>((set, get) => {
 		try {
 			const report = await globalThis.electronAPI.runFlakyTestsScan(
 				mode === "run"
-					? { projectPath, mode, runs, commandId }
+					? { projectPath, mode, runs, commandId, ...(only.length ? { only } : {}) }
 					: { projectPath, mode },
 			);
 			// A cancel came first: what the runner said after it is moot.
@@ -135,7 +137,7 @@ export const useFlakyTestsStore = create<FlakyTestsState>((set, get) => {
 		setRuns: (runs) => set({ runs }),
 
 		startScan: (projectPath) => run(projectPath, "scan"),
-		startRuns: (projectPath) => run(projectPath, "run"),
+		startRuns: (projectPath, only) => run(projectPath, "run", only ?? []),
 
 		cancelScan: async () => {
 			set({ phase: "idle", status: "", activity: IDLE_ACTIVITY });

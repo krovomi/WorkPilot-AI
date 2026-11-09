@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, FlaskConical, Play, RotateCcw, ScanSearch, X } from "lucide-react";
+import { AlertTriangle, Check, FlaskConical, Play, Repeat, RotateCcw, ScanSearch, X } from "lucide-react";
 import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -7,7 +7,6 @@ import { SharedReportNote } from "../analyses/SharedReportNote";
 import {
 	Bar,
 	CharterButton,
-	Chip,
 	Column,
 	Columns,
 	Composer,
@@ -16,7 +15,6 @@ import {
 	Notice,
 	Panel,
 	ScanLine,
-	type Tone,
 } from "../charter";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -31,21 +29,16 @@ import {
 	type FlakyActivity,
 	useFlakyTestsStore,
 } from "../../stores/flaky-tests-store";
+import { FlakyTestCard } from "./FlakyTestCard";
 import {
+	FLAKY_MAX_ONLY,
 	FLAKY_MAX_RUNS,
 	FLAKY_MIN_RUNS,
 	type FlakyCommandId,
-	type FlakyConfidence,
 	type FlakyReport,
 } from "../../../shared/types/flaky-tests";
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
-
-const CONFIDENCE_TONE: Record<FlakyConfidence, Tone> = {
-	high: "red",
-	medium: "amber",
-	low: "muted",
-};
 
 const ERROR_CODES = ["no_command", "no_results", "start_failed"] as const;
 
@@ -133,7 +126,13 @@ export function FlakyTestReport({
 					<div className="flex flex-col gap-3">
 						{phase === "error" && error && <ErrorView error={error} t={t} />}
 						{report && !isScanning ? (
-							<ReportBody report={report} t={t} />
+							<ReportBody
+								report={report}
+								projectPath={projectPath}
+								canRun={canRun}
+								onRerun={(names) => projectPath && startRuns(projectPath, names)}
+								t={t}
+							/>
 						) : (
 							!isScanning &&
 							phase !== "error" && (
@@ -368,9 +367,15 @@ function summaryText(report: FlakyReport, t: T): string {
 
 function ReportBody({
 	report,
+	projectPath,
+	canRun,
+	onRerun,
 	t,
 }: {
 	readonly report: FlakyReport;
+	readonly projectPath?: string;
+	readonly canRun: boolean;
+	readonly onRerun: (names: string[]) => void;
 	readonly t: T;
 }): React.ReactElement {
 	// An older report (or one saved by an older server) has no summary code.
@@ -390,6 +395,8 @@ function ReportBody({
 	const minRuns = report.minRuns ?? FLAKY_MIN_RUNS;
 	const fewRuns = report.runCount !== undefined && report.runCount < minRuns;
 	const alwaysFailing = report.alwaysFailing ?? [];
+	// The tests to confirm: those flaky now, and those that always failed (a bug or a flaky test unlucky every time).
+	const suspects = [...report.flakyTests.map((test) => test.testName), ...alwaysFailing].slice(0, FLAKY_MAX_ONLY);
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -406,37 +413,20 @@ function ReportBody({
 				</Notice>
 			)}
 
+			{suspects.length > 0 && (
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<p className="wp-meta whitespace-normal">
+						{report.only ? t("suspects.ranOnly", { count: report.only }) : t("suspects.hint")}
+					</p>
+					<CharterButton size="sm" icon={Repeat} disabled={!canRun} onClick={() => onRerun(suspects)}>
+						{t("suspects.rerun", { count: suspects.length })}
+					</CharterButton>
+				</div>
+			)}
+
 			<div className="flex flex-col gap-2">
 				{report.flakyTests.map((test) => (
-					<Panel key={test.testName} rail tone={CONFIDENCE_TONE[test.confidence]}>
-						<div className="mb-1 flex items-start justify-between gap-3">
-							<p className="wp-mono break-all text-sm font-medium">{test.testName}</p>
-							<Chip tone={CONFIDENCE_TONE[test.confidence]}>
-								{t(`confidenceLevel.${test.confidence}`)}
-							</Chip>
-						</div>
-						<div className="wp-meta flex flex-wrap items-center gap-x-4 gap-y-1 whitespace-normal">
-							<span>
-								{t("failedRuns", {
-									failures: test.failures,
-									total: test.totalRuns,
-									rate: (test.flakinessRate * 100).toFixed(0),
-								})}
-							</span>
-							<span>
-								{t("cause")} {t(`causes.${test.probableCause}`)}
-							</span>
-						</div>
-						<p className="mt-2 text-xs text-success">{t(`fixes.${test.probableCause}`)}</p>
-						{test.errorPatterns[0] && (
-							<details className="mt-2 text-xs">
-								<summary className="cursor-pointer text-muted-foreground">
-									{t("errorSample")}
-								</summary>
-								<pre className="wp-code mt-1">{test.errorPatterns[0]}</pre>
-							</details>
-						)}
-					</Panel>
+					<FlakyTestCard key={test.testName} test={test} projectPath={projectPath} t={t} />
 				))}
 			</div>
 

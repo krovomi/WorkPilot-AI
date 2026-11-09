@@ -37,6 +37,43 @@ export interface DetectedTestCommand {
 	command: string;
 }
 
+/** From the failure rate: above 0.8 a real bug more likely, from 0.2 confirmed flaky. */
+export type FlakyVerdict = "likely_bug" | "flaky" | "rare";
+
+/** The test framework family a test belongs to, for the quarantine and the fix. */
+export type FlakyStack =
+	| "pytest"
+	| "vitest"
+	| "jest"
+	| "js"
+	| "dotnet"
+	| "jvm"
+	| "go"
+	| "rust"
+	| "ruby"
+	| "php"
+	| "swift"
+	| "dart"
+	| "elixir"
+	| "other";
+
+/** A cause the test's own code shows, with the lines that show it. */
+export interface FlakySourceCause {
+	cause: Exclude<FlakyCause, "environment" | "unknown">;
+	evidence: Array<{ line: number; text: string }>;
+}
+
+export interface FlakyHistory {
+	firstSeen: string;
+	observations: number;
+	trend: "new" | "worse" | "better" | "same";
+	/** Systems it failed on (`linux`, `macos`, `windows`). */
+	systems: string[];
+	/** It failed only in CI, never in a local run. */
+	ciOnly: boolean;
+	rates?: number[];
+}
+
 export interface FlakyTest {
 	testName: string;
 	totalRuns: number;
@@ -46,6 +83,14 @@ export interface FlakyTest {
 	confidence: FlakyConfidence;
 	errorPatterns: string[];
 	suggestedFix: string;
+	/** Absent from a report made before #351. */
+	verdict?: FlakyVerdict;
+	file?: string;
+	line?: number;
+	stack?: FlakyStack;
+	sourceCauses?: FlakySourceCause[];
+	lastAuthor?: string;
+	history?: FlakyHistory;
 }
 
 export interface FlakyReport {
@@ -61,6 +106,8 @@ export interface FlakyReport {
 	reportCount?: number;
 	minRuns?: number;
 	command?: string;
+	/** How many tests the run was kept to (`only`), 0 for the whole suite. */
+	only?: number;
 	alwaysFailing?: string[];
 	detectedCommands?: DetectedTestCommand[];
 }
@@ -75,7 +122,13 @@ export interface FlakyRunOptions {
 	 * renderer names a command, it never sends a command line.
 	 */
 	commandId?: FlakyCommandId | "auto";
+	/** Run mode: only these tests (the suspects), by the names the report gave them. */
+	only?: string[];
 }
+
+/** At most this many tests named in `only`, each this long at most. */
+export const FLAKY_MAX_ONLY = 50;
+export const FLAKY_MAX_NAME = 300;
 
 export interface FlakyDetectResult {
 	commands: DetectedTestCommand[];
