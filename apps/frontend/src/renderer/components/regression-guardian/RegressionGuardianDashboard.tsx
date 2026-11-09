@@ -1,4 +1,4 @@
-import { AlertTriangle, Play, RotateCcw, ShieldAlert, Square } from "lucide-react";
+import { AlertTriangle, Info, Play, RotateCcw, ShieldAlert, Square } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useRegressionGuardianStore } from "../../stores/regression-guardian-store";
@@ -85,6 +85,11 @@ export function RegressionGuardianDashboard({
 				{!projectPath && (
 					<Notice tone="amber" icon={AlertTriangle}>
 						{t("regressionGuardian:errors.noProject")}
+					</Notice>
+				)}
+				{projectPath && (
+					<Notice tone="blue" icon={Info}>
+						{t("regressionGuardian:automationHint")}
 					</Notice>
 				)}
 				{isScanning && (

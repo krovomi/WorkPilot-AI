@@ -348,16 +348,18 @@ pas. Le détail et les faits vérifiés : [`pi.md`](pi.md). La colonne pi du tab
 
 ### `SOUL.md`
 
-`SOUL.md` at the root of this repository is the persona WorkPilot offers, and it is
+`apps/backend/hermes/SOUL.md` is the persona WorkPilot offers, and it is
 **not a project context file**. `agent/prompt_builder.load_soul_md` reads exactly one
 path — `<HERMES_HOME>/SOUL.md` — and injects it as identity slot #1 of every hermes
 session on every surface. Project context is a different chain entirely (`.hermes.md` /
 `HERMES.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`, first found wins), and this
 repository is already answered by its committed `AGENTS.md`.
 
-Shipping one anyway is right for the reason hermes ships one at the root of its own
-repository: it is the persona a person installs, and a persona nobody can see is a
-persona nobody adopts. The file is the offer; the install is a separate, explicit act —
+That is why it sits beside the package that installs it rather than at the root of the
+repository: the root is for files agents actually read, and as package data it ships
+with the backend everywhere the backend goes (packaged app, server image). Until F188
+it sat at the root, which the packaged app did not ship, so the install button there
+answered "this repository ships no SOUL.md". The file is the offer; the install is a separate, explicit act —
 from the card's button or `--action install-soul`, never from a build. That home belongs
 to the user's own agent, in conversations WorkPilot will never see; a pipeline that
 silently overwrote it would be rewriting a personality that is not ours. A *different*

@@ -424,7 +424,8 @@
 			"gitlab_token": "GitLab",
 			"azure_pat": "Azure DevOps",
 			"jira_token": "Jira",
-			"linear_api_key": "Linear"
+			"linear_api_key": "Linear",
+			"sentry_token": "Sentry"
 		},
 		"set": "Saved",
 		"notSet": "Not set",

@@ -55,7 +55,8 @@ RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
 COPY --chown=workpilot:workpilot apps/backend /app/apps/backend
 # Read from the repository root by the backend (`Path(__file__).parents[3]`):
 # the provider registry, the declarative workflows, the harness catalogue,
-# the skills and their emitted output, and SOUL.md.
+# the skills and their emitted output. (The hermes persona, SOUL.md, ships
+# inside apps/backend/hermes/ with the backend copied above.)
 # The shared connectors (`src.connectors`: provider config, Jira, Azure
 # DevOps), imported from the root above the backend (F174).
 COPY src /app/src
@@ -64,7 +65,6 @@ COPY workflows /app/workflows
 COPY capabilities /app/capabilities
 COPY skills /app/skills
 COPY .agents /app/.agents
-COPY SOUL.md /app/SOUL.md
 COPY --chmod=755 deploy/server-entrypoint.sh /usr/local/bin/workpilot-server
 
 USER workpilot

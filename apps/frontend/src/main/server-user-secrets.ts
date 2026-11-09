@@ -20,6 +20,7 @@ export const SERVER_SECRET_KINDS = [
 	"jira_token",
 	"linear_api_key",
 	"azure_pat",
+	"sentry_token",
 ] as const;
 export type ServerSecretKind = (typeof SERVER_SECRET_KINDS)[number];
 

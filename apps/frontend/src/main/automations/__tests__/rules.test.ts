@@ -106,6 +106,32 @@ describe("parseRule", () => {
 		expect(bad({ prompt: "" })).toMatch(/description/);
 	});
 
+	it("reads a production incident rule: the inbox alone, or a Sentry project", () => {
+		const inbox = parseRule({ name: "Prod", trigger: { type: "prod_incident" } }) as AutomationRule;
+		expect(inbox.trigger).toEqual({ type: "prod_incident" });
+		// An incident is a bug: the card writes the failing test first.
+		expect(inbox.kind).toBe("bug_fix");
+		const sentry = parseRule({
+			name: "Prod",
+			kind: "hotfix",
+			trigger: { type: "prod_incident", org: "acme", project: "shop-api", host: "" },
+		}) as AutomationRule;
+		expect(sentry.trigger).toEqual({ type: "prod_incident", org: "acme", project: "shop-api" });
+		expect(sentry.kind).toBe("hotfix");
+		const bad = (trigger: object) =>
+			parseRule({ name: "Prod", trigger: { type: "prod_incident", ...trigger } });
+		expect(bad({ org: "acme" })).toMatch(/project/);
+		expect(bad({ org: "Acme Inc", project: "api" })).toMatch(/organisation/);
+		expect(bad({ org: "acme", project: "../api" })).toMatch(/project/);
+		expect(bad({ host: "sentry.acme.test" })).toMatch(/needs an organisation/);
+		// A host, never a URL: the scheme is always HTTPS.
+		expect(bad({ org: "acme", project: "api", host: "http://evil.test" })).toMatch(/host/);
+		expect(bad({ org: "acme", project: "api", host: "10.0.0.1" })).toMatch(/host/);
+		expect(
+			(bad({ org: "acme", project: "api", host: "sentry.acme.test" }) as AutomationRule).trigger,
+		).toEqual({ type: "prod_incident", org: "acme", project: "api", host: "sentry.acme.test" });
+	});
+
 	it("keeps a saved rule's identity and age, and its trigger type", () => {
 		const first = parseRule(issueRule, undefined, NOW) as AutomationRule;
 		const later = new Date("2026-11-01T00:00:00.000Z");

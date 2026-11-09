@@ -22,7 +22,7 @@
 		"noProject": "Sélectionnez un projet pour lancer la Garde Anti-Injection.",
 		"failed": "Échec de l'analyse : {{error}}"
 	},
-	"description": "Vérifie les prompts enregistrés dans .workpilot/prompts/ (txt, md, json) : motifs connus, classifieur et contenus encodés.",
+	"description": "Vérifie chaque résultat d'outil qu'un agent lit pendant une tâche (fichiers, pages, commandes, réponses MCP), ainsi que les prompts enregistrés dans .workpilot/prompts/, à la recherche de tentatives d'injection.",
 	"idleTitle": "Pas encore d'analyse",
 	"emptyTitle": "Aucun prompt trouvé",
 	"promptsTitle": "Prompts analysés",
@@ -39,5 +39,42 @@
 		"regex": "Motif",
 		"classifier": "Classifieur",
 		"decode": "Décodage"
+	},
+	"toolResults": {
+		"kicker": "Tâches",
+		"title": "Résultats d'outils signalés",
+		"description": "Chaque résultat lu par un agent est analysé avant d'atteindre le modèle. Un résultat suspect est transmis encadré, derrière un avertissement ; avec WORKPILOT_TOOL_RESULT_GUARD=block, un résultat bloqué est retenu. Seule sa provenance est conservée, jamais son contenu.",
+		"refresh": "Actualiser",
+		"empty": "Aucun résultat d'outil signalé dans les tâches de ce projet.",
+		"loadFailed": "Impossible de lire les alertes.",
+		"where": "Tâche {{spec}} · outil {{tool}}",
+		"action": {
+			"fenced": "Encadré",
+			"withheld": "Retenu"
+		}
+	},
+	"trusted": {
+		"kicker": "Réglages",
+		"title": "Sources de confiance",
+		"description": "Un résultat venant d'une source listée ici est transmis sans analyse, par exemple vos fixtures de test qui contiennent des exemples d'injection. Les agents ne peuvent pas modifier cette liste. Les jokers * et ? sont permis, mais * seul est refusé.",
+		"kindLabel": "Type de source",
+		"patternLabel": "Motif",
+		"add": "Ajouter",
+		"remove": "Retirer {{source}}",
+		"empty": "Aucune source de confiance : chaque résultat est analysé.",
+		"invalid": "Cette entrée n'est pas valide et n'a pas été enregistrée.",
+		"saveFailed": "Impossible d'enregistrer la liste.",
+		"kind": {
+			"path": "Fichier",
+			"host": "Site web",
+			"tool": "Outil",
+			"command": "Commande"
+		},
+		"placeholder": {
+			"path": "tests/fixtures/*",
+			"host": "docs.python.org",
+			"tool": "mcp__jira__*",
+			"command": "gh issue"
+		}
 	}
 }

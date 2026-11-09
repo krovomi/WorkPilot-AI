@@ -61,6 +61,14 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The schema guard (docs/architecture/schema-guard.md): migration rules
     # over text, git through foundation. The QA gate that calls it is in qa.
     "schema_guard": {"foundation"},
+    # The red team (docs/architecture/red-team.md): the mutation gate's scratch
+    # copy, scope and test commands, the suite runner and its reports, git
+    # through foundation. Its session and the card's route are in qa
+    # (qa/red_team_gate.py, qa/red_team_api.py), which imports it.
+    "red_team": {"foundation", "mutation_gate", "security", "suite_runner"},
+    # A suite run with its machine report, for the flaky detective and the
+    # red team: the platform's command splitting, the child environment.
+    "suite_runner": {"foundation", "security"},
     # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
     # the plan's references, the Agent Trace records and the test conventions.
     # The build and the traceability route read it.

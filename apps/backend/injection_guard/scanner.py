@@ -232,6 +232,38 @@ _INJECTION_PATTERNS: list[tuple[str, str, str]] = [
         "French new instruction block",
         "high",
     ),
+    # Spanish, German, Italian, Portuguese, Chinese, Japanese: an issue, a page
+    # or a file the agent reads is not always in the product's languages.
+    (
+        r"ignora(?:r)?\s+(?:todas\s+)?las\s+instrucciones\s+(?:anteriores|previas)",
+        "Spanish instruction override",
+        "high",
+    ),
+    (
+        r"ignorier(?:e|en)?\s+(?:alle\s+)?(?:vorherigen|bisherigen|obigen)\s+anweisungen",
+        "German instruction override",
+        "high",
+    ),
+    (
+        r"ignora\s+(?:tutte\s+)?le\s+istruzioni\s+(?:precedenti|sopra)",
+        "Italian instruction override",
+        "high",
+    ),
+    (
+        r"ignor[ae]\s+(?:todas\s+)?as\s+instru[cç][oõ]es\s+anteriores",
+        "Portuguese instruction override",
+        "high",
+    ),
+    (
+        r"(?:忽略|无视|忽视)(?:之前|以上|上面|先前|所有)?(?:的)?(?:所有)?(?:指令|指示|说明)",
+        "Chinese instruction override",
+        "high",
+    ),
+    (
+        r"(?:以前|前|上記|これまで)の(?:指示|命令)を(?:すべて)?無視",
+        "Japanese instruction override",
+        "high",
+    ),
 ]
 
 _ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u202a-\u202e\ufeff]")

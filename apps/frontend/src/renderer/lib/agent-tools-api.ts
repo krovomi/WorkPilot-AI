@@ -1804,3 +1804,57 @@ export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "wa
 	const qs = new URLSearchParams(specAddress(query)).toString();
 	return `${backendUrl()}/api/verify/${kind}?${qs}`;
 }
+
+// ── Red team (`red_team/`, `qa/red_team_api.py`) ─────────────────────────────
+
+export type RedTeamOutcome = "crash" | "unexpected" | "resistant" | "not_run" | "flaky";
+
+export interface RedTeamAttack {
+	id: string;
+	mode: "fuzz" | "edge" | "injection" | "concurrency" | "regression";
+	test: string;
+	file: string;
+	target: string;
+	input: string;
+	expect: string;
+	outcome: RedTeamOutcome;
+	detail: string;
+}
+
+export interface RedTeamWarning {
+	path: string;
+	line: number;
+	kind: "toctou" | "shared-state";
+	message: string;
+}
+
+/** `red_team.json` as the card reads it: the attack files' contents stay on disk. */
+export interface RedTeamRecord {
+	status: "pass" | "fail" | "unknown" | "none";
+	reason: string;
+	run: "attack" | "replay";
+	attacks: RedTeamAttack[];
+	warnings: RedTeamWarning[];
+	counts: { crash: number; unexpected: number; resistant: number; warning: number; not_run: number };
+	attack_files: string[];
+	finished_at: number;
+}
+
+export interface RedTeamPayload {
+	record: RedTeamRecord | null;
+}
+
+export function fetchRedTeam(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<RedTeamPayload>> {
+	return _get<RedTeamPayload>("/api/red-team/", specAddress(query), signal);
+}
+
+/** A fresh attack on the task's code, with the QA provider and model. */
+export function runRedTeam(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<RedTeamPayload>> {
+	return _post<RedTeamPayload>("/api/red-team/run", specAddress(query), signal);
+}
