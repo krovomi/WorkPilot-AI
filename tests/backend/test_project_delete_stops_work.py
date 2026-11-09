@@ -1,4 +1,4 @@
-"""Deleting a server project stops its work first, and its rows go with it (F174).
+"""Deleting a server project stops its work first, and its rows go with it (F175).
 
 Before: the route deleted the row and the clone while the project's agents and
 jobs kept running in it, and SQLite (the default database of a small

@@ -40,7 +40,7 @@ def enforce_sqlite_foreign_keys(engine: AsyncEngine) -> None:
     is off by default), so every ``ondelete`` of the models was a dead letter
     there: deleting a project left its specs, runs, jobs and members behind,
     and nothing stopped a row from pointing at a project that no longer
-    existed (F174). PostgreSQL always enforces them.
+    existed (F175). PostgreSQL always enforces them.
 
     Only the application's engine: Alembic opens its own, and a batch
     migration that recreates a table must not cascade the drop of the old

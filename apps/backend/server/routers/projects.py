@@ -222,7 +222,7 @@ async def delete_project(
         raise HTTPException(status_code=404, detail="Project not found")
     # Before the rows and the clone go: an agent or a job still running in the
     # clone would write into a removed directory and record its end on a row
-    # that no longer exists (F174).
+    # that no longer exists (F175).
     await get_run_manager().stop_project(project_id)
     await get_project_jobs().stop_project(project_id)
     await db.delete(project)
