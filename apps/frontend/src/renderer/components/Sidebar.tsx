@@ -25,6 +25,7 @@ import {
 // Icons
 import {
 	Compass,
+	FlaskConical,
 	HelpCircle,
 	PanelLeft,
 	PanelLeftClose,
@@ -101,9 +102,16 @@ import { serverForge, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { MenuModeCard } from "./sidebar/MenuModeCard";
 import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
+import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
+import { LaboPanel } from "./sidebar/LaboPanel";
 import {
 	ESSENTIAL_VIEWS,
+	LABO_SPACE,
+	laboItemsOf,
 	MINE_SPACE,
+	railGroupsOf,
+	UNUSED_DAYS,
+	unusedEntries,
 	recentNavItems,
 	resolveSpace,
 	spaceToFollow,
@@ -275,6 +283,9 @@ export function Sidebar({
 		setHideExperimental,
 		setActiveSpace,
 		chooseMenuMode,
+		hideItems,
+		unhideItem,
+		snoozeHideSuggestions,
 		reset: resetSidebarPrefs,
 		mergeOrder,
 	} = useSidebarPrefs();
@@ -871,7 +882,6 @@ export function Sidebar({
 
 	const renderNavItem = (
 		item: NavItem,
-		isSubItem = false,
 		context: "default" | "favorites" = "default",
 	) => {
 		const isActive = isOn(item, activeView);
@@ -917,8 +927,8 @@ export function Sidebar({
 					aria-keyshortcuts={item.shortcut}
 					aria-current={isActive ? "page" : undefined}
 					className={cn(
-						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 text-sm transition-colors",
-						isSubItem ? "pl-5" : "pl-3",
+						// pl-5 leaves room for the drag grip shown on hover
+						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
 						"hover:bg-accent hover:text-accent-foreground",
 						"disabled:pointer-events-none disabled:opacity-50",
 						isActive && "bg-primary/10 text-primary font-medium",
@@ -935,21 +945,7 @@ export function Sidebar({
 		);
 	};
 
-	const groupItemsBySubGroup = (items: NavItem[]) => {
-		const subGroups: { key: string; items: NavItem[] }[] = [];
-		for (const item of items) {
-			const key = item.subGroup ?? "";
-			const last = subGroups.at(-1);
-			if (last?.key === key) {
-				last.items.push(item);
-			} else {
-				subGroups.push({ key, items: [item] });
-			}
-		}
-		return subGroups;
-	};
-
-	const renderTooltipSubGroupItem = (item: NavItem) => {
+	const renderTooltipItem = (item: NavItem) => {
 		const isActive = isOn(item, activeView);
 		const badge = groupBadgeFor([item]);
 		return (
@@ -978,33 +974,9 @@ export function Sidebar({
 		);
 	};
 
-	const renderTooltipItems = (items: NavItem[]) => {
-		const hasSubGroups = items.some((item) => item.subGroup);
+	const renderTooltipItems = (items: NavItem[]) => items.map(renderTooltipItem);
 
-		if (!hasSubGroups) {
-			return items.map(renderTooltipSubGroupItem);
-		}
-
-		const subGroups = groupItemsBySubGroup(items);
-		return subGroups.map((sg, sgIndex) => (
-			<div
-				key={sg.key}
-				className={cn(
-					"rounded bg-white/4 border border-white/8 px-1 py-1",
-					sgIndex > 0 && "mt-1",
-				)}
-			>
-				{sg.key && (
-					<div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
-						{t(sg.key)}
-					</div>
-				)}
-				{sg.items.map(renderTooltipSubGroupItem)}
-			</div>
-		));
-	};
-
-	const renderExpandedSubGroupItem = (
+	const renderPanelRow = (
 		item: NavItem,
 		delay: number,
 		context: "default" | "favorites" = "default",
@@ -1019,7 +991,7 @@ export function Sidebar({
 					className="animate-in slide-in-from-left-2 duration-200 ease-out"
 					style={{ animationDelay: `${delay}ms` }}
 				>
-					{renderNavItem(item, true, context)}
+					{renderNavItem(item, context)}
 				</div>
 			);
 		}
@@ -1042,21 +1014,11 @@ export function Sidebar({
 						<div data-drag-slot className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
 							{dragHandle}
 						</div>
-						{renderNavItem(item, true, context)}
+						{renderNavItem(item, context)}
 					</div>
 				)}
 			</SortableWrapper>
 		);
-	};
-
-	// Helper function to render sub-group items with proper indexing
-	const renderSubGroupItems = (items: NavItem[], context: "default" | "favorites") => {
-		let itemIndex = 0;
-		return items.map((item) => {
-			const delay = itemIndex * 50;
-			itemIndex++;
-			return renderExpandedSubGroupItem(item, delay, context);
-		});
 	};
 
 	// A section of a space, as a plain title instead of a box
@@ -1066,31 +1028,14 @@ export function Sidebar({
 		</h3>
 	);
 
-	// Helper function to render sub-groups
-	const renderSubGroups = (items: NavItem[], context: "default" | "favorites") => {
-		const subGroups = groupItemsBySubGroup(items);
-		return subGroups.map((sg, sgIndex) => (
-			<section key={sg.key || `section-${sgIndex}`} className={cn(sgIndex > 0 && "mt-2")}>
-				{sg.key && sectionTitle(sg.key)}
-				<div className="space-y-0.5">{renderSubGroupItems(sg.items, context)}</div>
-			</section>
-		));
-	};
-
 	const renderExpandedItems = (
 		items: NavItem[],
 		context: "default" | "favorites" = "default",
 	) => {
-		const hasSubGroups = items.some((item) => item.subGroup);
 		const sortableIds = items.map((i) => encodeSortableId("item", i.id));
-
-		const content = hasSubGroups ? (
-			renderSubGroups(items, context)
-		) : (
+		const content = (
 			<div className="space-y-0.5">
-				{items.map((item, index) =>
-					renderExpandedSubGroupItem(item, index * 50, context),
-				)}
+				{items.map((item, index) => renderPanelRow(item, index * 50, context))}
 			</div>
 		);
 
@@ -1108,7 +1053,22 @@ export function Sidebar({
 	// The rail (F181, lot 2): « Mon menu », then one space per group. The panel
 	// beside it lists the chosen space only.
 	const viewUsage = useViewUsageStore((state) => state.usage);
+	const usageSince = useViewUsageStore((state) => state.since);
 	const mineItems = favoritesGroup?.items ?? [];
+
+	// The rail's groups lose their beta entries to the Labo and the entries
+	// the user hid (lot 3); the lookups above keep every entry, so a pin, a
+	// recent page or Ctrl K still reaches them.
+	const hiddenSet = useMemo(() => new Set(sidebarPrefs.hiddenItems ?? []), [sidebarPrefs.hiddenItems]);
+	const railGroups = useMemo(() => railGroupsOf(visibleNavGroups, hiddenSet), [visibleNavGroups, hiddenSet]);
+	const laboItems = useMemo(() => laboItemsOf(visibleNavGroups, hubGates), [visibleNavGroups, hubGates]);
+	const spaceGroups = useMemo<NavGroup[]>(
+		() =>
+			laboItems.length > 0
+				? [...railGroups, { id: LABO_SPACE, labelKey: "navigation:spaces.labo", icon: FlaskConical, items: laboItems }]
+				: railGroups,
+		[railGroups, laboItems],
+	);
 	const recentItems = useMemo(
 		() => recentNavItems(viewUsage, visibleNavGroups, pinnedItemsSet),
 		[viewUsage, visibleNavGroups, pinnedItemsSet],
@@ -1117,15 +1077,15 @@ export function Sidebar({
 	const [chosenSpace, setChosenSpace] = useState(sidebarPrefs.activeSpace);
 	const space = resolveSpace(
 		chosenSpace,
-		visibleNavGroups,
+		spaceGroups,
 		mineItems.length > 0 || recentItems.length > 0 || showMenuModeCard,
 		activeView,
 	);
 
 	// A page opened from the palette, a shortcut or a notification brings its
 	// space into view, unless the space on screen already lists it.
-	const followRef = useRef({ space, groups: visibleNavGroups, listed: [...mineItems, ...recentItems] });
-	followRef.current = { space, groups: visibleNavGroups, listed: [...mineItems, ...recentItems] };
+	const followRef = useRef({ space, groups: spaceGroups, listed: [...mineItems, ...recentItems] });
+	followRef.current = { space, groups: spaceGroups, listed: [...mineItems, ...recentItems] };
 	// Only a change of page moves it: at start the space last chosen stays.
 	const followedViewRef = useRef(activeView);
 	useEffect(() => {
@@ -1164,7 +1124,25 @@ export function Sidebar({
 		attention: mineItems.some((item) => isOn(item, attentionView)),
 		preview: mineItems.length > 0 ? renderTooltipItems(mineItems) : undefined,
 	};
-	const spaceGroup = visibleNavGroups.find((group) => group.id === space);
+	const laboSpace: RailSpace = {
+		id: LABO_SPACE,
+		labelKey: "navigation:spaces.labo",
+		icon: FlaskConical,
+		badge: groupBadgeFor(laboItems),
+		attention: laboItems.some((item) => isOn(item, attentionView)),
+		count: laboItems.length,
+		preview: renderTooltipItems(laboItems),
+	};
+	const spaceGroup = spaceGroups.find((group) => group.id === space);
+
+	// A space's pages nobody opened for a month, offered to hide, and the ones hidden
+	const now = Date.now();
+	const groupOfSpace = visibleNavGroups.find((group) => group.id === space);
+	const unused =
+		spaceGroup && space !== LABO_SPACE && (sidebarPrefs.hideSuggestionsSnoozedUntil ?? 0) < now
+			? unusedEntries(spaceGroup.items, viewUsage, usageSince, now, pinnedItemsSet)
+			: [];
+	const hiddenHere = groupOfSpace?.items.filter((item) => hiddenSet.has(item.id)) ?? [];
 	const spaceTitle =
 		space === MINE_SPACE ? t("navigation:spaces.mine") : spaceGroup ? t(spaceGroup.labelKey) : "";
 
@@ -1203,7 +1181,8 @@ export function Sidebar({
 		sidebarPrefs.pinnedGroups.length > 0 ||
 		sidebarPrefs.groupOrder.length > 0 ||
 		Object.keys(sidebarPrefs.itemOrder).length > 0 ||
-		Boolean(sidebarPrefs.menuMode);
+		Boolean(sidebarPrefs.menuMode) ||
+		(sidebarPrefs.hiddenItems?.length ?? 0) > 0;
 
 	const railIconButton = (label: string, onClick: () => void, icon: ReactNode) => (
 		<Tooltip>
@@ -1259,7 +1238,8 @@ export function Sidebar({
 				>
 					<SidebarRail
 						mine={mineSpace}
-						groups={visibleNavGroups.map(spaceOf)}
+						groups={railGroups.map(spaceOf)}
+						extras={laboItems.length > 0 ? [laboSpace] : []}
 						activeSpace={space}
 						isCollapsed={isCollapsed}
 						onSelect={selectSpace}
@@ -1296,8 +1276,27 @@ export function Sidebar({
 								<div className="px-2 pb-4">
 									{space === MINE_SPACE
 										? renderMine()
-										: spaceGroup && renderExpandedItems(spaceGroup.items)}
+										: space === LABO_SPACE
+											? (
+												<LaboPanel
+													items={laboItems}
+													activeView={activeView}
+													disabled={!selectedProjectId}
+													onOpen={openNavItem}
+												/>
+											)
+											: spaceGroup && renderExpandedItems(spaceGroup.items)}
+									{unused.length > 0 && (
+										<div className="mt-4">
+											<HideSuggestion
+												unused={unused}
+												onHide={hideItems}
+												onSnooze={() => snoozeHideSuggestions(Date.now() + UNUSED_DAYS * 24 * 60 * 60 * 1000)}
+											/>
+										</div>
+									)}
 									<div className="mt-4 space-y-1">
+										<HiddenList hidden={hiddenHere} onShow={unhideItem} />
 										{layoutChanged && (
 											<button
 												type="button"

@@ -8,10 +8,13 @@ import { githubNavItems, navGroups } from "../nav-model";
 import {
 	ESSENTIAL_VIEWS,
 	groupOfView,
+	laboItemsOf,
 	MINE_SPACE,
+	railGroupsOf,
 	recentNavItems,
 	resolveSpace,
 	spaceToFollow,
+	unusedEntries,
 } from "../spaces";
 
 const groups = navGroups;
@@ -95,5 +98,72 @@ describe("ESSENTIAL_VIEWS", () => {
 			expect(groupOfView(withForge, view), view).toBeDefined();
 			expect(EXPERIMENTAL_VIEWS.has(view), view).toBe(false);
 		}
+	});
+});
+
+describe("railGroupsOf", () => {
+	const ids = (gs: ReturnType<typeof railGroupsOf>) => gs.flatMap((g) => g.items.map((i) => i.id));
+
+	it("leaves the beta entries to the Labo and keeps the hubs", () => {
+		const shown = ids(railGroupsOf(groups, new Set()));
+		expect(shown).not.toContain("regression-guardian");
+		expect(shown).not.toContain("carbon-profiler");
+		// the agent-history hub holds beta tabs but is not itself beta
+		expect(shown).toContain("session-history");
+		expect(shown).toContain("injection-guard");
+	});
+
+	it("leaves out the entries the user hid", () => {
+		expect(ids(railGroupsOf(groups, new Set(["insights"])))).not.toContain("insights");
+	});
+});
+
+describe("laboItemsOf", () => {
+	it("lists every beta page once, a hub's beta tab included", () => {
+		const labo = laboItemsOf(groups, { serverProject: false }).map((item) => item.id);
+		expect(labo).toContain("agent-replay");
+		expect(labo).toContain("regression-guardian");
+		expect(new Set(labo).size).toBe(labo.length);
+		for (const view of labo) expect(EXPERIMENTAL_VIEWS.has(view)).toBe(true);
+	});
+
+	it("is empty when the beta views are hidden", () => {
+		const shownOnly = groups.map((g) => ({ ...g, items: g.items.filter((i) => i.hub || !EXPERIMENTAL_VIEWS.has(i.id)) }));
+		expect(laboItemsOf(shownOnly, { serverProject: false, hideExperimental: true })).toEqual([]);
+	});
+});
+
+describe("unusedEntries", () => {
+	const day = 24 * 60 * 60 * 1000;
+	const now = 100 * day;
+	const explore = groups.find((g) => g.id === "explore")?.items ?? [];
+
+	it("offers nothing before a month of counting", () => {
+		expect(unusedEntries(explore, {}, now - 10 * day, now, new Set())).toEqual([]);
+	});
+
+	it("offers the entries not opened for a month, never a pinned one", () => {
+		const unused = unusedEntries(
+			explore,
+			{ insights: { lastVisitedAt: now - day }, ideation: { lastVisitedAt: now - 40 * day } },
+			now - 60 * day,
+			now,
+			new Set(["context"]),
+		).map((item) => item.id);
+		expect(unused).not.toContain("insights");
+		expect(unused).toContain("ideation");
+		expect(unused).not.toContain("context");
+	});
+
+	it("counts a hub as opened when one of its tabs was", () => {
+		const workspace = groups.find((g) => g.id === "workspace")?.items ?? [];
+		const unused = unusedEntries(
+			workspace,
+			{ "agent-replay": { lastVisitedAt: now - day } },
+			now - 60 * day,
+			now,
+			new Set(),
+		).map((item) => item.id);
+		expect(unused).not.toContain("session-history");
 	});
 });

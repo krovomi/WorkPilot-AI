@@ -14,15 +14,6 @@
 		"favorites": "Favorites",
 		"administration": "Administration"
 	},
-	"subGroups": {
-		"extensions": "Extensions",
-		"codeQuality": "Code Quality & Testing",
-		"documentation": "Documentation & Spec",
-		"accessibility": "Accessibility & i18n",
-		"api": "API & Data",
-		"automation": "Automation",
-		"utilities": "Utilities"
-	},
 	"items": {
 		"kanban": "Kanban board",
 		"terminals": "Agent terminals",
@@ -331,8 +322,14 @@
 			"context-aware-snippets": "Writes a code snippet that follows this project's context and coding style.",
 			"conflict-predictor": "Looks for conflicts between worktrees and branches before you merge them.",
 			"natural-language-git": "Turns a sentence into a git command for this project.",
-			"arena-mode": "Runs one prompt on two models side by side without saying which is which, and lets you vote."
-		}
+			"arena-mode": "Runs one prompt on two models side by side without saying which is which, and lets you vote.",
+			"dependency-sentinel": "Watches the project's dependencies: known vulnerabilities, outdated versions and licences.",
+			"app-emulator": "Runs the project's app in an emulator so you can see it working."
+		},
+		"qualitySecurity": "Quality and security",
+		"accessibilityI18n": "Accessibility and i18n",
+		"api": "API",
+		"automation": "Automation"
 	},
 	"keywords": {
 		"kanban": "tasks cards board build",
@@ -428,7 +425,8 @@
 		"mine": "My menu",
 		"pinned": "Pinned",
 		"recent": "Recent",
-		"mineEmpty": "Pin a page with its star, or drag it onto the rail's star. Pages you opened recently show here too."
+		"mineEmpty": "Pin a page with its star, or drag it onto the rail's star. Pages you opened recently show here too.",
+		"labo": "Labo"
 	},
 	"menuMode": {
 		"title": "Which menu do you want?",
@@ -437,5 +435,36 @@
 		"essentialHint": "The {{count}} everyday pages pinned here, beta views hidden.",
 		"full": "Full",
 		"fullHint": "Every page, sorted by space in the rail."
+	},
+	"labo": {
+		"intro": "Pages still in beta: they have neither a design document nor a test, and may change or go away. A page leaves the Labo as soon as it has them.",
+		"about": {
+			"agent-debugger": "Steps through an agent's tool calls to understand an error.",
+			"agent-replay": "Replays an agent session like a video, step by step.",
+			"api-watcher": "Compares API contracts between two versions and flags breaking changes.",
+			"blast-radius": "Shows the files and modules a change touches before you merge it.",
+			"carbon-profiler": "Estimates the energy and carbon used by builds and agents.",
+			"compliance": "Gathers compliance evidence (reviews, tests, access) for an audit.",
+			"cross-language-translation": "Translates code from one language to another, in a worktree to review.",
+			"env-snapshot": "Captures the development environment so it can be recreated as is.",
+			"notebook-agent": "Checks the project's notebooks: failing cells, stale outputs.",
+			"performance-profiler": "Measures the slow spots of the code and suggests optimisations.",
+			"pipeline-generator": "Writes a CI pipeline suited to the project's stack.",
+			"regression-guardian": "Spots regressions by comparing behaviour before and after a change.",
+			"release-coordinator": "Prepares a release train: branches, changelog and merge order.",
+			"team-bot": "Connects WorkPilot to Slack or Teams to follow and start tasks from chat."
+		}
+	},
+	"hidden": {
+		"suggestTitle": "Pages rarely used",
+		"suggest_one": "One page of this space was not opened for {{days}} days. Hiding it lightens the menu; Ctrl K still finds it.",
+		"suggest_other": "{{count}} pages of this space were not opened for {{days}} days. Hiding them lightens the menu; Ctrl K still finds them.",
+		"review": "See which",
+		"later": "Later",
+		"hideOne": "Hide {{name}}",
+		"hideAll_one": "Hide it",
+		"hideAll_other": "Hide all {{count}}",
+		"count": "Hidden pages ({{count}})",
+		"show": "Show again"
 	}
 }

@@ -120,8 +120,8 @@ id changes.
 
 Formula Lab stays outside the costs hub: it chooses the engine of one card
 and needs that card, so it opens from the card. Change Preview (`sandbox`),
-named "simulation" before lot R1, previews uncommitted changes and joined no
-hub. Hubs and their tabs: `hubs.ts`; render tests:
+named "simulation" before lot R1, previews uncommitted changes; it joined no
+hub then, and is a tab of the API hub since F181 (lot 3, see below). Hubs and their tabs: `hubs.ts`; render tests:
 `sidebar/__tests__/HubMain.test.tsx`.
 
 ## The menu and the command palette (`sidebar/nav-model.ts`)
@@ -152,6 +152,14 @@ one space.
 | while nothing is pinned and no choice was made, « Mon menu » asks once: « Essentiel » pins `ESSENTIAL_VIEWS` (10 stable pages) and hides the beta views, « Complet » keeps everything (`sidebarPrefs.menuMode`); resetting the layout asks again | a short menu by default would hide pages people use; asking in the menu, not in the wizard, lets them answer once they see it |
 | the rail and the panel share one `DndContext`: a group dragged on the rail reorders the spaces, a page or a group dropped on the star is pinned; collision tries the pointer first (`pointerFirst`) | the star is small, the nearest centre alone picked a row of the panel. The old drop zone never pinned: its id `__fav_drop__` has no kind, so the drag-end handler decoded it to nothing and stopped |
 | the stored `sidebarWidth` is the whole menu, rail included (default 296 px, minimum 240) | a width saved before the rail still gives a usable panel |
+
+Lot 3 tidies what the spaces list.
+
+| Decision | Why |
+|---|---|
+| the Toolbox's families are four more hubs (`sidebar/hubs.ts`): Quality and security, Accessibility and i18n, API, Automation; its sub-group headers are gone, and with them `NavItem.subGroup` | 20 entries became 9. A hub keeps each page's id and shortcut, so links, pins and the palette are unchanged; a dialog tool (dependency sentinel, app emulator) is a tab that offers to open it (`HubLauncher`) |
+| while a page is in beta (`EXPERIMENTAL_VIEWS`) its entry leaves its group for the Labo, the flask at the foot of the rail, with a count; the Labo lists every beta page, a hub's beta tab included, one card each with what it does (`navigation:labo.about.*`, `LaboPanel`) | stable pages are no longer mixed with trials. The move is computed (`railGroupsOf`, `laboItemsOf`), not written in `nav-model.ts`: a page out of beta is back at its place with no other change. Hiding the beta views hides the Labo |
+| a space's entries not opened for 30 days are offered for hiding (`unusedEntries`), never hidden by the app; nothing is offered before the usage count (`view-usage-store`, local) is 30 days old, nor a pinned entry; « Plus tard » puts the offer off for 30 days | the user decides what goes, from what they actually use. A hidden page stays in Ctrl K, in « Mon menu » if pinned, and under « Pages masquées » in its space to show it again; resetting the layout shows everything |
 
 ## Agent Management (`src/main/agent/`)
 

@@ -1,6 +1,9 @@
 import {
+	Accessibility,
 	BookOpen,
 	BookOpenCheck,
+	Bot,
+	Box,
 	Bug,
 	Calculator,
 	Code,
@@ -9,10 +12,14 @@ import {
 	Gauge,
 	GitBranch,
 	GitMerge,
+	Globe,
 	History,
+	Monitor,
 	Puzzle,
 	RotateCcw,
 	Share2,
+	Shield,
+	ShieldCheck,
 	Store,
 	Swords,
 	Target,
@@ -45,7 +52,11 @@ export type SidebarHubId =
 	| "docs"
 	| "onboarding"
 	| "debt"
-	| "arena";
+	| "arena"
+	| "quality-security"
+	| "accessibility-i18n"
+	| "api"
+	| "automation";
 
 export interface HubTab {
 	readonly view: SidebarView;
@@ -166,6 +177,44 @@ export const SIDEBAR_HUBS: readonly SidebarHub[] = [
 		tabs: [
 			tab("consensus-arbiter", "consensusArbiter", Users, "CA"),
 			tab("arena-mode", "arenaMode", Swords, "AM", true),
+		],
+	},
+	// The Toolbox's families (F181, lot 3): 20 entries became 9
+	{
+		id: "quality-security",
+		labelKey: "navigation:hubs.qualitySecurity",
+		icon: ShieldCheck,
+		tabs: [
+			tab("injection-guard", "injectionGuard", ShieldCheck, "IG"),
+			tab("guardrails", "guardrails", Shield, "GR"),
+			tab("dependency-sentinel", "dependencySentinel", Shield, "DS", true),
+		],
+	},
+	{
+		id: "accessibility-i18n",
+		labelKey: "navigation:hubs.accessibilityI18n",
+		icon: Accessibility,
+		tabs: [
+			tab("accessibility-agent", "accessibilityAgent", Accessibility, "AY"),
+			tab("i18n-agent", "i18nAgent", Globe, "II"),
+		],
+	},
+	{
+		id: "api",
+		labelKey: "navigation:hubs.api",
+		icon: Globe,
+		tabs: [
+			tab("api-explorer", "apiExplorer", Globe, "AE"),
+			tab("sandbox", "sandbox", Box, "SB"),
+		],
+	},
+	{
+		id: "automation",
+		labelKey: "navigation:hubs.automation",
+		icon: Bot,
+		tabs: [
+			tab("browser-agent", "browserAgent", Globe, "BW"),
+			tab("app-emulator", "appEmulator", Monitor, "AP", true),
 		],
 	},
 ];

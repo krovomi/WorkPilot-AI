@@ -1,9 +1,7 @@
 import {
-	Accessibility,
 	Activity,
 	AlertTriangle,
 	BarChart3,
-	Box,
 	Brain,
 	Building2,
 	Calendar,
@@ -30,11 +28,9 @@ import {
 	Lightbulb,
 	MessageSquare,
 	Mic,
-	Monitor,
 	Network,
 	Radio,
 	Rocket,
-	Shield,
 	ShieldAlert,
 	ShieldCheck,
 	Sparkles,
@@ -77,13 +73,12 @@ export interface NavItem {
 	labelKey: string;
 	icon: LucideIcon;
 	shortcut?: string;
-	subGroup?: string; // i18n key for visual sub-group header within a group
 	hub?: SidebarHubId; // the entry stands for this hub's tabs (`sidebar/hubs.ts`)
 }
 
-export function hubNavItem(id: SidebarHubId, subGroup?: string): NavItem {
+export function hubNavItem(id: SidebarHubId): NavItem {
 	const hub = getHub(id);
-	return { id: hub.tabs[0].view, labelKey: hub.labelKey, icon: hub.icon, hub: id, subGroup };
+	return { id: hub.tabs[0].view, labelKey: hub.labelKey, icon: hub.icon, hub: id };
 }
 
 /** The views a menu entry stands for: a hub's tabs, or its own view. */
@@ -94,7 +89,7 @@ export function itemViews(item: NavItem): SidebarView[] {
 /** A hub's tabs as menu entries, for the search and the shortcuts. */
 export function hubTabItems(item: NavItem, gates: HubTabGates): NavItem[] {
 	if (!item.hub) return [item];
-	return shownHubTabs(getHub(item.hub), gates).map((tab) => ({ ...tab, id: tab.view, subGroup: item.subGroup }));
+	return shownHubTabs(getHub(item.hub), gates).map((tab) => ({ ...tab, id: tab.view }));
 }
 
 /** Whether a menu entry stands for this view. */
@@ -375,145 +370,72 @@ export const navGroups: readonly NavGroup[] = [
 		labelKey: "navigation:groups.toolbox",
 		icon: Wrench,
 		items: [
-			// Extensions
-			hubNavItem("mcp-tools", "navigation:subGroups.extensions"),
-			// Code Quality & Testing
-			{
-				id: "regression-guardian",
-				labelKey: "navigation:items.regressionGuardian",
-				icon: ShieldAlert,
-				shortcut: "RG",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "injection-guard",
-				labelKey: "navigation:items.injectionGuard",
-				icon: ShieldCheck,
-				shortcut: "IG",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "compliance",
-				labelKey: "navigation:items.compliance",
-				icon: CheckCircle,
-				shortcut: "CO",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "dependency-sentinel",
-				labelKey: "navigation:items.dependencySentinel",
-				icon: Shield,
-				shortcut: "DS",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "guardrails",
-				labelKey: "navigation:items.guardrails",
-				icon: Shield,
-				shortcut: "GR",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			// Accessibility & i18n
-			{
-				id: "accessibility-agent",
-				labelKey: "navigation:items.accessibilityAgent",
-				icon: Accessibility,
-				shortcut: "AY",
-				subGroup: "navigation:subGroups.accessibility",
-			},
-			{
-				id: "i18n-agent",
-				labelKey: "navigation:items.i18nAgent",
-				icon: Globe,
-				shortcut: "II",
-				subGroup: "navigation:subGroups.accessibility",
-			},
-			// API & Data
-			{
-				id: "api-explorer",
-				labelKey: "navigation:items.apiExplorer",
-				icon: Globe,
-				shortcut: "AE",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "api-watcher",
-				labelKey: "navigation:items.apiWatcher",
-				icon: FileJson,
-				shortcut: "AW",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "sandbox",
-				labelKey: "navigation:items.sandbox",
-				icon: Box,
-				shortcut: "SB",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "notebook-agent",
-				labelKey: "navigation:items.notebookAgent",
-				icon: FileCode2,
-				shortcut: "NB",
-				subGroup: "navigation:subGroups.api",
-			},
-			// Automation
-			{
-				id: "app-emulator",
-				labelKey: "navigation:items.appEmulator",
-				icon: Monitor,
-				shortcut: "AP",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "browser-agent",
-				labelKey: "navigation:items.browserAgent",
-				icon: Globe,
-				shortcut: "BW",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "pipeline-generator",
-				labelKey: "navigation:items.pipelineGenerator",
-				icon: Layers,
-				shortcut: "PG",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "team-bot",
-				labelKey: "navigation:items.teamBot",
-				icon: MessageSquare,
-				shortcut: "TT",
-				subGroup: "navigation:subGroups.automation",
-			},
-			// Utilities
+			// One entry per tool family (F181, lot 3): the hubs open on tabs
+			hubNavItem("mcp-tools"),
+			hubNavItem("quality-security"),
+			hubNavItem("accessibility-i18n"),
+			hubNavItem("api"),
+			hubNavItem("automation"),
 			{
 				id: "voice-control",
 				labelKey: "navigation:items.voiceControl",
 				icon: Mic,
 				shortcut: "VO",
-				subGroup: "navigation:subGroups.utilities",
 			},
 			{
 				id: "migration",
 				labelKey: "navigation:items.migration",
 				icon: Download,
 				shortcut: "MG",
-				subGroup: "navigation:subGroups.utilities",
 			},
 			{
 				id: "prompt-optimizer",
 				labelKey: "navigation:items.promptOptimizer",
 				icon: WandSparkles,
 				shortcut: "PT",
-				subGroup: "navigation:subGroups.utilities",
 			},
 			{
 				id: "offline-mode",
 				labelKey: "navigation:items.offlineMode",
 				icon: WifiOff,
 				shortcut: "OF",
-				subGroup: "navigation:subGroups.utilities",
+			},
+			// Beta: shown in the Labo while they are; out of beta, they show here
+			{
+				id: "regression-guardian",
+				labelKey: "navigation:items.regressionGuardian",
+				icon: ShieldAlert,
+				shortcut: "RG",
+			},
+			{
+				id: "compliance",
+				labelKey: "navigation:items.compliance",
+				icon: CheckCircle,
+				shortcut: "CO",
+			},
+			{
+				id: "api-watcher",
+				labelKey: "navigation:items.apiWatcher",
+				icon: FileJson,
+				shortcut: "AW",
+			},
+			{
+				id: "notebook-agent",
+				labelKey: "navigation:items.notebookAgent",
+				icon: FileCode2,
+				shortcut: "NB",
+			},
+			{
+				id: "pipeline-generator",
+				labelKey: "navigation:items.pipelineGenerator",
+				icon: Layers,
+				shortcut: "PG",
+			},
+			{
+				id: "team-bot",
+				labelKey: "navigation:items.teamBot",
+				icon: MessageSquare,
+				shortcut: "TT",
 			},
 		],
 		defaultExpanded: false,
