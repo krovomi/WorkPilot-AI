@@ -50,5 +50,6 @@
 		"xctest": "XCTest"
 	},
 	"incidentsDetected_one": "{{count}} incident détecté",
-	"incidentsDetected_other": "{{count}} incidents détectés"
+	"incidentsDetected_other": "{{count}} incidents détectés",
+	"automationHint": "Pour faire de chaque nouvel incident une carte bug-fix (d'abord le test de régression qui échoue, puis le correctif, sur la branche et dans la PR de la carte), ajoutez une règle « incident de production » dans Réglages › projet › Automatisations. Elle lit ce dossier et, si vous en nommez un, un projet Sentry."
 }

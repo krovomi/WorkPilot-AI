@@ -14,7 +14,7 @@ Two report formats are understood:
 
 Three modes: ``scan`` reads the reports already in the project (the runs
 kept by ``run`` included), ``run`` runs the project's test command N times
-(``flaky_test_detective.suite_runs``) and analyses those runs, ``detect``
+(``suite_runner.runs``) and analyses those runs, ``detect``
 lists the test commands the project's stack has.
 
 Output protocol (one JSON value per line, prefixed):
@@ -40,7 +40,7 @@ from flaky_test_detective.flaky_analyzer import (  # noqa: E402
     FlakyAnalyzer,
     TestRun,
 )
-from flaky_test_detective.suite_runs import (  # noqa: E402
+from suite_runner.runs import (  # noqa: E402
     COMMAND_IDS,
     HISTORY_DIR,
     TestCommand,

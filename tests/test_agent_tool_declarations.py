@@ -60,6 +60,7 @@ _DECLARED_HERE: dict[str, list[str]] = {
     # `prompts_pkg.prompt_generator.generate_subtask_prompt`.
     "qa_reviewer": ["qa_reviewer.md"],
     "qa_fixer": ["qa_fixer.md"],
+    "red_team": ["red_team.md"],
 }
 
 _SHELL = re.compile(

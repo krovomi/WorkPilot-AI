@@ -38,11 +38,26 @@ export interface PrOpenedTrigger {
 	base?: string;
 }
 
+/**
+ * A production incident: a payload dropped in `<project>/.workpilot/incidents/`,
+ * or an issue Sentry saw first after the rule, when a Sentry project is named.
+ * Its card is a bug fix whose first step is the failing regression test.
+ */
+export interface ProdIncidentTrigger {
+	type: "prod_incident";
+	/** Sentry organisation and project slugs; the inbox only when absent. */
+	org?: string;
+	project?: string;
+	/** A bare host name; `sentry.io` when absent. Always HTTPS. */
+	host?: string;
+}
+
 export type AutomationTrigger =
 	| IssueLabeledTrigger
 	| CiFailedTrigger
 	| ScheduleTrigger
-	| PrOpenedTrigger;
+	| PrOpenedTrigger
+	| ProdIncidentTrigger;
 
 export type AutomationTriggerType = AutomationTrigger["type"];
 
@@ -103,7 +118,13 @@ export type AutomationReason =
 	/** Server: the person who saved the rule has no token for the forge there. */
 	| "token_missing"
 	/** Server: the person who saved the rule may no longer run it on the project. */
-	| "owner_not_allowed";
+	| "owner_not_allowed"
+	/** An incident payload older than the rule, too large, or not JSON. */
+	| "incident_predates_rule"
+	| "incident_too_large"
+	| "incident_unreadable"
+	/** No Sentry token: the project's `SENTRY_AUTH_TOKEN`, or « My tokens on the server ». */
+	| "sentry_token_missing";
 
 export interface AutomationActivity {
 	at: string;

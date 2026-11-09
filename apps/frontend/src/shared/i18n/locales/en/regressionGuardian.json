@@ -50,5 +50,6 @@
 		"xctest": "XCTest"
 	},
 	"incidentsDetected_one": "{{count}} incident detected",
-	"incidentsDetected_other": "{{count}} incidents detected"
+	"incidentsDetected_other": "{{count}} incidents detected",
+	"automationHint": "To turn each new incident into a bug-fix card (the failing regression test first, then the fix, in the card's branch and PR), add a « production incident » rule in Settings › project › Automations. It reads this folder and, if you name one, a Sentry project."
 }
