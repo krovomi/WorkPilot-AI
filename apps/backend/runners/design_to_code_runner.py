@@ -258,9 +258,23 @@ class DesignToCodeRunner:
 
     def _serialize_result(self, result) -> dict:
         """Serialize the full pipeline result for the renderer."""
-        from services.design_to_code_service import serialize_result
+        return serialize_for_renderer(result)
 
-        return serialize_result(result)
+
+def serialize_for_renderer(result) -> dict:
+    """The pipeline result, scored with the Accessibility page's rules (#391).
+
+    The score is added here, not in the service: ``services`` sits in the
+    agent runtime's import cycle and the accessibility agent must stay out of it.
+    """
+    from accessibility_agent.generated import check_generated
+    from services.design_to_code_service import serialize_result
+
+    data = serialize_result(result)
+    data["accessibility"] = check_generated(
+        {f.path: f.content for f in result.generated_files}
+    )
+    return data
 
 
 async def main():

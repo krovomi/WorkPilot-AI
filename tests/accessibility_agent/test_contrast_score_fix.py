@@ -99,7 +99,8 @@ class TestContrast:
                         "bad": "nope",
                     }
                 }
-            )
+            ),
+            encoding="utf-8",
         )
         tokens = load_tokens(tmp_path)
         assert "bad" not in tokens.mapping
@@ -115,7 +116,9 @@ class TestContrast:
 
     def test_a_broken_or_linked_token_map_maps_nothing(self, tmp_path):
         (tmp_path / ".workpilot").mkdir()
-        (tmp_path / ".workpilot" / "a11y-tokens.json").write_text("{not json")
+        (tmp_path / ".workpilot" / "a11y-tokens.json").write_text(
+            "{not json", encoding="utf-8"
+        )
         assert load_tokens(tmp_path).mapping == {}
 
 
@@ -170,10 +173,11 @@ def _project(tmp_path: Path) -> Path:
         "    <button onClick={remove}><Trash2 /></button>\n"
         '    <img src="/a.png" />\n'
         "  </main>\n"
-        ");\n"
+        ");\n",
+        encoding="utf-8",
     )
     (src / "index.html").write_text(
-        "<html><head><title>x</title></head><body></body></html>"
+        "<html><head><title>x</title></head><body></body></html>", encoding="utf-8"
     )
     return tmp_path
 
@@ -182,7 +186,7 @@ class TestFixes:
     def test_each_fix_is_derived_from_the_source(self, tmp_path):
         root = _project(tmp_path)
         report = AccessibilityScanner().scan_file(
-            "src/App.tsx", (root / "src" / "App.tsx").read_text()
+            "src/App.tsx", (root / "src" / "App.tsx").read_text(encoding="utf-8")
         )
         fixes = {v.rule_id: v.fix for v in report.violations if v.fix}
         assert fixes["control-label"] == {"attribute": "aria-label", "value": "Email"}
@@ -198,14 +202,16 @@ class TestFixes:
     def test_only_the_asked_fixes_are_made(self, tmp_path):
         root = _project(tmp_path)
         app = root / "src" / "App.tsx"
-        report = AccessibilityScanner().scan_file("src/App.tsx", app.read_text())
+        report = AccessibilityScanner().scan_file(
+            "src/App.tsx", app.read_text(encoding="utf-8")
+        )
         wanted = {
             v.fix_id
             for v in report.violations
             if v.rule_id in ("img-alt", "control-label") and v.fix_id
         }
         applied, missing = apply_fixes(root, wanted)
-        text = app.read_text()
+        text = app.read_text(encoding="utf-8")
         assert {f.rule_id for f in applied} == {
             "img-alt",
             "control-label",
@@ -217,20 +223,22 @@ class TestFixes:
     def test_a_fix_for_code_that_changed_is_reported_missing(self, tmp_path):
         root = _project(tmp_path)
         report = AccessibilityScanner().scan_file(
-            "src/App.tsx", (root / "src" / "App.tsx").read_text()
+            "src/App.tsx", (root / "src" / "App.tsx").read_text(encoding="utf-8")
         )
         wanted = {v.fix_id for v in report.violations if v.fix_id}
-        (root / "src" / "App.tsx").write_text("export const App = () => null;\n")
+        (root / "src" / "App.tsx").write_text(
+            "export const App = () => null;\n", encoding="utf-8"
+        )
         applied, missing = apply_fixes(root, wanted)
         assert not applied and sorted(missing) == sorted(wanted)
 
     def test_a_fix_never_reaches_outside_the_root(self, tmp_path):
         outside = tmp_path / "outside.html"
-        outside.write_text("<html></html>")
+        outside.write_text("<html></html>", encoding="utf-8")
         root = tmp_path / "root"
         root.mkdir()
         applied, _ = apply_fixes(root, {"page-lang:../outside.html:1:1"}, lang="fr")
-        assert not applied and outside.read_text() == "<html></html>"
+        assert not applied and outside.read_text(encoding="utf-8") == "<html></html>"
 
 
 class TestRunner:
@@ -270,7 +278,7 @@ class TestRunner:
         )
         ids = [v["fixId"] for v in report["violations"] if v["ruleId"] == "page-lang"]
         listed = tmp_path / "fixes.json"
-        listed.write_text(json.dumps(ids))
+        listed.write_text(json.dumps(ids), encoding="utf-8")
         lines = self._run(
             "--project-path", str(root), "--fix", str(listed), "--page-lang", "fr"
         )
@@ -278,7 +286,9 @@ class TestRunner:
             next(line for line in lines if line.startswith("A11Y_FIX:"))[9:]
         )
         assert [f["value"] for f in outcome["applied"]] == ["fr"]
-        assert '<html lang="fr">' in (root / "src" / "index.html").read_text()
+        assert '<html lang="fr">' in (root / "src" / "index.html").read_text(
+            encoding="utf-8"
+        )
 
     def test_a_hostile_page_lang_falls_back_to_en(self, tmp_path):
         root = _project(tmp_path)
@@ -288,7 +298,7 @@ class TestRunner:
         )
         ids = [v["fixId"] for v in report["violations"] if v["ruleId"] == "page-lang"]
         listed = tmp_path / "fixes.json"
-        listed.write_text(json.dumps(ids))
+        listed.write_text(json.dumps(ids), encoding="utf-8")
         self._run(
             "--project-path",
             str(root),
@@ -297,7 +307,9 @@ class TestRunner:
             "--page-lang",
             'x" onload="alert(1)',
         )
-        assert '<html lang="en">' in (root / "src" / "index.html").read_text()
+        assert '<html lang="en">' in (root / "src" / "index.html").read_text(
+            encoding="utf-8"
+        )
 
 
 def test_generated_code_is_scored_before_it_is_written():
@@ -309,15 +321,12 @@ def test_generated_code_is_scored_before_it_is_written():
 
 
 def test_the_design_to_code_result_carries_its_accessibility():
-    from services.design_to_code_service import (
-        GeneratedFile,
-        PipelineResult,
-        serialize_result,
-    )
+    from runners.design_to_code_runner import serialize_for_renderer
+    from services.design_to_code_service import GeneratedFile, PipelineResult
 
     result = PipelineResult(
         generated_files=[
             GeneratedFile("Hero.tsx", "return <img src='x.png' />;", "tsx")
         ]
     )
-    assert serialize_result(result)["accessibility"]["count"] == 1
+    assert serialize_for_renderer(result)["accessibility"]["count"] == 1

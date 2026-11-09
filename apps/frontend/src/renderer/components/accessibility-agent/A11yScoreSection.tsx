@@ -3,6 +3,7 @@ import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { A11yExportFormat, A11yHistoryEntry, A11yReport } from "../../../shared/types/accessibility";
+import { formatAppDateTime } from "../../lib/date-format";
 import { Bar, CharterButton, Gauge, Notice, Panel, Section, type Tone } from "../charter";
 
 export function scoreTone(score: number): Tone {
@@ -112,12 +113,11 @@ export function A11yScoreSection({ report }: { readonly report: A11yReport }): R
 }
 
 function HistoryStrip({ history }: { readonly history: readonly A11yHistoryEntry[] }): React.ReactElement | null {
-	const { t, i18n } = useTranslation("accessibility");
+	const { t } = useTranslation("accessibility");
 	if (history.length < 2) return <p className="wp-meta">{t("score.firstScan")}</p>;
 	const last = history[history.length - 1];
 	const previous = history[history.length - 2];
 	const delta = last.score - previous.score;
-	const format = new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" });
 	return (
 		<div>
 			<div className="flex h-8 items-end gap-0.5" aria-hidden="true">
@@ -126,7 +126,7 @@ function HistoryStrip({ history }: { readonly history: readonly A11yHistoryEntry
 						key={entry.at}
 						className={`wp-tone-${scoreTone(entry.score)} w-2 rounded-sm`}
 						style={{ height: `${Math.max(8, entry.score)}%`, background: "var(--wp-tone)" }}
-						title={`${format.format(new Date(entry.at))} · ${entry.score}`}
+						title={`${formatAppDateTime(entry.at, { dateStyle: "short", timeStyle: "short" })} · ${entry.score}`}
 					/>
 				))}
 			</div>
