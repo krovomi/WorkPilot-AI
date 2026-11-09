@@ -56,6 +56,12 @@ import { useKanbanAccessibility } from "../hooks/useKanbanAccessibility";
 import { useToast } from "../hooks/use-toast";
 import { useVisibleKanbanColumns } from "../hooks/useVisibleKanbanColumns";
 import { formatAgingDuration, listAgingTasks } from "../lib/kanban-aging";
+import {
+	canMoveTaskTo,
+	emptyColumnGroups,
+	getVisualColumn,
+	VALID_BULK_TRANSITIONS,
+} from "../lib/kanban-columns";
 import { computeBoardCostForecast } from "../lib/kanban-cost";
 import {
 	indexTasksById,
@@ -158,36 +164,6 @@ const IMPORT_ALLOWED_COLUMNS = new Set<string>([
 	"queue",
 	"in_progress",
 ]);
-
-// Valid target columns for bulk drag (multi-selection). Mirrors the action bar rules.
-const VALID_BULK_TRANSITIONS: Record<
-	(typeof TASK_STATUS_COLUMNS)[number],
-	(typeof TASK_STATUS_COLUMNS)[number][]
-> = {
-	backlog: ["queue", "in_progress"],
-	queue: ["backlog", "in_progress"],
-	in_progress: ["queue", "ai_review"],
-	ai_review: ["in_progress", "human_review"],
-	human_review: ["ai_review", "done"],
-	// build_failed is CI-driven: tasks land there when the pipeline goes red;
-	// from there the user can only send them back to work manually.
-	build_failed: ["queue", "in_progress"],
-	done: [],
-};
-
-/**
- * Get the visual column for a task status.
- * pr_created tasks are displayed in the 'done' column, so we map them accordingly.
- * error tasks are displayed in the 'human_review' column (errors need human attention).
- * This is used to compare visual positions during drag-and-drop operations.
- */
-function getVisualColumn(
-	status: TaskStatus,
-): (typeof TASK_STATUS_COLUMNS)[number] {
-	if (status === "pr_created") return "done";
-	if (status === "error") return "human_review";
-	return status;
-}
 
 interface KanbanBoardProps {
 	readonly tasks: Task[];
@@ -598,20 +574,10 @@ export function KanbanBoard({
 	const taskOrder = useTaskStore((state) => state.taskOrder);
 
 	const tasksByStatus = useMemo(() => {
-		// Note: pr_created tasks are shown in the 'done' column since they're essentially complete
-		// Note: error tasks are shown in the 'human_review' column since they need human attention
-		const grouped: Record<(typeof TASK_STATUS_COLUMNS)[number], Task[]> = {
-			backlog: [],
-			queue: [],
-			in_progress: [],
-			ai_review: [],
-			human_review: [],
-			build_failed: [],
-			done: [],
-		};
+		// error tasks are shown in the 'human_review' column (see getVisualColumn)
+		const grouped = emptyColumnGroups();
 
 		filteredTasks.forEach((task) => {
-			// Map pr_created tasks to the done column, error tasks to human_review
 			const targetColumn = getVisualColumn(task.status);
 			if (grouped[targetColumn]) {
 				grouped[targetColumn].push(task);
@@ -2181,6 +2147,10 @@ export function KanbanBoard({
 			}
 
 			if (!newStatus || newStatus === oldStatus) return;
+			if (newStatus === "pr_created" && !canMoveTaskTo(task, newStatus)) {
+				toast({ title: t("kanban.prOpenNeedsPr"), variant: "destructive" });
+				return;
+			}
 
 			// ============================================
 			// BULK DRAG: Move all selected tasks together

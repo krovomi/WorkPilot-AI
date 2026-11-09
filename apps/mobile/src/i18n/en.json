@@ -67,7 +67,7 @@
 		"ai_review": "AI Review",
 		"human_review": "Human Review",
 		"build_failed": "Red Build",
-		"pr_created": "PR Created",
+		"pr_created": "Open PR",
 		"done": "Done",
 		"error": "Error"
 	},

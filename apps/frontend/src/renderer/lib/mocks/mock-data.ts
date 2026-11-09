@@ -215,4 +215,30 @@ export const mockTasks = [
 		createdAt: new Date(Date.now() - 10800000),
 		updatedAt: new Date(Date.now() - 600000),
 	},
+	{
+		id: "task-7",
+		projectId: "mock-project-1",
+		specId: "007-dark-mode",
+		title: "Dark mode for the settings page",
+		description: "Follow the system theme, with a manual override",
+		status: "pr_created" as const,
+		subtasks: [
+			{
+				id: "subtask-1",
+				title: "Theme tokens",
+				description: "Read the colours from the active theme",
+				status: "completed" as const,
+				files: ["src/styles/theme.css"],
+			},
+		],
+		logs: ["[INFO] Pull request opened"],
+		metadata: { prUrl: "https://github.com/acme/storefront/pull/42" },
+		executionProgress: {
+			phase: "complete" as const,
+			phaseProgress: 100,
+			overallProgress: 100,
+		},
+		createdAt: new Date(Date.now() - 86400000),
+		updatedAt: new Date(Date.now() - 3600000),
+	},
 ];

@@ -1,0 +1,405 @@
+/*
+ * Diff viewer: git colours, syntax colours, layout.
+ *
+ * Git colours: green for what a change adds, red for what it removes, in every
+ * colour theme (a theme's --success can be teal or olive and its --destructive
+ * pink: a diff must read the same everywhere, like the task phase hues). Only
+ * a light and a dark value; the line, gutter and changed-word fills are the hue
+ * mixed with transparent, so they sit on any theme surface.
+ *
+ * Surface: a code surface, not the theme's card. Some dark themes have a
+ * saturated card (Forest green, Ocean blue, Neo violet) on which the green of
+ * an added line vanishes; in dark mode the surface is the theme background
+ * pulled toward a neutral code black, keeping a hint of the theme's hue.
+ *
+ * Syntax colours: VS Code Light+ / Dark+, the palette of the code editor
+ * (ui/code-editor.tsx), so a file reads the same in its diff and in the editor.
+ */
+
+:root {
+	--git-add: #1a7f37;
+	--git-del: #cf222e;
+	--git-add-hue: #2da44e;
+	--git-del-hue: #fa4549;
+	--git-line-mix: 13%;
+	--git-gutter-mix: 24%;
+	--git-word-mix: 34%;
+	--dv-surface: var(--card);
+
+	--syn-keyword: #0000ff;
+	--syn-control: #af00db;
+	--syn-string: #a31515;
+	--syn-string2: #811f3f;
+	--syn-comment: #008000;
+	--syn-number: #098658;
+	--syn-type: #267f99;
+	--syn-function: #795e26;
+	--syn-variable: #001080;
+	--syn-property: #001080;
+	--syn-tag: #800000;
+	--syn-attribute: #e50000;
+	--syn-meta: #af00db;
+	--syn-invalid: #cd3131;
+}
+
+.dark {
+	--git-add: #3fb950;
+	--git-del: #f85149;
+	--git-add-hue: #2ea043;
+	--git-del-hue: #f85149;
+	--git-line-mix: 15%;
+	--git-gutter-mix: 28%;
+	--git-word-mix: 40%;
+	--dv-surface: color-mix(in srgb, var(--background) 55%, #0d1117);
+
+	--syn-keyword: #569cd6;
+	--syn-control: #c586c0;
+	--syn-string: #ce9178;
+	--syn-string2: #d16969;
+	--syn-comment: #6a9955;
+	--syn-number: #b5cea8;
+	--syn-type: #4ec9b0;
+	--syn-function: #dcdcaa;
+	--syn-variable: #9cdcfe;
+	--syn-property: #9cdcfe;
+	--syn-tag: #569cd6;
+	--syn-attribute: #9cdcfe;
+	--syn-meta: #c586c0;
+	--syn-invalid: #f44747;
+}
+
+.dv {
+	--git-add-line: color-mix(in srgb, var(--git-add-hue) var(--git-line-mix), transparent);
+	--git-add-gutter: color-mix(in srgb, var(--git-add-hue) var(--git-gutter-mix), transparent);
+	--git-add-word: color-mix(in srgb, var(--git-add-hue) var(--git-word-mix), transparent);
+	--git-del-line: color-mix(in srgb, var(--git-del-hue) var(--git-line-mix), transparent);
+	--git-del-gutter: color-mix(in srgb, var(--git-del-hue) var(--git-gutter-mix), transparent);
+	--git-del-word: color-mix(in srgb, var(--git-del-hue) var(--git-word-mix), transparent);
+
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.6;
+	tab-size: 4;
+	color: var(--foreground);
+	background: var(--dv-surface);
+}
+
+/* ── Rows ─────────────────────────────────────────────────────────────── */
+
+.dv-row {
+	display: flex;
+	min-width: 0;
+	min-height: 1.6em;
+}
+
+.dv-half {
+	display: flex;
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.dv-half + .dv-half {
+	border-left: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.dv-num {
+	flex: none;
+	box-sizing: content-box;
+	width: var(--dv-digits, 3ch);
+	padding: 0 0.5rem 0 0.75rem;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: color-mix(in srgb, var(--muted-foreground) 75%, transparent);
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.dv-sign {
+	flex: none;
+	width: 1.5rem;
+	text-align: center;
+	color: transparent;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.dv-code {
+	flex: 1 1 0;
+	min-width: 0;
+	padding-right: 1rem;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.dv-row:hover .dv-num,
+.dv-half:hover .dv-num {
+	color: var(--foreground);
+}
+
+.dv-comment {
+	flex: none;
+	width: 1.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.dv-comment button {
+	opacity: 0;
+	border-radius: 0.25rem;
+	padding: 0.125rem;
+	color: var(--muted-foreground);
+}
+
+.dv-row:hover .dv-comment button,
+.dv-comment button:focus-visible {
+	opacity: 1;
+}
+
+.dv-comment button:focus-visible {
+	outline: 2px solid var(--primary);
+}
+
+/* Added / removed lines: line fill, stronger gutter, coloured +/- sign. */
+.dv .is-add .dv-sign,
+.dv .is-add .dv-code {
+	background: var(--git-add-line);
+}
+
+.dv .is-add .dv-num,
+.dv .is-add .dv-comment {
+	background: var(--git-add-gutter);
+	color: var(--git-add);
+}
+
+.dv .is-add .dv-sign {
+	color: var(--git-add);
+	font-weight: 700;
+}
+
+.dv .is-del .dv-sign,
+.dv .is-del .dv-code {
+	background: var(--git-del-line);
+}
+
+.dv .is-del .dv-num,
+.dv .is-del .dv-comment {
+	background: var(--git-del-gutter);
+	color: var(--git-del);
+}
+
+.dv .is-del .dv-sign {
+	color: var(--git-del);
+	font-weight: 700;
+}
+
+.dv-word-add {
+	background: var(--git-add-word);
+	border-radius: 0.1875rem;
+}
+
+.dv-word-del {
+	background: var(--git-del-word);
+	border-radius: 0.1875rem;
+}
+
+/* The empty side of a side-by-side row (the other side has no match). */
+.dv .is-empty {
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 6px,
+		color-mix(in srgb, var(--muted) 55%, transparent) 6px 7px
+	);
+}
+
+/* ── Hunk header ──────────────────────────────────────────────────────── */
+
+.dv-hunk {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	min-width: 0;
+	padding: 0.3rem 0.75rem;
+	background: color-mix(in srgb, var(--primary) 7%, var(--dv-surface));
+	border-block: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--muted-foreground);
+	font-size: 0.6875rem;
+}
+
+.dv-hunk:first-child {
+	border-top: 0;
+}
+
+.dv-hunk-gap {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	flex: none;
+	padding: 0 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+	border-radius: 9999px;
+	background: var(--dv-surface);
+	color: var(--muted-foreground);
+	font-family: var(--font-sans);
+}
+
+.dv-hunk-range {
+	flex: none;
+	color: color-mix(in srgb, var(--primary) 55%, var(--muted-foreground));
+}
+
+.dv-hunk-section {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--foreground);
+}
+
+/* ── Diffstat (+12 -3 ■■■□□) ─────────────────────────────────────────── */
+
+.dv-stat {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.dv-stat-add {
+	color: var(--git-add);
+	font-weight: 600;
+}
+
+.dv-stat-del {
+	color: var(--git-del);
+	font-weight: 600;
+}
+
+.dv-stat-bar {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.dv-stat-bar i {
+	width: 0.4375rem;
+	height: 0.4375rem;
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+}
+
+.dv-stat-bar i.add {
+	background: var(--git-add);
+}
+
+.dv-stat-bar i.del {
+	background: var(--git-del);
+}
+
+/* ── Syntax ───────────────────────────────────────────────────────────── */
+
+.dv-code .tok-keyword,
+.dv-code .tok-atom,
+.dv-code .tok-bool,
+.dv-code .tok-heading {
+	color: var(--syn-keyword);
+}
+
+.dv-code .tok-control {
+	color: var(--syn-control);
+}
+
+.dv-code .tok-string,
+.dv-code .tok-inserted {
+	color: var(--syn-string);
+}
+
+.dv-code .tok-string2,
+.dv-code .tok-url,
+.dv-code .tok-link {
+	color: var(--syn-string2);
+}
+
+.dv-code .tok-comment {
+	color: var(--syn-comment);
+	font-style: italic;
+}
+
+.dv-code .tok-number,
+.dv-code .tok-literal {
+	color: var(--syn-number);
+}
+
+.dv-code .tok-typeName,
+.dv-code .tok-className,
+.dv-code .tok-namespace {
+	color: var(--syn-type);
+}
+
+.dv-code .tok-function,
+.dv-code .tok-macroName {
+	color: var(--syn-function);
+}
+
+.dv-code .tok-variableName,
+.dv-code .tok-variableName2,
+.dv-code .tok-labelName {
+	color: var(--syn-variable);
+}
+
+.dv-code .tok-propertyName {
+	color: var(--syn-property);
+}
+
+.dv-code .tok-meta {
+	color: var(--syn-meta);
+}
+
+.dv-code .tok-invalid,
+.dv-code .tok-deleted {
+	color: var(--syn-invalid);
+}
+
+.dv-code .tok-strong {
+	font-weight: 700;
+}
+
+.dv-code .tok-emphasis {
+	font-style: italic;
+}
+
+/* HTML / XML / JSX: tags and attributes as in the editor. */
+.dv-code .tok-tagName {
+	color: var(--syn-tag);
+}
+
+.dv-code .tok-attributeName {
+	color: var(--syn-attribute);
+}
+
+/* Keep the function colour over the generic variable colour. */
+.dv-code .tok-variableName.tok-function,
+.dv-code .tok-propertyName.tok-function {
+	color: var(--syn-function);
+}
+
+/* ── File status in git colours (file lists next to a diff) ──────────── */
+
+.dv-ink-add {
+	color: var(--git-add);
+}
+
+.dv-ink-del {
+	color: var(--git-del);
+}
+
+.dv-badge-add {
+	color: var(--git-add);
+	background: color-mix(in srgb, var(--git-add-hue) 14%, transparent);
+}
+
+.dv-badge-del {
+	color: var(--git-del);
+	background: color-mix(in srgb, var(--git-del-hue) 14%, transparent);
+}

@@ -20,9 +20,19 @@ export function shouldShowBuildFailedColumn(
 }
 
 /**
- * The user's column order, minus « Build rouge » on a project without CI.
+ * Whether the « PR ouverte » column has a card: one of the board's tasks has a
+ * pull request waiting to be merged. A merge moves the card on to « Terminé »
+ * (worktree-purge/merged-watch.ts), so the column empties by itself.
+ */
+export function shouldShowPrOpenColumn(tasks: readonly Task[]): boolean {
+	return tasks.some((task) => task.status === "pr_created");
+}
+
+/**
+ * The user's column order, minus the columns that would stay empty: « Build
+ * rouge » on a project without CI, « PR ouverte » while no PR waits.
  *
- * That column only fills when a CI pipeline (Azure DevOps, GitHub Actions,
+ * « Build rouge » only fills when a CI pipeline (Azure DevOps, GitHub Actions,
  * GitLab CI, Jenkins) goes red on a task's branch. Without a pipeline it stays
  * empty forever and only takes room, so it appears with the first run.
  */
@@ -33,11 +43,14 @@ export function useVisibleKanbanColumns(
 	const showBuildFailed = useTaskStore((state) =>
 		shouldShowBuildFailedColumn(tasks, state.pipelineStatuses),
 	);
+	const showPrOpen = shouldShowPrOpenColumn(tasks);
 	return useMemo(
 		() =>
-			showBuildFailed
-				? columnOrder
-				: columnOrder.filter((status) => status !== "build_failed"),
-		[columnOrder, showBuildFailed],
+			columnOrder.filter(
+				(status) =>
+					(status !== "build_failed" || showBuildFailed) &&
+					(status !== "pr_created" || showPrOpen),
+			),
+		[columnOrder, showBuildFailed, showPrOpen],
 	);
 }
