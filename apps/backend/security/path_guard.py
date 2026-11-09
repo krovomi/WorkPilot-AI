@@ -170,6 +170,10 @@ PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
         # an agent that wrote either would approve its own action.
         "guardrail-approvals.json",
         "guardrail-log.jsonl",
+        # The sources the person trusts not to carry a prompt injection
+        # (`security/tool_result_guard.py`): an agent that wrote it would
+        # silence the scan of what it reads next.
+        "trusted-sources.json",
     ),
     ".claude": ("settings*.json",),
 }

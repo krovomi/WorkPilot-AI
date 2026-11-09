@@ -19,6 +19,7 @@ from harness.domain.subagents import (
     RESULT_CAP_TOKENS,
     estimate_tokens,
 )
+from security.tool_result_guard import CLAUDE_TOOLS_MATCHER
 
 FENCE_OPEN, FENCE_CLOSE = "<user_content>", "</user_content>"
 
@@ -187,7 +188,11 @@ async def test_create_client_tells_the_roster_and_holds_it_to_the_contract(
     assert roster
     assert all(CONTRACT_HEADING in d.prompt for d in roster.values())
 
-    matchers = options["hooks"]["PostToolUse"]
+    # The sub-agent hooks, then the tool result guard's (#388), which leaves
+    # the sub-agent tools to them.
+    matchers = [
+        m for m in options["hooks"]["PostToolUse"] if m.matcher != CLAUDE_TOOLS_MATCHER
+    ]
     assert sorted(m.matcher for m in matchers) == sorted(SUBAGENT_TOOLS)
     [hook] = matchers[0].hooks
     answer = await hook(_post_tool_use(matchers[0].matcher, _agent_output("ok")))

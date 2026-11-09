@@ -449,6 +449,7 @@ environment wins:
 | `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
 | `WORKPILOT_QA_RED_TEAM` | `complex` | The red team after QA ([red-team.md](architecture/red-team.md)): `complex` attacks the tasks whose spec was assessed complex, `always` every task that changed source code, `off` never (the hard gate `attack-resistant` then reads unknown). A workflow that declares `attack-resistant` runs it unless `off`. Any other value reads as `complex`. |
 | `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
+| `WORKPILOT_TOOL_RESULT_GUARD` | `warn` | The tool result guard ([tool-result-guard.md](architecture/tool-result-guard.md)): `warn` passes a flagged result on fenced, behind a warning; `block` also withholds a result rated blocked; `off` stops the scan. Any other value reads as `warn`. |
 
 ### Review budget
 

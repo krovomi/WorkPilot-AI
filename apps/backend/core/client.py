@@ -276,6 +276,7 @@ from rtk import settings as rtk_settings
 from security import bash_security_hook
 from security.guardrails import guardrails_hook as _raw_guardrails_hook
 from security.path_guard import GUARDED_WRITE_TOOLS, make_write_path_hook
+from security.tool_result_guard import CLAUDE_TOOLS_MATCHER, make_claude_hook
 from watermarks import CLEANED_TOOLS as WATERMARK_CLEANED_TOOLS
 from watermarks import make_watermarks_hook
 from watermarks import settings as watermarks_settings
@@ -1452,11 +1453,8 @@ def _session_hooks(
                 hooks=[_make_guardrails_hook(project_dir)],
             ),
             # rtk — condense what the command prints before the model reads
-            # it. Registered after the two hooks that decide whether the
-            # command may run at all, and returning only `updatedInput`:
-            # this one changes the output, never the permission. A machine
-            # without rtk answers in a cached `shutil.which` and the
-            # command runs exactly as written.
+            # it; after the hooks that decide whether it runs, `updatedInput`
+            # only. Without rtk, a cached `shutil.which` and the command as is.
             HookMatcher(matcher="Bash", hooks=[rtk_rewrite_hook]),
             # Where a write may land. Registered before the guardrails
             # hook because it answers the same question the guardrails
@@ -1486,14 +1484,10 @@ def _session_hooks(
                 for tool in GUARDED_WRITE_TOOLS
             ),
             # watermarks — strip the invisible codepoints a model leaves in
-            # what it writes, before the bytes reach the disk. Registered
-            # after the guardrails hook for the same reason rtk is
-            # registered after bash_security_hook: that one decides whether
-            # the write happens, this one only decides what it contains.
-            # `Pre`, not `Post`, so the dirty bytes never exist on disk and
-            # no file watcher sees two writes. A checkout without the
-            # vendored table answers in one `str.isascii()` and the content
-            # is written exactly as the model produced it.
+            # what it writes, after the guardrails hook (that one decides
+            # whether the write happens, this one what it contains). `Pre`,
+            # so the dirty bytes never exist on disk; without the vendored
+            # table, one `str.isascii()` and the content as written.
             *(
                 HookMatcher(matcher=tool, hooks=[_watermarks_hook])
                 for tool in WATERMARK_CLEANED_TOOLS
@@ -1505,6 +1499,12 @@ def _session_hooks(
             *(
                 HookMatcher(matcher=tool, hooks=[_subagent_result_hook])
                 for tool in SUBAGENT_TOOLS
+            ),
+            # Prompt injection in what a tool read (#388): the warning, or in
+            # block mode the refusal, reaches the model with the result.
+            HookMatcher(
+                matcher=CLAUDE_TOOLS_MATCHER,
+                hooks=[make_claude_hook(spec_dir, project_dir)],
             ),
             # MCP Apps (IA4): Claude Code calls the tool and shows no view;
             # this keeps it for the task panel, as the WorkPilot loop does.
