@@ -21,9 +21,17 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { DriftIssue, DriftReport, DriftSeverity } from "../../../shared/types/doc-drift";
+import {
+	DRIFT_FAMILY,
+	type DriftFamily,
+	type DriftIssue,
+	type DriftReport,
+	type DriftSeverity,
+} from "../../../shared/types/doc-drift";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
 import { useDocDriftStore } from "../../stores/doc-drift-store";
+import { useProjectStore } from "../../stores/project-store";
+import { DocDriftExportButtons, DocDriftFixBar, FreshnessCard, issueFix, issueMessage } from "./DocDriftPanels";
 import { SharedReportNote } from "../analyses/SharedReportNote";
 import {
 	CharterButton,
@@ -47,6 +55,8 @@ const SEVERITY_TONE: Record<DriftSeverity, Tone> = {
 	low: "blue",
 };
 const SEVERITIES: DriftSeverity[] = ["high", "medium", "low"];
+const FAMILIES: DriftFamily[] = ["signatures", "examples", "references", "stale"];
+const familyOf = (i: DriftIssue): DriftFamily => DRIFT_FAMILY[i.driftType] ?? "references";
 
 const issueKey = (i: DriftIssue) => `${i.docFile}:${i.docLine}:${i.referencedSymbol}:${i.driftType}`;
 
@@ -115,24 +125,35 @@ function ScanColumn({ report, scanning, status }: {
 					status={stepStatus(done, t)}
 					meta={report ? t("scan.stepCompareMeta", { count: report.issues.length }) : undefined}
 				/>
+				{report && <FreshnessCard report={report} />}
 				{scanning && <ScanLine label={status || t("actions.scanning")} />}
 			</div>
 		</Column>
 	);
 }
 
-function IssuesColumn({ report, selected, onSelect }: {
+function IssuesColumn({ report, selected, onSelect, projectPath, local }: {
 	readonly report: DriftReport | null;
 	readonly selected: string | null;
 	readonly onSelect: (key: string) => void;
+	readonly projectPath?: string;
+	readonly local: boolean;
 }) {
 	const { t } = useTranslation("docDrift");
 	const [filter, setFilter] = useState<DriftSeverity | "all">("all");
+	const [family, setFamily] = useState<DriftFamily | "all">("all");
+	const selectedFixes = useDocDriftStore((s) => s.selectedFixes);
 	const issues = report?.issues ?? [];
-	const shown = filter === "all" ? issues : issues.filter((i) => i.severity === filter);
+	const inFamily = family === "all" ? issues : issues.filter((i) => familyOf(i) === family);
+	const shown = filter === "all" ? inFamily : inFamily.filter((i) => i.severity === filter);
 	const counts = useMemo(() => {
 		const c: Record<DriftSeverity, number> = { high: 0, medium: 0, low: 0 };
-		for (const i of issues) c[i.severity] += 1;
+		for (const i of inFamily) c[i.severity] += 1;
+		return c;
+	}, [inFamily]);
+	const familyCounts = useMemo(() => {
+		const c: Record<DriftFamily, number> = { references: 0, signatures: 0, examples: 0, stale: 0 };
+		for (const i of issues) c[familyOf(i)] += 1;
 		return c;
 	}, [issues]);
 
@@ -152,11 +173,22 @@ function IssuesColumn({ report, selected, onSelect }: {
 					{t("issues.clean")}
 				</Notice>
 			)}
+			{report && <DocDriftFixBar report={report} projectPath={projectPath} local={local} />}
 			{issues.length > 0 && (
 				<div className="flex flex-col gap-3">
 					<Chips>
-						<Chip tone="muted" pressed={filter === "all"} onClick={() => setFilter("all")}>
+						<Chip tone="muted" pressed={family === "all"} onClick={() => setFamily("all")}>
 							{t("all")} · {issues.length}
+						</Chip>
+						{FAMILIES.filter((f) => familyCounts[f] > 0).map((f) => (
+							<Chip key={f} tone="violet" pressed={family === f} onClick={() => setFamily(f)}>
+								{t(`families.${f}`)} · {familyCounts[f]}
+							</Chip>
+						))}
+					</Chips>
+					<Chips>
+						<Chip tone="muted" pressed={filter === "all"} onClick={() => setFilter("all")}>
+							{t("all")} · {inFamily.length}
 						</Chip>
 						{SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
 							<Chip key={s} tone={SEVERITY_TONE[s]} pressed={filter === s} onClick={() => setFilter(s)}>
@@ -174,7 +206,12 @@ function IssuesColumn({ report, selected, onSelect }: {
 								kicker={t(`types.${issue.driftType}.label`, issue.driftType.replaceAll("_", " "))}
 								title={<span className="wp-mono text-[0.8rem]">{issue.referencedSymbol}</span>}
 								meta={`${issue.docFile}:${issue.docLine}`}
-								status={<span className="wp-meta">{t(issue.severity)}</span>}
+								status={
+									<span className="wp-meta">
+										{issue.fixId && selectedFixes.includes(issue.fixId) ? "✓ " : ""}
+										{t(issue.severity)}
+									</span>
+								}
 								active={selected === key}
 								onClick={() => onSelect(key)}
 							/>
@@ -186,9 +223,11 @@ function IssuesColumn({ report, selected, onSelect }: {
 	);
 }
 
-function DetailColumn({ issue }: { readonly issue: DriftIssue | null }) {
+function DetailColumn({ issue, local }: { readonly issue: DriftIssue | null; readonly local: boolean }) {
 	const { t } = useTranslation("docDrift");
 	const [copied, setCopied] = useState(false);
+	const selectedFixes = useDocDriftStore((s) => s.selectedFixes);
+	const toggleFix = useDocDriftStore((s) => s.toggleFix);
 	return (
 		<Column kicker={t("detail.kicker")} title={t("detail.title")} tone="violet">
 			{!issue && (
@@ -202,12 +241,7 @@ function DetailColumn({ issue }: { readonly issue: DriftIssue | null }) {
 						<span className="wp-kicker">
 							{t(`types.${issue.driftType}.label`, issue.driftType)} · {t(issue.severity)}
 						</span>
-						<p className="mt-1.5 text-sm leading-relaxed">
-							{t(`types.${issue.driftType}.message`, {
-								symbol: issue.referencedSymbol,
-								defaultValue: issue.message,
-							})}
-						</p>
+						<p className="mt-1.5 text-sm leading-relaxed">{issueMessage(t, issue)}</p>
 					</Panel>
 					<Panel>
 						<div className="flex items-center justify-between gap-2">
@@ -229,13 +263,21 @@ function DetailColumn({ issue }: { readonly issue: DriftIssue | null }) {
 							{issue.docFile}:{issue.docLine}
 						</p>
 						<span className="wp-kicker wp-faint mt-3 block">{t("detail.cited")}</span>
-						<pre className="wp-code mt-1">{issue.referencedSymbol}</pre>
+						<pre className="wp-code mt-1">{(issue.files?.length ? issue.files : [issue.referencedSymbol]).join("\n")}</pre>
 					</Panel>
 					<Panel rail tone="green">
 						<span className="wp-kicker">{t("detail.fix")}</span>
-						<p className="mt-1.5 text-sm">
-							{t(`types.${issue.driftType}.fix`, { defaultValue: issue.suggestion })}
-						</p>
+						<p className="mt-1.5 text-sm">{issueFix(t, issue)}</p>
+						{issue.fixId && local && (
+							<label className="mt-2 flex items-center gap-1.5 text-xs">
+								<input
+									type="checkbox"
+									checked={selectedFixes.includes(issue.fixId)}
+									onChange={() => issue.fixId && toggleFix(issue.fixId)}
+								/>
+								{t("fix.fixable")}
+							</label>
+						)}
 					</Panel>
 				</div>
 			)}
@@ -255,6 +297,8 @@ export function DocDriftReport({ projectPath }: DocDriftReportProps): React.Reac
 	const reset = useDocDriftStore((s) => s.reset);
 	const setReport = useDocDriftStore((s) => s.setReport);
 	const [selected, setSelected] = useState<string | null>(null);
+	// A server project has no folder here: no review branch to write its fixes on.
+	const local = useProjectStore((s) => !s.projects.find((p) => p.path === projectPath)?.remote);
 
 	const isScanning = phase === "scanning";
 	// A server project's last report, saved on the server by any member.
@@ -266,8 +310,14 @@ export function DocDriftReport({ projectPath }: DocDriftReportProps): React.Reac
 		<ModuleStage data-testid="doc-drift-view">
 			<Columns template="minmax(260px, 26%) minmax(320px, 38%) minmax(0, 1fr)">
 				<ScanColumn report={report} scanning={isScanning} status={status} />
-				<IssuesColumn report={report} selected={selected} onSelect={setSelected} />
-				<DetailColumn issue={selectedIssue} />
+				<IssuesColumn
+					report={report}
+					selected={selected}
+					onSelect={setSelected}
+					projectPath={projectPath}
+					local={local}
+				/>
+				<DetailColumn issue={selectedIssue} local={local} />
 			</Columns>
 			{(!projectPath || (phase === "error" && cleanError)) && (
 				<Notice tone="red" icon={AlertTriangle} role="alert" className="relative z-[2] mx-5 mb-2">
@@ -290,6 +340,7 @@ export function DocDriftReport({ projectPath }: DocDriftReportProps): React.Reac
 						</CharterButton>
 					) : (
 						<>
+							{report && <DocDriftExportButtons report={report} />}
 							{report && (
 								<CharterButton
 									icon={RotateCcw}

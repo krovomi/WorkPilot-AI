@@ -19,6 +19,7 @@ export const GENERATED_REVIEW_SOURCES = [
 	"quick-command",
 	"i18n",
 	"accessibility",
+	"doc-drift",
 ] as const;
 
 export type GeneratedReviewSource = (typeof GENERATED_REVIEW_SOURCES)[number];

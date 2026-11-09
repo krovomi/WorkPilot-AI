@@ -17,6 +17,7 @@ from .polyglot import (
     doc_comment_template,
     extract_symbols,
     language_for,
+    param_names,
     symbol_names,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     "doc_comment_template",
     "extract_symbols",
     "language_for",
+    "param_names",
     "symbol_names",
 ]

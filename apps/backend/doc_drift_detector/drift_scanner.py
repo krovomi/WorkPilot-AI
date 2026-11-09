@@ -242,5 +242,6 @@ def _is_not_a_project_path(ref: str) -> bool:
     return (
         normalised.startswith(("/", "~"))
         or "*" in normalised
+        or "..." in normalised  # tests/.../x.ts: an abbreviation
         or first in _GENERATED_ROOTS
     )
