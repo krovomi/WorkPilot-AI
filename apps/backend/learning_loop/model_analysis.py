@@ -122,7 +122,9 @@ async def extract_with_model(
             thinking_level=extractor.thinking_level,
             on_error=errors.append,
         )
-    except Exception as error:  # noqa: BLE001 - an analysis must never fail a build
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError) as error:
+        # The completion itself answers "" on a provider failure; what can still
+        # raise is resolving the provider and model first (configuration, files).
         logger.warning(
             "learning loop: model analysis failed (%s)", type(error).__name__
         )
