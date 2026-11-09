@@ -1913,6 +1913,40 @@
 		"effortSentAs": "Sent to the provider as “{{value}}”, the closest level this model takes.",
 		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent."
 	},
+	"redTeam": {
+		"title": "Red team",
+		"status": {
+			"pass": "Held",
+			"fail": "Crashed",
+			"unknown": "Unknown",
+			"none": "Nothing to attack"
+		},
+		"replay": "Replayed",
+		"counts": "{{crash}} crash · {{unexpected}} unexpected · {{resistant}} held · {{warning}} warning",
+		"attack": "Attack",
+		"running": "Attacking…",
+		"input": "Input: {{input}}.",
+		"expect": "Expected: {{expect}}.",
+		"outcome": {
+			"crash": "Crash",
+			"unexpected": "Unexpected",
+			"resistant": "Held",
+			"not_run": "Not run",
+			"flaky": "Flaky"
+		},
+		"mode": {
+			"fuzz": "Malformed input",
+			"edge": "Edge case",
+			"injection": "Prompt injection",
+			"concurrency": "Concurrency",
+			"regression": "Past bug"
+		},
+		"warnings": "Concurrency risks seen in the code (not proven)",
+		"warning": {
+			"toctou": "checks a file, then uses it: another process can change it in between",
+			"shared-state": "writes shared state from concurrent code without a lock"
+		}
+	},
 	"verify": {
 		"title": "Verification loop",
 		"status": {

@@ -191,6 +191,9 @@ PHASE_ALIASES: dict[str, str] = {
     # line of code exists. A workflow phase that wants another roster says so
     # with `roster:` — see `phase_specs`.
     "spec_validation": "spec",
+    # Writes attack tests on a throwaway copy, then Python runs them: a
+    # specialist would read the same changed files twice and judge nothing.
+    "red_team": "solo",
     # Single-purpose calls that will never delegate. An empty roster is the
     # honest answer; handing them three specialists is context billed per turn
     # and spent on nothing.
