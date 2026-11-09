@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
 import { useSharedAnalysisReport } from "../../hooks/useSharedAnalysisReport";
 import { SharedReportNote } from "../analyses/SharedReportNote";
 import { setupI18nAgentListeners, useI18nAgentStore } from "../../stores/i18n-agent-store";
-import type { I18nReport, I18nSeverity } from "../../../shared/types/i18n-agent";
+import type { I18nIssue, I18nReport } from "../../../shared/types/i18n-agent";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	CharterButton,
 	Chip,
@@ -15,7 +16,6 @@ import {
 	ModuleStage,
 	Notice,
 	Page,
-	Panel,
 	ScanLine,
 	Section,
 	Stat,
@@ -23,12 +23,14 @@ import {
 	type Tone,
 } from "../charter";
 import { Input } from "../ui/input";
+import { I18nCompletenessSection } from "./I18nCompletenessSection";
+import { I18nIssueCard } from "./I18nIssueCard";
 
-const SEVERITY_TONES: Record<I18nSeverity, Tone> = {
-	error: "red",
-	warning: "amber",
-	info: "blue",
-};
+/** Cards drawn at once: a large project can report thousands of strings. */
+const PAGE_SIZE = 200;
+
+const issueId = (issue: I18nIssue): string =>
+	`${issue.issueType}|${issue.file}|${issue.line}|${issue.key}|${issue.locale}|${issue.text ?? ""}`;
 
 const coverageTone = (pct: number): Tone => (pct >= 90 ? "green" : pct >= 70 ? "amber" : "red");
 
@@ -50,6 +52,7 @@ export function I18nReportView({ projectPath }: I18nReportViewProps): React.Reac
 	const cancelScan = useI18nAgentStore((s) => s.cancelScan);
 	const reset = useI18nAgentStore((s) => s.reset);
 	const setReport = useI18nAgentStore((s) => s.setReport);
+	const local = useProjectStore((s) => !s.projects.find((p) => p.path === projectPath)?.remote);
 
 	const isScanning = phase === "scanning";
 	// A server project's last report, saved on the server by any member.
@@ -101,7 +104,7 @@ export function I18nReportView({ projectPath }: I18nReportViewProps): React.Reac
 					</Notice>
 				)}
 				{report ? (
-					<ReportBody report={report} />
+					<ReportBody report={report} projectPath={projectPath} local={local} />
 				) : (
 					phase === "idle" && (
 						<EmptyStage icon={Globe} title={t("i18nAgent:emptyTitle")} tone="blue">
@@ -114,11 +117,19 @@ export function I18nReportView({ projectPath }: I18nReportViewProps): React.Reac
 	);
 }
 
-function ReportBody({ report }: { readonly report: I18nReport }): React.ReactElement {
+interface ReportBodyProps {
+	readonly report: I18nReport;
+	readonly projectPath?: string;
+	readonly local: boolean;
+}
+
+function ReportBody({ report, projectPath, local }: ReportBodyProps): React.ReactElement {
 	const { t } = useTranslation("i18nAgent");
 	const [query, setQuery] = useState("");
 	const [type, setType] = useState<string>("all");
+	const [shown, setShown] = useState(PAGE_SIZE);
 	const q = query.toLowerCase();
+	const rtl = report.rtlLocales ?? [];
 
 	const byType = new Map<string, number>();
 	for (const issue of report.issues) byType.set(issue.issueType, (byType.get(issue.issueType) ?? 0) + 1);
@@ -130,8 +141,12 @@ function ReportBody({ report }: { readonly report: I18nReport }): React.ReactEle
 				issue.message.toLowerCase().includes(q) ||
 				issue.file.toLowerCase().includes(q) ||
 				issue.key.toLowerCase().includes(q) ||
+				(issue.text ?? "").toLowerCase().includes(q) ||
+				(issue.proposedKey ?? "").toLowerCase().includes(q) ||
 				issue.locale?.toLowerCase().includes(q)),
 	);
+	// The same string twice on a line is one card.
+	const unique = [...new Map(issues.map((issue) => [issueId(issue), issue])).values()];
 	const coverage = Object.entries(report.coverageByLocale);
 	const errors = report.issues.filter((i) => i.severity === "error").length;
 
@@ -144,7 +159,9 @@ function ReportBody({ report }: { readonly report: I18nReport }): React.ReactEle
 				<Stat label={t("localesTitle")} value={report.localesCompared.length} tone="violet" />
 			</Stats>
 
-			{coverage.length > 0 && (
+			<I18nCompletenessSection report={report} projectPath={projectPath} local={local} />
+
+			{!report.completeness?.length && coverage.length > 0 && (
 				<Section kicker={t("kickers.coverage")} title={t("coverage")}>
 					<div className="flex flex-wrap gap-4">
 						{coverage.map(([locale, pct]) => (
@@ -172,51 +189,31 @@ function ReportBody({ report }: { readonly report: I18nReport }): React.ReactEle
 				}
 			>
 				<div className="wp-chips mb-3">
-					<Chip tone="blue" pressed={type === "all"} onClick={() => setType("all")}>
+					<Chip tone="blue" pressed={type === "all"} onClick={() => { setType("all"); setShown(PAGE_SIZE); }}>
 						{t("allTypes")} <span className="font-mono">{report.issues.length}</span>
 					</Chip>
 					{[...byType.entries()].map(([id, count]) => (
-						<Chip key={id} tone="blue" pressed={type === id} onClick={() => setType(id)}>
+						<Chip key={id} tone="blue" pressed={type === id} onClick={() => { setType(id); setShown(PAGE_SIZE); }}>
 							{t(`issueType.${id}`, { defaultValue: id })} <span className="font-mono">{count}</span>
 						</Chip>
 					))}
 				</div>
-				{issues.length === 0 ? (
+				{unique.length === 0 ? (
 					<p className="wp-muted text-sm">{t("search.noResults")}</p>
 				) : (
 					<div className="grid gap-2.5">
-						{issues.map((issue) => (
-							<Panel
-								key={`${issue.file}-${issue.line}-${issue.key}-${issue.locale}`}
-								rail
-								tone={SEVERITY_TONES[issue.severity]}
-							>
-								<div className="flex flex-wrap items-center gap-2">
-									<Chip tone={SEVERITY_TONES[issue.severity]}>{t(`severity.${issue.severity}`)}</Chip>
-									<span className="wp-meta">{t(`issueType.${issue.issueType}`, { defaultValue: issue.issueType })}</span>
-									{issue.locale && (
-										<Chip tone="muted" dot={false}>
-											{issue.locale}
-										</Chip>
-									)}
-								</div>
-								<p className="mt-1.5 text-sm">{issue.message}</p>
-								<p className="wp-meta mt-1 font-mono">
-									{issue.file}
-									{issue.line ? `:${issue.line}` : ""}
-								</p>
-								{issue.suggestion && <p className="wp-tone-green wp-ink mt-1 text-xs">{issue.suggestion}</p>}
-							</Panel>
+						{unique.slice(0, shown).map((issue) => (
+							<I18nIssueCard key={issueId(issue)} issue={issue} rtl={rtl} />
 						))}
+						{unique.length > shown && (
+							<CharterButton variant="ghost" size="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+								{t("showMore", { count: unique.length - shown })}
+							</CharterButton>
+						)}
 					</div>
 				)}
 			</Section>
 
-			{report.summary && (
-				<Notice tone="blue" icon={Globe}>
-					{report.summary}
-				</Notice>
-			)}
 		</>
 	);
 }

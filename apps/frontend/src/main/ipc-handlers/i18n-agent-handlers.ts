@@ -7,6 +7,7 @@
  * Channels:
  *   invoke "i18nAgent:run"     → { projectPath, referenceLocale? }
  *   invoke "i18nAgent:cancel"  → void
+ *   invoke "i18nAgent:translate" → { projectPath, referenceLocale, locales } (on a review card)
  *
  * Renderer events:
  *   i18n-agent-event     (progress / start / complete metadata)
@@ -20,6 +21,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { readTranslateRequest, translateOnReviewCard } from "../i18n-agent/translate-run";
 import {
 	cancelServerAnalysis,
 	relayServerAnalysis,
@@ -32,6 +34,7 @@ interface RunRequest {
 }
 
 const EVENT_PREFIX = "I18N_EVENT:";
+const LOCALE = /^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8}){0,2}$/;
 const RESULT_PREFIX = "I18N_RESULT:";
 const ERROR_PREFIX = "I18N_ERROR:";
 
@@ -57,8 +60,8 @@ export function registerI18nAgentHandlers(): void {
 		async (_event, { projectPath, referenceLocale = "en" }: RunRequest) => {
 			killExisting();
 
-			if (!projectPath) {
-				const message = "projectPath is required";
+			if (!projectPath || typeof projectPath !== "string" || !LOCALE.test(String(referenceLocale))) {
+				const message = "projectPath and a locale are required";
 				broadcast(IPC_CHANNELS.I18N_AGENT_ERROR, message);
 				throw new Error(message);
 			}
@@ -159,6 +162,13 @@ export function registerI18nAgentHandlers(): void {
 			});
 		},
 	);
+
+	// Missing keys translated by the active model, on a review card (#346).
+	ipcMain.handle(IPC_CHANNELS.I18N_AGENT_TRANSLATE, async (_event, raw: unknown) => {
+		const request = readTranslateRequest(raw);
+		if (!request) throw new Error("Invalid translation request");
+		return translateOnReviewCard(request);
+	});
 
 	ipcMain.handle(IPC_CHANNELS.I18N_AGENT_CANCEL, () => {
 		killExisting();

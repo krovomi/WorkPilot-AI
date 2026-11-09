@@ -333,6 +333,41 @@ CATALOGUE: dict[str, str] = {
     "step.line.manifest": "`{path}`",
     "step.line.deployment": "`{path}`",
     "step.line.ciWorkflow": "`{path}` (CI/CD)",
+    # -- the code's story (#349) -------------------------------------------
+    "story.chapter.structure": "How the project is laid out",
+    "story.chapter.entry": "Where it starts",
+    "story.chapter.critical": "Its most critical module",
+    "story.chapter.fragile": "Where it is fragile",
+    "story.chapter.decisions": "What the team decided",
+    "story.line.stack": "{language}: {paths}",
+    "story.line.critical": (
+        "`{path}` changed in {churn} commit(s) by {authors} person(s) this year, "
+        "with {complexity} decision points"
+    ),
+    "story.line.danger": "`{path}` — {zones} (risk {risk}/100)",
+    "story.line.untested": "`{path}` — no test names it (risk {risk}/100)",
+    "story.line.adr": "{title} ({status}, {date}) — `{path}`",
+    "story.line.breaking": "Breaking change `{ref}` ({date}): {title}",
+    "story.line.memory": "{kind}: {title}",
+    "story.line.noDecision": (
+        "No decision record, breaking commit or project memory was found."
+    ),
+    "story.list": "{first}, {rest}",
+    "story.memory.gotcha": "Gotcha",
+    "story.memory.pattern": "Pattern",
+    "story.danger.security": "security",
+    "story.danger.billing": "billing",
+    "story.danger.migrations": "migrations",
+    "story.danger.infrastructure": "infrastructure",
+    "story.reason.churn": "{count} commit(s) by {authors} person(s) this year",
+    "story.reason.complexity": "{count} decision points",
+    "story.reason.untested": "No test file names it",
+    "story.quiz.churn.question": "Which file changed most often this year?",
+    "story.quiz.churn.rationale": "`{path}` — {count} commit(s) over the last year",
+    "story.quiz.zone.migrations": "Which file changes the database schema?",
+    "story.quiz.zone.security": "Which file handles security (authentication, secrets, permissions)?",
+    "story.quiz.zone.billing": "Which file handles payments or billing?",
+    "story.quiz.zone.rationale": "`{path}` sits in a danger zone: change it with care",
     # -- progress ----------------------------------------------------------
     "progress.analyzing": "Analyzing project structure…",
     "progress.generated": (
