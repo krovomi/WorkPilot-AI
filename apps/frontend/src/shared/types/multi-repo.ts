@@ -7,6 +7,8 @@
  * the repositories done before it (docs/architecture/multi-repo.md).
  */
 
+import type { TaskEngine } from "./task";
+
 /** Overall orchestration status */
 export type MultiRepoStatus =
 	| "pending"
@@ -101,6 +103,8 @@ export interface MultiRepoOrchestration {
 	overallProgress: number; // 0-100
 	createdAt: string;
 	updatedAt: string;
+	/** The engine every repository's task gets; absent = each project's default. */
+	engine?: TaskEngine;
 }
 
 /** Configuration for creating a new multi-repo orchestration */
@@ -108,4 +112,6 @@ export interface MultiRepoCreateConfig {
 	/** Absolute paths: registered projects or folders picked in a dialog. */
 	repos: Array<{ localPath: string }>;
 	taskDescription: string;
+	/** Provider × LLM × Effort per phase for every repository's task. */
+	engine?: TaskEngine;
 }

@@ -21,7 +21,9 @@
 		"start": "Start",
 		"resume": "Resume",
 		"stop": "Stop",
-		"back": "All multi-repo tasks"
+		"back": "All multi-repo tasks",
+		"stepEngine": "3. Engine of the tasks",
+		"engineHint": "Every repository gets a Kanban task running on this provider, model and effort, as if it had been picked on the board."
 	},
 	"status": {
 		"pending": "Not started",
@@ -81,6 +83,12 @@
 		"taskCreateFailed": "The card of {{repo}} could not be created.",
 		"taskStartFailed": "The card of {{repo}} could not start: open it on the board to see why, then resume.",
 		"taskMissing": "The card of {{repo}} was deleted.",
-		"unexpected": "The run stopped on an unexpected error."
+		"unexpected": "The run stopped on an unexpected error.",
+		"invalidEngine": "The chosen engine is not valid. Pick a provider and a model again."
+	},
+	"detail": {
+		"engine": "Engine:",
+		"engineDefault": "each project's default provider",
+		"engineMixed": "{{provider}} · {{model}} (per phase)"
 	}
 }
