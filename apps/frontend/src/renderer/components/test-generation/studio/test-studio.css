@@ -1018,6 +1018,10 @@
 
 	/* A test, a gap, a fact: a row card with its accent rail. */
 	.tg-row {
+		/* A row of a scrolling column keeps its height: with overflow hidden,
+		   flex let it shrink to a sliver as soon as the list outgrew the panel
+		   (the name cut, assertions and code hidden). */
+		flex: none;
 		position: relative;
 		padding: 0.6rem 0.8rem 0.65rem 1rem;
 		border-radius: 12px;
@@ -1049,7 +1053,7 @@
 		font-family: var(--tg-mono);
 		font-size: 0.78rem;
 		font-weight: 600;
-		word-break: break-all;
+		overflow-wrap: anywhere;
 	}
 
 	.tg-row p {

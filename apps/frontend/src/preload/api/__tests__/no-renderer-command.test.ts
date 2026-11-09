@@ -17,10 +17,13 @@ describe("no command line from the renderer", () => {
 		);
 	});
 
-	it("exposes only the shell methods that take a URL or a directory", () => {
+	it("exposes only the shell methods that take a URL, a directory or a path to name", () => {
+		// toHostPath only rewrites a path string for the clipboard (Windows form
+		// under WSL): it runs nothing.
 		expect(Object.keys(createShellAPI()).sort()).toEqual([
 			"openExternal",
 			"openTerminal",
+			"toHostPath",
 		]);
 		expect(
 			(createElectronAPI() as unknown as Record<string, unknown>)
