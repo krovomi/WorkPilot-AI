@@ -114,11 +114,43 @@ function getColumnOrderKey(projectId: string): string {
 }
 
 /**
- * Validate column order array — must contain all expected columns (extras ignored)
+ * A saved column order, brought up to the current columns: unknown entries
+ * dropped, a column added since the order was saved (« PR ouverte ») slotted
+ * in before the column that follows it by default. Null when it is not a list
+ * of columns at all.
  */
-function validateColumnOrder(data: unknown): data is TaskStatusColumn[] {
-	if (!Array.isArray(data)) return false;
-	return TASK_STATUS_COLUMNS.every((col) => data.includes(col));
+export function normalizeColumnOrder(data: unknown): TaskStatusColumn[] | null {
+	if (!Array.isArray(data)) return null;
+	const known = new Set<string>(TASK_STATUS_COLUMNS);
+	const order = [
+		...new Set(data.filter((col): col is TaskStatusColumn => known.has(col))),
+	];
+	if (order.length === 0) return null;
+	TASK_STATUS_COLUMNS.forEach((column, index) => {
+		if (order.includes(column)) return;
+		const next = TASK_STATUS_COLUMNS.slice(index + 1).find((c) =>
+			order.includes(c),
+		);
+		order.splice(next ? order.indexOf(next) : order.length, 0, column);
+	});
+	return order;
+}
+
+/**
+ * Saved column preferences with a default entry for each column added since
+ * they were saved, so a new column does not reset every width and collapse.
+ */
+export function withNewColumnPreferences(data: unknown): unknown {
+	if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+	const prefs = { ...(data as Record<string, unknown>) };
+	for (const column of TASK_STATUS_COLUMNS) {
+		prefs[column] ??= {
+			width: DEFAULT_COLUMN_WIDTH,
+			isCollapsed: false,
+			isLocked: false,
+		};
+	}
+	return prefs;
 }
 
 /**
@@ -410,7 +442,7 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 				const stored = localStorage.getItem(key);
 
 				if (stored) {
-					const parsed = JSON.parse(stored);
+					const parsed = withNewColumnPreferences(JSON.parse(stored));
 					if (validatePreferences(parsed)) {
 						set({ columnPreferences: migrateLegacyColumnWidths(parsed) });
 					} else {
@@ -428,12 +460,8 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 				const orderKey = getColumnOrderKey(projectId);
 				const storedOrder = localStorage.getItem(orderKey);
 				if (storedOrder) {
-					const parsed = JSON.parse(storedOrder);
-					if (validateColumnOrder(parsed)) {
-						set({ columnOrder: parsed });
-					} else {
-						set({ columnOrder: [...TASK_STATUS_COLUMNS] });
-					}
+					const parsed = normalizeColumnOrder(JSON.parse(storedOrder));
+					set({ columnOrder: parsed ?? [...TASK_STATUS_COLUMNS] });
 				} else {
 					set({ columnOrder: [...TASK_STATUS_COLUMNS] });
 				}
@@ -449,8 +477,8 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 						await globalThis.electronAPI.getKanbanBoardState(projectId);
 					// Discard if the project changed while the IPC was in flight.
 					if (currentLoadingProjectId !== projectId) return;
-					const order = result?.data?.columnOrder;
-					if (result?.success && validateColumnOrder(order)) {
+					const order = normalizeColumnOrder(result?.data?.columnOrder);
+					if (result?.success && order) {
 						set({ columnOrder: order });
 						try {
 							localStorage.setItem(
@@ -478,8 +506,9 @@ export const useKanbanSettingsStore = create<KanbanSettingsState>(
 					}
 
 					if (result?.success && result.data) {
-						if (validatePreferences(result.data)) {
-							const prefs = migrateLegacyColumnWidths(result.data);
+						const saved = withNewColumnPreferences(result.data);
+						if (validatePreferences(saved)) {
+							const prefs = migrateLegacyColumnWidths(saved);
 							set({ columnPreferences: prefs });
 
 							// Update localStorage sync cache with IPC data

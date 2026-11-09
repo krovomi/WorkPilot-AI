@@ -74,7 +74,19 @@
 	"diffViewer": {
 		"noContent": "No diff content available for this file",
 		"noContentHint": "This might be a binary file or the diff is not available",
-		"commentLine": "Comment on line {{line}}"
+		"commentLine": "Comment on line {{line}}",
+		"hiddenLines_one": "{{count}} unchanged line",
+		"hiddenLines_other": "{{count}} unchanged lines",
+		"stat": "{{additions}} lines added, {{deletions}} lines removed",
+		"mode": {
+			"label": "Diff layout",
+			"auto": "Automatic layout",
+			"autoHint": "Automatic: side by side when a file has both removed and added lines and the window is wide enough, one column otherwise",
+			"unified": "Unified view",
+			"unifiedHint": "Unified: removed and added lines in one column",
+			"split": "Side by side",
+			"splitHint": "Side by side: old version on the left, new version on the right (a new or deleted file stays in one column)"
+		}
 	},
 	"buttons": {
 		"save": "Save",
