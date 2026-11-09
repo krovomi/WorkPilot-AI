@@ -41,7 +41,12 @@ const review = {
 /** Prepend, like the service. */
 const saveIn = (dir: string, request: ChangelogSaveRequest): ChangelogSaveResult => {
 	const file = path.join(dir, request.filePath ?? "CHANGELOG.md");
-	const existing = existsSync(file) ? readFileSync(file, "utf-8") : "";
+	let existing = "";
+	try {
+		existing = readFileSync(file, "utf-8");
+	} catch {
+		// No changelog yet.
+	}
 	const content = existing ? `${request.content}\n\n${existing}` : request.content;
 	writeFileSync(file, content, "utf-8");
 	return { filePath: file, bytesWritten: Buffer.byteLength(content) };
