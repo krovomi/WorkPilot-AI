@@ -149,6 +149,24 @@ describe("plural forms", () => {
 		}
 		expect([...new Set(unresolvable)].sort()).toEqual([]);
 	});
+
+	it("never writes code inside a placeholder", () => {
+		// i18next only substitutes `{{name}}`: `{{count > 1 ? 's' : ''}}` was
+		// printed as is, « 1 result{{count > 1 ? 's' : ''}} for "Mistral" » in
+		// the provider search. A plural goes in `_one`/`_other` keys.
+		const coded: string[] = [];
+		for (const locale of ["en", "fr"] as const) {
+			for (const file of namespaces) {
+				const raw = readFileSync(path.join(LOCALES, locale, file), "utf-8");
+				for (const match of raw.matchAll(/\{\{([^}]*)\}\}/g)) {
+					if (/[?:<>=!&|+]/.test(match[1].replace(/,\s*\w+$/, ""))) {
+						coded.push(`${locale}/${file}: ${match[0]}`);
+					}
+				}
+			}
+		}
+		expect(coded).toEqual([]);
+	});
 });
 
 describe("translation keys used in the source", () => {

@@ -6,7 +6,7 @@ import type {
 
 /**
  * Where an earlier version kept the whole configuration, webhook URL in clear.
- * Read once, handed to the main process, then removed (F175).
+ * Read once, handed to the main process, then removed (F177).
  */
 export const LEGACY_STORAGE_KEY = "workpilot-team-bot";
 

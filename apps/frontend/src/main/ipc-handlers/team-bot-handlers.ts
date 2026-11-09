@@ -10,7 +10,7 @@
  * The configuration, webhook URL included, is the main process's own
  * (team-bot-config.ts): the renderer never names the URL a send goes to, and
  * the runner reads its input from stdin, not from a command line every local
- * process can list (F175). Provider-agnostic: no LLM calls, only webhook POSTs.
+ * process can list (F177). Provider-agnostic: no LLM calls, only webhook POSTs.
  */
 
 import { spawn } from "node:child_process";

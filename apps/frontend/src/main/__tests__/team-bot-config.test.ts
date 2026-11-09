@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The Team Bot webhook URL is a credential (F175): the main process keeps it
+ * The Team Bot webhook URL is a credential (F177): the main process keeps it
  * encrypted in <userData>/team-bot.json, the renderer only sees the mask, and
  * a mask sent back keeps the stored URL.
  */

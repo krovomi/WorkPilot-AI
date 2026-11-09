@@ -50,10 +50,13 @@ async def _fresh_db():
 
 
 async def _spec(factory):
-    from server.db.models import Organization, Project, SpecIndex
+    from server.db.models import Organization, Project, SpecIndex, User
     from sqlalchemy import select
 
     async with factory() as db:
+        # Who starts the runs below: a real row, as foreign keys are enforced.
+        if await db.get(User, "u1") is None:
+            db.add(User(id="u1", email="u1@test.invalid", display_name="U"))
         org_id = await db.scalar(
             select(Organization.id).where(Organization.slug == "default")
         )

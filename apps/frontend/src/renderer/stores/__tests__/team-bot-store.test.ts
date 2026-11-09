@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The renderer no longer keeps the Team Bot webhook URL (F175): it reads the
+ * The renderer no longer keeps the Team Bot webhook URL (F177): it reads the
  * configuration from the main process, saves each edit there, and moves what
  * an earlier version left in localStorage over once, then deletes it.
  */

@@ -19,7 +19,13 @@ import { DevToolsStep } from "./DevToolsStep";
 import { OAuthStep } from "./OAuthStep";
 import { PrivacyStep } from "./PrivacyStep";
 import { WelcomeStep } from "./WelcomeStep";
-import { WIZARD_STEPS, type WizardStepId } from "./wizard-steps";
+import { ProvidersStep } from "./ProvidersStep";
+import {
+	neighbourStep,
+	stepsForPath,
+	type WizardPath,
+	type WizardStepId,
+} from "./wizard-steps";
 import { WizardProgress, type WizardStep } from "./WizardProgress";
 
 interface OnboardingWizardProps {
@@ -52,18 +58,21 @@ export function OnboardingWizard({
 			updateSettings: s.updateSettings,
 		})),
 	);
-	const [currentStepIndex, setCurrentStepIndex] = useState(0);
+	const [currentStepId, setCurrentStepId] = useState<WizardStepId>("welcome");
 	const [completedSteps, setCompletedSteps] = useState<Set<WizardStepId>>(
 		new Set(),
 	);
-	// Track if oauth step was bypassed (API key path chosen)
-	const [oauthBypassed, setOauthBypassed] = useState(false);
+	// The path chosen on the « Choose your AI » step decides which steps follow.
+	const [path, setPath] = useState<WizardPath>("undecided");
 
-	// Get current step ID
-	const currentStepId = WIZARD_STEPS[currentStepIndex].id;
+	const visibleSteps = stepsForPath(path);
+	const currentStepIndex = Math.max(
+		0,
+		visibleSteps.findIndex((step) => step.id === currentStepId),
+	);
 
 	// Build step data for progress indicator
-	const steps: WizardStep[] = WIZARD_STEPS.map((step, index) => ({
+	const steps: WizardStep[] = visibleSteps.map((step, index) => ({
 		id: step.id,
 		label: t(step.labelKey),
 		completed: completedSteps.has(step.id) || index < currentStepIndex,
@@ -71,60 +80,35 @@ export function OnboardingWizard({
 
 	// Navigation handlers
 	const goToNextStep = useCallback(() => {
-		// Mark current step as completed
 		setCompletedSteps((prev) => new Set(prev).add(currentStepId));
-
-		// If leaving auth-choice, reset oauth bypassed flag
-		if (currentStepId === "auth-choice") {
-			setOauthBypassed(false);
-		}
-
-		if (currentStepIndex < WIZARD_STEPS.length - 1) {
-			setCurrentStepIndex((prev) => prev + 1);
-		}
-	}, [currentStepIndex, currentStepId]);
+		setCurrentStepId(neighbourStep(path, currentStepId, 1));
+	}, [path, currentStepId]);
 
 	const goToPreviousStep = useCallback(() => {
-		// If going back from completion and oauth was bypassed, go back to auth-choice (skip oauth)
-		if (currentStepId === "completion" && oauthBypassed) {
-			// Find index of auth-choice step
-			const authChoiceIndex = WIZARD_STEPS.findIndex(
-				(step) => step.id === "auth-choice",
-			);
-			setCurrentStepIndex(authChoiceIndex);
-			setOauthBypassed(false);
-			return;
-		}
+		const previous = neighbourStep(path, currentStepId, -1);
+		// Back on the choice screen, the choice is open again.
+		if (previous === "auth-choice") setPath("undecided");
+		setCurrentStepId(previous);
+	}, [path, currentStepId]);
 
-		if (currentStepIndex > 0) {
-			setCurrentStepIndex((prev) => prev - 1);
-		}
-	}, [currentStepIndex, currentStepId, oauthBypassed]);
-
-	// Handler for when API key path is chosen - skips oauth step
-	const handleSkipToCompletion = useCallback(() => {
-		setOauthBypassed(true);
+	// Leave the choice screen on a path: its steps follow, then the common ones.
+	const choosePath = useCallback((chosen: WizardPath) => {
+		setPath(chosen);
 		setCompletedSteps((prev) => new Set(prev).add("auth-choice"));
-
-		// Find index of completion step
-		const completionIndex = WIZARD_STEPS.findIndex(
-			(step) => step.id === "completion",
-		);
-		setCurrentStepIndex(completionIndex);
+		setCurrentStepId(neighbourStep(chosen, "auth-choice", 1));
 	}, []);
 
-	// "Skip" inside a step skips that step, not the rest of the wizard: on a
-	// machine with no Claude account it ended the setup at the auth step, and
-	// the CLI, dev tools and privacy steps were never shown.
-	const skipAuthentication = useCallback(() => {
-		setCurrentStepIndex(WIZARD_STEPS.findIndex((step) => step.id === "claude-code"));
+	// From the last screen with no AI connected: straight to the providers.
+	const connectProvider = useCallback(() => {
+		setPath("other");
+		setCurrentStepId("providers");
 	}, []);
 
 	// Reset wizard state (for re-running) - defined before skipWizard/finishWizard that use it
 	const resetWizard = useCallback(() => {
-		setCurrentStepIndex(0);
+		setCurrentStepId("welcome");
 		setCompletedSteps(new Set());
-		setOauthBypassed(false);
+		setPath("undecided");
 	}, []);
 
 	const completeWizard = useCallback(async () => {
@@ -173,10 +157,12 @@ export function OnboardingWizard({
 			case "auth-choice":
 				return (
 					<AuthChoiceStep
-						onNext={goToNextStep}
+						onNext={() => choosePath("claude")}
 						onBack={goToPreviousStep}
-						onSkip={skipAuthentication}
-						onAPIKeyPathComplete={handleSkipToCompletion}
+						// "Skip" skips this step, not the rest of the wizard.
+						onSkip={() => choosePath("skipped")}
+						onAPIKeyPathComplete={() => choosePath("api-key")}
+						onOtherProvider={() => choosePath("other")}
 					/>
 				);
 			case "oauth":
@@ -187,6 +173,8 @@ export function OnboardingWizard({
 						onSkip={goToNextStep}
 					/>
 				);
+			case "providers":
+				return <ProvidersStep onNext={goToNextStep} onBack={goToPreviousStep} />;
 			case "claude-code":
 				return (
 					<ClaudeCodeStep
@@ -205,6 +193,7 @@ export function OnboardingWizard({
 						onFinish={completeWizard}
 						onOpenTaskCreator={handleOpenTaskCreator}
 						onOpenSettings={handleOpenSettings}
+						onConnectProvider={connectProvider}
 					/>
 				);
 			default:

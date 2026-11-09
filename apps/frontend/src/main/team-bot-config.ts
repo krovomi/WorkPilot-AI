@@ -1,6 +1,6 @@
 /**
  * The Team Bot configuration (Slack / Microsoft Teams incoming webhook), kept
- * by the main process in `<userData>/team-bot.json` (F175).
+ * by the main process in `<userData>/team-bot.json` (F177).
  *
  * An incoming webhook URL is a credential: whoever holds it posts into the
  * channel. It used to live in the renderer's localStorage, in clear, and went
