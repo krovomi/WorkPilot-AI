@@ -9,6 +9,7 @@ import path from "node:path";
 import { app, type BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { Project } from "../../shared/types";
+import { buildEngineMetadata } from "../../shared/utils/task-engine";
 import { appLog } from "../app-logger";
 import { getToolPath } from "../cli-tool-manager";
 import { getTaskControl } from "../ipc-handlers/task/execution-handlers";
@@ -133,7 +134,7 @@ export function createMultiRepoHost(
 			const project = ensureRepoProject(repoPath);
 			return project ? { id: project.id } : null;
 		},
-		createTask: async (projectId, title, description) => {
+		createTask: async (projectId, title, description, engine) => {
 			const project = projectStore.getProject(projectId);
 			if (!project || project.remote) return null;
 			try {
@@ -142,6 +143,9 @@ export function createMultiRepoHost(
 					aiDescription: description,
 					displayDescription: description,
 					descriptionIsHtml: false,
+					// The orchestration's engine, owned by each task like one picked
+					// on the board; none = the project's provider, then Settings'.
+					...(engine ? { metadata: buildEngineMetadata(engine) } : {}),
 				}).id;
 			} catch (error) {
 				appLog.warn("[MultiRepo] Task creation failed:", error);

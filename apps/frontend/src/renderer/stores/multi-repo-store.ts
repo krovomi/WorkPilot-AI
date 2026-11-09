@@ -5,7 +5,8 @@
  * orchestration on each change (`onMultiRepoUpdated`); this store keeps the
  * latest of each and the dialog's form.
  */
-import type { MultiRepoOrchestration } from "@shared/types";
+import type { MultiRepoOrchestration, TaskEngine } from "@shared/types";
+import type { SetStateAction } from "react";
 import { create } from "zustand";
 import { loadProjects } from "./project-store";
 
@@ -25,6 +26,8 @@ interface MultiRepoState {
 	activeId: string | null;
 	pickedRepos: PickedRepo[];
 	taskDescription: string;
+	/** The engine of every repository's task; seeded by the form when it opens. */
+	engine: TaskEngine | null;
 	busy: boolean;
 	/** A `multiRepo:` i18n key. */
 	error: string | null;
@@ -36,13 +39,19 @@ interface MultiRepoState {
 	showDetail: (id: string) => void;
 	toggleRepo: (repo: PickedRepo) => void;
 	setTaskDescription: (text: string) => void;
+	/** Takes a state action: the engine editor chains its corrections. */
+	setEngine: (next: SetStateAction<TaskEngine>) => void;
 	launch: () => Promise<void>;
 	start: (id: string) => Promise<void>;
 	stop: (id: string) => Promise<void>;
 	applyUpdate: (orchestration: MultiRepoOrchestration) => void;
 }
 
-const emptyForm = { pickedRepos: [] as PickedRepo[], taskDescription: "" };
+const emptyForm = {
+	pickedRepos: [] as PickedRepo[],
+	taskDescription: "",
+	engine: null as TaskEngine | null,
+};
 
 function api() {
 	return typeof window === "undefined" ? undefined : window.electronAPI;
@@ -80,8 +89,14 @@ export const useMultiRepoStore = create<MultiRepoState>((set, get) => ({
 
 	setTaskDescription: (text) => set({ taskDescription: text }),
 
+	setEngine: (next) =>
+		set((state) => {
+			if (typeof next !== "function") return { engine: next };
+			return state.engine ? { engine: next(state.engine) } : {};
+		}),
+
 	launch: async () => {
-		const { projectId, pickedRepos, taskDescription } = get();
+		const { projectId, pickedRepos, taskDescription, engine } = get();
 		const electron = api();
 		if (!projectId || !electron) return;
 		set({ busy: true, error: null });
@@ -89,6 +104,7 @@ export const useMultiRepoStore = create<MultiRepoState>((set, get) => ({
 			const created = await electron.createMultiRepoOrchestration(projectId, {
 				repos: pickedRepos.map((r) => ({ localPath: r.path })),
 				taskDescription: taskDescription.trim(),
+				...(engine ? { engine } : {}),
 			});
 			if (!created.success || !created.data) {
 				set({ error: created.error ?? "errors.createFailed" });

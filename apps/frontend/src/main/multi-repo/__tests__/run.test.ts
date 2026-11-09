@@ -6,7 +6,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Project } from "../../../shared/types";
+import type { Project, TaskEngine } from "../../../shared/types";
+import { writeEngine } from "../engine";
 import {
 	createOrchestration,
 	orchestrationDir,
@@ -42,6 +43,7 @@ class FakeHost implements MultiRepoHost {
 	readonly pollMs = 1_000_000;
 	readonly steps: string[][] = [];
 	readonly created: Array<{ projectId: string; title: string; description: string }> = [];
+	readonly engines: Array<TaskEngine | null> = [];
 	readonly started: string[] = [];
 	readonly stopped: string[] = [];
 	readonly published: Array<{ status: string; running: boolean }> = [];
@@ -80,8 +82,14 @@ class FakeHost implements MultiRepoHost {
 		return { id: `p-${path.basename(repoPath)}` };
 	}
 
-	async createTask(projectId: string, title: string, description: string) {
+	async createTask(
+		projectId: string,
+		title: string,
+		description: string,
+		engine: TaskEngine | null,
+	) {
 		this.created.push({ projectId, title, description });
+		this.engines.push(engine);
 		const id = `00${this.created.length}-task`;
 		this.tasks.set(id, { status: "backlog" });
 		return id;
@@ -187,6 +195,20 @@ describe("MultiRepoRun", () => {
 		expect(manifest().status).toBe("completed");
 		expect(run.running).toBe(false);
 		expect(host.published.at(-1)).toEqual({ status: "completed", running: false });
+	});
+
+	it("gives every repository's card the orchestration's engine, or none", async () => {
+		const trio = { provider: "ollama", model: "qwen3-coder:30b", effort: "medium" } as const;
+		const engine: TaskEngine = { spec: trio, planning: trio, coding: trio, qa: trio };
+		writeEngine(dir, engine);
+		const host = new FakeHost();
+		const done = new MultiRepoRun(dir, host).run();
+		await vi.waitFor(() => expect(host.started).toHaveLength(1));
+		host.move("001-task", PASSED);
+		await vi.waitFor(() => expect(host.started).toHaveLength(2));
+		host.move("002-task", { status: "done" });
+		await done;
+		expect(host.engines).toEqual([engine, engine]);
 	});
 
 	it("waits on a card that needs a person, then goes on", async () => {

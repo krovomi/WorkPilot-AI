@@ -157,6 +157,46 @@ describe("MULTI_REPO_CREATE", () => {
 		expect((await create(repos, "x".repeat(20_001))).error).toBe("errors.descriptionTooLong");
 	});
 
+	it("keeps the engine chosen for the repositories' tasks, and refuses a malformed one", async () => {
+		rememberUserChosenPath(picked);
+		const repos = [{ localPath: api }, { localPath: picked }];
+		const trio = { provider: "openai", model: "gpt-5.5-codex", effort: "high" };
+		const engine = { spec: trio, planning: trio, coding: trio, qa: trio };
+
+		const created = await call(IPC_CHANNELS.MULTI_REPO_CREATE, "host", {
+			repos,
+			taskDescription: "Add auth",
+			engine,
+		});
+		expect(created.success).toBe(true);
+		expect((created.data as { engine?: unknown }).engine).toEqual(engine);
+		const listed = await call(IPC_CHANNELS.MULTI_REPO_LIST, "host");
+		expect((listed.data as Array<{ engine?: unknown }>)[0].engine).toEqual(engine);
+
+		for (const bad of [
+			"openai",
+			{ ...engine, qa: { ...trio, provider: "Open AI" } },
+			{ ...engine, coding: { ...trio, model: "gpt\nINJECTED=1" } },
+			{ ...engine, planning: { ...trio, effort: "maximum" } },
+			{ spec: trio, coding: trio },
+		]) {
+			expect(
+				await call(IPC_CHANNELS.MULTI_REPO_CREATE, "host", {
+					repos,
+					taskDescription: "Add auth",
+					engine: bad,
+				}),
+			).toEqual({ success: false, error: "errors.invalidEngine" });
+		}
+	});
+
+	it("leaves the engine to each project when none is chosen", async () => {
+		rememberUserChosenPath(picked);
+		const created = await create([{ localPath: api }, { localPath: picked }]);
+		expect(created.success).toBe(true);
+		expect((created.data as { engine?: unknown }).engine).toBeUndefined();
+	});
+
 	it("refuses a server project and an unknown one", async () => {
 		const repos = [{ localPath: api }, { localPath: host }];
 		expect((await create(repos, "t", "srv")).error).toBe("errors.projectNotFound");
