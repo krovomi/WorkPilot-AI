@@ -92,6 +92,7 @@ from .report import (
     write_visual_qa_report,
 )
 from .reviewer import classify_qa_error, run_qa_agent_session
+from .schema_gate import schema_gate
 
 
 def _ensure_fix_request_file(
@@ -539,6 +540,13 @@ async def run_qa_validation_loop(
             )
             gate = (
                 dependency_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or schema_gate(
                     spec_dir,
                     project_dir,
                     state.qa_iteration,

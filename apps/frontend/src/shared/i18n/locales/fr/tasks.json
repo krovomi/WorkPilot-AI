@@ -2450,5 +2450,50 @@
 		"done_other": "{{count}} worktrees purgés, {{size}} libérés.",
 		"kept_one": "{{count}} conservé : modifications non commitées ou suppression impossible.",
 		"kept_other": "{{count}} conservés : modifications non commitées ou suppression impossible."
+	},
+	"schemaGuard": {
+		"title": "Migrations",
+		"status": {
+			"pass": "Zéro interruption",
+			"warn": "À revoir",
+			"fail": "Casse une base en production",
+			"unchecked": "Non vérifiées"
+		},
+		"summary_one": "{{count}} migration vérifiée · {{engine}}",
+		"summary_other": "{{count}} migrations vérifiées · {{engine}}",
+		"engine": {
+			"postgres": "PostgreSQL",
+			"mysql": "MySQL / MariaDB",
+			"sqlserver": "SQL Server",
+			"sqlite": "SQLite",
+			"unknown": "moteur non détecté"
+		},
+		"check": "Revérifier",
+		"checking": "Vérification…",
+		"kind": {
+			"data_loss": "Perte de données",
+			"rename": "Renommage",
+			"type_change": "Changement de type",
+			"not_null": "NOT NULL",
+			"lock": "Verrou",
+			"no_rollback": "Pas de retour arrière",
+			"edited": "Migration appliquée modifiée"
+		},
+		"advice": {
+			"data_loss": "Déployer d'abord le code qui ne s'en sert plus, garder les données pendant un délai, puis supprimer dans une migration suivante.",
+			"rename": "Ajouter le nouveau nom à côté de l'ancien, écrire les deux, remplir, basculer les lectures, puis supprimer l'ancien plus tard.",
+			"type_change": "Ajouter une colonne du nouveau type, la remplir avec une conversion vérifiée, basculer le code, puis supprimer l'ancienne colonne.",
+			"not_null": "Ajouter la colonne nullable ou avec une valeur par défaut, remplir par lots, puis ajouter NOT NULL (sur PostgreSQL via un CHECK … NOT VALID d'abord).",
+			"lock": "Sur PostgreSQL, construire l'index CONCURRENTLY et ajouter les contraintes NOT VALID puis VALIDATE, hors transaction.",
+			"no_rollback": "Écrire la migration de retour arrière, ou dire dans la migration pourquoi elle est irréversible et comment restaurer les données.",
+			"edited": "Cette migration a peut-être déjà tourné ailleurs : la restaurer et ajouter une nouvelle migration pour le changement."
+		},
+		"planTitle": "Plan zéro interruption",
+		"plan": {
+			"expand": "Expand : ajouter la nouvelle structure à côté de l'ancienne, et faire écrire les deux par le code.",
+			"migrate": "Migrate : remplir par lots qui peuvent reprendre, hors du déploiement.",
+			"switch": "Switch : déployer le code qui ne lit plus que la nouvelle structure.",
+			"contract": "Contract : quand plus aucune version en service ne s'en sert, supprimer l'ancienne structure dans une migration suivante."
+		}
 	}
 }

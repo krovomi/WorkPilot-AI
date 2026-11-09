@@ -817,6 +817,58 @@ function specAddress(query: SpecTraceabilityQuery): Record<string, string> {
 	return address;
 }
 
+// ── Schema guard (`schema_guard/`, `qa/schema_guard_api.py`) ─────────────────
+
+export type SchemaFindingKind =
+	| "data_loss"
+	| "rename"
+	| "type_change"
+	| "not_null"
+	| "lock"
+	| "no_rollback"
+	| "edited";
+
+export interface SchemaFinding {
+	kind: SchemaFindingKind;
+	severity: "error" | "warning";
+	path: string;
+	line: number;
+	statement: string;
+	message: string;
+	advice: string;
+}
+
+/** `schema_guard.json`: the task's migrations as a live database would see them. */
+export interface SchemaGuardRecord {
+	status: "pass" | "warn" | "fail" | "unchecked";
+	engine: "postgres" | "mysql" | "sqlserver" | "sqlite" | "unknown";
+	mode: string;
+	unchecked: string;
+	migrations: Array<{ path: string; tool: string; new: boolean }>;
+	findings: SchemaFinding[];
+	plan: string[];
+	checked_at: number;
+}
+
+export interface SchemaGuardPayload {
+	record: SchemaGuardRecord | null;
+}
+
+export function fetchSchemaGuard(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<SchemaGuardPayload>> {
+	return _get<SchemaGuardPayload>("/api/schema-guard/", specAddress(query), signal);
+}
+
+/** Reads the task's migrations again, now: files and git only, no model. */
+export function checkSchemaGuard(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<SchemaGuardPayload>> {
+	return _post<SchemaGuardPayload>("/api/schema-guard/check", specAddress(query), signal);
+}
+
 export function fetchDocintelDrafts(
 	query: SpecTraceabilityQuery,
 	signal?: AbortSignal,
