@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
+import type { OnboardingRole } from "../../../preload/api/modules/onboarding-agent-api";
 import { useOnboardingAgentStore } from "../../stores/onboarding-agent-store";
+import { Chip, Chips } from "../charter";
 import { Button } from "../ui/button";
 import { Progress } from "../ui/progress";
 import { CategoryBadge, EmptyState, useGeneratedText } from "./shared";
@@ -21,6 +23,8 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 	file: <FileCode className="w-4 h-4" />,
 };
 
+const ROLES: OnboardingRole[] = ["fullstack", "frontend", "backend", "devops"];
+
 export function TourPanel(): React.ReactElement | null {
 	const { t } = useTranslation("onboardingAgent");
 	const pkg = useOnboardingAgentStore((s) => s.pkg);
@@ -28,6 +32,8 @@ export function TourPanel(): React.ReactElement | null {
 	const setIdx = useOnboardingAgentStore((s) => s.setCurrentTourStep);
 	const completed = useOnboardingAgentStore((s) => s.completedTourSteps);
 	const toggleDone = useOnboardingAgentStore((s) => s.toggleTourStepDone);
+	const role = useOnboardingAgentStore((s) => s.role);
+	const setRole = useOnboardingAgentStore((s) => s.setRole);
 	const generated = useGeneratedText();
 
 	if (!pkg) return null;
@@ -35,144 +41,164 @@ export function TourPanel(): React.ReactElement | null {
 		return <EmptyState message={t("emptyTour")} />;
 	}
 
-	const step = pkg.tour[Math.min(idx, pkg.tour.length - 1)];
+	// The tour for a role keeps its areas and the general steps (#349).
+	const orders = pkg.story?.roles?.[role];
+	const tour = orders ? pkg.tour.filter((entry) => orders.includes(entry.order)) : pkg.tour;
+	const steps = tour.length ? tour : pkg.tour;
+	const step = steps[Math.min(idx, steps.length - 1)];
 	const isDone = completed.includes(step.order);
-	const progress = Math.round((completed.length / pkg.tour.length) * 100);
+	const done = steps.filter((entry) => completed.includes(entry.order)).length;
+	const progress = Math.round((done / steps.length) * 100);
 
 	return (
-		<div className="flex gap-4 h-full">
-			{/* Step list — a tour you cannot see the shape of is a slideshow. */}
-			<aside className="w-56 shrink-0 hidden md:flex md:flex-col gap-1 overflow-auto">
-				{pkg.tour.map((entry, entryIdx) => {
-					const done = completed.includes(entry.order);
-					return (
-						<button
-							type="button"
-							key={entry.file_path}
-							onClick={() => setIdx(entryIdx)}
-							className={`text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 ${
-								entryIdx === idx
-									? "bg-accent text-accent-foreground"
-									: "hover:bg-accent/50 text-muted-foreground"
-							}`}
-						>
-							<span
-								className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-									done ? "bg-success/20 text-success" : "bg-muted"
+		<div className="flex flex-col gap-3 h-full">
+			{pkg.story?.roles && (
+				<div className="flex flex-wrap items-center gap-2">
+					<span className="wp-kicker">{t("roles.label")}</span>
+					<Chips>
+						{ROLES.map((entry) => (
+							<Chip key={entry} dot={false} pressed={role === entry} onClick={() => setRole(entry)}>
+								{t(`roles.${entry}`)}
+							</Chip>
+						))}
+					</Chips>
+					<span className="wp-faint text-xs">{t("roles.count", { count: steps.length, total: pkg.tour.length })}</span>
+				</div>
+			)}
+			<div className="flex gap-4 min-h-0 flex-1">
+				{/* Step list — a tour you cannot see the shape of is a slideshow. */}
+				<aside className="w-56 shrink-0 hidden md:flex md:flex-col gap-1 overflow-auto">
+					{steps.map((entry, entryIdx) => {
+						const done = completed.includes(entry.order);
+						return (
+							<button
+								type="button"
+								key={entry.file_path}
+								onClick={() => setIdx(entryIdx)}
+								className={`text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+									entryIdx === idx
+										? "bg-accent text-accent-foreground"
+										: "hover:bg-accent/50 text-muted-foreground"
 								}`}
 							>
-								{done ? (
-									<Check className="w-3 h-3" />
-								) : (
-									<span>{entry.order}</span>
-								)}
+								<span
+									className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+										done ? "bg-success/20 text-success" : "bg-muted"
+									}`}
+								>
+									{done ? (
+										<Check className="w-3 h-3" />
+									) : (
+										<span>{entry.order}</span>
+									)}
+								</span>
+								<span className="truncate">{entry.title}</span>
+							</button>
+						);
+					})}
+				</aside>
+
+				<div className="flex-1 min-w-0 space-y-4">
+					<div className="space-y-2">
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-sm text-muted-foreground">
+								{t("stepOfTotal", {
+									current: idx + 1,
+									total: steps.length,
+								})}
 							</span>
-							<span className="truncate">{entry.title}</span>
-						</button>
-					);
-				})}
-			</aside>
-
-			<div className="flex-1 min-w-0 space-y-4">
-				<div className="space-y-2">
-					<div className="flex items-center justify-between gap-3">
-						<span className="text-sm text-muted-foreground">
-							{t("stepOfTotal", {
-								current: idx + 1,
-								total: pkg.tour.length,
+							<div className="flex gap-2">
+								<Button
+									size="icon"
+									variant="outline"
+									aria-label={t("actions.previous")}
+									onClick={() => setIdx(Math.max(0, idx - 1))}
+									disabled={idx === 0}
+								>
+									<ChevronLeft className="w-4 h-4" />
+								</Button>
+								<Button
+									size="icon"
+									variant="outline"
+									aria-label={t("actions.next")}
+									onClick={() => setIdx(Math.min(steps.length - 1, idx + 1))}
+									disabled={idx >= steps.length - 1}
+								>
+									<ChevronRight className="w-4 h-4" />
+								</Button>
+							</div>
+						</div>
+						<Progress value={progress} />
+						<p className="text-xs text-muted-foreground">
+							{t("tourProgress", {
+								done,
+								total: steps.length,
 							})}
-						</span>
-						<div className="flex gap-2">
-							<Button
-								size="icon"
-								variant="outline"
-								aria-label={t("actions.previous")}
-								onClick={() => setIdx(Math.max(0, idx - 1))}
-								disabled={idx === 0}
-							>
-								<ChevronLeft className="w-4 h-4" />
-							</Button>
-							<Button
-								size="icon"
-								variant="outline"
-								aria-label={t("actions.next")}
-								onClick={() => setIdx(Math.min(pkg.tour.length - 1, idx + 1))}
-								disabled={idx === pkg.tour.length - 1}
-							>
-								<ChevronRight className="w-4 h-4" />
-							</Button>
-						</div>
-					</div>
-					<Progress value={progress} />
-					<p className="text-xs text-muted-foreground">
-						{t("tourProgress", {
-							done: completed.length,
-							total: pkg.tour.length,
-						})}
-					</p>
-				</div>
-
-				<div className="border rounded-md p-4 bg-card space-y-3">
-					<div className="flex items-start justify-between gap-3">
-						<div className="min-w-0">
-							<h3 className="font-semibold flex items-center gap-2">
-								{STEP_ICONS[step.category] ?? STEP_ICONS.file}
-								{step.title}
-							</h3>
-							<p className="text-sm font-mono text-muted-foreground truncate">
-								{step.file_path}
-							</p>
-						</div>
-						<CategoryBadge
-							category={step.category}
-							label={t(`tourCategories.${step.category}`)}
-						/>
+						</p>
 					</div>
 
-					<p className="text-sm whitespace-pre-wrap">
-						{generated(step.reason_i18n, step.reason)}
-					</p>
-
-					{step.suggested_questions.length > 0 && (
-						<div>
-							<p className="text-xs font-medium text-muted-foreground mb-1">
-								{t("suggestedQuestions")}
-							</p>
-							<ul className="list-disc pl-5 space-y-1 text-sm">
-								{step.suggested_questions.map((question, index) => (
-									<li key={question}>
-										{generated(
-											step.suggested_questions_i18n?.[index],
-											question,
-										)}
-									</li>
-								))}
-							</ul>
+					<div className="border rounded-md p-4 bg-card space-y-3">
+						<div className="flex items-start justify-between gap-3">
+							<div className="min-w-0">
+								<h3 className="font-semibold flex items-center gap-2">
+									{STEP_ICONS[step.category] ?? STEP_ICONS.file}
+									{step.title}
+								</h3>
+								<p className="text-sm font-mono text-muted-foreground truncate">
+									{step.file_path}
+								</p>
+							</div>
+							<CategoryBadge
+								category={step.category}
+								label={t(`tourCategories.${step.category}`)}
+							/>
 						</div>
-					)}
 
-					<div className="flex gap-2 pt-1">
-						<Button
-							size="sm"
-							variant={isDone ? "outline" : "default"}
-							onClick={() => toggleDone(step.order)}
-						>
-							<Check className="w-4 h-4 mr-1" />
-							{isDone ? t("actions.markUndone") : t("actions.markDone")}
-						</Button>
-						{idx < pkg.tour.length - 1 && (
+						<p className="text-sm whitespace-pre-wrap">
+							{generated(step.reason_i18n, step.reason)}
+						</p>
+
+						{step.suggested_questions.length > 0 && (
+							<div>
+								<p className="text-xs font-medium text-muted-foreground mb-1">
+									{t("suggestedQuestions")}
+								</p>
+								<ul className="list-disc pl-5 space-y-1 text-sm">
+									{step.suggested_questions.map((question, index) => (
+										<li key={question}>
+											{generated(
+												step.suggested_questions_i18n?.[index],
+												question,
+											)}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+
+						<div className="flex gap-2 pt-1">
 							<Button
 								size="sm"
-								variant="outline"
-								onClick={() => {
-									if (!isDone) toggleDone(step.order);
-									setIdx(idx + 1);
-								}}
+								variant={isDone ? "outline" : "default"}
+								onClick={() => toggleDone(step.order)}
 							>
-								{t("actions.nextStep")}
-								<ChevronRight className="w-4 h-4 ml-1" />
+								<Check className="w-4 h-4 mr-1" />
+								{isDone ? t("actions.markUndone") : t("actions.markDone")}
 							</Button>
-						)}
+							{idx < steps.length - 1 && (
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => {
+										if (!isDone) toggleDone(step.order);
+										setIdx(idx + 1);
+									}}
+								>
+									{t("actions.nextStep")}
+									<ChevronRight className="w-4 h-4 ml-1" />
+								</Button>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>

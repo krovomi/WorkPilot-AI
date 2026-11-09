@@ -15,7 +15,11 @@
 		"nextStep": "Étape suivante",
 		"markDone": "Marquer comme lue",
 		"markUndone": "Marquer comme non lue",
-		"retryQuiz": "Refaire le quiz"
+		"retryQuiz": "Refaire le quiz",
+		"exportMarkdown": "Exporter en Markdown",
+		"exportHtml": "Exporter en page web",
+		"skipTour": "Je connais déjà le projet",
+		"showTour": "Afficher la visite"
 	},
 	"errors": {
 		"noProject": "Sélectionnez un projet pour générer son guide d'intégration.",
@@ -28,7 +32,8 @@
 		"tour": "Une visite guidée de la documentation, des points d'entrée et des couches",
 		"quiz": "Un quiz de compréhension sur tout le projet, pas seulement les fichiers",
 		"tasks": "Premières tâches : TODO existants, modules sans test, points d'entrée non documentés",
-		"glossary": "Un glossaire du vocabulaire du projet et l'endroit où chaque terme vit"
+		"glossary": "Un glossaire du vocabulaire du projet et l'endroit où chaque terme vit",
+		"story": "L'histoire du code : points chauds, zones fragiles, décisions de l'équipe, racontées pour votre rôle"
 	},
 	"tabs": {
 		"overview": "Aperçu",
@@ -36,7 +41,8 @@
 		"architecture": "Architecture",
 		"quiz": "Quiz",
 		"firstTasks": "Premières tâches",
-		"glossary": "Glossaire"
+		"glossary": "Glossaire",
+		"story": "L'histoire du code"
 	},
 	"overview": {
 		"stack": "Stack technique",
@@ -425,7 +431,54 @@
 			"analyzing": "Analyse de la structure du projet…",
 			"generated": "{{tour}} étape(s) de visite, {{quiz}} question(s) de quiz, {{tasks}} première(s) tâche(s), {{glossary}} terme(s) de glossaire"
 		},
-		"summary": "{{project}} : {{technologies}} technologies, {{keyFiles}} fichiers clés, {{conventions}} conventions, {{commands}} commandes."
+		"summary": "{{project}} : {{technologies}} technologies, {{keyFiles}} fichiers clés, {{conventions}} conventions, {{commands}} commandes.",
+		"story": {
+			"chapter": {
+				"structure": "Comment le projet est organisé",
+				"entry": "Par où il démarre",
+				"critical": "Son module le plus critique",
+				"fragile": "Là où il est fragile",
+				"decisions": "Ce que l'équipe a décidé"
+			},
+			"line": {
+				"stack": "{{language}} : {{paths}}",
+				"critical": "`{{path}}` a changé dans {{churn}} commit(s), par {{authors}} personne(s) cette année, avec {{complexity}} points de décision",
+				"danger": "`{{path}}` — {{zones}} (risque {{risk}}/100)",
+				"untested": "`{{path}}` — aucun test ne le nomme (risque {{risk}}/100)",
+				"adr": "{{title}} ({{status}}, {{date}}) — `{{path}}`",
+				"breaking": "Changement cassant `{{ref}}` ({{date}}) : {{title}}",
+				"memory": "{{kind}} : {{title}}",
+				"noDecision": "Aucun dossier de décision, commit cassant ni mémoire du projet n'a été trouvé."
+			},
+			"list": "{{first}}, {{rest}}",
+			"memory": {
+				"gotcha": "Piège",
+				"pattern": "Pratique"
+			},
+			"danger": {
+				"security": "sécurité",
+				"billing": "facturation",
+				"migrations": "migrations",
+				"infrastructure": "infrastructure"
+			},
+			"reason": {
+				"churn": "{{count}} commit(s) par {{authors}} personne(s) cette année",
+				"complexity": "{{count}} points de décision",
+				"untested": "Aucun fichier de test ne le nomme"
+			},
+			"quiz": {
+				"churn": {
+					"question": "Quel fichier a changé le plus souvent cette année ?",
+					"rationale": "`{{path}}` — {{count}} commit(s) sur la dernière année"
+				},
+				"zone": {
+					"migrations": "Quel fichier modifie le schéma de la base de données ?",
+					"security": "Quel fichier gère la sécurité (authentification, secrets, permissions) ?",
+					"billing": "Quel fichier gère les paiements ou la facturation ?",
+					"rationale": "`{{path}}` est dans une zone sensible : à modifier avec prudence"
+				}
+			}
+		}
 	},
 	"kickers": {
 		"package": "Dossier d'intégration",
@@ -435,5 +488,55 @@
 	},
 	"guideIntro": "Un parcours pas à pas pour démarrer sur ce projet : installation, commandes, structure.",
 	"guideEmptyTitle": "Aucun parcours pour l'instant",
-	"selectStep": "Choisissez une étape à gauche."
+	"selectStep": "Choisissez une étape à gauche.",
+	"roles": {
+		"label": "Visite pour",
+		"fullstack": "Full stack",
+		"frontend": "Frontend",
+		"backend": "Backend",
+		"devops": "DevOps",
+		"count": "{{count}} étapes sur {{total}}"
+	},
+	"storyView": {
+		"intro": "Mesurée sur le dépôt : historique git, points de décision, zones sensibles et tests. Aucun modèle n'est nécessaire ; il peut raconter chaque chapitre en prose si vous le demandez.",
+		"narrate": "Raconter avec l'IA",
+		"narrating": "Le modèle actif raconte l'histoire…",
+		"narrateFailed": "L'histoire n'a pas pu être racontée : {{error}}",
+		"noAnswer": "Le modèle actif n'a pas donné de réponse exploitable ; les chapitres restent tels que mesurés.",
+		"hotspots": "Points chauds",
+		"hotspotsIntro": "Les fichiers à aborder avec prudence, par risque. Le risque pèse les commits de l'année, les points de décision, les zones sensibles et l'absence de tests, par rapport au reste du dépôt.",
+		"decisions": "Décisions",
+		"noHotspots": "Aucun point chaud : le dépôt n'a pas encore d'historique, ou aucun fichier ne ressort.",
+		"risk": "Risque {{risk}}",
+		"columns": {
+			"file": "Fichier",
+			"risk": "Risque",
+			"commits": "Commits",
+			"authors": "Personnes",
+			"complexity": "Points de décision",
+			"zones": "Zones",
+			"tested": "Testé"
+		},
+		"yes": "oui",
+		"no": "non",
+		"source": {
+			"adr": "Dossier de décision",
+			"commit": "Commit cassant",
+			"memory": "Mémoire du projet"
+		},
+		"empty": "Ce paquet date d'avant l'histoire du code : régénérez-le."
+	},
+	"freshness": {
+		"regenerated": "Le projet a changé depuis la dernière visite, elle a donc été régénérée. Nouveau : {{added}}. Disparu : {{removed}}.",
+		"none": "rien",
+		"skipped": "La visite et le quiz sont masqués. La carte, l'histoire, les premières tâches et le glossaire restent disponibles."
+	},
+	"export": {
+		"saved": "Enregistré dans {{path}}",
+		"failed": "L'export a échoué : {{error}}",
+		"generatedAt": "Généré le {{date}}",
+		"tourStep": "{{order}}. {{title}} — {{path}}",
+		"hotspotLine": "{{path}} — risque {{risk}}/100 : {{reasons}}",
+		"quizLine": "{{question}} → {{answer}}"
+	}
 }

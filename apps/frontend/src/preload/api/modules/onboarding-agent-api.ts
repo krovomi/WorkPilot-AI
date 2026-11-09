@@ -5,6 +5,10 @@
  */
 
 import type { OnboardingGuide } from "../../../shared/types/onboarding";
+import type {
+	OnboardingExportOutcome,
+	OnboardingExportRequest,
+} from "../../../shared/types/onboarding-export";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
@@ -126,6 +130,79 @@ export interface OnboardingPackageStats {
 	languages?: number;
 }
 
+export type OnboardingRole = "fullstack" | "frontend" | "backend" | "devops";
+
+export type OnboardingDangerZone = "security" | "billing" | "migrations" | "infrastructure";
+
+/** A file a newcomer should approach with care, and why, in numbers. */
+export interface OnboardingHotspot {
+	path: string;
+	/** Commits that touched it over the last year. */
+	churn: number;
+	authors: number;
+	/** Decision points (`if`, loops, `case`, `catch`, `&&`…). */
+	complexity: number;
+	lines: number;
+	danger: OnboardingDangerZone[];
+	tested: boolean;
+	/** 0-100, relative to the other files of the repository. */
+	risk: number;
+	reasons: OnboardingText[];
+}
+
+export interface OnboardingDecision {
+	source: "adr" | "commit" | "memory";
+	title: string;
+	path: string;
+	status: string;
+	date: string;
+	ref: string;
+}
+
+export type OnboardingChapterId = "structure" | "entry" | "critical" | "fragile" | "decisions";
+
+export interface OnboardingChapter {
+	id: OnboardingChapterId;
+	title: OnboardingText;
+	lines: OnboardingText[];
+	files: string[];
+}
+
+/** The code's story: five chapters, the hot spots, the decisions, a tour per role. */
+export interface OnboardingStory {
+	chapters: OnboardingChapter[];
+	hotspots: OnboardingHotspot[];
+	decisions: OnboardingDecision[];
+	/** Tour step orders each role sees. */
+	roles: Partial<Record<OnboardingRole, number[]>>;
+	areas: Record<string, string>;
+	stacks: Record<string, string[]>;
+	fingerprint: string;
+	modules: string[];
+}
+
+/** Whether the last tour still fits the project. */
+export interface OnboardingFreshness {
+	known: boolean;
+	stale: boolean;
+	added: string[];
+	removed: string[];
+	generatedAt: string;
+	/** On a fresh result: what had made the previous tour stale. */
+	changed?: { added: string[]; removed: string[] } | null;
+}
+
+export interface OnboardingNarration {
+	paragraphs: Partial<Record<OnboardingChapterId, string>>;
+	answered: boolean;
+	missing: OnboardingChapterId[];
+}
+
+export interface OnboardingNarrateOptions {
+	projectPath: string;
+	language: string;
+}
+
 export interface OnboardingPackage {
 	guide: {
 		project_name: string;
@@ -145,11 +222,14 @@ export interface OnboardingPackage {
 	quiz: OnboardingQuizQuestion[];
 	first_tasks: OnboardingFirstTask[];
 	glossary: OnboardingGlossaryTerm[];
+	/** Absent from a package made before #349. */
+	story?: OnboardingStory;
 }
 
 export interface OnboardingAgentResult {
 	guide: OnboardingGuide;
 	package?: OnboardingPackage;
+	freshness?: OnboardingFreshness;
 }
 
 export interface OnboardingAgentEvent {
@@ -162,6 +242,9 @@ export interface OnboardingAgentAPI {
 		options: OnboardingAgentRunOptions,
 	) => Promise<OnboardingAgentResult>;
 	cancelOnboardingAgentScan: () => Promise<boolean>;
+	getOnboardingTourStatus: (options: OnboardingAgentRunOptions) => Promise<OnboardingFreshness>;
+	narrateOnboardingStory: (options: OnboardingNarrateOptions) => Promise<OnboardingNarration>;
+	exportOnboardingTour: (request: OnboardingExportRequest) => Promise<OnboardingExportOutcome>;
 	onOnboardingAgentEvent: (
 		callback: (event: OnboardingAgentEvent) => void,
 	) => () => void;
@@ -177,6 +260,15 @@ export const createOnboardingAgentAPI = (): OnboardingAgentAPI => ({
 
 	cancelOnboardingAgentScan: () =>
 		invokeIpc<boolean>(IPC_CHANNELS.ONBOARDING_AGENT_CANCEL),
+
+	getOnboardingTourStatus: (options) =>
+		invokeIpc<OnboardingFreshness>(IPC_CHANNELS.ONBOARDING_AGENT_STATUS, options),
+
+	narrateOnboardingStory: (options) =>
+		invokeIpc<OnboardingNarration>(IPC_CHANNELS.ONBOARDING_AGENT_NARRATE, options),
+
+	exportOnboardingTour: (request) =>
+		invokeIpc<OnboardingExportOutcome>(IPC_CHANNELS.ONBOARDING_AGENT_EXPORT, request),
 
 	onOnboardingAgentEvent: (callback) =>
 		createIpcListener<[OnboardingAgentEvent]>(IPC_CHANNELS.ONBOARDING_EVENT, (payload) =>

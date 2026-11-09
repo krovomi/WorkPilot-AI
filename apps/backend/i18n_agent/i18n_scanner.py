@@ -15,6 +15,8 @@ from typing import Any
 
 from agents.scanner_base import BaseScanner, BaseScanReport
 
+from .parity import PLURAL_CATEGORIES
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +27,9 @@ class I18nIssueType(str, Enum):
     INCONSISTENT_PARAMS = "inconsistent_params"
     MISSING_PLURAL = "missing_plural"
     LOCALE_FILE_MISMATCH = "locale_file_mismatch"
+    ORPHAN_KEY = "orphan_key"
+    UNTRANSLATED = "untranslated"
+    RTL_SIDE = "rtl_side"
 
 
 class I18nSeverity(str, Enum):
@@ -45,6 +50,15 @@ class I18nIssue:
     key: str = ""
     locale: str = ""
     suggestion: str = ""
+    text: str = ""
+    """The hard-coded text itself, for a ``hardcoded_string``."""
+    proposed_key: str = ""
+    proposed_value: str = ""
+    snippet: str = ""
+    reused: bool = False
+    """The proposed key already exists with the same text."""
+    possibly: bool = False
+    """An orphan in a project that builds some keys at run time."""
 
 
 # In i18n, only ``error`` blocks (warnings are advisory, info is noise).
@@ -114,6 +128,49 @@ _HARDCODED_PATTERNS = [
 ]
 
 
+# Files whose strings are not shown to the person: tests, stories, fixtures.
+_NOT_UI_FILE = re.compile(
+    r"(?:^|/)(?:tests?|__tests__|__mocks__|spec|e2e|fixtures?|stories|storybook|mocks?)/|"
+    r"\.(?:test|spec|stories|story|e2e|cy)\.\w+$|(?:^|/)test_[^/]+\.py$|_test\.(?:py|dart|go)$",
+    re.I,
+)
+_TEST_CLASS = re.compile(r"[a-z0-9](?:Tests?|Spec)\.(?:cs|kt|java|swift)$")
+# Lines that write a log or a debug message rather than an interface text.
+_LOG_LINE = re.compile(
+    r"\b(?:console|logger|logging|log|Log|_logger|Logger|Debug|Trace|NSLog|os_log|debugPrint|"
+    r"print|println|printf|Timber)\s*[.(]",
+)
+
+_PLURAL_SUFFIX = re.compile(r"^(?P<base>.+)_(?P<cat>zero|one|two|few|many|other)$")
+
+
+def is_ui_file(path: str) -> bool:
+    """Whether strings in ``path`` may be shown to the person (not a test or story)."""
+    normal = path.replace("\\", "/")
+    return not (_NOT_UI_FILE.search(normal) or _TEST_CLASS.search(normal))
+
+
+def _plural_not_needed(key: str, locale: str) -> bool:
+    """A plural form ``locale`` does not use (``x_one`` in Japanese)."""
+    match = _PLURAL_SUFFIX.match(key.rsplit(".", 1)[-1])
+    if not match:
+        return False
+    needed = PLURAL_CATEGORIES.get(re.split(r"[-_]", locale.lower(), maxsplit=1)[0])
+    return bool(needed) and match.group("cat") not in needed
+
+
+def _plural_sibling(key: str, keys: set[str]) -> bool:
+    """``x_many`` whose ``x_one`` / ``x_other`` the reference has."""
+    match = _PLURAL_SUFFIX.match(key)
+    if not match:
+        return False
+    base = match.group("base")
+    return any(
+        f"{base}_{cat}" in keys
+        for cat in ("zero", "one", "two", "few", "many", "other")
+    )
+
+
 class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
     """Scan a codebase for internationalisation issues.
 
@@ -149,9 +206,13 @@ class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
     def scan_file_for_hardcoded(self, file_path: str, content: str) -> list[I18nIssue]:
         """Detect hardcoded user-facing strings in a source file."""
         issues: list[I18nIssue] = []
+        if not is_ui_file(file_path):
+            return issues
         lines = content.splitlines()
 
         for i, line in enumerate(lines, 1):
+            if _LOG_LINE.search(line):
+                continue
             for pattern in _HARDCODED_PATTERNS:
                 for match in pattern.finditer(line):
                     text = match.group(1).strip()
@@ -164,6 +225,7 @@ class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
                                 line=i,
                                 message=f'Hardcoded string: "{text[:50]}"',
                                 suggestion="Extract to translation key",
+                                text=text,
                             )
                         )
         return issues
@@ -176,8 +238,8 @@ class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
         ref_keys = _flatten_keys(reference)
         target_keys = _flatten_keys(target)
 
-        for key in ref_keys:
-            if key not in target_keys:
+        for key in sorted(ref_keys):
+            if key not in target_keys and not _plural_not_needed(key, target_locale):
                 issues.append(
                     I18nIssue(
                         issue_type=I18nIssueType.MISSING_KEY,
@@ -190,8 +252,8 @@ class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
                     )
                 )
 
-        for key in target_keys:
-            if key not in ref_keys:
+        for key in sorted(target_keys):
+            if key not in ref_keys and not _plural_sibling(key, ref_keys):
                 issues.append(
                     I18nIssue(
                         issue_type=I18nIssueType.UNUSED_KEY,
@@ -216,8 +278,9 @@ class I18nScanner(BaseScanner[I18nIssue, I18nReport]):
         coverage: dict[str, float] = {}
         for locale_name, locale_data in locales.items():
             target_keys = _flatten_keys(locale_data)
-            matched = sum(1 for k in ref_keys if k in target_keys)
-            coverage[locale_name] = matched / len(ref_keys)
+            wanted = [k for k in ref_keys if not _plural_not_needed(k, locale_name)]
+            matched = sum(1 for k in wanted if k in target_keys)
+            coverage[locale_name] = matched / len(wanted) if wanted else 1.0
         return coverage
 
 

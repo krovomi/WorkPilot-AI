@@ -15,7 +15,11 @@
 		"nextStep": "Next step",
 		"markDone": "Mark as read",
 		"markUndone": "Mark as unread",
-		"retryQuiz": "Retake the quiz"
+		"retryQuiz": "Retake the quiz",
+		"exportMarkdown": "Export as Markdown",
+		"exportHtml": "Export as a web page",
+		"skipTour": "I already know this project",
+		"showTour": "Show the tour"
 	},
 	"errors": {
 		"noProject": "Select a project to generate its onboarding guide.",
@@ -28,7 +32,8 @@
 		"tour": "A guided tour of the documentation, entry points and layers",
 		"quiz": "A comprehension quiz covering the whole project, not only the files",
 		"tasks": "First tasks: existing TODOs, untested modules, undocumented entry points",
-		"glossary": "A glossary of the project's vocabulary with where each term lives"
+		"glossary": "A glossary of the project's vocabulary with where each term lives",
+		"story": "The code's story: hot spots, fragile zones, the team's decisions, told for your role"
 	},
 	"tabs": {
 		"overview": "Overview",
@@ -36,7 +41,8 @@
 		"architecture": "Architecture",
 		"quiz": "Quiz",
 		"firstTasks": "First tasks",
-		"glossary": "Glossary"
+		"glossary": "Glossary",
+		"story": "The code's story"
 	},
 	"overview": {
 		"stack": "Tech stack",
@@ -425,7 +431,54 @@
 			"analyzing": "Analyzing project structure…",
 			"generated": "Generated {{tour}} tour step(s), {{quiz}} quiz question(s), {{tasks}} first task(s), {{glossary}} glossary term(s)"
 		},
-		"summary": "{{project}}: {{technologies}} technologies, {{keyFiles}} key files, {{conventions}} conventions, {{commands}} commands."
+		"summary": "{{project}}: {{technologies}} technologies, {{keyFiles}} key files, {{conventions}} conventions, {{commands}} commands.",
+		"story": {
+			"chapter": {
+				"structure": "How the project is laid out",
+				"entry": "Where it starts",
+				"critical": "Its most critical module",
+				"fragile": "Where it is fragile",
+				"decisions": "What the team decided"
+			},
+			"line": {
+				"stack": "{{language}}: {{paths}}",
+				"critical": "`{{path}}` changed in {{churn}} commit(s) by {{authors}} person(s) this year, with {{complexity}} decision points",
+				"danger": "`{{path}}` — {{zones}} (risk {{risk}}/100)",
+				"untested": "`{{path}}` — no test names it (risk {{risk}}/100)",
+				"adr": "{{title}} ({{status}}, {{date}}) — `{{path}}`",
+				"breaking": "Breaking change `{{ref}}` ({{date}}): {{title}}",
+				"memory": "{{kind}}: {{title}}",
+				"noDecision": "No decision record, breaking commit or project memory was found."
+			},
+			"list": "{{first}}, {{rest}}",
+			"memory": {
+				"gotcha": "Gotcha",
+				"pattern": "Pattern"
+			},
+			"danger": {
+				"security": "security",
+				"billing": "billing",
+				"migrations": "migrations",
+				"infrastructure": "infrastructure"
+			},
+			"reason": {
+				"churn": "{{count}} commit(s) by {{authors}} person(s) this year",
+				"complexity": "{{count}} decision points",
+				"untested": "No test file names it"
+			},
+			"quiz": {
+				"churn": {
+					"question": "Which file changed most often this year?",
+					"rationale": "`{{path}}` — {{count}} commit(s) over the last year"
+				},
+				"zone": {
+					"migrations": "Which file changes the database schema?",
+					"security": "Which file handles security (authentication, secrets, permissions)?",
+					"billing": "Which file handles payments or billing?",
+					"rationale": "`{{path}}` sits in a danger zone: change it with care"
+				}
+			}
+		}
 	},
 	"kickers": {
 		"package": "Onboarding package",
@@ -435,5 +488,55 @@
 	},
 	"guideIntro": "A step-by-step path to get started on this project: setup, commands, structure.",
 	"guideEmptyTitle": "No path yet",
-	"selectStep": "Pick a step on the left."
+	"selectStep": "Pick a step on the left.",
+	"roles": {
+		"label": "Tour for",
+		"fullstack": "Full stack",
+		"frontend": "Frontend",
+		"backend": "Backend",
+		"devops": "DevOps",
+		"count": "{{count}} of {{total}} steps"
+	},
+	"storyView": {
+		"intro": "Measured on the repository: git history, decision points, danger zones and tests. No model is needed; it can tell each chapter in prose if you ask.",
+		"narrate": "Tell it with AI",
+		"narrating": "The active model is telling the story…",
+		"narrateFailed": "The story could not be told: {{error}}",
+		"noAnswer": "The active model gave no usable answer; the chapters stay as measured.",
+		"hotspots": "Hot spots",
+		"hotspotsIntro": "The files to approach with care, by risk. Risk weighs this year's commits, decision points, danger zones and missing tests against the rest of the repository.",
+		"decisions": "Decisions",
+		"noHotspots": "No hot spot: the repository has no history yet, or no file stands out.",
+		"risk": "Risk {{risk}}",
+		"columns": {
+			"file": "File",
+			"risk": "Risk",
+			"commits": "Commits",
+			"authors": "People",
+			"complexity": "Decision points",
+			"zones": "Zones",
+			"tested": "Tested"
+		},
+		"yes": "yes",
+		"no": "no",
+		"source": {
+			"adr": "Decision record",
+			"commit": "Breaking commit",
+			"memory": "Project memory"
+		},
+		"empty": "This package was made before the code's story existed: regenerate it."
+	},
+	"freshness": {
+		"regenerated": "The project changed since the last tour, so it was regenerated. New: {{added}}. Gone: {{removed}}.",
+		"none": "none",
+		"skipped": "The tour and the quiz are hidden. The map, the story, the first tasks and the glossary stay here."
+	},
+	"export": {
+		"saved": "Saved to {{path}}",
+		"failed": "The export failed: {{error}}",
+		"generatedAt": "Generated on {{date}}",
+		"tourStep": "{{order}}. {{title}} — {{path}}",
+		"hotspotLine": "{{path}} — risk {{risk}}/100: {{reasons}}",
+		"quizLine": "{{question}} → {{answer}}"
+	}
 }

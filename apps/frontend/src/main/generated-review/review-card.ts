@@ -73,6 +73,7 @@ const TITLE_PREFIX: Record<GeneratedReviewSource, { en: string; fr: string }> = 
 	changelog: { en: "Changelog update", fr: "Mise à jour du changelog" },
 	"pair-programming": { en: "Pair programming", fr: "Pair programming" },
 	"quick-command": { en: "Quick command", fr: "Commande rapide" },
+	i18n: { en: "Translations", fr: "Traductions" },
 	accessibility: { en: "Accessibility fixes", fr: "Corrections d'accessibilité" },
 };
 
