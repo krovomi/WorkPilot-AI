@@ -99,7 +99,7 @@ l'UI n'existe pas.
 - Ajouter une commande à l'allowlist (`project/command_registry/`) : un validateur si elle peut
   écrire, supprimer, exécuter du code ou joindre le réseau, et un test dans `tests/`.
 - Un agent ne modifie jamais ses garde-fous : `.workpilot-security.json`, `.workpilot-allowlist`,
-  `.workpilot/guardrails.*`, `.claude_settings.json`, `.claude/settings*.json`, `.workpilot-goal.json`.
+  `.workpilot/guardrail*`, `workpilot.policy.yaml`, `.claude_settings.json`, `.claude/settings*.json`, `.workpilot-goal.json`.
 - Serveur MCP tiers : seulement par `CUSTOM_MCP_SERVERS`, validé par `validate_custom_mcp_server` (`core/custom_mcp_validation.py`).
   N'élargir ni la liste des lanceurs autorisés ni celle des options refusées.
 
