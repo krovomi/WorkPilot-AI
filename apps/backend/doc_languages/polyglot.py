@@ -62,6 +62,9 @@ class SourceSymbol:
     args: list[str] = field(default_factory=list)
     returns: bool = False
     doc: str = ""
+    #: False when a parameter has no plain name (destructured, rest, variadic):
+    #: ``args`` is then not the whole signature.
+    args_complete: bool = True
 
 
 def _p(pattern: str) -> re.Pattern[str]:
@@ -475,6 +478,18 @@ def _params(args: str | None, style: str) -> list[str]:
     return out
 
 
+def param_names(args: str, style: str) -> tuple[list[str], bool]:
+    """The parameter names of an argument list, and whether every one has a plain name."""
+    return _params(args, style), _params_complete(args, style)
+
+
+def _params_complete(args: str | None, style: str) -> bool:
+    """Whether every parameter of ``args`` has a plain name."""
+    if not args:
+        return True
+    return all(_param_name(part, style) for part in _split_top_level(args))
+
+
 def _has_return(match: re.Match[str], lang: Language) -> bool:
     groups = match.groupdict()
     ret = (groups.get("ret") or "").strip()
@@ -625,6 +640,8 @@ def extract_symbols(content: str, path: str) -> list[SourceSymbol]:
                 language=lang.id,
                 indent=raw[:width],
                 args=[] if is_type else _params(groups.get("args"), lang.params),
+                args_complete=is_type
+                or _params_complete(groups.get("args"), lang.params),
                 returns=False if is_type else _has_return(match, lang),
                 doc=_doc_above(lines, index, lang),
             )

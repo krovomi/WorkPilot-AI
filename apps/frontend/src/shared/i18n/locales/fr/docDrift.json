@@ -1,6 +1,6 @@
 {
 	"title": "Détecteur de dérive",
-	"description": "Les noms de fonctions et chemins de fichiers cités dans la documentation, comparés au code actuel",
+	"description": "Commentaires de doc, exemples de code, fonctions et chemins cités, et documents que le code a dépassés, comparés au code actuel",
 	"scan": {
 		"kicker": "Scan",
 		"title": "Votre documentation",
@@ -23,7 +23,7 @@
 		"title_other": "{{count}} écarts",
 		"titleNone": "Aucun écart",
 		"emptyTitle": "Lancez un scan",
-		"emptyHint": "Le scan compare chaque fonction et chaque chemin cités entre `backticks` dans vos .md / .rst au code du projet, quel que soit le langage.",
+		"emptyHint": "L'analyse lit chaque commentaire de doc, chaque exemple de code et chaque fonction ou chemin cité entre `backticks` dans vos .md / .rst, et git pour les documents que le code a dépassés, quel que soit le langage.",
 		"clean": "La documentation correspond au code.",
 		"filtered": "Aucun écart pour ce filtre."
 	},
@@ -46,7 +46,8 @@
 		"stale_reference": {
 			"label": "Fichier introuvable",
 			"message": "La documentation cite le fichier « {{symbol}} », absent du projet.",
-			"fix": "Mettez à jour le chemin ou retirez la référence."
+			"fix": "Mettez à jour le chemin ou retirez la référence.",
+			"fixMoved": "Citer « {{target}} », le seul fichier du projet qui porte ce nom."
 		},
 		"outdated_example": {
 			"label": "Exemple périmé",
@@ -72,6 +73,50 @@
 			"label": "Configuration différente",
 			"message": "La configuration « {{symbol}} » ne correspond pas au code.",
 			"fix": "Alignez la configuration documentée."
+		},
+		"signature_mismatch": {
+			"label": "Commentaire de doc dépassé",
+			"message_renamed": "Le commentaire de doc de « {{symbol}} » nomme encore « {{old}} », renommé « {{new}} » dans le code.",
+			"message_removed": "Le commentaire de doc de « {{symbol}} » documente {{removed}}, que le code ne prend plus.",
+			"message": "Le commentaire de doc de « {{symbol}} » ne correspond plus à ses paramètres.",
+			"fix": "Décrire les paramètres que le code prend aujourd'hui."
+		},
+		"type_mismatch": {
+			"label": "Type dépassé",
+			"message": "« {{name}} » est documenté en {{documented}} mais annoté {{annotated}} dans « {{symbol}} ».",
+			"fix": "Écrire le type annoté dans la docstring."
+		},
+		"undocumented_param": {
+			"label": "Paramètre non décrit",
+			"message": "Le commentaire de doc de « {{symbol}} » ne décrit pas {{added}}.",
+			"fix": "Décrire les nouveaux paramètres."
+		},
+		"example_syntax": {
+			"label": "Exemple qui ne se lit pas",
+			"message": "Un exemple de code ne se lit pas : {{detail}}",
+			"message_json": "Un exemple JSON ne se lit pas : {{detail}}",
+			"fix": "Corriger l'exemple pour qu'il se copie tel quel."
+		},
+		"example_import": {
+			"label": "Exemple qui importe ce qui n'existe plus",
+			"message": "Un exemple de code importe « {{symbol}} », que le projet n'a plus.",
+			"fix": "Importer ce que le projet propose aujourd'hui."
+		},
+		"example_arguments": {
+			"label": "Appel d'exemple dépassé",
+			"message": "Un exemple de code appelle « {{symbol}} » avec des arguments qu'il n'accepte plus ({{detail}}).",
+			"fix": "L'appeler avec ses paramètres actuels."
+		},
+		"stale_doc": {
+			"label": "Probablement pas à jour",
+			"message_one": "{{count}} fichier que ce document décrit a changé après lui, il y a {{days}} jours : {{files}}.",
+			"message_other": "{{count}} fichiers que ce document décrit ont changé après lui, il y a {{days}} jours : {{files}}.",
+			"fix": "Lire ces changements et mettre le document à jour."
+		},
+		"doc_not_updated": {
+			"label": "Document non mis à jour",
+			"message": "Le changement modifie {{files}} mais pas ce document.",
+			"fix": "Vérifier que le document tient toujours."
 		}
 	},
 	"high": "Élevée",
@@ -89,5 +134,56 @@
 	"errors": {
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
+	},
+	"families": {
+		"references": "Références",
+		"signatures": "Commentaires de doc",
+		"examples": "Exemples",
+		"stale": "Pas à jour"
+	},
+	"freshness": {
+		"kicker": "Fraîcheur",
+		"title": "Fraîcheur",
+		"average": "{{score}}/100 en moyenne",
+		"worst": "Documents les moins frais",
+		"noGit": "Pas d'historique git : l'ancienneté n'est pas mesurée.",
+		"score": "{{score}}/100"
+	},
+	"fix": {
+		"available_one": "{{count}} écart se corrige automatiquement",
+		"available_other": "{{count}} écarts se corrigent automatiquement",
+		"apply_one": "Corriger {{count}} sur une carte de revue",
+		"apply_other": "Corriger {{count}} sur une carte de revue",
+		"running": "Préparation de la carte de revue…",
+		"done_one": "{{count}} correction faite sur la branche {{branch}} : relisez-la sur la carte.",
+		"done_other": "{{count}} corrections faites sur la branche {{branch}} : relisez-les sur la carte.",
+		"nothing": "Plus rien à corriger : le code a changé depuis l'analyse.",
+		"missing_one": "{{count}} correction n'a plus été trouvée.",
+		"missing_other": "{{count}} corrections n'ont plus été trouvées.",
+		"failed": "Les corrections n'ont pas pu être faites : {{error}}",
+		"serverOnly": "Les fichiers d'un projet du serveur ne sont pas sur cet ordinateur : corrigez-les depuis une copie locale.",
+		"fixable": "Corrigeable"
+	},
+	"export": {
+		"json": "Exporter en JSON",
+		"html": "Exporter en HTML",
+		"saved": "Enregistré dans {{path}}",
+		"failed": "Échec de l'export : {{error}}",
+		"title": "Dérive de la documentation",
+		"summary": "{{docs}} documents, {{issues}} écarts, fraîcheur moyenne {{score}}",
+		"columns": {
+			"severity": "Gravité",
+			"type": "Type",
+			"where": "Où",
+			"what": "Quoi",
+			"fix": "Correction"
+		},
+		"freshnessTitle": "Fraîcheur de chaque document",
+		"freshnessColumns": {
+			"doc": "Document",
+			"score": "Score",
+			"locale": "Langue",
+			"issues": "Écarts"
+		}
 	}
 }

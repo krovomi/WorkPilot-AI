@@ -1,6 +1,6 @@
 {
 	"title": "Drift detector",
-	"description": "Function names and file paths cited in the documentation, compared with the current code",
+	"description": "Doc comments, code examples, cited functions and paths, and documents the code moved past, compared with the current code",
 	"scan": {
 		"kicker": "Scan",
 		"title": "Your documentation",
@@ -23,7 +23,7 @@
 		"title_other": "{{count}} gaps",
 		"titleNone": "No gap",
 		"emptyTitle": "Run a scan",
-		"emptyHint": "The scan compares every function and path cited in `backticks` in your .md / .rst with the project's code, whatever the language.",
+		"emptyHint": "The scan reads every doc comment, every code example and every function or path cited in `backticks` in your .md / .rst, and git for the documents the code moved past, whatever the language.",
 		"clean": "The documentation matches the code.",
 		"filtered": "No gap for this filter."
 	},
@@ -46,7 +46,8 @@
 		"stale_reference": {
 			"label": "File not found",
 			"message": "The documentation cites the file “{{symbol}}”, which is not in the project.",
-			"fix": "Update the path or remove the reference."
+			"fix": "Update the path or remove the reference.",
+			"fixMoved": "Cite “{{target}}”, the only project file with this name."
 		},
 		"outdated_example": {
 			"label": "Outdated example",
@@ -72,6 +73,50 @@
 			"label": "Config mismatch",
 			"message": "The configuration “{{symbol}}” does not match the code.",
 			"fix": "Align the documented configuration."
+		},
+		"signature_mismatch": {
+			"label": "Doc comment out of date",
+			"message_renamed": "The doc comment of “{{symbol}}” still names “{{old}}”, renamed “{{new}}” in the code.",
+			"message_removed": "The doc comment of “{{symbol}}” documents {{removed}}, which the code no longer takes.",
+			"message": "The doc comment of “{{symbol}}” no longer matches its parameters.",
+			"fix": "Describe the parameters the code takes now."
+		},
+		"type_mismatch": {
+			"label": "Type out of date",
+			"message": "“{{name}}” is documented as {{documented}} but annotated {{annotated}} in “{{symbol}}”.",
+			"fix": "Write the annotated type in the docstring."
+		},
+		"undocumented_param": {
+			"label": "Parameter not described",
+			"message": "The doc comment of “{{symbol}}” does not describe {{added}}.",
+			"fix": "Describe the new parameters."
+		},
+		"example_syntax": {
+			"label": "Example does not parse",
+			"message": "A code example does not parse: {{detail}}",
+			"message_json": "A JSON example does not parse: {{detail}}",
+			"fix": "Fix the example so it can be copied as is."
+		},
+		"example_import": {
+			"label": "Example imports what is gone",
+			"message": "A code example imports “{{symbol}}”, which the project no longer has.",
+			"fix": "Import what the project offers now."
+		},
+		"example_arguments": {
+			"label": "Example call out of date",
+			"message": "A code example calls “{{symbol}}” with arguments it no longer accepts ({{detail}}).",
+			"fix": "Call it with its current parameters."
+		},
+		"stale_doc": {
+			"label": "Probably out of date",
+			"message_one": "{{count}} file this document describes changed after it, {{days}} days ago: {{files}}.",
+			"message_other": "{{count}} files this document describes changed after it, {{days}} days ago: {{files}}.",
+			"fix": "Read those changes and update the document."
+		},
+		"doc_not_updated": {
+			"label": "Document not updated",
+			"message": "The change edits {{files}} but not this document.",
+			"fix": "Check that the document still holds."
 		}
 	},
 	"high": "High",
@@ -89,5 +134,56 @@
 	"errors": {
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
+	},
+	"families": {
+		"references": "References",
+		"signatures": "Doc comments",
+		"examples": "Examples",
+		"stale": "Out of date"
+	},
+	"freshness": {
+		"kicker": "Freshness",
+		"title": "Freshness",
+		"average": "{{score}}/100 on average",
+		"worst": "Least fresh documents",
+		"noGit": "No git history: staleness is not measured.",
+		"score": "{{score}}/100"
+	},
+	"fix": {
+		"available_one": "{{count}} gap can be fixed automatically",
+		"available_other": "{{count}} gaps can be fixed automatically",
+		"apply_one": "Fix {{count}} on a review card",
+		"apply_other": "Fix {{count}} on a review card",
+		"running": "Preparing the review card…",
+		"done_one": "{{count}} fix made on the branch {{branch}}: review it on the card.",
+		"done_other": "{{count}} fixes made on the branch {{branch}}: review them on the card.",
+		"nothing": "Nothing left to fix: the code changed since the scan.",
+		"missing_one": "{{count}} fix was no longer found.",
+		"missing_other": "{{count}} fixes were no longer found.",
+		"failed": "The fixes could not be made: {{error}}",
+		"serverOnly": "A server project's files are not on this computer: fix them from a local copy.",
+		"fixable": "Fixable"
+	},
+	"export": {
+		"json": "Export JSON",
+		"html": "Export HTML",
+		"saved": "Saved to {{path}}",
+		"failed": "Export failed: {{error}}",
+		"title": "Documentation drift",
+		"summary": "{{docs}} documents, {{issues}} gaps, average freshness {{score}}",
+		"columns": {
+			"severity": "Severity",
+			"type": "Type",
+			"where": "Where",
+			"what": "What",
+			"fix": "Fix"
+		},
+		"freshnessTitle": "Freshness of each document",
+		"freshnessColumns": {
+			"doc": "Document",
+			"score": "Score",
+			"locale": "Language",
+			"issues": "Gaps"
+		}
 	}
 }

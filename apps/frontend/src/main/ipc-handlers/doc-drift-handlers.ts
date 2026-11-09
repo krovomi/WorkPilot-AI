@@ -7,6 +7,8 @@
  * Channels:
  *   invoke "docDrift:run"     → { projectPath }
  *   invoke "docDrift:cancel"  → void
+ *   invoke "docDrift:fix"     → fixes made on a review card (#354)
+ *   invoke "docDrift:export"  → { format, report, document }: JSON or HTML
  *
  * Renderer events:
  *   doc-drift-event     (progress / start / complete metadata)
@@ -20,6 +22,10 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { fixOnReviewCard, readFixRequest } from "../doc-drift/fix-run";
+import { readFormat, writeExport } from "../doc-drift/report-export";
+import { showSaveDialog } from "../electron-utils";
+import { resolveKnownProject } from "../security/renderer-path";
 import {
 	cancelServerAnalysis,
 	relayServerAnalysis,
@@ -72,6 +78,14 @@ export function registerDocDriftHandlers(): void {
 				});
 			}
 
+			// Only a project the user added is scanned (S6).
+			const projectRoot = resolveKnownProject(projectPath);
+			if (!projectRoot) {
+				const message = "Not a project of this app";
+				broadcast(IPC_CHANNELS.DOC_DRIFT_ERROR, message);
+				throw new Error(message);
+			}
+
 			const backendPath = app.isPackaged
 				? path.resolve(process.resourcesPath, "backend")
 				: path.resolve(app.getAppPath(), "..", "backend");
@@ -85,7 +99,7 @@ export function registerDocDriftHandlers(): void {
 
 			const child = spawn(
 				pythonExe,
-				[runnerPath, "--project-path", projectPath],
+				[runnerPath, "--project-path", projectRoot],
 				{
 					cwd: backendPath,
 					env: await pythonRunnerEnv(backendPath),
@@ -157,4 +171,25 @@ export function registerDocDriftHandlers(): void {
 		killExisting();
 		return true;
 	});
+
+	ipcMain.handle(IPC_CHANNELS.DOC_DRIFT_FIX, async (_event, raw: unknown) => {
+		const request = readFixRequest(raw);
+		if (!request) throw new Error("No fix to make");
+		return fixOnReviewCard(request);
+	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.DOC_DRIFT_EXPORT,
+		async (_event, request: { format?: unknown; report?: unknown; document?: unknown } | undefined) => {
+			const format = readFormat(request?.format);
+			if (!format) throw new Error("Unknown export format");
+			const { canceled, filePath } = await showSaveDialog({
+				defaultPath: `doc-drift-report.${format}`,
+				filters: [{ name: format.toUpperCase(), extensions: [format] }],
+			});
+			if (canceled || !filePath) return null;
+			await writeExport(format, { report: request?.report, document: request?.document }, filePath);
+			return filePath;
+		},
+	);
 }

@@ -66,6 +66,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The schema guard (docs/architecture/schema-guard.md): migration rules
     # over text, git through foundation. The QA gate that calls it is in qa.
     "schema_guard": {"foundation"},
+    "doc_drift_detector": {"doc_languages", "foundation"},
     # The red team (docs/architecture/red-team.md): the mutation gate's scratch
     # copy, scope and test commands, the suite runner and its reports, git
     # through foundation. Its session and the card's route are in qa

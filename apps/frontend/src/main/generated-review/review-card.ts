@@ -75,6 +75,7 @@ const TITLE_PREFIX: Record<GeneratedReviewSource, { en: string; fr: string }> = 
 	"quick-command": { en: "Quick command", fr: "Commande rapide" },
 	i18n: { en: "Translations", fr: "Traductions" },
 	accessibility: { en: "Accessibility fixes", fr: "Corrections d'accessibilité" },
+	"doc-drift": { en: "Documentation fixes", fr: "Corrections de documentation" },
 };
 
 const DESCRIPTION: { en: string; fr: string } = {

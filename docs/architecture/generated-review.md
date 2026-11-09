@@ -74,6 +74,10 @@ Par page :
   reste dans le projet (il ne l'était pas : `path.join` sans contrôle). Les images collées
   attendent dans `.workpilot/changelog-assets/` et rejoignent le commit sous `.github/assets/`.
   Un projet du serveur garde son journal sur le serveur, sans fichier ni branche.
+- **Détecteur de dérive de doc** (#354) : « Corriger N sur une carte de revue » lance
+  `doc_drift_runner.py --fix` dans le worktree (`main/doc-drift/fix-run.ts`) : paramètre renommé
+  dans son commentaire de doc, type de docstring, chemin d'un fichier déplacé, refaits seulement
+  s'ils sont encore là ; `docs: N drift fixes`. Aucune carte quand rien n'a changé.
 - **Pair programming** (lot 3) : l'agent codeur reçoit le worktree de la carte comme
   `--project-dir` ; ses outils n'écrivent donc que là. À la fin de la session (terminée,
   arrêtée ou en erreur), ce qu'il a écrit est commité : `feat: <objectif> (pair programming)`.

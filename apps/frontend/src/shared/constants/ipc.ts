@@ -1151,6 +1151,8 @@ export const IPC_CHANNELS = {
 	DOC_DRIFT_CANCEL: "docDrift:cancel",
 	DOC_DRIFT_ERROR: "doc-drift-error",
 	DOC_DRIFT_EVENT: "doc-drift-event",
+	DOC_DRIFT_EXPORT: "docDrift:export",
+	DOC_DRIFT_FIX: "docDrift:fix",
 	DOC_DRIFT_RESULT: "doc-drift-result",
 	DOC_DRIFT_RUN: "docDrift:run",
 	DOCUMENTATION_CANCEL: "documentation:cancel",
