@@ -81,7 +81,7 @@
   "apps/frontend/src/renderer/components/ClaudeCodeStatusBadge.tsx": 2,
   "apps/frontend/src/renderer/components/CodeReview.tsx": 1,
   "apps/frontend/src/renderer/components/CodexCliStatusBadge.tsx": 2,
-  "apps/frontend/src/renderer/components/CommandPalette.tsx": 4,
+  "apps/frontend/src/renderer/components/CommandPalette.tsx": 3,
   "apps/frontend/src/renderer/components/CopilotCliStatusBadge.tsx": 2,
   "apps/frontend/src/renderer/components/EditableNode.tsx": 2,
   "apps/frontend/src/renderer/components/FileTreeItem.tsx": 3,
