@@ -1,12 +1,13 @@
 {
 	"noData": "No preview yet",
 	"noChanges": "No uncommitted changes to preview",
-	"title": "Uncommitted Changes Preview",
+	"title": "Dry run",
 	"actions": {
 		"runScan": "Preview changes",
 		"cancel": "Cancel",
 		"scanning": "Reading the changes...",
-		"reset": "Reset"
+		"reset": "Reset",
+		"runPlan": "Rehearse the plan"
 	},
 	"errors": {
 		"noProject": "Select a project to preview its uncommitted changes.",
@@ -22,7 +23,7 @@
 		"filesChanged_other": "{{count}} files changed",
 		"noHunks": "No text hunk for this file (binary or empty)."
 	},
-	"description": "Every uncommitted change of the project, file by file, read from git without touching it.",
+	"description": "Rehearse a spec's plan over the repository before its build spends a token, or preview the uncommitted changes of the project.",
 	"emptyBody": "Run the preview to read the changes not yet committed, with their hunks.",
 	"kickers": {
 		"files": "Files",
@@ -33,5 +34,88 @@
 		"modified": "Modified",
 		"deleted": "Deleted",
 		"renamed": "Renamed"
+	},
+	"modes": {
+		"plan": "Plan rehearsal",
+		"changes": "Uncommitted changes"
+	},
+	"levels": {
+		"error": "Error",
+		"warning": "Warning",
+		"info": "Note"
+	},
+	"stepStatus": {
+		"success": "OK",
+		"warning": "To review",
+		"error": "Blocked",
+		"skipped": "Not checked"
+	},
+	"strategies": {
+		"schema_based": "From the contract",
+		"llm_generated": "Generated",
+		"static": "Empty mock",
+		"error": "Error"
+	},
+	"verdict": {
+		"ready": "The plan holds over {{ref}}: every file it touches exists when it needs to, and every verification can run.",
+		"review": "The plan can run over {{ref}}, with points to review below.",
+		"blocked": "The plan breaks over {{ref}}: fix the errors below before building, or the build fails on them."
+	},
+	"plan": {
+		"spec": "Spec",
+		"selectSpec": "Select a spec",
+		"noSpecs": "No spec in this project",
+		"baseRef": "Base branch or commit",
+		"emptyTitle": "No rehearsal yet",
+		"emptyBody": "Pick a spec that has a plan and rehearse it: each subtask is checked over the files of the base branch (files to modify, order of creation, verification commands, API calls against the OpenAPI contract). Nothing is written and no model is called.",
+		"subtasksOk": "Subtasks OK",
+		"errors": "Errors",
+		"rehearsalCost": "Rehearsal",
+		"free": "Free · 0 token",
+		"buildEstimate": "Build estimate",
+		"unknown": "Unknown",
+		"estimateDetail": "Estimate of the real build, {{confidence}}: {{models}}",
+		"confidence": {
+			"high": "high confidence",
+			"medium": "medium confidence",
+			"low": "low confidence"
+		},
+		"partial": "The rehearsal ran out of time: the last subtasks were not checked.",
+		"structure": "Structure of the plan",
+		"kickers": {
+			"walk": "Walk",
+			"footprint": "Footprint"
+		},
+		"subtasks_one": "{{count}} subtask",
+		"subtasks_other": "{{count}} subtasks",
+		"footprintMeta": "{{added}} new · {{modified}} modified",
+		"contracts": "API contracts used for the mocks",
+		"noContracts": "No OpenAPI, GraphQL or Protobuf contract in the repository."
+	},
+	"findings": {
+		"plan_empty": "The plan has no subtask to run.",
+		"plan_unreadable": "implementation_plan.json cannot be read: {{reason}}",
+		"phase_unknown_dependency": "Phase {{phase}} depends on phase {{dependency}}, which the plan does not define.",
+		"phase_cycle": "Phases {{phases}} depend on each other: none of them can start.",
+		"subtask_duplicate_id": "Subtask id {{id}} is used more than once.",
+		"path_outside_project": "{{path}} is outside the project.",
+		"file_missing": "{{path}} is modified but exists neither in {{ref}} nor in an earlier subtask.",
+		"file_modified_before_created": "{{path}} is modified before subtask {{creator}} creates it.",
+		"file_created_by_unrelated_phase": "{{path}} comes from phase {{phase}}, which this phase does not depend on: it breaks if phases run in parallel.",
+		"file_already_exists": "{{path}} already exists in {{ref}}: creating it overwrites it.",
+		"file_created_twice": "{{path}} is already created by subtask {{creator}}.",
+		"path_is_directory": "{{path}} is a folder, not a file.",
+		"pattern_missing": "Pattern file {{path}} does not exist.",
+		"parallel_conflict": "{{path}} is also changed by subtask {{other}} in the same parallel phase.",
+		"binary_file": "{{path}} is a binary file: it has no diff preview.",
+		"no_files": "This subtask names no file.",
+		"no_verification": "This subtask has no verification.",
+		"command_dir_missing": "The verification enters {{dir}}, which does not exist.",
+		"command_manifest_missing": "`{{command}}` needs {{manifest}}, which the project does not have.",
+		"command_script_missing": "{{manifest}} has no \"{{script}}\" script.",
+		"api_status_undeclared": "The contract does not declare this status for {{method}} {{url}}.",
+		"api_endpoint_undeclared": "No contract of the project describes {{method}} {{url}}.",
+		"api_no_contract": "The project has no OpenAPI contract: {{method}} {{url}} is answered with an empty mock.",
+		"timeout": "The rehearsal stopped after {{seconds}} s: the remaining subtasks were not checked."
 	}
 }

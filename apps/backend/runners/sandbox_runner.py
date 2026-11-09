@@ -1,10 +1,13 @@
 """
 Sandbox Runner
 
-Produces a dry-run simulation report for a project by diffing the current
-working tree against ``HEAD`` via ``git diff``. The result is a
-``SimulationResult`` with no executed steps and a list of predicted file
-diffs, letting users preview uncommitted changes before they commit.
+Two modes, one ``SimulationResult``:
+
+* without ``--spec-dir``: the uncommitted changes of the working tree, diffed
+  against ``HEAD`` (``mode = "changes"``), to preview them before a commit;
+* with ``--spec-dir``: a rehearsal of the spec's implementation plan over the
+  files of ``--base-ref`` (``mode = "plan"``, see :mod:`simulation`), free and
+  offline, to catch a broken plan before the build spends any token.
 
 Output protocol (one JSON object per line, prefixed):
     SANDBOX_EVENT:{"type": "progress", "data": {"status": "..."}}
@@ -135,6 +138,7 @@ def run_scan(project_path: Path, spec_id: str) -> dict[str, Any]:
     result = {
         "id": str(uuid.uuid4()),
         "specId": spec_id,
+        "mode": "changes",
         "phase": "awaiting_approval" if diffs else "complete",
         "steps": [],
         "diffs": diffs,
@@ -159,19 +163,64 @@ def run_scan(project_path: Path, spec_id: str) -> dict[str, Any]:
     return {"result": result}
 
 
+SPEC_ROOTS = (".workpilot", ".autonomousbuild")
+
+
+def resolve_spec_dir(project_path: Path, raw: str) -> Path:
+    """``raw`` resolved, provided it is a spec folder of this project."""
+    spec_dir = Path(raw).resolve()
+    for root in SPEC_ROOTS:
+        specs = (project_path / root / "specs").resolve()
+        if spec_dir.parent == specs and spec_dir.is_dir():
+            return spec_dir
+    raise RuntimeError("The spec folder is not a spec of this project")
+
+
+def run_plan(
+    project_path: Path, spec_dir: Path, base_ref: str, timeout_s: float
+) -> dict[str, Any]:
+    from simulation import rehearse_spec
+
+    _emit_event("start", {"status": "Preparing the plan rehearsal..."})
+    result = rehearse_spec(
+        project_path,
+        spec_dir,
+        ref=base_ref,
+        timeout_s=timeout_s,
+        emit=lambda status: _emit_event("progress", {"status": status}),
+    )
+    _emit_event(
+        "complete",
+        {"files": len(result["diffs"]), "steps": len(result["steps"])},
+    )
+    return {"result": result}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sandbox Runner")
     parser.add_argument("--project-path", required=True, help="Project root path")
     parser.add_argument("--spec-id", default="dry-run", help="Spec identifier label")
+    parser.add_argument("--spec-dir", help="Rehearse this spec's implementation plan")
+    parser.add_argument(
+        "--base-ref", default="HEAD", help="Ref the build would start from"
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=60.0, help="Rehearsal budget in seconds"
+    )
     args = parser.parse_args()
 
-    project_path = Path(args.project_path)
+    project_path = Path(args.project_path).resolve()
     if not project_path.exists():
         _emit("SANDBOX_ERROR", f"Project path does not exist: {project_path}")
         sys.exit(1)
 
     try:
-        result = run_scan(project_path, args.spec_id)
+        if args.spec_dir:
+            spec_dir = resolve_spec_dir(project_path, args.spec_dir)
+            timeout_s = min(max(args.timeout, 1.0), 600.0)
+            result = run_plan(project_path, spec_dir, args.base_ref, timeout_s)
+        else:
+            result = run_scan(project_path, args.spec_id)
         _emit("SANDBOX_RESULT", result)
     except Exception as exc:  # noqa: BLE001
         _emit("SANDBOX_ERROR", str(exc))
