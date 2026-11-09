@@ -1,23 +1,8 @@
 import {
-	BarChart3,
-	BookOpen,
-	BookOpenCheck,
 	CalendarClock,
-	Coins,
 	Download,
-	FileCode2,
-	FileText,
-	GitBranch,
-	GitMerge,
-	GitPullRequest,
-	Globe,
-	History,
 	Keyboard,
-	LayoutGrid,
-	Lightbulb,
 	type LucideIcon,
-	// biome-ignore lint/suspicious/noShadowRestrictedNames: shadow name is intentional
-	Map,
 	Mic,
 	PlusCircle,
 	Router,
@@ -25,23 +10,25 @@ import {
 	Settings,
 	Shield,
 	ShieldAlert,
-	Sparkles,
 	Sun,
 	Terminal,
-	Wand2,
-	Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/utils";
+import { useViewUsageStore } from "../stores/view-usage-store";
 import { openVoiceAssistant } from "../stores/voice-assistant-store";
+import type { SidebarView } from "./Sidebar";
+import { openNavView } from "./sidebar/nav-actions";
+import { type NavIndexEntry, useNavIndexStore } from "./sidebar/nav-index";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type CommandCategory =
+	| "recent"
 	| "tasks"
 	| "navigation"
 	| "agents"
@@ -75,14 +62,19 @@ interface CommandPaletteProps {
 // Fuzzy matching
 // ---------------------------------------------------------------------------
 
+/** Lower case without accents: « securite » finds « Sécurité ». */
+function foldText(text: string): string {
+	return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
 function fuzzyMatch(
 	query: string,
 	text: string,
 ): { match: boolean; score: number } {
 	if (!query) return { match: true, score: 0 };
 
-	const q = query.toLowerCase();
-	const t = text.toLowerCase();
+	const q = foldText(query);
+	const t = foldText(text);
 
 	// Exact substring match — highest score
 	if (t.includes(q)) {
@@ -168,199 +160,6 @@ function getBuiltinCommands(
 			shortcut: "Ctrl+Shift+Space",
 			keywords: ["voice", "speech", "dictate", "vocal", "voix", "micro"],
 			handler: openVoiceAssistant,
-		},
-		{
-			id: "go_kanban",
-			label: t("commandPalette.commands.go_kanban.label"),
-			description: t("commandPalette.commands.go_kanban.description"),
-			category: "navigation",
-			icon: LayoutGrid,
-			shortcut: "Ctrl+1",
-			keywords: ["board", "tasks", "kanban"],
-			handler: () => onNavigate("kanban"),
-		},
-		{
-			id: "go_terminals",
-			label: t("commandPalette.commands.go_terminals.label"),
-			description: t("commandPalette.commands.go_terminals.description"),
-			category: "navigation",
-			icon: Terminal,
-			shortcut: "Ctrl+2",
-			keywords: ["terminal", "shell", "console"],
-			handler: () => onNavigate("terminals"),
-		},
-		{
-			id: "go_insights",
-			label: t("commandPalette.commands.go_insights.label"),
-			description: t("commandPalette.commands.go_insights.description"),
-			category: "navigation",
-			icon: Sparkles,
-			shortcut: "Ctrl+3",
-			keywords: ["insights", "ai", "chat", "analytics"],
-			handler: () => onNavigate("insights"),
-		},
-		{
-			id: "go_roadmap",
-			label: t("commandPalette.commands.go_roadmap.label"),
-			description: t("commandPalette.commands.go_roadmap.description"),
-			category: "navigation",
-			icon: Map,
-			shortcut: "Ctrl+4",
-			keywords: ["roadmap", "plan", "timeline"],
-			handler: () => onNavigate("roadmap"),
-		},
-		{
-			id: "go_ideation",
-			label: t("commandPalette.commands.go_ideation.label"),
-			description: t("commandPalette.commands.go_ideation.description"),
-			category: "navigation",
-			icon: Lightbulb,
-			keywords: ["ideation", "brainstorm", "ideas"],
-			handler: () => onNavigate("ideation"),
-		},
-		{
-			id: "go_context",
-			label: t("commandPalette.commands.go_context.label"),
-			description: t("commandPalette.commands.go_context.description"),
-			category: "navigation",
-			icon: BookOpen,
-			keywords: ["context", "memory", "knowledge"],
-			handler: () => onNavigate("context"),
-		},
-		{
-			id: "go_agent_tools",
-			label: t("commandPalette.commands.go_agent_tools.label"),
-			description: t("commandPalette.commands.go_agent_tools.description"),
-			category: "navigation",
-			icon: Wrench,
-			keywords: ["tools", "agent", "mcp"],
-			handler: () => onNavigate("agent-tools"),
-		},
-		{
-			id: "go_changelog",
-			label: t("commandPalette.commands.go_changelog.label"),
-			description: t("commandPalette.commands.go_changelog.description"),
-			category: "navigation",
-			icon: FileText,
-			keywords: ["changelog", "updates", "history"],
-			handler: () => onNavigate("changelog"),
-		},
-		{
-			id: "go_worktrees",
-			label: t("commandPalette.commands.go_worktrees.label"),
-			description: t("commandPalette.commands.go_worktrees.description"),
-			category: "navigation",
-			icon: GitBranch,
-			keywords: ["worktrees", "git", "branches"],
-			handler: () => onNavigate("worktrees"),
-		},
-		{
-			id: "go_dashboard",
-			label: t("commandPalette.commands.go_dashboard.label"),
-			description: t("commandPalette.commands.go_dashboard.description"),
-			category: "navigation",
-			icon: BarChart3,
-			keywords: ["dashboard", "metrics", "kpi", "analytics", "stats"],
-			handler: () => onNavigate("dashboard"),
-		},
-		{
-			id: "go_code_review",
-			label: t("commandPalette.commands.go_code_review.label"),
-			description: t("commandPalette.commands.go_code_review.description"),
-			category: "navigation",
-			icon: FileCode2,
-			keywords: ["review", "code", "diff", "quality"],
-			handler: () => onNavigate("code-review"),
-		},
-		{
-			id: "go_refactoring",
-			label: t("commandPalette.commands.go_refactoring.label"),
-			description: t("commandPalette.commands.go_refactoring.description"),
-			category: "navigation",
-			icon: Wand2,
-			keywords: ["refactor", "smells", "clean", "code"],
-			handler: () => onNavigate("refactoring"),
-		},
-		{
-			id: "go_documentation",
-			label: t("commandPalette.commands.go_documentation.label"),
-			description: t("commandPalette.commands.go_documentation.description"),
-			category: "navigation",
-			icon: BookOpenCheck,
-			keywords: ["docs", "documentation", "docstring", "readme"],
-			handler: () => onNavigate("documentation"),
-		},
-		{
-			id: "go_cost_estimator",
-			label: t("commandPalette.commands.go_cost_estimator.label"),
-			description: t("commandPalette.commands.go_cost_estimator.description"),
-			category: "navigation",
-			icon: Coins,
-			keywords: ["cost", "budget", "spending", "tokens", "money"],
-			handler: () => onNavigate("cost-estimator"),
-		},
-		{
-			id: "go_session_history",
-			label: t("commandPalette.commands.go_session_history.label"),
-			description: t("commandPalette.commands.go_session_history.description"),
-			category: "navigation",
-			icon: History,
-			keywords: ["sessions", "history", "timeline", "past"],
-			handler: () => onNavigate("session-history"),
-		},
-		{
-			id: "go_migration",
-			label: t("commandPalette.commands.go_migration.label"),
-			description: t("commandPalette.commands.go_migration.description"),
-			category: "navigation",
-			icon: Download,
-			keywords: ["migration", "framework", "upgrade", "wizard"],
-			handler: () => onNavigate("migration"),
-		},
-		{
-			id: "go_visual_programming",
-			label: t("commandPalette.commands.go_visual_programming.label"),
-			description: t("commandPalette.commands.go_visual_programming.description"),
-			category: "navigation",
-			icon: Sparkles,
-			keywords: ["visual", "programming", "nodes", "flow"],
-			handler: () => onNavigate("visual-programming"),
-		},
-		{
-			id: "go_github_issues",
-			label: t("commandPalette.commands.go_github_issues.label"),
-			description: t("commandPalette.commands.go_github_issues.description"),
-			category: "navigation",
-			icon: Globe,
-			keywords: ["github", "issues", "bugs", "tickets"],
-			handler: () => onNavigate("github-issues"),
-		},
-		{
-			id: "go_github_prs",
-			label: t("commandPalette.commands.go_github_prs.label"),
-			description: t("commandPalette.commands.go_github_prs.description"),
-			category: "navigation",
-			icon: GitPullRequest,
-			keywords: ["github", "pull", "requests", "prs", "review"],
-			handler: () => onNavigate("github-prs"),
-		},
-		{
-			id: "go_gitlab_issues",
-			label: t("commandPalette.commands.go_gitlab_issues.label"),
-			description: t("commandPalette.commands.go_gitlab_issues.description"),
-			category: "navigation",
-			icon: GitMerge,
-			keywords: ["gitlab", "issues", "bugs", "tickets"],
-			handler: () => onNavigate("gitlab-issues"),
-		},
-		{
-			id: "go_gitlab_merge_requests",
-			label: t("commandPalette.commands.go_gitlab_merge_requests.label"),
-			description: t("commandPalette.commands.go_gitlab_merge_requests.description"),
-			category: "navigation",
-			icon: GitMerge,
-			keywords: ["gitlab", "merge", "requests", "mrs", "review"],
-			handler: () => onNavigate("gitlab-merge-requests"),
 		},
 		{
 			id: "go_settings",
@@ -480,10 +279,66 @@ function getBuiltinCommands(
 }
 
 // ---------------------------------------------------------------------------
+// Pages of the menu
+// ---------------------------------------------------------------------------
+
+/** The menu's last segment of an item key: `navigation:items.flakyTests` → `flakyTests`. */
+function itemKeyOf(labelKey: string): string {
+	return labelKey.slice(labelKey.lastIndexOf(".") + 1);
+}
+
+/**
+ * One command per page the sidebar shows (`sidebar/nav-index.ts`): found by
+ * its name, where it sits in the menu and a few words people search with, and
+ * opened the way the sidebar opens it (a tool that is a dialog opens it).
+ */
+function pageCommands(
+	t: TFunction,
+	entries: readonly NavIndexEntry[],
+	onNavigate: (view: string) => void,
+): PaletteCommand[] {
+	return entries.map((entry) => {
+		const place = entry.placeKeys.map((key) => t(key));
+		if (entry.experimental) place.push(t("commandPalette.beta"));
+		const keywords = t(`navigation:keywords.${itemKeyOf(entry.labelKey)}`, {
+			defaultValue: "",
+		});
+		return {
+			id: `page:${entry.view}`,
+			label: t(entry.labelKey),
+			description: place.join(" · "),
+			category: "navigation",
+			icon: entry.icon,
+			shortcut: entry.shortcut,
+			keywords: [...place, ...keywords.split(" ").filter(Boolean)],
+			handler: () => openNavView(entry.view, (view: SidebarView) => onNavigate(view)),
+		};
+	});
+}
+
+/** The pages opened last, most recent first, as « Recent » commands. */
+function recentCommands(
+	pages: readonly PaletteCommand[],
+	usage: Partial<Record<SidebarView, { lastVisitedAt: number }>>,
+	limit = 5,
+): PaletteCommand[] {
+	const byView = new Map(pages.map((cmd) => [cmd.id.slice("page:".length), cmd]));
+	return (Object.entries(usage) as Array<[SidebarView, { lastVisitedAt: number }]>)
+		.filter(([view]) => byView.has(view))
+		.sort((a, b) => b[1].lastVisitedAt - a[1].lastVisitedAt)
+		.slice(0, limit)
+		.map(([view]) => {
+			const cmd = byView.get(view) as PaletteCommand;
+			return { ...cmd, id: `recent:${view}`, category: "recent" };
+		});
+}
+
+// ---------------------------------------------------------------------------
 // Category labels & colors
 // ---------------------------------------------------------------------------
 
 const CATEGORIES: CommandCategory[] = [
+	"recent",
 	"tasks",
 	"navigation",
 	"agents",
@@ -512,7 +367,13 @@ export function CommandPalette({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
 
-	const commands = useMemo(
+	const navEntries = useNavIndexStore((state) => state.entries);
+	const usage = useViewUsageStore((state) => state.usage);
+	const pages = useMemo(
+		() => pageCommands(t, navEntries, onNavigate),
+		[t, navEntries, onNavigate],
+	);
+	const builtins = useMemo(
 		() =>
 			getBuiltinCommands(
 				t,
@@ -531,20 +392,22 @@ export function CommandPalette({
 			onOpenSettingsSection,
 		],
 	);
+	const commands = useMemo(() => [...pages, ...builtins], [pages, builtins]);
 
 	// Filtered & scored results
 	const results = useMemo(() => {
 		if (!query.trim()) {
-			// Show navigation commands first when no query
-			return commands.sort((a, b) => {
+			// The pages opened last first, then the actions, then every page
+			return [...recentCommands(pages, usage), ...builtins, ...pages].sort((a, b) => {
 				const order: CommandCategory[] = [
-					"navigation",
+					"recent",
 					"tasks",
 					"agents",
 					"terminal",
 					"settings",
 					"providers",
 					"help",
+					"navigation",
 				];
 				return order.indexOf(a.category) - order.indexOf(b.category);
 			});
@@ -573,8 +436,16 @@ export function CommandPalette({
 			.filter((r) => r.match)
 			.sort((a, b) => b.score - a.score);
 
-		return scored.map((r) => r.cmd);
-	}, [query, commands]);
+		// With ~100 commands, a letter-by-letter match finds almost anything:
+		// once some command contains the words typed, only those are listed.
+		const folded = foldText(searchText);
+		const contains = (cmd: PaletteCommand) =>
+			[cmd.label, cmd.description, ...(cmd.keywords ?? [])].some((text) =>
+				foldText(text).includes(folded),
+			);
+		const exact = scored.filter((r) => contains(r.cmd));
+		return (exact.length > 0 ? exact : scored).map((r) => r.cmd);
+	}, [query, commands, pages, builtins, usage]);
 
 	// Reset on open
 	useEffect(() => {

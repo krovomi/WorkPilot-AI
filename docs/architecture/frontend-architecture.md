@@ -113,8 +113,8 @@ id changes.
 | the hub's entry has its first tab's id, and carries `hub` | pins, custom order and the server gates were keyed on that id; a pin left on another tab shows as the hub's pin, and unpinning clears both in one save |
 | the entry opens the tab last used in this session, held in memory | a hub reopens where the user left it; a new session starts on the first tab, so nothing is saved that could point at a tab gone missing |
 | the tabs follow the gates of the entries: a server project shows a hub only for the tabs it offers (`server-gates.ts`), and hiding the experimental views hides their tabs, never the one on screen | a hub must not become a way around a gate |
-| a tool that is a dialog (conflict predictor, arena…) is a tab whose page says what it does and opens it | a tab list mixing tabs and buttons is not a tab list; the tool picked from the sidebar search still opens its dialog at once, and its shortcut opens its tab |
-| the sidebar search lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
+| a tool that is a dialog (conflict predictor, arena…) is a tab whose page says what it does and opens it | a tab list mixing tabs and buttons is not a tab list; the tool picked from the menu or the command palette still opens its dialog at once (`sidebar/nav-actions.ts`), and its shortcut opens its tab |
+| the command palette lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
 | `HubTabList` follows the WAI-ARIA tabs pattern: one tab in the tab order, arrows, Home and End move, Enter or Space opens; activation is manual | a tab is a whole page: moving the focus does not load one |
 | `HubMain` has the same tree with or without a hub | entering a hub does not remount what the main area keeps alive (the terminals) |
 
@@ -123,6 +123,21 @@ and needs that card, so it opens from the card. Change Preview (`sandbox`),
 named "simulation" before lot R1, previews uncommitted changes and joined no
 hub. Hubs and their tabs: `hubs.ts`; render tests:
 `sidebar/__tests__/HubMain.test.tsx`.
+
+## The menu and the command palette (`sidebar/nav-model.ts`)
+
+The menu had grown to 61 entries for 77 pages, and people got lost in it
+(F181). Lot 1 makes it lighter without moving a page.
+
+| Decision | Why |
+|---|---|
+| the groups and entries live in `sidebar/nav-model.ts`; the sidebar renders them, `sidebar/nav-index.ts` flattens them for the palette, `navItemLabelKey` names a page for the activity centre | the palette was a hand-written list of 21 pages out of 77: a second list drifts, one list cannot |
+| the sidebar publishes the pages it shows (`useNavIndexStore`); the palette offers exactly those | the palette follows the same gates (server project, forge, hidden beta views) without knowing them |
+| a page is found by its name, by its place in the menu (group, sub-group or hub) and by a few words (`navigation:keywords.*`, en and fr), accents ignored; once some command contains the words typed, only those are listed | « tests » finds the test generator, the flaky tests and the regression guardian; « securite » finds the injection guard. A letter-by-letter match alone listed 25 commands for « tests » |
+| the pages opened last come first, from `view-usage-store` (local to the machine) | the page you come back to is one key away |
+| the sidebar's search field, `/` and Ctrl+K open the palette (`stores/command-palette-store.ts`) | one search, which knows every page, instead of a filter of the visible labels |
+| « Outils CLI » is a chip at the foot of the menu (`sidebar/CliToolsChip.tsx`): « CLI 1/8 » and a dot, opening the same badges above it; the badges stay mounted while closed | the panel was always open and took 320 px of a 1000 px window, leaving 420 px for the menu; mounted, the checks still run and the count is right |
+| rows show the icon, the name and the activity badge; the two-letter shortcut moves to the hover title, the drag grip shows on hover; group headers are plain titles; long names were shortened (« Tests instables », « Train de release ») | most names were cut (« Contrôle de … ») by the grip, the shortcut and the counter |
 
 ## Agent Management (`src/main/agent/`)
 
