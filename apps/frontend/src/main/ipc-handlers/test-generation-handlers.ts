@@ -160,13 +160,14 @@ export function setupTestGenerationHandlers(
 			},
 		) => {
 			try {
-				const report = await testGenerationService.addPackages(
+				// Edited on the review card's branch, never in the project folder.
+				const { report, review } = await testGenerationService.addPackages(
 					params.selected,
 					params.projectPath,
 					params.testDir,
 					params.filePath,
 				);
-				return { success: true, report };
+				return { success: true, report, review };
 			} catch (error) {
 				console.error("[TestGeneration] add-packages error:", error);
 				return {

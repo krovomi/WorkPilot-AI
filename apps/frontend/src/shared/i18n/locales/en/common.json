@@ -1536,5 +1536,17 @@
 			"authenticatingMessage": "Finish the sign-in in your browser…",
 			"successMessage": "Authentication succeeded! Closing…"
 		}
+	},
+	"generatedReview": {
+		"title": "Written on a review branch, not in your project folder",
+		"body_one": "{{count}} file committed on {{branch}} (card “{{card}}”, in Human Review). Read the diff, then open the pull request to {{base}}.",
+		"body_other": "{{count}} files committed on {{branch}} (card “{{card}}”, in Human Review). Read the diff, then open the pull request to {{base}}.",
+		"defaultBase": "the base branch",
+		"openCard": "Open the card",
+		"createPr": "Create the PR",
+		"creatingPr": "Creating the PR…",
+		"openPr": "Open the PR",
+		"prCreated": "Pull request created",
+		"prFailed": "The pull request could not be created."
 	}
 }

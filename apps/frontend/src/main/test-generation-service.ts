@@ -21,6 +21,15 @@ import {
 	isTestStudioLanguage,
 	TDD_SNIPPET_TYPES,
 } from "../shared/constants/test-studio-languages";
+import type { GeneratedReview } from "../shared/types/generated-review";
+import { getAppLanguage } from "./app-language";
+import { findOpenReviewCard } from "./generated-review/review-card";
+import {
+	findLocalProject,
+	openReviewRun,
+	type ReviewRun,
+	ReviewUnavailableError,
+} from "./generated-review/review-run";
 import { getRunnerEnv } from "./ipc-handlers/github/utils/runner-env";
 
 /**
@@ -84,6 +93,36 @@ const RESOLVE_TIMEOUT_MS = 15_000;
 
 /** `dotnet add package` restores from the network; give it room. */
 const INSTALL_TIMEOUT_MS = 240_000;
+
+/** What a run that writes is recorded as on its review card. */
+interface ReviewStep {
+	readonly message: string;
+	readonly summary: string;
+}
+
+const STEP_SUMMARY = {
+	unit: { en: "Unit tests for {subject}", fr: "Tests unitaires de {subject}" },
+	e2e: { en: "E2E tests: {subject}", fr: "Tests E2E : {subject}" },
+	tdd: { en: "TDD tests: {subject}", fr: "Tests TDD : {subject}" },
+	packages: { en: "Test packages: {subject}", fr: "Paquets de test : {subject}" },
+} as const;
+
+function reviewStep(kind: keyof typeof STEP_SUMMARY, subject: string, message: string): ReviewStep {
+	const language = getAppLanguage().toLowerCase().startsWith("fr") ? "fr" : "en";
+	return {
+		message,
+		summary: STEP_SUMMARY[kind][language].replace("{subject}", subject),
+	};
+}
+
+/** A short subject for a card title: the file name, or the start of a sentence. */
+function subjectOf(text: string): string {
+	const trimmed = text.trim();
+	const looksLikePath = /[\\/]/.test(trimmed) && !/\s/.test(trimmed);
+	const flat = (looksLikePath ? path.basename(trimmed) : trimmed).replace(/\s+/g, " ");
+	// Short enough that "test: add generated unit tests for <subject>" stays a one-line subject.
+	return flat.length > 40 ? `${flat.slice(0, 39)}…` : flat;
+}
 
 export class TestGenerationService extends EventEmitter {
 	private activeProcess: ChildProcess | null = null;
@@ -184,27 +223,44 @@ export class TestGenerationService extends EventEmitter {
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<void> {
+		const subject = subjectOf(filePath);
+		const run = await this.openRun(projectPath, subject);
+		if (!run) return;
+		const source = run.map(filePath);
+		if (!source) {
+			await run.abandon();
+			this.emitError({
+				message: "The file to test is not inside the project.",
+				code: "invalid_input",
+				details: filePath,
+			});
+			return;
+		}
 		const args = [
 			"--action",
 			"generate-unit",
 			"--file-path",
-			filePath,
+			source,
 			"--coverage-target",
 			String(coverageTarget ?? 80),
+			"--project-path",
+			run.root,
 		];
-		if (existingTestPath) {
-			args.push("--existing-test-path", existingTestPath);
+		const existing = run.map(existingTestPath);
+		if (existing) {
+			args.push("--existing-test-path", existing);
 		}
-		if (projectPath) {
-			args.push("--project-path", projectPath);
-		}
-		if (testDir) {
-			args.push("--test-dir", testDir);
+		const dir = run.map(testDir);
+		if (dir) {
+			args.push("--test-dir", dir);
 		}
 		if (testLibraries?.length) {
 			args.push("--test-libraries", testLibraries.join(","));
 		}
-		await this.spawnRunner(args, "complete");
+		await this.spawnRunner(args, "complete", {
+			run,
+			step: reviewStep("unit", subject, `test: add generated unit tests for ${subject}`),
+		});
 	}
 
 	/**
@@ -217,24 +273,30 @@ export class TestGenerationService extends EventEmitter {
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<void> {
+		const subject = subjectOf(targetModule || userStory);
+		const run = await this.openRun(projectPath, subject);
+		if (!run) return;
 		const args = [
 			"--action",
 			"generate-e2e",
 			"--user-story",
 			userStory,
 			"--target-module",
-			targetModule,
+			run.map(targetModule) ?? targetModule,
+			"--project-path",
+			run.root,
 		];
-		if (projectPath) {
-			args.push("--project-path", projectPath);
-		}
-		if (testDir) {
-			args.push("--test-dir", testDir);
+		const dir = run.map(testDir);
+		if (dir) {
+			args.push("--test-dir", dir);
 		}
 		if (testLibraries?.length) {
 			args.push("--test-libraries", testLibraries.join(","));
 		}
-		await this.spawnRunner(args, "complete");
+		await this.spawnRunner(args, "complete", {
+			run,
+			step: reviewStep("e2e", subject, `test: add generated e2e tests for ${subject}`),
+		});
 	}
 
 	/**
@@ -259,6 +321,9 @@ export class TestGenerationService extends EventEmitter {
 		const snippet = (TDD_SNIPPET_TYPES as readonly string[]).includes(snippetType)
 			? snippetType
 			: "function";
+		const subject = subjectOf(description.split("\n")[0] ?? description);
+		const run = await this.openRun(projectPath, subject);
+		if (!run) return;
 		const args = [
 			"--action",
 			"generate-tdd",
@@ -268,17 +333,20 @@ export class TestGenerationService extends EventEmitter {
 			language,
 			"--snippet-type",
 			snippet,
+			"--project-path",
+			run.root,
 		];
-		if (projectPath) {
-			args.push("--project-path", projectPath);
-		}
-		if (testDir) {
-			args.push("--test-dir", testDir);
+		const dir = run.map(testDir);
+		if (dir) {
+			args.push("--test-dir", dir);
 		}
 		if (testLibraries?.length) {
 			args.push("--test-libraries", testLibraries.join(","));
 		}
-		await this.spawnRunner(args, "complete");
+		await this.spawnRunner(args, "complete", {
+			run,
+			step: reviewStep("tdd", subject, `test: add generated tdd tests for ${subject}`),
+		});
 	}
 
 	/**
@@ -299,9 +367,17 @@ export class TestGenerationService extends EventEmitter {
 		projectPath?: string,
 		existingTestPath?: string,
 	): Promise<TestDestination | null> {
-		const args = ["--action", "resolve-destination", "--file-path", filePath];
-		if (projectPath) args.push("--project-path", projectPath);
-		if (existingTestPath) args.push("--existing-test-path", existingTestPath);
+		// Where the next run writes: the card waiting for review, when there is one.
+		const view = this.reviewView(projectPath);
+		const args = [
+			"--action",
+			"resolve-destination",
+			"--file-path",
+			view.map(filePath) ?? filePath,
+		];
+		if (view.root) args.push("--project-path", view.root);
+		const existing = view.map(existingTestPath);
+		if (existing) args.push("--existing-test-path", existing);
 
 		const payload = await this.runQuietly(args, RESOLVE_TIMEOUT_MS);
 		return parseTestDestination(payload?.destination);
@@ -320,12 +396,15 @@ export class TestGenerationService extends EventEmitter {
 		selected?: string[],
 		language?: string,
 	): Promise<TestLibrarySelection | null> {
+		// The packages added by an earlier run live on the card's branch, not in
+		// the project folder: read the manifests where the next run writes.
+		const view = this.reviewView(projectPath);
 		const args = ["--action", "resolve-libraries"];
-		if (filePath) args.push("--file-path", filePath);
+		if (filePath) args.push("--file-path", view.map(filePath) ?? filePath);
 		// TDD and E2E name their language; without it a C# TDD run was offered
 		// the libraries of whatever file another tab had open, or Python's.
 		if (isTestStudioLanguage(language)) args.push("--language", language);
-		if (projectPath) args.push("--project-path", projectPath);
+		if (view.root) args.push("--project-path", view.root);
 		if (selected?.length) args.push("--test-libraries", selected.join(","));
 
 		const payload = await this.runQuietly(args, RESOLVE_TIMEOUT_MS);
@@ -345,20 +424,83 @@ export class TestGenerationService extends EventEmitter {
 		projectPath: string,
 		testDir?: string,
 		filePath?: string,
-	): Promise<PackageInstallReport | null> {
+	): Promise<{ report: PackageInstallReport | null; review: GeneratedReview | null }> {
+		const subject = selected.join(", ");
+		// The manifests are edited on the card's branch, beside the tests they serve.
+		const run = await openReviewRun(projectPath, "test-studio", subjectOf(subject));
 		const args = [
 			"--action",
 			"add-packages",
 			"--project-path",
-			projectPath,
+			run.root,
 			"--test-libraries",
 			selected.join(","),
 		];
-		if (testDir) args.push("--test-dir", testDir);
-		if (filePath) args.push("--file-path", filePath);
+		const dir = run.map(testDir);
+		if (dir) args.push("--test-dir", dir);
+		const source = run.map(filePath);
+		if (source) args.push("--file-path", source);
 
 		const payload = await this.runQuietly(args, INSTALL_TIMEOUT_MS);
-		return parsePackageInstallReport(payload?.install);
+		const report = parsePackageInstallReport(payload?.install);
+		if (!report?.installed.length) {
+			await run.abandon();
+			return { report, review: null };
+		}
+		const review = await run.finish(
+			reviewStep("packages", subject, `test: add test packages ${subject}`),
+		);
+		return { report, review: review.committed ? review : null };
+	}
+
+	/**
+	 * Open (or join) the review card a writing run goes to. Null after the
+	 * failure has been reported: no card, no write.
+	 */
+	private async openRun(
+		projectPath: string | undefined,
+		subject: string,
+	): Promise<ReviewRun | null> {
+		try {
+			return await openReviewRun(projectPath, "test-studio", subject);
+		} catch (error) {
+			this.emitError({
+				message:
+					error instanceof ReviewUnavailableError
+						? error.message
+						: "The review branch for these tests could not be prepared.",
+				code: "write_failed",
+				stage: "write",
+				details:
+					error instanceof ReviewUnavailableError
+						? error.details
+						: error instanceof Error
+							? error.message
+							: String(error),
+			});
+			return null;
+		}
+	}
+
+	/** Where read-only questions look: the open card's worktree, or the project. */
+	private reviewView(projectPath: string | undefined): {
+		root: string | undefined;
+		map: (target: string | undefined) => string | undefined;
+	} {
+		const project = findLocalProject(projectPath);
+		const open = project ? findOpenReviewCard(project, "test-studio") : null;
+		if (!project || !open) return { root: projectPath, map: (target) => target };
+		const base = path.resolve(project.path);
+		return {
+			root: open.worktreePath,
+			map: (target) => {
+				if (!target || !path.isAbsolute(target)) return target;
+				const resolved = path.resolve(target);
+				return resolved.startsWith(base + path.sep)
+					? path.join(open.worktreePath, path.relative(base, resolved))
+					: target;
+			},
+		};
 	}
 
 	/**
@@ -433,9 +575,15 @@ export class TestGenerationService extends EventEmitter {
 	private async spawnRunner(
 		args: string[],
 		successEvent: "result" | "complete",
+		review?: { run: ReviewRun; step: ReviewStep },
 	): Promise<void> {
 		// Cancel any existing process
 		this.cancel();
+		// Whatever stops this run before it produced something takes back the
+		// card it opened (a joined card keeps everything it had).
+		const abandon = () => {
+			if (review) void review.run.abandon().catch(() => undefined);
+		};
 
 		const backendSource = this.getBackendPath();
 		if (!backendSource) {
@@ -445,6 +593,7 @@ export class TestGenerationService extends EventEmitter {
 				code: "backend_missing",
 				details: `Looked for runners/test_generation_runner.py under:\n${this.searchedPaths.join("\n")}`,
 			});
+			abandon();
 			return;
 		}
 
@@ -460,6 +609,7 @@ export class TestGenerationService extends EventEmitter {
 				code: "backend_missing",
 				details: `Expected file: ${runnerPath}`,
 			});
+			abandon();
 			return;
 		}
 
@@ -566,12 +716,20 @@ export class TestGenerationService extends EventEmitter {
 			}
 
 			// code === null means killed by signal (e.g. cancel() was called) — ignore silently
-			if (code === null) return;
-
-			if (generationResult !== null) {
-				this.emit(successEvent, generationResult);
+			if (code === null) {
+				abandon();
 				return;
 			}
+
+			if (generationResult !== null) {
+				if (review) {
+					void this.commitToReview(review, generationResult, successEvent);
+				} else {
+					this.emit(successEvent, generationResult);
+				}
+				return;
+			}
+			abandon();
 			// The runner already explained itself on stdout — anything we add here
 			// would only bury it under a generic exit-code message.
 			if (reportedFailure) return;
@@ -602,6 +760,7 @@ export class TestGenerationService extends EventEmitter {
 			if (this.activeProcess === proc) {
 				this.activeProcess = null;
 			}
+			abandon();
 			reportedFailure = true;
 			this.emitError({
 				message: `The Python interpreter could not be started: ${err.message}`,
@@ -609,6 +768,33 @@ export class TestGenerationService extends EventEmitter {
 				details: `command: ${this.pythonPath} ${fullArgs.join(" ")}\ncwd: ${backendSource}`,
 			});
 		});
+	}
+
+	/**
+	 * Commit what the runner wrote on the card's branch, then report the run
+	 * with the card it went to. The tests exist either way; a commit that
+	 * fails is said as such, not as a failed generation.
+	 */
+	private async commitToReview(
+		review: { run: ReviewRun; step: ReviewStep },
+		result: unknown,
+		successEvent: "result" | "complete",
+	): Promise<void> {
+		try {
+			const card = await review.run.finish(review.step);
+			const payload = result && typeof result === "object" ? result : { result };
+			this.emit(successEvent, { ...payload, review: card.committed ? card : null });
+		} catch (error) {
+			// A card this run opened keeps nothing it could not commit.
+			await review.run.abandon().catch(() => undefined);
+			this.emitError({
+				message:
+					"The tests were generated on the review branch, but could not be committed there.",
+				code: "write_failed",
+				stage: "write",
+				details: error instanceof Error ? error.message : String(error),
+			});
+		}
 	}
 }
 

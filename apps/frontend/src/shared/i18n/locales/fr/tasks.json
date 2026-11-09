@@ -637,7 +637,8 @@
 			"gitlab": "GitLab",
 			"visual-canvas": "Canvas visuel",
 			"tech-debt": "Dette technique",
-			"automation": "Automatisation"
+			"automation": "Automatisation",
+			"generated": "Code généré"
 		}
 	},
 	"kind": {

@@ -1536,5 +1536,17 @@
 			"authenticatingMessage": "Terminez la connexion dans votre navigateur…",
 			"successMessage": "Authentification réussie ! Fermeture…"
 		}
+	},
+	"generatedReview": {
+		"title": "Écrit sur une branche de revue, pas dans votre dossier de projet",
+		"body_one": "{{count}} fichier commité sur {{branch}} (carte « {{card}} », en Revue humaine). Relisez le diff, puis ouvrez la pull request vers {{base}}.",
+		"body_other": "{{count}} fichiers commités sur {{branch}} (carte « {{card}} », en Revue humaine). Relisez le diff, puis ouvrez la pull request vers {{base}}.",
+		"defaultBase": "la branche de base",
+		"openCard": "Voir la carte",
+		"createPr": "Créer la PR",
+		"creatingPr": "Création de la PR…",
+		"openPr": "Ouvrir la PR",
+		"prCreated": "Pull request créée",
+		"prFailed": "La pull request n'a pas pu être créée."
 	}
 }
