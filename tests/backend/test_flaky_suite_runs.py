@@ -284,7 +284,14 @@ def _fake_runs(
     queue = list(outcomes)
 
     def run_once(
-        command, project, out_dir, *, timeout_s, no_build=False, report_globs=()
+        command,
+        project,
+        out_dir,
+        *,
+        timeout_s,
+        no_build=False,
+        report_globs=(),
+        only=(),
     ):
         flags.append(no_build)
         outcome = queue.pop(0)

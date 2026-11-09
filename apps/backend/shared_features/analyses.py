@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from changelog_generator.options import ChangelogOptions
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -75,12 +75,18 @@ class FlakyOptions(NoOptions):
     command_id: Literal[
         "auto", "dotnet", "pytest", "vitest", "jest", "maven", "gradle", "go"
     ] = "auto"
+    #: Run mode: only these tests (the suspects), through the stack's filter.
+    only: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        default_factory=list, max_length=50
+    )
 
 
 def _flaky_args(o: FlakyOptions) -> list[str]:
     args = ["--threshold", str(o.threshold), "--min-runs", str(o.min_runs)]
     if o.mode == "run":
         args += ["--mode", "run", "--runs", str(o.runs), "--command-id", o.command_id]
+        if o.only:
+            args += ["--only", json.dumps(o.only)]
     return args
 
 

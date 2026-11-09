@@ -56,7 +56,28 @@ describe("checkRunRequest", () => {
 			mode: "scan",
 			runs: 5,
 			commandId: "auto",
+			only: [],
 		});
+	});
+
+	it("runs only the suspects named, as one JSON argument", () => {
+		const checked = checkRunRequest({
+			projectPath: "/p",
+			mode: "run",
+			commandId: "pytest",
+			only: ["tests.test_a::test_x", "tests.test_a::test_x", "--rootdir=/"],
+		});
+		expect(checked.only).toEqual(["tests.test_a::test_x", "--rootdir=/"]);
+		const args = runnerArgs(checked);
+		expect(args.slice(-2)).toEqual(["--only", JSON.stringify(checked.only)]);
+		expect(args).not.toContain("--rootdir=/");
+	});
+
+	it("refuses a list of suspects that is not one", () => {
+		expect(() => checkRunRequest({ projectPath: "/p", mode: "run", only: "test_x" })).toThrow();
+		expect(() => checkRunRequest({ projectPath: "/p", mode: "run", only: [3] })).toThrow();
+		expect(() => checkRunRequest({ projectPath: "/p", mode: "run", only: Array(51).fill("t") })).toThrow();
+		expect(() => checkRunRequest({ projectPath: "/p", mode: "run", only: ["x".repeat(301)] })).toThrow();
 	});
 
 	it("bounds the number of runs", () => {
@@ -123,7 +144,7 @@ describe("flaky tests handlers", () => {
 		expect(mocks.relayServerAnalysis).toHaveBeenCalledWith(
 			project,
 			"flaky-tests",
-			{ mode: "run", runs: 3, command_id: "go" },
+			{ mode: "run", runs: 3, command_id: "go", only: [] },
 			expect.any(Object),
 		);
 		await run?.({}, { projectPath: "/mirror/p-1" });

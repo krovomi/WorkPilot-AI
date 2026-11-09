@@ -49,7 +49,9 @@
 		"runScan": "Analyse existing reports",
 		"cancel": "Cancel",
 		"scanning": "Analysing...",
-		"reset": "Reset"
+		"reset": "Reset",
+		"fix": "Fix on a card",
+		"quarantine": "Quarantine on a card"
 	},
 	"progress": {
 		"discovering": "Looking for test reports…",
@@ -85,5 +87,73 @@
 		"report": "Report"
 	},
 	"reportTitle": "Flaky tests found",
-	"emptyReportTitle": "No report yet"
+	"emptyReportTitle": "No report yet",
+	"verdict": {
+		"likely_bug": "Fails in more than 80% of the runs: more likely a real bug than a flaky test.",
+		"flaky": "Fails in 20% of the runs or more: confirmed flaky.",
+		"rare": "Fails rarely (under 20% of the runs): run it again to confirm."
+	},
+	"verdictShort": {
+		"likely_bug": "likely a bug",
+		"flaky": "flaky",
+		"rare": "rare"
+	},
+	"inCode": "What its code shows",
+	"history": {
+		"firstSeen": "First seen {{date}}",
+		"trend": {
+			"new": "First analysis",
+			"worse": "Worse than last time",
+			"better": "Better than last time",
+			"same": "As last time"
+		},
+		"systems": "Fails on {{systems}}",
+		"ciOnly": "Fails only in CI, never in a local run: look at what CI changes (fewer CPUs, containers, parallel jobs, clock).",
+		"ciOnlyShort": "CI only"
+	},
+	"suspects": {
+		"hint": "Too long to run the whole suite again? Run only these tests.",
+		"rerun": "Run the {{count}} suspects again",
+		"ranOnly": "This run kept {{count}} suspect test(s) only."
+	},
+	"quarantine": {
+		"pytest": "Mark the test `@pytest.mark.xfail(reason=\"flaky: <link to this card>\", strict=False)` so it still runs but no longer fails the suite, and register a `quarantine` marker if the project lists its markers.",
+		"vitest": "Move the test into a `*.quarantine.test.ts` file excluded from the default `vitest run` (the `exclude` of the config) and run by a separate, non-blocking CI step.",
+		"jest": "Move the test into a `*.quarantine.test.js` file left out by `testPathIgnorePatterns` and run by a separate, non-blocking CI step.",
+		"js": "Move the test to a file the default test command leaves out, run by a separate, non-blocking CI step.",
+		"dotnet": "Add the framework's category (`[Trait(\"Category\", \"Quarantine\")]` for xUnit, `[Category(\"Quarantine\")]` for NUnit, `[TestCategory(\"Quarantine\")]` for MSTest), filter it out of the blocking CI step (`--filter Category!=Quarantine`) and run it in a separate, non-blocking step.",
+		"jvm": "Tag the test `@Tag(\"quarantine\")` (JUnit 5), exclude the tag from the blocking build (Surefire `excludedGroups`, Gradle `excludeTags`) and run it in a separate, non-blocking job.",
+		"go": "Skip the test unless `QUARANTINE=1` (`if os.Getenv(\"QUARANTINE\") == \"\" { t.Skip(\"flaky: <link>\") }`) and run `QUARANTINE=1 go test -run` in a separate, non-blocking CI step.",
+		"rust": "Mark the test `#[ignore = \"flaky: <link>\"]` and run `cargo test -- --ignored` in a separate, non-blocking CI step.",
+		"ruby": "Tag the example `:quarantine`, exclude the tag from the blocking run (`--tag ~quarantine`) and run it in a separate, non-blocking step.",
+		"php": "Add the test to a `quarantine` group (`#[Group('quarantine')]`), exclude it from the blocking run (`--exclude-group quarantine`) and run it in a separate, non-blocking step.",
+		"swift": "Move the test into a separate test plan or scheme that CI runs without blocking.",
+		"dart": "Tag the test `quarantine`, exclude the tag from the blocking run (`--exclude-tags quarantine`) and run it in a separate, non-blocking step.",
+		"elixir": "Tag the test `@tag :quarantine`, exclude it in `test_helper.exs` and run `mix test --only quarantine` in a separate, non-blocking step.",
+		"other": "Use the test framework's own way to keep the test running in a separate, non-blocking suite, out of the blocking one."
+	},
+	"task": {
+		"test": "Test:",
+		"where": "Where:",
+		"seenInCode": "Its code shows {{cause}}:",
+		"lastAuthor": "Last changed by {{author}}",
+		"diagnosis": "Diagnosis",
+		"howTo": "How",
+		"rules": "Rules",
+		"created": "Card created: {{title}}.",
+		"open": "Open it on the board",
+		"failed": "The card could not be created.",
+		"fix": {
+			"title": "Fix the flaky test {{name}}",
+			"intro": "This test passes and fails on the same code. Find why and make it deterministic.",
+			"rules": "Fix the cause, not the symptom: no skip, no retry, and a longer timeout alone is not a fix.\nThe test must still fail when the behaviour it checks breaks.\nIf the test shows a real bug (it fails almost every time), fix the code, not the test.",
+			"criteria": "{{name}} passes in 10 runs in a row.\n{{name}} still fails when the behaviour it checks is broken.\nThe rest of the suite stays green."
+		},
+		"quarantine": {
+			"title": "Quarantine the flaky test {{name}}",
+			"intro": "This test passes and fails on the same code. Until it is fixed, keep it running without blocking CI.",
+			"rules": "The test keeps running, in a separate suite that does not block CI: it is not deleted or emptied.\nThe quarantine names this card, so it can be lifted once the test is fixed.\nNothing else changes in the blocking suite.",
+			"criteria": "{{name}} no longer blocks CI.\n{{name}} still runs, in the quarantine suite.\nThe rest of the suite stays green."
+		}
+	}
 }
