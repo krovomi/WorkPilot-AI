@@ -177,7 +177,10 @@
 		"fileExists": "remplace",
 		"fileNew": "nouveau",
 		"fileExistsHint": "Ce fichier existe déjà dans le projet : l'écrire le remplace.",
-		"fileNewHint": "Ce fichier n'existe pas encore dans le projet."
+		"fileNewHint": "Ce fichier n'existe pas encore dans le projet.",
+		"accessibility_one": "Accessibilité {{score}}/100 : {{count}} violation WCAG dans le code généré ({{rules}}). Corrigez-la sur la carte de revue, ou lancez la page Accessibilité sur la branche.",
+		"accessibility_other": "Accessibilité {{score}}/100 : {{count}} violations WCAG dans le code généré ({{rules}}). Corrigez-les sur la carte de revue, ou lancez la page Accessibilité sur la branche.",
+		"accessibilityClean": "Accessibilité : aucune violation WCAG {{level}} trouvée dans le code généré."
 	},
 	"phases": {
 		"analyzing": "Lecture du design",

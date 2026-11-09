@@ -148,6 +148,22 @@ export function ResultInspector() {
 					{t("inspector.simulated")}
 				</div>
 			)}
+			{result?.accessibility && (
+				<div
+					className="di-banner mb-3"
+					data-kind={result.accessibility.count ? "error" : undefined}
+					role="status"
+					data-testid="design-accessibility"
+				>
+					{result.accessibility.count
+						? t("inspector.accessibility", {
+								score: result.accessibility.score,
+								count: result.accessibility.count,
+								rules: [...new Set(result.accessibility.violations.map((v) => v.ruleId))].slice(0, 4).join(", "),
+							})
+						: t("inspector.accessibilityClean", { level: result.accessibility.targetLevel })}
+				</div>
+			)}
 		</>
 	);
 
