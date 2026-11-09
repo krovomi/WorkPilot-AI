@@ -60,6 +60,11 @@ to one. They are not ranked by confidence like the patterns: they are the
 project's word. Newest first, at most 30, at most 4,000 characters, never a
 rule cut in the middle.
 
+The spec pipeline asks for them too: the quick spec and the spec writer as
+`spec_writer`, the self-critique as `spec_self_critique`, both mapped to the
+planning lessons (`spec/phases/spec_phases.py`, `learning_context_for`). A rule
+adopted for the planner therefore reaches the spec that frames its plan.
+
 ## What it does not do
 
 - No LLM rewrites a comment into a rule: the person's wording is the rule.
