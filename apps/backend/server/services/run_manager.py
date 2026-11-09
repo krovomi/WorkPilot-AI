@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 import tempfile
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -256,6 +257,18 @@ def confine(
     return [*prefix, *cmd]
 
 
+#: How long a project delete waits for its runs to end once stopped.
+STOP_TIMEOUT_SECONDS = 15.0
+
+
+async def wait_until_ended(alive: Callable[[], bool], timeout: float) -> None:
+    """Wait while ``alive()`` holds, at most ``timeout`` seconds."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while alive() and loop.time() < deadline:
+        await asyncio.sleep(0.05)
+
+
 class RunManager:
     """Singleton orchestrating server-side agent subprocesses."""
 
@@ -266,6 +279,8 @@ class RunManager:
         self._cancelled: set[str] = set()  # run_ids terminated on request
         # run_ids this process queued and has not finished: what a restart loses.
         self._tracked: set[str] = set()
+        # run_id -> project_id of the runs above: what a project delete stops.
+        self._projects: dict[str, str] = {}
 
     def _get_semaphore(self) -> asyncio.Semaphore:
         if self._semaphore is None:
@@ -333,6 +348,7 @@ class RunManager:
             self._running_specs.discard(spec.id)
             raise
         self._tracked.add(run_id)
+        self._projects[run_id] = project_id
 
         asyncio.get_running_loop().create_task(
             self._execute(
@@ -368,6 +384,24 @@ class RunManager:
         if proc is not None:
             proc.terminate()
         return True
+
+    async def stop_project(
+        self, project_id: str, timeout: float = STOP_TIMEOUT_SECONDS
+    ) -> int:
+        """Stop every run of a project and wait until they have ended.
+
+        Called before a project is deleted: its clone is removed right after,
+        and an agent still running in it would write into a directory that no
+        longer exists, then record its end on a row that is gone. Returns how
+        many runs were stopped; gives up waiting after ``timeout`` seconds.
+        """
+        runs = [run for run, owner in self._projects.items() if owner == project_id]
+        for run_id in runs:
+            await self.cancel_run(run_id)
+        await wait_until_ended(
+            lambda: any(run in self._tracked for run in runs), timeout
+        )
+        return len(runs)
 
     async def settle_orphans(self) -> int:
         """Mark failed the runs left queued or running by a server that stopped.
@@ -508,6 +542,7 @@ class RunManager:
             self._running_specs.discard(spec_id)
             self._cancelled.discard(run_id)
             self._tracked.discard(run_id)
+            self._projects.pop(run_id, None)
 
     async def _set_run_status(
         self, run_id: str, status: str, error: str | None = None
