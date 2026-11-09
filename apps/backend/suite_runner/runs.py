@@ -386,8 +386,12 @@ def run_once(
     no_build: bool = False,
     report_globs: Iterable[str] = (),
     popen: Callable[..., subprocess.Popen] = subprocess.Popen,
+    only: Iterable[str] = (),
 ) -> RunOutcome:
-    """Run the suite once; its reports end up in ``out_dir``. Never raises."""
+    """Run the suite once; its reports end up in ``out_dir``. Never raises.
+
+    ``only`` keeps the tests named, through the stack's own filter.
+    """
     global _current
     out_dir.mkdir(parents=True, exist_ok=True)
     log = out_dir / "output.log"
@@ -397,6 +401,21 @@ def run_once(
         return RunOutcome(None, error=f"the command cannot be parsed: {exc}")
     if not invocation.argv:
         return RunOutcome(None, error="the command is empty")
+    names = list(only)
+    if names:
+        from .only import filter_args
+
+        extra = filter_args(command.id, names)
+        if not extra:
+            return RunOutcome(
+                None, error="the tests named cannot be selected with this command"
+            )
+        invocation = _Invocation(
+            [*invocation.argv, *extra],
+            invocation.env,
+            invocation.collect_changed,
+            invocation.go_json,
+        )
 
     globs = list(report_globs)
     before = _report_snapshot(project, globs) if invocation.collect_changed else {}

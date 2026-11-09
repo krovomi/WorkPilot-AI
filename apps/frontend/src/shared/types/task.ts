@@ -433,6 +433,7 @@ export interface TaskMetadata {
 		| "gitlab"
 		| "visual-canvas"
 		| "tech-debt"
+		| "flaky-tests"
 		| "automation"
 		| "generated";
 	/**
