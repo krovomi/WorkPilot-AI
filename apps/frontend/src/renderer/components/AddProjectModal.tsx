@@ -675,7 +675,7 @@ export function AddProjectModal({
 									{t("addProject.locationTitle")}
 								</h3>
 								<p className="font-mono text-sm bg-muted/50 rounded px-2 py-1 inline-block">
-									{projectLocation}
+									{targetProjectPath ?? projectLocation}
 								</p>
 							</div>
 						</div>
@@ -891,30 +891,10 @@ export function AddProjectModal({
 				});
 			}
 
-			// Vérifie la présence d'un commit git si git a été initialisé
-			if (initGit) {
-				const status = await globalThis.electronAPI.checkGitStatus(
-					result.data.path,
-				);
-				if (
-					status?.success &&
-					status.data &&
-					!status.data.hasCommits &&
-					!showGitCommitModal
-				) {
-					// Finaliser le projet d'abord
-					if (project) onProjectAdded?.(project, false);
-
-					// Puis afficher le modal Git SEULEMENT si aucun remote n'a été configuré
-					// (car si un remote est configuré, le modal Git est déjà géré par les callbacks remote)
-					if (!remoteType) {
-						setPendingProjectPath(result.data.path);
-						setShowGitCommitModal(true);
-						setIsCreating(false);
-						return;
-					}
-				}
-			}
+			// No commit yet (a fresh `git init`): the sidebar asks to create the
+			// first one as soon as the new project is selected. Asking here too
+			// stacked two copies of that dialog, and the one left behind after
+			// "Initialize Git" still said the repository had no commits.
 			// Si pas de popin à afficher, afficher le toast immédiatement
 			toast({
 				title: t("addProject.successTitle"),
@@ -941,7 +921,9 @@ export function AddProjectModal({
 	// Navigation
 	const canNext = () => {
 		if (step === 0) {
-			return !!projectName && !!projectLocation && providerSelected;
+			// "Skip for now" is the default and shows as chosen: requiring a click
+			// on it kept Next disabled with a complete form.
+			return !!projectName && !!projectLocation;
 		}
 		if (step === 1 && remoteType === "github")
 			return (

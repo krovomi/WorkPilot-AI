@@ -89,6 +89,7 @@ Object.defineProperty(window, "electronAPI", {
 		getOAuthToken: vi.fn().mockResolvedValue(null),
 		startOAuthFlow: vi.fn().mockResolvedValue({ success: true }),
 		loadProfiles: vi.fn().mockResolvedValue([]),
+		checkClaudeCodeVersion: vi.fn().mockResolvedValue({ success: false }),
 	},
 	writable: true,
 });
@@ -280,6 +281,16 @@ describe("OnboardingWizard Integration Tests", () => {
 					onboardingCompleted: true,
 				});
 			});
+		});
+
+		it("skipping the auth step moves on to the CLI step, not out of the wizard", async () => {
+			// With no Claude account, Skip used to end the setup right there.
+			render(<OnboardingWizard {...defaultProps} />);
+			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
+			fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
+
+			expect(await screen.findByText("cli.title")).toBeInTheDocument();
+			expect(mockSaveSettings).not.toHaveBeenCalled();
 		});
 
 		it("should call onOpenChange when wizard is closed", async () => {

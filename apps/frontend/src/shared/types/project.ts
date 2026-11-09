@@ -536,7 +536,9 @@ export type InitializationBlocker =
 	| "path-missing"
 	| "not-a-git-repo"
 	| "no-commits"
-	| "already-initialized";
+	| "already-initialized"
+	/** Git has no author name/email, so the first commit cannot be made. */
+	| "git-identity-missing";
 
 export interface InitializationResult {
 	success: boolean;

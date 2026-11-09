@@ -97,7 +97,8 @@ export interface UseProjectSettingsReturn {
 
 	// Actions
 	handleInitialize: () => Promise<void>;
-	handleRepairGit: () => Promise<void>;
+	/** `identity`: the git name/email asked for after a `git-identity-missing` blocker. */
+	handleRepairGit: (identity?: { name: string; email: string }) => Promise<void>;
 	handleClaudeSetup: () => Promise<void>;
 	handleSave: (onClose: () => void) => Promise<void>;
 }
@@ -481,11 +482,20 @@ export function useProjectSettings(
 	 * is retried straight away, because "prepare git" was never the goal: the
 	 * user clicked a button that said initialize.
 	 */
-	const handleRepairGit = async () => {
+	const handleRepairGit = async (identity?: { name: string; email: string }) => {
 		setIsRepairingGit(true);
 		setError(null);
 		try {
-			const result = await window.electronAPI.initializeGit(project.path);
+			const result = await window.electronAPI.initializeGit(
+				project.path,
+				undefined,
+				identity,
+			);
+			if (!result?.success && result?.data?.blocker === "git-identity-missing") {
+				// A fresh machine: the panel now asks for the name and email.
+				setInitBlocker("git-identity-missing");
+				return;
+			}
 			if (!result?.success) {
 				setError(result?.error || "Failed to prepare the git repository");
 				return;

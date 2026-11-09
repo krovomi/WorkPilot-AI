@@ -1,4 +1,4 @@
-"""`src.connectors` is importable wherever the backend runs (F173).
+"""`src.connectors` is importable wherever the backend runs (F174).
 
 The installed app ships `src` inside the backend; the repository (dev mode) and
 the server image keep it at the root. Runners started by the app only had the
