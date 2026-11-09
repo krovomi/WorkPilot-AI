@@ -84,7 +84,9 @@ def _drop(root: Path, name: str, payload: object, mtime: float = SINCE + 60) -> 
 
 
 def test_an_incident_becomes_a_bug_card_that_writes_the_failing_test_first(tmp_path):
-    (tmp_path / "pyproject.toml").write_text("[project]\nname='shop'\n")
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname='shop'\n", encoding="utf-8"
+    )
     _drop(tmp_path, "sentry.json", SENTRY_PAYLOAD)
 
     result = inbox_events(tmp_path, SINCE, _seen())
@@ -109,8 +111,8 @@ def test_an_incident_becomes_a_bug_card_that_writes_the_failing_test_first(tmp_p
 
 
 def test_the_card_names_the_test_framework_of_the_faulting_stack(tmp_path):
-    (tmp_path / "Shop.sln").write_text("")
-    (tmp_path / "Cart.cs").write_text("class Cart {}")
+    (tmp_path / "Shop.sln").write_text("", encoding="utf-8")
+    (tmp_path / "Cart.cs").write_text("class Cart {}", encoding="utf-8")
     _drop(
         tmp_path,
         "dotnet.json",
@@ -150,7 +152,9 @@ def test_the_inbox_keeps_what_is_not_an_incident_out(tmp_path):
     assert again.ignored == [] and again.events == []
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="symlinks need privileges on Windows"
+)
 def test_a_linked_inbox_or_payload_is_not_read(tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -238,7 +242,9 @@ LATEST = {
 
 
 def test_sentry_issues_first_seen_after_the_rule_become_cards(tmp_path):
-    (tmp_path / "package.json").write_text('{"devDependencies": {"vitest": "1"}}')
+    (tmp_path / "package.json").write_text(
+        '{"devDependencies": {"vitest": "1"}}', encoding="utf-8"
+    )
     api = "https://sentry.io/api/0"
     get, sent = _sentry(
         {
@@ -302,13 +308,17 @@ def test_sentry_answering_something_else_than_a_list_fails(tmp_path):
 
 
 def test_the_runner_feed_needs_the_project_s_sentry_token(tmp_path, monkeypatch):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "apps" / "backend" / "runners"))
+    sys.path.insert(
+        0, str(Path(__file__).resolve().parents[2] / "apps" / "backend" / "runners")
+    )
     import regression_guardian_runner as runner
 
     monkeypatch.delenv("SENTRY_AUTH_TOKEN", raising=False)
     _drop(tmp_path, "sentry.json", SENTRY_PAYLOAD, mtime=SINCE + 60)
     inbox_only = asyncio.run(
-        runner.run_feed(tmp_path, "2023-11-14T22:13:20Z", {"type": "prod_incident"}, set())
+        runner.run_feed(
+            tmp_path, "2023-11-14T22:13:20Z", {"type": "prod_incident"}, set()
+        )
     )
     assert [e["key"] for e in inbox_only["events"]] == ["incident:sentry:abc123"]
     with pytest.raises(FeedError) as error:
