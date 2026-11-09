@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -130,8 +131,10 @@ _I18N_DIRS = frozenset(
 )
 
 
-def _classify(path: Path, reference: str) -> tuple[str, str, dict[str, Any]] | None:
-    """(locale, catalog name, entries) for a catalog file, or None."""
+def _classify(
+    path: Path, reference: str
+) -> tuple[str, str, dict[str, Any], str] | None:
+    """(locale, catalog name, entries, format) for a catalog file, or None."""
     name, parent = path.name, path.parent.name
     suffix = path.suffix.lower()
     text = None
@@ -144,19 +147,19 @@ def _classify(path: Path, reference: str) -> tuple[str, str, dict[str, Any]] | N
 
     grand = path.parent.parent.name
     if suffix == ".json" and grand in _I18N_DIRS and (loc := _locale(parent)):
-        return loc, path.stem, _json(load())
+        return loc, path.stem, _json(load()), "json"
     if suffix == ".json" and parent in _I18N_DIRS and (loc := _locale(path.stem)):
-        return loc, "messages", _json(load())
+        return loc, "messages", _json(load()), "json"
     if suffix == ".arb":
         loc = _locale(path.stem.rsplit("_", 1)[-1]) or _locale(path.stem)
         if loc:
             entries = {k: v for k, v in _json(load()).items() if not k.startswith("@")}
-            return loc, "arb", entries
+            return loc, "arb", entries, "arb"
     if suffix == ".resx":
         stem, _, culture = path.stem.rpartition(".")
         if stem and _locale(culture):
-            return culture, stem, _xml_strings(load(), "data", "name")
-        return reference, path.stem, _xml_strings(load(), "data", "name")
+            return culture, stem, _xml_strings(load(), "data", "name"), "resx"
+        return reference, path.stem, _xml_strings(load(), "data", "name"), "resx"
     if name == "strings.xml" and parent.startswith("values"):
         qualifier = parent[len("values") :].lstrip("-").replace("-r", "-")
         if not qualifier or _locale(qualifier):
@@ -164,38 +167,42 @@ def _classify(path: Path, reference: str) -> tuple[str, str, dict[str, Any]] | N
                 qualifier or reference,
                 "strings",
                 _xml_strings(load(), "string", "name"),
+                "android",
             )
     if suffix == ".strings" and parent.endswith(".lproj"):
         loc = parent[: -len(".lproj")]
         loc = reference if loc == "Base" else _locale(loc)
         if loc:
-            return loc, path.stem, _pairs(_STRINGS_LINE, load())
+            return loc, path.stem, _pairs(_STRINGS_LINE, load()), "strings"
     if suffix in {".xlf", ".xliff"}:
         culture = path.stem.rpartition(".")[2]
         loc = _locale(culture) if "." in path.stem else reference
         if loc:
-            return loc, "xliff", _xml_strings(load(), "trans-unit", "id")
+            return loc, "xliff", _xml_strings(load(), "trans-unit", "id"), "xliff"
     if suffix == ".po":
         loc = _locale(path.stem) or (
             _locale(path.parent.parent.name) if parent == "LC_MESSAGES" else None
         )
         if loc:
-            return loc, "gettext", _po(load())
+            return loc, "gettext", _po(load()), "gettext"
     if suffix == ".properties":
         stem, _, culture = path.stem.partition("_")
         if culture and _locale(culture):
-            return culture, stem, _pairs(_PROPERTY, load())
+            return culture, stem, _pairs(_PROPERTY, load()), "properties"
         if stem in {"messages", "strings", "labels"} or stem.endswith("Bundle"):
-            return reference, stem, _pairs(_PROPERTY, load())
+            return reference, stem, _pairs(_PROPERTY, load()), "properties"
     if suffix in {".yml", ".yaml"} and parent == "locales":
         data = _yaml(load())
         if len(data) == 1:
             ((loc, entries),) = data.items()
             if _locale(str(loc)) and isinstance(entries, dict):
-                return str(loc), path.stem.split(".")[0], entries
+                # en.yml and fr.yml are one catalog; devise.en.yml is "devise".
+                parts = path.stem.split(".")
+                name = ".".join(parts[:-1]) if parts[-1] == str(loc) else path.stem
+                return str(loc), name or "messages", entries, "yaml"
     if suffix == ".php" and grand == "lang":
         if loc := _locale(parent):
-            return loc, path.stem, _php(load())
+            return loc, path.stem, _php(load()), "php"
     return None
 
 
@@ -203,6 +210,31 @@ _CATALOG_SUFFIXES = frozenset(
     {".json", ".arb", ".resx", ".xml", ".strings", ".xlf", ".xliff", ".po",
      ".properties", ".yml", ".yaml", ".php"}
 )  # fmt: skip
+
+
+@dataclass(frozen=True)
+class CatalogFile:
+    locale: str
+    catalog: str
+    path: Path
+    format: str
+    """``json``, ``arb``, ``resx``, ``android``, ``strings``, ``xliff``, ``gettext``,
+    ``properties``, ``yaml`` or ``php``."""
+
+
+def catalog_files(root: Path, reference: str = "en") -> list[CatalogFile]:
+    """Every catalog file, with its locale, its catalog name and its format."""
+    found: list[CatalogFile] = []
+    for path in iter_files(root, _CATALOG_SUFFIXES):
+        if path.suffix.lower() == ".json" and path.name in {
+            "package.json", "tsconfig.json", "composer.json", "package-lock.json",
+        }:  # fmt: skip
+            continue
+        classified = _classify(path, reference)
+        if classified:
+            locale, catalog, _entries, fmt = classified
+            found.append(CatalogFile(locale.replace("_", "-"), catalog, path, fmt))
+    return found
 
 
 def discover_catalogs(root: Path, reference: str = "en") -> dict[str, dict[str, Any]]:
@@ -216,8 +248,14 @@ def discover_catalogs(root: Path, reference: str = "en") -> dict[str, dict[str, 
         found = _classify(path, reference)
         if not found:
             continue
-        locale, catalog, entries = found
+        locale, catalog, entries, _fmt = found
         if entries:
             bucket = locales.setdefault(locale.replace("_", "-"), {})
             bucket.setdefault(catalog, {}).update(entries)
     return locales
+
+
+def entries_of(file: CatalogFile, reference: str = "en") -> dict[str, Any]:
+    """The entries of one catalog file, as ``discover_catalogs`` reads them."""
+    found = _classify(file.path, reference)
+    return found[2] if found else {}

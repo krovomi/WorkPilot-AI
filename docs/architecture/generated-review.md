@@ -95,6 +95,9 @@ Par page :
   affiche seulement sa réponse. Une commande à la fois par projet. `/help` est répondu par la barre
   à partir de la liste ; `/review` a des instructions que tout provider exécute
   (`slash_commands.api._BUILT_IN_BODIES`). La route `POST /api/slash-commands/run` n'existe plus.
+- **Analyse i18n** (#346) : « Traduire les clés manquantes » lance `i18n_runner.py --translate`
+  dans le worktree (`main/i18n-agent/translate-run.ts`) ; `feat(i18n): N missing translations
+  (fr, de)`. Aucune carte quand aucune traduction n'est gardée. Voir [i18n-agent](i18n-agent.md).
 
 ## Ce que le mécanisme refuse
 
