@@ -648,6 +648,13 @@
 			"tech-debt": "Tech debt",
 			"automation": "Automation",
 			"generated": "Generated code"
+		},
+		"cicdRun": {
+			"triggered_pr": "{{provider}} pipeline started after the PR was opened, {{when}}",
+			"triggered_merge": "{{provider}} pipeline started after the merge, {{when}}",
+			"failed_pr": "The {{provider}} pipeline could not start after the PR was opened ({{when}})",
+			"failed_merge": "The {{provider}} pipeline could not start after the merge ({{when}})",
+			"open": "Open the pipeline"
 		}
 	},
 	"kind": {

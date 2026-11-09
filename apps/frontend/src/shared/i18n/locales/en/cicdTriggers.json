@@ -39,7 +39,9 @@
 	"runs": {
 		"heading_one": "{{count}} run",
 		"heading_other": "{{count}} runs",
-		"noBranch": "No branch recorded"
+		"noBranch": "No branch recorded",
+		"auto": "started after an agent PR",
+		"autoForTask": "started after the PR of {{task}}"
 	},
 	"empty": {
 		"title": "No pipeline runs yet",

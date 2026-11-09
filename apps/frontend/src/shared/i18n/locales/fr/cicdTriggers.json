@@ -39,7 +39,9 @@
 	"runs": {
 		"heading_one": "{{count}} exécution",
 		"heading_other": "{{count}} exécutions",
-		"noBranch": "Aucune branche enregistrée"
+		"noBranch": "Aucune branche enregistrée",
+		"auto": "lancée après une PR d'agent",
+		"autoForTask": "lancée après la PR de {{task}}"
 	},
 	"empty": {
 		"title": "Aucune exécution pour l'instant",

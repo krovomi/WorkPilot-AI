@@ -37,6 +37,11 @@ export interface PipelineRun {
 	branch: string;
 	error?: string;
 	run_data?: unknown;
+	/** "auto": started after an agent opened the PR; absent or "manual" otherwise. */
+	source?: "manual" | "auto";
+	event?: "pr" | "merge";
+	task_id?: string;
+	spec_id?: string;
 }
 
 interface CICDTriggersState {

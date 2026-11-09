@@ -92,6 +92,20 @@ describe("followMergedPrs", () => {
 		expect(deps.reload).toHaveBeenCalled();
 	});
 
+	it("hands each merged card to CI/CD Triggers' on-merge, after closing it", async () => {
+		tasks.push(card("001-pr"), card("002-open"));
+		deps.readState.mockImplementation(async (url) => (url.endsWith("/6") ? "merged" : "open"));
+		const order: string[] = [];
+		deps.markDone.mockImplementation(() => void order.push("done"));
+		const onMerged = vi.fn(async (task: (typeof tasks)[number]) => void order.push(`ci:${task.specId}`));
+
+		await followMergedPrs(project, { ...deps, onMerged });
+
+		expect(onMerged).toHaveBeenCalledTimes(1);
+		expect(onMerged).toHaveBeenCalledWith(tasks[0], project);
+		expect(order).toEqual(["done", "ci:001-pr"]);
+	});
+
 	it("changes nothing for a PR that is open, closed or unreadable", async () => {
 		tasks.push(card("001-pr"), card("002-pr"), card("003-pr"));
 		deps.readState

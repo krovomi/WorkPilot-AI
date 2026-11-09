@@ -198,6 +198,14 @@ export function CICDTriggersDashboard(): React.ReactElement {
 												})}
 												{" · "}
 												{formatAppDateTime(run.triggered_at)}
+												{run.source === "auto" && (
+													<>
+														{" · "}
+														{run.spec_id
+															? t("cicdTriggers:runs.autoForTask", { task: run.spec_id })
+															: t("cicdTriggers:runs.auto")}
+													</>
+												)}
 											</div>
 											{run.pr_url && (
 												<div className="wp-muted mt-1 break-all font-mono text-xs">
