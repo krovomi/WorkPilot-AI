@@ -50,7 +50,7 @@ function runsPath(projectId: string, specId: string, rest = ""): string {
 }
 
 /** The personal tokens the server keeps for a person (`server/services/secrets.py`). */
-export const SECRET_KINDS = ["github_token", "gitlab_token", "azure_pat", "jira_token", "linear_api_key"] as const;
+export const SECRET_KINDS = ["github_token", "gitlab_token", "azure_pat", "jira_token", "linear_api_key", "sentry_token"] as const;
 export type SecretKind = (typeof SECRET_KINDS)[number];
 
 export interface NewCard {

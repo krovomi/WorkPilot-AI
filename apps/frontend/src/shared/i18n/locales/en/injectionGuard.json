@@ -22,7 +22,7 @@
 		"noProject": "Select a project to run the Injection Guard scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"description": "Checks the prompts saved in .workpilot/prompts/ (txt, md, json) for injection attempts: patterns, classifier and encoded payloads.",
+	"description": "Checks every tool result an agent reads during a task (files, pages, commands, MCP answers), and the prompts saved in .workpilot/prompts/, for injection attempts.",
 	"idleTitle": "No analysis yet",
 	"emptyTitle": "No prompt found",
 	"promptsTitle": "Analysed prompts",
@@ -39,5 +39,42 @@
 		"regex": "Pattern",
 		"classifier": "Classifier",
 		"decode": "Decoding"
+	},
+	"toolResults": {
+		"kicker": "Tasks",
+		"title": "Flagged tool results",
+		"description": "Every result an agent reads is scanned before it reaches the model. A suspect one is passed on fenced, behind a warning; with WORKPILOT_TOOL_RESULT_GUARD=block a blocked one is withheld. Only where it came from is kept, never its content.",
+		"refresh": "Refresh",
+		"empty": "No tool result flagged in this project's tasks.",
+		"loadFailed": "Could not read the alerts.",
+		"where": "Task {{spec}} · tool {{tool}}",
+		"action": {
+			"fenced": "Fenced",
+			"withheld": "Withheld"
+		}
+	},
+	"trusted": {
+		"kicker": "Settings",
+		"title": "Trusted sources",
+		"description": "A result from a source listed here is passed on unscanned, for example your test fixtures that contain injection samples. Agents cannot change this list. Wildcards * and ? are allowed, but * alone is refused.",
+		"kindLabel": "Source type",
+		"patternLabel": "Pattern",
+		"add": "Add",
+		"remove": "Remove {{source}}",
+		"empty": "No trusted source: every result is scanned.",
+		"invalid": "This entry is not valid and was not saved.",
+		"saveFailed": "Could not save the list.",
+		"kind": {
+			"path": "File",
+			"host": "Website",
+			"tool": "Tool",
+			"command": "Command"
+		},
+		"placeholder": {
+			"path": "tests/fixtures/*",
+			"host": "docs.python.org",
+			"tool": "mcp__jira__*",
+			"command": "gh issue"
+		}
 	}
 }

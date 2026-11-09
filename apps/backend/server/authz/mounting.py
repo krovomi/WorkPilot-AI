@@ -45,6 +45,8 @@ ROUTE_OVERRIDES: dict[tuple[str, str], str] = {
     ("POST", "/api/verify/run"): "agent.execute",
     # Launches the task's app twice, on its base branch and on the task.
     ("POST", "/api/verify/compare"): "agent.execute",
+    # Opens a red team session and runs the project's tests on its attacks.
+    ("POST", "/api/red-team/run"): "agent.execute",
     # Executes arbitrary submitted code in the playground sandbox.
     ("POST", "/api/code-playground/run"): "agent.execute",
     # Starts and stops orchestration sessions.

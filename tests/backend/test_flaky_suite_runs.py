@@ -19,9 +19,9 @@ _BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from flaky_test_detective import suite_runs as tr  # noqa: E402
 from foundation.platform import is_windows  # noqa: E402
 from runners import flaky_tests_runner as ftr  # noqa: E402
+from suite_runner import runs as tr  # noqa: E402
 
 TRX = """<?xml version="1.0" encoding="UTF-8"?>
 <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results>

@@ -631,14 +631,14 @@ class LoopAdapter:
                     is_error=True,
                 )
             return ToolResult(await run_delegation(self.client, call.arguments))
+        executor = getattr(self.client, "_tool_executor", None)
         if mcp is not None and mcp.has_tool(call.name):
             try:
                 result = await mcp.call(call.name, call.arguments)
             except Exception as e:
                 logger.warning(f"[{self.label}] MCP tool {call.name} failed: {e}")
                 return ToolResult(f"MCP tool error: {e}", is_error=True)
-            return ToolResult(str(result) if result is not None else "")
-        executor = getattr(self.client, "_tool_executor", None)
+            return self._guarded(call, result, executor, mcp=True)
         if not executor:
             return ToolResult(unavailable, is_error=True)
         try:
@@ -646,4 +646,24 @@ class LoopAdapter:
         except Exception as e:
             logger.warning(f"[{self.label}] Tool {call.name} failed: {e}")
             return ToolResult(f"{error_prefix}: {e}", is_error=True)
-        return ToolResult(str(result) if result is not None else "")
+        return self._guarded(call, result, executor)
+
+    @staticmethod
+    def _guarded(
+        call: ToolCall, result: Any, executor: Any, mcp: bool = False
+    ) -> ToolResult:
+        """The result as the model reads it: scanned for prompt injection,
+        fenced or withheld when it looks like one (`security/tool_result_guard`)."""
+        from security.tool_result_guard import guard_tool_result
+
+        text = str(result) if result is not None else ""
+        verdict = guard_tool_result(
+            f"mcp__{call.name}"
+            if mcp and not call.name.startswith("mcp__")
+            else call.name,
+            call.arguments,
+            text,
+            spec_dir=getattr(executor, "spec_dir", None),
+            project_dir=getattr(executor, "project_dir", None),
+        )
+        return ToolResult(verdict.text if verdict.text is not None else text)
