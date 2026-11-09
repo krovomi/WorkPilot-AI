@@ -14,6 +14,7 @@ import {
 } from "../../../stores/test-generation-store";
 import { GenerationErrorPanel } from "../GenerationErrorPanel";
 import { LiveCode, lineCount } from "./LiveCode";
+import { copyPath } from "../../../lib/copy-path";
 
 const PRIORITY_ACCENT: Record<CoverageGap["priority"], string> = {
 	high: "var(--tg-danger)",
@@ -244,7 +245,7 @@ function CodePanel({ mode, code }: { readonly mode: StudioMode; readonly code: s
 						type="button"
 						className="tg-btn tg-btn-sm"
 						onClick={() => {
-							void navigator.clipboard?.writeText(path);
+							void copyPath(path);
 							setPathCopied(true);
 							setTimeout(() => setPathCopied(false), 2000);
 						}}
@@ -280,6 +281,11 @@ function Stat({
 	);
 }
 
+/** The last segment of a path, Windows or POSIX: rows name the file, the tooltip the path. */
+function fileName(path: string): string {
+	return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
 function TestsPanel({ mode }: { readonly mode: StudioMode }) {
 	const { t } = useTranslation("testGeneration");
 	const runKind = useTestGenerationStore((s) => s.runKind);
@@ -311,7 +317,9 @@ function TestsPanel({ mode }: { readonly mode: StudioMode }) {
 						</div>
 						{test.description && <p>{test.description}</p>}
 						<div className="tg-row-meta">
-							{test.target_function && <span>→ {test.target_function}</span>}
+							{test.target_function && (
+								<span title={test.target_function}>→ {fileName(test.target_function)}</span>
+							)}
 							{asserts > 0 && <span>{t("studio.inspector.assertions", { count: asserts })}</span>}
 						</div>
 						{test.test_code?.trim() && (

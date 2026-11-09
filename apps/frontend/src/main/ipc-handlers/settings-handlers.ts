@@ -46,7 +46,7 @@ import {
 	preWarmToolCache,
 } from "../cli-tool-manager";
 import { credentialManager } from "../services/credential-manager";
-import { openExternalUrl } from "../open-external";
+import { openExternalUrl, toHostPath } from "../open-external";
 import {
 	decryptSecret,
 	prepareSecrets,
@@ -1226,6 +1226,17 @@ export function registerSettingsHandlers(
 				console.warn(`[SHELL_OPEN_EXTERNAL] ${reason}`);
 				throw error instanceof Error ? error : new Error(reason);
 			}
+		},
+	);
+
+	// « Copier le chemin » : sous WSL, le chemin que l'Explorateur Windows ouvre.
+	// Une pure traduction de chaîne, sans accès disque ; le renderer n'étant pas
+	// fiable, on ne traduit qu'une chaîne de taille raisonnable.
+	ipcMain.handle(
+		IPC_CHANNELS.SHELL_HOST_PATH,
+		async (_, filePath: unknown): Promise<string> => {
+			if (typeof filePath !== "string" || filePath.length > 4096) return "";
+			return toHostPath(filePath);
 		},
 	);
 
