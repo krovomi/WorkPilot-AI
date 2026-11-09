@@ -1,19 +1,28 @@
 """
-Accessibility Scanner — Detect WCAG 2.1 / ADA compliance issues.
+Accessibility Scanner — WCAG 2.2 checks read from the source (#391).
 
-Scans HTML, JSX/TSX, and Vue templates for accessibility violations
-such as missing alt text, insufficient colour contrast, missing ARIA
-roles, keyboard traps, and focus management issues.
+Every markup the project ships (HTML, JSX/TSX, Vue, Svelte, Astro, Angular,
+Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars) and its CSS go through one
+reader (``markup.py``) and one rule set (``rules.py``): text alternatives,
+labels, names, headings, page language and title, keyboard, ARIA, captions,
+focus visibility, contrast (``contrast.py``) and target size. No model is
+called. A violation inside conditional markup, or on a component imported
+from a package, carries a note: the first may not render, the second is
+fixed where it is used or by its maintainer.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 
 from agents.scanner_base import BaseScanner, BaseScanReport
+
+from .contrast import Tokens
+from .fixer import fix_id, propose
+from .markup import parse
+from .rules import check
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +53,14 @@ class A11yViolation:
     line: int = 0
     element: str = ""
     suggestion: str = ""
+    detail: str = ""
+    conditional: bool = False
+    """Inside markup that may not render (``v-if``, ``*ngIf``, ``{cond && …}``)."""
+    external: bool = False
+    """On a component imported from a package: fix it where it is used, or report it upstream."""
+    fix_id: str = ""
+    fix: dict | None = None
+    """The one-click fix, when one can be derived: attribute and value."""
 
 
 # Accessibility uses a richer severity vocabulary than the default
@@ -78,90 +95,6 @@ class A11yReport(BaseScanReport[A11yViolation]):
         return self.blocking_count
 
 
-# Rule definitions: (regex, rule_id, description, severity, wcag_level, wcag_criteria, suggestion)
-_HTML_RULES: list[
-    tuple[re.Pattern[str], str, str, A11ySeverity, WcagLevel, str, str]
-] = [
-    (
-        re.compile(r"<img\b(?![^>]*\balt\s*=)", re.IGNORECASE),
-        "img-alt",
-        "Image missing alt attribute",
-        A11ySeverity.CRITICAL,
-        WcagLevel.A,
-        "1.1.1",
-        'Add alt attribute: alt="descriptive text" or alt="" for decorative images',
-    ),
-    (
-        re.compile(
-            r"<input\b(?![^>]*\b(?:aria-label|aria-labelledby|id\s*=\s*[\"'][^\"']+[\"'])\b)(?![^>]*\btype\s*=\s*[\"']hidden[\"'])",
-            re.IGNORECASE,
-        ),
-        "input-label",
-        "Form input missing accessible label",
-        A11ySeverity.SERIOUS,
-        WcagLevel.A,
-        "1.3.1",
-        "Add aria-label, aria-labelledby, or associate with a <label> element",
-    ),
-    (
-        re.compile(r"<(?:div|span)\b[^>]*\bonclick\b", re.IGNORECASE),
-        "click-events-have-key-events",
-        "Interactive element using div/span with onclick but no keyboard handler",
-        A11ySeverity.SERIOUS,
-        WcagLevel.A,
-        "2.1.1",
-        'Use <button> or <a> instead, or add onKeyDown/onKeyPress handler and role="button"',
-    ),
-    (
-        re.compile(r"<html\b(?![^>]*\blang\s*=)", re.IGNORECASE),
-        "html-lang",
-        "HTML element missing lang attribute",
-        A11ySeverity.SERIOUS,
-        WcagLevel.A,
-        "3.1.1",
-        'Add lang attribute: <html lang="en">',
-    ),
-    (
-        re.compile(r"tabindex\s*=\s*[\"']([2-9]|\d{2,})[\"']", re.IGNORECASE),
-        "tabindex-positive",
-        "Positive tabindex value creates confusing tab order",
-        A11ySeverity.MODERATE,
-        WcagLevel.A,
-        "2.4.3",
-        'Use tabindex="0" or tabindex="-1" instead of positive values',
-    ),
-    (
-        re.compile(r"<a\b[^>]*href\s*=\s*[\"']#[\"'][^>]*>", re.IGNORECASE),
-        "anchor-is-valid",
-        'Anchor with href="#" — not a valid link',
-        A11ySeverity.MODERATE,
-        WcagLevel.A,
-        "2.1.1",
-        "Use <button> for interactive elements or provide a valid href",
-    ),
-    (
-        re.compile(
-            r"aria-hidden\s*=\s*[\"']true[\"'][^>]*\bfocusable\b", re.IGNORECASE
-        ),
-        "aria-hidden-focusable",
-        'Element with aria-hidden="true" is also focusable',
-        A11ySeverity.SERIOUS,
-        WcagLevel.A,
-        "4.1.2",
-        "Remove focusability or aria-hidden from this element",
-    ),
-    (
-        re.compile(r"<video\b(?![^>]*\b(?:track|captions))", re.IGNORECASE),
-        "video-captions",
-        "Video element missing captions track",
-        A11ySeverity.CRITICAL,
-        WcagLevel.A,
-        "1.2.2",
-        'Add <track kind="captions" src="..." srclang="en">',
-    ),
-]
-
-
 class AccessibilityScanner(BaseScanner[A11yViolation, A11yReport]):
     """Scan files for WCAG accessibility violations.
 
@@ -173,8 +106,15 @@ class AccessibilityScanner(BaseScanner[A11yViolation, A11yReport]):
 
     report_cls = A11yReport
 
-    def __init__(self, target_level: WcagLevel = WcagLevel.AA) -> None:
+    def __init__(
+        self,
+        target_level: WcagLevel = WcagLevel.AA,
+        tokens: Tokens | None = None,
+        page_lang: str = "en",
+    ) -> None:
         self._target_level = target_level
+        self._tokens = tokens or Tokens()
+        self._page_lang = page_lang
 
     def _new_report(self) -> A11yReport:
         return A11yReport(target_level=self._target_level)
@@ -182,31 +122,35 @@ class AccessibilityScanner(BaseScanner[A11yViolation, A11yReport]):
     def scan_file(self, file_path: str, content: str) -> A11yReport:
         """Scan a single file for violations."""
         report = A11yReport(files_scanned=1, target_level=self._target_level)
-        lines = content.splitlines()
-
-        for (
-            rule_pattern,
-            rule_id,
-            desc,
-            sev,
-            level,
-            criteria,
-            suggestion,
-        ) in _HTML_RULES:
-            for i, line in enumerate(lines, 1):
-                if rule_pattern.search(line):
-                    report.findings.append(
-                        A11yViolation(
-                            rule_id=rule_id,
-                            description=desc,
-                            severity=sev,
-                            wcag_level=level,
-                            wcag_criteria=criteria,
-                            file=file_path,
-                            line=i,
-                            element=line.strip()[:120],
-                            suggestion=suggestion,
-                        )
-                    )
-
+        markup = parse(file_path, content)
+        hits = check(markup, self._tokens, self._target_level.value)
+        fixes = propose(markup, hits, self._page_lang)
+        for hit in hits:
+            element = hit.element
+            fid = fix_id(hit.rule.rule_id, file_path, hit.line, element)
+            fix = fixes.get(fid)
+            report.findings.append(
+                A11yViolation(
+                    rule_id=hit.rule.rule_id,
+                    description=hit.rule.description,
+                    severity=A11ySeverity(hit.rule.severity),
+                    wcag_level=WcagLevel(hit.rule.level),
+                    wcag_criteria=hit.rule.criterion,
+                    file=file_path,
+                    line=hit.line,
+                    element=(element.source if element is not None else hit.snippet)[
+                        :120
+                    ],
+                    suggestion=hit.rule.suggestion,
+                    detail=hit.detail,
+                    conditional=bool(element and element.conditional),
+                    external=bool(
+                        element and element.is_component and markup.is_external(element)
+                    ),
+                    fix_id=fid if fix else "",
+                    fix={"attribute": fix.attribute, "value": fix.value}
+                    if fix
+                    else None,
+                )
+            )
         return report

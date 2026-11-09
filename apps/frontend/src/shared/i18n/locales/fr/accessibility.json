@@ -24,12 +24,14 @@
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
 	},
-	"description": "Vérifie les règles WCAG (textes alternatifs, libellés, clavier, sous-titres…) dans tout le balisage du projet : HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars.",
+	"description": "Vérifie WCAG 2.2 dans tout le balisage du projet (HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars) et ses feuilles de style : alternatives textuelles, libellés, noms, titres, clavier, ARIA, sous-titres, focus, contraste et taille des cibles. Note le projet, analyse l'application en cours d'exécution et fait les corrections simples sur une branche de revue.",
 	"emptyTitle": "Pas encore de scan",
 	"findingsTitle": "Constats",
 	"noMatches": "Aucun constat ne correspond à ce filtre.",
 	"kickers": {
-		"findings": "Constats"
+		"findings": "Constats",
+		"score": "Score",
+		"dynamic": "Application lancée"
 	},
 	"severities": {
 		"critical": "Critique",
@@ -38,5 +40,197 @@
 		"minor": "Mineure"
 	},
 	"wcagLevel": "WCAG {{level}}",
-	"wcagCriterion": "WCAG {{criterion}}"
+	"wcagCriterion": "WCAG {{criterion}}",
+	"score": {
+		"title": "Score d'accessibilité",
+		"explain": "De 0 à 100 : chaque violation pèse selon sa gravité, rapportée au nombre de fichiers analysés. Le même code a toujours le même score, les analyses se comparent donc dans le temps.",
+		"noLang_one": "{{count}} page ne déclare pas sa langue : {{files}}",
+		"noLang_other": "{{count}} pages ne déclarent pas leur langue : {{files}}",
+		"criterionCount_one": "{{count}} violation",
+		"criterionCount_other": "{{count}} violations",
+		"pages": "Pages et composants qui coûtent le plus",
+		"firstScan": "Première analyse : les suivantes montreront la tendance.",
+		"trendSame_one": "Même score qu'à l'analyse précédente ({{count}} analyse)",
+		"trendSame_other": "Même score qu'à l'analyse précédente ({{count}} analyses)",
+		"trendUp_one": "{{delta}} de plus qu'à l'analyse précédente ({{count}} analyse)",
+		"trendUp_other": "{{delta}} de plus qu'à l'analyse précédente ({{count}} analyses)",
+		"trendDown_one": "{{delta}} de moins qu'à l'analyse précédente ({{count}} analyse)",
+		"trendDown_other": "{{delta}} de moins qu'à l'analyse précédente ({{count}} analyses)"
+	},
+	"criteria": {
+		"1.1.1": "Contenu non textuel",
+		"1.2.2": "Sous-titres (pré-enregistrés)",
+		"1.3.1": "Information et relations",
+		"1.4.3": "Contraste (minimum)",
+		"1.4.4": "Redimensionnement du texte",
+		"1.4.6": "Contraste (amélioré)",
+		"2.1.1": "Clavier",
+		"2.1.2": "Pas de piège au clavier",
+		"2.4.1": "Contournement de blocs",
+		"2.4.2": "Titre de page",
+		"2.4.3": "Parcours du focus",
+		"2.4.4": "Fonction du lien",
+		"2.4.7": "Visibilité du focus",
+		"2.5.5": "Taille de la cible (améliorée)",
+		"2.5.8": "Taille de la cible (minimum)",
+		"3.1.1": "Langue de la page",
+		"4.1.2": "Nom, rôle et valeur"
+	},
+	"export": {
+		"title": "Rapport d'accessibilité",
+		"html": "HTML",
+		"csv": "CSV",
+		"pdf": "PDF",
+		"saved": "Enregistré dans {{path}}",
+		"failed": "Échec de l'export : {{error}}"
+	},
+	"notes": {
+		"dynamic": "Application lancée",
+		"conditional": "Conditionnel",
+		"conditionalHint": "Dans un balisage qui peut ne pas s'afficher : vérifiez-le dans l'état où il apparaît.",
+		"external": "Composant externe",
+		"externalHint": "Un composant d'un paquet : passez la propriété manquante là où vous l'utilisez, ou signalez-le à son mainteneur."
+	},
+	"fix": {
+		"propose": "Correction :",
+		"available_one": "{{count}} violation peut être corrigée en un clic",
+		"available_other": "{{count}} violations peuvent être corrigées en un clic",
+		"clear": "Tout décocher",
+		"selectAll": "Tout cocher",
+		"aiAlt": "Rédiger les textes alternatifs avec le modèle d'IA",
+		"running": "Correction sur une branche de revue…",
+		"apply_one": "Corriger {{count}} sur une branche de revue",
+		"apply_other": "Corriger {{count}} sur une branche de revue",
+		"serverOnly": "Les corrections se font sur une branche de revue d'un projet de cet ordinateur.",
+		"done_one": "{{count}} correction commitée sur {{branch}} : relisez le diff sur sa carte Kanban, puis ouvrez la pull request.",
+		"done_other": "{{count}} corrections commitées sur {{branch}} : relisez le diff sur sa carte Kanban, puis ouvrez la pull request.",
+		"nothing": "Rien à corriger sur la branche de revue : le code y a changé depuis l'analyse.",
+		"missing_one": "{{count}} correction n'a pas été retrouvée sur la branche.",
+		"missing_other": "{{count}} corrections n'ont pas été retrouvées sur la branche.",
+		"failed": "Échec de la correction : {{error}}"
+	},
+	"dynamic": {
+		"title": "Analyser l'application lancée",
+		"url": "URL de l'application",
+		"run": "Analyser l'application",
+		"explain": "Ouvre l'application (App Emulator ou une URL localhost) dans une fenêtre cachée, la parcourt avec Tab, lit ce que reçoit un lecteur d'écran et mesure le contraste affiché.",
+		"running": "Analyse de l'application lancée…",
+		"failed": "Échec de l'analyse : {{error}}",
+		"summary_one": "{{url}} : {{stops}} arrêts de tabulation, {{count}} violation",
+		"summary_other": "{{url}} : {{stops}} arrêts de tabulation, {{count}} violations"
+	},
+	"rules": {
+		"img-alt": {
+			"description": "Image sans alternative textuelle",
+			"suggestion": "Ajoutez alt=\"ce que montre l'image\", ou alt=\"\" si elle est décorative"
+		},
+		"img-alt-meaningful": {
+			"description": "Alternative d'image qui est un nom de fichier ou un texte bouche-trou",
+			"suggestion": "Décrivez ce que l'image montre, pas son fichier"
+		},
+		"svg-img-name": {
+			"description": "SVG avec role=\"img\" sans nom",
+			"suggestion": "Ajoutez un <title> en premier enfant, ou aria-label"
+		},
+		"control-label": {
+			"description": "Champ de formulaire sans libellé",
+			"suggestion": "Liez un <label for=\"id\">, entourez-le d'un <label> ou ajoutez aria-label ; un placeholder n'est pas un libellé"
+		},
+		"button-name": {
+			"description": "Bouton sans nom accessible",
+			"suggestion": "Donnez-lui un texte, ou aria-label pour un bouton qui n'a qu'une icône"
+		},
+		"link-name": {
+			"description": "Lien sans nom accessible",
+			"suggestion": "Donnez-lui un texte qui dit où il mène, ou aria-label"
+		},
+		"heading-order": {
+			"description": "Niveau de titre sauté",
+			"suggestion": "Descendez d'un niveau à la fois (h2 après h1, h3 après h2)"
+		},
+		"page-lang": {
+			"description": "Langue de la page non déclarée",
+			"suggestion": "Ajoutez lang à <html>, par exemple <html lang=\"fr\">"
+		},
+		"page-title": {
+			"description": "Page sans titre",
+			"suggestion": "Ajoutez un <title> qui dit ce qu'est la page"
+		},
+		"tabindex-positive": {
+			"description": "Un tabindex positif réordonne la navigation au clavier",
+			"suggestion": "Utilisez tabindex=\"0\" (ou -1) et ordonnez plutôt le balisage"
+		},
+		"click-without-keyboard": {
+			"description": "Élément cliquable que le clavier ne peut ni atteindre ni utiliser",
+			"suggestion": "Utilisez un <button>, ou ajoutez role, tabindex=\"0\" et un gestionnaire de touche"
+		},
+		"anchor-is-valid": {
+			"description": "Lien href=\"#\" ou javascript: utilisé comme bouton",
+			"suggestion": "Utilisez un <button> pour une action, un vrai href pour un lien"
+		},
+		"aria-role": {
+			"description": "Rôle ARIA qui n'existe pas",
+			"suggestion": "Utilisez un rôle WAI-ARIA 1.2, ou retirez-le"
+		},
+		"aria-hidden-focus": {
+			"description": "Élément focalisable dans aria-hidden=\"true\"",
+			"suggestion": "Retirez-le de l'ordre de tabulation (tabindex=\"-1\", inert) ou ne le masquez pas"
+		},
+		"video-captions": {
+			"description": "Vidéo sans sous-titres",
+			"suggestion": "Ajoutez <track kind=\"captions\" src=\"…\" srclang=\"…\">"
+		},
+		"iframe-title": {
+			"description": "Cadre sans titre",
+			"suggestion": "Ajoutez un title qui dit ce que contient le cadre"
+		},
+		"skip-link": {
+			"description": "Aucun moyen de passer la navigation",
+			"suggestion": "Ajoutez un premier lien <a href=\"#main\">Aller au contenu</a> et id=\"main\" sur <main>"
+		},
+		"meta-viewport": {
+			"description": "Zoom désactivé par le viewport",
+			"suggestion": "Retirez user-scalable=no et un maximum-scale inférieur à 2"
+		},
+		"focus-visible": {
+			"description": "Contour de focus retiré sans rien à la place",
+			"suggestion": "Gardez un contour, ou donnez à :focus-visible un anneau, une bordure ou une ombre"
+		},
+		"color-contrast": {
+			"description": "Contraste du texte sous 4,5:1 (3:1 pour un grand texte)",
+			"suggestion": "Foncez le texte ou éclaircissez le fond jusqu'à ce que le rapport passe"
+		},
+		"target-size": {
+			"description": "Cible de pointeur plus petite que 24×24 px",
+			"suggestion": "Donnez-lui au moins 24×24 px, marge interne comprise, ou espacez-la de ses voisines"
+		},
+		"color-contrast-enhanced": {
+			"description": "Contraste du texte sous 7:1 (4,5:1 pour un grand texte)",
+			"suggestion": "Foncez le texte ou éclaircissez le fond jusqu'à ce que le rapport passe"
+		},
+		"target-size-enhanced": {
+			"description": "Cible de pointeur plus petite que 44×44 px",
+			"suggestion": "Donnez-lui au moins 44×44 px"
+		},
+		"ax-name": {
+			"description": "Contrôle que le lecteur d'écran annonce sans nom",
+			"suggestion": "Donnez-lui un texte, un libellé ou aria-label"
+		},
+		"ax-image-name": {
+			"description": "Image que le lecteur d'écran annonce sans nom",
+			"suggestion": "Ajoutez un texte alternatif, ou alt=\"\" si elle est décorative"
+		},
+		"focus-order": {
+			"description": "Tab remonte dans la page",
+			"suggestion": "Ordonnez le balisage dans l'ordre de lecture et évitez les tabindex positifs"
+		},
+		"no-focusable": {
+			"description": "Rien dans la page n'est atteignable avec Tab",
+			"suggestion": "Utilisez de vrais liens et boutons, ou rendez les contrôles focalisables"
+		},
+		"dialog-focus": {
+			"description": "Le focus sort d'une boîte de dialogue modale ouverte",
+			"suggestion": "Gardez le focus dans la boîte tant qu'elle est ouverte (arrière-plan inert ou piège à focus)"
+		}
+	}
 }

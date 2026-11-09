@@ -7,6 +7,7 @@
     "goal",
     "mcp_tasks",
     "os_sandbox",
+    "schema_guard",
     "red_team",
     "security",
     "simulation",

@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import type { AccessibilityEvent } from "../../preload/api/modules/accessibility-api";
-import type { A11yReport } from "../../shared/types/accessibility";
+import type {
+	A11yDynamicReport,
+	A11yFixOutcome,
+	A11yReport,
+} from "../../shared/types/accessibility";
 
 export type AccessibilityPhase = "idle" | "scanning" | "complete" | "error";
 
@@ -13,8 +17,23 @@ interface AccessibilityState {
 	error: string | null;
 	targetLevel: WcagTargetLevel;
 
+	/** The running app's scan (#391). */
+	dynamicRunning: boolean;
+	dynamicReport: A11yDynamicReport | null;
+	dynamicError: string | null;
+
+	/** The fixes ticked for the next review branch, by fix id. */
+	selectedFixes: string[];
+	fixing: boolean;
+	fixOutcome: A11yFixOutcome | null;
+	fixError: string | null;
+
 	setTargetLevel: (level: WcagTargetLevel) => void;
-	startScan: (projectPath: string) => Promise<void>;
+	startScan: (projectPath: string, pageLang?: string) => Promise<void>;
+	startDynamicScan: (url?: string) => Promise<void>;
+	toggleFix: (fixId: string) => void;
+	selectFixes: (fixIds: string[]) => void;
+	applyFixes: (projectPath: string, pageLang: string, aiAlt: boolean) => Promise<void>;
 	cancelScan: () => Promise<void>;
 	setStatus: (status: string) => void;
 	setReport: (report: A11yReport) => void;
@@ -28,10 +47,56 @@ export const useAccessibilityStore = create<AccessibilityState>((set, get) => ({
 	report: null,
 	error: null,
 	targetLevel: "AA",
+	dynamicRunning: false,
+	dynamicReport: null,
+	dynamicError: null,
+	selectedFixes: [],
+	fixing: false,
+	fixOutcome: null,
+	fixError: null,
 
 	setTargetLevel: (level) => set({ targetLevel: level }),
 
-	startScan: async (projectPath) => {
+	startDynamicScan: async (url) => {
+		set({ dynamicRunning: true, dynamicError: null });
+		try {
+			const dynamicReport = await globalThis.electronAPI.runAccessibilityDynamicScan({
+				url: url?.trim() || undefined,
+				targetLevel: get().targetLevel,
+			});
+			set({ dynamicRunning: false, dynamicReport });
+		} catch (err) {
+			set({ dynamicRunning: false, dynamicError: err instanceof Error ? err.message : String(err) });
+		}
+	},
+
+	toggleFix: (fixId) =>
+		set((state) => ({
+			selectedFixes: state.selectedFixes.includes(fixId)
+				? state.selectedFixes.filter((id) => id !== fixId)
+				: [...state.selectedFixes, fixId],
+		})),
+
+	selectFixes: (fixIds) => set({ selectedFixes: [...new Set(fixIds)] }),
+
+	applyFixes: async (projectPath, pageLang, aiAlt) => {
+		const fixIds = get().selectedFixes;
+		if (!projectPath || fixIds.length === 0) return;
+		set({ fixing: true, fixError: null, fixOutcome: null });
+		try {
+			const fixOutcome = await globalThis.electronAPI.fixAccessibilityViolations({
+				projectPath,
+				fixIds,
+				pageLang,
+				aiAlt,
+			});
+			set({ fixing: false, fixOutcome, selectedFixes: [] });
+		} catch (err) {
+			set({ fixing: false, fixError: err instanceof Error ? err.message : String(err) });
+		}
+	},
+
+	startScan: async (projectPath, pageLang) => {
 		if (!projectPath) {
 			set({ phase: "error", error: "No project selected" });
 			return;
@@ -41,11 +106,15 @@ export const useAccessibilityStore = create<AccessibilityState>((set, get) => ({
 			status: "Starting scan...",
 			report: null,
 			error: null,
+			selectedFixes: [],
+			fixOutcome: null,
+			fixError: null,
 		});
 		try {
 			const report = await globalThis.electronAPI.runAccessibilityScan({
 				projectPath,
 				targetLevel: get().targetLevel,
+				pageLang,
 			});
 			set({ phase: "complete", report, status: "" });
 		} catch (err) {
@@ -70,6 +139,11 @@ export const useAccessibilityStore = create<AccessibilityState>((set, get) => ({
 			status: "",
 			report: null,
 			error: null,
+			dynamicReport: null,
+			dynamicError: null,
+			selectedFixes: [],
+			fixOutcome: null,
+			fixError: null,
 		}),
 }));
 

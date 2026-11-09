@@ -63,6 +63,7 @@ from task_logger import (
 )
 
 from . import recheck
+from .api_contract_gate import api_contract_gate
 from .budget import (
     MAX_QA_ITERATIONS,
     qa_iteration_cap,
@@ -91,6 +92,7 @@ from .report import (
     write_visual_qa_report,
 )
 from .reviewer import classify_qa_error, run_qa_agent_session
+from .schema_gate import schema_gate
 
 
 def _ensure_fix_request_file(
@@ -544,6 +546,13 @@ async def run_qa_validation_loop(
                     state.review_scope,
                     task_logger=scope.task_logger,
                 )
+                or schema_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
                 or proof_gate(
                     spec_dir,
                     project_dir,
@@ -558,6 +567,13 @@ async def run_qa_validation_loop(
                     state.review_commands,
                 )
                 or mutation_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or api_contract_gate(
                     spec_dir,
                     project_dir,
                     state.qa_iteration,

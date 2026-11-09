@@ -44,6 +44,7 @@ __all__ = [
     "DEPS_EXIST",
     "PROOF_CHECKS",
     "TESTS_BITE",
+    "MIGRATION_SAFE",
     "ATTACK_RESISTANT",
     "is_test_file",
     "GATE_RECORD",
@@ -87,6 +88,13 @@ PROOF_CHECKS = "proof-checks"
 # `qa/mutation_gate.py`). Unknown when the gate did not run, was switched off,
 # or could not measure (no test command, a red suite, the time budget).
 TESTS_BITE = "tests-bite"
+
+# The task's migrations survive a live database: the schema guard's record
+# (`<spec_dir>/schema_guard.json`, written by the QA gate, `qa/schema_gate.py`).
+# Held when no finding is an error (no migration at all included); unknown
+# when the guard did not run or was switched off. Declaring it makes the QA
+# gate strict.
+MIGRATION_SAFE = "migration-safe"
 
 # No attack of the red team crashed the changed code: its record
 # (`<spec_dir>/red_team.json`, written by `qa/red_team_gate.py`). Unknown when
@@ -228,6 +236,33 @@ def _tests_bite(spec_dir: Path) -> tuple[bool | None, str]:
             if isinstance(r, dict) and r.get("outcome") == "survived"
         ]
         return False, f"{measured}; survived: {', '.join(survivors[:5])}"
+    return None, f"unknown — {reason}" if reason else "unknown"
+
+
+def _migration_safe(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from schema_guard import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the schema guard is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no schema record — the QA schema guard did not run"
+    status = record.get("status")
+    findings = [f for f in record.get("findings") or [] if isinstance(f, dict)]
+    if status == "fail":
+        errors = [
+            f"{f.get('path')}:{f.get('line')} {f.get('message')}"
+            for f in findings
+            if f.get("severity") == "error"
+        ]
+        return False, "; ".join(errors[:5])
+    if status in ("pass", "warn"):
+        count = len(record.get("migrations") or [])
+        if not count:
+            return True, "no migration in the change set"
+        warned = f", {len(findings)} warning(s)" if findings else ""
+        return True, f"{count} migration(s) checked{warned}"
+    reason = str(record.get("unchecked") or "")
     return None, f"unknown — {reason}" if reason else "unknown"
 
 
@@ -380,6 +415,11 @@ def _evaluate_one(
                     phase_id=resolved.id, gate=gate, held=held, detail=detail
                 )
             )
+    elif gate == MIGRATION_SAFE:
+        held, detail = _migration_safe(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
     elif gate == TESTS_BITE:
         held, detail = _tests_bite(spec_dir)
         report.results.append(

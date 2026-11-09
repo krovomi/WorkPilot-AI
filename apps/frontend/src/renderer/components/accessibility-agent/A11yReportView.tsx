@@ -8,7 +8,8 @@ import {
 	useAccessibilityStore,
 	type WcagTargetLevel,
 } from "../../stores/accessibility-store";
-import type { A11yReport, A11ySeverity } from "../../../shared/types/accessibility";
+import type { A11yReport } from "../../../shared/types/accessibility";
+import { useProjectStore } from "../../stores/project-store";
 import {
 	CharterButton,
 	Chip,
@@ -25,13 +26,10 @@ import {
 	type Tone,
 } from "../charter";
 import { Input } from "../ui/input";
-
-const SEVERITY_TONES: Record<A11ySeverity, Tone> = {
-	critical: "red",
-	serious: "orange",
-	moderate: "amber",
-	minor: "blue",
-};
+import { A11yDynamicSection } from "./A11yDynamicSection";
+import { A11yFixBar } from "./A11yFixBar";
+import { A11yScoreSection } from "./A11yScoreSection";
+import { A11yViolationCard } from "./A11yViolationCard";
 
 const LEVELS: WcagTargetLevel[] = ["A", "AA", "AAA"];
 
@@ -43,7 +41,11 @@ interface A11yReportViewProps {
 
 /** WCAG checks over every markup the project ships (HTML, JSX, Vue, Razor, Blade…). */
 export function A11yReportView({ projectPath }: A11yReportViewProps): React.ReactElement {
-	const { t } = useTranslation(["accessibility", "navigation"]);
+	const { t, i18n } = useTranslation(["accessibility", "navigation"]);
+	// A server project has no folder here: no running app to open, no review branch to write.
+	const local = useProjectStore(
+		(s) => !s.projects.find((p) => p.path === projectPath)?.remote,
+	);
 
 	const phase = useAccessibilityStore((s) => s.phase);
 	const status = useAccessibilityStore((s) => s.status);
@@ -83,7 +85,7 @@ export function A11yReportView({ projectPath }: A11yReportViewProps): React.Reac
 							<CharterButton
 								variant="primary"
 								icon={Play}
-								onClick={() => projectPath && startScan(projectPath)}
+								onClick={() => projectPath && startScan(projectPath, i18n.language.split("-")[0])}
 								disabled={!projectPath}
 							>
 								{t("accessibility:actions.runScan")}
@@ -119,8 +121,9 @@ export function A11yReportView({ projectPath }: A11yReportViewProps): React.Reac
 						{t("accessibility:errors.failed", { error })}
 					</Notice>
 				)}
+				{local && <A11yDynamicSection />}
 				{report ? (
-					<ReportBody report={report} />
+					<ReportBody report={report} projectPath={projectPath} local={local} />
 				) : (
 					phase === "idle" && (
 						<EmptyStage icon={Accessibility} title={t("accessibility:emptyTitle")} tone="violet">
@@ -133,8 +136,18 @@ export function A11yReportView({ projectPath }: A11yReportViewProps): React.Reac
 	);
 }
 
-function ReportBody({ report }: { readonly report: A11yReport }): React.ReactElement {
+function ReportBody({
+	report,
+	projectPath,
+	local,
+}: {
+	readonly report: A11yReport;
+	readonly projectPath?: string;
+	readonly local: boolean;
+}): React.ReactElement {
 	const { t } = useTranslation("accessibility");
+	const selectedFixes = useAccessibilityStore((s) => s.selectedFixes);
+	const toggleFix = useAccessibilityStore((s) => s.toggleFix);
 	const [filter, setFilter] = useState<FilterType>("all");
 	const [query, setQuery] = useState("");
 	const q = query.toLowerCase();
@@ -171,6 +184,8 @@ function ReportBody({ report }: { readonly report: A11yReport }): React.ReactEle
 				{t("targetInfo", { targetLevel: report.targetLevel, filesScanned: report.filesScanned })}
 			</p>
 
+			<A11yScoreSection report={report} />
+
 			<Section
 				kicker={t("kickers.findings")}
 				title={t("findingsTitle")}
@@ -188,6 +203,9 @@ function ReportBody({ report }: { readonly report: A11yReport }): React.ReactEle
 					</div>
 				}
 			>
+				<div className="mb-3">
+					<A11yFixBar report={report} projectPath={projectPath} local={local} />
+				</div>
 				<div className="wp-chips mb-3">
 					{filters.map((f) => (
 						<Chip key={f.id} tone={f.tone} pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -203,21 +221,12 @@ function ReportBody({ report }: { readonly report: A11yReport }): React.ReactEle
 								</Panel>
 							))
 						: violations.map((v) => (
-								<Panel key={`${v.ruleId}-${v.file}-${v.line}`} rail tone={SEVERITY_TONES[v.severity]}>
-									<div className="flex flex-wrap items-center gap-2">
-										<Chip tone={SEVERITY_TONES[v.severity]}>
-											{t(`severities.${v.severity}`, { defaultValue: v.severity })}
-										</Chip>
-										<span className="wp-meta font-mono">
-											{v.ruleId} · {t("wcagCriterion", { criterion: v.wcagCriteria })}
-										</span>
-									</div>
-									<p className="mt-1.5 text-sm">{v.description}</p>
-									<p className="wp-meta mt-1 font-mono">
-										{v.file}:{v.line}
-									</p>
-									{v.suggestion && <p className="wp-tone-green wp-ink mt-1 text-xs">{v.suggestion}</p>}
-								</Panel>
+								<A11yViolationCard
+									key={`${v.ruleId}-${v.file}-${v.line}-${v.fixId ?? ""}`}
+									violation={v}
+									selected={v.fixId ? selectedFixes.includes(v.fixId) : false}
+									onToggleFix={local ? toggleFix : undefined}
+								/>
 							))}
 					{filter !== "passed" && violations.length === 0 && (
 						<p className="wp-muted text-sm">{t("noMatches")}</p>
