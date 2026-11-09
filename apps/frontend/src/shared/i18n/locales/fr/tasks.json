@@ -2382,5 +2382,27 @@
 		"overBadge": "{{lines}} / {{max}} lignes",
 		"overFilesBadge": "{{files}} / {{max}} fichiers",
 		"overTooltip": "Le diff réel compte environ {{lines}} lignes à relire dans {{files}} fichiers, au-delà du plafond de {{max}} lignes et {{maxFiles}} fichiers pour ce type de tâche : la relecture sera plus longue."
+	},
+	"purge": {
+		"button": "Purger",
+		"buttonTitle": "Libérer la place des worktrees dont le travail est terminé",
+		"title": "Purger les worktrees terminés",
+		"description": "Chaque carte travaille dans une copie complète du projet. Celles-ci appartiennent à des cartes dont la PR est fusionnée, ou qui sont terminées, archivées ou abandonnées. Purger supprime le dossier et la branche locale workpilot/… ; la carte, sa spec et sa PR restent. Une PR fusionnée est purgée automatiquement.",
+		"loading": "Calcul de la place occupée…",
+		"empty": "Aucun worktree à purger : rien n'occupe de place inutilement.",
+		"dirty": "modifications non commitées, conservé",
+		"failed": "La purge n'a pas pu être lancée.",
+		"reason": {
+			"merged": "PR fusionnée",
+			"done": "terminée",
+			"archived": "archivée",
+			"abandoned": "abandonnée"
+		},
+		"confirm_one": "Purger {{count}} worktree ({{size}})",
+		"confirm_other": "Purger {{count}} worktrees ({{size}})",
+		"done_one": "{{count}} worktree purgé, {{size}} libérés.",
+		"done_other": "{{count}} worktrees purgés, {{size}} libérés.",
+		"kept_one": "{{count}} conservé : modifications non commitées ou suppression impossible.",
+		"kept_other": "{{count}} conservés : modifications non commitées ou suppression impossible."
 	}
 }

@@ -89,9 +89,21 @@ Par page :
 
 ## La purge (lot 4)
 
-Le worktree d'une carte dont la PR est fusionnée occupe le disque pour rien. Le lot 4 le retire,
-avec sa branche locale, quand la forge dit la PR fusionnée, et ajoute un bouton « Purger » au
-Kanban pour les cartes terminées ou abandonnées.
+Un worktree est une copie complète du projet, sorties de build et dépendances comprises : une
+fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
+
+- **PR fusionnée** : toutes les 5 minutes, la PR de chaque carte locale en revue (statut
+  `human_review` ou `pr_created`, URL de PR connue) est lue sur sa forge (`pr-state.ts` : GitHub,
+  GitLab, Azure DevOps). Fusionnée, la carte passe « Terminé » avec `prMergedAt`, puis son worktree
+  et sa branche locale `workpilot/<spec>` sont supprimés, sans demander. Les parties d'un
+  découpage sont suivies par `split-merge-watch.ts` et purgées ici une fois terminées.
+- **« Purger »** (barre du Kanban) : liste les worktrees des cartes à PR fusionnée, terminées,
+  archivées ou abandonnées, avec la place occupée, et supprime ceux que la personne coche.
+- **Jamais purgé** : un worktree avec des modifications non commitées (affiché, case grisée),
+  une carte sur laquelle une autre est encore empilée, une carte en cours, un lien à la place du
+  dossier, une carte du serveur. Une PR fermée sans fusion, ou une forge qui ne répond pas, ne
+  déclenche rien ; un projet en mode hors ligne strict n'est jamais interrogé.
+- La carte, sa spec et sa PR restent : seule la copie locale part.
 
 Vérification : `pytest tests/test_review_worktree_runner.py -q` ;
-`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review`.
+`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeButton`.

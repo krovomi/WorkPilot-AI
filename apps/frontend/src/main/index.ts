@@ -77,6 +77,7 @@ import {
 import { getSourceEnvPath } from "./ipc-handlers/settings-handlers";
 import { stopAllPrFollowups } from "./ipc-handlers/task/pr-followup-handlers";
 import { stopSplitMergeWatch } from "./ipc-handlers/task/split-merge-watch";
+import { stopMergedWatch } from "./worktree-purge/merged-watch";
 import { initializeUsageMonitorForwarding } from "./ipc-handlers/terminal-handlers";
 import { setupIpcHandlers } from "./ipc-setup";
 import { loadPersistedState, restoreSession } from "./server-connection";
@@ -1388,6 +1389,7 @@ app.on("before-quit", (event) => {
 	stopPeriodicUpdates();
 	stopAllPrFollowups();
 	stopSplitMergeWatch();
+	stopMergedWatch();
 
 	const usageMonitor = getUsageMonitor();
 	usageMonitor.stop();

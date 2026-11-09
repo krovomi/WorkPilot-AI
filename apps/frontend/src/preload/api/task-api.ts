@@ -227,6 +227,15 @@ export interface TaskAPI {
 		projectId: string,
 		options?: { includeStats?: boolean },
 	) => Promise<IPCResult<import("../../shared/types").WorktreeListResult>>;
+	/** Worktrees whose work is over (merged, done, archived, abandoned), with their size. */
+	listPurgeableWorktrees: (
+		projectId: string,
+	) => Promise<IPCResult<import("../../shared/types/worktree-purge").PurgeCandidate[]>>;
+	/** Remove those worktrees and their local branch; checked again in the main process. */
+	purgeWorktrees: (
+		projectId: string,
+		specIds: string[],
+	) => Promise<IPCResult<import("../../shared/types/worktree-purge").PurgeOutcome[]>>;
 	worktreeOpenInIDE: (
 		worktreePath: string,
 		ide: SupportedIDE,
@@ -742,6 +751,12 @@ export const createTaskAPI = (): TaskAPI => ({
 		options?: { includeStats?: boolean },
 	): Promise<IPCResult<import("../../shared/types").WorktreeListResult>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_LIST_WORKTREES, projectId, options),
+
+	listPurgeableWorktrees: (projectId: string) =>
+		ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_PURGE_LIST, projectId),
+
+	purgeWorktrees: (projectId: string, specIds: string[]) =>
+		ipcRenderer.invoke(IPC_CHANNELS.WORKTREE_PURGE, projectId, specIds),
 
 	worktreeOpenInIDE: (
 		worktreePath: string,

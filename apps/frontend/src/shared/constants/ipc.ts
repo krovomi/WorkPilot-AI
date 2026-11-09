@@ -124,6 +124,8 @@ export const IPC_CHANNELS = {
 	TASK_WORKTREE_WRITE_FILE: "task:worktreeWriteFile",
 	TASK_WORKTREE_DELETE_FILES: "task:worktreeDeleteFiles",
 	TASK_LIST_WORKTREES: "task:listWorktrees",
+	WORKTREE_PURGE_LIST: "worktreePurge:list", // Worktrees whose work is over, with their size
+	WORKTREE_PURGE: "worktreePurge:purge", // Remove them and their local branch
 	TASK_ARCHIVE: "task:archive",
 	TASK_UNARCHIVE: "task:unarchive",
 	TASK_CLEAR_STAGED_STATE: "task:clearStagedState",
