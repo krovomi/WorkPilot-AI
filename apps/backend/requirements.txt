@@ -71,6 +71,9 @@ sqlalchemy[asyncio]>=2.1.6
 psutil>=7.2.2
 azure-devops>=7.1.0b4  # Azure DevOps SDK for src/connectors/azure_devops
 msrest>=0.7.1           # Required by azure-devops SDK
+# Pulled in by msrest through requests-oauthlib. Floor set by hand because
+# 4.0.0 carries CVE-2026-49272 and nothing above it asks for the fix.
+oauthlib>=4.0.1
 
 # Hardened XML parsing. WorkPilot reads coverage.xml and JUnit XML out of
 # whichever repository it is building, so those files are attacker-controlled
