@@ -102,16 +102,24 @@
 			"description": "En savoir plus sur les fonctionnalités avancées, les bonnes pratiques et le dépannage."
 		},
 		"finish": "Terminer et commencer à construire",
-		"rerunHint": "Vous pouvez toujours relancer cet assistant depuis Paramètres → Application"
+		"rerunHint": "Vous pouvez toujours relancer cet assistant depuis Paramètres → Application",
+		"titleNotReady": "Presque prêt",
+		"subtitleNotReady": "Il reste une étape avant que WorkPilot AI puisse lancer vos tâches",
+		"checking": "Vérification de vos fournisseurs d'IA…",
+		"connectedTo": "Connecté : {{providers}}",
+		"noProvider": "Aucun fournisseur d'IA connecté pour l'instant",
+		"noProviderDescription": "Les tâches ont besoin d'une IA pour tourner. Connectez Claude, Codex, GitHub Copilot, Gemini, OpenCode, Ollama ou un autre fournisseur maintenant, ou plus tard dans Paramètres → Comptes.",
+		"connectProvider": "Connecter un fournisseur"
 	},
 	"steps": {
 		"welcome": "Bienvenue",
-		"authChoice": "Méthode d'auth",
+		"authChoice": "Votre IA",
 		"auth": "Auth",
 		"cli": "CLI",
 		"devtools": "Outils dev",
 		"privacy": "Confidentialité",
-		"done": "Terminé"
+		"done": "Terminé",
+		"providers": "Fournisseurs IA"
 	},
 	"privacy": {
 		"title": "Aidez à améliorer WorkPilot AI",
@@ -215,14 +223,16 @@
 		"startingDownload": "Démarrage du téléchargement..."
 	},
 	"authChoice": {
-		"title": "Choisissez votre méthode d'authentification",
-		"description": "Choisissez comment vous authentifier auprès de Claude. Vous pourrez changer plus tard dans les paramètres.",
+		"title": "Choisissez votre IA",
+		"description": "Choisissez l'IA qui planifiera, écrira et relira votre code. Vous pourrez en ajouter d'autres ou changer plus tard dans Paramètres → Comptes.",
 		"oauthTitle": "Se connecter avec Anthropic",
 		"oauthDescription": "Authentifiez-vous avec votre compte Anthropic. Un flux OAuth simple et sûr.",
 		"apiKeyTitle": "Utiliser une clé API personnalisée",
 		"apiKeyDescription": "Apportez votre clé API Anthropic ou d'un fournisseur compatible. ⚠️ Très expérimental : peut entraîner des coûts importants.",
-		"footer": "Les deux options donnent accès à toutes les fonctions de Claude Code. Choisissez selon votre préférence.",
-		"skip": "Passer pour l'instant"
+		"footer": "Claude passe par votre compte Anthropic ou une clé API ; les autres fournisseurs gardent chacun leur propre connexion.",
+		"skip": "Passer pour l'instant",
+		"otherTitle": "Utiliser une autre IA",
+		"otherDescription": "OpenAI Codex, GitHub Copilot, Gemini, OpenCode, Ollama, Mistral et d'autres : connectez un compte, un CLI ou une clé API."
 	},
 	"firstSpec": {
 		"title": "Créez votre première tâche",
@@ -235,5 +245,10 @@
 		"open": "Ouvrir le créateur de tâche",
 		"continueHint": "Vous pouvez continuer l'assistant maintenant ou créer d'autres tâches.",
 		"skipHint": "Vous pouvez passer cette étape et créer des tâches plus tard depuis le tableau de bord."
+	},
+	"providers": {
+		"title": "Connectez vos fournisseurs d'IA",
+		"description": "Configurez un ou plusieurs fournisseurs : connexion, installation d'un CLI ou clé API. C'est le même panneau que Paramètres → Comptes.",
+		"continue": "Continuer"
 	}
 }
