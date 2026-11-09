@@ -24,6 +24,9 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 // GitHub refuses labels over 50 characters; git refs have their own grammar.
 const LABEL_MAX = 50;
 const BRANCH = /^(?!.*\.\.)(?!\/)(?!.*\/$)[A-Za-z0-9._/-]{1,200}$/;
+// A Sentry organisation or project slug, and a bare host name (HTTPS always).
+const SLUG = /^[a-z0-9][a-z0-9_-]{0,49}$/;
+const HOST = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 export function newRuleId(): string {
 	return `r-${randomBytes(6).toString("hex")}`;
@@ -96,6 +99,26 @@ function parseTrigger(raw: unknown): AutomationTrigger | string {
 			}
 			return { type: "pr_opened", base: trigger.base };
 		}
+		case "prod_incident": {
+			// The project's incident inbox always; Sentry when a project is named.
+			const { org, project, host } = trigger;
+			const empty = (v: unknown) => v === undefined || v === null || v === "";
+			if (empty(org) && empty(project)) {
+				if (!empty(host)) return "A Sentry host needs an organisation and a project";
+				return { type: "prod_incident" };
+			}
+			if (typeof org !== "string" || !SLUG.test(org)) {
+				return "The Sentry organisation is not a slug";
+			}
+			if (typeof project !== "string" || !SLUG.test(project)) {
+				return "The Sentry project is not a slug";
+			}
+			if (empty(host)) return { type: "prod_incident", org, project };
+			if (typeof host !== "string" || !HOST.test(host)) {
+				return "The Sentry host is not a host name";
+			}
+			return { type: "prod_incident", org, project, host };
+		}
 		default:
 			return "Unknown trigger";
 	}
@@ -137,6 +160,8 @@ export function parseRule(
 		if (!TASK_KINDS.includes(rule.kind as TaskKind)) return "Unknown card kind";
 		kind = rule.kind as TaskKind;
 	}
+	// An incident is a bug: its card writes the failing test first.
+	if (!kind && trigger.type === "prod_incident") kind = "bug_fix";
 	const engine = parseEngine(rule.engine);
 	if (typeof engine === "string") return engine;
 	const cap = rule.dailyCap ?? DEFAULT_DAILY_CAP;
