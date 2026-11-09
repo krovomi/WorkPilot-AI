@@ -1190,6 +1190,7 @@ export const IPC_CHANNELS = {
 	I18N_AGENT_EVENT: "i18n-agent-event",
 	I18N_AGENT_RESULT: "i18n-agent-result",
 	I18N_AGENT_RUN: "i18nAgent:run",
+	I18N_AGENT_TRANSLATE: "i18nAgent:translate",
 	INJECTION_GUARD_CANCEL: "injectionGuard:cancel",
 	INJECTION_GUARD_ERROR: "injection-guard-error",
 	INJECTION_GUARD_EVENT: "injection-guard-event",
