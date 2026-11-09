@@ -1,6 +1,8 @@
 import { Check, PartyPopper } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ChangelogTask } from "../../../shared/types";
+import { useChangelogStore } from "../../stores/changelog-store";
+import { GeneratedReviewBanner } from "../generated-review/GeneratedReviewBanner";
 import { Button } from "../ui/button";
 import { ArchiveTasksCard } from "./ArchiveTasksCard";
 import { GitHubReleaseCard } from "./GitHubReleaseCard";
@@ -31,6 +33,7 @@ export function Step3SuccessScreen({
 		selectedTaskIds.includes(task.id),
 	);
 	const tag = formatVersionTag(version);
+	const savedReview = useChangelogStore((s) => s.savedReview);
 
 	return (
 		<div className="flex flex-1 flex-col items-center justify-center p-8">
@@ -51,6 +54,11 @@ export function Step3SuccessScreen({
 							: t("changelog:success.description", { tag })}
 					</p>
 				</div>
+
+				{/* The file is on a review card's branch, not in the project folder. */}
+				{!serverProject && savedReview && (
+					<GeneratedReviewBanner review={savedReview} projectId={projectId} />
+				)}
 
 				{/* Action Cards: a release and an archive act on this computer's project. */}
 				{!serverProject && (

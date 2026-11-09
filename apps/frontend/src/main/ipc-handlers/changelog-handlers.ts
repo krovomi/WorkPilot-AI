@@ -18,6 +18,12 @@ import type {
 	Task,
 	TaskSpecContent,
 } from "../../shared/types";
+import {
+	STAGED_ASSETS_DIR,
+	saveChangelogForReview,
+	stagedAsset,
+} from "../changelog/changelog-review";
+import { findOpenReviewCard } from "../generated-review/review-card";
 import { changelogService } from "../changelog-service";
 import { projectStore } from "../project-store";
 import { resolveKnownProject, resolveUnder } from "../security/renderer-path";
@@ -261,7 +267,10 @@ export function registerChangelogHandlers(
 			}
 
 			try {
-				const result = changelogService.saveChangelog(project.path, request);
+				// On a review card's branch, never in the project folder.
+				const result = await saveChangelogForReview(project.path, request, (root, req) =>
+					changelogService.saveChangelog(root, req),
+				);
 				return { success: true, data: result };
 			} catch (error) {
 				return {
@@ -288,7 +297,9 @@ export function registerChangelogHandlers(
 				return { success: false, error: "Project not found" };
 			}
 
-			const result = changelogService.readExistingChangelog(project.path);
+			// A version saved but not merged yet lives on the open changelog card.
+			const open = findOpenReviewCard(project, "changelog");
+			const result = changelogService.readExistingChangelog(open?.worktreePath ?? project.path);
 			return { success: true, data: result };
 		},
 	);
@@ -558,8 +569,9 @@ export function registerChangelogHandlers(
 			}
 
 			try {
-				// Create .github/assets directory if it doesn't exist
-				const assetsDir = path.join(project.path, ".github", "assets");
+				// Kept out of the checkout until « Enregistrer » commits it, with
+				// the text, on the review card's branch (changelog-review.ts).
+				const assetsDir = path.join(project.path, STAGED_ASSETS_DIR);
 				if (!existsSync(assetsDir)) {
 					mkdirSync(assetsDir, { recursive: true });
 				}
@@ -601,8 +613,11 @@ export function registerChangelogHandlers(
 				// The project must be one the user added, and the image a file
 				// inside it once resolved: the renderer names, the main decides.
 				const projectDir = resolveKnownProject(projectPath);
+				// A pasted image waits outside the checkout until the save.
 				const fullPath =
-					projectDir && resolveUnder(projectDir, relativePath, "file");
+					projectDir &&
+					(stagedAsset(projectDir, relativePath) ??
+						resolveUnder(projectDir, relativePath, "file"));
 				const mimeType =
 					typeof relativePath === "string"
 						? IMAGE_MIME_TYPES[path.extname(relativePath).toLowerCase()]

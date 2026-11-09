@@ -11,9 +11,12 @@ GitHub) et pour un des trois publics (technique, utilisateurs, marketing).
 Tout se passe dans le main (`apps/frontend/src/main/changelog/`) : `git-integration.ts` lit les
 branches, les tags et les commits par `execFileSync` (liste d'arguments), `formatter.ts` construit
 le prompt, `generator.ts` le passe au CLI Claude (`haiku`), `parser.ts` retire le préambule de la
-réponse. Enregistrer ajoute le texte en tête de `CHANGELOG.md` ; l'étape 3 propose une release
-GitHub et l'archivage des tâches incluses. Les images collées vont dans `.github/assets/` du
-projet.
+réponse. Enregistrer ajoute le texte en tête de `CHANGELOG.md` sur la branche d'une carte du
+Kanban en revue, jamais dans le dossier du projet (`changelog-review.ts`,
+[generated-review.md](generated-review.md)) ; l'étape 3 montre la carte et « Créer la PR », puis
+propose une release GitHub et l'archivage des tâches incluses. Les images collées attendent dans
+`.workpilot/changelog-assets/` et rejoignent le commit, sous `.github/assets/`, avec le texte qui
+les cite.
 
 ## Projet du serveur
 

@@ -21,6 +21,7 @@ import type {
 	TaskSpecContent,
 } from "../../shared/types";
 import { getToolInfo } from "../cli-tool-manager";
+import { resolveWritableUnder } from "../security/renderer-path";
 import { getValidatedPythonPath } from "../python-detector";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { loadBackendEnv } from "../source-env";
@@ -441,9 +442,14 @@ export class ChangelogService extends EventEmitter {
 		projectPath: string,
 		request: ChangelogSaveRequest,
 	): ChangelogSaveResult {
-		const filePath = request.filePath
-			? path.join(projectPath, request.filePath)
-			: path.join(projectPath, DEFAULT_CHANGELOG_PATH);
+		// The renderer names the file: it must stay inside the folder (S4, S6).
+		const filePath = resolveWritableUnder(
+			projectPath,
+			request.filePath || DEFAULT_CHANGELOG_PATH,
+		);
+		if (!filePath) {
+			throw new Error("The changelog file must be inside the project");
+		}
 
 		let finalContent = request.content;
 
