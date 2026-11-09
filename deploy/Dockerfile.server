@@ -56,6 +56,9 @@ COPY --chown=workpilot:workpilot apps/backend /app/apps/backend
 # Read from the repository root by the backend (`Path(__file__).parents[3]`):
 # the provider registry, the declarative workflows, the harness catalogue,
 # the skills and their emitted output, and SOUL.md.
+# The shared connectors (`src.connectors`: provider config, Jira, Azure
+# DevOps), imported from the root above the backend (F173).
+COPY src /app/src
 COPY config /app/config
 COPY workflows /app/workflows
 COPY capabilities /app/capabilities
