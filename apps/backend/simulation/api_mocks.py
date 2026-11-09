@@ -18,6 +18,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
+import yaml
+
 _CONTRACT_NAME = re.compile(r"(openapi|swagger|api)", re.IGNORECASE)
 _CONTRACT_SUFFIXES = (".yaml", ".yml", ".json")
 _SCHEMA_SUFFIXES = (".proto", ".graphql", ".graphqls", ".gql")
@@ -139,10 +141,8 @@ def _load(content: str) -> Any:
     except ValueError:
         pass
     try:
-        import yaml
-
         return yaml.safe_load(content)
-    except Exception:  # noqa: BLE001 - an unreadable contract is just skipped
+    except yaml.YAMLError:  # an unreadable contract is just skipped
         return None
 
 

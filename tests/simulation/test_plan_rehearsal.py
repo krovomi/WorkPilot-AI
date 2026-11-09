@@ -29,8 +29,10 @@ def repo(tmp_path: Path) -> Path:
     _git(tmp_path, "config", "user.email", "t@example.com")
     _git(tmp_path, "config", "user.name", "t")
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "app.py").write_text("print('hi')\n")
-    (tmp_path / "package.json").write_text(json.dumps({"scripts": {"test": "vitest"}}))
+    (tmp_path / "src" / "app.py").write_text("print('hi')\n", encoding="utf-8")
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest"}}), encoding="utf-8"
+    )
     (tmp_path / "openapi.yaml").write_text(
         """openapi: 3.0.0
 info: {title: shop, version: '1'}
@@ -50,7 +52,8 @@ components:
         id: {type: string, format: uuid}
         total: {type: number}
         lines: {type: array, items: {type: integer}}
-"""
+""",
+        encoding="utf-8",
     )
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-q", "-m", "init")
@@ -286,7 +289,7 @@ class TestToolchains:
 
 class TestApiMocks:
     def test_schema_based_mock_with_base_path(self, repo: Path):
-        files = {"openapi.yaml": (repo / "openapi.yaml").read_text()}
+        files = {"openapi.yaml": (repo / "openapi.yaml").read_text(encoding="utf-8")}
         index = build_index(set(files), _reader(files))
         result = mock(index, "GET", "http://localhost:5000/api/orders/42", 200)
         assert result.strategy == "schema_based"
@@ -339,12 +342,14 @@ class TestEndToEnd:
     def _spec(self, repo: Path, plan: dict) -> Path:
         spec = repo / ".workpilot" / "specs" / "001-orders"
         spec.mkdir(parents=True)
-        (spec / "spec.md").write_text("# Orders\n")
-        (spec / "implementation_plan.json").write_text(json.dumps(plan))
+        (spec / "spec.md").write_text("# Orders\n", encoding="utf-8")
+        (spec / "implementation_plan.json").write_text(
+            json.dumps(plan), encoding="utf-8"
+        )
         return spec
 
     def test_report_over_head_ignores_uncommitted_files(self, repo: Path):
-        (repo / "src" / "draft.py").write_text("uncommitted\n")
+        (repo / "src" / "draft.py").write_text("uncommitted\n", encoding="utf-8")
         plan = {
             "phases": [
                 {
@@ -391,7 +396,7 @@ class TestEndToEnd:
 
     def test_unreadable_plan(self, repo: Path):
         spec = self._spec(repo, {})
-        (spec / "implementation_plan.json").write_text("{not json")
+        (spec / "implementation_plan.json").write_text("{not json", encoding="utf-8")
         result = rehearse_spec(repo, spec)
         assert [f["code"] for f in result["planFindings"]][:1] == ["plan_unreadable"]
 
@@ -441,7 +446,8 @@ class TestRunner:
         (spec / "implementation_plan.json").write_text(
             json.dumps(
                 {"phases": [{"subtasks": [_sub("1", files_to_modify=["src/app.py"])]}]}
-            )
+            ),
+            encoding="utf-8",
         )
         out = self._run("--project-path", str(repo), "--spec-dir", str(spec))
         line = next(

@@ -54,10 +54,9 @@ def _tracked_reader(project_path: Path, ref: str, tracked: set[str]):
 def _estimate(spec_dir: Path) -> dict[str, Any] | None:
     try:
         from cost_intelligence.estimator import estimate_build_cost
-
-        return estimate_build_cost(spec_dir).to_dict()
-    except Exception:  # noqa: BLE001 - the estimate is a bonus, never a blocker
+    except ImportError:  # the estimate is a bonus, never a blocker
         return None
+    return estimate_build_cost(spec_dir).to_dict()  # never raises, by contract
 
 
 def rehearse_spec(
