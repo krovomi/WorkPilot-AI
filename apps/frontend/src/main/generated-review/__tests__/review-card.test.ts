@@ -214,7 +214,8 @@ describe("recordReviewStep", () => {
 });
 
 describe("toWorkspacePath", () => {
-	const project = path.join(path.sep, "repo");
+	// Absolute on every platform: "\\repo" alone has no drive on Windows.
+	const project = path.resolve(path.sep, "repo");
 	const worktree = path.join(project, ".workpilot", "worktrees", "tasks", "001-a");
 
 	it("moves a project path to the same place in the worktree", () => {
@@ -233,7 +234,7 @@ describe("toWorkspacePath", () => {
 	});
 
 	it("has no counterpart for what is outside the project or in its WorkPilot folder", () => {
-		expect(toWorkspacePath(project, worktree, path.join(path.sep, "etc", "passwd"))).toBeUndefined();
+		expect(toWorkspacePath(project, worktree, path.resolve(path.sep, "etc", "passwd"))).toBeUndefined();
 		expect(toWorkspacePath(project, worktree, path.join("..", "..", "x"))).toBeUndefined();
 		expect(
 			toWorkspacePath(project, worktree, path.join(project, ".workpilot", "specs", "x")),
