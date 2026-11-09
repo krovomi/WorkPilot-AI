@@ -9,6 +9,7 @@ import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type {
 	WorktreeCreatePROptions,
+	CicdAutoRun,
 	VisualProofRun,
 } from "../../../shared/types";
 import { getAppLanguage } from "../../app-language";
@@ -26,8 +27,8 @@ import { getEffectiveSourcePath } from "../../updater/path-resolver";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import {
 	persistPlanStatus,
+	updateTaskMetadataField,
 	updateTaskMetadataPrUrl,
-	updateTaskMetadataVisualProof,
 } from "./plan-file-utils";
 import { GIT_BRANCH_REGEX } from "./worktree-git-refs";
 
@@ -269,19 +270,43 @@ export function updateVisualProofMetadata(
 	visualProof: VisualProofRun,
 	debug: (...args: unknown[]) => void,
 ): VisualProofMetadataUpdateResult {
+	return updateTaskMetadataEverywhere(
+		{ specDir, worktreePath, autoBuildPath, specId },
+		"visualProof",
+		visualProof,
+		debug,
+	);
+}
+
+/** The pipeline started for the task's PR, kept on the task (spec dir + worktree). */
+export function updateCicdRunMetadata(
+	where: TaskMetadataLocation,
+	cicdRun: CicdAutoRun,
+	debug: (...args: unknown[]) => void,
+): VisualProofMetadataUpdateResult {
+	return updateTaskMetadataEverywhere(where, "cicdRun", cicdRun, debug);
+}
+
+interface TaskMetadataLocation {
+	specDir: string;
+	worktreePath: string | null;
+	autoBuildPath: string | undefined;
+	specId: string;
+}
+
+function updateTaskMetadataEverywhere(
+	{ specDir, worktreePath, autoBuildPath, specId }: TaskMetadataLocation,
+	field: "visualProof" | "cicdRun",
+	value: unknown,
+	debug: (...args: unknown[]) => void,
+): VisualProofMetadataUpdateResult {
 	const result: VisualProofMetadataUpdateResult = {
 		mainProjectMetadata: false,
 		worktreeMetadata: false,
 	};
 	const metadataPath = path.join(specDir, "task_metadata.json");
-	result.mainProjectMetadata = updateTaskMetadataVisualProof(
-		metadataPath,
-		visualProof,
-	);
-	debug(
-		"Main project metadata updated with visual proof:",
-		result.mainProjectMetadata,
-	);
+	result.mainProjectMetadata = updateTaskMetadataField(metadataPath, field, value);
+	debug(`Main project metadata updated with ${field}:`, result.mainProjectMetadata);
 
 	if (worktreePath) {
 		const specsBaseDir = getSpecsDir(autoBuildPath);
@@ -291,11 +316,8 @@ export function updateVisualProofMetadata(
 			specId,
 			"task_metadata.json",
 		);
-		result.worktreeMetadata = updateTaskMetadataVisualProof(
-			worktreeMetadataPath,
-			visualProof,
-		);
-		debug("Worktree metadata updated with visual proof:", result.worktreeMetadata);
+		result.worktreeMetadata = updateTaskMetadataField(worktreeMetadataPath, field, value);
+		debug(`Worktree metadata updated with ${field}:`, result.worktreeMetadata);
 	}
 
 	return result;

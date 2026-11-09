@@ -572,6 +572,15 @@ export function updateTaskMetadataVisualProof(
 	metadataPath: string,
 	visualProof: VisualProofRun,
 ): boolean {
+	return updateTaskMetadataField(metadataPath, "visualProof", visualProof);
+}
+
+/** Sets one field of task_metadata.json, keeping the others. */
+export function updateTaskMetadataField(
+	metadataPath: string,
+	field: "visualProof" | "cicdRun",
+	value: unknown,
+): boolean {
 	try {
 		let metadata: Record<string, unknown> = {};
 
@@ -584,15 +593,12 @@ export function updateTaskMetadataVisualProof(
 			}
 		}
 
-		metadata.visualProof = visualProof;
+		metadata[field] = value;
 		mkdirSync(path.dirname(metadataPath), { recursive: true });
 		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
 		return true;
 	} catch (err) {
-		console.warn(
-			`[plan-file-utils] Could not update visual proof at ${metadataPath}:`,
-			err,
-		);
+		console.warn(`[plan-file-utils] Could not update ${field} at ${metadataPath}:`, err);
 		return false;
 	}
 }

@@ -648,6 +648,13 @@
 			"tech-debt": "Dette technique",
 			"automation": "Automatisation",
 			"generated": "Code généré"
+		},
+		"cicdRun": {
+			"triggered_pr": "Pipeline {{provider}} lancé à l'ouverture de la PR, {{when}}",
+			"triggered_merge": "Pipeline {{provider}} lancé après la fusion, {{when}}",
+			"failed_pr": "Le pipeline {{provider}} n'a pas pu démarrer à l'ouverture de la PR ({{when}})",
+			"failed_merge": "Le pipeline {{provider}} n'a pas pu démarrer après la fusion ({{when}})",
+			"open": "Ouvrir le pipeline"
 		}
 	},
 	"kind": {

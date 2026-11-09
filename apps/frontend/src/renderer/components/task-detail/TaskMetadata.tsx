@@ -57,6 +57,7 @@ import {
 } from "./acceptance-criteria-draft";
 import { extractAcceptanceCriteriaFromDescription } from "../../../shared/utils/acceptance-criteria";
 import { TaskBlockers } from "./TaskBlockers";
+import { TaskCicdRun } from "./TaskCicdRun";
 import { TaskStack } from "./TaskStack";
 import { TaskKindBadge } from "./TaskKindBadge";
 
@@ -905,6 +906,7 @@ export function TaskMetadata({ task, editable = true }: TaskMetadataProps) {
 								{task.metadata.prUrl}
 								<ExternalLink className="h-3 w-3" />
 							</button>
+							{task.metadata.cicdRun && <TaskCicdRun run={task.metadata.cicdRun} />}
 						</div>
 					)}
 
