@@ -71,7 +71,13 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 			return;
 		}
 		setPhase({ kind: "done", outcomes: result.data });
-		void loadTasks(projectId, { forceRefresh: true });
+	};
+
+	// The board reloads once the dialog is closed: a reload while it is open
+	// can show the board's skeleton, which unmounts the dialog and its result.
+	const onOpenChange = (next: boolean) => {
+		setOpen(next);
+		if (!next && phase.kind === "done") void loadTasks(projectId, { forceRefresh: true });
 	};
 
 	const toggle = (specId: string) =>
@@ -103,7 +109,7 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 				<HardDrive className="h-4 w-4" aria-hidden="true" />
 				{t("tasks:purge.button")}
 			</Button>
-			<Dialog open={open} onOpenChange={setOpen}>
+			<Dialog open={open} onOpenChange={onOpenChange}>
 				<DialogContent className="max-w-2xl" data-testid="worktree-purge-dialog">
 					<DialogHeader>
 						<DialogTitle>{t("tasks:purge.title")}</DialogTitle>

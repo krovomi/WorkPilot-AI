@@ -23,6 +23,7 @@ const list = vi.fn();
 const purge = vi.fn();
 
 beforeEach(() => {
+	loadTasksMock.mockReset();
 	list.mockReset().mockResolvedValue({ success: true, data: candidates });
 	purge.mockReset().mockResolvedValue({
 		success: true,
@@ -61,7 +62,10 @@ describe("WorktreePurgeButton", () => {
 
 		await waitFor(() => expect(purge).toHaveBeenCalledWith("p1", ["001"]));
 		expect(await screen.findByText(/2 worktrees purged, 500 MB freed/)).toBeInTheDocument();
-		expect(loadTasksMock).toHaveBeenCalledWith("p1", { forceRefresh: true });
+		// The board reloads once the result is read, not under it.
+		expect(loadTasksMock).not.toHaveBeenCalled();
+		fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+		await waitFor(() => expect(loadTasksMock).toHaveBeenCalledWith("p1", { forceRefresh: true }));
 	});
 
 	it("says when there is nothing to purge", async () => {
