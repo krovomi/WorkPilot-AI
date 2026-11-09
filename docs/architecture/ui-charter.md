@@ -63,6 +63,34 @@ other colours per architecture).
 Set a tone with the `tone` prop (or the class `wp-tone-<name>`): kickers, dots,
 rails, bars and gauges of that element follow it.
 
+### Diffs
+
+A diff is the one place where the theme does not choose the colours: an added
+line is git green and a removed line git red in every theme, light and dark
+(Leub, 2026-11-09: "utilise les vraies couleurs de git"). A theme's `--success`
+can be teal and its `--destructive` pink, and a diff must read the same
+everywhere, like the task phase hues. `components/ui/diff-viewer.css` holds the
+two hues (`--git-add`, `--git-del`, a light and a dark value) and mixes them with
+transparent for the line, gutter and changed-word fills, so they sit on any
+surface. The code surface is the theme's card in light mode; in dark mode it is
+the theme background pulled toward a neutral code black, because a saturated
+dark card (Forest green, Ocean blue, Neo violet) swallowed the green of an added
+line. Syntax colours are VS Code Light+ / Dark+, those of the code editor.
+
+`ui/diff-viewer.tsx` is shared by the Kanban "Fichiers modifiés" dialog, the
+subtask files viewer, the guided review, the code review workspace and the PR
+files modal. It adds to the patch: `+` / `-` signs, syntax colours for every
+grammar of `@codemirror/language-data` (plus .NET project files as XML and
+Razor as HTML), each side of a hunk parsed whole so a multi-line comment stays a
+comment (`diff-syntax.ts`), the changed words of a rewritten line
+(`diff-words.ts`, token LCS, skipped when the two lines share under 40 % of
+their visible characters), the unchanged lines git left out between two hunks
+and the enclosing scope git prints after `@@`. The layout toggle
+(`diff-mode-toggle.tsx`) offers Auto, unified and side by side; Auto (the
+default) puts a file side by side only when it has both removals and additions
+and the view is at least 900 px wide, and a new or deleted file is always one
+column, whatever the choice, since its other half would be empty.
+
 ## Writing a view
 
 1. `ModuleStage` at the root; `Columns` when the view reads left to right

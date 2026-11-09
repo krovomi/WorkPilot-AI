@@ -56,7 +56,6 @@ import {
 	TASK_IMPACT_LABELS,
 	TASK_PRIORITY_COLORS,
 	TASK_PRIORITY_LABELS,
-	TASK_STATUS_COLUMNS,
 	TASK_STATUS_LABELS,
 } from "../../shared/constants";
 import type {
@@ -96,6 +95,7 @@ import { Card, CardContent } from "./ui/card";
 import { TaskEngineChip } from "./task-engine/TaskEngineChip";
 import { ContextGaugeMini } from "./task-detail/ContextGauge";
 import { FormulaBadge } from "./formula-lab/FormulaBadge";
+import { manualMoveTargets } from "../lib/kanban-columns";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { useKanbanBlockerStore } from "../stores/kanban-blocker-store";
@@ -831,7 +831,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 		);
 	}
 
-	if (task.status === "done" && task.metadata?.prUrl) {
+	if (
+		(task.status === "done" || task.status === "pr_created") &&
+		task.metadata?.prUrl
+	) {
 		return (
 			<div className="flex gap-1">
 				{onPreviewApp && (
@@ -1046,6 +1049,8 @@ const getStatusBadgeVariant = (
 			return "purple";
 		case "build_failed":
 			return "destructive";
+		case "pr_created":
+			return "info";
 		case "done":
 			return "success";
 		default:
@@ -1088,6 +1093,8 @@ const getStatusLabel = (status: string, t?: any): string => {
 			return t("labels.needsReview");
 		case "build_failed":
 			return t("labels.buildFailed");
+		case "pr_created":
+			return t("labels.prOpen");
 		case "done":
 			return t("status.complete");
 		default:
@@ -1327,16 +1334,16 @@ export const TaskCard = memo(function TaskCard({
 	);
 
 	// Memoize status menu items to avoid recreating on every render
+	const prUrl = task.metadata?.prUrl;
 	const statusMenuItems = useMemo(() => {
 		if (!onStatusChange) return null;
-		return TASK_STATUS_COLUMNS.filter((status) => status !== task.status).map(
-			(status) => (
-				<DropdownMenuItem key={status} onClick={() => onStatusChange(status)}>
-					{t(TASK_STATUS_LABELS[status])}
-				</DropdownMenuItem>
-			),
-		);
-	}, [task.status, onStatusChange, t]);
+		const targets = manualMoveTargets({ status: task.status, metadata: { prUrl } });
+		return targets.map((status) => (
+			<DropdownMenuItem key={status} onClick={() => onStatusChange(status)}>
+				{t(TASK_STATUS_LABELS[status])}
+			</DropdownMenuItem>
+		));
+	}, [task.status, prUrl, onStatusChange, t]);
 
 	// Catastrophic stuck detection — last-resort safety net.
 	// XState handles all normal transitions via PROCESS_EXITED events.

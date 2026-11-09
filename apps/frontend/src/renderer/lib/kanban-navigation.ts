@@ -12,18 +12,8 @@
  */
 import { TASK_STATUS_COLUMNS } from "../../shared/constants";
 import type { TaskStatusColumn } from "../../shared/constants/task";
-import type { Task, TaskOrderState, TaskStatus } from "../../shared/types";
-
-/**
- * Détermine la colonne visuelle d'une tâche.
- * Les tâches `pr_created` sont affichées dans la colonne `done`,
- * les tâches `error` dans la colonne `human_review`.
- */
-function getVisualColumn(status: TaskStatus): TaskStatusColumn {
-	if (status === "pr_created") return "done";
-	if (status === "error") return "human_review";
-	return status as TaskStatusColumn;
-}
+import type { Task, TaskOrderState } from "../../shared/types";
+import { getVisualColumn } from "./kanban-columns";
 
 function sortByCreatedAtDesc(a: Task, b: Task): number {
 	return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();

@@ -83,8 +83,9 @@ describe("getKanbanOrderedTasks", () => {
 		expect(ordered.map((t) => t.id)).toEqual(["d1", "b1"]);
 	});
 
-	it("place les tâches pr_created dans done et error dans human_review", () => {
+	it("place pr_created dans sa colonne « PR ouverte » et error dans human_review", () => {
 		const tasks = [
+			createTask({ id: "fini", status: "done" }),
 			createTask({ id: "err", status: "error" }),
 			createTask({ id: "pr", status: "pr_created" }),
 		];
@@ -93,8 +94,8 @@ describe("getKanbanOrderedTasks", () => {
 			...TASK_STATUS_COLUMNS,
 		]);
 
-		// human_review (err) vient avant done (pr) dans l'ordre par défaut
-		expect(ordered.map((t) => t.id)).toEqual(["err", "pr"]);
+		// human_review (err), puis PR ouverte (pr), puis done (fini)
+		expect(ordered.map((t) => t.id)).toEqual(["err", "pr", "fini"]);
 	});
 
 	it("trie par date de création (récent d'abord) sans ordre personnalisé", () => {

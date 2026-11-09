@@ -1,8 +1,6 @@
 import {
-	AlignJustify,
 	ChevronDown,
 	ChevronRight,
-	Columns2,
 	Eye,
 	FileCode,
 	Folder,
@@ -28,7 +26,14 @@ import {
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { CodeEditor } from "../../ui/code-editor";
-import { DiffViewer, type DiffViewMode } from "../../ui/diff-viewer";
+import {
+	type DiffViewMode,
+	readStoredDiffViewMode,
+	storeDiffViewMode,
+} from "../../ui/diff-model";
+import { DiffModeToggle } from "../../ui/diff-mode-toggle";
+import { DiffStat } from "../../ui/diff-stat";
+import { DiffViewer } from "../../ui/diff-viewer";
 import { Input } from "../../ui/input";
 import {
 	Select,
@@ -116,19 +121,6 @@ function buildFileTree(files: WorktreeDiffFile[]): TreeNode[] {
 	return root;
 }
 
-// ── Diff view-mode preference (unified vs side-by-side) ───────────────
-
-// Shared with the subtask file viewer so the user's unified/split choice is
-// consistent across every diff view and persists across sessions.
-const DIFF_VIEW_MODE_STORAGE_KEY = "workpilot.subtaskDiff.viewMode";
-
-function readStoredDiffViewMode(): DiffViewMode {
-	if (typeof window === "undefined") return "unified";
-	return window.localStorage.getItem(DIFF_VIEW_MODE_STORAGE_KEY) === "split"
-		? "split"
-		: "unified";
-}
-
 // ── Inline diff panel ────────────────────────────────────────────────
 
 /** The expandable diff shown under a file row (single-open accordion). */
@@ -145,17 +137,16 @@ function InlineDiff({
 }) {
 	return (
 		<div
-			className="my-1 overflow-hidden rounded-lg border border-border/60 bg-card/40 shadow-sm"
+			className="mt-1 mb-2 overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm"
 			style={{ marginLeft: depth * 16 + 28 }}
 		>
 			{file.patch && file.patch.trim() !== "" ? (
-				<div className="overflow-x-auto">
-					<DiffViewer
-						patch={file.patch}
-						viewMode={viewMode}
-						className="max-h-[60vh] overflow-auto"
-					/>
-				</div>
+				<DiffViewer
+					patch={file.patch}
+					filePath={file.path}
+					viewMode={viewMode}
+					className="max-h-[65vh] overflow-auto themed-scrollbar"
+				/>
 			) : (
 				<div className="px-3 py-4 text-center text-xs text-muted-foreground">
 					{noChangesLabel}
@@ -234,10 +225,12 @@ function FileTreeNode({
 						)}
 						<span className="text-sm font-medium truncate">{node.name}</span>
 					</div>
-					<div className="flex items-center gap-2 shrink-0 ml-2">
-						<span className="text-xs text-success">+{node.additions}</span>
-						<span className="text-xs text-destructive">-{node.deletions}</span>
-					</div>
+					<DiffStat
+						additions={node.additions}
+						deletions={node.deletions}
+						compact
+						className="shrink-0 ml-2 text-xs"
+					/>
 				</div>
 				{expanded &&
 					node.children.map((child) => (
@@ -297,8 +290,8 @@ function FileTreeNode({
 					<FileCode
 						className={cn(
 							"h-4 w-4 shrink-0",
-							file.status === "added" && "text-success",
-							file.status === "deleted" && "text-destructive",
+							file.status === "added" && "dv-ink-add",
+							file.status === "deleted" && "dv-ink-del",
 							file.status === "modified" && "text-info",
 							file.status === "renamed" && "text-warning",
 						)}
@@ -311,16 +304,15 @@ function FileTreeNode({
 						variant="secondary"
 						className={cn(
 							"text-xs",
-							file.status === "added" && "bg-success/10 text-success",
-							file.status === "deleted" && "bg-destructive/10 text-destructive",
+							file.status === "added" && "dv-badge-add",
+							file.status === "deleted" && "dv-badge-del",
 							file.status === "modified" && "bg-info/10 text-info",
 							file.status === "renamed" && "bg-warning/10 text-warning",
 						)}
 					>
 						{t(`taskReview:diff.status.${file.status}`)}
 					</Badge>
-					<span className="text-xs text-success">+{file.additions}</span>
-					<span className="text-xs text-destructive">-{file.deletions}</span>
+					<DiffStat additions={file.additions} deletions={file.deletions} />
 					{canEdit && file.status !== "deleted" && (
 						<Button
 							size="sm"
@@ -416,6 +408,18 @@ export function DiffViewDialog({
 
 	const hasFiles = filteredFiles.length > 0;
 
+	const totals = useMemo(
+		() =>
+			filteredFiles.reduce(
+				(sum, file) => ({
+					additions: sum.additions + file.additions,
+					deletions: sum.deletions + file.deletions,
+				}),
+				{ additions: 0, deletions: 0 },
+			),
+		[filteredFiles],
+	);
+
 	// Toggle a file's inline diff. Single-open accordion: clicking a file focuses
 	// its diff and collapses any other; clicking the only-open file closes it.
 	const handleFileClick = useCallback((file: WorktreeDiffFile) => {
@@ -449,11 +453,7 @@ export function DiffViewDialog({
 
 	const handleDiffViewModeChange = useCallback((mode: DiffViewMode) => {
 		setDiffViewMode(mode);
-		try {
-			window.localStorage.setItem(DIFF_VIEW_MODE_STORAGE_KEY, mode);
-		} catch {
-			/* localStorage unavailable (quota / private mode): choice not persisted */
-		}
+		storeDiffViewMode(mode);
 	}, []);
 
 	// Expand all: in tree view reveal every folder (without opening diffs); in
@@ -760,9 +760,8 @@ export function DiffViewDialog({
 										<FileCode
 											className={cn(
 												"h-4 w-4 shrink-0",
-												file.status === "added" && "text-success",
-												file.status === "deleted" &&
-													"text-destructive",
+												file.status === "added" && "dv-ink-add",
+												file.status === "deleted" && "dv-ink-del",
 												file.status === "modified" && "text-info",
 												file.status === "renamed" && "text-warning",
 											)}
@@ -776,10 +775,8 @@ export function DiffViewDialog({
 											variant="secondary"
 											className={cn(
 												"text-xs",
-												file.status === "added" &&
-													"bg-success/10 text-success",
-												file.status === "deleted" &&
-													"bg-destructive/10 text-destructive",
+												file.status === "added" && "dv-badge-add",
+												file.status === "deleted" && "dv-badge-del",
 												file.status === "modified" &&
 													"bg-info/10 text-info",
 												file.status === "renamed" &&
@@ -788,12 +785,10 @@ export function DiffViewDialog({
 										>
 											{t(`taskReview:diff.status.${file.status}`)}
 										</Badge>
-										<span className="text-xs text-success">
-											+{file.additions}
-										</span>
-										<span className="text-xs text-destructive">
-											-{file.deletions}
-										</span>
+										<DiffStat
+											additions={file.additions}
+											deletions={file.deletions}
+										/>
 										{worktreePath && (
 											<Button
 												size="sm"
@@ -932,57 +927,17 @@ export function DiffViewDialog({
 									</div>
 								)}
 								{selectedPaths.size === 0 && (
-									<div className="flex items-center gap-0.5 border border-border rounded-md p-0.5 bg-secondary/30">
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<button
-													type="button"
-													onClick={() => handleDiffViewModeChange("unified")}
-													aria-pressed={diffViewMode === "unified"}
-													aria-label={t("taskReview:diff.unifiedView")}
-													className={cn(
-														"flex items-center justify-center h-7 w-7 rounded transition-colors",
-														diffViewMode === "unified"
-															? "bg-secondary text-foreground"
-															: "text-muted-foreground hover:text-foreground",
-													)}
-												>
-													<AlignJustify className="h-3.5 w-3.5" />
-												</button>
-											</TooltipTrigger>
-											<TooltipContent side="bottom">
-												{t("taskReview:diff.unifiedView")}
-											</TooltipContent>
-										</Tooltip>
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<button
-													type="button"
-													onClick={() => handleDiffViewModeChange("split")}
-													aria-pressed={diffViewMode === "split"}
-													aria-label={t("taskReview:diff.splitView")}
-													className={cn(
-														"flex items-center justify-center h-7 w-7 rounded transition-colors",
-														diffViewMode === "split"
-															? "bg-secondary text-foreground"
-															: "text-muted-foreground hover:text-foreground",
-													)}
-												>
-													<Columns2 className="h-3.5 w-3.5" />
-												</button>
-											</TooltipTrigger>
-											<TooltipContent side="bottom">
-												{t("taskReview:diff.splitView")}
-											</TooltipContent>
-										</Tooltip>
-									</div>
+									<DiffModeToggle
+										value={diffViewMode}
+										onChange={handleDiffViewModeChange}
+									/>
 								)}
 								<Select
 									value={viewMode}
 									onValueChange={(v) => setViewMode(v as ViewMode)}
 									disabled={selectedPaths.size > 0}
 								>
-									<SelectTrigger className="w-[140px] h-8 text-xs">
+									<SelectTrigger className="h-8 w-auto min-w-[140px] gap-2 text-xs">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
@@ -997,12 +952,26 @@ export function DiffViewDialog({
 							</div>
 						)}
 					</div>
-					<AlertDialogDescription>
-						{editingFile
-							? editingFile.path
-							: showAddFile
-								? t("taskReview:diff.addingNewFile")
-								: worktreeDiff?.summary || t("taskReview:diff.noChanges")}
+					<AlertDialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+						{editingFile ? (
+							editingFile.path
+						) : showAddFile ? (
+							t("taskReview:diff.addingNewFile")
+						) : hasFiles ? (
+							<>
+								<span>
+									{t("taskReview:diff.filesChangedCount", {
+										count: filteredFiles.length,
+									})}
+								</span>
+								<DiffStat
+									additions={totals.additions}
+									deletions={totals.deletions}
+								/>
+							</>
+						) : (
+							worktreeDiff?.summary || t("taskReview:diff.noChanges")
+						)}
 					</AlertDialogDescription>
 					{!editingFile && !showAddFile && (
 						<AiTaskShare attribution={worktreeDiff?.attribution} />
