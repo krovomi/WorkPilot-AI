@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../../shared/types";
-import { shouldShowBuildFailedColumn } from "../useVisibleKanbanColumns";
+import {
+	shouldShowBuildFailedColumn,
+	shouldShowPrOpenColumn,
+} from "../useVisibleKanbanColumns";
 
 const task = (id: string, status: Task["status"]) => ({ id, status }) as Task;
 
@@ -29,5 +32,19 @@ describe("shouldShowBuildFailedColumn", () => {
 		expect(shouldShowBuildFailedColumn([task("a", "build_failed")], {})).toBe(
 			true,
 		);
+	});
+});
+
+describe("shouldShowPrOpenColumn", () => {
+	it("hides the column while no PR waits to be merged", () => {
+		expect(
+			shouldShowPrOpenColumn([task("a", "done"), task("b", "human_review")]),
+		).toBe(false);
+	});
+
+	it("shows the column as soon as a card has an open PR", () => {
+		expect(
+			shouldShowPrOpenColumn([task("a", "done"), task("b", "pr_created")]),
+		).toBe(true);
 	});
 });

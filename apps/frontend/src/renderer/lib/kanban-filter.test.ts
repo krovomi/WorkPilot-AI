@@ -11,7 +11,9 @@ import { useKanbanFilterStore } from "../stores/kanban-filter-store";
 import {
 	activeFilterCount,
 	EMPTY_FILTERS,
+	getTaskSource,
 	hasActiveFilters,
+	TASK_SOURCES,
 	taskMatchesFilters,
 } from "./kanban-filter";
 
@@ -59,5 +61,25 @@ describe("toggleGroup", () => {
 		toggleGroup("012-oauth");
 		clearFilters();
 		expect(useKanbanFilterStore.getState().filters.group).toBeUndefined();
+	});
+});
+
+describe("the generated source", () => {
+	const generated = {
+		...whole,
+		id: "040-tests",
+		metadata: { sourceType: "generated" },
+	} as unknown as Task;
+
+	it("gives the cards written by a page their own source", () => {
+		expect(TASK_SOURCES).toContain("generated");
+		expect(getTaskSource(generated)).toBe("generated");
+		expect(getTaskSource(whole)).toBe("manual");
+	});
+
+	it("filters on it like any other source", () => {
+		const filters = { ...EMPTY_FILTERS, sources: ["generated" as const] };
+		expect(taskMatchesFilters(generated, filters)).toBe(true);
+		expect(taskMatchesFilters(whole, filters)).toBe(false);
 	});
 });

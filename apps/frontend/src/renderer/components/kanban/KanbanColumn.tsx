@@ -21,6 +21,7 @@ import {
 	ChevronRight,
 	Eye,
 	Gauge,
+	GitPullRequest,
 	GripVertical,
 	Inbox,
 	ListPlus,
@@ -234,6 +235,12 @@ export const getEmptyStateContent = (
 				icon: <CheckCircle2 className="h-6 w-6 text-success/50" />,
 				message: t("kanban.emptyBuildFailed"),
 				subtext: t("kanban.emptyBuildFailedHint"),
+			};
+		case "pr_created":
+			return {
+				icon: <GitPullRequest className="h-6 w-6 text-muted-foreground/50" />,
+				message: t("kanban.emptyPrOpen"),
+				subtext: t("kanban.emptyPrOpenHint"),
 			};
 		case "done":
 			return {
@@ -575,6 +582,8 @@ export const DroppableColumn = memo(function DroppableColumn({
 				return "column-ai-review";
 			case "human_review":
 				return "column-human-review";
+			case "pr_created":
+				return "column-pr-open";
 			case "done":
 				return "column-done";
 			default:
