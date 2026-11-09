@@ -165,6 +165,7 @@ settings:
 overrides:
   glob@>=9.0.0 <14.0.2: ^14.0.3
   minimatch@>=7.0.0 <11.0.1: ^11.0.4
+  deepmerge: file:./vendor/deepmerge
 
 importers:
 
@@ -1745,6 +1746,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@workpilot/deepmerge-patched@file:vendor/deepmerge':
+    resolution: {directory: vendor/deepmerge, type: directory}
+    engines: {node: '>=0.10.0'}
+
   '@xmldom/xmldom@0.8.15':
     resolution: {integrity: sha512-/5NV/vDALVFDXgLmfsy9TRCBlKwO2LNBFzpzvb9iIj+jR+eSc6DLYYvVOdivT/jm7MtU6TebYuRmzEOI7w40UA==}
     engines: {node: '>=10.0.0'}
@@ -2161,10 +2166,6 @@ packages:
     peerDependenciesMeta:
       babel-plugin-macros:
         optional: true
-
-  deepmerge@4.3.1:
-    resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
-    engines: {node: '>=0.10.0'}
 
   defaults@1.0.4:
     resolution: {integrity: sha512-eFuaLoy/Rxalv2kr+lqMlUnrDWV+3j4pljOIJgLIhI058IQfWJ7vXhyEIHu+HtC738klGALYxOKDO0bQP3tg8A==}
@@ -6067,6 +6068,8 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.12.2':
     optional: true
 
+  '@workpilot/deepmerge-patched@file:vendor/deepmerge': {}
+
   '@xmldom/xmldom@0.8.15': {}
 
   '@xmldom/xmldom@0.9.12': {}
@@ -6532,8 +6535,6 @@ snapshots:
   decimal.js@10.6.0: {}
 
   dedent@1.7.2: {}
-
-  deepmerge@4.3.1: {}
 
   defaults@1.0.4:
     dependencies:
@@ -7210,7 +7211,7 @@ snapshots:
       babel-jest: 30.5.2(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1)
       chalk: 4.1.2
       ci-info: 4.4.0
-      deepmerge: 4.3.1
+      deepmerge: '@workpilot/deepmerge-patched@file:vendor/deepmerge'
       glob: 14.0.4
       graceful-fs: 4.2.11
       jest-circus: 30.5.2(supports-color@8.1.1)

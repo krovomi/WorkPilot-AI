@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import type {
+	GuardrailActivity,
+	GuardrailDiffCheck,
+	GuardrailPolicyReport,
 	GuardrailRuleDoc,
 	GuardrailsDoc,
 	GuardrailTestResult,
@@ -11,8 +14,18 @@ interface GuardrailsState {
 	loading: boolean;
 	error: string | null;
 	lastTest: GuardrailTestResult | null;
+	/** The file could not be read: saving would replace the person's rules. */
+	loadFailed: boolean;
+	policy: GuardrailPolicyReport | null;
+	activity: GuardrailActivity | null;
+	diffCheck: GuardrailDiffCheck | null;
+	checking: boolean;
 
 	load: (projectPath: string) => Promise<void>;
+	/** What the backend reads (layers, errors) and what the rules did. */
+	refreshInsights: (projectPath: string) => Promise<void>;
+	answer: (projectPath: string, requestId: string, approve: boolean) => Promise<void>;
+	checkDiff: (projectPath: string, ref?: string) => Promise<void>;
 	save: (projectPath: string) => Promise<void>;
 	addRule: () => void;
 	updateRule: (index: number, patch: Partial<GuardrailRuleDoc>) => void;
@@ -38,9 +51,14 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 	loading: false,
 	error: null,
 	lastTest: null,
+	loadFailed: false,
+	policy: null,
+	activity: null,
+	diffCheck: null,
+	checking: false,
 
 	load: async (projectPath) => {
-		set({ loading: true, error: null });
+		set({ loading: true, error: null, loadFailed: false, diffCheck: null });
 		try {
 			const doc = await globalThis.electronAPI.loadGuardrails(projectPath);
 			// A reply without a rules array (an older main, a preview) is an
@@ -52,17 +70,49 @@ export const useGuardrailsStore = create<GuardrailsState>((set, get) => ({
 				loading: false,
 			});
 		} catch (e) {
-			set({ error: String(e), loading: false });
+			set({ error: String(e), loading: false, loadFailed: true });
 		}
+		void get().refreshInsights(projectPath);
 	},
 
 	save: async (projectPath) => {
+		if (get().loadFailed) return;
 		set({ loading: true, error: null });
 		try {
 			await globalThis.electronAPI.saveGuardrails(projectPath, get().doc);
 			set({ dirty: false, loading: false });
 		} catch (e) {
 			set({ error: String(e), loading: false });
+		}
+		void get().refreshInsights(projectPath);
+	},
+
+	refreshInsights: async (projectPath) => {
+		const [policy, activity] = await Promise.allSettled([
+			globalThis.electronAPI.validateGuardrails(projectPath),
+			globalThis.electronAPI.getGuardrailActivity(projectPath),
+		]);
+		set({
+			policy: policy.status === "fulfilled" ? policy.value : null,
+			activity: activity.status === "fulfilled" ? activity.value : null,
+		});
+	},
+
+	answer: async (projectPath, requestId, approve) => {
+		try {
+			await globalThis.electronAPI.answerGuardrailRequest(projectPath, requestId, approve);
+		} catch (e) {
+			set({ error: String(e) });
+		}
+		await get().refreshInsights(projectPath);
+	},
+
+	checkDiff: async (projectPath, ref) => {
+		set({ checking: true, error: null });
+		try {
+			set({ diffCheck: await globalThis.electronAPI.checkGuardrailsDiff(projectPath, ref), checking: false });
+		} catch (e) {
+			set({ error: String(e), checking: false });
 		}
 	},
 
