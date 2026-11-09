@@ -153,6 +153,43 @@ def test_commit_lands_on_the_card_branch_not_the_checkout(temp_git_repo: Path) -
     assert not (temp_git_repo / "tests").exists()
 
 
+def test_commits_the_agent_made_itself_count_as_the_runs_work(
+    temp_git_repo: Path,
+) -> None:
+    base = _branch(temp_git_repo)
+    _, created, _ = _run(
+        temp_git_repo, "--action", "create", "--spec", "008-ag", "--base-branch", base
+    )
+    assert created is not None and created["head"]
+    worktree = Path(created["path"])
+    (worktree / "agent.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "agent.py"], cwd=worktree, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "agent work"],
+        cwd=worktree,
+        check=True,
+        env=_git_env(temp_git_repo.parent),
+    )
+    (worktree / "left.py").write_text("y = 2\n", encoding="utf-8")
+
+    code, payload, error = _run(
+        temp_git_repo,
+        "--action",
+        "commit",
+        "--spec",
+        "008-ag",
+        "--base-branch",
+        base,
+        "--since",
+        created["head"],
+        "--message",
+        "feat: pair",
+    )
+
+    assert code == 0, error
+    assert payload == {"committed": True, "files": ["agent.py", "left.py"]}
+
+
 def test_commit_with_nothing_new_reports_no_commit(temp_git_repo: Path) -> None:
     base = _branch(temp_git_repo)
     _run(temp_git_repo, "--action", "create", "--spec", "004-z", "--base-branch", base)

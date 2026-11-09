@@ -20,7 +20,7 @@
 		"aiScopeLabel": "Périmètre de l'IA (ce que l'IA fera)",
 		"aiScopePlaceholder": "ex. API backend auth, middleware JWT et tests d'intégration",
 		"startButton": "Démarrer le pair programming",
-		"hint": "L'IA travaillera sur son périmètre en parallèle pendant que vous vous concentrez sur le vôtre. Vous pouvez chatter pour vous coordonner en temps réel."
+		"hint": "L'IA travaillera sur son périmètre en parallèle, sur la branche d'une carte en revue, pendant que vous vous concentrez sur le vôtre. Vous pouvez chatter pour vous coordonner en temps réel."
 	},
 	"status": {
 		"idle": "Prêt",
@@ -35,7 +35,8 @@
 		"planning": "Analyse du projet et planification...",
 		"active": "Travail sur le périmètre assigné...",
 		"actionLog": "Actions de l'IA",
-		"noActions": "Aucune action pour l'instant"
+		"noActions": "Aucune action pour l'instant",
+		"reviewBranch": "L'IA travaille sur la branche d'une carte du Kanban, pas dans votre dossier de projet. À la fin de la session, son travail y est commité : vous relisez le diff puis ouvrez la pull request."
 	},
 	"actions": {
 		"file_created": "Créé",

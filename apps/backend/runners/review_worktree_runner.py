@@ -15,8 +15,13 @@ Kanban's.
 Actions (one ``__REVIEW_WORKTREE__:<json>`` line on stdout, or
 ``__REVIEW_WORKTREE_ERROR__:<message>`` and exit code 1):
 
-  create:  {"path": "...", "branch": "workpilot/<spec>", "base_branch": "develop"}
+  create:  {"path": "...", "branch": "workpilot/<spec>", "base_branch": "develop",
+            "head": "<sha>"}
   commit:  {"committed": true, "files": ["tests/test_x.py", ...]}
+
+``commit --since <sha>`` (the ``head`` of ``create``) counts the commits the
+run's own agent made too: a coding agent may commit by itself, and its work
+is the run's work.
 
 Usage::
 
@@ -63,20 +68,22 @@ def _cmd_create(args: argparse.Namespace) -> int:
     manager = _manager(args)
     # The spec name is validated by the manager (no separator, no "..").
     info = manager.get_or_create_worktree(args.spec)
+    head = run_git(["rev-parse", "HEAD"], cwd=info.path).stdout.strip()
     _emit(
         {
             "path": str(info.path),
             "branch": info.branch,
             "base_branch": info.base_branch or manager.base_branch,
+            "head": head,
         }
     )
     return 0
 
 
-def _changed_files(manager: WorktreeManager, spec: str) -> list[str]:
-    """What the last commit of the card's branch changed, relative paths."""
+def _changed_files(manager: WorktreeManager, spec: str, since: str) -> list[str]:
+    """What the run changed on the card's branch, relative paths."""
     result = run_git(
-        ["diff", "--name-only", "HEAD~1", "HEAD"],
+        ["diff", "--name-only", since, "HEAD"],
         cwd=manager.get_worktree_path(spec),
     )
     if result.returncode != 0:
@@ -101,7 +108,9 @@ def _cmd_commit(args: argparse.Namespace) -> int:
     if not manager.worktree_exists(args.spec):
         return _fail(f"No worktree for {args.spec}")
     worktree = manager.get_worktree_path(args.spec)
-    before = run_git(["rev-parse", "HEAD"], cwd=worktree).stdout.strip()
+    before = args.since or run_git(["rev-parse", "HEAD"], cwd=worktree).stdout.strip()
+    if run_git(["cat-file", "-e", f"{before}^{{commit}}"], cwd=worktree).returncode:
+        return _fail(f"Unknown commit {before}")
     if not manager.commit_in_worktree(args.spec, args.message):
         return _fail(_commit_failure(worktree))
     after = run_git(["rev-parse", "HEAD"], cwd=worktree).stdout.strip()
@@ -109,7 +118,7 @@ def _cmd_commit(args: argparse.Namespace) -> int:
     _emit(
         {
             "committed": committed,
-            "files": _changed_files(manager, args.spec) if committed else [],
+            "files": _changed_files(manager, args.spec, before) if committed else [],
         }
     )
     return 0
@@ -122,6 +131,11 @@ def main() -> int:
     parser.add_argument("--spec", required=True)
     parser.add_argument("--base-branch", default=None)
     parser.add_argument("--message", default="chore: generated code")
+    parser.add_argument(
+        "--since",
+        default=None,
+        help="the branch head when the run began (create's head)",
+    )
     args = parser.parse_args()
     try:
         if args.action == "create":

@@ -7,6 +7,7 @@
 
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult } from "../../../shared/types";
+import type { GeneratedReview } from "../../../shared/types/generated-review";
 import {
 	createIpcListener,
 	type IpcListenerCleanup,
@@ -130,6 +131,11 @@ export interface PairProgrammingAPI {
 	onPairComplete: (
 		callback: (projectId: string, summary: string) => void,
 	) => IpcListenerCleanup;
+
+	/** The AI's work committed on its review card (null: it wrote nothing) */
+	onPairReview: (
+		callback: (projectId: string, review: GeneratedReview | null) => void,
+	) => IpcListenerCleanup;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +204,12 @@ export function createPairProgrammingAPI(): PairProgrammingAPI {
 		onPairComplete: (callback) =>
 			createIpcListener<[string, string]>(
 				IPC_CHANNELS.PAIR_PROGRAMMING_COMPLETE,
+				callback,
+			),
+
+		onPairReview: (callback) =>
+			createIpcListener<[string, GeneratedReview | null]>(
+				IPC_CHANNELS.PAIR_PROGRAMMING_REVIEW,
 				callback,
 			),
 	};

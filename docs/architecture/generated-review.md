@@ -73,6 +73,12 @@ Par page :
   reste dans le projet (il ne l'était pas : `path.join` sans contrôle). Les images collées
   attendent dans `.workpilot/changelog-assets/` et rejoignent le commit sous `.github/assets/`.
   Un projet du serveur garde son journal sur le serveur, sans fichier ni branche.
+- **Pair programming** (lot 3) : l'agent codeur reçoit le worktree de la carte comme
+  `--project-dir` ; ses outils n'écrivent donc que là. À la fin de la session (terminée,
+  arrêtée ou en erreur), ce qu'il a écrit est commité : `feat: <objectif> (pair programming)`.
+  Les commits que l'agent fait lui-même comptent (`commit --since <head du create>`). Exception à
+  la règle d'échec : un commit refusé par git laisse le travail dans le worktree, dont la page
+  donne le chemin, car la personne l'a regardé s'écrire.
 
 ## Ce que le mécanisme refuse
 

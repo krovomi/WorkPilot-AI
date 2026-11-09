@@ -187,6 +187,23 @@ describe("recordReviewStep", () => {
 		expect(findOpenReviewCard(project, "test-studio")?.specId).toBe(ws.specId);
 	});
 
+	it("counts the commits the run's own agent made since it began", async () => {
+		const run = deps.run;
+		deps = {
+			...deps,
+			run: async (args) => {
+				const out = await run(args);
+				return args.includes("create") ? { ...out, head: "abc123" } : out;
+			},
+		};
+		const ws = await openReviewWorkspace(project, { source: "pair-programming", subject: "A" }, deps);
+		expect(ws.startHead).toBe("abc123");
+
+		await recordReviewStep(ws, { message: "feat: a", summary: "s" }, deps);
+
+		expect(calls[1].slice(-2)).toEqual(["--since", "abc123"]);
+	});
+
 	it("takes back a new card the run wrote nothing to", async () => {
 		const ws = await openReviewWorkspace(project, { source: "test-studio", subject: "A" }, deps);
 		commitAnswer = { committed: false, files: [] };

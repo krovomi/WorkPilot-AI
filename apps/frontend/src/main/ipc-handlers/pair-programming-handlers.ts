@@ -4,6 +4,10 @@
  * Manages pair programming sessions: spawns the Python runner, forwards
  * JSON-line events to the renderer, and handles user messages via a
  * temp message-queue file.
+ *
+ * The AI codes in the worktree of a Kanban card, on its own branch, never in
+ * the project folder; when the session ends its work is committed there and
+ * the card waits for review (docs/architecture/generated-review.md).
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
@@ -14,6 +18,7 @@ import type { BrowserWindow } from "electron";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type { IPCResult } from "../../shared/types";
+import { openReviewRun, type ReviewRun } from "../generated-review/review-run";
 import { projectStore } from "../project-store";
 import { getConfiguredPythonPath } from "../python-env-manager";
 import { readIfExists } from "../utils/existing-file";
@@ -71,6 +76,8 @@ interface ActiveSession {
 	process: ChildProcess | null;
 	messagesFile: string;
 	streamBuffer: string;
+	/** The review card the AI writes to; null once its work is committed. */
+	review: ReviewRun | null;
 }
 
 const activeSessions = new Map<string, ActiveSession>();
@@ -164,8 +171,6 @@ export function registerPairProgrammingHandlers(
 				updatedAt: new Date().toISOString(),
 			};
 
-			const messagesFile = createMessagesFile(sessionId);
-
 			// Spawn the Python runner
 			const pythonPath = getConfiguredPythonPath() || "python3";
 			const runnerPath = getRunnerPath();
@@ -173,6 +178,28 @@ export function registerPairProgrammingHandlers(
 			if (!existsSync(runnerPath)) {
 				return { success: false, error: `Runner not found: ${runnerPath}` };
 			}
+
+			// The AI's branch: the card's worktree, never the project folder.
+			let review: ReviewRun;
+			try {
+				review = await openReviewRun(
+					project.path,
+					"pair-programming",
+					goalSubject(goal),
+					undefined,
+					`${goal}\n\nAI: ${aiScope}\nDeveloper: ${devScope}`,
+				);
+			} catch (error) {
+				const details = (error as { details?: string }).details;
+				return {
+					success: false,
+					error: [error instanceof Error ? error.message : String(error), details]
+						.filter(Boolean)
+						.join(" "),
+				};
+			}
+
+			const messagesFile = createMessagesFile(sessionId);
 
 			const backendDir = getBackendDir();
 
@@ -185,7 +212,7 @@ export function registerPairProgrammingHandlers(
 				[
 					runnerPath,
 					"--project-dir",
-					project.path,
+					review.root,
 					"--project-id",
 					projectId,
 					"--session-id",
@@ -210,6 +237,7 @@ export function registerPairProgrammingHandlers(
 				process: proc,
 				messagesFile,
 				streamBuffer: "",
+				review,
 			};
 			activeSessions.set(projectId, activeSession);
 
@@ -258,9 +286,15 @@ export function registerPairProgrammingHandlers(
 					code === 0 ? "completed" : "error",
 					"",
 				);
+				// Stopped, finished or failed: what the AI wrote goes to review.
+				void settleReview(activeSession, projectId, getMainWindow);
 			});
 
 			proc.on("error", (err) => {
+				// Never started: the card it was given has nothing on it.
+				const unused = activeSession.review;
+				activeSession.review = null;
+				void unused?.abandon().catch(() => undefined);
 				safeSendToRenderer(
 					getMainWindow,
 					IPC_CHANNELS.PAIR_PROGRAMMING_ERROR,
@@ -331,6 +365,49 @@ export function registerPairProgrammingHandlers(
 			return { success: true, data: active?.session ?? null };
 		},
 	);
+}
+
+/** The card's subject: the start of the goal. */
+function goalSubject(goal: string): string {
+	const flat = goal.trim().replace(/\s+/g, " ");
+	return flat.length > 50 ? `${flat.slice(0, 49)}…` : flat || "session";
+}
+
+/**
+ * Commit what the AI wrote on its card's branch and put the card in review.
+ * A card the session opened and never wrote to goes away. A commit git
+ * refuses leaves the work where it is, in the card's worktree: the person
+ * watched it being written, and is told where it is.
+ */
+async function settleReview(
+	active: ActiveSession,
+	projectId: string,
+	getMainWindow: () => BrowserWindow | null,
+): Promise<void> {
+	const run = active.review;
+	if (!run) return;
+	active.review = null;
+	try {
+		const review = await run.finish({
+			message: `feat: ${goalSubject(active.session.goal)} (pair programming)`,
+			summary: active.session.aiScope,
+		});
+		safeSendToRenderer(
+			getMainWindow,
+			IPC_CHANNELS.PAIR_PROGRAMMING_REVIEW,
+			projectId,
+			review.committed ? review : null,
+		);
+	} catch (error) {
+		safeSendToRenderer(
+			getMainWindow,
+			IPC_CHANNELS.PAIR_PROGRAMMING_ERROR,
+			projectId,
+			`The AI's changes could not be committed on the review branch; they are still in ${run.root}. ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,8 @@ export interface ReviewWorkspace {
 	readonly baseBranch: string;
 	/** The card was already waiting for review when this run started. */
 	readonly reused: boolean;
+	/** The branch head when this run began (the runner's `create`). */
+	readonly startHead?: string;
 }
 
 export interface OpenReviewRequest {
@@ -143,6 +145,13 @@ export async function openReviewWorkspace(
 ): Promise<ReviewWorkspace> {
 	const open = findOpenReviewCard(project, request.source);
 	if (open) {
+		// Where this run starts on the card's branch.
+		const current = await createReviewWorktree(
+			project.path,
+			open.specId,
+			open.baseBranch || undefined,
+			deps.run,
+		);
 		return {
 			project,
 			source: request.source,
@@ -152,6 +161,7 @@ export async function openReviewWorkspace(
 			branch: `workpilot/${path.basename(open.worktreePath)}`,
 			baseBranch: open.baseBranch,
 			reused: true,
+			...(current.head ? { startHead: current.head } : {}),
 		};
 	}
 
@@ -198,6 +208,7 @@ export async function openReviewWorkspace(
 			branch: created.branch,
 			baseBranch: created.baseBranch,
 			reused: false,
+			...(created.head ? { startHead: created.head } : {}),
 		};
 	} catch (error) {
 		rmSync(specDir, { recursive: true, force: true });
@@ -230,6 +241,7 @@ export async function recordReviewStep(
 		workspace.baseBranch || undefined,
 		oneLine(step.message, 100),
 		deps.run,
+		workspace.startHead,
 	);
 	const review: GeneratedReview = {
 		taskId: specId,
