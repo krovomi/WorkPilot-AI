@@ -35,6 +35,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from accessibility_agent.generated import check_generated
 from services.design_to_code_stacks import (
     STACKS,
     build_visual_test,
@@ -1776,4 +1777,8 @@ def serialize_result(result: PipelineResult) -> dict[str, Any]:
         "duration_seconds": result.duration_seconds,
         "tokens_used": result.tokens_used,
         "simulated": result.simulated,
+        # Scored with the Accessibility page's rules before anything is written (#391).
+        "accessibility": check_generated(
+            {f.path: f.content for f in result.generated_files}
+        ),
     }
