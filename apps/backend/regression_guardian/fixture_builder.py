@@ -108,7 +108,7 @@ class FixtureBuilder:
                 "environment": incident.environment,
                 "version": incident.version,
                 "exception_type": incident.exception_type,
-                "exception_message": _redact_string(incident.exception_message)
+                "exception_message": redact_text(incident.exception_message)
                 if self._redact_pii
                 else incident.exception_message,
                 "faulting_file": incident.faulting_file,
@@ -129,7 +129,9 @@ class FixtureBuilder:
 # ------------------------------------------------------------------
 
 
-def _redact_string(value: str) -> str:
+def redact_text(value: str) -> str:
+    """``value`` with emails, phone and social security numbers, and
+    ``key=value`` credentials replaced by placeholders."""
     result = value
     for pattern, replacement in _PII_PATTERNS:
         result = pattern.sub(replacement, result)
@@ -153,7 +155,7 @@ def _redact_dict(data: dict[str, Any]) -> dict[str, Any]:
         if k.lower() in sensitive_keys:
             result[k] = "REDACTED"
         elif isinstance(v, str):
-            result[k] = _redact_string(v)
+            result[k] = redact_text(v)
         elif isinstance(v, dict):
             result[k] = _redact_dict(v)
         elif isinstance(v, list):
