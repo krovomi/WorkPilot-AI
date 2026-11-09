@@ -162,7 +162,7 @@ it, inside its hub. The hubs are listed in
 | `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
-| `sandbox` | Change Preview | Toolbox › API | — |  |
+| `sandbox` | Dry Run | Toolbox › API | [plan-rehearsal.md](plan-rehearsal.md) |  |
 | `team-bot` | Team Bot (Slack/Teams) | Toolbox | — | yes |
 | `voice-control` | Voice Assistant | Toolbox | [voice-assistant.md](voice-assistant.md) |  |
 | `administration` | Administration | Administration, in server mode for an administrator | — |  |
