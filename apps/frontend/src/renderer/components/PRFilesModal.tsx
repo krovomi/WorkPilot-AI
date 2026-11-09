@@ -462,6 +462,7 @@ export function PRFilesModal({
 												<div className="p-3">
 													<DiffViewer
 														patch={getFilePatch(file)}
+														filePath={file.filename}
 														className="max-h-[400px] overflow-auto border rounded"
 													/>
 												</div>

@@ -381,7 +381,7 @@ function FileView({
 			{expanded && (
 				<div className="border-t border-border">
 					{file.patch ? (
-						<DiffViewer patch={file.patch} onCommentLine={canComment ? setTarget : undefined} />
+						<DiffViewer patch={file.patch} filePath={file.path} onCommentLine={canComment ? setTarget : undefined} />
 					) : (
 						<p className="px-3 py-2 text-xs text-muted-foreground">{t("taskReview:guided.noPatch")}</p>
 					)}
