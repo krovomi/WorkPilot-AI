@@ -1314,12 +1314,21 @@ Return ONLY a raw JSON object (no markdown) matching this schema:
             self._compute_test_file_path(file_path, framework_info),
         )
 
-        # Ensure E2E tests land under an e2e/ path even if the model omitted it.
-        if test_type == "e2e" and "e2e" not in test_file_path:
-            stem = Path(file_path).stem.lower()
-            language = framework_info.get("language", "unknown")
-            ext = "py" if language == "python" else "js"
-            test_file_path = f"e2e/test_{stem}.{ext}"
+        # An E2E scenario the model gave no E2E path for gets the stack's own
+        # convention (stacks.suggested_test_path): a C# project used to get
+        # ``e2e/test_x.js``, since only Python escaped the ``.js`` default
+        # (F179). A model path is kept when the convention itself has no
+        # ``e2e`` folder (Ruby ``spec/features``, Dart ``integration_test``…).
+        if test_type == "e2e":
+            conventional = suggested_test_path(
+                framework_info.get("language", ""),
+                Path(file_path).stem.lower() or "scenario",
+                "e2e",
+            )
+            if "test_file_path" not in data or (
+                "e2e" not in test_file_path and "e2e" in conventional
+            ):
+                test_file_path = conventional
 
         language = framework_info.get("language", "")
         generated_tests = [

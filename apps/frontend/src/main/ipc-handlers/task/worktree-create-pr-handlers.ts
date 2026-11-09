@@ -42,6 +42,7 @@ import {
 	initializePythonEnvForPR,
 } from "./worktree-pr-helpers";
 import { PR_CREATION_TIMEOUT_MS } from "./worktree-handler-utils";
+import { triggerCicdAfterAgentPR } from "./worktree-pr-cicd";
 
 export function registerWorktreeCreatePRHandlers(
 	pythonEnvManager: PythonEnvManager,
@@ -304,6 +305,17 @@ export function registerWorktreeCreatePRHandlers(
 										debug(
 											"PR already exists, refreshed task status with existing PR URL",
 										);
+									} else {
+										// A new PR: the CI/CD settings may ask for a pipeline.
+										await triggerCicdAfterAgentPR({
+											project,
+											task,
+											specDir,
+											worktreePath,
+											prUrl: result.prUrl,
+											getMainWindow,
+											debug,
+										});
 									}
 									if (options?.runVisualProof !== false) {
 										visualProof = await visualProofService.run({

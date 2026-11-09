@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import {
+	type GeneratedReview,
+	parseGeneratedReview,
+} from "../../shared/types/generated-review";
 import type {
 	BranchDiffOptions,
 	ChangelogAudience,
@@ -62,6 +66,8 @@ interface ChangelogState {
 	generatedChangelog: string;
 	isGenerating: boolean;
 	error: string | null;
+	/** The review card the last save went to (never the project folder). */
+	savedReview: GeneratedReview | null;
 
 	// Actions
 	setDoneTasks: (tasks: ChangelogTask[]) => void;
@@ -113,6 +119,7 @@ interface ChangelogState {
 	setGeneratedChangelog: (changelog: string) => void;
 	setIsGenerating: (isGenerating: boolean) => void;
 	setError: (error: string | null) => void;
+	setSavedReview: (review: unknown) => void;
 
 	// Compound actions
 	reset: () => void;
@@ -124,6 +131,7 @@ const getDefaultDate = (): string => {
 };
 
 const initialState = {
+	savedReview: null as GeneratedReview | null,
 	doneTasks: [] as ChangelogTask[],
 	selectedTaskIds: [] as string[],
 	loadedSpecs: [] as TaskSpecContent[],
@@ -276,6 +284,7 @@ export const useChangelogStore = create<ChangelogState>((set, get) => ({
 	setGeneratedChangelog: (changelog) => set({ generatedChangelog: changelog }),
 	setIsGenerating: (isGenerating) => set({ isGenerating }),
 	setError: (error) => set({ error }),
+	setSavedReview: (review) => set({ savedReview: parseGeneratedReview(review) }),
 
 	// Compound actions
 	reset: () => set({ ...initialState, date: getDefaultDate() }),
@@ -561,6 +570,7 @@ export async function saveChangelog(
 		});
 
 		if (result.success) {
+			store.setSavedReview(result.data?.review);
 			return true;
 		} else {
 			store.setError(result.error || "Failed to save changelog");

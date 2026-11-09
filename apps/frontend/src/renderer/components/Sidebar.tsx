@@ -5,6 +5,7 @@ import type { GitStatus, Project } from "@shared/types";
 import { providerFromRemoteUrl } from "@shared/utils/git-remote-provider";
 // Drag and drop (dnd-kit)
 import {
+	type CollisionDetection,
 	closestCenter,
 	DndContext,
 	type DragEndEvent,
@@ -12,6 +13,7 @@ import {
 	type DragStartEvent,
 	KeyboardSensor,
 	PointerSensor,
+	pointerWithin,
 	useSensor,
 	useSensors,
 } from "@dnd-kit/core";
@@ -22,83 +24,23 @@ import {
 } from "@dnd-kit/sortable";
 // Icons
 import {
-	Accessibility,
-	Activity,
-	AlertTriangle,
-	BarChart3,
-	Box,
-	Brain,
-	Building2,
-	Calendar,
-	Camera,
-	CheckCircle,
-	ClipboardCheck,
-	ChevronRight,
-	Code,
 	Compass,
-	Database,
-	Download,
-	FileCode2,
-	FileJson,
-	FileText,
 	FlaskConical,
-	GitBranch,
-	GitFork,
-	GitMerge,
-	GitPullRequest,
-	Globe,
-	HeartPulse,
 	HelpCircle,
-	Layers,
-	Languages,
-	LayoutGrid,
-	Leaf,
-	Lightbulb,
-	Map as MapIcon,
-	MessageSquare,
-	Mic,
-	Monitor,
-	Network,
 	PanelLeft,
 	PanelLeftClose,
 	Plus,
-	Radio,
 	RefreshCcw,
-	Rocket,
 	Search,
 	Settings,
-	Shield,
-	ShieldAlert,
-	ShieldCheck,
-	Sparkles,
 	Star,
-	Target,
-	Terminal,
-	TestTube,
-	Trophy,
-	UserCheck,
-	Users,
-	WandSparkles,
-	WifiOff,
-	Workflow,
-	Wrench,
-	X,
-	Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 // i18n
 import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@/components/ui";
 // Utils
 import { cn } from "@/lib/utils";
-import { openAppEmulatorDialog } from "@/stores/app-emulator-store";
-import { openArenaDialog } from "@/stores/arena-store";
-import { openCodePlaygroundDialog } from "@/stores/code-playground-store";
-import { openConflictPredictorDialog } from "@/stores/conflict-predictor-store";
-import { openContextAwareSnippetsDialog } from "@/stores/context-aware-snippets-store";
-import { openDependencySentinelDialog } from "@/stores/dependency-sentinel-store";
-import { openLearningLoopDialog } from "@/stores/learning-loop-store";
-import { useNaturalLanguageGitStore } from "@/stores/natural-language-git-store";
 import {
 	clearProjectEnvConfig,
 	loadProjectEnvConfig,
@@ -111,17 +53,13 @@ import {
 	useActivityStore,
 	useAttentionView,
 } from "@/stores/activity-store";
-import { openPromptOptimizerDialog } from "@/stores/prompt-optimizer-store";
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
-import { openTestGenerationDialog } from "@/stores/test-generation-store";
-import { openVoiceAssistant } from "@/stores/voice-assistant-store";
 // Modals & Components
 import { AddProjectModal } from "./AddProjectModal";
 import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
-import { CliToolBadges } from "./CliToolBadges";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
 import { ConflictPredictorDialog } from "./conflict-predictor/ConflictPredictorDialog";
 import { ContextAwareSnippetsDialog } from "./context-aware-snippets/ContextAwareSnippetsDialog";
@@ -136,10 +74,8 @@ import { SmartEstimationDialog } from "./smart-estimation/SmartEstimationDialog"
 import { TestGenerationDialog } from "./test-generation/TestGenerationDialog";
 import { SecureStorageBanner } from "./SecureStorageBanner";
 import { UpdateBanner } from "./UpdateBanner";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui";
 // UI
 import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
 import {
 	Tooltip,
 	TooltipContent,
@@ -149,8 +85,7 @@ import {
 import {
 	decodeSortableId,
 	encodeSortableId,
-	FavoritesDropZone,
-	FavoritesDropZoneEmpty,
+	FAV_DROP_ID,
 	SortableWrapper,
 	type SortableKind,
 } from "./sidebar/sortable-primitives";
@@ -162,13 +97,43 @@ import {
 	getHub,
 	type HubTabGates,
 	hubEntryTarget,
-	isHubExperimental,
-	SIDEBAR_HUBS,
-	type SidebarHubId,
-	shownHubTabs,
 } from "./sidebar/hubs";
-import { serverForge, showsView, useServerNavGates } from "./sidebar/server-gates";
+import { serverForge, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
+import { MenuModeCard } from "./sidebar/MenuModeCard";
+import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
+import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
+import { LaboPanel } from "./sidebar/LaboPanel";
+import {
+	ESSENTIAL_VIEWS,
+	LABO_SPACE,
+	laboItemsOf,
+	MINE_SPACE,
+	railGroupsOf,
+	UNUSED_DAYS,
+	unusedEntries,
+	recentNavItems,
+	resolveSpace,
+	spaceToFollow,
+} from "./sidebar/spaces";
+import { useViewUsageStore } from "@/stores/view-usage-store";
+import { CliToolsChip } from "./sidebar/CliToolsChip";
+import { openNavView } from "./sidebar/nav-actions";
+import { buildNavIndex, useNavIndexStore } from "./sidebar/nav-index";
+import {
+	administrationNavGroup,
+	githubNavItems,
+	gitlabNavItems,
+	hubTabItems,
+	isItemExperimental,
+	isOn,
+	itemShown,
+	itemViews,
+	type NavGroup,
+	type NavItem,
+	navGroups,
+} from "./sidebar/nav-model";
+import { openCommandPalette } from "@/stores/command-palette-store";
 import { VoiceAssistant } from "./voice-assistant/VoiceAssistant";
 
 export type SidebarView =
@@ -261,525 +226,20 @@ interface SidebarProps {
 	readonly onViewChange?: (view: SidebarView, force?: boolean) => void;
 }
 
-interface NavItem {
-	id: SidebarView;
-	labelKey: string;
-	icon: React.ElementType;
-	shortcut?: string;
-	subGroup?: string; // i18n key for visual sub-group header within a group
-	hub?: SidebarHubId; // the entry stands for this hub's tabs (`sidebar/hubs.ts`)
-}
+export { navItemLabelKey } from "./sidebar/nav-model";
 
-function hubNavItem(id: SidebarHubId, subGroup?: string): NavItem {
-	const hub = getHub(id);
-	return { id: hub.tabs[0].view, labelKey: hub.labelKey, icon: hub.icon, hub: id, subGroup };
-}
-
-/** The views a menu entry stands for: a hub's tabs, or its own view. */
-function itemViews(item: NavItem): SidebarView[] {
-	return item.hub ? getHub(item.hub).tabs.map((tab) => tab.view) : [item.id];
-}
-
-/** A hub's tabs as menu entries, for the search and the shortcuts. */
-function hubTabItems(item: NavItem, gates: HubTabGates): NavItem[] {
-	if (!item.hub) return [item];
-	return shownHubTabs(getHub(item.hub), gates).map((tab) => ({ ...tab, id: tab.view, subGroup: item.subGroup }));
-}
-
-/** Whether a menu entry stands for this view. */
-function isOn(item: NavItem, view: SidebarView | null): boolean {
-	return view !== null && itemViews(item).includes(view);
-}
-
-function isItemExperimental(item: NavItem): boolean {
-	return item.hub ? isHubExperimental(getHub(item.hub)) : EXPERIMENTAL_VIEWS.has(item.id);
-}
-
-function itemShown(item: NavItem, gates: HubTabGates): boolean {
-	if (item.hub) return shownHubTabs(getHub(item.hub), gates).length > 0;
-	return !(gates.hideExperimental && isItemExperimental(item)) && showsView(item.id, gates.serverProject);
-}
-
-interface NavGroup {
-	id: string;
-	labelKey: string;
-	icon: React.ElementType;
-	items: NavItem[];
-	defaultExpanded?: boolean;
-}
-
-// Navigation groups organized by user intent
-const navGroups: NavGroup[] = [
-	{
-		id: "workspace",
-		labelKey: "navigation:groups.workspace",
-		icon: Target,
-		items: [
-			{
-				id: "kanban",
-				labelKey: "navigation:items.kanban",
-				icon: LayoutGrid,
-				shortcut: "WK",
-			},
-			{
-				id: "dashboard",
-				labelKey: "navigation:items.dashboard",
-				icon: BarChart3,
-				shortcut: "WD",
-			},
-			{
-				id: "mission-control",
-				labelKey: "navigation:items.missionControl",
-				icon: Rocket,
-				shortcut: "WM",
-			},
-			hubNavItem("agent-history"),
-			{
-				id: "phase35-hub",
-				labelKey: "navigation:items.phase35Hub",
-				icon: Sparkles,
-				shortcut: "WA",
-			},
-		],
-		defaultExpanded: true,
-	},
-	{
-		id: "agents",
-		labelKey: "navigation:groups.agents",
-		icon: Rocket,
-		items: [
-			{
-				id: "terminals",
-				labelKey: "navigation:items.terminals",
-				icon: Terminal,
-				shortcut: "TM",
-			},
-			{
-				id: "pixel-office",
-				labelKey: "navigation:items.pixelOffice",
-				icon: Building2,
-				shortcut: "PO",
-			},
-			{
-				id: "self-healing",
-				labelKey: "navigation:items.selfHealing",
-				icon: HeartPulse,
-				shortcut: "SE",
-			},
-			hubNavItem("arena"),
-			{
-				id: "repo-bench",
-				labelKey: "navigation:items.repoBench",
-				icon: FlaskConical,
-				shortcut: "RB",
-			},
-			{
-				id: "bounty-board",
-				labelKey: "navigation:items.bountyBoard",
-				icon: Trophy,
-				shortcut: "BB",
-			},
-			{
-				id: "agent-coach",
-				labelKey: "navigation:items.agentCoach",
-				icon: UserCheck,
-				shortcut: "AC",
-			},
-			{
-				id: "live-companion",
-				labelKey: "navigation:items.liveCompanion",
-				icon: Radio,
-				shortcut: "LC",
-			},
-		],
-		defaultExpanded: false,
-	},
-	{
-		id: "development",
-		labelKey: "navigation:groups.development",
-		icon: Code,
-		items: [
-			{
-				id: "pair-programming",
-				labelKey: "navigation:items.pairProgramming",
-				icon: Users,
-				shortcut: "PP",
-			},
-			{
-				id: "code-review",
-				labelKey: "navigation:items.codeReview",
-				icon: FileCode2,
-				shortcut: "CR",
-			},
-			hubNavItem("debt"),
-			{
-				id: "test-generation",
-				labelKey: "navigation:items.testGeneration",
-				icon: TestTube,
-				shortcut: "TG",
-			},
-			{
-				id: "code-playground",
-				labelKey: "navigation:items.codePlayground",
-				icon: Zap,
-				shortcut: "CP",
-			},
-			{
-				id: "visual-to-code",
-				labelKey: "navigation:items.visualToCode",
-				icon: WandSparkles,
-				shortcut: "VC",
-			},
-			hubNavItem("docs"),
-			hubNavItem("onboarding"),
-			{
-				id: "flaky-tests",
-				labelKey: "navigation:items.flakyTests",
-				icon: AlertTriangle,
-				shortcut: "FT",
-			},
-			{
-				id: "performance-profiler",
-				labelKey: "navigation:items.performanceProfiler",
-				icon: Activity,
-				shortcut: "PF",
-			},
-			{
-				id: "cross-language-translation",
-				labelKey: "navigation:items.crossLanguageTranslation",
-				icon: Languages,
-				shortcut: "CX",
-			},
-		],
-		defaultExpanded: false,
-	},
-	{
-		id: "explore",
-		labelKey: "navigation:groups.explore",
-		icon: Sparkles,
-		items: [
-			{
-				id: "insights",
-				labelKey: "navigation:items.insights",
-				icon: Sparkles,
-				shortcut: "IN",
-			},
-			hubNavItem("context"),
-			{
-				id: "architecture-visualizer",
-				labelKey: "navigation:items.architectureVisualizer",
-				icon: Network,
-				shortcut: "AV",
-			},
-			{
-				id: "ideation",
-				labelKey: "navigation:items.ideation",
-				icon: Lightbulb,
-				shortcut: "ID",
-			},
-			{
-				id: "learning-loop",
-				labelKey: "navigation:items.learningLoop",
-				icon: Brain,
-				shortcut: "LL",
-			},
-		],
-		defaultExpanded: false,
-	},
-	{
-		id: "git-integrations",
-		labelKey: "navigation:groups.gitIntegrations",
-		icon: GitFork,
-		items: [
-			{
-				id: "worktrees",
-				labelKey: "navigation:items.worktrees",
-				icon: GitBranch,
-				shortcut: "WT",
-			},
-			hubNavItem("git-history"),
-			hubNavItem("git-impact"),
-			{
-				id: "cicd-triggers",
-				labelKey: "navigation:items.cicdTriggers",
-				icon: Workflow,
-				shortcut: "CD",
-			},
-		],
-		defaultExpanded: false,
-	},
-	{
-		id: "planning",
-		labelKey: "navigation:groups.planning",
-		icon: BarChart3,
-		items: [
-			{
-				id: "roadmap",
-				labelKey: "navigation:items.roadmap",
-				icon: MapIcon,
-				shortcut: "RM",
-			},
-			{
-				id: "analytics",
-				labelKey: "navigation:items.analytics",
-				icon: Database,
-				shortcut: "AN",
-			},
-			hubNavItem("costs"),
-			{
-				id: "spec-approval",
-				labelKey: "navigation:items.specApproval",
-				icon: ClipboardCheck,
-				shortcut: "SA",
-			},
-			{
-				id: "changelog",
-				labelKey: "navigation:items.changelog",
-				icon: FileText,
-				shortcut: "CL",
-			},
-			{
-				id: "release-coordinator",
-				labelKey: "navigation:items.releaseCoordinator",
-				icon: Calendar,
-				shortcut: "RC",
-			},
-			{
-				id: "carbon-profiler",
-				labelKey: "navigation:items.carbonProfiler",
-				icon: Leaf,
-				shortcut: "CB",
-			},
-			{
-				id: "env-snapshot",
-				labelKey: "navigation:items.envSnapshot",
-				icon: Camera,
-				shortcut: "ES",
-			},
-		],
-		defaultExpanded: false,
-	},
-	{
-		id: "toolbox",
-		labelKey: "navigation:groups.toolbox",
-		icon: Wrench,
-		items: [
-			// Extensions
-			hubNavItem("mcp-tools", "navigation:subGroups.extensions"),
-			// Code Quality & Testing
-			{
-				id: "regression-guardian",
-				labelKey: "navigation:items.regressionGuardian",
-				icon: ShieldAlert,
-				shortcut: "RG",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "injection-guard",
-				labelKey: "navigation:items.injectionGuard",
-				icon: ShieldCheck,
-				shortcut: "IG",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "compliance",
-				labelKey: "navigation:items.compliance",
-				icon: CheckCircle,
-				shortcut: "CO",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "dependency-sentinel",
-				labelKey: "navigation:items.dependencySentinel",
-				icon: Shield,
-				shortcut: "DS",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			{
-				id: "guardrails",
-				labelKey: "navigation:items.guardrails",
-				icon: Shield,
-				shortcut: "GR",
-				subGroup: "navigation:subGroups.codeQuality",
-			},
-			// Accessibility & i18n
-			{
-				id: "accessibility-agent",
-				labelKey: "navigation:items.accessibilityAgent",
-				icon: Accessibility,
-				shortcut: "AY",
-				subGroup: "navigation:subGroups.accessibility",
-			},
-			{
-				id: "i18n-agent",
-				labelKey: "navigation:items.i18nAgent",
-				icon: Globe,
-				shortcut: "II",
-				subGroup: "navigation:subGroups.accessibility",
-			},
-			// API & Data
-			{
-				id: "api-explorer",
-				labelKey: "navigation:items.apiExplorer",
-				icon: Globe,
-				shortcut: "AE",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "api-watcher",
-				labelKey: "navigation:items.apiWatcher",
-				icon: FileJson,
-				shortcut: "AW",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "sandbox",
-				labelKey: "navigation:items.sandbox",
-				icon: Box,
-				shortcut: "SB",
-				subGroup: "navigation:subGroups.api",
-			},
-			{
-				id: "notebook-agent",
-				labelKey: "navigation:items.notebookAgent",
-				icon: FileCode2,
-				shortcut: "NB",
-				subGroup: "navigation:subGroups.api",
-			},
-			// Automation
-			{
-				id: "app-emulator",
-				labelKey: "navigation:items.appEmulator",
-				icon: Monitor,
-				shortcut: "AP",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "browser-agent",
-				labelKey: "navigation:items.browserAgent",
-				icon: Globe,
-				shortcut: "BW",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "pipeline-generator",
-				labelKey: "navigation:items.pipelineGenerator",
-				icon: Layers,
-				shortcut: "PG",
-				subGroup: "navigation:subGroups.automation",
-			},
-			{
-				id: "team-bot",
-				labelKey: "navigation:items.teamBot",
-				icon: MessageSquare,
-				shortcut: "TT",
-				subGroup: "navigation:subGroups.automation",
-			},
-			// Utilities
-			{
-				id: "voice-control",
-				labelKey: "navigation:items.voiceControl",
-				icon: Mic,
-				shortcut: "VO",
-				subGroup: "navigation:subGroups.utilities",
-			},
-			{
-				id: "migration",
-				labelKey: "navigation:items.migration",
-				icon: Download,
-				shortcut: "MG",
-				subGroup: "navigation:subGroups.utilities",
-			},
-			{
-				id: "prompt-optimizer",
-				labelKey: "navigation:items.promptOptimizer",
-				icon: WandSparkles,
-				shortcut: "PT",
-				subGroup: "navigation:subGroups.utilities",
-			},
-			{
-				id: "offline-mode",
-				labelKey: "navigation:items.offlineMode",
-				icon: WifiOff,
-				shortcut: "OF",
-				subGroup: "navigation:subGroups.utilities",
-			},
-		],
-		defaultExpanded: false,
-	},
-];
-
-// GitHub nav items shown when GitHub is enabled
-// The administration console. Kept out of `navGroups` and appended only when
-// the signed-in user can actually reach it: in local mode, and for a member
-// with no administration permission, the entry would lead to a page that only
-// explains why it is empty.
-const administrationNavGroup: NavGroup = {
-	id: "administration",
-	labelKey: "navigation:groups.administration",
-	icon: ShieldCheck,
-	items: [
-		{
-			id: "administration",
-			labelKey: "navigation:items.administration",
-			icon: ShieldCheck,
-			shortcut: "AD",
-		},
-	],
+/** A drag grip shows only while its row is hovered or focused, not on every row. */
+/**
+ * The star of the rail is small: the pointer over it wins, then the nearest
+ * sortable row, so a page dragged onto the star pins it.
+ */
+const pointerFirst: CollisionDetection = (args) => {
+	const within = pointerWithin(args);
+	return within.length > 0 ? within : closestCenter(args);
 };
 
-const githubNavItems: NavItem[] = [
-	{
-		id: "github-issues",
-		labelKey: "navigation:items.githubIssues",
-		icon: Globe,
-		shortcut: "GI",
-	},
-	{
-		id: "github-prs",
-		labelKey: "navigation:items.githubPRs",
-		icon: GitPullRequest,
-		shortcut: "GP",
-	},
-];
-
-// GitLab nav items shown when GitLab is enabled
-const gitlabNavItems: NavItem[] = [
-	{
-		id: "gitlab-issues",
-		labelKey: "navigation:items.gitlabIssues",
-		icon: Globe,
-		shortcut: "LI",
-	},
-	{
-		id: "gitlab-merge-requests",
-		labelKey: "navigation:items.gitlabMRs",
-		icon: GitMerge,
-		shortcut: "LM",
-	},
-];
-
-/**
- * How a menu entry is named, for anything outside the sidebar that has to say
- * which page it is talking about — the activity centre, its toasts.
- *
- * Built from the same arrays the sidebar renders, so a page renamed here is
- * renamed there too; a second hand-written table is how the two start
- * disagreeing.
- */
-const NAV_LABEL_KEYS: Partial<Record<SidebarView, string>> = Object.fromEntries(
-	[
-		...navGroups.flatMap((group) => group.items),
-		...githubNavItems,
-		...gitlabNavItems,
-		// A hub's entry has its first tab's id: the tab's own name wins.
-		...SIDEBAR_HUBS.flatMap((hub) => hub.tabs.map((tab) => ({ ...tab, id: tab.view }))),
-	].map((item) => [item.id, item.labelKey]),
-);
-
-export function navItemLabelKey(view: SidebarView): string | undefined {
-	return NAV_LABEL_KEYS[view];
-}
+const DRAG_SLOT_REVEAL =
+	"[&>[data-drag-slot]]:opacity-0 [&>[data-drag-slot]]:transition-opacity [&:hover>[data-drag-slot]]:opacity-100 [&:focus-within>[data-drag-slot]]:opacity-100";
 
 export function Sidebar({
 	onSettingsClick,
@@ -820,17 +280,15 @@ export function Sidebar({
 		toggleGroupPin,
 		reorderGroups,
 		reorderItems,
-		toggleGroupExpanded,
-		setFavoritesExpanded,
 		setHideExperimental,
-		clearAllFavorites,
+		setActiveSpace,
+		chooseMenuMode,
+		hideItems,
+		unhideItem,
+		snoozeHideSuggestions,
 		reset: resetSidebarPrefs,
 		mergeOrder,
 	} = useSidebarPrefs();
-	const expandedGroups = useMemo(
-		() => new Set(sidebarPrefs.expandedGroups),
-		[sidebarPrefs.expandedGroups],
-	);
 	const pinnedItemsSet = useMemo(
 		() => new Set(sidebarPrefs.pinnedItems),
 		[sidebarPrefs.pinnedItems],
@@ -840,9 +298,6 @@ export function Sidebar({
 		[sidebarPrefs.pinnedGroups],
 	);
 	const [activeDragId, setActiveDragId] = useState<string | null>(null);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [isSearchOpen, setIsSearchOpen] = useState(false);
-	const searchInputRef = useRef<HTMLInputElement>(null);
 	const shortcutBufferRef = useRef<string>("");
 	const shortcutBufferTimeRef = useRef<number>(0);
 
@@ -860,10 +315,11 @@ export function Sidebar({
 	const isCollapsed = settings.sidebarCollapsed ?? false;
 
 	// Sidebar resizable width
-	const SIDEBAR_MIN_WIDTH = 200;
+	// The whole menu, rail and panel; folded, only the rail stays.
+	const SIDEBAR_MIN_WIDTH = 240;
 	const SIDEBAR_MAX_WIDTH = 480;
-	const SIDEBAR_DEFAULT_WIDTH = 256;
-	const SIDEBAR_COLLAPSED_WIDTH = 64;
+	const SIDEBAR_DEFAULT_WIDTH = 296;
+	const SIDEBAR_RAIL_WIDTH = 52; // w-13 of the rail
 
 	const sidebarWidth = settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH;
 	const [isResizing, setIsResizing] = useState(false);
@@ -917,11 +373,6 @@ export function Sidebar({
 	const toggleSidebar = () => {
 		saveSettings({ sidebarCollapsed: !isCollapsed });
 	};
-
-	// CLI panel expanded state persisted in settings (default: true)
-	const isCliPanelExpanded = settings.cliPanelExpanded ?? true;
-	const setIsCliPanelExpanded = (value: boolean) =>
-		saveSettings({ cliPanelExpanded: value });
 
 	// Subscribe to project-env-store for reactive GitHub/GitLab tab visibility
 	const envGitHub = useProjectEnvStore((state) => state.envConfig?.githubEnabled ?? false);
@@ -1052,23 +503,11 @@ export function Sidebar({
 		);
 	}, [visibleNavGroups, hubGates]);
 
-	// Filter nav groups based on search query
-	const filteredNavGroups = useMemo(() => {
-		if (!searchQuery.trim()) return visibleNavGroups;
-		const query = searchQuery.toLowerCase().trim();
-		return visibleNavGroups
-			.map((group) => ({
-				...group,
-				items: group.items.flatMap((item) => {
-					const hubMatches = item.hub && matches(item);
-					return hubTabItems(item, hubGates).filter((tab) => hubMatches || matches(tab));
-				}),
-			}))
-			.filter((group) => group.items.length > 0);
-		function matches(item: NavItem) {
-			return t(item.labelKey).toLowerCase().includes(query);
-		}
-	}, [visibleNavGroups, searchQuery, t, hubGates]);
+	// The pages shown, for the command palette: one list for both
+	const setNavIndex = useNavIndexStore((state) => state.setEntries);
+	useEffect(() => {
+		setNavIndex(buildNavIndex(visibleNavGroups, hubGates));
+	}, [visibleNavGroups, hubGates, setNavIndex]);
 
 	// Load envConfig when project changes to ensure store is populated
 	useEffect(() => {
@@ -1117,11 +556,10 @@ export function Sidebar({
 			// Check for modifier keys - we want plain key presses only
 			if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-			// "/" opens and focuses the search input when sidebar is expanded
-			if (e.key === "/" && !isCollapsed) {
+			// "/" opens the search: the command palette, which lists every page
+			if (e.key === "/") {
 				e.preventDefault();
-				setIsSearchOpen(true);
-				requestAnimationFrame(() => searchInputRef.current?.focus());
+				openCommandPalette();
 				return;
 			}
 
@@ -1170,7 +608,7 @@ export function Sidebar({
 
 		globalThis.addEventListener("keydown", handleKeyDown);
 		return () => globalThis.removeEventListener("keydown", handleKeyDown);
-	}, [selectedProjectId, onViewChange, visibleNavItems, isCollapsed]);
+	}, [selectedProjectId, onViewChange, visibleNavItems]);
 
 	// Check git status when a project changes
 	useEffect(() => {
@@ -1185,10 +623,10 @@ export function Sidebar({
 					);
 					if (result.success && result.data) {
 						setGitStatus(result.data);
-						// Show git setup modal if a project is not a git repo or has no commits,
-						// but only if the user hasn't explicitly dismissed it for this project yet
+						// Git not ready and not dismissed. A project still to initialize is left to its
+						// settings (opened on add, they repair git): a 2nd dialog on top closed them.
 						if (
-							(!result.data.isGitRepo || !result.data.hasCommits) &&
+							(!result.data.isGitRepo || !result.data.hasCommits) && selectedProject.autoBuildPath &&
 							gitSetupSkippedForProjectRef.current !== selectedProject.id
 						) {
 							setShowGitSetupModal(true);
@@ -1323,71 +761,12 @@ export function Sidebar({
 		setAzureDevOpsSetupProject(null);
 	};
 
-	const handleNavClick = (view: SidebarView) => {
-		// Clear search when navigating
-		setSearchQuery("");
-		setIsSearchOpen(false);
-
-		// Handle AI Tools that open dialogs instead of changing view
-		if (view === "test-generation") {
-			openTestGenerationDialog();
-			return;
-		}
-		if (view === "prompt-optimizer") {
-			openPromptOptimizerDialog();
-			return;
-		}
-		if (view === "context-aware-snippets") {
-			openContextAwareSnippetsDialog();
-			return;
-		}
-		if (view === "code-playground") {
-			openCodePlaygroundDialog();
-			return;
-		}
-		if (view === "conflict-predictor") {
-			openConflictPredictorDialog();
-			return;
-		}
-		if (view === "dependency-sentinel") {
-			openDependencySentinelDialog();
-			return;
-		}
-		if (view === "natural-language-git") {
-			useNaturalLanguageGitStore.getState().openDialog();
-			return;
-		}
-		if (view === "voice-control") {
-			openVoiceAssistant();
-			return;
-		}
-		if (view === "app-emulator") {
-			openAppEmulatorDialog();
-			return;
-		}
-		if (view === "learning-loop") {
-			openLearningLoopDialog();
-			return;
-		}
-		if (view === "arena-mode") {
-			openArenaDialog();
-			return;
-		}
-
-		// Handle regular view changes
-		onViewChange?.(view);
-	};
+	const handleNavClick = (view: SidebarView) => openNavView(view, onViewChange);
 
 	const openNavItem = (item: NavItem) => {
 		if (!item.hub) return handleNavClick(item.id);
-		setSearchQuery("");
-		setIsSearchOpen(false);
 		const target = hubEntryTarget(getHub(item.hub), hubGates);
 		if (target) onViewChange?.(target);
-	};
-
-	const toggleGroupExpansion = (groupId: string) => {
-		toggleGroupExpanded(groupId);
 	};
 
 	// Require 6px of pointer movement before starting a drag so regular clicks on
@@ -1409,7 +788,7 @@ export function Sidebar({
 	}, []);
 
 	// Helper function to handle dropping on favorites
-	const handleFavoritesDrop = useCallback((activeInfo: SortableInfo, _overInfo: SortableInfo) => {
+	const handleFavoritesDrop = useCallback((activeInfo: SortableInfo) => {
 		if (activeInfo.kind === "item" && !pinnedItemsSet.has(activeInfo.id)) {
 			toggleItemPin(activeInfo.id);
 			return true;
@@ -1454,14 +833,17 @@ export function Sidebar({
 			if (!over) return;
 
 			const activeInfo = decodeSortableId(String(active.id));
-			const overInfo = decodeSortableId(String(over.id));
-			if (!activeInfo || !overInfo) return;
+			if (!activeInfo) return;
 
-			// Dropped on the favorites drop zone -> pin the item/group
-			if (overInfo.kind === "fav-group" || over.id === "__fav_drop__") {
-				handleFavoritesDrop(activeInfo, overInfo);
+			// Dropped on the star of the rail -> pin the page or the group. Its
+			// id has no kind, so it is checked before decoding (it never pinned
+			// while the decoding came first).
+			if (over.id === FAV_DROP_ID) {
+				handleFavoritesDrop(activeInfo);
 				return;
 			}
+			const overInfo = decodeSortableId(String(over.id));
+			if (!overInfo) return;
 
 			// Reorder groups (same kind, both "group")
 			if (activeInfo.kind === "group" && overInfo.kind === "group") {
@@ -1481,9 +863,25 @@ export function Sidebar({
 		],
 	);
 
+	const dragLabel = (dragId: string) => {
+		const info = decodeSortableId(dragId);
+		if (!info) return null;
+		if (info.kind === "group") {
+			const group = visibleNavGroups.find((g) => g.id === info.id);
+			return group ? t(group.labelKey) : null;
+		}
+		const item = visibleNavGroups.flatMap((g) => g.items).find((i) => i.id === info.id);
+		return item ? t(item.labelKey) : null;
+	};
+
+	// The two-letter shortcut lives in the hover title, not on every row
+	const navItemTitle = (item: NavItem) => {
+		const title = navLabelTitle(t, item.labelKey, isItemExperimental(item));
+		return item.shortcut ? `${title} · ${item.shortcut}` : title;
+	};
+
 	const renderNavItem = (
 		item: NavItem,
-		isSubItem = false,
 		context: "default" | "favorites" = "default",
 	) => {
 		const isActive = isOn(item, activeView);
@@ -1492,147 +890,62 @@ export function Sidebar({
 		const badge = groupBadgeFor([item]);
 		const hasAttention = isOn(item, attentionView);
 
-		// Determine CSS classes based on collapsed state and sub-item status
-		const getLayoutClasses = () => {
-			if (isCollapsed) {
-				return "justify-center px-2 py-2";
-			}
-			if (isSubItem) {
-				return "gap-3 px-3 py-1.5 ml-6";
-			}
-			return "gap-3 px-3 py-2";
-		};
-
 		// Pin star lives OUTSIDE the nav button (nested <button> is invalid HTML).
-		// It is an absolute overlay so the nav button keeps the full row width;
-		// it only appears on hover/focus, fading the kbd shortcut underneath.
-		// right-2 (8px) + the 7px inset of the items box = 15px from the sidebar
-		// inner edge — must match the group pin star (right-[15px]) so all stars align.
-		const starButton = !isCollapsed && context !== "favorites" ? (
-			<button
-				type="button"
-				onClick={(e) => {
-					e.stopPropagation();
-					if (isPinned && item.hub) unpinItems(itemViews(item));
-					else toggleItemPin(item.id);
-				}}
-				aria-label={
-					isPinned
-						? t("navigation:actions.unpin")
-						: t("navigation:actions.pin")
-				}
-				aria-pressed={isPinned}
-				className={cn(
-					"absolute right-2 top-1/2 -translate-y-1/2 z-10",
-					"flex items-center justify-center w-5 h-5 rounded",
-					"transition-all duration-200",
-					"hover:bg-accent/60 hover:scale-110",
-					"opacity-0 group-hover/nav-item:opacity-100 focus-visible:opacity-100",
-					isPinned
-						? "text-warning"
-						: "text-muted-foreground/40 hover:text-warning",
-				)}
-			>
-				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
-				/>
-			</button>
-		) : null;
+		// It is an absolute overlay so the nav button keeps the full row width,
+		// and only appears on hover/focus.
+		const starButton =
+			context === "favorites" ? null : (
+				<button
+					type="button"
+					onClick={(e) => {
+						e.stopPropagation();
+						if (isPinned && item.hub) unpinItems(itemViews(item));
+						else toggleItemPin(item.id);
+					}}
+					aria-label={isPinned ? t("navigation:actions.unpin") : t("navigation:actions.pin")}
+					aria-pressed={isPinned}
+					className={cn(
+						"absolute right-2 top-1/2 -translate-y-1/2 z-10",
+						"flex items-center justify-center w-5 h-5 rounded",
+						"transition-all duration-200",
+						"hover:bg-accent/60 hover:scale-110",
+						"opacity-0 group-hover/nav-item:opacity-100 focus-visible:opacity-100",
+						isPinned ? "text-warning" : "text-muted-foreground/40 hover:text-warning",
+					)}
+				>
+					<Star className={cn("h-3.5 w-3.5", isPinned && "fill-warning")} />
+				</button>
+			);
 
-		const button = (
-			<div
-				key={item.id}
-				className="group/nav-item relative flex items-center"
-			>
+		return (
+			<div key={item.id} className="group/nav-item relative flex items-center">
 				<button
 					type="button"
 					onClick={() => openNavItem(item)}
 					// The console is deployment-scoped, not project-scoped.
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
+					aria-current={isActive ? "page" : undefined}
 					className={cn(
-						"flex w-full min-w-0 items-center rounded-lg text-sm transition-all duration-200",
+						// pl-5 leaves room for the drag grip shown on hover
+						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
 						"hover:bg-accent hover:text-accent-foreground",
 						"disabled:pointer-events-none disabled:opacity-50",
-						isActive && "bg-accent text-accent-foreground",
-						isPinned &&
-							!isActive &&
-							context !== "favorites" &&
-							"ring-1 ring-inset ring-warning/20 shadow-[inset_0_0_12px_-6px_rgba(251,191,36,0.25)]",
-						getLayoutClasses(),
+						isActive && "bg-primary/10 text-primary font-medium",
 					)}
 				>
 					<NavIcon icon={Icon} experimental={isItemExperimental(item)} />
-					{!isCollapsed && (
-						<>
-							<span className="flex-1 text-left truncate" title={navLabelTitle(t, item.labelKey, isItemExperimental(item))}>
-								{t(item.labelKey)}
-							</span>
-							<ActivityBadge badge={badge} attention={hasAttention} />
-							{item.shortcut && (
-								<kbd
-									className={cn(
-										"pointer-events-none hidden h-5 select-none items-center gap-1 rounded-md border border-border bg-secondary px-1.5 font-mono text-3xs font-medium text-muted-foreground sm:flex",
-										"transition-opacity duration-200",
-										context !== "favorites" &&
-											"group-hover/nav-item:opacity-0",
-									)}
-								>
-									{item.shortcut}
-								</kbd>
-							)}
-						</>
-					)}
+					<span className="flex-1 text-left truncate" title={navItemTitle(item)}>
+						{t(item.labelKey)}
+					</span>
+					<ActivityBadge badge={badge} attention={hasAttention} />
 				</button>
 				{starButton}
-				{isCollapsed && (
-					<ActivityBadge
-						badge={badge}
-						attention={hasAttention}
-						variant="corner"
-					/>
-				)}
 			</div>
 		);
-
-		// Wrap in tooltip when collapsed
-		if (isCollapsed) {
-			return (
-				<Tooltip key={item.id}>
-					<TooltipTrigger asChild>{button}</TooltipTrigger>
-					<TooltipContent side="right">
-						<span>{t(item.labelKey)}</span>
-						{isItemExperimental(item) && (
-							<span className="ml-2 text-warning">{t("navigation:experimental.badge")}</span>
-						)}
-						{item.shortcut && (
-							<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
-								{item.shortcut}
-							</kbd>
-						)}
-					</TooltipContent>
-				</Tooltip>
-			);
-		}
-
-		return button;
 	};
 
-	const groupItemsBySubGroup = (items: NavItem[]) => {
-		const subGroups: { key: string; items: NavItem[] }[] = [];
-		for (const item of items) {
-			const key = item.subGroup ?? "";
-			const last = subGroups.at(-1);
-			if (last?.key === key) {
-				last.items.push(item);
-			} else {
-				subGroups.push({ key, items: [item] });
-			}
-		}
-		return subGroups;
-	};
-
-	const renderTooltipSubGroupItem = (item: NavItem) => {
+	const renderTooltipItem = (item: NavItem) => {
 		const isActive = isOn(item, activeView);
 		const badge = groupBadgeFor([item]);
 		return (
@@ -1661,33 +974,9 @@ export function Sidebar({
 		);
 	};
 
-	const renderTooltipItems = (items: NavItem[]) => {
-		const hasSubGroups = items.some((item) => item.subGroup);
+	const renderTooltipItems = (items: NavItem[]) => items.map(renderTooltipItem);
 
-		if (!hasSubGroups) {
-			return items.map(renderTooltipSubGroupItem);
-		}
-
-		const subGroups = groupItemsBySubGroup(items);
-		return subGroups.map((sg, sgIndex) => (
-			<div
-				key={sg.key}
-				className={cn(
-					"rounded bg-white/4 border border-white/8 px-1 py-1",
-					sgIndex > 0 && "mt-1",
-				)}
-			>
-				{sg.key && (
-					<div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 pb-0.5">
-						{t(sg.key)}
-					</div>
-				)}
-				{sg.items.map(renderTooltipSubGroupItem)}
-			</div>
-		));
-	};
-
-	const renderExpandedSubGroupItem = (
+	const renderPanelRow = (
 		item: NavItem,
 		delay: number,
 		context: "default" | "favorites" = "default",
@@ -1702,7 +991,7 @@ export function Sidebar({
 					className="animate-in slide-in-from-left-2 duration-200 ease-out"
 					style={{ animationDelay: `${delay}ms` }}
 				>
-					{renderNavItem(item, true, context)}
+					{renderNavItem(item, context)}
 				</div>
 			);
 		}
@@ -1717,67 +1006,36 @@ export function Sidebar({
 						style={{ ...style, animationDelay: `${delay}ms` }}
 						className={cn(
 							"relative group animate-in slide-in-from-left-2 duration-200 ease-out",
+							DRAG_SLOT_REVEAL,
 							isDragging &&
 								"ring-1 ring-primary/50 rounded-lg bg-background/80 backdrop-blur",
 						)}
 					>
-						<div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+						<div data-drag-slot className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
 							{dragHandle}
 						</div>
-						{renderNavItem(item, true, context)}
+						{renderNavItem(item, context)}
 					</div>
 				)}
 			</SortableWrapper>
 		);
 	};
 
-	// Helper function to render sub-group items with proper indexing
-	const renderSubGroupItems = (items: NavItem[], context: "default" | "favorites") => {
-		let itemIndex = 0;
-		return items.map((item) => {
-			const delay = itemIndex * 50;
-			itemIndex++;
-			return renderExpandedSubGroupItem(item, delay, context);
-		});
-	};
-
-	// Helper function to render sub-groups
-	const renderSubGroups = (items: NavItem[], context: "default" | "favorites") => {
-		const subGroups = groupItemsBySubGroup(items);
-		return subGroups.map((sg, sgIndex) => (
-			<div
-				key={sg.key}
-				className={cn(
-					"rounded-lg overflow-hidden bg-white/4 border border-white/8 px-1.5 py-1.5",
-					sgIndex > 0 && "mt-2",
-				)}
-			>
-				{sg.key && (
-					<div className="px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground/70">
-						{t(sg.key)}
-					</div>
-				)}
-				<div className="space-y-0.5">
-					{renderSubGroupItems(sg.items, context)}
-				</div>
-			</div>
-		));
-	};
+	// A section of a space, as a plain title instead of a box
+	const sectionTitle = (key: string) => (
+		<h3 className="px-3 pt-3 pb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+			{t(key)}
+		</h3>
+	);
 
 	const renderExpandedItems = (
 		items: NavItem[],
 		context: "default" | "favorites" = "default",
 	) => {
-		const hasSubGroups = items.some((item) => item.subGroup);
 		const sortableIds = items.map((i) => encodeSortableId("item", i.id));
-
-		const content = hasSubGroups ? (
-			renderSubGroups(items, context)
-		) : (
-			<div className="rounded-lg overflow-hidden bg-white/4 border border-white/8 px-1.5 py-1.5 space-y-0.5">
-				{items.map((item, index) =>
-					renderExpandedSubGroupItem(item, index * 50, context),
-				)}
+		const content = (
+			<div className="space-y-0.5">
+				{items.map((item, index) => renderPanelRow(item, index * 50, context))}
 			</div>
 		);
 
@@ -1792,701 +1050,331 @@ export function Sidebar({
 		);
 	};
 
-	// Helper function to determine if a group is expanded
-	const getGroupExpandedState = (group: NavGroup, isFavorites: boolean): boolean => {
-		if (searchQuery.trim()) {
-			return true;
+	// The rail (F181, lot 2): « Mon menu », then one space per group. The panel
+	// beside it lists the chosen space only.
+	const viewUsage = useViewUsageStore((state) => state.usage);
+	const usageSince = useViewUsageStore((state) => state.since);
+	const mineItems = favoritesGroup?.items ?? [];
+
+	// The rail's groups lose their beta entries to the Labo and the entries
+	// the user hid (lot 3); the lookups above keep every entry, so a pin, a
+	// recent page or Ctrl K still reaches them.
+	const hiddenSet = useMemo(() => new Set(sidebarPrefs.hiddenItems ?? []), [sidebarPrefs.hiddenItems]);
+	const railGroups = useMemo(() => railGroupsOf(visibleNavGroups, hiddenSet), [visibleNavGroups, hiddenSet]);
+	const laboItems = useMemo(() => laboItemsOf(visibleNavGroups, hubGates), [visibleNavGroups, hubGates]);
+	const spaceGroups = useMemo<NavGroup[]>(
+		() =>
+			laboItems.length > 0
+				? [...railGroups, { id: LABO_SPACE, labelKey: "navigation:spaces.labo", icon: FlaskConical, items: laboItems }]
+				: railGroups,
+		[railGroups, laboItems],
+	);
+	const recentItems = useMemo(
+		() => recentNavItems(viewUsage, visibleNavGroups, pinnedItemsSet),
+		[viewUsage, visibleNavGroups, pinnedItemsSet],
+	);
+	const showMenuModeCard = !sidebarPrefs.menuMode && mineItems.length === 0;
+	const [chosenSpace, setChosenSpace] = useState(sidebarPrefs.activeSpace);
+	const space = resolveSpace(
+		chosenSpace,
+		spaceGroups,
+		mineItems.length > 0 || recentItems.length > 0 || showMenuModeCard,
+		activeView,
+	);
+
+	// A page opened from the palette, a shortcut or a notification brings its
+	// space into view, unless the space on screen already lists it.
+	const followRef = useRef({ space, groups: spaceGroups, listed: [...mineItems, ...recentItems] });
+	followRef.current = { space, groups: spaceGroups, listed: [...mineItems, ...recentItems] };
+	// Only a change of page moves it: at start the space last chosen stays.
+	const followedViewRef = useRef(activeView);
+	useEffect(() => {
+		if (followedViewRef.current === activeView) return;
+		followedViewRef.current = activeView;
+		const { space: current, groups, listed } = followRef.current;
+		const next = spaceToFollow(current, groups, listed, activeView);
+		if (next) setChosenSpace(next);
+	}, [activeView]);
+
+	// Choosing a space shows it; choosing the one shown folds the panel, and
+	// any choice unfolds a folded panel.
+	const selectSpace = (spaceId: string) => {
+		if (!isCollapsed && spaceId === space) {
+			saveSettings({ sidebarCollapsed: true });
+			return;
 		}
-		if (isFavorites) {
-			return sidebarPrefs.favoritesExpanded;
-		}
-		return expandedGroups.has(group.id);
+		setChosenSpace(spaceId);
+		setActiveSpace(spaceId);
+		if (isCollapsed) saveSettings({ sidebarCollapsed: false });
 	};
 
-	// Helper function to get icon container className
-	const getIconContainerClassName = (isFavorites: boolean, hasActiveItem: boolean): string => {
-		if (isFavorites) {
-			return "bg-warning/10 text-warning";
-		}
-		if (hasActiveItem) {
-			return "bg-primary/10 text-primary";
-		}
-		return "text-muted-foreground";
+	const spaceOf = (group: NavGroup): RailSpace => ({
+		id: group.id,
+		labelKey: group.labelKey,
+		icon: group.icon,
+		badge: groupBadgeFor(group.items),
+		attention: group.items.some((item) => isOn(item, attentionView)),
+		preview: renderTooltipItems(group.items),
+	});
+	const mineSpace: RailSpace = {
+		id: MINE_SPACE,
+		labelKey: "navigation:spaces.mine",
+		icon: Star,
+		badge: groupBadgeFor(mineItems),
+		attention: mineItems.some((item) => isOn(item, attentionView)),
+		preview: mineItems.length > 0 ? renderTooltipItems(mineItems) : undefined,
 	};
-
-	// Helper function to render collapsed group
-	const renderCollapsedGroup = (group: NavGroup, hasActiveItem: boolean) => {
-		const GroupIcon = group.icon;
-		const isFavorites = group.id === "__favorites__";
-		// On the rail there is no room for a row, so the group icon carries the
-		// rollup of everything folded behind it.
-		const groupBadge = groupBadgeFor(group.items);
-		const groupAttention = group.items.some((item) => isOn(item, attentionView));
-
-		return (
-			<Tooltip key={group.id}>
-				<TooltipTrigger asChild>
-					<div className="flex flex-col items-center gap-1 py-2">
-						<div
-							className={cn(
-								"relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105",
-								hasActiveItem
-									? "bg-accent text-accent-foreground shadow-sm"
-									: "hover:bg-accent hover:text-accent-foreground",
-								isFavorites && "ring-1 ring-warning/40",
-							)}
-						>
-							<GroupIcon
-								className={cn(
-									"h-4 w-4",
-									isFavorites && "fill-warning text-warning",
-								)}
-							/>
-							<ActivityBadge
-								badge={groupBadge}
-								attention={groupAttention}
-								variant="corner"
-							/>
-						</div>
-					</div>
-				</TooltipTrigger>
-				<TooltipContent side="right" className="max-w-xs">
-					<div className="space-y-2">
-						<p className="font-medium text-sm">{t(group.labelKey)}</p>
-						<div className="space-y-1">{renderTooltipItems(group.items)}</div>
-					</div>
-				</TooltipContent>
-			</Tooltip>
-		);
+	const laboSpace: RailSpace = {
+		id: LABO_SPACE,
+		labelKey: "navigation:spaces.labo",
+		icon: FlaskConical,
+		badge: groupBadgeFor(laboItems),
+		attention: laboItems.some((item) => isOn(item, attentionView)),
+		count: laboItems.length,
+		preview: renderTooltipItems(laboItems),
 	};
+	const spaceGroup = spaceGroups.find((group) => group.id === space);
 
-	const renderNavGroup = (
-		group: NavGroup,
-		context: "default" | "favorites" = "default",
-	) => {
-		const isFavorites = group.id === "__favorites__";
-		const isExpanded = getGroupExpandedState(group, isFavorites);
-		const hasActiveItem = group.items.some((item) => isOn(item, activeView));
-		const isPinned = pinnedGroupsSet.has(group.id);
+	// A space's pages nobody opened for a month, offered to hide, and the ones hidden
+	const now = Date.now();
+	const groupOfSpace = visibleNavGroups.find((group) => group.id === space);
+	const unused =
+		spaceGroup && space !== LABO_SPACE && (sidebarPrefs.hideSuggestionsSnoozedUntil ?? 0) < now
+			? unusedEntries(spaceGroup.items, viewUsage, usageSince, now, pinnedItemsSet)
+			: [];
+	const hiddenHere = groupOfSpace?.items.filter((item) => hiddenSet.has(item.id)) ?? [];
+	const spaceTitle =
+		space === MINE_SPACE ? t("navigation:spaces.mine") : spaceGroup ? t(spaceGroup.labelKey) : "";
 
-		if (isCollapsed) {
-			// In collapsed mode, show group icon with tooltip containing all items
-			return renderCollapsedGroup(group, hasActiveItem);
-		}
-
-		// Helper function to render the pin button
-	const renderPinButton = (group: NavGroup, isPinned: boolean, context: "default" | "favorites") => {
-		const isFavorites = group.id === "__favorites__";
-		
-		if (context === "favorites" || isFavorites) {
-			return null;
-		}
-
-		return (
-			<button
-				type="button"
-				onClick={(e) => {
-					e.stopPropagation();
-					toggleGroupPin(group.id);
-				}}
-				aria-label={
-					isPinned
-						? t("navigation:actions.unpinGroup")
-						: t("navigation:actions.pinGroup")
-				}
-				aria-pressed={isPinned}
-				className={cn(
-					// right-[15px] = the item star's right-2 (8px) + the 7px inset
-					// (border + px-1.5) of the items box, so group and item stars align.
-					"absolute right-[15px] top-1/2 -translate-y-1/2 z-10",
-					"flex items-center justify-center w-5 h-5 rounded",
-					"transition-all duration-200",
-					"hover:bg-accent/60 hover:scale-110",
-					"opacity-0 group-hover/group-header:opacity-100 focus-visible:opacity-100",
-					isPinned
-						? "text-warning"
-						: "text-muted-foreground/40 hover:text-warning",
-				)}
-			>
-				<Star
-					className={cn("h-3.5 w-3.5", isPinned && "fill-warning")}
-				/>
-			</button>
-		);
-	};
-
-	// Helper function to render the clear favorites button
-	const renderClearFavoritesButton = (isFavorites: boolean) => {
-		if (!isFavorites) {
-			return null;
-		}
-
-		return (
-			<button
-				type="button"
-				onClick={(e) => {
-					e.stopPropagation();
-					clearAllFavorites();
-				}}
-				aria-label={t("navigation:actions.clearAllFavorites")}
-				title={t("navigation:actions.clearAllFavorites")}
-				className={cn(
-					// The favorites card adds a 5px inset (border + p-1), so right-[10px]
-					// lands at the same 15px-from-sidebar-edge line as the other stars.
-					"absolute right-[10px] top-1/2 -translate-y-1/2 z-10",
-					"flex items-center justify-center w-5 h-5 rounded",
-					"transition-all duration-200",
-					"opacity-0 group-hover/group-header:opacity-100 focus-visible:opacity-100",
-					"text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 hover:scale-110",
-				)}
-			>
-				<X className="h-3.5 w-3.5" />
-			</button>
-		);
-	};
-
-	// Helper function to render the main group button
-	const renderGroupButton = (group: NavGroup, isExpanded: boolean, hasActiveItem: boolean) => {
-		const isFavorites = group.id === "__favorites__";
-		const GroupIcon = group.icon;
-		// A collapsed group hides its entries, so it carries the worst state
-		// among them — otherwise work in a folded group is invisible.
-		const groupBadge = isExpanded ? null : groupBadgeFor(group.items);
-		const groupAttention = group.items.some((item) => isOn(item, attentionView));
-		
-		const toggleExpand = () => {
-			if (isFavorites) {
-				setFavoritesExpanded(!isExpanded);
-			} else {
-				toggleGroupExpansion(group.id);
-			}
-		};
-
-		return (
-			<button
-				type="button"
-				onClick={toggleExpand}
-				className={cn(
-					"flex w-full min-w-0 items-center rounded-lg text-sm transition-all duration-200 hover:scale-[1.02]",
-					"hover:bg-accent hover:text-accent-foreground hover:shadow-sm",
-					hasActiveItem && "bg-accent/50 text-accent-foreground shadow-sm",
-					"gap-3 px-3 py-2.5",
-				)}
-			>
-				<div
-					className={cn(
-						"flex items-center justify-center w-8 h-8 rounded-md transition-colors shrink-0",
-						getIconContainerClassName(isFavorites, hasActiveItem),
-					)}
-				>
-					<GroupIcon
-						className={cn(
-							"h-4 w-4",
-							isFavorites && "fill-warning text-warning",
-						)}
+	// « Mon menu »: the pages pinned, the pages opened last, and the first time
+	// the choice between the essential menu and the full one.
+	const renderMine = () => (
+		<div className="space-y-1">
+			{mineItems.length > 0 && (
+				<section>
+					{sectionTitle("navigation:spaces.pinned")}
+					{renderExpandedItems(mineItems, "favorites")}
+				</section>
+			)}
+			{recentItems.length > 0 && (
+				<section>
+					{sectionTitle("navigation:spaces.recent")}
+					<div className="space-y-0.5">{recentItems.map((item) => renderNavItem(item))}</div>
+				</section>
+			)}
+			{showMenuModeCard && (
+				<div className="pt-2">
+					<MenuModeCard
+						essentialCount={ESSENTIAL_VIEWS.length}
+						onChoose={(mode) => chooseMenuMode(mode, ESSENTIAL_VIEWS)}
 					/>
 				</div>
-				<span className="flex-1 text-left font-medium truncate">
-					{t(group.labelKey)}
-				</span>
-				<div
-					className={cn(
-						"flex items-center gap-1 shrink-0",
-						// Fades out under the pin star (or favorites X) on header hover.
-						"transition-opacity duration-200 group-hover/group-header:opacity-0",
-					)}
-				>
-					<ActivityBadge
-						badge={groupBadge}
-						attention={groupAttention && !isExpanded}
-					/>
-					<span
-						className={cn(
-							"text-xs px-1.5 py-0.5 rounded-full",
-							isFavorites
-								? "text-warning bg-warning/10"
-								: "text-muted-foreground bg-muted",
-						)}
-					>
-						{group.items.length}
-					</span>
-					<ChevronRight
-						className={cn(
-							"h-4 w-4 shrink-0 transition-transform duration-300 text-muted-foreground",
-							isExpanded && "rotate-90",
-						)}
-					/>
-				</div>
-			</button>
-		);
-	};
+			)}
+			{!showMenuModeCard && mineItems.length === 0 && recentItems.length === 0 && (
+				<p className="px-3 py-4 text-xs text-muted-foreground">{t("navigation:spaces.mineEmpty")}</p>
+			)}
+		</div>
+	);
 
-		return (
-			<div
-				key={group.id}
-				className={cn(
-					"space-y-1",
-					isFavorites &&
-						"rounded-lg bg-linear-to-b from-amber-400/5 to-transparent border border-warning/20 p-1",
-				)}
-			>
-				<div className="group/group-header relative flex items-center">
-					{renderGroupButton(group, isExpanded, hasActiveItem)}
-					{renderPinButton(group, isPinned, context)}
-					{renderClearFavoritesButton(isFavorites)}
-				</div>
+	const layoutChanged =
+		sidebarPrefs.pinnedItems.length > 0 ||
+		sidebarPrefs.pinnedGroups.length > 0 ||
+		sidebarPrefs.groupOrder.length > 0 ||
+		Object.keys(sidebarPrefs.itemOrder).length > 0 ||
+		Boolean(sidebarPrefs.menuMode) ||
+		(sidebarPrefs.hiddenItems?.length ?? 0) > 0;
 
-				{isExpanded && (
-					<div className="space-y-1 animate-in slide-in-from-top-2 duration-300 ease-out">
-						{renderExpandedItems(group.items, context)}
-					</div>
-				)}
-			</div>
-		);
-	};
+	const railIconButton = (label: string, onClick: () => void, icon: ReactNode) => (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClick} aria-label={label}>
+					{icon}
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent side="right">{label}</TooltipContent>
+		</Tooltip>
+	);
+
+	const railFooter = (
+		<>
+			{isCollapsed &&
+				railIconButton(t("actions.newTask"), () => {
+					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
+				}, <Plus className="h-4 w-4" />)}
+			<CliToolsChip
+				isCollapsed
+				onNavigateToTerminals={() => onViewChange?.("terminals", true)}
+			/>
+			{railIconButton(t("setupHub:title"), () => openSetupHub(), <Compass className="h-4 w-4" />)}
+			{railIconButton(
+				t("tooltips.help"),
+				() => globalThis.open("https://github.com/krovomi/WorkPilot-AI/issues", "_blank"),
+				<HelpCircle className="h-4 w-4" />,
+			)}
+			{railIconButton(t("tooltips.settings"), onSettingsClick, <Settings className="h-4 w-4" />)}
+			{railIconButton(
+				isCollapsed ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
+				toggleSidebar,
+				isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
+			)}
+		</>
+	);
 
 	return (
 		<TooltipProvider>
-			<div
-				className={cn(
-					"relative flex h-full flex-col bg-sidebar border-r border-border",
-					!isResizing && "transition-all duration-300",
-				)}
-				style={{ width: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : resizeWidth }}
+			<DndContext
+				sensors={dndSensors}
+				collisionDetection={pointerFirst}
+				onDragStart={handleDragStart}
+				onDragEnd={handleDragEnd}
+				onDragCancel={() => setActiveDragId(null)}
 			>
-				{/* Header with drag area - extra top padding for macOS traffic lights */}
 				<div
 					className={cn(
-						"electron-drag flex h-14 items-center pt-6 transition-all duration-300",
-						isCollapsed ? "justify-center px-2" : "px-4",
+						"relative flex h-full bg-sidebar border-r border-border",
+						!isResizing && "transition-[width] duration-300",
 					)}
+					style={{ width: isCollapsed ? SIDEBAR_RAIL_WIDTH : resizeWidth }}
 				>
-					{isCollapsed ? (
-						<div className="electron-no-drag flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
-							W
-						</div>
-					) : (
-						<span className="electron-no-drag text-lg font-bold text-primary">
-							WorkPilot AI
-						</span>
-					)}
-				</div>
+					<SidebarRail
+						mine={mineSpace}
+						groups={railGroups.map(spaceOf)}
+						extras={laboItems.length > 0 ? [laboSpace] : []}
+						activeSpace={space}
+						isCollapsed={isCollapsed}
+						onSelect={selectSpace}
+						footer={railFooter}
+					/>
 
-				{/* Toggle + Search row */}
-				<div
-					className={cn(
-						"flex items-center py-2 transition-all duration-300",
-						isCollapsed ? "justify-center px-2" : "justify-end gap-1 px-3",
-					)}
-				>
-					{/* Search button / inline input â€” only when expanded */}
 					{!isCollapsed && (
-						<div
-							className={cn(
-								"flex items-center overflow-hidden rounded-md transition-all duration-300 ease-in-out",
-								isSearchOpen
-									? "flex-1 bg-muted/50 border border-border"
-									: "flex-none",
-							)}
-						>
-							{isSearchOpen ? (
-								<div className="relative flex items-center w-full">
-									<Search className="absolute left-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-									<input
-										ref={searchInputRef}
-										type="text"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Escape") {
-												setSearchQuery("");
-												setIsSearchOpen(false);
-											}
-										}}
-										onBlur={() => {
-											if (!searchQuery.trim()) {
-												setIsSearchOpen(false);
-											}
-										}}
-										placeholder={t("search.placeholder")}
-										className="w-full bg-transparent pl-7 pr-7 py-1 text-sm placeholder:text-muted-foreground/60 focus:outline-none"
-									/>
-									{searchQuery && (
-										<button
-											type="button"
-											onMouseDown={(e) => e.preventDefault()}
-											onClick={() => {
-												setSearchQuery("");
-												searchInputRef.current?.focus();
-											}}
-											className="absolute right-1.5 text-muted-foreground hover:text-foreground transition-colors"
-											aria-label={t("search.clear")}
-										>
-											<X className="h-3.5 w-3.5" />
-										</button>
-									)}
-								</div>
-							) : (
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="h-7 w-7 shrink-0"
-											onClick={() => {
-												setIsSearchOpen(true);
-												requestAnimationFrame(() =>
-													searchInputRef.current?.focus(),
-												);
-											}}
-											aria-label={t("search.placeholder")}
-										>
-											<Search className="h-4 w-4" />
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent side="bottom">
-										{t("search.placeholder")}
-										<kbd className="ml-2 rounded border border-border bg-secondary px-1 font-mono text-3xs">
-											/
-										</kbd>
-									</TooltipContent>
-								</Tooltip>
-							)}
-						</div>
-					)}
+						<div className="flex min-w-0 flex-1 flex-col" data-testid="sidebar-panel">
+							{/* Header with drag area - extra top padding for macOS traffic lights */}
+							<div className="electron-drag flex h-14 shrink-0 items-end px-4 pb-1.5">
+								<h2 className="electron-no-drag truncate text-base font-semibold text-foreground">
+									{spaceTitle}
+								</h2>
+							</div>
 
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								variant="ghost"
-								size="icon"
-								className="h-7 w-7 shrink-0"
-								onClick={toggleSidebar}
-								aria-label={
-									isCollapsed
-										? t("actions.expandSidebar")
-										: t("actions.collapseSidebar")
-								}
-							>
-								{isCollapsed ? (
-									<PanelLeft className="h-4 w-4" />
-								) : (
-									<PanelLeftClose className="h-4 w-4" />
-								)}
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent side="right">
-							{isCollapsed
-								? t("actions.expandSidebar")
-								: t("actions.collapseSidebar")}
-						</TooltipContent>
-					</Tooltip>
-				</div>
-
-				<Separator />
-
-				{/* Navigation */}
-				<ScrollArea className="flex-1">
-					<div
-						className={cn(
-							"py-4 transition-all duration-300",
-							isCollapsed ? "px-2" : "px-3",
-						)}
-					>
-						{/* Navigation Groups with DnD */}
-						<DndContext
-							sensors={dndSensors}
-							collisionDetection={closestCenter}
-							onDragStart={handleDragStart}
-							onDragEnd={handleDragEnd}
-							onDragCancel={() => setActiveDragId(null)}
-						>
-							<div className="space-y-2">
-								{favoritesGroup && !searchQuery.trim() && (
-									<FavoritesDropZone
-										isDragging={Boolean(activeDragId)}
-										active={Boolean(
-											activeDragId &&
-												decodeSortableId(activeDragId)?.kind !== "fav-group",
-										)}
-									>
-										{renderNavGroup(favoritesGroup, "favorites")}
-									</FavoritesDropZone>
-								)}
-								{!favoritesGroup &&
-									!searchQuery.trim() &&
-									!isCollapsed &&
-									Boolean(activeDragId) && (
-										<FavoritesDropZoneEmpty
-											label={t("navigation:favorites.dropHint")}
-										/>
-									)}
-								<SortableContext
-									items={filteredNavGroups.map((g) =>
-										encodeSortableId("group", g.id),
-									)}
-									strategy={verticalListSortingStrategy}
+							{/* Search: the command palette, which lists every page */}
+							<div className="px-3 py-2">
+								<button
+									type="button"
+									onClick={openCommandPalette}
+									title={t("search.openTooltip")}
+									data-testid="sidebar-search"
+									className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-muted/40 px-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
 								>
-									{filteredNavGroups.map((group) => (
-										<SortableWrapper
-											key={group.id}
-											sortableId={encodeSortableId("group", group.id)}
-											disabled={Boolean(searchQuery.trim()) || isCollapsed}
-										>
-											{({ setNodeRef, style, isDragging, dragHandle }) => (
-												<div
-													ref={setNodeRef}
-													style={style}
-													className={cn(
-														"relative group",
-														isDragging &&
-															"ring-1 ring-primary/50 rounded-lg bg-background/80 backdrop-blur",
-													)}
-												>
-													{!isCollapsed && !searchQuery.trim() && (
-														<div className="absolute -left-0.5 top-4 z-10">
-															{dragHandle}
-														</div>
-													)}
-													{renderNavGroup(group)}
-												</div>
-											)}
-										</SortableWrapper>
-									))}
-								</SortableContext>
-								{!isCollapsed &&
-									searchQuery.trim() &&
-									filteredNavGroups.length === 0 && (
-										<p className="px-3 py-4 text-sm text-center text-muted-foreground">
-											{t("search.noResults")}
-										</p>
+									<Search className="h-3.5 w-3.5 shrink-0" />
+									<span className="flex-1 truncate text-left">{t("search.open")}</span>
+									<kbd className="rounded border border-border bg-secondary px-1 font-mono text-3xs">
+										Ctrl K
+									</kbd>
+								</button>
+							</div>
+
+							<ScrollArea className="flex-1">
+								<div className="px-2 pb-4">
+									{space === MINE_SPACE
+										? renderMine()
+										: space === LABO_SPACE
+											? (
+												<LaboPanel
+													items={laboItems}
+													activeView={activeView}
+													disabled={!selectedProjectId}
+													onOpen={openNavItem}
+												/>
+											)
+											: spaceGroup && renderExpandedItems(spaceGroup.items)}
+									{unused.length > 0 && (
+										<div className="mt-4">
+											<HideSuggestion
+												unused={unused}
+												onHide={hideItems}
+												onSnooze={() => snoozeHideSuggestions(Date.now() + UNUSED_DAYS * 24 * 60 * 60 * 1000)}
+											/>
+										</div>
 									)}
-								{!isCollapsed &&
-									!searchQuery.trim() &&
-									(sidebarPrefs.pinnedItems.length > 0 ||
-										sidebarPrefs.pinnedGroups.length > 0 ||
-										sidebarPrefs.groupOrder.length > 0 ||
-										Object.keys(sidebarPrefs.itemOrder).length > 0) && (
+									<div className="mt-4 space-y-1">
+										<HiddenList hidden={hiddenHere} onShow={unhideItem} />
+										{layoutChanged && (
+											<button
+												type="button"
+												onClick={resetSidebarPrefs}
+												className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+											>
+												<RefreshCcw className="h-3 w-3" />
+												{t("navigation:actions.resetLayout")}
+											</button>
+										)}
 										<button
 											type="button"
-											onClick={resetSidebarPrefs}
-											className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+											onClick={() => setHideExperimental(sidebarPrefs.hideExperimental !== true)}
+											aria-pressed={sidebarPrefs.hideExperimental === true}
+											className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
 										>
-											<RefreshCcw className="h-3 w-3" />
-											{t("navigation:actions.resetLayout")}
+											{sidebarPrefs.hideExperimental === true
+												? t("navigation:experimental.show", { count: EXPERIMENTAL_VIEWS.size })
+												: t("navigation:experimental.hide")}
 										</button>
-									)}
-								{!isCollapsed && !searchQuery.trim() && (
-									<button
-										type="button"
-										onClick={() =>
-											setHideExperimental(sidebarPrefs.hideExperimental !== true)
-										}
-										aria-pressed={sidebarPrefs.hideExperimental === true}
-										className="mt-1 w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+									</div>
+								</div>
+							</ScrollArea>
+
+							{/* Rate Limit Indicator - shows when Claude is rate limited */}
+							<RateLimitIndicator />
+							{/* Update Banner - shows when app update is available */}
+							<UpdateBanner />
+							{/* API keys stored without the OS keyring (rule S1) */}
+							<SecureStorageBanner />
+
+							<div className="border-t border-border p-3">
+								<Button
+									className="w-full"
+									onClick={onNewTaskClick}
+									disabled={!selectedProjectId || !selectedProject?.autoBuildPath}
+								>
+									<Plus className="mr-2 h-4 w-4" />
+									{t("actions.newTask")}
+								</Button>
+								{selectedProject && !selectedProject.autoBuildPath && (
+									// A project added from an existing folder reaches its first
+									// task through the pane that initializes it.
+									<Button
+										variant="link"
+										size="sm"
+										className="mt-1 h-auto w-full whitespace-normal text-xs text-muted-foreground"
+										onClick={() => onInitializeProject?.(selectedProject.id)}
 									>
-										{sidebarPrefs.hideExperimental === true
-											? t("navigation:experimental.show", {
-													count: EXPERIMENTAL_VIEWS.size,
-												})
-											: t("navigation:experimental.hide")}
-									</button>
+										{t("messages.initializeToCreateTasks")}
+									</Button>
 								)}
 							</div>
-							<DragOverlay dropAnimation={null}>
-								{activeDragId ? (
-									<div className="rounded-lg bg-accent/80 backdrop-blur border border-primary/40 shadow-2xl px-3 py-2 text-sm">
-										{(() => {
-											const info = decodeSortableId(activeDragId);
-											if (!info) return null;
-											if (info.kind === "group") {
-												const g = visibleNavGroups.find(
-													(x) => x.id === info.id,
-												);
-												return g ? t(g.labelKey) : null;
-											}
-											const item = visibleNavGroups
-												.flatMap((x) => x.items)
-												.find((x) => x.id === info.id);
-											return item ? t(item.labelKey) : null;
-										})()}
-									</div>
-								) : null}
-							</DragOverlay>
-						</DndContext>
-					</div>
-				</ScrollArea>
-
-				<Separator />
-
-				{/* Rate Limit Indicator - shows when Claude is rate limited */}
-				<RateLimitIndicator />
-
-				{/* Update Banner - shows when app update is available */}
-				<UpdateBanner />
-
-				{/* API keys stored without the OS keyring (rule S1) */}
-				<SecureStorageBanner />
-
-				{/* Bottom section with CLI/Settings collapsible panel and New Task */}
-				<div
-					className={cn(
-						"space-y-3 transition-all duration-300",
-						isCollapsed ? "p-2" : "p-4",
+						</div>
 					)}
-				>
-					{/* CLI/Settings Panel */}
-					<Collapsible
-						open={isCliPanelExpanded}
-						onOpenChange={setIsCliPanelExpanded}
-						className={isCollapsed ? "flex flex-col" : undefined}
-					>
-						<CollapsibleTrigger asChild>
-							<Button
-								variant="ghost"
-								size={isCollapsed ? "icon" : "sm"}
-								className={
-									isCollapsed
-										? "self-center"
-										: "w-full h-8 justify-start gap-2 text-xs font-medium"
-								}
-							>
-								<Wrench className="h-4 w-4" />
-								{!isCollapsed && (
-									<>
-										<span>{t("common:actions.cliTools")}</span>
-										<ChevronRight
-											className={cn(
-												"h-3 w-3 ml-auto transition-transform duration-200",
-												isCliPanelExpanded && "rotate-90",
-											)}
-										/>
-									</>
-								)}
-							</Button>
-						</CollapsibleTrigger>
 
-						<CollapsibleContent className="mt-2 space-y-2">
-							<CliToolBadges
-								isCollapsed={isCollapsed}
-								onNavigateToTerminals={() => onViewChange?.("terminals", true)}
-							/>
-						</CollapsibleContent>
-					</Collapsible>
-
-					{/* Settings and Help row — always visible, outside the CLI collapsible */}
-					<div
-						className={cn(
-							"flex items-center rounded-lg bg-white/4 border border-white/8 p-1.5",
-							isCollapsed ? "flex-col gap-1" : "gap-2",
-						)}
-					>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="ghost"
-									size={isCollapsed ? "icon" : "sm"}
-									className={
-										isCollapsed ? "" : "flex-1 justify-start gap-2"
-									}
-									onClick={onSettingsClick}
-								>
-									<Settings className="h-4 w-4" />
-									{!isCollapsed && t("actions.settings")}
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent side={isCollapsed ? "right" : "top"}>
-								{t("tooltips.settings")}
-							</TooltipContent>
-						</Tooltip>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={() => openSetupHub()}
-									aria-label={t("setupHub:title")}
-								>
-									<Compass className="h-4 w-4" />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent side={isCollapsed ? "right" : "top"}>
-								{t("setupHub:title")}
-							</TooltipContent>
-						</Tooltip>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={() =>
-										globalThis.open(
-											"https://github.com/krovomi/WorkPilot-AI/issues",
-											"_blank",
-										)
-									}
-									aria-label={t("tooltips.help")}
-								>
-									<HelpCircle className="h-4 w-4" />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent side={isCollapsed ? "right" : "top"}>
-								{t("tooltips.help")}
-							</TooltipContent>
-						</Tooltip>
-					</div>
-
-					{/* New Task button */}
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								className="w-full"
-								size={isCollapsed ? "icon" : "default"}
-								onClick={onNewTaskClick}
-								disabled={!selectedProjectId || !selectedProject?.autoBuildPath}
-							>
-								<Plus className={isCollapsed ? "h-4 w-4" : "mr-2 h-4 w-4"} />
-								{!isCollapsed && t("actions.newTask")}
-							</Button>
-						</TooltipTrigger>
-						{isCollapsed && (
-							<TooltipContent side="right">
-								{t("actions.newTask")}
-							</TooltipContent>
-						)}
-					</Tooltip>
-					{!isCollapsed &&
-						selectedProject &&
-						!selectedProject.autoBuildPath && (
-							// The hint used to be plain text pointing at an
-							// initialization dialog that no longer rendered: a project
-							// added from an existing folder had no way from here to
-							// its first task. It now opens the pane that initializes it.
-							<Button
-								variant="link"
-								size="sm"
-								className="mt-1 h-auto w-full whitespace-normal text-xs text-muted-foreground"
-								onClick={() => onInitializeProject?.(selectedProject.id)}
-							>
-								{t("messages.initializeToCreateTasks")}
-							</Button>
-						)}
+					{/* Resize handle */}
+					{!isCollapsed && (
+						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
+						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — mouse drag interaction
+						<div
+							onMouseDown={handleResizeStart}
+							className={cn(
+								"absolute top-0 right-0 w-1 h-full cursor-col-resize z-50 transition-colors",
+								"hover:bg-primary/40",
+								isResizing && "bg-primary/60",
+							)}
+						/>
+					)}
 				</div>
-
-				{/* Resize handle */}
-				{!isCollapsed && (
-					// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-					// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — mouse drag interaction
-					<div
-						onMouseDown={handleResizeStart}
-						className={cn(
-							"absolute top-0 right-0 w-1 h-full cursor-col-resize z-50 transition-colors",
-							"hover:bg-primary/40",
-							isResizing && "bg-primary/60",
-						)}
-					/>
-				)}
-			</div>
+				<DragOverlay dropAnimation={null}>
+					{activeDragId ? (
+						<div className="rounded-lg bg-accent/80 backdrop-blur border border-primary/40 shadow-2xl px-3 py-2 text-sm">
+							{dragLabel(activeDragId)}
+						</div>
+					) : null}
+				</DragOverlay>
+			</DndContext>
 
 			{/* Add Project Modal */}
 			<AddProjectModal

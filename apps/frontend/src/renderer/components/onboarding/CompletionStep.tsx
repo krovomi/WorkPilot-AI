@@ -1,12 +1,20 @@
 import {
+	AlertTriangle,
 	ArrowRight,
 	BookOpen,
 	CheckCircle2,
 	FileText,
+	Loader2,
+	Plug,
 	Rocket,
 	Settings,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
+import { getStaticProviders } from "../../../shared/utils/providers";
+import { useSettingsStore } from "../../stores/settings-store";
+import { readyProviderLabels } from "./provider-readiness";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 
@@ -14,6 +22,8 @@ interface CompletionStepProps {
 	onFinish: () => void;
 	onOpenTaskCreator?: () => void;
 	onOpenSettings?: () => void;
+	/** Back to the providers step, offered when no AI is connected. */
+	onConnectProvider?: () => void;
 }
 
 interface NextStepCardProps {
@@ -59,17 +69,112 @@ function NextStepCard({
 	);
 }
 
+function ReadinessCard({
+	ready,
+	onConnectProvider,
+}: {
+	readonly ready: string[] | null;
+	readonly onConnectProvider?: () => void;
+}) {
+	const { t } = useTranslation("onboarding");
+	if (ready === null) {
+		return (
+			<Card className="border border-border bg-card/50 mb-8">
+				<CardContent className="p-5 flex items-center gap-3 text-sm text-muted-foreground">
+					<Loader2 className="h-5 w-5 animate-spin" />
+					{t("completion.checking")}
+				</CardContent>
+			</Card>
+		);
+	}
+	if (ready.length === 0) {
+		return (
+			<Card className="border border-warning/30 bg-warning/10 mb-8">
+				<CardContent className="p-5">
+					<div className="flex items-start gap-4">
+						<AlertTriangle className="h-6 w-6 text-warning shrink-0 mt-0.5" />
+						<div className="flex-1">
+							<h3 className="text-lg font-medium text-warning">
+								{t("completion.noProvider")}
+							</h3>
+							<p className="mt-1 text-sm text-muted-foreground">
+								{t("completion.noProviderDescription")}
+							</p>
+							{onConnectProvider && (
+								<Button size="sm" onClick={onConnectProvider} className="mt-3 gap-2">
+									<Plug className="h-4 w-4" />
+									{t("completion.connectProvider")}
+								</Button>
+							)}
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+	return (
+		<Card className="border border-success/30 bg-success/10 mb-8">
+			<CardContent className="p-5">
+				<div className="flex items-start gap-4">
+					<CheckCircle2 className="h-6 w-6 text-success shrink-0 mt-0.5" />
+					<div className="flex-1">
+						<h3 className="text-lg font-medium text-success">
+							{t("completion.setupComplete")}
+						</h3>
+						<p className="mt-1 text-sm text-success/80">
+							{t("completion.connectedTo", { providers: ready.join(", ") })}
+						</p>
+						<p className="mt-1 text-sm text-success/80">
+							{t("completion.setupCompleteDescription")}
+						</p>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+/**
+ * The AI providers ready to run a task: `null` while checking. Asked once,
+ * from the same source as the provider pickers.
+ */
+function useReadyProviders(): string[] | null {
+	const { profiles, settings } = useSettingsStore(
+		useShallow((s) => ({ profiles: s.profiles, settings: s.settings })),
+	);
+	const [ready, setReady] = useState<string[] | null>(null);
+	useEffect(() => {
+		let cancelled = false;
+		const extra = settings as unknown as Record<string, unknown>;
+		getStaticProviders(profiles, extra)
+			.then((response) => readyProviderLabels(response, profiles, extra))
+			.catch(() => [])
+			.then((labels) => {
+				if (!cancelled) setReady(labels);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [profiles, settings]);
+	return ready;
+}
+
 /**
  * Completion step component for the onboarding wizard.
- * Displays a success message with suggestions for next steps
- * and a prominent "Finish" button to complete the wizard.
+ * Says what is ready (or that no AI is connected yet, with a way back to
+ * connect one) and offers the next steps and the "Finish" button.
  */
 export function CompletionStep({
 	onFinish,
 	onOpenTaskCreator,
 	onOpenSettings,
+	onConnectProvider,
 }: CompletionStepProps) {
 	const { t } = useTranslation("onboarding");
+	const ready = useReadyProviders();
+	// « Setup Complete » only once an AI can run a task; it was shown even
+	// after skipping every step.
+	const notReady = ready !== null && ready.length === 0;
 
 	const nextSteps = [
 		{
@@ -109,29 +214,18 @@ export function CompletionStep({
 						</div>
 					</div>
 					<h1 className="text-3xl font-bold text-foreground tracking-tight">
-						{t("completion.title")}
+						{t(notReady ? "completion.titleNotReady" : "completion.title")}
 					</h1>
 					<p className="mt-3 text-muted-foreground text-lg">
-						{t("completion.subtitle")}
+						{t(notReady ? "completion.subtitleNotReady" : "completion.subtitle")}
 					</p>
 				</div>
 
-				{/* Completion message */}
-				<Card className="border border-success/30 bg-success/10 mb-8">
-					<CardContent className="p-5">
-						<div className="flex items-start gap-4">
-							<CheckCircle2 className="h-6 w-6 text-success shrink-0 mt-0.5" />
-							<div className="flex-1">
-								<h3 className="text-lg font-medium text-success">
-									{t("completion.setupComplete")}
-								</h3>
-								<p className="mt-1 text-sm text-success/80">
-									{t("completion.setupCompleteDescription")}
-								</p>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+				{/* Completion message: what is connected, or what is missing */}
+				<ReadinessCard
+					ready={ready}
+					onConnectProvider={onConnectProvider}
+				/>
 
 				{/* Next Steps Section */}
 				<div className="space-y-4 mb-10">

@@ -29,6 +29,7 @@ import { CleanProviderGrid } from "./CleanProviderGrid";
 import { GlobalAutoSwitching } from "./GlobalAutoSwitching";
 import { getAllConnectors } from "./multiconnector/utils";
 import { ProviderConfigDialog } from "./ProviderConfigDialog";
+import { providerIsWorking } from "./provider-health";
 import {
 	consumeProviderReauthRequest,
 	onProviderReauthRequest,
@@ -644,7 +645,7 @@ export function CleanProviderSection({
 					t(`sections.accounts.providers.${provider.name}`) ||
 					provider.description,
 				isConfigured: providerStatus[provider.name] || false,
-				isWorking: providerStatus[provider.name] && isEnabled,
+				isWorking: providerIsWorking(providerStatus[provider.name], isEnabled),
 				// Use real data instead of dummy data
 				lastTested: testResult?.date,
 				usageCount: usageData?.sessionPercent

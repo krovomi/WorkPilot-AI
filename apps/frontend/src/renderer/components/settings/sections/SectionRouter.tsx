@@ -56,7 +56,7 @@ interface SectionRouterProps {
 	initBlocker: InitializationBlocker | null;
 	isRepairingGit: boolean;
 	handleInitialize: () => Promise<void>;
-	handleRepairGit: () => Promise<void>;
+	handleRepairGit: (identity?: { name: string; email: string }) => Promise<void>;
 	onOpenLinearImport: () => void;
 	onOpenAzureDevOpsImport: () => void;
 }

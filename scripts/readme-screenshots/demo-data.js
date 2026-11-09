@@ -842,6 +842,17 @@
 			},
 		}),
 		getDashboardSnapshot: async () => ({ success: true, snapshot }),
+		// Agent Terminals: no pty in the preview, so the capture writes the
+		// session text itself through the output listener kept here.
+		createTerminal: async (options) => {
+			window.__DEMO_TERMINALS__ = window.__DEMO_TERMINALS__ || [];
+			window.__DEMO_TERMINALS__.push(options?.id);
+			return { success: true };
+		},
+		onTerminalOutput: (callback) => {
+			window.__DEMO_TERMINAL_OUTPUT__ = callback;
+			return () => {};
+		},
 		__wrap: {
 			getProjects: (r) => {
 				if (!r || !Array.isArray(r.data)) return r;

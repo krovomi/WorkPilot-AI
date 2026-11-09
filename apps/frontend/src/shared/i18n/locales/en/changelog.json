@@ -204,7 +204,7 @@
 		"loadingImage": "Loading image...",
 		"preview": "Preview",
 		"copy": "Copy to clipboard",
-		"prepend": "Prepend to CHANGELOG.md in project root",
+		"prepend": "Prepend to CHANGELOG.md, on a Kanban card's branch to review before the pull request",
 		"aria": "Changelog preview with drag and drop support",
 		"dropImages": "Drop images here to add to changelog",
 		"pasteImages": "Paste images into the description to save them to the changelog",
@@ -217,7 +217,7 @@
 		"saveToFile": "Save to CHANGELOG.md"
 	},
 	"success": {
-		"description": "Version {{tag}} has been added to CHANGELOG.md",
+		"description": "Version {{tag}} has been added to CHANGELOG.md, on a review card's branch",
 		"title": "Changelog Saved!",
 		"done": "Done"
 	}

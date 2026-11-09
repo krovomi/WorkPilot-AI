@@ -5,6 +5,12 @@
 
 ## Where generated tests are written
 
+Never in the project folder: every run that writes (unit, E2E, TDD, adding
+packages) writes into the worktree of a "Code généré" card waiting in human
+review, on its own `workpilot/<spec>` branch, and the person opens the pull
+request from the card ([generated-review.md](generated-review.md)). What follows
+is where, *inside that checkout*, the file goes.
+
 The test generator asks the model for a file *path*, and what comes back is a
 convention it remembers — `CalculatorTests.cs`, `tests/test_calculator.py` —
 which used to be resolved against the project root because there was nowhere

@@ -1,18 +1,46 @@
-import { FileText, MessageSquarePlus } from "lucide-react";
-import { Fragment } from "react";
+import { ChevronsUpDown, FileText, MessageSquarePlus } from "lucide-react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
+import {
+	buildSplitRows,
+	countChanges,
+	type DiffLayout,
+	type DiffLine,
+	type DiffViewMode,
+	pairChangedLines,
+	parseDiff,
+	patchFilePath,
+	resolveDiffLayout,
+} from "./diff-model";
+import { splitLine } from "./diff-segments";
+import { type SyntaxToken, useDiffSyntax } from "./diff-syntax";
+import { diffWords, type TextRange } from "./diff-words";
+import "./diff-viewer.css";
 
-export type DiffViewMode = "unified" | "split";
+export {
+	buildSplitRows,
+	type DiffLayout,
+	type DiffLine,
+	type DiffViewMode,
+	parseDiff,
+};
 
 interface DiffViewerProps {
 	patch?: string;
 	className?: string;
-	/** "unified" (default) shows one column; "split" shows old/new side by side. */
-	viewMode?: DiffViewMode;
 	/**
-	 * Shows a comment button in the gutter of every line (unified view): a
-	 * removed line is commented on the old side, any other on the new side.
+	 * "auto" (default) puts old and new side by side when a file has both
+	 * removals and additions and the view is wide enough; "unified" shows one
+	 * column; "split" shows old/new side by side. A new or deleted file is
+	 * always one column (the other half would be empty).
+	 */
+	viewMode?: DiffViewMode;
+	/** The file the patch is about, for syntax colours (else read from the patch). */
+	filePath?: string;
+	/**
+	 * Shows a comment button in the gutter of every line: a removed line is
+	 * commented on the old side, any other on the new side.
 	 */
 	onCommentLine?: (target: DiffLineTarget) => void;
 }
@@ -23,27 +51,78 @@ export interface DiffLineTarget {
 	line: number;
 }
 
-interface DiffLine {
-	content: string;
-	type: "context" | "added" | "removed" | "hunk";
-	oldLineNumber?: number;
-	newLineNumber?: number;
+const SIGN: Record<DiffLine["type"], string> = {
+	added: "+",
+	removed: "-",
+	context: " ",
+	hunk: " ",
+};
+
+const ROW_CLASS: Record<DiffLine["type"], string | undefined> = {
+	added: "is-add",
+	removed: "is-del",
+	context: undefined,
+	hunk: undefined,
+};
+
+interface LineDecor {
+	syntax: Map<number, SyntaxToken[]> | null;
+	words: Map<number, TextRange[]>;
+	onCommentLine?: (target: DiffLineTarget) => void;
 }
 
-/** A single row of the side-by-side view, pairing an old line with a new one. */
-interface SplitRow {
-	type: "context" | "change" | "hunk";
-	left?: DiffLine;
-	right?: DiffLine;
+/** Changed words of every rewritten line (removed line paired with its added one). */
+function buildWordMap(lines: DiffLine[]): Map<number, TextRange[]> {
+	const words = new Map<number, TextRange[]>();
+	for (const [removed, added] of pairChangedLines(lines)) {
+		if (lines[removed].type !== "removed") continue;
+		const diff = diffWords(lines[removed].content, lines[added].content);
+		if (!diff) continue;
+		words.set(removed, diff.removed);
+		words.set(added, diff.added);
+	}
+	return words;
+}
+
+/** Width of the element, followed while `active` (for the "auto" layout). */
+function useElementWidth(active: boolean) {
+	const [node, setNode] = useState<HTMLDivElement | null>(null);
+	const [width, setWidth] = useState<number | undefined>(undefined);
+	useEffect(() => {
+		if (!active || !node || typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver((entries) => {
+			setWidth(entries[0]?.contentRect.width);
+		});
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [active, node]);
+	return [setNode, width] as const;
 }
 
 export function DiffViewer({
 	patch,
 	className,
-	viewMode = "unified",
+	viewMode = "auto",
+	filePath,
 	onCommentLine,
 }: DiffViewerProps) {
 	const { t } = useTranslation(["common"]);
+	const lines = useMemo(() => (patch ? parseDiff(patch) : []), [patch]);
+	const path = useMemo(
+		() => filePath ?? (patch ? patchFilePath(patch) : undefined),
+		[filePath, patch],
+	);
+	const syntax = useDiffSyntax(lines, path, patch?.length ?? 0);
+	const words = useMemo(() => buildWordMap(lines), [lines]);
+	const counts = useMemo(() => countChanges(lines), [lines]);
+	const digits = useMemo(() => {
+		let max = 0;
+		for (const line of lines) {
+			max = Math.max(max, line.oldLineNumber ?? 0, line.newLineNumber ?? 0);
+		}
+		return Math.max(2, String(max).length);
+	}, [lines]);
+	const [measure, width] = useElementWidth(viewMode === "auto");
 
 	if (!patch || patch.trim() === "") {
 		return (
@@ -59,14 +138,20 @@ export function DiffViewer({
 		);
 	}
 
-	const lines = parseDiff(patch);
+	const layout = resolveDiffLayout(viewMode, counts, width);
+	const decor: LineDecor = { syntax, words, onCommentLine };
 
 	return (
-		<div className={cn("diff-viewer font-mono text-xs", className)}>
-			{viewMode === "split" ? (
-				<SplitDiff lines={lines} />
+		<div
+			ref={measure}
+			className={cn("dv diff-viewer", className)}
+			data-layout={layout}
+			style={{ "--dv-digits": `${digits}ch` } as CSSProperties}
+		>
+			{layout === "split" ? (
+				<SplitDiff lines={lines} decor={decor} />
 			) : (
-				<UnifiedDiff lines={lines} onCommentLine={onCommentLine} />
+				<UnifiedDiff lines={lines} decor={decor} />
 			)}
 		</div>
 	);
@@ -80,287 +165,188 @@ function lineTarget(line: DiffLine): DiffLineTarget | null {
 	return line.newLineNumber ? { side: "new", line: line.newLineNumber } : null;
 }
 
+/** The hunk separator: unchanged lines skipped, `@@` range, enclosing scope. */
+function HunkHeader({ line }: { line: DiffLine }) {
+	const { t } = useTranslation(["common"]);
+	return (
+		<div className="dv-hunk" data-diff-hunk="true">
+			{(line.hiddenBefore ?? 0) > 0 && (
+				<span className="dv-hunk-gap">
+					<ChevronsUpDown className="h-3 w-3" aria-hidden="true" />
+					{t("common:diffViewer.hiddenLines", { count: line.hiddenBefore })}
+				</span>
+			)}
+			<span className="dv-hunk-range">{line.range ?? line.content}</span>
+			{line.section && (
+				<span className="dv-hunk-section">{line.section}</span>
+			)}
+		</div>
+	);
+}
+
+function CommentCell({
+	line,
+	onCommentLine,
+}: {
+	line: DiffLine;
+	onCommentLine: (target: DiffLineTarget) => void;
+}) {
+	const { t } = useTranslation(["common"]);
+	const target = lineTarget(line);
+	return (
+		<span className="dv-comment">
+			{target && (
+				<button
+					type="button"
+					onClick={() => onCommentLine(target)}
+					aria-label={t("common:diffViewer.commentLine", { line: target.line })}
+					title={t("common:diffViewer.commentLine", { line: target.line })}
+				>
+					<MessageSquarePlus className="h-3 w-3" />
+				</button>
+			)}
+		</span>
+	);
+}
+
+/** The code of a line: syntax colours, changed words marked on top. */
+function CodeCell({
+	line,
+	index,
+	decor,
+}: {
+	line: DiffLine;
+	index: number;
+	decor: LineDecor;
+}) {
+	const segments = splitLine(
+		line.content,
+		decor.syntax?.get(index),
+		decor.words.get(index),
+	);
+	const wordClass = line.type === "removed" ? "dv-word-del" : "dv-word-add";
+	return (
+		<span className="dv-code">
+			{segments.map((segment) => (
+				<span
+					key={segment.from}
+					className={cn(segment.className, segment.changed && wordClass)}
+				>
+					{segment.text}
+				</span>
+			))}
+		</span>
+	);
+}
+
 /** Classic single-column diff: removed and added lines interleaved. */
 function UnifiedDiff({
 	lines,
-	onCommentLine,
+	decor,
 }: {
 	lines: DiffLine[];
-	onCommentLine?: (target: DiffLineTarget) => void;
+	decor: LineDecor;
 }) {
-	const { t } = useTranslation(["common"]);
+	const items = useMemo(
+		() => lines.map((line, index) => ({ line, index })),
+		[lines],
+	);
 	return (
 		<div className="diff-content">
-			{lines.map((line, index) => (
-				<div
-					// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-					key={index}
-					data-diff-hunk={line.type === "hunk" ? "true" : undefined}
-					className={cn(
-						"flex diff-line",
-						line.type === "added" && "bg-success/20",
-						line.type === "removed" && "bg-destructive/20",
-						line.type === "hunk" && "bg-blue-500/20",
-						line.type === "context" && "bg-transparent",
-					)}
-				>
-					{onCommentLine && (
-						<div className="w-6 shrink-0 flex items-center justify-center">
-							{(() => {
-								const target = lineTarget(line);
-								return target ? (
-									<button
-										type="button"
-										onClick={() => onCommentLine(target)}
-										aria-label={t("common:diffViewer.commentLine", { line: target.line })}
-										title={t("common:diffViewer.commentLine", { line: target.line })}
-										className="rounded p-0.5 text-muted-foreground opacity-40 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-									>
-										<MessageSquarePlus className="h-3 w-3" />
-									</button>
-								) : null;
-							})()}
-						</div>
-					)}
+			{items.map(({ line, index }) =>
+				line.type === "hunk" ? (
+					<HunkHeader key={index} line={line} />
+				) : (
 					<div
-						className={cn(
-							"diff-line-numbers flex shrink-0 select-none",
-							"w-20 border-r border-border",
-						)}
+						key={index}
+						className={cn("dv-row diff-line", ROW_CLASS[line.type])}
+						data-line-type={line.type}
 					>
-						<div
-							className={cn(
-								"w-10 text-right pr-2",
-								line.type === "added" && "text-success font-medium",
-								line.type === "removed" && "text-destructive font-medium",
-								line.type === "context" && "text-muted-foreground",
-								line.type === "hunk" && "text-blue-400 font-medium",
-							)}
-						>
-							{line.oldLineNumber || ""}
-						</div>
-						<div
-							className={cn(
-								"w-10 text-right pr-2 border-l border-border",
-								line.type === "added" && "text-success font-medium",
-								line.type === "removed" && "text-destructive font-medium",
-								line.type === "context" && "text-muted-foreground",
-								line.type === "hunk" && "text-blue-400 font-medium",
-							)}
-						>
-							{line.newLineNumber || ""}
-						</div>
-					</div>
-					<div
-						className={cn(
-							"flex-1 px-2 py-0.5 whitespace-pre overflow-x-auto",
-							line.type === "added" && "text-success font-medium",
-							line.type === "removed" && "text-destructive font-medium",
-							line.type === "hunk" && "text-blue-400 font-medium",
-							line.type === "context" && "text-foreground",
+						{decor.onCommentLine && (
+							<CommentCell line={line} onCommentLine={decor.onCommentLine} />
 						)}
-					>
-						{line.content}
+						<span className="dv-num">{line.oldLineNumber ?? ""}</span>
+						<span className="dv-num">{line.newLineNumber ?? ""}</span>
+						<span className="dv-sign" aria-hidden="true">
+							{SIGN[line.type]}
+						</span>
+						<CodeCell line={line} index={index} decor={decor} />
 					</div>
-				</div>
-			))}
+				),
+			)}
+		</div>
+	);
+}
+
+/** One half of a side-by-side row: old side (left) or new side (right). */
+function SplitHalf({
+	line,
+	index,
+	side,
+	decor,
+}: {
+	line?: DiffLine;
+	index?: number;
+	side: "old" | "new";
+	decor: LineDecor;
+}) {
+	if (!line || index === undefined) {
+		return <div className="dv-half is-empty" data-side={side} />;
+	}
+	const number = side === "old" ? line.oldLineNumber : line.newLineNumber;
+	return (
+		<div
+			className={cn("dv-half", ROW_CLASS[line.type])}
+			data-side={side}
+			data-line-type={line.type}
+		>
+			{decor.onCommentLine &&
+				// A context row is commented once, on its new side.
+				((side === "old") === (line.type === "removed") ? (
+					<CommentCell line={line} onCommentLine={decor.onCommentLine} />
+				) : (
+					<span className="dv-comment" />
+				))}
+			<span className="dv-num">{number ?? ""}</span>
+			<span className="dv-sign" aria-hidden="true">
+				{SIGN[line.type]}
+			</span>
+			<CodeCell line={line} index={index} decor={decor} />
 		</div>
 	);
 }
 
 /** Side-by-side diff: old version (left) vs new version (right), GitHub-style. */
-function SplitDiff({ lines }: { lines: DiffLine[] }) {
-	const rows = buildSplitRows(lines);
-
+function SplitDiff({ lines, decor }: { lines: DiffLine[]; decor: LineDecor }) {
+	const rows = useMemo(
+		() =>
+			buildSplitRows(lines).map((row, position) => ({ row, key: position })),
+		[lines],
+	);
 	return (
-		<div
-			className="diff-content grid"
-			style={{
-				gridTemplateColumns: "auto minmax(0,1fr) auto minmax(0,1fr)",
-			}}
-		>
-			{rows.map((row, index) => {
-				if (row.type === "hunk") {
-					return (
-						<div
-							// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-							key={index}
-							data-diff-hunk="true"
-							className="col-span-4 bg-blue-500/20 text-blue-400 font-medium px-2 py-0.5 whitespace-pre overflow-x-auto"
-						>
-							{row.left?.content}
-						</div>
-					);
-				}
-
-				const leftRemoved = row.left?.type === "removed";
-				const rightAdded = row.right?.type === "added";
-
-				return (
-					// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-					<Fragment key={index}>
-						{/* Old side */}
-						<div
-							className={cn(
-								"px-2 text-right select-none border-r border-border tabular-nums",
-								leftRemoved ? "text-destructive" : "text-muted-foreground",
-								!row.left && "bg-muted/30",
-							)}
-						>
-							{row.left?.oldLineNumber || ""}
-						</div>
-						<div
-							className={cn(
-								"px-2 py-0.5 whitespace-pre overflow-x-auto border-r border-border",
-								leftRemoved && "bg-destructive/20 text-destructive",
-								!leftRemoved && row.left && "text-foreground",
-								!row.left && "bg-muted/30",
-							)}
-						>
-							{row.left?.content ?? ""}
-						</div>
-
-						{/* New side */}
-						<div
-							className={cn(
-								"px-2 text-right select-none border-r border-border tabular-nums",
-								rightAdded ? "text-success" : "text-muted-foreground",
-								!row.right && "bg-muted/30",
-							)}
-						>
-							{row.right?.newLineNumber || ""}
-						</div>
-						<div
-							className={cn(
-								"px-2 py-0.5 whitespace-pre overflow-x-auto",
-								rightAdded && "bg-success/20 text-success",
-								!rightAdded && row.right && "text-foreground",
-								!row.right && "bg-muted/30",
-							)}
-						>
-							{row.right?.content ?? ""}
-						</div>
-					</Fragment>
-				);
-			})}
+		<div className="diff-content">
+			{rows.map(({ row, key }) =>
+				row.type === "hunk" && row.left ? (
+					<HunkHeader key={key} line={row.left} />
+				) : (
+					<div key={key} className="dv-row diff-line">
+						<SplitHalf
+							line={row.left}
+							index={row.leftIndex}
+							side="old"
+							decor={decor}
+						/>
+						<SplitHalf
+							line={row.right}
+							index={row.rightIndex}
+							side="new"
+							decor={decor}
+						/>
+					</div>
+				),
+			)}
 		</div>
 	);
-}
-
-/**
- * Pair unified diff lines into side-by-side rows. Context and hunk lines map to
- * a single row; a run of removed/added lines is zipped so the k-th removal sits
- * opposite the k-th addition (extra lines on either side get an empty cell),
- * mirroring GitHub's split view.
- */
-export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
-	const rows: SplitRow[] = [];
-	let i = 0;
-
-	while (i < lines.length) {
-		const line = lines[i];
-
-		if (line.type === "hunk") {
-			rows.push({ type: "hunk", left: line, right: line });
-			i++;
-		} else if (line.type === "context") {
-			rows.push({ type: "context", left: line, right: line });
-			i++;
-		} else {
-			// Gather the maximal run of consecutive changed lines, then zip the
-			// removals against the additions.
-			const removed: DiffLine[] = [];
-			const added: DiffLine[] = [];
-			while (
-				i < lines.length &&
-				(lines[i].type === "removed" || lines[i].type === "added")
-			) {
-				if (lines[i].type === "removed") removed.push(lines[i]);
-				else added.push(lines[i]);
-				i++;
-			}
-			const max = Math.max(removed.length, added.length);
-			for (let k = 0; k < max; k++) {
-				rows.push({ type: "change", left: removed[k], right: added[k] });
-			}
-		}
-	}
-
-	return rows;
-}
-
-export function parseDiff(patch: string): DiffLine[] {
-	const lines = patch.split("\n");
-	const result: DiffLine[] = [];
-	let oldLineNumber = 0;
-	let newLineNumber = 0;
-	let inHunk = false;
-
-	for (const line of lines) {
-		if (line.startsWith("diff --git ")) {
-			inHunk = false;
-			continue;
-		}
-		if (
-			!inHunk &&
-			/^(index |--- |\+\+\+ |new file mode |deleted file mode |old mode |new mode |similarity index |rename from |rename to )/.test(
-				line,
-			)
-		)
-			continue;
-		if (!line || line.startsWith("\\ No newline")) continue;
-		let diffLine: DiffLine;
-
-		if (line.startsWith("@@")) {
-			inHunk = true;
-			// Hunk header - extract line numbers
-			const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
-			if (match) {
-				oldLineNumber = parseInt(match[1], 10) - 1;
-				newLineNumber = parseInt(match[3], 10) - 1;
-			}
-			diffLine = {
-				content: line,
-				type: "hunk",
-			};
-		} else if (line.startsWith("+")) {
-			// Added line
-			newLineNumber++;
-			diffLine = {
-				content: line.substring(1),
-				type: "added",
-				newLineNumber,
-			};
-		} else if (line.startsWith("-")) {
-			// Removed line
-			oldLineNumber++;
-			diffLine = {
-				content: line.substring(1),
-				type: "removed",
-				oldLineNumber,
-			};
-		} else if (line.startsWith(" ")) {
-			// Context line
-			oldLineNumber++;
-			newLineNumber++;
-			diffLine = {
-				content: line.substring(1),
-				type: "context",
-				oldLineNumber,
-				newLineNumber,
-			};
-		} else {
-			// Other lines (file headers, etc.)
-			diffLine = {
-				content: line,
-				type: "context",
-			};
-		}
-
-		result.push(diffLine);
-	}
-
-	return result;
 }
 
 export default DiffViewer;

@@ -9,9 +9,9 @@ from contextlib import asynccontextmanager
 # Windows: force the Proactor event-loop policy BEFORE anything else creates
 # a loop. uvicorn (especially with --reload) defaults to the Selector loop on
 # Python ≥ 3.8, which raises NotImplementedError on `asyncio.create_subprocess_exec`.
-# The Claude Agent SDK spawns the bundled `claude.exe` via subprocess, so the
-# /api/slash-commands/run endpoint (and any future SDK-backed endpoint) would
-# fail with "Failed to start Claude Code" without this fix.
+# The Claude Agent SDK spawns the bundled `claude.exe` via subprocess, so any
+# SDK-backed endpoint would fail with "Failed to start Claude Code" without
+# this fix.
 # Safe no-op on Linux/macOS where the policy attribute doesn't exist.
 if sys.platform == "win32":
     import asyncio as _asyncio

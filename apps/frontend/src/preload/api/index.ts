@@ -196,6 +196,8 @@ import type { MultiRepoAPI } from "./modules/multi-repo-api";
 import { createMultiRepoAPI } from "./modules/multi-repo-api";
 import type { PairProgrammingAPI } from "./modules/pair-programming-api";
 import { createPairProgrammingAPI } from "./modules/pair-programming-api";
+import type { QuickCommandAPI } from "./modules/quick-command-api";
+import { createQuickCommandAPI } from "./modules/quick-command-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -293,6 +295,7 @@ export interface ElectronAPI
 		CodeMigrationAPI,
 		PerformanceProfilerAPI,
 		PairProgrammingAPI,
+		QuickCommandAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -445,6 +448,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createCodeMigrationAPI(),
 		...createPerformanceProfilerAPI(),
 		...createPairProgrammingAPI(),
+		...createQuickCommandAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -607,6 +611,8 @@ export type { MultiRepoAPI } from "./modules/multi-repo-api";
 export { createMultiRepoAPI } from "./modules/multi-repo-api";
 export type { PairProgrammingAPI } from "./modules/pair-programming-api";
 export { createPairProgrammingAPI } from "./modules/pair-programming-api";
+export type { QuickCommandAPI } from "./modules/quick-command-api";
+export { createQuickCommandAPI } from "./modules/quick-command-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";

@@ -124,6 +124,8 @@ export const IPC_CHANNELS = {
 	TASK_WORKTREE_WRITE_FILE: "task:worktreeWriteFile",
 	TASK_WORKTREE_DELETE_FILES: "task:worktreeDeleteFiles",
 	TASK_LIST_WORKTREES: "task:listWorktrees",
+	WORKTREE_PURGE_LIST: "worktreePurge:list", // Worktrees whose work is over, with their size
+	WORKTREE_PURGE: "worktreePurge:purge", // Remove them and their local branch
 	TASK_ARCHIVE: "task:archive",
 	TASK_UNARCHIVE: "task:unarchive",
 	TASK_CLEAR_STAGED_STATE: "task:clearStagedState",
@@ -262,6 +264,7 @@ export const IPC_CHANNELS = {
 	// Shell operations
 	SHELL_OPEN_EXTERNAL: "shell:openExternal",
 	SHELL_OPEN_TERMINAL: "shell:openTerminal",
+	SHELL_HOST_PATH: "shell:hostPath",
 
 	// Roadmap operations
 	ROADMAP_GET: "roadmap:get",
@@ -857,6 +860,11 @@ export const IPC_CHANNELS = {
 	PAIR_PROGRAMMING_CONFLICT: "pairProgramming:conflict",
 	PAIR_PROGRAMMING_ERROR: "pairProgramming:error",
 	PAIR_PROGRAMMING_COMPLETE: "pairProgramming:complete",
+	/** The AI's work, committed on its review card's branch (or null: nothing written). */
+	PAIR_PROGRAMMING_REVIEW: "pairProgramming:review",
+
+	// Kanban quick-command bar: a command runs on a review card (F182)
+	QUICK_COMMAND_RUN: "quickCommand:run",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
@@ -1331,6 +1339,8 @@ export const IPC_CHANNELS = {
 	SWARM_STATUS: "swarm:status",
 	TASK_PAUSE: "TASK_PAUSE",
 	TASK_RESUME: "TASK_RESUME",
+	TEAM_BOT_GET_CONFIG: "teamBot:getConfig",
+	TEAM_BOT_SAVE_CONFIG: "teamBot:saveConfig",
 	TEAM_BOT_SEND: "teamBot:send",
 	TEAM_BOT_TEST: "teamBot:test",
 	TECH_DEBT_GENERATE_SPEC: "techDebt:generateSpec",

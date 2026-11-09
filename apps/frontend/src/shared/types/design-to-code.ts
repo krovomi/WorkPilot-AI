@@ -4,6 +4,8 @@
  * result; `DESIGN_TO_CODE_STACKS` mirrors `design_to_code_stacks.STACKS`.
  */
 
+import type { GeneratedReview } from "./generated-review";
+
 export const DESIGN_TO_CODE_STACKS = [
 	"react",
 	"nextjs",
@@ -179,4 +181,6 @@ export interface DesignFileToWrite {
 export interface DesignWriteOutcome {
 	written: { path: string; created: boolean }[];
 	refused: { path: string; reason: "outside" | "protected" | "invalid" }[];
+	/** The review card the files were committed to (never the project folder). */
+	review?: GeneratedReview | null;
 }

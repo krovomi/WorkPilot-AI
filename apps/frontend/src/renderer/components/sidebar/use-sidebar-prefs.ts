@@ -114,34 +114,61 @@ export function useSidebarPrefs() {
 		[update],
 	);
 
-	const toggleGroupExpanded = useCallback(
-		(groupId: string) => {
-			const current =
-				useSettingsStore.getState().settings.sidebarPrefs ??
-				DEFAULT_SIDEBAR_PREFS;
-			const isExpanded = current.expandedGroups.includes(groupId);
-			update({
-				expandedGroups: isExpanded
-					? current.expandedGroups.filter((id) => id !== groupId)
-					: [...current.expandedGroups, groupId],
-			});
-		},
-		[update],
-	);
-
-	const setFavoritesExpanded = useCallback(
-		(value: boolean) => update({ favoritesExpanded: value }),
-		[update],
-	);
-
 	const setHideExperimental = useCallback(
 		(value: boolean) => update({ hideExperimental: value }),
 		[update],
 	);
 
-	const clearAllFavorites = useCallback(() => {
-		update({ pinnedItems: [], pinnedGroups: [] });
-	}, [update]);
+	const setActiveSpace = useCallback(
+		(spaceId: string) => update({ activeSpace: spaceId }),
+		[update],
+	);
+
+	// « Essentiel » pins the essential pages (keeping the user's own pins) and
+	// hides the beta views; « Complet » only records the choice.
+	const chooseMenuMode = useCallback(
+		(mode: "essential" | "full", essentialIds: readonly string[] = []) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			if (mode === "full") {
+				update({ menuMode: "full" });
+				return;
+			}
+			const pinned = [
+				...current.pinnedItems,
+				...essentialIds.filter((id) => !current.pinnedItems.includes(id)),
+			];
+			update({ menuMode: "essential", pinnedItems: pinned, hideExperimental: true });
+		},
+		[update],
+	);
+
+	const hideItems = useCallback(
+		(ids: readonly string[]) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			const hidden = current.hiddenItems ?? [];
+			update({ hiddenItems: [...hidden, ...ids.filter((id) => !hidden.includes(id))] });
+		},
+		[update],
+	);
+
+	const unhideItem = useCallback(
+		(id: string) => {
+			const current =
+				useSettingsStore.getState().settings.sidebarPrefs ??
+				DEFAULT_SIDEBAR_PREFS;
+			update({ hiddenItems: (current.hiddenItems ?? []).filter((x) => x !== id) });
+		},
+		[update],
+	);
+
+	const snoozeHideSuggestions = useCallback(
+		(until: number) => update({ hideSuggestionsSnoozedUntil: until }),
+		[update],
+	);
 
 	const reset = useCallback(() => {
 		saveSettings({ sidebarPrefs: DEFAULT_SIDEBAR_PREFS });
@@ -155,10 +182,12 @@ export function useSidebarPrefs() {
 			toggleGroupPin,
 			reorderGroups,
 			reorderItems,
-			toggleGroupExpanded,
-			setFavoritesExpanded,
 			setHideExperimental,
-			clearAllFavorites,
+			setActiveSpace,
+			chooseMenuMode,
+			hideItems,
+			unhideItem,
+			snoozeHideSuggestions,
 			reset,
 			mergeOrder,
 		}),
@@ -169,10 +198,12 @@ export function useSidebarPrefs() {
 			toggleGroupPin,
 			reorderGroups,
 			reorderItems,
-			toggleGroupExpanded,
-			setFavoritesExpanded,
 			setHideExperimental,
-			clearAllFavorites,
+			setActiveSpace,
+			chooseMenuMode,
+			hideItems,
+			unhideItem,
+			snoozeHideSuggestions,
 			reset,
 		],
 	);

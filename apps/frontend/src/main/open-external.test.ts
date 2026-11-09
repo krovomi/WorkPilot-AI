@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import {
 	detectWsl,
+	toHostPath,
 	LINUX_OPENERS,
 	LINUX_SCHEME_OPENERS,
 	openExternalUrl,
@@ -268,5 +269,34 @@ describe("openExternalUrl — obsidian:", () => {
 			spawnOpener: vi.fn(),
 		});
 		expect(openExternal).toHaveBeenCalledWith("obsidian://open?path=C%3A%5Cv%5Cn.md");
+	});
+});
+
+describe("toHostPath", () => {
+	const wsl = {
+		wsl: true,
+		toWindowsPath: (p: string) =>
+			wslToWindowsPath(p, "/mnt/", "Ubuntu"),
+	};
+
+	it("sous WSL, rend le chemin que l'Explorateur Windows ouvre", () => {
+		expect(
+			toHostPath(
+				"/home/leub/repositories/perso/IA - LLM - RAG/dotnet/src/Rag.Application/Agent/RagAgentTests.cs",
+				wsl,
+			),
+		).toBe(
+			"\\\\wsl.localhost\\Ubuntu\\home\\leub\\repositories\\perso\\IA - LLM - RAG\\dotnet\\src\\Rag.Application\\Agent\\RagAgentTests.cs",
+		);
+		expect(toHostPath("/mnt/d/code/app.cs", wsl)).toBe("D:\\code\\app.cs");
+	});
+
+	it("laisse le chemin tel quel hors WSL, relatif, ou intraduisible", () => {
+		const native = { wsl: false, toWindowsPath: () => "C:\\never" };
+		expect(toHostPath("/home/x/f.cs", native)).toBe("/home/x/f.cs");
+		expect(toHostPath("tests/f.cs", wsl)).toBe("tests/f.cs");
+		expect(
+			toHostPath("/home/x/f.cs", { wsl: true, toWindowsPath: () => null }),
+		).toBe("/home/x/f.cs");
 	});
 });

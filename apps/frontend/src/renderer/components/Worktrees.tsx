@@ -73,6 +73,7 @@ import {
 } from "./ui/dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { formatAppDate } from "@/lib/date-format";
+import { copyPath } from "@/lib/copy-path";
 
 // Prefix constants for worktree ID parsing
 const TASK_PREFIX = "task:";
@@ -827,8 +828,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 														variant="outline"
 														size="sm"
 														onClick={() => {
-															// Copy worktree path to clipboard
-															navigator.clipboard.writeText(worktree.path);
+															void copyPath(worktree.path);
 														}}
 													>
 														<FolderOpen className="h-3.5 w-3.5 mr-1.5" />
@@ -921,8 +921,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 														variant="outline"
 														size="sm"
 														onClick={() => {
-															// Copy worktree path to clipboard
-															navigator.clipboard.writeText(wt.worktreePath);
+															void copyPath(wt.worktreePath);
 														}}
 													>
 														<FolderOpen className="h-3.5 w-3.5 mr-1.5" />

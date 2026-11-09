@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CANVAS_PRESETS, canvasThemeStyle, normalizeCanvasTheme } from "./canvas-themes";
+import {
+	CANVAS_PRESETS,
+	canvasThemeStyle,
+	DEFAULT_CANVAS_PRESET,
+	normalizeCanvasTheme,
+} from "./canvas-themes";
 
 describe("normalizeCanvasTheme", () => {
 	it("keeps a known preset and hex colours only", () => {
@@ -19,9 +24,14 @@ describe("normalizeCanvasTheme", () => {
 });
 
 describe("canvasThemeStyle", () => {
-	it("leaves the default look to the stylesheet", () => {
+	it("leaves the default look, the app's colour theme, to the stylesheet", () => {
+		expect(DEFAULT_CANVAS_PRESET).toBe("app");
 		expect(canvasThemeStyle(undefined)).toEqual({});
-		expect(canvasThemeStyle({ preset: "ember" })).toEqual({});
+		expect(canvasThemeStyle({ preset: "app" })).toEqual({});
+	});
+
+	it("keeps the theme's surfaces for an accent-only preset", () => {
+		expect(canvasThemeStyle({ preset: "ember" })).toEqual({ "--vtc-flow": "#f26b2d" });
 	});
 
 	it("applies the preset, then the person's colours on top", () => {
@@ -36,7 +46,4 @@ describe("canvasThemeStyle", () => {
 		expect(style["--vtc-card-solid"]).toBe("#abcdef");
 	});
 
-	it("follows the app's colour theme with the app preset", () => {
-		expect(canvasThemeStyle({ preset: "app" })["--vtc-flow"]).toBe("var(--primary)");
-	});
 });

@@ -14,12 +14,28 @@ export interface FirstRunState {
 	showServerLogin: boolean;
 	onboardingCompleted: boolean | undefined;
 	apiProfileCount: number;
-	claudeProfiles: ReadonlyArray<{ oauthToken?: string | null }>;
+	claudeProfiles: ReadonlyArray<SignInState>;
+}
+
+/** What a Claude profile, as the main process hands it over, says about its sign-in. */
+export interface SignInState {
+	oauthToken?: string | null;
+	/** Computed in the main process from the token or the config dir's stored login. */
+	isAuthenticated?: boolean;
+}
+
+/**
+ * Whether a Claude profile can run a build. Only what the main process
+ * verified counts: the default profile always carries a `configDir`
+ * (`~/.claude`), which exists before anyone signs in.
+ */
+export function isProfileSignedIn(profile: SignInState): boolean {
+	return Boolean(profile.oauthToken) || profile.isAuthenticated === true;
 }
 
 export function shouldOpenOnboardingWizard(state: FirstRunState): boolean {
 	const hasAnyAuth =
-		state.apiProfileCount > 0 || state.claudeProfiles.some((p) => p.oauthToken);
+		state.apiProfileCount > 0 || state.claudeProfiles.some(isProfileSignedIn);
 	return (
 		state.settingsHaveLoaded &&
 		state.serverSessionResolved &&

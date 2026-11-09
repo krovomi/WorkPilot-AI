@@ -10,6 +10,10 @@
  */
 
 import { create } from "zustand";
+import {
+	type GeneratedReview,
+	parseGeneratedReview,
+} from "../../shared/types/generated-review";
 import { useProjectStore } from "./project-store";
 import type {
 	AiAction,
@@ -63,6 +67,9 @@ interface PairProgrammingState {
 	// Conflicts
 	conflicts: ConflictWarning[];
 
+	/** The card the AI's work was committed to (its branch, not the project folder). */
+	review: GeneratedReview | null;
+
 	// Actions
 	setSession: (session: PairSession | null) => void;
 	setStatus: (status: PairStatus, message?: string) => void;
@@ -73,6 +80,7 @@ interface PairProgrammingState {
 	clearStreamContent: () => void;
 	addAiAction: (action: AiAction) => void;
 	addConflict: (filePath: string, message: string) => void;
+	setReview: (review: unknown) => void;
 	reset: () => void;
 }
 
@@ -90,6 +98,7 @@ export const usePairProgrammingStore = create<PairProgrammingState>(
 		streamingContent: "",
 		aiActions: [],
 		conflicts: [],
+		review: null,
 
 		setSession: (session) => set({ session }),
 
@@ -152,8 +161,11 @@ export const usePairProgrammingStore = create<PairProgrammingState>(
 				],
 			})),
 
+		setReview: (review) => set({ review: parseGeneratedReview(review) }),
+
 		reset: () =>
 			set({
+				review: null,
 				session: null,
 				status: "idle",
 				statusMessage: "",
@@ -306,7 +318,15 @@ export function setupPairProgrammingListeners(): () => void {
 		},
 	);
 
+	const unsubReview = globalThis.electronAPI.onPairReview(
+		(pid: string, review: GeneratedReview | null) => {
+			if (!isCurrentProject(pid)) return;
+			store().setReview(review);
+		},
+	);
+
 	return () => {
+		unsubReview();
 		unsubChunk();
 		unsubStatus();
 		unsubAction();

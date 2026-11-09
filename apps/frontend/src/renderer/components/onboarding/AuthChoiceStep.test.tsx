@@ -54,15 +54,27 @@ vi.mock("../settings/ProfileEditDialog", () => ({
 	ProfileEditDialog: ({
 		open,
 		onOpenChange,
+		onSaved,
 	}: {
 		open: boolean;
 		onOpenChange: (open: boolean) => void;
+		onSaved?: () => void;
 	}) => {
 		if (!open) return null;
 		return (
 			<div data-testid="profile-edit-dialog">
 				<button type="button" onClick={() => onOpenChange(false)}>
 					Close Dialog
+				</button>
+				{/* What the real dialog does on a successful save: close, then onSaved. */}
+				<button
+					type="button"
+					onClick={() => {
+						onOpenChange(false);
+						onSaved?.();
+					}}
+				>
+					Save Profile
 				</button>
 			</div>
 		);
@@ -88,7 +100,7 @@ describe("AuthChoiceStep", () => {
 
 			// Check for heading
 			expect(
-				screen.getByText("Choose Your Authentication Method"),
+				screen.getByText("Choose Your AI"),
 			).toBeInTheDocument();
 
 			// Check for OAuth option
@@ -223,6 +235,26 @@ describe("AuthChoiceStep", () => {
 			// Callback should NOT be called when no profile was created (profiles still empty)
 			expect(mockOnAPIKeyPathComplete).not.toHaveBeenCalled();
 		});
+
+		it("skips the OAuth step once a profile is saved", () => {
+			// The store still holds no profile when the dialog closes: the skip
+			// must come from the save itself, not from a profile count.
+			render(
+				<AuthChoiceStep
+					onNext={mockGoToNext}
+					onBack={mockGoToPrevious}
+					onSkip={mockSkipWizard}
+					onAPIKeyPathComplete={mockOnAPIKeyPathComplete}
+				/>,
+			);
+			fireEvent.click(
+				screen.getByText("Use Custom API Key").closest(".cursor-pointer") as Element,
+			);
+			fireEvent.click(screen.getByText("Save Profile"));
+
+			expect(mockOnAPIKeyPathComplete).toHaveBeenCalledTimes(1);
+			expect(screen.queryByTestId("profile-edit-dialog")).not.toBeInTheDocument();
+		});
 	});
 
 	describe("Skip Button Handler", () => {
@@ -314,7 +346,7 @@ describe("AuthChoiceStep", () => {
 			expect(screen.getByText(/Bring your own API key/)).toBeInTheDocument();
 		});
 
-		it("should have helper text explaining both options", () => {
+		it("should have helper text explaining the options", () => {
 			render(
 				<AuthChoiceStep
 					onNext={mockGoToNext}
@@ -325,9 +357,28 @@ describe("AuthChoiceStep", () => {
 
 			expect(
 				screen.getByText(
-					/Both options provide full access to Claude Code features/,
+					/the other providers each keep their own sign-in/,
 				),
 			).toBeInTheDocument();
+		});
+	});
+
+	describe("Other providers", () => {
+		it("offers another AI when the wizard handles it", () => {
+			const onOtherProvider = vi.fn();
+			const { container } = render(
+				<AuthChoiceStep
+					onNext={mockGoToNext}
+					onBack={mockGoToPrevious}
+					onSkip={mockSkipWizard}
+					onOtherProvider={onOtherProvider}
+				/>,
+			);
+
+			expect(container.querySelector(".grid")?.className).toContain("lg:grid-cols-3");
+			fireEvent.click(screen.getByTestId("auth-option-other"));
+			expect(onOtherProvider).toHaveBeenCalledTimes(1);
+			expect(mockGoToNext).not.toHaveBeenCalled();
 		});
 	});
 

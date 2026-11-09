@@ -127,6 +127,29 @@ describe("changelog images", () => {
 		expect(result.success).toBe(false);
 	});
 
+	it("keeps a pasted image out of the checkout until the changelog is saved", async () => {
+		const saved = await call(
+			IPC_CHANNELS.CHANGELOG_SAVE_IMAGE,
+			"p1",
+			"aGVsbG8=",
+			"pasted.png",
+		);
+		expect(saved).toMatchObject({
+			success: true,
+			data: { relativePath: ".github/assets/pasted.png" },
+		});
+		expect(existsSync(path.join(state.project, ".github"))).toBe(false);
+		expect(
+			existsSync(path.join(state.project, ".workpilot", "changelog-assets", "pasted.png")),
+		).toBe(true);
+		const preview = await call(
+			IPC_CHANNELS.CHANGELOG_READ_LOCAL_IMAGE,
+			state.project,
+			".github/assets/pasted.png",
+		);
+		expect(preview.success).toBe(true);
+	});
+
 	it("refuses to save under a name that leaves the assets folder", async () => {
 		for (const filename of [
 			"../../../outside/x.png",

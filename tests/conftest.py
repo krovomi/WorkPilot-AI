@@ -1286,6 +1286,18 @@ def _worktree_setup_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_WORKTREE_SETUP", "0")
 
 
+# A finished build runs the learning loop, whose analysis asks the selected
+# provider's model for patterns (`learning_loop/model_analysis.py`): every
+# pipeline test that reaches "build complete" would make a real model call.
+# The analysis's own tests (`tests/test_learning_model_analysis.py`) turn it
+# back on, against a fake runtime.
+
+
+@pytest.fixture(autouse=True)
+def _learning_loop_model_off_by_default(monkeypatch):
+    monkeypatch.setenv("WORKPILOT_LEARNING_LOOP_MODEL", "0")
+
+
 # ── Ambient state is not input ─────────────────────────────────────────
 #
 # These two lived in a repository-root `conftest.py` while some tests still

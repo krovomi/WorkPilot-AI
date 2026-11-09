@@ -13,6 +13,7 @@ import type { AgentManager } from "../../agent";
 import type { PythonEnvManager } from "../../python-env-manager";
 import { registerTaskArchiveHandlers } from "./archive-handlers";
 import { registerBestOfNHandlers } from "./best-of-n-handlers";
+import { registerWorktreePurgeHandlers } from "../../worktree-purge/handlers";
 import { startSplitMergeWatch } from "./split-merge-watch";
 import { registerStackHandlers } from "./stack-handlers";
 import { registerTaskContextHandlers } from "./context-handlers";
@@ -64,6 +65,8 @@ export function registerTaskHandlers(
 	registerStackHandlers(agentManager);
 	// Follow the PRs of split parts: a merge closes the part, the next ones move.
 	startSplitMergeWatch(agentManager, getMainWindow);
+	// « Purger », and merged PRs closing their card and freeing its worktree.
+	registerWorktreePurgeHandlers(getMainWindow);
 }
 
 // Export shared utilities for use by other modules if needed

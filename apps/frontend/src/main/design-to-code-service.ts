@@ -8,6 +8,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	openSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -23,6 +24,9 @@ import {
 	type DesignToCodeResult,
 	type DesignWriteOutcome,
 } from "../shared/types/design-to-code";
+import { getAppLanguage } from "./app-language";
+import { findOpenReviewCard } from "./generated-review/review-card";
+import { findLocalProject, openReviewRun, type ReviewRun } from "./generated-review/review-run";
 import { projectStore } from "./project-store";
 import { pythonEnvManager } from "./python-env-manager";
 import {
@@ -290,21 +294,29 @@ export class DesignToCodeService {
 			// The scratch folder only held the image.
 			rmSync(workDir, { recursive: true, force: true });
 		}
-		return projectDir ? markExisting(result, projectDir) : result;
+		return projectDir ? markExisting(result, reviewRoot(projectDir)) : result;
 	}
 
 	/**
-	 * Write the files the person accepted into the project. Each path is
-	 * resolved inside the project (links included); a path outside it, a
-	 * protected file or an oversized content is refused, the rest written.
+	 * Write the files the person accepted, on the branch of a review card and
+	 * never in the project folder (docs/architecture/generated-review.md).
+	 * Each path is resolved inside the project, then inside the card's
+	 * worktree (links included); a path outside it, a protected file or an
+	 * oversized content is refused, the rest written and committed. No card
+	 * is opened when every file is refused.
 	 */
-	writeFiles(projectId: unknown, files: unknown): DesignWriteOutcome {
+	async writeFiles(
+		projectId: unknown,
+		files: unknown,
+		openRun: OpenReviewRun = openReviewRun,
+	): Promise<DesignWriteOutcome> {
 		const projectDir = projectDirFor(projectId);
 		if (!projectDir) throw new Error("Unknown project");
 		if (!Array.isArray(files) || files.length > MAX_FILES) {
 			throw new Error("Invalid file list");
 		}
-		const outcome: DesignWriteOutcome = { written: [], refused: [] };
+		const outcome: DesignWriteOutcome = { written: [], refused: [], review: null };
+		const accepted: DesignFileToWrite[] = [];
 		for (const raw of files as DesignFileToWrite[]) {
 			const relative = typeof raw?.path === "string" ? raw.path : "";
 			const content = raw?.content;
@@ -316,25 +328,85 @@ export class DesignToCodeService {
 				outcome.refused.push({ path: relative, reason: "invalid" });
 				continue;
 			}
-			const target = resolveWritableUnder(projectDir, relative);
-			if (!target) {
-				outcome.refused.push({ path: relative, reason: "outside" });
+			const reason = refusalUnder(projectDir, relative);
+			if (reason) {
+				outcome.refused.push({ path: relative, reason });
 				continue;
 			}
-			if (isProtectedPath(path.relative(projectDir, target))) {
-				outcome.refused.push({ path: relative, reason: "protected" });
-				continue;
-			}
-			mkdirSync(path.dirname(target), { recursive: true });
-			const created = writeReviewedFile(target, content);
-			if (created === null) {
-				outcome.refused.push({ path: relative, reason: "invalid" });
-				continue;
-			}
-			outcome.written.push({ path: relative, created });
+			accepted.push({ path: relative, content });
 		}
-		return outcome;
+		if (accepted.length === 0) return outcome;
+
+		const subject = designSubject(accepted);
+		const run = await openRun(projectDir, "design-import", subject);
+		try {
+			for (const file of accepted) {
+				// The worktree is checked again: its links are not the project's.
+				const reason = refusalUnder(run.root, file.path);
+				const target = reason ? null : resolveWritableUnder(run.root, file.path);
+				if (!target) {
+					outcome.refused.push({ path: file.path, reason: reason ?? "outside" });
+					continue;
+				}
+				mkdirSync(path.dirname(target), { recursive: true });
+				const created = writeReviewedFile(target, file.content);
+				if (created === null) {
+					outcome.refused.push({ path: file.path, reason: "invalid" });
+					continue;
+				}
+				outcome.written.push({ path: file.path, created });
+			}
+			if (outcome.written.length === 0) {
+				await run.abandon();
+				return outcome;
+			}
+			const review = await run.finish({
+				message: `feat: add ${subject} from an imported design`,
+				summary: STEP_SUMMARY[getAppLanguage() === "fr" ? "fr" : "en"](subject),
+			});
+			outcome.review = review.committed ? review : null;
+			return outcome;
+		} catch (error) {
+			await run.abandon().catch(() => undefined);
+			throw error;
+		}
 	}
+}
+
+type OpenReviewRun = (
+	projectPath: string,
+	source: "design-import",
+	subject: string,
+) => Promise<ReviewRun>;
+
+const STEP_SUMMARY = {
+	en: (subject: string) => `Component imported from a design: ${subject}`,
+	fr: (subject: string) => `Composant importé d'un design : ${subject}`,
+};
+
+/** Why `relative` may not be written under `base`, or null when it may. */
+function refusalUnder(
+	base: string,
+	relative: string,
+): "outside" | "protected" | null {
+	const target = resolveWritableUnder(base, relative);
+	if (!target) return "outside";
+	return isProtectedPath(path.relative(realpathOrSelf(base), target)) ? "protected" : null;
+}
+
+function realpathOrSelf(dir: string): string {
+	try {
+		return realpathSync(dir);
+	} catch {
+		return dir;
+	}
+}
+
+/** The component's name: the first file's, without its extension. */
+function designSubject(files: DesignFileToWrite[]): string {
+	const first = path.basename(files[0]?.path ?? "design");
+	const name = first.replace(/\.[^.]+$/, "") || first;
+	return name.length > 40 ? `${name.slice(0, 39)}…` : name;
 }
 
 /**
@@ -370,6 +442,17 @@ function writeReviewedFile(target: string, content: string): boolean | null {
 	} finally {
 		closeSync(fd);
 	}
+}
+
+/**
+ * Where the next write goes: the worktree of the Import Design card still
+ * waiting for review, or the project when there is none yet (a new card
+ * starts from the project's base branch).
+ */
+function reviewRoot(projectDir: string): string {
+	const project = findLocalProject(projectDir);
+	const open = project ? findOpenReviewCard(project, "design-import") : null;
+	return open?.worktreePath ?? projectDir;
 }
 
 /** Flag the generated files that would replace a file of the project. */

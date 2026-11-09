@@ -176,7 +176,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # their own below the agents' one; none of them imports core, agents or a
     # phase.
     "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    # The model analysis (F178) asks the agent_runtime port, never core.
     "learning_loop": {
+        "agent_runtime",
         "brain",
         "foundation",
         "hermes",

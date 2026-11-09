@@ -161,6 +161,21 @@ const defaultDeps: OpenExternalDeps = {
 };
 
 /**
+ * Le chemin tel que le bureau de l'utilisateur le nomme, pour le copier.
+ * Sous WSL, l'app voit `/home/x/projet/f.cs` alors que l'Explorateur Windows
+ * attend `\\wsl.localhost\<distro>\home\x\projet\f.cs` (ou `C:\…` sous
+ * `/mnt/c`) : un chemin copié tel quel ne se collait nulle part. Ailleurs, et
+ * pour un chemin relatif ou que l'on ne sait pas traduire, rien ne change.
+ */
+export function toHostPath(
+	path: string,
+	deps: Pick<OpenExternalDeps, "wsl" | "toWindowsPath"> = defaultDeps,
+): string {
+	if (!deps.wsl || !path.startsWith("/")) return path;
+	return deps.toWindowsPath(path) ?? path;
+}
+
+/**
  * Valide l'URL et rend son objet `URL`. Lève avec un message qui distingue les
  * deux fautes possibles — une URL illisible et un schéma refusé ne se corrigent
  * pas de la même façon.

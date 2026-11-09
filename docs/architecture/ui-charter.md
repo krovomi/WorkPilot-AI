@@ -17,7 +17,7 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 
 | Element | Primitive | Rule |
 |---|---|---|
-| Stage | `ModuleStage` | The theme background, a faint dot grid, a warm glow in two corners. Every module and Settings page opens on one. |
+| Stage | `ModuleStage` | The theme background, a faint dot grid, a glow of the theme's accent in two corners. Every module and Settings page opens on one. |
 | Header band | `ModuleHeader` | Mono uppercase **kicker** in the accent, a short title, one line of description, actions on the right. Not needed inside a hub whose tabs already name the view. |
 | Columns | `Columns` + `Column` | Side by side, separated by a dashed rule; each opens with kicker / title / mono meta on the right. One column under 1100 px. |
 | Page | `Page` + `Section` | For a single scrolling page (Settings): the same head per section, a dashed rule between sections. Sections side by side in a grid take `.wp-split` on the grid: no rule between columns. |
@@ -26,25 +26,70 @@ colours, light/dark and the UI scale setting (sizes are in `rem`).
 | Step | `StepCard` | `01 · KICKER` / title / mono meta; clickable steps glow when active. |
 | Chip | `Chip` / `Chips` | Mono, pill, coloured dot. A chip with `onClick` is a toggle (filters). |
 | Tabs | `Tabs` | A module's tabs: pill chips (`role="tab"`), the selected one in the tone of the accent, an optional icon and count. |
-| Button | `CharterButton` | `primary` = the glowing warm action, **one per screen**; `default`, `ghost`, `danger`; `sm` in lists. |
+| Button | `CharterButton` | `primary` = the glowing action in the theme's accent, **one per screen**; `default`, `ghost`, `danger`; `sm` in lists. |
 | Feedback | `Notice`, `ScanLine`, `EmptyStage`, `.wp-ink` | Errors and successes are notices with a tone, never raw red text; a running job is the scan line with its status; an empty column says what will appear and how. A line in the tone of its element (a suggested fix) is `.wp-ink` under a `wp-tone-*`. |
 | Figures | `Stat`, `Gauge`, `Bar`, `.wp-stack` | Tabular numbers in the tone of what they count; `.wp-stack` holds one `<i>` per share (stacked bar). |
 | Composer | `Composer` + `Field` | The bottom bar: `> prompt` and the actions on top, options or a hint underneath (the second row keeps the actions clear of the activity pill at the bottom right). |
 
 ## Colours
 
-Surfaces come from the theme tokens (`--background`, `--card`, `--foreground`),
-so the eight themes and the custom theme keep working. The charter adds:
+Every colour comes from the active colour theme, light or dark, so the eight
+themes keep their identity inside every module (Ocean stays blue, Forest
+green, Neo magenta):
 
-- `--wp-accent`: the warm orange of the canvas wires, for the primary action,
-  the active state and the kicker. The same in every theme, as on the canvas.
-- Six tones (`blue`, `amber`, `violet`, `orange`, `green`, `pink`) plus `red`
-  and `muted`, with a light and a dark value each. Status reads by tone:
-  `green` done / documented, `amber` partial / medium, `red` missing / high /
-  error, `blue` low / information.
+- surfaces from `--background`, `--card`, `--foreground`;
+- `--wp-accent` is the theme's `--primary` (with `--primary-foreground` on a
+  primary button), for the primary action, the active state and the kicker;
+- the status tones are the theme's semantic tokens: `green` = `--success`,
+  `amber` = `--warning`, `red` = `--destructive`, `blue` = `--info`. Status
+  reads by tone: `green` done / documented, `amber` partial / medium, `red`
+  missing / high / error, `blue` low / information;
+- `violet`, `orange` and `pink` are category hues no theme defines: they are
+  fixed, with a light and a dark value, like the task phase hues;
+- text in a tone (kicker, `.wp-ink`, `Stat` value, the composer prompt) is the
+  tone mixed toward the foreground (`--wp-ink-mix`, 72 %), so a pale theme
+  accent (Default light olive, Dusk) stays legible on a card while keeping its
+  hue. Fills, rails, dots and bars use the tone itself.
+
+The first version of the charter (2026-11-07) had its own warm orange accent
+and fixed tones, and remapped `--color-primary` to it: inside a module the app
+looked orange whatever the theme. Since 2026-11-08 the charter only reads the
+theme; `tests/test_renderer_charter_theme.py` refuses a hex value for the
+accent or a status tone, and a remap of the Tailwind colour tokens. Import
+Design, the test studio and the Visual-to-Code canvas follow the same rule
+(their category hues stay fixed; the canvas presets still let a person pick
+other colours per architecture).
 
 Set a tone with the `tone` prop (or the class `wp-tone-<name>`): kickers, dots,
 rails, bars and gauges of that element follow it.
+
+### Diffs
+
+A diff is the one place where the theme does not choose the colours: an added
+line is git green and a removed line git red in every theme, light and dark
+(Leub, 2026-11-09: "utilise les vraies couleurs de git"). A theme's `--success`
+can be teal and its `--destructive` pink, and a diff must read the same
+everywhere, like the task phase hues. `components/ui/diff-viewer.css` holds the
+two hues (`--git-add`, `--git-del`, a light and a dark value) and mixes them with
+transparent for the line, gutter and changed-word fills, so they sit on any
+surface. The code surface is the theme's card in light mode; in dark mode it is
+the theme background pulled toward a neutral code black, because a saturated
+dark card (Forest green, Ocean blue, Neo violet) swallowed the green of an added
+line. Syntax colours are VS Code Light+ / Dark+, those of the code editor.
+
+`ui/diff-viewer.tsx` is shared by the Kanban "Fichiers modifiés" dialog, the
+subtask files viewer, the guided review, the code review workspace and the PR
+files modal. It adds to the patch: `+` / `-` signs, syntax colours for every
+grammar of `@codemirror/language-data` (plus .NET project files as XML and
+Razor as HTML), each side of a hunk parsed whole so a multi-line comment stays a
+comment (`diff-syntax.ts`), the changed words of a rewritten line
+(`diff-words.ts`, token LCS, skipped when the two lines share under 40 % of
+their visible characters), the unchanged lines git left out between two hunks
+and the enclosing scope git prints after `@@`. The layout toggle
+(`diff-mode-toggle.tsx`) offers Auto, unified and side by side; Auto (the
+default) puts a file side by side only when it has both removals and additions
+and the view is at least 900 px wide, and a new or deleted file is always one
+column, whatever the choice, since its other half would be empty.
 
 ## Writing a view
 
@@ -63,10 +108,9 @@ rails, bars and gauges of that element follow it.
 A view does not have to drop `Button`, `Card`, `Badge` or `PageHeader` to
 match. Inside a `ModuleStage` (or any element with the class `wp-scope`):
 
-- the Tailwind colour tokens are remapped: `primary` and `ring` become the
-  charter accent, `destructive` / `success` / `warning` / `info` the red,
-  green, amber and blue tones. `bg-primary`, `text-primary`, the default
-  `Button` and the `Badge` variants follow without a change in the view;
+- the Tailwind colour tokens are left alone: `bg-primary`, `text-primary`,
+  the default `Button` and the `Badge` variants already read the theme, which
+  is where the charter's accent and tones come from too;
 - `ui/card`, `ui/button`, `ui/badge` and `ui/page-header` mark themselves with
   `data-slot` (and `data-variant`); charter.css restyles their surface (border,
   background, radius, shadow), never their size or layout. These rules are

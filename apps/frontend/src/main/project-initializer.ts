@@ -9,6 +9,11 @@ import {
 import path from "node:path";
 import { promisify } from "node:util";
 import { getToolPath, getToolPathAsync } from "./cli-tool-manager";
+import {
+	canGitCommit,
+	type GitIdentity,
+	saveGlobalGitIdentity,
+} from "./git-identity";
 import { getIsolatedGitEnv } from "./utils/git-isolation";
 
 const execFileAsync = promisify(execFile);
@@ -191,6 +196,7 @@ export async function checkGitStatusAsync(
 export function initializeGit(
 	projectPath: string,
 	remoteConfig?: { url?: string; name?: string },
+	identity?: GitIdentity,
 ): InitializationResult {
 	debug("initializeGit called", { projectPath, remoteConfig });
 
@@ -218,6 +224,17 @@ export function initializeGit(
 
 		// Step 3: If there are untracked/modified files, add and commit them
 		if (statusOutput || !status.hasCommits) {
+			// A fresh machine has no author identity and git refuses to commit:
+			// say so as a blocker the UI answers with a name/email form.
+			if (identity) saveGlobalGitIdentity(git, identity);
+			if (!canGitCommit(git, projectPath)) {
+				return {
+					success: false,
+					blocker: "git-identity-missing",
+					error:
+						"Git does not know your name and email yet, so it cannot create the first commit.",
+				};
+			}
 			debug("Adding files and creating initial commit");
 
 			// Add all files

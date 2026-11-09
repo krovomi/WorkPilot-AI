@@ -1,6 +1,5 @@
-import { Key, LogIn, Shield } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useSettingsStore } from "../../stores/settings-store";
+import { Bot, Key, LogIn, Shield } from "lucide-react";
+import { useState } from "react";
 import { ProfileEditDialog } from "../settings/ProfileEditDialog";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -11,6 +10,8 @@ interface AuthChoiceStepProps {
 	readonly onBack?: () => void;
 	readonly onSkip: () => void;
 	readonly onAPIKeyPathComplete?: () => void; // Called when profile is created (skips oauth)
+	/** Any provider other than Claude: Codex, Copilot, Gemini, OpenCode, Ollama… */
+	readonly onOtherProvider?: () => void;
 }
 
 interface AuthOptionCardProps {
@@ -61,6 +62,7 @@ function AuthOptionCard({
  * Allows new users to choose between:
  * 1. OAuth authentication (Sign in with Anthropic)
  * 2. Custom API key authentication (Use Custom API Key)
+ * 3. Another AI provider (OpenAI Codex, GitHub Copilot, Gemini, OpenCode…)
  *
  * Features:
  * - Two equal-weight authentication options
@@ -76,22 +78,10 @@ export function AuthChoiceStep({
 	onBack,
 	onSkip,
 	onAPIKeyPathComplete,
+	onOtherProvider,
 }: AuthChoiceStepProps) {
 	const { t } = useTranslation();
 	const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
-	const profiles = useSettingsStore((state) => state.profiles);
-
-	// Track initial profiles length to detect new profile creation
-	const initialProfilesLengthRef = useRef(profiles.length);
-
-	// Update the ref when profiles change (to track the initial state before dialog opened)
-	useEffect(() => {
-		// Only update the ref when dialog is NOT open
-		// This captures the state before user opens the dialog
-		if (!isProfileDialogOpen) {
-			initialProfilesLengthRef.current = profiles.length;
-		}
-	}, [profiles.length, isProfileDialogOpen]);
 
 	// OAuth button handler - proceeds to OAuth step
 	const handleOAuthChoice = () => {
@@ -103,24 +93,10 @@ export function AuthChoiceStep({
 		setIsProfileDialogOpen(true);
 	};
 
-	// Profile dialog close handler - detects profile creation and skips oauth step
-	const handleProfileDialogClose = (open: boolean) => {
-		const wasEmpty = initialProfilesLengthRef.current === 0;
-		const hasProfilesNow = profiles.length > 0;
-
-		setIsProfileDialogOpen(open);
-
-		// If dialog closed and profile was created (was empty, now has profiles), skip the oauth step
-		if (!open && wasEmpty && hasProfilesNow && onAPIKeyPathComplete) {
-			// Call the callback to skip oauth and go directly to the completion step
-			onAPIKeyPathComplete();
-		}
-	};
-
 	return (
 		<>
 			<div className="flex h-full flex-col items-center justify-center px-8 py-6">
-				<div className="w-full max-w-2xl">
+				<div className={`w-full ${onOtherProvider ? "max-w-4xl" : "max-w-2xl"}`}>
 					{/* Hero Section */}
 					<div className="text-center mb-8">
 						<div className="flex justify-center mb-4">
@@ -137,7 +113,9 @@ export function AuthChoiceStep({
 					</div>
 
 					{/* Authentication Options - Equal Visual Weight */}
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+					<div
+						className={`grid grid-cols-1 gap-6 mb-10 ${onOtherProvider ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}
+					>
 						<AuthOptionCard
 							icon={<LogIn className="h-6 w-6" />}
 							title={t("onboarding:authChoice.oauthTitle")}
@@ -153,6 +131,15 @@ export function AuthChoiceStep({
 							onClick={handleAPIKeyChoice}
 							data-testid="auth-option-apikey"
 						/>
+						{onOtherProvider && (
+							<AuthOptionCard
+								icon={<Bot className="h-6 w-6" />}
+								title={t("onboarding:authChoice.otherTitle")}
+								description={t("onboarding:authChoice.otherDescription")}
+								onClick={onOtherProvider}
+								data-testid="auth-option-other"
+							/>
+						)}
 					</div>
 
 					{/* Info text */}
@@ -187,10 +174,13 @@ export function AuthChoiceStep({
 			</div>
 
 			{/* Profile Edit Dialog for API Key Path */}
+			{/* No profile prop = create mode. `onSaved` fires only after a save:
+			    the close handler used to compare a profile count captured before
+			    the save, so a created profile never skipped the OAuth step. */}
 			<ProfileEditDialog
 				open={isProfileDialogOpen}
-				onOpenChange={handleProfileDialogClose}
-				// No profile prop = create mode
+				onOpenChange={setIsProfileDialogOpen}
+				onSaved={onAPIKeyPathComplete}
 			/>
 		</>
 	);

@@ -3,6 +3,7 @@
  */
 
 import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
+import type { GeneratedReviewSource } from "./generated-review";
 import type {
 	CompletablePhase,
 	ExecutionPhase as ExecutionPhaseType,
@@ -432,7 +433,13 @@ export interface TaskMetadata {
 		| "gitlab"
 		| "visual-canvas"
 		| "tech-debt"
-		| "automation";
+		| "automation"
+		| "generated";
+	/**
+	 * The page whose generated code this card holds for review
+	 * (`sourceType: "generated"`, main/generated-review/).
+	 */
+	generatedBy?: GeneratedReviewSource;
 	/** The rule that created the card (shared/types/automations.ts). */
 	automation?: AutomationOrigin;
 	ideationType?: string; // e.g., 'code_improvements', 'security_hardening'
@@ -597,6 +604,8 @@ export interface TaskMetadata {
 	 */
 	bestOfN?: { parent: string; index: number };
 	visualProof?: VisualProofRun; // Latest automated emulator/screenshots proof for the PR
+	/** The last pipeline the CI/CD settings started for this task's PR (opened or merged). */
+	cicdRun?: CicdAutoRun;
 	useWorktree?: boolean; // If false, use direct mode (no worktree isolation) - default is true for safety
 	useLocalBranch?: boolean; // If true, use the local branch directly instead of preferring origin/branch (preserves gitignored files)
 	/**
@@ -1168,6 +1177,24 @@ export interface VisualProofApiSmoke {
 	results: ApiSmokeEndpointResult[];
 	/** Markdown report file, relative to the artifact dir. */
 	reportFileName: string;
+}
+
+/**
+ * A pipeline started on its own after an agent opened the task's pull request,
+ * or after that pull request was merged (CI/CD Triggers with "auto-trigger" on,
+ * and "on pull request" or "on merge").
+ */
+export interface CicdAutoRun {
+	/** The run's id in `.workpilot/cicd_runs.json`. */
+	id: string;
+	provider: string;
+	/** What started it: the PR being opened, or the PR being merged. */
+	event: "pr" | "merge";
+	status: "triggered" | "failed";
+	triggeredAt: string;
+	error?: string;
+	/** The pipeline's page, when the provider gives one (GitLab, Azure DevOps). */
+	webUrl?: string;
 }
 
 export interface VisualProofRun {

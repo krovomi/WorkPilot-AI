@@ -10,6 +10,8 @@ import i18n from "../../../shared/i18n";
 import enCommon from "../../../shared/i18n/locales/en/common.json";
 import frCommon from "../../../shared/i18n/locales/fr/common.json";
 import { CommandPalette } from "../CommandPalette";
+import { buildNavIndex, useNavIndexStore } from "../sidebar/nav-index";
+import { navGroups } from "../sidebar/nav-model";
 
 function renderPalette() {
 	return render(
@@ -44,11 +46,12 @@ describe("CommandPalette i18n", () => {
 	});
 
 	it("shows French labels, categories and hints in French", async () => {
+		useNavIndexStore.setState({ entries: buildNavIndex(navGroups, { serverProject: false }) });
 		await act(() => i18n.changeLanguage("fr"));
 		renderPalette();
 
 		expect(screen.getByText("Créer une tâche")).toBeTruthy();
-		expect(screen.getByText("Aller au Kanban")).toBeTruthy();
+		expect(screen.getByText("Tableau Kanban")).toBeTruthy();
 		expect(screen.getByText("Réglages")).toBeTruthy();
 		expect(
 			screen.getByPlaceholderText("Tapez une commande ou cherchez…"),

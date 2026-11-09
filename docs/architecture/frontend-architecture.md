@@ -113,16 +113,53 @@ id changes.
 | the hub's entry has its first tab's id, and carries `hub` | pins, custom order and the server gates were keyed on that id; a pin left on another tab shows as the hub's pin, and unpinning clears both in one save |
 | the entry opens the tab last used in this session, held in memory | a hub reopens where the user left it; a new session starts on the first tab, so nothing is saved that could point at a tab gone missing |
 | the tabs follow the gates of the entries: a server project shows a hub only for the tabs it offers (`server-gates.ts`), and hiding the experimental views hides their tabs, never the one on screen | a hub must not become a way around a gate |
-| a tool that is a dialog (conflict predictor, arena…) is a tab whose page says what it does and opens it | a tab list mixing tabs and buttons is not a tab list; the tool picked from the sidebar search still opens its dialog at once, and its shortcut opens its tab |
-| the sidebar search lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
+| a tool that is a dialog (conflict predictor, arena…) is a tab whose page says what it does and opens it | a tab list mixing tabs and buttons is not a tab list; the tool picked from the menu or the command palette still opens its dialog at once (`sidebar/nav-actions.ts`), and its shortcut opens its tab |
+| the command palette lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
 | `HubTabList` follows the WAI-ARIA tabs pattern: one tab in the tab order, arrows, Home and End move, Enter or Space opens; activation is manual | a tab is a whole page: moving the focus does not load one |
 | `HubMain` has the same tree with or without a hub | entering a hub does not remount what the main area keeps alive (the terminals) |
 
 Formula Lab stays outside the costs hub: it chooses the engine of one card
 and needs that card, so it opens from the card. Change Preview (`sandbox`),
-named "simulation" before lot R1, previews uncommitted changes and joined no
-hub. Hubs and their tabs: `hubs.ts`; render tests:
+named "simulation" before lot R1, previews uncommitted changes; it joined no
+hub then, and is a tab of the API hub since F181 (lot 3, see below). Hubs and their tabs: `hubs.ts`; render tests:
 `sidebar/__tests__/HubMain.test.tsx`.
+
+## The menu and the command palette (`sidebar/nav-model.ts`)
+
+The menu had grown to 61 entries for 77 pages, and people got lost in it
+(F181). Lot 1 makes it lighter without moving a page.
+
+| Decision | Why |
+|---|---|
+| the groups and entries live in `sidebar/nav-model.ts`; the sidebar renders them, `sidebar/nav-index.ts` flattens them for the palette, `navItemLabelKey` names a page for the activity centre | the palette was a hand-written list of 21 pages out of 77: a second list drifts, one list cannot |
+| the sidebar publishes the pages it shows (`useNavIndexStore`); the palette offers exactly those | the palette follows the same gates (server project, forge, hidden beta views) without knowing them |
+| a page is found by its name, by its place in the menu (group, sub-group or hub) and by a few words (`navigation:keywords.*`, en and fr), accents ignored; once some command contains the words typed, only those are listed | « tests » finds the test generator, the flaky tests and the regression guardian; « securite » finds the injection guard. A letter-by-letter match alone listed 25 commands for « tests » |
+| the pages opened last come first, from `view-usage-store` (local to the machine) | the page you come back to is one key away |
+| the sidebar's search field, `/` and Ctrl+K open the palette (`stores/command-palette-store.ts`) | one search, which knows every page, instead of a filter of the visible labels |
+| « Outils CLI » is a chip at the foot of the menu (`sidebar/CliToolsChip.tsx`): « CLI 1/8 » and a dot, opening the same badges above it; the badges stay mounted while closed | the panel was always open and took 320 px of a 1000 px window, leaving 420 px for the menu; mounted, the checks still run and the count is right |
+| rows show the icon, the name and the activity badge; the two-letter shortcut moves to the hover title, the drag grip shows on hover; group headers are plain titles; long names were shortened (« Tests instables », « Train de release ») | most names were cut (« Contrôle de … ») by the grip, the shortcut and the counter |
+
+Lot 2 splits the menu in two levels: a rail of spaces and a panel that lists
+one space.
+
+| Decision | Why |
+|---|---|
+| the rail (`sidebar/SidebarRail.tsx`) has one icon per group, « Mon menu » (the star) first; the panel beside it lists the space chosen only, its sub-groups as plain titles | seven groups open at once was the clutter; one space at a time fits a 1000 px window with room to spare |
+| a space is a group id, « Mon menu » is `__mine__` (`sidebar/spaces.ts`); the choice is saved in `sidebarPrefs.activeSpace` | an unknown or removed group falls back without a settings migration (`resolveSpace`) |
+| a page opened from the palette, a shortcut or a notification brings its space into view, unless the space shown already lists it (`spaceToFollow`); at start the space last chosen stays | the panel never shows a space that hides the page on screen, and never jumps while you use it |
+| choosing the space shown folds the panel; folded, the rail stays and hovering an icon lists its pages in its tooltip | the folded menu keeps every page two moves away, as the old icon column did |
+| « Mon menu » lists the pinned pages, then the 5 opened last (`recentNavItems`, a hub's tab counts for its hub, a pinned page is not repeated) | the pages you use are found without choosing a space |
+| while nothing is pinned and no choice was made, « Mon menu » asks once: « Essentiel » pins `ESSENTIAL_VIEWS` (10 stable pages) and hides the beta views, « Complet » keeps everything (`sidebarPrefs.menuMode`); resetting the layout asks again | a short menu by default would hide pages people use; asking in the menu, not in the wizard, lets them answer once they see it |
+| the rail and the panel share one `DndContext`: a group dragged on the rail reorders the spaces, a page or a group dropped on the star is pinned; collision tries the pointer first (`pointerFirst`) | the star is small, the nearest centre alone picked a row of the panel. The old drop zone never pinned: its id `__fav_drop__` has no kind, so the drag-end handler decoded it to nothing and stopped |
+| the stored `sidebarWidth` is the whole menu, rail included (default 296 px, minimum 240) | a width saved before the rail still gives a usable panel |
+
+Lot 3 tidies what the spaces list.
+
+| Decision | Why |
+|---|---|
+| the Toolbox's families are four more hubs (`sidebar/hubs.ts`): Quality and security, Accessibility and i18n, API, Automation; its sub-group headers are gone, and with them `NavItem.subGroup` | 20 entries became 9. A hub keeps each page's id and shortcut, so links, pins and the palette are unchanged; a dialog tool (dependency sentinel, app emulator) is a tab that offers to open it (`HubLauncher`) |
+| while a page is in beta (`EXPERIMENTAL_VIEWS`) its entry leaves its group for the Labo, the flask at the foot of the rail, with a count; the Labo lists every beta page, a hub's beta tab included, one card each with what it does (`navigation:labo.about.*`, `LaboPanel`) | stable pages are no longer mixed with trials. The move is computed (`railGroupsOf`, `laboItemsOf`), not written in `nav-model.ts`: a page out of beta is back at its place with no other change. Hiding the beta views hides the Labo |
+| a space's entries not opened for 30 days are offered for hiding (`unusedEntries`), never hidden by the app; nothing is offered before the usage count (`view-usage-store`, local) is 30 days old, nor a pinned entry; « Plus tard » puts the offer off for 30 days | the user decides what goes, from what they actually use. A hidden page stays in Ctrl K, in « Mon menu » if pinned, and under « Pages masquées » in its space to show it again; resetting the layout shows everything |
 
 ## Agent Management (`src/main/agent/`)
 

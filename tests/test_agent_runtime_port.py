@@ -126,3 +126,92 @@ def test_the_architecture_reviewer_prompt_is_filled(tmp_path, monkeypatch):
     assert "RULES-X" in prompt and "REPORT-Y" in prompt
     assert "develop" in prompt
     assert "{{" not in prompt
+
+
+# ── Every entry point that reaches a port unit installs the runtime ──────────
+#
+# `current()` is None until `core` is imported, and a unit that gets None takes
+# its "no SDK" path. The test-generation runner never imported core, so every
+# generation in the studio (unit, coverage analysis, E2E, TDD) failed with "No
+# agent runtime is installed", on every provider (F179). These two tests hold
+# the assumption the port rests on.
+
+_RUNNERS = BACKEND / "runners"
+
+
+def _imported_modules(path: Path) -> set[str]:
+    """Every module a file imports, at any depth (functions included)."""
+    import ast
+
+    names: set[str] = set()
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            names.add(node.module)
+            names.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return names
+
+
+def _port_units() -> set[str]:
+    """The backend modules that start a session through the port."""
+    units = set()
+    for path in BACKEND.rglob("*.py"):
+        if ".venv" in path.parts or "tests" in path.parts:
+            continue
+        if "agent_runtime.current()" in path.read_text(encoding="utf-8"):
+            units.add(".".join(path.relative_to(BACKEND).with_suffix("").parts))
+    return units
+
+
+def test_every_runner_that_reaches_a_port_unit_imports_core():
+    units = _port_units()
+    assert "test_generation.generator" in units  # the scan sees the port units
+
+    missing = []
+    for path in sorted(_RUNNERS.rglob("*.py")):
+        imported = _imported_modules(path)
+        reached = sorted(u for u in units if u in imported)
+        installs = any(m == "core" or m.startswith("core.") for m in imported)
+        if reached and not installs:
+            missing.append(f"{path.relative_to(BACKEND)} -> {', '.join(reached)}")
+    assert not missing, (
+        "These runners reach a unit that asks agent_runtime.current() but never "
+        "import core, so the runtime is never installed:\n" + "\n".join(missing)
+    )
+
+
+@pytest.mark.parametrize(
+    "action", ["analyze-coverage", "generate-unit", "generate-e2e", "generate-tdd"]
+)
+def test_the_test_generation_runner_installs_the_runtime(action):
+    """In a fresh interpreter, loaded as a script the way Electron spawns it
+    (not through the `runners` package): the runtime is there by the time an
+    action that calls the model runs."""
+    import subprocess
+
+    probe = (
+        "import importlib.util, sys\n"
+        f"sys.path.insert(0, {str(_RUNNERS)!r})\n"
+        f"spec = importlib.util.spec_from_file_location('runner', {str(_RUNNERS / 'test_generation_runner.py')!r})\n"
+        "runner = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(runner)\n"
+        "import agent_runtime\n"
+        "assert agent_runtime.current() is None, 'core already imported'\n"
+        "def handler(agent, args):\n"
+        "    print('RUNTIME', type(agent_runtime.current()).__name__)\n"
+        f"runner._ACTION_HANDLERS[{action!r}] = handler\n"
+        f"sys.argv = ['test_generation_runner.py', '--action', {action!r}]\n"
+        "runner.main()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "RUNTIME CoreAgentRuntime" in result.stdout

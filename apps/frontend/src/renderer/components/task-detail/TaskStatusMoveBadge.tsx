@@ -2,11 +2,11 @@ import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	TASK_STATUS_COLUMNS,
 	TASK_STATUS_LABELS,
 	type TaskStatusColumn,
 } from "../../../shared/constants";
 import type { Task, TaskStatus } from "../../../shared/types";
+import { manualMoveTargets } from "../../lib/kanban-columns";
 import { cn } from "../../lib/utils";
 import { Badge, type BadgeProps } from "../ui/badge";
 import {
@@ -30,6 +30,7 @@ const STATUS_DOT_CLASS: Record<TaskStatusColumn, string> = {
 	ai_review: "bg-warning",
 	human_review: "bg-purple-400",
 	build_failed: "bg-destructive",
+	pr_created: "bg-indigo-400",
 	done: "bg-success",
 };
 
@@ -72,9 +73,7 @@ export function TaskStatusMoveBadge({
 }: TaskStatusMoveBadgeProps) {
 	const { t } = useTranslation(["tasks"]);
 
-	const targets = TASK_STATUS_COLUMNS.filter(
-		(status) => status !== task.status,
-	);
+	const targets = manualMoveTargets(task);
 
 	return (
 		<DropdownMenu>

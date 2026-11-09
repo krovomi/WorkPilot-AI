@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, MessageSquare, Send } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useTeamBotStore } from "../../stores/team-bot-store";
 import {
@@ -21,6 +22,12 @@ const EVENTS = ["agentDone", "costAlert", "guardrailBlock", "blastRadius"] as co
 export function TeamBotSettings() {
 	const { t } = useTranslation(["teamBot", "navigation"]);
 	const { config, testing, lastResult, lastError, setConfig, sendTest } = useTeamBotStore();
+	const load = useTeamBotStore((s) => s.load);
+
+	// The main process keeps the configuration (its webhook URL masked here).
+	useEffect(() => {
+		void load();
+	}, [load]);
 
 	return (
 		<ModuleStage scroll="page" data-testid="team-bot-view">

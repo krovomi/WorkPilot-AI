@@ -56,6 +56,11 @@ vi.mock("react-i18next", () => ({
 	Trans: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// The providers step embeds the Settings → Accounts panel.
+vi.mock("../settings/CleanProviderSection", () => ({
+	CleanProviderSection: () => <div>accounts-panel</div>,
+}));
+
 // Mock the settings store
 const mockUpdateSettings = vi.fn();
 const mockLoadSettings = vi.fn();
@@ -89,6 +94,7 @@ Object.defineProperty(window, "electronAPI", {
 		getOAuthToken: vi.fn().mockResolvedValue(null),
 		startOAuthFlow: vi.fn().mockResolvedValue({ success: true }),
 		loadProfiles: vi.fn().mockResolvedValue([]),
+		checkClaudeCodeVersion: vi.fn().mockResolvedValue({ success: false }),
 	},
 	writable: true,
 });
@@ -280,6 +286,32 @@ describe("OnboardingWizard Integration Tests", () => {
 					onboardingCompleted: true,
 				});
 			});
+		});
+
+		it("skipping the auth step moves on to the CLI step, not out of the wizard", async () => {
+			// With no Claude account, Skip used to end the setup right there.
+			render(<OnboardingWizard {...defaultProps} />);
+			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
+			fireEvent.click(await screen.findByRole("button", { name: /Skip for now/ }));
+
+			expect(await screen.findByText("cli.title")).toBeInTheDocument();
+			expect(mockSaveSettings).not.toHaveBeenCalled();
+		});
+
+		it("offers every other provider, not only Claude", async () => {
+			render(<OnboardingWizard {...defaultProps} />);
+			fireEvent.click(screen.getByRole("button", { name: /Get Started/ }));
+			fireEvent.click(await screen.findByTestId("auth-option-other"));
+
+			expect(await screen.findByText(/providers\.title/)).toBeInTheDocument();
+			expect(screen.getByText("accounts-panel")).toBeInTheDocument();
+			// The Claude sign-in step is not on this path.
+			expect(screen.queryByText("steps.auth")).not.toBeInTheDocument();
+
+			fireEvent.click(screen.getByRole("button", { name: "common:buttons.back" }));
+			expect(
+				await screen.findByText(/Choose Your Authentication Method/),
+			).toBeInTheDocument();
 		});
 
 		it("should call onOpenChange when wizard is closed", async () => {

@@ -32,7 +32,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSection } from "@/components/settings/AppSettings";
 import { getBadgeColorClasses, getColorClass } from "../utils/usageColors";
-import { useProviderContext } from "./ProviderContext";
+import { useEffectiveUsageProvider } from "../hooks/useEffectiveUsageProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
 	Tooltip,
@@ -74,8 +74,9 @@ export function UsageIndicator() {
 	const pendingFetchRef = useRef<Promise<void> | null>(null);
 	const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// The provider the usage badges observe: the running tasks', unless the
-	// person picked one (UsageLensSelector). Not the default provider.
-	const { usageProvider: selectedProvider } = useProviderContext();
+	// person picked one (UsageLensSelector). Not the default provider, except
+	// when nothing chose any yet (first start), where it was stuck loading.
+	const selectedProvider = useEffectiveUsageProvider();
 
 	/**
 	 * Helper function to get initials from a profile name

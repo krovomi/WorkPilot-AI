@@ -14,6 +14,169 @@ Changes not released yet are not written here: each PR adds a fragment to
 folds them into a new section at release time (`python scripts/changelog.py preview`
 shows the next notes). Two open PRs no longer edit the same lines.
 
+## 1.4.1 - Tout code généré passe par une revue, et le menu de gauche s'allège
+
+Toute page qui écrit du code dans votre projet (studio de tests, Import Design, journal des
+modifications, pair programming, commande rapide) le fait désormais sur une branche de revue, comme
+une carte du Kanban, et le menu de gauche passe à un rail d'espaces avec « Mon menu », quatre hubs et
+un Labo pour les pages en bêta. Le Kanban gagne une colonne « PR ouverte » et la purge des worktrees,
+les diffs prennent les couleurs de git, l'assistant de premier lancement configure toutes les IA, et
+les alertes de dépendances sont corrigées.
+
+### ✨ Nouveautés
+
+- **CI/CD Triggers se déclenche tout seul.** Avec « Déclencheurs actifs » coché, le pipeline configuré (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) démarre quand un agent ouvre la PR d'une tâche et, si « Déclencher à la fusion » est coché, quand cette PR est fusionnée. Les détails de la tâche disent quel pipeline a démarré, ou pourquoi il n'a pas pu ; la liste des exécutions marque celles lancées automatiquement avec leur tâche. Les deux réglages n'étaient jusqu'ici qu'affichés (#378).
+- **Des diffs aux vraies couleurs de git, plus lisibles**. Dans « Fichiers modifiés » d'une carte,
+  la revue guidée, la revue de code et les fichiers d'une sous-tâche, une ligne ajoutée est verte
+  et une ligne supprimée rouge dans tous les thèmes, avec ses marqueurs `+` / `-`. Le code est
+  coloré selon son langage (C#, TypeScript, Python, Go, Rust, Java, Kotlin, Swift, Dart, PHP,
+  Ruby, SQL, YAML, Vue, HTML, XML…), les mots modifiés d'une ligne réécrite sont surlignés, et
+  chaque bloc indique combien de lignes inchangées le séparent du précédent et dans quelle
+  fonction il se trouve. Le nouveau mode « Auto » met un fichier côte à côte seulement s'il a des
+  lignes supprimées et ajoutées et que la fenêtre est assez large ; un fichier ajouté ou supprimé
+  reste en une colonne, sans moitié vide. Chaque fichier affiche son diffstat (`+12 -3 ■■■■□`).
+- **Colonne « PR ouverte » sur le Kanban** : une carte dont la pull request est ouverte n'est
+  plus rangée dans « Terminé ». Elle attend dans sa propre colonne, entre « Révision humaine »
+  et « Terminé », et passe seule dans « Terminé » quand la PR est fusionnée. La colonne est
+  masquée tant qu'aucune PR n'attend, la carte y montre ses boutons de PR, et un ordre de
+  colonnes déjà enregistré la reçoit sans perdre ses largeurs. Une carte sans PR ne peut pas y
+  être déposée.
+- **Filtre « Générée par une page »** : les cartes que crée le studio de tests, Import Design,
+  le journal des modifications ou le pair programming ont leur source dans le filtre du Kanban.
+- **La spec profite aussi de la boucle d'apprentissage.** Le rédacteur de spec (rapide et standard) et son critique reçoivent les leçons que la Learning Loop a tirées des builds précédents et que vous avez adoptées, comme le planificateur, le codeur et la QA les recevaient déjà. Une règle apprise ne manque donc plus à la spec qui cadre le plan (#345).
+- **La boucle d'apprentissage analyse les builds avec un modèle, quel que soit le provider choisi**
+  (F178). Aux patterns tirés des règles s'ajoutent ceux du modèle (Claude, Copilot, OpenAI, Gemini,
+  Mistral, DeepSeek, Grok, Ollama…), vérifiés avant d'être gardés. `WORKPILOT_LEARNING_LOOP_MODEL=0`
+  coupe l'appel.
+- **Multi-dépôts : choisir le moteur des cartes.** Le dialogue « Multi-dépôts » demande le fournisseur, le modèle et l'effort (par phase sous « Avancé ») ; chaque carte de dépôt les reçoit comme si on les avait choisis sur le tableau. Codex, Copilot, Ollama, Mistral et les autres fournisseurs servent donc aussi aux changements multi-dépôts. Sans choix, chaque projet garde son fournisseur par défaut (#382).
+- **L'assistant de premier lancement ouvre tous les fournisseurs d'IA** (F176). Une carte
+  « Utiliser une autre IA » permet de configurer Codex, GitHub Copilot, Gemini, OpenCode, Ollama,
+  Mistral et les autres dès le premier lancement, dans le même panneau que Réglages → Comptes. Le
+  dernier écran nomme les IA connectées, ou dit qu'aucune ne l'est et propose d'en connecter une, au
+  lieu d'annoncer « Configuration terminée » dans tous les cas. Le chemin clé d'API ne saute plus les
+  outils de dev ni la confidentialité. Réglages → Comptes n'affiche plus « 15 fournisseur(s) en
+  erreur » sur une installation neuve, et la recherche n'affiche plus `{{count > 1 ? 's' : ''}}`.
+- **Un menu de gauche plus léger, et Ctrl+K trouve toutes les pages** (F181). « Outils CLI » devient
+  une pastille « CLI 1/8 » en pied de menu, qui ouvre les mêmes badges : le menu gagne environ
+  320 px de haut. Les lignes n'affichent plus que l'icône et le nom (le raccourci passe dans
+  l'infobulle, la poignée apparaît au survol) et les noms trop longs ont été raccourcis. Le champ
+  « Rechercher », `/` et Ctrl+K ouvrent la palette de commandes, qui liste désormais les 77 pages
+  (et non plus 21), les trouve par leur nom, leur groupe ou un mot-clé, sans tenir compte des
+  accents, et propose d'abord les pages ouvertes récemment.
+- **Une Boîte à outils rangée, un Labo pour la bêta, et le menu qui s'adapte à vous** (F181). La
+  Boîte à outils passe de 20 à 9 entrées : Qualité et sécurité, Accessibilité et i18n, API et
+  Automatisation deviennent des pages à onglets. Les 14 pages encore en bêta sont réunies dans le
+  Labo, la fiole en bas du rail, avec une phrase sur ce que fait chacune ; une page qui sort de
+  bêta retrouve sa place. Quand des pages d'un espace n'ont pas été ouvertes depuis 30 jours, le
+  menu propose de les masquer (rien n'est masqué d'office) ; elles restent trouvables par Ctrl K et
+  se réaffichent depuis « Pages masquées ».
+- **Le menu de gauche en deux niveaux : un rail d'espaces et « Mon menu »** (F181). Une colonne
+  d'icônes (Mon menu, Espace de travail, Agents, Développement…) choisit l'espace, et le panneau
+  à côté ne liste que ses pages. « Mon menu » réunit les pages épinglées et les 5 dernières
+  ouvertes ; la première fois, il propose un menu « Essentiel » (10 pages du quotidien, vues en
+  bêta masquées) ou « Complet ». Menu replié, survoler une icône liste ses pages. Glisser une
+  page sur l'étoile l'épingle, et glisser une icône du rail réordonne les espaces.
+- **Les worktrees des cartes terminées ne remplissent plus le disque** (F180). Quand la PR d'une
+  carte est fusionnée sur la forge (GitHub, GitLab, Azure DevOps), la carte passe « Terminé » et
+  son worktree et sa branche locale sont supprimés. Le bouton « Purger » du Kanban montre la place
+  occupée par les worktrees des cartes terminées, archivées ou abandonnées et les supprime. Un
+  worktree avec des modifications non commitées n'est jamais supprimé.
+
+### 🐛 Corrections
+
+- **Mistral, DeepSeek et Grok fonctionnent aussi en mode développement et sur un serveur** (F174).
+  Les fonctions qui passent par ces providers (Arena, traduction, appels ponctuels), Jira et
+  Azure DevOps échouaient sur « No module named 'src' » hors de l'app installée.
+- **« Copier le chemin » colle directement dans l'Explorateur Windows sous WSL** : le studio de
+  tests, les worktrees et les réglages du dépôt copient `\\wsl.localhost\<distro>\…` (ou `C:\…`
+  sous `/mnt/c`) au lieu du chemin Linux.
+- **La liste des tests générés reste lisible** : chaque test garde sa hauteur au lieu d'être écrasé
+  quand la liste dépasse le panneau, et nomme le fichier ciblé au lieu de son chemin complet.
+- **Premier lancement et ajout d'un projet sans impasse** (F173). L'assistant n'affiche plus
+  « steps.claudeCode » ni un compte Claude « Authentifié » sans connexion, passe à l'étape suivante
+  après la création d'un profil clé d'API, « Passer » saute l'étape au lieu de fermer l'assistant, et
+  « Ouvrir le créateur de tâches » ouvre l'ajout de projet quand il n'y en a pas encore ;
+  l'indicateur d'usage ne reste plus sur « Loading... » au premier lancement. Sur une
+  machine où git ne connaît ni nom ni e-mail, « Initialiser Git » les demande au lieu d'échouer.
+  Créer un projet ne demande plus de recliquer sur « Passer pour l'instant », et un projet à
+  initialiser prépare git dans ses réglages sans fenêtre qui les ferme.
+- **Import Design et le journal des modifications écrivent sur une branche de revue** (F180).
+  « Écrire dans le projet » d'Import Design et « Enregistrer » du journal écrivaient dans le
+  dossier du projet, sur la branche courante. Les fichiers du composant, `CHANGELOG.md` et les
+  images collées vont maintenant sur la branche d'une carte « Code généré » en Revue humaine :
+  vous relisez le diff, puis « Créer la PR ». Le chemin du journal ne peut plus sortir du projet.
+- **Le pair programming code sur une branche de revue** (F180). L'agent écrivait en direct dans
+  le dossier du projet. Il travaille maintenant dans le worktree d'une carte « Code généré » ; à
+  la fin de la session, son travail y est commité et la carte attend votre revue, avec « Voir la
+  carte » et « Créer la PR » sur la page.
+- **Les tests générés arrivent sur une branche de revue, plus dans votre dossier de projet**
+  (F180). Le studio de tests écrivait ses fichiers, et les paquets ajoutés aux manifestes,
+  directement dans le projet, donc sur la branche courante. Chaque génération (Unitaire, E2E,
+  TDD) et chaque ajout de paquets vont maintenant dans le worktree d'une carte « Code généré »
+  en Revue humaine, comme une tâche du Kanban : vous relisez le diff, puis « Créer la PR ». Les
+  générations suivantes rejoignent la même carte jusqu'à l'ouverture de sa PR.
+- **La barre « Commande rapide » du Kanban marche avec un abonnement Claude et avec tous les
+  providers** (F182). Elle échouait sur « No OAuth token found » avec un abonnement Claude
+  classique et ignorait le provider choisi : la commande tournait dans le serveur backend, qui n'a
+  ni la connexion du profil Claude ni le provider de l'app. Elle tourne maintenant avec le
+  provider sélectionné (Claude Code, Codex, Copilot, Gemini, OpenCode, Mistral, Ollama…) et, comme
+  les autres pages, sur une branche de revue : ce que la commande écrit attend sur une carte en
+  Revue humaine, d'où l'on ouvre la PR, au lieu d'arriver dans le dossier du projet.
+- **Supprimer un projet du serveur arrête d'abord ses agents et ses analyses** (F175). Ils ne
+  continuent plus dans un dossier effacé, et sur un serveur SQLite les tâches, runs et membres du
+  projet partent avec lui au lieu de rester orphelins.
+- **Le studio de génération de tests fonctionne à nouveau** (F179). Les onglets Unitaire,
+  Analyser, E2E et TDD échouaient sur « No agent runtime is installed », quels que soient le
+  provider et la stack, et un scénario E2E d’un projet C#, Java ou Go ne s’écrit plus en `.js`.
+- **Les modules et les Paramètres reprennent les couleurs du thème choisi** (F172). La charte UI
+  imposait son propre orange et ses propres couleurs d'état : sur Ocean, Forest, Neo ou Lime, la
+  barre latérale avait la couleur du thème et l'écran à côté était orange. L'accent, les états
+  (succès, alerte, erreur, info) et les surfaces suivent maintenant le thème actif, en clair comme
+  en sombre ; Import Design, le studio de génération de tests et le canvas Visuel vers Code aussi
+  (le canvas garde ses préréglages de couleurs, « Thème de l'app » devient celui par défaut).
+
+### 🔒 Sécurité
+
+- **Les dernières alertes de dépendances sont corrigées.** oauthlib passe en 4.0.1 (CVE-2026-49272) côté Python ; glob et minimatch passent sur leurs versions corrigées (14.0.2+ et 11.0.1+) dans l'application de bureau et l'application mobile ; le renderer archify embarqué ne déclare plus fast-uri 3.1.5, et le script de vendoring garde ce plancher quand on le relance. Reste deepmerge (faible, outillage Jest du mobile) : aucune version corrigée n'existe encore.
+- **L'URL du webhook Slack ou Teams est stockée chiffrée** (F177). Elle n'est plus gardée en clair
+  dans l'interface et n'apparaît plus dans la liste des processus. Une URL déjà enregistrée est
+  reprise automatiquement à la première ouverture de l'écran Team Bot.
+
+### 🛠️ Qualité
+
+- **Une version se publie dès que son tag est posé** (F171). Les builds de la release ne tentent
+  plus de créer eux-mêmes la release GitHub, ce qui les faisait tous échouer quand le tag lançait le
+  workflow.
+
+### 📚 Documentation
+
+- **Un README plus soigné, avec le nouveau menu**. Les captures sont refaites avec le menu en
+  espaces (« Mon menu », rail, Labo) et présentées dans un cadre de fenêtre sur fond dégradé. Les
+  schémas « Fonctionnement » et « Architecture » sont redessinés (cartes, icônes de l'app, légende),
+  en anglais et en français, et suivent le thème clair ou sombre de GitHub.
+- **L'atlas d'architecture et le README racontent les changements du 9 novembre**. L'atlas
+  (`docs/audit/WorkPilot-architecture.html`) gagne un tableau « Ce qui a changé le 9 novembre
+  2026 » lisible sans bagage technique, la carte « Code généré » dans sa topologie et les PR du jour
+  en tête de ses évolutions. Le README, en anglais et en français, dit que tout code écrit par une
+  page passe par une branche et une PR relue, et présente la purge des worktrees, les nouveaux diffs,
+  la commande rapide, le menu en espaces avec son Labo et l'assistant de premier lancement pour
+  tous les providers.
+- **Des schémas dans le README à la place des flèches en texte**. Le fonctionnement (planifier,
+  construire et contrôler, prouver et livrer) et l'architecture (machine, services, mode équipe)
+  sont dessinés en diagrammes Mermaid, affichés par GitHub, en anglais et en français ; l'arbre des
+  dossiers devient un tableau.
+- **Le README existe en anglais et en français, avec des captures aux couleurs du thème**.
+  `README.fr.md` reprend tout le README anglais, et chacun renvoie vers l'autre en tête de page.
+  Les captures sont refaites après le passage de la charte UI aux couleurs du thème actif. À chaque
+  version, le tableau de téléchargement des deux fichiers est mis à jour, chacun dans sa langue.
+- **Un README plus court et rangé, avec des captures à jour**. Le README tient en une page : ce que
+  fait l'app, téléchargement, démarrage rapide, fonctionnement, visite en captures, features en bref,
+  providers, documentation. Le détail part dans `docs/FEATURES.md`, `docs/INSTALLATION.md` et
+  `docs/ARCHITECTURE.md`. Toutes les captures sont refaites, dont celle des terminaux d'agents qui
+  montrait encore l'ancienne interface ; le wiki reçoit la nouvelle.
+
+---
+
 ## 1.4.0 - Une seule charte UI, et les grosses tâches se découpent en petites PR
 
 Tous les modules et toutes les pages de paramètres adoptent une seule charte, celle de « Visuel

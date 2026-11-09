@@ -872,7 +872,7 @@ jobs:
           ref: develop
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update README.md
+      - name: Update README.md and README.fr.md
         run: |
           VERSION="${{ github.event.inputs.version }}"
           python3 scripts/update-readme.py "$VERSION" --prerelease
@@ -885,12 +885,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet README.md; then
-            echo "No changes to README.md, skipping commit"
+          READMES=$(ls README.md README.fr.md 2>/dev/null)
+          if git diff --quiet -- $READMES; then
+            echo "No changes to the READMEs, skipping commit"
             exit 0
           fi
 
-          git add README.md
+          git add -- $READMES
           git commit -m "docs: update README to v${{ github.event.inputs.version }} [skip ci]"
           git push origin develop
 

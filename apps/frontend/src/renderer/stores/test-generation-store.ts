@@ -4,6 +4,10 @@ import type {
 	TestGenStageId,
 } from "../../shared/types/test-generation";
 import { normalizeTestGenerationError } from "../../shared/types/test-generation";
+import {
+	type GeneratedReview,
+	parseGeneratedReview,
+} from "../../shared/types/generated-review";
 import { useProjectStore } from "./project-store";
 
 /**
@@ -152,6 +156,11 @@ interface TestGenerationState {
 	isLiveRun: boolean;
 	/** Re-runs the last launched generation — powers the panel's Retry button. */
 	lastRun: (() => Promise<unknown>) | null;
+	/**
+	 * The review card the last written run went to: generated tests land on
+	 * its branch, never in the project folder (main/generated-review/).
+	 */
+	review: GeneratedReview | null;
 
 	// Actions
 	openDialog: (filePath: string, existingTestPath?: string) => void;
@@ -159,6 +168,8 @@ interface TestGenerationState {
 	setPhase: (phase: TestGenerationPhase) => void;
 	setStatus: (status: string) => void;
 	setResult: (result: TestGenerationResult) => void;
+	/** Keep the card a run wrote to; a run that wrote nothing keeps the last one. */
+	setReview: (review: unknown) => void;
 	setPostBuildResults: (postBuildResults: PostBuildResult[]) => void;
 	setError: (error: TestGenerationError | string) => void;
 	clearError: () => void;
@@ -238,6 +249,7 @@ const initialState = {
 	genEndedAt: null as number | null,
 	isLiveRun: false,
 	lastRun: null as (() => Promise<unknown>) | null,
+	review: null as GeneratedReview | null,
 };
 
 /**
@@ -318,6 +330,7 @@ export const useTestGenerationStore = create<TestGenerationState>(
 		closeDialog: () => {
 			set({
 				isOpen: false,
+				review: null,
 				phase: "idle",
 				status: "",
 				result: null,
@@ -331,6 +344,10 @@ export const useTestGenerationStore = create<TestGenerationState>(
 		setPhase: (phase: TestGenerationPhase) => set({ phase }),
 		setStatus: (status: string) => set({ status }),
 		setResult: (result: TestGenerationResult) => set({ result }),
+		setReview: (review: unknown) => {
+			const parsed = parseGeneratedReview(review);
+			if (parsed) set({ review: parsed });
+		},
 		setPostBuildResults: (postBuildResults: PostBuildResult[]) =>
 			set({ postBuildResults }),
 		setError: (error: TestGenerationError | string) => {
@@ -551,7 +568,8 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 				const onComplete = (data: any) => {
 					cleanup();
-					const parsed = data as { result?: TestGenerationResult };
+					const parsed = data as { result?: TestGenerationResult; review?: unknown };
+					get().setReview(parsed.review);
 					const result = parsed.result as TestGenerationResult;
 					set({ genEndedAt: Date.now() });
 					setPhase("complete");
@@ -621,7 +639,8 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 				const onComplete = (data: any) => {
 					cleanup();
-					const parsed = data as { result?: TestGenerationResult };
+					const parsed = data as { result?: TestGenerationResult; review?: unknown };
+					get().setReview(parsed.review);
 					const result = parsed.result as TestGenerationResult;
 					set({ genEndedAt: Date.now() });
 					setPhase("complete");
@@ -687,7 +706,8 @@ export const useTestGenerationStore = create<TestGenerationState>(
 				// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 				const onComplete = (data: any) => {
 					cleanup();
-					const parsed = data as { result?: TestGenerationResult };
+					const parsed = data as { result?: TestGenerationResult; review?: unknown };
+					get().setReview(parsed.review);
 					const result = parsed.result as TestGenerationResult;
 					set({ genEndedAt: Date.now() });
 					setPhase("complete");

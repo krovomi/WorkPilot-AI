@@ -17,7 +17,8 @@
  * tested with fakes (`__tests__/run.test.ts`) and wired to the app in
  * `host.ts`.
  */
-import type { ReviewReason, TaskStatus } from "../../shared/types";
+import type { ReviewReason, TaskEngine, TaskStatus } from "../../shared/types";
+import { readEngine } from "./engine";
 import { type RawManifest, type RawRepo, readManifest, writeManifest } from "./manifest";
 import { progressOf, repoStatusFromTask, waitsForSomeone } from "./task-outcome";
 
@@ -46,7 +47,13 @@ export interface MultiRepoHost {
 	): Promise<{ ok: boolean; events: RunnerEvent[] }>;
 	/** The registered, initialized project of a repo path, added if needed. */
 	ensureProject(repoPath: string): { id: string } | null;
-	createTask(projectId: string, title: string, description: string): Promise<string | null>;
+	/** `engine`: the orchestration's, or `null` for the project's own default. */
+	createTask(
+		projectId: string,
+		title: string,
+		description: string,
+		engine: TaskEngine | null,
+	): Promise<string | null>;
 	/** `false` when the task could not start (missing sign-in, bad project…). */
 	startTask(taskId: string): Promise<boolean>;
 	/** Stops the task if its agents are running; nothing otherwise. */
@@ -299,6 +306,7 @@ export class MultiRepoRun {
 			project.id,
 			repoTaskTitle(sub.repo, m.task_description),
 			description,
+			readEngine(this.dir),
 		);
 		if (this.stopped) return "stopped";
 		if (!taskId) {

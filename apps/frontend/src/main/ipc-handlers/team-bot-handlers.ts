@@ -2,18 +2,30 @@
  * Team Bot IPC Handlers — Slack / Microsoft Teams notifications.
  *
  * Channels:
- *   teamBot:send → { config, payload } → { ok }
- *   teamBot:test → { config }          → { ok }
+ *   teamBot:getConfig  → TeamBotConfig, webhook URL masked
+ *   teamBot:saveConfig → TeamBotConfig (masked) after storing it
+ *   teamBot:send       → { payload } → { ok }
+ *   teamBot:test       → { ok }
  *
- * Provider-agnostic: no LLM calls, only outbound webhook POSTs.
+ * The configuration, webhook URL included, is the main process's own
+ * (team-bot-config.ts): the renderer never names the URL a send goes to, and
+ * the runner reads its input from stdin, not from a command line every local
+ * process can list (F177). Provider-agnostic: no LLM calls, only webhook POSTs.
  */
 
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { app, ipcMain } from "electron";
-import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
+import {
+	maskedTeamBotConfig,
+	readTeamBotConfig,
+	saveTeamBotConfig,
+} from "../team-bot-config";
+import { requirePythonPath } from "../utils/ensure-python";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+
+const NO_WEBHOOK = "No webhook URL is configured";
 
 async function runRunner(
 	action: "send" | "test",
@@ -29,19 +41,14 @@ async function runRunner(
 	);
 	const pythonExe = await requirePythonPath();
 
-	const args = [
-		runnerPath,
-		"--action",
-		action,
-		"--payload",
-		JSON.stringify(payload),
-	];
+	const args = [runnerPath, "--action", action, "--payload", "-"];
 
 	const env = await pythonRunnerEnv(backendPath);
 	return new Promise((resolve, reject) => {
 		const child = spawn(pythonExe, args, {
 			cwd: backendPath,
 			env,
+			stdio: ["pipe", "pipe", "pipe"],
 		} as Parameters<typeof spawn>[2]);
 
 		let stdout = "";
@@ -74,23 +81,42 @@ async function runRunner(
 				);
 			}
 		});
+		child.stdin?.end(JSON.stringify(payload));
 	});
 }
 
+/** The stored configuration, ready for the runner, or an error without one. */
+function configForRunner(): Record<string, unknown> {
+	const config = readTeamBotConfig();
+	if (!config.webhook_url) throw new Error(NO_WEBHOOK);
+	return { ...config };
+}
+
+function notification(value: unknown): Record<string, unknown> {
+	const record =
+		typeof value === "object" && value !== null && !Array.isArray(value)
+			? (value as Record<string, unknown>)
+			: {};
+	const payload = record.payload;
+	if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+		throw new Error("Invalid notification");
+	}
+	const { title } = payload as Record<string, unknown>;
+	if (typeof title !== "string" || !title) throw new Error("Invalid notification");
+	return payload as Record<string, unknown>;
+}
+
 export function registerTeamBotHandlers(): void {
-	ipcMain.handle(
-		IPC_CHANNELS.TEAM_BOT_SEND,
-		async (
-			_e,
-			{
-				config,
-				payload,
-			}: { config: Record<string, unknown>; payload: Record<string, unknown> },
-		) => runRunner("send", { config, payload }),
+	ipcMain.handle(IPC_CHANNELS.TEAM_BOT_GET_CONFIG, async () =>
+		maskedTeamBotConfig(),
 	);
-	ipcMain.handle(
-		IPC_CHANNELS.TEAM_BOT_TEST,
-		async (_e, { config }: { config: Record<string, unknown> }) =>
-			runRunner("test", { config }),
+	ipcMain.handle(IPC_CHANNELS.TEAM_BOT_SAVE_CONFIG, async (_e, config: unknown) =>
+		saveTeamBotConfig(config),
+	);
+	ipcMain.handle(IPC_CHANNELS.TEAM_BOT_SEND, async (_e, request: unknown) =>
+		runRunner("send", { config: configForRunner(), payload: notification(request) }),
+	);
+	ipcMain.handle(IPC_CHANNELS.TEAM_BOT_TEST, async () =>
+		runRunner("test", { config: configForRunner() }),
 	);
 }

@@ -582,7 +582,8 @@
 						"description": "Ajoutez des endpoints API personnalisés pour étendre vos options LLM",
 						"title": "Aucun endpoint configuré"
 					},
-					"endpointCount": "{{count}} endpoint(s) configuré(s)",
+					"endpointCount_one": "{{count}} endpoint configuré",
+					"endpointCount_other": "{{count}} endpoints configurés",
 					"title": "Endpoints personnalisés"
 				},
 				"standard": {
@@ -2120,7 +2121,8 @@
 			"noProviders": "Aucun fournisseur disponible",
 			"noResults": "Aucun fournisseur trouvé",
 			"placeholder": "Rechercher un fournisseur...",
-			"results": "{{count}} résultat(s) pour « {{query}} »"
+			"results_one": "{{count}} résultat pour « {{query}} »",
+			"results_other": "{{count}} résultats pour « {{query}} »"
 		},
 		"sort": {
 			"category": "Catégorie",

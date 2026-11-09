@@ -1,8 +1,10 @@
 import { ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { openAppEmulatorDialog } from "@/stores/app-emulator-store";
 import { openArenaDialog } from "@/stores/arena-store";
 import { openConflictPredictorDialog } from "@/stores/conflict-predictor-store";
 import { openContextAwareSnippetsDialog } from "@/stores/context-aware-snippets-store";
+import { openDependencySentinelDialog } from "@/stores/dependency-sentinel-store";
 import { useNaturalLanguageGitStore } from "@/stores/natural-language-git-store";
 import { openSmartEstimation } from "@/stores/smart-estimation-store";
 import type { SidebarView } from "../Sidebar";
@@ -19,6 +21,8 @@ export const HUB_DIALOG_OPENERS: Partial<Record<SidebarView, () => void>> = {
 	"conflict-predictor": openConflictPredictorDialog,
 	"natural-language-git": () => useNaturalLanguageGitStore.getState().openDialog(),
 	"arena-mode": openArenaDialog,
+	"dependency-sentinel": openDependencySentinelDialog,
+	"app-emulator": openAppEmulatorDialog,
 };
 
 /** The page of a tab whose tool is a dialog: what it does, and a button that opens it. */

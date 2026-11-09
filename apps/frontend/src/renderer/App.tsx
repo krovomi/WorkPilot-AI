@@ -413,6 +413,7 @@ import { useTaskNotifications } from "./hooks/useTaskNotifications";
 import type { Activity } from "./stores/activity-store";
 import { setActivityActiveView } from "./stores/activity-store";
 import { recordViewVisit } from "./stores/view-usage-store";
+import { useCommandPaletteStore } from "./stores/command-palette-store";
 import { setupGlobalListeners } from "./stores/global-listeners";
 import {
 	loadClaudeProfiles,
@@ -704,7 +705,7 @@ export function App() {
 	}, []);
 
 	// Command Palette & Keyboard Shortcuts state (Features 9.4 & 9.5)
-	const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+	const { open: isCommandPaletteOpen, setOpen: setIsCommandPaletteOpen } = useCommandPaletteStore();
 	const [isShortcutsOverlayOpen, setIsShortcutsOverlayOpen] = useState(false);
 
 	// A paused task is still `in_progress`, but nothing is running: it must not
@@ -2164,7 +2165,6 @@ export function App() {
 						{/* Global download progress indicator - shows overall progress of all downloads */}
 						<GlobalDownloadIndicator />
 
-						{/* Command Palette (Feature 9.5) */}
 						<CommandPalette
 							open={isCommandPaletteOpen}
 							onOpenChange={setIsCommandPaletteOpen}
@@ -2192,8 +2192,8 @@ export function App() {
 						open={isOnboardingWizardOpen}
 						onOpenChange={setIsOnboardingWizardOpen}
 						onOpenTaskCreator={() => {
-							setIsOnboardingWizardOpen(false);
-							setIsNewTaskDialogOpen(true);
+							// No project yet means no task creator: add a project first.
+							(activeProjectId || selectedProjectId ? setIsNewTaskDialogOpen : setShowAddProjectModal)(true);
 						}}
 						onOpenSettings={() => {
 							setIsOnboardingWizardOpen(false);

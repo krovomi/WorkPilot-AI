@@ -8,6 +8,8 @@ import { invokeIpc } from "./ipc-utils";
 export interface ShellAPI {
 	openExternal: (url: string) => Promise<void>;
 	openTerminal: (dirPath: string) => Promise<IPCResult<void>>;
+	/** The path as the user's desktop names it (Windows form under WSL). */
+	toHostPath: (path: string) => Promise<string>;
 }
 
 /**
@@ -18,4 +20,6 @@ export const createShellAPI = (): ShellAPI => ({
 		invokeIpc(IPC_CHANNELS.SHELL_OPEN_EXTERNAL, url),
 	openTerminal: (dirPath: string): Promise<IPCResult<void>> =>
 		invokeIpc(IPC_CHANNELS.SHELL_OPEN_TERMINAL, dirPath),
+	toHostPath: (path: string): Promise<string> =>
+		invokeIpc(IPC_CHANNELS.SHELL_HOST_PATH, path),
 });

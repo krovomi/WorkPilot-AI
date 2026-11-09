@@ -29,6 +29,7 @@ export type TaskSource =
 	| "ideation"
 	| "roadmap"
 	| "insights"
+	| "generated"
 	| "manual";
 
 /** Field a column can be sorted by. "manual" preserves the drag-and-drop order. */
@@ -79,6 +80,7 @@ export const TASK_SOURCES: TaskSource[] = [
 	"ideation",
 	"roadmap",
 	"insights",
+	"generated",
 	"manual",
 ];
 
@@ -108,6 +110,8 @@ export function getTaskSource(task: Task): TaskSource {
 	if (m.sourceType === "ideation") return "ideation";
 	if (m.sourceType === "roadmap") return "roadmap";
 	if (m.sourceType === "insights") return "insights";
+	// Code written by a page (test studio, Import Design…) for review.
+	if (m.sourceType === "generated") return "generated";
 	return "manual";
 }
 

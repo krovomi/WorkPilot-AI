@@ -98,6 +98,7 @@
 		"pipeline": "Pipeline",
 		"repairBuild": "Réparer le build",
 		"buildFailed": "Build rouge",
+		"prOpen": "PR ouverte",
 		"openInTracker": "Ouvrir dans {{tracker}}",
 		"currentPhase": "Phase actuelle",
 		"compactedPhases": "{{count}} phases",
@@ -178,7 +179,7 @@
 		"human_review": "Révision humaine",
 		"build_failed": "Build rouge",
 		"done": "Terminé",
-		"pr_created": "PR créée",
+		"pr_created": "PR ouverte",
 		"error": "Erreur"
 	},
 	"kanban": {
@@ -194,6 +195,9 @@
 		"emptyQueueHint": "Les tâches attendront ici lorsque la limite de tâches parallèles sera atteinte",
 		"emptyBuildFailed": "Aucun build rouge",
 		"emptyBuildFailedHint": "Les tâches arrivent ici quand leur pipeline CI/CD échoue — l'agent les répare automatiquement",
+		"emptyPrOpen": "Aucune PR en attente",
+		"emptyPrOpenHint": "Les tâches arrivent ici dès que leur pull request est ouverte, et passent dans Terminé quand elle est fusionnée",
+		"prOpenNeedsPr": "Cette tâche n'a pas encore de pull request. Créez-la depuis la tâche pour la placer dans PR ouverte.",
 		"emptyInProgress": "Rien en cours",
 		"emptyInProgressHint": "Démarrez une tâche depuis le Backlog",
 		"emptyAiReview": "Aucune tâche en révision",
@@ -333,6 +337,7 @@
 				"ideation": "Idéation",
 				"roadmap": "Roadmap",
 				"insights": "Insights",
+				"generated": "Générée par une page",
 				"manual": "Manuelle"
 			}
 		},
@@ -352,7 +357,7 @@
 			"placeholder": "Commande rapide (ex. /review, /help)",
 			"buttonLabel": "Exécuter",
 			"running": "Exécution…",
-			"hint": "Tape / puis le nom de la commande. Tab pour autocompléter.",
+			"hint": "Tape / puis le nom de la commande. Tab pour autocompléter. Ce que la commande écrit part sur une branche de revue, jamais dans ton dossier de projet.",
 			"noResults": "Aucune commande correspondante",
 			"sourceProject": "Projet",
 			"sourceUser": "Utilisateur",
@@ -362,8 +367,12 @@
 			"successTitle": "Commande terminée",
 			"ariaListLabel": "Commandes slash disponibles",
 			"runAsTaskLabel": "Lancer en tâche",
-			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'un tir unique.",
-			"taskCreated": "Tâche créée : {{name}}"
+			"runAsTaskHint": "Lancer comme une tâche Kanban interactive (planification, revue, conversation) plutôt qu'une exécution directe.",
+			"taskCreated": "Tâche créée : {{name}}",
+			"uncommitted": "Les fichiers écrits n'ont pas pu être commités sur la branche de revue ; ils sont restés dans {{path}}.",
+			"reviewCard_other": "{{count}} fichiers commités sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
+			"reviewCard_one": "{{count}} fichier commité sur {{branch}} (carte « {{card}} », en Revue humaine). Relis le diff puis crée la PR depuis la carte.",
+			"helpTitle": "Commandes disponibles"
 		},
 		"blockers": {
 			"label_one": "1 bloqueur",
@@ -637,7 +646,15 @@
 			"gitlab": "GitLab",
 			"visual-canvas": "Canvas visuel",
 			"tech-debt": "Dette technique",
-			"automation": "Automatisation"
+			"automation": "Automatisation",
+			"generated": "Code généré"
+		},
+		"cicdRun": {
+			"triggered_pr": "Pipeline {{provider}} lancé à l'ouverture de la PR, {{when}}",
+			"triggered_merge": "Pipeline {{provider}} lancé après la fusion, {{when}}",
+			"failed_pr": "Le pipeline {{provider}} n'a pas pu démarrer à l'ouverture de la PR ({{when}})",
+			"failed_merge": "Le pipeline {{provider}} n'a pas pu démarrer après la fusion ({{when}})",
+			"open": "Ouvrir le pipeline"
 		}
 	},
 	"kind": {
@@ -946,10 +963,6 @@
 			"viewDiff": "Voir les modifications",
 			"hideDiff": "Masquer les modifications",
 			"noDiff": "Aucune modification enregistrée pour ce fichier",
-			"viewMode": {
-				"unified": "Vue unifiée",
-				"split": "Vue côte à côte"
-			},
 			"stats": {
 				"files": "Fichiers",
 				"folders": "Dossiers",
@@ -2381,5 +2394,27 @@
 		"overBadge": "{{lines}} / {{max}} lignes",
 		"overFilesBadge": "{{files}} / {{max}} fichiers",
 		"overTooltip": "Le diff réel compte environ {{lines}} lignes à relire dans {{files}} fichiers, au-delà du plafond de {{max}} lignes et {{maxFiles}} fichiers pour ce type de tâche : la relecture sera plus longue."
+	},
+	"purge": {
+		"button": "Purger",
+		"buttonTitle": "Libérer la place des worktrees dont le travail est terminé",
+		"title": "Purger les worktrees terminés",
+		"description": "Chaque carte travaille dans une copie complète du projet. Celles-ci appartiennent à des cartes dont la PR est fusionnée, ou qui sont terminées, archivées ou abandonnées. Purger supprime le dossier et la branche locale workpilot/… ; la carte, sa spec et sa PR restent. Une PR fusionnée est purgée automatiquement.",
+		"loading": "Calcul de la place occupée…",
+		"empty": "Aucun worktree à purger : rien n'occupe de place inutilement.",
+		"dirty": "modifications non commitées, conservé",
+		"failed": "La purge n'a pas pu être lancée.",
+		"reason": {
+			"merged": "PR fusionnée",
+			"done": "terminée",
+			"archived": "archivée",
+			"abandoned": "abandonnée"
+		},
+		"confirm_one": "Purger {{count}} worktree ({{size}})",
+		"confirm_other": "Purger {{count}} worktrees ({{size}})",
+		"done_one": "{{count}} worktree purgé, {{size}} libérés.",
+		"done_other": "{{count}} worktrees purgés, {{size}} libérés.",
+		"kept_one": "{{count}} conservé : modifications non commitées ou suppression impossible.",
+		"kept_other": "{{count}} conservés : modifications non commitées ou suppression impossible."
 	}
 }

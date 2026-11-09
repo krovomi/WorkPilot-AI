@@ -23,6 +23,7 @@ import type { AgentManager } from "../agent";
 import { appEmulatorService } from "../app-emulator-service";
 import { changelogService } from "../changelog-service";
 import { getToolPath } from "../cli-tool-manager";
+import { parseGitIdentity } from "../git-identity";
 import { insightsService } from "../insights-service";
 import { migrateProjectEnvSecrets } from "../project-env-file";
 import { listServerProjects } from "../server-projects";
@@ -1358,12 +1359,22 @@ export function registerProjectHandlers(
 			_,
 			projectPath: string,
 			remoteConfig?: { url?: string; name?: string },
+			identity?: unknown,
 		): Promise<IPCResult<InitializationResult>> => {
 			try {
 				if (!existsSync(projectPath)) {
 					return { success: false, error: "Directory does not exist" };
 				}
-				const result = initializeGit(projectPath, remoteConfig);
+				// Saved to the global git config: revalidated here, not trusted.
+				const parsedIdentity = parseGitIdentity(identity);
+				if (identity !== undefined && !parsedIdentity) {
+					return { success: false, error: "Invalid git name or email" };
+				}
+				const result = initializeGit(
+					projectPath,
+					remoteConfig,
+					parsedIdentity ?? undefined,
+				);
 				return { success: result.success, data: result, error: result.error };
 			} catch (error) {
 				return {

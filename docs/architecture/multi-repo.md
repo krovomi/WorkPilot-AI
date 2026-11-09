@@ -21,6 +21,7 @@ apps/backend/orchestration/
 apps/backend/runners/multi_repo_runner.py         une sous-commande par étape, lignes [MULTI_REPO] {json}
 apps/frontend/src/main/multi-repo/
   manifest.ts          lecture, écriture, création, dossier d'une orchestration
+  engine.ts            le moteur des cartes (engine.json), revalidé à l'entrée
   run.ts               le déroulé (testé avec un hôte factice)
   task-outcome.ts      statut d'un dépôt lu dans sa carte
   host.ts              ce que le déroulé utilise de l'app : runner, projets, cartes, renderer
@@ -36,6 +37,13 @@ apps/frontend/src/renderer/components/multi-repo/  bouton « Multi-dépôts » d
    projet (ajouté, initialisé), refusé s'il n'est pas un dépôt git avec un commit. Le manifeste
    est écrit dans `<projet>/.workpilot/multi-repo/<NNN-slug>/`, hors de `.workpilot/specs/` : un
    dossier de spec est une carte, une orchestration n'en est pas une.
+   La personne choisit aussi le **moteur** des cartes (fournisseur × modèle × effort, par phase,
+   le même `TaskEngineEditor` que la création d'une carte), amorcé comme une carte neuve : le
+   fournisseur du projet hôte, sinon celui des Paramètres. Il est écrit dans `engine.json` à côté
+   du manifeste et non dedans, parce que le runner Python réécrit le manifeste depuis sa
+   dataclass à `analyze` et `check` et perdrait un champ qu'il ne connaît pas. Le main le
+   revalide (fournisseur en minuscules, modèle borné sans caractère de contrôle, effort connu) ;
+   un moteur mal formé est refusé, aucun moteur laisse chaque projet à son fournisseur par défaut.
 2. **Analyser** (`analyze`). Lecture heuristique de chaque dépôt (`package.json`,
    `requirements.txt`, workspaces), graphe des dépendances, tri topologique. Un cycle arrête le
    déroulé avant toute carte. Une nouvelle analyse garde ce que chaque dépôt a déjà (projet, carte,
@@ -47,7 +55,8 @@ apps/frontend/src/renderer/components/multi-repo/  bouton « Multi-dépôts » d
      seulement les fournisseurs détectés : un front qui appelle une API en HTTP ne partage aucun
      paquet avec elle.
    - La carte est créée par `createLocalTask` (le même code que `TASK_CREATE`), titrée
-     `<dépôt>: <première ligne du changement>`, puis lancée par `getTaskControl().start` (le
+     `<dépôt>: <première ligne du changement>`, avec le moteur de l'orchestration en
+     `buildEngineMetadata` (`engineLocked` : rien de global ne le remplace ensuite), puis lancée par `getTaskControl().start` (le
      bouton Démarrer du tableau).
    - Le déroulé suit la carte : par les statuts que `TaskStateManager` envoie au tableau
      (`addStatusListener`), et par une relecture du disque toutes les 15 s, au cas où un statut

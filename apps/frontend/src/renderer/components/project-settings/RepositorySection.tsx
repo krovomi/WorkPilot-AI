@@ -22,6 +22,7 @@ import { renameProject, useProjectStore } from "../../stores/project-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { copyPath } from "../../lib/copy-path";
 
 interface RepositorySectionProps {
 	readonly project: Project;
@@ -693,7 +694,9 @@ function CopyButton({
 
 	const handleCopy = async () => {
 		try {
-			await navigator.clipboard.writeText(value);
+			// A path is copied in the form the desktop opens (Windows under WSL);
+			// a URL goes through unchanged.
+			await copyPath(value);
 			setCopied(true);
 			setTimeout(() => setCopied(false), 1500);
 		} catch (err) {
