@@ -20,10 +20,9 @@ import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
-interface RunRequest {
-	projectPath: string;
-	saveBaseline?: boolean;
-}
+import { type RunRequest, runnerArgs } from "./api-watcher-args";
+
+
 
 const EVENT_PREFIX = "API_WATCHER_EVENT:";
 const RESULT_PREFIX = "API_WATCHER_RESULT:";
@@ -47,11 +46,16 @@ export function registerApiWatcherHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.API_WATCHER_RUN,
-		async (_event, { projectPath, saveBaseline = false }: RunRequest) => {
+		async (_event, request: RunRequest) => {
 			killExisting();
+			const projectPath = typeof request?.projectPath === "string" ? request.projectPath : "";
 
-			if (!projectPath) {
-				const message = "projectPath is required";
+			let runner: string[] = [];
+			try {
+				if (!projectPath || projectPath.startsWith("-")) throw new Error("projectPath is required");
+				runner = runnerArgs({ ...request, projectPath });
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
 				broadcast(IPC_CHANNELS.API_WATCHER_ERROR, message);
 				throw new Error(message);
 			}
@@ -67,8 +71,7 @@ export function registerApiWatcherHandlers(): void {
 
 			const pythonExe = await requirePythonPath();
 
-			const args = [runnerPath, "--project-path", projectPath];
-			if (saveBaseline) args.push("--save-baseline");
+			const args = [runnerPath, ...runner];
 
 			const child = spawn(pythonExe, args, {
 				cwd: backendPath,
