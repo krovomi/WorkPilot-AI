@@ -74,7 +74,19 @@
 	"diffViewer": {
 		"noContent": "No diff content available for this file",
 		"noContentHint": "This might be a binary file or the diff is not available",
-		"commentLine": "Comment on line {{line}}"
+		"commentLine": "Comment on line {{line}}",
+		"hiddenLines_one": "{{count}} unchanged line",
+		"hiddenLines_other": "{{count}} unchanged lines",
+		"stat": "{{additions}} lines added, {{deletions}} lines removed",
+		"mode": {
+			"label": "Diff layout",
+			"auto": "Automatic layout",
+			"autoHint": "Automatic: side by side when a file has both removed and added lines and the window is wide enough, one column otherwise",
+			"unified": "Unified view",
+			"unifiedHint": "Unified: removed and added lines in one column",
+			"split": "Side by side",
+			"splitHint": "Side by side: old version on the left, new version on the right (a new or deleted file stays in one column)"
+		}
 	},
 	"buttons": {
 		"save": "Save",
@@ -1218,12 +1230,13 @@
 		},
 		"categories": {
 			"tasks": "Tasks",
-			"navigation": "Navigation",
+			"navigation": "Pages",
 			"agents": "Agents",
 			"settings": "Settings",
 			"providers": "Providers",
 			"terminal": "Terminal",
-			"help": "Help"
+			"help": "Help",
+			"recent": "Recent"
 		},
 		"commands": {
 			"create_task": {
@@ -1237,90 +1250,6 @@
 			"voice_assistant": {
 				"label": "Voice Assistant",
 				"description": "Say a command: open a feature, create a task…"
-			},
-			"go_kanban": {
-				"label": "Go to Kanban",
-				"description": "Navigate to the Kanban board"
-			},
-			"go_terminals": {
-				"label": "Go to Terminals",
-				"description": "Navigate to the terminal view"
-			},
-			"go_insights": {
-				"label": "Go to Insights",
-				"description": "Navigate to the AI Insights chat"
-			},
-			"go_roadmap": {
-				"label": "Go to Roadmap",
-				"description": "Navigate to the project roadmap"
-			},
-			"go_ideation": {
-				"label": "Go to Ideation",
-				"description": "Navigate to the ideation view"
-			},
-			"go_context": {
-				"label": "Go to Context",
-				"description": "Navigate to the context view"
-			},
-			"go_agent_tools": {
-				"label": "Go to Agent Tools",
-				"description": "Navigate to agent tools configuration"
-			},
-			"go_changelog": {
-				"label": "Go to Changelog",
-				"description": "Navigate to the changelog"
-			},
-			"go_worktrees": {
-				"label": "Go to Worktrees",
-				"description": "Navigate to Git worktrees"
-			},
-			"go_dashboard": {
-				"label": "Go to Dashboard",
-				"description": "View project metrics, KPIs, and analytics"
-			},
-			"go_code_review": {
-				"label": "Go to Code Review",
-				"description": "AI-powered code review with quality scoring"
-			},
-			"go_refactoring": {
-				"label": "Go to Refactoring",
-				"description": "Detect code smells and get refactoring proposals"
-			},
-			"go_documentation": {
-				"label": "Go to Documentation",
-				"description": "Check coverage and generate docstrings"
-			},
-			"go_cost_estimator": {
-				"label": "Go to Cost Estimator",
-				"description": "View LLM usage costs and budgets"
-			},
-			"go_session_history": {
-				"label": "Go to Session History",
-				"description": "Track agent session performance and costs"
-			},
-			"go_migration": {
-				"label": "Go to Migration",
-				"description": "Framework migration wizard"
-			},
-			"go_visual_programming": {
-				"label": "Go to Visual Programming",
-				"description": "Visual node-based programming interface"
-			},
-			"go_github_issues": {
-				"label": "Go to GitHub Issues",
-				"description": "View and manage GitHub issues"
-			},
-			"go_github_prs": {
-				"label": "Go to GitHub PRs",
-				"description": "View and review GitHub pull requests"
-			},
-			"go_gitlab_issues": {
-				"label": "Go to GitLab Issues",
-				"description": "View and manage GitLab issues"
-			},
-			"go_gitlab_merge_requests": {
-				"label": "Go to GitLab Merge Requests",
-				"description": "View and review GitLab merge requests"
 			},
 			"go_settings": {
 				"label": "Open Settings",
@@ -1358,7 +1287,8 @@
 				"label": "Export Report",
 				"description": "Export project report as JSON or CSV"
 			}
-		}
+		},
+		"beta": "beta"
 	},
 	"serverLogin": {
 		"title": "Sign in to a WorkPilot server",

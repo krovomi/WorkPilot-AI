@@ -15,7 +15,7 @@ Exposes the endpoints the Kanban Quick-Command bar reads:
   GET  /api/slash-commands/body?project_dir=<abs path>&command=<name>
        Returns a command's resolved instructions without running them.
 
-Running a command is not a route any more (F181): the Electron main opens a
+Running a command is not a route any more (F182): the Electron main opens a
 Kanban review card and runs `runners/slash_command_runner.py` in its worktree
 with the app's provider and sign-in (`slash_commands/execution.py`), so what
 the agent writes waits on a branch for review instead of landing in the

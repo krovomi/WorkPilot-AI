@@ -15,7 +15,7 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 | `../KanbanBoard.tsx` | ~3 250 | le tableau : drag-and-drop, sélection en masse, file d'attente, dialogues |
 | `KanbanColumn.tsx` | ~1 080 | une colonne : `DroppableColumn`, `WipLimitPopover`, `SortableColumnWrapper`, comparateurs mémo, `COLUMN_RENDER_CAP` (lot L11) |
 | `KanbanToolbar.tsx` | ~400 | barre d'outils au-dessus du tableau |
-| `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F181) |
+| `QuickCommandBar.tsx` | ~430 | palette `/slash` — liste via le backend, exécution par le main sur une carte de revue (`main/quick-command/`, F182) |
 | `../RoadmapKanbanView.tsx` | ~350 | vue roadmap, tableau distinct |
 | `../task-detail/TaskMobilePreview.tsx` | ~430 | onglet *Mobile* : plateforme, appareil, run, capture, logs |
 | `../../stores/mobile-store.ts` | ~200 | plateforme / appareil / dernière capture sélectionnés |
@@ -27,18 +27,25 @@ adresse : confirmer avec `grep -n "<nom>" KanbanBoard.tsx` avant d'éditer.
 ## Colonnes
 
 `TASK_STATUS_COLUMNS` (`shared/constants/task.ts:13`) :
-`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `build_failed` · `done`
+`backlog` · `queue` · `in_progress` · `ai_review` · `human_review` · `build_failed` · `pr_created` · `done`
 
 `build_failed` (« Build rouge ») est piloté par la CI (`main/ci-pipeline-service.ts`) : une
 tâche y entre quand le pipeline de sa branche `workpilot/<spec>` passe au rouge et en sort, vers
 son statut d'avant, quand il repasse au vert. `useVisibleKanbanColumns` masque la colonne tant
 qu'aucune tâche du tableau n'a de run CI et qu'elle est vide.
 
-Deux statuts n'ont pas de colonne à eux et sont projetés par `getVisualColumn()` :
-`pr_created → done`, `error → human_review`.
+`pr_created` (« PR ouverte ») tient les cartes dont la PR attend sa fusion ; le suivi des PR
+fusionnées (`main/worktree-purge/merged-watch.ts`) les fait passer dans `done`. Masquée tant
+qu'elle est vide (`useVisibleKanbanColumns`) ; une carte sans `metadata.prUrl` ne peut pas y être
+déplacée à la main (`canMoveTaskTo`). Un ordre de colonnes ou des préférences enregistrés avant
+l'ajout d'une colonne la reçoivent (`normalizeColumnOrder`, `withNewColumnPreferences`).
+
+Un statut n'a pas de colonne à lui : `getVisualColumn()` projette `error → human_review`.
+`getVisualColumn`, `VALID_BULK_TRANSITIONS` (déplacements en masse) et `manualMoveTargets`
+(menus « Déplacer vers ») vivent dans `../../lib/kanban-columns.ts`.
 
 `IMPORT_ALLOWED_COLUMNS` restreint les cibles d'import (Azure DevOps / Jira) à
-`backlog`, `queue`, `in_progress`. `VALID_BULK_TRANSITIONS` filtre les déplacements en masse.
+`backlog`, `queue`, `in_progress`.
 
 ## Carte de `KanbanBoard.tsx` et `KanbanColumn.tsx`
 
@@ -47,7 +54,7 @@ l'identique ; le tableau les importe depuis `kanban/KanbanColumn.tsx`.
 
 | Fichier · zone | Ligne ~ | Contenu |
 |---|---|---|
-| `KanbanBoard.tsx` · constantes et gardes | 130-200 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS`, `VALID_BULK_TRANSITIONS`, `getVisualColumn` |
+| `KanbanBoard.tsx` · constantes et gardes | 130-160 | `VALID_DROP_COLUMNS`, `IMPORT_ALLOWED_COLUMNS` |
 | `KanbanColumn.tsx` · `COLUMN_RENDER_CAP` | 58 | 60 cartes rendues par colonne |
 | `KanbanColumn.tsx` · comparateurs mémo | 110-190 | `tasksAreEquivalent`, `droppableColumnPropsAreEqual` — **le rendu en dépend, y toucher se paie en perfs** |
 | `KanbanColumn.tsx` · `WipLimitPopover` | 254 | réglage de la limite WIP d'une colonne |

@@ -20,7 +20,7 @@ import { Input } from "../ui/input";
  *
  * Fetches the merged list of slash commands (project / user / built-in) from
  * the FastAPI backend and lets the user fire one against the active project.
- * A command runs in the main process (`runQuickCommand`, F181): on the
+ * A command runs in the main process (`runQuickCommand`, F182): on the
  * provider chosen in the app, with the Claude profile's sign-in when that
  * provider needs it, in the worktree of a Kanban review card. What the agent
  * writes is committed on the card's branch and waits for review; it never

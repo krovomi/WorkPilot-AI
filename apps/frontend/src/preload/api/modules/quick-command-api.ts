@@ -1,5 +1,5 @@
 /**
- * The Kanban's quick-command bar: run a command on a review card (F181).
+ * The Kanban's quick-command bar: run a command on a review card (F182).
  */
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult } from "../../../shared/types";

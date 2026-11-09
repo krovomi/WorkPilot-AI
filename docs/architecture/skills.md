@@ -33,7 +33,7 @@ added, updated and dropped through the same CLI (`skills:add`, `skills:update`,
 
 `apps/backend/slash_commands/api.py` scans `.agents/skills/` and serves the result to the
 Kanban Quick-Command bar (`GET /api/slash-commands`). Running a command is the Electron
-main's job (F181): it opens a review card and starts `runners/slash_command_runner.py` in the
+main's job (F182): it opens a review card and starts `runners/slash_command_runner.py` in the
 card's worktree, which resolves the command's body from the project and runs it on the provider
 chosen in the app, so any provider can execute it ([generated-review.md](generated-review.md)).
 

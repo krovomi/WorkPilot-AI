@@ -6,7 +6,7 @@
  * main process environment: no Claude profile sign-in, no provider chosen in
  * the app, no key. A Claude subscription (OAuth) was never found ("No OAuth
  * token found… ANTHROPIC_API_KEY not supported"), every other provider was
- * ignored, and the agent wrote straight into the project folder (F181).
+ * ignored, and the agent wrote straight into the project folder (F182).
  *
  * A command now runs like every page that writes code
  * (docs/architecture/generated-review.md): a Kanban review card is opened,

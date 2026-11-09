@@ -98,6 +98,7 @@
 		"pipeline": "Pipeline",
 		"repairBuild": "Réparer le build",
 		"buildFailed": "Build rouge",
+		"prOpen": "PR ouverte",
 		"openInTracker": "Ouvrir dans {{tracker}}",
 		"currentPhase": "Phase actuelle",
 		"compactedPhases": "{{count}} phases",
@@ -178,7 +179,7 @@
 		"human_review": "Révision humaine",
 		"build_failed": "Build rouge",
 		"done": "Terminé",
-		"pr_created": "PR créée",
+		"pr_created": "PR ouverte",
 		"error": "Erreur"
 	},
 	"kanban": {
@@ -194,6 +195,9 @@
 		"emptyQueueHint": "Les tâches attendront ici lorsque la limite de tâches parallèles sera atteinte",
 		"emptyBuildFailed": "Aucun build rouge",
 		"emptyBuildFailedHint": "Les tâches arrivent ici quand leur pipeline CI/CD échoue — l'agent les répare automatiquement",
+		"emptyPrOpen": "Aucune PR en attente",
+		"emptyPrOpenHint": "Les tâches arrivent ici dès que leur pull request est ouverte, et passent dans Terminé quand elle est fusionnée",
+		"prOpenNeedsPr": "Cette tâche n'a pas encore de pull request. Créez-la depuis la tâche pour la placer dans PR ouverte.",
 		"emptyInProgress": "Rien en cours",
 		"emptyInProgressHint": "Démarrez une tâche depuis le Backlog",
 		"emptyAiReview": "Aucune tâche en révision",
@@ -333,6 +337,7 @@
 				"ideation": "Idéation",
 				"roadmap": "Roadmap",
 				"insights": "Insights",
+				"generated": "Générée par une page",
 				"manual": "Manuelle"
 			}
 		},
@@ -951,10 +956,6 @@
 			"viewDiff": "Voir les modifications",
 			"hideDiff": "Masquer les modifications",
 			"noDiff": "Aucune modification enregistrée pour ce fichier",
-			"viewMode": {
-				"unified": "Vue unifiée",
-				"split": "Vue côte à côte"
-			},
 			"stats": {
 				"files": "Fichiers",
 				"folders": "Dossiers",

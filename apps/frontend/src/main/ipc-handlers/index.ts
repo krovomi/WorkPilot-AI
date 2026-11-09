@@ -473,7 +473,7 @@ export function setupIpcHandlers(
 	// AI Pair Programming handlers (Feature 10)
 	registerPairProgrammingHandlers(getMainWindow);
 
-	// Kanban quick-command bar: commands run on a review card (F181)
+	// Kanban quick-command bar: commands run on a review card (F182)
 	registerQuickCommandHandlers();
 
 	// Pipeline Generator handlers (Feature 23)

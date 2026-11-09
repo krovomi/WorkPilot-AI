@@ -1,4 +1,4 @@
-"""The Kanban's quick-command bar: a command runs in a review card's worktree (F181).
+"""The Kanban's quick-command bar: a command runs in a review card's worktree (F182).
 
 The bar used to ask the desktop backend server to run the command. That server
 has neither the Claude profile's sign-in nor the provider chosen in the app, so

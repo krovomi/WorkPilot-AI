@@ -1,6 +1,6 @@
 /**
  * The Kanban's quick-command bar: one command run on a review card
- * (`main/quick-command/quick-command-run.ts`, F181). The renderer names a
+ * (`main/quick-command/quick-command-run.ts`, F182). The renderer names a
  * project by its id and a command by its name; both are checked again there.
  */
 import { ipcMain } from "electron";

@@ -2,7 +2,7 @@
 
 The bar used to ``POST /api/slash-commands/run``: the desktop backend server
 ran the agent itself, in the project folder, with the server's own
-environment (F181). Two things went wrong there:
+environment (F182). Two things went wrong there:
 
 * the server is started once, with the main process environment, and never
   receives what a run needs: the Claude profile's sign-in, the provider chosen

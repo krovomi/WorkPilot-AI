@@ -16,7 +16,7 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Import Design | les fichiers du composant (« Écrire dans le projet ») | 2 |
 | Journal des modifications | `CHANGELOG.md` (« Enregistrer ») | 2 |
 | Pair programming | tout ce que l'agent codeur modifie, en direct | 3 |
-| Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F181](../audit/findings/F181.md)) | 5 |
+| Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F182](../audit/findings/F182.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
 Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab. N'écrivent rien
@@ -80,7 +80,7 @@ Par page :
   Les commits que l'agent fait lui-même comptent (`commit --since <head du create>`). Exception à
   la règle d'échec : un commit refusé par git laisse le travail dans le worktree, dont la page
   donne le chemin, car la personne l'a regardé s'écrire.
-- **Commande rapide du Kanban** (lot 5, F181) : la barre ne demande plus au serveur backend de
+- **Commande rapide du Kanban** (lot 5, F182) : la barre ne demande plus au serveur backend de
   lancer la commande. Le main ouvre la carte (`main/quick-command/quick-command-run.ts`), puis
   lance `runners/slash_command_runner.py` avec `--workdir` = le worktree et `--project-dir` = le
   dossier du projet, d'où viennent les instructions de la commande (la palette les y a lues ;

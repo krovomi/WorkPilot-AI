@@ -74,7 +74,19 @@
 	"diffViewer": {
 		"noContent": "Aucun contenu de diff disponible pour ce fichier",
 		"noContentHint": "Ceci peut être un fichier binaire ou le diff n'est pas disponible",
-		"commentLine": "Commenter la ligne {{line}}"
+		"commentLine": "Commenter la ligne {{line}}",
+		"hiddenLines_one": "{{count}} ligne inchangée",
+		"hiddenLines_other": "{{count}} lignes inchangées",
+		"stat": "{{additions}} lignes ajoutées, {{deletions}} lignes supprimées",
+		"mode": {
+			"label": "Disposition du diff",
+			"auto": "Disposition automatique",
+			"autoHint": "Automatique : côte à côte quand un fichier a des lignes supprimées et ajoutées et que la fenêtre est assez large, sinon en une colonne",
+			"unified": "Vue unifiée",
+			"unifiedHint": "Unifiée : lignes supprimées et ajoutées dans une seule colonne",
+			"split": "Côte à côte",
+			"splitHint": "Côte à côte : ancienne version à gauche, nouvelle à droite (un fichier ajouté ou supprimé reste en une colonne)"
+		}
 	},
 	"buttons": {
 		"save": "Enregistrer",
@@ -1218,12 +1230,13 @@
 		},
 		"categories": {
 			"tasks": "Tâches",
-			"navigation": "Navigation",
+			"navigation": "Pages",
 			"agents": "Agents",
 			"settings": "Réglages",
 			"providers": "Providers",
 			"terminal": "Terminal",
-			"help": "Aide"
+			"help": "Aide",
+			"recent": "Récents"
 		},
 		"commands": {
 			"create_task": {
@@ -1237,90 +1250,6 @@
 			"voice_assistant": {
 				"label": "Assistant vocal",
 				"description": "Dites une commande : ouvrir une fonctionnalité, créer une tâche…"
-			},
-			"go_kanban": {
-				"label": "Aller au Kanban",
-				"description": "Ouvrir le tableau Kanban"
-			},
-			"go_terminals": {
-				"label": "Aller aux terminaux",
-				"description": "Ouvrir la vue des terminaux"
-			},
-			"go_insights": {
-				"label": "Aller à Insights",
-				"description": "Ouvrir la discussion AI Insights"
-			},
-			"go_roadmap": {
-				"label": "Aller à la roadmap",
-				"description": "Ouvrir la roadmap du projet"
-			},
-			"go_ideation": {
-				"label": "Aller à l'idéation",
-				"description": "Ouvrir la vue d'idéation"
-			},
-			"go_context": {
-				"label": "Aller au contexte",
-				"description": "Ouvrir la vue du contexte"
-			},
-			"go_agent_tools": {
-				"label": "Aller aux outils d'agent",
-				"description": "Ouvrir la configuration des outils d'agent"
-			},
-			"go_changelog": {
-				"label": "Aller au changelog",
-				"description": "Ouvrir le changelog"
-			},
-			"go_worktrees": {
-				"label": "Aller aux worktrees",
-				"description": "Ouvrir les worktrees Git"
-			},
-			"go_dashboard": {
-				"label": "Aller au tableau de bord",
-				"description": "Voir les métriques, KPI et analyses du projet"
-			},
-			"go_code_review": {
-				"label": "Aller à la revue de code",
-				"description": "Revue de code par IA, avec note de qualité"
-			},
-			"go_refactoring": {
-				"label": "Aller au refactoring",
-				"description": "Détecter les code smells et proposer des refactorings"
-			},
-			"go_documentation": {
-				"label": "Aller à la documentation",
-				"description": "Vérifier la couverture et générer les docstrings"
-			},
-			"go_cost_estimator": {
-				"label": "Aller à l'estimateur de coûts",
-				"description": "Voir les coûts d'usage des LLM et les budgets"
-			},
-			"go_session_history": {
-				"label": "Aller à l'historique des sessions",
-				"description": "Suivre la performance et le coût des sessions d'agent"
-			},
-			"go_migration": {
-				"label": "Aller à la migration",
-				"description": "Assistant de migration de framework"
-			},
-			"go_visual_programming": {
-				"label": "Aller à la programmation visuelle",
-				"description": "Interface de programmation visuelle par nœuds"
-			},
-			"go_github_issues": {
-				"label": "Aller aux issues GitHub",
-				"description": "Voir et gérer les issues GitHub"
-			},
-			"go_github_prs": {
-				"label": "Aller aux PR GitHub",
-				"description": "Voir et relire les pull requests GitHub"
-			},
-			"go_gitlab_issues": {
-				"label": "Aller aux issues GitLab",
-				"description": "Voir et gérer les issues GitLab"
-			},
-			"go_gitlab_merge_requests": {
-				"label": "Aller aux merge requests GitLab",
-				"description": "Voir et relire les merge requests GitLab"
 			},
 			"go_settings": {
 				"label": "Ouvrir les réglages",
@@ -1358,7 +1287,8 @@
 				"label": "Exporter un rapport",
 				"description": "Exporter le rapport du projet en JSON ou CSV"
 			}
-		}
+		},
+		"beta": "bêta"
 	},
 	"serverLogin": {
 		"title": "Connexion au serveur WorkPilot",
