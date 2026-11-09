@@ -63,6 +63,27 @@ describe("trusted sources", () => {
 		}
 	});
 
+	it("neither reads nor writes a linked list", () => {
+		const elsewhere = mkdtempSync(path.join(tmpdir(), "wp-elsewhere-"));
+		try {
+			const target = path.join(elsewhere, "sources.json");
+			writeFileSync(target, JSON.stringify({ sources: ["path:x"] }));
+			mkdirSync(path.join(root, ".workpilot"));
+			symlinkSync(target, path.join(root, TRUSTED_SOURCES_FILE));
+			expect(readTrustedSources(root)).toEqual([]);
+			expect(() => writeTrustedSources(root, ["path:a"])).toThrow();
+			expect(JSON.parse(readFileSync(target, "utf-8"))).toEqual({ sources: ["path:x"] });
+		} finally {
+			rmSync(elsewhere, { recursive: true, force: true });
+		}
+	});
+
+	it("overwrites a longer list completely", () => {
+		writeTrustedSources(root, ["path:tests/fixtures/very/long/folder/*", "host:docs.python.org"]);
+		expect(writeTrustedSources(root, ["path:a"])).toEqual(["path:a"]);
+		expect(readTrustedSources(root)).toEqual(["path:a"]);
+	});
+
 	it("reads nothing when there is no list", () => {
 		expect(readTrustedSources(root)).toEqual([]);
 	});

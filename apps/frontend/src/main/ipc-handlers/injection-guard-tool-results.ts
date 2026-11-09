@@ -10,7 +10,19 @@
  * (S6): every list is revalidated here with the backend's rules.
  */
 
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	existsSync,
+	fstatSync,
+	ftruncateSync,
+	lstatSync,
+	mkdirSync,
+	openSync,
+	readdirSync,
+	readSync,
+	writeSync,
+} from "node:fs";
 import path from "node:path";
 import type { ToolResultAlert } from "../../shared/types/injection-guard";
 
@@ -21,6 +33,7 @@ const MAX_TRUSTED = 100;
 const MAX_PATTERN = 200;
 const MAX_ALERT_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_ALERTS = 200;
+const MAX_TRUSTED_FILE_BYTES = 256 * 1024;
 
 
 /** The well-formed entries, in order: same rules as `validate_trusted_sources`. */
@@ -47,20 +60,52 @@ export function validateTrustedSources(raw: unknown): string[] {
 	return kept;
 }
 
-function isPlainFile(file: string): boolean {
+// A link could point anywhere on the disk: only plain files are read or
+// written, checked on the descriptor itself so nothing can swap the file
+// between the check and the use. O_NOFOLLOW refuses a link where it exists;
+// Windows has none, so the name must still be the very file that was opened.
+const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
+
+function openPlainFile(file: string, flags: number): number | null {
+	let fd: number | null = null;
 	try {
-		const st = lstatSync(file);
-		return st.isFile() && !st.isSymbolicLink();
+		fd = openSync(file, flags | NO_FOLLOW, 0o644);
+		const stat = fstatSync(fd);
+		const named = lstatSync(file);
+		if (!stat.isFile() || !named.isFile() || named.ino !== stat.ino || named.dev !== stat.dev) {
+			closeSync(fd);
+			return null;
+		}
+		return fd;
 	} catch {
-		return false;
+		if (fd !== null) closeSync(fd);
+		return null;
+	}
+}
+
+/** The file's text, or null when it is missing, not a plain file or too big. */
+function readPlainFile(file: string, maxBytes: number): string | null {
+	const fd = openPlainFile(file, constants.O_RDONLY);
+	if (fd === null) return null;
+	try {
+		const size = fstatSync(fd).size;
+		if (size > maxBytes) return null;
+		// Read what was measured, not what the file may have grown to since.
+		const buffer = Buffer.alloc(size);
+		const read = readSync(fd, buffer, 0, size, 0);
+		return buffer.subarray(0, read).toString("utf-8");
+	} catch {
+		return null;
+	} finally {
+		closeSync(fd);
 	}
 }
 
 export function readTrustedSources(projectRoot: string): string[] {
-	const file = path.join(projectRoot, TRUSTED_SOURCES_FILE);
-	if (!isPlainFile(file)) return [];
+	const text = readPlainFile(path.join(projectRoot, TRUSTED_SOURCES_FILE), MAX_TRUSTED_FILE_BYTES);
+	if (text === null) return [];
 	try {
-		return validateTrustedSources(JSON.parse(readFileSync(file, "utf-8")));
+		return validateTrustedSources(JSON.parse(text));
 	} catch {
 		return [];
 	}
@@ -74,11 +119,17 @@ export function writeTrustedSources(projectRoot: string, raw: unknown): string[]
 		throw new Error(".workpilot is a link");
 	}
 	mkdirSync(dir, { recursive: true });
-	const file = path.join(projectRoot, TRUSTED_SOURCES_FILE);
-	if (existsSync(file) && !isPlainFile(file)) {
-		throw new Error("trusted-sources.json is not a plain file");
+	const fd = openPlainFile(
+		path.join(projectRoot, TRUSTED_SOURCES_FILE),
+		constants.O_WRONLY | constants.O_CREAT,
+	);
+	if (fd === null) throw new Error("trusted-sources.json is not a plain file");
+	try {
+		ftruncateSync(fd, 0);
+		writeSync(fd, `${JSON.stringify({ sources }, null, 2)}\n`, 0, "utf-8");
+	} finally {
+		closeSync(fd);
 	}
-	writeFileSync(file, `${JSON.stringify({ sources }, null, 2)}\n`, "utf-8");
 	return sources;
 }
 
@@ -131,15 +182,8 @@ export function readToolResultAlerts(projectRoot: string): ToolResultAlert[] {
 			continue;
 		}
 		for (const spec of specs) {
-			const file = path.join(root, spec, ALERTS_FILENAME);
-			if (!isPlainFile(file)) continue;
-			let text: string;
-			try {
-				if (lstatSync(file).size > MAX_ALERT_FILE_BYTES) continue;
-				text = readFileSync(file, "utf-8");
-			} catch {
-				continue;
-			}
+			const text = readPlainFile(path.join(root, spec, ALERTS_FILENAME), MAX_ALERT_FILE_BYTES);
+			if (text === null) continue;
 			for (const line of text.split("\n")) {
 				if (!line.trim()) continue;
 				const alert = parseAlert(line, spec);
