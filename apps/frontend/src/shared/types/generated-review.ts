@@ -1,9 +1,9 @@
 /**
  * Code a page generates goes through a review card, never into the checkout.
  *
- * The test studio, Import Design, the changelog and pair programming used to
- * write into the person's project folder, so the code landed on whatever
- * branch was checked out (`develop`, `main`) without a review. They now write
+ * The test studio, Import Design, the changelog, pair programming and the
+ * Kanban's quick-command bar used to write into the person's project folder,
+ * so the code landed on whatever branch was checked out (`develop`, `main`) without a review. They now write
  * into the worktree of a Kanban card waiting in human review, on the card's
  * own branch `workpilot/<spec>`, and the person reviews the diff and opens the
  * pull request from the card, as for any task
@@ -16,6 +16,7 @@ export const GENERATED_REVIEW_SOURCES = [
 	"design-import",
 	"changelog",
 	"pair-programming",
+	"quick-command",
 ] as const;
 
 export type GeneratedReviewSource = (typeof GENERATED_REVIEW_SOURCES)[number];

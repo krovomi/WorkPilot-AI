@@ -92,8 +92,7 @@ class TestPermissionDerivation:
 
     def test_override_wins_over_derivation(self):
         assert (
-            mounting.permission_for("POST", "/api/slash-commands/run", "agent")
-            == "agent.execute"
+            mounting.permission_for("POST", "/api/verify/run", "qa") == "agent.execute"
         )
 
     def test_every_override_names_a_real_permission(self):
@@ -157,25 +156,23 @@ class TestGuardAppliesToWholeRouter:
 
 
 class TestOverridesAreEnforced:
-    def test_slash_command_run_needs_agent_execute_not_agent_write(self):
-        """`agent.write` must not be enough to execute a tooled agent session."""
+    def test_verify_run_needs_agent_execute_not_qa_write(self):
+        """`qa.write` must not be enough to run the verify agents."""
         router = APIRouter()
 
-        @router.post("/api/slash-commands/run")
+        @router.post("/api/verify/run")
         def run():
             return {"ok": True}
 
-        app = _app_with(
-            _principal("agent.read", "agent.write"), (router, "slash_commands")
-        )
+        app = _app_with(_principal("qa.read", "qa.write"), (router, "verify"))
         with TestClient(app) as client:
-            resp = client.post("/api/slash-commands/run")
+            resp = client.post("/api/verify/run")
             assert resp.status_code == 403
             assert "agent.execute" in resp.json()["detail"]
 
-        app = _app_with(_principal("agent.execute"), (router, "slash_commands"))
+        app = _app_with(_principal("agent.execute"), (router, "verify"))
         with TestClient(app) as client:
-            assert client.post("/api/slash-commands/run").status_code == 200
+            assert client.post("/api/verify/run").status_code == 200
 
 
 class TestPrincipalShortcuts:
