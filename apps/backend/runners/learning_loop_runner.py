@@ -118,10 +118,13 @@ async def record_outcome(
 async def run_analysis(
     project_dir: str,
     spec_id: str | None = None,
-    model: str = "sonnet",
+    model: str | None = None,
     thinking_level: str = "medium",
 ) -> None:
     """Run learning loop analysis."""
+    # Installs the agent runtime the model analysis goes through, and puts
+    # the provider connectors on the path.
+    import core  # noqa: F401
     from learning_loop.service import LearningLoopService
 
     service = LearningLoopService(
@@ -180,7 +183,11 @@ def main() -> None:
         "--project-dir", required=True, help="Path to the project directory"
     )
     parser.add_argument("--spec-id", help="Analyze a specific build (spec ID)")
-    parser.add_argument("--model", default="sonnet", help="LLM model to use")
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Model for the analysis (default: the selected provider's own)",
+    )
     parser.add_argument("--thinking-level", default="medium", help="Thinking level")
     parser.add_argument(
         "--record-outcome",

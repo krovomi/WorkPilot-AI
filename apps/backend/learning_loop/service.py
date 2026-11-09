@@ -15,6 +15,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from .model_analysis import extract_with_model
 from .models import (
     ImprovementMetrics,
     LearningPattern,
@@ -88,21 +89,26 @@ class LearningLoopService:
         builds_data: list[dict[str, Any]],
         status_callback: Any | None = None,
     ) -> LearningReport:
-        """Extract patterns from the builds' records, by heuristics.
+        """Extract patterns from the builds' records: the rules, then a model.
 
-        No model runs here, and none ever has. This method used to import
-        `core.session`, a module that has never existed, so every analysis
-        ended in its `ImportError` branch and in `_heuristic_extract`, while the
-        status line said "with AI". Calling a model instead is a decision of its
-        own (it would run after every build, and what it writes becomes
-        instructions in later prompts), not the side effect of an import fix
-        (N8 A1, F131). `PatternExtractor.build_analysis_prompt` and
-        `parse_patterns_from_response` are kept for that decision.
+        The rules (`_heuristic_extract`) always run. The model analysis
+        (`model_analysis.extract_with_model`) runs on the provider the process
+        is set to, whichever it is, and adds the patterns it finds once vetted;
+        it is skipped without a runtime, when `WORKPILOT_LEARNING_LOOP_MODEL`
+        is off, or when the model answers nothing usable (F178; before, no
+        model ever ran, F131).
         """
         if status_callback:
             status_callback(f"Analyzing {len(builds_data)} build(s)...")
 
         patterns = self._heuristic_extract(builds_data)
+        if status_callback:
+            status_callback("Asking the model for patterns...")
+        model_patterns = await extract_with_model(
+            self.extractor, builds_data, project_dir=self.project_dir
+        )
+        if model_patterns:
+            patterns.extend(model_patterns)
 
         # Store patterns (with deduplication)
         if patterns:
@@ -118,7 +124,11 @@ class LearningLoopService:
             analyzed_builds=len(builds_data),
             patterns_found=patterns,
             improvement_metrics=metrics,
-            analysis_model=self.extractor.model,
+            analysis_model=(
+                (self.extractor.model or "provider default")
+                if model_patterns is not None
+                else "rules"
+            ),
         )
 
         if status_callback:
