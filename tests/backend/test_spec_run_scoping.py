@@ -137,7 +137,7 @@ async def test_cancel_rejects_a_run_belonging_to_another_spec(monkeypatch):
 @pytest.mark.asyncio
 async def test_cancel_accepts_a_run_of_the_addressed_spec(monkeypatch):
     from server.auth.deps import CurrentUser
-    from server.db.models import AgentRun, Project, SpecIndex
+    from server.db.models import AgentRun, Project, SpecIndex, User
     from server.routers.specs import cancel_run
     from server.services import run_manager as run_manager_module
 
@@ -164,6 +164,8 @@ async def test_cancel_accepts_a_run_of_the_addressed_spec(monkeypatch):
         await db.flush()
         run = AgentRun(spec_id=spec.id, phase="build", status="running")
         db.add(run)
+        # The canceller is audited: a real row, as foreign keys are enforced.
+        db.add(User(id="u-owner", email="o@example.com", display_name="O"))
         await db.commit()
 
         user = CurrentUser(

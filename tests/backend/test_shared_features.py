@@ -58,7 +58,7 @@ def events(monkeypatch, tmp_path):
 
 async def _project(tmp_path: Path):
     from server.db import engine as db_engine
-    from server.db.models import Organization, Project
+    from server.db.models import Organization, Project, User
 
     db_engine._engine = None
     db_engine._session_factory = None
@@ -69,6 +69,8 @@ async def _project(tmp_path: Path):
     async with db_engine.get_session_factory()() as db:
         org = Organization(name="A", slug="org-a")
         db.add(org)
+        # The principal of `_request`: a real row, as foreign keys are enforced.
+        db.add(User(id="u-1", email="u-1@test.invalid", display_name="U"))
         await db.flush()
         project = Project(
             org_id=org.id, name="P", repo_url="https://x/p.git", server_path=str(clone)
