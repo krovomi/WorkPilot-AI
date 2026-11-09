@@ -14,8 +14,11 @@
 		"unused_key": "Clé inutilisée",
 		"inconsistent_interpolation": "Interpolation inconsistante",
 		"missing_plural": "Pluriel manquant",
-		"inconsistent_params": "Paramètres incohérents",
-		"locale_file_mismatch": "Catalogue incohérent"
+		"inconsistent_params": "Variables différentes",
+		"locale_file_mismatch": "Catalogue incohérent",
+		"orphan_key": "Clé orpheline",
+		"untranslated": "Non traduite",
+		"rtl_side": "Droite à gauche"
 	},
 	"search": {
 		"placeholder": "Rechercher dans les problèmes...",
@@ -31,7 +34,7 @@
 		"noProject": "Sélectionnez un projet avant de lancer un scan.",
 		"failed": "Échec du scan : {{error}}"
 	},
-	"description": "Repère le texte d'interface codé en dur (JSX, Vue, Angular, Razor, XAML, Flutter, SwiftUI, Compose, layouts Android…) et compare chaque langue à la référence, quel que soit le format du catalogue : JSON, RESX, ARB, XLIFF, strings.xml Android, .strings iOS, gettext, .properties, YAML Rails, Laravel.",
+	"description": "Repère le texte d'interface codé en dur sur toutes les stacks et propose une clé dans le style du projet, compare chaque langue à la référence quel que soit le format du catalogue (JSON, RESX, ARB, XLIFF, strings.xml Android, .strings iOS, gettext, .properties, YAML Rails, Laravel), et signale les clés orphelines, les recopies, les variables, les pluriels de chaque langue et la mise en page de droite à gauche. Les clés manquantes peuvent être traduites par le modèle actif sur une carte de revue.",
 	"emptyTitle": "Pas encore de scan",
 	"filesScanned": "Fichiers analysés",
 	"localesTitle": "Langues",
@@ -39,6 +42,75 @@
 	"allTypes": "Tous",
 	"kickers": {
 		"coverage": "Couverture",
-		"issues": "Problèmes"
-	}
+		"issues": "Problèmes",
+		"completeness": "Complétude"
+	},
+	"completeness": {
+		"title": "Traduit, langue par langue",
+		"description": "Clés traduites sur les clés dont chaque langue a besoin. Une phrase recopiée telle quelle de la référence ne compte pas ; les formes de pluriel qu'une langue n'utilise pas sont écartées.",
+		"present": "{{present}} clés présentes sur {{total}}",
+		"missing_one": "{{count}} manquante",
+		"missing_other": "{{count}} manquantes",
+		"untranslated_one": "{{count}} recopiée de la référence",
+		"untranslated_other": "{{count}} recopiées de la référence",
+		"rtl": "Droite à gauche"
+	},
+	"translate": {
+		"action_one": "Traduire {{count}} clé manquante sur une carte de revue",
+		"action_other": "Traduire {{count}} clés manquantes sur une carte de revue",
+		"running": "Traduction…",
+		"note": "Le modèle de texte actif les traduit ; une traduction qui perd une variable ou une balise est écartée. Rien n'est écrit dans le dossier du projet : les clés vont sur une carte de revue avec sa propre branche.",
+		"serverOnly": "Les catalogues d'un projet serveur ne sont pas sur cet ordinateur : traduisez-les depuis un clone local.",
+		"done_one": "{{count}} traduction ajoutée sur la carte de revue (branche {{branch}}). Relisez le diff puis ouvrez la pull request depuis la carte.",
+		"done_other": "{{count}} traductions ajoutées sur la carte de revue (branche {{branch}}). Relisez le diff puis ouvrez la pull request depuis la carte.",
+		"nothing": "Aucune traduction n'a été gardée : rien n'a été écrit et la carte a été retirée.",
+		"noModel": "Aucun modèle de texte n'a répondu : vérifiez le provider dans les Paramètres. Rien n'a été écrit.",
+		"rejected_one": "{{count}} réponse écartée (variable, balise ou pas de réponse).",
+		"rejected_other": "{{count}} réponses écartées (variable, balise ou pas de réponse).",
+		"skipped_one": "{{count}} clé reste pour un prochain passage.",
+		"skipped_other": "{{count}} clés restent pour un prochain passage.",
+		"notWritable_one": "{{count}} catalogue est dans un format que WorkPilot n'écrit pas (YAML, XLIFF, gettext, PHP) : {{files}}.",
+		"notWritable_other": "{{count}} catalogues sont dans un format que WorkPilot n'écrit pas (YAML, XLIFF, gettext, PHP) : {{files}}.",
+		"failed": "Échec de la traduction : {{error}}"
+	},
+	"messages": {
+		"hardcoded_string": "Texte codé en dur : « {{text}} »",
+		"missing_key": "{{key}} manque en {{locale}}",
+		"unused_key": "{{key}} existe en {{locale}} mais pas dans la langue de référence",
+		"inconsistent_params": "Les variables de {{key}} diffèrent de la référence : {{text}}",
+		"plural_forms": "Il manque à {{locale}} des formes de pluriel de {{key}} : {{text}}",
+		"missing_plural_many": "{{locale}} n'a aucune forme _many : les versions récentes d'i18next et d'ICU l'utilisent pour les grands nombres ronds",
+		"orphan_key": "Aucun fichier source n'utilise {{key}}",
+		"orphan_key_possibly": "Aucun fichier source ne nomme {{key}}, mais certaines clés sont construites à l'exécution : vérifiez avant de la supprimer",
+		"untranslated": "{{key}} reprend le texte de référence tel quel : « {{text}} »",
+		"rtl_side": "{{text}} ne s'inverse pas pour {{locales}}",
+		"locale_file_mismatch": "{{key}} : les catalogues de {{locale}} ne correspondent pas à la référence"
+	},
+	"suggestions": {
+		"add": "Ajoutez {{key}} au catalogue, puis remplacez le texte par l'appel ci-dessous",
+		"reuse": "Le catalogue a déjà ce texte : utilisez {{key}}",
+		"missing_key": "Traduisez-la, ou utilisez le bouton de traduction ci-dessus",
+		"unused_key": "Supprimez-la, ou ajoutez-la à la langue de référence",
+		"inconsistent_params": "Reprenez exactement les variables de la référence",
+		"plural_forms": "Ajoutez les formes {{text}}",
+		"missing_plural_many": "Ajoutez _many à côté de _other là où un nombre peut atteindre le million",
+		"orphan_key": "Supprimez-la de chaque langue, ou utilisez-la",
+		"untranslated": "Traduisez-la en {{locale}}",
+		"rtl_side": "Utilisez {{logical}}",
+		"rtl_side_generic": "Utilisez une propriété logique (start / end)",
+		"locale_file_mismatch": "Alignez le catalogue sur la référence"
+	},
+	"proposal": {
+		"key": "Clé",
+		"value": "Valeur",
+		"snippet": "Appel",
+		"copy": "Copier",
+		"copied": "Copié",
+		"copyKey": "Copier la clé",
+		"copySnippet": "Copier l'appel",
+		"reused": "Clé existante",
+		"possibly": "Peut-être utilisée"
+	},
+	"showMore_one": "Afficher {{count}} de plus",
+	"showMore_other": "Afficher {{count}} de plus"
 }

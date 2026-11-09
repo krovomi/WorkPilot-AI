@@ -152,8 +152,8 @@ def test_i18n_reads_the_catalogs_of_every_stack(tmp_path: Path) -> None:
     assert fr["arb"] == {"title": "Boutique"}
     assert fr["strings"] == {"cart": "Panier"}
     assert fr["Localizable"] == {"pay": "Payer"}
-    assert fr["fr"] == {"hello": "Bonjour"}
-    assert fr["messages"] == {"greeting": "Bonjour"}
+    # Rails fr.yml is the same catalog as en.yml, not a catalog named "fr" (#346).
+    assert fr["messages"] == {"hello": "Bonjour", "greeting": "Bonjour"}
     assert "Hi" in fr["gettext"]
     assert catalogs["en"]["Strings"] == {"Hello": "Hello"}
     assert "@title" not in catalogs["en"]["arb"]
@@ -174,12 +174,13 @@ def test_i18n_flags_hardcoded_text_in_native_ui() -> None:
 
 
 def test_i18n_runner_scans_every_ui_source(tmp_path: Path) -> None:
-    runner = _runner("i18n_runner")
+    from i18n_agent.audit import _read_sources
+
     for rel in ("a.razor", "b.dart", "c.swift", "d.xaml", "e.php", "f.astro"):
         _write(tmp_path, f"ui/{rel}")
     _write(tmp_path, "node_modules/x/g.tsx")
 
-    names = {p.name for p in runner._iter_source_files(tmp_path)}
+    names = {Path(p).name for p in _read_sources(tmp_path)}
 
     assert names == {"a.razor", "b.dart", "c.swift", "d.xaml", "e.php", "f.astro"}
 

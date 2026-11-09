@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { I18nAgentEvent } from "../../preload/api/modules/i18n-agent-api";
-import type { I18nReport } from "../../shared/types/i18n-agent";
+import type { I18nReport, I18nTranslateOutcome } from "../../shared/types/i18n-agent";
 
 export type I18nAgentPhase = "idle" | "scanning" | "complete" | "error";
 
@@ -10,7 +10,12 @@ interface I18nAgentState {
 	report: I18nReport | null;
 	error: string | null;
 	referenceLocale: string;
+	translating: boolean;
+	translation: I18nTranslateOutcome | null;
+	translateError: string | null;
 
+	/** Translate the missing keys on a review card; empty `locales` is every locale. */
+	translate: (projectPath: string, locales?: string[]) => Promise<void>;
 	setReferenceLocale: (locale: string) => void;
 	startScan: (projectPath: string) => Promise<void>;
 	cancelScan: () => Promise<void>;
@@ -26,6 +31,24 @@ export const useI18nAgentStore = create<I18nAgentState>((set, get) => ({
 	report: null,
 	error: null,
 	referenceLocale: "en",
+	translating: false,
+	translation: null,
+	translateError: null,
+
+	translate: async (projectPath, locales = []) => {
+		if (!projectPath || get().translating) return;
+		set({ translating: true, translation: null, translateError: null });
+		try {
+			const translation = await globalThis.electronAPI.translateI18nKeys({
+				projectPath,
+				referenceLocale: get().report?.referenceLocale ?? get().referenceLocale,
+				locales,
+			});
+			set({ translating: false, translation });
+		} catch (err) {
+			set({ translating: false, translateError: err instanceof Error ? err.message : String(err) });
+		}
+	},
 
 	setReferenceLocale: (locale) => set({ referenceLocale: locale }),
 
@@ -39,6 +62,8 @@ export const useI18nAgentStore = create<I18nAgentState>((set, get) => ({
 			status: "Starting scan...",
 			report: null,
 			error: null,
+			translation: null,
+			translateError: null,
 		});
 		try {
 			const report = await globalThis.electronAPI.runI18nScan({
@@ -68,6 +93,8 @@ export const useI18nAgentStore = create<I18nAgentState>((set, get) => ({
 			status: "",
 			report: null,
 			error: null,
+			translation: null,
+			translateError: null,
 		}),
 }));
 
