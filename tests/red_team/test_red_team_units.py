@@ -326,14 +326,26 @@ def test_the_card_reads_the_latest_record_without_the_attack_files(tmp_path):
     project = tmp_path / "project"
     spec = project / ".workpilot" / "specs" / "001-cart"
     spec.mkdir(parents=True)
-    worktree_spec = project / ".workpilot" / "worktrees" / "tasks" / "001-cart" / ".workpilot" / "specs" / "001-cart"
+    worktree_spec = (
+        project
+        / ".workpilot"
+        / "worktrees"
+        / "tasks"
+        / "001-cart"
+        / ".workpilot"
+        / "specs"
+        / "001-cart"
+    )
     worktree_spec.mkdir(parents=True)
     app = FastAPI()
     app.include_router(router)
     client = TestClient(app)
     query = {"project_dir": str(project), "spec_id": "001-cart"}
 
-    assert client.get("/api/red-team/", params=query).json() == {"success": True, "record": None}
+    assert client.get("/api/red-team/", params=query).json() == {
+        "success": True,
+        "record": None,
+    }
 
     old = _crashed_report()
     old.finished_at = 1.0
@@ -347,5 +359,7 @@ def test_the_card_reads_the_latest_record_without_the_attack_files(tmp_path):
     assert "files" not in record
     assert record["attack_files"] == ["tests/test_shop_red_team.py"]
 
-    bad = client.get("/api/red-team/", params={"project_dir": str(project), "spec_id": "../x"})
+    bad = client.get(
+        "/api/red-team/", params={"project_dir": str(project), "spec_id": "../x"}
+    )
     assert bad.json()["success"] is False
