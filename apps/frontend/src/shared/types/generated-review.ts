@@ -17,6 +17,7 @@ export const GENERATED_REVIEW_SOURCES = [
 	"changelog",
 	"pair-programming",
 	"quick-command",
+	"i18n",
 	"accessibility",
 	"doc-drift",
 ] as const;
