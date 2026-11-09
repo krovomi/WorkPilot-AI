@@ -600,6 +600,12 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
+        # The generator reaches the model through the agent_runtime port,
+        # which only `core` installs: without this import every generation
+        # (unit, coverage analysis, E2E, TDD) failed with "No agent runtime is
+        # installed", whatever the provider (F179). Importing core also puts
+        # `src.connectors` on the path the providers read their routing from.
+        import core  # noqa: F401
         from test_generation.generator import TestGeneratorAgent
     except ImportError as exc:
         _print_error(

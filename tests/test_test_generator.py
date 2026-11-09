@@ -587,6 +587,52 @@ class TestTestGeneratorAgent:
 
         assert "e2e" in result.test_file_path
 
+    @pytest.mark.parametrize(
+        ("source", "manifest", "expected"),
+        [
+            ("Calculator.cs", "Calc.csproj", "e2e/CalculatorE2ETests.cs"),
+            ("Calculator.java", "pom.xml", "e2e/CalculatorE2ETest.java"),
+            ("calculator.go", "go.mod", "e2e/calculator_e2e_test.go"),
+        ],
+    )
+    def test_e2e_path_follows_the_stack_when_the_model_gives_none(
+        self, agent, tmp_path, source, manifest, expected
+    ):
+        """A raw answer (no JSON envelope, so no path) from a C#, Java or Go
+        project used to be written to ``e2e/test_<x>.js`` (F179)."""
+        (tmp_path / manifest).write_text("", encoding="utf-8")
+        target = tmp_path / "src" / source
+        target.parent.mkdir()
+        target.write_text("// code\n", encoding="utf-8")
+        _fake, ctx = _patch_llm("// a raw scenario, no JSON envelope\n")
+        with ctx:
+            result = agent.generate_tests_from_user_story(
+                "A story", target_module=str(target), project_path=str(tmp_path)
+            )
+
+        assert result.test_file_path == expected
+
+    def test_e2e_path_from_the_model_is_kept_when_the_stack_has_no_e2e_folder(
+        self, agent, tmp_path
+    ):
+        (tmp_path / "Gemfile").write_text("", encoding="utf-8")
+        target = tmp_path / "app" / "cart.rb"
+        target.parent.mkdir()
+        target.write_text("class Cart; end\n", encoding="utf-8")
+        response = json.dumps(
+            {
+                "test_file_content": "describe 'cart' do\nend\n",
+                "test_file_path": "spec/features/cart_spec.rb",
+            }
+        )
+        _fake, ctx = _patch_llm(response)
+        with ctx:
+            result = agent.generate_tests_from_user_story(
+                "A story", target_module=str(target), project_path=str(tmp_path)
+            )
+
+        assert result.test_file_path == "spec/features/cart_spec.rb"
+
     def test_generation_falls_back_to_raw_response_when_not_json(
         self, agent, sample_source
     ):

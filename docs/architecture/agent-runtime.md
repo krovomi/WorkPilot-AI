@@ -35,7 +35,8 @@ test_generation
   `core.auth.get_auth_token` ou `core.simple_client.create_simple_client` atteint aussi les
   unités qui passent par le port.
 - **`current()` vaut `None` tant que `core` n'est pas importé.** Tout processus qui lance un
-  agent importe `core` avant d'atteindre ces unités. Une unité qui reçoit `None` prend le
+  agent importe `core` avant d'atteindre ces unités ; pour les runners, `tests/test_agent_runtime_port.py`
+  le vérifie (le runner du studio de tests ne le faisait pas, F179). Une unité qui reçoit `None` prend le
   chemin qu'elle avait déjà pour « pas de SDK, pas de jeton » : le résolveur de merge sans IA,
   l'extraction d'insights désactivée, la revue d'architecture sans violation ajoutée, le client
   Linear refusé par `ImportError` (que son appelant traitait déjà), le générateur de tests en
