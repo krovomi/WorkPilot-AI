@@ -2450,5 +2450,50 @@
 		"done_other": "{{count}} worktrees purged, {{size}} freed.",
 		"kept_one": "{{count}} kept: uncommitted changes or could not be removed.",
 		"kept_other": "{{count}} kept: uncommitted changes or could not be removed."
+	},
+	"schemaGuard": {
+		"title": "Migrations",
+		"status": {
+			"pass": "Zero-downtime",
+			"warn": "To review",
+			"fail": "Breaks a live database",
+			"unchecked": "Not checked"
+		},
+		"summary_one": "{{count}} migration checked · {{engine}}",
+		"summary_other": "{{count}} migrations checked · {{engine}}",
+		"engine": {
+			"postgres": "PostgreSQL",
+			"mysql": "MySQL / MariaDB",
+			"sqlserver": "SQL Server",
+			"sqlite": "SQLite",
+			"unknown": "engine not detected"
+		},
+		"check": "Check again",
+		"checking": "Checking…",
+		"kind": {
+			"data_loss": "Data loss",
+			"rename": "Rename",
+			"type_change": "Type change",
+			"not_null": "NOT NULL",
+			"lock": "Lock",
+			"no_rollback": "No rollback",
+			"edited": "Applied migration edited"
+		},
+		"advice": {
+			"data_loss": "Ship the code that no longer uses it first, keep the data through a cooldown, then drop it in a later migration.",
+			"rename": "Add the new name next to the old one, write both, backfill, switch the reads, then drop the old name later.",
+			"type_change": "Add a column of the new type, backfill it with a checked conversion, switch the code, then drop the old column.",
+			"not_null": "Add the column nullable or with a default, backfill in batches, then add NOT NULL (on PostgreSQL through a CHECK … NOT VALID first).",
+			"lock": "On PostgreSQL, build the index CONCURRENTLY and add constraints NOT VALID then VALIDATE, outside a transaction.",
+			"no_rollback": "Write the down migration, or say in the migration why it cannot be reversed and how the data is restored.",
+			"edited": "This migration may already have run somewhere: restore it and add a new migration for the change."
+		},
+		"planTitle": "Zero-downtime plan",
+		"plan": {
+			"expand": "Expand: add the new structure next to the old one, and have the code write both.",
+			"migrate": "Migrate: backfill in batches that can resume, outside the deploy.",
+			"switch": "Switch: deploy the code that reads only the new structure.",
+			"contract": "Contract: once no running version uses it, drop the old structure in a later migration."
+		}
 	}
 }

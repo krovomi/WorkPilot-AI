@@ -44,6 +44,7 @@ export type PanelCardId =
 	| "uiux"
 	| "visualReview"
 	| "verifyLoop"
+	| "schemaGuard"
 	| "redTeam"
 	// Costs & context
 	| "workflowProfile"
@@ -66,7 +67,7 @@ export const PANEL_CARDS: Readonly<Record<PanelSectionId, readonly PanelCardId[]
 		"bestOfN",
 		"mcpApps",
 	],
-	quality: ["jev", "traceability", "uiux", "visualReview", "verifyLoop", "redTeam"],
+	quality: ["jev", "traceability", "uiux", "visualReview", "verifyLoop", "schemaGuard", "redTeam"],
 	costs: ["workflowProfile", "documents", "hermes", "brain", "rtk"],
 };
 

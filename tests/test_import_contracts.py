@@ -63,6 +63,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
     "mutation_gate": {"foundation", "security"},
+    # The schema guard (docs/architecture/schema-guard.md): migration rules
+    # over text, git through foundation. The QA gate that calls it is in qa.
+    "schema_guard": {"foundation"},
     # The red team (docs/architecture/red-team.md): the mutation gate's scratch
     # copy, scope and test commands, the suite runner and its reports, git
     # through foundation. Its session and the card's route are in qa

@@ -16,6 +16,7 @@ import { RedTeamCard } from "./RedTeamCard";
 import { HermesLearningCard } from "./HermesLearningCard";
 import { McpAppsCard } from "./McpAppsCard";
 import { PanelCardSlot } from "./PanelCardSlot";
+import { SchemaGuardCard } from "./SchemaGuardCard";
 import { PanelTabList } from "./PanelTabList";
 import {
 	PANEL_CARDS,
@@ -122,6 +123,8 @@ export function TaskOverview({
 		verifyLoop: (
 			<VerifyLoopCard task={task} projectPath={projectPath} onOpenDetails={onOpenVerify} />
 		),
+		// Ce que les migrations de la tâche font à une base en production. Rien sans migration.
+		schemaGuard: <SchemaGuardCard task={task} projectPath={projectPath} />,
 		// La red team : ce qui a fait planter le code, ce qui a tenu. Rien sans attaque.
 		redTeam: <RedTeamCard task={task} projectPath={projectPath} />,
 		workflowProfile: <WorkflowProfileCard task={task} projectPath={projectPath} />,
