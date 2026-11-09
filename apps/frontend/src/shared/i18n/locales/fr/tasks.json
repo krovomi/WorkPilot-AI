@@ -1913,6 +1913,40 @@
 		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
 		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
 	},
+	"redTeam": {
+		"title": "Red team",
+		"status": {
+			"pass": "A tenu",
+			"fail": "A planté",
+			"unknown": "Inconnu",
+			"none": "Rien à attaquer"
+		},
+		"replay": "Rejouée",
+		"counts": "{{crash}} plantage · {{unexpected}} inattendu · {{resistant}} tenu · {{warning}} avertissement",
+		"attack": "Attaquer",
+		"running": "Attaque en cours…",
+		"input": "Entrée : {{input}}.",
+		"expect": "Attendu : {{expect}}.",
+		"outcome": {
+			"crash": "Plantage",
+			"unexpected": "Inattendu",
+			"resistant": "A tenu",
+			"not_run": "Non lancée",
+			"flaky": "Instable"
+		},
+		"mode": {
+			"fuzz": "Entrée malformée",
+			"edge": "Cas limite",
+			"injection": "Injection de prompt",
+			"concurrency": "Concurrence",
+			"regression": "Ancien bug"
+		},
+		"warnings": "Risques de concurrence vus dans le code (non prouvés)",
+		"warning": {
+			"toctou": "vérifie un fichier puis s'en sert : un autre processus peut le changer entre les deux",
+			"shared-state": "écrit un état partagé depuis du code concurrent, sans verrou"
+		}
+	},
 	"verify": {
 		"title": "Boucle de vérification",
 		"status": {

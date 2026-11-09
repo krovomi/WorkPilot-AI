@@ -5,7 +5,10 @@
  * prompt payloads for prompt injection attempts.
  */
 
-import type { InjectionScanResult } from "../../../shared/types/injection-guard";
+import type {
+	InjectionScanResult,
+	ToolResultAlert,
+} from "../../../shared/types/injection-guard";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
@@ -27,6 +30,11 @@ export interface InjectionGuardAPI {
 		options: InjectionGuardRunOptions,
 	) => Promise<InjectionGuardScanResult>;
 	cancelInjectionGuardScan: () => Promise<boolean>;
+	/** Tool results the agents read that the guard flagged, newest first. */
+	getToolResultAlerts: (projectPath: string) => Promise<ToolResultAlert[]>;
+	getTrustedSources: (projectPath: string) => Promise<string[]>;
+	/** Saves the valid entries (revalidated in main) and returns them. */
+	setTrustedSources: (projectPath: string, sources: string[]) => Promise<string[]>;
 	onInjectionGuardEvent: (
 		callback: (event: InjectionGuardEvent) => void,
 	) => () => void;
@@ -43,6 +51,15 @@ export const createInjectionGuardAPI = (): InjectionGuardAPI => ({
 		invokeIpc<InjectionGuardScanResult>(IPC_CHANNELS.INJECTION_GUARD_RUN, options),
 
 	cancelInjectionGuardScan: () => invokeIpc<boolean>(IPC_CHANNELS.INJECTION_GUARD_CANCEL),
+
+	getToolResultAlerts: (projectPath: string) =>
+		invokeIpc<ToolResultAlert[]>(IPC_CHANNELS.INJECTION_GUARD_ALERTS, { projectPath }),
+
+	getTrustedSources: (projectPath: string) =>
+		invokeIpc<string[]>(IPC_CHANNELS.INJECTION_GUARD_TRUSTED_GET, { projectPath }),
+
+	setTrustedSources: (projectPath: string, sources: string[]) =>
+		invokeIpc<string[]>(IPC_CHANNELS.INJECTION_GUARD_TRUSTED_SET, { projectPath, sources }),
 
 	onInjectionGuardEvent: (callback) =>
 		createIpcListener<[InjectionGuardEvent]>(

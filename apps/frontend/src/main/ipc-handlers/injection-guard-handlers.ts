@@ -7,6 +7,8 @@
  * Channels:
  *   invoke "injectionGuard:run"     → { projectPath }
  *   invoke "injectionGuard:cancel"  → void
+ *   invoke "injectionGuard:alerts"  → { projectPath } → flagged tool results
+ *   invoke "injectionGuard:trustedSources:get|set" → the trusted sources
  *
  * Renderer events:
  *   injection-guard-event
@@ -21,6 +23,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	readToolResultAlerts,
+	readTrustedSources,
+	writeTrustedSources,
+} from "./injection-guard-tool-results";
 
 interface RunRequest {
 	projectPath: string;
@@ -178,4 +185,22 @@ export function registerInjectionGuardHandlers(): void {
 		killExisting();
 		return true;
 	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.INJECTION_GUARD_ALERTS,
+		(_event, request: Partial<RunRequest> | undefined) =>
+			readToolResultAlerts(normalizeProjectPath(request?.projectPath)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.INJECTION_GUARD_TRUSTED_GET,
+		(_event, request: Partial<RunRequest> | undefined) =>
+			readTrustedSources(normalizeProjectPath(request?.projectPath)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.INJECTION_GUARD_TRUSTED_SET,
+		(_event, request: (Partial<RunRequest> & { sources?: unknown }) | undefined) =>
+			writeTrustedSources(normalizeProjectPath(request?.projectPath), request?.sources),
+	);
 }

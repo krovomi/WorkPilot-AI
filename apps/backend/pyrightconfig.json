@@ -7,8 +7,10 @@
     "goal",
     "mcp_tasks",
     "os_sandbox",
+    "red_team",
     "security",
-    "simulation"
+    "simulation",
+    "suite_runner"
   ],
   "exclude": ["**/__pycache__", ".venv"],
   "venvPath": ".",
