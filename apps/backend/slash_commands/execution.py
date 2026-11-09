@@ -25,7 +25,9 @@ tool-enabled agent on the active provider, whatever it is.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from slash_commands.api import resolve_command_instructions
 
@@ -53,6 +55,21 @@ def resolve_prompt(project_dir: Path, command: str, args: str) -> str | None:
     return f"{body}\n\nArguments: {extra}" if extra else body
 
 
+async def _guarded(
+    failure: str, call: Callable[[], Awaitable[Any]]
+) -> tuple[bool, Any]:
+    """`(True, result)` of `call`, or `(False, "<failure>: <error>")`.
+
+    The one place a run's errors are caught: a provider's SDK or CLI may raise
+    anything, and the bar must say what went wrong rather than crash.
+    """
+    try:
+        return True, await call()
+    except Exception as exc:  # noqa: BLE001 - reported to the person, logged here
+        logger.exception("[slash-commands] %s", failure)
+        return False, f"{failure}: {exc}"
+
+
 async def _agent_workflow_call(workdir: Path, prompt: str) -> tuple[bool, str]:
     """Run `prompt` as a multi-turn, tool-enabled agent on the active provider.
 
@@ -71,34 +88,34 @@ async def _agent_workflow_call(workdir: Path, prompt: str) -> tuple[bool, str]:
     except ImportError as exc:
         return False, f"agent runner not available: {exc}"
 
-    try:
+    async def build():
         # Peeked: a palette command is not the session a "resume with X"
         # choice was made for, and must not eat it.
         provider = peek_active_provider(workdir)
         model = _resolve_model(provider, None, workdir)
         # spec_dir == workdir: the bar is project-scoped (no per-task spec).
         # agent_type="coder" carries the read+write+web tool set a workflow needs.
-        client = create_agent_client(
+        return create_agent_client(
             project_dir=workdir,
             spec_dir=workdir,
             model=model,
             agent_type="coder",
             provider=provider,
         )
-    except Exception as exc:
-        logger.exception("[slash-commands] failed to build agent client")
-        return False, f"failed to build agent client: {exc}"
 
-    text = ""
-    try:
+    ok, client = await _guarded("failed to build agent client", build)
+    if not ok:
+        return False, client
+
+    async def converse() -> str:
+        text = ""
         async with client:
             await client.query(prompt)
             async for msg in client.receive_response():
                 text += _extract_text(msg)
-    except Exception as exc:
-        logger.exception("[slash-commands] agent workflow call failed")
-        return False, f"workflow run failed: {exc}"
-    return True, text.strip()
+        return text.strip()
+
+    return await _guarded("workflow run failed", converse)
 
 
 async def _oneshot_call(workdir: Path, prompt: str) -> tuple[bool, str]:
@@ -108,12 +125,11 @@ async def _oneshot_call(workdir: Path, prompt: str) -> tuple[bool, str]:
     except ImportError as exc:
         return False, f"oneshot runner not available: {exc}"
 
-    try:
+    async def complete() -> str:
         text = await oneshot_completion(prompt, project_dir=str(workdir), max_turns=1)
-    except Exception as exc:
-        logger.exception("[slash-commands] one-shot call failed")
-        return False, f"command run failed: {exc}"
-    return True, (text or "").strip()
+        return (text or "").strip()
+
+    return await _guarded("command run failed", complete)
 
 
 async def run_prompt(workdir: Path, prompt: str) -> tuple[bool, str]:
