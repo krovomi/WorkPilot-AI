@@ -24,6 +24,7 @@ import {
 import "../charter/charter.css";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+import { GuardrailsActivity } from "./GuardrailsActivity";
 import { SettingsSection } from "./SettingsSection";
 
 const ACTIONS: GuardrailAction[] = ["allow", "warn", "deny", "require_approval"];
@@ -42,7 +43,7 @@ type TestTool = (typeof TOOLS)[number];
 export function GuardrailsView(): React.ReactElement {
 	const { t } = useTranslation(["settings", "navigation", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
-	const { doc, dirty, loading, addRule, save } = useGuardrailsStore();
+	const { doc, dirty, loading, loadFailed, addRule, save } = useGuardrailsStore();
 	const projectPath = activeProject?.path;
 
 	return (
@@ -66,7 +67,7 @@ export function GuardrailsView(): React.ReactElement {
 								variant="primary"
 								icon={Save}
 								onClick={() => save(projectPath)}
-								disabled={!dirty || loading}
+								disabled={!dirty || loading || loadFailed}
 							>
 								{t("common:save")}
 							</CharterButton>
@@ -91,7 +92,7 @@ export function GuardrailsView(): React.ReactElement {
 export function GuardrailsSettings(): React.ReactElement {
 	const { t } = useTranslation(["settings", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
-	const { dirty, loading, addRule, save } = useGuardrailsStore();
+	const { dirty, loading, loadFailed, addRule, save } = useGuardrailsStore();
 	const projectPath = activeProject?.path;
 
 	return (
@@ -111,7 +112,7 @@ export function GuardrailsSettings(): React.ReactElement {
 							variant="primary"
 							icon={Save}
 							onClick={() => save(projectPath)}
-							disabled={!dirty || loading}
+							disabled={!dirty || loading || loadFailed}
 						>
 							{t("common:save")}
 						</CharterButton>
@@ -175,6 +176,7 @@ function GuardrailsEditor({ projectPath }: { readonly projectPath: string }): Re
 				)}
 			</Section>
 			<Tester projectPath={projectPath} />
+			<GuardrailsActivity projectPath={projectPath} />
 		</>
 	);
 }
@@ -283,7 +285,70 @@ function RuleCard({
 					/>
 				</div>
 				{text("command_pattern", t("guardrails.commandPattern"), "git push.*--force")}
+				{text("path_glob", t("guardrails.pathGlob"), "**/migrations/**")}
+				{text("adds_regex", t("guardrails.addsRegex"), ":\\s*any\\b")}
+				<div className="space-y-1">
+					<label className="wp-kicker block" htmlFor={`${uid}-newlines`}>
+						{t("guardrails.newFileMaxLines")}
+					</label>
+					<Input
+						id={`${uid}-newlines`}
+						type="number"
+						className="h-8 font-mono text-xs"
+						value={rule.when.new_file_max_lines ?? ""}
+						onChange={(e) =>
+							onChange({
+								when: { new_file_max_lines: e.target.value ? Number(e.target.value) : undefined },
+							})
+						}
+						placeholder="500"
+					/>
+				</div>
+				<div className="space-y-1">
+					<label className="wp-kicker block" htmlFor={`${uid}-branch`}>
+						{t("guardrails.branch")}
+					</label>
+					<Input
+						id={`${uid}-branch`}
+						className="h-8 font-mono text-xs"
+						value={Array.isArray(rule.when.branch) ? rule.when.branch.join(", ") : (rule.when.branch ?? "")}
+						onChange={(e) => {
+							const branches = e.target.value
+								.split(",")
+								.map((b) => b.trim())
+								.filter(Boolean);
+							onChange({ when: { branch: branches.length ? branches : undefined } });
+						}}
+						placeholder={t("guardrails.branchPlaceholder")}
+					/>
+				</div>
 			</div>
+			<div className="space-y-1">
+				<p className="wp-kicker">{t("guardrails.meaning")}</p>
+				<div className="wp-chips">
+					<Chip
+						tone="violet"
+						pressed={rule.when.deletes_tests === true}
+						onClick={() => onChange({ when: { deletes_tests: rule.when.deletes_tests ? undefined : true } })}
+					>
+						{t("guardrails.deletesTests")}
+					</Chip>
+					<Chip
+						tone="violet"
+						pressed={rule.when.adds_dependency === true}
+						onClick={() => onChange({ when: { adds_dependency: rule.when.adds_dependency ? undefined : true } })}
+					>
+						{t("guardrails.addsDependency")}
+					</Chip>
+				</div>
+			</div>
+			<Input
+				aria-label={t("guardrails.agentMessage")}
+				className="h-8 text-sm"
+				value={rule.message ?? ""}
+				onChange={(e) => onChange({ message: e.target.value || undefined })}
+				placeholder={t("guardrails.agentMessage")}
+			/>
 		</Panel>
 	);
 }

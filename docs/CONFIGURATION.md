@@ -552,6 +552,16 @@ it is missing, the Claude provider's commands run without isolation and the task
 WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
 command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
 
+## Guardrails (`security/guardrail_policy.py`)
+
+Rules on what agents may not write or run, read in three layers from the main project, worktrees
+included: global, the versioned `workpilot.policy.yaml`, then `.workpilot/guardrails.yaml` (what
+Settings → Guardrails writes). See [architecture/guardrails.md](architecture/guardrails.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_GUARDRAILS_GLOBAL` | `~/.workpilot/guardrails.yaml` | The global layer: rules for every project of this machine. A later layer cannot weaken them. |
+
 ## Automatic split of big tasks (`task_split`)
 
 After planning, a task whose plan is bigger than the ceiling becomes several smaller tasks, one

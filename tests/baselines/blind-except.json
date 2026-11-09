@@ -364,7 +364,6 @@
   "apps/backend/security/auto_integration.py": {"blind": 2, "silent": 0},
   "apps/backend/security/compliance_analyzer.py": {"blind": 1, "silent": 1},
   "apps/backend/security/git_hooks.py": {"blind": 2, "silent": 0},
-  "apps/backend/security/guardrails.py": {"blind": 1, "silent": 0},
   "apps/backend/security/hooks.py": {"blind": 1, "silent": 0},
   "apps/backend/security/parser.py": {"blind": 1, "silent": 0},
   "apps/backend/security/profile.py": {"blind": 1, "silent": 0},
