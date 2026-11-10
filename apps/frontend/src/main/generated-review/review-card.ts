@@ -76,6 +76,7 @@ const TITLE_PREFIX: Record<GeneratedReviewSource, { en: string; fr: string }> = 
 	i18n: { en: "Translations", fr: "Traductions" },
 	accessibility: { en: "Accessibility fixes", fr: "Corrections d'accessibilité" },
 	"doc-drift": { en: "Documentation fixes", fr: "Corrections de documentation" },
+	"notebook-agent": { en: "Notebook refactor", fr: "Refactor de notebook" },
 };
 
 const DESCRIPTION: { en: string; fr: string } = {

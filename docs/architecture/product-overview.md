@@ -155,7 +155,7 @@ it, inside its hub. The hubs are listed in
 | `injection-guard` | Injection Guard | Toolbox › Quality and security | — |  |
 | `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `migration` | Code Migration | Toolbox | — |  |
-| `notebook-agent` | Notebook Checks | Toolbox | — | yes |
+| `notebook-agent` | Notebook Checks | Toolbox | [notebook-agent.md](notebook-agent.md) |  |
 | `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |  |
 | `onboarding-agent` | Onboarding Pack | Development › Onboarding | — |  |
 | `pipeline-generator` | Pipeline Generator | Toolbox | — | yes |

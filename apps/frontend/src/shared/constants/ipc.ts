@@ -1228,6 +1228,9 @@ export const IPC_CHANNELS = {
 	NATURAL_LANGUAGE_GIT_STREAM_CHUNK: "natural-language-git-stream-chunk",
 	NOTEBOOK_AGENT_CANCEL: "notebookAgent:cancel",
 	NOTEBOOK_AGENT_RUN: "notebookAgent:run",
+	NOTEBOOK_AGENT_EXECUTE: "notebookAgent:execute", // Run one notebook in a fresh kernel (#371)
+	NOTEBOOK_AGENT_REFACTOR: "notebookAgent:refactor", // Cells → functions and cleaning, on a review card
+	NOTEBOOK_AGENT_METRICS: "notebookAgent:metrics", // Per month: notebooks, findings, runs, extractions
 	NOTEBOOK_ERROR: "notebook-error",
 	NOTEBOOK_EVENT: "notebook-event",
 	NOTEBOOK_RESULT: "notebook-result",

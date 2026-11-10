@@ -18,7 +18,6 @@ export const EXPERIMENTAL_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>
 	"compliance",
 	"cross-language-translation",
 	"env-snapshot",
-	"notebook-agent",
 	"performance-profiler",
 	"pipeline-generator",
 	"regression-guardian",

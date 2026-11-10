@@ -3,6 +3,8 @@ import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useNotebookAgentStore } from "../../stores/notebook-agent-store";
 import type { ParsedNotebook } from "../../../shared/types/notebook-agent";
+import { NotebookDetails } from "./NotebookDetails";
+import { NotebookMetrics } from "./NotebookMetrics";
 import {
 	CharterButton,
 	Chip,
@@ -99,10 +101,11 @@ export function NotebookView({ projectPath }: NotebookViewProps): React.ReactEle
 						<Section kicker={t("notebookAgent:kickers.notebooks")} title={t("notebookAgent:notebooksTitle")}>
 							<div className="grid gap-2.5 lg:grid-cols-2">
 								{notebooks.map((nb) => (
-									<NotebookPanel key={nb.path} notebook={nb} />
+									<NotebookPanel key={nb.path} notebook={nb} projectPath={projectPath} />
 								))}
 							</div>
 						</Section>
+						<NotebookMetrics key={`${phase}-${notebooks.length}`} projectPath={projectPath} />
 					</>
 				) : (
 					!isScanning && (
@@ -120,7 +123,13 @@ export function NotebookView({ projectPath }: NotebookViewProps): React.ReactEle
 	);
 }
 
-function NotebookPanel({ notebook }: { readonly notebook: ParsedNotebook }): React.ReactElement {
+function NotebookPanel({
+	notebook,
+	projectPath,
+}: {
+	readonly notebook: ParsedNotebook;
+	readonly projectPath: string | undefined;
+}): React.ReactElement {
 	const { t } = useTranslation("notebookAgent");
 	const worst = notebook.issues.some((i) => i.severity === "error")
 		? "red"
@@ -174,6 +183,7 @@ function NotebookPanel({ notebook }: { readonly notebook: ParsedNotebook }): Rea
 			) : (
 				<p className="wp-muted mt-1.5 text-xs">{t("noIssues")}</p>
 			)}
+			<NotebookDetails notebook={notebook} projectPath={projectPath} />
 		</Panel>
 	);
 }
