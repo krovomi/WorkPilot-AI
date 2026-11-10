@@ -615,6 +615,7 @@ export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
 	testGenerator: "claude-sonnet-5-5", // Balanced test generation for comprehensive coverage
 	codeReview: "claude-opus-5-5", // Code review benefits from thorough Opus analysis
 	voiceControl: "claude-haiku-5-5", // Voice assistant: a short, fast reading
+	arbiter: "claude-opus-5-5", // Best-of-N arbiter: comparative reasoning benefits from Opus
 };
 
 // Default feature thinking configuration
@@ -630,6 +631,7 @@ export const DEFAULT_FEATURE_THINKING: FeatureThinkingConfig = {
 	testGenerator: "medium", // Balanced thinking for test generation
 	codeReview: "medium", // Balanced thinking for code review
 	voiceControl: "low", // Voice assistant
+	arbiter: "high", // Best-of-N arbiter: weighs several implementations
 };
 
 // Default agent profiles for preset model/thinking configurations

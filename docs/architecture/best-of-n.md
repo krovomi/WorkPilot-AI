@@ -91,6 +91,41 @@ Le tableau montre chaque nombre : sous-tâches faites / total, statut QA, verdic
   sortie sont marquées « interrompues » à la réouverture. La personne relance le classement ou
   abandonne.
 
+## L'arbitre
+
+Deux variantes qui passent les mêmes critères peuvent être deux conceptions différentes (la
+logique dans un service ou dans le contrôleur). Le classement ne le voit pas ; le contenu des
+fichiers, si.
+
+- **Quand.** `best_of_n/divergence.py` compare les variantes à garder (worktree présent, build
+  fini) deux à deux : un moins la similarité (`difflib`) des fichiers que l'une ou l'autre a
+  changés, pondérée par leur taille. Un même fichier final compte 0, un fichier écrit d'un seul
+  côté compte 1. L'arbitre est nécessaire quand la plus grande divergence atteint le seuil
+  (`WORKPILOT_ARBITER_DIVERGENCE`, 0,3 par défaut) ou quand aucune variante n'est seule en tête.
+  Le classement écrit `arbiter.status: "pending"`, et le main le consulte aussitôt. Sous le seuil,
+  le classement suffit (`not_needed`). Moins de deux variantes finies ou un diff illisible : pas de
+  verdict.
+- **Avec quoi.** Le moteur est celui du réglage par page « Arbitre du Best-of-N » (vue
+  `consensus-arbiter`), passé au runner en `--provider` / `--model`, avec les identifiants de ce
+  fournisseur. Un appel `core.oneshot`, un tour, sans outil : tous les fournisseurs le servent.
+  La carte prévient quand l'arbitre tourne sur le fournisseur d'une variante.
+- **Ce qu'il lit.** Les axes mesurés sans modèle (`arbiter.axes` : build, QA, objectif, taille du
+  diff, fichiers de test touchés, coût, rang) et le patch de chaque variante, plafonné et cité par
+  `quote_untrusted` (S2). Le prompt système lui interdit de suivre une instruction trouvée dans un
+  patch.
+- **Ce qu'il rend.** Un objet JSON vérifié strictement (`parse_verdict`) : une variante de la
+  course, ou une fusion où chaque fichier vient une fois d'une variante qui l'a changé, avec au
+  moins deux sources. S'y ajoutent une raison par axe, les risques des variantes écartées et une
+  confiance. Une réponse hors de ce format donne `invalid`, un modèle injoignable `unavailable` :
+  la carte montre alors les chiffres seuls, jamais un verdict deviné. Une confiance basse donne
+  `needs_human`. Des approches déclarées équivalentes gardent la plus petite.
+- **Contester.** La personne pose une question (1 à 1 000 caractères, revalidée dans le main puis
+  par le runner, citée comme message de personne) ; la réponse s'ajoute au fil, dix au plus.
+- **Suivi.** Le verdict n'adopte rien et n'applique pas de fusion. À l'adoption, une ligne va dans
+  `.workpilot/arbiter/history.jsonl` (verdict suivi ou non, fusion, confiance, questions posées) ;
+  `arbiter-metrics` en tire, par mois, le nombre d'arbitrages, la part suivie et la confiance
+  moyenne.
+
 ## Sécurité
 
 - **Le renderer ne nomme que la tâche et des moteurs.** Fournisseur, modèle et effort sont
@@ -109,6 +144,9 @@ Le tableau montre chaque nombre : sous-tâches faites / total, statut QA, verdic
   lancement.
 - **Les variantes ne sont pas visibles une par une.** Elles n'ont ni logs ni fiche propre dans
   l'UI : la carte montre leur état, puis le classement.
+- **Une fusion proposée ne s'applique pas.** La personne garde la variante qui apporte le plus de
+  fichiers et reprend les autres à la main ; l'historique de l'arbitre n'alimente pas encore la
+  boucle d'apprentissage.
 - **Le coût après adoption.** Les lignes de coût des variantes gardent leur nom de spec, `-bon<k>`,
   et le coût affiché sur la tâche adoptée ne les additionne pas.
 
@@ -116,5 +154,5 @@ Le tableau montre chaque nombre : sous-tâches faites / total, statut QA, verdic
 
 ```
 pytest tests/best_of_n -q
-cd apps/frontend && npx vitest run best-of-n-handlers BestOfNCard project-store
+cd apps/frontend && npx vitest run best-of-n-handlers BestOfNCard BestOfNArbiterPanel project-store
 ```

@@ -65,7 +65,7 @@ fichier-ci reste l'autorité sur les règles.
 | Changelog | [changelog.md](architecture/changelog.md) | Notes de version depuis les tâches terminées ou git ; serveur : job sur le clone, un appel `core.oneshot`, requête fermée. |
 | Génération de tests | [test-generation.md](architecture/test-generation.md) | Où les tests générés sont écrits (`test_generation/layout.py`) et avec quelles bibliothèques. |
 | libdocs | [libdocs.md](architecture/libdocs.md) | Pages Context7 des bibliothèques sans exemple dans le dépôt, avant le build. |
-| Catalogues de modèles | [model-catalog.md](architecture/model-catalog.md) | Découverte des modèles Codex et registre models.dev derrière les sélecteurs. |
+| Catalogues de modèles | [model-catalog.md](architecture/model-catalog.md) | Modèles Codex et registre models.dev derrière les sélecteurs. |
 | docintel | [docintel.md](architecture/docintel.md) | Pièces jointes, diagrammes, moteurs OCR, redaction des secrets, ADR, traces de pile, ERD, QA visuelle. |
 | rtk | [rtk.md](architecture/rtk.md) | Sortie de commande condensée pour les modèles seulement ; l'allowlist voit à travers le proxy. |
 | watermarks | [watermarks.md](architecture/watermarks.md) | Caractères invisibles retirés des fichiers générés dans un hook PreToolUse ; `old_string` n'est jamais touché. |
@@ -85,7 +85,7 @@ fichier-ci reste l'autorité sur les règles.
 | Essai à blanc | [plan-rehearsal.md](architecture/plan-rehearsal.md) | Plan d'une spec rejoué sur sa base, sans écriture ni modèle. |
 | Bac à sable de l'OS | [os-sandbox.md](architecture/os-sandbox.md) | Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree, identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; Windows pas encore. |
 | Multi-dépôts | [multi-repo.md](architecture/multi-repo.md) | Analyse Python (graphe, ordre, ruptures), puis une carte Kanban par dépôt dans son projet, lancée quand la précédente a passé la QA, avec ce que les précédents ont changé ; une carte en attente suspend la suite ; reprise par le manifeste ; dépôts = projets enregistrés ou dossiers choisis. |
-| Best-of-N | [best-of-n.md](architecture/best-of-n.md) | Une tâche construite N fois, une variante par moteur ; classement chiffré, choix humain, rien de fusionné. |
+| Best-of-N | [best-of-n.md](architecture/best-of-n.md) | Une tâche construite N fois, une variante par moteur ; classement chiffré, arbitre si elles divergent, choix humain, rien de fusionné. |
 | Découpage auto | [task-split.md](architecture/task-split.md) | Plan > plafond de lignes : N cartes, dépendantes empilées (F6). |
 | Variantes et rejeux | [variants-and-replays.md](architecture/variants-and-replays.md) | ADR : `best_of_n` seul mécanisme de variantes ; `replay` et `bench` séparés ; un fork de Time Travel est enregistré, jamais exécuté. |
 | Mode objectif | [goal-mode.md](architecture/goal-mode.md) | Une commande dit « fini » : chemins protégés, plafond de passes et de dépense, fichier qu'aucun agent n'écrit. |
@@ -117,7 +117,7 @@ fichier-ci reste l'autorité sur les règles.
 | Assistant vocal | [voice-assistant.md](architecture/voice-assistant.md) | Raccourci global (Ctrl+Shift+Espace, sans AltGr ni raccourci pris), Whisper local, commandes simples lues localement puis modèle « Assistant vocal » ; liste fermée d'actions (vue de la barre latérale, tâche après confirmation, réglages), réponse revalidée dans le main. |
 | Émulateur d'app | [app-emulator.md](architecture/app-emulator.md) | Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur. |
 | Agent d'accessibilité | [accessibility-agent.md](architecture/accessibility-agent.md) | WCAG 2.2 lu dans le balisage de toutes les stacks et le CSS (liaisons, spread, composants : silence si incertain), contraste, score 0-100 et historique ; scan dynamique en fenêtre cachée sur localhost ; corrections sur carte de revue. |
-| Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents (provider, modèle) et un coût mesuré. |
+| Mode Arena | [arena.md](architecture/arena.md) | De vrais concurrents et un coût mesuré. |
 | Banc de rejeu | [repo-bench.md](architecture/repo-bench.md) | Cartes terminées rejouées par moteur depuis le commit d'avant, jugées par les tests du commit d'arrivée (F2P/P2P) ; recommande par type de carte le moteur le moins cher proche du meilleur, jamais appliqué seul ; une règle candidate est mesurée sans et avec elle. |
 | Recette de worktree | [worktree-recipe.md](architecture/worktree-recipe.md) | Worktree de tâche préparé avant la première session : recette détectée selon la stack, ou `.workpilot/worktree.toml` approuvé par empreinte ; sans shell ; seuls les fichiers ignorés sont copiés ; ports par tâche ; une étape en échec arrive dans le prompt. |
 | Code généré en revue | [generated-review.md](architecture/generated-review.md) | Le code d'une page va sur la branche d'une carte en revue, jamais dans le dossier du projet. |

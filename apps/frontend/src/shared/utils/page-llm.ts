@@ -55,6 +55,8 @@ export const PAGE_LLM_FEATURES = {
 	"natural-language-git": "natural-language-git",
 	// The voice assistant's reading of a free sentence (`voice-assistant-handlers.ts`).
 	"voice-control": "voiceControl",
+	// The Best-of-N arbiter (`task/best-of-n-handlers.ts`); the Consensus Arbiter view names its engine.
+	"consensus-arbiter": "arbiter",
 } as const satisfies Record<string, PageLlmFeature>;
 
 /** Une page qui accepte une formule propre. */
