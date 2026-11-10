@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -487,4 +488,31 @@ def test_usage_tracker_records_task_phase_agent_and_cache_reads(tmp_path):
         "001-shop",
         "qa",
         "qa_reviewer",
+    )
+
+
+def test_degraded_model_sees_a_config_rewritten_in_the_same_clock_tick(tmp_path):
+    """Windows can give two quick writes one mtime: the cache must still see the change."""
+    spec_dir = tmp_path / ".workpilot" / "specs" / "001-shop"
+    spec_dir.mkdir(parents=True)
+    write_ledger(
+        tmp_path,
+        [
+            entry(
+                model="claude-opus-4-8",
+                tokens_out=50_000,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        ],
+    )
+    write_config(tmp_path, {"monthly_budget_kg": 0.0001, "degrade": False})
+    config = tmp_path / ".workpilot" / "carbon.json"
+    stamp = config.stat().st_mtime_ns
+    assert budget.degraded_model(spec_dir, "claude-opus-4-8", "qa") == "claude-opus-4-8"
+    write_config(
+        tmp_path, {"monthly_budget_kg": 0.0001, "degrade": True, "region": "fr"}
+    )
+    os.utime(config, ns=(stamp, stamp))
+    assert budget.degraded_model(spec_dir, "claude-opus-4-8", "qa").startswith(
+        "claude-sonnet"
     )

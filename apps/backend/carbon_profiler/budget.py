@@ -147,19 +147,21 @@ def project_root(spec_dir: Path) -> Path | None:
     return None
 
 
-_cache: dict[str, tuple[tuple[str, float, float], bool]] = {}
+_cache: dict[str, tuple[tuple[str, tuple[int, int], tuple[int, int]], bool]] = {}
 
 
-def _mtime(path: Path | None) -> float:
+def _stamp(path: Path | None) -> tuple[int, int]:
+    """Modification time and size: two writes in one clock tick (Windows) still differ."""
     try:
-        return path.stat().st_mtime if path else 0.0
+        info = path.stat() if path else None
     except OSError:
-        return 0.0
+        return (0, 0)
+    return (info.st_mtime_ns, info.st_size) if info else (0, 0)
 
 
 def exceeded_with_degrade(root: Path) -> bool:
     cfg_path = root / ".workpilot" / "carbon.json"
-    key = (datetime.now(UTC).strftime("%Y-%m"), _mtime(cfg_path), _mtime(path_of(root)))
+    key = (datetime.now(UTC).strftime("%Y-%m"), _stamp(cfg_path), _stamp(path_of(root)))
     cached = _cache.get(str(root))
     if cached and cached[0] == key:
         return cached[1]
