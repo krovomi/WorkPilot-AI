@@ -1,0 +1,76 @@
+# PCI DSS v4.0, requirements 6, 7, 10, 11 and 12 that a code base can evidence.
+# See soc2.yaml for the format.
+id: pci_dss
+name: PCI DSS
+version: "4.0"
+controls:
+  - id: "6.2.1"
+    title: {en: Bespoke software is developed securely, fr: Logiciel spécifique développé de façon sécurisée}
+    evidence: [[spec_approval], [code_review]]
+    max_age_days: 90
+    recommendation:
+      en: Approve each spec and let QA review each task.
+      fr: Approuver chaque spec et laisser la QA relire chaque tâche.
+  - id: "6.2.3"
+    title: {en: Code is reviewed before release, fr: Code relu avant la mise en production}
+    evidence: [[code_review], [merge]]
+    max_age_days: 30
+    recommendation:
+      en: Merge through reviewed pull requests.
+      fr: Fusionner par des pull requests relues.
+  - id: "6.2.4"
+    title: {en: Software attacks are prevented, fr: Attaques logicielles empêchées}
+    evidence: [[security]]
+    max_age_days: 30
+    recommendation:
+      en: Keep the QA red team on the tasks.
+      fr: Garder la red team de la QA sur les tâches.
+  - id: "6.3.1"
+    title: {en: Security vulnerabilities are identified and managed, fr: Vulnérabilités identifiées et gérées}
+    evidence: [[security], [security_config]]
+    max_age_days: 30
+    recommendation:
+      en: Keep a vulnerability scanner configured and its findings handled.
+      fr: Garder un scanner de vulnérabilités configuré et traiter ses résultats.
+  - id: "6.5.1"
+    title: {en: Changes follow change control, fr: Les changements suivent le contrôle des changements}
+    evidence: [[change, merge], [code_review], [tests]]
+    max_age_days: 30
+    recommendation:
+      en: Build changes as Kanban tasks, reviewed and tested, merged by pull request.
+      fr: Construire les changements en tâches Kanban, relues et testées, fusionnées par pull request.
+  - id: "7.2.1"
+    title: {en: An access control model is defined, fr: Modèle de contrôle d'accès défini}
+    evidence: [[access]]
+    max_age_days: 365
+    recommendation:
+      en: Declare code ownership in CODEOWNERS.
+      fr: Déclarer les propriétaires du code dans CODEOWNERS.
+  - id: "10.2.1"
+    title: {en: Audit logs are enabled, fr: Journaux d'audit activés}
+    evidence: [[monitoring]]
+    max_age_days: 365
+    recommendation:
+      en: Version the logging and monitoring configuration.
+      fr: Versionner la configuration de journalisation et de supervision.
+  - id: "11.3.1"
+    title: {en: Internal vulnerability scans every three months, fr: Scans de vulnérabilités internes tous les trois mois}
+    evidence: [[security]]
+    max_age_days: 90
+    recommendation:
+      en: Run the QA security checks at least once a quarter.
+      fr: Faire tourner les contrôles de sécurité de la QA au moins une fois par trimestre.
+  - id: "12.1.1"
+    title: {en: An information security policy is established, fr: Politique de sécurité de l'information établie}
+    evidence: [[policy]]
+    max_age_days: 365
+    recommendation:
+      en: Keep the security policy in the repository and review it every year.
+      fr: Garder la politique de sécurité dans le dépôt et la relire chaque année.
+  - id: "12.10.1"
+    title: {en: An incident response plan exists, fr: Plan de réponse aux incidents en place}
+    evidence: [[incident, procedure]]
+    max_age_days: 365
+    recommendation:
+      en: Write the incident response plan and record each incident.
+      fr: Écrire le plan de réponse aux incidents et consigner chaque incident.

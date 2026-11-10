@@ -687,6 +687,10 @@
 			"voiceControl": {
 				"label": "Voice assistant",
 				"description": "Reads spoken commands the assistant cannot place by itself"
+			},
+			"arbiter": {
+				"label": "Best-of-N arbiter",
+				"description": "Gives a verdict when the variants of a Best-of-N run diverge; another provider than the variants' avoids bias"
 			}
 		},
 		"thinkingLevels": {
@@ -2044,7 +2048,8 @@
 			"gitlab_token": "GitLab token",
 			"jira_token": "Jira API token",
 			"linear_api_key": "Linear API key",
-			"azure_pat": "Azure DevOps personal access token"
+			"azure_pat": "Azure DevOps personal access token",
+			"sentry_token": "Sentry token"
 		},
 		"stored": "Stored",
 		"placeholder": "Paste a token",
@@ -2529,7 +2534,7 @@
 	},
 	"guardrails": {
 		"title": "Agent Guardrails",
-		"description": "Rules agents must respect before Write / Edit / Bash. Stored in .workpilot/guardrails.json.",
+		"description": "Rules agents must respect before Write / Edit / Bash, on every provider. Saved in .workpilot/guardrails.json; workpilot.policy.yaml in the repository and your global file add theirs.",
 		"selectProject": "Select a project to manage its guardrails.",
 		"addRule": "Add rule",
 		"empty": "No rules yet. Add one to start enforcing policies.",
@@ -2552,7 +2557,11 @@
 		"fileContentPlaceholder": "file content…",
 		"kickers": {
 			"rules": "Rules",
-			"tester": "Tester"
+			"tester": "Tester",
+			"policy": "Policy",
+			"approvals": "Approvals",
+			"activity": "Activity",
+			"dryRun": "Dry run"
 		},
 		"rulesTitle": "Rules agents respect",
 		"emptyTitle": "No rule yet",
@@ -2561,7 +2570,49 @@
 		"filePath": "File path",
 		"clearTest": "Clear the result",
 		"activeCount_one": "{{count}} active rule",
-		"activeCount_other": "{{count}} active rules"
+		"activeCount_other": "{{count}} active rules",
+		"pathGlob": "Path glob",
+		"addsRegex": "Pattern the change adds",
+		"newFileMaxLines": "New file: max lines",
+		"branch": "Branch(es)",
+		"branchPlaceholder": "e.g. main, release/*",
+		"meaning": "What the change does",
+		"deletesTests": "Removes a test",
+		"addsDependency": "Adds a dependency",
+		"agentMessage": "Message to the agent (what to do instead)",
+		"refresh": "Refresh",
+		"policyTitle": "What the agents are held to",
+		"policyHint": "Every layer the backend reads, in order. A later layer adds rules; it cannot weaken an earlier one.",
+		"invalidPolicy": "The guardrails are invalid: no agent can write or run a command until this is fixed.",
+		"layers": {
+			"global": "Global",
+			"repository": "Repository",
+			"project": "Project"
+		},
+		"layerRules_one": "{{count}} rule",
+		"layerRules_other": "{{count}} rules",
+		"noLayers": "No guardrails file yet: agents only have the default protections.",
+		"approvalsTitle_one": "{{count}} action waiting for your approval",
+		"approvalsTitle_other": "{{count}} actions waiting for your approval",
+		"noPending": "Nothing is waiting for your approval.",
+		"approveOnce": "Approve once",
+		"refuse": "Refuse",
+		"activityTitle": "What the rules did",
+		"noActivity": "No rule has been triggered yet.",
+		"noisy": "{{count}} actions blocked in the last 10 minutes: a rule may be stopping the agents rather than guiding them.",
+		"outcomes": {
+			"warn": "Warned",
+			"deny": "Refused",
+			"pending": "Waiting",
+			"approved": "Approved"
+		},
+		"dryRunTitle": "Check the current changes",
+		"dryRunHint": "Applies the rules to every file changed since the reference, without blocking anything: a test removed, a dependency added, a protected path.",
+		"compareWith": "Compare with",
+		"compareWithPlaceholder": "HEAD",
+		"checkChanges": "Check the changes",
+		"dryRunClean_one": "{{count}} changed file checked against {{ref}}: no rule is triggered.",
+		"dryRunClean_other": "{{count}} changed files checked against {{ref}}: no rule is triggered."
 	},
 	"search": {
 		"placeholder": "Search settings...",
@@ -2729,13 +2780,17 @@
 			"engine": "Choose the engine",
 			"draft": "Draft cards",
 			"dailyCap": "Cards per day, at most",
-			"base": "Base branch"
+			"base": "Base branch",
+			"sentryOrg": "Sentry organisation",
+			"sentryProject": "Sentry project",
+			"sentryHost": "Sentry host"
 		},
 		"triggers": {
 			"issue_labeled": "An issue gets a label (GitHub or GitLab)",
 			"ci_failed": "The CI turns red on a branch",
 			"schedule": "At a time of day",
-			"pr_opened": "Someone else opens a GitHub PR"
+			"pr_opened": "Someone else opens a GitHub PR",
+			"prod_incident": "A production incident (Sentry or the incident inbox)"
 		},
 		"help": {
 			"issue_labeled": "Only issues labelled after the rule is created, on the project's GitHub or, without it, its GitLab. An issue that already has a card is not imported twice.",
@@ -2745,13 +2800,16 @@
 			"noDraft": "Each card starts its build as soon as it is created.",
 			"dailyCap": "Events over the cap wait for the next day; none is dropped.",
 			"pr_opened": "Only PRs opened after the rule is created, by someone other than you and not by a bot. A draft PR waits until it is ready for review. Leave the branch empty for any base branch.",
-			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews."
+			"review": "The rule starts the review from GitHub PRs, with that page's engine. The review is never posted: it waits in GitHub PRs until you post, edit or drop it. Nobody is assigned. The daily cap counts reviews.",
+			"prod_incident": "Each incident becomes a bug-fix card whose first step is a regression test that reproduces it and fails, then the fix, in the card's branch and PR. The rule reads the payloads dropped in .workpilot/incidents/ after it was created (Sentry, Datadog, CloudWatch, New Relic, PagerDuty, Grafana, OpsGenie) and, when you name a Sentry project, the unresolved issues Sentry sees first after it. The Sentry token is SENTRY_AUTH_TOKEN in the project's .env (as for sentry-cli); on the server, your Sentry token in Settings › My tokens on the server. Leave the host empty for sentry.io. Nothing listens on this machine: the rule reads the sources every 5 minutes."
 		},
 		"summary": {
 			"issue_labeled": "Issue labelled “{{label}}”",
 			"ci_failed": "CI red on {{branch}}",
 			"schedule": "{{days}} at {{time}}",
-			"pr_opened": "PR opened into {{base}}"
+			"pr_opened": "PR opened into {{base}}",
+			"prod_incident": "Production incident from the inbox",
+			"prod_incident_sentry": "Production incident from Sentry {{project}} and the inbox"
 		},
 		"status": {
 			"never": "Not run yet",
@@ -2786,12 +2844,21 @@
 			"review_failed": "the review could not start",
 			"forge_not_connected": "neither GitHub nor GitLab is connected for this project",
 			"token_missing": "the person who saved this rule has no token for this forge on the server (Settings › My tokens on the server)",
-			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over"
+			"owner_not_allowed": "the person who saved this rule may no longer run it on this project: save it again to take it over",
+			"incident_predates_rule": "the incident was there before the rule",
+			"incident_too_large": "the incident file is over 256 KB",
+			"incident_unreadable": "the incident file is not a JSON object",
+			"sentry_token_missing": "no Sentry token: SENTRY_AUTH_TOKEN in the project's .env, or your Sentry token in Settings › My tokens on the server"
 		},
 		"anyBranch": "any branch",
 		"reviewDrafts": "reviews wait for you",
 		"serverIntro": "A rule creates a Kanban card when its event happens, and the card follows the normal cycle. A rule on PRs starts the AI review instead, kept as a draft. A rule never merges, pushes or comments. This project is on the server: its rules are the team's, and the server runs them every 5 minutes, even when nobody has the app open. Each rule reads GitHub or GitLab with the token of the person who saved it last, and its cards are created by Automations. Times are the server's.",
-		"runsAs": "runs with {{name}}'s tokens"
+		"runsAs": "runs with {{name}}'s tokens",
+		"placeholders": {
+			"sentryOrg": "my-org",
+			"sentryProject": "my-api",
+			"sentryHost": "sentry.io"
+		}
 	},
 	"githubOAuth": {
 		"usingCli": "Using GitHub CLI {{version}}",

@@ -21,8 +21,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from foundation.git_executable import get_git_executable
+from goal.gate import fork_bases
 from review.state import ReviewState
 
+from . import arbiter as arbiter_mod
+from .divergence import Changes, changes, divergence, threshold
 from .rank import measure_variant, rank_variants
 from .variants import (
     STATE_FILENAME,
@@ -34,7 +37,7 @@ from .variants import (
     write_state,
 )
 
-__all__ = ["adopt", "discard", "prepare", "rank"]
+__all__ = ["adopt", "arbitrate", "challenge", "discard", "prepare", "rank"]
 
 OPEN_PHASES = ("running", "ranked")
 
@@ -257,6 +260,90 @@ def rank(project: Path, parent_dir: Path, *, goal_runner=None) -> dict:
         "at": _now(),
         "variants": [score.to_dict() for score in scores],
     }
+    found = divergence(
+        _candidate_changes(project, parent_dir, state),
+        summary["recommended"],
+        threshold(),
+    )
+    state["arbiter"] = {
+        "status": "pending" if found["needed"] else "not_needed",
+        "divergence": found,
+    }
+    write_state(parent_dir, state)
+    return state
+
+
+def _candidate_changes(
+    project: Path, parent_dir: Path, state: dict
+) -> dict[str, Changes]:
+    """What each variant worth keeping changed: built, with every subtask done."""
+    ranked = {
+        v.get("spec_id"): v
+        for v in (state.get("ranking") or {}).get("variants", [])
+        if isinstance(v, dict)
+    }
+    found: dict[str, Changes] = {}
+    for _entry, variant_dir in _entries(parent_dir, state):
+        score = ranked.get(variant_dir.name) or {}
+        worktree = _worktree_path(project, variant_dir.name)
+        if (
+            not score.get("worktree")
+            or not score.get("build_complete")
+            or not worktree.is_dir()
+        ):
+            continue
+        local_spec = worktree / ".workpilot" / "specs" / variant_dir.name
+        spec_dir = local_spec if local_spec.is_dir() else variant_dir
+        found[variant_dir.name] = changes(worktree, fork_bases(spec_dir, variant_dir))
+    return found
+
+
+def _task_text(parent_dir: Path) -> str:
+    for name in ("requirements.json", "task_metadata.json"):
+        try:
+            data = json.loads((parent_dir / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            for key in ("task_description", "title", "description"):
+                if isinstance(data.get(key), str) and data[key].strip():
+                    return data[key].strip()
+    return parent_dir.name
+
+
+def arbitrate(
+    project: Path,
+    parent_dir: Path,
+    ask: arbiter_mod.Ask,
+    engine: dict[str, str] | None = None,
+) -> dict:
+    """The arbiter's verdict between the variants worth keeping; the state with it."""
+    state = _open_state(parent_dir)
+    if state.get("phase") != "ranked" or not state.get("ranking"):
+        raise BestOfNError("rank the variants before asking the arbiter")
+    candidates = _candidate_changes(project, parent_dir, state)
+    if len(candidates) < 2:
+        raise BestOfNError("fewer than two finished variants: nothing to arbitrate")
+    previous = state.get("arbiter") or {}
+    result = arbiter_mod.verdict(
+        _task_text(parent_dir), state["ranking"]["variants"], candidates, ask, engine
+    )
+    state["arbiter"] = {**result, "divergence": previous.get("divergence")}
+    write_state(parent_dir, state)
+    return state
+
+
+def challenge(
+    project: Path, parent_dir: Path, question: str, ask: arbiter_mod.Ask
+) -> dict:
+    """The arbiter's answer to the person's question; the state with the exchange."""
+    state = _open_state(parent_dir)
+    current = state.get("arbiter") or {}
+    if current.get("status") not in ("done", "needs_human"):
+        raise BestOfNError("there is no verdict to question")
+    state["arbiter"] = arbiter_mod.challenge(
+        _task_text(parent_dir), current, question, ask
+    )
     write_state(parent_dir, state)
     return state
 
@@ -333,6 +420,10 @@ def adopt(project: Path, parent_dir: Path, spec_id: str) -> dict:
 
     state["phase"] = "adopted"
     state["adopted"] = {"specId": spec_id, "at": _now(), "cleanupProblems": problems}
+    try:
+        arbiter_mod.record_outcome(project, parent_id, state.get("arbiter"), spec_id)
+    except OSError:
+        pass  # the history is a measure; it never blocks an adoption
     write_state(parent_dir, state)
     return state
 

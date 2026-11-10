@@ -193,7 +193,7 @@ ol.prio,ul.plain{margin:0;padding-left:20px;display:flex;flex-direction:column;g
 <body>
 <div class="shell">
 <nav class="rail" aria-label="Vues">
-  <div class="brand">Atlas WorkPilot&nbsp;AI<small>atlas d'architecture · develop 862014e<br>mis à jour le 9 nov. 2026 · revu le 15 oct. 2026</small></div>
+  <div class="brand">Atlas WorkPilot&nbsp;AI<small>atlas d'architecture · develop 94c0b13<br>mis à jour le 10 nov. 2026 · revu le 15 oct. 2026</small></div>
   <div class="tabs" role="tablist">
     <button role="tab" data-v="tous">Pour tous<span class="k">00</span></button>
     <button role="tab" data-v="synthese" aria-selected="true">Synthèse<span class="k">01</span></button>
@@ -1840,6 +1840,30 @@ const CLEAN=[
 
 /* ---------- 08 évolutions ---------- */
 const PRS=[
+ ["10 nov. · #855", "Profil de style du coach", "agent_coach/style_dimensions.py, style_observer.py (votes pondérés par type de commit), style_lint.py, profile_builder.py ; profile_injector.py ajoute des phrases fixes au prompt du codeur et du fixer ; CoachProfilePanel.tsx, runners/coach_profile_runner.py.", "—"],
+ ["10 nov. · #854", "Notebooks : dépendances et exécution", "notebook_agent/dataflow.py (ast + symtable pour Python, déclarations ailleurs), executor.py (nbconvert ou quarto en copie temporaire, sans identifiants), refactor.py sur une carte de revue, outputs.py, history.py.", "—"],
+ ["10 nov. · #853", "Arbitre du Best-of-N", "best_of_n/divergence.py et arbiter.py : verdict quand les variantes divergent, contestation, historique de l'arbitre ; BestOfNArbiterPanel.tsx.", "—"],
+ ["10 nov. · #852", "Budget carbone", "carbon_profiler/{factors,config,ledger,report,budget,export}.py remplacent energy_tracker ; get_phase_model passe par budget.degraded_model ; export ESG ; CarbonBudgetPanel.tsx.", "—"],
+ ["10 nov. · #851", "Release Train piloté", "release_coordinator/ : fichier release-train.yaml approuvé (empreinte hors du projet), vagues par dépendances, santé et smoke entre services, clic par service de production, rollback en cascade.", "—"],
+ ["10 nov. · #850", "Chirurgien de l'historique Git", "git_surgeon/ : plan par règles, rejeu par cherry-pick -n + commit-tree dans un worktree temporaire, arbre identique exigé, nouvelle branche locale, jamais de push.", "—"],
+ ["10 nov. · #849", "Alertes CodeQL de #845 et #848", "regex sans retour arrière, lecture de configuration sans course, constante inutilisée retirée.", "—"],
+ ["10 nov. · #848", "Preuves de conformité", "compliance/ : preuves datées (tâches, git, config), contrôles en YAML dont ceux du projet, rapport mensuel, alerte à 30 jours, exports.", "—"],
+ ["10 nov. · #847", "Regex des tests instables", "flaky_test_detective : retrait des chaînes par une regex sans ambiguïté (ReDoS signalé par CodeQL).", "—"],
+ ["9 nov. · #846", "Dérive de la doc", "doc_drift_detector : commentaires de doc, exemples exécutables, ancienneté git, fraîcheur, corrections sur une carte de revue.", "—"],
+ ["9 nov. · #845", "Tests instables expliqués", "verdict, cause lue dans le code du test, historique, relance des suspects, carte de correction.", "—"],
+ ["9 nov. · #844", "Onboarding raconté", "l'histoire du code par rôle, régénérée quand le code bouge, exportable.", "—"],
+ ["9 nov. · #843", "Agent i18n", "propositions de clés, orphelines, pluriels, RTL, traductions vérifiées sur une carte de revue.", "—"],
+ ["9 nov. · #842", "Agent d'accessibilité", "règles WCAG 2.2 pour toutes les stacks, score par critère et par page, scan dynamique, corrections sur une carte de revue, exports.", "—"],
+ ["9 nov. · #841", "Veille des contrats d'API", "comparaison avec la branche cible, consommateurs touchés, porte de QA et CI.", "—"],
+ ["9 nov. · #840", "Résultats d'outils analysés", "chaque résultat d'outil passe le scanner d'injection de prompt avant que l'agent ne le lise, sur tous les providers.", "—"],
+ ["9 nov. · #839", "Garde des migrations", "schema_guard/ (feuille sur foundation), qa/schema_gate.py, porte dure migration-safe ; perte de données, renommage, NOT NULL sans défaut, verrous, toutes stacks.", "—"],
+ ["9 nov. · #838", "SOUL.md dans le paquet hermes", "SOUL.md déplacé de la racine vers apps/backend/hermes/ : « Installer SOUL.md » marche dans l'app installée.", "—"],
+ ["9 nov. · #837", "Incidents de production en cartes", "déclencheur prod_incident (bureau et serveur), boîte .workpilot/incidents et API Sentry, texte de carte par regression_guardian/feed.py ; aucun webhook.", "—"],
+ ["9 nov. · #836", "deepmerge corrigé", "application mobile : deepmerge patché contre l'empoisonnement de prototype (GHSA-gcqx-w48m-w2h4).", "—"],
+ ["9 nov. · #835", "Red team après la QA", "red_team/ + qa/red_team_gate.py : un agent attaque le code de la tâche, jugé par l'exécution de WorkPilot ; RedTeamCard.", "—"],
+ ["9 nov. · #834", "Garde-fous en code", "politique versionnée par couches, règles sémantiques, appliquée dans les worktrees ; chemins absolus du SDK enfin reconnus.", "—"],
+ ["9 nov. · #833", "Essai à blanc du plan", "onglet « Répétition du plan » : le plan d'une spec rejoué sur la branche de base, sans écriture ni modèle.", "—"],
+ ["9 nov. · #832", "Release construite sur le tag", "package-simple.cjs ne transmet plus le -- nu : electron-builder lit --publish never.", "—"],
  ["9 nov. · #827", "CI/CD après la PR d'un agent", "cicd-triggers-handlers.ts : triggerPipeline et autoTriggerForTask (ne lève jamais) ; task/worktree-pr-cicd.ts après la création de PR, worktree-purge/merged-watch.ts à la fusion ; metadata.cicdRun sur la tâche, source auto dans cicd_runs.json.", "—"],
  ["9 nov. · #826", "Moteur des cartes multi-dépôts", "multi-repo/engine.ts (parseTaskEngine, engine.json écrit puis renommé) ; host.ts crée chaque carte avec buildEngineMetadata ; TaskEngineEditor dans MultiRepoDialog.", "—"],
  ["9 nov. · #825", "Leçons dans la spec", "spec/phases/spec_phases.py : learning_context_for(spec_writer | spec_self_critique) ajouté au contexte de la spec rapide, du rédacteur et du critique.", "—"],

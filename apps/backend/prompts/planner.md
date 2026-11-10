@@ -585,6 +585,13 @@ A SEPARATE coder agent will:
 - Never break existing functionality
 - Add new → Migrate → Remove old
 
+### For Database Schema Changes
+- The old code still runs against the new schema while a deploy rolls out
+- A rename, a type change, a dropped column or a NOT NULL column on an existing table is expand/contract: add the new structure (nullable or with a default) → backfill in batches → switch the code → drop the old one in a later migration
+- One subtask per step, each with its own migration in the project's tool; never edit a migration that already exists
+- Indexes and constraints on existing PostgreSQL tables: `CONCURRENTLY` and `NOT VALID`, in the tool's own way
+- Every migration has a down part when the tool supports one
+
 ### Verification is Mandatory
 - Every subtask has verification
 - No "trust me, it works"

@@ -24,12 +24,14 @@
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"description": "Checks WCAG rules (alt text, labels, keyboard, contrast hints, captions…) in every markup the project ships: HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars.",
+	"description": "Checks WCAG 2.2 in every markup the project ships (HTML, JSX/TSX, Vue, Svelte, Astro, Angular, Razor/Blazor, PHP/Blade, Twig, ERB, Handlebars) and its stylesheets: text alternatives, labels, names, headings, keyboard, ARIA, captions, focus, contrast and target size. Scores the project, scans the running app, and makes simple fixes on a review branch.",
 	"emptyTitle": "No scan yet",
 	"findingsTitle": "Findings",
 	"noMatches": "No finding matches this filter.",
 	"kickers": {
-		"findings": "Findings"
+		"findings": "Findings",
+		"score": "Score",
+		"dynamic": "Running app"
 	},
 	"severities": {
 		"critical": "Critical",
@@ -38,5 +40,197 @@
 		"minor": "Minor"
 	},
 	"wcagLevel": "WCAG {{level}}",
-	"wcagCriterion": "WCAG {{criterion}}"
+	"wcagCriterion": "WCAG {{criterion}}",
+	"score": {
+		"title": "Accessibility score",
+		"explain": "0 to 100: every violation weighs by its severity, against the number of files scanned. The same code always scores the same, so scans compare over time.",
+		"noLang_one": "{{count}} page does not declare its language: {{files}}",
+		"noLang_other": "{{count}} pages do not declare their language: {{files}}",
+		"criterionCount_one": "{{count}} violation",
+		"criterionCount_other": "{{count}} violations",
+		"pages": "Pages and components that cost the most",
+		"firstScan": "First scan: the next ones will show the trend.",
+		"trendSame_one": "Same score as the previous scan ({{count}} scan)",
+		"trendSame_other": "Same score as the previous scan ({{count}} scans)",
+		"trendUp_one": "Up {{delta}} since the previous scan ({{count}} scan)",
+		"trendUp_other": "Up {{delta}} since the previous scan ({{count}} scans)",
+		"trendDown_one": "Down {{delta}} since the previous scan ({{count}} scan)",
+		"trendDown_other": "Down {{delta}} since the previous scan ({{count}} scans)"
+	},
+	"criteria": {
+		"1.1.1": "Non-text content",
+		"1.2.2": "Captions (prerecorded)",
+		"1.3.1": "Info and relationships",
+		"1.4.3": "Contrast (minimum)",
+		"1.4.4": "Resize text",
+		"1.4.6": "Contrast (enhanced)",
+		"2.1.1": "Keyboard",
+		"2.1.2": "No keyboard trap",
+		"2.4.1": "Bypass blocks",
+		"2.4.2": "Page titled",
+		"2.4.3": "Focus order",
+		"2.4.4": "Link purpose",
+		"2.4.7": "Focus visible",
+		"2.5.5": "Target size (enhanced)",
+		"2.5.8": "Target size (minimum)",
+		"3.1.1": "Language of page",
+		"4.1.2": "Name, role, value"
+	},
+	"export": {
+		"title": "Accessibility report",
+		"html": "HTML",
+		"csv": "CSV",
+		"pdf": "PDF",
+		"saved": "Saved to {{path}}",
+		"failed": "Export failed: {{error}}"
+	},
+	"notes": {
+		"dynamic": "Running app",
+		"conditional": "Conditional",
+		"conditionalHint": "Inside markup that may not render: check it in the state where it shows.",
+		"external": "External component",
+		"externalHint": "A component from a package: pass the missing prop where you use it, or report it to its maintainer."
+	},
+	"fix": {
+		"propose": "Fix:",
+		"available_one": "{{count}} violation can be fixed in one click",
+		"available_other": "{{count}} violations can be fixed in one click",
+		"clear": "Clear",
+		"selectAll": "Select all",
+		"aiAlt": "Write alt texts with the AI model",
+		"running": "Fixing on a review branch…",
+		"apply_one": "Fix {{count}} on a review branch",
+		"apply_other": "Fix {{count}} on a review branch",
+		"serverOnly": "Fixes are made on a review branch of a project of this computer.",
+		"done_one": "{{count}} fix committed on {{branch}}: review the diff on its Kanban card, then open the pull request.",
+		"done_other": "{{count}} fixes committed on {{branch}}: review the diff on its Kanban card, then open the pull request.",
+		"nothing": "Nothing to fix on the review branch: the code there has changed since the scan.",
+		"missing_one": "{{count}} fix was not found on the branch.",
+		"missing_other": "{{count}} fixes were not found on the branch.",
+		"failed": "Fixing failed: {{error}}"
+	},
+	"dynamic": {
+		"title": "Scan the running app",
+		"url": "App URL",
+		"run": "Scan the app",
+		"explain": "Opens the app (App Emulator or a localhost URL) in a hidden window, presses Tab through it, reads what a screen reader gets, and measures the rendered contrast.",
+		"running": "Scanning the running app…",
+		"failed": "Scan failed: {{error}}",
+		"summary_one": "{{url}}: {{stops}} Tab stops, {{count}} violation",
+		"summary_other": "{{url}}: {{stops}} Tab stops, {{count}} violations"
+	},
+	"rules": {
+		"img-alt": {
+			"description": "Image without a text alternative",
+			"suggestion": "Add alt=\"what the image shows\", or alt=\"\" when it is decorative"
+		},
+		"img-alt-meaningful": {
+			"description": "Image alternative is a file name or a placeholder",
+			"suggestion": "Describe what the image shows, not its file"
+		},
+		"svg-img-name": {
+			"description": "SVG with role=\"img\" has no name",
+			"suggestion": "Add a <title> as first child, or aria-label"
+		},
+		"control-label": {
+			"description": "Form control without a label",
+			"suggestion": "Link a <label for=\"id\">, wrap it in <label>, or add aria-label; a placeholder is not a label"
+		},
+		"button-name": {
+			"description": "Button without an accessible name",
+			"suggestion": "Give it text, or aria-label for an icon-only button"
+		},
+		"link-name": {
+			"description": "Link without an accessible name",
+			"suggestion": "Give it text that says where it goes, or aria-label"
+		},
+		"heading-order": {
+			"description": "Heading level skipped",
+			"suggestion": "Go down one level at a time (h2 after h1, h3 after h2)"
+		},
+		"page-lang": {
+			"description": "Page language not declared",
+			"suggestion": "Add lang to <html>, for example <html lang=\"en\">"
+		},
+		"page-title": {
+			"description": "Page without a title",
+			"suggestion": "Add a <title> that says what the page is"
+		},
+		"tabindex-positive": {
+			"description": "Positive tabindex reorders keyboard navigation",
+			"suggestion": "Use tabindex=\"0\" (or -1) and order the markup instead"
+		},
+		"click-without-keyboard": {
+			"description": "Clickable element the keyboard cannot reach or use",
+			"suggestion": "Use a <button>, or add role, tabindex=\"0\" and a key handler"
+		},
+		"anchor-is-valid": {
+			"description": "Link with href=\"#\" or javascript: used as a button",
+			"suggestion": "Use a <button> for an action, a real href for a link"
+		},
+		"aria-role": {
+			"description": "ARIA role that does not exist",
+			"suggestion": "Use a WAI-ARIA 1.2 role, or remove it"
+		},
+		"aria-hidden-focus": {
+			"description": "Focusable element inside aria-hidden=\"true\"",
+			"suggestion": "Remove it from the tab order (tabindex=\"-1\", inert) or do not hide it"
+		},
+		"video-captions": {
+			"description": "Video without captions",
+			"suggestion": "Add <track kind=\"captions\" src=\"…\" srclang=\"…\">"
+		},
+		"iframe-title": {
+			"description": "Frame without a title",
+			"suggestion": "Add title that says what the frame holds"
+		},
+		"skip-link": {
+			"description": "No way to skip the navigation",
+			"suggestion": "Add a first link <a href=\"#main\">Skip to content</a> and id=\"main\" on <main>"
+		},
+		"meta-viewport": {
+			"description": "Zoom disabled by the viewport",
+			"suggestion": "Remove user-scalable=no and maximum-scale below 2"
+		},
+		"focus-visible": {
+			"description": "Focus outline removed with nothing in its place",
+			"suggestion": "Keep an outline, or give :focus-visible a ring, border or shadow"
+		},
+		"color-contrast": {
+			"description": "Text contrast below 4.5:1 (3:1 for large text)",
+			"suggestion": "Darken the text or lighten the background until the ratio passes"
+		},
+		"target-size": {
+			"description": "Pointer target smaller than 24×24 px",
+			"suggestion": "Make it at least 24×24 px, padding included, or space it from its neighbours"
+		},
+		"color-contrast-enhanced": {
+			"description": "Text contrast below 7:1 (4.5:1 for large text)",
+			"suggestion": "Darken the text or lighten the background until the ratio passes"
+		},
+		"target-size-enhanced": {
+			"description": "Pointer target smaller than 44×44 px",
+			"suggestion": "Make it at least 44×44 px"
+		},
+		"ax-name": {
+			"description": "Control the screen reader announces without a name",
+			"suggestion": "Give it text, a label or aria-label"
+		},
+		"ax-image-name": {
+			"description": "Image the screen reader announces without a name",
+			"suggestion": "Add alt text, or alt=\"\" if it is decorative"
+		},
+		"focus-order": {
+			"description": "Tab jumps back up the page",
+			"suggestion": "Order the markup as it reads, and avoid positive tabindex"
+		},
+		"no-focusable": {
+			"description": "Nothing on the page can be reached with Tab",
+			"suggestion": "Use real links and buttons, or make controls focusable"
+		},
+		"dialog-focus": {
+			"description": "Focus leaves an open modal dialog",
+			"suggestion": "Keep the focus inside the dialog while it is open (inert background or a focus trap)"
+		}
+	}
 }

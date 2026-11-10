@@ -817,6 +817,58 @@ function specAddress(query: SpecTraceabilityQuery): Record<string, string> {
 	return address;
 }
 
+// ── Schema guard (`schema_guard/`, `qa/schema_guard_api.py`) ─────────────────
+
+export type SchemaFindingKind =
+	| "data_loss"
+	| "rename"
+	| "type_change"
+	| "not_null"
+	| "lock"
+	| "no_rollback"
+	| "edited";
+
+export interface SchemaFinding {
+	kind: SchemaFindingKind;
+	severity: "error" | "warning";
+	path: string;
+	line: number;
+	statement: string;
+	message: string;
+	advice: string;
+}
+
+/** `schema_guard.json`: the task's migrations as a live database would see them. */
+export interface SchemaGuardRecord {
+	status: "pass" | "warn" | "fail" | "unchecked";
+	engine: "postgres" | "mysql" | "sqlserver" | "sqlite" | "unknown";
+	mode: string;
+	unchecked: string;
+	migrations: Array<{ path: string; tool: string; new: boolean }>;
+	findings: SchemaFinding[];
+	plan: string[];
+	checked_at: number;
+}
+
+export interface SchemaGuardPayload {
+	record: SchemaGuardRecord | null;
+}
+
+export function fetchSchemaGuard(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<SchemaGuardPayload>> {
+	return _get<SchemaGuardPayload>("/api/schema-guard/", specAddress(query), signal);
+}
+
+/** Reads the task's migrations again, now: files and git only, no model. */
+export function checkSchemaGuard(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<SchemaGuardPayload>> {
+	return _post<SchemaGuardPayload>("/api/schema-guard/check", specAddress(query), signal);
+}
+
 export function fetchDocintelDrafts(
 	query: SpecTraceabilityQuery,
 	signal?: AbortSignal,
@@ -1751,4 +1803,58 @@ export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
 export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
 	return `${backendUrl()}/api/verify/${kind}?${qs}`;
+}
+
+// ── Red team (`red_team/`, `qa/red_team_api.py`) ─────────────────────────────
+
+export type RedTeamOutcome = "crash" | "unexpected" | "resistant" | "not_run" | "flaky";
+
+export interface RedTeamAttack {
+	id: string;
+	mode: "fuzz" | "edge" | "injection" | "concurrency" | "regression";
+	test: string;
+	file: string;
+	target: string;
+	input: string;
+	expect: string;
+	outcome: RedTeamOutcome;
+	detail: string;
+}
+
+export interface RedTeamWarning {
+	path: string;
+	line: number;
+	kind: "toctou" | "shared-state";
+	message: string;
+}
+
+/** `red_team.json` as the card reads it: the attack files' contents stay on disk. */
+export interface RedTeamRecord {
+	status: "pass" | "fail" | "unknown" | "none";
+	reason: string;
+	run: "attack" | "replay";
+	attacks: RedTeamAttack[];
+	warnings: RedTeamWarning[];
+	counts: { crash: number; unexpected: number; resistant: number; warning: number; not_run: number };
+	attack_files: string[];
+	finished_at: number;
+}
+
+export interface RedTeamPayload {
+	record: RedTeamRecord | null;
+}
+
+export function fetchRedTeam(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<RedTeamPayload>> {
+	return _get<RedTeamPayload>("/api/red-team/", specAddress(query), signal);
+}
+
+/** A fresh attack on the task's code, with the QA provider and model. */
+export function runRedTeam(
+	query: SpecTraceabilityQuery,
+	signal?: AbortSignal,
+): Promise<ApiResult<RedTeamPayload>> {
+	return _post<RedTeamPayload>("/api/red-team/run", specAddress(query), signal);
 }

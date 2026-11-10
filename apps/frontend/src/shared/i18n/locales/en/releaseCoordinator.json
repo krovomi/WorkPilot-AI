@@ -52,5 +52,114 @@
 		"bumped": "To release",
 		"gates": "Go / no-go",
 		"services": "Services"
+	},
+	"train": {
+		"kicker": "Release train",
+		"title": "Ship the services in order",
+		"hint": "release-train.yaml says how each service deploys, rolls back and is checked. The train runs those commands wave after wave: the next service starts only once the previous one is healthy.",
+		"loading": "Reading the train file…",
+		"failed": "Release train: {{error}}",
+		"changedWhileApproving": "The train file changed while you were reading it. Read it again, then approve.",
+		"noFileTitle": "No train file yet",
+		"noFile": "Add release-train.yaml at the root of the project (or in .workpilot/). Each command is a list of arguments, never a shell line.",
+		"invalid": "The train file cannot be used: {{error}}",
+		"liveStep": "{{service}}: {{step}}…",
+		"working": "The train is moving…",
+		"wave": "Wave {{number}}",
+		"external": "external",
+		"flagLine": "Flag {{key}} ({{provider}}) on once {{services}} shipped"
+	},
+	"approval": {
+		"title": "Approve this train file before it runs anything",
+		"hint": "{{path}} runs these commands on your computer. Read them. A change to the file (hash {{sha}}) will ask you again.",
+		"approve": "Approve this version",
+		"variables": "Project variables handed to the commands and flags: {{names}}"
+	},
+	"problems": {
+		"cycle": "The dependencies form a cycle ({{services}}): nothing can ship first. Removing the link from {{from}} to {{to}} would break it.",
+		"unknownDependency": "{{service}} depends on {{dependency}}, which the train file does not list: it is assumed to be in place.",
+		"noDeploy": "{{service}} has no deploy command."
+	},
+	"steps": {
+		"deploy": "deploy",
+		"rollback": "rollback",
+		"health": "health check",
+		"smoke": "smoke test",
+		"flag": "flag"
+	},
+	"start": {
+		"environment": "Environment",
+		"production": "{{name}} (production)",
+		"train": "Start the train",
+		"or": "or",
+		"hotfix": "Hotfix",
+		"express": "Express deploy",
+		"productionHint": "Production: each service waits for your click before its deploy runs.",
+		"stagingHint": "Each service ships as soon as the previous one passed its checks. An external service waits for you to say it is ready."
+	},
+	"runs": {
+		"title": "Recent runs",
+		"line": "{{environment}} · {{status}} · {{date}}"
+	},
+	"runStatuses": {
+		"running": "Running",
+		"waiting": "Waiting for you",
+		"blocked": "Stopped on a failure",
+		"done": "Shipped",
+		"rolled_back": "Rolled back",
+		"rollback_failed": "Rollback failed",
+		"aborted": "Stopped"
+	},
+	"itemStatuses": {
+		"pending": "To do",
+		"waiting_confirmation": "Waiting for you",
+		"deploying": "In progress",
+		"done": "Shipped",
+		"failed": "Failed",
+		"rolled_back": "Rolled back",
+		"rollback_failed": "Rollback failed",
+		"skipped": "Not shipped"
+	},
+	"flagStates": {
+		"off": "off",
+		"waiting": "waiting for you",
+		"confirmed": "on",
+		"on": "on",
+		"failed": "failed"
+	},
+	"calendar": {
+		"title": "Planned slots",
+		"slot": "{{service}} on {{environment}}, {{minutes}} min",
+		"conflict": "Conflict"
+	},
+	"metrics": {
+		"trains": "Trains this month",
+		"multiService": "Multi-service",
+		"meanMinutes": "Mean minutes",
+		"blockedByGates": "Stopped by a check",
+		"rollbacks": "Rollbacks done"
+	},
+	"notes": {
+		"make": "Release notes",
+		"ai": "Add a summary by the model",
+		"byModel": "Summary by the model, the list from the commits.",
+		"byRules": "Written from the commits."
+	},
+	"run": {
+		"title": "Train on {{environment}}",
+		"express": "Express deploy on {{environment}}",
+		"calendarWarning": "A slot of {{service}} is planned on this environment now.",
+		"flagWaiting": "Turn the flag {{key}} on in your tool, then confirm.",
+		"flagDone": "It is on",
+		"flag": "{{key}}: {{state}}",
+		"flagBlocked": "The flag {{key}} could not be turned on: {{detail}}",
+		"blocked": "{{service}}: the {{step}} failed ({{detail}}).",
+		"retry": "Retry once fixed",
+		"rollback": "Roll back the chain",
+		"abort": "Stop here",
+		"blockedHint": "Roll back takes the failed service and every shipped service that depends on it, dependents first; their flags go off before.",
+		"journal": "Journal",
+		"externalReady": "It is ready",
+		"deploy": "Deploy {{service}}"
 	}
 }

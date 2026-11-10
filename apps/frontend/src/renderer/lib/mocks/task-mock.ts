@@ -207,6 +207,15 @@ export const taskMock = {
 		success: true as const,
 		data: { state: null, running: [] },
 	}),
+	arbitrateBestOfN: async () => ({
+		success: false as const,
+		error: "Best-of-N is not available in the browser preview",
+	}),
+	challengeBestOfN: async () => ({
+		success: false as const,
+		error: "Best-of-N is not available in the browser preview",
+	}),
+	getBestOfNArbiterMetrics: async () => ({ success: true as const, data: [] }),
 	onBestOfNEvent: () => () => {
 		/* noop */
 	},

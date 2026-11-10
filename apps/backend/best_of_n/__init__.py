@@ -3,7 +3,7 @@
 See docs/architecture/best-of-n.md.
 """
 
-from .lifecycle import adopt, discard, prepare, rank
+from .lifecycle import adopt, arbitrate, challenge, discard, prepare, rank
 from .rank import CRITERIA, VariantScore, measure_variant, rank_variants
 from .variants import (
     MAX_VARIANTS,
@@ -25,6 +25,8 @@ __all__ = [
     "Variant",
     "VariantScore",
     "adopt",
+    "arbitrate",
+    "challenge",
     "discard",
     "measure_variant",
     "parse_variants",

@@ -1,0 +1,72 @@
+# SOC 2: the Trust Services Criteria (AICPA, 2017, points of focus revised 2022).
+# The controls WorkPilot can find evidence for in a project; a control with no
+# such evidence is still listed and reported as a gap, never left out.
+# evidence: each line is one requirement, met by any of its kinds.
+# max_age_days: the evidence older than this, at the end of the period, is stale.
+id: soc2
+name: SOC 2
+version: "TSC 2017 (2022)"
+controls:
+  - id: CC2.2
+    title: {en: Security policies communicated internally, fr: Politiques de sécurité communiquées en interne}
+    evidence: [[policy]]
+    max_age_days: 365
+    recommendation:
+      en: Keep a SECURITY.md or docs/policies/ in the repository and review it every year.
+      fr: Tenir un SECURITY.md ou un dossier docs/policies/ dans le dépôt et le relire chaque année.
+  - id: CC6.1
+    title: {en: Logical access to the code is restricted, fr: Accès logique au code restreint}
+    evidence: [[access]]
+    max_age_days: 365
+    recommendation:
+      en: Declare who owns each part of the code in a CODEOWNERS file.
+      fr: Déclarer qui possède chaque partie du code dans un fichier CODEOWNERS.
+  - id: CC6.8
+    title: {en: Malicious or unauthorised software is prevented, fr: Logiciel malveillant ou non autorisé empêché}
+    evidence: [[security], [security_config]]
+    max_age_days: 30
+    recommendation:
+      en: Let QA check each task's new dependencies and keep a dependency scanner (Dependabot, Renovate, Snyk, Trivy…) configured.
+      fr: Laisser la QA vérifier les nouvelles dépendances de chaque tâche et garder un scanner de dépendances (Dependabot, Renovate, Snyk, Trivy…) configuré.
+  - id: CC7.1
+    title: {en: Vulnerabilities and configuration changes are detected, fr: Vulnérabilités et changements de configuration détectés}
+    evidence: [[security]]
+    max_age_days: 30
+    recommendation:
+      en: Run the QA security checks (dependency guard, red team) on the tasks of every month.
+      fr: Faire tourner les contrôles de sécurité de la QA (garde des dépendances, red team) sur les tâches de chaque mois.
+  - id: CC7.2
+    title: {en: System components are monitored for anomalies, fr: Composants surveillés pour détecter les anomalies}
+    evidence: [[monitoring]]
+    max_age_days: 365
+    recommendation:
+      en: Version the monitoring and alerting configuration (Prometheus, Alertmanager, Sentry, OpenTelemetry…) with the code.
+      fr: Versionner la configuration de supervision et d'alerte (Prometheus, Alertmanager, Sentry, OpenTelemetry…) avec le code.
+  - id: CC7.4
+    title: {en: Security incidents are responded to, fr: Réponse aux incidents de sécurité}
+    evidence: [[incident, procedure]]
+    max_age_days: 365
+    recommendation:
+      en: Write an incident response procedure and record each incident in .workpilot/incidents/ or docs/postmortems/.
+      fr: Écrire une procédure de réponse aux incidents et consigner chaque incident dans .workpilot/incidents/ ou docs/postmortems/.
+  - id: CC8.1
+    title: {en: Changes are authorised, tested and approved, fr: Changements autorisés, testés et approuvés}
+    evidence: [[spec_approval, code_review], [tests], [change, merge]]
+    max_age_days: 30
+    recommendation:
+      en: Build changes as Kanban tasks so that the spec approval, the QA review and the tests are recorded for each one.
+      fr: Construire les changements en tâches Kanban pour que l'approbation de la spec, la revue QA et les tests soient enregistrés pour chacun.
+  - id: CC9.1
+    title: {en: Business disruption risks are mitigated, fr: Risques d'interruption d'activité atténués}
+    evidence: [[procedure], [deployment]]
+    max_age_days: 365
+    recommendation:
+      en: Version the deployment pipeline and a continuity or recovery procedure.
+      fr: Versionner le pipeline de déploiement et une procédure de continuité ou de reprise.
+  - id: A1.2
+    title: {en: Recovery infrastructure is in place, fr: Infrastructure de reprise en place}
+    evidence: [[deployment], [release]]
+    max_age_days: 90
+    recommendation:
+      en: Tag each release so that a known version can be redeployed.
+      fr: Étiqueter chaque version pour pouvoir redéployer une version connue.

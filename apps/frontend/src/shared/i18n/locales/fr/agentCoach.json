@@ -36,5 +36,134 @@
 		"high": "Haute",
 		"medium": "Moyenne",
 		"low": "Basse"
+	},
+	"profile": {
+		"kicker": "Style personnel",
+		"title": "Votre profil de style",
+		"intro": "Lu dans vos propres commits de ce projet (ceux des agents mis à part), dans ce que vous avez gardé ou corrigé après une fusion, et dans la configuration du lint. Les habitudes récentes comptent plus que les anciennes.",
+		"build": "Construire depuis mon historique",
+		"rebuild": "Relire mon historique",
+		"enabled": "Donner mon style aux agents de ce projet",
+		"injected": "Le codeur et le correcteur QA reçoivent ces préférences ; les consignes de la tâche passent toujours avant.",
+		"notInjected": "Les agents ne reçoivent aucun style : construisez le profil ou choisissez une préférence.",
+		"noEmail": "Aucun user.email git dans ce projet : seuls les commits des autres auteurs et la configuration du lint ont été lus.",
+		"empty": "Pas encore de profil. Construisez-le depuis vos commits de ce projet, ou choisissez vos préférences à la main.",
+		"commits": {
+			"gold": "Vos commits",
+			"accepted": "Commits d'agents gardés",
+			"corrected": "Corrections",
+			"team": "Autres auteurs"
+		},
+		"keptAsIs": "Builds gardés tels quels : {{with}} % avec votre profil ({{withCount}}), {{without}} % sans ({{withoutCount}})",
+		"lint": "Règles lues dans :",
+		"indifferent": "Indifférent",
+		"evidence": "{{share}} % · {{source}}",
+		"sources": {
+			"history": "votre historique",
+			"project": "le projet",
+			"lint": "la config du lint"
+		},
+		"override": "Votre choix pour {{dimension}}",
+		"auto": "Mesuré",
+		"off": "Ne pas donner",
+		"export": "Exporter",
+		"import": "Importer",
+		"exported": "Enregistré dans {{path}}",
+		"dimensions": {
+			"naming_functions": "Noms de fonctions",
+			"naming_variables": "Noms de variables",
+			"name_length": "Longueur des noms",
+			"comments": "Commentaires",
+			"doc_comments": "Commentaires de doc",
+			"comment_language": "Langue des commentaires",
+			"function_length": "Longueur des fonctions",
+			"imports": "Imports",
+			"error_handling": "Erreurs",
+			"guard_style": "Conditions",
+			"assertions": "Assertions par test",
+			"mocking": "Mocks"
+		},
+		"values": {
+			"naming_functions": {
+				"camelCase": "camelCase",
+				"snake_case": "snake_case",
+				"PascalCase": "PascalCase"
+			},
+			"naming_variables": {
+				"camelCase": "camelCase",
+				"snake_case": "snake_case",
+				"PascalCase": "PascalCase"
+			},
+			"name_length": {
+				"short": "Courts",
+				"descriptive": "Descriptifs"
+			},
+			"comments": {
+				"none": "Aucun",
+				"minimal": "Minimaux",
+				"verbose": "Généreux"
+			},
+			"doc_comments": {
+				"documented": "Sur chaque fonction",
+				"undocumented": "Seulement si utile"
+			},
+			"comment_language": {
+				"en": "Anglais",
+				"fr": "Français"
+			},
+			"function_length": {
+				"short": "Courtes (≤ 20 lignes)",
+				"medium": "Moyennes (≤ 50 lignes)",
+				"long": "Longues"
+			},
+			"imports": {
+				"named": "Nommés",
+				"default": "Par défaut",
+				"from_import": "from … import",
+				"module_import": "import module"
+			},
+			"error_handling": {
+				"exceptions": "Exceptions",
+				"result_types": "Types Result"
+			},
+			"guard_style": {
+				"early_return": "Retours anticipés",
+				"nested": "Imbriquées"
+			},
+			"assertions": {
+				"few": "Une ou deux",
+				"many": "Plusieurs"
+			},
+			"mocking": {
+				"framework": "Mocks du framework",
+				"manual": "Faux écrits à la main"
+			}
+		},
+		"check": {
+			"title": "Vérifier une tâche en attente de revue",
+			"task": "Tâche à vérifier",
+			"choose": "Choisissez une tâche",
+			"run": "Vérifier",
+			"none": "La tâche suit votre profil.",
+			"deviation": "{{language}} · {{dimension}} : {{found}} ({{count}}×), votre profil dit {{expected}}"
+		},
+		"languages": {
+			"python": "Python",
+			"javascript": "JavaScript",
+			"typescript": "TypeScript",
+			"csharp": "C#",
+			"java": "Java",
+			"kotlin": "Kotlin",
+			"go": "Go",
+			"rust": "Rust",
+			"ruby": "Ruby",
+			"php": "PHP",
+			"swift": "Swift",
+			"dart": "Dart",
+			"scala": "Scala",
+			"cpp": "C++",
+			"c": "C",
+			"fsharp": "F#"
+		}
 	}
 }

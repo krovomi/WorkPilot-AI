@@ -7,6 +7,10 @@
  * Channels:
  *   invoke "accessibility:run"     → { projectPath, targetLevel? }
  *   invoke "accessibility:cancel"  → void
+ *   invoke "accessibility:dynamic" → { url?, targetLevel? }: the running app (#391)
+ *   invoke "accessibility:app-url" → the App Emulator's URL, or null
+ *   invoke "accessibility:fix"     → fixes made on a review card (#391)
+ *   invoke "accessibility:export"  → { format, report }: HTML, CSV or PDF
  *
  * Renderer events:
  *   accessibility-event     (progress / start / complete metadata)
@@ -20,6 +24,12 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { runDynamicScan } from "../accessibility/dynamic-scan";
+import { fixOnReviewCard, readFixRequest } from "../accessibility/fix-run";
+import { type ExportFormat, writeExport } from "../accessibility/report-export";
+import { appEmulatorService } from "../app-emulator-service";
+import { showSaveDialog } from "../electron-utils";
+import type { WcagLevel } from "../../shared/types/accessibility";
 import {
 	cancelServerAnalysis,
 	relayServerAnalysis,
@@ -29,6 +39,7 @@ import {
 interface RunRequest {
 	projectPath: string;
 	targetLevel?: "A" | "AA" | "AAA";
+	pageLang?: string;
 }
 
 const EVENT_PREFIX = "A11Y_EVENT:";
@@ -54,10 +65,12 @@ export function registerAccessibilityHandlers(): void {
 
 	ipcMain.handle(
 		IPC_CHANNELS.ACCESSIBILITY_RUN,
-		async (_event, { projectPath, targetLevel = "AA" }: RunRequest) => {
+		async (_event, { projectPath, targetLevel: rawLevel, pageLang }: RunRequest) => {
 			killExisting();
+			const targetLevel = readLevel(rawLevel);
+			const lang = typeof pageLang === "string" && /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/.test(pageLang) ? pageLang : "en";
 
-			if (!projectPath) {
+			if (typeof projectPath !== "string" || !projectPath || projectPath.startsWith("-")) {
 				const message = "projectPath is required";
 				broadcast(IPC_CHANNELS.ACCESSIBILITY_ERROR, message);
 				throw new Error(message);
@@ -87,7 +100,7 @@ export function registerAccessibilityHandlers(): void {
 
 			const child = spawn(
 				pythonExe,
-				[runnerPath, "--project-path", projectPath, "--target-level", targetLevel],
+				[runnerPath, "--project-path", projectPath, "--target-level", targetLevel, "--page-lang", lang],
 				{
 					cwd: backendPath,
 					env: await pythonRunnerEnv(backendPath),
@@ -159,4 +172,48 @@ export function registerAccessibilityHandlers(): void {
 		killExisting();
 		return true;
 	});
+
+	ipcMain.handle(IPC_CHANNELS.ACCESSIBILITY_APP_URL, () => appEmulatorService.getUrl());
+
+	ipcMain.handle(
+		IPC_CHANNELS.ACCESSIBILITY_DYNAMIC,
+		async (_event, request: { url?: unknown; targetLevel?: unknown } | undefined) => {
+			const level = readLevel(request?.targetLevel);
+			const url = request?.url || appEmulatorService.getUrl();
+			return runDynamicScan(url, level);
+		},
+	);
+
+	ipcMain.handle(IPC_CHANNELS.ACCESSIBILITY_FIX, async (_event, raw: unknown) => {
+		const request = readFixRequest(raw);
+		if (!request) throw new Error("No fix to make");
+		return fixOnReviewCard(request);
+	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.ACCESSIBILITY_EXPORT,
+		async (_event, request: { format?: unknown; report?: unknown; title?: unknown } | undefined) => {
+			const format = readFormat(request?.format);
+			if (!format) throw new Error("Unknown export format");
+			const title =
+				typeof request?.title === "string" && request.title.trim()
+					? request.title.trim().slice(0, 120)
+					: "Accessibility report";
+			const { canceled, filePath } = await showSaveDialog({
+				defaultPath: `accessibility-report.${format}`,
+				filters: [{ name: format.toUpperCase(), extensions: [format] }],
+			});
+			if (canceled || !filePath) return null;
+			await writeExport(format, request?.report, filePath, title);
+			return filePath;
+		},
+	);
+}
+
+function readLevel(value: unknown): WcagLevel {
+	return value === "A" || value === "AAA" ? value : "AA";
+}
+
+function readFormat(value: unknown): ExportFormat | null {
+	return value === "html" || value === "csv" || value === "pdf" ? value : null;
 }

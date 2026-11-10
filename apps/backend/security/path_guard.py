@@ -113,6 +113,10 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # The task's definition of done (`goal/spec.py`): an agent that could
     # rewrite it would make `true` its goal.
     ".workpilot-goal.json",
+    # The repository's own guardrails (`security/guardrail_policy.py`): an
+    # agent that could edit it would lift the rules that bind it.
+    "workpilot.policy.yaml",
+    "workpilot.policy.yml",
     # What the person told the next session (`foundation/human_input.py`): an
     # agent that could write it would hand the next session a fake human
     # instruction, planted by whatever content it read (rule S2).
@@ -161,6 +165,15 @@ PROTECTED_CONFIG_DIRS: dict[str, tuple[str, ...]] = {
         "worktree.toml",
         "worktree-approved.json",
         "mcp-pins.json",
+        # What the person approved under a `require_approval` guardrail, and
+        # the log the approvals are read from (`security/guardrail_ledger.py`):
+        # an agent that wrote either would approve its own action.
+        "guardrail-approvals.json",
+        "guardrail-log.jsonl",
+        # The sources the person trusts not to carry a prompt injection
+        # (`security/tool_result_guard.py`): an agent that wrote it would
+        # silence the scan of what it reads next.
+        "trusted-sources.json",
     ),
     ".claude": ("settings*.json",),
 }

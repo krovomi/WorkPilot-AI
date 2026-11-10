@@ -63,6 +63,7 @@ from task_logger import (
 )
 
 from . import recheck
+from .api_contract_gate import api_contract_gate
 from .budget import (
     MAX_QA_ITERATIONS,
     qa_iteration_cap,
@@ -74,9 +75,11 @@ from .criteria import (
     is_qa_approved,
 )
 from .dependency_gate import dependency_gate
+from .doc_drift_gate import doc_drift_gate
 from .fixer import run_qa_fixer_session
 from .mutation_gate import guard_start, guard_test_only, mutation_gate
 from .proof_gate import proof_gate
+from .red_team_gate import red_team_gate
 from .report import (
     create_manual_test_plan,
     escalate_to_human,
@@ -90,6 +93,7 @@ from .report import (
     write_visual_qa_report,
 )
 from .reviewer import classify_qa_error, run_qa_agent_session
+from .schema_gate import schema_gate
 
 
 def _ensure_fix_request_file(
@@ -543,6 +547,13 @@ async def run_qa_validation_loop(
                     state.review_scope,
                     task_logger=scope.task_logger,
                 )
+                or schema_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
                 or proof_gate(
                     spec_dir,
                     project_dir,
@@ -563,7 +574,31 @@ async def run_qa_validation_loop(
                     state.review_scope,
                     task_logger=scope.task_logger,
                 )
+                or api_contract_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
+                or doc_drift_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    task_logger=scope.task_logger,
+                )
             )
+            if gate is None:
+                gate = await red_team_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
+                    model=qa_model,
+                    verbose=scope.verbose,
+                    task_logger=scope.task_logger,
+                )
             if gate is None and goal is not None:
                 goal_gate = _goal_gate(scope, state, goal)
                 if goal_gate is _Next.FAILED:

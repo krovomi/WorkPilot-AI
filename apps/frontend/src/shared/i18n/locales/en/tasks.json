@@ -1913,6 +1913,40 @@
 		"effortSentAs": "Sent to the provider as “{{value}}”, the closest level this model takes.",
 		"effortRuntime": "Applied at launch if the model takes it; the task log says what was sent."
 	},
+	"redTeam": {
+		"title": "Red team",
+		"status": {
+			"pass": "Held",
+			"fail": "Crashed",
+			"unknown": "Unknown",
+			"none": "Nothing to attack"
+		},
+		"replay": "Replayed",
+		"counts": "{{crash}} crash · {{unexpected}} unexpected · {{resistant}} held · {{warning}} warning",
+		"attack": "Attack",
+		"running": "Attacking…",
+		"input": "Input: {{input}}.",
+		"expect": "Expected: {{expect}}.",
+		"outcome": {
+			"crash": "Crash",
+			"unexpected": "Unexpected",
+			"resistant": "Held",
+			"not_run": "Not run",
+			"flaky": "Flaky"
+		},
+		"mode": {
+			"fuzz": "Malformed input",
+			"edge": "Edge case",
+			"injection": "Prompt injection",
+			"concurrency": "Concurrency",
+			"regression": "Past bug"
+		},
+		"warnings": "Concurrency risks seen in the code (not proven)",
+		"warning": {
+			"toctou": "checks a file, then uses it: another process can change it in between",
+			"shared-state": "writes shared state from concurrent code without a lock"
+		}
+	},
 	"verify": {
 		"title": "Verification loop",
 		"status": {
@@ -2275,6 +2309,8 @@
 		"busy": {
 			"preparing": "Setting up the worktrees…",
 			"ranking": "Measuring the variants…",
+			"arbitrating": "The arbiter is comparing the variants…",
+			"answering": "The arbiter is answering…",
 			"adopting": "Adopting…",
 			"discarding": "Removing the variants…"
 		},
@@ -2315,7 +2351,60 @@
 		"confirmTitle": "Keep this build?",
 		"confirmBody": "The build on {{engine}} becomes the task's build. The {{others}} other variants, their worktrees and their branches are deleted. Nothing is merged.",
 		"adoptedLine": "Kept: {{variant}}",
-		"discardedLine": "Every variant was discarded."
+		"discardedLine": "Every variant was discarded.",
+		"arbiter": {
+			"title": "Arbiter",
+			"status": {
+				"pending": "Not asked yet",
+				"not_needed": "Not needed",
+				"done": "Verdict",
+				"needs_human": "Your call",
+				"invalid": "No verdict",
+				"unavailable": "Unreachable"
+			},
+			"reason": {
+				"diverge": "The finished variants take different approaches (divergence {{max}}, threshold {{threshold}}).",
+				"no_winner": "No variant ranks first alone, so the arbiter reads them.",
+				"same_approach": "The finished variants take the same approach (divergence {{max}}, under {{threshold}}): the ranking is enough.",
+				"single_candidate": "Fewer than two variants finished: there is nothing to arbitrate.",
+				"changes_unknown": "A variant's changes could not be read: no verdict is given."
+			},
+			"keeps": "Recommends {{variant}}",
+			"merge": "Recommends a merge, each file whole from one variant:",
+			"mergeFile": "File",
+			"mergeFrom": "From",
+			"mergeNotApplied": "The merge is not applied for you: keep the variant that brings most files, then take the others by hand.",
+			"equivalent": "The approaches are equivalent: the simplest one is kept.",
+			"axes": {
+				"correctness": "Correctness",
+				"performance": "Performance",
+				"maintainability": "Maintainability",
+				"security": "Security",
+				"tests": "Tests"
+			},
+			"risks": "Risks of {{variant}}",
+			"confidence": {
+				"high": "High confidence",
+				"medium": "Medium confidence",
+				"low": "Low confidence"
+			},
+			"yourCall": "The arbiter is not sure: the choice is yours.",
+			"invalid": "The arbiter's answer was not a valid verdict: compare the numbers above.",
+			"unavailable": "The arbiter could not be reached ({{reason}}). Check its model in Settings, then ask again.",
+			"sameProvider": "The arbiter runs on {{provider}}, like one of the variants, and may favour that provider's code. Set another provider for \"Best-of-N arbiter\" in Settings for a neutral verdict.",
+			"engine": "Arbiter: {{engine}}",
+			"ask": "Ask the arbiter",
+			"askAgain": "Ask again",
+			"questionLabel": "Question the verdict",
+			"questionPlaceholder": "Why not variant #2?",
+			"send": "Send",
+			"threadFull": "Ten questions asked: this verdict's thread is full.",
+			"you": "You:",
+			"arbiter": "Arbiter:",
+			"metrics": "Track record",
+			"metricsLine": "{{month}}: {{count}} arbitrated, followed {{percent}}%, {{merges}} merges proposed",
+			"noMetrics": "No arbitrated run has been closed yet in this project."
+		}
 	},
 	"crossReview": {
 		"cardBadge": {
@@ -2416,5 +2505,50 @@
 		"done_other": "{{count}} worktrees purged, {{size}} freed.",
 		"kept_one": "{{count}} kept: uncommitted changes or could not be removed.",
 		"kept_other": "{{count}} kept: uncommitted changes or could not be removed."
+	},
+	"schemaGuard": {
+		"title": "Migrations",
+		"status": {
+			"pass": "Zero-downtime",
+			"warn": "To review",
+			"fail": "Breaks a live database",
+			"unchecked": "Not checked"
+		},
+		"summary_one": "{{count}} migration checked · {{engine}}",
+		"summary_other": "{{count}} migrations checked · {{engine}}",
+		"engine": {
+			"postgres": "PostgreSQL",
+			"mysql": "MySQL / MariaDB",
+			"sqlserver": "SQL Server",
+			"sqlite": "SQLite",
+			"unknown": "engine not detected"
+		},
+		"check": "Check again",
+		"checking": "Checking…",
+		"kind": {
+			"data_loss": "Data loss",
+			"rename": "Rename",
+			"type_change": "Type change",
+			"not_null": "NOT NULL",
+			"lock": "Lock",
+			"no_rollback": "No rollback",
+			"edited": "Applied migration edited"
+		},
+		"advice": {
+			"data_loss": "Ship the code that no longer uses it first, keep the data through a cooldown, then drop it in a later migration.",
+			"rename": "Add the new name next to the old one, write both, backfill, switch the reads, then drop the old name later.",
+			"type_change": "Add a column of the new type, backfill it with a checked conversion, switch the code, then drop the old column.",
+			"not_null": "Add the column nullable or with a default, backfill in batches, then add NOT NULL (on PostgreSQL through a CHECK … NOT VALID first).",
+			"lock": "On PostgreSQL, build the index CONCURRENTLY and add constraints NOT VALID then VALIDATE, outside a transaction.",
+			"no_rollback": "Write the down migration, or say in the migration why it cannot be reversed and how the data is restored.",
+			"edited": "This migration may already have run somewhere: restore it and add a new migration for the change."
+		},
+		"planTitle": "Zero-downtime plan",
+		"plan": {
+			"expand": "Expand: add the new structure next to the old one, and have the code write both.",
+			"migrate": "Migrate: backfill in batches that can resume, outside the deploy.",
+			"switch": "Switch: deploy the code that reads only the new structure.",
+			"contract": "Contract: once no running version uses it, drop the old structure in a later migration."
+		}
 	}
 }

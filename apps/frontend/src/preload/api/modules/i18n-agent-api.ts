@@ -4,7 +4,11 @@
  * Renderer-side bridge to the i18n scanner runner.
  */
 
-import type { I18nReport } from "../../../shared/types/i18n-agent";
+import type {
+	I18nReport,
+	I18nTranslateOutcome,
+	I18nTranslateRequest,
+} from "../../../shared/types/i18n-agent";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
@@ -21,6 +25,8 @@ export interface I18nAgentEvent {
 export interface I18nAgentAPI {
 	runI18nScan: (options: I18nAgentRunOptions) => Promise<I18nReport>;
 	cancelI18nScan: () => Promise<boolean>;
+	/** Translate the missing keys on a review card (a worktree and its own branch). */
+	translateI18nKeys: (request: I18nTranslateRequest) => Promise<I18nTranslateOutcome>;
 	onI18nAgentEvent: (
 		callback: (event: I18nAgentEvent) => void,
 	) => () => void;
@@ -35,6 +41,9 @@ export const createI18nAgentAPI = (): I18nAgentAPI => ({
 		invokeIpc<I18nReport>(IPC_CHANNELS.I18N_AGENT_RUN, options),
 
 	cancelI18nScan: () => invokeIpc<boolean>(IPC_CHANNELS.I18N_AGENT_CANCEL),
+
+	translateI18nKeys: (request) =>
+		invokeIpc<I18nTranslateOutcome>(IPC_CHANNELS.I18N_AGENT_TRANSLATE, request),
 
 	onI18nAgentEvent: (callback) =>
 		createIpcListener<[I18nAgentEvent]>(IPC_CHANNELS.I18N_AGENT_EVENT, (payload) =>

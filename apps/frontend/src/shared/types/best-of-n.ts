@@ -60,6 +60,94 @@ export interface BestOfNRanking {
 	variants: BestOfNScore[];
 }
 
+/** One pair of finished variants and how far apart their changes are (0 to 1). */
+export interface BestOfNPair {
+	a: string;
+	b: string;
+	divergence: number;
+}
+
+export type BestOfNDivergenceReason =
+	| "diverge"
+	| "no_winner"
+	| "same_approach"
+	| "single_candidate"
+	| "changes_unknown";
+
+export interface BestOfNDivergence {
+	needed: boolean;
+	reason: BestOfNDivergenceReason;
+	pairs: BestOfNPair[];
+	max: number;
+	threshold: number;
+}
+
+/** The axes measured for a variant, the same for every provider (no model). */
+export interface BestOfNArbiterFacts {
+	build: string;
+	buildComplete: boolean;
+	qa: string | null;
+	goal: string | null;
+	diffLines: number | null;
+	diffFiles: number | null;
+	testFiles: number;
+	costUsd: number | null;
+	rank: number | null;
+}
+
+export type BestOfNArbiterAxis =
+	| "correctness"
+	| "performance"
+	| "maintainability"
+	| "security"
+	| "tests";
+
+export type BestOfNArbiterStatus =
+	| "pending"
+	| "not_needed"
+	| "done"
+	| "needs_human"
+	| "invalid"
+	| "unavailable";
+
+export interface BestOfNArbiterExchange {
+	at: string;
+	question: string;
+	answer: string;
+}
+
+/**
+ * The arbiter's verdict, when the finished variants diverge. Advice only: the
+ * person still picks the variant to adopt.
+ */
+export interface BestOfNArbiter {
+	status: BestOfNArbiterStatus;
+	divergence?: BestOfNDivergence | null;
+	at?: string;
+	facts?: Record<string, BestOfNArbiterFacts>;
+	engine?: { provider?: string; model?: string };
+	/** A variant's spec id, or "merge". */
+	choice?: string;
+	merge?: { file: string; from: string }[];
+	equivalent?: boolean;
+	reasons?: Partial<Record<BestOfNArbiterAxis, string>>;
+	risks?: Record<string, string[]>;
+	summary?: string;
+	confidence?: "high" | "medium" | "low";
+	reason?: string;
+	thread?: BestOfNArbiterExchange[];
+}
+
+/** One month of arbitrations, from `.workpilot/arbiter/history.jsonl`. */
+export interface BestOfNArbiterMonth {
+	month: string;
+	arbitrations: number;
+	followedPercent: number;
+	merges: number;
+	choices: number;
+	meanConfidence: number;
+}
+
 export interface BestOfNState {
 	parent: string;
 	phase: BestOfNPhase;
@@ -69,6 +157,7 @@ export interface BestOfNState {
 	ranking?: BestOfNRanking;
 	adopted?: { specId: string; at: string; cleanupProblems: string[] };
 	discarded?: { at: string; cleanupProblems: string[] };
+	arbiter?: BestOfNArbiter;
 }
 
 export interface BestOfNStatus {
@@ -77,6 +166,6 @@ export interface BestOfNStatus {
 	/** The variants whose build is running now. */
 	running: string[];
 	/** A step the main process is doing: setting up, ranking, adopting… */
-	busy?: "preparing" | "ranking" | "adopting" | "discarding";
+	busy?: "preparing" | "ranking" | "arbitrating" | "answering" | "adopting" | "discarding";
 	error?: string;
 }

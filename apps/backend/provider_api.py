@@ -1962,21 +1962,17 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import spec_traceability router: {e}")
 
-# --- Verification loop (the app launched, driven and measured; verify/) ---
-try:
-    from verify.api import router as verify_router
-
-    _mount(verify_router, "verify")
-except ImportError as e:
-    print(f"Warning: Could not import verify router: {e}")
-
-# --- Docintel API (task attachments and ADRs, as the agents will read them) ---
-try:
-    from docintel.api import router as docintel_router
-
-    _mount(docintel_router, "docintel")
-except ImportError as e:
-    print(f"Warning: Could not import docintel router: {e}")
+# --- The verification loop (verify/), the red team's record and run (qa/red_team_api.py),
+# what a task's attachments and the ADRs say (docintel/) ---
+for _module, _feature in (
+    ("verify.api", "verify"),
+    ("qa.red_team_api", "red_team"),
+    ("docintel.api", "docintel"),
+):
+    try:
+        _mount(__import__(_module, fromlist=["router"]).router, _feature)
+    except ImportError as e:
+        print(f"Warning: Could not import {_feature} router: {e}")
 
 # --- UI/UX API (ui-ux-pro-max: is this task about the interface, which design system) ---
 try:
@@ -1986,29 +1982,19 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import uiux router: {e}")
 
-# --- Slash Commands API (Kanban Quick-Command bar: list + run .claude/commands) ---
-try:
-    from slash_commands.api import router as slash_commands_router
-
-    _mount(slash_commands_router, "slash_commands")
-except ImportError as e:
-    print(f"Warning: Could not import slash_commands router: {e}")
-
-# --- Virtual Reviewer API (advisory only, no signature, no PR) ---
-try:
-    from virtual_reviewer.api import router as virtual_reviewer_router
-
-    _mount(virtual_reviewer_router, "virtual_reviewer")
-except ImportError as e:
-    print(f"Warning: Could not import virtual_reviewer router: {e}")
-
-# --- Test Generation Agent API (extracted from this file) ---
-try:
-    from test_generation.api import router as test_generation_router
-
-    _mount(test_generation_router, "test_generation")
-except ImportError as e:
-    print(f"Warning: Could not import test_generation router: {e}")
+# --- The Kanban Quick-Command bar (list + run .claude/commands), the virtual
+# reviewer (advisory only, no signature, no PR), the test generation agent, and
+# the schema guard (what a task's migrations do to a live database) ---
+for _module, _feature in (
+    ("slash_commands.api", "slash_commands"),
+    ("virtual_reviewer.api", "virtual_reviewer"),
+    ("test_generation.api", "test_generation"),
+    ("qa.schema_guard_api", "schema_guard"),
+):
+    try:
+        _mount(__import__(_module, fromlist=["router"]).router, _feature)
+    except ImportError as e:
+        print(f"Warning: Could not import {_feature} router: {e}")
 
 # --- GitHub PR Details API (extracted from this file) ---
 try:

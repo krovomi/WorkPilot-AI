@@ -4,7 +4,14 @@
  * Renderer-side bridge to the notebook agent runner.
  */
 
-import type { ParsedNotebook } from "../../../shared/types/notebook-agent";
+import type {
+	NotebookExecution,
+	NotebookMonth,
+	NotebookRefactorOutcome,
+	NotebookRefactorRequest,
+	NotebookRunRequest,
+	ParsedNotebook,
+} from "../../../shared/types/notebook-agent";
 import { createIpcListener, invokeIpc } from "./ipc-utils";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 
@@ -26,6 +33,9 @@ export interface NotebookAgentAPI {
 		options: NotebookAgentRunOptions,
 	) => Promise<NotebookAgentResult>;
 	cancelNotebookAgentScan: () => Promise<boolean>;
+	executeNotebook: (request: NotebookRunRequest) => Promise<NotebookExecution>;
+	refactorNotebook: (request: NotebookRefactorRequest) => Promise<NotebookRefactorOutcome>;
+	getNotebookMetrics: (options: NotebookAgentRunOptions) => Promise<NotebookMonth[]>;
 	onNotebookAgentEvent: (
 		callback: (event: NotebookAgentEvent) => void,
 	) => () => void;
@@ -40,6 +50,15 @@ export const createNotebookAgentAPI = (): NotebookAgentAPI => ({
 		invokeIpc<NotebookAgentResult>(IPC_CHANNELS.NOTEBOOK_AGENT_RUN, options),
 
 	cancelNotebookAgentScan: () => invokeIpc<boolean>(IPC_CHANNELS.NOTEBOOK_AGENT_CANCEL),
+
+	executeNotebook: (request: NotebookRunRequest) =>
+		invokeIpc<NotebookExecution>(IPC_CHANNELS.NOTEBOOK_AGENT_EXECUTE, request),
+
+	refactorNotebook: (request: NotebookRefactorRequest) =>
+		invokeIpc<NotebookRefactorOutcome>(IPC_CHANNELS.NOTEBOOK_AGENT_REFACTOR, request),
+
+	getNotebookMetrics: (options: NotebookAgentRunOptions) =>
+		invokeIpc<NotebookMonth[]>(IPC_CHANNELS.NOTEBOOK_AGENT_METRICS, options),
 
 	onNotebookAgentEvent: (callback) =>
 		createIpcListener<[NotebookAgentEvent]>(IPC_CHANNELS.NOTEBOOK_EVENT, (payload) =>

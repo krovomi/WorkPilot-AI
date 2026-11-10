@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { DocDriftEvent } from "../../preload/api/modules/doc-drift-api";
-import type { DriftReport } from "../../shared/types/doc-drift";
+import type { DocDriftFixOutcome, DriftReport } from "../../shared/types/doc-drift";
 
 export type DocDriftPhase = "idle" | "scanning" | "complete" | "error";
 
@@ -9,7 +9,15 @@ interface DocDriftState {
 	status: string;
 	report: DriftReport | null;
 	error: string | null;
+	/** Fix ids ticked on the page (#354). */
+	selectedFixes: string[];
+	fixing: boolean;
+	fixOutcome: DocDriftFixOutcome | null;
+	fixError: string | null;
 
+	toggleFix: (fixId: string) => void;
+	selectFixes: (fixIds: string[]) => void;
+	applyFixes: (projectPath: string) => Promise<void>;
 	startScan: (projectPath: string) => Promise<void>;
 	cancelScan: () => Promise<void>;
 	setStatus: (status: string) => void;
@@ -18,11 +26,36 @@ interface DocDriftState {
 	reset: () => void;
 }
 
-export const useDocDriftStore = create<DocDriftState>((set) => ({
+export const useDocDriftStore = create<DocDriftState>((set, get) => ({
 	phase: "idle",
 	status: "",
 	report: null,
 	error: null,
+	selectedFixes: [],
+	fixing: false,
+	fixOutcome: null,
+	fixError: null,
+
+	toggleFix: (fixId) => {
+		const selected = get().selectedFixes;
+		set({
+			selectedFixes: selected.includes(fixId) ? selected.filter((id) => id !== fixId) : [...selected, fixId],
+		});
+	},
+
+	selectFixes: (fixIds) => set({ selectedFixes: [...new Set(fixIds)] }),
+
+	applyFixes: async (projectPath) => {
+		const fixIds = get().selectedFixes;
+		if (!projectPath || fixIds.length === 0) return;
+		set({ fixing: true, fixError: null, fixOutcome: null });
+		try {
+			const fixOutcome = await globalThis.electronAPI.fixDocDrift({ projectPath, fixIds });
+			set({ fixing: false, fixOutcome, selectedFixes: [] });
+		} catch (err) {
+			set({ fixing: false, fixError: err instanceof Error ? err.message : String(err) });
+		}
+	},
 
 	startScan: async (projectPath) => {
 		if (!projectPath) {
@@ -34,6 +67,9 @@ export const useDocDriftStore = create<DocDriftState>((set) => ({
 			status: "Starting scan...",
 			report: null,
 			error: null,
+			selectedFixes: [],
+			fixOutcome: null,
+			fixError: null,
 		});
 		try {
 			const report = await globalThis.electronAPI.runDocDriftScan({ projectPath });
@@ -54,7 +90,16 @@ export const useDocDriftStore = create<DocDriftState>((set) => ({
 	setStatus: (status) => set({ status }),
 	setReport: (report) => set({ report, phase: "complete" }),
 	setError: (error) => set({ error, phase: "error" }),
-	reset: () => set({ phase: "idle", status: "", report: null, error: null }),
+	reset: () =>
+		set({
+			phase: "idle",
+			status: "",
+			report: null,
+			error: null,
+			selectedFixes: [],
+			fixOutcome: null,
+			fixError: null,
+		}),
 }));
 
 export function setupDocDriftListeners(): () => void {

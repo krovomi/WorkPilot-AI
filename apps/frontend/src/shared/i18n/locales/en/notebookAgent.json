@@ -14,7 +14,7 @@
 		"noProject": "Select a project to analyse its notebooks.",
 		"failed": "Analysis failed: {{error}}"
 	},
-	"description": "Execution order, empty or long cells and missing prose, in Jupyter notebooks (any kernel), .NET Polyglot (.dib), Quarto and R Markdown.",
+	"description": "Execution order, dependencies between cells, empty or long cells and missing prose, then a full run in a fresh kernel and long cells turned into functions, in Jupyter notebooks (any kernel), .NET Polyglot (.dib), Quarto and R Markdown.",
 	"idleTitle": "No check yet",
 	"emptyTitle": "No notebook in this project",
 	"notebooks": "Notebooks",
@@ -36,6 +36,72 @@
 		"empty_cell": "Empty cell",
 		"long_cell": "Long cell",
 		"no_markdown": "No prose",
-		"sensitive_output": "Sensitive output"
+		"sensitive_output": "Sensitive output",
+		"used_before_defined": "Used before defined",
+		"undefined_name": "Undefined name",
+		"hidden_state": "Hidden state",
+		"implicit_global": "Implicit global",
+		"shared_mutation": "Shared mutation",
+		"duplicate_code": "Duplicate code",
+		"execution_error": "Execution error",
+		"assertion_failed": "Assertion failed",
+		"missing_dependency": "Missing dependency",
+		"empty_plot": "Empty figure",
+		"shape_changed": "Table shape changed",
+		"output_changed": "Output changed"
+	},
+	"deps": {
+		"title": "Dependencies between cells",
+		"inOrder": "Every cell runs after the cells it needs.",
+		"reorder": "Run order that respects the dependencies: {{order}}",
+		"cycle": "Two cells need each other: no order works from top to bottom.",
+		"edge": "Cell #{{to}} uses {{names}} from cell #{{from}}",
+		"more": "{{count}} more dependencies",
+		"approximate": "Read from declarations in this language: some dependencies may be missing."
+	},
+	"refactor": {
+		"title": "Turn long cells into functions",
+		"proposal": "Cell #{{index}} ({{lines}} lines) into a function in {{module}}",
+		"refused": "Cell #{{index}} ({{lines}} lines) stays as is: {{reason}}",
+		"clean": "Also clear outputs, execution counts and run metadata",
+		"apply": "Prepare on a review card",
+		"none": "No cell long enough to become a function.",
+		"nothing": "Nothing changed: the notebook already has this shape."
+	},
+	"run": {
+		"title": "Run in a fresh kernel",
+		"start": "Run",
+		"warning": "The notebook's code runs on this machine, in a temporary copy, without your credentials.",
+		"running": "Running the notebook…",
+		"hint": "To install the kernel:",
+		"score": "Cells without error",
+		"matching": "Same output as stored",
+		"duration": "Duration",
+		"seconds": "{{value}} s",
+		"status": {
+			"done": "Run complete.",
+			"no_runner": "Jupyter is not installed: {{detail}}",
+			"no_kernel": "No kernel for this notebook: {{detail}}",
+			"timeout": "The run took too long and was stopped: {{detail}}",
+			"failed": "The run failed: {{detail}}",
+			"unsupported": "This format cannot be run here: {{detail}}"
+		},
+		"cell": {
+			"ok": "OK",
+			"error": "Error",
+			"skipped": "Skipped",
+			"empty": "Empty"
+		}
+	},
+	"metrics": {
+		"kicker": "History",
+		"title": "Month by month",
+		"month": "Month",
+		"notebooks": "Notebooks",
+		"findings": "Dependency findings",
+		"runs": "Runs",
+		"score": "Mean score",
+		"extracted": "Functions extracted",
+		"percent": "{{value}} %"
 	}
 }

@@ -1913,6 +1913,40 @@
 		"effortSentAs": "Envoyé au fournisseur comme « {{value}} », le niveau le plus proche que ce modèle accepte.",
 		"effortRuntime": "Appliqué au lancement si le modèle l'accepte ; le journal de la tâche dit ce qui a été envoyé."
 	},
+	"redTeam": {
+		"title": "Red team",
+		"status": {
+			"pass": "A tenu",
+			"fail": "A planté",
+			"unknown": "Inconnu",
+			"none": "Rien à attaquer"
+		},
+		"replay": "Rejouée",
+		"counts": "{{crash}} plantage · {{unexpected}} inattendu · {{resistant}} tenu · {{warning}} avertissement",
+		"attack": "Attaquer",
+		"running": "Attaque en cours…",
+		"input": "Entrée : {{input}}.",
+		"expect": "Attendu : {{expect}}.",
+		"outcome": {
+			"crash": "Plantage",
+			"unexpected": "Inattendu",
+			"resistant": "A tenu",
+			"not_run": "Non lancée",
+			"flaky": "Instable"
+		},
+		"mode": {
+			"fuzz": "Entrée malformée",
+			"edge": "Cas limite",
+			"injection": "Injection de prompt",
+			"concurrency": "Concurrence",
+			"regression": "Ancien bug"
+		},
+		"warnings": "Risques de concurrence vus dans le code (non prouvés)",
+		"warning": {
+			"toctou": "vérifie un fichier puis s'en sert : un autre processus peut le changer entre les deux",
+			"shared-state": "écrit un état partagé depuis du code concurrent, sans verrou"
+		}
+	},
 	"verify": {
 		"title": "Boucle de vérification",
 		"status": {
@@ -2275,6 +2309,8 @@
 		"busy": {
 			"preparing": "Création des worktrees…",
 			"ranking": "Mesure des variantes…",
+			"arbitrating": "L'arbitre compare les variantes…",
+			"answering": "L'arbitre répond…",
 			"adopting": "Adoption…",
 			"discarding": "Suppression des variantes…"
 		},
@@ -2315,7 +2351,60 @@
 		"confirmTitle": "Garder ce build ?",
 		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
 		"adoptedLine": "Gardée : {{variant}}",
-		"discardedLine": "Toutes les variantes ont été abandonnées."
+		"discardedLine": "Toutes les variantes ont été abandonnées.",
+		"arbiter": {
+			"title": "Arbitre",
+			"status": {
+				"pending": "Pas encore consulté",
+				"not_needed": "Inutile",
+				"done": "Verdict",
+				"needs_human": "À vous de trancher",
+				"invalid": "Pas de verdict",
+				"unavailable": "Injoignable"
+			},
+			"reason": {
+				"diverge": "Les variantes terminées suivent des approches différentes (divergence {{max}}, seuil {{threshold}}).",
+				"no_winner": "Aucune variante n'est seule en tête : l'arbitre les lit.",
+				"same_approach": "Les variantes terminées suivent la même approche (divergence {{max}}, sous {{threshold}}) : le classement suffit.",
+				"single_candidate": "Moins de deux variantes ont fini : il n'y a rien à arbitrer.",
+				"changes_unknown": "Les changements d'une variante n'ont pas pu être lus : aucun verdict n'est donné."
+			},
+			"keeps": "Recommande {{variant}}",
+			"merge": "Recommande une fusion, chaque fichier repris en entier d'une variante :",
+			"mergeFile": "Fichier",
+			"mergeFrom": "Depuis",
+			"mergeNotApplied": "La fusion n'est pas appliquée à votre place : gardez la variante qui apporte le plus de fichiers, puis reprenez les autres à la main.",
+			"equivalent": "Les approches se valent : la plus simple est retenue.",
+			"axes": {
+				"correctness": "Exactitude",
+				"performance": "Performance",
+				"maintainability": "Maintenabilité",
+				"security": "Sécurité",
+				"tests": "Tests"
+			},
+			"risks": "Risques de {{variant}}",
+			"confidence": {
+				"high": "Confiance haute",
+				"medium": "Confiance moyenne",
+				"low": "Confiance basse"
+			},
+			"yourCall": "L'arbitre n'est pas sûr : le choix vous revient.",
+			"invalid": "La réponse de l'arbitre n'était pas un verdict valide : comparez les chiffres ci-dessus.",
+			"unavailable": "L'arbitre n'a pas pu être joint ({{reason}}). Vérifiez son modèle dans les Réglages, puis relancez.",
+			"sameProvider": "L'arbitre tourne sur {{provider}}, comme une des variantes, et peut favoriser le code de ce fournisseur. Choisissez un autre fournisseur pour « Arbitre du Best-of-N » dans les Réglages pour un verdict neutre.",
+			"engine": "Arbitre : {{engine}}",
+			"ask": "Consulter l'arbitre",
+			"askAgain": "Redemander",
+			"questionLabel": "Contester le verdict",
+			"questionPlaceholder": "Pourquoi pas la variante n° 2 ?",
+			"send": "Envoyer",
+			"threadFull": "Dix questions posées : le fil de ce verdict est plein.",
+			"you": "Vous :",
+			"arbiter": "Arbitre :",
+			"metrics": "Bilan",
+			"metricsLine": "{{month}} : {{count}} arbitrés, suivis à {{percent}} %, {{merges}} fusions proposées",
+			"noMetrics": "Aucun run arbitré n'a encore été clos dans ce projet."
+		}
 	},
 	"crossReview": {
 		"cardBadge": {
@@ -2416,5 +2505,50 @@
 		"done_other": "{{count}} worktrees purgés, {{size}} libérés.",
 		"kept_one": "{{count}} conservé : modifications non commitées ou suppression impossible.",
 		"kept_other": "{{count}} conservés : modifications non commitées ou suppression impossible."
+	},
+	"schemaGuard": {
+		"title": "Migrations",
+		"status": {
+			"pass": "Zéro interruption",
+			"warn": "À revoir",
+			"fail": "Casse une base en production",
+			"unchecked": "Non vérifiées"
+		},
+		"summary_one": "{{count}} migration vérifiée · {{engine}}",
+		"summary_other": "{{count}} migrations vérifiées · {{engine}}",
+		"engine": {
+			"postgres": "PostgreSQL",
+			"mysql": "MySQL / MariaDB",
+			"sqlserver": "SQL Server",
+			"sqlite": "SQLite",
+			"unknown": "moteur non détecté"
+		},
+		"check": "Revérifier",
+		"checking": "Vérification…",
+		"kind": {
+			"data_loss": "Perte de données",
+			"rename": "Renommage",
+			"type_change": "Changement de type",
+			"not_null": "NOT NULL",
+			"lock": "Verrou",
+			"no_rollback": "Pas de retour arrière",
+			"edited": "Migration appliquée modifiée"
+		},
+		"advice": {
+			"data_loss": "Déployer d'abord le code qui ne s'en sert plus, garder les données pendant un délai, puis supprimer dans une migration suivante.",
+			"rename": "Ajouter le nouveau nom à côté de l'ancien, écrire les deux, remplir, basculer les lectures, puis supprimer l'ancien plus tard.",
+			"type_change": "Ajouter une colonne du nouveau type, la remplir avec une conversion vérifiée, basculer le code, puis supprimer l'ancienne colonne.",
+			"not_null": "Ajouter la colonne nullable ou avec une valeur par défaut, remplir par lots, puis ajouter NOT NULL (sur PostgreSQL via un CHECK … NOT VALID d'abord).",
+			"lock": "Sur PostgreSQL, construire l'index CONCURRENTLY et ajouter les contraintes NOT VALID puis VALIDATE, hors transaction.",
+			"no_rollback": "Écrire la migration de retour arrière, ou dire dans la migration pourquoi elle est irréversible et comment restaurer les données.",
+			"edited": "Cette migration a peut-être déjà tourné ailleurs : la restaurer et ajouter une nouvelle migration pour le changement."
+		},
+		"planTitle": "Plan zéro interruption",
+		"plan": {
+			"expand": "Expand : ajouter la nouvelle structure à côté de l'ancienne, et faire écrire les deux par le code.",
+			"migrate": "Migrate : remplir par lots qui peuvent reprendre, hors du déploiement.",
+			"switch": "Switch : déployer le code qui ne lit plus que la nouvelle structure.",
+			"contract": "Contract : quand plus aucune version en service ne s'en sert, supprimer l'ancienne structure dans une migration suivante."
+		}
 	}
 }

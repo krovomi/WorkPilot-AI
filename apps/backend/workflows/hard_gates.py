@@ -44,6 +44,8 @@ __all__ = [
     "DEPS_EXIST",
     "PROOF_CHECKS",
     "TESTS_BITE",
+    "MIGRATION_SAFE",
+    "ATTACK_RESISTANT",
     "is_test_file",
     "GATE_RECORD",
     "load_gate_record",
@@ -86,6 +88,18 @@ PROOF_CHECKS = "proof-checks"
 # `qa/mutation_gate.py`). Unknown when the gate did not run, was switched off,
 # or could not measure (no test command, a red suite, the time budget).
 TESTS_BITE = "tests-bite"
+
+# The task's migrations survive a live database: the schema guard's record
+# (`<spec_dir>/schema_guard.json`, written by the QA gate, `qa/schema_gate.py`).
+# Held when no finding is an error (no migration at all included); unknown
+# when the guard did not run or was switched off. Declaring it makes the QA
+# gate strict.
+MIGRATION_SAFE = "migration-safe"
+
+# No attack of the red team crashed the changed code: its record
+# (`<spec_dir>/red_team.json`, written by `qa/red_team_gate.py`). Unknown when
+# it did not run, was switched off, or no attack could run.
+ATTACK_RESISTANT = "attack-resistant"
 
 _TEST_DIRS = ("tests", "test", "__tests__", "spec", "specs", "e2e")
 # `test_x.py`, `x_test.go`, `x.test.ts`, `x.spec.ts`, `x_spec.rb`, `x-test.js`:
@@ -225,6 +239,57 @@ def _tests_bite(spec_dir: Path) -> tuple[bool | None, str]:
     return None, f"unknown — {reason}" if reason else "unknown"
 
 
+def _migration_safe(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from schema_guard import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the schema guard is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no schema record — the QA schema guard did not run"
+    status = record.get("status")
+    findings = [f for f in record.get("findings") or [] if isinstance(f, dict)]
+    if status == "fail":
+        errors = [
+            f"{f.get('path')}:{f.get('line')} {f.get('message')}"
+            for f in findings
+            if f.get("severity") == "error"
+        ]
+        return False, "; ".join(errors[:5])
+    if status in ("pass", "warn"):
+        count = len(record.get("migrations") or [])
+        if not count:
+            return True, "no migration in the change set"
+        warned = f", {len(findings)} warning(s)" if findings else ""
+        return True, f"{count} migration(s) checked{warned}"
+    reason = str(record.get("unchecked") or "")
+    return None, f"unknown — {reason}" if reason else "unknown"
+
+
+def _attack_resistant(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from red_team import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the red team is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no red team record — the QA red team did not run"
+    status = record.get("status")
+    reason = str(record.get("reason") or "")
+    if status == "pass":
+        return True, reason
+    if status == "none":
+        return True, reason or "no source line to attack"
+    if status == "fail":
+        crashed = [
+            str(a.get("test"))
+            for a in record.get("attacks") or []
+            if isinstance(a, dict) and a.get("outcome") == "crash"
+        ]
+        return False, f"{reason}: {', '.join(crashed[:5])}"
+    return None, f"unknown — {reason}" if reason else "unknown"
+
+
 @dataclass(frozen=True)
 class HardGateResult:
     phase_id: str
@@ -350,8 +415,18 @@ def _evaluate_one(
                     phase_id=resolved.id, gate=gate, held=held, detail=detail
                 )
             )
+    elif gate == MIGRATION_SAFE:
+        held, detail = _migration_safe(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
     elif gate == TESTS_BITE:
         held, detail = _tests_bite(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
+    elif gate == ATTACK_RESISTANT:
+        held, detail = _attack_resistant(spec_dir)
         report.results.append(
             HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
         )

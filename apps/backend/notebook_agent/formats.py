@@ -72,22 +72,31 @@ def parse_text_notebook(path: Path) -> ParsedNotebook:
         path=str(path), kernel=kernel, language=", ".join(sorted(languages))
     )
     nb.cells = [
-        NotebookCell(index=i, cell_type=kind, source=source)
-        for i, (kind, source) in enumerate(cells)
+        NotebookCell(
+            index=i,
+            cell_type=kind,
+            source=source,
+            metadata={"language": language} if language else {},
+        )
+        for i, (kind, source, language) in enumerate(cells)
     ]
     return nb
 
 
-def _parse_dib(text: str) -> tuple[list[tuple[CellType, str]], set[str]]:
-    cells: list[tuple[CellType, str]] = []
+Cells = list[tuple[CellType, str, str]]
+
+
+def _parse_dib(text: str) -> tuple[Cells, set[str]]:
+    cells: Cells = []
     languages: set[str] = set()
     kind: CellType | None = None
+    name = ""
     lines: list[str] = []
     for line in text.splitlines():
         magic = _DIB_MAGIC.match(line)
         if magic and magic.group(1) != "meta":
             if kind is not None:
-                cells.append((kind, "\n".join(lines).strip()))
+                cells.append((kind, "\n".join(lines).strip(), name))
             name = magic.group(1).lower()
             kind = CellType.MARKDOWN if name in _PROSE_KERNELS else CellType.CODE
             if kind is CellType.CODE:
@@ -96,33 +105,37 @@ def _parse_dib(text: str) -> tuple[list[tuple[CellType, str]], set[str]]:
         elif kind is not None:
             lines.append(line)
     if kind is not None:
-        cells.append((kind, "\n".join(lines).strip()))
-    return cells, languages
+        cells.append((kind, "\n".join(lines).strip(), name))
+    return [
+        (k, src, "" if k is CellType.MARKDOWN else n) for k, src, n in cells
+    ], languages
 
 
-def _parse_chunks(text: str) -> tuple[list[tuple[CellType, str]], set[str]]:
-    cells: list[tuple[CellType, str]] = []
+def _parse_chunks(text: str) -> tuple[Cells, set[str]]:
+    cells: Cells = []
     languages: set[str] = set()
     prose: list[str] = []
     code: list[str] | None = None
+    language = ""
     for line in text.splitlines():
         if code is None:
             opening = _CHUNK_OPEN.match(line)
             if opening:
                 if "".join(prose).strip():
-                    cells.append((CellType.MARKDOWN, "\n".join(prose).strip()))
+                    cells.append((CellType.MARKDOWN, "\n".join(prose).strip(), ""))
                 prose = []
                 code = []
-                languages.add(opening.group(1).lower())
+                language = opening.group(1).lower()
+                languages.add(language)
             else:
                 prose.append(line)
         elif _CHUNK_CLOSE.match(line):
-            cells.append((CellType.CODE, "\n".join(code).strip()))
+            cells.append((CellType.CODE, "\n".join(code).strip(), language))
             code = None
         else:
             code.append(line)
     if code is not None:
-        cells.append((CellType.CODE, "\n".join(code).strip()))
+        cells.append((CellType.CODE, "\n".join(code).strip(), language))
     elif "".join(prose).strip():
-        cells.append((CellType.MARKDOWN, "\n".join(prose).strip()))
+        cells.append((CellType.MARKDOWN, "\n".join(prose).strip(), ""))
     return cells, languages

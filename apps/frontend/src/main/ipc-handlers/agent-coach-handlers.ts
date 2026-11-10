@@ -20,6 +20,17 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	buildProfile,
+	checkTask,
+	exportProfile,
+	getProfile,
+	importProfile,
+	readPreferences,
+	readProjectPath,
+	readSpec,
+	setPreferences,
+} from "../agent-coach/coach-profile";
 
 interface RunRequest {
 	projectPath: string;
@@ -140,5 +151,32 @@ export function registerAgentCoachHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.AGENT_COACH_CANCEL, () => {
 		killExisting();
 		return true;
+	});
+
+	registerCoachProfileHandlers();
+}
+
+/** The personal style profile (#376): every argument is checked here, then by the runner. */
+function registerCoachProfileHandlers(): void {
+	const project = (raw: unknown): string => {
+		const projectPath = readProjectPath(raw);
+		if (!projectPath) throw new Error("projectPath is required");
+		return projectPath;
+	};
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_GET, (_event, raw: unknown) => getProfile(project(raw)));
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_BUILD, (_event, raw: unknown) => buildProfile(project(raw)));
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_SET, (_event, raw: unknown) => {
+		const projectPath = project(raw);
+		const preferences = readPreferences((raw as { preferences?: unknown }).preferences);
+		if (!preferences) throw new Error("Invalid preferences");
+		return setPreferences(projectPath, preferences);
+	});
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_EXPORT, (_event, raw: unknown) => exportProfile(project(raw)));
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_IMPORT, (_event, raw: unknown) => importProfile(project(raw)));
+	ipcMain.handle(IPC_CHANNELS.COACH_PROFILE_CHECK, (_event, raw: unknown) => {
+		const projectPath = project(raw);
+		const spec = readSpec(raw);
+		if (!spec) throw new Error("Invalid task");
+		return checkTask(projectPath, spec);
 	});
 }

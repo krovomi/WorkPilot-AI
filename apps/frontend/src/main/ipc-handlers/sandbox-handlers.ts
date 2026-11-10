@@ -1,11 +1,13 @@
 /**
  * Sandbox IPC Handlers
  *
- * Spawns the Python sandbox runner which performs a dry-run diff of
- * uncommitted changes against HEAD and produces a SimulationResult.
+ * Spawns the Python sandbox runner, which produces a SimulationResult in one
+ * of two modes: the uncommitted changes of the project (git diff HEAD), or,
+ * when a spec is named, a rehearsal of that spec's implementation plan over
+ * the files of a git ref (apps/backend/simulation).
  *
  * Channels:
- *   invoke "sandbox:run"     → { projectPath }
+ *   invoke "sandbox:run"     → { projectPath, specId?, baseRef? }
  *   invoke "sandbox:cancel"  → void
  *
  * Renderer events:
@@ -15,14 +17,59 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { findSpecDir } from "./bounty-board-handlers";
 
 interface RunRequest {
 	projectPath: string;
+	specId?: string;
+	baseRef?: string;
+}
+
+// Same rule as the runner's: a ref, never an option disguised as one.
+const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._/@{}~^-]{0,199}$/;
+
+/**
+ * The runner arguments for a request from the renderer, revalidated here.
+ *
+ * The renderer only offers projects and specs that exist, but this is the one
+ * place every call goes through: a relative project path, a spec id that names
+ * no spec folder of that project, or a ref that starts with a dash is refused
+ * before any process starts.
+ */
+export function buildSandboxArgs(runnerPath: string, request: unknown): string[] {
+	const { projectPath, specId, baseRef } = (request ?? {}) as Partial<RunRequest>;
+	if (typeof projectPath !== "string" || !projectPath || !path.isAbsolute(projectPath)) {
+		throw new Error("projectPath is required");
+	}
+	if (!fs.existsSync(projectPath) || !fs.statSync(projectPath).isDirectory()) {
+		throw new Error("projectPath is not a folder");
+	}
+	const args = [runnerPath, "--project-path", projectPath];
+	if (specId === undefined || specId === "") return args;
+	if (typeof specId !== "string") throw new Error("specId must be a string");
+	const specDir = findSpecDir(projectPath, specId);
+	if (!specDir) throw new Error(`No spec named ${specId} in this project`);
+	args.push("--spec-dir", specDir);
+	const ref = typeof baseRef === "string" && baseRef.trim() ? baseRef.trim() : "HEAD";
+	if (!SAFE_REF.test(ref)) throw new Error(`Not a git ref: ${ref}`);
+	args.push("--base-ref", ref);
+	return args;
+}
+
+/** The runner prints its error as JSON; older runners printed plain text. */
+function readErrorLine(raw: string): string {
+	try {
+		const parsed = JSON.parse(raw);
+		return typeof parsed === "string" ? parsed : raw;
+	} catch {
+		return raw;
+	}
 }
 
 const EVENT_PREFIX = "SANDBOX_EVENT:";
@@ -45,14 +92,8 @@ export function registerSandboxHandlers(): void {
 		}
 	};
 
-	ipcMain.handle(IPC_CHANNELS.SANDBOX_RUN, async (_event, { projectPath }: RunRequest) => {
+	ipcMain.handle(IPC_CHANNELS.SANDBOX_RUN, async (_event, request: unknown) => {
 		killExisting();
-
-		if (!projectPath) {
-			const message = "projectPath is required";
-			broadcast(IPC_CHANNELS.SANDBOX_ERROR, message);
-			throw new Error(message);
-		}
 
 		const backendPath = app.isPackaged
 			? path.resolve(process.resourcesPath, "backend")
@@ -63,11 +104,20 @@ export function registerSandboxHandlers(): void {
 			"sandbox_runner.py",
 		);
 
+		let args: string[];
+		try {
+			args = buildSandboxArgs(runnerPath, request);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			broadcast(IPC_CHANNELS.SANDBOX_ERROR, message);
+			throw err instanceof Error ? err : new Error(message);
+		}
+
 		const pythonExe = await requirePythonPath();
 
 		const child = spawn(
 			pythonExe,
-			[runnerPath, "--project-path", projectPath],
+			args,
 			{
 				cwd: backendPath,
 				env: await pythonRunnerEnv(backendPath),
@@ -102,7 +152,7 @@ export function registerSandboxHandlers(): void {
 						console.error("[Sandbox] Bad result line:", err);
 					}
 				} else if (line.startsWith(ERROR_PREFIX)) {
-					errorMessage = line.slice(ERROR_PREFIX.length);
+					errorMessage = readErrorLine(line.slice(ERROR_PREFIX.length));
 				}
 			}
 		});

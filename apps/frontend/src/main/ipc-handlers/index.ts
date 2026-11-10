@@ -44,11 +44,11 @@ import {
 import { registerArenaHandlers } from "./arena-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
-import { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
+import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 import { registerClaudeCodeHandlers } from "./claude-code-handlers";
-import { registerComplianceHandlers } from "./compliance-handlers";
+import { registerComplianceHandlers, startComplianceSchedule } from "./compliance-handlers";
 import {
 	registerCodeMigrationHandlers,
 	setupCodeMigrationEventForwarding,
@@ -551,9 +551,11 @@ export function setupIpcHandlers(
 
 	// Carbon Profiler handlers (energy and CO2 footprint)
 	registerCarbonProfilerHandlers();
+	startCarbonBudgetSchedule();
 
-	// Compliance Evidence Collector handlers (SOC2, ISO 27001)
+	// Compliance evidence collector (SOC 2, ISO 27001, HIPAA, PCI DSS) and its monthly report
 	registerComplianceHandlers();
+	startComplianceSchedule();
 
 	// API Watcher handlers (OpenAPI/GraphQL/Protobuf breaking change detection)
 	registerApiWatcherHandlers();

@@ -14,7 +14,7 @@ Two report formats are understood:
 
 Three modes: ``scan`` reads the reports already in the project (the runs
 kept by ``run`` included), ``run`` runs the project's test command N times
-(``flaky_test_detective.suite_runs``) and analyses those runs, ``detect``
+(``suite_runner.runs``) and analyses those runs, ``detect``
 lists the test commands the project's stack has.
 
 Output protocol (one JSON value per line, prefixed):
@@ -36,11 +36,12 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
+from flaky_test_detective.enrich import enrich_report  # noqa: E402
 from flaky_test_detective.flaky_analyzer import (  # noqa: E402
     FlakyAnalyzer,
     TestRun,
 )
-from flaky_test_detective.suite_runs import (  # noqa: E402
+from suite_runner.runs import (  # noqa: E402
     COMMAND_IDS,
     HISTORY_DIR,
     TestCommand,
@@ -373,11 +374,19 @@ def _build_report(
         }
     analyzer = FlakyAnalyzer(flakiness_threshold=threshold, min_runs=min_runs)
     report = analyzer.analyze(runs)
+    flaky = [_flaky_test_to_dict(t) for t in report.flaky_tests]
+    enrich_report(
+        project_path,
+        flaky,
+        runs,
+        [c["id"] for c in detected],
+        keep_history=mode == "run",
+    )
     return {
         **base,
         "totalTests": report.total_tests_analysed,
         "flakyCount": report.flaky_count,
-        "flakyTests": [_flaky_test_to_dict(t) for t in report.flaky_tests],
+        "flakyTests": flaky,
         "alwaysFailing": _always_failing(runs, min_runs),
         "summaryCode": "flaky" if report.flaky_count else "no_flaky",
         "summary": report.summary,
@@ -442,8 +451,13 @@ def run_repeated(
     threshold: float,
     min_runs: int,
     timeout_s: float,
+    only: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Run the suite ``runs`` times and analyse those runs together."""
+    """Run the suite ``runs`` times and analyse those runs together.
+
+    ``only`` runs the tests named and nothing else: the suspects of a suite
+    too long to run in full several times.
+    """
     command = _pick_command(project_path, command_id)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     history = project_path / HISTORY_DIR / stamp
@@ -476,6 +490,7 @@ def run_repeated(
             # The first run built the solution; the others test that build.
             no_build=produced > 0,
             report_globs=REPORT_GLOBS,
+            only=only or (),
         )
         if outcome.error:
             raise RunError(f"start_failed: {outcome.error}")
@@ -520,11 +535,25 @@ def run_repeated(
         report_count=produced,
     )
     result["command"] = command.command
+    result["only"] = len(only or [])
     _emit_event(
         "complete",
         {"flakyCount": result["flakyCount"], "totalTests": result["totalTests"]},
     )
     return result
+
+
+def _only(raw: str) -> list[str]:
+    """The test names of ``--only``: strings, 50 at most; anything else is refused."""
+    if not raw:
+        return []
+    try:
+        names = json.loads(raw)
+    except ValueError as exc:
+        raise RunError("bad_only: --only is not a JSON list") from exc
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise RunError("bad_only: --only is not a list of test names")
+    return [n[:300] for n in names if n.strip()][:50]
 
 
 def main() -> None:
@@ -559,6 +588,11 @@ def main() -> None:
         default=2,
         help="Minimum runs needed to assess flakiness",
     )
+    parser.add_argument(
+        "--only",
+        default="",
+        help="Run mode: a JSON list of the test names to run, nothing else",
+    )
     args = parser.parse_args()
 
     project_path = Path(args.project_path)
@@ -571,6 +605,7 @@ def main() -> None:
             commands = [c.to_dict() for c in detect_test_commands(project_path)]
             _emit("FLAKY_RESULT", {"detectedCommands": commands})
             return
+        only = _only(args.only)
         if args.mode == "run":
             result = run_repeated(
                 project_path,
@@ -579,6 +614,7 @@ def main() -> None:
                 threshold=args.threshold,
                 min_runs=args.min_runs,
                 timeout_s=max(10.0, args.timeout),
+                only=only,
             )
         else:
             result = run_scan(project_path, args.threshold, args.min_runs)

@@ -309,6 +309,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # The verification loop's record and its re-run. Desktop-only like
         # docintel; the re-run launches the app and agents (`agent.execute`).
         "verify": "qa",
+        # The red team's record and a fresh attack. Desktop-only like verify;
+        # the run opens an agent session (`agent.execute`).
+        "red_team": "qa",
         "workflow_profile": "task",
         "slash_commands": "agent",
         "virtual_reviewer": "review",
@@ -323,6 +326,9 @@ FEATURE_DOMAINS: MappingProxyType[str, str] = MappingProxyType(
         # project's machine-local tooling; the router is desktop-only.
         "worktree_recipe": "settings",
         "providers": "settings",
+        # The schema guard's record and a re-check of the task's migrations.
+        # Desktop-only like verify; files and git only, no agent.
+        "schema_guard": "qa",
     }
 )
 
@@ -389,6 +395,7 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "docintel",
         "uiux",
         "verify",
+        "red_team",
         "workflow_profile",
         "slash_commands",
         "virtual_reviewer",
@@ -400,6 +407,7 @@ LOCAL_ONLY_FEATURES: frozenset[str] = frozenset(
         "event_hooks",
         "notifications",
         "worktree_recipe",
+        "schema_guard",
     }
 )
 

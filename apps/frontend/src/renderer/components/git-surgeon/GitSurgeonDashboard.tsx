@@ -3,6 +3,8 @@ import type React from "react";
 import { useTranslation } from "react-i18next";
 import type { SurgeryPlan } from "../../../shared/types/git-surgeon";
 import { useGitSurgeonStore } from "../../stores/git-surgeon-store";
+import { GitBranchesPanel } from "./GitBranchesPanel";
+import { GitRewritePanel } from "./GitRewritePanel";
 import {
 	CharterButton,
 	Chip,
@@ -93,6 +95,7 @@ export function GitSurgeonDashboard({
 						{t("gitSurgeon:errors.failed", { error })}
 					</Notice>
 				)}
+				{projectPath && <GitRewritePanel projectPath={projectPath} />}
 				{plan ? (
 					<ReportBody plan={plan} />
 				) : (
@@ -104,6 +107,7 @@ export function GitSurgeonDashboard({
 						</div>
 					)
 				)}
+				{projectPath && <GitBranchesPanel projectPath={projectPath} />}
 			</Page>
 		</ModuleStage>
 	);

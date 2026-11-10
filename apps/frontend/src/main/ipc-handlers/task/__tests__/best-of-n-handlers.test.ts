@@ -18,6 +18,9 @@ const state = vi.hoisted(() => ({
 	reply: (_args: string[]): unknown => ({ error: "no reply set" }),
 	task: undefined as unknown,
 	project: undefined as unknown,
+	envs: [] as unknown[],
+	arbiterEngine: { provider: "google", model: "model-g" },
+	pendingArbiter: false,
 }));
 
 vi.mock("electron", () => ({
@@ -51,7 +54,14 @@ vi.mock("../../../python-detector", () => ({
 	parsePythonCommand: (p: string) => [p, []],
 }));
 vi.mock("../../../utils/python-runner-env", () => ({
-	pythonRunnerEnv: async () => ({ PATH: "/usr/bin" }),
+	pythonRunnerEnv: async (_backend: string, extra: Record<string, string>) => {
+		state.envs.push(extra);
+		return { PATH: "/usr/bin", ...extra };
+	},
+}));
+vi.mock("../../../services/page-llm-config", () => ({
+	getPageFeatureSettings: () => state.arbiterEngine,
+	getPageProviderEnv: () => ({ ARBITER_KEY_NAME: "set" }),
 }));
 vi.mock("../../../project-store", () => ({
 	projectStore: { invalidateTasksCache: vi.fn() },
@@ -59,8 +69,10 @@ vi.mock("../../../project-store", () => ({
 vi.mock("../../../app-logger", () => ({ appLog: { debug: vi.fn(), warn: vi.fn() } }));
 
 import {
+	arbiterEngineArgs,
 	isBestOfNVariant,
 	parseRunnerOutput,
+	sanitizeQuestion,
 	readState,
 	registerBestOfNHandlers,
 	sanitizeEngines,
@@ -126,7 +138,21 @@ function backend(spec: string) {
 		if (command === "prepare") {
 			next = { parent: spec, phase: "running", createdAt: "now", variants: variants(spec) };
 		} else if (command === "rank") {
-			next = { ...current, phase: "ranked" };
+			next = {
+				...current,
+				phase: "ranked",
+				...(state.pendingArbiter && { arbiter: { status: "pending" } }),
+			};
+		} else if (command === "arbitrate") {
+			next = { ...current, arbiter: { status: "done", choice: `${spec}-bon1`, thread: [] } };
+		} else if (command === "challenge") {
+			const question = args[args.indexOf("--question") + 1];
+			next = {
+				...current,
+				arbiter: { ...current.arbiter, thread: [{ at: "t", question, answer: "because" }] },
+			};
+		} else if (command === "arbiter-metrics") {
+			return { metrics: [{ month: "2026-11", arbitrations: 1 }] };
 		} else if (command === "adopt") {
 			next = { ...current, phase: "adopted" };
 		} else {
@@ -177,6 +203,9 @@ describe("best-of-N handlers", () => {
 		state.task = { id: spec, specId: spec, projectId: "p1", status: "backlog" };
 		agents.running.clear();
 		agents.started = [];
+		state.envs = [];
+		state.pendingArbiter = false;
+		state.arbiterEngine = { provider: "google", model: "model-g" };
 		vi.useFakeTimers({ toFake: ["setTimeout"] });
 	});
 	afterEach(() => {
@@ -265,6 +294,83 @@ describe("best-of-N handlers", () => {
 		const adopted = await call(IPC_CHANNELS.TASK_BEST_OF_N_ADOPT, spec, `${spec}-bon2`);
 		expect(adopted.success).toBe(true);
 		expect(state.runs.at(-1)).toEqual(expect.arrayContaining(["adopt", "--variant", `${spec}-bon2`]));
+	});
+
+	it("keeps the arbiter's engine and the person's question to what the runner accepts", () => {
+		expect(arbiterEngineArgs({ provider: "google", model: "gemini-x" })).toEqual([
+			"--provider",
+			"google",
+			"--model",
+			"gemini-x",
+		]);
+		expect(arbiterEngineArgs({ provider: "../x", model: "a b" })).toEqual([]);
+		expect(arbiterEngineArgs({ provider: "", model: "" })).toEqual([]);
+		expect(sanitizeQuestion("  Why not B?\u0007 ")).toBe("Why not B?");
+		expect(sanitizeQuestion("")).toBeNull();
+		expect(sanitizeQuestion("x".repeat(1001))).toBeNull();
+		expect(sanitizeQuestion(42)).toBeNull();
+	});
+
+	it("asks the arbiter after the ranking when the variants diverge, with its page's engine", async () => {
+		state.pendingArbiter = true;
+		await drive(call(IPC_CHANNELS.TASK_BEST_OF_N_START, spec, ENGINES));
+		agents.end(`${spec}-bon1`, 0);
+		agents.end(`${spec}-bon2`, 0);
+		vi.useRealTimers();
+		await settle();
+		await settle();
+		expect(state.runs.map((args) => args[1])).toEqual(["prepare", "rank", "arbitrate"]);
+		expect(state.runs.at(-1)).toEqual(
+			expect.arrayContaining(["--provider", "google", "--model", "model-g"]),
+		);
+		expect(state.envs.at(-1)).toEqual({ ARBITER_KEY_NAME: "set" });
+		expect(readState(specDir)?.arbiter?.status).toBe("done");
+		// Advice only: nothing adopted.
+		expect(state.runs.some((args) => args[1] === "adopt")).toBe(false);
+	});
+
+	it("does not ask the arbiter when the ranking says it is not needed", async () => {
+		await drive(call(IPC_CHANNELS.TASK_BEST_OF_N_START, spec, ENGINES));
+		agents.end(`${spec}-bon1`, 0);
+		agents.end(`${spec}-bon2`, 0);
+		vi.useRealTimers();
+		await settle();
+		expect(state.runs.map((args) => args[1])).toEqual(["prepare", "rank"]);
+	});
+
+	it("questions a verdict only when there is one, with a bounded question", async () => {
+		vi.useRealTimers();
+		writeFileSync(
+			path.join(specDir, "best_of_n.json"),
+			JSON.stringify({ parent: spec, phase: "ranked", createdAt: "x", variants: variants(spec) }),
+		);
+		const none = await call(IPC_CHANNELS.TASK_BEST_OF_N_CHALLENGE, spec, "Why?");
+		expect(none).toMatchObject({ success: false, error: expect.stringMatching(/no verdict/) });
+
+		const asked = await call(IPC_CHANNELS.TASK_BEST_OF_N_ARBITRATE, spec);
+		expect(asked.success).toBe(true);
+		const empty = await call(IPC_CHANNELS.TASK_BEST_OF_N_CHALLENGE, spec, "   ");
+		expect(empty).toMatchObject({ success: false, error: expect.stringMatching(/1 to 1000/) });
+
+		const answered = await call(IPC_CHANNELS.TASK_BEST_OF_N_CHALLENGE, spec, "Why not B?");
+		expect(answered.success).toBe(true);
+		expect(state.runs.at(-1)).toEqual(expect.arrayContaining(["challenge", "--question", "Why not B?"]));
+		expect(readState(specDir)?.arbiter?.thread?.[0]?.answer).toBe("because");
+	});
+
+	it("refuses to arbitrate an unranked run, and reads the track record", async () => {
+		vi.useRealTimers();
+		writeFileSync(
+			path.join(specDir, "best_of_n.json"),
+			JSON.stringify({ parent: spec, phase: "running", createdAt: "x", variants: variants(spec) }),
+		);
+		const early = await call(IPC_CHANNELS.TASK_BEST_OF_N_ARBITRATE, spec);
+		expect(early).toMatchObject({ success: false, error: expect.stringMatching(/Rank/) });
+		const metrics = (await call(IPC_CHANNELS.TASK_BEST_OF_N_ARBITER_METRICS, spec)) as unknown as {
+			success: boolean;
+			data: unknown[];
+		};
+		expect(metrics).toEqual({ success: true, data: [{ month: "2026-11", arbitrations: 1 }] });
 	});
 
 	it("stops the builds before discarding", async () => {

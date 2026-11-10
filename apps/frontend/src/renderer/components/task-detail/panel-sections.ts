@@ -8,7 +8,7 @@
  * | Tab | Answers | Cards |
  * |---|---|---|
  * | **Progress** (Avancement) | where is the task, and what does it need from me to move on? | spec interview and execution formula (prerequisites), the agent's question, the human review (plan approval included), the CI pipeline, the PR follow-through, the task itself, goal mode, Best-of-N, the MCP Apps views of the build |
- * | **Quality** (Qualité) | is what was built right? | JEV second opinion, spec traceability, UI/UX design system, visual review (OCR), verification loop |
+ * | **Quality** (Qualité) | is what was built right? | JEV second opinion, spec traceability, UI/UX design system, visual review (OCR), verification loop, red team |
  * | **Costs & context** (Coûts et contexte) | what does it cost, and what do the agents read and remember? | workflow profile (what the effort level buys), attachments and ADRs, hermes learning, shared brain, rtk savings |
  *
  * The other tabs of the panel (Subtasks, Logs, Files, Change graph, Visual
@@ -44,6 +44,8 @@ export type PanelCardId =
 	| "uiux"
 	| "visualReview"
 	| "verifyLoop"
+	| "schemaGuard"
+	| "redTeam"
 	// Costs & context
 	| "workflowProfile"
 	| "documents"
@@ -65,7 +67,7 @@ export const PANEL_CARDS: Readonly<Record<PanelSectionId, readonly PanelCardId[]
 		"bestOfN",
 		"mcpApps",
 	],
-	quality: ["jev", "traceability", "uiux", "visualReview", "verifyLoop"],
+	quality: ["jev", "traceability", "uiux", "visualReview", "verifyLoop", "schemaGuard", "redTeam"],
 	costs: ["workflowProfile", "documents", "hermes", "brain", "rtk"],
 };
 

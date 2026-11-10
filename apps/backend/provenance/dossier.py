@@ -22,7 +22,7 @@ answer already exists somewhere in the task, in a file a feature writes:
 (`pr_block`). A part whose source is absent is recorded as absent, never
 guessed; building the dossier never fails a build or a PR. It holds paths,
 counts, package names, verdicts and model names only: no code, no prompt, no
-secret. `evidence_sources` hands the same facts to `compliance_collector`.
+secret. The compliance collector reads `dossier.json` as evidence of a change.
 """
 
 from __future__ import annotations
@@ -44,7 +44,6 @@ __all__ = [
     "SBOM_FILE",
     "build_dossier",
     "dossier_markdown",
-    "evidence_sources",
     "pr_block",
     "purl",
     "write_dossier",
@@ -435,57 +434,3 @@ def write_dossier(
         logger.warning("[provenance] dossier not written: %s", exc)
         return None
     return dossier
-
-
-def evidence_sources(dossier: dict) -> dict:
-    """The dossier as `compliance_collector` sources: change log, code review,
-    security scan and test results, each only when the dossier has it."""
-    from compliance_collector import EvidenceType
-
-    task = dossier.get("task") or ""
-    sources: dict = {
-        EvidenceType.CHANGE_LOG: [
-            {
-                "description": f"{task}: {dossier.get('base', '')[:12]}..{dossier.get('head', '')[:12]}",
-                "source": f"provenance/{DOSSIER_FILE}",
-                "changed_files": dossier.get("changed_files", 0),
-            }
-        ]
-    }
-    if dossier.get("attribution"):
-        sources[EvidenceType.CODE_REVIEW] = [
-            {
-                "description": _attribution_text(dossier["attribution"]),
-                "source": "agent-trace",
-                **dossier["attribution"],
-            }
-        ]
-    security = []
-    if dossier.get("dependencies"):
-        security.append(
-            {
-                "description": f"dependency guard: {dossier['dependencies']['status']}",
-                "source": "dependency_guard.json",
-            }
-        )
-    if dossier.get("sbom") is not None:
-        security.append(
-            {
-                "description": f"SBOM of the diff: {len(dossier['sbom']['components'])} component(s)",
-                "source": f"provenance/{SBOM_FILE}",
-            }
-        )
-    if security:
-        sources[EvidenceType.SECURITY_SCAN] = security
-    gates = dossier.get("gates") or {}
-    tests = [r for r in gates.get("results") or [] if r["gate"].startswith("tests-")]
-    if tests:
-        sources[EvidenceType.TEST_RESULTS] = [
-            {
-                "description": f"{r['gate']}: {_held(r['held'])}",
-                "source": "hard_gates.json",
-                **r,
-            }
-            for r in tests
-        ]
-    return sources

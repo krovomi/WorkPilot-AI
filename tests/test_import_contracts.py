@@ -50,6 +50,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # The API contract watcher (docs/architecture/api-contract-watcher.md):
+    # git through foundation; the consumer registry is read in the main
+    # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,
+    # its PR section read by core.
+    "api_watcher": {"foundation", "security"},
     # Agent Trace attribution (docs/architecture/agent-trace.md): git through
     # foundation, the records in the spec directory. A leaf the coder session,
     # the write hooks and the PR body read.
@@ -58,19 +63,29 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
     "mutation_gate": {"foundation", "security"},
+    # The schema guard (docs/architecture/schema-guard.md): migration rules
+    # over text, git through foundation. The QA gate that calls it is in qa.
+    "schema_guard": {"foundation"},
+    "doc_drift_detector": {"doc_languages", "foundation"},
+    # The red team (docs/architecture/red-team.md): the mutation gate's scratch
+    # copy, scope and test commands, the suite runner and its reports, git
+    # through foundation. Its session and the card's route are in qa
+    # (qa/red_team_gate.py, qa/red_team_api.py), which imports it.
+    "red_team": {"foundation", "mutation_gate", "security", "suite_runner"},
+    # A suite run with its machine report, for the flaky detective and the
+    # red team: the platform's command splitting, the child environment.
+    "suite_runner": {"foundation", "security"},
     # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
     # the plan's references, the Agent Trace records and the test conventions.
     # The build and the traceability route read it.
     "requirement_trace": {"foundation", "agent_trace"},
     # The provenance dossier of a PR (docs/architecture/provenance.md): it
-    # reads what Agent Trace, the dependency guard and the build recorded, and
-    # hands it to the compliance collector. The PR body (core) reads it.
-    "provenance": {
-        "foundation",
-        "agent_trace",
-        "dependency_guard",
-        "compliance_collector",
-    },
+    # reads what Agent Trace, the dependency guard and the build recorded.
+    # The PR body (core) and the compliance collector read it.
+    "provenance": {"foundation", "agent_trace", "dependency_guard"},
+    # The compliance evidence collector (docs/architecture/compliance-evidence.md):
+    # the records the tasks left, read as files, and git through foundation.
+    "compliance_collector": {"foundation"},
     # MCP tool pins (docs/architecture/mcp-pins.md): the fingerprints, the
     # poisoning scan and the project's pins file; the desktop route reads the
     # API helpers of foundation. Probing a server is core's (mcp_pinning).
@@ -109,8 +124,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Server mode is mounted by provider_api; it reaches nothing back.
     "server": set(),
     # Model and provider per phase: the catalogue, the provider chosen in the
-    # UI, and the complexity router.
-    "phase_config": {"models_registry", "provider_selection", "scheduling"},
+    # UI, the complexity router, and the carbon budget's degraded mode
+    # (carbon_profiler.budget steps a flagship down).
+    "phase_config": {
+        "carbon_profiler",
+        "models_registry",
+        "provider_selection",
+        "scheduling",
+    },
+    # The carbon profiler: the ledger, its estimates and the budget; model tiers
+    # from the registry. phase_config calls it, so it never imports it back.
+    "carbon_profiler": {"foundation", "models_registry"},
     "harness": {
         "agents",
         "context_mgmt",

@@ -49,7 +49,9 @@
 		"runScan": "Analyser les rapports existants",
 		"cancel": "Annuler",
 		"scanning": "Analyse en cours...",
-		"reset": "Réinitialiser"
+		"reset": "Réinitialiser",
+		"fix": "Corriger sur une carte",
+		"quarantine": "Mettre en quarantaine sur une carte"
 	},
 	"progress": {
 		"discovering": "Recherche des rapports de tests…",
@@ -85,5 +87,73 @@
 		"report": "Rapport"
 	},
 	"reportTitle": "Tests instables trouvés",
-	"emptyReportTitle": "Aucun rapport pour l'instant"
+	"emptyReportTitle": "Aucun rapport pour l'instant",
+	"verdict": {
+		"likely_bug": "Échoue dans plus de 80 % des passages : plus probablement un vrai bug qu'un test instable.",
+		"flaky": "Échoue dans 20 % des passages ou plus : instabilité confirmée.",
+		"rare": "Échoue rarement (moins de 20 % des passages) : relancez-le pour confirmer."
+	},
+	"verdictShort": {
+		"likely_bug": "bug probable",
+		"flaky": "instable",
+		"rare": "rare"
+	},
+	"inCode": "Ce que montre son code",
+	"history": {
+		"firstSeen": "Vu la première fois le {{date}}",
+		"trend": {
+			"new": "Première analyse",
+			"worse": "Pire que la dernière fois",
+			"better": "Mieux que la dernière fois",
+			"same": "Comme la dernière fois"
+		},
+		"systems": "Échoue sur {{systems}}",
+		"ciOnly": "Échoue seulement en CI, jamais en local : regardez ce que la CI change (moins de processeurs, conteneurs, jobs en parallèle, horloge).",
+		"ciOnlyShort": "CI seulement"
+	},
+	"suspects": {
+		"hint": "Suite trop longue pour tout relancer ? Ne relancez que ces tests.",
+		"rerun": "Relancer les {{count}} suspects",
+		"ranOnly": "Ce passage n'a gardé que {{count}} test(s) suspect(s)."
+	},
+	"quarantine": {
+		"pytest": "Marquer le test `@pytest.mark.xfail(reason=\"flaky: <lien vers cette carte>\", strict=False)` pour qu'il tourne toujours sans faire échouer la suite, et déclarer un marqueur `quarantine` si le projet liste ses marqueurs.",
+		"vitest": "Déplacer le test dans un fichier `*.quarantine.test.ts` exclu du `vitest run` par défaut (l'`exclude` de la config) et lancé par une étape de CI séparée, non bloquante.",
+		"jest": "Déplacer le test dans un fichier `*.quarantine.test.js` écarté par `testPathIgnorePatterns` et lancé par une étape de CI séparée, non bloquante.",
+		"js": "Déplacer le test dans un fichier que la commande de test par défaut écarte, lancé par une étape de CI séparée, non bloquante.",
+		"dotnet": "Ajouter la catégorie du framework (`[Trait(\"Category\", \"Quarantine\")]` pour xUnit, `[Category(\"Quarantine\")]` pour NUnit, `[TestCategory(\"Quarantine\")]` pour MSTest), l'exclure de l'étape de CI bloquante (`--filter Category!=Quarantine`) et la lancer dans une étape séparée, non bloquante.",
+		"jvm": "Étiqueter le test `@Tag(\"quarantine\")` (JUnit 5), exclure l'étiquette du build bloquant (`excludedGroups` de Surefire, `excludeTags` de Gradle) et la lancer dans un job séparé, non bloquant.",
+		"go": "Sauter le test sauf si `QUARANTINE=1` (`if os.Getenv(\"QUARANTINE\") == \"\" { t.Skip(\"flaky: <lien>\") }`) et lancer `QUARANTINE=1 go test -run` dans une étape de CI séparée, non bloquante.",
+		"rust": "Marquer le test `#[ignore = \"flaky: <lien>\"]` et lancer `cargo test -- --ignored` dans une étape de CI séparée, non bloquante.",
+		"ruby": "Étiqueter l'exemple `:quarantine`, l'exclure du passage bloquant (`--tag ~quarantine`) et le lancer dans une étape séparée, non bloquante.",
+		"php": "Mettre le test dans un groupe `quarantine` (`#[Group('quarantine')]`), l'exclure du passage bloquant (`--exclude-group quarantine`) et le lancer dans une étape séparée, non bloquante.",
+		"swift": "Déplacer le test dans un plan de test ou un scheme séparé que la CI lance sans bloquer.",
+		"dart": "Étiqueter le test `quarantine`, l'exclure du passage bloquant (`--exclude-tags quarantine`) et le lancer dans une étape séparée, non bloquante.",
+		"elixir": "Étiqueter le test `@tag :quarantine`, l'exclure dans `test_helper.exs` et lancer `mix test --only quarantine` dans une étape séparée, non bloquante.",
+		"other": "Utiliser le moyen propre au framework de test pour que le test tourne dans une suite séparée, non bloquante, hors de la suite bloquante."
+	},
+	"task": {
+		"test": "Test :",
+		"where": "Où :",
+		"seenInCode": "Son code montre : {{cause}}",
+		"lastAuthor": "Modifié en dernier par {{author}}",
+		"diagnosis": "Diagnostic",
+		"howTo": "Comment",
+		"rules": "Règles",
+		"created": "Carte créée : {{title}}.",
+		"open": "L'ouvrir sur le tableau",
+		"failed": "La carte n'a pas pu être créée.",
+		"fix": {
+			"title": "Corriger le test instable {{name}}",
+			"intro": "Ce test passe et échoue sur le même code. Trouver pourquoi et le rendre déterministe.",
+			"rules": "Corriger la cause, pas le symptôme : ni saut du test, ni relance, et un délai plus long seul n'est pas une correction.\nLe test doit toujours échouer quand le comportement qu'il vérifie casse.\nSi le test révèle un vrai bug (il échoue presque à chaque fois), corriger le code, pas le test.",
+			"criteria": "{{name}} passe 10 fois de suite.\n{{name}} échoue toujours quand le comportement qu'il vérifie est cassé.\nLe reste de la suite reste vert."
+		},
+		"quarantine": {
+			"title": "Mettre en quarantaine le test instable {{name}}",
+			"intro": "Ce test passe et échoue sur le même code. En attendant sa correction, le garder en exécution sans bloquer la CI.",
+			"rules": "Le test continue de tourner, dans une suite séparée qui ne bloque pas la CI : il n'est ni supprimé ni vidé.\nLa quarantaine cite cette carte, pour être levée une fois le test corrigé.\nRien d'autre ne change dans la suite bloquante.",
+			"criteria": "{{name}} ne bloque plus la CI.\n{{name}} tourne toujours, dans la suite de quarantaine.\nLe reste de la suite reste vert."
+		}
+	}
 }

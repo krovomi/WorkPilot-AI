@@ -21,6 +21,12 @@ class NotebookIssueType(str, Enum):
     LONG_CELL = "long_cell"
     NO_MARKDOWN = "no_markdown"
     SENSITIVE_OUTPUT = "sensitive_output"
+    USED_BEFORE_DEFINED = "used_before_defined"
+    UNDEFINED_NAME = "undefined_name"
+    HIDDEN_STATE = "hidden_state"
+    IMPLICIT_GLOBAL = "implicit_global"
+    SHARED_MUTATION = "shared_mutation"
+    DUPLICATE_CODE = "duplicate_code"
 
 
 @dataclass

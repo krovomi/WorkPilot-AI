@@ -19,10 +19,11 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F182](../audit/findings/F182.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
-Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab. N'écrivent rien
+Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab, les fonctions
+et le nettoyage des notebooks ([notebook-agent.md](notebook-agent.md)). N'écrivent rien
 dans le projet : la traduction inter-langages (dossier temporaire), les extraits contextuels
 (copie), le playground, le compagnon, les analyses (accessibilité, i18n, dérive de doc,
-notebooks, git surgeon), le générateur de pipelines (`.workpilot/pipelines/`). Le mode serveur
+exécution des notebooks, git surgeon), le générateur de pipelines (`.workpilot/pipelines/`). Le mode serveur
 n'offre aucune de ces pages.
 
 ## Le mécanisme
@@ -74,6 +75,10 @@ Par page :
   reste dans le projet (il ne l'était pas : `path.join` sans contrôle). Les images collées
   attendent dans `.workpilot/changelog-assets/` et rejoignent le commit sous `.github/assets/`.
   Un projet du serveur garde son journal sur le serveur, sans fichier ni branche.
+- **Détecteur de dérive de doc** (#354) : « Corriger N sur une carte de revue » lance
+  `doc_drift_runner.py --fix` dans le worktree (`main/doc-drift/fix-run.ts`) : paramètre renommé
+  dans son commentaire de doc, type de docstring, chemin d'un fichier déplacé, refaits seulement
+  s'ils sont encore là ; `docs: N drift fixes`. Aucune carte quand rien n'a changé.
 - **Pair programming** (lot 3) : l'agent codeur reçoit le worktree de la carte comme
   `--project-dir` ; ses outils n'écrivent donc que là. À la fin de la session (terminée,
   arrêtée ou en erreur), ce qu'il a écrit est commité : `feat: <objectif> (pair programming)`.
@@ -95,6 +100,9 @@ Par page :
   affiche seulement sa réponse. Une commande à la fois par projet. `/help` est répondu par la barre
   à partir de la liste ; `/review` a des instructions que tout provider exécute
   (`slash_commands.api._BUILT_IN_BODIES`). La route `POST /api/slash-commands/run` n'existe plus.
+- **Analyse i18n** (#346) : « Traduire les clés manquantes » lance `i18n_runner.py --translate`
+  dans le worktree (`main/i18n-agent/translate-run.ts`) ; `feat(i18n): N missing translations
+  (fr, de)`. Aucune carte quand aucune traduction n'est gardée. Voir [i18n-agent](i18n-agent.md).
 
 ## Ce que le mécanisme refuse
 

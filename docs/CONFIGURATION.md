@@ -206,6 +206,7 @@ in French, by [server-operations.md](server-operations.md).
 | `WORKPILOT_RUN_ISOLATION` | `required` | Each run is confined by Landlock to its own clone, its project's home (`REPOS_ROOT/.run-homes/<project>`) and its own temp directory; other projects and the server's state are out of its reach. Needs Linux 5.13+ with Landlock enabled (Docker 23+ allows it) and a server that does not run as root. Where it cannot be enforced, runs fail with the reason. `off` runs them unconfined: only for a deployment where every user may read every project. See [server-mode.md](architecture/server-mode.md#ce-quun-run-voit-sur-le-disque). |
 | `WORKPILOT_WS_URL` | `ws://127.0.0.1:8765` | Where the API pushes board events (projects, specs, runs) to the streaming WebSocket server. Change it only when that server is not on the API's loopback. |
 | `WORKPILOT_GITLAB_HOSTS` | — | Self-hosted GitLab instances (comma-separated host names, e.g. `git.acme.test`) whose projects show their GitLab views, relayed with each person's own GitLab token. gitlab.com is always one. A project cloned from any other host shows none: its owner chose that URL, and a member's token is never sent to a host the operator did not name. |
+| `WORKPILOT_SENTRY_HOSTS` | — | Self-hosted Sentry instances (comma-separated host names) that a « production incident » automation may read with each person's own Sentry token. sentry.io and its regional hosts are always allowed. A rule naming any other host fails before anything is sent. |
 
 Sign-in, invitations and email have their own variables, after
 [Quotas](#quotas).
@@ -442,11 +443,16 @@ environment wins:
 | `WORKPILOT_QA_RECURRING_THRESHOLD` | 8 | Occurrences of the same issue, across passes, that make QA escalate to a human. Bounded by the budget; a value below 2 or that is not a number falls back to 8. |
 | `WORKPILOT_QA_LIGHT` | 1 | `0` reviews every task in full, text-only and small code changes included (see *Text-only changes* below). |
 | `WORKPILOT_QA_TARGETED` | 1 | `0` turns the targeted QA off alone: small code changes get the full review (see *Small code changes* below). |
+| `WORKPILOT_QA_SCHEMA_GUARD` | `warn` | The schema guard after QA ([schema-guard.md](architecture/schema-guard.md)): what the task's migrations do to a live database (data loss, renames, NOT NULL without default, an applied migration edited; PostgreSQL locks, type changes, a missing down), on every stack. `warn` shows the findings without blocking; `strict` sends an error back to the fixer with the expand/contract plan; `off` switches it off, and the hard gate `migration-safe` then reads unknown. A workflow that declares `migration-safe` runs it `strict`. Any other value reads as `warn`. |
 | `WORKPILOT_QA_RECHECK` | 1 | `0` turns the re-review by delta off: from the second QA pass on, the reviewer no longer checks the fixer's delta first ([docs/architecture/qa-recheck.md](architecture/qa-recheck.md)). |
 | `WORKPILOT_LEARNING_LOOP_MODEL` | 1 | `0` turns off the learning loop's model analysis (after each build and from its dashboard): only the rule-based patterns remain. On, it makes one completion on the selected provider, whichever it is. |
 | `WORKPILOT_QA_MIN_COVERAGE` | 100 | Minimum coverage, in percent, of the `unit` **and** `integration` tests; `e2e` below it only warns. `0` disables the gate. Clamped to 0–100; a value that is not a number falls back to 100. |
+| `WORKPILOT_QA_API_CONTRACT` | `warn` | The API contract watcher after QA ([api-contract-watcher.md](architecture/api-contract-watcher.md)): `warn` records the contract changes and lists them in the PR body; `strict` also sends a breaking change the contract does not acknowledge back to the fixer; `off` stops it. Any other value reads as `warn`. |
+| `WORKPILOT_QA_DOC_DRIFT` | `warn` | The documentation drift detector after QA ([docs-and-drift.md](architecture/docs-and-drift.md)): `warn` logs the doc comments, documents and examples the task's change left behind; `strict` also sends a high one (a parameter the code no longer has, an example importing or calling what no longer exists) back to the fixer; `off` stops it. Any other value reads as `warn`. |
 | `WORKPILOT_QA_MIN_MUTATION` | unset | The mutation gate `tests-bite` ([mutation-gate.md](architecture/mutation-gate.md)): minimum share, in percent, of the mutants planted in the lines the task wrote that its tests catch. Unset: the gate runs only for workflows that declare `tests-bite` (the `test` workflow), at 60. Above `0`: it runs for every task at that threshold. `0` switches it off; the hard gate then reads unknown, never a pass. A value that is not a number falls back to 60. |
+| `WORKPILOT_QA_RED_TEAM` | `complex` | The red team after QA ([red-team.md](architecture/red-team.md)): `complex` attacks the tasks whose spec was assessed complex, `always` every task that changed source code, `off` never (the hard gate `attack-resistant` then reads unknown). A workflow that declares `attack-resistant` runs it unless `off`. Any other value reads as `complex`. |
 | `WORKPILOT_DEPENDENCY_GUARD` | 1 | `0` switches off the dependency guard (a package the task added must exist on its registry, see [dependency-guard.md](architecture/dependency-guard.md)); the hard gate `deps-exist` then reads unknown, never a pass. |
+| `WORKPILOT_TOOL_RESULT_GUARD` | `warn` | The tool result guard ([tool-result-guard.md](architecture/tool-result-guard.md)): `warn` passes a flagged result on fenced, behind a warning; `block` also withholds a result rated blocked; `off` stops the scan. Any other value reads as `warn`. |
 
 ### Review budget
 
@@ -550,6 +556,16 @@ it is missing, the Claude provider's commands run without isolation and the task
 `Sandbox (claude): commands are NOT isolated: … socat … install it with …`. On Debian, Ubuntu or
 WSL: `sudo apt install bubblewrap socat`, then start the task again. The reason line names the
 command of the package manager found on the machine (apt, dnf, pacman, zypper, apk).
+
+## Guardrails (`security/guardrail_policy.py`)
+
+Rules on what agents may not write or run, read in three layers from the main project, worktrees
+included: global, the versioned `workpilot.policy.yaml`, then `.workpilot/guardrails.yaml` (what
+Settings → Guardrails writes). See [architecture/guardrails.md](architecture/guardrails.md).
+
+| Variable | Default | Meaning |
+| --- | ---: | --- |
+| `WORKPILOT_GUARDRAILS_GLOBAL` | `~/.workpilot/guardrails.yaml` | The global layer: rules for every project of this machine. A later layer cannot weaken them. |
 
 ## Automatic split of big tasks (`task_split`)
 
@@ -792,7 +808,7 @@ message. WorkPilot's own integrations read other names, in the last column.
 | `brave-search` | `BRAVE_API_KEY` | — |
 | `jira` | `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` | `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` |
 | `azure-devops` | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_TOKEN` | `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PAT` |
-| `sentry` | `SENTRY_AUTH_TOKEN` | — (error reporting uses `SENTRY_DSN`) |
+| `sentry` | `SENTRY_AUTH_TOKEN` | the same, for the « production incident » automation (the project's root `.env` or `.workpilot/.env`); on a server, each person's Sentry token. The app's own error reporting uses `SENTRY_DSN` |
 | `slack` | `SLACK_BOT_TOKEN` | — |
 | `postman` | `POSTMAN_API_KEY` | — |
 | `teams` | `TEAMS_WEBHOOK_URL` | the same, for notifications |

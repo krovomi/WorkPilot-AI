@@ -22,6 +22,8 @@ import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import {
 	FLAKY_COMMAND_IDS,
+	FLAKY_MAX_NAME,
+	FLAKY_MAX_ONLY,
 	FLAKY_MAX_RUNS,
 	FLAKY_MIN_RUNS,
 	type DetectedTestCommand,
@@ -47,6 +49,7 @@ export interface CheckedRunRequest {
 	mode: "scan" | "run";
 	runs: number;
 	commandId: FlakyCommandId | "auto";
+	only: string[];
 }
 
 /**
@@ -76,11 +79,20 @@ export function checkRunRequest(raw: unknown): CheckedRunRequest {
 	) {
 		throw new Error("unknown test command");
 	}
+	const rawOnly = req.only ?? [];
+	if (
+		!Array.isArray(rawOnly) ||
+		rawOnly.length > FLAKY_MAX_ONLY ||
+		!rawOnly.every((name) => typeof name === "string" && name.trim() && name.length <= FLAKY_MAX_NAME)
+	) {
+		throw new Error("only must be a short list of test names");
+	}
 	return {
 		projectPath,
 		mode,
 		runs,
 		commandId: commandId as FlakyCommandId | "auto",
+		only: mode === "run" ? [...new Set(rawOnly as string[])] : [],
 	};
 }
 
@@ -96,6 +108,8 @@ export function runnerArgs(req: CheckedRunRequest): string[] {
 			"--command-id",
 			req.commandId,
 		);
+		// Test names travel as one JSON argument, never as options of their own.
+		if (req.only.length) args.push("--only", JSON.stringify(req.only));
 	}
 	return args;
 }
@@ -189,7 +203,7 @@ export function registerFlakyTestsHandlers(): void {
 		if (remote) {
 			const options =
 				req.mode === "run"
-					? { mode: "run", runs: req.runs, command_id: req.commandId }
+					? { mode: "run", runs: req.runs, command_id: req.commandId, only: req.only }
 					: {};
 			return relayServerAnalysis(remote, "flaky-tests", options, {
 				event: IPC_CHANNELS.FLAKY_TESTS_EVENT,

@@ -44,9 +44,9 @@ _HOST = re.compile(
 )
 
 
-def _gitlab_hosts(value: str) -> tuple[str, ...]:
-    """gitlab.com and the hosts listed, lowercased; a malformed one is left out."""
-    hosts = ["gitlab.com"]
+def _hosts(value: str, default: str, variable: str) -> tuple[str, ...]:
+    """``default`` and the hosts listed, lowercased; a malformed one is left out."""
+    hosts = [default]
     for raw in value.split(","):
         host = raw.strip().lower()
         if not host:
@@ -54,10 +54,13 @@ def _gitlab_hosts(value: str) -> tuple[str, ...]:
         if _HOST.match(host) and host not in hosts:
             hosts.append(host)
         else:
-            logger.warning(
-                "Ignoring invalid host in WORKPILOT_GITLAB_HOSTS: %r", raw[:100]
-            )
+            logger.warning("Ignoring invalid host in %s: %r", variable, raw[:100])
     return tuple(hosts)
+
+
+def _gitlab_hosts(value: str) -> tuple[str, ...]:
+    """gitlab.com and the hosts listed, lowercased; a malformed one is left out."""
+    return _hosts(value, "gitlab.com", "WORKPILOT_GITLAB_HOSTS")
 
 
 def _stream_url(value: str) -> str:
@@ -113,6 +116,11 @@ class ServerSettings:
     # token: gitlab.com and the hosts listed (comma-separated). A project
     # cloned from any other host shows no GitLab views.
     gitlab_hosts: tuple[str, ...]
+
+    # The Sentry instances a « production incident » rule reads with a
+    # person's token: sentry.io (and its regional hosts) and the self-hosted
+    # hosts listed (comma-separated). A rule naming any other host fails.
+    sentry_hosts: tuple[str, ...]
 
     # Notifications to the mobile app through Expo's push service
     # (exp.host), which hands them to Apple and Google. Off by default: the
@@ -187,6 +195,11 @@ class ServerSettings:
                 os.environ.get("WORKPILOT_PUBLIC_STREAM_URL", "")
             ),
             gitlab_hosts=_gitlab_hosts(os.environ.get("WORKPILOT_GITLAB_HOSTS", "")),
+            sentry_hosts=_hosts(
+                os.environ.get("WORKPILOT_SENTRY_HOSTS", ""),
+                "sentry.io",
+                "WORKPILOT_SENTRY_HOSTS",
+            ),
             push_enabled=_env_bool("WORKPILOT_PUSH_ENABLED", False),
             needs_you_enabled=_env_bool("WORKPILOT_NEEDS_YOU_ENABLED", False),
             invitation_ttl_hours=_env_int("WORKPILOT_INVITATION_TTL_HOURS", 72),

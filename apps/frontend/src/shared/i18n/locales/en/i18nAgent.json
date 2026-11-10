@@ -14,8 +14,11 @@
 		"unused_key": "Unused key",
 		"inconsistent_interpolation": "Inconsistent interpolation",
 		"missing_plural": "Missing plural",
-		"inconsistent_params": "Inconsistent parameters",
-		"locale_file_mismatch": "Catalog mismatch"
+		"inconsistent_params": "Placeholders differ",
+		"locale_file_mismatch": "Catalog mismatch",
+		"orphan_key": "Orphan key",
+		"untranslated": "Not translated",
+		"rtl_side": "Right-to-left"
 	},
 	"search": {
 		"placeholder": "Search issues...",
@@ -31,7 +34,7 @@
 		"noProject": "Select a project before running a scan.",
 		"failed": "Scan failed: {{error}}"
 	},
-	"description": "Finds hard-coded UI text (JSX, Vue, Angular, Razor, XAML, Flutter, SwiftUI, Compose, Android layouts…) and compares every locale with the reference one, whatever the catalog format: JSON, RESX, ARB, XLIFF, Android strings.xml, iOS .strings, gettext, .properties, Rails YAML, Laravel.",
+	"description": "Finds hard-coded interface text on every stack and proposes a key in the project's own style, compares each locale with the reference whatever the catalog format (JSON, RESX, ARB, XLIFF, Android strings.xml, iOS .strings, gettext, .properties, Rails YAML, Laravel), and reports orphan keys, copies, placeholders, plural forms per language and right-to-left layout. Missing keys can be translated by the active model on a review card.",
 	"emptyTitle": "No scan yet",
 	"filesScanned": "Files scanned",
 	"localesTitle": "Locales",
@@ -39,6 +42,75 @@
 	"allTypes": "All",
 	"kickers": {
 		"coverage": "Coverage",
-		"issues": "Issues"
-	}
+		"issues": "Issues",
+		"completeness": "Completeness"
+	},
+	"completeness": {
+		"title": "Translated, locale by locale",
+		"description": "Keys translated out of the keys each locale needs. A sentence copied from the reference unchanged does not count; plural forms a language does not use are left out.",
+		"present": "{{present}} of {{total}} keys present",
+		"missing_one": "{{count}} missing",
+		"missing_other": "{{count}} missing",
+		"untranslated_one": "{{count}} copied from the reference",
+		"untranslated_other": "{{count}} copied from the reference",
+		"rtl": "Right to left"
+	},
+	"translate": {
+		"action_one": "Translate {{count}} missing key on a review card",
+		"action_other": "Translate {{count}} missing keys on a review card",
+		"running": "Translating…",
+		"note": "The active text model translates them; a translation that loses a placeholder or a tag is dropped. Nothing is written into the project folder: the keys go to a review card with its own branch.",
+		"serverOnly": "A server project's catalogs are not on this computer: translate them from a local clone.",
+		"done_one": "{{count}} translation added on the review card (branch {{branch}}). Review the diff, then open the pull request from the card.",
+		"done_other": "{{count}} translations added on the review card (branch {{branch}}). Review the diff, then open the pull request from the card.",
+		"nothing": "No translation was kept: nothing was written and the card was removed.",
+		"noModel": "No text model answered: check the provider in Settings. Nothing was written.",
+		"rejected_one": "{{count}} answer was dropped (placeholder, tag or no answer).",
+		"rejected_other": "{{count}} answers were dropped (placeholder, tag or no answer).",
+		"skipped_one": "{{count}} key is left for a next run.",
+		"skipped_other": "{{count}} keys are left for a next run.",
+		"notWritable_one": "{{count}} catalog is in a format WorkPilot does not write (YAML, XLIFF, gettext, PHP): {{files}}.",
+		"notWritable_other": "{{count}} catalogs are in a format WorkPilot does not write (YAML, XLIFF, gettext, PHP): {{files}}.",
+		"failed": "Translation failed: {{error}}"
+	},
+	"messages": {
+		"hardcoded_string": "Hard-coded text: “{{text}}”",
+		"missing_key": "{{key}} is missing in {{locale}}",
+		"unused_key": "{{key}} is in {{locale}} but not in the reference locale",
+		"inconsistent_params": "The placeholders of {{key}} differ from the reference: {{text}}",
+		"plural_forms": "{{locale}} lacks plural forms of {{key}}: {{text}}",
+		"missing_plural_many": "{{locale}} has no _many form: recent i18next and ICU use it for large round numbers",
+		"orphan_key": "No source file uses {{key}}",
+		"orphan_key_possibly": "No source file names {{key}}, but some keys are built at run time: check before deleting it",
+		"untranslated": "{{key}} is the reference text unchanged: “{{text}}”",
+		"rtl_side": "{{text}} does not mirror for {{locales}}",
+		"locale_file_mismatch": "{{key}}: the catalogs of {{locale}} do not match the reference"
+	},
+	"suggestions": {
+		"add": "Add {{key}} to the catalog, then replace the text with the call below",
+		"reuse": "The catalog already has this text: use {{key}}",
+		"missing_key": "Translate it, or use the translation button above",
+		"unused_key": "Remove it, or add it to the reference locale",
+		"inconsistent_params": "Write exactly the reference's placeholders",
+		"plural_forms": "Add the forms {{text}}",
+		"missing_plural_many": "Add _many next to _other where a count can reach a million",
+		"orphan_key": "Remove it from every locale, or use it",
+		"untranslated": "Translate it into {{locale}}",
+		"rtl_side": "Use {{logical}}",
+		"rtl_side_generic": "Use a logical property (start / end)",
+		"locale_file_mismatch": "Align the catalog with the reference"
+	},
+	"proposal": {
+		"key": "Key",
+		"value": "Value",
+		"snippet": "Call",
+		"copy": "Copy",
+		"copied": "Copied",
+		"copyKey": "Copy the key",
+		"copySnippet": "Copy the call",
+		"reused": "Existing key",
+		"possibly": "Maybe used"
+	},
+	"showMore_one": "Show {{count}} more",
+	"showMore_other": "Show {{count}} more"
 }

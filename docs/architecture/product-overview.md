@@ -96,7 +96,7 @@ it, inside its hub. The hubs are listed in
 | `mission-control` | Mission Control | Workspace | — |  |
 | `phase35-hub` | Advanced Features | Workspace | — |  |
 | `session-history` | Session History | Workspace › Agent history | — |  |
-| `agent-coach` | Personal Agent Coach | Agents | — |  |
+| `agent-coach` | Personal Agent Coach | Agents | [agent-coach.md](agent-coach.md) |  |
 | `agent-debugger` | Agent Debugger | Workspace › Agent history | — | yes |
 | `agent-replay` | Agent Replay | Workspace › Agent history | — | yes |
 | `arena-mode` | Arena Mode | Agents › Arena | [arena.md](arena.md) |  |
@@ -155,14 +155,14 @@ it, inside its hub. The hubs are listed in
 | `injection-guard` | Injection Guard | Toolbox › Quality and security | — |  |
 | `mcp-marketplace` | MCP Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `migration` | Code Migration | Toolbox | — |  |
-| `notebook-agent` | Notebook Checks | Toolbox | — | yes |
+| `notebook-agent` | Notebook Checks | Toolbox | [notebook-agent.md](notebook-agent.md) |  |
 | `offline-mode` | Offline Mode | Toolbox | [offline-mode.md](offline-mode.md) |  |
 | `onboarding-agent` | Onboarding Pack | Development › Onboarding | — |  |
 | `pipeline-generator` | Pipeline Generator | Toolbox | — | yes |
 | `plugin-marketplace` | Plugin Marketplace | Toolbox › MCP tools | [marketplaces.md](marketplaces.md) |  |
 | `prompt-optimizer` | Prompt Optimizer | Toolbox | — |  |
 | `regression-guardian` | Regression Guardian | Toolbox | — | yes |
-| `sandbox` | Change Preview | Toolbox › API | — |  |
+| `sandbox` | Dry Run | Toolbox › API | [plan-rehearsal.md](plan-rehearsal.md) |  |
 | `team-bot` | Team Bot (Slack/Teams) | Toolbox | — | yes |
 | `voice-control` | Voice Assistant | Toolbox | [voice-assistant.md](voice-assistant.md) |  |
 | `administration` | Administration | Administration, in server mode for an administrator | — |  |

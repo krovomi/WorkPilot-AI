@@ -208,6 +208,9 @@ def record_session_usage(
             output_tokens,
             cache_creation_input_tokens,
             cache_read_input_tokens,
+            spec_id,
+            phase,
+            agent_type,
         )
     except Exception as exc:
         logger.warning("[usage_tracker] carbon-ledger write failed: %s", exc)
@@ -448,12 +451,12 @@ def _update_dashboard_snapshot(
 
 
 # ---------------------------------------------------------------------------
-# Destination 4: carbon-ledger.json  (consumed by carbon_profiler_runner.py)
+# Destination 4: carbon-ledger.json  (read by carbon_profiler.ledger)
 # ---------------------------------------------------------------------------
 
 # Providers whose inference runs on local/consumer hardware rather than a
-# hyperscale data centre. Used to pick the ComputeSource in the ledger so the
-# EnergyTracker applies the right grid-intensity multiplier.
+# hyperscale data centre. The ledger's ``source`` tells the carbon estimate to
+# use the machine's power and grid instead of a data centre's.
 _LOCAL_PROVIDERS = {"ollama", "local", "lmstudio", "llamacpp", "llama.cpp"}
 
 
@@ -485,12 +488,16 @@ def _carbon_record(
     cache_creation_input_tokens: int,
     cache_read_input_tokens: int,
     timestamp: str,
+    task: str = "",
+    phase: str = "",
+    agent: str = "",
 ) -> dict:
-    """Build one carbon-ledger entry in the shape the runner ingests.
+    """Build one carbon-ledger entry in the shape ``carbon_profiler.ledger`` reads.
 
-    All input-side tokens (fresh + cache creation + cache read) are counted as
-    ``tokens_in`` because they are all processed by the model — cache reads are
-    cheaper to bill but still consume compute.
+    ``tokens_in`` counts every input-side token (fresh, cache creation, cache
+    read), and ``cache_read`` says how many of them came from the cache, which
+    costs far less compute. Task, phase and agent let the report break the
+    footprint down.
     """
     return {
         "source": _classify_carbon_source(provider),
@@ -500,6 +507,10 @@ def _carbon_record(
         + int(cache_creation_input_tokens)
         + int(cache_read_input_tokens),
         "tokens_out": int(output_tokens),
+        "cache_read": int(cache_read_input_tokens),
+        "task": task,
+        "phase": phase,
+        "agent": agent,
         "timestamp": timestamp,
     }
 
@@ -512,10 +523,13 @@ def _append_carbon_ledger(
     output_tokens: int,
     cache_creation_input_tokens: int = 0,
     cache_read_input_tokens: int = 0,
+    task: str = "",
+    phase: str = "",
+    agent: str = "",
 ) -> None:
     """Append one usage record to ``<root>/.workpilot/carbon-ledger.json``.
 
-    The ledger is a flat JSON array (see carbon_profiler_runner.py).
+    The ledger is a flat JSON array (see carbon_profiler/ledger.py).
     """
     root = _resolve_carbon_ledger_root(project_dir)
     ledger_path = root / ".workpilot" / "carbon-ledger.json"
@@ -541,6 +555,9 @@ def _append_carbon_ledger(
                 cache_creation_input_tokens,
                 cache_read_input_tokens,
                 datetime.now(UTC).isoformat(),
+                task,
+                phase,
+                agent,
             )
         )
         _atomic_write(ledger_path, json.dumps(ledger, indent=2))
@@ -598,6 +615,9 @@ def backfill_carbon_ledger_from_cost_data(project_dir: Path) -> int:
                     cache_creation,
                     cache_read,
                     timestamp,
+                    str(usage.get("task_id") or ""),
+                    str(usage.get("phase") or ""),
+                    str(usage.get("agent_type") or ""),
                 )
             )
 
