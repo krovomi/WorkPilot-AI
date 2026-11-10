@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "WorkPilot AI",
 		"slug": "workpilot-ai",
-		"version": "1.4.1",
+		"version": "1.5.0",
 		"scheme": "workpilot",
 		"orientation": "default",
 		"icon": "./assets/icon.png",
