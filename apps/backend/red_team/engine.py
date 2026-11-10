@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import re
 import subprocess
 import tempfile
@@ -49,8 +48,6 @@ from .reports import (
     read_reports,
 )
 from .surface import Surface, attack_surface
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "MANIFEST",

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from accessibility_agent import AccessibilityScanner, WcagLevel
+from accessibility_agent import AccessibilityScanner
 from accessibility_agent.contrast import (
     Tokens,
     contrast_ratio,

@@ -39,7 +39,7 @@ INPUT_WEIGHT = 0.10
 CACHE_READ_WEIGHT = 0.02
 LOCAL_TOKEN_FACTOR = 3.0
 DEFAULT_LOCAL_POWER_W = 150.0
-_unused_CPU_ONLY_POWER_W = 45.0
+CPU_ONLY_POWER_W = 45.0
 
 # gCO₂e per kWh, location-based yearly averages (Ember, IEA), rounded.
 GRID_INTENSITY: dict[str, float] = {
