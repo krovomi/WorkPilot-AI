@@ -33,5 +33,96 @@
 		"messy_commits": "Commits brouillons",
 		"force_push_risk": "Risque de force push",
 		"duplicate_commits": "Commits en double"
+	},
+	"rewrite": {
+		"kicker": "Réécriture",
+		"title": "Nettoyer l'historique de la branche",
+		"hint": "Regroupe les correctifs, reformule les messages selon la convention du projet et découpe les commits qui mêlent plusieurs parties du projet. Le résultat est une nouvelle branche locale dont les fichiers sont exactement ceux de la branche : votre branche, son dépôt distant et ses tags restent tels quels, rien n'est poussé.",
+		"base": "Commencer après",
+		"basePlaceholder": "là où la branche a quitté main",
+		"ai": "Rédiger les messages avec le modèle configuré",
+		"prepare": "Préparer la réécriture",
+		"planning": "Lecture des commits de la branche…",
+		"applying": "Rejeu de l'historique sur une nouvelle branche…",
+		"failed": "La réécriture s'est arrêtée : {{error}}",
+		"done": "Branche {{branch}} créée : {{commits}} commits, exactement les fichiers de {{source}}. Lisibilité {{before}} % → {{after}} %. Rien n'a été poussé : vérifiez-la, puis poussez-la ou renommez-la vous-même.",
+		"apply": "Créer la branche nettoyée",
+		"restore": "Revenir au plan proposé",
+		"applyHint": "Votre branche n'est jamais réécrite sur place.",
+		"commitsBefore": "Commits aujourd'hui",
+		"commitsAfter": "Commits après",
+		"readabilityBefore": "Lisibilité aujourd'hui",
+		"readabilityAfter": "Lisibilité après",
+		"convention": "Convention : {{kind}} ({{source}})",
+		"byModel_one": "{{count}} message rédigé par le modèle, les autres par règles",
+		"byModel_other": "{{count}} messages rédigés par le modèle, les autres par règles",
+		"byRules": "messages rédigés par règles, hors ligne",
+		"before": "Avant · {{branch}}",
+		"after": "Après",
+		"files_one": "{{count}} fichier",
+		"files_other": "{{count}} fichiers",
+		"message": "Message du commit",
+		"edit": "Modifier le message",
+		"closeEdit": "Terminé",
+		"keepAsIs": "Garder tel quel"
+	},
+	"conventions": {
+		"conventional": "Conventional Commits",
+		"gitmoji": "Gitmoji",
+		"custom": "le motif du projet"
+	},
+	"conventionSources": {
+		"project": ".workpilot/git-surgeon.json",
+		"commitlint": "configuration commitlint",
+		"gitmoji": "configuration gitmoji",
+		"history": "lue dans l'historique",
+		"default": "par défaut"
+	},
+	"warnings": {
+		"signed": "{{count}} commits signés changent de sha : leurs signatures disparaissent (git signe les nouveaux avec votre clé si la signature est configurée).",
+		"pushed": "Ces commits sont déjà sur {{remotes}}. Les y remplacer demanderait un push forcé, ce que WorkPilot ne fait jamais : l'historique nettoyé reste sur la nouvelle branche locale.",
+		"merges": "La plage contient {{count}} commits de fusion : choisissez un départ après {{after}} pour réécrire la suite."
+	},
+	"kinds": {
+		"keep": "Gardé",
+		"reword": "Reformulé",
+		"squash": "Regroupé",
+		"split": "Découpé"
+	},
+	"reasons": {
+		"autosquash": "fixup! rattaché",
+		"fixups": "correctifs regroupés",
+		"vague": "message vague",
+		"convention": "hors convention",
+		"mixed": "mêle plusieurs parties"
+	},
+	"branches": {
+		"kicker": "Branches",
+		"title": "Branches locales à ranger",
+		"default": "branche par défaut {{branch}}",
+		"refresh": "Actualiser",
+		"delete_one": "Supprimer {{count}} branche fusionnée",
+		"delete_other": "Supprimer {{count}} branches fusionnées",
+		"deleteHint": "Seules les branches locales déjà fusionnées dans la branche par défaut peuvent être supprimées ({{count}} en ce moment) ; les branches distantes ne sont jamais touchées.",
+		"deleted_one": "{{count}} branche supprimée",
+		"deleted_other": "{{count}} branches supprimées",
+		"refused": {
+			"unknown": "introuvable",
+			"in_use": "utilisée",
+			"not_merged": "pas fusionnée",
+			"git_refused": "refusée par git"
+		},
+		"choose": "Choisir {{name}}",
+		"suggest": "→ {{name}}",
+		"current": "actuelle",
+		"merged": "fusionnée",
+		"gone": "distante supprimée",
+		"stale": "{{days}} jours"
+	},
+	"history": {
+		"title": "Ce que le chirurgien a fait",
+		"month": "Mois",
+		"runs": "Passages",
+		"readability": "Lisibilité"
 	}
 }
