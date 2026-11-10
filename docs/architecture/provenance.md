@@ -33,9 +33,9 @@ names only: no code, no prompt, no secret.
   refused.
 - The PR body carries a folded `<details>` block of four lines: attribution,
   dependencies added and the guard's verdict, each gate, the verification.
-- The compliance scan (`runners/compliance_runner.py`) reads the 20 most recent
-  dossiers into its evidence: change log, code review (attribution), security
-  scan (guard and SBOM), test results (the `tests-*` gates).
+- The compliance collector (`compliance_collector/evidence.py`) reads each
+  task's dossier as a dated change; the review, gates and guard records it
+  reads from the task itself ([compliance-evidence.md](compliance-evidence.md)).
 
 Building the dossier never fails a build or a PR: a git or disk error leaves
 the body as it was.

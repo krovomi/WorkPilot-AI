@@ -1,0 +1,83 @@
+# ISO/IEC 27001:2022, Annex A (numbering of ISO/IEC 27002:2022).
+# See soc2.yaml for the format.
+id: iso27001
+name: ISO/IEC 27001
+version: "2022"
+controls:
+  - id: A.5.1
+    title: {en: Policies for information security, fr: Politiques de sécurité de l'information}
+    evidence: [[policy]]
+    max_age_days: 365
+    recommendation:
+      en: Keep the security policy in the repository (SECURITY.md, docs/policies/) and review it every year.
+      fr: Garder la politique de sécurité dans le dépôt (SECURITY.md, docs/policies/) et la relire chaque année.
+  - id: A.5.15
+    title: {en: Access control, fr: Contrôle d'accès}
+    evidence: [[access]]
+    max_age_days: 365
+    recommendation:
+      en: Declare code ownership in CODEOWNERS and require their review.
+      fr: Déclarer les propriétaires du code dans CODEOWNERS et exiger leur revue.
+  - id: A.5.26
+    title: {en: Response to information security incidents, fr: Réponse aux incidents de sécurité de l'information}
+    evidence: [[incident, procedure]]
+    max_age_days: 365
+    recommendation:
+      en: Record incidents and their root cause in .workpilot/incidents/ or docs/postmortems/.
+      fr: Consigner les incidents et leur cause dans .workpilot/incidents/ ou docs/postmortems/.
+  - id: A.8.8
+    title: {en: Management of technical vulnerabilities, fr: Gestion des vulnérabilités techniques}
+    evidence: [[security], [security_config]]
+    max_age_days: 30
+    recommendation:
+      en: Keep a vulnerability scanner configured and let QA check each task's dependencies.
+      fr: Garder un scanner de vulnérabilités configuré et laisser la QA vérifier les dépendances de chaque tâche.
+  - id: A.8.9
+    title: {en: Configuration management, fr: Gestion de la configuration}
+    evidence: [[change]]
+    max_age_days: 90
+    recommendation:
+      en: Keep the configuration in git so that each change is dated and attributed.
+      fr: Garder la configuration dans git pour que chaque changement soit daté et attribué.
+  - id: A.8.16
+    title: {en: Monitoring activities, fr: Activités de surveillance}
+    evidence: [[monitoring]]
+    max_age_days: 365
+    recommendation:
+      en: Version the monitoring and alerting configuration with the code.
+      fr: Versionner la configuration de supervision et d'alerte avec le code.
+  - id: A.8.25
+    title: {en: Secure development life cycle, fr: Cycle de développement sécurisé}
+    evidence: [[spec_approval], [code_review], [security]]
+    max_age_days: 90
+    recommendation:
+      en: Approve each spec before its build and keep the QA security checks on.
+      fr: Approuver chaque spec avant sa construction et garder les contrôles de sécurité de la QA.
+  - id: A.8.28
+    title: {en: Secure coding, fr: Codage sécurisé}
+    evidence: [[code_review]]
+    max_age_days: 30
+    recommendation:
+      en: Let the QA reviewer sign off each task.
+      fr: Laisser le relecteur QA valider chaque tâche.
+  - id: A.8.29
+    title: {en: Security testing in development and acceptance, fr: Tests de sécurité en développement et en recette}
+    evidence: [[tests], [security]]
+    max_age_days: 30
+    recommendation:
+      en: Keep the tests and the red team in the QA of each task.
+      fr: Garder les tests et la red team dans la QA de chaque tâche.
+  - id: A.8.31
+    title: {en: Separation of development, test and production, fr: Séparation des environnements de développement, de test et de production}
+    evidence: [[deployment]]
+    max_age_days: 365
+    recommendation:
+      en: Version the deployment pipeline and its environments.
+      fr: Versionner le pipeline de déploiement et ses environnements.
+  - id: A.8.32
+    title: {en: Change management, fr: Gestion des changements}
+    evidence: [[change, merge], [spec_approval, code_review]]
+    max_age_days: 30
+    recommendation:
+      en: Merge changes through reviewed pull requests built from approved specs.
+      fr: Fusionner les changements par des pull requests relues, construites depuis des specs approuvées.

@@ -1,12 +1,19 @@
 """
-Compliance Runner
+Compliance Runner (#357)
 
-Walks a project to collect evidence for a compliance framework (SOC2
-or ISO 27001), mapping discovered artifacts to control types.
+The audit evidence of a project, judged against a framework's controls
+(`compliance_collector/`), with no model.
+
+    --frameworks                 the frameworks and the project's choice
+    --framework soc2 [--period 2026-10] [--save]
+                                 one report (the month to date by default)
+    --monthly                    the missing reports of the month just ended
+    --list | --load NAME         the saved reports
+    --config FILE                save the project's choice (a JSON file)
 
 Output protocol (one JSON object per line, prefixed):
     COMPLIANCE_EVENT:{"type": "progress", "data": {"status": "..."}}
-    COMPLIANCE_RESULT:{...full report dict...}
+    COMPLIANCE_RESULT:{...}
     COMPLIANCE_ERROR:<message>
 """
 
@@ -14,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,20 +29,19 @@ from typing import Any
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from compliance_collector.evidence_collector import (  # noqa: E402
-    ComplianceFramework,
-    EvidenceCollector,
-    EvidenceType,
+from compliance_collector import (  # noqa: E402
+    list_reports,
+    load_config,
+    load_frameworks,
+    load_report,
+    make_report,
+    month_period,
+    run_monthly,
+    save_config,
+    save_report,
 )
 
-FRAMEWORK_ALIASES = {
-    "SOC2": ComplianceFramework.SOC2,
-    "ISO_27001": ComplianceFramework.ISO_27001,
-    "HIPAA": ComplianceFramework.HIPAA,
-    "PCI_DSS": ComplianceFramework.PCI_DSS,
-    "GDPR": ComplianceFramework.GDPR,
-    "CCPA": ComplianceFramework.CCPA,
-}
+MAX_CONFIG_BYTES = 16 * 1024
 
 
 def _emit(prefix: str, payload: Any) -> None:
@@ -47,261 +52,92 @@ def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("COMPLIANCE_EVENT", {"type": event_type, "data": data})
 
 
-def _discover_files(root: Path, patterns: list[str]) -> list[Path]:
-    found: list[Path] = []
-    for pattern in patterns:
-        for path in root.glob(pattern):
-            if path.is_file():
-                found.append(path)
-    return found
-
-
-def _evidence_entry(source: str, description: str) -> dict[str, Any]:
-    return {"source": source, "description": description}
-
-
-def _collect_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, Any]]]:
-    sources: dict[EvidenceType, list[dict[str, Any]]] = {}
-
-    code_reviews = _discover_files(
-        project_path,
-        [".github/CODEOWNERS", ".github/pull_request_template.md", "CODE_REVIEW*.md"],
-    )
-    if code_reviews:
-        sources[EvidenceType.CODE_REVIEW] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Code review artifact")
-            for p in code_reviews
-        ]
-
-    security_scans = _discover_files(
-        project_path,
-        [
-            "**/dependabot.yml",
-            ".github/dependabot.yml",
-            "**/.snyk",
-            "**/trivy*.yaml",
-            "**/.semgrep*",
-            "SECURITY.md",
-            "renovate.json",
-            ".github/renovate.json",
-            ".github/workflows/codeql*.yml",
-            "sonar-project.properties",
-            ".gitleaks.toml",
-        ],
-    )
-    if security_scans:
-        sources[EvidenceType.SECURITY_SCAN] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Security scan config")
-            for p in security_scans
-        ]
-
-    access_logs = _discover_files(
-        project_path,
-        [
-            ".github/CODEOWNERS",
-            "CODEOWNERS",
-            "docs/CODEOWNERS",
-            ".gitlab/CODEOWNERS",
-            ".github/workflows/*.yml",
-            "docs/access*.md",
-        ],
-    )
-    if access_logs:
-        sources[EvidenceType.ACCESS_LOG] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Access policy artifact")
-            for p in access_logs
-        ]
-
-    change_logs = _discover_files(
-        project_path,
-        ["CHANGELOG.md", "CHANGES.md", "CHANGELOG.txt", "docs/changelog*.md"],
-    )
-    if not change_logs and (project_path / ".git").exists():
-        try:
-            out = subprocess.run(  # noqa: S603
-                ["git", "log", "--oneline", "-20"],
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                sources[EvidenceType.CHANGE_LOG] = [
-                    _evidence_entry("git-log", "Recent commit history"),
-                ]
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
-    elif change_logs:
-        sources[EvidenceType.CHANGE_LOG] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Changelog")
-            for p in change_logs
-        ]
-
-    policies = _discover_files(
-        project_path,
-        [
-            "SECURITY.md",
-            "PRIVACY.md",
-            "TERMS.md",
-            "LICENSE",
-            "docs/policies/*.md",
-            "docs/security/*.md",
-        ],
-    )
-    if policies:
-        sources[EvidenceType.POLICY_DOCUMENT] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Policy document")
-            for p in policies
-        ]
-
-    deploys = _discover_files(
-        project_path,
-        [
-            ".github/workflows/deploy*.yml",
-            ".github/workflows/release*.yml",
-            ".gitlab-ci.yml",
-            "azure-pipelines.yml",
-            "bitbucket-pipelines.yml",
-            "Jenkinsfile",
-            ".circleci/config.yml",
-            "Dockerfile",
-            "docker-compose*.yml",
-            "compose*.yaml",
-        ],
-    )
-    if deploys:
-        sources[EvidenceType.DEPLOYMENT_LOG] = [
-            _evidence_entry(str(p.relative_to(project_path)), "Deployment config")
-            for p in deploys
-        ]
-
-    for evidence_type, items in _dossier_sources(project_path).items():
-        sources.setdefault(evidence_type, []).extend(items)
-    return sources
-
-
-#: The most recent provenance dossiers read into one report.
-MAX_DOSSIERS = 20
-
-
-def _dossier_sources(project_path: Path) -> dict[EvidenceType, list[dict[str, Any]]]:
-    """Evidence from the tasks' provenance dossiers (P5), newest first."""
-    from provenance import DOSSIER_DIR, DOSSIER_FILE, evidence_sources
-
-    specs = project_path / ".workpilot" / "specs"
-    if not specs.is_dir() or specs.is_symlink():
-        return {}
-    found = []
-    for path in specs.glob(f"*/{DOSSIER_DIR}/{DOSSIER_FILE}"):
-        if path.is_symlink() or path.parent.is_symlink():
-            continue
-        try:
-            found.append((path.stat().st_mtime, path))
-        except OSError:
-            continue
-    merged: dict[EvidenceType, list[dict[str, Any]]] = {}
-    for _mtime, path in sorted(found, reverse=True)[:MAX_DOSSIERS]:
-        try:
-            dossier = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if not isinstance(dossier, dict):
-            continue
-        try:
-            sources = evidence_sources(dossier)
-        except (KeyError, TypeError, AttributeError):
-            continue  # a dossier written by hand or by another version
-        for evidence_type, items in sources.items():
-            merged.setdefault(evidence_type, []).extend(
-                {
-                    "source": item.get("source", ""),
-                    "description": item.get("description", ""),
-                }
-                for item in items
-            )
-    return merged
-
-
-def _normalize_evidence_type(raw: str) -> str:
-    """Map backend evidence type values to frontend-expected values."""
-    mapping = {
-        "code_review": "code_review",
-        "test_results": "test_result",
-        "security_scan": "security_scan",
-        "access_log": "access_log",
-        "change_log": "git_log",
-        "approval_record": "code_review",
-        "deployment_log": "ci_cd_log",
-        "policy_document": "policy_file",
-        "training_record": "policy_file",
-    }
-    return mapping.get(raw, raw)
-
-
-def _evidence_to_dict(ev: Any, framework_ui: str) -> dict[str, Any]:
+def _frameworks(root: Path) -> dict[str, Any]:
+    known, errors = load_frameworks(root)
     return {
-        "id": ev.id,
-        "evidenceType": _normalize_evidence_type(ev.evidence_type.value),
-        "framework": framework_ui,
-        "controlId": ev.control_id,
-        "title": ev.title,
-        "description": ev.description,
-        "status": ev.status.value,
-        "source": ev.source,
+        "frameworks": [f.summary() for f in known.values()],
+        "config": load_config(root),
+        "errors": errors,
     }
 
 
-def run_scan(project_path: Path, framework_ui: str) -> dict[str, Any]:
-    framework = FRAMEWORK_ALIASES.get(framework_ui, ComplianceFramework.SOC2)
-    _emit_event("start", {"status": f"Collecting {framework_ui} evidence..."})
-
-    sources = _collect_sources(project_path)
-    _emit_event(
-        "progress",
-        {"status": f"Found {sum(len(v) for v in sources.values())} evidence artifacts"},
+def _report(root: Path, framework_id: str, period: str | None, save: bool) -> dict:
+    known, errors = load_frameworks(root)
+    framework = known.get(framework_id)
+    if framework is None:
+        raise ValueError(f"unknown framework: {framework_id[:40]}")
+    now = datetime.now(UTC).timestamp()
+    if period:
+        since, until = month_period(period)
+        until = min(until, now)
+    else:
+        period = datetime.fromtimestamp(now, tz=UTC).strftime("%Y-%m")
+        since, until = month_period(period)[0], now
+    _emit_event("start", {"status": f"Collecting {framework.name} evidence..."})
+    report = make_report(
+        root, framework, since, until, period=period, now=now, warnings=errors
     )
-
-    collector = EvidenceCollector()
-    report = collector.collect(framework, sources)
-
-    result = {
-        "framework": framework_ui,
-        "evidence": [_evidence_to_dict(e, framework_ui) for e in report.evidence],
-        "coveragePercent": round(report.coverage * 100, 1),
-        "missingControls": report.missing_controls,
-        "collectedCount": report.collected_count,
-        "generatedAt": datetime.fromtimestamp(report.generated_at, tz=UTC).isoformat(),
-        "summary": report.summary,
-    }
     _emit_event(
         "complete",
-        {"collected": report.collected_count, "missing": len(report.missing_controls)},
+        {"controls": len(report["controls"]), "gaps": len(report["gaps"])},
     )
-    return result
+    if save:
+        report["saved"] = save_report(root, report)
+    return report
+
+
+def run(args: argparse.Namespace) -> Any:
+    root = Path(args.project_path)
+    if args.frameworks:
+        return _frameworks(root)
+    if args.list:
+        return {"reports": list_reports(root)}
+    if args.load:
+        report = load_report(root, args.load)
+        if report is None:
+            raise ValueError("no such report")
+        return report
+    if args.config:
+        path = Path(args.config)
+        if path.stat().st_size > MAX_CONFIG_BYTES:
+            raise ValueError("the configuration is too large")
+        return {"config": save_config(root, json.loads(path.read_text("utf-8")))}
+    if args.monthly:
+        return {
+            "made": [
+                {
+                    "name": m["name"],
+                    "framework": m["report"]["framework"],
+                    "period": m["report"]["period"]["label"],
+                    "coveragePercent": m["report"]["coveragePercent"],
+                    "alerts": [g for g in m["report"]["gaps"] if g["alert"]],
+                }
+                for m in run_monthly(root)
+            ]
+        }
+    return _report(root, args.framework, args.period, args.save)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compliance Runner")
     parser.add_argument("--project-path", required=True, help="Project root path")
-    parser.add_argument(
-        "--framework",
-        default="SOC2",
-        choices=list(FRAMEWORK_ALIASES.keys()),
-        help="Compliance framework to evaluate",
-    )
+    parser.add_argument("--framework", default="soc2")
+    parser.add_argument("--period", help="YYYY-MM (default: this month to date)")
+    parser.add_argument("--save", action="store_true")
+    parser.add_argument("--frameworks", action="store_true")
+    parser.add_argument("--monthly", action="store_true")
+    parser.add_argument("--list", action="store_true")
+    parser.add_argument("--load")
+    parser.add_argument("--config")
     args = parser.parse_args()
 
-    project_path = Path(args.project_path)
-    if not project_path.exists():
-        _emit("COMPLIANCE_ERROR", f"Project path does not exist: {project_path}")
+    if not Path(args.project_path).is_dir():
+        _emit("COMPLIANCE_ERROR", f"Project path does not exist: {args.project_path}")
         sys.exit(1)
-
     try:
-        result = run_scan(project_path, args.framework)
-        _emit("COMPLIANCE_RESULT", result)
-    except Exception as exc:  # noqa: BLE001
-        _emit("COMPLIANCE_ERROR", str(exc))
+        _emit("COMPLIANCE_RESULT", run(args))
+    except (OSError, ValueError) as exc:
+        _emit("COMPLIANCE_ERROR", str(exc)[:500])
         sys.exit(1)
 
 

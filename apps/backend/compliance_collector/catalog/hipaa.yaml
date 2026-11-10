@@ -1,0 +1,62 @@
+# HIPAA Security Rule, 45 CFR Part 164 Subpart C.
+# See soc2.yaml for the format.
+id: hipaa
+name: HIPAA Security Rule
+version: "45 CFR 164"
+controls:
+  - id: 164.308(a)(1)(ii)(A)
+    title: {en: Risk analysis, fr: Analyse des risques}
+    evidence: [[security]]
+    max_age_days: 365
+    recommendation:
+      en: Keep the QA security checks on so that each change is assessed.
+      fr: Garder les contrôles de sécurité de la QA pour que chaque changement soit évalué.
+  - id: 164.308(a)(1)(ii)(D)
+    title: {en: Information system activity review, fr: Revue de l'activité du système}
+    evidence: [[monitoring]]
+    max_age_days: 90
+    recommendation:
+      en: Version the logging and monitoring configuration.
+      fr: Versionner la configuration de journalisation et de supervision.
+  - id: 164.308(a)(6)
+    title: {en: Security incident procedures, fr: Procédures en cas d'incident de sécurité}
+    evidence: [[incident, procedure]]
+    max_age_days: 365
+    recommendation:
+      en: Write the incident procedure and record each incident.
+      fr: Écrire la procédure d'incident et consigner chaque incident.
+  - id: 164.308(a)(8)
+    title: {en: Evaluation, fr: Évaluation}
+    evidence: [[tests], [security]]
+    max_age_days: 365
+    recommendation:
+      en: Keep tests and security checks in the QA of each task.
+      fr: Garder tests et contrôles de sécurité dans la QA de chaque tâche.
+  - id: 164.312(a)(1)
+    title: {en: Access control, fr: Contrôle d'accès}
+    evidence: [[access]]
+    max_age_days: 365
+    recommendation:
+      en: Declare code ownership in CODEOWNERS.
+      fr: Déclarer les propriétaires du code dans CODEOWNERS.
+  - id: 164.312(b)
+    title: {en: Audit controls, fr: Contrôles d'audit}
+    evidence: [[monitoring]]
+    max_age_days: 365
+    recommendation:
+      en: Version the audit logging configuration.
+      fr: Versionner la configuration des journaux d'audit.
+  - id: 164.312(c)(1)
+    title: {en: Integrity, fr: Intégrité}
+    evidence: [[code_review], [change]]
+    max_age_days: 90
+    recommendation:
+      en: Review each change before it is merged.
+      fr: Relire chaque changement avant sa fusion.
+  - id: 164.316(b)(1)
+    title: {en: Policies and documentation, fr: Politiques et documentation}
+    evidence: [[policy]]
+    max_age_days: 365
+    recommendation:
+      en: Keep the security policies in the repository and review them every year.
+      fr: Garder les politiques de sécurité dans le dépôt et les relire chaque année.
