@@ -19,10 +19,11 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F182](../audit/findings/F182.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
-Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab. N'écrivent rien
+Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab, les fonctions
+et le nettoyage des notebooks ([notebook-agent.md](notebook-agent.md)). N'écrivent rien
 dans le projet : la traduction inter-langages (dossier temporaire), les extraits contextuels
 (copie), le playground, le compagnon, les analyses (accessibilité, i18n, dérive de doc,
-notebooks, git surgeon), le générateur de pipelines (`.workpilot/pipelines/`). Le mode serveur
+exécution des notebooks, git surgeon), le générateur de pipelines (`.workpilot/pipelines/`). Le mode serveur
 n'offre aucune de ces pages.
 
 ## Le mécanisme

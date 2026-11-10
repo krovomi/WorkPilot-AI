@@ -14,7 +14,7 @@
 		"noProject": "Sélectionnez un projet pour analyser ses notebooks.",
 		"failed": "Échec de l'analyse : {{error}}"
 	},
-	"description": "Ordre d’exécution, cellules vides ou trop longues et texte manquant, dans les notebooks Jupyter (tout noyau), .NET Polyglot (.dib), Quarto et R Markdown.",
+	"description": "Ordre d'exécution, dépendances entre cellules, cellules vides ou longues et prose manquante, puis une exécution complète dans un noyau neuf et les cellules longues changées en fonctions, dans les notebooks Jupyter (tout noyau), .NET Polyglot (.dib), Quarto et R Markdown.",
 	"idleTitle": "Aucun contrôle pour l’instant",
 	"emptyTitle": "Aucun notebook dans ce projet",
 	"notebooks": "Notebooks",
@@ -36,6 +36,72 @@
 		"empty_cell": "Cellule vide",
 		"long_cell": "Cellule longue",
 		"no_markdown": "Pas de texte",
-		"sensitive_output": "Sortie sensible"
+		"sensitive_output": "Sortie sensible",
+		"used_before_defined": "Utilisé avant d'être défini",
+		"undefined_name": "Nom non défini",
+		"hidden_state": "État caché",
+		"implicit_global": "Global implicite",
+		"shared_mutation": "Mutation partagée",
+		"duplicate_code": "Code dupliqué",
+		"execution_error": "Erreur d'exécution",
+		"assertion_failed": "Assertion en échec",
+		"missing_dependency": "Dépendance manquante",
+		"empty_plot": "Figure vide",
+		"shape_changed": "Forme du tableau changée",
+		"output_changed": "Sortie changée"
+	},
+	"deps": {
+		"title": "Dépendances entre cellules",
+		"inOrder": "Chaque cellule s'exécute après celles dont elle a besoin.",
+		"reorder": "Ordre d'exécution qui respecte les dépendances : {{order}}",
+		"cycle": "Deux cellules ont besoin l'une de l'autre : aucun ordre ne marche de haut en bas.",
+		"edge": "La cellule n°{{to}} utilise {{names}} de la cellule n°{{from}}",
+		"more": "{{count}} dépendances de plus",
+		"approximate": "Lu dans les déclarations de ce langage : des dépendances peuvent manquer."
+	},
+	"refactor": {
+		"title": "Changer les cellules longues en fonctions",
+		"proposal": "Cellule n°{{index}} ({{lines}} lignes) en fonction dans {{module}}",
+		"refused": "La cellule n°{{index}} ({{lines}} lignes) reste telle quelle : {{reason}}",
+		"clean": "Effacer aussi les sorties, les compteurs d'exécution et les métadonnées de run",
+		"apply": "Préparer sur une carte de revue",
+		"none": "Aucune cellule assez longue pour devenir une fonction.",
+		"nothing": "Rien n'a changé : le notebook a déjà cette forme."
+	},
+	"run": {
+		"title": "Exécuter dans un noyau neuf",
+		"start": "Exécuter",
+		"warning": "Le code du notebook s'exécute sur cette machine, dans une copie temporaire, sans vos identifiants.",
+		"running": "Exécution du notebook…",
+		"hint": "Pour installer le noyau :",
+		"score": "Cellules sans erreur",
+		"matching": "Même sortie qu'enregistrée",
+		"duration": "Durée",
+		"seconds": "{{value}} s",
+		"status": {
+			"done": "Exécution terminée.",
+			"no_runner": "Jupyter n'est pas installé : {{detail}}",
+			"no_kernel": "Aucun noyau pour ce notebook : {{detail}}",
+			"timeout": "L'exécution a pris trop de temps et a été arrêtée : {{detail}}",
+			"failed": "L'exécution a échoué : {{detail}}",
+			"unsupported": "Ce format ne s'exécute pas ici : {{detail}}"
+		},
+		"cell": {
+			"ok": "OK",
+			"error": "Erreur",
+			"skipped": "Sautée",
+			"empty": "Vide"
+		}
+	},
+	"metrics": {
+		"kicker": "Historique",
+		"title": "Mois par mois",
+		"month": "Mois",
+		"notebooks": "Notebooks",
+		"findings": "Problèmes de dépendances",
+		"runs": "Exécutions",
+		"score": "Score moyen",
+		"extracted": "Fonctions extraites",
+		"percent": "{{value}} %"
 	}
 }

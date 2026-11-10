@@ -6,6 +6,9 @@
  * Channels:
  *   invoke "notebookAgent:run"     → { projectPath }
  *   invoke "notebookAgent:cancel"  → void
+ *   invoke "notebookAgent:execute" → { projectPath, notebook }: a run in a fresh kernel
+ *   invoke "notebookAgent:refactor" → { projectPath, notebook, extract, clean }: on a review card
+ *   invoke "notebookAgent:metrics" → { projectPath }: the monthly figures
  *
  * Renderer events:
  *   notebook-event
@@ -19,6 +22,13 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import {
+	executeNotebook,
+	notebookMetrics,
+	readRefactorRequest,
+	readRunRequest,
+	refactorOnReviewCard,
+} from "../notebook-agent/notebook-runs";
 
 interface RunRequest {
 	projectPath: string;
@@ -139,5 +149,23 @@ export function registerNotebookAgentHandlers(): void {
 	ipcMain.handle(IPC_CHANNELS.NOTEBOOK_AGENT_CANCEL, () => {
 		killExisting();
 		return true;
+	});
+
+	ipcMain.handle(IPC_CHANNELS.NOTEBOOK_AGENT_EXECUTE, async (_event, raw: unknown) => {
+		const request = readRunRequest(raw);
+		if (!request) throw new Error("Not a notebook of this project");
+		return executeNotebook(request);
+	});
+
+	ipcMain.handle(IPC_CHANNELS.NOTEBOOK_AGENT_REFACTOR, async (_event, raw: unknown) => {
+		const request = readRefactorRequest(raw);
+		if (!request) throw new Error("Nothing to change in this notebook");
+		return refactorOnReviewCard(request);
+	});
+
+	ipcMain.handle(IPC_CHANNELS.NOTEBOOK_AGENT_METRICS, async (_event, raw: unknown) => {
+		const projectPath = (raw as { projectPath?: unknown } | undefined)?.projectPath;
+		if (typeof projectPath !== "string" || !projectPath) throw new Error("projectPath is required");
+		return notebookMetrics(projectPath);
 	});
 }
