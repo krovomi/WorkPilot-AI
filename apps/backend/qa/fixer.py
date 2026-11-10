@@ -269,6 +269,13 @@ async def run_qa_fixer_session(
         # L'injection de patterns est un bonus : sans elle le prompt reste valide.
         pass
 
+    # The developer's personal style, measured by the coach (#376); "" when off.
+    from agent_coach.profile_injector import profile_block
+
+    style = profile_block(project_dir)
+    if style:
+        prompt += "\n\n" + style
+
     # Add session context - use full path so agent can find files
     prompt += f"\n\n---\n\n**Fix Session**: {fix_session}\n"
     prompt += f"**Spec Directory**: {spec_dir}\n"

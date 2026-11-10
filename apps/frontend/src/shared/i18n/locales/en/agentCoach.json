@@ -36,5 +36,134 @@
 		"high": "High",
 		"medium": "Medium",
 		"low": "Low"
+	},
+	"profile": {
+		"kicker": "Personal style",
+		"title": "Your style profile",
+		"intro": "Read from your own commits in this project (the agents' commits set aside), from what you kept or corrected after a merge, and from the lint configuration. Recent habits count more than old ones.",
+		"build": "Build from my history",
+		"rebuild": "Read my history again",
+		"enabled": "Give my style to the agents of this project",
+		"injected": "The coder and the QA fixer receive these preferences; the task's own instructions still come first.",
+		"notInjected": "The agents receive no style: build the profile or set a preference.",
+		"noEmail": "No git user.email in this project: only the other authors' commits and the lint configuration were read.",
+		"empty": "No profile yet. Build it from your commits in this project, or set your preferences by hand.",
+		"commits": {
+			"gold": "Your commits",
+			"accepted": "Agent commits kept",
+			"corrected": "Corrections",
+			"team": "Other authors"
+		},
+		"keptAsIs": "Builds kept as they were: {{with}} % with your profile ({{withCount}}), {{without}} % without ({{withoutCount}})",
+		"lint": "Rules read in:",
+		"indifferent": "Indifferent",
+		"evidence": "{{share}} % · {{source}}",
+		"sources": {
+			"history": "your history",
+			"project": "the project",
+			"lint": "the lint config"
+		},
+		"override": "Your choice for {{dimension}}",
+		"auto": "Measured",
+		"off": "Do not give",
+		"export": "Export",
+		"import": "Import",
+		"exported": "Saved to {{path}}",
+		"dimensions": {
+			"naming_functions": "Function names",
+			"naming_variables": "Variable names",
+			"name_length": "Name length",
+			"comments": "Comments",
+			"doc_comments": "Doc comments",
+			"comment_language": "Comment language",
+			"function_length": "Function length",
+			"imports": "Imports",
+			"error_handling": "Errors",
+			"guard_style": "Conditions",
+			"assertions": "Assertions per test",
+			"mocking": "Mocks"
+		},
+		"values": {
+			"naming_functions": {
+				"camelCase": "camelCase",
+				"snake_case": "snake_case",
+				"PascalCase": "PascalCase"
+			},
+			"naming_variables": {
+				"camelCase": "camelCase",
+				"snake_case": "snake_case",
+				"PascalCase": "PascalCase"
+			},
+			"name_length": {
+				"short": "Short",
+				"descriptive": "Descriptive"
+			},
+			"comments": {
+				"none": "None",
+				"minimal": "Minimal",
+				"verbose": "Generous"
+			},
+			"doc_comments": {
+				"documented": "On each function",
+				"undocumented": "Only when needed"
+			},
+			"comment_language": {
+				"en": "English",
+				"fr": "French"
+			},
+			"function_length": {
+				"short": "Short (≤ 20 lines)",
+				"medium": "Medium (≤ 50 lines)",
+				"long": "Long"
+			},
+			"imports": {
+				"named": "Named",
+				"default": "Default",
+				"from_import": "from … import",
+				"module_import": "import module"
+			},
+			"error_handling": {
+				"exceptions": "Exceptions",
+				"result_types": "Result types"
+			},
+			"guard_style": {
+				"early_return": "Early returns",
+				"nested": "Nested"
+			},
+			"assertions": {
+				"few": "One or two",
+				"many": "Several"
+			},
+			"mocking": {
+				"framework": "Framework mocks",
+				"manual": "Hand-written fakes"
+			}
+		},
+		"check": {
+			"title": "Check a task waiting for review",
+			"task": "Task to check",
+			"choose": "Choose a task",
+			"run": "Check",
+			"none": "The task follows your profile.",
+			"deviation": "{{language}} · {{dimension}}: {{found}} ({{count}}×), your profile says {{expected}}"
+		},
+		"languages": {
+			"python": "Python",
+			"javascript": "JavaScript",
+			"typescript": "TypeScript",
+			"csharp": "C#",
+			"java": "Java",
+			"kotlin": "Kotlin",
+			"go": "Go",
+			"rust": "Rust",
+			"ruby": "Ruby",
+			"php": "PHP",
+			"swift": "Swift",
+			"dart": "Dart",
+			"scala": "Scala",
+			"cpp": "C++",
+			"c": "C",
+			"fsharp": "F#"
+		}
 	}
 }

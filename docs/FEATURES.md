@@ -67,7 +67,7 @@ screenshots; the design of each feature is in [`architecture/`](architecture/).
 | **Agent Replay & Debug** _(experimental)_ | Step-by-step replay of any agent session with timeline navigation, file diffs, breakpoints, and token heatmaps |
 | **Decision Logger** | Real-time visualization of agent decision trees and trade-off rationale |
 | **Consensus Arbiter** | Reconciles conflicting opinions from security scans and QA reviewers into a single verdict |
-| **Agent Coach** | Analyzes real usage to suggest cheaper models, better effort levels, and prompt tweaks per agent |
+| **Agent Coach** | Analyzes real usage to suggest cheaper models, better effort levels, and prompt tweaks per agent; learns your personal coding style per language from your git history and lint config and gives it to the coder and QA fixer (editable, exportable) |
 | **Pair Programming** | Interactive real-time AI coding partner with live suggestions and conversation-driven development |
 | **Onboarding Agent** | A newcomer's tour of the repository, for their role (full stack, frontend, backend, DevOps): the code's story in five chapters, hot spots measured from git history, decision points, danger zones (security, billing, migrations, infrastructure) and missing tests, the team's decisions from ADRs, breaking commits and project memory, then a quiz. No model is needed; the active one can tell each chapter in prose. The tour is regenerated when a module appears or disappears, can be skipped, and exports to Markdown or a static web page. Every stack. |
 | **Learning Mode** | Educational mode with step-by-step explanations of agent decisions |
