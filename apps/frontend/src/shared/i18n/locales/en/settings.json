@@ -687,6 +687,10 @@
 			"voiceControl": {
 				"label": "Voice assistant",
 				"description": "Reads spoken commands the assistant cannot place by itself"
+			},
+			"arbiter": {
+				"label": "Best-of-N arbiter",
+				"description": "Gives a verdict when the variants of a Best-of-N run diverge; another provider than the variants' avoids bias"
 			}
 		},
 		"thinkingLevels": {

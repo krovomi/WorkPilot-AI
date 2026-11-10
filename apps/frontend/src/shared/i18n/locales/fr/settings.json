@@ -1140,6 +1140,10 @@
 			"voiceControl": {
 				"label": "Assistant vocal",
 				"description": "Lit les commandes vocales que l'assistant ne comprend pas seul"
+			},
+			"arbiter": {
+				"label": "Arbitre du Best-of-N",
+				"description": "Rend un verdict quand les variantes d'un Best-of-N divergent ; un autre fournisseur que celui des variantes évite le biais"
 			}
 		},
 		"thinkingLevels": {
