@@ -2309,6 +2309,8 @@
 		"busy": {
 			"preparing": "Setting up the worktrees…",
 			"ranking": "Measuring the variants…",
+			"arbitrating": "The arbiter is comparing the variants…",
+			"answering": "The arbiter is answering…",
 			"adopting": "Adopting…",
 			"discarding": "Removing the variants…"
 		},
@@ -2349,7 +2351,60 @@
 		"confirmTitle": "Keep this build?",
 		"confirmBody": "The build on {{engine}} becomes the task's build. The {{others}} other variants, their worktrees and their branches are deleted. Nothing is merged.",
 		"adoptedLine": "Kept: {{variant}}",
-		"discardedLine": "Every variant was discarded."
+		"discardedLine": "Every variant was discarded.",
+		"arbiter": {
+			"title": "Arbiter",
+			"status": {
+				"pending": "Not asked yet",
+				"not_needed": "Not needed",
+				"done": "Verdict",
+				"needs_human": "Your call",
+				"invalid": "No verdict",
+				"unavailable": "Unreachable"
+			},
+			"reason": {
+				"diverge": "The finished variants take different approaches (divergence {{max}}, threshold {{threshold}}).",
+				"no_winner": "No variant ranks first alone, so the arbiter reads them.",
+				"same_approach": "The finished variants take the same approach (divergence {{max}}, under {{threshold}}): the ranking is enough.",
+				"single_candidate": "Fewer than two variants finished: there is nothing to arbitrate.",
+				"changes_unknown": "A variant's changes could not be read: no verdict is given."
+			},
+			"keeps": "Recommends {{variant}}",
+			"merge": "Recommends a merge, each file whole from one variant:",
+			"mergeFile": "File",
+			"mergeFrom": "From",
+			"mergeNotApplied": "The merge is not applied for you: keep the variant that brings most files, then take the others by hand.",
+			"equivalent": "The approaches are equivalent: the simplest one is kept.",
+			"axes": {
+				"correctness": "Correctness",
+				"performance": "Performance",
+				"maintainability": "Maintainability",
+				"security": "Security",
+				"tests": "Tests"
+			},
+			"risks": "Risks of {{variant}}",
+			"confidence": {
+				"high": "High confidence",
+				"medium": "Medium confidence",
+				"low": "Low confidence"
+			},
+			"yourCall": "The arbiter is not sure: the choice is yours.",
+			"invalid": "The arbiter's answer was not a valid verdict: compare the numbers above.",
+			"unavailable": "The arbiter could not be reached ({{reason}}). Check its model in Settings, then ask again.",
+			"sameProvider": "The arbiter runs on {{provider}}, like one of the variants, and may favour that provider's code. Set another provider for \"Best-of-N arbiter\" in Settings for a neutral verdict.",
+			"engine": "Arbiter: {{engine}}",
+			"ask": "Ask the arbiter",
+			"askAgain": "Ask again",
+			"questionLabel": "Question the verdict",
+			"questionPlaceholder": "Why not variant #2?",
+			"send": "Send",
+			"threadFull": "Ten questions asked: this verdict's thread is full.",
+			"you": "You:",
+			"arbiter": "Arbiter:",
+			"metrics": "Track record",
+			"metricsLine": "{{month}}: {{count}} arbitrated, followed {{percent}}%, {{merges}} merges proposed",
+			"noMetrics": "No arbitrated run has been closed yet in this project."
+		}
 	},
 	"crossReview": {
 		"cardBadge": {

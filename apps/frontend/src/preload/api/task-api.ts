@@ -1,6 +1,7 @@
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
 import type {
+	BestOfNArbiterMonth,
 	BestOfNStatus,
 	ContextAction,
 	ContextPolicy,
@@ -321,6 +322,14 @@ export interface TaskAPI {
 		variantSpecId: string,
 	) => Promise<IPCResult<BestOfNStatus>>;
 	discardBestOfN: (taskId: string) => Promise<IPCResult<BestOfNStatus>>;
+	arbitrateBestOfN: (taskId: string) => Promise<IPCResult<BestOfNStatus>>;
+	challengeBestOfN: (
+		taskId: string,
+		question: string,
+	) => Promise<IPCResult<BestOfNStatus>>;
+	getBestOfNArbiterMetrics: (
+		taskId: string,
+	) => Promise<IPCResult<BestOfNArbiterMonth[]>>;
 	getPRDetails: (
 		prNumber: number,
 		taskId?: string,
@@ -893,6 +902,20 @@ export const createTaskAPI = (): TaskAPI => ({
 
 	discardBestOfN: (taskId: string): Promise<IPCResult<BestOfNStatus>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_DISCARD, taskId),
+
+	arbitrateBestOfN: (taskId: string): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_ARBITRATE, taskId),
+
+	challengeBestOfN: (
+		taskId: string,
+		question: string,
+	): Promise<IPCResult<BestOfNStatus>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_CHALLENGE, taskId, question),
+
+	getBestOfNArbiterMetrics: (
+		taskId: string,
+	): Promise<IPCResult<BestOfNArbiterMonth[]>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_BEST_OF_N_ARBITER_METRICS, taskId),
 
 	getPRDetails: (
 		prNumber: number,

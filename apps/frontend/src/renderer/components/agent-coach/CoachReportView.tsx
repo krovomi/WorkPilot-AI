@@ -10,6 +10,7 @@ import type { CoachReport, TipPriority } from "../../../shared/types/agent-coach
 import { useCurrency } from "../../hooks/useCurrency";
 import { formatCurrency } from "../../lib/currency";
 import { useAgentCoachStore } from "../../stores/agent-coach-store";
+import { CoachProfilePanel } from "./CoachProfilePanel";
 import {
 	CharterButton,
 	Column,
@@ -106,6 +107,7 @@ export function CoachReportView({ projectPath }: CoachReportViewProps): React.Re
 							</p>
 						</div>
 					)}
+					<CoachProfilePanel projectPath={projectPath} />
 				</Column>
 				<Column
 					kicker={t("agentCoach:kickers.tips")}

@@ -726,6 +726,38 @@ def get_phase_model(
     cli_model: str | None = None,
     cli_provider: str | None = None,
 ) -> str:
+    """The model of ``phase``, stepped down a tier when the carbon budget says so.
+
+    A project whose monthly carbon budget is spent, with ``degrade`` on, runs
+    its flagship models on the provider's standard one
+    (``carbon_profiler.budget``). Otherwise the model is the resolved one.
+    """
+    model = _resolve_phase_model(spec_dir, phase, cli_model, cli_provider)
+    try:
+        from carbon_profiler.budget import degraded_model
+    except ImportError:
+        return model
+    return degraded_model(spec_dir, model, phase, _provider_standard_model)
+
+
+def _provider_standard_model(provider: str) -> str | None:
+    """The provider's default coding model, when the registry does not list it as a flagship."""
+    from models_registry import REGISTRY
+
+    name = PROVIDER_DEFAULT_MODELS.get(provider, {}).get("coding")
+    if not name:
+        return None
+    model = resolve_model_id(name) if provider in ("anthropic", "claude") else name
+    tiers = {e.tier for e in REGISTRY if e.model_id == model}
+    return model if tiers and "flagship" not in tiers else None
+
+
+def _resolve_phase_model(
+    spec_dir: Path,
+    phase: Phase,
+    cli_model: str | None = None,
+    cli_provider: str | None = None,
+) -> str:
     """
     Get the resolved model ID for a specific execution phase.
 

@@ -210,6 +210,7 @@ export interface FeatureModelConfig {
 	testGenerator: string; // Test Generation Agent
 	codeReview: string; // Code Review Agent
 	voiceControl: string; // Voice assistant: reads a spoken command
+	arbiter: string; // Best-of-N arbiter: a verdict between variants that diverge
 }
 
 // Feature-specific thinking level configuration
@@ -225,6 +226,7 @@ export interface FeatureThinkingConfig {
 	testGenerator: ThinkingLevel; // Test Generation Agent
 	codeReview: ThinkingLevel; // Code Review Agent
 	voiceControl: ThinkingLevel; // Voice assistant
+	arbiter: ThinkingLevel; // Best-of-N arbiter
 }
 
 // Agent profile for preset model/thinking configurations

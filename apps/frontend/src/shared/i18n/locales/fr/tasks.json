@@ -2309,6 +2309,8 @@
 		"busy": {
 			"preparing": "Création des worktrees…",
 			"ranking": "Mesure des variantes…",
+			"arbitrating": "L'arbitre compare les variantes…",
+			"answering": "L'arbitre répond…",
 			"adopting": "Adoption…",
 			"discarding": "Suppression des variantes…"
 		},
@@ -2349,7 +2351,60 @@
 		"confirmTitle": "Garder ce build ?",
 		"confirmBody": "Le build sur {{engine}} devient celui de la tâche. Les {{others}} autres variantes, leurs worktrees et leurs branches sont supprimés. Rien n'est fusionné.",
 		"adoptedLine": "Gardée : {{variant}}",
-		"discardedLine": "Toutes les variantes ont été abandonnées."
+		"discardedLine": "Toutes les variantes ont été abandonnées.",
+		"arbiter": {
+			"title": "Arbitre",
+			"status": {
+				"pending": "Pas encore consulté",
+				"not_needed": "Inutile",
+				"done": "Verdict",
+				"needs_human": "À vous de trancher",
+				"invalid": "Pas de verdict",
+				"unavailable": "Injoignable"
+			},
+			"reason": {
+				"diverge": "Les variantes terminées suivent des approches différentes (divergence {{max}}, seuil {{threshold}}).",
+				"no_winner": "Aucune variante n'est seule en tête : l'arbitre les lit.",
+				"same_approach": "Les variantes terminées suivent la même approche (divergence {{max}}, sous {{threshold}}) : le classement suffit.",
+				"single_candidate": "Moins de deux variantes ont fini : il n'y a rien à arbitrer.",
+				"changes_unknown": "Les changements d'une variante n'ont pas pu être lus : aucun verdict n'est donné."
+			},
+			"keeps": "Recommande {{variant}}",
+			"merge": "Recommande une fusion, chaque fichier repris en entier d'une variante :",
+			"mergeFile": "Fichier",
+			"mergeFrom": "Depuis",
+			"mergeNotApplied": "La fusion n'est pas appliquée à votre place : gardez la variante qui apporte le plus de fichiers, puis reprenez les autres à la main.",
+			"equivalent": "Les approches se valent : la plus simple est retenue.",
+			"axes": {
+				"correctness": "Exactitude",
+				"performance": "Performance",
+				"maintainability": "Maintenabilité",
+				"security": "Sécurité",
+				"tests": "Tests"
+			},
+			"risks": "Risques de {{variant}}",
+			"confidence": {
+				"high": "Confiance haute",
+				"medium": "Confiance moyenne",
+				"low": "Confiance basse"
+			},
+			"yourCall": "L'arbitre n'est pas sûr : le choix vous revient.",
+			"invalid": "La réponse de l'arbitre n'était pas un verdict valide : comparez les chiffres ci-dessus.",
+			"unavailable": "L'arbitre n'a pas pu être joint ({{reason}}). Vérifiez son modèle dans les Réglages, puis relancez.",
+			"sameProvider": "L'arbitre tourne sur {{provider}}, comme une des variantes, et peut favoriser le code de ce fournisseur. Choisissez un autre fournisseur pour « Arbitre du Best-of-N » dans les Réglages pour un verdict neutre.",
+			"engine": "Arbitre : {{engine}}",
+			"ask": "Consulter l'arbitre",
+			"askAgain": "Redemander",
+			"questionLabel": "Contester le verdict",
+			"questionPlaceholder": "Pourquoi pas la variante n° 2 ?",
+			"send": "Envoyer",
+			"threadFull": "Dix questions posées : le fil de ce verdict est plein.",
+			"you": "Vous :",
+			"arbiter": "Arbitre :",
+			"metrics": "Bilan",
+			"metricsLine": "{{month}} : {{count}} arbitrés, suivis à {{percent}} %, {{merges}} fusions proposées",
+			"noMetrics": "Aucun run arbitré n'a encore été clos dans ce projet."
+		}
 	},
 	"crossReview": {
 		"cardBadge": {

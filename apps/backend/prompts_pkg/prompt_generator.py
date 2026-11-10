@@ -600,6 +600,13 @@ Before marking complete, verify:
     except Exception:
         pass
 
+    # The developer's personal style, measured by the coach (#376); "" when off.
+    from agent_coach.profile_injector import profile_block
+
+    style = profile_block(project_dir)
+    if style:
+        sections.append(style)
+
     return "\n".join(sections)
 
 
