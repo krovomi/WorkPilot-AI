@@ -117,6 +117,9 @@ export const IPC_CHANNELS = {
 	TASK_BEST_OF_N_RANK: "task:bestOfNRank", // Measure and rank the variants again
 	TASK_BEST_OF_N_ADOPT: "task:bestOfNAdopt", // Make the chosen variant the task's build, remove the others
 	TASK_BEST_OF_N_DISCARD: "task:bestOfNDiscard", // Stop and remove every variant
+	TASK_BEST_OF_N_ARBITRATE: "task:bestOfNArbitrate", // Ask the arbiter again for a verdict between the variants
+	TASK_BEST_OF_N_CHALLENGE: "task:bestOfNChallenge", // Question the arbiter's verdict ("why not B?")
+	TASK_BEST_OF_N_ARBITER_METRICS: "task:bestOfNArbiterMetrics", // Per month: arbitrations and how often they were followed
 	TASK_WORKTREE_OPEN_IN_IDE: "task:worktreeOpenInIDE",
 	TASK_WORKTREE_OPEN_IN_TERMINAL: "task:worktreeOpenInTerminal",
 	TASK_WORKTREE_DETECT_TOOLS: "task:worktreeDetectTools", // Detect installed IDEs/terminals
@@ -1097,9 +1100,9 @@ export const IPC_CHANNELS = {
 	CANCEL_NATURAL_LANGUAGE_GIT: "cancel-natural-language-git",
 	CANCEL_SMART_ESTIMATION: "cancel-smart-estimation",
 	CARBON_PROFILER_CANCEL: "carbonProfiler:cancel",
-	CARBON_PROFILER_ERROR: "carbon-profiler-error",
+	CARBON_PROFILER_CONFIG: "carbonProfiler:config",
 	CARBON_PROFILER_EVENT: "carbon-profiler-event",
-	CARBON_PROFILER_RESULT: "carbon-profiler-result",
+	CARBON_PROFILER_EXPORT: "carbonProfiler:export",
 	CARBON_PROFILER_RUN: "carbonProfiler:run",
 	CICD_TRIGGERS_CANCEL_RUN: "cicdTriggers:cancelRun",
 	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",

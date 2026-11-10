@@ -92,6 +92,7 @@ export const TERMS: ReadonlySet<string> = new Set([
 	"AAA",
 	"GB",
 	"KB",
+	"kg",
 	"kWh",
 	"MB",
 	"ms",

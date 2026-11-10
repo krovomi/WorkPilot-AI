@@ -10,6 +10,11 @@
  * build ends, the variants are ranked. Nothing is merged: the person picks a
  * variant on the card, confirms, and only then is it made the task's build.
  *
+ * When the finished variants take different approaches (the ranking says so
+ * with `arbiter.status: "pending"`), the arbiter is asked right after the
+ * ranking, with the engine of its page setting ("Best-of-N arbiter"). Its
+ * verdict is advice on the card; the person can question it and still picks.
+ *
  * The renderer names the task and the engines. The spec directory is read
  * here from the task record, and the runner resolves it again before use
  * (docs/rules/security.md, S4 and S6).
@@ -20,6 +25,9 @@
  *   invoke TASK_BEST_OF_N_RANK    (taskId)          → IPCResult<BestOfNStatus>
  *   invoke TASK_BEST_OF_N_ADOPT   (taskId, specId)  → IPCResult<BestOfNStatus>
  *   invoke TASK_BEST_OF_N_DISCARD (taskId)          → IPCResult<BestOfNStatus>
+ *   invoke TASK_BEST_OF_N_ARBITRATE (taskId)        → IPCResult<BestOfNStatus>
+ *   invoke TASK_BEST_OF_N_CHALLENGE (taskId, question) → IPCResult<BestOfNStatus>
+ *   invoke TASK_BEST_OF_N_ARBITER_METRICS (taskId)  → IPCResult<BestOfNArbiterMonth[]>
  *   send   TASK_BEST_OF_N_EVENT   (taskId, BestOfNStatus)
  */
 
@@ -29,6 +37,7 @@ import path from "node:path";
 import { app, type BrowserWindow, ipcMain } from "electron";
 import { getSpecsDir, IPC_CHANNELS } from "../../../shared/constants";
 import type {
+	BestOfNArbiterMonth,
 	BestOfNState,
 	BestOfNStatus,
 	EngineTrio,
@@ -41,6 +50,7 @@ import { appLog } from "../../app-logger";
 import { projectStore } from "../../project-store";
 import { parsePythonCommand } from "../../python-detector";
 import { readyPythonPath } from "../../utils/ensure-python";
+import { getPageFeatureSettings, getPageProviderEnv } from "../../services/page-llm-config";
 import { pythonRunnerEnv } from "../../utils/python-runner-env";
 import { findTaskAndProject } from "./shared";
 
@@ -51,9 +61,13 @@ export const MAX_VARIANTS = 4;
 /** Between two builds' starts: each reads and writes the same repository. */
 const START_SPACING_MS = 1500;
 const DISCARD_WAIT_MS = 15_000;
+export const MAX_QUESTION = 1000;
+/** The page whose model setting is the arbiter's engine. */
+const ARBITER_PAGE = "consensus-arbiter";
 
 const PROVIDER = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const EFFORT = /^[a-z][a-z_-]{0,31}$/;
+const MODEL = /^[\w.:/@[\]-]{1,200}$/;
 const VARIANT_ID = /-bon[1-4]$/;
 
 type Busy = NonNullable<BestOfNStatus["busy"]>;
@@ -106,8 +120,34 @@ export function sanitizeEngines(raw: unknown): EngineTrio[] | string {
 	return engines;
 }
 
+/** A question for the arbiter: trimmed, 1 to 1000 characters, no control characters. */
+export function sanitizeQuestion(raw: unknown): string | null {
+	if (typeof raw !== "string") return null;
+	const text = [...raw]
+		.map((c) => (c.charCodeAt(0) < 32 && c !== "\n") || c.charCodeAt(0) === 127 ? " " : c)
+		.join("")
+		.trim();
+	return text && text.length <= MAX_QUESTION ? text : null;
+}
+
+/** The arbiter's engine from its page setting, as runner arguments; none when unset or odd. */
+export function arbiterEngineArgs(engine: { provider: string; model: string }): string[] {
+	const provider = engine.provider.trim();
+	const model = engine.model.trim();
+	const args: string[] = [];
+	if (provider && PROVIDER.test(provider)) args.push("--provider", provider);
+	if (model && MODEL.test(model)) args.push("--model", model);
+	return args;
+}
+
+interface RunnerResult {
+	state?: BestOfNState;
+	metrics?: BestOfNArbiterMonth[];
+	error?: string;
+}
+
 /** The runner's one JSON line. */
-export function parseRunnerOutput(stdout: string): { state?: BestOfNState; error?: string } {
+export function parseRunnerOutput(stdout: string): RunnerResult {
 	const lines = stdout.trim().split("\n").reverse();
 	for (const line of lines) {
 		const text = line.trim();
@@ -117,6 +157,9 @@ export function parseRunnerOutput(stdout: string): { state?: BestOfNState; error
 			if (typeof payload.error === "string") return { error: payload.error };
 			if (payload.state && typeof payload.state === "object") {
 				return { state: payload.state as BestOfNState };
+			}
+			if (Array.isArray(payload.metrics)) {
+				return { metrics: payload.metrics as BestOfNArbiterMonth[] };
 			}
 		} catch {
 			// Not ours.
@@ -151,16 +194,26 @@ function writeState(specDir: string, state: BestOfNState): void {
 	renameSync(partial, file);
 }
 
+type RunnerCommand =
+	| "prepare"
+	| "rank"
+	| "adopt"
+	| "discard"
+	| "arbitrate"
+	| "challenge"
+	| "arbiter-metrics";
+
 async function runRunner(
-	command: "prepare" | "rank" | "adopt" | "discard",
+	command: RunnerCommand,
 	project: Project,
 	specDir: string,
 	extra: string[] = [],
-): Promise<{ state?: BestOfNState; error?: string }> {
+	providerEnv: Record<string, string> = {},
+): Promise<RunnerResult> {
 	const pythonPath = await readyPythonPath();
 	if (!pythonPath) return { error: "Python environment not ready" };
 	const backend = backendPath();
-	const env = await pythonRunnerEnv(backend, {});
+	const env = await pythonRunnerEnv(backend, providerEnv);
 	const [exe, baseArgs] = parsePythonCommand(pythonPath);
 	const args = [
 		...baseArgs,
@@ -238,6 +291,37 @@ export function registerBestOfNHandlers(
 		);
 	};
 
+	/** Ask the arbiter (or ask it a question) with its page's engine and credentials. */
+	const askArbiter = async (
+		taskId: string,
+		run: Run,
+		command: "arbitrate" | "challenge",
+		extra: string[] = [],
+	): Promise<RunnerResult> => {
+		run.busy = command === "arbitrate" ? "arbitrating" : "answering";
+		run.error = undefined;
+		publish(taskId);
+		let engineArgs: string[] = [];
+		let providerEnv: Record<string, string> = {};
+		try {
+			engineArgs = arbiterEngineArgs(getPageFeatureSettings(ARBITER_PAGE));
+			providerEnv = getPageProviderEnv(ARBITER_PAGE);
+		} catch (error) {
+			appLog.warn("[BEST_OF_N] the arbiter's engine setting could not be read:", error);
+		}
+		const result = await runRunner(
+			command,
+			run.project,
+			run.specDir,
+			[...engineArgs, ...extra],
+			providerEnv,
+		);
+		run.busy = undefined;
+		run.error = result.error;
+		publish(taskId);
+		return result;
+	};
+
 	const rankRun = async (taskId: string, run: Run) => {
 		run.busy = "ranking";
 		run.error = undefined;
@@ -246,6 +330,10 @@ export function registerBestOfNHandlers(
 		run.busy = undefined;
 		run.error = result.error;
 		publish(taskId);
+		// The finished variants took different roads: the arbiter reads them now.
+		if (result.state?.arbiter?.status === "pending") {
+			await askArbiter(taskId, run, "arbitrate");
+		}
 	};
 
 	const variantEnded = (variantId: string, code: number) => {
@@ -371,6 +459,58 @@ export function registerBestOfNHandlers(
 			}
 			await rankRun(found.task.id, run);
 			return { success: true, data: status(found.task.id, found.specDir) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_BEST_OF_N_ARBITRATE,
+		async (_, taskId: unknown): Promise<IPCResult<BestOfNStatus>> => {
+			const found = lookup(taskId);
+			if ("error" in found) return { success: false, error: found.error };
+			if (readState(found.specDir)?.phase !== "ranked") {
+				return { success: false, error: "Rank the variants first" };
+			}
+			const run = runFor(found.task, found.project, found.specDir);
+			if (run.busy || run.live.size > 0) {
+				return { success: false, error: "Wait for the current step to end" };
+			}
+			const result = await askArbiter(found.task.id, run, "arbitrate");
+			if (result.error) return { success: false, error: result.error };
+			return { success: true, data: status(found.task.id, found.specDir) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_BEST_OF_N_CHALLENGE,
+		async (_, taskId: unknown, rawQuestion: unknown): Promise<IPCResult<BestOfNStatus>> => {
+			const found = lookup(taskId);
+			if ("error" in found) return { success: false, error: found.error };
+			const question = sanitizeQuestion(rawQuestion);
+			if (!question) {
+				return { success: false, error: `The question must be 1 to ${MAX_QUESTION} characters` };
+			}
+			const verdict = readState(found.specDir)?.arbiter?.status;
+			if (verdict !== "done" && verdict !== "needs_human") {
+				return { success: false, error: "There is no verdict to question" };
+			}
+			const run = runFor(found.task, found.project, found.specDir);
+			if (run.busy || run.live.size > 0) {
+				return { success: false, error: "Wait for the current step to end" };
+			}
+			const result = await askArbiter(found.task.id, run, "challenge", ["--question", question]);
+			if (result.error) return { success: false, error: result.error };
+			return { success: true, data: status(found.task.id, found.specDir) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_BEST_OF_N_ARBITER_METRICS,
+		async (_, taskId: unknown): Promise<IPCResult<BestOfNArbiterMonth[]>> => {
+			const found = lookup(taskId);
+			if ("error" in found) return { success: false, error: found.error };
+			const result = await runRunner("arbiter-metrics", found.project, found.specDir);
+			if (result.error) return { success: false, error: result.error };
+			return { success: true, data: result.metrics ?? [] };
 		},
 	);
 

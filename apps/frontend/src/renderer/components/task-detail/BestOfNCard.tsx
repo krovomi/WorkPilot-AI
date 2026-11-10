@@ -28,6 +28,7 @@ import {
 	AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Badge } from "../ui/badge";
+import { BestOfNArbiterPanel } from "./BestOfNArbiterPanel";
 import { Button } from "../ui/button";
 
 export const MIN_VARIANTS = 2;
@@ -57,7 +58,8 @@ export function isOpen(state: BestOfNState | null | undefined): boolean {
  * QA (les tests), objectif (goal mode) revérifié dans chaque worktree, taille
  * du diff, coût. Un critère illisible pour une variante ne classe personne.
  * Rien n'est fusionné : la personne choisit, confirme, et les autres variantes
- * sont supprimées.
+ * sont supprimées. Quand les variantes terminées divergent, l'arbitre donne un
+ * avis (BestOfNArbiterPanel) ; la personne reste seule à choisir.
  */
 export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 	const { t } = useTranslation(["tasks", "common"]);
@@ -347,6 +349,9 @@ export function BestOfNCard({ task, editable = true }: BestOfNCardProps) {
 					))}
 					{!ranking.recommended && (
 						<p className="text-2xs text-muted-foreground">{t("tasks:bestOfN.noRecommendation")}</p>
+					)}
+					{state.arbiter && (
+						<BestOfNArbiterPanel taskId={task.id} state={state} busy={busy} call={call} />
 					)}
 				</div>
 			)}
