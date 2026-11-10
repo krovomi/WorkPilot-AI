@@ -28,7 +28,7 @@ from foundation.git_executable import run_git
 
 from .messages import Text, text
 
-logger = logging.getLogger(__name__)
+_unused_logger = logging.getLogger(__name__)
 
 __all__ = [
     "DANGER_KINDS",
