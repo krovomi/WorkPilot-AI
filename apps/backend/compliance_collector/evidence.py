@@ -35,7 +35,7 @@ from typing import Any
 
 from foundation.git_executable import run_git
 
-__all__ = ["Evidence", "collect_evidence", "STATIC_PATTERNS", "SPEC_RECORDS"]
+__all__ = ["DAY", "Evidence", "collect_evidence", "STATIC_PATTERNS", "SPEC_RECORDS"]
 
 DAY = 86_400
 MAX_COMMITS = 5000
