@@ -31,7 +31,7 @@ SOURCES = ["src/Orders/OrderService.cs", "shop/cart.py", "pkg/cart.go", "src/car
         "panic: runtime error: index out of range [0] with length 0\n\n"
         + "goroutine 7 [running]:\nexample.com/pkg.Total(...)\n\t/repo/pkg/cart.go:18 +0x1d",
         "TypeError: Cannot read properties of undefined (reading 'price')\n"
-        "    at total (/repo/src/cart.ts:9:21)",
+        + "    at total (/repo/src/cart.ts:9:21)",
     ],
 )
 def test_a_programming_error_inside_the_changed_code_is_a_crash(message):
