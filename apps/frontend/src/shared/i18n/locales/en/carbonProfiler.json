@@ -1,29 +1,119 @@
 {
-	"noData": "No scan run yet. Click \"Run scan\" to start.",
-	"title": "Carbon / Energy Profiler",
-	"totalEnergy": "Total Energy",
-	"co2Emissions": "CO₂ Emissions",
-	"records": "Records",
-	"co2ByProvider": "CO₂ by Provider (g)",
-	"co2ByModel": "CO₂ by Model (g)",
-	"recentRecords": "Recent Records",
-	"summary": "Summary",
+	"title": "Carbon footprint",
+	"description": "The estimated energy and CO₂ of the models the project's agents call, with a monthly budget and an ESG export.",
+	"noData": "Nothing to show yet. The report fills as the agents work on this project.",
+	"emptyTitle": "No report yet",
+	"noLedger": "No model call is recorded for this project yet. Builds started from now on are recorded; \"Rebuild from costs\" recovers the earlier ones from the cost records.",
+	"estimated": "Every figure is an estimate: providers publish no energy per call. It comes from the tokens, the model's size, the data centre's PUE and the grid's carbon intensity.",
+	"unknownHosts": "Where these providers run is a guess: {{providers}}.",
+	"totalEnergy": "Energy",
+	"co2Emissions": "CO₂e",
+	"records": "Model calls",
+	"carKm": "Petrol car equivalent",
+	"period": "From {{start}} to {{end}}",
+	"co2ByProvider": "CO₂e by provider (g)",
+	"co2ByModel": "CO₂e by model (g)",
+	"co2ByPhase": "By phase",
+	"co2ByTask": "By task",
+	"share": "{{co2}} g · {{calls}} calls",
+	"recentRecords": "Latest calls",
+	"adviceTitle": "How to lower it",
+	"trendTitle": "The last months",
+	"month": {
+		"label": "Month",
+		"all": "Whole ledger"
+	},
+	"sources": {
+		"llm_cloud": "Cloud",
+		"llm_local": "Local"
+	},
 	"actions": {
-		"runScan": "Run scan",
+		"refresh": "Refresh",
 		"cancel": "Cancel",
-		"scanning": "Scanning...",
-		"reset": "Reset"
+		"scanning": "Reading the ledger…",
+		"backfill": "Rebuild from costs",
+		"backfillHint": "Rebuild the ledger from the cost records of every build of the project"
 	},
 	"errors": {
-		"noProject": "Select a project before running a scan.",
-		"failed": "Scan failed: {{error}}"
+		"noProject": "Select a project to see its footprint.",
+		"failed": "The report failed: {{error}}"
 	},
-	"description": "Energy and CO₂ of the project's LLM calls and CI runs, read from its carbon ledger.",
-	"emptyTitle": "No scan yet",
-	"period": "From {{start}} to {{end}}",
+	"budget": {
+		"title": "Budget of {{month}}",
+		"none": "No monthly budget is set. Set one in the settings below to get alerts.",
+		"used": "{{used}} kg CO₂e used of {{budget}} kg",
+		"alertAt": "First alert at {{percent}}%, then at 100%, on the desktop and on your notification channel.",
+		"degraded": "The budget is reached and the degraded mode is on: flagship models run on their provider's standard model until the end of the month.",
+		"states": {
+			"none": "No budget",
+			"ok": "Within budget",
+			"warning": "Close to the budget",
+			"exceeded": "Budget reached"
+		}
+	},
+	"advice": {
+		"review_on_fast": "{{share}}% of the review and QA footprint comes from large models. A fast model is usually enough there and uses about {{saving}}% less energy.",
+		"use_cache": "Only {{share}}% of the input tokens sent to {{provider}} are read from its prompt cache. Keeping prompts stable lets the cache serve more of them.",
+		"cleaner_region": "{{provider}} is counted on the {{from}} grid. A region in {{to}} would emit about {{saving}}% less.",
+		"local_heavier": "Your local models use {{local}} Wh per 1,000 tokens written, the cloud ones {{cloud}} Wh: here the cloud is lighter.",
+		"local_lighter": "Your local models use {{local}} Wh per 1,000 tokens written, the cloud ones {{cloud}} Wh: here local is lighter."
+	},
+	"export": {
+		"title": "ESG export of {{month}}",
+		"description": "CSRD (ESRS E1-6: cloud models in Scope 3 category 1, local models in Scope 2 location-based) and GRI 305-3 / 302-1, with the method and the factors used.",
+		"formats": {
+			"json": "JSON",
+			"csv": "CSV",
+			"md": "Markdown"
+		},
+		"saved": "Saved to {{path}}"
+	},
+	"settings": {
+		"title": "Carbon settings",
+		"description": "Kept in .workpilot/carbon.json, for this project only.",
+		"region": "Grid of this machine",
+		"regionHint": "Used for local models. Cloud models are counted on their provider's grid.",
+		"budget": "Monthly budget (kg CO₂e)",
+		"budgetHint": "0 means no budget.",
+		"alert": "First alert (%)",
+		"localPower": "Power of a local model (W)",
+		"degrade": "Degraded mode when the budget is reached",
+		"degradeHint": "Flagship models (Opus, GPT flagships…) step down to their provider's standard model. Standard, fast and local models stay as chosen.",
+		"cpuOnly": "Local models run on the CPU only",
+		"cpuOnlyHint": "Counts 45 W instead of the power above.",
+		"save": "Save"
+	},
+	"regions": {
+		"world": "World average",
+		"us": "United States",
+		"us-west": "US West",
+		"us-southeast": "US Southeast",
+		"ca": "Canada",
+		"eu": "European Union",
+		"fr": "France",
+		"de": "Germany",
+		"uk": "United Kingdom",
+		"nordics": "Nordic countries",
+		"es": "Spain",
+		"it": "Italy",
+		"nl": "Netherlands",
+		"pl": "Poland",
+		"cn": "China",
+		"in": "India",
+		"jp": "Japan",
+		"au": "Australia",
+		"br": "Brazil"
+	},
 	"kickers": {
 		"providers": "Providers",
 		"models": "Models",
-		"records": "Ledger"
+		"records": "Ledger",
+		"budget": "Budget",
+		"advice": "Advice",
+		"trend": "Trend",
+		"phases": "Phases",
+		"tasks": "Tasks",
+		"export": "Export",
+		"settings": "Settings"
 	}
 }
