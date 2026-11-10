@@ -33,5 +33,96 @@
 		"messy_commits": "Messy commits",
 		"force_push_risk": "Force push risk",
 		"duplicate_commits": "Duplicate commits"
+	},
+	"rewrite": {
+		"kicker": "Rewrite",
+		"title": "Clean up the branch's history",
+		"hint": "Squashes the fix-ups, rewords the messages to the project's convention and splits the commits that mix parts of the project. The result is a new local branch whose files are exactly the branch's: your branch, its remote and its tags stay as they are, nothing is pushed.",
+		"base": "Start after",
+		"basePlaceholder": "where the branch left main",
+		"ai": "Word the messages with the configured model",
+		"prepare": "Prepare the rewrite",
+		"planning": "Reading the branch's commits…",
+		"applying": "Replaying the history on a new branch…",
+		"failed": "The rewrite stopped: {{error}}",
+		"done": "Branch {{branch}} created: {{commits}} commits, the files exactly those of {{source}}. Readability {{before}} % → {{after}} %. Nothing was pushed: check it, then push it or rename it yourself.",
+		"apply": "Create the cleaned branch",
+		"restore": "Back to the proposed plan",
+		"applyHint": "Your branch is never rewritten in place.",
+		"commitsBefore": "Commits now",
+		"commitsAfter": "Commits after",
+		"readabilityBefore": "Readability now",
+		"readabilityAfter": "Readability after",
+		"convention": "Convention: {{kind}} ({{source}})",
+		"byModel_one": "{{count}} message worded by the model, the others by rules",
+		"byModel_other": "{{count}} messages worded by the model, the others by rules",
+		"byRules": "messages worded by rules, offline",
+		"before": "Before · {{branch}}",
+		"after": "After",
+		"files_one": "{{count}} file",
+		"files_other": "{{count}} files",
+		"message": "Commit message",
+		"edit": "Edit the message",
+		"closeEdit": "Done",
+		"keepAsIs": "Keep as it was"
+	},
+	"conventions": {
+		"conventional": "Conventional Commits",
+		"gitmoji": "Gitmoji",
+		"custom": "the project's pattern"
+	},
+	"conventionSources": {
+		"project": ".workpilot/git-surgeon.json",
+		"commitlint": "commitlint configuration",
+		"gitmoji": "gitmoji configuration",
+		"history": "read from the history",
+		"default": "default"
+	},
+	"warnings": {
+		"signed": "{{count}} signed commits get new shas: their signatures go (git signs the new ones with your key if signing is configured).",
+		"pushed": "These commits are already on {{remotes}}. Replacing them there would need a force push, which WorkPilot never does: the cleaned history stays on the new local branch.",
+		"merges": "The range holds {{count}} merge commits: choose a start after {{after}} to rewrite what follows."
+	},
+	"kinds": {
+		"keep": "Kept",
+		"reword": "Reworded",
+		"squash": "Squashed",
+		"split": "Split"
+	},
+	"reasons": {
+		"autosquash": "fixup! joined",
+		"fixups": "fix-ups joined",
+		"vague": "vague message",
+		"convention": "outside the convention",
+		"mixed": "mixes several parts"
+	},
+	"branches": {
+		"kicker": "Branches",
+		"title": "Local branches to tidy",
+		"default": "default branch {{branch}}",
+		"refresh": "Refresh",
+		"delete_one": "Delete {{count}} merged branch",
+		"delete_other": "Delete {{count}} merged branches",
+		"deleteHint": "Only local branches already merged into the default branch can be deleted ({{count}} now); remote branches are never touched.",
+		"deleted_one": "{{count}} branch deleted",
+		"deleted_other": "{{count}} branches deleted",
+		"refused": {
+			"unknown": "not found",
+			"in_use": "in use",
+			"not_merged": "not merged",
+			"git_refused": "refused by git"
+		},
+		"choose": "Choose {{name}}",
+		"suggest": "→ {{name}}",
+		"current": "current",
+		"merged": "merged",
+		"gone": "remote gone",
+		"stale": "{{days}} days old"
+	},
+	"history": {
+		"title": "What the surgeon did",
+		"month": "Month",
+		"runs": "Runs",
+		"readability": "Readability"
 	}
 }
