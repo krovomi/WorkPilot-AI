@@ -162,7 +162,8 @@ def _body(lines: list[str], start: int) -> str:
         return "\n".join(lines[start:end])
     depth, opened, end = 0, False, start
     while end < len(lines) and end - start < _MAX_BODY_LINES:
-        code = re.sub(r"(['\"`])(?:\\.|(?!\1).)*\1", "", lines[end])
+        # a backslash is only ever read as an escape: no two ways to match it
+        code = re.sub(r"(['\"`])(?:\\.|(?!\1|\\).)*\1", "", lines[end])
         depth += code.count("{") - code.count("}")
         opened = opened or "{" in code
         end += 1
