@@ -18,7 +18,6 @@ complexity, danger and test columns.
 
 from __future__ import annotations
 
-import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -27,8 +26,6 @@ from pathlib import PurePosixPath
 from foundation.git_executable import run_git
 
 from .messages import Text, text
-
-_unused_logger = logging.getLogger(__name__)
 
 __all__ = [
     "DANGER_KINDS",
