@@ -91,6 +91,7 @@ génération de tests ;
 | `mem_search/` | lecture de la mémoire par paliers (index → timeline → détail) |
 | `cross_review/` | verdict de la revue croisée : lecture, enregistrement, `blocking_verdict` qui retient la PR d'un code avec lequel le second fournisseur est en désaccord ; feuille sur `foundation`. La phase `cross-review` elle-même (choix du moteur, session) est `workflows/cross_review_phase.py` |
 | `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne |
+| `agent_coach/` | conseils tirés des runs ; profil de style personnel par langage (`profile_builder.py`), donné au codeur et au fixer en phrases fixes (`profile_injector.py`) ; [justification](../../docs/architecture/agent-coach.md) |
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
 | `foundation/workpilot_layout.py` | un dossier par feature sous `.workpilot/` |

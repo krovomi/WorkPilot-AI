@@ -45,6 +45,7 @@ SUBSCRIBERS: list[str | Subscriber] = [
     "learning_loop.observe:on_merge",
     "brain.learn:on_merge",
     "uiux.knowledge:on_merge",
+    "agent_coach.style_observer:on_merge",
 ]
 """Who hears about a merge, in the order they are told. ``module:function``."""
 

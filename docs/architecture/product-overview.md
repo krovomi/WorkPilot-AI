@@ -96,7 +96,7 @@ it, inside its hub. The hubs are listed in
 | `mission-control` | Mission Control | Workspace | — |  |
 | `phase35-hub` | Advanced Features | Workspace | — |  |
 | `session-history` | Session History | Workspace › Agent history | — |  |
-| `agent-coach` | Personal Agent Coach | Agents | — |  |
+| `agent-coach` | Personal Agent Coach | Agents | [agent-coach.md](agent-coach.md) |  |
 | `agent-debugger` | Agent Debugger | Workspace › Agent history | — | yes |
 | `agent-replay` | Agent Replay | Workspace › Agent history | — | yes |
 | `arena-mode` | Arena Mode | Agents › Arena | [arena.md](arena.md) |  |
