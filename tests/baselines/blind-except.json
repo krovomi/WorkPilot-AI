@@ -276,7 +276,6 @@
   "apps/backend/runners/blast_radius_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/bounty_board_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/browser_agent_runner.py": {"blind": 1, "silent": 0},
-  "apps/backend/runners/carbon_profiler_runner.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/cicd_triggers_runner.py": {"blind": 3, "silent": 0},
   "apps/backend/runners/code_migration_runner.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/code_playground_runner.py": {"blind": 3, "silent": 1},

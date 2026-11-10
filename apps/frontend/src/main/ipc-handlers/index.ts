@@ -44,7 +44,7 @@ import {
 import { registerArenaHandlers } from "./arena-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
-import { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
+import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
 import { registerClaudeCodeHandlers } from "./claude-code-handlers";
@@ -551,6 +551,7 @@ export function setupIpcHandlers(
 
 	// Carbon Profiler handlers (energy and CO2 footprint)
 	registerCarbonProfilerHandlers();
+	startCarbonBudgetSchedule();
 
 	// Compliance evidence collector (SOC 2, ISO 27001, HIPAA, PCI DSS) and its monthly report
 	registerComplianceHandlers();

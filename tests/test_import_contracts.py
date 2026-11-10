@@ -124,8 +124,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Server mode is mounted by provider_api; it reaches nothing back.
     "server": set(),
     # Model and provider per phase: the catalogue, the provider chosen in the
-    # UI, and the complexity router.
-    "phase_config": {"models_registry", "provider_selection", "scheduling"},
+    # UI, the complexity router, and the carbon budget's degraded mode
+    # (carbon_profiler.budget steps a flagship down).
+    "phase_config": {
+        "carbon_profiler",
+        "models_registry",
+        "provider_selection",
+        "scheduling",
+    },
+    # The carbon profiler: the ledger, its estimates and the budget; model tiers
+    # from the registry. phase_config calls it, so it never imports it back.
+    "carbon_profiler": {"foundation", "models_registry"},
     "harness": {
         "agents",
         "context_mgmt",

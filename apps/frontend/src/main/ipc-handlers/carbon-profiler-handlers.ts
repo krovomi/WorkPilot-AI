@@ -1,144 +1,119 @@
 /**
- * Carbon Profiler IPC Handlers
+ * Carbon profiler IPC handlers (#365).
  *
- * Spawns the Python carbon profiler runner.
+ * Every channel takes a project the person added (`resolveKnownProject`, S6)
+ * and checked values only: a month, an export format, settings of the known
+ * shape. The runner reads the ledger and does the sums (`main/carbon/runner.ts`).
  *
- * Channels:
- *   invoke "carbonProfiler:run"     → { projectPath, region? }
+ *   invoke "carbonProfiler:run"     → { projectPath, month?, backfill? }
  *   invoke "carbonProfiler:cancel"  → void
- *
- * Renderer events:
- *   carbon-profiler-event     (progress / start / complete metadata)
- *   carbon-profiler-result    (full CarbonReport JSON)
- *   carbon-profiler-error     (string)
+ *   invoke "carbonProfiler:config"  → { projectPath, config }
+ *   invoke "carbonProfiler:export"  → { projectPath, month, format } (save dialog)
+ *   event  "carbon-profiler-event"  ← progress
  */
 
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { app, BrowserWindow, ipcMain } from "electron";
-import { requirePythonPath } from "../utils/ensure-python";
+import { BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
-import { pythonRunnerEnv } from "../utils/python-runner-env";
+import type { CarbonExportFormat } from "../../shared/types/carbon-profiler";
+import { getAppLanguage } from "../app-language";
+import { readCarbonConfig, startCarbonBudgetChecks } from "../carbon/budget-alerts";
+import { FORMATS, MONTH, runCarbon } from "../carbon/runner";
+import { showSaveDialog } from "../electron-utils";
+import { notificationService } from "../notification-service";
+import { projectStore } from "../project-store";
+import { resolveKnownProject } from "../security/renderer-path";
 
-interface RunRequest {
-	projectPath: string;
-	region?: string;
-}
-
-const EVENT_PREFIX = "CARBON_EVENT:";
-const RESULT_PREFIX = "CARBON_RESULT:";
-const ERROR_PREFIX = "CARBON_ERROR:";
+type Args = Record<string, unknown> | undefined;
 
 function broadcast(channel: string, payload: unknown): void {
-	for (const win of BrowserWindow.getAllWindows()) {
-		win.webContents.send(channel, payload);
-	}
+	for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload);
+}
+
+function project(args: Args): string {
+	const root = resolveKnownProject(args?.projectPath);
+	if (!root) throw new Error("Not a project of this app");
+	return root;
+}
+
+function month(value: unknown): string {
+	if (typeof value !== "string" || !MONTH.test(value)) throw new Error("Not a month");
+	return value;
 }
 
 export function registerCarbonProfilerHandlers(): void {
-	let currentProcess: ChildProcess | null = null;
+	let current: ChildProcess | null = null;
 
-	const killExisting = (): void => {
-		if (currentProcess) {
-			currentProcess.kill("SIGTERM");
-			currentProcess = null;
+	const run = async (root: string, args: string[], progress = false) => {
+		const handle = await runCarbon(
+			root,
+			args,
+			progress ? (payload) => broadcast(IPC_CHANNELS.CARBON_PROFILER_EVENT, payload) : undefined,
+		);
+		if (progress) current = handle.child;
+		try {
+			return await handle.result;
+		} finally {
+			if (current === handle.child) current = null;
 		}
 	};
 
-	ipcMain.handle(
-		IPC_CHANNELS.CARBON_PROFILER_RUN,
-		async (_event, { projectPath, region = "global_avg" }: RunRequest) => {
-			killExisting();
-
-			if (!projectPath) {
-				const message = "projectPath is required";
-				broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
-				throw new Error(message);
-			}
-
-			const backendPath = app.isPackaged
-				? path.resolve(process.resourcesPath, "backend")
-				: path.resolve(app.getAppPath(), "..", "backend");
-			const runnerPath = path.resolve(
-				backendPath,
-				"runners",
-				"carbon_profiler_runner.py",
-			);
-
-			const pythonExe = await requirePythonPath();
-
-			const child = spawn(
-				pythonExe,
-				[runnerPath, "--project-path", projectPath, "--region", region],
-				{
-					cwd: backendPath,
-					env: await pythonRunnerEnv(backendPath),
-				} as Parameters<typeof spawn>[2],
-			);
-			currentProcess = child;
-
-			let buffer = "";
-			let result: unknown = null;
-			let errorMessage: string | null = null;
-
-			child.stdout?.on("data", (chunk: Buffer) => {
-				buffer += chunk.toString();
-				let newlineIdx = buffer.indexOf("\n");
-				while (newlineIdx >= 0) {
-					const line = buffer.slice(0, newlineIdx).trim();
-					buffer = buffer.slice(newlineIdx + 1);
-					newlineIdx = buffer.indexOf("\n");
-					if (!line) continue;
-
-					if (line.startsWith(EVENT_PREFIX)) {
-						try {
-							const payload = JSON.parse(line.slice(EVENT_PREFIX.length));
-							broadcast(IPC_CHANNELS.CARBON_PROFILER_EVENT, payload);
-						} catch (err) {
-							console.error("[CarbonProfiler] Bad event line:", err);
-						}
-					} else if (line.startsWith(RESULT_PREFIX)) {
-						try {
-							result = JSON.parse(line.slice(RESULT_PREFIX.length));
-						} catch (err) {
-							console.error("[CarbonProfiler] Bad result line:", err);
-						}
-					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
-					}
-				}
-			});
-
-			child.stderr?.on("data", (chunk: Buffer) => {
-				console.error("[CarbonProfiler] stderr:", chunk.toString());
-			});
-
-			return new Promise((resolve, reject) => {
-				child.on("close", (code) => {
-					currentProcess = null;
-					if (code === 0 && result) {
-						broadcast(IPC_CHANNELS.CARBON_PROFILER_RESULT, result);
-						resolve(result);
-					} else {
-						const message =
-							errorMessage ?? `carbon profiler runner exited with code ${code}`;
-						broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
-						reject(new Error(message));
-					}
-				});
-
-				child.on("error", (err) => {
-					currentProcess = null;
-					const message = `Failed to start carbon profiler runner: ${err.message}`;
-					broadcast(IPC_CHANNELS.CARBON_PROFILER_ERROR, message);
-					reject(new Error(message));
-				});
-			});
-		},
-	);
+	ipcMain.handle(IPC_CHANNELS.CARBON_PROFILER_RUN, async (_event, args: Args) => {
+		const root = project(args);
+		const runArgs: string[] = [];
+		if (args?.month !== undefined && args.month !== "") runArgs.push("--month", month(args.month));
+		if (args?.backfill === true) runArgs.push("--backfill");
+		current?.kill("SIGTERM");
+		return run(root, runArgs, true);
+	});
 
 	ipcMain.handle(IPC_CHANNELS.CARBON_PROFILER_CANCEL, () => {
-		killExisting();
+		current?.kill("SIGTERM");
+		current = null;
 		return true;
+	});
+
+	ipcMain.handle(IPC_CHANNELS.CARBON_PROFILER_CONFIG, async (_event, args: Args) => {
+		const root = project(args);
+		const config = readCarbonConfig(args?.config);
+		if (!config) throw new Error("Not carbon settings");
+		const folder = await mkdtemp(path.join(os.tmpdir(), "workpilot-carbon-"));
+		try {
+			const file = path.join(folder, "carbon.json");
+			await writeFile(file, JSON.stringify(config), "utf-8");
+			return await run(root, ["--save-config", file]);
+		} finally {
+			await rm(folder, { recursive: true, force: true });
+		}
+	});
+
+	ipcMain.handle(IPC_CHANNELS.CARBON_PROFILER_EXPORT, async (_event, args: Args) => {
+		const root = project(args);
+		const chosen = month(args?.month);
+		const format = args?.format as CarbonExportFormat;
+		if (!FORMATS.includes(format)) throw new Error("Unknown export format");
+		const result = (await run(root, ["--export", chosen, "--format", format])) as { content?: unknown };
+		if (typeof result?.content !== "string") throw new Error("The export is empty");
+		const { canceled, filePath } = await showSaveDialog({
+			defaultPath: `carbon-${path.basename(root)}-${chosen}.${format}`.replace(/[^\w.-]/g, "_"),
+			filters: [{ name: format.toUpperCase(), extensions: [format] }],
+		});
+		if (canceled || !filePath) return null;
+		await writeFile(filePath, result.content, "utf-8");
+		return filePath;
+	});
+}
+
+/** The budget alerts of the projects that set a budget (`carbon/budget-alerts.ts`). */
+export function startCarbonBudgetSchedule(): () => void {
+	return startCarbonBudgetChecks({
+		projects: () => projectStore.getProjects().map((p) => ({ id: p.id, name: p.name, path: p.path })),
+		resolve: (projectPath) => resolveKnownProject(projectPath),
+		run: async (root) => (await runCarbon(root, ["--budget-check"])).result,
+		announce: (projectId, text) => notificationService.announce(projectId, text),
+		language: getAppLanguage,
 	});
 }
