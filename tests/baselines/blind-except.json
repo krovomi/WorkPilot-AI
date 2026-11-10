@@ -343,7 +343,6 @@
   "apps/backend/runners/pr_followup_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/prompt_optimizer_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/regression_guardian_runner.py": {"blind": 1, "silent": 0},
-  "apps/backend/runners/release_coordinator_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/roadmap/executor.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/roadmap/graph_integration.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/sandbox_runner.py": {"blind": 1, "silent": 0},
