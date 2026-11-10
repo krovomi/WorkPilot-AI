@@ -10,7 +10,7 @@
  * The config is only read here (no link followed, size capped); the runner
  * makes and saves the report, and never rewrites one already saved.
  */
-import { lstatSync, readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from "node:fs";
 import path from "node:path";
 
 const FIRST_CHECK_MS = 3 * 60_000;
@@ -68,14 +68,36 @@ export function readConfig(raw: unknown): MonthlyConfig | null {
 	return { frameworks: c.frameworks as string[], monthly: c.monthly === true };
 }
 
+/**
+ * The text of a plain file, checked on the descriptor itself so nothing can
+ * swap it between the check and the read. O_NOFOLLOW refuses a link where it
+ * exists; Windows has none, so the name must still be the file opened.
+ */
+function readPlainFile(file: string, maxBytes: number): string | null {
+	let fd: number | null = null;
+	try {
+		fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+		const stat = fstatSync(fd);
+		const named = lstatSync(file);
+		if (!stat.isFile() || !named.isFile() || named.ino !== stat.ino || named.dev !== stat.dev) return null;
+		if (stat.size > maxBytes) return null;
+		const buffer = Buffer.alloc(stat.size);
+		const read = readSync(fd, buffer, 0, stat.size, 0);
+		return buffer.subarray(0, read).toString("utf-8");
+	} catch {
+		return null;
+	} finally {
+		if (fd !== null) closeSync(fd);
+	}
+}
+
 export function readMonthlyConfig(projectRoot: string): MonthlyConfig | null {
 	const base = folder(projectRoot);
 	if (!base) return null;
-	const file = path.join(base, "config.json");
-	if (!regularFile(file)) return null;
+	const text = readPlainFile(path.join(base, "config.json"), MAX_CONFIG_BYTES);
+	if (text === null) return null;
 	try {
-		if (lstatSync(file).size > MAX_CONFIG_BYTES) return null;
-		const data = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+		const data = JSON.parse(text) as Record<string, unknown>;
 		const frameworks = Array.isArray(data.frameworks)
 			? data.frameworks.filter((f): f is string => typeof f === "string" && FRAMEWORK_ID.test(f))
 			: [];
