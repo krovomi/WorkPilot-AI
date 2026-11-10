@@ -75,6 +75,11 @@ describe("monthly", () => {
 		expect(monthlyDue(root, now)).toBe(false);
 	});
 
+	it("never reads a config bigger than its cap", () => {
+		config({ frameworks: ["soc2"], monthly: true, pad: "x".repeat(17 * 1024) });
+		expect(readMonthlyConfig(root)).toBeNull();
+	});
+
 	it("never reads a linked compliance folder", () => {
 		const elsewhere = mkdtempSync(path.join(os.tmpdir(), "elsewhere-"));
 		writeFileSync(path.join(elsewhere, "config.json"), JSON.stringify({ frameworks: ["soc2"], monthly: true }));

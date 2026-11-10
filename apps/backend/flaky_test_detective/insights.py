@@ -79,6 +79,11 @@ _SKIP_DIRS = {
 _MAX_FILES = 5000
 _MAX_READ = 400_000
 _MAX_BODY_LINES = 160
+# one alternative per quote, a character class that excludes the quote and
+# the backslash: each character matches one way only (no backtracking)
+_STRING_LITERAL = re.compile(
+    r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'|`(?:[^`\\\n]|\\.)*`'
+)
 
 
 def find_test_files(root: Path) -> list[str]:
@@ -162,8 +167,7 @@ def _body(lines: list[str], start: int) -> str:
         return "\n".join(lines[start:end])
     depth, opened, end = 0, False, start
     while end < len(lines) and end - start < _MAX_BODY_LINES:
-        # a backslash is only ever read as an escape: no two ways to match it
-        code = re.sub(r"(['\"`])(?:\\.|(?!\1|\\).)*\1", "", lines[end])
+        code = _STRING_LITERAL.sub("", lines[end])
         depth += code.count("{") - code.count("}")
         opened = opened or "{" in code
         end += 1
