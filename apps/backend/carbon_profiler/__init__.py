@@ -1,15 +1,12 @@
+"""Carbon profiler: the estimated CO₂ footprint of the models a project uses (#365).
+
+``ledger`` reads the calls the agents made, ``factors`` estimates each one,
+``report`` totals them with advice, ``budget`` keeps the month under its
+budget (alerts, degraded mode) and ``export`` writes the ESG document.
+See docs/architecture/carbon-profiler.md.
 """
-Carbon / Energy Profiler — Track CO2 footprint of LLM and CI/CD usage.
 
-Estimates energy (kWh) and carbon emissions (gCO2eq) per provider,
-model, and region with grid-intensity factors.
-"""
+from .config import CarbonConfig
+from .factors import Estimate, estimate
 
-from .energy_tracker import (
-    CarbonReport,
-    ComputeSource,
-    EnergyRecord,
-    EnergyTracker,
-)
-
-__all__ = ["EnergyTracker", "CarbonReport", "EnergyRecord", "ComputeSource"]
+__all__ = ["CarbonConfig", "Estimate", "estimate"]

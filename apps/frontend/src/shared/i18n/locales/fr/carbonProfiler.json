@@ -1,29 +1,119 @@
 {
-	"noData": "Aucun scan effectué. Cliquez sur « Lancer le scan » pour démarrer.",
-	"title": "Profilage carbone / énergie",
-	"totalEnergy": "Énergie totale",
-	"co2Emissions": "Émissions CO₂",
-	"records": "Enregistrements",
-	"co2ByProvider": "CO₂ par fournisseur (g)",
-	"co2ByModel": "CO₂ par modèle (g)",
-	"recentRecords": "Enregistrements récents",
-	"summary": "Résumé",
+	"title": "Empreinte carbone",
+	"description": "L'énergie et le CO₂ estimés des modèles appelés par les agents du projet, avec un budget mensuel et un export ESG.",
+	"noData": "Rien à afficher pour l'instant. Le rapport se remplit au fil du travail des agents sur ce projet.",
+	"emptyTitle": "Pas encore de rapport",
+	"noLedger": "Aucun appel de modèle n'est encore enregistré pour ce projet. Les builds lancés à partir de maintenant le sont ; « Reconstruire depuis les coûts » récupère les précédents dans les relevés de coûts.",
+	"estimated": "Chaque chiffre est une estimation : les fournisseurs ne publient pas l'énergie d'un appel. Il vient des tokens, de la taille du modèle, du PUE du centre de données et de l'intensité carbone du réseau.",
+	"unknownHosts": "L'hébergement de ces fournisseurs est supposé : {{providers}}.",
+	"totalEnergy": "Énergie",
+	"co2Emissions": "CO₂e",
+	"records": "Appels de modèle",
+	"carKm": "Équivalent voiture essence",
+	"period": "Du {{start}} au {{end}}",
+	"co2ByProvider": "CO₂e par fournisseur (g)",
+	"co2ByModel": "CO₂e par modèle (g)",
+	"co2ByPhase": "Par phase",
+	"co2ByTask": "Par tâche",
+	"share": "{{co2}} g · {{calls}} appels",
+	"recentRecords": "Derniers appels",
+	"adviceTitle": "Comment la réduire",
+	"trendTitle": "Les derniers mois",
+	"month": {
+		"label": "Mois",
+		"all": "Tout le registre"
+	},
+	"sources": {
+		"llm_cloud": "Cloud",
+		"llm_local": "Local"
+	},
 	"actions": {
-		"runScan": "Lancer le scan",
+		"refresh": "Actualiser",
 		"cancel": "Annuler",
-		"scanning": "Scan en cours...",
-		"reset": "Réinitialiser"
+		"scanning": "Lecture du registre…",
+		"backfill": "Reconstruire depuis les coûts",
+		"backfillHint": "Reconstruire le registre à partir des relevés de coûts de tous les builds du projet"
 	},
 	"errors": {
-		"noProject": "Sélectionnez un projet avant de lancer un scan.",
-		"failed": "Échec du scan : {{error}}"
+		"noProject": "Sélectionnez un projet pour voir son empreinte.",
+		"failed": "Le rapport a échoué : {{error}}"
 	},
-	"description": "Énergie et CO₂ des appels LLM et des runs CI du projet, lus dans son registre carbone.",
-	"emptyTitle": "Pas encore de scan",
-	"period": "Du {{start}} au {{end}}",
+	"budget": {
+		"title": "Budget de {{month}}",
+		"none": "Aucun budget mensuel n'est défini. Définissez-en un dans les réglages ci-dessous pour recevoir des alertes.",
+		"used": "{{used}} kg CO₂e utilisés sur {{budget}} kg",
+		"alertAt": "Première alerte à {{percent}} %, puis à 100 %, sur le bureau et sur votre canal de notification.",
+		"degraded": "Le budget est atteint et le mode dégradé est actif : les modèles les plus lourds passent au modèle standard de leur fournisseur jusqu'à la fin du mois.",
+		"states": {
+			"none": "Pas de budget",
+			"ok": "Dans le budget",
+			"warning": "Proche du budget",
+			"exceeded": "Budget atteint"
+		}
+	},
+	"advice": {
+		"review_on_fast": "{{share}} % de l'empreinte des revues et de la QA vient de grands modèles. Un modèle rapide suffit souvent et consomme environ {{saving}} % d'énergie en moins.",
+		"use_cache": "Seuls {{share}} % des tokens d'entrée envoyés à {{provider}} sont lus dans son cache de prompts. Des prompts stables lui permettent d'en servir davantage.",
+		"cleaner_region": "{{provider}} est compté sur le réseau {{from}}. Une région en {{to}} émettrait environ {{saving}} % de moins.",
+		"local_heavier": "Vos modèles locaux consomment {{local}} Wh pour 1 000 tokens écrits, ceux du cloud {{cloud}} Wh : ici le cloud est plus sobre.",
+		"local_lighter": "Vos modèles locaux consomment {{local}} Wh pour 1 000 tokens écrits, ceux du cloud {{cloud}} Wh : ici le local est plus sobre."
+	},
+	"export": {
+		"title": "Export ESG de {{month}}",
+		"description": "CSRD (ESRS E1-6 : modèles cloud en Scope 3 catégorie 1, modèles locaux en Scope 2 location-based) et GRI 305-3 / 302-1, avec la méthode et les facteurs utilisés.",
+		"formats": {
+			"json": "JSON",
+			"csv": "CSV",
+			"md": "Markdown"
+		},
+		"saved": "Enregistré dans {{path}}"
+	},
+	"settings": {
+		"title": "Réglages carbone",
+		"description": "Gardés dans .workpilot/carbon.json, pour ce projet seulement.",
+		"region": "Réseau électrique de cette machine",
+		"regionHint": "Sert aux modèles locaux. Les modèles cloud sont comptés sur le réseau de leur fournisseur.",
+		"budget": "Budget mensuel (kg CO₂e)",
+		"budgetHint": "0 signifie aucun budget.",
+		"alert": "Première alerte (%)",
+		"localPower": "Puissance d'un modèle local (W)",
+		"degrade": "Mode dégradé quand le budget est atteint",
+		"degradeHint": "Les modèles les plus lourds (Opus, GPT haut de gamme…) passent au modèle standard de leur fournisseur. Les modèles standard, rapides et locaux restent tels quels.",
+		"cpuOnly": "Les modèles locaux tournent sur le processeur seul",
+		"cpuOnlyHint": "Compte 45 W au lieu de la puissance ci-dessus.",
+		"save": "Enregistrer"
+	},
+	"regions": {
+		"world": "Moyenne mondiale",
+		"us": "États-Unis",
+		"us-west": "Ouest des États-Unis",
+		"us-southeast": "Sud-Est des États-Unis",
+		"ca": "Canada",
+		"eu": "Union européenne",
+		"fr": "France",
+		"de": "Allemagne",
+		"uk": "Royaume-Uni",
+		"nordics": "Pays nordiques",
+		"es": "Espagne",
+		"it": "Italie",
+		"nl": "Pays-Bas",
+		"pl": "Pologne",
+		"cn": "Chine",
+		"in": "Inde",
+		"jp": "Japon",
+		"au": "Australie",
+		"br": "Brésil"
+	},
 	"kickers": {
 		"providers": "Fournisseurs",
 		"models": "Modèles",
-		"records": "Registre"
+		"records": "Registre",
+		"budget": "Budget",
+		"advice": "Conseils",
+		"trend": "Tendance",
+		"phases": "Phases",
+		"tasks": "Tâches",
+		"export": "Export",
+		"settings": "Réglages"
 	}
 }
