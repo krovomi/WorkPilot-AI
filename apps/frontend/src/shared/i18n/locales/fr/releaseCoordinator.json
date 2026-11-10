@@ -52,5 +52,114 @@
 		"bumped": "À publier",
 		"gates": "Go / no-go",
 		"services": "Services"
+	},
+	"train": {
+		"kicker": "Release train",
+		"title": "Livrer les services dans l'ordre",
+		"hint": "release-train.yaml dit comment chaque service se déploie, revient en arrière et se vérifie. Le train lance ces commandes vague après vague : le service suivant ne part qu'une fois le précédent en bonne santé.",
+		"loading": "Lecture du fichier du train…",
+		"failed": "Release train : {{error}}",
+		"changedWhileApproving": "Le fichier du train a changé pendant votre lecture. Relisez-le, puis approuvez.",
+		"noFileTitle": "Pas encore de fichier du train",
+		"noFile": "Ajoutez release-train.yaml à la racine du projet (ou dans .workpilot/). Chaque commande est une liste d'arguments, jamais une ligne de shell.",
+		"invalid": "Le fichier du train n'est pas utilisable : {{error}}",
+		"liveStep": "{{service}} : {{step}}…",
+		"working": "Le train avance…",
+		"wave": "Vague {{number}}",
+		"external": "externe",
+		"flagLine": "Flag {{key}} ({{provider}}) activé une fois {{services}} livrés"
+	},
+	"approval": {
+		"title": "Approuvez ce fichier du train avant qu'il lance quoi que ce soit",
+		"hint": "{{path}} lance ces commandes sur votre ordinateur. Lisez-les. Toute modification du fichier (empreinte {{sha}}) vous redemandera.",
+		"approve": "Approuver cette version",
+		"variables": "Variables du projet transmises aux commandes et aux flags : {{names}}"
+	},
+	"problems": {
+		"cycle": "Les dépendances forment un cycle ({{services}}) : rien ne peut partir en premier. Retirer le lien de {{from}} vers {{to}} le casserait.",
+		"unknownDependency": "{{service}} dépend de {{dependency}}, absent du fichier du train : il est supposé déjà en place.",
+		"noDeploy": "{{service}} n'a pas de commande de déploiement."
+	},
+	"steps": {
+		"deploy": "déploiement",
+		"rollback": "retour arrière",
+		"health": "contrôle de santé",
+		"smoke": "smoke test",
+		"flag": "flag"
+	},
+	"start": {
+		"environment": "Environnement",
+		"production": "{{name}} (production)",
+		"train": "Lancer le train",
+		"or": "ou",
+		"hotfix": "Hotfix",
+		"express": "Déploiement express",
+		"productionHint": "Production : chaque service attend votre clic avant de lancer son déploiement.",
+		"stagingHint": "Chaque service part dès que le précédent a passé ses contrôles. Un service externe attend que vous disiez qu'il est prêt."
+	},
+	"runs": {
+		"title": "Derniers trains",
+		"line": "{{environment}} · {{status}} · {{date}}"
+	},
+	"runStatuses": {
+		"running": "En cours",
+		"waiting": "Vous attend",
+		"blocked": "Arrêté sur un échec",
+		"done": "Livré",
+		"rolled_back": "Revenu en arrière",
+		"rollback_failed": "Retour arrière en échec",
+		"aborted": "Arrêté"
+	},
+	"itemStatuses": {
+		"pending": "À faire",
+		"waiting_confirmation": "Vous attend",
+		"deploying": "En cours",
+		"done": "Livré",
+		"failed": "En échec",
+		"rolled_back": "Revenu en arrière",
+		"rollback_failed": "Retour arrière en échec",
+		"skipped": "Non livré"
+	},
+	"flagStates": {
+		"off": "désactivé",
+		"waiting": "vous attend",
+		"confirmed": "activé",
+		"on": "activé",
+		"failed": "en échec"
+	},
+	"calendar": {
+		"title": "Créneaux prévus",
+		"slot": "{{service}} sur {{environment}}, {{minutes}} min",
+		"conflict": "Conflit"
+	},
+	"metrics": {
+		"trains": "Trains ce mois-ci",
+		"multiService": "Multi-services",
+		"meanMinutes": "Minutes en moyenne",
+		"blockedByGates": "Arrêtés par un contrôle",
+		"rollbacks": "Retours arrière réussis"
+	},
+	"notes": {
+		"make": "Notes de version",
+		"ai": "Ajouter un résumé par le modèle",
+		"byModel": "Résumé par le modèle, liste tirée des commits.",
+		"byRules": "Rédigées à partir des commits."
+	},
+	"run": {
+		"title": "Train sur {{environment}}",
+		"express": "Déploiement express sur {{environment}}",
+		"calendarWarning": "Un créneau de {{service}} est prévu sur cet environnement en ce moment.",
+		"flagWaiting": "Activez le flag {{key}} dans votre outil, puis confirmez.",
+		"flagDone": "C'est activé",
+		"flag": "{{key}} : {{state}}",
+		"flagBlocked": "Le flag {{key}} n'a pas pu être activé : {{detail}}",
+		"blocked": "{{service}} : le {{step}} a échoué ({{detail}}).",
+		"retry": "Réessayer une fois corrigé",
+		"rollback": "Revenir en arrière sur la chaîne",
+		"abort": "S'arrêter là",
+		"blockedHint": "Le retour arrière prend le service en échec et chaque service livré qui en dépend, les dépendants d'abord ; leurs flags sont désactivés avant.",
+		"journal": "Journal",
+		"externalReady": "Il est prêt",
+		"deploy": "Déployer {{service}}"
 	}
 }

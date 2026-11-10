@@ -2,6 +2,7 @@ import { AlertTriangle, Calendar, Package, Play, RotateCcw, Square } from "lucid
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useReleaseCoordinatorStore } from "../../stores/release-coordinator-store";
+import { ReleaseTrainPanel } from "./ReleaseTrainPanel";
 import type {
 	BumpType,
 	GateStatus,
@@ -110,6 +111,7 @@ export function ReleasePlanView({
 						</EmptyStage>
 					)
 				)}
+				{projectPath && <ReleaseTrainPanel projectPath={projectPath} />}
 			</Page>
 		</ModuleStage>
 	);

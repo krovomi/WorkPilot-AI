@@ -1,0 +1,5 @@
+---
+section: ✨ Nouveautés
+---
+
+- **Le Release Train livre lui-même les services, dans l'ordre** (F199). Le fichier `release-train.yaml` du projet dit comment chaque service se déploie, revient en arrière et se vérifie : une commande (script, `kubectl`, `gh workflow run`…, jamais une ligne de shell) ou une URL de santé. Le train calcule les vagues d'après les dépendances, la criticité d'abord, et signale un cycle avec le lien à couper. Il lance chaque déploiement, puis le contrôle de santé, puis le smoke test, avant de passer au suivant. En production, chaque service attend votre clic. Un service externe attend que vous disiez qu'il est prêt. Après un échec, vous choisissez : réessayer, revenir en arrière sur la chaîne (les services livrés qui en dépendent d'abord, flags désactivés avant) ou s'arrêter. Le train gère aussi le déploiement express d'un hotfix, les feature flags Unleash, LaunchDarkly, ConfigCat ou manuels, un calendrier qui signale les créneaux en conflit, des notes de version agrégées (résumé facultatif par le modèle configuré) et les métriques du mois. Rien ne s'exécute avant que vous ayez approuvé cette version exacte du fichier (#362).
