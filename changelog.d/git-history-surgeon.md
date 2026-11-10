@@ -1,5 +1,0 @@
----
-section: ✨ Nouveautés
----
-
-- **Le chirurgien de l'historique Git nettoie une branche sans toucher au code** (F198). Il propose un plan par règles, sans modèle et pour toutes les stacks : les `fixup!` et les correctifs vagues rejoignent leur commit, mais seulement dans la même partie du projet ; les messages sont reformulés selon la convention du projet (Conventional Commits, Gitmoji ou motif propre) ; les commits qui mêlent migrations, code, tests et doc sont découpés. Les auteurs, les co-auteurs, les trailers et les `(#123)` sont conservés. Le modèle configuré peut rédiger les messages, quel que soit le fournisseur, à partir des messages et des chemins seulement. Le plan, modifiable, est rejoué sur une nouvelle branche locale dont les fichiers sont identiques à ceux de la branche, octet pour octet. Rien n'est poussé ni forcé. La page liste aussi les branches locales fusionnées, orphelines, anciennes ou mal nommées, et supprime seulement les branches fusionnées que l'on choisit (#360).
