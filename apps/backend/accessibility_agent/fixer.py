@@ -131,14 +131,14 @@ def _label_for_control(el: Element) -> str:
     return ""
 
 
+# One digit per repetition: `\d+` inside the "+" backtracked exponentially on a run of digits.
+ICON_SUFFIX = re.compile(r"(?:Icon|Outline|Solid|Filled|Rounded|Sharp|\d)+$")
+
+
 def _label_from_icon(markup: Markup, el: Element) -> str:
     for child in el.descendants():
         if child.is_component:
-            name = re.sub(
-                r"(Icon|Outline|Solid|Filled|Rounded|Sharp|\d+)+$",
-                "",
-                child.name.split(".")[-1],
-            )
+            name = ICON_SUFFIX.sub("", child.name.split(".")[-1])
             words = _words(name)
             if words:
                 return words
