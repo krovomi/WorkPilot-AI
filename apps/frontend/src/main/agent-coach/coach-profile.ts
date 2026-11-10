@@ -9,7 +9,7 @@
  * is read from a file chosen the same way, at most 256 KB.
  */
 import { spawn } from "node:child_process";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { open, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	type CoachCheckResult,
@@ -159,7 +159,25 @@ export async function importProfile(projectPath: string, run: RunCoach = runCoac
 	});
 	const file = filePaths?.[0];
 	if (canceled || !file) return null;
-	const info = await stat(file);
-	if (!info.isFile() || info.size > MAX_IMPORT_BYTES) throw new Error("The file is not a coach profile");
-	return run<CoachProfileState>(projectPath, "import", "COACH_PROFILE:", { stdin: await readFile(file, "utf-8") });
+	return run<CoachProfileState>(projectPath, "import", "COACH_PROFILE:", { stdin: await readImport(file) });
+}
+
+/** Checks and reads through one handle, so the file checked is the file read; never more than the cap. */
+async function readImport(file: string): Promise<string> {
+	const handle = await open(file, "r");
+	try {
+		const info = await handle.stat();
+		if (!info.isFile() || info.size > MAX_IMPORT_BYTES) throw new Error("The file is not a coach profile");
+		const buffer = Buffer.alloc(MAX_IMPORT_BYTES + 1);
+		let total = 0;
+		while (total < buffer.length) {
+			const { bytesRead } = await handle.read(buffer, total, buffer.length - total, total);
+			if (bytesRead === 0) break;
+			total += bytesRead;
+		}
+		if (total > MAX_IMPORT_BYTES) throw new Error("The file is not a coach profile");
+		return buffer.toString("utf-8", 0, total);
+	} finally {
+		await handle.close();
+	}
 }
