@@ -1,0 +1,108 @@
+From 2b4bcc430fa6361646e5f8c4a24bba11e0256413 Mon Sep 17 00:00:00 2001
+From: WorkPilot AI <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 06:59:52 +0000
+Subject: [PATCH] =?UTF-8?q?docs(wiki):=201.5.0=20=E2=80=94=20what's=20new,?=
+ =?UTF-8?q?=20roadmap?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ Home.md       |  6 +++---
+ Roadmap.fr.md | 34 +++++++++++++++++++++++++++++++++-
+ Roadmap.md    | 15 ++++++++++++++-
+ 3 files changed, 50 insertions(+), 5 deletions(-)
+
+diff --git a/Home.md b/Home.md
+index f209b58..9d75b0c 100644
+--- a/Home.md
++++ b/Home.md
+@@ -6,11 +6,11 @@
+ 
+ ---
+ 
+-## 🆕 What's new in 1.4.1 / Nouveautés de la 1.4.1
++## 🆕 What's new in 1.5.0 / Nouveautés de la 1.5.0
+ 
+-Every page that writes code into your project (test studio, Import Design, changelog, pair programming, quick command) now works on a review branch: a « Generated code » card waits in Human Review and you open the PR from it. The left menu becomes a rail of spaces with « My menu », four Toolbox hubs and a Labo for beta pages, and Ctrl+K finds all 77 pages. The board gains an « Open PR » column and a worktree purge, diffs use git colours with syntax highlighting for every stack, the first-run wizard sets up any AI provider, multi-repo changes run on the engine you pick, CI/CD Triggers start your pipeline after an agent's PR, and the learning loop's lessons reach the spec. Dependency alerts (oauthlib, glob, minimatch, fast-uri) are fixed. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
++Agent rules become a versioned policy they cannot get around, every tool result is scanned for prompt injection before the agent reads it, and a red team agent attacks what each task built. A plan rehearsal replays the spec's plan before the build, and the migration guard says what a task's migrations would do to a production database. The quality agents (accessibility with a WCAG 2.2 score, i18n, API contract watcher, doc drift, flaky tests, compliance evidence, notebooks) cover every stack and fix on a review branch. The Release Train now deploys your services itself, the Git history surgeon cleans up a branch, Best-of-N gets an arbiter, the carbon profiler a monthly budget, production incidents from Sentry become bug-fix cards, and the coach learns your coding style and gives it to the agents. → [Roadmap](Roadmap) · [Feuille de route](Roadmap.fr) · [Release notes](https://github.com/krovomi/WorkPilot-AI/releases)
+ 
+-Tout code généré passe par une branche et une PR relue, et le menu de gauche s'allège.
++Garde-fous en code, red team et agents qualité pour toutes les stacks.
+ 
+ ---
+ 
+diff --git a/Roadmap.fr.md b/Roadmap.fr.md
+index eec1e0a..ed4e1db 100644
+--- a/Roadmap.fr.md
++++ b/Roadmap.fr.md
+@@ -20,7 +20,39 @@ WorkPilot AI vise à devenir le **framework de référence pour le développemen
+ 
+ ## 🧭 Versions récentes
+ 
+-### v1.4.1 — Stable actuelle (9 novembre 2026)
++### v1.5.0 — Stable actuelle (10 novembre 2026)
++
++*Garde-fous en code, red team et agents qualité pour toutes les stacks.* Détail dans le
++[CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
++
++- **Garde-fous en code** : une politique versionnée, par couches, que les agents ne contournent
++  pas, appliquée aussi dans les worktrees ; chaque résultat d'outil est analysé contre l'injection
++  de prompt avant que l'agent ne le lise
++- **Red team** : après la QA, un agent essaie de casser ce que la tâche a construit, jugé par
++  l'exécution de WorkPilot
++- L'**essai à blanc** rejoue le plan d'une spec sur la branche de base avant le build ; la **garde
++  des migrations** relit les migrations d'une tâche (perte de données, renommage, NOT NULL sans
++  défaut, verrous) pour toutes les stacks
++- **Des agents qualité pour toutes les stacks** : accessibilité (score WCAG 2.2 par critère et par
++  page, scan dynamique), i18n (clés proposées, pluriels, RTL), veille des contrats d'API (contre la
++  branche cible, consommateurs, porte de QA), dérive de la doc, tests instables (cause et carte de
++  correction), preuves de conformité, onboarding raconté par rôle ; les corrections vont sur une
++  branche de revue
++- Le **Release Train** livre les services d'un fichier approuvé dans l'ordre des dépendances, avec
++  contrôles de santé et smoke tests, un clic par service de production et un rollback en cascade
++- **Chirurgien de l'historique Git** : regrouper, renommer et découper les commits d'une branche sur
++  une nouvelle branche au code identique, jamais poussée
++- **Arbitre du Best-of-N** quand les variantes ne font pas la même chose ; **budget carbone**
++  mensuel avec export ESG ; les **incidents de production** (Sentry ou une boîte de dépôt)
++  deviennent des cartes de correction
++- **Notebooks** : dépendances entre cellules, exécution en noyau neuf sans identifiants, cellules
++  longues changées en fonctions sur une carte de revue
++- **Coach personnel** : votre style de code par langage, appris de votre historique git et du lint,
++  donné au codeur et au correcteur QA ; modifiable et exportable
++- **Corrections** : la release se construit de nouveau sur le tag, « Installer SOUL.md » dans l'app
++  installée ; **sécurité** : deepmerge corrigé dans l'application mobile
++
++### v1.4.1 — 9 novembre 2026
+ 
+ *Tout code généré passe par une branche et une PR relue, et le menu de gauche s'allège.* Détail dans le
+ [CHANGELOG](https://github.com/krovomi/WorkPilot-AI/blob/main/CHANGELOG.md).
+diff --git a/Roadmap.md b/Roadmap.md
+index a2a2c48..5909654 100644
+--- a/Roadmap.md
++++ b/Roadmap.md
+@@ -25,7 +25,20 @@ As with every other feature in WorkPilot AI, nothing on the Roadmap writes code
+ 
+ ## Recent releases
+ 
+-### v1.4.1 — current stable (November 9, 2026)
++### v1.5.0 — current stable (November 10, 2026)
++
++- **Guardrails as code**: a versioned, layered policy that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it
++- **Red team**: after QA, an agent tries to break what the task built, judged by WorkPilot's own run
++- **Plan rehearsal** replays a spec's plan over the base branch before the build; the **migration guard** reviews a task's migrations for data loss, renames, NOT NULL without default and locks, on every stack
++- **Quality agents for every stack**: accessibility (WCAG 2.2 score per criterion and page, dynamic scan), i18n (key proposals, plurals, RTL), API contract watcher (against the target branch, consumers, QA gate), doc drift, flaky tests (cause and fix card), compliance evidence, onboarding story per role; fixes go on a review branch
++- **Release Train** deploys the services of an approved train file in dependency order, with health and smoke checks, a click per production service and cascading rollback
++- **Git history surgeon**: squash, reword and split a branch's commits onto a new branch with the same code, never pushed
++- **Best-of-N arbiter** when variants do not do the same thing; **carbon budget** per month with an ESG export; **production incidents** (Sentry or an inbox) become bug-fix cards
++- **Notebooks**: cell dependencies, runs in a fresh kernel without credentials, long cells turned into functions on a review card
++- **Personal coach**: your coding style per language, learned from your git history and lint config, given to the coder and QA fixer; editable and exportable
++- **Fixes**: the release builds on the tag again, « Install SOUL.md » in the packaged app; **security**: deepmerge patched in the mobile app
++
++### v1.4.1 — November 9, 2026
+ 
+ - **Every write goes through review**: the test generation studio, Import Design, the changelog, pair programming and the Kanban quick command write on the branch of a « Generated code » card in Human Review; you read the diff, then « Create PR »
+ - **A lighter left menu**: a rail of spaces with one panel at a time, « My menu » for pinned and recent pages, the Toolbox in four hubs (20 entries become 9), the 14 beta pages in a **Labo**, an offer to hide pages unused for 30 days; Ctrl+K and `/` find all 77 pages by name, group or keyword
+-- 
+2.43.0
+

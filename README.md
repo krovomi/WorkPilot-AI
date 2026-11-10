@@ -192,15 +192,19 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Build pipeline**
 - **Kanban board** with spec approval, pause and resume, per-phase re-run, steering messages while the agent works, and a guided review with line comments sent back to the fixer; diffs in git colours, with syntax highlighting for every stack, changed words marked and an Auto side-by-side layout.
-- **Automatic split** of big tasks into small grouped PRs, **stacked tasks**, **Best-of-N** (build a task 2 to 4 times on different engines and keep the best) and **multi-repo** changes, on the provider, model and effort you pick for them.
+- **Automatic split** of big tasks into small grouped PRs, **stacked tasks**, **Best-of-N** (build a task 2 to 4 times on different engines and keep the best, with an arbiter when the variants do not do the same thing) and **multi-repo** changes, on the provider, model and effort you pick for them.
+- **Plan rehearsal** replays a spec's plan over the base branch before the build; after QA, a **red team** agent tries to break what the task built, and the **migration guard** says what the task's migrations would do to a production database, for every stack.
 - **Goal mode** (done when a command says so, e.g. `dotnet test` exits 0), **cross review** by a second engine, **spec by example** for ASP.NET Core Web APIs, **.NET upgrades** one release at a time up to .NET 11.
 - **Runtime verification** with proof videos and a comparison against the base branch; **hard gates** for invented packages, toothless tests and formal proofs.
 - **PR follow-through**: a red check or a review thread on the task's PR goes back to the fixer, never forced, never merged.
 - **Provenance**: which lines the AI wrote and with which model, an SBOM of the packages added, requirement-to-test traceability.
+- **Guardrails as code**: a versioned policy, in layers, that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it.
 
 **Agents and orchestration**
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
-- Specialised agents: test generator, flaky test detective, refactorer, docs and drift, migration, release coordinator, self-healing on CI failures, technical debt tracker.
+- Specialised agents: test generator, flaky test detective (with the cause and a fix card), refactorer, docs and drift, accessibility (WCAG 2.2 score and fixes), i18n, API contract watcher, compliance evidence, notebooks (cell dependencies, fresh-kernel runs), migration, self-healing on CI failures, technical debt tracker; their fixes go on a review branch, never straight into your folder.
+- **Release Train** deploys your services itself, in dependency order, with health and smoke checks and a click per production service; the **Git history surgeon** cleans up a branch's commits onto a new branch, same code.
+- **Personal coach**: learns your coding style per language from your git history and lint config, and gives your clear preferences to the coder and the QA fixer.
 - **Shared memory**: one Obsidian vault and graph every agent reads and writes, across sessions and providers; the learning loop analyses each build with a model of whichever provider is selected, and its lessons reach the spec, the plan, the code and QA; provider-agnostic **skills** packs.
 
 **Understand and plan**
@@ -209,7 +213,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Integrations**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
-- **Automations** turn an event (an issue labelled, CI red, a time of day) into a draft card; **CI/CD Triggers** start your pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged.
+- **Automations** turn an event (an issue labelled, CI red, a time of day, a production incident from Sentry) into a draft card; **CI/CD Triggers** start your pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged.
 - MCP marketplace and custom MCP servers with pinned tool descriptions; the **workpilot-board** MCP server gives Claude Code, Codex, Gemini CLI, Copilot, Cursor and others your Kanban.
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
@@ -218,7 +222,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Mobile app** for iOS and Android, team chat, invitation-only sign-up.
 
 **Cost and monitoring**
-- Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler, OpenTelemetry GenAI traces for every provider.
+- Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**
 - One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, full English and French interface.
