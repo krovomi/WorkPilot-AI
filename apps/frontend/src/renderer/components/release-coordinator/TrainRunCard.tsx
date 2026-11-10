@@ -99,9 +99,10 @@ export function TrainRunCard({ run }: { readonly run: TrainRun }): React.ReactEl
 				<details className="mt-2">
 					<summary className="wp-kicker cursor-pointer">{t("run.journal")}</summary>
 					<ul className="mt-1 space-y-0.5 font-mono text-xs">
-						{run.journal.map((entry, index) => (
-							// biome-ignore lint/suspicious/noArrayIndexKey: the journal only grows, in order
-							<li key={index} className={entry.kind === "error" ? "text-destructive" : undefined}>
+						{run.journal.map((entry) => (
+							<li
+								key={`${entry.at}|${entry.kind}|${entry.service ?? ""}|${entry.text}`}
+								className={entry.kind === "error" ? "text-destructive" : undefined}>
 								{formatAppTime(entry.at)} {entry.service && `${entry.service} · `}
 								{entry.text}
 							</li>
