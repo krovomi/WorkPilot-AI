@@ -29,7 +29,7 @@ SOURCES = ["src/Orders/OrderService.cs", "shop/cart.py", "pkg/cart.go", "src/car
         + "   at Orders.OrderService.Total(Cart cart) in /repo/src/Orders/OrderService.cs:line 42",
         "shop/cart.py:12: in total\n    return items[0].price\nE   IndexError: list index out of range",
         "panic: runtime error: index out of range [0] with length 0\n\n"
-        "goroutine 7 [running]:\nexample.com/pkg.Total(...)\n\t/repo/pkg/cart.go:18 +0x1d",
+        + "goroutine 7 [running]:\nexample.com/pkg.Total(...)\n\t/repo/pkg/cart.go:18 +0x1d",
         "TypeError: Cannot read properties of undefined (reading 'price')\n"
         "    at total (/repo/src/cart.ts:9:21)",
     ],
