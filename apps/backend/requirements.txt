@@ -97,5 +97,5 @@ pillow>=13.0.0
 # OpenTelemetry GenAI spans for every provider (genai_trace/), exported over
 # OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
 # installed through mcp; the SDK and the exporter make the spans leave.
-opentelemetry-sdk>=1.45.1
+opentelemetry-sdk>=1.45.2
 opentelemetry-exporter-otlp-proto-http>=1.45.2
