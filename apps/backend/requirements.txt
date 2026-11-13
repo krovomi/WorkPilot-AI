@@ -28,7 +28,7 @@ secretstorage>=3.5.0; sys_platform == "linux"
 pywin32>=312; sys_platform == "win32"
 
 # Pydantic for structured output schemas
-pydantic>=2.14.2
+pydantic>=2.14.3
 
 # Rich for beautiful CLI formatting (intent recognition)
 rich>=15.0.0
@@ -97,5 +97,5 @@ pillow>=13.0.0
 # OpenTelemetry GenAI spans for every provider (genai_trace/), exported over
 # OTLP http/protobuf when AUTO_CLAUDE_OTEL_ENDPOINT is set. The API was already
 # installed through mcp; the SDK and the exporter make the spans leave.
-opentelemetry-sdk>=1.45.1
+opentelemetry-sdk>=1.45.2
 opentelemetry-exporter-otlp-proto-http>=1.45.2
