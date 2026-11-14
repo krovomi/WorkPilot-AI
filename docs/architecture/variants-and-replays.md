@@ -1,3 +1,10 @@
+---
+feature: Variantes et rejeux
+summary: >-
+  ADR : `best_of_n` seul mécanisme de variantes ; `replay` et `bench` séparés ; un fork de Time
+  Travel est enregistré, jamais exécuté.
+---
+
 # Variantes et rejeux : deux paires qui se ressemblent (ADR)
 
 Le plan du 29 octobre (A3) relevait deux doublons apparents dans `apps/backend/` : deux

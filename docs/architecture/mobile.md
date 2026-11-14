@@ -1,3 +1,9 @@
+---
+feature: Applications mobiles
+summary: >-
+  Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS.
+---
+
 # Mobile applications (Android and Apple)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

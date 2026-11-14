@@ -1,3 +1,9 @@
+---
+feature: Architecture frontend
+summary: >-
+  Stores, activité de fond et barre latérale, agents, profils, terminaux, liens d'auth.
+---
+
 # Frontend architecture
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

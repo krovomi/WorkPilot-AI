@@ -1,3 +1,10 @@
+---
+feature: Panneau de tâche
+summary: >-
+  Progression (`shared/progress.ts`), onglets Avancement / Qualité / Coûts et contexte, bannière «
+  ce qui vous attend », critères d'acceptation, graphe des changements.
+---
+
 # Le panneau de tâche (frontend)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

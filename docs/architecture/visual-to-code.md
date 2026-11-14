@@ -1,3 +1,9 @@
+---
+feature: Visual-to-code
+summary: >-
+  Documents d'architecture et leur historique sur disque.
+---
+
 # Visual-to-code : architectures et historique
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

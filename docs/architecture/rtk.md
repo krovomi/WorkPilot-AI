@@ -1,3 +1,9 @@
+---
+feature: rtk
+summary: >-
+  Sortie de commande condensée pour les modèles seulement ; l'allowlist voit à travers le proxy.
+---
+
 # Token savings (rtk)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

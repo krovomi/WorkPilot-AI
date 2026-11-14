@@ -1,3 +1,10 @@
+---
+feature: Agents ACP
+summary: >-
+  Un client ACP pour tous les agents qui le parlent, une entrée `acp:` par agent dans
+  `providers.yaml` ; droits tenus trois fois, `session/request_permission` posée sur la carte.
+---
+
 # Agents ACP — un client pour tous les agents du protocole
 
 > **Statut : livré pour Gemini CLI.** Faits relevés sur le schéma ACP (protocole version 1,
