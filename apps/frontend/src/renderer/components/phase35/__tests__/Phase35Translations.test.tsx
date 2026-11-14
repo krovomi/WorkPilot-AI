@@ -13,11 +13,13 @@ import {
 	useArchDriftStore,
 	useCicdAnomalyStore,
 	useDomainAgentsStore,
+	useI18nScalerStore,
 	useLicenseStore,
 } from "../../../stores/phase35-stores";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
+import { I18nScalerPanel } from "../I18nScalerPanel";
 import { LicensePanel } from "../LicensePanel";
 
 const DOMAINS = [
@@ -38,6 +40,7 @@ afterEach(() => {
 	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
 	useCicdAnomalyStore.setState({ signals: [], phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, phase: "idle", error: null });
+	useI18nScalerStore.setState({ report: null, formats: [], scannedDir: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
 		scanReport: null,
 		driftReport: null,
@@ -75,6 +78,21 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText("Conflit de dépendances")).toBeInTheDocument();
 		expect(screen.getByText("élevée")).toBeInTheDocument();
 		expect(screen.queryByText("dependency_conflict")).not.toBeInTheDocument();
+	});
+
+	it("names the other stacks' catalogs it read and offers the open project as the folder", () => {
+		useI18nScalerStore.setState({
+			phase: "ok",
+			report: { source_locale: "en", diffs: [], coverage: [] },
+			scannedDir: "/work/shop",
+			redirectedFrom: null,
+			formats: ["resx", "android"],
+		});
+		render(<I18nScalerPanel projectPath="/work/shop" />);
+		expect(
+			screen.getByText(/Catalogues lus : RESX \(\.NET\), strings\.xml \(Android\)/),
+		).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Analyser tout le projet ouvert" })).toBeInTheDocument();
 	});
 
 	it("translates a licence conflict's category and remediation", () => {

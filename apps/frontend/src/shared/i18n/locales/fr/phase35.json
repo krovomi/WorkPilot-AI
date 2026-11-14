@@ -361,7 +361,22 @@
 		"editorEmpty": "Chargez les traductions pour les parcourir et les modifier.",
 		"detectedTitle": "Trouvés dans ce projet",
 		"detectedMeta_one": "{{locales}} · {{count}} namespace",
-		"detectedMeta_other": "{{locales}} · {{count}} namespaces"
+		"detectedMeta_other": "{{locales}} · {{count}} namespaces",
+		"useProject": "Analyser tout le projet ouvert",
+		"formatsNote": "Lit l'i18next JSON, et sinon les catalogues de toutes les stacks : RESX, Android, iOS, gettext, ARB, XLIFF, .properties, Rails, Laravel. L'éditeur ne modifie que le JSON.",
+		"formatsRead": "Catalogues lus : {{formats}}. Ils ne sont pas modifiables dans l'éditeur, qui n'écrit que du JSON.",
+		"formats": {
+			"json": "JSON",
+			"arb": "ARB (Flutter)",
+			"resx": "RESX (.NET)",
+			"android": "strings.xml (Android)",
+			"strings": ".strings (iOS, macOS)",
+			"xliff": "XLIFF (Angular)",
+			"gettext": "gettext (.po)",
+			"properties": ".properties (Java, Kotlin)",
+			"yaml": "YAML (Rails)",
+			"php": "PHP (Laravel)"
+		}
 	},
 	"i18nEditor": {
 		"searchNamespaces": "Filtrer les namespaces",

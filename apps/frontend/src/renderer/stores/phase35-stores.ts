@@ -390,6 +390,8 @@ interface I18nScalerState extends BaseSlice {
 	scannedDir: string | null;
 	/** Set only when the picked directory was one language, not the root. */
 	redirectedFrom: string | null;
+	/** Catalog formats read, when the folder held another stack's catalogs rather than JSON. */
+	formats: string[];
 	runReport: (localesDir: string, sourceLocale?: string) => Promise<void>;
 }
 
@@ -401,8 +403,9 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 	diff: null,
 	scannedDir: null,
 	redirectedFrom: null,
+	formats: [],
 	runReport: async (localesDir, sourceLocale) => {
-		set({ phase: "running", error: null, redirectedFrom: null });
+		set({ phase: "running", error: null, redirectedFrom: null, formats: [] });
 		try {
 			const res = await globalThis.electronAPI.reportI18nFromDir(
 				localesDir,
@@ -414,6 +417,7 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 				report: res.report,
 				scannedDir: res.locales_dir ?? null,
 				redirectedFrom: res.redirected_from ?? null,
+				formats: res.layout === "catalogs" ? (res.formats ?? []) : [],
 			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });

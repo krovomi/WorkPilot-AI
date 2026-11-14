@@ -87,7 +87,7 @@ vi.mock("../../../stores/phase35-stores", () => ({
 		compare: noop,
 		deleteGen: noop,
 	}),
-	useI18nScalerStore: () => ({ ...idleSlice, runReport: noop }),
+	useI18nScalerStore: () => ({ ...idleSlice, formats: [], runReport: noop }),
 	useCogContextStore: () => ({ ...idleSlice, optimize: noop }),
 	useAuditTrailStore: () => ({
 		...idleSlice,
