@@ -53,12 +53,16 @@ class FileChangeEvent:
     file_path: str
     change_type: str  # created | modified | deleted | renamed
     diff: str = ""
+    # "diff" for a git diff, "file" for the head of a new or untracked file
+    content_kind: str = ""
     language: str = ""
     timestamp: str = ""
 
     def __post_init__(self):
         if not self.timestamp:
             self.timestamp = datetime.now(UTC).isoformat()
+        if self.content_kind not in ("diff", "file"):
+            self.content_kind = "diff" if self.change_type == "modified" else "file"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

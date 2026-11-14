@@ -228,9 +228,12 @@ class AgentRunner:
                     "Use absolute paths for project source files. Modify the failed files "
                     "with tools; describing commands does not execute them.\n"
                 )
-            return await self._run_with_agent_client(
-                client, prompt, working_directory=working_directory
-            )
+            try:
+                return await self._run_with_agent_client(
+                    client, prompt, working_directory=working_directory
+                )
+            finally:
+                self._record_usage(client, agent_type)
 
         # Claude/Anthropic provider: use raw SDK client (create_client) for full
         # SDK message type compatibility (AssistantMessage, ToolUseBlock, etc.)
@@ -263,7 +266,7 @@ class AgentRunner:
 
         from context_mgmt.sdk_usage import SdkUsageProbe
 
-        usage_probe = SdkUsageProbe()
+        usage_probe = SdkUsageProbe(model=self.model or "")
         context_gauge = self._context_gauge(
             usage_probe, active_provider, self.model, prompt
         )
@@ -390,6 +393,7 @@ class AgentRunner:
                             )
 
                 print()
+                self._record_usage(usage_probe, agent_type)
 
                 # Detect empty sessions: if the agent didn't call any tools
                 # and produced no meaningful output, something went wrong
@@ -481,6 +485,16 @@ class AgentRunner:
             if self.task_logger:
                 self.task_logger.log_error(f"Agent error: {e}", LogPhase.PLANNING)
             return False, str(e)
+
+    def _record_usage(self, source, agent_type: str) -> None:
+        """A spec session counts in the project's usage ledgers, like a build's.
+
+        ``source`` is the AgentClient, or the ``SdkUsageProbe`` of a raw SDK
+        stream. Never raises: ``record_client_usage`` swallows its errors.
+        """
+        from agents.session import record_client_usage
+
+        record_client_usage(source, self.spec_dir, "spec", agent_type=agent_type)
 
     def _context_gauge(self, usage_source, provider: str, model: str, prompt: str):
         """A measure-only context guard for this spec session, or None.
