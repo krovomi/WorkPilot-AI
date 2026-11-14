@@ -251,29 +251,21 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.GEN_TESTS_CAPTURE,
-		async (_e, { projectPath, label, junitXml }: { projectPath: string; label: string; junitXml: string }) =>
+		async (_e, { projectPath, label, report }: { projectPath: string; label: string; report: string }) =>
 			backendFetch("/api/generational-tests/capture", {
 				method: "POST",
-				body: JSON.stringify({ project_path: projectPath, label, junit_xml: junitXml }),
+				body: JSON.stringify({ project_path: projectPath, label, report }),
 			}),
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.GEN_TESTS_COMPARE,
 		async (
 			_e,
-			{
-				projectPath,
-				baselineLabel,
-				currentJunitXml,
-			}: { projectPath: string; baselineLabel: string; currentJunitXml: string },
+			{ projectPath, baselineLabel, report }: { projectPath: string; baselineLabel: string; report: string },
 		) =>
 			backendFetch("/api/generational-tests/compare", {
 				method: "POST",
-				body: JSON.stringify({
-					project_path: projectPath,
-					baseline_label: baselineLabel,
-					current_junit_xml: currentJunitXml,
-				}),
+				body: JSON.stringify({ project_path: projectPath, baseline_label: baselineLabel, report }),
 			}),
 	);
 	ipcMain.handle(

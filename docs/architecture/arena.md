@@ -1,3 +1,9 @@
+---
+feature: Mode Arena
+summary: >-
+  De vrais concurrents et un coût mesuré.
+---
+
 # Mode Arena
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

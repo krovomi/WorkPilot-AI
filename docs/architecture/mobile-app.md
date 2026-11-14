@@ -1,3 +1,11 @@
+---
+feature: App mobile (iOS, Android)
+summary: >-
+  Client Expo du mode serveur : Kanban en direct (`GET /api/board/cards`, `project:<id>`), actions
+  d'une carte ; refresh dans le Keychain ou le Keystore, un à la fois, HTTPS sauf réseau local ;
+  APK et simulateur iOS en artefacts de `mobile.yml`.
+---
+
 # L'app mobile (iOS et Android)
 
 L'app mobile est un client du [mode serveur](server-mode.md). Les agents ont besoin d'une machine

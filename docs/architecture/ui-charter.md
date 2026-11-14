@@ -1,3 +1,10 @@
+---
+feature: Charte UI
+summary: >-
+  `components/charter/` : scène, colonnes, cartes à rail, un seul bouton principal, pour tous les
+  modules et Réglages.
+---
+
 # WorkPilot UI charter
 
 > One look for every feature module and every Settings page: the one of

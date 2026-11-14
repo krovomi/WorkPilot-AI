@@ -107,6 +107,7 @@ def build_codex_exec_args(
     thread_id: str | None,
     sandbox: str = "workspace-write",
     auto_compact_token_limit: int | None = None,
+    mcp_overrides: list[str] | None = None,
 ) -> list[str]:
     """Build a shell-free Codex command; the prompt is always sent on stdin."""
     # Both values are deliberately excluded from launcher arguments. ``cwd``
@@ -143,6 +144,9 @@ def build_codex_exec_args(
         args.extend(
             ["-c", f"model_auto_compact_token_limit={auto_compact_token_limit}"]
         )
+    # The project's approved MCP servers (`core.cli_mcp.codex_mcp_overrides`):
+    # plain values only, their secrets in the environment.
+    args.extend(mcp_overrides or [])
     args.append("-")
     return args
 
@@ -225,8 +229,11 @@ class CodexCliAgentClient(AgentClient):
         executable: str | None = None,
         process_factory: _ProcessFactory | None = None,
         auto_compact_token_limit: int | None = None,
+        mcp_servers: list[dict[str, Any]] | None = None,
     ) -> None:
         self.model = resolve_codex_model(model) or "default"
+        #: The custom MCP servers Codex may start; looked up on first use.
+        self._mcp_servers = mcp_servers
         self._auto_compact_token_limit = auto_compact_token_limit
         self.system_prompt = system_prompt
         self._project_dir = str(Path(project_dir))
@@ -281,6 +288,15 @@ class CodexCliAgentClient(AgentClient):
             raise FileNotFoundError(
                 "Codex CLI is not installed or is not available on PATH."
             )
+        if self._mcp_servers is None:
+            from core.cli_mcp import cli_mcp_servers
+
+            self._mcp_servers = await asyncio.to_thread(
+                cli_mcp_servers, self._agent_type, self._project_dir
+            )
+        from core.cli_mcp import codex_mcp_overrides
+
+        overrides, mcp_env = codex_mcp_overrides(self._mcp_servers, os.environ)
         logical_args = build_codex_exec_args(
             executable=executable,
             project_dir=self._project_dir,
@@ -290,11 +306,14 @@ class CodexCliAgentClient(AgentClient):
             thread_id=self.thread_id,
             sandbox=codex_sandbox_for(self._agent_type),
             auto_compact_token_limit=self._auto_compact_token_limit,
+            mcp_overrides=overrides,
         )
         command = build_windows_command(logical_args[0], logical_args[1:])
+        extra = {"env": {**os.environ, **mcp_env}} if mcp_env else {}
         process = await self._process_factory(
             *command,
             cwd=self._project_dir,
+            **extra,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

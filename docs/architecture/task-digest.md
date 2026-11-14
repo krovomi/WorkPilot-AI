@@ -1,3 +1,10 @@
+---
+feature: Point des tâches longues
+summary: >-
+  Un point à intervalle fixe sur les canaux de notification existants, lu dans les fichiers de la
+  tâche seulement.
+---
+
 # Point périodique d'une tâche longue (P1)
 
 La durée des tâches qu'un agent réussit double environ tous les sept mois (METR, mars 2025) :

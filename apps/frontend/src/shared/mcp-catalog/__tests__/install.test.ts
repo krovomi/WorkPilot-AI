@@ -3,6 +3,8 @@ import type { McpMarketplaceServer } from "../../types/mcp-marketplace";
 import {
 	agentsUsingServer,
 	buildCatalogServer,
+	catalogAgents,
+	DEFAULT_MCP_AGENTS,
 	loadMcpCatalog,
 	localized,
 	missingCatalogVars,
@@ -158,6 +160,25 @@ describe("buildCatalogServer", () => {
 		const fr = buildCatalogServer(byId("time"), {}, "fr-FR");
 		expect(fr.ok && fr.server.description).toBe(byId("time").tagline.fr);
 		expect(localized(byId("time").tagline, "en")).toBe(byId("time").tagline.en);
+	});
+});
+
+describe("catalogAgents", () => {
+	it("offers a server to the default agents unless it names its own", () => {
+		expect(catalogAgents(byId("github"))).toEqual([...DEFAULT_MCP_AGENTS]);
+		expect(catalogAgents(byId("rea"))).toEqual(["analyzer"]);
+		expect(catalogAgents({ ...byId("rea"), agents: [] })).toEqual([
+			...DEFAULT_MCP_AGENTS,
+		]);
+	});
+
+	it("installs REA as a pinned stdio server with its profiles", () => {
+		const built = buildCatalogServer(byId("rea"), {});
+		expect(built.ok).toBe(true);
+		if (!built.ok) return;
+		expect(built.server.command).toBe("npx");
+		expect(built.server.args).toEqual(["-y", "rea-agents@6.9.0", "mcp"]);
+		expect(built.server.env?.REA_MCP_TOOL_CATALOG_PROFILE).toBe("hot-cold");
 	});
 });
 

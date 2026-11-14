@@ -1,3 +1,9 @@
+---
+feature: Émulateur d'app
+summary: >-
+  Adresse d'arrivée déduite du diff, barre d'adresse, ouverture dans le navigateur.
+---
+
 # L'émulateur d'application
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

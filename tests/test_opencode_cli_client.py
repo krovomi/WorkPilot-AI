@@ -452,3 +452,50 @@ def test_opencode_phase_default_is_the_cli_default(tmp_path: Path) -> None:
     from phase_config import get_phase_model
 
     assert get_phase_model(tmp_path, "coding", cli_provider="opencode") == "default"
+
+
+async def test_approved_mcp_servers_reach_opencode_in_its_inline_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Lot E: the servers ride in OPENCODE_CONFIG_CONTENT; an HTTP one is left
+    out under the OS sandbox, which reaches only OpenCode's own hosts."""
+    monkeypatch.setenv("OPENCODE_CONFIG_CONTENT", json.dumps({"share": "disabled"}))
+    process = _FakeProcess([_event("text", part={"type": "text", "text": "Done."})])
+    factory = _ProcessFactory(process)
+    client = _client(tmp_path, factory)
+    client._mcp_servers = [
+        {
+            "id": "rea",
+            "type": "command",
+            "command": "npx",
+            "args": ["-y", "rea-agents@6.9.0", "mcp"],
+        }
+    ]
+
+    await _collect(client)
+
+    _args, kwargs = factory.calls[0]
+    content = json.loads(kwargs["env"]["OPENCODE_CONFIG_CONTENT"])
+    assert content["share"] == "disabled"
+    assert content["mcp"]["rea"]["command"] == ["npx", "-y", "rea-agents@6.9.0", "mcp"]
+
+
+async def test_http_mcp_servers_stay_out_of_a_sandboxed_cli(tmp_path: Path) -> None:
+    import core.cli_mcp as cli_mcp
+
+    class _Isolated:
+        isolated = True
+
+    servers = [
+        {"id": "rea", "type": "command", "command": "npx", "args": []},
+        {"id": "github", "type": "http", "url": "https://api.githubcopilot.com/mcp/"},
+    ]
+    client = _client(tmp_path, _ProcessFactory(_FakeProcess([])))
+    client._sandbox = _Isolated()
+    original = cli_mcp.cli_mcp_servers
+    cli_mcp.cli_mcp_servers = lambda *a, **k: servers
+    try:
+        kept = await client.custom_mcp_servers()
+    finally:
+        cli_mcp.cli_mcp_servers = original
+    assert [s["id"] for s in kept] == ["rea"]

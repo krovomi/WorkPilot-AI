@@ -155,3 +155,28 @@ def test_the_prompt_goes_on_stdin_not_on_the_command_line(un, monkeypatch):
     assert un._call_claude_cli("claude", "model", prompt) == "prose"
     assert seen["input"] == prompt
     assert all(len(arg) < 1000 for arg in seen["cmd"])
+
+
+def test_the_design_index_still_reaches_the_wiki(un, repo):
+    # docs/CLAUDE.md no longer carries one row per design file: the wiki
+    # narrative reads the same table from the files' own frontmatter.
+    (repo / "docs" / "architecture").mkdir()
+    (repo / "docs" / "architecture" / "rea.md").write_text(
+        "---\nfeature: REA\nsummary: >-\n  Lecteurs statiques.\n---\n\n# REA\n",
+        encoding="utf-8",
+    )
+    sources = un._load_sources(repo)
+    assert "===== docs/architecture (index) =====" in sources
+    assert (
+        "| REA | [rea.md](docs/architecture/rea.md) | Lecteurs statiques. |" in sources
+    )
+
+
+def test_a_broken_frontmatter_leaves_the_index_out_not_the_run(un, repo):
+    (repo / "docs" / "architecture").mkdir()
+    (repo / "docs" / "architecture" / "x.md").write_text(
+        "# no frontmatter\n", encoding="utf-8"
+    )
+    sources = un._load_sources(repo)
+    assert "docs/architecture (index)" not in sources
+    assert "===== README.md =====" in sources

@@ -1,3 +1,10 @@
+---
+feature: Secrets au repos
+summary: >-
+  Clés et jetons chiffrés par `safeStorage` (trousseau WSL déclaré), logs Electron caviardés ;
+  `.env` de projet et du backend : jetons chiffrés ; âge de chaque clé, rappel à 90 jours.
+---
+
 # Secrets at rest
 
 > Design rationale for rule S1 of [`docs/rules/security.md`](../rules/security.md),

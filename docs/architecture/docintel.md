@@ -1,3 +1,10 @@
+---
+feature: docintel
+summary: >-
+  Pièces jointes, diagrammes, moteurs OCR, redaction des secrets, ADR, traces de pile, ERD, QA
+  visuelle.
+---
+
 # Attachments, diagrams and ADRs (docintel)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

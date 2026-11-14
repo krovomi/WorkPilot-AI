@@ -1,3 +1,11 @@
+---
+feature: Boucle de vérification
+summary: >-
+  Lancer l'app, corriger, confirmer, mesurer, garder la preuve ; Windows par UI Automation, web
+  par Playwright (trace, vidéo, GIF sur demande), jamais un succès inachevé ; rejeu sur la base
+  pour lister ce qui change.
+---
+
 # Verification loop (verify)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

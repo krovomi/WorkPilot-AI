@@ -7,7 +7,7 @@ fichiers y renvoient.
 
 | Dossier / fichier | Contenu | Statut |
 |---|---|---|
-| [`CLAUDE.md`](CLAUDE.md) | carte des règles et table des justifications de conception (les règles critiques sont dans [`../AGENTS.md`](../AGENTS.md)) | normatif |
+| [`CLAUDE.md`](CLAUDE.md) | carte des règles et mode d'emploi de `architecture/` (les règles critiques sont dans [`../AGENTS.md`](../AGENTS.md)) | normatif |
 | [`rules/`](rules/) | règles par thème : [sécurité](rules/security.md), [backend](rules/backend.md), [frontend](rules/frontend.md), [workflow](rules/workflow.md) | normatif |
 | [`architecture/`](architecture/) | pourquoi chaque feature est construite ainsi, une feature par fichier | référence |
 | [`SECURITY.md`](SECURITY.md) | politique de sécurité : versions supportées, signaler une vulnérabilité | public |

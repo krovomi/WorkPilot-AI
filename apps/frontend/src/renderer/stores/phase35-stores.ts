@@ -15,6 +15,8 @@ import type {
 	DomainProfile,
 	DomainSummary,
 	DriftReport,
+	GenerationSummary,
+	GenTestCommand,
 	I18nDict,
 	I18nScalingReport,
 	LicenseScanReport,
@@ -253,7 +255,7 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.analyseCicdLogs(samples);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, signals: res.report.signals });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
@@ -353,62 +355,124 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 
 // ---------- #3.10 Generational Tests ----------
 
+export type GenSource = "run" | "report";
+export type GenMode = "capture" | "compare";
+
 interface GenTestsState extends BaseSlice {
-	generations: string[];
+	generations: GenerationSummary[];
 	regression: RegressionReport | null;
+	/** The project's test commands; null until detected. */
+	commands: GenTestCommand[] | null;
+	/** What the last capture or compare read: a command, or a report's format. */
+	lastSource: { kind: GenSource; value: string } | null;
+	running: GenMode | null;
 	listGenerations: (projectPath: string) => Promise<void>;
-	capture: (projectPath: string, label: string, junitXml: string) => Promise<void>;
-	compare: (projectPath: string, baseline: string, junitXml: string) => Promise<void>;
+	detect: (projectPath: string) => Promise<void>;
+	capture: (projectPath: string, label: string, report: string) => Promise<boolean>;
+	compare: (projectPath: string, baseline: string, report: string) => Promise<void>;
+	/** Runs the project's own suite once, then captures it or compares it. */
+	runSuite: (projectPath: string, mode: GenMode, label: string, commandId: string) => Promise<boolean>;
+	cancel: () => Promise<void>;
+	/** The report file the person picks, or null when they cancel. */
+	importFile: () => Promise<{ name: string; content: string } | null>;
 	deleteGen: (projectPath: string, label: string) => Promise<void>;
+	reset: () => void;
 }
 
-export const useGenTestsStore = create<GenTestsState>((set, get) => ({
-	phase: "idle",
+const GEN_IDLE = {
+	phase: "idle" as Phase,
 	error: null,
 	generations: [],
 	regression: null,
+	commands: null,
+	lastSource: null,
+	running: null,
+};
+
+export const useGenTestsStore = create<GenTestsState>((set, get) => ({
+	...GEN_IDLE,
 	listGenerations: async (projectPath) => {
-		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.listGenerations(projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", generations: res.generations });
+			set({ generations: res.details ?? [] });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
-	capture: async (projectPath, label, junitXml) => {
-		set({ phase: "running", error: null });
+	detect: async (projectPath) => {
+		const res = await globalThis.electronAPI.detectGenTestCommands(projectPath);
+		set({ commands: res.success ? res.commands : [] });
+	},
+	capture: async (projectPath, label, report) => {
+		set({ phase: "running", running: "capture", error: null });
 		try {
-			const res = await globalThis.electronAPI.captureGeneration(
-				projectPath,
-				label,
-				junitXml,
-			);
+			const res = await globalThis.electronAPI.captureGeneration(projectPath, label, report);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ phase: "ok", lastSource: { kind: "report", value: res.format } });
 			await get().listGenerations(projectPath);
+			return true;
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
+			return false;
+		} finally {
+			set({ running: null });
 		}
 	},
-	compare: async (projectPath, baseline, junitXml) => {
-		set({ phase: "running", error: null });
+	compare: async (projectPath, baseline, report) => {
+		set({ phase: "running", running: "compare", error: null, regression: null });
 		try {
-			const res = await globalThis.electronAPI.compareGeneration(
-				projectPath,
-				baseline,
-				junitXml,
-			);
+			const res = await globalThis.electronAPI.compareGeneration(projectPath, baseline, report);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", regression: res.report });
+			set({
+				phase: "ok",
+				regression: res.report,
+				lastSource: { kind: "report", value: res.format },
+			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
+		} finally {
+			set({ running: null });
 		}
+	},
+	runSuite: async (projectPath, mode, label, commandId) => {
+		set({
+			phase: "running",
+			running: mode,
+			error: null,
+			...(mode === "compare" ? { regression: null } : {}),
+		});
+		try {
+			const res = await globalThis.electronAPI.runGenTests(projectPath, mode, label, commandId);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({
+				phase: "ok",
+				lastSource: { kind: "run", value: res.command },
+				...(mode === "compare" ? { regression: res.report ?? null } : {}),
+			});
+			if (mode === "capture") await get().listGenerations(projectPath);
+			return true;
+		} catch (e) {
+			set({ phase: "error", error: errorMessage(e) });
+			return false;
+		} finally {
+			set({ running: null });
+		}
+	},
+	cancel: async () => {
+		await globalThis.electronAPI.cancelGenTests();
+	},
+	importFile: async () => {
+		const res = await globalThis.electronAPI.importGenTestsReport();
+		if (res.success) return { name: res.name, content: res.content };
+		if (res.error !== "cancelled") set({ phase: "error", error: res.error });
+		return null;
 	},
 	deleteGen: async (projectPath, label) => {
 		await globalThis.electronAPI.deleteGeneration(projectPath, label);
 		await get().listGenerations(projectPath);
 	},
+	reset: () => set(GEN_IDLE),
 }));
 
 // ---------- #3.12 i18n Scaler ----------
