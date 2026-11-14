@@ -76,6 +76,7 @@ from .criteria import (
 )
 from .dependency_gate import dependency_gate
 from .doc_drift_gate import doc_drift_gate
+from .dotnet_api_gate import dotnet_api_gate
 from .exposure_gate import exposure_gate
 from .fixer import run_qa_fixer_session
 from .mutation_gate import guard_start, guard_test_only, mutation_gate
@@ -593,6 +594,13 @@ async def run_qa_validation_loop(
                     spec_dir,
                     project_dir,
                     state.qa_iteration,
+                    task_logger=scope.task_logger,
+                )
+                or dotnet_api_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
                     task_logger=scope.task_logger,
                 )
             )
