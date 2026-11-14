@@ -29,7 +29,7 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 from agents.documenter import DocStatus, DocumentationAgent  # noqa: E402
-from doc_languages import language_for  # noqa: E402
+from doc_languages import Language, language_for  # noqa: E402
 
 IGNORED_DIRS = {
     "node_modules",
@@ -84,14 +84,16 @@ def _rel(project: Path, path: Path) -> str:
     return str(path.resolve().relative_to(project.resolve())).replace("\\", "/")
 
 
-def _source_files(project: Path) -> list[Path]:
-    out: list[Path] = []
+def _source_files(project: Path) -> list[tuple[Path, Language]]:
+    """Every source file under ``project``, with the language it was listed for."""
+    out: list[tuple[Path, Language]] = []
     for dirpath, dirnames, filenames in os.walk(project):
         dirnames[:] = [
             d for d in dirnames if d not in IGNORED_DIRS and not d.startswith(".")
         ]
         for name in filenames:
-            if language_for(name) is None:
+            lang = language_for(name)
+            if lang is None:
                 continue
             path = Path(dirpath) / name
             try:
@@ -99,7 +101,7 @@ def _source_files(project: Path) -> list[Path]:
                     continue
             except OSError:
                 continue
-            out.append(path)
+            out.append((path, lang))
             if len(out) >= MAX_FILES:
                 return out
     return out
@@ -129,7 +131,7 @@ def project_overview(project: Path) -> dict[str, Any]:
     files = _source_files(project)
     per_language: dict[str, dict[str, Any]] = {}
     per_file: list[dict[str, Any]] = []
-    for index, path in enumerate(files, 1):
+    for index, (path, lang) in enumerate(files, 1):
         if index % 200 == 0:
             _progress(f"Reading {index}/{len(files)} files...")
         try:
@@ -137,9 +139,6 @@ def project_overview(project: Path) -> dict[str, Any]:
         except (OSError, ValueError):
             continue
         if not symbols:
-            continue
-        lang = language_for(path.name)
-        if lang is None:
             continue
         counts = _counts(symbols)
         bucket = per_language.setdefault(

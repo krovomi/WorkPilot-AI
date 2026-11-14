@@ -107,6 +107,45 @@ def test_detects_python_requirements(tmp_path):
     assert "hypothesis" in installed
 
 
+@pytest.mark.parametrize(
+    ("name", "manifest"),
+    [
+        (
+            "pyproject.toml",
+            '[project]\nname = "shop"\ndependencies = [\n    "requests>=2",\n]\n'
+            '[project.optional-dependencies]\ntest = [\n    "pytest>=8",\n    "pytest-mock",\n]\n'
+            '[dependency-groups]\ndev = ["hypothesis", {include-group = "test"}]\n',
+        ),
+        (
+            "pyproject.toml",
+            '[tool.poetry.dependencies]\npython = "^3.12"\nrequests = "*"\n'
+            '[tool.poetry.group.test.dependencies]\npytest = "^8"\npytest-mock = "*"\n'
+            '[tool.poetry.dev-dependencies]\nhypothesis = "*"\n',
+        ),
+        (
+            "Pipfile",
+            '[packages]\nrequests = "*"\n[dev-packages]\npytest = "*"\n'
+            '"pytest-mock" = "*"\nhypothesis = "*"\n',
+        ),
+    ],
+)
+def test_detects_python_packages_declared_in_toml(tmp_path, name, manifest):
+    (tmp_path / name).write_text(manifest, encoding="utf-8")
+
+    installed = detect_installed(tmp_path, "python")
+
+    # An array entry ("pytest>=8",) and a table key alike; never the section
+    # name ("test") nor the interpreter ("python").
+    assert {"pytest", "pytest-mock", "hypothesis", "requests"} <= set(installed)
+    assert "test" not in installed and "python" not in installed
+
+
+def test_a_toml_manifest_that_does_not_parse_detects_nothing(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project\npytest = 1\n", encoding="utf-8")
+
+    assert detect_installed(tmp_path, "python") == {}
+
+
 def test_a_project_that_is_not_there_detects_nothing(tmp_path):
     assert detect_installed(tmp_path / "nope", "csharp") == {}
 

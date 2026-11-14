@@ -818,14 +818,68 @@ def _detect_pypi(root: Path) -> dict[str, str]:
         root, ("requirements*.txt", "pyproject.toml", "Pipfile")
     ):
         blob = read_manifest(manifest)
-        for line in blob.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
+        if manifest.suffix == ".txt":
+            names = _requirement_lines(blob)
+        else:
+            # TOML: read line by line, `"pytest>=8",` inside an array never
+            # matched, and `test = [...]` read as a package named "test", so a
+            # pyproject project was always told pytest was missing.
+            names = _toml_requirements(blob)
+        for name in names:
+            found.setdefault(name.lower(), "")
+    return found
+
+
+def _requirement_lines(blob: str) -> list[str]:
+    names = []
+    for line in blob.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith(("#", "-")):
             match = _REQUIREMENT.match(stripped)
             if match:
-                found.setdefault(match.group(1).lower(), "")
-    return found
+                names.append(match.group(1))
+    return names
+
+
+def _toml_requirements(blob: str) -> list[str]:
+    """Package names declared in a pyproject.toml (PEP 621, PEP 735, Poetry) or Pipfile."""
+    import tomllib
+
+    try:
+        data = tomllib.loads(blob)
+    except tomllib.TOMLDecodeError:
+        return []
+    specs: list[Any] = []
+    names: list[str] = []
+    project = data.get("project")
+    if isinstance(project, dict):
+        specs.extend(_as_list(project.get("dependencies")))
+        for group in _as_dict(project.get("optional-dependencies")).values():
+            specs.extend(_as_list(group))
+    for group in _as_dict(data.get("dependency-groups")).values():
+        specs.extend(_as_list(group))
+    poetry = _as_dict(_as_dict(data.get("tool")).get("poetry"))
+    tables = [poetry.get("dependencies"), poetry.get("dev-dependencies")]
+    tables += [
+        _as_dict(g).get("dependencies") for g in _as_dict(poetry.get("group")).values()
+    ]
+    tables += [data.get("packages"), data.get("dev-packages")]  # Pipfile
+    for table in tables:
+        names.extend(n for n in _as_dict(table) if n.lower() != "python")
+    for spec in specs:
+        if isinstance(spec, str):
+            match = _REQUIREMENT.match(spec)
+            if match:
+                names.append(match.group(1))
+    return names
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _detect_maven(root: Path) -> dict[str, str]:
