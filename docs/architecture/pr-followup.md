@@ -1,3 +1,10 @@
+---
+feature: Suivi de la PR
+summary: >-
+  La carte fait avancer sa PR jusqu'au merge : check rouge ou fil de revue au QA fixer, commit
+  vérifié (aucun test sauté, aucune CI modifiée), push jamais forcé.
+---
+
 # Suivi de la PR jusqu'au merge (`pr_followup`)
 
 Une tâche qui avait ouvert sa pull request s'arrêtait à « PR créée » : un check

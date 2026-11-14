@@ -1,3 +1,11 @@
+---
+feature: Types de tâche Kanban
+summary: >-
+  Le type de tâche décidé sans token, un workflow YAML par type (`workflows/registry.py`,
+  `fallback:`, `when:`), BMAD là où il est documentaire, RUN exécuté par Python derrière une pause
+  avant l'irréversible ; à venir : rosters par type.
+---
+
 # Plan — spécialiser WorkPilot par type de tâche Kanban
 
 > Plan par lots, comme [context-harness.md](context-harness.md). Rien ici n'est livré ; chaque

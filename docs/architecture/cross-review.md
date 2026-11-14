@@ -1,3 +1,11 @@
+---
+feature: Revue croisée
+summary: >-
+  Après la QA, un autre fournisseur relit le diff contre la spec : agree, disagree ou inconclusive
+  ; un désaccord bloquant retient la PR jusqu'à un code changé ou un passer outre ; illisible
+  n'est jamais un accord.
+---
+
 # Cross review by a second engine
 
 Plan of 29 October, IA2. A build is planned, coded, reviewed and corrected by

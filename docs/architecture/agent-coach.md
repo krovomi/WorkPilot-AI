@@ -1,3 +1,10 @@
+---
+feature: "Coach : profil de style"
+summary: >-
+  Style par langage tiré des commits de la personne, lint en amorce ; phrases fixes au codeur et
+  au fixer ; export sans code.
+---
+
 # Coach personnel : le profil de style
 
 > Pourquoi le coach apprend le style de la personne dans chaque projet et le donne aux agents, et

@@ -1,3 +1,11 @@
+---
+feature: Guider une tâche en cours
+summary: >-
+  `foundation/steering.py` : `steering.jsonl` en ajout seul dans chaque copie du dossier de spec ;
+  le message entre dans le prompt de la prochaine session, marqué reçu par l'orchestrateur, jamais
+  par le modèle ; fichier interdit aux agents.
+---
+
 # Steering a running task
 
 > Rationale for `foundation/steering.py`. The normative summary is the row in

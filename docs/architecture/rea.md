@@ -1,3 +1,11 @@
+---
+feature: REA
+summary: >-
+  Lecteurs statiques de npm `rea-agents` (figé dans `rea/pin.json`) : fuses et audit des apps
+  livrées, badge « Outils CLI », portes QA `artifact-exposure`, `public-api-stable` (.NET), étape
+  du Release Train ; inconnu jamais vert ; jamais en MCP par défaut, jamais la cible exécutée.
+---
+
 # REA : ce que révèle un logiciel livré
 
 [REA](https://github.com/morluto/rea) (« Reverse Engineer Anything », npm `rea-agents`, MIT) lit un

@@ -1,3 +1,10 @@
+---
+feature: Besoin de toi
+summary: >-
+  Notifications lues dans XState ; ntfy, Telegram ; approbation d'un plan par jeton à usage
+  unique.
+---
+
 # « Besoin de toi » : notifications et approbation à distance
 
 Une tâche qui attend quelqu'un ne servait à rien tant que personne ne regardait
