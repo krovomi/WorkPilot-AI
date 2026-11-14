@@ -1,3 +1,11 @@
+---
+feature: Mode serveur
+summary: >-
+  Une équipe sur un serveur : organisations, rôles, groupes, sans fuite entre tenants ; features
+  partagées par `project_id` ; runs confinés à leur clone (Landlock). Exploitation :
+  `docs/server-operations.md`.
+---
+
 # Mode serveur multi-utilisateurs
 
 Une équipe se connecte au même serveur WorkPilot depuis l'app de bureau. Chacun voit les mêmes

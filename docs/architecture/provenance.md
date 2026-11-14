@@ -1,3 +1,10 @@
+---
+feature: Dossier de provenance d'une PR
+summary: >-
+  `provenance/` : attribution, dépendances ajoutées, SBOM CycloneDX du diff, portes et
+  vérification d'une PR, `null` quand la source manque ; résumé dans la PR ; ni code ni prompt.
+---
+
 # Provenance dossier of a pull request (prospective P5)
 
 The EU Cyber Resilience Act (regulation (EU) 2024/2847) requires reporting

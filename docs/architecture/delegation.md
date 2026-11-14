@@ -1,3 +1,10 @@
+---
+feature: Délégation aux sous-agents
+summary: >-
+  `native` (Claude), `emulated` (outil `delegate` + session enfant du même client sur la boucle
+  WorkPilot), `none` (CLI) ; le scope d'un enfant ne s'élargit jamais.
+---
+
 # Délégation aux sous-agents sur tout provider
 
 > Justification de conception. [`docs/CLAUDE.md`](../CLAUDE.md) reste l'autorité sur les règles.

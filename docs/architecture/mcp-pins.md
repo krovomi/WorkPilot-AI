@@ -1,3 +1,10 @@
+---
+feature: Épinglage des outils MCP
+summary: >-
+  Un serveur MCP personnalisé n'expose que les outils approuvés, épinglés par l'empreinte de ce
+  que lit le modèle ; ajout ou description changée retenus ; injoignable = jamais exposé.
+---
+
 # Épinglage des outils MCP (*tool poisoning*, *rug pull*)
 
 Un serveur MCP tiers est du code et du texte qui parlent directement au modèle, avec les droits de

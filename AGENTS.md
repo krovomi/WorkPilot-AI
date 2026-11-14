@@ -32,7 +32,7 @@ Une vulnérabilité se signale par [`docs/SECURITY.md`](docs/SECURITY.md), jamai
 | Electron, React, IPC, i18n | [`docs/rules/frontend.md`](docs/rules/frontend.md), puis [`apps/frontend/AGENTS.md`](apps/frontend/AGENTS.md) |
 | Secret, contenu externe, chemin, IPC, route serveur, dépendance | [`docs/rules/security.md`](docs/rules/security.md) en entier |
 | Commandes, hooks, CI, release | [`docs/rules/workflow.md`](docs/rules/workflow.md) |
-| Pourquoi une feature est construite ainsi | [`docs/CLAUDE.md`](docs/CLAUDE.md) (table des justifications), puis `docs/architecture/<feature>.md` |
+| Pourquoi une feature est construite ainsi | `docs/architecture/<feature>.md` ; index : `python scripts/docs_index.py [mots]` ; en ajouter une : [`docs/CLAUDE.md`](docs/CLAUDE.md) |
 | Configuration, providers, variables | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) |
 
 Index locaux (chacun a un `CLAUDE.md` voisin qui l'importe pour Claude Code) :

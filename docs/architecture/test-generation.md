@@ -1,3 +1,9 @@
+---
+feature: Génération de tests
+summary: >-
+  Où les tests générés sont écrits (`test_generation/layout.py`) et avec quelles bibliothèques.
+---
+
 # Test generation
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

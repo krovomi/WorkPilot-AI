@@ -1,3 +1,11 @@
+---
+feature: Bac à sable de l'OS
+summary: >-
+  Processus d'agent sous bubblewrap (Linux) ou Seatbelt (macOS) : écritures dans le worktree,
+  identifiants masqués, réseau par un proxy filtrant (provider + registres) ; sans bac à sable la
+  carte le dit au lancement, `WORKPILOT_SANDBOX=required` refuse de démarrer ; Windows pas encore.
+---
+
 # Bac à sable de l'OS autour des commandes d'agent
 
 > [Annexe G8](../audit/annexes/G8.md) du cahier d'audit. Code :

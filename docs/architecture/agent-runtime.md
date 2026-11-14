@@ -1,3 +1,11 @@
+---
+feature: Moteur d'agents comme port
+summary: >-
+  `agent_runtime` : un Protocol que `core` installe à l'import ; merge, intégrations, analyse et
+  architecture lancent leur session par lui au lieu d'importer `core` ou `agents` ; aucun client
+  en plus, chaque appel va à la fabrique de `core`.
+---
+
 # Le moteur d'agents comme port (`agent_runtime`)
 
 > Plan du 29 octobre, A1, deuxième étape · constat [F131](../audit/findings/F131.md), suite de F101.

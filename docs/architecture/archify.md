@@ -1,3 +1,9 @@
+---
+feature: archify
+summary: >-
+  Cartes d'architecture et deltas par tâche ; la continuité des identifiants est la contrainte.
+---
+
 # Architecture diagrams (archify)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

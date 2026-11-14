@@ -1,3 +1,10 @@
+---
+feature: Agent i18n
+summary: >-
+  Toutes stacks, sans modèle : clé proposée au style du projet, orphelines, recopies, variables,
+  pluriels CLDR, RTL ; traduction vérifiée sur carte de revue.
+---
+
 # Agent i18n (#346)
 
 La page Analyse i18n lit le code et les catalogues du projet sur toutes les stacks, dit ce qui
