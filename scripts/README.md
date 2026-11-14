@@ -65,6 +65,7 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | Script | Rôle | Appelé par |
 |---|---|---|
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
+| `docs_index.py` | L'index de `docs/architecture/`, lu dans le frontmatter (`feature`, `summary`) de chaque fichier : toute la table, les lignes qui contiennent des mots (`docs_index.py sandbox mcp`) ou la vérification (`--check`). | `tests/test_docs_context.py`, `scripts/wiki/update_narrative.py` ; à la main pour trouver une conception |
 | `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
 | `quality_baselines.py` | Plafonds par fichier des `except` aveugles (backend), des `biome-ignore` (frontend) et de la taille des fichiers de plus de 2 000 lignes dans `tests/baselines/` : `check`, et `update` qui ne fait que les baisser. | `pre-push.js`, `tests/test_quality_baselines.py` ; `update` à la main après une correction |
 | `diff_coverage.py` | Chaque ligne qu'une PR ajoute ou modifie, et chaque branche qui y commence, est lancée par un test : lit le diff (`--base`) et un rapport Cobertura (`--cobertura`) ou Istanbul (`--istanbul`), une annotation par trou. | `ci.yml` (`coverage-python`, `test-frontend` sous Linux), `mobile.yml`, `tests/test_diff_coverage.py` ; à la main après la suite avec couverture |

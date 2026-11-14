@@ -33,7 +33,6 @@ import logging
 import re
 import time
 import xml.etree.ElementTree as ET  # noqa: S405 - element/ParseError types only
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -167,6 +166,55 @@ def _make_test_id(classname: str, name: str) -> str:
     return f"{classname}::{cleaned_name}" if classname else cleaned_name
 
 
+def _seconds(raw: str | None) -> float:
+    """A JUnit ``time``: ``1.5``, ``1,5`` (some locales), or nothing."""
+    try:
+        return float((raw or "0").replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def _message(node: ET.Element) -> str:
+    return (node.get("message") or node.text or "").strip()[:500]
+
+
+def parse_junit_root(root: ET.Element) -> list[TestOutcome]:
+    """The outcomes of a parsed JUnit document.
+
+    Every ``<testcase>`` counts, at any depth: Surefire, Gradle and some
+    Vitest versions nest ``<testsuite>`` inside ``<testsuite>``.
+    """
+    if root.tag not in ("testsuites", "testsuite"):
+        raise ValueError(f"Unexpected root element <{root.tag}>")
+
+    outcomes: list[TestOutcome] = []
+    for tc in root.iter("testcase"):
+        classname = tc.get("classname", "") or ""
+        name = tc.get("name", "") or ""
+        failure = tc.find("failure")
+        error = tc.find("error")
+        if failure is not None:
+            status, failure_msg = TestStatus.FAILED, _message(failure)
+        elif error is not None:
+            status, failure_msg = TestStatus.ERROR, _message(error)
+        elif tc.find("skipped") is not None:
+            status, failure_msg = TestStatus.SKIPPED, ""
+        else:
+            status, failure_msg = TestStatus.PASSED, ""
+
+        outcomes.append(
+            TestOutcome(
+                test_id=_make_test_id(classname, name),
+                name=name,
+                classname=classname,
+                status=status,
+                duration_seconds=_seconds(tc.get("time")),
+                failure_message=failure_msg,
+            )
+        )
+    return outcomes
+
+
 def parse_junit_xml(xml_text: str | bytes | Path) -> list[TestOutcome]:
     """Parse a JUnit XML report into TestOutcomes.
 
@@ -180,52 +228,7 @@ def parse_junit_xml(xml_text: str | bytes | Path) -> list[TestOutcome]:
         root = defused_fromstring(xml_text)
     except ET.ParseError as e:
         raise ValueError(f"Invalid JUnit XML: {e}") from e
-
-    suites: Iterable[ET.Element]
-    if root.tag == "testsuites":
-        suites = root.findall("testsuite")
-    elif root.tag == "testsuite":
-        suites = [root]
-    else:
-        raise ValueError(f"Unexpected root element <{root.tag}>")
-
-    outcomes: list[TestOutcome] = []
-    for suite in suites:
-        for tc in suite.findall("testcase"):
-            classname = tc.get("classname", "") or ""
-            name = tc.get("name", "") or ""
-            duration = float(tc.get("time", "0") or 0.0)
-
-            if tc.find("failure") is not None:
-                node = tc.find("failure")
-                status = TestStatus.FAILED
-                failure_msg = (
-                    (node.get("message") or "")[:500] if node is not None else ""
-                )
-            elif tc.find("error") is not None:
-                node = tc.find("error")
-                status = TestStatus.ERROR
-                failure_msg = (
-                    (node.get("message") or "")[:500] if node is not None else ""
-                )
-            elif tc.find("skipped") is not None:
-                status = TestStatus.SKIPPED
-                failure_msg = ""
-            else:
-                status = TestStatus.PASSED
-                failure_msg = ""
-
-            outcomes.append(
-                TestOutcome(
-                    test_id=_make_test_id(classname, name),
-                    name=name,
-                    classname=classname,
-                    status=status,
-                    duration_seconds=duration,
-                    failure_message=failure_msg,
-                )
-            )
-    return outcomes
+    return parse_junit_root(root)
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +255,10 @@ class GenerationalArchive:
     # ------------------------------------------------------------------
     # Storage helpers
 
+    def validate_label(self, label: str) -> str:
+        """The label if it can name a generation; ``ValueError`` otherwise."""
+        return self._validate_label(label)
+
     def _validate_label(self, label: str) -> str:
         if not isinstance(label, str) or not _LABEL_RE.fullmatch(label):
             raise ValueError(
@@ -271,6 +278,27 @@ class GenerationalArchive:
         if not target_dir.exists():
             return []
         return sorted(p.stem for p in target_dir.glob("*.json"))
+
+    def summaries(self) -> list[dict[str, Any]]:
+        """Each stored generation with its date, its source and its counts, newest first."""
+        found: list[dict[str, Any]] = []
+        for label in self.list_generations():
+            gen = self.load(label)
+            if gen is None:
+                continue
+            counts = {status.value: 0 for status in TestStatus}
+            for outcome in gen.outcomes:
+                counts[outcome.status.value] += 1
+            found.append(
+                {
+                    "label": gen.label,
+                    "captured_at": gen.captured_at,
+                    "source": gen.junit_source,
+                    "total": len(gen.outcomes),
+                    **counts,
+                }
+            )
+        return sorted(found, key=lambda g: g["captured_at"], reverse=True)
 
     def load(self, label: str) -> Generation | None:
         path = self._path_for(label)

@@ -214,7 +214,8 @@ def run_gen_tests_check(
     """Fail if the supplied JUnit XML shows regressions vs the latest generation.
 
     Requires:
-      * ``junit_xml`` — path to a JUnit XML produced by the test runner.
+      * ``junit_xml`` — path to the test runner's report: JUnit XML, TRX
+        (.NET) or any format ``generational_tests.reports`` reads.
       * At least one prior generation in
         ``<project>/.workpilot/generational_tests/``.
 
@@ -222,7 +223,8 @@ def run_gen_tests_check(
     """
     err = stderr or sys.stderr
     try:
-        from generational_tests import GenerationalArchive, parse_junit_xml
+        from generational_tests import GenerationalArchive
+        from generational_tests.reports import parse_report_file
     except ImportError:
         print("[gen-tests-check] generational_tests not available — skipping", file=err)
         return HOOK_EXIT_OK
@@ -234,7 +236,7 @@ def run_gen_tests_check(
         return HOOK_EXIT_OK
 
     try:
-        outcomes = parse_junit_xml(junit_xml)
+        outcomes = parse_report_file(junit_xml, project_dir)[1]
     except Exception as exc:  # noqa: BLE001
         print(f"[gen-tests-check] could not parse {junit_xml}: {exc}", file=err)
         return HOOK_EXIT_INFRASTRUCTURE_ERROR

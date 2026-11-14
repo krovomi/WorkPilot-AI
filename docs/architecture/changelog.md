@@ -1,3 +1,10 @@
+---
+feature: Changelog
+summary: >-
+  Notes de version depuis les tâches terminées ou git ; serveur : job sur le clone, un appel
+  `core.oneshot`, requête fermée.
+---
+
 # Changelog
 
 La vue Changelog écrit les notes d'une version en trois étapes : choisir la source, générer,

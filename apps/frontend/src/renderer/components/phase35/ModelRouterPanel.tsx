@@ -9,6 +9,7 @@ import { ChevronDown, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatCurrency, getEurRate } from "../../lib/currency";
+import type { ModelChoice } from "../../../preload/api/modules/phase35-features-api";
 import { useModelRouterStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -16,25 +17,99 @@ import { Checkbox } from "../ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { PanelShell } from "./_panel-shell";
 
-import { Input } from "../ui/input";
+import { NativeSelect } from "../ui/native-select";
 import { Textarea } from "../ui/textarea";
+
+/** The providers the backend router knows (`model_router.router.ROUTABLE_PROVIDERS`). */
 const PROVIDER_OPTIONS = [
 	{ value: "anthropic", labelKey: "modelRouter.providerAnthropic" },
 	{ value: "openai", labelKey: "modelRouter.providerOpenai" },
 	{ value: "google", labelKey: "modelRouter.providerGoogle" },
 	{ value: "mistral", labelKey: "modelRouter.providerMistral" },
+	{ value: "deepseek", labelKey: "modelRouter.providerDeepseek" },
+	{ value: "grok", labelKey: "modelRouter.providerGrok" },
+	{ value: "copilot", labelKey: "modelRouter.providerCopilot" },
 	{ value: "ollama", labelKey: "modelRouter.providerOllama" },
 ] as const;
 
+/** `model_router.router.TaskClass`; empty lets the router read the prompt. */
+const TASK_CLASSES = [
+	"trivial",
+	"simple_edit",
+	"multi_file",
+	"architecture",
+	"review",
+	"planning",
+	"ideation",
+	"documentation",
+] as const;
+
 const PROMPT_MAX_LEN = 4000;
-const HINT_MAX_LEN = 64;
+
+/** Why the router chose this model, in the app language, from its reason code. */
+function RouteReason({ choice }: { choice: ModelChoice }) {
+	const { t } = useTranslation("phase35");
+	const params = choice.reason_params ?? {};
+	const providerLabel = (value: string) => {
+		const opt = PROVIDER_OPTIONS.find((o) => o.value === value);
+		return opt ? t(opt.labelKey as never) : value;
+	};
+	const provider = providerLabel(String(params.provider ?? choice.provider));
+	const tier = t(`modelRouter.tiers.${choice.tier}` as never, { defaultValue: choice.tier });
+	const task = t(`modelRouter.taskClasses.${choice.task_class}` as never, {
+		defaultValue: choice.task_class,
+	});
+	const lines: string[] = [];
+	switch (choice.reason_code) {
+		case "unpriced_provider":
+			lines.push(
+				params.billing === "local"
+					? t("modelRouter.reasons.local", { provider })
+					: t("modelRouter.reasons.subscription", { provider }),
+			);
+			break;
+		case "no_model":
+			lines.push(
+				t("modelRouter.reasons.noModel", {
+					providers: Array.isArray(params.providers)
+						? params.providers.map((p) => providerLabel(String(p))).join(", ")
+						: provider,
+				}),
+			);
+			break;
+		case "fallback":
+			lines.push(t("modelRouter.reasons.fallback"));
+			break;
+		case "tier_for_task":
+			lines.push(t("modelRouter.tierFor", { tier, task }));
+			break;
+		default:
+			lines.push(choice.reason);
+	}
+	if (typeof params.bench_resolved === "number" && typeof params.bench_judged === "number") {
+		lines.push(
+			t("modelRouter.reasons.bench", {
+				resolved: params.bench_resolved,
+				judged: params.bench_judged,
+			}),
+		);
+	}
+	if (Array.isArray(params.passed_over) && params.passed_over.length > 0) {
+		lines.push(t("modelRouter.reasons.passedOver", { models: params.passed_over.join(", ") }));
+	}
+	return (
+		<div className="text-xs text-muted-foreground">
+			{t("modelRouter.reason")}: {lines.join(" ")}
+		</div>
+	);
+}
 
 export function ModelRouterPanel() {
 	const { t, i18n } = useTranslation("phase35");
 	const { phase, error, chosen, comparison, route, compare } = useModelRouterStore();
 	const [prompt, setPrompt] = useState("");
 	const [hint, setHint] = useState("");
-	const [providers, setProviders] = useState<string[]>(["anthropic", "openai"]);
+	const [providers, setProviders] = useState<string[]>(["anthropic"]);
 	const [popoverOpen, setPopoverOpen] = useState(false);
 	const [eurRate, setEurRate] = useState(0.92);
 
@@ -143,14 +218,19 @@ export function ModelRouterPanel() {
 						<label htmlFor="hint-input" className="block text-sm font-medium mb-1">
 							{t("modelRouter.hint")}
 						</label>
-						<Input
+						<NativeSelect
 							id="hint-input"
 							value={hint}
-							onChange={(e) => setHint(e.target.value.slice(0, HINT_MAX_LEN))}
-							maxLength={HINT_MAX_LEN}
+							onChange={(e) => setHint(e.target.value)}
 							className="w-full p-2 text-sm h-auto"
-							placeholder={t("modelRouter.hintPlaceholder")}
-						/>
+						>
+							<option value="">{t("modelRouter.hintAuto")}</option>
+							{TASK_CLASSES.map((tc) => (
+								<option key={tc} value={tc}>
+									{t(`modelRouter.taskClasses.${tc}` as never)}
+								</option>
+							))}
+						</NativeSelect>
 					</div>
 					<div>
 						<div className="block text-sm font-medium mb-1">
@@ -235,7 +315,9 @@ export function ModelRouterPanel() {
 											{opt ? t(opt.labelKey as never) : p}
 											<button
 												type="button"
-												aria-label={`remove ${p}`}
+												aria-label={t("modelRouter.removeProvider", {
+													provider: opt ? t(opt.labelKey as never) : p,
+												})}
 												onClick={() => toggleProvider(p)}
 												className="rounded p-0.5 hover:bg-muted"
 											>
@@ -259,7 +341,7 @@ export function ModelRouterPanel() {
 						<div>
 							<span className="font-medium">{t("modelRouter.chosen")}: </span>
 							<Badge variant="outline">{chosen.provider}</Badge>{" "}
-							<code>{chosen.model}</code> (
+							{chosen.model ? <code>{chosen.model}</code> : t("modelRouter.noModel")} (
 							{t(`modelRouter.tiers.${chosen.tier}` as never, { defaultValue: chosen.tier })} ·{" "}
 							{t(`modelRouter.taskClasses.${chosen.task_class}` as never, {
 								defaultValue: chosen.task_class,
@@ -275,9 +357,7 @@ export function ModelRouterPanel() {
 								6,
 							)}
 						</div>
-						<div className="text-xs text-muted-foreground">
-							{t("modelRouter.reason")}: {chosen.reason}
-						</div>
+						<RouteReason choice={chosen} />
 					</div>
 				)}
 
@@ -297,7 +377,7 @@ export function ModelRouterPanel() {
 										{t(`modelRouter.tiers.${tier}` as never, { defaultValue: tier })}
 									</td>
 									<td className="p-2 font-mono">
-										{c.provider}/{c.model}
+										{c.model ? `${c.provider}/${c.model}` : t("modelRouter.noModel")}
 									</td>
 									<td className="p-2 text-right font-mono">
 										{formatCurrency(

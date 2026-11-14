@@ -70,7 +70,11 @@ export interface ModelChoice {
 	task_class: string;
 	tier: "budget" | "balanced" | "premium";
 	estimated_cost_usd: number;
+	/** English, for the audit trail; the app words `reason_code` instead. */
 	reason: string;
+	/** `tier_for_task` | `unpriced_provider` | `fallback` | `no_model`. */
+	reason_code?: string;
+	reason_params?: Record<string, unknown>;
 }
 export interface RouteRequest {
 	prompt?: string;
@@ -111,13 +115,22 @@ export interface AnomalySignal {
 	matching_line: string;
 	line_number: number;
 	suggested_fix: string;
+	/** Stable id of the fix; the app words it from `cicdAnomaly.fixes.<fix_id>`. */
+	fix_id?: string;
 	log_label: string;
+}
+export interface AnomalyRecommendation {
+	kind: string;
+	fix_id: string;
+	suggested_fix: string;
+	recurring: boolean;
 }
 export interface AnomalyReport {
 	signals: AnomalySignal[];
 	recurring_kinds: string[];
 	summary: { samples: number; total_signals: number; by_kind: Record<string, number>; by_severity: Record<string, number> };
 	fix_recommendations: string[];
+	recommendations?: AnomalyRecommendation[];
 	has_critical: boolean;
 }
 
@@ -204,6 +217,27 @@ export interface RegressionReport {
 	}>;
 	summary: Record<string, number>;
 	regression_count: number;
+}
+
+/** A stored generation, as the archive lists it (newest first). */
+export interface GenerationSummary {
+	label: string;
+	/** Unix seconds. */
+	captured_at: number;
+	/** `trx:<hash>`, `junit:<hash>`… for an imported report, `run:<command>` for a run. */
+	source: string;
+	total: number;
+	passed: number;
+	failed: number;
+	error: number;
+	skipped: number;
+}
+
+/** A test command the project's stack has, detected by the runner. */
+export interface GenTestCommand {
+	id: string;
+	label: string;
+	command: string;
 }
 
 // #3.12 i18n Scaler
@@ -440,17 +474,40 @@ export interface Phase35FeaturesAPI {
 	// #3.10 Generational Tests
 	listGenerations: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ generations: string[] }>>;
+	) => Promise<Phase35Result<{ generations: string[]; details: GenerationSummary[] }>>;
+	/** `report`: the text of a test report of any supported format. */
 	captureGeneration: (
 		projectPath: string,
 		label: string,
-		junitXml: string,
-	) => Promise<Phase35Result<{ label: string; outcome_count: number; passing_count: number }>>;
+		report: string,
+	) => Promise<
+		Phase35Result<{ label: string; format: string; outcome_count: number; passing_count: number }>
+	>;
 	compareGeneration: (
 		projectPath: string,
 		baselineLabel: string,
-		currentJunitXml: string,
-	) => Promise<Phase35Result<{ report: RegressionReport }>>;
+		report: string,
+	) => Promise<Phase35Result<{ format: string; report: RegressionReport }>>;
+	detectGenTestCommands: (
+		projectPath: string,
+	) => Promise<Phase35Result<{ commands: GenTestCommand[] }>>;
+	/** Runs the project's suite once, then stores it as `label` or diffs it against it. */
+	runGenTests: (
+		projectPath: string,
+		mode: "capture" | "compare",
+		label: string,
+		commandId: string,
+	) => Promise<
+		Phase35Result<{
+			command: string;
+			label?: string;
+			outcome_count?: number;
+			report?: RegressionReport;
+		}>
+	>;
+	cancelGenTests: () => Promise<boolean>;
+	/** The text of a report file the person picks; `cancelled` when they close the dialog. */
+	importGenTestsReport: () => Promise<Phase35Result<{ name: string; content: string }>>;
 	deleteGeneration: (
 		projectPath: string,
 		label: string,
@@ -712,18 +769,16 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	// #3.10
 	listGenerations: (projectPath) =>
 		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_LIST, { projectPath }),
-	captureGeneration: (projectPath, label, junitXml) =>
-		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CAPTURE, {
-			projectPath,
-			label,
-			junitXml,
-		}),
-	compareGeneration: (projectPath, baselineLabel, currentJunitXml) =>
-		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_COMPARE, {
-			projectPath,
-			baselineLabel,
-			currentJunitXml,
-		}),
+	captureGeneration: (projectPath, label, report) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CAPTURE, { projectPath, label, report }),
+	compareGeneration: (projectPath, baselineLabel, report) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_COMPARE, { projectPath, baselineLabel, report }),
+	detectGenTestCommands: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_DETECT, { projectPath }),
+	runGenTests: (projectPath, mode, label, commandId) =>
+		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_RUN, { projectPath, mode, label, commandId }),
+	cancelGenTests: () => ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_CANCEL),
+	importGenTestsReport: () => ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_IMPORT_FILE),
 	deleteGeneration: (projectPath, label) =>
 		ipcRenderer.invoke(IPC_CHANNELS.GEN_TESTS_DELETE, { projectPath, label }),
 

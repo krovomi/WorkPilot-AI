@@ -82,9 +82,9 @@ from foundation.debug import debug_error
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Now import models and orchestrator directly (they use relative imports internally)
+from core.io_utils import safe_print
 from models import GitHubRunnerConfig
 from orchestrator import GitHubOrchestrator, ProgressCallback
-from services.io_utils import safe_print
 
 
 def print_progress(callback: ProgressCallback) -> None:
@@ -414,8 +414,10 @@ async def cmd_check_labels(args) -> int:
 
     if issues:
         safe_print(f"Found {len(issues)} issues with auto-fix labels:")
-        for num in issues:
-            safe_print(f"  #{num}")
+        for issue in issues:
+            safe_print(
+                f"  #{issue['issue_number']} ({issue['trigger_label']}) {issue['title']}"
+            )
     else:
         safe_print("No issues with auto-fix labels found.")
 
@@ -815,10 +817,8 @@ def main():
         "approve-batches": cmd_approve_batches,
     }
 
-    handler = commands.get(args.command)
-    if not handler:
-        safe_print(f"Unknown command: {args.command}")
-        sys.exit(1)
+    # argparse has already refused any other command.
+    handler = commands[args.command]
 
     try:
         # Set context for Sentry

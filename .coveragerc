@@ -1,0 +1,7 @@
+# coverage.py settings for the backend suite (pytest --cov, and the combine
+# step of the coverage-python job in .github/workflows/ci.yml).
+[run]
+# The desktop app starts each runner as `python runners/<name>.py`, and the
+# tests that matter start it the same way. Measuring those child processes
+# counts what they ran instead of leaving every entry point at 0 %.
+patch = subprocess

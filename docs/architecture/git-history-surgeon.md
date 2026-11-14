@@ -1,3 +1,10 @@
+---
+feature: Chirurgien de l'historique Git
+summary: >-
+  Plan par règles (fix-ups dans une même partie, convention, découpe), rejeu sur une nouvelle
+  branche aux fichiers identiques ; jamais de push.
+---
+
 # Git History Surgeon
 
 Issue #360. The "Git History Surgeon" page (Git integrations). Code:

@@ -191,6 +191,11 @@ class CliSubprocessAgentClient(AgentClient):
     #: The providers.yaml entry whose ``sandbox:`` block this CLI runs under;
     #: None reads `provider_name()`.
     sandbox_provider: str | None = None
+    #: The project's custom MCP servers this CLI may start (`core.cli_mcp`);
+    #: None until `custom_mcp_servers` looks them up.
+    _mcp_servers: list[dict[str, Any]] | None = None
+    #: Whether this CLI is handed those servers (``standards.mcp: handed``).
+    hands_mcp_servers = False
 
     def __init__(
         self,
@@ -259,6 +264,39 @@ class CliSubprocessAgentClient(AgentClient):
 
     def _resolve_executable(self) -> str | None:
         return self._executable
+
+    async def custom_mcp_servers(self) -> list[dict[str, Any]]:
+        """The approved custom MCP servers for this agent type, looked up once.
+
+        Under the OS sandbox the process reaches only its provider's hosts and
+        the package registries, so an HTTP server is left out and said so; a
+        command server runs inside the sandbox with the CLI.
+        """
+        if self._mcp_servers is None:
+            from core.cli_mcp import cli_mcp_servers
+
+            servers = await asyncio.to_thread(
+                cli_mcp_servers,
+                self._agent_type,
+                self._project_dir,
+                getattr(self, "_spec_dir", None),
+            )
+            try:
+                isolated = bool(self.session_sandbox().isolated)
+            except RuntimeError:  # SandboxRequiredError: the launch says it
+                isolated = False
+            if isolated:
+                for server in servers:
+                    if server.get("type") == "http":
+                        logger.warning(
+                            "[cli-mcp] MCP server '%s' not started in %s: the OS "
+                            "sandbox reaches only the provider's hosts",
+                            server.get("id"),
+                            self.cli_label,
+                        )
+                servers = [s for s in servers if s.get("type") != "http"]
+            self._mcp_servers = servers
+        return self._mcp_servers
 
     def _launch(self, command: list[str]) -> tuple[list[str], dict[str, str]]:
         """The command and environment as started: under the sandbox if on."""

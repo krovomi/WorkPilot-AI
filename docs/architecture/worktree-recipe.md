@@ -1,3 +1,11 @@
+---
+feature: Recette de worktree
+summary: >-
+  Worktree de tâche préparé avant la première session : recette détectée selon la stack, ou
+  `.workpilot/worktree.toml` approuvé par empreinte ; sans shell ; seuls les fichiers ignorés sont
+  copiés ; ports par tâche ; une étape en échec arrive dans le prompt.
+---
+
 # Recette de worktree (`.workpilot/worktree.toml`)
 
 Un worktree de tâche est un checkout neuf : ni `node_modules`, ni `.venv`, ni paquets NuGet

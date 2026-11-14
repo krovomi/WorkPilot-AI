@@ -1,3 +1,10 @@
+---
+feature: Kanban en MCP
+summary: >-
+  `workpilot-board` sert cartes, spec, roadmap et idées aux apps d'IA ; serveur : `POST /mcp` avec
+  jeton `wpat_` ou de tâche ; aucun outil ne build, n'approuve, ne fusionne ni ne prend de chemin.
+---
+
 # The board as an MCP server
 
 Plan of 29 October, IA5. WorkPilot's board lived only in the desktop window.

@@ -1,3 +1,9 @@
+---
+feature: Cerveau partagé et mémoire
+summary: >-
+  La seule mémoire : vault Obsidian, `graph.json`, serveur MCP, mémoire des builds, `mem-search`.
+---
+
 # The shared brain (memory)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

@@ -760,3 +760,62 @@ def provider_catalog() -> dict[str, list[dict[str, object]]]:
     result.setdefault("llama-cpp", [])
     result.setdefault("custom", [])
     return result
+
+
+# =============================================================================
+# ROUTER PICKS
+# The model the Adaptive Model Router (model_router/) sends a task to, per
+# provider and tier: the current generation, as MODEL_ID_MAP's bare `opus` /
+# `sonnet` / `haiku` are for Claude. A provider or tier left out here falls
+# back to `tier_pick`'s rule. tests/model_router/test_router.py checks that
+# each pick is an entry of REGISTRY with that tier.
+# =============================================================================
+
+_TIER_PICKS: dict[str, dict[str, str]] = {
+    "anthropic": {
+        "fast": "claude-haiku-5-5",
+        "standard": "claude-sonnet-5-5",
+        "flagship": "claude-opus-5-5",
+    },
+    "openai": {
+        "fast": "gpt-6-luna",
+        "standard": "gpt-6.1-sol",
+        "flagship": "gpt-5.6-sol",
+    },
+    "google": {
+        "fast": "gemini-3.1-flash-lite",
+        "standard": "gemini-3.8-flash",
+        "flagship": "gemini-3.1-pro-preview",
+    },
+    "mistral": {
+        "fast": "ministral-3b-2512",
+        "standard": "codestral-2508",
+        "flagship": "mistral-large-2512",
+    },
+    "deepseek": {"standard": "deepseek-flash", "flagship": "deepseek-v4-pro"},
+    "grok": {"standard": "grok-build-0.1", "flagship": "grok-4.3"},
+    "copilot": {
+        "fast": "claude-haiku-4.5",
+        "standard": "claude-sonnet-4.6",
+        "flagship": "claude-opus-4.8",
+    },
+}
+
+
+def tier_pick(provider: str, tier: str) -> ModelEntry | None:
+    """The model a router sends ``provider``'s ``tier`` work to, or None.
+
+    `_TIER_PICKS` first; otherwise the provider's default when it is of that
+    tier, then the first entry of that tier.
+    """
+    entries = [e for e in REGISTRY if e.provider == provider and e.tier == tier]
+    if not entries:
+        return None
+    picked = _TIER_PICKS.get(provider, {}).get(tier)
+    for entry in entries:
+        if entry.model_id == picked:
+            return entry
+    for entry in entries:
+        if entry.is_default:
+            return entry
+    return entries[0]

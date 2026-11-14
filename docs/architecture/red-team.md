@@ -1,3 +1,11 @@
+---
+feature: Red team
+summary: >-
+  Tests d'attaque écrits dans une copie jetable, lancés par WorkPilot ; plantage = erreur de
+  programmation dont la trace nomme un fichier changé, sinon « inattendu », non bloquant ; échec
+  non reproduit = instable ; passes suivantes rejouées sans modèle.
+---
+
 # Red team (QA adverse, F186)
 
 Le reviewer QA vérifie que le code fait ce que dit la spec ; la red team essaie de le **casser**.
