@@ -1,10 +1,17 @@
 """
 Usage Tracker — Records LLM token usage and costs from agent sessions.
 
-Writes to three destinations:
-  1. {project_dir}/.workpilot/cost_data.json       (CostEstimator IPC handler)
-  2. analytics.db SQLite                              (AnalyticsDashboard REST API)
-  3. {project_dir}/.workpilot/dashboard_snapshot.json (DashboardMetrics REST API)
+Writes to four destinations:
+  1. {root}/.workpilot/cost_data.json          (Costs view, goal spend, coach)
+  2. analytics.db SQLite                         (AnalyticsDashboard REST API)
+  3. {root}/.workpilot/dashboard_snapshot.json (QA and merge counters, build times)
+  4. {root}/.workpilot/carbon-ledger.json      (CarbonProfiler)
+
+``root`` is the project, never a task's worktree: a build runs in
+``<root>/.workpilot/worktrees/tasks/<spec>/`` and the ``project_dir`` it hands
+over is that worktree, whose ``.workpilot`` the dashboard never read and the
+merge deletes. ``ledger_root`` walks back to the project, so every task of a
+project feeds one ledger (``foundation.json_ledger`` serialises the processes).
 
 Called from agents/session.py after each run_agent_session() call.
 All writes are best-effort: errors are logged but never propagated to the caller.
@@ -14,35 +21,41 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Per-file locks — serialise concurrent read-modify-write on JSON snapshots
-# within the same process (covers parallel subagents / async tasks).
-# ---------------------------------------------------------------------------
+from foundation.json_ledger import update_json
 
-_file_locks: dict[str, threading.Lock] = {}
-_file_locks_mutex = threading.Lock()
+COST_DATA = "cost_data.json"
+SNAPSHOT = "dashboard_snapshot.json"
+CARBON_LEDGER = "carbon-ledger.json"
 
 
-def _get_file_lock(path: Path) -> threading.Lock:
-    key = str(path.resolve())
-    with _file_locks_mutex:
-        if key not in _file_locks:
-            _file_locks[key] = threading.Lock()
-        return _file_locks[key]
+def ledger_root(project_dir: Path) -> Path:
+    """The project that owns the usage ledgers of ``project_dir``.
+
+    A build works in ``<root>/.workpilot/worktrees/tasks/<spec>`` (or, for an
+    older checkout, ``<root>/.worktrees/<spec>``): its ledgers belong to
+    ``<root>``, which the dashboard, the Costs view and the server read, and
+    which outlives the worktree. Any other directory is its own root.
+    """
+    parts = project_dir.parts
+    for i, part in enumerate(parts):
+        if i == 0:
+            continue
+        nxt = parts[i + 1] if i + 1 < len(parts) else None
+        if part == ".workpilot" and nxt == "worktrees":
+            return Path(*parts[:i])
+        if part == ".worktrees" and nxt is not None:
+            return Path(*parts[:i])
+    return project_dir
 
 
-def _atomic_write(path: Path, content: str) -> None:
-    """Write *content* to *path* atomically via a sibling .tmp file + rename."""
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    tmp.replace(path)
+def _ledger_path(project_dir: Path, name: str) -> Path:
+    return ledger_root(project_dir) / ".workpilot" / name
 
 
 # ---------------------------------------------------------------------------
@@ -80,12 +93,16 @@ def start_build(
     return build_id
 
 
-def finish_build(spec_dir: Path, status: str = "complete") -> None:
-    """Finalize the build record and write it to analytics DB."""
+def finish_build(spec_dir: Path, status: str = "complete") -> dict | None:
+    """Finalize the build record and write it to analytics DB.
+
+    Returns the record (``started_at``, ``completed_at``, totals), or None when
+    no build was registered for ``spec_dir`` in this process.
+    """
     key = str(spec_dir)
     info = _active_builds.pop(key, None)
     if not info:
-        return
+        return None
 
     info["completed_at"] = datetime.now(UTC).isoformat()
     info["status"] = status
@@ -97,6 +114,60 @@ def finish_build(spec_dir: Path, status: str = "complete") -> None:
         logger.warning("[usage_tracker] Could not write build to analytics DB: %s", exc)
 
     logger.debug("[usage_tracker] Build finished: %s (%s)", info["build_id"], status)
+    return info
+
+
+def build_seconds(info: dict | None) -> float:
+    """How long a finished build ran, from ``finish_build``'s record; 0 if unknown."""
+    if not info:
+        return 0.0
+    try:
+        started = datetime.fromisoformat(str(info["started_at"]))
+        completed = datetime.fromisoformat(str(info["completed_at"]))
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+    return max(0.0, (completed - started).total_seconds())
+
+
+def spec_complexity(spec_dir: Path) -> str:
+    """The complexity the spec pipeline assessed (``complexity_assessment.json``)."""
+    try:
+        data = json.loads(
+            (spec_dir / "complexity_assessment.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return "standard"
+    value = data.get("complexity") if isinstance(data, dict) else None
+    return (
+        value.strip().lower()
+        if isinstance(value, str) and value.strip()
+        else "standard"
+    )
+
+
+def catalog_cost(
+    provider: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_creation_input_tokens: int = 0,
+    cache_read_input_tokens: int = 0,
+) -> float:
+    """What a session cost at the catalog's prices; 0.0 when none is known."""
+    from harness.application.budget import prices_for
+    from harness.domain.cost import call_cost
+    from harness.domain.usage import CallUsage
+
+    prices = prices_for(provider, model)
+    if prices is None:
+        return 0.0
+    usage = CallUsage(
+        prompt=input_tokens + cache_creation_input_tokens + cache_read_input_tokens,
+        cache_read=cache_read_input_tokens,
+        cache_write=cache_creation_input_tokens,
+        output=output_tokens,
+    )
+    return call_cost(usage, prices) or 0.0
 
 
 def record_session_usage(
@@ -132,6 +203,17 @@ def record_session_usage(
                                       response's characters when it reported nothing
     """
     spec_id = spec_dir.name
+    if not cost_usd and (input_tokens or output_tokens):
+        # Only the Claude SDK and a few loops report a price: the others are
+        # priced from the catalog, like the session budget measures them.
+        cost_usd = catalog_cost(
+            provider,
+            model,
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+        )
 
     # Update in-process build totals
     key = str(spec_dir)
@@ -235,40 +317,36 @@ def _append_cost_data(
     cache_read_input_tokens: int = 0,
     usage_source: str = "reported",
 ) -> None:
-    """Append a usage record to {project_dir}/.workpilot/cost_data.json."""
-    data_path = project_dir / ".workpilot" / "cost_data.json"
-    data_path.parent.mkdir(parents=True, exist_ok=True)
+    """Append a usage record to the project's ``.workpilot/cost_data.json``."""
+    root = ledger_root(project_dir)
+    record = {
+        "project_id": str(root),
+        "provider": provider,
+        "model": model,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cache_creation_input_tokens": cache_creation_input_tokens,
+        "cache_read_input_tokens": cache_read_input_tokens,
+        "cost": cost_usd,
+        "task_id": spec_id,
+        "agent_type": agent_type,
+        "phase": phase,
+        "spec_id": spec_id,
+        "usage_source": usage_source,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
 
-    with _get_file_lock(data_path):
-        if data_path.exists():
-            try:
-                data = json.loads(data_path.read_text(encoding="utf-8"))
-            except Exception:
-                data = {"usages": [], "budgets": {}}
-        else:
+    def change(data: object) -> dict:
+        if not isinstance(data, dict):
             data = {"usages": [], "budgets": {}}
+        if not isinstance(data.get("usages"), list):
+            data["usages"] = []
+        data["usages"].append(record)
+        return data
 
-        data.setdefault("usages", [])
-        data["usages"].append(
-            {
-                "project_id": str(project_dir),
-                "provider": provider,
-                "model": model,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "cache_creation_input_tokens": cache_creation_input_tokens,
-                "cache_read_input_tokens": cache_read_input_tokens,
-                "cost": cost_usd,
-                "task_id": spec_id,
-                "agent_type": agent_type,
-                "phase": phase,
-                "spec_id": spec_id,
-                "usage_source": usage_source,
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        )
-
-        _atomic_write(data_path, json.dumps(data, indent=2))
+    update_json(
+        root / ".workpilot" / COST_DATA, lambda: {"usages": [], "budgets": {}}, change
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -401,37 +479,14 @@ def _update_dashboard_snapshot(
     cache_creation_input_tokens: int = 0,
     cache_read_input_tokens: int = 0,
 ) -> None:
-    """Update {project_dir}/.workpilot/dashboard_snapshot.json.
+    """Update the project's ``.workpilot/dashboard_snapshot.json``.
     Accumulates token/cost totals and per-provider/model breakdowns."""
-    snap_path = project_dir / ".workpilot" / "dashboard_snapshot.json"
-    snap_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with _get_file_lock(snap_path):
-        try:
-            snap: dict = (
-                json.loads(snap_path.read_text(encoding="utf-8"))
-                if snap_path.exists()
-                else {}
-            )
-        except Exception:
-            snap = {}
-
-        snap.setdefault("total_tokens", 0)
-        snap.setdefault("total_cost", 0.0)
-        snap.setdefault("total_cache_creation_tokens", 0)
-        snap.setdefault("total_cache_read_tokens", 0)
-        snap.setdefault("tokens_by_provider", {})
-        snap.setdefault("cost_by_model", {})
-        snap.setdefault("tasks_by_status", {})
-        snap.setdefault("qa_first_pass_rate", 0.0)
-        snap.setdefault("qa_avg_score", 0.0)
-        snap.setdefault("merge_auto_count", 0)
-        snap.setdefault("merge_manual_count", 0)
-        snap.setdefault("avg_completion_by_complexity", {})
-
+    def change(snap: object) -> dict:
+        snap = _snapshot(snap)
         total = input_tokens + output_tokens
-        snap["total_tokens"] += total
-        snap["total_cost"] = (snap["total_cost"] or 0.0) + cost_usd
+        snap["total_tokens"] = (snap.get("total_tokens") or 0) + total
+        snap["total_cost"] = (snap.get("total_cost") or 0.0) + cost_usd
         snap["total_cache_creation_tokens"] = (
             snap.get("total_cache_creation_tokens") or 0
         ) + cache_creation_input_tokens
@@ -446,8 +501,34 @@ def _update_dashboard_snapshot(
             snap["cost_by_model"].get(model_key) or 0.0
         ) + cost_usd
         snap["last_updated"] = datetime.now(UTC).isoformat()
+        return snap
 
-        _atomic_write(snap_path, json.dumps(snap, indent=2))
+    update_json(_ledger_path(project_dir, SNAPSHOT), dict, change)
+
+
+def _snapshot(value: object) -> dict:
+    """A snapshot with every field the readers expect, whatever was on disk."""
+    snap = value if isinstance(value, dict) else {}
+    for key, default in (
+        ("total_tokens", 0),
+        ("total_cost", 0.0),
+        ("total_cache_creation_tokens", 0),
+        ("total_cache_read_tokens", 0),
+        ("qa_first_pass_rate", 0.0),
+        ("qa_avg_score", 0.0),
+        ("merge_auto_count", 0),
+        ("merge_manual_count", 0),
+    ):
+        snap.setdefault(key, default)
+    for key in (
+        "tokens_by_provider",
+        "cost_by_model",
+        "tasks_by_status",
+        "avg_completion_by_complexity",
+    ):
+        if not isinstance(snap.get(key), dict):
+            snap[key] = {}
+    return snap
 
 
 # ---------------------------------------------------------------------------
@@ -466,18 +547,8 @@ def _classify_carbon_source(provider: str) -> str:
 
 
 def _resolve_carbon_ledger_root(project_dir: Path) -> Path:
-    """Return the main project root that owns the carbon ledger.
-
-    Builds run inside worktrees (``<root>/.workpilot/worktrees/tasks/<spec>``)
-    so ``project_dir`` is the worktree, not the repo the CarbonProfiler scans.
-    Walk back to the directory that owns the first ``.workpilot`` in the chain
-    so every worktree feeds a single ledger at the real project root.
-    """
-    parts = project_dir.parts
-    for i, part in enumerate(parts):
-        if part == ".workpilot" and i + 1 < len(parts) and parts[i + 1] == "worktrees":
-            return Path(*parts[:i]) if i else project_dir
-    return project_dir
+    """The project root that owns the carbon ledger (see ``ledger_root``)."""
+    return ledger_root(project_dir)
 
 
 def _carbon_record(
@@ -531,36 +602,25 @@ def _append_carbon_ledger(
 
     The ledger is a flat JSON array (see carbon_profiler/ledger.py).
     """
-    root = _resolve_carbon_ledger_root(project_dir)
-    ledger_path = root / ".workpilot" / "carbon-ledger.json"
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    entry = _carbon_record(
+        provider,
+        model,
+        input_tokens,
+        output_tokens,
+        cache_creation_input_tokens,
+        cache_read_input_tokens,
+        datetime.now(UTC).isoformat(),
+        task,
+        phase,
+        agent,
+    )
 
-    with _get_file_lock(ledger_path):
-        if ledger_path.exists():
-            try:
-                ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
-                if not isinstance(ledger, list):
-                    ledger = []
-            except Exception:
-                ledger = []
-        else:
-            ledger = []
+    def change(ledger: object) -> list:
+        ledger = ledger if isinstance(ledger, list) else []
+        ledger.append(entry)
+        return ledger
 
-        ledger.append(
-            _carbon_record(
-                provider,
-                model,
-                input_tokens,
-                output_tokens,
-                cache_creation_input_tokens,
-                cache_read_input_tokens,
-                datetime.now(UTC).isoformat(),
-                task,
-                phase,
-                agent,
-            )
-        )
-        _atomic_write(ledger_path, json.dumps(ledger, indent=2))
+    update_json(_ledger_path(project_dir, CARBON_LEDGER), list, change)
 
 
 def backfill_carbon_ledger_from_cost_data(project_dir: Path) -> int:
@@ -621,10 +681,7 @@ def backfill_carbon_ledger_from_cost_data(project_dir: Path) -> int:
                 )
             )
 
-    ledger_path = workpilot / "carbon-ledger.json"
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    with _get_file_lock(ledger_path):
-        _atomic_write(ledger_path, json.dumps(records, indent=2))
+    update_json(workpilot / CARBON_LEDGER, list, lambda _old: records)
     return len(records)
 
 
@@ -640,37 +697,49 @@ def record_task_status(
     complexity: str = "medium",
     completion_seconds: float = 0.0,
 ) -> None:
-    """Increment tasks_by_status counter in dashboard_snapshot.json."""
+    """Count a build's outcome and, when it completed, how long it took.
+
+    The dashboard counts the tasks from the board itself; ``tasks_by_status``
+    stays for readers of older snapshots. The durations, by complexity, are
+    what the dashboard's "average time" reads.
+    """
+
+    def change(snap: object) -> dict:
+        snap = _snapshot(snap)
+        snap["tasks_by_status"][status] = snap["tasks_by_status"].get(status, 0) + 1
+        if status == "completed" and completion_seconds > 0:
+            existing = snap["avg_completion_by_complexity"].get(complexity)
+            durations = existing if isinstance(existing, list) else []
+            durations.append(round(completion_seconds, 1))
+            snap["avg_completion_by_complexity"][complexity] = durations
+        snap["last_updated"] = datetime.now(UTC).isoformat()
+        return snap
+
     try:
-        snap_path = project_dir / ".workpilot" / "dashboard_snapshot.json"
-        snap_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with _get_file_lock(snap_path):
-            try:
-                snap: dict = (
-                    json.loads(snap_path.read_text(encoding="utf-8"))
-                    if snap_path.exists()
-                    else {}
-                )
-            except Exception:
-                snap = {}
-
-            snap.setdefault("tasks_by_status", {})
-            snap["tasks_by_status"][status] = snap["tasks_by_status"].get(status, 0) + 1
-
-            if status == "completed" and completion_seconds > 0:
-                snap.setdefault("avg_completion_by_complexity", {})
-                existing = snap["avg_completion_by_complexity"].get(complexity, [])
-                if isinstance(existing, list):
-                    existing.append(completion_seconds)
-                else:
-                    existing = [completion_seconds]
-                snap["avg_completion_by_complexity"][complexity] = existing
-
-            snap["last_updated"] = datetime.now(UTC).isoformat()
-            _atomic_write(snap_path, json.dumps(snap, indent=2))
-    except Exception as exc:
+        update_json(_ledger_path(project_dir, SNAPSHOT), dict, change)
+    except (OSError, ValueError) as exc:
         logger.warning("[usage_tracker] record_task_status failed: %s", exc)
+
+
+def record_build_end(
+    project_dir: Path, spec_dir: Path, build_status: str, task_status: str
+) -> None:
+    """Close the build's record and count its outcome. Never raises.
+
+    A completed build reports how long it ran and the spec's complexity, which
+    the dashboard's "average time by complexity" reads.
+    """
+    try:
+        build = finish_build(spec_dir, status=build_status)
+        record_task_status(
+            project_dir,
+            spec_dir.name,
+            task_status,
+            complexity=spec_complexity(spec_dir),
+            completion_seconds=build_seconds(build),
+        )
+    except Exception as exc:  # noqa: BLE001 - telemetry never stops a build
+        logger.debug("[usage_tracker] build end not recorded: %s", exc)
 
 
 def record_qa_result(
@@ -680,61 +749,36 @@ def record_qa_result(
     score: float = 0.0,
 ) -> None:
     """Update QA first-pass rate in dashboard_snapshot.json (running average)."""
+
+    def change(snap: object) -> dict:
+        snap = _snapshot(snap)
+        snap["_qa_total"] = (snap.get("_qa_total") or 0) + 1
+        snap["_qa_passed"] = (snap.get("_qa_passed") or 0) + (1 if passed else 0)
+        snap["_qa_score_sum"] = (snap.get("_qa_score_sum") or 0.0) + score
+        snap["qa_first_pass_rate"] = snap["_qa_passed"] / snap["_qa_total"] * 100
+        snap["qa_avg_score"] = snap["_qa_score_sum"] / snap["_qa_total"]
+        snap["last_updated"] = datetime.now(UTC).isoformat()
+        return snap
+
     try:
-        snap_path = project_dir / ".workpilot" / "dashboard_snapshot.json"
-        snap_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with _get_file_lock(snap_path):
-            try:
-                snap: dict = (
-                    json.loads(snap_path.read_text(encoding="utf-8"))
-                    if snap_path.exists()
-                    else {}
-                )
-            except Exception:
-                snap = {}
-
-            snap.setdefault("_qa_total", 0)
-            snap.setdefault("_qa_passed", 0)
-            snap.setdefault("_qa_score_sum", 0.0)
-            snap["_qa_total"] += 1
-            if passed:
-                snap["_qa_passed"] += 1
-            snap["_qa_score_sum"] += score
-
-            snap["qa_first_pass_rate"] = snap["_qa_passed"] / snap["_qa_total"] * 100
-            snap["qa_avg_score"] = snap["_qa_score_sum"] / snap["_qa_total"]
-            snap["last_updated"] = datetime.now(UTC).isoformat()
-            _atomic_write(snap_path, json.dumps(snap, indent=2))
-    except Exception as exc:
+        update_json(_ledger_path(project_dir, SNAPSHOT), dict, change)
+    except (OSError, ValueError) as exc:
         logger.warning("[usage_tracker] record_qa_result failed: %s", exc)
 
 
 def record_merge(project_dir: Path, automatic: bool) -> None:
     """Increment merge counters in dashboard_snapshot.json."""
+
+    def change(snap: object) -> dict:
+        snap = _snapshot(snap)
+        key = "merge_auto_count" if automatic else "merge_manual_count"
+        snap[key] = (snap.get(key) or 0) + 1
+        snap["last_updated"] = datetime.now(UTC).isoformat()
+        return snap
+
     try:
-        snap_path = project_dir / ".workpilot" / "dashboard_snapshot.json"
-        snap_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with _get_file_lock(snap_path):
-            try:
-                snap: dict = (
-                    json.loads(snap_path.read_text(encoding="utf-8"))
-                    if snap_path.exists()
-                    else {}
-                )
-            except Exception:
-                snap = {}
-
-            snap.setdefault("merge_auto_count", 0)
-            snap.setdefault("merge_manual_count", 0)
-            if automatic:
-                snap["merge_auto_count"] += 1
-            else:
-                snap["merge_manual_count"] += 1
-            snap["last_updated"] = datetime.now(UTC).isoformat()
-            _atomic_write(snap_path, json.dumps(snap, indent=2))
-    except Exception as exc:
+        update_json(_ledger_path(project_dir, SNAPSHOT), dict, change)
+    except (OSError, ValueError) as exc:
         logger.warning("[usage_tracker] record_merge failed: %s", exc)
 
 
