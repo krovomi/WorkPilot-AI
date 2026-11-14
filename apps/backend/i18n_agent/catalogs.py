@@ -95,9 +95,12 @@ def _xml_strings(text: str, tag: str, key_attr: str) -> dict[str, Any]:
 
 
 _STRINGS_LINE = re.compile(r'^\s*"((?:[^"\\]|\\.)+)"\s*=\s*"((?:[^"\\]|\\.)*)"\s*;')
-_PO_ID = re.compile(r'^msgid\s+"(.*)"\s*$')
+_PO_LINE = re.compile(r'^(msgid|msgstr|msgctxt|msgid_plural|msgstr\[0\])\s+"(.*)"\s*$')
+_PO_MORE = re.compile(r'^"(.*)"\s*$')
 _PROPERTY = re.compile(r"^\s*([^#!=:\s][^=:]*?)\s*[=:]\s*(.*)$")
-_PHP_PAIR = re.compile(r"""['"]([\w.\-]+)['"]\s*=>\s*['"]""")
+_PHP_PAIR = re.compile(
+    r"""['"]([\w.\-]+)['"]\s*=>\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")?"""
+)
 
 
 def _pairs(pattern: re.Pattern[str], text: str) -> dict[str, Any]:
@@ -110,12 +113,50 @@ def _pairs(pattern: re.Pattern[str], text: str) -> dict[str, Any]:
 
 
 def _po(text: str) -> dict[str, Any]:
-    ids = (m.group(1) for line in text.splitlines() if (m := _PO_ID.match(line)))
-    return {msgid: "" for msgid in ids if msgid}
+    """``{msgid: msgstr}``; an untranslated entry keeps an empty ``msgstr``.
+
+    Continuation lines (``"..."`` after a ``msgid`` or ``msgstr``) are joined,
+    and a plural entry takes its first form. The header (empty ``msgid``) is
+    not an entry.
+    """
+    out: dict[str, Any] = {}
+    msgid: str | None = None
+    field: str | None = None
+    parts: dict[str, list[str]] = {}
+
+    def flush() -> None:
+        if msgid:
+            out[msgid] = "".join(parts.get("msgstr", []))
+
+    for line in text.splitlines():
+        if match := _PO_LINE.match(line):
+            name, value = match.group(1), match.group(2)
+            if name == "msgid":
+                flush()
+                parts = {"msgid": [value]}
+                field = "msgid"
+            elif name in {"msgstr", "msgstr[0]"}:
+                parts["msgstr"] = [value]
+                field = "msgstr"
+            else:
+                field = None  # msgctxt / msgid_plural: not part of the key or text
+            if field == "msgid":
+                msgid = "".join(parts["msgid"])
+            continue
+        if field and (more := _PO_MORE.match(line)):
+            parts.setdefault(field, []).append(more.group(1))
+            if field == "msgid":
+                msgid = "".join(parts["msgid"])
+    flush()
+    return out
 
 
 def _php(text: str) -> dict[str, Any]:
-    return dict.fromkeys(_PHP_PAIR.findall(text), "")
+    """``{key: text}`` from a Laravel ``lang/<locale>/*.php`` array (strings only)."""
+    return {
+        key: single if single else double
+        for key, single, double in _PHP_PAIR.findall(text)
+    }
 
 
 def _yaml(text: str) -> dict[str, Any]:

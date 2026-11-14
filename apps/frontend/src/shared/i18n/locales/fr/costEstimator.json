@@ -23,13 +23,51 @@
 		}
 	},
 	"budget": {
-		"title": "Budget mensuel",
-		"pctUsed": "{{pct}}% utilisé",
-		"spent": "{{amount}} dépensé",
-		"remaining": "{{amount}} restant",
-		"total": "{{amount}} total",
-		"forecast": "Prévision fin de mois :",
-		"overBudget": "Dépassement de budget"
+		"title": "Budget",
+		"description": "Lu avant chaque session d'agent d'une tâche, quel que soit le fournisseur : seuils notés dans le journal de la tâche, pause au plafond, modèle allégé en option.",
+		"notSet": "Aucun budget",
+		"noProjectLimit": "Pas de budget pour le projet : seul le plafond par tâche s'applique.",
+		"spent": "{{amount}} dépensés",
+		"spentFloor": "au moins {{amount}} dépensés (un modèle sans prix connu)",
+		"remaining": "{{amount}} restants",
+		"total": "{{amount}} au total",
+		"forecast": "Prévision en fin de période :",
+		"overBudget": "Dépassement prévu",
+		"tasksNearLimit": "Tâches proches de leur plafond de {{limit}} :",
+		"period": {
+			"monthly": "Ce mois-ci",
+			"weekly": "Cette semaine",
+			"total": "Depuis le début"
+		},
+		"level": {
+			"ok": "{{pct}} % utilisés",
+			"warning": "{{pct}} % : attention",
+			"critical": "{{pct}} % : critique",
+			"exceeded": "Budget atteint"
+		},
+		"alert": {
+			"warning": "{{spent}} dépensés sur {{limit}}. Au plafond, les tâches en cours seront {{action}}.",
+			"critical": "{{spent}} dépensés sur {{limit}}, le plafond approche. Les tâches en cours y seront {{action}}.",
+			"exceeded": "{{spent}} dépensés sur {{limit}}. Les tâches en cours sont {{action}}."
+		},
+		"action": {
+			"pause": "mises en pause avant leur prochaine session",
+			"warn": "seulement averties"
+		},
+		"form": {
+			"projectLimit": "Budget du projet",
+			"period": "Période",
+			"taskLimit": "Plafond par tâche",
+			"usdHint": "Montants en dollars US, comme les tarifs des fournisseurs. Vide ou 0 : pas de plafond.",
+			"onExceed": "Quand un plafond est atteint",
+			"degrade": "Passer à un modèle plus léger quand le budget s'épuise",
+			"degradeHint": "Au seuil d'alerte, un modèle haut de gamme passe au niveau standard du même fournisseur ; au seuil critique, au niveau rapide.",
+			"stall": "Mettre en pause une tâche qui dépense sans avancer",
+			"stallHint": "Une tâche qui dépense trois fois le coût moyen de ses sous-tâches terminées sans en terminer une nouvelle est mise en pause.",
+			"save": "Enregistrer le budget",
+			"saved": "Budget enregistré",
+			"saveFailed": "Le budget n'a pas pu être enregistré"
+		}
 	},
 	"breakdown": {
 		"costByProvider": "Coût par fournisseur",
