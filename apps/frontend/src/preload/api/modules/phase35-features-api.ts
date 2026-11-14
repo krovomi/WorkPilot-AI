@@ -364,6 +364,10 @@ export interface OptimizedContext {
 	tokens_used: number;
 	files_skipped: string[];
 	summary: Record<string, unknown>;
+	/** True when the project's own sources were proposed (no list sent). */
+	discovered?: boolean;
+	/** Paths not read, with why: outside | missing | binary | too_large. */
+	refused?: Array<{ path: string; reason: string }>;
 }
 
 // #3.3 Audit Trail
@@ -718,6 +722,14 @@ export interface Phase35FeaturesAPI {
 	unsubscribePairRoom: (
 		subscriptionId: string,
 	) => Promise<Phase35Result<{ closed: boolean }>>;
+	/** The AI participant's turn in a room, with the page's provider. */
+	pairAskAi: (
+		roomId: string,
+		projectPath: string,
+	) => Promise<
+		| { success: true; suggested: boolean }
+		| { success: false; error: "room" | "unavailable" | "empty" | "invalid" }
+	>;
 	onPairOpEvent: (
 		callback: (data: { subscriptionId: string; op: PairOperation }) => void,
 	) => () => void;
@@ -915,6 +927,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_SUBSCRIBE, { roomId, sinceSequence }),
 	unsubscribePairRoom: (subscriptionId) =>
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_UNSUBSCRIBE, { subscriptionId }),
+	pairAskAi: (roomId, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_ASK_AI, { roomId, projectPath }),
 	onPairOpEvent: (callback) => {
 		const listener = (
 			_event: unknown,

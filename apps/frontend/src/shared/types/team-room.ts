@@ -33,7 +33,13 @@ export interface TeamChatMessage {
 }
 
 /** Why the server did not take a message. */
-export type TeamChatRejection = "forbidden" | "invalid" | "too_fast" | "unavailable";
+export type TeamChatRejection =
+	| "forbidden"
+	| "invalid"
+	| "too_fast"
+	| "unavailable"
+	/** My `@ia` got no answer from my provider (`main/team-chat-ai.ts`). */
+	| "ai_unavailable";
 
 /** Something a teammate did, worth a notification. */
 export type TeamActivity =
