@@ -66,7 +66,7 @@ class _ScriptedClient(AgentClient):
         self.last_usage = {"input_tokens": 1200, "output_tokens": 300, "cost_usd": 0.02}
 
     async def query(self, prompt: str) -> None:
-        del prompt
+        self.prompt = prompt
 
     async def receive_response(self):
         for message in self._messages:
@@ -161,10 +161,8 @@ async def test_a_session_that_fails_is_saved_as_failed(
     assert session["status"] == "failed"
 
 
-def test_the_run_is_listed_for_the_debugger_while_it_runs(
-    stores: Path, spec_dir: Path
-) -> None:
-    del stores
+@pytest.mark.usefixtures("stores")
+def test_the_run_is_listed_for_the_debugger_while_it_runs(spec_dir: Path) -> None:
     recording = SessionRecording(
         spec_dir, LogPhase.CODING, provider="mistral", model="m"
     )
@@ -182,10 +180,10 @@ def test_the_run_is_listed_for_the_debugger_while_it_runs(
     assert listed["active"] is False
 
 
+@pytest.mark.usefixtures("stores")
 def test_finished_untouched_runs_leave_the_debugger_list(
-    stores: Path, spec_dir: Path, monkeypatch: pytest.MonkeyPatch
+    spec_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    del stores
     SessionRecording(spec_dir, LogPhase.CODING, provider="x", model="y").end()
     debugger_store.add_breakpoint("002-kept", {"id": "bp", "tool": "Bash"})
 
