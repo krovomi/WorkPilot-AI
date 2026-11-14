@@ -59,6 +59,10 @@ export function EditableTaskTitle({
 	// Changer de tâche l'incrémente aussi, si bien qu'un aller-retour A → B → A
 	// ne rend pas au champ rouvert sur A l'issue d'un enregistrement d'avant.
 	const saveSeq = useRef(0);
+	// Un enregistrement refusé rend la main au champ une fois réactivé : focus
+	// et nouvel essai attendent le rendu où `disabled` est retiré, sinon le
+	// blur du champ encore désactivé relancerait l'enregistrement tout seul.
+	const [retry, setRetry] = useState(0);
 
 	useEffect(() => {
 		if (!editing) setDraft(displayTitle);
@@ -75,6 +79,12 @@ export function EditableTaskTitle({
 	useEffect(() => {
 		if (!editable) setEditing(false);
 	}, [editable]);
+
+	useEffect(() => {
+		if (retry === 0) return;
+		settled.current = false;
+		input.current?.focus();
+	}, [retry]);
 
 	// Le dialogue navigue d'une tâche à l'autre sans démonter ce composant : un
 	// champ encore ouvert enregistrerait le titre de l'une sous l'id de l'autre.
@@ -135,9 +145,7 @@ export function EditableTaskTitle({
 			description: t("tasks:inlineEdit.titleSaveError"),
 			variant: "destructive",
 		});
-		if (!stillShown) return;
-		settled.current = false;
-		input.current?.focus();
+		if (stillShown) setRetry((n) => n + 1);
 	};
 
 	const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
