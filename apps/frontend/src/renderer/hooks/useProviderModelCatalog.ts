@@ -12,6 +12,7 @@ import {
 	sortClaudeCatalog,
 } from "../../shared/constants/models";
 import { dedupeLocalCatalog } from "../../shared/utils/local-models";
+import { localBackendFetch } from "../lib/local-backend";
 
 /**
  * `live`: the provider's own API (a key is configured).
@@ -150,9 +151,8 @@ async function load(provider: string, force = false): Promise<void> {
 	publish(state, { loading: true });
 	state.pending = (async () => {
 		try {
-			const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
-			const res = await fetch(
-				`${baseUrl}/providers/models/${encodeURIComponent(provider)}/catalog${force ? "?refresh=true" : ""}`,
+			const res = await localBackendFetch(
+				`/providers/models/${encodeURIComponent(provider)}/catalog${force ? "?refresh=true" : ""}`,
 				{ signal: controller.signal },
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);

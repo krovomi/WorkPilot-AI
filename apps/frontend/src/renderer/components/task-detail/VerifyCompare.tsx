@@ -8,6 +8,7 @@ import {
 import { useVerifyStore } from "../../stores/verify-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { BackendImage } from "./BackendMedia";
 
 /** Ce qui se lit comme un recul : à montrer en premier, en rouge. */
 const WORSE = new Set<VerifyDifference["change"]>(["broken"]);
@@ -106,7 +107,7 @@ export function VerifyCompare({
 							{(["base", "task"] as const).map((side) =>
 								typeof shots?.[side] === "number" ? (
 									<figure key={side} className="overflow-hidden rounded border border-border">
-										<img
+										<BackendImage
 											src={verifyScreenshotUrl(query, shots[side] as number)}
 											alt={t(`tasks:verify.compare.side.${side}`)}
 											className="block w-full bg-background object-contain"

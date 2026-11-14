@@ -18,7 +18,6 @@ export interface CanonicalProvider {
 	description: string;
 }
 
-export const API_BASE = import.meta?.env?.VITE_BACKEND_URL ?? "";
 
 export interface ProvidersResponse {
 	providers: CanonicalProvider[];
@@ -171,19 +170,3 @@ export async function getStaticProviders(
 	return { providers, status };
 }
 
-/**
- * @deprecated Use getStaticProviders() instead — this HTTP fetch fails silently in Electron.
- */
-export async function getProviders(): Promise<ProvidersResponse> {
-	try {
-		const res = await fetch(`${API_BASE}/providers`);
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const data = await res.json();
-		return {
-			providers: data.providers || [],
-			status: data.status || {},
-		};
-	} catch {
-		return { providers: [], status: {} };
-	}
-}

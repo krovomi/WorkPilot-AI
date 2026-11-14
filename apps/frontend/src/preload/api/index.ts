@@ -22,6 +22,10 @@ import {
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
 import {
+	createLocalBackendAPI,
+	type LocalBackendAPI,
+} from "./modules/local-backend-api";
+import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
 } from "./modules/blast-radius-api";
@@ -325,6 +329,7 @@ export interface ElectronAPI
 		InjectionGuardAPI,
 		GuardrailsAPI,
 		AgentDebuggerAPI,
+		LocalBackendAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
 		BountyBoardAPI,
@@ -478,6 +483,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
 		...createAgentDebuggerAPI(),
+		...createLocalBackendAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),
 		...createBountyBoardAPI(),
