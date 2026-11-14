@@ -60,6 +60,7 @@ const api = {
 	getCostSummary: vi.fn(),
 	getCostBudget: vi.fn(),
 	getDashboardSnapshot: vi.fn(),
+	listSessionHistory: vi.fn(),
 	onCostsUpdated: vi.fn(() => () => undefined),
 	onDashboardSnapshotUpdated: vi.fn(() => () => undefined),
 };
@@ -123,6 +124,7 @@ describe("a server project's workspace views", () => {
 			screen.getByText("The runs and jobs of this project on the server, for the whole team"),
 		).toBeInTheDocument();
 		expect(api.getServerSessions).toHaveBeenCalledWith("p-1");
+		expect(api.listSessionHistory).not.toHaveBeenCalled();
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 

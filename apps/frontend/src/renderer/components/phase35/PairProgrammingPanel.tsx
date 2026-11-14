@@ -175,7 +175,7 @@ export function PairProgrammingPanel() {
 											#{op.sequence}
 										</span>{" "}
 										<Badge variant="outline" className="text-3xs">
-											{op.kind}
+											{t(`pair.opKinds.${op.kind}` as never, { defaultValue: op.kind })}
 										</Badge>{" "}
 										<span>{op.actor}</span>
 										{op.kind === "chat" && (
