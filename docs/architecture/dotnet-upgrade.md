@@ -1,3 +1,10 @@
+---
+feature: Migrations .NET 8 → 11 / C# 15
+summary: >-
+  Skills de migration 8 → 9, 9 → 10, 10 → 11 adaptées de dotnet/skills, une étape par version,
+  copiées dans la spec des seules tâches qui en ont besoin, lisibles par tous les providers.
+---
+
 # .NET migrations 8 → 9 → 10 → 11 and C# 15
 
 > Rationale for the `dotnet_upgrade` package and the `migrate-dotnet8-to-dotnet9`,

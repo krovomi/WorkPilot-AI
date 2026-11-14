@@ -1,3 +1,9 @@
+---
+feature: Revue et refactoring
+summary: >-
+  IPC `codeInsights:run` ; smells et règles de revue pour toutes les piles.
+---
+
 # Code review and Refactoring views (code insights)
 
 The "Revue de code" and "Refactoring" views of the Development group read code

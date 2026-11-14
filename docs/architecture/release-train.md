@@ -1,3 +1,10 @@
+---
+feature: Release Train
+summary: >-
+  Lance les commandes du fichier approuvé (empreinte gardée hors du projet) par vagues ; santé et
+  smoke entre services, clic par service en prod, rollback en cascade.
+---
+
 # Release Train
 
 Issue #362. The "Release Coordinator" page (Planning). Code:

@@ -1,3 +1,10 @@
+---
+feature: Traces GenAI
+summary: >-
+  Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais
+  0.
+---
+
 # Traces OpenTelemetry GenAI pour tous les providers (`genai_trace`)
 
 `AUTO_CLAUDE_OTEL_ENDPOINT` branchait seulement le SDK Claude

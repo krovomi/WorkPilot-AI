@@ -1,3 +1,9 @@
+---
+feature: Découpage auto
+summary: >-
+  Plan > plafond de lignes : N cartes, dépendantes empilées (F6).
+---
+
 # Découpage automatique d'une grosse tâche (`task_split`)
 
 Une tâche du Kanban peut produire une PR de 3 000 lignes, trop longue à relire. Après la

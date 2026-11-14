@@ -1,3 +1,11 @@
+---
+feature: Conformité aux standards
+summary: >-
+  Les versions de MCP, ACP, AGENTS.md et OTel GenAI que parle le code, et ce qui atteint chaque
+  provider (champ `standards` de `providers.yaml`) ; chaque affirmation est vérifiée contre le
+  client qui tourne, `unverified` n'est jamais lu comme un support.
+---
+
 # Conformité aux standards ouverts (P4)
 
 Un orchestrateur multi-provider gagne à parler les formats communs plutôt qu'à maintenir un

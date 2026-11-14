@@ -1,3 +1,11 @@
+---
+feature: Revue guidée
+summary: >-
+  Le diff regroupé par sous-tâche du plan (plages de `build_commits.json`), puis orphelins, puis
+  non-commité ; explication du planner, aucun modèle ; « vu » invalidé par le hash du patch ; le
+  renderer ne passe qu'un `taskId` ; local.
+---
+
 # Guided review: the diff grouped by intention
 
 > Rationale for the guided review. The normative summary is the row in

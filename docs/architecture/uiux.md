@@ -1,3 +1,9 @@
+---
+feature: ui-ux-pro-max
+summary: >-
+  Design system et règles de pile, seulement sur les tâches qui touchent une interface.
+---
+
 # UI/UX design intelligence (ui-ux-pro-max)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

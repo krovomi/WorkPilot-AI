@@ -1,3 +1,10 @@
+---
+feature: Commentaires de revue ancrés
+summary: >-
+  Un commentaire sur une ligne du diff guidé, envoyé au fixer avec `chemin:ligne` ; `addressed`
+  décidé par le diff de sa session ; seul l'humain résout.
+---
+
 # Review comments anchored on a line
 
 > Rationale for the line comments of the review. The normative summary is the

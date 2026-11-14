@@ -1,3 +1,11 @@
+---
+feature: Exigence → fichiers → tests
+summary: >-
+  `requirement_trace/` en fin de build : chaque exigence reliée aux fichiers de ses sous-tâches
+  (Agent Trace, sinon le plan) et à leurs tests (conventions de toutes les stacks), gardée dans
+  `.workpilot/requirements/` après la tâche.
+---
+
 # Requirement → files → tests, kept after the task (prospective P3)
 
 When generating code costs little, the spec and the tests become the

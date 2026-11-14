@@ -1,3 +1,11 @@
+---
+feature: Garde des dépendances
+summary: >-
+  Paquets ajoutés depuis la base, toutes stacks, vus sur leur registre public ; seul un 404 sans
+  autre source bloque ; registre muet ou flux privé = « inconnu » ; nom proche d'un paquet
+  populaire averti.
+---
+
 # Garde des dépendances (paquets inventés, *slopsquatting*)
 
 Un agent qui écrit du code invente des noms de paquets. L'étude *We Have a Package for You!*
