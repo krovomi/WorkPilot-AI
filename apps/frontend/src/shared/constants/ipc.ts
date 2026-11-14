@@ -1051,6 +1051,8 @@ export const IPC_CHANNELS = {
 	AGENT_CLI_INSTALL: "agentCli:install",
 	AGENT_CLI_UPDATE_CHECK: "agentCli:updateCheck",
 	AGENT_CLI_UPDATE: "agentCli:update",
+	REA_CHECK: "rea:check",
+	REA_INSTALL: "rea:install",
 	AGENT_COACH_CANCEL: "agentCoach:cancel",
 	AGENT_COACH_ERROR: "agent-coach-error",
 	AGENT_COACH_EVENT: "agent-coach-event",

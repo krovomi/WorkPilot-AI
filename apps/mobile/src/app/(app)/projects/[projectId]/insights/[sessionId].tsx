@@ -1,13 +1,13 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useApi, useSession } from "../../../../../auth/session";
 import { JOB_POLL_MS } from "../../../../../features/useFeature";
 import type { InsightMessage } from "../../../../../features/types";
 import { useLoad } from "../../../../../hooks/useLoad";
 import { describeError } from "../../../../../i18n";
-import { Button, ErrorBanner, Loading } from "../../../../../ui/components";
+import { Button, ErrorBanner, KeyboardAvoiding, Loading } from "../../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../../ui/theme";
 
 const MAX_MESSAGE = 20_000;
@@ -69,7 +69,7 @@ export default function Conversation() {
 		]);
 
 	return (
-		<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+		<KeyboardAvoiding>
 			<Stack.Screen options={{ headerTitle: data.title }} />
 			<ScrollView contentContainerStyle={styles.content}>
 				<ErrorBanner message={actionError} />
@@ -102,7 +102,7 @@ export default function Conversation() {
 					/>
 				</View>
 			) : null}
-		</KeyboardAvoidingView>
+		</KeyboardAvoiding>
 	);
 }
 

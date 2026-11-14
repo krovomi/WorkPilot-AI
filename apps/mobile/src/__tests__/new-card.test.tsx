@@ -226,6 +226,14 @@ describe("share", () => {
 		expect(draftFromShare(many)?.description.split("\n\n")).toHaveLength(MAX_SHARED_ITEMS);
 	});
 
+	it("keeps tabs, drops DEL, C1 and every bidi control, and reads an item with no type as text", () => {
+		const draft = draftFromShare([
+			{ value: "a\tb\u007f\u0085c\u2066d\u2069e\u202ef" },
+			{ shareType: "text", value: undefined },
+		] as never);
+		expect(draft).toEqual({ title: "a bcdef", description: "a\tbcdef" });
+	});
+
 	it("hands a held draft over once", () => {
 		holdShareDraft({ title: "T", description: "D" });
 		expect(takeShareDraft()).toEqual({ title: "T", description: "D" });

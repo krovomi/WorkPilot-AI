@@ -35,6 +35,41 @@ describe("server routes", () => {
 		});
 	});
 
+	it("creates a card with its settings and pictures only when it has some", async () => {
+		const { calls, routes } = recorder();
+		const base = { title: "T", description: "D", requireReview: true };
+		await routes.createCard("p1", base);
+		await routes.createCard("p1", {
+			...base,
+			kind: "bug_fix",
+			settings: { priority: "high" } as never,
+			attachments: [{ filename: "a.png", mimeType: "image/png", data: "iVBO" }],
+		});
+		await routes.createCard("p1", { ...base, attachments: [] });
+		expect(calls.map((c) => c.body)).toEqual([
+			{ title: "T", description: "D", kind: null, require_review: true },
+			{
+				title: "T",
+				description: "D",
+				kind: "bug_fix",
+				require_review: true,
+				settings: { priority: "high" },
+				attachments: [{ filename: "a.png", mimeType: "image/png", data: "iVBO" }],
+			},
+			{ title: "T", description: "D", kind: null, require_review: true },
+		]);
+	});
+
+	it("starts a feature job with no options and reads its output from the start by default", async () => {
+		const { calls, routes } = recorder();
+		await routes.startFeatureJob("roadmap", "p1");
+		await routes.featureJob("roadmap", "p1", "j 1");
+		expect(calls).toEqual([
+			{ method: "POST", path: "/api/features/roadmap/jobs?project_id=p1", body: {} },
+			{ method: "GET", path: "/api/features/roadmap/jobs/j%201?project_id=p1&after=0", body: undefined },
+		]);
+	});
+
 	it("edits a card by project id, never by path", async () => {
 		const { calls, routes } = recorder();
 		await routes.updateCard("p 1", "007/x", { title: "New" });

@@ -39,6 +39,7 @@ FILE_NOT_FOUND = "file_not_found"
 WRITE_FAILED = "write_failed"
 PARSE_FAILED = "parse_failed"
 INVALID_INPUT = "invalid_input"
+UNSUPPORTED_STACK = "unsupported_stack"
 UNKNOWN = "unknown"
 
 # ── Redaction ────────────────────────────────────────────────────────
