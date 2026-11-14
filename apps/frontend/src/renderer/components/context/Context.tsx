@@ -1,10 +1,11 @@
-import { Brain, FolderTree } from "lucide-react";
+import { Brain, FolderTree, History } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useServerViewLive } from "../../hooks/useServerViewLive";
-import { useContextStore } from "../../stores/context-store";
+import { loadRecentMemories, useContextStore } from "../../stores/context-store";
 import { ModuleHeader, ModuleStage, Tabs } from "../charter";
 import { useMemorySearch, useProjectContext, useRefreshIndex } from "./hooks";
+import { LifecycleTab } from "./lifecycle/LifecycleTab";
 import { MemoriesTab } from "./MemoriesTab";
 import { ProjectIndexTab } from "./ProjectIndexTab";
 import type { ContextProps } from "./types";
@@ -27,7 +28,9 @@ export function Context(props: ContextProps) {
 		searchLoading,
 	} = useContextStore();
 
-	const [activeTab, setActiveTab] = useState<"index" | "memories">("index");
+	const [activeTab, setActiveTab] = useState<"index" | "memories" | "lifecycle">(
+		"index",
+	);
 
 	// Custom hooks
 	useProjectContext(projectId);
@@ -42,9 +45,17 @@ export function Context(props: ContextProps) {
 				description={
 					activeTab === "index"
 						? t("context:projectIndex.description")
-						: t("context:memories.description")
+						: activeTab === "memories"
+							? t("context:memories.description")
+							: t("context:lifecycle.description")
 				}
-				icon={activeTab === "index" ? FolderTree : Brain}
+				icon={
+					activeTab === "index"
+						? FolderTree
+						: activeTab === "memories"
+							? Brain
+							: History
+				}
 				tone="blue"
 			/>
 			<Tabs
@@ -55,6 +66,7 @@ export function Context(props: ContextProps) {
 						icon: FolderTree,
 					},
 					{ id: "memories", label: t("context:tabs.memories"), icon: Brain },
+					{ id: "lifecycle", label: t("context:tabs.lifecycle"), icon: History },
 				]}
 				value={activeTab}
 				onChange={setActiveTab}
@@ -68,8 +80,15 @@ export function Context(props: ContextProps) {
 						indexError={indexError}
 						onRefresh={handleRefreshIndex}
 					/>
+				) : activeTab === "lifecycle" ? (
+					<LifecycleTab
+						projectId={projectId}
+						onServer={memoryStatus?.onServer === true}
+					/>
 				) : (
 					<MemoriesTab
+						projectId={projectId}
+						onMemoryChanged={() => loadRecentMemories(projectId)}
 						memoryStatus={memoryStatus}
 						memoryState={memoryState}
 						recentMemories={recentMemories}

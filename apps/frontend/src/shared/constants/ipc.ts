@@ -296,6 +296,14 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_STATUS: "context:memoryStatus",
 	CONTEXT_SEARCH_MEMORIES: "context:searchMemories",
 	CONTEXT_GET_MEMORIES: "context:getMemories",
+	// The memory's lifecycle (journal, trash, pins, sync conflicts): /api/brain/memory/*
+	CONTEXT_MEMORY_LIFECYCLE: "context:memoryLifecycle",
+	CONTEXT_MEMORY_HISTORY: "context:memoryHistory",
+	CONTEXT_MEMORY_FORGET: "context:memoryForget",
+	CONTEXT_MEMORY_RESTORE: "context:memoryRestore",
+	CONTEXT_MEMORY_PIN: "context:memoryPin",
+	CONTEXT_MEMORY_RESOLVE_CONFLICT: "context:memoryResolveConflict",
+	CONTEXT_MEMORY_SUGGEST_RESOLUTION: "context:memorySuggestResolution",
 
 	// Environment configuration
 	ENV_GET: "env:get",
