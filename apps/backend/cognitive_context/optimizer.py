@@ -229,7 +229,9 @@ class CognitiveContextOptimizer:
                 logger.debug("Skipping unreadable file %s: %s", path, e)
                 continue
             score = self._score_file(
-                file_path=str(path),
+                # Forward slashes on every OS: the path is shown to the model
+                # and the person, and a Windows build wrote `Shop\\Order.cs`.
+                file_path=path.as_posix(),
                 content=content,
                 keywords=keywords,
                 explicit_set=explicit_set,
