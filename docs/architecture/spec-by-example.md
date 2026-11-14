@@ -1,3 +1,10 @@
+---
+feature: Spécification par l'exemple
+summary: >-
+  ASP.NET Core : critères d'acceptation en tests d'intégration HTTP avant le code, vérifiés
+  (projets de test seuls, compilent, échouent) puis protégés sous l'objectif `dotnet test`.
+---
+
 # Spec by example: integration tests before code (ASP.NET Core)
 
 Plan of 29 October, IA6. Goal mode ([goal-mode.md](goal-mode.md)) gives a card

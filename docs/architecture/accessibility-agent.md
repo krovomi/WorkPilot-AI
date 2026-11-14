@@ -1,3 +1,11 @@
+---
+feature: Agent d'accessibilité
+summary: >-
+  WCAG 2.2 lu dans le balisage de toutes les stacks et le CSS (liaisons, spread, composants :
+  silence si incertain), contraste, score 0-100 et historique ; scan dynamique en fenêtre cachée
+  sur localhost ; corrections sur carte de revue.
+---
+
 # Agent d'accessibilité (#391)
 
 La page Accessibilité vérifie les critères WCAG 2.2 que la source permet de juger, note le

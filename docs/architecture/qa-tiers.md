@@ -1,3 +1,10 @@
+---
+feature: Paliers de QA
+summary: >-
+  Légère (texte seul), ciblée (≤ 3 fichiers de code, ≤ 150 lignes, un test par fichier : seuls ces
+  tests tournent, sans sous-agent), complète ; tout doute donne la complète.
+---
+
 # QA tiers: light, targeted, full
 
 Every QA reviewer pass first reads the task's change set from git

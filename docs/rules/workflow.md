@@ -96,9 +96,11 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   pour l'utilisateur ajoute un fragment à [`changelog.d/`](../../changelog.d/README.md) au lieu
   d'écrire dans `CHANGELOG.md` ; un nouveau constat d'audit est un fichier de
   [`docs/audit/findings/`](../audit/findings/README.md) (puis `python scripts/audit_findings.py
-  build`), une nouvelle annexe un fichier de `docs/audit/annexes/`. Deux PR ouvertes en même temps
-  ne touchent plus les mêmes lignes ; `tests/test_changelog_fragments.py` et
-  `tests/test_audit_findings.py` le gardent.
+  build`), une nouvelle annexe un fichier de `docs/audit/annexes/`, une nouvelle conception un fichier
+  `docs/architecture/<feature>.md` dont le frontmatter (`feature`, `summary`) est l'index, sans ligne
+  dans `docs/CLAUDE.md`. Deux PR ouvertes en même temps ne touchent plus les mêmes lignes ;
+  `tests/test_changelog_fragments.py`, `tests/test_audit_findings.py` et `tests/test_docs_context.py`
+  le gardent.
 - **Fusion des PR vertes : le pilote de pile** (`stack-autopilot.yml`, `scripts/stack_autopilot.py`).
   Toute PR de ce dépôt vers `develop` (ou vers la branche d'une autre PR ouverte, une pile) est
   inscrite d'office et fusionnée par lui, celles de Dependabot comprises, jamais une PR vers `main`.

@@ -1,3 +1,11 @@
+---
+feature: Tâches empilées
+summary: >-
+  Parent = prérequis non terminé, sans boucle ; l'enfant part du commit local du parent ; « Mettre
+  à jour » rebase `--onto` hors agent et sur worktree propre, un conflit est annulé ; parent
+  fusionné : l'enfant passe sur sa base, PR reciblée.
+---
+
 # Tâches empilées (F6)
 
 Une tâche B qui attend une tâche A (A est dans ses « Bloquée par ») ne peut d'habitude démarrer

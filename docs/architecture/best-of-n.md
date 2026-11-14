@@ -1,3 +1,10 @@
+---
+feature: Best-of-N
+summary: >-
+  Une tâche construite N fois, une variante par moteur ; classement chiffré, arbitre si elles
+  divergent, choix humain, rien de fusionné.
+---
+
 # Best-of-N : une tâche construite N fois, la personne garde un build (`best_of_n`)
 
 `parallel_variations/` écrivait des plans de variantes sans lancer d'agent (supprimé depuis, voir
