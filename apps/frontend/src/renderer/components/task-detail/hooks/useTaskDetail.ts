@@ -15,6 +15,7 @@ import type {
 import { getActiveLogPhase } from "../../../../shared/utils/task-logs";
 import { isTaskPaused } from "../../../../shared/utils/task-pause";
 import { consumePendingTaskDetailTab } from "../../../lib/task-detail-nav";
+import { retainTaskLogWatch } from "../../../lib/task-log-watch";
 import { useProjectStore } from "../../../stores/project-store";
 import { useSettingsStore } from "../../../stores/settings-store";
 import {
@@ -417,8 +418,8 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 		loadLogs();
 
-		// Start watching for log changes
-		window.electronAPI.watchTaskLogs(selectedProject.id, task.specId);
+		// Start watching for log changes (shared with the Pixel Office bubble)
+		const releaseWatch = retainTaskLogWatch(selectedProject.id, task.specId);
 
 		// Listen for log changes
 		const unsubscribe = window.electronAPI.onTaskLogsChanged((specId, logs) => {
@@ -450,7 +451,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 
 		return () => {
 			unsubscribe();
-			window.electronAPI.unwatchTaskLogs(task.specId);
+			releaseWatch();
 		};
 	}, [selectedProject, task.specId]);
 
