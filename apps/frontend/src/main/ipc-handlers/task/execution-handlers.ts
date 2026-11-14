@@ -17,19 +17,16 @@ import type {
 import type { AgentManager } from "../../agent";
 import { appLog } from "../../app-logger";
 import { fileWatcher } from "../../file-watcher";
-import { projectStore } from "../../project-store";
 import { taskStateManager } from "../../task-state-manager";
 import { getPlanPath, updatePlanSubtasks } from "./plan-file-utils";
 import {
 	clearPauseState,
-	type PauseStateRecord,
-	writePauseState,
 } from "./pause-state-utils";
+import { pauseTaskNow } from "./pause-task";
 import { findTaskAndProject } from "./shared";
 import {
 	allSpecDirs,
 	convertTaskMetadataToSpecCreation,
-	currentPausePhase,
 	getSpecPaths,
 	resumePausedTask,
 } from "./resume-task";
@@ -482,78 +479,19 @@ export function registerTaskExecutionHandlers(
 		},
 	);
 
-	/**
-	 * Pause task execution, at whatever phase it is in.
-	 *
-	 * The flag goes to `pause_state.json`, not into `implementation_plan.json`:
-	 * that file does not exist during spec creation or planning, so the previous
-	 * version answered "Implementation plan not found" for a task the user could
-	 * see running. The backend reads the same file from its coder loop, its QA
-	 * loop and its spec pipeline, so one Pause click stops all three.
-	 */
+	/** Pause task execution, at whatever phase it is in (see `pauseTaskNow`). */
 	ipcMain.handle(
 		IPC_CHANNELS.TASK_PAUSE,
 		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
 			try {
-				const { task, project } = findTaskAndProject(taskId);
-				if (!task || !project) {
-					return { success: false, error: "Task not found" };
+				const result = pauseTaskNow(agentManager, taskId, { subtaskId });
+				if (result.success && result.data) {
+					appLog.info(
+						`[TASK_PAUSE] Task ${taskId} paused during ${result.data.pausedPhase} (${result.data.specDirs} spec ` +
+							`dir(s)); subprocess ${result.data.wasRunning ? "killed" : "was not running"}.`,
+					);
 				}
-
-				const specPaths = getSpecPaths(task, project);
-				const specDirs = allSpecDirs(specPaths);
-				if (specDirs.length === 0) {
-					return { success: false, error: "Spec directory not found" };
-				}
-
-				const phase = currentPausePhase(task, specPaths);
-				const pausedState: PauseStateRecord = {
-					enabled: true,
-					paused_at: new Date().toISOString(),
-					paused_phase: phase,
-					paused_subtask_id:
-						subtaskId ?? task.executionProgress?.currentSubtask ?? null,
-					provider: task.metadata?.provider ?? null,
-					model: task.metadata?.model ?? null,
-				};
-
-				const written = writePauseState(specDirs, pausedState);
-
-				if (written === 0) {
-					return { success: false, error: "Could not write pause state" };
-				}
-
-				// Re-scan so the scanner surfaces the pause on task.metadata; the
-				// UI uses that to switch the controls into the paused state.
-				projectStore.invalidateTasksCache(project.id);
-
-				// Immediate pause: stop the running subprocess NOW rather than
-				// waiting for the backend to reach its next cooperative checkpoint
-				// (which, mid-session, can be a long way off). haltTask marks the
-				// spawn as killed (its exit handler returns early WITHOUT emitting
-				// "exit" — no PROCESS_EXITED/USER_STOPPED, so the card keeps its
-				// current column) AND unregisters the task from the
-				// OperationRegistry so the proactive profile-swap / usage monitor
-				// cannot resurrect the paused process when a token limit is hit.
-				// The flag written above drives the UI and a clean resume.
-				const wasRunning = agentManager.haltTask(taskId);
-
-				appLog.info(
-					`[TASK_PAUSE] Task ${taskId} paused during ${phase} at subtask ` +
-						`${pausedState.paused_subtask_id ?? "none"} (${written} spec ` +
-						`dir(s)); subprocess ${wasRunning ? "killed" : "was not running"}.`,
-				);
-
-				return {
-					success: true,
-					data: {
-						taskId,
-						paused: true,
-						pausedAt: pausedState.paused_at,
-						pausedPhase: phase,
-						specDirs: written,
-					},
-				};
+				return result;
 			} catch (error) {
 				appLog.error("[TASK_PAUSE] Error:", error);
 				return { success: false, error: String(error) };

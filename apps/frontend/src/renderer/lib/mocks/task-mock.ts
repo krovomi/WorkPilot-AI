@@ -63,6 +63,11 @@ export const taskMock = {
 		console.warn("[Browser Mock] stopTask called");
 	},
 
+	stopAllAgents: async () => ({
+		success: true,
+		data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+	}),
+
 	submitReview: async () => ({ success: true }),
 
 	// Task archive operations

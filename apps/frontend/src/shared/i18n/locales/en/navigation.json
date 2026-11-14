@@ -489,5 +489,14 @@
 			"busy": "REA is already being installed."
 		},
 		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files."
+	},
+	"stopAll": {
+		"label": "Stop all agents",
+		"tooltip": "Stop all agents (Ctrl+Shift+.): every running task is paused, to resume from its card",
+		"done_one": "{{count}} task paused",
+		"done_other": "{{count}} tasks paused",
+		"resumeHint": "Every agent has stopped. Resume each task from its card when you are ready.",
+		"nothing": "No agent was running",
+		"failed": "The agents could not be stopped"
 	}
 }

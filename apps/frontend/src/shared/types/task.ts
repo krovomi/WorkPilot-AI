@@ -19,6 +19,23 @@ import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
 
+/** What the circuit breaker saw when it paused a task (`agents/tool_breaker.py`). */
+export interface BreakerPauseDetail {
+	tool: string;
+	repeats: number;
+	limit: number;
+}
+
+/** What "Stop all agents" stopped (`main/ipc-handlers/task/stop-all-handlers.ts`). */
+export interface StopAllResult {
+	/** Tasks paused, to resume one by one. */
+	pausedTasks: string[];
+	/** Other agent processes (ideation, roadmap, insights…) stopped outright. */
+	stoppedProcesses: number;
+	/** Tasks whose pause could not be written: stopped all the same. */
+	failedTasks: string[];
+}
+
 /** One phase's engine: provider × model × effort (see shared/utils/task-engine.ts). */
 export interface EngineTrio {
 	provider: string;
@@ -651,9 +668,13 @@ export interface TaskMetadata {
 		 * when WorkPilot was closed while it ran — the next launch resumes those
 		 * on its own, and only those. "budget" / "budget_stall" when the
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
+		 * "tool_loop" when the circuit breaker stopped an agent repeating the
+		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
+		 * when the person stopped every agent at once.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
+		breaker?: BreakerPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -787,9 +808,13 @@ export interface ImplementationPlan {
 		 * when WorkPilot was closed while it ran — the next launch resumes those
 		 * on its own, and only those. "budget" / "budget_stall" when the
 		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
+		 * "tool_loop" when the circuit breaker stopped an agent repeating the
+		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
+		 * when the person stopped every agent at once.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
+		breaker?: BreakerPauseDetail;
 	};
 }
 
