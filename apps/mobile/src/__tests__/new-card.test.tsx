@@ -4,7 +4,8 @@ import NewCard from "../app/(app)/projects/[projectId]/new";
 import { redirectSystemPath } from "../app/+native-intent";
 import { isModelValid, NO_CHOICE, settingsPayload } from "../new-card/engine";
 import { ImagesSection } from "../new-card/ImagesSection";
-import { addImages, decodedSize, MAX_IMAGE_BYTES, MAX_IMAGES, type PendingImage, sniffMime } from "../new-card/images";
+import { addImages, decodedSize, leadingBytes, MAX_IMAGE_BYTES, MAX_IMAGES, type PendingImage, sniffMime } from "../new-card/images";
+import { Platform } from "react-native";
 import { draftFromShare, holdShareDraft, MAX_SHARED_ITEMS, SHARED_TITLE_LENGTH, takeShareDraft } from "../new-card/share";
 
 const mockApi = { engines: jest.fn(), createCard: jest.fn() };
@@ -22,7 +23,11 @@ jest.mock("expo-image-picker", () => ({
 }));
 jest.mock("expo-sharing", () => ({ getSharedPayloads: jest.fn(() => []), clearSharedPayloads: jest.fn() }));
 
-const picker = jest.requireMock("expo-image-picker") as { launchImageLibraryAsync: jest.Mock };
+const picker = jest.requireMock("expo-image-picker") as {
+	launchImageLibraryAsync: jest.Mock;
+	launchCameraAsync: jest.Mock;
+	requestCameraPermissionsAsync: jest.Mock;
+};
 
 const ENGINES = [
 	{ provider: "claude", label: "Anthropic (Claude)", effort: "thinking_budget", models: [{ id: "claude-opus-4-8", label: "Opus 4.8" }] },
@@ -80,6 +85,10 @@ describe("image rules", () => {
 		expect(sniffMime(WEBP)).toBe("image/webp");
 		expect(sniffMime(HEIC)).toBeNull();
 		expect(sniffMime(PDF)).toBeNull();
+		// Every base64 alphabet, and a stop at padding or at anything that is not base64.
+		expect(leadingBytes("+/8=")).toEqual([0xfb, 0xff]);
+		expect(leadingBytes("QUJD*QUJD")).toEqual([0x41, 0x42, 0x43]);
+		expect(sniffMime("iVBO\nRw0KGgo=")).toBeNull();
 		expect(decodedSize("QUJD")).toBe(3);
 		expect(decodedSize("QUI=")).toBe(2);
 	});
@@ -147,6 +156,53 @@ describe("ImagesSection", () => {
 	});
 });
 
+describe("ImagesSection, camera", () => {
+	beforeEach(() => {
+		picker.launchCameraAsync.mockReset();
+		picker.requestCameraPermissionsAsync.mockReset().mockResolvedValue({ granted: true });
+	});
+
+	it("adds a photo taken with the camera", async () => {
+		picker.launchCameraAsync.mockResolvedValueOnce({ canceled: false, assets: [{ uri: "file:///p.jpg", base64: JPEG, fileName: "p.jpg" }] });
+		const onChange = jest.fn();
+		await render(<ImagesSection images={[]} onChange={onChange} />);
+		await fireEvent.press(screen.getByRole("button", { name: "Camera" }));
+		await waitFor(() => expect(onChange).toHaveBeenCalled());
+		expect(onChange.mock.calls[0][0].map((i: PendingImage) => i.filename)).toEqual(["p.jpg"]);
+	});
+
+	it("adds nothing when the person closes the camera", async () => {
+		picker.launchCameraAsync.mockResolvedValueOnce({ canceled: true, assets: null });
+		const onChange = jest.fn();
+		await render(<ImagesSection images={[]} onChange={onChange} />);
+		await fireEvent.press(screen.getByRole("button", { name: "Camera" }));
+		await waitFor(() => expect(picker.launchCameraAsync).toHaveBeenCalled());
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it("says how to allow the camera when the system refuses it", async () => {
+		picker.requestCameraPermissionsAsync.mockResolvedValueOnce({ granted: false });
+		await render(<ImagesSection images={[]} onChange={jest.fn()} />);
+		await fireEvent.press(screen.getByRole("button", { name: "Camera" }));
+		expect(
+			await screen.findByText("The camera is not allowed for WorkPilot AI. Allow it in the system settings."),
+		).toBeTruthy();
+		expect(picker.launchCameraAsync).not.toHaveBeenCalled();
+	});
+
+	it("offers no camera on the web preview", async () => {
+		const realOS = Platform.OS;
+		Object.defineProperty(Platform, "OS", { value: "web", configurable: true });
+		try {
+			await render(<ImagesSection images={[]} onChange={jest.fn()} />);
+			expect(screen.getByRole("button", { name: "Photo library" })).toBeTruthy();
+			expect(screen.queryByRole("button", { name: "Camera" })).toBeNull();
+		} finally {
+			Object.defineProperty(Platform, "OS", { value: realOS, configurable: true });
+		}
+	});
+});
+
 describe("share", () => {
 	it("routes the system's share link to the share screen only", () => {
 		expect(redirectSystemPath({ path: "workpilot://expo-sharing", initial: true })).toBe("/share");
@@ -196,6 +252,23 @@ describe("New card screen", () => {
 		expect(sent.settings).toBeUndefined();
 		expect(sent.attachments).toEqual([]);
 		expect(mockReplace).toHaveBeenCalled();
+	});
+
+	it("sends the pictures added, as their name, type and bytes only", async () => {
+		mockApi.engines.mockResolvedValue(ENGINES);
+		picker.launchImageLibraryAsync.mockReset();
+		picker.launchImageLibraryAsync.mockResolvedValueOnce({
+			canceled: false,
+			assets: [{ uri: "file:///shot.png", base64: PNG, fileName: "shot.png" }],
+		});
+		await render(<NewCard />);
+		await fireEvent.changeText(screen.getByLabelText("Title"), "Fix the header");
+		await fireEvent.press(screen.getByRole("button", { name: "Photo library" }));
+		expect(await screen.findByLabelText("Remove shot.png")).toBeTruthy();
+		await fireEvent.press(screen.getByRole("button", { name: "Create" }));
+		await waitFor(() => expect(mockApi.createCard).toHaveBeenCalled());
+		const sent = mockApi.createCard.mock.calls[0][1];
+		expect(sent.attachments).toEqual([{ filename: "shot.png", mimeType: "image/png", data: PNG }]);
 	});
 
 	it("sends the engine, model, effort and priority chosen", async () => {

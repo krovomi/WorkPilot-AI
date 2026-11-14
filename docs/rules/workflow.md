@@ -133,7 +133,8 @@ commit vide pour relancer.
 Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
 - **Couverture** : pytest `--cov-fail-under=58` (`ci.yml`), Vitest `coverage.thresholds`
-  (`apps/frontend/vitest.config.ts`, mesuré sur Linux). Ce sont des planchers sous le niveau
+  (`apps/frontend/vitest.config.ts`, mesuré sur Linux), Jest `coverageThreshold` de l'app
+  mobile (`apps/mobile/package.json`, job `test` de `mobile.yml`). Ce sont des planchers sous le niveau
   mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.
 - **Démarrage** : `apps/frontend/scripts/smoke-test.cjs` lance l'app avec `WORKPILOT_SMOKE_TEST=1`
   et exige que le renderer monte (`src/main/smoke-test.ts`) ; `ci.yml` le fait sur le build des

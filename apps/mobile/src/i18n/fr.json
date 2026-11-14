@@ -29,7 +29,7 @@
 		"submit": "Se connecter",
 		"invalidUrl": "Cette adresse de serveur n'est pas valide.",
 		"insecureUrl": "Utilisez une adresse https://. Le http simple n'est permis que sur votre réseau local.",
-		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft, que l'app mobile ne gère pas encore.",
+		"localDisabled": "Ce serveur n'accepte que la connexion Microsoft : utilisez Se connecter avec Microsoft.",
 		"failed": "Connexion impossible : {{message}}",
 		"badCredentials": "E-mail ou mot de passe incorrect.",
 		"or": "ou",

@@ -40,6 +40,17 @@ describe("the project's index, read defensively", () => {
 		expect(index?.infrastructure[0].value.endsWith(", +10")).toBe(true);
 	});
 
+	it("leaves out a list with nothing to show, a false flag and a service that is not an object", () => {
+		const index = readIndex(
+			JSON.stringify({
+				services: { api: "dotnet", web: { language: "TypeScript" } },
+				infrastructure: { ci_workflows: ["", "  ", 3], dockerfile: false, ci: "GitHub Actions" },
+			}),
+		);
+		expect(index?.services.map((s) => s.name)).toEqual(["web"]);
+		expect(index?.infrastructure).toEqual([{ key: "ci", value: "GitHub Actions" }]);
+	});
+
 	it("is null for a missing or broken file", () => {
 		expect(readIndex(undefined)).toBeNull();
 		expect(readIndex("{not json")).toBeNull();
