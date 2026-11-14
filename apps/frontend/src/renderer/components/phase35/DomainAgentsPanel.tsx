@@ -45,6 +45,7 @@ export function DomainAgentsPanel() {
 	}, [domains, selected, t]);
 
 	const noDomains = !isRunning && domains.length === 0;
+	const selectedDomain = domains.find((d) => d.tag === selected);
 
 	return (
 		<PanelShell
@@ -84,13 +85,20 @@ export function DomainAgentsPanel() {
 							{domains.length === 0 && <option value="">—</option>}
 							{domains.map((d) => (
 								<option key={d.tag} value={d.tag}>
-									{d.label}
+									{t(`domainAgents.domains.${d.tag}.label` as never, { defaultValue: d.label })}
 								</option>
 							))}
 						</NativeSelect>
 						{domainError && (
 							<p id="domain-error" className="mt-1 text-xs text-destructive">
 								{domainError}
+							</p>
+						)}
+						{selectedDomain && (
+							<p className="mt-1 text-xs text-muted-foreground">
+								{t(`domainAgents.domains.${selectedDomain.tag}.description` as never, {
+									defaultValue: selectedDomain.description,
+								})}
 							</p>
 						)}
 					</div>
@@ -115,6 +123,7 @@ export function DomainAgentsPanel() {
 
 				{bundle && (
 					<div className="space-y-3 text-sm">
+						<p className="text-xs text-muted-foreground">{t("domainAgents.promptNote")}</p>
 						{bundle.guardrails.length > 0 && (
 							<details open>
 								<summary className="font-medium cursor-pointer">

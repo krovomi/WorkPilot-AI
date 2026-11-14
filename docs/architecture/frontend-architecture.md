@@ -14,7 +14,10 @@
 - `github/issues-store.ts`, `github/pr-review-store.ts` — GitHub integration
 - `insights-store.ts`, `roadmap-store.ts`, `kanban-settings-store.ts`
 - `self-healing-store.ts` — Incident management and production response
-- `pixel-office-store.ts` — Multi-agent Pixel Office visualization
+- `pixel-office-store.ts` — Multi-agent Pixel Office visualization. The task bubble's log (`pixel-office/use-agent-log-lines.ts`) is the
+  task's phase log, local or server, loaded on open and watched while it stays open, with the
+  live output only until that log has an entry; the watch is shared with the task panel
+  (`lib/task-log-watch.ts`), so closing one view does not silence the other
 - `learning-loop-store.ts` — Learning analytics
 - `app-emulator-store.ts` — App preview/emulator
 - `arena-store.ts` — Model comparison arena
