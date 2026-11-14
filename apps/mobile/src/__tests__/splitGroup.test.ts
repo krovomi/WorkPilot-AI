@@ -24,6 +24,10 @@ describe("split group colour", () => {
 		["abc", "orange"],
 		["é-123", "blue"],
 		["999-very-long-name-here", "orange"],
+		// Three- and four-byte characters, hashed as Python's str.encode("utf-8") does.
+		["日本-1", "amber"],
+		["€-7", "amber"],
+		["🚀-42", "orange"],
 	])("%s is %s on every surface", (id, tone) => {
 		expect(groupTone(id)).toBe(tone);
 	});
