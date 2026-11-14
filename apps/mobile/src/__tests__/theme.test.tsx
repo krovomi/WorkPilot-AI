@@ -3,8 +3,8 @@ import * as SecureStore from "expo-secure-store";
 import { Text } from "react-native";
 import "../i18n";
 import { PALETTES } from "../ui/palettes";
-import { paletteFor, type Theme, useTheme } from "../ui/theme";
-import { COLOR_THEME_IDS, parsePrefs } from "../ui/theme-ids";
+import { paletteFor, type Theme, useTheme, useThemeChoice } from "../ui/theme";
+import { COLOR_THEME_IDS, DEFAULT_PREFS, parsePrefs } from "../ui/theme-ids";
 import { loadPrefs, savePrefs } from "../ui/theme-store";
 import { type PrefsApi, pushPrefs, syncPrefs } from "../ui/theme-sync";
 import { ThemeProvider } from "../ui/ThemeProvider";
@@ -99,6 +99,8 @@ describe("palettes", () => {
 		expect(paletteFor("lime", "system", null)).toBe(PALETTES.lime.light);
 		expect(paletteFor("lime", "dark", "light")).toBe(PALETTES.lime.dark);
 		expect(paletteFor("lime", "light", "dark")).toBe(PALETTES.lime.light);
+		// A theme a newer desktop added, unknown here: the default one.
+		expect(paletteFor("aurora" as never, "dark", null)).toBe(PALETTES.default.dark);
 	});
 
 	it("accepts only the closed lists", () => {
@@ -107,6 +109,20 @@ describe("palettes", () => {
 		expect(parsePrefs({ theme: "dark", colorTheme: "solarized" })).toBeNull();
 		expect(parsePrefs({ theme: null, colorTheme: null })).toBeNull();
 		expect(parsePrefs("dark")).toBeNull();
+	});
+});
+
+describe("outside a provider", () => {
+	it("uses the default theme, and a choice there changes nothing", async () => {
+		let choice!: ReturnType<typeof useThemeChoice>;
+		function Chooser() {
+			choice = useThemeChoice();
+			return <Probe />;
+		}
+		await render(<Chooser />);
+		expect(choice.prefs).toEqual(DEFAULT_PREFS);
+		choice.choose({ theme: "dark", colorTheme: "retro" });
+		expect(screen.getByTestId("probe")).toHaveTextContent(`${PALETTES.default.light.background}|${PALETTES.default.light.accent}`);
 	});
 });
 
@@ -233,6 +249,42 @@ describe("theme provider and settings section", () => {
 		expect(screen.getByTestId("probe")).toHaveTextContent(`${PALETTES.lime.light.background}|${PALETTES.lime.light.accent}`);
 		await waitFor(() => expect(api.setPreferences).toHaveBeenCalled());
 		expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "system", colorTheme: "lime", pending: true, owner: "u1" });
+	});
+
+	it("keeps a choice made signed out on the phone only, for whoever signs in next", async () => {
+		await render(
+			<ThemeProvider>
+				<Probe />
+				<ThemeSection />
+			</ThemeProvider>,
+		);
+		await fireEvent.press(screen.getByRole("radio", { name: "Ocean" }));
+		expect(screen.getByTestId("probe")).toHaveTextContent(`${PALETTES.ocean.light.background}|${PALETTES.ocean.light.accent}`);
+		await waitFor(() =>
+			expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ theme: "system", colorTheme: "ocean", pending: true, owner: null }),
+		);
+	});
+
+	it("reads the account's theme once per sign-in, not on every render", async () => {
+		const api = fakeApi({ theme: "dark", colorTheme: "ocean" });
+		Object.assign(mockSession, { status: "signedIn", api, user: { id: "u1" } });
+		const tree = () => (
+			<ThemeProvider>
+				<Probe />
+			</ThemeProvider>
+		);
+		const view = await render(tree());
+		await waitFor(() => expect(api.preferences).toHaveBeenCalledTimes(1));
+		// A new client for the same person (a refreshed session) is not a new sign-in.
+		Object.assign(mockSession, { api: { ...api } });
+		await view.rerender(tree());
+		expect(api.preferences).toHaveBeenCalledTimes(1);
+		Object.assign(mockSession, { api });
+		Object.assign(mockSession, { status: "signedOut", api: null, user: null });
+		await view.rerender(tree());
+		Object.assign(mockSession, { status: "signedIn", api, user: { id: "u1" } });
+		await view.rerender(tree());
+		await waitFor(() => expect(api.preferences).toHaveBeenCalledTimes(2));
 	});
 
 	it("never sends a pending choice of the previous person to the one now signed in", async () => {
