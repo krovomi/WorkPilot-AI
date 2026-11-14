@@ -170,9 +170,12 @@ class LocaleDiscovery:
     """
 
     root: Path
-    layout: str  # "nested" | "flat" | "none"
+    layout: str  # "nested" | "flat" | "catalogs" | "none"
     locales: dict[str, dict[str, Any]] = field(default_factory=dict)
     redirected_from: Path | None = None
+    #: The catalog formats read when ``layout == "catalogs"`` (resx, android,
+    #: strings, gettext, arb, xliff, properties, yaml, php, json).
+    formats: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -331,7 +334,13 @@ class I18nAutoScaler:
     # ------------------------------------------------------------------
     # Filesystem helpers
 
-    def discover_locales(self, locales_dir: Path | str) -> LocaleDiscovery:
+    def discover_locales(
+        self,
+        locales_dir: Path | str,
+        reference: str = "en",
+        *,
+        catalogs: bool = False,
+    ) -> LocaleDiscovery:
         """Find the locales under `locales_dir`, whichever layout is in use.
 
         Two layouts are read, because both are ordinary i18next output and a
@@ -349,23 +358,55 @@ class I18nAutoScaler:
         holds no locales but is itself named like one, the search moves up to
         its parent and says so in ``redirected_from``, so the answer names the
         directory it was actually read from.
+
+        With ``catalogs=True`` (the report, which only reads), a directory
+        with no i18next JSON is read for every other stack's catalogs
+        (`_read_catalogs`). The editor leaves it off: it writes JSON only.
         """
         root = Path(locales_dir)
         if not root.is_dir():
             raise ValueError(f"Not a directory: {root}")
 
         found = self._read_locales_at(root)
-        if found.locales or not self._looks_like_locale_dir(root):
+        if found.locales and catalogs and not any(found.locales.values()):
+            # Directories named like locales ("app", "lib", "src") but no JSON
+            # in any of them: a project root, not an i18next folder.
+            catalog_found = self._read_catalogs(root, reference)
+            if catalog_found.locales:
+                return catalog_found
+        if found.locales:
             return found
+        if not self._looks_like_locale_dir(root):
+            return self._read_catalogs(root, reference) if catalogs else found
 
         parent = self._read_locales_at(root.parent)
         if not parent.locales:
-            return found
+            return self._read_catalogs(root, reference) if catalogs else found
         return LocaleDiscovery(
             root=parent.root,
             layout=parent.layout,
             locales=parent.locales,
             redirected_from=root,
+        )
+
+    @staticmethod
+    def _read_catalogs(root: Path, reference: str) -> LocaleDiscovery:
+        """Every stack's catalogs under ``root``, when it holds no i18next JSON.
+
+        .NET RESX, Android ``strings.xml``, iOS ``.strings``, gettext, Flutter
+        ARB, XLIFF, Java ``.properties``, Rails YAML and Laravel PHP are read
+        by `i18n_agent.catalogs`, the same reader as the i18n check, so a
+        project that is not on i18next gets a report too. A neutral catalog
+        (``Strings.resx``, ``values/strings.xml``) is the reference locale's.
+        """
+        from i18n_agent.catalogs import catalog_files, discover_catalogs
+
+        locales = discover_catalogs(root, reference)
+        if not locales:
+            return LocaleDiscovery(root=root, layout="none", locales={})
+        formats = sorted({f.format for f in catalog_files(root, reference)})
+        return LocaleDiscovery(
+            root=root, layout="catalogs", locales=locales, formats=formats
         )
 
     def _read_locales_at(self, root: Path) -> LocaleDiscovery:
