@@ -24,7 +24,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	DEFAULT_MCP_AGENTS,
+	catalogAgents,
 	localized,
 	missingCatalogVars,
 } from "../../../shared/mcp-catalog/install";
@@ -69,14 +69,15 @@ export function McpServerCard({ server }: McpServerCardProps) {
 	const [showDetails, setShowDetails] = useState(false);
 	const [values, setValues] = useState<Record<string, string>>({});
 	const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-	const [agents, setAgents] = useState<string[]>([...DEFAULT_MCP_AGENTS]);
+	const offeredAgents = catalogAgents(server);
+	const [agents, setAgents] = useState<string[]>(offeredAgents);
 
 	const requiredVars = server.vars.filter((v) => v.required);
 	const optionalVars = server.vars.filter((v) => !v.required);
 
 	const handleInstallClick = () => {
 		setValues({});
-		setAgents([...DEFAULT_MCP_AGENTS]);
+		setAgents(offeredAgents);
 		setShowInstallDialog(true);
 	};
 
@@ -391,7 +392,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 								{t("mcpMarketplace.installDialog.agents")}
 							</Label>
 							<div className="flex flex-wrap gap-4">
-								{DEFAULT_MCP_AGENTS.map((agent) => (
+								{offeredAgents.map((agent) => (
 									<div key={agent} className="flex items-center gap-2">
 										<Checkbox
 											id={`mcp-agent-${server.id}-${agent}`}

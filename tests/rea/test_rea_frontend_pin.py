@@ -47,3 +47,37 @@ def test_the_badge_installs_the_pin_without_install_scripts():
     ).read_text(encoding="utf-8")
     assert '["install", "-g", "--ignore-scripts", REA_SPEC]' in handlers
     assert "@latest" not in handlers
+
+
+def test_the_catalog_entry_starts_the_pin_for_investigations_only():
+    """Lot E: the MCP Marketplace's REA runs the pinned release, with compact
+    schemas and the hot-cold catalog, offered to the `analyzer` (the agent of
+    investigation tasks), and without the families that drive a device, a
+    browser or a running program."""
+    pin = json.loads(PIN.read_text(encoding="utf-8"))
+    catalog = json.loads(
+        (
+            ROOT
+            / "apps"
+            / "frontend"
+            / "src"
+            / "shared"
+            / "mcp-catalog"
+            / "servers.json"
+        ).read_text(encoding="utf-8")
+    )
+    [entry] = [s for s in catalog["servers"] if s["id"] == "rea"]
+    assert entry["args"] == ["-y", f"{pin['package']}@{pin['version']}", "mcp"]
+    assert entry["agents"] == ["analyzer"]
+    env = entry["env"]
+    assert env["REA_MCP_INPUT_SCHEMA_PROFILE"] == "compact"
+    assert env["REA_MCP_OUTPUT_SCHEMA_PROFILE"] == "compact"
+    assert env["REA_MCP_TOOL_CATALOG_PROFILE"] == "hot-cold"
+    families = set(env["REA_MCP_TOOL_FAMILIES"].split(","))
+    assert not families & {
+        "frida",
+        "adb",
+        "browser",
+        "javascript-runtime",
+        "application",
+    }
