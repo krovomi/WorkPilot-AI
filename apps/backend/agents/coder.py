@@ -82,7 +82,7 @@ from prompts_pkg.prompts import (
     docintel_section,
     dotnet_section,
     is_first_run,
-    mobile_section,
+    platform_section,
     uiux_section,
     workflow_reports_section,
 )
@@ -512,7 +512,7 @@ def _coding_task_segments(
         # happens to mention a library — so it goes in whole, each time.
         section("constitution", constitution_section(project_dir), Stability.PROJECT),
         # Same reasoning: the platform rules apply to every subtask, not one.
-        section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("platform", platform_section(project_dir, spec_dir), Stability.TASK),
         section("dotnet", dotnet_section(project_dir, spec_dir), Stability.TASK),
         section("effort", effort, Stability.TASK),
         # The ADRs bind every subtask too; the attachments come with them
@@ -1122,10 +1122,10 @@ async def _planning_prompt(
 
     # A phone app has no URL: the plan says which platform verifies each
     # subtask, and which one this machine cannot build.
-    planner_mobile = mobile_section(project_dir)
+    planner_mobile = platform_section(project_dir, spec_dir, role="planner")
     if planner_mobile:
         prompt += "\n\n" + planner_mobile
-        print_status("Mobile stack and device toolchain applied to planning", "success")
+        print_status("Platform rules (mobile, WinDev) applied to planning", "success")
     # A .NET 11 migration is planned along its procedure (`dotnet_upgrade`).
     if planner_dotnet := dotnet_section(project_dir, spec_dir, role="planner"):
         prompt += "\n\n" + planner_dotnet

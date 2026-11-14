@@ -106,8 +106,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # fence, nothing that runs an agent (its model call is the runner's,
     # through core.oneshot).
     "changelog_generator": {"board_mcp", "foundation", "security"},
-    # Stack detection, including the UI and test stacks moved here in M10.
-    "project": {"mobile"},
+    # Stack detection, including the UI and test stacks moved here in M10,
+    # and the WinDev-family project (a leaf).
+    "project": {"mobile", "windev"},
     "mobile": {"foundation"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
@@ -218,6 +219,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # and the bundled skill through skills_registry, nothing that runs an agent
     # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
     "dotnet_upgrade": {"skills_registry"},
+    # WinDev, WebDev and WinDev Mobile: the file formats, the integrity check,
+    # the prompt section and its staged skills, nothing that runs an agent
+    # (docs/architecture/windev.md). A leaf: the stack detection imports it.
+    "windev": set(),
 }
 
 # The largest set of units that all import one another, directly or not. It

@@ -74,7 +74,7 @@ def test_two_subtasks_share_the_task_block(tmp_path, monkeypatch):
     import agents.coder as coder
 
     monkeypatch.setattr(coder, "constitution_section", lambda _p: "CONSTITUTION")
-    monkeypatch.setattr(coder, "mobile_section", lambda _p: "")
+    monkeypatch.setattr(coder, "platform_section", lambda _p, _s=None: "")
     monkeypatch.setattr(coder, "docintel_section", lambda _p, _s: "ADRS")
     monkeypatch.setattr(
         coder, "workflow_reports_section", lambda _s, _phase, inline=True: "REPORTS"
@@ -91,8 +91,8 @@ def test_two_subtasks_share_the_task_block(tmp_path, monkeypatch):
 def test_an_absent_section_leaves_no_blank_lines(tmp_path, monkeypatch):
     import agents.coder as coder
 
-    for name in ("constitution_section", "mobile_section"):
-        monkeypatch.setattr(coder, name, lambda _p: "")
+    monkeypatch.setattr(coder, "constitution_section", lambda _p: "")
+    monkeypatch.setattr(coder, "platform_section", lambda _p, _s=None: "")
     monkeypatch.setattr(coder, "docintel_section", lambda _p, _s: "")
     monkeypatch.setattr(
         coder, "workflow_reports_section", lambda _s, _phase, inline=True: ""
