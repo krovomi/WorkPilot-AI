@@ -71,6 +71,16 @@ class WinDevProject:
         return self.elements.get("text", 0) > 0
 
     @property
+    def mobile_platforms(self) -> list[str]:
+        """``android`` / ``ios``: the phones a generation configuration targets."""
+        found = {
+            "android" if hit.lower() == "android" else "ios"
+            for name in self.configurations
+            for hit in _MOBILE_RE.findall(name)
+        }
+        return [p for p in ("android", "ios") if p in found]
+
+    @property
     def fully_text(self) -> bool:
         return self.readable and not self.elements.get("native", 0)
 
