@@ -341,6 +341,15 @@ class ToolExecutor:
                 "does not include it. Work with the tools you were given."
             )
 
+        # The Agent Debugger's breakpoints, as the SDK hook applies them on
+        # Claude: the call waits for the person, who may skip it.
+        from agents.debugger_gate import gate_tool_call
+
+        gated = await gate_tool_call(self.spec_dir, tool_name, arguments)
+        if gated.refusal is not None:
+            return gated.refusal
+        arguments = gated.arguments
+
         if tool_name == "read_file":
             return await self._read_file(
                 _pick_arg(arguments, *path_aliases),
