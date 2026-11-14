@@ -46,6 +46,7 @@ __all__ = [
     "TESTS_BITE",
     "MIGRATION_SAFE",
     "ATTACK_RESISTANT",
+    "ARTIFACT_EXPOSURE",
     "is_test_file",
     "GATE_RECORD",
     "load_gate_record",
@@ -100,6 +101,13 @@ MIGRATION_SAFE = "migration-safe"
 # (`<spec_dir>/red_team.json`, written by `qa/red_team_gate.py`). Unknown when
 # it did not run, was switched off, or no attack could run.
 ATTACK_RESISTANT = "attack-resistant"
+
+# The build output the task left exposes nothing at the threshold (`high` by
+# default): REA's static audit (`<spec_dir>/artifact_exposure.json`, written by
+# `qa/exposure_gate.py`). Unknown when there was no build output, REA could not
+# run, or the gate was switched off; `unknown` and `not_assessed` checks never
+# fail it. Declaring it makes the QA gate strict.
+ARTIFACT_EXPOSURE = "artifact-exposure"
 
 _TEST_DIRS = ("tests", "test", "__tests__", "spec", "specs", "e2e")
 # `test_x.py`, `x_test.go`, `x.test.ts`, `x.spec.ts`, `x_spec.rb`, `x-test.js`:
@@ -290,6 +298,33 @@ def _attack_resistant(spec_dir: Path) -> tuple[bool | None, str]:
     return None, f"unknown — {reason}" if reason else "unknown"
 
 
+def _artifact_exposure(spec_dir: Path) -> tuple[bool | None, str]:
+    try:
+        from rea.exposure import load_record
+    except ImportError as exc:  # pragma: no cover - import-time environment
+        return None, f"the artifact exposure audit is unavailable: {exc}"
+    record = load_record(spec_dir)
+    if record is None:
+        return None, "no exposure record — the QA artifact exposure gate did not run"
+    status = record.get("status")
+    artifacts = [a for a in record.get("artifacts") or [] if isinstance(a, dict)]
+    if status == "fail":
+        exposed = [
+            f"{c.get('id')} ({c.get('severity')}) in {a.get('path')}"
+            for a in artifacts
+            for c in a.get("checks") or []
+            if isinstance(c, dict) and c.get("blocking")
+        ]
+        return False, "; ".join(exposed[:5])
+    if status == "pass":
+        return True, (
+            f"{len(artifacts)} artifact(s) read, nothing exposed at "
+            f"{record.get('fail_on') or 'high'} or above"
+        )
+    reason = str(record.get("unchecked") or "")
+    return None, f"unknown — {reason}" if reason else "unknown"
+
+
 @dataclass(frozen=True)
 class HardGateResult:
     phase_id: str
@@ -427,6 +462,11 @@ def _evaluate_one(
         )
     elif gate == ATTACK_RESISTANT:
         held, detail = _attack_resistant(spec_dir)
+        report.results.append(
+            HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
+        )
+    elif gate == ARTIFACT_EXPOSURE:
+        held, detail = _artifact_exposure(spec_dir)
         report.results.append(
             HardGateResult(phase_id=resolved.id, gate=gate, held=held, detail=detail)
         )

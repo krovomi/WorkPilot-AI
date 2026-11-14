@@ -70,6 +70,7 @@
 		"flagLine": "Flag {{key}} ({{provider}}) activé une fois {{services}} livrés"
 	},
 	"approval": {
+		"exposure": "audit REA de {{artifact}}, bloque à partir de {{failOn}}",
 		"title": "Approuvez ce fichier du train avant qu'il lance quoi que ce soit",
 		"hint": "{{path}} lance ces commandes sur votre ordinateur. Lisez-les. Toute modification du fichier (empreinte {{sha}}) vous redemandera.",
 		"approve": "Approuver cette version",
@@ -81,6 +82,7 @@
 		"noDeploy": "{{service}} n'a pas de commande de déploiement."
 	},
 	"steps": {
+		"exposure": "exposition de l'artefact",
 		"deploy": "déploiement",
 		"rollback": "retour arrière",
 		"health": "contrôle de santé",
