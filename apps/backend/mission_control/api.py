@@ -12,7 +12,7 @@ Provides REST endpoints for:
 import logging
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .orchestrator import get_mission_control
 
@@ -62,8 +62,10 @@ class AgentStateUpdateRequest(BaseModel):
     cost_usd: float | None = None
     progress: float | None = None
     current_step: str | None = None
+    # A chunk of the answer, appended to what the agent already said.
+    output_delta: str | None = Field(default=None, max_length=20_000)
     status: str | None = None
-    error: str | None = None
+    error: str | None = Field(default=None, max_length=2_000)
 
 
 class StartSessionRequest(BaseModel):
@@ -254,6 +256,8 @@ async def update_agent_state(agent_id: str, req: AgentStateUpdateRequest):
             output_tokens=req.output_tokens or 0,
             cost_usd=req.cost_usd or 0.0,
         )
+    if req.output_delta:
+        mc.update_agent_output(agent_id, req.output_delta)
     if req.progress is not None:
         mc.update_agent_progress(agent_id, req.progress, req.current_step or "")
     if req.status is not None:

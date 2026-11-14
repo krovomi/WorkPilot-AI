@@ -27,6 +27,24 @@ const sentryDefines = {
 	),
 };
 
+/**
+ * A dynamic `import()` of a module that another file imports statically does
+ * nothing: the module stays in the same chunk and is evaluated at startup
+ * anyway. Rolldown only warns (INEFFECTIVE_DYNAMIC_IMPORT), and those warnings
+ * piled up in every `pnpm dev`; the build now refuses them.
+ */
+function refuseIneffectiveDynamicImports(
+	warning: { code?: string; message: string },
+	warn: (warning: { code?: string; message: string }) => void,
+): void {
+	if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+		throw new Error(
+			`${warning.message}\nImport the module statically instead (the dynamic import does not split it out).`,
+		);
+	}
+	warn(warning);
+}
+
 export default defineConfig({
 	main: {
 		define: sentryDefines,
@@ -65,6 +83,7 @@ export default defineConfig({
 				input: {
 					index: resolve(__dirname, "src/main/index.ts"),
 				},
+				onwarn: refuseIneffectiveDynamicImports,
 				// Native modules that must be external (rebuilt by electron-builder)
 				// electron itself must be external so its path.txt lookup resolves
 				// against node_modules/electron rather than out/main/chunks.
@@ -90,6 +109,7 @@ export default defineConfig({
 				input: {
 					index: resolve(__dirname, "src/preload/index.ts"),
 				},
+				onwarn: refuseIneffectiveDynamicImports,
 				output: {
 					format: "cjs",
 					entryFileNames: "[name].cjs",
@@ -108,6 +128,7 @@ export default defineConfig({
 				input: {
 					index: resolve(__dirname, "src/renderer/index.html"),
 				},
+				onwarn: refuseIneffectiveDynamicImports,
 			},
 		},
 		plugins: [react()],

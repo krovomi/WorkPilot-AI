@@ -13,6 +13,7 @@
 
 import i18n from "i18next";
 import { create } from "zustand";
+import type { ReplayResult } from "../../preload/api/modules/replay-api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -216,34 +217,15 @@ export interface AgentReplayState {
 // API helpers
 // ---------------------------------------------------------------------------
 
-const getBackendUrl = () => {
-	return import.meta?.env?.VITE_BACKEND_URL || "";
-};
-
-async function replayFetch<T = Record<string, unknown>>(
-	path: string,
-	options?: RequestInit,
-): Promise<T> {
-	const url = `${getBackendUrl()}/replay${path}`;
-	const unreachable = () => new Error(i18n.t("replay:errors.backendUnreachable"));
-	let res: Response;
-	try {
-		res = await fetch(url, {
-			headers: { "Content-Type": "application/json" },
-			...options,
-		});
-	} catch (e) {
-		if ((e as { name?: string })?.name === "AbortError") throw e;
-		throw unreachable();
-	}
-	if (!res.ok) {
-		const err = await res.text();
-		throw new Error(err || `HTTP ${res.status}`);
-	}
-	// A page served without the backend answers 200 with HTML: say so instead
-	// of surfacing a JSON parser error.
-	if (!res.headers.get("content-type")?.includes("application/json")) throw unreachable();
-	return res.json();
+/**
+ * A backend answer, read by main (`replay-handlers.ts`): its body, or an error
+ * that says the backend did not answer when nothing did.
+ */
+async function replayCall<T>(call: Promise<ReplayResult<T>>): Promise<T> {
+	const res = await call;
+	if (res.success) return res;
+	if (res.unreachable) throw new Error(i18n.t("replay:errors.backendUnreachable"));
+	throw new Error(res.error);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,10 +256,11 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 	fetchSessions: async () => {
 		set({ sessionsLoading: true, error: null });
 		try {
-			const res = await replayFetch<{
-				success: boolean;
-				sessions: ReplaySessionSummary[];
-			}>("/sessions");
+			const res = await replayCall(
+				window.electronAPI.listReplaySessions<{
+					sessions: ReplaySessionSummary[];
+				}>(),
+			);
 			set({ sessions: res.sessions, sessionsLoading: false });
 		} catch (e) {
 			set({ error: (e as Error).message, sessionsLoading: false });
@@ -292,10 +275,11 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 			isPlaying: false,
 		});
 		try {
-			const res = await replayFetch<{
-				success: boolean;
-				session: ReplaySessionFull;
-			}>(`/sessions/${sessionId}`);
+			const res = await replayCall(
+				window.electronAPI.getReplaySession<{ session: ReplaySessionFull }>(
+					sessionId,
+				),
+			);
 			set({
 				activeSession: res.session,
 				activeSessionLoading: false,
@@ -309,7 +293,7 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 
 	deleteSession: async (sessionId: string) => {
 		try {
-			await replayFetch(`/sessions/${sessionId}`, { method: "DELETE" });
+			await replayCall(window.electronAPI.deleteReplaySession(sessionId));
 			set((s) => ({
 				sessions: s.sessions.filter((sess) => sess.session_id !== sessionId),
 				activeSession:
@@ -456,10 +440,11 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 	// --- Heatmap ---
 	fetchHeatmap: async (sessionId: string) => {
 		try {
-			const res = await replayFetch<{
-				success: boolean;
-				heatmap: HeatmapEntry[];
-			}>(`/sessions/${sessionId}/heatmap`);
+			const res = await replayCall(
+				window.electronAPI.getReplayHeatmap<{ heatmap: HeatmapEntry[] }>(
+					sessionId,
+				),
+			);
 			set({ heatmap: res.heatmap });
 		} catch (e) {
 			set({ error: (e as Error).message });
@@ -470,18 +455,13 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 	compareSessionsAction: async (sessionAId: string, sessionBId: string) => {
 		set({ compareLoading: true, error: null });
 		try {
-			const res = await replayFetch<{
-				success: boolean;
-				comparison: ABComparison;
-				session_a: ReplaySessionSummary;
-				session_b: ReplaySessionSummary;
-			}>("/compare", {
-				method: "POST",
-				body: JSON.stringify({
-					session_a_id: sessionAId,
-					session_b_id: sessionBId,
-				}),
-			});
+			const res = await replayCall(
+				window.electronAPI.compareReplaySessions<{
+					comparison: ABComparison;
+					session_a: ReplaySessionSummary;
+					session_b: ReplaySessionSummary;
+				}>(sessionAId, sessionBId),
+			);
 			set({
 				comparison: res.comparison,
 				comparisonSessionA: res.session_a,
@@ -510,20 +490,13 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 		description?: string,
 	) => {
 		try {
-			const res = await replayFetch<{
-				success: boolean;
-				breakpoint: Breakpoint;
-			}>(`/sessions/${sessionId}/breakpoints`, {
-				method: "POST",
-				body: JSON.stringify({
-					breakpoint_type: type,
-					condition,
-					description: description || "",
-				}),
-			});
-			if (res.success) {
-				set((s) => ({ breakpoints: [...s.breakpoints, res.breakpoint] }));
-			}
+			const res = await replayCall(
+				window.electronAPI.addReplayBreakpoint<{ breakpoint: Breakpoint }>(
+					sessionId,
+					{ breakpoint_type: type, condition, description: description || "" },
+				),
+			);
+			set((s) => ({ breakpoints: [...s.breakpoints, res.breakpoint] }));
 		} catch (e) {
 			set({ error: (e as Error).message });
 		}
@@ -531,9 +504,9 @@ export const useAgentReplayStore = create<AgentReplayState>((set, get) => ({
 
 	removeBreakpoint: async (sessionId: string, breakpointId: string) => {
 		try {
-			await replayFetch(`/sessions/${sessionId}/breakpoints/${breakpointId}`, {
-				method: "DELETE",
-			});
+			await replayCall(
+				window.electronAPI.removeReplayBreakpoint(sessionId, breakpointId),
+			);
 			set((s) => ({
 				breakpoints: s.breakpoints.filter((b) => b.id !== breakpointId),
 			}));
