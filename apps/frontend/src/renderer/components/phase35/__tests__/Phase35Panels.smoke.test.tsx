@@ -64,7 +64,7 @@ const noop = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../../../stores/phase35-stores", () => ({
 	useLongevityStore: () => ({ ...idleSlice, compute: noop, reset: noop }),
-	useAgentHealthStore: () => ({ ...idleSlice, refresh: noop, resetMonitor: noop }),
+	useAgentHealthStore: () => ({ ...idleSlice, health: null, projectPath: null, refresh: noop }),
 	useModelRouterStore: () => ({ ...idleSlice, route: noop, compare: noop }),
 	useDomainAgentsStore: () => ({
 		...idleSlice,

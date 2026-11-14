@@ -110,7 +110,11 @@ function Commands({ view }: { readonly view: TrainView }): React.ReactElement {
 						<span className="wp-kicker mr-2">
 							{service.name} · {t(`steps.${kind}`, { defaultValue: kind })}
 						</span>
-						{step?.command.length ? step.command.join(" ") : step?.url}
+						{step?.artifact
+							? t("approval.exposure", { artifact: step.artifact, failOn: step.failOn || "high" })
+							: step?.command.length
+								? step.command.join(" ")
+								: step?.url}
 					</li>
 				)),
 			)}

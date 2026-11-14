@@ -43,6 +43,26 @@ export interface AgentHealthScoreData {
 	diagnostics: Record<string, number>;
 }
 
+/** One agent role on one provider and model, scored from the project's own tasks. */
+export interface ProjectAgentHealthScore extends AgentHealthScoreData {
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+}
+export interface ProjectAgentHealthPending {
+	agent_name: string;
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+	runs: number;
+}
+export interface ProjectAgentHealth {
+	scores: ProjectAgentHealthScore[];
+	pending: ProjectAgentHealthPending[];
+	tasks_read: number;
+	min_runs: number;
+}
+
 // #3.1 Model Routing
 export interface ModelChoice {
 	provider: string;
@@ -375,6 +395,7 @@ export interface Phase35FeaturesAPI {
 		Phase35Result<{ scores: AgentHealthScoreData[]; agents_known: string[] }>
 	>;
 	resetAgentHealth: (agentName?: string) => Promise<Phase35Result<{}>>;
+	scoreProjectAgentHealth: (projectPath: string) => Promise<Phase35Result<ProjectAgentHealth>>;
 
 	// #3.1 Model Router
 	routeModel: (req: RouteRequest) => Promise<Phase35Result<{ choice: ModelChoice }>>;
@@ -655,6 +676,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	scoreAllAgentHealth: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_SCORES),
 	resetAgentHealth: (agentName) =>
 		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_RESET, { agentName }),
+	scoreProjectAgentHealth: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_PROJECT, { projectPath }),
 
 	// #3.1
 	routeModel: (req) => ipcRenderer.invoke(IPC_CHANNELS.MODEL_ROUTER_ROUTE, req),
