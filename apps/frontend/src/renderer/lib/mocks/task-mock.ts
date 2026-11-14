@@ -219,4 +219,9 @@ export const taskMock = {
 	onBestOfNEvent: () => () => {
 		/* noop */
 	},
+	// Execution waves (#358): the planner reads worktrees, only in Electron.
+	planExecutionWaves: async () => ({
+		success: false as const,
+		error: "Execution waves are not available in the browser preview",
+	}),
 };

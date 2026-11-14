@@ -206,6 +206,8 @@ import type { QuickCommandAPI } from "./modules/quick-command-api";
 import { createQuickCommandAPI } from "./modules/quick-command-api";
 import type { MissionControlAPI } from "./modules/mission-control-api";
 import { createMissionControlAPI } from "./modules/mission-control-api";
+import type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+import { createConflictWavesAPI } from "./modules/conflict-waves-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -306,6 +308,7 @@ export interface ElectronAPI
 		PairProgrammingAPI,
 		QuickCommandAPI,
 		MissionControlAPI,
+		ConflictWavesAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -463,6 +466,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPairProgrammingAPI(),
 		...createQuickCommandAPI(),
 		...createMissionControlAPI(),
+		...createConflictWavesAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -633,6 +637,8 @@ export type { QuickCommandAPI } from "./modules/quick-command-api";
 export { createQuickCommandAPI } from "./modules/quick-command-api";
 export type { MissionControlAPI } from "./modules/mission-control-api";
 export { createMissionControlAPI } from "./modules/mission-control-api";
+export type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+export { createConflictWavesAPI } from "./modules/conflict-waves-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";

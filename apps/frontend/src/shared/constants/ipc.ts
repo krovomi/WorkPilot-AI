@@ -878,6 +878,9 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
 
+	// Execution waves across specs (Conflict Predictor, #358): plan by task id
+	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
+
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
 	CONTEXT_MESH_REGISTER_PROJECT: "contextMesh:registerProject",
