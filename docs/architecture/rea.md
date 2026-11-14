@@ -185,3 +185,40 @@ portes (`qa/loop.py`).
   nouvelle version impose est remontée à une personne, jamais cachée.
 - **La porte dure `public-api-stable`** lit `dotnet_public_api.json` : tenue quand rien de .NET n'a
   changé ou que l'API est gardée.
+
+## Lot E : les serveurs MCP du projet pour les providers en CLI
+
+Un serveur MCP installé dans le projet n'atteignait que le SDK Claude et la boucle WorkPilot :
+Codex, OpenCode et les agents ACP recevaient `mcpServers: []`, Copilot n'avait pas de pont. Le
+lot les branche tous, puis ajoute REA au catalogue, en option.
+
+- **À la même condition que le SDK** (`core/cli_mcp.py`). Un CLI ouvre le serveur lui-même et
+  montre au modèle tout ce qu'il liste, comme Claude Code : il ne reçoit donc que les serveurs que
+  `load_mcp_server_configs_for` garde pour le type d'agent (validés, ajoutés à cet agent), et
+  parmi eux ceux dont chaque outil listé est celui que la personne a approuvé
+  ([mcp-pins.md](mcp-pins.md)). Un serveur jamais approuvé, modifié ou injoignable ne démarre pas.
+- **Dans les mots de chaque CLI**, jamais par un shell :
+  - Codex : des surcharges `-c mcp_servers.<id>.…`. L'environnement du serveur et ses en-têtes HTTP
+    passent par l'environnement du processus Codex, nommés par `env_vars` et `env_http_headers` :
+    aucun secret sur la ligne de commande. Une valeur hors d'un jeu de caractères simple (espace,
+    guillemet, `&`, `%`) pourrait changer ce que `cmd.exe` lance pour un lanceur npm `.cmd` : ce
+    serveur est écarté, et le journal le dit. Un serveur qui remplacerait une variable de Codex
+    (`OPENAI_API_KEY`, `PATH`) l'est aussi.
+  - OpenCode : le bloc `mcp` de `OPENCODE_CONFIG_CONTENT`, la configuration en ligne qu'OpenCode
+    charge en dernier, fusionnée avec celle qui y serait déjà.
+  - ACP (Gemini CLI…) : `mcpServers` de `session/new` ; un serveur HTTP seulement à un agent qui
+    déclare `mcpCapabilities.http`.
+  - Sous le bac à sable de l'OS, un serveur HTTP est écarté : le processus n'atteint que les hôtes
+    de son provider et les registres. Un serveur en commande tourne dans le bac à sable avec le CLI.
+- **Copilot** passe par le pont de la boucle WorkPilot (`core/agent_clients/mcp_bridge.py`, le
+  même qu'OpenAI) : seuls les outils approuvés sont offerts. pi n'a pas de client MCP.
+- **`providers.yaml`** : `standards.mcp` gagne la valeur `handed` (OpenCode, Gemini CLI) et Copilot
+  passe à `bridged` ; `tests/test_provider_standards.py` vérifie chaque affirmation contre le client.
+- **REA au catalogue MCP**, en option : `npx -y rea-agents@6.9.0 mcp`, la version figée, avec
+  `REA_MCP_INPUT_SCHEMA_PROFILE=compact`, `REA_MCP_OUTPUT_SCHEMA_PROFILE=compact` et
+  `REA_MCP_TOOL_CATALOG_PROFILE=hot-cold` : cinq outils au démarrage au lieu de 240. Il n'est
+  proposé qu'à l'`analyzer`, l'agent des tâches d'enquête (champ `agents` de l'entrée), et
+  `REA_MCP_TOOL_FAMILIES` laisse dehors les familles qui pilotent un appareil, un navigateur ou un
+  programme en marche (`frida`, `adb`, `browser`, `javascript-runtime`, `application`). Limite :
+  l'épinglage porte sur les outils listés au démarrage ; ceux que `discover_tools` charge pendant
+  la session viennent de ces familles statiques, mais aucune empreinte ne les a vus.
