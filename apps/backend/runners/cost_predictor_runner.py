@@ -54,6 +54,21 @@ def _parse_compare(raw: str | None) -> list[tuple[str, str]]:
     return pairs
 
 
+# Where a spec lives: `.workpilot/specs/` today, `.autonomousbuild/specs/` for a
+# project from before the rename.
+SPEC_ROOTS = (".workpilot", ".autonomousbuild")
+
+
+def _spec_dir(project_root: Path, spec_id: str) -> Path | None:
+    """The folder of spec ``spec_id``, provided it is one of this project's specs."""
+    for root in SPEC_ROOTS:
+        specs = (project_root / root / "specs").resolve()
+        candidate = (specs / spec_id).resolve()
+        if candidate.parent == specs and candidate.is_dir():
+            return candidate
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Cost Predictor Runner")
     parser.add_argument("--project-path", required=True)
@@ -70,9 +85,9 @@ def main() -> None:
     args = parser.parse_args()
 
     project_root = Path(args.project_path)
-    spec_dir = project_root / ".autonomousbuild" / "specs" / args.spec_id
-    if not spec_dir.exists():
-        print(json.dumps({"error": f"Spec not found: {spec_dir}"}), flush=True)
+    spec_dir = _spec_dir(project_root, args.spec_id)
+    if spec_dir is None:
+        print(json.dumps({"error": f"Spec not found: {args.spec_id}"}), flush=True)
         sys.exit(1)
 
     try:
