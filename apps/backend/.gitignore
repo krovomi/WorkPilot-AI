@@ -4,7 +4,9 @@
 .env.*.local
 
 # Virtual environment
-.venv/
+# No trailing slash: a symbolic link named .venv (a worktree pointing at the main
+# checkout's venv) is ignored too, not only the directory.
+.venv
 .venv*/
 venv/
 env/
