@@ -75,6 +75,7 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	pairOps: () => browserUnavailable("Pair programming"),
 	subscribePairRoom: () => browserUnavailable("Pair programming"),
 	unsubscribePairRoom: () => browserUnavailable("Pair programming"),
+	pairAskAi: async () => ({ success: false as const, error: "unavailable" as const }),
 	onPairOpEvent: () => () => undefined,
 	onPairStreamError: () => () => undefined,
 };

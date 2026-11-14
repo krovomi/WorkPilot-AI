@@ -502,9 +502,8 @@
 	},
 	"pair": {
 		"title": "Real-time Pair Programming",
-		"subtitle": "Multi-user collaborative sessions with live operations",
+		"subtitle": "A room on the open project: chat, a shared file and an AI participant",
 		"roomId": "Room ID",
-		"createRoom": "Create room",
 		"joinRoom": "Join room",
 		"leave": "Leave",
 		"yourName": "Your display name",
@@ -533,6 +532,27 @@
 			"join": "joined",
 			"leave": "left",
 			"role_change": "role change"
+		},
+		"localNotice": "This room lives on this computer: only WorkPilot windows open here can join it. The AI participant answers with the provider and model chosen for Advanced features (top right).",
+		"offline": "Offline",
+		"aiName": "WorkPilot AI",
+		"inviteAi": "Invite the AI",
+		"aiInRoom": "The AI is in the room",
+		"file": "Room file",
+		"noFile": "No file: the AI only reads the conversation.",
+		"filePath": "File path, relative to the project",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Work on this file",
+		"pickFile": "Choose…",
+		"noOps": "Nothing yet.",
+		"suggestionFor": "Proposal for {{file}} (nothing is written to disk)",
+		"aiThinking": "The AI is preparing its answer…",
+		"chatPlaceholderAi": "Write to the room: the AI will answer",
+		"aiErrors": {
+			"room": "The room did not answer: the AI could not read or write.",
+			"unavailable": "The provider did not answer. Check the provider chosen for Advanced features.",
+			"empty": "The provider returned an empty answer.",
+			"invalid": "Invalid room or project."
 		}
 	},
 	"hubDescription": "Twelve advanced tools in one place: codebase longevity, agent health, model routing, domain agents, CI/CD anomalies, licenses, architecture drift, generated tests, i18n at scale, cognitive context, audit trail and pair programming."

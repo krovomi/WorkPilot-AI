@@ -14,11 +14,13 @@ import {
 	useCicdAnomalyStore,
 	useDomainAgentsStore,
 	useLicenseStore,
+	usePairRealtimeStore,
 } from "../../../stores/phase35-stores";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
 import { LicensePanel } from "../LicensePanel";
+import { PairProgrammingPanel } from "../PairProgrammingPanel";
 
 const DOMAINS = [
 	{ tag: "generic", label: "Generic", description: "No domain assumptions — neutral defaults." },
@@ -38,6 +40,7 @@ afterEach(() => {
 	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
 	useCicdAnomalyStore.setState({ signals: [], phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, phase: "idle", error: null });
+	usePairRealtimeStore.setState({ currentRoom: null, ops: [], isStreaming: false, aiError: null });
 	useArchDriftStore.setState({
 		scanReport: null,
 		driftReport: null,
@@ -146,5 +149,53 @@ describe("Fonctions avancées in French", () => {
 		render(<ArchDriftPanel projectPath="/p" />);
 		expect(screen.getByText(/Aucune référence enregistrée/)).toBeInTheDocument();
 		expect(screen.queryByText("Nouvelles violations")).not.toBeInTheDocument();
+	});
+	it("shows a pair room in French, with the AI's proposal and roles", () => {
+		usePairRealtimeStore.setState({
+			isStreaming: true,
+			subscribe: () => Promise.resolve(),
+			currentRoom: {
+				room_id: "pair",
+				created_at: 0,
+				participants: [
+					{ user_id: "ana", display_name: "Ana", role: "driver", joined_at: 0, last_seen: 0 },
+					{
+						user_id: "workpilot-ai",
+						display_name: "WorkPilot IA",
+						role: "ai",
+						joined_at: 0,
+						last_seen: 0,
+					},
+				],
+				op_count: 2,
+				last_op_sequence: 2,
+				closed: false,
+			},
+			ops: [
+				{
+					op_id: "1",
+					sequence: 1,
+					kind: "cursor",
+					actor: "ana",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs" },
+				},
+				{
+					op_id: "2",
+					sequence: 2,
+					kind: "suggestion",
+					actor: "workpilot-ai",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs", suggestion: "class Orders {}" },
+				},
+			],
+			aiError: "unavailable",
+		});
+		render(<PairProgrammingPanel projectPath="/work/shop" />);
+		expect(screen.getByText(/Pilote/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /L'IA est dans la salle/ })).toBeDisabled();
+		expect(screen.getByText(/Proposition pour src\/Orders.cs/)).toBeInTheDocument();
+		expect(screen.getByText(/Le fournisseur n'a pas répondu/)).toBeInTheDocument();
+		expect(screen.getByText(/Cette salle vit sur cet ordinateur/)).toBeInTheDocument();
 	});
 });

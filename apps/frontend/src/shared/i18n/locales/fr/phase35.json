@@ -502,9 +502,8 @@
 	},
 	"pair": {
 		"title": "Pair Programming Temps Réel",
-		"subtitle": "Sessions collaboratives multi-utilisateurs, opérations en direct",
+		"subtitle": "Une salle sur le projet ouvert : chat, fichier partagé et participant IA",
 		"roomId": "ID de la salle",
-		"createRoom": "Créer la salle",
 		"joinRoom": "Rejoindre la salle",
 		"leave": "Quitter",
 		"yourName": "Votre nom",
@@ -533,6 +532,27 @@
 			"join": "arrivée",
 			"leave": "départ",
 			"role_change": "changement de rôle"
+		},
+		"localNotice": "Cette salle vit sur cet ordinateur : seules les fenêtres de WorkPilot ouvertes ici peuvent la rejoindre. Le participant IA répond avec le fournisseur et le modèle choisis pour les Fonctions avancées (en haut à droite).",
+		"offline": "Hors ligne",
+		"aiName": "WorkPilot IA",
+		"inviteAi": "Inviter l'IA",
+		"aiInRoom": "L'IA est dans la salle",
+		"file": "Fichier de la salle",
+		"noFile": "Aucun fichier : l'IA ne lit que la conversation.",
+		"filePath": "Chemin du fichier, relatif au projet",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Travailler sur ce fichier",
+		"pickFile": "Choisir…",
+		"noOps": "Rien pour l'instant.",
+		"suggestionFor": "Proposition pour {{file}} (rien n'est écrit sur le disque)",
+		"aiThinking": "L'IA prépare sa réponse…",
+		"chatPlaceholderAi": "Écrivez à la salle : l'IA répondra",
+		"aiErrors": {
+			"room": "La salle n'a pas répondu : l'IA n'a pas pu lire ni écrire.",
+			"unavailable": "Le fournisseur n'a pas répondu. Vérifiez le fournisseur choisi pour les Fonctions avancées.",
+			"empty": "Le fournisseur a renvoyé une réponse vide.",
+			"invalid": "Salle ou projet invalide."
 		}
 	},
 	"hubDescription": "Douze outils avancés au même endroit : longévité du code, santé des agents, routage des modèles, agents de domaine, anomalies CI/CD, licences, dérive d’architecture, tests générés, i18n à grande échelle, contexte cognitif, piste d’audit et pair programming."

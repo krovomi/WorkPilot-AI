@@ -95,16 +95,26 @@ vi.mock("../../../stores/phase35-stores", () => ({
 		replay: noop,
 		verify: noop,
 	}),
-	usePairRealtimeStore: () => ({
-		...idleSlice,
-		createOrJoin: noop,
-		leave: noop,
-		sendChat: noop,
-		sendEdit: noop,
-		subscribe: noop,
-		unsubscribe: noop,
-		_appendOp: noop,
-	}),
+	PAIR_AI_USER_ID: "workpilot-ai",
+	usePairRealtimeStore: (select?: (s: Record<string, unknown>) => unknown) => {
+		const state = {
+			...idleSlice,
+			currentRoom: null,
+			ops: [],
+			isStreaming: false,
+			aiThinking: false,
+			aiError: null,
+			createOrJoin: noop,
+			leave: noop,
+			sendChat: noop,
+			inviteAi: noop,
+			focusFile: noop,
+			subscribe: noop,
+			unsubscribe: noop,
+			_appendOp: noop,
+		};
+		return select ? select(state) : state;
+	},
 	setupPairRealtimeListeners: () => () => undefined,
 	unwrap: <T,>(res: T) => res,
 	errorMessage: (e: unknown) => String(e),
@@ -207,7 +217,7 @@ describe("Phase 3-5 panels smoke tests", () => {
 	});
 
 	it("PairProgrammingPanel renders join form when not in a room", () => {
-		render(<PairProgrammingPanel />);
+		render(<PairProgrammingPanel projectPath="/work/shop" />);
 		expect(screen.getAllByText("title").length).toBeGreaterThan(0);
 		// Join button label is the leaf "joinRoom" — confirms the empty-room branch.
 		expect(screen.getByText("joinRoom")).toBeInTheDocument();

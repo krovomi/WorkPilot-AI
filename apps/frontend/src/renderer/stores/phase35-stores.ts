@@ -510,29 +510,41 @@ export const useAuditTrailStore = create<AuditTrailState>((set) => ({
 
 // ---------- #3.5 Pair Realtime ----------
 
+/** The AI participant's id in every room (`main/pair-ai-partner.ts`). */
+export const PAIR_AI_USER_ID = "workpilot-ai";
+
+export type PairAiError = "room" | "unavailable" | "empty" | "invalid";
+
 interface PairRealtimeState extends BaseSlice {
 	currentRoom: PairRoomSnapshot | null;
 	ops: PairOperation[];
 	subscriptionId: string | null;
 	isStreaming: boolean;
+	/** Who I am in the room, and the project the room works on. */
+	me: string | null;
+	projectPath: string | null;
+	aiThinking: boolean;
+	aiError: PairAiError | null;
 	createOrJoin: (
 		roomId: string,
 		userId: string,
 		displayName: string,
-		role?: "driver" | "navigator" | "ai",
+		role: "driver" | "navigator",
+		projectPath: string,
 	) => Promise<void>;
 	leave: () => Promise<void>;
 	sendChat: (text: string) => Promise<void>;
-	sendEdit: (
-		filePath: string,
-		startLine: number,
-		endLine: number,
-		newText: string,
-	) => Promise<void>;
+	inviteAi: (displayName: string) => Promise<void>;
+	askAi: () => Promise<void>;
+	focusFile: (filePath: string) => Promise<void>;
+	refreshRoom: () => Promise<void>;
 	subscribe: () => Promise<void>;
 	unsubscribe: () => Promise<void>;
 	_appendOp: (op: PairOperation) => void;
 }
+
+const aiInRoom = (room: PairRoomSnapshot | null): boolean =>
+	Boolean(room?.participants.some((p) => p.user_id === PAIR_AI_USER_ID));
 
 export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 	phase: "idle",
@@ -541,10 +553,14 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 	ops: [],
 	subscriptionId: null,
 	isStreaming: false,
-	createOrJoin: async (roomId, userId, displayName, role) => {
+	me: null,
+	projectPath: null,
+	aiThinking: false,
+	aiError: null,
+	createOrJoin: async (roomId, userId, displayName, role, projectPath) => {
 		set({ phase: "running", error: null });
 		try {
-			// Try create; if it already exists, just join.
+			// Create, or join the room that already exists under this name.
 			await globalThis.electronAPI.createPairRoom(roomId);
 			const joinRes = await globalThis.electronAPI.pairJoin(
 				roomId,
@@ -555,35 +571,73 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 			if (!joinRes.success) throw new Error(joinRes.error ?? "join failed");
 			const snapRes = await globalThis.electronAPI.getPairRoom(roomId);
 			if (!snapRes.success) throw new Error(snapRes.error ?? "snapshot failed");
-			set({ phase: "ok", currentRoom: snapRes.room, ops: [] });
+			set({
+				phase: "ok",
+				currentRoom: snapRes.room,
+				ops: [],
+				me: userId,
+				projectPath,
+				aiError: null,
+			});
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
 	leave: async () => {
-		const room = get().currentRoom;
+		const { currentRoom: room, me } = get();
 		if (!room) return;
 		await get().unsubscribe();
-		set({ currentRoom: null, ops: [] });
+		if (me) await globalThis.electronAPI.pairLeave(room.room_id, me);
+		set({ currentRoom: null, ops: [], me: null, aiThinking: false, aiError: null });
 	},
 	sendChat: async (text) => {
-		const room = get().currentRoom;
-		if (!room) return;
-		const me = room.participants[0]?.user_id ?? "anon";
-		await globalThis.electronAPI.pairChat(room.room_id, me, text);
+		const { currentRoom: room, me } = get();
+		if (!room || !me) return;
+		const res = await globalThis.electronAPI.pairChat(room.room_id, me, text);
+		if (!res.success) {
+			set({ error: res.error ?? "chat failed" });
+			return;
+		}
+		if (aiInRoom(get().currentRoom)) await get().askAi();
 	},
-	sendEdit: async (filePath, startLine, endLine, newText) => {
+	inviteAi: async (displayName) => {
+		const room = get().currentRoom;
+		if (!room || aiInRoom(room)) return;
+		const res = await globalThis.electronAPI.pairJoin(
+			room.room_id,
+			PAIR_AI_USER_ID,
+			displayName,
+			"ai",
+		);
+		if (!res.success) {
+			set({ error: res.error ?? "join failed" });
+			return;
+		}
+		await get().refreshRoom();
+	},
+	askAi: async () => {
+		const { currentRoom: room, projectPath } = get();
+		if (!room || !projectPath || get().aiThinking) return;
+		set({ aiThinking: true, aiError: null });
+		try {
+			const res = await globalThis.electronAPI.pairAskAi(room.room_id, projectPath);
+			set({ aiError: res.success ? null : res.error });
+		} catch {
+			set({ aiError: "unavailable" });
+		} finally {
+			set({ aiThinking: false });
+		}
+	},
+	focusFile: async (filePath) => {
+		const { currentRoom: room, me } = get();
+		if (!room || !me) return;
+		await globalThis.electronAPI.pairCursor(room.room_id, me, filePath, 0, 0);
+	},
+	refreshRoom: async () => {
 		const room = get().currentRoom;
 		if (!room) return;
-		const me = room.participants[0]?.user_id ?? "anon";
-		await globalThis.electronAPI.pairEdit(
-			room.room_id,
-			me,
-			filePath,
-			startLine,
-			endLine,
-			newText,
-		);
+		const res = await globalThis.electronAPI.getPairRoom(room.room_id);
+		if (res.success) set({ currentRoom: res.room });
 	},
 	subscribe: async () => {
 		const room = get().currentRoom;
@@ -607,7 +661,13 @@ export const usePairRealtimeStore = create<PairRealtimeState>((set, get) => ({
 		await globalThis.electronAPI.unsubscribePairRoom(sid);
 		set({ subscriptionId: null, isStreaming: false });
 	},
-	_appendOp: (op) => set((s) => ({ ops: [...s.ops, op] })),
+	_appendOp: (op) => {
+		set((s) => ({ ops: [...s.ops, op] }));
+		// Someone came or went: the participant list is the room's, reread it.
+		if (op.kind === "join" || op.kind === "leave" || op.kind === "role_change") {
+			void get().refreshRoom();
+		}
+	},
 }));
 
 // Listener helper to wire the SSE stream into the store.
