@@ -113,7 +113,7 @@ eggs/
 MANIFEST
 
 # Virtual environments
-.venv/
+.venv
 venv/
 ENV/
 env/
