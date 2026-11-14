@@ -132,6 +132,49 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText("42 fichiers analysés")).toBeInTheDocument();
 	});
 
+	it("words layer and domain rules in French from the backend's structured fields", () => {
+		useArchDriftStore.setState({
+			configSource: "inferred",
+			scanReport: {
+				status: "approved",
+				violations: [],
+				warnings: [
+					{
+						type: "layer_violation",
+						severity: "warning",
+						file: "src/Shop.Domain/Order.cs",
+						line: 2,
+						import_target: "Shop.Infrastructure.Persistence",
+						rule: "Layer 'domain' cannot import from 'infrastructure'",
+						source_layer: "domain",
+						target_layer: "infrastructure",
+					},
+					{
+						type: "forbidden_import",
+						severity: "warning",
+						file: "src/Shop.Domain/User.cs",
+						line: 3,
+						import_target: "Microsoft.EntityFrameworkCore",
+						rule: "The domain layer must not depend on a persistence or web framework",
+						rule_id: "domain_framework",
+					},
+				],
+				violation_count: 0,
+				warning_count: 2,
+				summary: "",
+			},
+		});
+		render(<ArchDriftPanel projectPath="/p" />);
+		expect(
+			screen.getByText("La couche « Domaine » ne doit pas dépendre de la couche « Infrastructure »."),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText("Le domaine ne doit dépendre d’aucun framework de persistance ou web."),
+		).toBeInTheDocument();
+		expect(screen.queryByText(/cannot import/)).not.toBeInTheDocument();
+		expect(screen.getByText(/Imports lus pour \.NET/)).toBeInTheDocument();
+	});
+
 	it("says there is no baseline instead of showing an empty drift", () => {
 		useArchDriftStore.setState({
 			driftReport: {

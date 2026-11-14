@@ -278,6 +278,17 @@
 			"inferred": "Rules inferred from the detected stack (no architecture config in the project).",
 			"none": "No rule could be inferred for this project: nothing was checked."
 		},
+		"layers": {
+			"domain": "Domain",
+			"application": "Application",
+			"infrastructure": "Infrastructure",
+			"presentation": "Presentation"
+		},
+		"layerRule": "The “{{source}}” layer must not depend on the “{{target}}” layer.",
+		"ruleIds": {
+			"domain_framework": "The domain must not depend on any persistence or web framework."
+		},
+		"languagesNote": "Imports are read for .NET (C#, F#, VB and project references), Java, Kotlin, Scala, Go, PHP, Rust, Dart/Flutter, Swift, Python and JavaScript/TypeScript. Without a rules file, the Domain, Application, Infrastructure and Presentation layers are inferred from folders and projects.",
 		"violationTypes": {
 			"layer_violation": "Layer violation",
 			"circular_dependency": "Circular dependency",

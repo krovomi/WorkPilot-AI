@@ -131,6 +131,11 @@ export interface ArchViolation {
 	rule?: string;
 	description?: string;
 	fingerprint?: string;
+	/** Layer violation: the importing layer and the layer it must not reach. */
+	source_layer?: string;
+	target_layer?: string;
+	/** Built-in forbidden pattern (`domain_framework`), empty for a project's own rule. */
+	rule_id?: string;
 }
 export interface ArchitectureScanReport {
 	status: string;
