@@ -293,18 +293,36 @@ def maybe_optimize_context(
 
 
 def _read_spec_domain(spec_dir: Path) -> str | None:
-    """Look for a ``domain`` key in ``requirements.json`` at the spec root."""
+    """The spec's ``domain`` (``requirements.json``), else the project's.
+
+    The project's is the one saved from the Domain Agents tab
+    (``domain_agents.project_domain``), read in the project the user picked
+    even when the task runs in its worktree.
+    """
     req_file = spec_dir / "requirements.json"
-    if not req_file.exists():
-        return None
     try:
         data = json.loads(req_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return None
-    domain = data.get("domain")
+        data = None
+    domain = data.get("domain") if isinstance(data, dict) else None
     if isinstance(domain, str) and domain.strip():
         return domain.strip()
-    return None
+    try:
+        from domain_agents.project_domain import project_root_of, read_project_domain
+    except ImportError:
+        return None
+    root = project_root_of(spec_dir)
+    return read_project_domain(root) if root else None
+
+
+def _spec_languages(spec_dir: Path) -> list[str]:
+    """The stacks of the code the task works on, for stack-specific advice."""
+    try:
+        from project.stack import detect_languages
+    except ImportError:
+        return []
+    # <worktree or project>/.workpilot/specs/<spec>
+    return detect_languages(Path(spec_dir).parent.parent.parent)
 
 
 def load_domain_addendum(
@@ -314,9 +332,10 @@ def load_domain_addendum(
 ) -> str:
     """Return the prompt addendum for the spec's domain (or ``""``).
 
-    Reads the top-level ``domain`` field from ``requirements.json``. If the
-    field is missing or unrecognised, returns an empty string — the agent
-    keeps its baseline prompt. Never raises.
+    Reads the top-level ``domain`` field from ``requirements.json``, else the
+    project's saved domain. If neither is set or the value is unrecognised,
+    returns an empty string — the agent keeps its baseline prompt. Library
+    advice follows the stacks of the code the task works on. Never raises.
     """
     domain = _read_spec_domain(spec_dir)
     if not domain:
@@ -336,7 +355,9 @@ def load_domain_addendum(
         return ""
 
     try:
-        bundle = DomainAgentFactory().build(domain=domain, role=role)
+        bundle = DomainAgentFactory().build(
+            domain=domain, role=role, languages=_spec_languages(spec_dir)
+        )
         return bundle.prompt_addendum or ""
     except Exception as exc:  # noqa: BLE001
         logger.debug("Failed to build domain bundle for %r/%r: %s", domain, role, exc)

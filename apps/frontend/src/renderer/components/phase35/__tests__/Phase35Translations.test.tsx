@@ -6,7 +6,7 @@
  * listed "Generic", "Healthcare", "unknown", "approved".
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../shared/i18n";
 import {
@@ -41,7 +41,15 @@ beforeEach(async () => {
 
 afterEach(() => {
 	cleanup();
-	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
+	useDomainAgentsStore.setState({
+		domains: [],
+		bundle: null,
+		phase: "idle",
+		error: null,
+		projectPath: null,
+		projectDomain: null,
+		projectLanguages: [],
+	});
 	useCicdAnomalyStore.setState({ signals: [], report: null, phase: "idle", error: null });
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
@@ -65,6 +73,30 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByRole("option", { name: "Pipeline de données" })).toBeInTheDocument();
 		expect(screen.queryByRole("option", { name: "Healthcare" })).not.toBeInTheDocument();
 		expect(screen.getByText(/Aucune hypothèse de domaine/)).toBeInTheDocument();
+	});
+
+	it("shows the project's domain and stacks, and applies the chosen domain to the project", async () => {
+		const setProjectDomain = vi.fn().mockResolvedValue({ success: true, domain: "data_pipeline" });
+		const api = (globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
+		api.getProjectDomain = vi
+			.fn()
+			.mockResolvedValue({ success: true, domain: "healthcare", languages: ["c#", "go"] });
+		api.setProjectDomain = setProjectDomain;
+		render(<DomainAgentsPanel projectPath="/work/shop" />);
+		expect(await screen.findByText("Domaine appliqué à ce projet : Santé")).toBeInTheDocument();
+		expect(screen.getByText("Stacks détectées : c#, go")).toBeInTheDocument();
+		await screen.findByRole("option", { name: "Santé" });
+		const apply = screen.getByRole("button", { name: "Appliquer à ce projet" });
+		const domainSelect = screen.getByRole("combobox", { name: "Domaine" }) as HTMLSelectElement;
+		await waitFor(() => expect(domainSelect.value).toBe("healthcare"));
+		expect(apply).toBeDisabled();
+		fireEvent.change(domainSelect, { target: { value: "data_pipeline" } });
+		expect(apply).toBeEnabled();
+		fireEvent.click(apply);
+		await waitFor(() => expect(setProjectDomain).toHaveBeenCalledWith("/work/shop", "data_pipeline"));
+		expect(
+			await screen.findByText("Domaine appliqué à ce projet : Pipeline de données"),
+		).toBeInTheDocument();
 	});
 
 	it("scores agents from the project's tasks, by role and model, and lists those without enough phases", async () => {

@@ -13,6 +13,7 @@ no I/O. Adding a new domain = appending one entry to the catalogue.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -50,7 +51,20 @@ class DomainProfile:
     required_skills: tuple[str, ...]
     forbidden_patterns: tuple[str, ...]
     validation_rules: tuple[str, ...]
-    suggested_libraries: tuple[str, ...] = ()
+    # Per stack, keyed by `project.stack.detect_languages` names ("python",
+    # "c#", "javascript/typescript", "java/kotlin", "go", "rust", "php",
+    # "ruby", "dart", "swift"): a .NET project is never told to use a PyPI
+    # package. A stack absent here simply gets no library advice.
+    suggested_libraries: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+    def libraries_for(self, languages: list[str] | None) -> dict[str, list[str]]:
+        """The suggestions for ``languages``; every stack's when it is None."""
+        wanted = self.suggested_libraries.keys() if languages is None else languages
+        return {
+            lang: list(self.suggested_libraries[lang])
+            for lang in wanted
+            if self.suggested_libraries.get(lang)
+        }
 
     def to_dict(self) -> dict:
         return {
@@ -61,7 +75,7 @@ class DomainProfile:
             "required_skills": list(self.required_skills),
             "forbidden_patterns": list(self.forbidden_patterns),
             "validation_rules": list(self.validation_rules),
-            "suggested_libraries": list(self.suggested_libraries),
+            "suggested_libraries": self.libraries_for(None),
         }
 
 
@@ -104,7 +118,17 @@ _ECOMMERCE = DomainProfile(
         "Order + inventory are committed in a single transaction",
         "Payment events go through the gateway SDK, not raw HTTP",
     ),
-    suggested_libraries=("stripe", "money-py", "pydantic"),
+    suggested_libraries={
+        "python": ("stripe", "py-moneyed"),
+        "c#": ("Stripe.net", "NodaMoney"),
+        "javascript/typescript": ("stripe", "dinero.js"),
+        "java/kotlin": ("com.stripe:stripe-java", "org.javamoney:moneta"),
+        "go": ("github.com/stripe/stripe-go", "github.com/Rhymond/go-money"),
+        "php": ("stripe/stripe-php", "moneyphp/money"),
+        "ruby": ("stripe", "money"),
+        "rust": ("async-stripe", "rusty-money"),
+        "dart": ("flutter_stripe",),
+    },
 )
 
 _FINTECH = DomainProfile(
@@ -130,7 +154,21 @@ _FINTECH = DomainProfile(
         "All money math uses Decimal, never float",
         "Audit trail captures actor, timestamp, intent, and prior state",
     ),
-    suggested_libraries=("decimal", "structlog", "schwifty"),
+    suggested_libraries={
+        "python": ("decimal (stdlib)", "structlog", "schwifty"),
+        "c#": ("System.Decimal", "NodaMoney", "Serilog", "IbanNet"),
+        "javascript/typescript": ("dinero.js", "pino", "ibantools"),
+        "java/kotlin": (
+            "java.math.BigDecimal",
+            "org.javamoney:moneta",
+            "org.iban4j:iban4j",
+        ),
+        "go": ("github.com/shopspring/decimal", "github.com/Rhymond/go-money"),
+        "php": ("moneyphp/money", "brick/math"),
+        "ruby": ("bigdecimal", "money"),
+        "rust": ("rust_decimal", "iban_validate"),
+        "dart": ("decimal",),
+    },
 )
 
 _HEALTHCARE = DomainProfile(
@@ -156,7 +194,12 @@ _HEALTHCARE = DomainProfile(
         "Outbound integrations only call BAA-approved processors",
         "Patient consent is checked before any data sharing path",
     ),
-    suggested_libraries=("cryptography", "structlog"),
+    suggested_libraries={
+        "python": ("cryptography", "fhir.resources", "structlog"),
+        "c#": ("Hl7.Fhir.R4", "Serilog"),
+        "javascript/typescript": ("pino",),
+        "java/kotlin": ("ca.uhn.hapi.fhir:hapi-fhir-structures-r4",),
+    },
 )
 
 _GAMING = DomainProfile(
@@ -179,7 +222,15 @@ _GAMING = DomainProfile(
         "Action endpoints have per-player rate limits",
         "Game loop runs at a fixed tick (no wall-clock-based deltas in physics)",
     ),
-    suggested_libraries=("websockets", "msgpack"),
+    suggested_libraries={
+        "python": ("websockets", "msgpack"),
+        "c#": ("MessagePack", "Microsoft.AspNetCore.SignalR.Client"),
+        "javascript/typescript": ("ws", "@msgpack/msgpack"),
+        "java/kotlin": ("org.msgpack:msgpack-core",),
+        "go": ("github.com/gorilla/websocket", "github.com/vmihailenco/msgpack/v5"),
+        "rust": ("tokio-tungstenite", "rmp-serde"),
+        "dart": ("web_socket_channel",),
+    },
 )
 
 _IOT = DomainProfile(
@@ -202,7 +253,15 @@ _IOT = DomainProfile(
         "OTA pipeline ships A/B partitions or supports rollback",
         "Each device has a unique credential",
     ),
-    suggested_libraries=("paho-mqtt",),
+    suggested_libraries={
+        "python": ("paho-mqtt",),
+        "c#": ("MQTTnet",),
+        "javascript/typescript": ("mqtt",),
+        "java/kotlin": ("org.eclipse.paho:org.eclipse.paho.client.mqttv3",),
+        "go": ("github.com/eclipse/paho.mqtt.golang",),
+        "rust": ("rumqttc",),
+        "dart": ("mqtt_client",),
+    },
 )
 
 _GOVTECH = DomainProfile(
@@ -222,7 +281,12 @@ _GOVTECH = DomainProfile(
         "All citizen-submitted data is queryable by submission ID",
         "Form drafts persist across sessions",
     ),
-    suggested_libraries=("axe-core",),
+    suggested_libraries={
+        "javascript/typescript": ("axe-core", "@axe-core/playwright"),
+        "c#": ("Deque.AxeCore.Playwright",),
+        "java/kotlin": ("com.deque.html.axe-core:playwright",),
+        "python": ("axe-selenium-python",),
+    },
 )
 
 _EDUCATION = DomainProfile(
@@ -241,7 +305,7 @@ _EDUCATION = DomainProfile(
         "Authorisation checks separate student / teacher / parent / admin roles",
         "Grade access is scoped to the owner + their teacher(s)",
     ),
-    suggested_libraries=(),
+    suggested_libraries={},
 )
 
 _SAAS = DomainProfile(
@@ -264,7 +328,10 @@ _SAAS = DomainProfile(
         "Background workers receive tenant context explicitly",
         "Metering events fire on every billable action",
     ),
-    suggested_libraries=("pydantic", "sqlalchemy"),
+    suggested_libraries={
+        "python": ("pydantic", "sqlalchemy"),
+        "c#": ("Finbuckle.MultiTenant",),
+    },
 )
 
 _DATA_PIPELINE = DomainProfile(
@@ -286,7 +353,10 @@ _DATA_PIPELINE = DomainProfile(
         "Inputs and outputs validate against an explicit schema",
         "Failures emit a structured event consumable by the alerting pipeline",
     ),
-    suggested_libraries=("pydantic", "great-expectations"),
+    suggested_libraries={
+        "python": ("pydantic", "great-expectations"),
+        "javascript/typescript": ("zod",),
+    },
 )
 
 
@@ -323,9 +393,11 @@ class DomainAgentBundle:
     guardrails: list[str] = field(default_factory=list)
     forbidden_patterns: list[str] = field(default_factory=list)
     validation_rules: list[str] = field(default_factory=list)
+    suggested_libraries: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
+            "suggested_libraries": self.suggested_libraries,
             "domain": self.domain.value,
             "role": self.role.value,
             "profile": self.profile.to_dict(),
@@ -365,13 +437,20 @@ class DomainAgentFactory:
         self,
         domain: DomainTag | str,
         role: AgentRole | str,
+        languages: list[str] | None = None,
     ) -> DomainAgentBundle:
-        """Compose a bundle for `(domain, role)`."""
+        """Compose a bundle for `(domain, role)`.
+
+        ``languages`` are the project's stacks (`project.stack.detect_languages`):
+        library advice is given for those only, none when the list is empty,
+        every stack's when it is None (the app's preview, which has no project).
+        """
         domain_tag = DomainTag(domain) if isinstance(domain, str) else domain
         role_value = AgentRole(role) if isinstance(role, str) else role
 
         profile = self.get_profile(domain_tag)
-        addendum = self._build_prompt_addendum(profile, role_value)
+        libraries = profile.libraries_for(languages)
+        addendum = self._build_prompt_addendum(profile, role_value, libraries)
 
         # The role narrows the set of guardrails / rules we surface.
         guardrails = list(profile.guardrails)
@@ -398,12 +477,18 @@ class DomainAgentFactory:
             guardrails=guardrails,
             forbidden_patterns=forbidden,
             validation_rules=validation_rules,
+            suggested_libraries=libraries,
         )
 
     # ------------------------------------------------------------------
     # Prompt assembly
 
-    def _build_prompt_addendum(self, profile: DomainProfile, role: AgentRole) -> str:
+    def _build_prompt_addendum(
+        self,
+        profile: DomainProfile,
+        role: AgentRole,
+        libraries: dict[str, list[str]],
+    ) -> str:
         if profile.tag == DomainTag.GENERIC:
             return ""
 
@@ -434,10 +519,14 @@ class DomainAgentFactory:
                 + "\n".join(f"- `{s}`" for s in profile.required_skills)
             )
 
-        if profile.suggested_libraries:
+        if libraries:
+            lines: list[str] = []
+            for lang, libs in libraries.items():
+                prefix = f"{lang}: " if len(libraries) > 1 else ""
+                lines.append(f"- {prefix}" + ", ".join(f"`{lib}`" for lib in libs))
             sections.append(
                 "### Suggested libraries — prefer these over hand-rolled implementations:\n"
-                + "\n".join(f"- `{lib}`" for lib in profile.suggested_libraries)
+                + "\n".join(lines)
             )
 
         return "\n\n".join(sections)
