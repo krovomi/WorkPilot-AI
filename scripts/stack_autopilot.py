@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stack autopilot: merge the opted-in pull requests into develop, in stack order.
+"""Stack autopilot: merge the enrolled pull requests into develop, in stack order.
 
 Threads often open a pile of pull requests where each one is built on the
 previous one (#771, then #774 built on it, then #775…). GitHub's auto-merge
@@ -9,10 +9,12 @@ request the moment it stops conflicting, before CI has run on the result.
 
 This script, run by ``.github/workflows/stack-autopilot.yml``, does it instead:
 
-1. Opt-in: every open pull request with auto-merge enabled or the
-   ``autopilot`` label. Native auto-merge is switched off and replaced by the
-   labels ``autopilot`` + ``autopilot:<method>`` (the method the person chose),
-   so GitHub can no longer merge it before CI.
+1. Enrolment: every open, non-draft pull request of this repository that
+   targets develop (or the branch of another such pull request, a stack), by
+   default, Dependabot's included (Leub, 2026-11-14). Left out: drafts,
+   forks and the ``autopilot/off`` label. Native auto-merge is switched off
+   and replaced by the labels ``autopilot`` + ``autopilot:<method>`` (the
+   method the person chose), so GitHub can no longer merge it before CI.
 2. Order: B waits for A when B is based on A's branch, when B's description
    names A ("built on #A", "Merge order: #A, …", "basée sur #A"), or when the
    two share commits that are not on develop (the older one goes first).
@@ -49,6 +51,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 OPT_IN_LABEL = "autopilot"
+#: Keeps a pull request out of the autopilot, whatever else it carries.
+OPT_OUT_LABEL = "autopilot/off"
 METHOD_PREFIX = "autopilot:"
 CONFLICT_LABEL = "autopilot/conflit"
 RED_LABEL = "autopilot/rouge"
@@ -88,10 +92,26 @@ class PullRequest:
     draft: bool = False
     labels: set[str] = field(default_factory=set)
     auto_merge_method: str | None = None
+    from_fork: bool = False
 
     @property
     def opted_in(self) -> bool:
+        """Explicitly asked for: auto-merge enabled or the ``autopilot`` label."""
         return self.auto_merge_method is not None or OPT_IN_LABEL in self.labels
+
+    def enrolled(self, base: str, stack_heads: set[str]) -> bool:
+        """Merged by the autopilot once green (Leub, 2026-11-14: every green PR,
+        Dependabot's included).
+
+        On by default for a pull request of this repository towards ``base``
+        or towards another open pull request's branch (a stack). A draft, a
+        fork (outside code) and ``autopilot/off`` stay out; never ``main``.
+        """
+        if self.draft or self.from_fork or OPT_OUT_LABEL in self.labels:
+            return False
+        if self.opted_in:
+            return True
+        return self.base_ref == base or self.base_ref in stack_heads
 
     @property
     def method(self) -> str:
@@ -117,6 +137,8 @@ def from_api(raw: dict) -> PullRequest:
         draft=bool(raw.get("draft")),
         labels={label["name"] for label in raw.get("labels", [])},
         auto_merge_method=(auto.get("merge_method") or None) if auto else None,
+        from_fork=((raw["head"].get("repo") or {}).get("full_name") or "").lower()
+        != ((raw["base"].get("repo") or {}).get("full_name") or "").lower(),
     )
 
 
@@ -411,7 +433,9 @@ class Autopilot:
 
     def open_prs(self) -> list[PullRequest]:
         raw = self.gh.pages(f"repos/{self.gh.repo}/pulls?state=open&per_page=100")
-        return [pr for pr in map(from_api, raw) if pr.opted_in and not pr.draft]
+        prs = [from_api(item) for item in raw]
+        heads = {pr.head_ref for pr in prs if not pr.from_fork}
+        return [pr for pr in prs if pr.enrolled(self.base, heads)]
 
     def take_over_auto_merge(self, prs: list[PullRequest]) -> None:
         """Native auto-merge would merge before CI on develop: labels replace it."""
