@@ -34,6 +34,8 @@ export const taskMock = {
 	deleteTask: async () => ({ success: true }),
 
 	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	getAppliedLessons: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
+	setLessonDisabled: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
 	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
 
 	updateTask: async (
