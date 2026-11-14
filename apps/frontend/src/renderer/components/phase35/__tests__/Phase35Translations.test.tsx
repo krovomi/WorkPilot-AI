@@ -6,7 +6,7 @@
  * listed "Generic", "Healthcare", "unknown", "approved".
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../shared/i18n";
 import {
@@ -38,7 +38,7 @@ beforeEach(async () => {
 afterEach(() => {
 	cleanup();
 	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
-	useCicdAnomalyStore.setState({ signals: [], phase: "idle", error: null });
+	useCicdAnomalyStore.setState({ signals: [], report: null, phase: "idle", error: null });
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
@@ -123,6 +123,51 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText("Conflit de dépendances")).toBeInTheDocument();
 		expect(screen.getByText("élevée")).toBeInTheDocument();
 		expect(screen.queryByText("dependency_conflict")).not.toBeInTheDocument();
+	});
+
+	it("words each CI fix in French from its id and shows the fixes that recur across builds", async () => {
+		const signal = {
+			kind: "dependency_conflict",
+			severity: "high" as const,
+			matching_line: "error NU1605: Detected package downgrade: Serilog from 4.0.0 to 3.1.1",
+			line_number: 7,
+			suggested_fix: "Reference the package version NuGet asks for directly.",
+			fix_id: "nuget_conflict",
+			log_label: "Build 1",
+		};
+		const analyseCicdLogs = vi.fn().mockResolvedValue({
+			success: true,
+			report: {
+				signals: [signal, { ...signal, log_label: "Build 2" }],
+				recurring_kinds: ["dependency_conflict"],
+				summary: { samples: 2, total_signals: 2, by_kind: {}, by_severity: {} },
+				fix_recommendations: ["[recurring] Reference the package version NuGet asks for directly."],
+				recommendations: [
+					{
+						kind: "dependency_conflict",
+						fix_id: "nuget_conflict",
+						suggested_fix: signal.suggested_fix,
+						recurring: true,
+					},
+				],
+				has_critical: false,
+			},
+		});
+		(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI.analyseCicdLogs =
+			analyseCicdLogs;
+		render(<CicdAnomalyPanel />);
+		fireEvent.change(screen.getByLabelText("Contenu du log"), { target: { value: "log one" } });
+		fireEvent.click(screen.getByRole("button", { name: "Ajouter le log d'un autre build" }));
+		fireEvent.change(screen.getByLabelText("Build 2"), { target: { value: "log two" } });
+		fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+		expect(await screen.findByText("revient")).toBeInTheDocument();
+		expect(analyseCicdLogs).toHaveBeenCalledWith([
+			{ label: "Build 1", text: "log one" },
+			{ label: "Build 2", text: "log two" },
+		]);
+		expect(screen.getAllByText(/Référencez directement la version que NuGet demande/)).toHaveLength(3);
+		expect(screen.getByText("Build 2, ligne 7")).toBeInTheDocument();
+		expect(screen.queryByText(/Reference the package version/)).not.toBeInTheDocument();
 	});
 
 	it("translates a licence conflict's category and remediation", () => {
