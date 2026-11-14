@@ -11,6 +11,19 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import { liveCompanionService } from "../live-companion-service";
 import { safeSendToRenderer } from "./utils";
 
+/** A suggestion or proposal id, as main generates them. */
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function validId(value: unknown): value is string {
+	return typeof value === "string" && ID_PATTERN.test(value);
+}
+
+function optionalDir(value: unknown): string | undefined {
+	return typeof value === "string" && value ? value : undefined;
+}
+
+const INVALID_ID = { success: false, error: "invalid id" } as const;
+
 /**
  * Register all live-companion-related IPC handlers
  */
@@ -24,9 +37,17 @@ export function registerLiveCompanionHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_START,
 		async (_event, projectDir: string) => {
+			if (typeof projectDir !== "string" || !projectDir) {
+				return { success: false, error: "invalid project" };
+			}
 			try {
 				const success = await liveCompanionService.start(projectDir);
-				return { success };
+				return success
+					? { success }
+					: {
+							success,
+							error: liveCompanionService.getState().last_error?.message,
+						};
 			} catch (error: unknown) {
 				return { success: false, error: (error as Error).message };
 			}
@@ -50,17 +71,24 @@ export function registerLiveCompanionHandlers(
 	// Suggestion operations
 	// ============================================
 
-	ipcMain.handle(IPC_CHANNELS.LIVE_COMPANION_GET_SUGGESTIONS, async () => {
-		try {
-			return { success: true, data: liveCompanionService.getSuggestions() };
-		} catch (error: unknown) {
-			return { success: false, error: (error as Error).message };
-		}
-	});
+	ipcMain.handle(
+		IPC_CHANNELS.LIVE_COMPANION_GET_SUGGESTIONS,
+		async (_event, projectDir?: string) => {
+			try {
+				return {
+					success: true,
+					data: liveCompanionService.getSuggestions(optionalDir(projectDir)),
+				};
+			} catch (error: unknown) {
+				return { success: false, error: (error as Error).message };
+			}
+		},
+	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_DISMISS_SUGGESTION,
 		async (_event, suggestionId: string) => {
+			if (!validId(suggestionId)) return INVALID_ID;
 			try {
 				const result = liveCompanionService.dismissSuggestion(suggestionId);
 				return { success: result };
@@ -73,6 +101,7 @@ export function registerLiveCompanionHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_APPLY_SUGGESTION,
 		async (_event, suggestionId: string) => {
+			if (!validId(suggestionId)) return INVALID_ID;
 			try {
 				const result = liveCompanionService.applySuggestion(suggestionId);
 				return { success: result };
@@ -86,17 +115,24 @@ export function registerLiveCompanionHandlers(
 	// Takeover operations
 	// ============================================
 
-	ipcMain.handle(IPC_CHANNELS.LIVE_COMPANION_GET_TAKEOVERS, async () => {
-		try {
-			return { success: true, data: liveCompanionService.getTakeovers() };
-		} catch (error: unknown) {
-			return { success: false, error: (error as Error).message };
-		}
-	});
+	ipcMain.handle(
+		IPC_CHANNELS.LIVE_COMPANION_GET_TAKEOVERS,
+		async (_event, projectDir?: string) => {
+			try {
+				return {
+					success: true,
+					data: liveCompanionService.getTakeovers(optionalDir(projectDir)),
+				};
+			} catch (error: unknown) {
+				return { success: false, error: (error as Error).message };
+			}
+		},
+	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_ACCEPT_TAKEOVER,
 		async (_event, proposalId: string) => {
+			if (!validId(proposalId)) return INVALID_ID;
 			try {
 				const result = liveCompanionService.acceptTakeover(proposalId);
 				return { success: result };
@@ -109,6 +145,7 @@ export function registerLiveCompanionHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_DECLINE_TAKEOVER,
 		async (_event, proposalId: string) => {
+			if (!validId(proposalId)) return INVALID_ID;
 			try {
 				const result = liveCompanionService.declineTakeover(proposalId);
 				return { success: result };
@@ -129,6 +166,9 @@ export function registerLiveCompanionHandlers(
 	ipcMain.handle(
 		IPC_CHANNELS.LIVE_COMPANION_UPDATE_CONFIG,
 		async (_event, updates: Record<string, unknown>) => {
+			if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+				return { success: false, error: "invalid config" };
+			}
 			try {
 				const config = liveCompanionService.updateConfig(updates);
 				return { success: true, data: config };

@@ -61,6 +61,7 @@ from ui import (
 from .base import sanitize_error_message
 from .manual_verification import settle_block
 from .memory_manager import save_session_memory
+from .session_recording import SessionRecording, client_usage
 from .tool_display import (
     extract_streaming_command,
     extract_streaming_file_change,
@@ -79,14 +80,6 @@ try:
     from core.usage_tracker import record_session_usage as _record_usage
 except ImportError:
     _record_usage = None  # type: ignore[assignment]
-
-try:
-    from replay.recorder import get_replay_recorder as _get_replay_recorder
-
-    _REPLAY_AVAILABLE = True
-except ImportError:
-    _REPLAY_AVAILABLE = False
-    _get_replay_recorder = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -1071,16 +1064,31 @@ async def run_agent_session(
     """
     # If client is an AgentClient, delegate to the provider-agnostic session runner
     if isinstance(client, AgentClient):
-        return await _run_agent_client_session(
-            client,
-            message,
+        # Recorded here, around every return of the loop, for every provider.
+        recording = SessionRecording(
             spec_dir,
-            verbose,
             phase,
-            streaming_wrapper=streaming_wrapper,
-            context_managed=context_managed,
-            context_monitor_only=context_monitor_only,
+            provider=client.provider_name(),
+            model=str(getattr(client, "model", "") or ""),
         )
+        outcome = "failed"
+        try:
+            result = await _run_agent_client_session(
+                client,
+                message,
+                spec_dir,
+                verbose,
+                phase,
+                streaming_wrapper=streaming_wrapper,
+                context_managed=context_managed,
+                context_monitor_only=context_monitor_only,
+                recording=recording,
+            )
+            outcome = "failed" if result[0] == "error" else "completed"
+            return result
+        finally:
+            recording.usage(*client_usage(client))
+            recording.end(outcome)
 
     debug_section("session", f"Agent Session - {phase.value}")
     debug(
@@ -1104,38 +1112,13 @@ async def run_agent_session(
     message_count = 0
     tool_count = 0
 
-    # Initialize replay recorder for this session (non-blocking, best-effort)
-    _rs_id = None
-    _rr = None
-    if _REPLAY_AVAILABLE and spec_dir is not None:
-        try:
-            import uuid as _uuid_mod
-
-            _rr = _get_replay_recorder()
-            _rs_id = _uuid_mod.uuid4().hex[:16]
-            _phase_to_role_replay = {
-                LogPhase.PLANNING: "planner",
-                LogPhase.CODING: "coder",
-                LogPhase.VALIDATION: "qa_reviewer",
-                LogPhase.QA_FIX: "qa_fixer",
-            }
-            _agent_role = _phase_to_role_replay.get(
-                phase, phase.value if hasattr(phase, "value") else str(phase)
-            )
-            _rr.start_session(
-                _rs_id,
-                {
-                    "agent_name": _agent_role.replace("_", " ").title(),
-                    "agent_type": _agent_role,
-                    "task": spec_dir.name,
-                    "project_path": str(spec_dir.parent.parent.parent),
-                    "model": getattr(getattr(client, "options", None), "model", "")
-                    or "",
-                },
-            )
-        except Exception:
-            _rr = None
-            _rs_id = None
+    # The Replay record and the Debugger's live list (never raises).
+    _rec = SessionRecording(
+        spec_dir,
+        phase,
+        provider="claude",
+        model=getattr(getattr(client, "options", None), "model", "") or "",
+    )
 
     try:
         # Send the query
@@ -1203,13 +1186,7 @@ async def run_agent_session(
                             except Exception:
                                 # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
-                        # Record agent response in replay
-                        if _rr and _rs_id and block.text.strip():
-                            try:
-                                _rr.record_response(_rs_id, block.text)
-                            except Exception:
-                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                                pass
+                        _rec.text(block.text)
                     elif block_type == "ToolUseBlock" and hasattr(block, "name"):
                         tool_name = block.name
                         tool_input_display = None
@@ -1247,35 +1224,7 @@ async def run_agent_session(
                                 print(f"   Input: {input_str}", flush=True)
                         current_tool = tool_name
 
-                        # Record tool use in replay
-                        if _rr and _rs_id:
-                            try:
-                                if (
-                                    tool_name in ("Edit", "Write")
-                                    and inp
-                                    and inp.get("file_path")
-                                ):
-                                    _op = "update" if tool_name == "Edit" else "create"
-                                    _after = str(
-                                        inp.get("new_string")
-                                        or inp.get("content")
-                                        or ""
-                                    )
-                                    _rr.record_file_change(
-                                        _rs_id,
-                                        inp["file_path"],
-                                        operation=_op,
-                                        after_content=_after,
-                                    )
-                                elif tool_name == "Bash" and inp and inp.get("command"):
-                                    _rr.record_command(_rs_id, inp["command"])
-                                else:
-                                    _rr.record_tool_call(
-                                        _rs_id, tool_name, tool_input_dict=inp or {}
-                                    )
-                            except Exception:
-                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                                pass
+                        _rec.tool_use(tool_name, inp)
 
                         # Stream tool use events to live view
                         if streaming_wrapper and inp:
@@ -1391,24 +1340,7 @@ async def run_agent_session(
                                 # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                                 pass
 
-                        # Record tool result in replay
-                        if _rr and _rs_id and current_tool:
-                            try:
-                                _result_str = str(result_content)[:2000]
-                                if current_tool == "Bash":
-                                    _rr.record_command_output(
-                                        _rs_id, _result_str, is_error=is_error
-                                    )
-                                elif current_tool not in ("Edit", "Write"):
-                                    _rr.record_tool_result(
-                                        _rs_id,
-                                        current_tool,
-                                        output=_result_str,
-                                        success=not is_error,
-                                    )
-                            except Exception:
-                                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                                pass
+                        _rec.tool_result(result_content, is_error=is_error)
 
                         current_tool = None
 
@@ -1487,27 +1419,15 @@ async def run_agent_session(
             except Exception as _ute:
                 logger.debug("[usage_tracker] SDK usage recording failed: %s", _ute)
 
-        # Mirror the SDK usage into the replay recorder so the Session History
-        # cards show real tokens/cost (independent of the usage_tracker above).
-        if _sdk_result_msg is not None and _rr and _rs_id:
-            try:
-                _usage = getattr(_sdk_result_msg, "usage", None)
-                _in_tok = (
-                    _usage.get("input_tokens", 0) if isinstance(_usage, dict) else 0
-                )
-                _out_tok = (
-                    _usage.get("output_tokens", 0) if isinstance(_usage, dict) else 0
-                )
-                _cost = getattr(_sdk_result_msg, "total_cost_usd", None) or 0.0
-                _rr.record_usage(
-                    _rs_id,
-                    input_tokens=_in_tok,
-                    output_tokens=_out_tok,
-                    cost_usd=_cost,
-                )
-            except Exception:
-                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                pass
+        # The SDK usage on the replay record (Session History cards).
+        if _sdk_result_msg is not None:
+            _usage = getattr(_sdk_result_msg, "usage", None)
+            _usage = _usage if isinstance(_usage, dict) else {}
+            _rec.usage(
+                _usage.get("input_tokens"),
+                _usage.get("output_tokens"),
+                getattr(_sdk_result_msg, "total_cost_usd", None),
+            )
 
         # Check if build is complete
         if is_build_complete(spec_dir):
@@ -1518,12 +1438,7 @@ async def run_agent_session(
                 tool_count=tool_count,
                 response_length=len(response_text),
             )
-            if _rr and _rs_id:
-                try:
-                    _rr.end_session(_rs_id)
-                except Exception:
-                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                    pass
+            _rec.end()
             return "complete", response_text, {}
 
         # Invalid / inaccessible model surfaced as a short text response (not an
@@ -1535,6 +1450,7 @@ async def run_agent_session(
                 "Reclassifying 'selected model unavailable' response as error",
                 response_preview=response_text[:160],
             )
+            _rec.end("failed")
             return (
                 "error",
                 response_text,
@@ -1578,12 +1494,7 @@ async def run_agent_session(
             except OSError:
                 # L'archivage des logs est du menage : il ne doit pas masquer la vraie cause.
                 pass
-            if _rr and _rs_id:
-                try:
-                    _rr.end_session(_rs_id, status="failed")
-                except Exception:
-                    # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                    pass
+            _rec.end("failed")
             return "error", response_text, error_info
 
         debug_success(
@@ -1593,12 +1504,7 @@ async def run_agent_session(
             tool_count=tool_count,
             response_length=len(response_text),
         )
-        if _rr and _rs_id:
-            try:
-                _rr.end_session(_rs_id)
-            except Exception:
-                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                pass
+        _rec.end()
         return "continue", response_text, {}
 
     except Exception as e:
@@ -1703,12 +1609,7 @@ async def run_agent_session(
             "message": sanitized_error,
             "exception_type": type(e).__name__,
         }
-        if _rr and _rs_id:
-            try:
-                _rr.end_session(_rs_id, status="failed")
-            except Exception:
-                # L'enregistrement replay est de la telemetrie : jamais au prix de la session.
-                pass
+        _rec.end("failed")
         return "error", sanitized_error, error_info
 
 
@@ -1857,6 +1758,7 @@ async def _run_agent_client_session(
     streaming_wrapper: Any = None,
     context_managed: bool = False,
     context_monitor_only: bool = False,
+    recording: SessionRecording | None = None,
 ) -> tuple[str, str, dict]:
     """
     Run a single agent session using any AgentClient provider.
@@ -1890,6 +1792,7 @@ async def _run_agent_client_session(
     current_tool = None
     message_count = 0
     tool_count = 0
+    recording = recording or SessionRecording(None, phase, provider="", model="")
 
     # Conversation log context: provider, model and subtask_id are persisted on
     # every message so a different provider can replay the transcript later.
@@ -2033,6 +1936,7 @@ async def _run_agent_client_session(
                             )
                         continue
                     response_text += block.text
+                    recording.text(block.text)
                     print(block.text, end="", flush=True)
                     if task_logger and block.text.strip():
                         task_logger.log(
@@ -2080,6 +1984,7 @@ async def _run_agent_client_session(
                         else:
                             print(f"   Input: {input_str}", flush=True)
                     current_tool = tool_name
+                    recording.tool_use(tool_name, inp)
 
                     # Stream tool use events to live view
                     if streaming_wrapper and inp:
@@ -2178,6 +2083,7 @@ async def _run_agent_client_session(
                             # La vue live est un miroir : son echec ne doit pas arreter l'agent.
                             pass
 
+                    recording.tool_result(result_content, is_error=is_error)
                     current_tool = None
 
             # Persist this assistant message in the conversation log AFTER all

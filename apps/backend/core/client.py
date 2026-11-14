@@ -1374,46 +1374,22 @@ def _system_prompt(
 
 
 def _debugger_hooks(project_dir: Path, spec_dir: Path, agent_type: str) -> list:
-    """Agent Debugger (opt-in): a PreToolUse hook that pauses on breakpoints.
+    """Agent Debugger: a PreToolUse hook that pauses on the person's breakpoints.
 
-    It waits for a resume decision issued from the UI. Zero impact on normal
-    runs: the hook is installed ONLY when this run opts in, which happens when
-    either (a) AUTO_CLAUDE_AGENT_DEBUGGER is truthy, or (b) the user has
-    already attached a debugger session for this spec in the UI (a row exists
-    in the file-backed store keyed by the spec name). Both checks are cheap and
-    off the tool-call hot path — session_exists() is a single stat when the
-    store file is absent. Wiring failures must never abort session startup,
-    hence the broad guard.
+    Installed on every run, so a person who attaches while the run is going
+    (it is listed as soon as it starts, ``agents.session_recording``) can stop
+    its next tool call. Zero cost without breakpoints: the hook stats one file
+    per tool call. Wiring failures must never abort session startup.
     """
-    _debugger_hooks: list = []
+    del agent_type  # the run announces itself with its role when it starts
     try:
-        from agents import debugger_store
         from agents.debugger import make_persistent_debugger_hook
 
         _dbg_session_id = spec_dir.name if spec_dir else project_dir.name
-        _dbg_forced = os.environ.get("AUTO_CLAUDE_AGENT_DEBUGGER", "").lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        if _dbg_forced or debugger_store.session_exists(_dbg_session_id):
-            debugger_store.register_active(
-                _dbg_session_id,
-                {
-                    "project": str(project_dir.resolve()),
-                    "spec": _dbg_session_id,
-                    "agent_type": agent_type,
-                    "pid": os.getpid(),
-                },
-            )
-            _debugger_hooks.append(
-                HookMatcher(hooks=[make_persistent_debugger_hook(_dbg_session_id)])
-            )
-            print(f"   - Agent Debugger: attached to session '{_dbg_session_id}'")
+        return [HookMatcher(hooks=[make_persistent_debugger_hook(_dbg_session_id)])]
     except Exception:
         logger.debug("Agent debugger wiring skipped", exc_info=True)
-    return _debugger_hooks
+        return []
 
 
 def _session_hooks(
@@ -1492,7 +1468,7 @@ def _session_hooks(
                 HookMatcher(matcher=tool, hooks=[_watermarks_hook])
                 for tool in WATERMARK_CLEANED_TOOLS
             ),
-            # Debugger breakpoints (any tool). Empty unless this run opted in.
+            # Debugger breakpoints (any tool), last: a refused call never waits.
             *debugger_hooks,
         ],
         "PostToolUse": [

@@ -259,7 +259,12 @@ export function ModelRouterPanel() {
 						<div>
 							<span className="font-medium">{t("modelRouter.chosen")}: </span>
 							<Badge variant="outline">{chosen.provider}</Badge>{" "}
-							<code>{chosen.model}</code> ({chosen.tier})
+							<code>{chosen.model}</code> (
+							{t(`modelRouter.tiers.${chosen.tier}` as never, { defaultValue: chosen.tier })} ·{" "}
+							{t(`modelRouter.taskClasses.${chosen.task_class}` as never, {
+								defaultValue: chosen.task_class,
+							})}
+							)
 						</div>
 						<div className="text-muted-foreground">
 							{t("modelRouter.estimatedCost")}:{" "}
@@ -288,7 +293,9 @@ export function ModelRouterPanel() {
 						<tbody>
 							{Object.entries(comparison).map(([tier, c]) => (
 								<tr key={tier} className="border-b">
-									<td className="p-2">{tier}</td>
+									<td className="p-2">
+										{t(`modelRouter.tiers.${tier}` as never, { defaultValue: tier })}
+									</td>
 									<td className="p-2 font-mono">
 										{c.provider}/{c.model}
 									</td>

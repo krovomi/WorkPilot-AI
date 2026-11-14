@@ -240,14 +240,20 @@ describe("generated tests go through a review card", () => {
 		await run();
 
 		proc.stdout.write(
+			`__TG_EVENT__:${JSON.stringify({ type: "stage", stage: "detect", status: "done", language: "C#", framework: "xUnit" })}\n`,
+		);
+		proc.stdout.write("Writing tests\n");
+		proc.stdout.write(
 			`__TEST_GENERATION_RESULT__:${JSON.stringify({ result: { tests_generated: 3 } })}\n`,
 		);
 		proc.emit("close", 0);
 		await flush();
 
+		// The run's own stage lines go to the card's log; the result line does not.
 		expect(reviewRun.finish).toHaveBeenCalledWith({
 			message: "test: add generated unit tests for Program.cs",
 			summary: "Tests unitaires de Program.cs",
+			log: ["detect (done): C# · xUnit", "Writing tests"],
 		});
 		expect(completed).toEqual([
 			expect.objectContaining({

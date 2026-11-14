@@ -185,20 +185,14 @@ export function SessionHistory({ projectId }: SessionHistoryProps) {
 					else setError(result.error || t("sessionHistory:errors.loadFailed"));
 					return;
 				}
-				const backendUrl = import.meta.env?.VITE_BACKEND_URL || "";
-				const res = await fetch(`${backendUrl}/api/sessions/${encodeURIComponent(projectId)}`, { signal });
-				// No backend answering (stopped, or a page served without one): an
-				// empty or HTML body, never JSON. Say so instead of a parser error.
-				if (!res.ok) {
-					setError(t("sessionHistory:errors.loadFailed"));
-					return;
-				}
-				if (!res.headers.get("content-type")?.includes("application/json")) {
-					setError(t("sessionHistory:errors.backendUnreachable"));
-					return;
-				}
-				const data = await res.json();
+				// Main reads the local backend (replay-handlers.ts): the renderer
+				// has no backend URL of its own.
+				const data = await globalThis.electronAPI.listSessionHistory<{
+					sessions?: SessionEntry[];
+				}>(projectId);
+				if (signal?.aborted) return;
 				if (data.success) setSessions(data.sessions || []);
+				else if (data.unreachable) setError(t("sessionHistory:errors.backendUnreachable"));
 				else setError(data.error || t("sessionHistory:errors.loadFailed"));
 			} catch (e) {
 				if ((e as { name?: string })?.name === "AbortError") return;
