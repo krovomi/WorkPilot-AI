@@ -1020,7 +1020,8 @@
 		"agents": {
 			"planner": "Planificateur",
 			"coder": "Codeur",
-			"qa_reviewer": "Relecteur QA"
+			"qa_reviewer": "Relecteur QA",
+			"analyzer": "Enquêteur"
 		}
 	},
 	"terminalGrid": {

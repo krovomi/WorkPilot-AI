@@ -42,6 +42,10 @@
 #                                          to the provider's SDK
 #                               bridged    WorkPilot connects to them and offers
 #                                          their tools in its own loop
+#                               handed     WorkPilot hands the CLI the project's
+#                                          approved custom servers in its own
+#                                          words (core/cli_mcp.py), on top of
+#                                          what its own config declares
 #                               own        WorkPilot hands none: the CLI loads
 #                                          what its own config declares
 #                               none       no MCP tool reaches the model
@@ -88,9 +92,11 @@ copilot:
     compact: emulated
     usage: reported
   standards:
-    mcp: none
+    mcp: bridged
     instructions: agents_md
-  note: Was declared native while nothing reached the model; see `emulated`.
+  note: >-
+    Was declared native while nothing reached the model; see `emulated`. The
+    project's MCP servers are bridged into the loop like OpenAI's.
 
 windsurf:
   adapter: WindsurfAgentClient
@@ -122,9 +128,11 @@ openai:
   note: >-
     With OPENAI_AUTH_MODE=codex-cli the task runs on CodexCliAgentClient, whose
     threads compact natively (model_auto_compact_token_limit); context_mgmt
-    resolves that from the client, not from this entry. The Codex CLI also loads the
-    MCP servers of its own config (.codex/config.toml) and reads AGENTS.md
-    itself, on top of the prompt WorkPilot injects.
+    resolves that from the client, not from this entry. The Codex CLI is handed
+    the project's approved custom MCP servers as `-c mcp_servers.<id>.…`
+    overrides (core/cli_mcp.py), also loads those of its own config
+    (.codex/config.toml), and reads AGENTS.md itself, on top of the prompt
+    WorkPilot injects.
 
 google:
   adapter: GoogleAgentClient
@@ -227,7 +235,7 @@ opencode:
     compact: emulated
     usage: reported
   standards:
-    mcp: own
+    mcp: handed
     instructions: agents_md
   note: >-
     `opencode run --format json`. A type declaring none of Write/Edit/Bash runs
@@ -346,7 +354,7 @@ gemini-cli:
     compact: emulated
     usage: exact
   standards:
-    mcp: own
+    mcp: handed
     instructions: unverified
   acp:
     label: Gemini CLI

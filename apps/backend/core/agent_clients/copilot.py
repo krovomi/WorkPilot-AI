@@ -37,6 +37,7 @@ from .base import (
     _parse_retry_after,
     _required_output,
 )
+from .mcp_bridge import McpBridgeMixin
 from .openai import ChatCompletionsAdapter
 
 # The name the monolith logged under, kept so logging configuration and log
@@ -744,8 +745,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
         super().reinject(reply, results)
 
     async def execute(self, call: ToolCall) -> ToolResult:
-        # Executed locally: Copilot has no MCP bridge.
-        return await self.run_tool(call)
+        return await self.run_tool(call, mcp=self.client._mcp_manager)
 
     def finish(self, reason: StopReason) -> None:
         if reason == "max_turns":
@@ -761,7 +761,7 @@ class _CopilotAdapter(ChatCompletionsAdapter):
 # =============================================================================
 
 
-class CopilotAgentClient(AgentClient):
+class CopilotAgentClient(McpBridgeMixin, AgentClient):
     """Agent client backed by GitHub Copilot API.
 
     Authentication flow (two-step):
@@ -1401,12 +1401,14 @@ class CopilotAgentClient(AgentClient):
                     spec_dir=getattr(self, "_spec_dir", None),
                     agent_type=self._agent_type,
                 )
-                # Fixed for the session, sorted and serialized one way
-                # (harness.domain.tools): every turn sends the same bytes.
+                # Fixed for the session, MCP tools included, sorted and
+                # serialized one way (harness.domain.tools): every turn sends
+                # the same bytes.
                 self._freeze_tools(
                     get_tool_definitions(
                         self._agent_type, getattr(self, "_spec_dir", None)
                     )
+                    + await self._bridge_mcp_tools()
                 )
                 logger.info(
                     f"[CopilotAgentClient] Tool execution enabled: "
@@ -1419,6 +1421,7 @@ class CopilotAgentClient(AgentClient):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._close_mcp_bridge()
         if self._http_client is not None:
             await self._http_client.close()
             self._http_client = None

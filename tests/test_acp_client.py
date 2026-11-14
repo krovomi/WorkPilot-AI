@@ -1017,3 +1017,29 @@ def test_the_broker_follows_the_channel(tmp_path: Path, monkeypatch) -> None:
 
 async def test_nobody_to_ask_refuses() -> None:
     assert await UnansweredBroker("no one").ask(_question()) is None
+
+
+async def test_approved_mcp_servers_are_opened_with_the_session(project: Path) -> None:
+    """Lot E: `session/new` carries the custom servers this type may start;
+    an HTTP one because this Gemini declares MCP over HTTP."""
+    agent = FakeAgent(_fixture("write-allowed", project))
+    client = _client(project, agent, broker=RecordingBroker("proceed_once"))
+    client._mcp_servers = [
+        {
+            "id": "rea",
+            "type": "command",
+            "command": "npx",
+            "args": ["-y", "rea-agents@6.9.0", "mcp"],
+            "env": {"REA_MCP_TOOL_CATALOG_PROFILE": "hot-cold"},
+        },
+        {"id": "github", "type": "http", "url": "https://api.githubcopilot.com/mcp/"},
+    ]
+    async with client:
+        await _turn(client)
+    [new] = agent.answers("session/new")
+    servers = new["params"]["mcpServers"]
+    assert [s["name"] for s in servers] == ["rea", "github"]
+    assert servers[1]["type"] == "http"
+    assert servers[0]["env"] == [
+        {"name": "REA_MCP_TOOL_CATALOG_PROFILE", "value": "hot-cold"}
+    ]
