@@ -109,3 +109,24 @@ def test_the_windev_skills_ship_with_the_desktop_build():
     for name in ("wlangage", "windev-text-format"):
         assert f"backend/skills_registry/bundled/{name}" in targets
         assert (REPO / "skills/windev" / name / "SKILL.md").is_file()
+
+
+def test_a_windev_mobile_app_is_offered_no_framework_to_install(tmp_path: Path):
+    from mobile.bootstrap import mobile_profile
+
+    (tmp_path / "Appli.wdp").write_text(
+        project_file(("Application Android", "Application iPhone/iPad")),
+        encoding="utf-8",
+    )
+    assert detect_project(tmp_path).mobile_platforms == ["android", "ios"]
+    profile = mobile_profile(tmp_path)
+    assert profile["isMobile"] and profile["windev"]
+    assert profile["stack"] == {
+        "framework": "windev-mobile",
+        "platforms": ["android", "ios"],
+    }
+
+    (tmp_path / "Appli.wdp").write_text(project_file(), encoding="utf-8")
+    profile = mobile_profile(tmp_path)
+    assert not profile["isMobile"] and profile["windev"]
+    assert profile["frameworks"] == []
