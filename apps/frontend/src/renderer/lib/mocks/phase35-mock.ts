@@ -30,6 +30,8 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	listDomains: () => browserUnavailable("Domain agents"),
 	getDomainProfile: () => browserUnavailable("Domain agents"),
 	buildDomainBundle: () => browserUnavailable("Domain agents"),
+	getProjectDomain: () => browserUnavailable("Domain agents"),
+	setProjectDomain: () => browserUnavailable("Domain agents"),
 
 	scanCicdLog: () => browserUnavailable("CI/CD anomaly detection"),
 	analyseCicdLogs: () => browserUnavailable("CI/CD anomaly detection"),
