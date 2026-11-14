@@ -11,7 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../shared/i18n";
 import type { FlakyReport } from "../../../../shared/types/flaky-tests";
 import { useFlakyTestsStore } from "../../../stores/flaky-tests-store";
-import { FlakyTestReport, activityText, parseRunnerError } from "../FlakyTestReport";
+import {
+	FlakyTestReport,
+	activityText,
+	parseRunnerError,
+	splitRunOutput,
+} from "../FlakyTestReport";
 
 const DOTNET = { id: "dotnet", label: "C# / .NET", command: "dotnet test App.sln" };
 
@@ -139,6 +144,43 @@ describe("FlakyTestReport", () => {
 			await screen.findByText(/La commande de test n'a écrit aucun rapport/),
 		).toBeInTheDocument();
 		expect(screen.getByText("error CS1002: ; expected")).toBeInTheDocument();
+	});
+
+	it("says a run ran no test, with the end of its output and the full log", async () => {
+		// The bug: "dotnet test Rag.sln" on a solution without a test project.
+		api.runFlakyTestsScan.mockRejectedValue(
+			new Error(
+				"Error invoking remote method 'flakyTests:run': Error: no_tests: the test command ran no test (exit code 0).\nlog: .workpilot/flaky-tests/runs/1/run-01/output.log\nRestored Rag.Api.csproj",
+			),
+		);
+		render(<FlakyTestReport projectPath="/p" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Exécuter 5 fois" }));
+		expect(await screen.findByText(/sans lancer un seul test/)).toBeInTheDocument();
+		expect(screen.getByText("Restored Rag.Api.csproj")).toBeInTheDocument();
+		expect(screen.getByText(".workpilot/flaky-tests/runs/1/run-01/output.log")).toBeInTheDocument();
+	});
+
+	it("explains a .NET project without a test project", async () => {
+		api.runFlakyTestsScan.mockRejectedValue(
+			new Error("Error: no_dotnet_tests: this .NET project has no test project (xUnit, NUnit, MSTest, TUnit)"),
+		);
+		render(<FlakyTestReport projectPath="/p" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Exécuter 5 fois" }));
+		expect(await screen.findByText(/n'a aucun projet de test/)).toBeInTheDocument();
+		expect(screen.queryByText(/this \.NET project/)).not.toBeInTheDocument();
+	});
+});
+
+describe("splitRunOutput", () => {
+	it("drops the English line and takes the log path out", () => {
+		expect(splitRunOutput("no_results", "no_results line\nlog: a/output.log\nerror CS1002")).toEqual({
+			output: "error CS1002",
+			logPath: "a/output.log",
+		});
+		expect(splitRunOutput("start_failed", "the command could not start")).toEqual({
+			output: "the command could not start",
+			logPath: null,
+		});
 	});
 });
 
