@@ -2158,6 +2158,71 @@
 			],
 			"homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/time",
 			"requires": "uv"
+		},
+		{
+			"id": "rea",
+			"name": "REA",
+			"tagline": {
+				"en": "Reads a shipped build without running it: binaries, ASAR, APK, .NET assemblies",
+				"fr": "Lit un build livré sans le lancer : binaires, ASAR, APK, assemblies .NET"
+			},
+			"description": {
+				"en": "REA (Reverse Engineer Anything) reads what a shipped artifact reveals, without its source and without running it: executables, Electron archives, JavaScript bundles, .NET assemblies, APKs. WorkPilot pins the release it starts and offers it to investigations only: five tools at start, the others loaded on demand from the static families (no device, browser or runtime capture).",
+				"fr": "REA (Reverse Engineer Anything) lit ce que révèle un artefact livré, sans son code source et sans le lancer : exécutables, archives Electron, bundles JavaScript, assemblies .NET, APK. WorkPilot fige la version qu'il démarre et ne la propose qu'aux enquêtes : cinq outils au départ, les autres chargés à la demande parmi les familles statiques (ni appareil, ni navigateur, ni capture à l'exécution)."
+			},
+			"author": "morluto (community)",
+			"official": false,
+			"category": "security",
+			"color": "#7C3AED",
+			"package": "rea-agents",
+			"transport": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"rea-agents@6.9.0",
+				"mcp"
+			],
+			"env": {
+				"REA_MCP_INPUT_SCHEMA_PROFILE": "compact",
+				"REA_MCP_OUTPUT_SCHEMA_PROFILE": "compact",
+				"REA_MCP_TOOL_CATALOG_PROFILE": "hot-cold",
+				"REA_MCP_TOOL_FAMILIES": "direct,artifact,managed,native,electron,android,firmware,flutter,pcap,session"
+			},
+			"vars": [],
+			"agents": [
+				"analyzer"
+			],
+			"tools": [
+				{
+					"name": "open_binary",
+					"description": "Open a local artifact or analysis database for reading"
+				},
+				{
+					"name": "binary_session",
+					"description": "Show the current target and what the provider can read"
+				},
+				{
+					"name": "get_evidence_bundle",
+					"description": "Read the evidence gathered so far"
+				},
+				{
+					"name": "close_binary",
+					"description": "Release the target, keeping the evidence"
+				},
+				{
+					"name": "discover_tools",
+					"description": "Find and load more REA readers by keyword"
+				}
+			],
+			"tags": [
+				"reverse-engineering",
+				"binary",
+				"electron",
+				"dotnet",
+				"android",
+				"security"
+			],
+			"homepage": "https://github.com/morluto/rea"
 		}
 	]
 }

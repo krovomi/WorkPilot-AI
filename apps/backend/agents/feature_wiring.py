@@ -78,6 +78,25 @@ def _bench_scores(project_dir: Path | None, kind: str | None = None) -> dict:
         return {}
 
 
+def task_provider(spec_dir: Path | None, phase: str | None = None) -> str:
+    """The provider the task runs this phase on; Claude when nothing says otherwise.
+
+    The router must stay on it: a model of another provider would be handed
+    to this provider's client and fail (or run nowhere for a coding-agent CLI).
+    """
+    if spec_dir is not None:
+        try:
+            from phase_config import get_phase_provider
+
+            provider = get_phase_provider(Path(spec_dir), phase=phase)  # type: ignore[arg-type]
+        except (OSError, ValueError) as exc:
+            logger.debug("phase provider unreadable: %s", exc)
+            provider = None
+        if provider:
+            return provider
+    return "anthropic"
+
+
 def suggest_routed_model(
     *,
     prompt: str = "",
@@ -85,6 +104,8 @@ def suggest_routed_model(
     available_providers: list[str] | None = None,
     project_dir: Path | None = None,
     kind: str | None = None,
+    spec_dir: Path | None = None,
+    phase: str | None = None,
 ) -> dict[str, Any] | None:
     """Ask the ModelRouter for a cheaper/cheapest acceptable model.
 
@@ -93,6 +114,11 @@ def suggest_routed_model(
     ``task_class``, ``tier``. Always returns a *suggestion* — the caller is
     responsible for deciding whether to use it (default policy: respect the
     user's UI choice + log divergence to the audit trail).
+
+    With ``spec_dir``, the suggestion stays on the task's provider for
+    ``phase`` (``task_provider``) unless ``available_providers`` says
+    otherwise, the project is the one of the spec, and the card's kind is
+    read from it. ``None`` when that provider has no model to suggest.
 
     With ``project_dir``, the project's repo bench results take part: a model
     the bench saw fail is passed over (``model_router.router``), judged on the
@@ -103,12 +129,23 @@ def suggest_routed_model(
     except ImportError:
         return None
 
+    if spec_dir is not None:
+        if available_providers is None:
+            available_providers = [task_provider(spec_dir, phase)]
+        if project_dir is None:
+            # <project>/.workpilot/specs/<spec>
+            project_dir = Path(spec_dir).parent.parent.parent
+        if kind is None:
+            kind = card_kind(spec_dir)
+
     try:
         router = ModelRouter(
             available=available_providers,
             bench_scores=_bench_scores(project_dir, kind),
         )
         choice = router.route(prompt=prompt, hint=task_hint)
+        if not choice.model:
+            return None
         return {
             "provider": choice.provider,
             "model": choice.model,
@@ -202,9 +239,8 @@ def apply_router_override(
         prompt=prompt_hint or f"{phase} phase",
         task_hint=task_hint or phase,
         available_providers=available_providers,
-        # <project>/.workpilot/specs/<spec>
-        project_dir=Path(spec_dir).parent.parent.parent if spec_dir else None,
-        kind=card_kind(spec_dir),
+        spec_dir=spec_dir,
+        phase=phase,
     )
     if not suggestion:
         return current_model, None

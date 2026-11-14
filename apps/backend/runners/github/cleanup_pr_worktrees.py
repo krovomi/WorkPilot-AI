@@ -19,6 +19,12 @@ import importlib.util
 import sys
 from pathlib import Path
 
+# Launched without PYTHONPATH, as its usage says: put the backend on the path
+# before loading the manager, which imports ``foundation``.
+_BACKEND = str(Path(__file__).resolve().parents[2])
+if _BACKEND not in sys.path:
+    sys.path.insert(0, _BACKEND)
+
 services_dir = Path(__file__).parent / "services"
 module_path = services_dir / "pr_worktree_manager.py"
 
@@ -202,8 +208,6 @@ Environment variables:
 
 
 if __name__ == "__main__":
-    # Launched without PYTHONPATH: put the backend on the path for core.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from foundation.log_redaction import install_global_redaction
 
     install_global_redaction()

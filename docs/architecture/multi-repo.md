@@ -1,3 +1,11 @@
+---
+feature: Multi-dépôts
+summary: >-
+  Graphe, ordre et ruptures analysés, puis une carte par dépôt, lancée quand la précédente a passé
+  la QA, avec ce que les précédentes ont changé ; une carte en attente suspend la suite ; reprise
+  par le manifeste.
+---
+
 # Multi-dépôts : un changement, une carte par dépôt, lancées dans l'ordre
 
 Un changement touche souvent plusieurs dépôts : une bibliothèque partagée et ses consommateurs,

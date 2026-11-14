@@ -13,7 +13,9 @@ Signals detected:
   - long_function:   Python/JS/TS function bodies > N lines
   - deep_complexity: nested loops/conditionals > N levels
   - duplication:     repeated >=6-line blocks across the project
-  - stale_deps:      outdated dependencies from requirements.txt / package.json
+  - stale_deps:      unstable or unpinned dependencies from the manifest of every
+                     stack (npm, pip, NuGet, Maven, Gradle, Cargo, Go, Composer,
+                     pub), see ``tech_debt.manifests``
   - low_coverage:    files in coverage.xml below threshold (optional)
 """
 
@@ -37,7 +39,16 @@ DebtKind = Literal[
     "low_coverage",
 ]
 
-SCAN_EXTS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".cs"}
+# Source files of every stack the app supports: the scanner used to read nine
+# extensions, so Kotlin, Swift, Dart, PHP, Ruby, C/C++, F#, VB and the UI
+# single-file components counted as no code at all.
+SCAN_EXTS = {
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte",
+    ".go", ".rs", ".java", ".kt", ".kts", ".scala", ".groovy",
+    ".cs", ".fs", ".vb", ".razor",
+    ".swift", ".m", ".mm", ".dart", ".php", ".rb", ".ex", ".exs",
+    ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp",
+}  # fmt: skip
 SKIP_DIRS = {
     ".git",
     "node_modules",
@@ -61,16 +72,24 @@ SKIP_DIRS = {
     "packages",
     ".vs",
     "TestResults",
+    # Vendored and generated code of the other stacks (PHP, Ruby, iOS, Flutter, Gradle).
+    "vendor",
+    "Pods",
+    ".dart_tool",
+    ".gradle",
+    "DerivedData",
 }
 
 TODO_PATTERN = re.compile(
-    r"(?://|#|/\*)\s*(TODO|FIXME|XXX|HACK)[:\s]?(.*)", re.IGNORECASE
+    r"(?://|#|/\*|<!--)\s*(TODO|FIXME|XXX|HACK)[:\s]?(.*)", re.IGNORECASE
 )
+# A function or method header: Python/Ruby ``def``, JS/PHP ``function``, Rust
+# ``fn``, Go/Swift ``func``, Kotlin ``fun``, and the access or storage
+# modifiers that open a method in Java, C#, Kotlin, Swift, Dart and PHP.
 FUNCTION_PATTERN = re.compile(
-    r"^\s*(?:async\s+)?(?:def|function|fn|public|private|protected)\s+[\w$]+",
+    r"^\s*(?:(?:async|export|override|open|suspend|inline)\s+)*"
+    r"(?:def|function|fn|func|fun|public|private|protected|internal|static|fileprivate)\s+[\w$]+",
 )
-PACKAGE_JSON = "package.json"
-REQUIREMENTS_TXT = "requirements.txt"
 
 
 @dataclass
@@ -345,54 +364,26 @@ def _scan_duplication(root: Path, block_size: int = 6) -> list[DebtItem]:
 
 
 def _scan_stale_deps(root: Path) -> list[DebtItem]:
+    """Unstable or unpinned dependencies, from every manifest of every stack."""
+    from .manifests import stale_dependencies
+
     items: list[DebtItem] = []
-    pkg_json = root / PACKAGE_JSON
-    if pkg_json.exists():
-        try:
-            data = json.loads(pkg_json.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
-        deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
-        for name, version in deps.items():
-            if isinstance(version, str) and ("^0." in version or "~0." in version):
-                items.append(
-                    DebtItem(
-                        id=_make_id("stale_deps", PACKAGE_JSON, 0, name),
-                        kind="stale_deps",
-                        file_path=PACKAGE_JSON,
-                        line=0,
-                        message=f"{name}@{version} is pre-1.0 (unstable)",
-                        cost=1.5,
-                        effort=1.0,
-                        roi=score_roi(1.5, 1.0),
-                        tags=["dependencies"],
-                    )
-                )
-    req = root / REQUIREMENTS_TXT
-    if req.exists():
-        try:
-            for idx, line in enumerate(
-                req.read_text(encoding="utf-8").splitlines(), start=1
-            ):
-                s = line.strip()
-                if not s or s.startswith("#"):
-                    continue
-                if "==" not in s and ">=" not in s:
-                    items.append(
-                        DebtItem(
-                            id=_make_id("stale_deps", REQUIREMENTS_TXT, idx, s),
-                            kind="stale_deps",
-                            file_path=REQUIREMENTS_TXT,
-                            line=idx,
-                            message=f"{s} is unpinned",
-                            cost=1.0,
-                            effort=0.5,
-                            roi=score_roi(1.0, 0.5),
-                            tags=["dependencies", "unpinned"],
-                        )
-                    )
-        except OSError:
-            pass
+    for dep in stale_dependencies(root, SKIP_DIRS):
+        unpinned = dep.reason in {"unpinned", "floating", "range", "vcs"}
+        cost, effort = (1.0, 0.5) if unpinned else (1.5, 1.0)
+        items.append(
+            DebtItem(
+                id=_make_id("stale_deps", dep.file_path, dep.line, dep.name),
+                kind="stale_deps",
+                file_path=dep.file_path,
+                line=dep.line,
+                message=dep.message,
+                cost=cost,
+                effort=effort,
+                roi=score_roi(cost, effort),
+                tags=["dependencies", dep.ecosystem, dep.reason],
+            )
+        )
     return items
 
 

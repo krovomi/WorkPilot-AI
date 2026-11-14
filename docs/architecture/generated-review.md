@@ -1,3 +1,9 @@
+---
+feature: Code généré en revue
+summary: >-
+  Le code d'une page va sur la branche d'une carte en revue, jamais dans le dossier du projet.
+---
+
 # Code généré en revue : une carte, un worktree, une PR
 
 > Pourquoi une page qui écrit du code dans un projet passe par une carte du Kanban, et comment.

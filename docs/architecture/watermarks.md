@@ -1,3 +1,10 @@
+---
+feature: watermarks
+summary: >-
+  Caractères invisibles retirés des fichiers générés dans un hook PreToolUse ; `old_string` n'est
+  jamais touché.
+---
+
 # Clean generated files (watermarks)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

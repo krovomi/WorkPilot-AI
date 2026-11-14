@@ -1,3 +1,11 @@
+---
+feature: Garde des migrations
+summary: >-
+  Le `up` des migrations de la tâche, toutes stacks, sans modèle ni base : perte de données,
+  renommage, NOT NULL sans défaut, ancienne migration modifiée = erreur ; verrou, type, pas de
+  `down` = alerte ; bloque en `strict`.
+---
+
 # Garde des migrations (zéro interruption, #386)
 
 Pendant un déploiement, l'ancien code tourne encore sur le nouveau schéma, et l'inverse pendant un

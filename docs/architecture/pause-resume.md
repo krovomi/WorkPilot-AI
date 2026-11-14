@@ -1,3 +1,10 @@
+---
+feature: Pause et reprise
+summary: >-
+  `foundation/pause_state.py`, `BuildPaused` / `BuildHalted`, reprendre une phase sans la payer
+  deux fois.
+---
+
 # Pause, resume, and how a phase reports failure
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

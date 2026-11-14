@@ -508,3 +508,69 @@ async def test_oneshot_returns_empty_text_on_cli_failure(monkeypatch) -> None:
     result = await oneshot_completion("title this", provider="openai", model="gpt-5.5")
 
     assert result == ""
+
+
+@pytest.mark.asyncio
+async def test_approved_mcp_servers_reach_codex_with_their_values_in_its_environment(
+    tmp_path: Path,
+) -> None:
+    """Lot E: the custom servers this type may start, as `-c` overrides; the
+    server's environment travels in Codex's, named by `env_vars`."""
+    process = _FakeProcess(
+        [
+            _event("thread.started", thread_id="t-1"),
+            _event(
+                "item.completed",
+                item={"id": "i1", "type": "agent_message", "text": "done"},
+            ),
+        ]
+    )
+    factory = _ProcessFactory(process)
+    server = {
+        "id": "rea",
+        "name": "REA",
+        "type": "command",
+        "command": "npx",
+        "args": ["-y", "rea-agents@6.9.0", "mcp"],
+        "env": {"REA_MCP_TOOL_CATALOG_PROFILE": "hot-cold"},
+    }
+    client = CodexCliAgentClient(
+        project_dir=str(tmp_path),
+        executable="codex",
+        process_factory=factory,
+        mcp_servers=[server],
+    )
+    await client.query("work")
+    _ = [message async for message in client.receive_response()]
+
+    args, kwargs = factory.calls[0]
+    assert 'mcp_servers.rea.args=["-y","rea-agents@6.9.0","mcp"]' in args
+    assert 'mcp_servers.rea.env_vars=["REA_MCP_TOOL_CATALOG_PROFILE"]' in args
+    assert args[-1] == "-"
+    assert kwargs["env"]["REA_MCP_TOOL_CATALOG_PROFILE"] == "hot-cold"
+
+
+@pytest.mark.asyncio
+async def test_without_custom_mcp_servers_codex_inherits_its_environment(
+    tmp_path: Path,
+) -> None:
+    process = _FakeProcess(
+        [
+            _event("thread.started", thread_id="t-1"),
+            _event(
+                "item.completed",
+                item={"id": "i1", "type": "agent_message", "text": "done"},
+            ),
+        ]
+    )
+    factory = _ProcessFactory(process)
+    client = CodexCliAgentClient(
+        project_dir=str(tmp_path), executable="codex", process_factory=factory
+    )
+    await client.query("work")
+    _ = [message async for message in client.receive_response()]
+
+    args, kwargs = factory.calls[0]
+    assert not any(str(a).startswith("mcp_servers.") for a in args)
+    assert "env" not in kwargs
+    assert client._mcp_servers == []  # looked up once: nothing configured here

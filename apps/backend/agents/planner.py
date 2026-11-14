@@ -162,6 +162,8 @@ async def run_followup_planner(
             suggestion = suggest_routed_model(
                 prompt=f"follow-up planning for spec {spec_dir.name}",
                 task_hint=jev_hint or "planning",
+                spec_dir=spec_dir,
+                phase="planning",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(

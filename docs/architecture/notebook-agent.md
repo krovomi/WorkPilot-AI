@@ -1,3 +1,10 @@
+---
+feature: Agent notebooks
+summary: >-
+  Dépendances entre cellules (Python exact, sinon déclarations), exécution en noyau neuf sans
+  identifiants, cellules longues en fonctions sur carte de revue.
+---
+
 # Agent notebooks : dépendances, exécution, fonctions
 
 > Pourquoi la page Notebooks lit les dépendances entre cellules, exécute un notebook dans un noyau
