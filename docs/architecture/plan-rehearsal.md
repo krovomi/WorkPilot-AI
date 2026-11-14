@@ -1,3 +1,9 @@
+---
+feature: Essai à blanc
+summary: >-
+  Plan d'une spec rejoué sur sa base, sans écriture ni modèle.
+---
+
 # Essai à blanc : répétition du plan (`simulation`)
 
 Avant qu'un build ne dépense le moindre token, la page « Essai à blanc » rejoue le plan d'une spec

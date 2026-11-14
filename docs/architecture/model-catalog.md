@@ -1,3 +1,9 @@
+---
+feature: Catalogues de modèles
+summary: >-
+  Modèles Codex et registre models.dev derrière les sélecteurs.
+---
+
 # Model catalogues
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

@@ -1,3 +1,11 @@
+---
+feature: Garde-fous en code
+summary: >-
+  Lue du projet principal (worktrees compris), couches globale → `workpilot.policy.yaml` →
+  `.workpilot/guardrails.*` sans affaiblir ; chemins relatifs ; tests supprimés, dépendance
+  ajoutée (toutes stacks) ; invalide = refus ; approbation unique.
+---
+
 # Garde-fous en code (Policy-as-Code)
 
 Une politique écrite dans le dépôt dit ce que les agents ne peuvent pas faire : toucher

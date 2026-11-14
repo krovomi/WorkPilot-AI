@@ -1,3 +1,11 @@
+---
+feature: Marketplaces MCP et plugins
+summary: >-
+  Un serveur MCP installé va dans `CUSTOM_MCP_SERVERS` du projet ; un plugin écrit son skill dans
+  `.agents/skills/` et `.claude/skills/`, marqué, jamais sur un skill étranger ; serveurs vérifiés
+  à la source.
+---
+
 # Marketplaces MCP et plugins
 
 > Code : `apps/frontend/src/shared/mcp-catalog/`, `apps/frontend/src/shared/plugin-catalog/`,
@@ -16,7 +24,7 @@ et les notes affichés étaient inventés. Les deux vues étaient marquées exp�
 
 | Marketplace | Ce qu'« Installer » écrit | Qui s'en sert |
 |---|---|---|
-| MCP | un serveur dans `CUSTOM_MCP_SERVERS` du `.workpilot/.env` du projet sélectionné, et son id dans `AGENT_MCP_<agent>_ADD` des agents cochés (planificateur, codeur, relecteur QA par défaut) | `core.client._custom_servers` le démarre pour ces agents ; le pont MCP de la boucle WorkPilot (`core/mcp_tools.py`) aussi ; l'onglet Outils des agents le montre et règle les agents |
+| MCP | un serveur dans `CUSTOM_MCP_SERVERS` du `.workpilot/.env` du projet sélectionné, et son id dans `AGENT_MCP_<agent>_ADD` des agents cochés (planificateur, codeur, relecteur QA par défaut, ou ceux que l'entrée nomme dans `agents`) | `core.client._custom_servers` le démarre pour ces agents ; le pont MCP de la boucle WorkPilot (`core/mcp_tools.py`) aussi ; Codex, OpenCode et les agents ACP le reçoivent dans leurs mots (`core/cli_mcp.py`) ; l'onglet Outils des agents le montre et règle les agents |
 | Plugins | `<projet>/.agents/skills/<id>/SKILL.md` et son miroir Claude Code `<projet>/.claude/skills/<id>/SKILL.md` | les commandes `/` du Kanban sur tous les providers (`slash_commands/api.py`), pi, les phases de workflow, Codex et Claude Code qui lisent ces dossiers |
 
 Aucune des deux vues ne garde de liste à elle : « installé » est relu dans le projet. Ce que la

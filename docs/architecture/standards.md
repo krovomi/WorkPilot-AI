@@ -1,3 +1,11 @@
+---
+feature: Conformité aux standards
+summary: >-
+  Les versions de MCP, ACP, AGENTS.md et OTel GenAI que parle le code, et ce qui atteint chaque
+  provider (champ `standards` de `providers.yaml`) ; chaque affirmation est vérifiée contre le
+  client qui tourne, `unverified` n'est jamais lu comme un support.
+---
+
 # Conformité aux standards ouverts (P4)
 
 Un orchestrateur multi-provider gagne à parler les formats communs plutôt qu'à maintenir un
@@ -26,9 +34,9 @@ n'a pas de ligne : il tourne comme son `degrades_to`.
 | Provider | MCP | Instructions du projet |
 |---|---|---|
 | `claude` | native : le SDK reçoit les serveurs configurés | `claude_md` |
-| `copilot` | none : la boucle exécute ses outils sans pont MCP | `agents_md` |
+| `copilot` | bridged : la boucle offre les outils approuvés des serveurs du projet | `agents_md` |
 | `windsurf` | none | injected |
-| `openai` | bridged (avec le CLI Codex, aussi sa propre config `.codex/config.toml`) | injected |
+| `openai` | bridged (avec le CLI Codex : les serveurs approuvés en `-c mcp_servers.…`, plus sa propre config `.codex/config.toml`) | injected |
 | `google` | bridged | injected |
 | `ollama` | bridged | injected |
 | `local` | bridged | injected |
@@ -36,15 +44,16 @@ n'a pas de ligne : il tourne comme son `degrades_to`.
 | `mistral` | bridged | injected |
 | `deepseek` | bridged | injected |
 | `grok` | bridged | injected |
-| `opencode` | own : sa propre config | `agents_md` |
+| `opencode` | handed : les serveurs approuvés dans `OPENCODE_CONFIG_CONTENT`, plus sa propre config | `agents_md` |
 | `pi` | own : `.pi/mcp.json`, chargé seulement dans un dépôt de confiance | `agents_md` |
-| `gemini-cli` | own : sa propre config, rien par ACP | unverified : Gemini CLI lit `GEMINI.md` par défaut, `AGENTS.md` seulement si `context.fileName` le nomme |
+| `gemini-cli` | handed : les serveurs approuvés dans `mcpServers` de `session/new`, plus sa propre config | unverified : Gemini CLI lit `GEMINI.md` par défaut, `AGENTS.md` seulement si `context.fileName` le nomme |
 | `antigravity` | unverified | unverified |
 
 Le test vérifie chaque affirmation contre le code :
 
 - `bridged` si et seulement si la classe du client a le pont MCP (`_bridge_mcp_tools`) ;
-- `native` seulement pour le SDK Claude, `own` seulement pour un CLI ;
+- `native` seulement pour le SDK Claude, `own` et `handed` seulement pour un CLI, `handed` si et
+  seulement si le client remet les serveurs (`hands_mcp_servers`) ;
 - `injected` si et seulement si la fabrique de `core/client.py` qui construit ce client lui
   donne le prompt avec `AGENTS.md` (`req.prompt(tool_use_hint=True)`).
 

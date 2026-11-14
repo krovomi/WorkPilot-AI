@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import os
 import re
 import shutil
@@ -83,12 +84,32 @@ def _ensure_cli() -> str:
     return claude
 
 
+def _design_index(repo: Path) -> str:
+    """The table docs/CLAUDE.md used to carry, read from the design files' frontmatter."""
+    architecture = repo / "docs" / "architecture"
+    if not architecture.is_dir():
+        return ""
+    spec = importlib.util.spec_from_file_location(
+        "docs_index", Path(__file__).resolve().parent.parent / "docs_index.py"
+    )
+    docs_index = importlib.util.module_from_spec(spec)
+    sys.modules["docs_index"] = docs_index
+    try:
+        spec.loader.exec_module(docs_index)  # needs PyYAML
+        return docs_index.render(docs_index.entries(architecture))
+    except (ImportError, ValueError):
+        # tests/test_docs_context.py fails the PR that breaks a frontmatter.
+        return ""
+
+
 def _load_sources(repo: Path) -> str:
     chunks: list[str] = []
     for rel in SOURCE_FILES:
         path = repo / rel
         if path.is_file():
             chunks.append(f"===== {rel} =====\n{path.read_text(encoding='utf-8')}\n")
+    if index := _design_index(repo):
+        chunks.append(f"===== docs/architecture (index) =====\n{index}\n")
     return "\n".join(chunks)
 
 

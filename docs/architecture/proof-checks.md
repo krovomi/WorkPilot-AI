@@ -1,3 +1,10 @@
+---
+feature: Vérification des preuves
+summary: >-
+  Vérificateurs `[proofs]` lancés dans le worktree après la QA ; seul un refus renvoie au fixer ;
+  absent ou hors délai = « inconnu ».
+---
+
 # Vérification des preuves (`proof-checks`, P2)
 
 Écrire une preuve formelle devient automatisable, et une preuve fausse écrite par un modèle est

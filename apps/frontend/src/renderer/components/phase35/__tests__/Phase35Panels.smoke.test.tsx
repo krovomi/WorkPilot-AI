@@ -72,7 +72,7 @@ vi.mock("../../../stores/phase35-stores", () => ({
 		loadProfile: noop,
 		build: noop,
 	}),
-	useCicdAnomalyStore: () => ({ ...idleSlice, scan: noop, analyse: noop }),
+	useCicdAnomalyStore: () => ({ ...idleSlice, signals: [], scan: noop, analyse: noop }),
 	useLicenseStore: () => ({ ...idleSlice, scan: noop }),
 	useArchDriftStore: () => ({
 		...idleSlice,

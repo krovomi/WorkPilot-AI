@@ -1,3 +1,9 @@
+---
+feature: Docs et dérive
+summary: >-
+  Tous langages, sans modèle : doc comments, exemples, doc périmée (git) ; corrections en revue.
+---
+
 # Docs et dérive
 
 The hub "Docs et dérive" has two tabs: **Documentation** (coverage and draft

@@ -1,3 +1,11 @@
+---
+feature: Re-revue QA par delta
+summary: >-
+  Après un rejet, la passe suivante vérifie d'abord les issues contre le delta du fixer (lu dans
+  git, snapshot en objet tree sans toucher au worktree) et les tests des fichiers touchés, et
+  rejette tôt ; la passe qui approuve reste la revue complète.
+---
+
 # Re-review after a fix (QA by delta)
 
 [`qa/recheck.py`](../../apps/backend/qa/recheck.py), wired in
