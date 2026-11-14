@@ -538,8 +538,7 @@ def test_the_pull_request_says_what_happened_to_the_documentation():
 
 def test_missing_documentation_holds_the_merge():
     class NoCall:
-        def __getattr__(self, name):
-            raise AssertionError(f"GitHub called: {name}")
+        """No method at all: any GitHub call raises AttributeError."""
 
     pilot = ra.ReleaseAutopilot(
         NoCall(), can_push=True, quiet_hours=2, min_interval_hours=24, force=False
