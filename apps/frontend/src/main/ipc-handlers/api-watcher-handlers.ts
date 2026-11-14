@@ -21,6 +21,7 @@ import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 import { type RunRequest, runnerArgs } from "./api-watcher-args";
+import { decodeRunnerError } from "../utils/runner-error";
 
 
 
@@ -106,7 +107,7 @@ export function registerApiWatcherHandlers(): void {
 							console.error("[APIWatcher] Bad result line:", err);
 						}
 					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
+						errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 					}
 				}
 			});

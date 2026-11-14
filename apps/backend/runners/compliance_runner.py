@@ -14,7 +14,7 @@ The audit evidence of a project, judged against a framework's controls
 Output protocol (one JSON object per line, prefixed):
     COMPLIANCE_EVENT:{"type": "progress", "data": {"status": "..."}}
     COMPLIANCE_RESULT:{...}
-    COMPLIANCE_ERROR:<message>
+    COMPLIANCE_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

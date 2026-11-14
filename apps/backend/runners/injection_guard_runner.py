@@ -10,7 +10,7 @@ For JSON files, the runner looks for a ``text`` or ``content`` field. Plain
 Output protocol (one JSON object per line, prefixed):
     INJECTION_GUARD_EVENT:{"type": "progress", "data": {"status": "..."}}
     INJECTION_GUARD_RESULT:{"results": [...]}
-    INJECTION_GUARD_ERROR:<message>
+    INJECTION_GUARD_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

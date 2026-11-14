@@ -21,7 +21,7 @@ Each JSON payload must be a list of opinion objects, e.g.::
 Output protocol (one JSON object per line, prefixed):
     CONSENSUS_ARBITER_EVENT:{"type": "progress", "data": {"status": "..."}}
     CONSENSUS_ARBITER_RESULT:{"result": {...}}
-    CONSENSUS_ARBITER_ERROR:<message>
+    CONSENSUS_ARBITER_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

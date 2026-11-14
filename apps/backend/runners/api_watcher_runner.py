@@ -13,7 +13,7 @@ when absent, the runner saves the current contracts and returns an empty diff.
 Output protocol (one JSON object per line, prefixed):
     API_WATCHER_EVENT:{"type": "progress", "data": {"status": "..."}}
     API_WATCHER_RESULT:{...diff dict...}
-    API_WATCHER_ERROR:<message>
+    API_WATCHER_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations
