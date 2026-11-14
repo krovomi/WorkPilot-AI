@@ -66,10 +66,10 @@ except (ImportError, ValueError, SystemError):
         ReviewSeverity,
     )
     from phase_config import get_thinking_budget, resolve_model_id
+    from runners.github.services.learned_suppression import learned_prompt_block
     from services.agent_utils import create_working_dir_injector
     from services.category_utils import map_category
     from services.io_utils import safe_print
-    from services.learned_suppression import learned_prompt_block
     from services.pr_worktree_manager import PRWorktreeManager
     from services.pydantic_models import (
         AgentAgreement,
