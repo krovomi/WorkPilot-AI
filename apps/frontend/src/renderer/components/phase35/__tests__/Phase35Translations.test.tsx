@@ -13,6 +13,7 @@ import {
 	useAgentHealthStore,
 	useArchDriftStore,
 	useCicdAnomalyStore,
+	useCogContextStore,
 	useDomainAgentsStore,
 	useI18nScalerStore,
 	useLicenseStore,
@@ -22,6 +23,7 @@ import {
 import { AgentHealthPanel } from "../AgentHealthPanel";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
+import { CogContextPanel } from "../CogContextPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
 import { I18nScalerPanel } from "../I18nScalerPanel";
 import { LicensePanel } from "../LicensePanel";
@@ -56,6 +58,7 @@ afterEach(() => {
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
 	usePairRealtimeStore.setState({ currentRoom: null, ops: [], isStreaming: false, aiError: null });
+	useCogContextStore.setState({ context: null, phase: "idle", error: null });
 	useI18nScalerStore.setState({ report: null, formats: [], scannedDir: null, phase: "idle", error: null });
 	useModelRouterStore.setState({ chosen: null, comparison: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
@@ -417,6 +420,50 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText(/Proposition pour src\/Orders.cs/)).toBeInTheDocument();
 		expect(screen.getByText(/Le fournisseur n'a pas répondu/)).toBeInTheDocument();
 		expect(screen.getByText(/Cette salle vit sur cet ordinateur/)).toBeInTheDocument();
+	});
+
+	it("asks for a project before optimizing a context", () => {
+		render(<CogContextPanel />);
+		expect(screen.queryByRole("button", { name: "Optimiser" })).not.toBeInTheDocument();
+	});
+
+	it("lists the files it refused to read, in French, and the sources it proposed", () => {
+		useCogContextStore.setState({
+			phase: "ok",
+			context: {
+				slices: [
+					{
+						file_path: "src/Orders/OrderService.cs",
+						content: "public class OrderService {}",
+						full_size_tokens: 900,
+						included_tokens: 120,
+						truncated: true,
+						relevance: {
+							file_path: "src/Orders/OrderService.cs",
+							score: 1.5,
+							keyword_hits: 2,
+							path_score: 0.5,
+							explicit_mention: false,
+							recency_score: 0,
+							breakdown: {},
+						},
+					},
+				],
+				token_budget: 8000,
+				tokens_used: 120,
+				files_skipped: [],
+				summary: { candidates: 12, keywords_detected: ["order", "total"] },
+				discovered: true,
+				refused: [{ path: "/etc/hosts", reason: "outside" }],
+			},
+		});
+		render(<CogContextPanel projectPath="/work/shop" />);
+		expect(screen.getByText("Fichiers non lus")).toBeInTheDocument();
+		expect(screen.getByText(/hors du projet/)).toBeInTheDocument();
+		expect(screen.getByText("Extrait")).toBeInTheDocument();
+		expect(screen.getByText(/12 sources du projet examinées/)).toBeInTheDocument();
+		expect(screen.getByText(/Mots-clés lus dans la tâche : order, total/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Copier le contexte/ })).toBeInTheDocument();
 	});
 
 

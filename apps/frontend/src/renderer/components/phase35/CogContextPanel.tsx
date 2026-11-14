@@ -1,31 +1,33 @@
 /**
  * #3.2 Cognitive Context Optimizer panel.
  *
- * Paste a prompt + a list of candidate files + a token budget → see which
- * files were included, with their relevance scores and truncation status.
+ * A task's wording + the project's files + a token budget → which files (or
+ * which slices of them) fit, with their relevance. Files are the project's
+ * own: picked in the project, typed relative to it, or proposed by the
+ * backend when the list is empty. A path outside the project is refused by
+ * the backend and listed with its reason, never read.
  *
- * The candidate-file list is managed as a chip list, not a textarea: users
- * pick files via the native OS dialog (`electronAPI.selectFiles`) or type
- * a path manually. Each row is a separate, removable item — no parsing of
- * newline-separated paths, no silent acceptance of duplicates.
+ * The same packing feeds the coder's inlined file context when
+ * WORKPILOT_COGNITIVE_CONTEXT_ENABLED is on.
  */
 
-import { FileText, FolderOpen, Plus, X } from "lucide-react";
+import { Check, Copy, FileText, FolderOpen, Plus, Scissors, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useCogContextStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
 import { PanelShell } from "./_panel-shell";
 import { TokenCostEstimate } from "./_token-cost-estimate";
 
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
 const PROMPT_MAX_LEN = 4000;
 const PATH_MAX_LEN = 1024;
 const BUDGET_MIN = 100;
-const BUDGET_MAX = 1_000_000;
-const ABSOLUTE_PATH_RE = /^(?:[A-Za-z]:[\\/]|[\\/])/;
+// The backend accepts at most 200 000 tokens.
+const BUDGET_MAX = 200_000;
+const REFUSAL_REASONS = ["outside", "missing", "binary", "too_large"] as const;
 
 const basename = (p: string): string => {
 	const cleaned = p.replace(/[\\/]+$/, "");
@@ -33,7 +35,19 @@ const basename = (p: string): string => {
 	return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
 };
 
-export function CogContextPanel() {
+/** The path as the user reads it: relative to the project when inside it. */
+export const relativeToProject = (path: string, projectPath: string): string => {
+	const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+	const root = norm(projectPath);
+	const file = norm(path);
+	return root && file.startsWith(`${root}/`) ? file.slice(root.length + 1) : path;
+};
+
+interface CogContextPanelProps {
+	readonly projectPath?: string;
+}
+
+export function CogContextPanel({ projectPath = "" }: CogContextPanelProps) {
 	const { t } = useTranslation("phase35");
 	const { phase, error, context, optimize } = useCogContextStore();
 	const [prompt, setPrompt] = useState("");
@@ -41,16 +55,13 @@ export function CogContextPanel() {
 	const [manualPath, setManualPath] = useState("");
 	const [manualError, setManualError] = useState<string | null>(null);
 	const [budget, setBudget] = useState(8000);
+	const [copied, setCopied] = useState(false);
 
 	const isRunning = phase === "running";
 
 	const promptError = useMemo(
 		() => (prompt.trim().length === 0 ? t("cogContext.validation.promptRequired") : null),
 		[prompt, t],
-	);
-	const filesError = useMemo(
-		() => (files.length === 0 ? t("cogContext.validation.filesRequired") : null),
-		[files, t],
 	);
 	const budgetError = useMemo(() => {
 		if (!Number.isFinite(budget)) return t("common.invalidNumber");
@@ -59,58 +70,84 @@ export function CogContextPanel() {
 		return null;
 	}, [budget, t]);
 
-	const hasError = Boolean(promptError) || Boolean(filesError) || Boolean(budgetError);
+	const hasError = !projectPath || Boolean(promptError) || Boolean(budgetError);
 
-	const validateAndAdd = (path: string): string | null => {
-		const trimmed = path.trim();
-		if (trimmed.length === 0) return t("common.required");
-		if (trimmed.length > PATH_MAX_LEN)
-			return t("cogContext.validation.pathTooLong", { max: PATH_MAX_LEN });
-		if (!ABSOLUTE_PATH_RE.test(trimmed))
-			return t("cogContext.validation.pathNotAbsolute");
-		if (files.includes(trimmed)) return t("cogContext.validation.duplicatePath");
-		setFiles((prev) => [...prev, trimmed]);
-		return null;
-	};
+	const addPaths = (paths: string[]) =>
+		setFiles((prev) => {
+			const merged = [...prev];
+			for (const p of paths) {
+				const shown = relativeToProject(p, projectPath);
+				if (!merged.includes(shown)) merged.push(shown);
+			}
+			return merged;
+		});
 
 	const handlePickFiles = async () => {
 		try {
 			const picked = await globalThis.electronAPI.selectFiles({
 				multi: true,
 				title: t("cogContext.addFiles"),
+				defaultPath: projectPath || undefined,
 			});
-			if (!picked || picked.length === 0) return;
-			setFiles((prev) => {
-				const merged = [...prev];
-				for (const p of picked) {
-					if (!merged.includes(p)) merged.push(p);
-				}
-				return merged;
-			});
+			if (picked && picked.length > 0) addPaths(picked);
 		} catch {
 			// Picker cancellation or unavailable — leave state unchanged.
 		}
 	};
 
 	const handleAddManual = () => {
-		const err = validateAndAdd(manualPath);
-		if (err) {
-			setManualError(err);
+		const trimmed = manualPath.trim();
+		if (trimmed.length === 0) {
+			setManualError(t("common.required"));
 			return;
 		}
+		if (trimmed.length > PATH_MAX_LEN) {
+			setManualError(t("cogContext.validation.pathTooLong", { max: PATH_MAX_LEN }));
+			return;
+		}
+		if (files.includes(relativeToProject(trimmed, projectPath))) {
+			setManualError(t("cogContext.validation.duplicatePath"));
+			return;
+		}
+		addPaths([trimmed]);
 		setManualPath("");
 		setManualError(null);
 	};
 
-	const handleRemove = (path: string) =>
-		setFiles((prev) => prev.filter((p) => p !== path));
-
-	const handleClearAll = () => setFiles([]);
+	const handleRemove = (path: string) => setFiles((prev) => prev.filter((p) => p !== path));
 
 	const handleRun = () => {
 		if (hasError) return;
-		optimize(prompt.trim(), files, budget);
+		setCopied(false);
+		optimize(projectPath, prompt.trim(), files, budget);
 	};
+
+	const handleCopy = async () => {
+		if (!context) return;
+		const text = context.slices
+			.map((s) => `### ${s.file_path}\n\`\`\`\n${s.content}\n\`\`\``)
+			.join("\n\n");
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+		} catch {
+			setCopied(false);
+		}
+	};
+
+	if (!projectPath) {
+		return (
+			<PanelShell title={t("cogContext.title")} subtitle={t("cogContext.subtitle")}>
+				<p className="text-sm text-muted-foreground">{t("common.projectPathRequired")}</p>
+			</PanelShell>
+		);
+	}
+
+	const fillRatio = context?.token_budget
+		? Math.round((context.tokens_used / context.token_budget) * 100)
+		: 0;
+	const refused = context?.refused ?? [];
+	const keywords = (context?.summary?.keywords_detected as string[] | undefined) ?? [];
 
 	return (
 		<PanelShell
@@ -155,34 +192,19 @@ export function CogContextPanel() {
 								</span>
 							</div>
 							<div className="flex items-center gap-1">
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onClick={handlePickFiles}
-								>
+								<Button type="button" size="sm" variant="outline" onClick={handlePickFiles}>
 									<FolderOpen className="h-3.5 w-3.5 mr-1" />
 									{t("cogContext.addFiles")}
 								</Button>
 								{files.length > 0 && (
-									<Button
-										type="button"
-										size="sm"
-										variant="ghost"
-										onClick={handleClearAll}
-										aria-label={t("cogContext.clearFiles")}
-									>
+									<Button type="button" size="sm" variant="ghost" onClick={() => setFiles([])}>
 										{t("cogContext.clearFiles")}
 									</Button>
 								)}
 							</div>
 						</div>
 
-						<div
-							className="rounded border bg-background"
-							aria-invalid={Boolean(filesError) || undefined}
-							aria-describedby={filesError ? "cog-files-error" : undefined}
-						>
+						<div className="rounded border bg-background">
 							{files.length === 0 ? (
 								<p className="px-3 py-4 text-xs text-muted-foreground text-center">
 									{t("cogContext.noFiles")}
@@ -190,17 +212,11 @@ export function CogContextPanel() {
 							) : (
 								<ul className="divide-y max-h-48 overflow-auto">
 									{files.map((p) => (
-										<li
-											key={p}
-											className="flex items-center gap-2 px-2 py-1.5 text-xs"
-										>
+										<li key={p} className="flex items-center gap-2 px-2 py-1.5 text-xs">
 											<FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 											<div className="flex min-w-0 flex-1 flex-col">
 												<span className="truncate font-medium">{basename(p)}</span>
-												<span
-													className="truncate font-mono text-3xs text-muted-foreground"
-													title={p}
-												>
+												<span className="truncate font-mono text-3xs text-muted-foreground" title={p}>
 													{p}
 												</span>
 											</div>
@@ -234,16 +250,14 @@ export function CogContextPanel() {
 										}
 									}}
 									maxLength={PATH_MAX_LEN}
+									aria-label={t("cogContext.addManually")}
 									aria-invalid={Boolean(manualError) || undefined}
 									aria-describedby={manualError ? "cog-manual-error" : undefined}
 									className="w-full p-2 font-mono text-xs h-auto"
 									placeholder={t("cogContext.manualPathPlaceholder")}
 								/>
 								{manualError && (
-									<p
-										id="cog-manual-error"
-										className="mt-1 text-xs text-destructive"
-									>
+									<p id="cog-manual-error" className="mt-1 text-xs text-destructive">
 										{manualError}
 									</p>
 								)}
@@ -259,12 +273,6 @@ export function CogContextPanel() {
 								{t("cogContext.add")}
 							</Button>
 						</div>
-
-						{filesError && (
-							<p id="cog-files-error" className="text-xs text-destructive">
-								{filesError}
-							</p>
-						)}
 					</div>
 
 					<div>
@@ -299,44 +307,96 @@ export function CogContextPanel() {
 
 				{context && (
 					<div className="space-y-2">
-						<div className="flex flex-wrap gap-2">
+						{context.discovered && (
+							<p className="text-xs text-muted-foreground">
+								{t("cogContext.discovered", {
+									count: Number(context.summary?.candidates ?? 0),
+								})}
+							</p>
+						)}
+						<div className="flex flex-wrap items-center gap-2">
 							<Badge variant="outline">
-								{t("cogContext.included")}: {context.slices.length}
+								{t("cogContext.included")} : {context.slices.length}
 							</Badge>
 							<Badge variant="outline">
-								{t("cogContext.skipped")}: {context.files_skipped.length}
+								{t("cogContext.skipped")} : {context.files_skipped.length}
 							</Badge>
 							<Badge variant="outline">
-								{t("cogContext.fillRatio")}:{" "}
-								{((context.tokens_used / context.token_budget) * 100).toFixed(0)}%
+								{t("cogContext.fillRatio")} : {fillRatio} %
 							</Badge>
+							{context.slices.length > 0 && (
+								<Button type="button" size="sm" variant="outline" onClick={handleCopy}>
+									{copied ? (
+										<Check className="h-3.5 w-3.5 mr-1" />
+									) : (
+										<Copy className="h-3.5 w-3.5 mr-1" />
+									)}
+									{copied ? t("cogContext.copied") : t("cogContext.copy")}
+								</Button>
+							)}
 						</div>
-						<table className="w-full text-sm border">
-							<thead>
-								<tr className="border-b bg-muted/40">
-									<th className="text-left p-2">{t("cogContext.colFile")}</th>
-									<th className="text-right p-2">{t("cogContext.colScore")}</th>
-									<th className="text-right p-2">{t("cogContext.colTokens")}</th>
-									<th className="p-2">{t("cogContext.colTruncated")}</th>
-								</tr>
-							</thead>
-							<tbody>
+						{keywords.length > 0 && (
+							<p className="text-xs text-muted-foreground">
+								{t("cogContext.keywords", { list: keywords.join(", ") })}
+							</p>
+						)}
+						{refused.length > 0 && (
+							<div className="rounded border border-destructive/40 p-2 text-xs">
+								<p className="font-medium">{t("cogContext.refusedTitle")}</p>
+								<ul className="mt-1 space-y-0.5">
+									{refused.map((r) => (
+										<li key={r.path} className="font-mono">
+											{r.path}{" "}
+											<span className="font-sans text-muted-foreground">
+												(
+												{REFUSAL_REASONS.includes(r.reason as (typeof REFUSAL_REASONS)[number])
+													? t(`cogContext.refused.${r.reason}` as never)
+													: r.reason}
+												)
+											</span>
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{context.slices.length === 0 ? (
+							<p className="text-xs text-muted-foreground">{t("cogContext.noneIncluded")}</p>
+						) : (
+							<ul className="divide-y rounded border">
 								{context.slices.map((s) => (
-									<tr key={s.file_path} className="border-b">
-										<td className="p-2 font-mono text-xs truncate max-w-md">
-											{s.file_path}
-										</td>
-										<td className="p-2 text-right">
-											{s.relevance.score.toFixed(2)}
-										</td>
-										<td className="p-2 text-right">
-											{s.included_tokens}/{s.full_size_tokens}
-										</td>
-										<td className="p-2 text-center">{s.truncated ? "✂" : ""}</td>
-									</tr>
+									<li key={s.file_path} className="p-2">
+										<details>
+											<summary className="flex cursor-pointer items-center gap-2 text-xs">
+												<span className="min-w-0 flex-1 truncate font-mono" title={s.file_path}>
+													{s.file_path}
+												</span>
+												{s.truncated && (
+													<Badge variant="outline" className="gap-1">
+														<Scissors className="h-3 w-3" aria-hidden="true" />
+														{t("cogContext.truncated")}
+													</Badge>
+												)}
+												<span className="text-muted-foreground">
+													{t("cogContext.scoreTokens", {
+														score: s.relevance.score.toFixed(2),
+														included: s.included_tokens,
+														full: s.full_size_tokens,
+													})}
+												</span>
+											</summary>
+											<pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/40 p-2 font-mono text-3xs">
+												{s.content}
+											</pre>
+										</details>
+									</li>
 								))}
-							</tbody>
-						</table>
+							</ul>
+						)}
+						{context.files_skipped.length > 0 && (
+							<p className="text-xs text-muted-foreground">
+								{t("cogContext.skippedList", { list: context.files_skipped.join(", ") })}
+							</p>
+						)}
 					</div>
 				)}
 			</div>
