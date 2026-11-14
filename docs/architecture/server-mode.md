@@ -528,8 +528,11 @@ de ce qu'il tient : les cartes indexées (`specs_index`, relues comme le tableau
 sur elles (`agent_runs`) et les jobs du projet (`project_jobs`), avec le nom de qui les a lancés.
 
 Ce qu'ont dépensé les agents, le serveur ne l'enregistre pas en base : chaque session d'agent
-l'écrit (`core/usage_tracker.py`) dans le dossier où elle travaille, le clone pour la phase `spec`
-et les jobs, l'espace de build d'une carte pour son build et sa QA. `shared_features/usage_ledger.py`
+l'écrit (`core/usage_tracker.py`) dans le `.workpilot` du clone, même quand elle travaille dans
+l'espace de build d'une carte (`ledger_root` remonte du worktree au clone, car la fusion supprime
+l'espace de build et ses relevés avec lui ; `foundation/json_ledger.py` sérialise les processus).
+Les builds d'avant ce changement ont écrit dans l'espace de build : il est encore lu. L'ordinateur
+lit les mêmes fichiers de la même façon (`main/workspace-ledgers.ts`). `shared_features/usage_ledger.py`
 lit ces relevés par liste fermée : `cost_data.json` et `dashboard_snapshot.json` du `.workpilot` du
 clone et de chaque espace de build nommé comme une carte, chacun un fichier régulier sous sa taille,
 résolu dans le clone, avec un plafond sur le tout. Un relevé est écrit par un run, donc par un agent
