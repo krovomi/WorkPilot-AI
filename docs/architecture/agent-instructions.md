@@ -1,3 +1,10 @@
+---
+feature: Fichiers d'instructions
+summary: >-
+  Un seul jeu de règles (`AGENTS.md`), un fichier fin par agent ; la boucle WorkPilot injecte le
+  `AGENTS.md` du projet.
+---
+
 # Fichiers d'instructions des agents
 
 Chaque agent de code lit ses instructions à sa façon. Ce dépôt en a un seul jeu, écrit une fois,

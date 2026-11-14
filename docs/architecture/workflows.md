@@ -1,3 +1,10 @@
+---
+feature: Workflows déclaratifs
+summary: >-
+  `workflow.yaml`, élagage par effort, fenêtres, rosters, passage de phase ; le logger de
+  workflow.
+---
+
 # Declarative workflows
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

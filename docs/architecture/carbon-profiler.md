@@ -1,3 +1,10 @@
+---
+feature: Budget carbone
+summary: >-
+  CO₂ estimé de chaque appel (tokens, taille, PUE, réseau) ; budget du mois, alerte une fois par
+  seuil, flagship → standard en mode dégradé ; export ESRS E1-6 / GRI.
+---
+
 # Carbon profiler: footprint, monthly budget, ESG export (#365)
 
 The page **Carbon footprint** shows the estimated energy and CO₂ of the models

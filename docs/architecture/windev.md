@@ -1,3 +1,9 @@
+---
+feature: WinDev, WebDev, WinDev Mobile
+summary: >-
+  Format texte : seul le code WLangage s'édite ; contrôle d'intégrité ; pas de compilation.
+---
+
 # WinDev, WebDev et WinDev Mobile
 
 WorkPilot prend en charge les projets PC SOFT (WLangage) **dans la mesure où un agent peut les lire** :

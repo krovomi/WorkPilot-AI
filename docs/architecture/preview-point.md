@@ -1,3 +1,10 @@
+---
+feature: Pointer un élément de l'aperçu
+summary: >-
+  Sélecteur par le protocole DevTools, sans script injecté ; fichiers candidats par marqueurs
+  (toutes stacks) ; l'élément part en guidage, cité comme donnée.
+---
+
 # Pointing an element of the task preview
 
 > Rationale for `main/preview-point.ts`, `main/ipc-handlers/task/preview-point-handlers.ts` and

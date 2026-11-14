@@ -1,3 +1,9 @@
+---
+feature: Outils de développement
+summary: >-
+  MCP Electron pour l'E2E, Chrome DevTools MCP, grepai.
+---
+
 # Developer tools: Electron MCP, Chrome DevTools MCP, grepai
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

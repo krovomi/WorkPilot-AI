@@ -1,3 +1,11 @@
+---
+feature: Collaboration d'équipe
+summary: >-
+  Tableau serveur : salle du projet (`project:<id>`) avec présence sans e-mail, chat en base écrit
+  par les membres, claims libérés par le serveur, modification de carte arbitrée
+  (`reconcileEdit`), notifications gardées sur l'ordinateur.
+---
+
 # Collaboration d'équipe : qui est là, qui tient quelle carte, le chat, les conflits
 
 Sur un projet du serveur (mode serveur), le tableau montre l'équipe : qui le regarde en ce moment,

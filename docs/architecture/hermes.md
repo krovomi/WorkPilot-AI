@@ -1,3 +1,10 @@
+---
+feature: hermes-agent
+summary: >-
+  Ingestion, tri et adoption des skills d'hermes, et `SOUL.md`. Rien n'accorde la confiance à la
+  place de quelqu'un.
+---
+
 # hermes-agent
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

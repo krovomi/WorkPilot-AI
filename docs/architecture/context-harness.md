@@ -1,3 +1,11 @@
+---
+feature: Harness de contexte
+summary: >-
+  Tous providers : mesure commune, budget et arrêt sans progrès, préfixe stable, troncature à la
+  source, purge par lots, retours de sous-agents bornés, outils figés, `search_code`, rejeu à
+  chaque PR.
+---
+
 # Harness de contexte : le plan
 
 > **Statut : plan ; livrés : le lot 0 (mesurer, sauf sa ligne de base), le lot 1a (un budget
