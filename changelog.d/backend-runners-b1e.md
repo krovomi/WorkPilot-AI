@@ -9,3 +9,4 @@ section: 🧪 Filets de test
   - Débogueur d'agent, vérification (`/verify`), Bounty Board, best-of-N.
 - **La prédiction de coût trouve de nouveau les specs** : elle ne cherchait que dans l'ancien dossier `.autonomousbuild/specs/` et répondait « Spec not found » pour toute spec de `.workpilot/specs/`. Elle lit les deux, et seulement un dossier de spec du projet.
 - **Code mort retiré** : le runner du profilage des performances gardait un repli « module pas encore disponible » que rien ne pouvait atteindre, le module `performance` étant livré avec le backend.
+- **Plancher de couverture backend relevé à 72 %** (72,7 % mesurés) : la CI refuse une PR qui ferait redescendre la suite en dessous.
