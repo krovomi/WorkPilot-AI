@@ -74,7 +74,7 @@ export function AgentHealthPanel() {
 								<span className="text-xs text-muted-foreground mr-2">{t("agentHealth.actions")}:</span>
 								{s.actions.map((a) => (
 									<Badge key={a} variant="outline" className="text-xs">
-										{a}
+										{t(`agentHealth.actionLabels.${a}` as never, { defaultValue: a })}
 									</Badge>
 								))}
 							</div>

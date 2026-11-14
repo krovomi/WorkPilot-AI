@@ -85,9 +85,11 @@ export function CicdAnomalyPanel() {
 								<li key={`${s.kind}-${s.line_number}`} className="rounded border p-2">
 									<div className="flex items-center gap-2">
 										<Badge className={SEV_COLOR[s.severity] ?? "bg-muted"}>
-											{s.severity}
+											{t(`common.severity.${s.severity}` as never, { defaultValue: s.severity })}
 										</Badge>
-										<span className="font-mono text-xs">{s.kind}</span>
+										<span className="text-xs font-medium">
+											{t(`cicdAnomaly.kinds.${s.kind}` as never, { defaultValue: s.kind })}
+										</span>
 										<span className="text-xs text-muted-foreground">
 											{t("cicdAnomaly.line")} {s.line_number}
 										</span>

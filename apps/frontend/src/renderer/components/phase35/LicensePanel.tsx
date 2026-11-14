@@ -99,9 +99,15 @@ export function LicensePanel({ projectPath }: LicensePanelProps) {
 									{report.conflicts.map((c) => (
 										<tr key={c.dependency.name} className="border-b">
 											<td className="p-2 font-mono">{c.dependency.name}</td>
-											<td className="p-2">{c.category}</td>
+											<td className="p-2">
+												{t(`license.categories.${c.category}` as never, {
+													defaultValue: c.category,
+												})}
+											</td>
 											<td className="p-2 text-xs text-muted-foreground">
-												{c.remediation}
+												{t(`license.remediations.${c.category}` as never, {
+													defaultValue: c.remediation,
+												})}
 											</td>
 										</tr>
 									))}

@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatAppDateTime } from "../../lib/date-format";
 import { useAuditTrailStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -202,16 +203,17 @@ export function AuditTrailPanel({ projectPath = "" }: AuditTrailPanelProps) {
 								>
 									<div className="flex justify-between">
 										<span>
-											#{e.sequence} · {e.kind}
+											#{e.sequence} ·{" "}
+											{t(`audit.kinds.${e.kind}` as never, { defaultValue: e.kind })}
 										</span>
 										<span className="text-muted-foreground">
-											{new Date(e.timestamp * 1000).toISOString()}
+											{formatAppDateTime(e.timestamp * 1000)}
 										</span>
 									</div>
 									<div className="mt-1">
-										<span className="text-muted-foreground">actor=</span>
-										{e.actor}{" "}
-										<span className="text-muted-foreground">cid=</span>
+										<span className="text-muted-foreground">{t("audit.actor")}:</span>{" "}
+										{e.actor} ·{" "}
+										<span className="text-muted-foreground">{t("audit.correlation")}:</span>{" "}
 										{e.correlation_id}
 									</div>
 									<div className="mt-1 text-muted-foreground truncate">
