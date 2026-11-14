@@ -50,6 +50,14 @@ avant d'écrire :
    les fichiers qu'elle a changés. La page montre la carte (« Voir la carte ») et peut ouvrir la PR
    (« Créer la PR », le même `TASK_WORKTREE_CREATE_PR` que le Kanban : GitHub, GitLab, Azure
    DevOps).
+5. **Le log.** La carte ne passe jamais par le pipeline, qui écrit le `task_logs.json` d'une
+   tâche : chaque exécution commitée y ajoute donc ses entrées dans la phase de codage
+   (`generated-review/review-log.ts`) : son résumé, les lignes d'étape de la page (le studio de
+   tests passe les siennes, 400 au plus), les fichiers du commit et son message. Ni prompt, ni
+   code généré (S1). L'onglet Logs et le Bureau Pixel le lisent comme celui de toute tâche ; sans
+   lui, ils restaient sur « En attente de logs… ». Le titre de la carte nomme le fichier par son
+   nom, jamais par son chemin absolu, même quand un dossier a une espace
+   (`generated-review/review-subject.ts`).
 
 Les exécutions d'une même page rejoignent la carte qui attend encore sa revue : des tests puis
 les paquets qu'ils demandent, deux designs d'un même écran font une carte, une branche, une PR.
