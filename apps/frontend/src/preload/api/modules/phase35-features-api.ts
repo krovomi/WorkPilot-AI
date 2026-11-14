@@ -549,8 +549,11 @@ export interface Phase35FeaturesAPI {
 			report: I18nScalingReport;
 			/** The directory the locales were actually read from. */
 			locales_dir: string;
+			/** The catalog formats read when layout is "catalogs" (resx, android, gettext…). */
+			formats?: string[];
 			locales_found: string[];
-			layout: "nested" | "flat" | "none";
+			/** "nested" | "flat" (i18next JSON), or "catalogs" (another stack's files). */
+			layout: "nested" | "flat" | "catalogs" | "none";
 			/**
 			 * Set when the picked directory was one language rather than the
 			 * root of all of them, and the search moved up to its parent.

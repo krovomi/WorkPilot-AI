@@ -1169,6 +1169,7 @@ export const IPC_CHANNELS = {
 	COSTS_GET_CONTEXT_USAGE: "costs:getContextUsage",
 	COSTS_GET_SUMMARY: "costs:getSummary",
 	COSTS_SET_BUDGET: "costs:setBudget",
+	COSTS_SET_TASK_BUDGET: "costs:setTaskBudget",
 	COST_PREDICTOR_RUN: "costPredictor:run",
 	CREDENTIAL_CHECK_CLAUDE_OAUTH: "credential:checkClaudeOAuth",
 	CREDENTIAL_CHECK_OPENAI_CODEX_OAUTH: "credential:checkOpenAICodexOAuth",
