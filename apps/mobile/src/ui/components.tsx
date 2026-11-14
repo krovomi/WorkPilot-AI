@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import {
 	ActivityIndicator,
+	KeyboardAvoidingView,
+	Platform,
 	Pressable,
 	type PressableProps,
 	StyleSheet,
@@ -12,6 +14,7 @@ import {
 	View,
 	type ViewStyle,
 } from "react-native";
+import { describeError } from "../i18n";
 import { RADIUS, SPACE, useTheme } from "./theme";
 
 type Variant = "primary" | "secondary" | "danger";
@@ -71,14 +74,30 @@ export function Field({ label, ...input }: TextInputProps & { label: string }) {
 	);
 }
 
-export function ErrorBanner({ message }: { message: string | null }) {
+/** Shows `message`, else the failure `error` in the person's words; nothing when there is neither. */
+export function ErrorBanner({ message = null, error = null }: { message?: string | null; error?: unknown }) {
 	const theme = useTheme();
-	if (!message) return null;
+	const text = message ?? (error ? describeError(error) : null);
+	if (!text) return null;
 	return (
 		<View accessibilityRole="alert" style={[styles.banner, { backgroundColor: theme.dangerSoft }]}>
-			<Text style={{ color: theme.danger }}>{message}</Text>
+			<Text style={{ color: theme.danger }}>{text}</Text>
 		</View>
 	);
+}
+
+/** Lifts a form above the on-screen keyboard: iOS pads it, Android already resizes the window. */
+export function KeyboardAvoiding({ children }: { children: ReactNode }) {
+	return (
+		<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+			{children}
+		</KeyboardAvoidingView>
+	);
+}
+
+/** The opacity of a list row while a finger is on it. */
+export function rowOpacity(pressed: boolean): number {
+	return pressed ? 0.85 : 1;
 }
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
