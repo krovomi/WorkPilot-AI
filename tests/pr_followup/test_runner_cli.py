@@ -18,8 +18,16 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gh_fake import write_fake_gh  # noqa: E402
+# Loaded by path, not through sys.path: putting tests/ on the path while the
+# suite is collected lets a test folder (tests/release_coordinator) shadow the
+# backend package of the same name for every module collected after this one.
+_spec = importlib.util.spec_from_file_location(
+    "pr_followup_gh_fake", Path(__file__).resolve().parents[1] / "gh_fake.py"
+)
+_gh_fake = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _gh_fake  # its dataclasses look their module up there
+_spec.loader.exec_module(_gh_fake)
+write_fake_gh = _gh_fake.write_fake_gh
 
 BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
 RUNNER = BACKEND / "runners" / "pr_followup_runner.py"
@@ -192,7 +200,11 @@ def test_the_fixer_runs_on_the_tasks_qa_engine_in_the_worktree(
     runner, monkeypatch, tmp_path: Path
 ) -> None:
     import core.client
-    import qa.fixer
+
+    # By its module entry: a test that swaps the `qa` package in sys.modules
+    # leaves `qa.fixer` without its attribute on the package, and the runner
+    # imports the function from sys.modules["qa.fixer"].
+    qa_fixer = importlib.import_module("qa.fixer")
 
     project = _layout(tmp_path)
     worktree = project / ".workpilot" / "worktrees" / "tasks" / "001-x"
@@ -214,7 +226,7 @@ def test_the_fixer_runs_on_the_tasks_qa_engine_in_the_worktree(
         return "fixed", f"session {session} in {project_dir.name}"
 
     monkeypatch.setattr(core.client, "create_agent_client", create_agent_client)
-    monkeypatch.setattr(qa.fixer, "run_qa_fixer_session", run_qa_fixer_session)
+    monkeypatch.setattr(qa_fixer, "run_qa_fixer_session", run_qa_fixer_session)
     monkeypatch.delenv("PROJECT_DIR", raising=False)
     assert asyncio.run(runner._qa_fixer(worktree, spec, 2)) == (
         "fixed",

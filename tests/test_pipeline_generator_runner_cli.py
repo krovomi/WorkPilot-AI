@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,8 @@ def _run(project: Path, *args: str) -> tuple[int, list[str]]:
     done = subprocess.run(
         [sys.executable, str(RUNNER), "--project", str(project), *args],
         cwd=BACKEND,
+        # As the app starts it (pythonRunnerEnv): UTF-8 whatever the code page.
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         capture_output=True,
         text=True,
         encoding="utf-8",

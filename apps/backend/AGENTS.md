@@ -119,7 +119,7 @@ génération de tests ;
 | `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
-| `rea/` | REA (npm `rea-agents`, version figée dans `pin.json`) : `locate` (Node.js accepté, REA installé à la version figée, sinon npx, refusé en hors-ligne strict), `run_rea` (lecteurs statiques en liste fermée, chemins absolus, sans shell ni identifiants) ; `artifacts` (sortie de build de chaque stack) et `exposure` (verdict lu des checks), lus par `qa/exposure_gate.py` et le Release Train ; `managed_api` et `dotnet_api` (API publique .NET avant et après, lus par `qa/dotnet_api_gate.py`) ; [justification](../../docs/architecture/rea.md) |
+| `rea/` | REA (npm `rea-agents`, version figée dans `pin.json`) : `locate` (Node.js accepté, du PATH ou d'un gestionnaire de versions via `node_installs`, REA installé à la version figée, sinon npx, refusé en hors-ligne strict), `run_rea` (lecteurs statiques en liste fermée, chemins absolus, sans shell ni identifiants) ; `artifacts` (sortie de build de chaque stack) et `exposure` (verdict lu des checks), lus par `qa/exposure_gate.py` et le Release Train ; `managed_api` et `dotnet_api` (API publique .NET avant et après, lus par `qa/dotnet_api_gate.py`) ; [justification](../../docs/architecture/rea.md) |
 | `vendor/archify/`, `vendor/watermarks/` | code vendorisé et épinglé (`scripts/vendor_*.py`) |
 
 ## Imports et tests
