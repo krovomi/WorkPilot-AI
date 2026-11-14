@@ -909,6 +909,17 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
 
+	// Agent Replay — recorded agent sessions, read from the local backend by main
+	REPLAY_LIST_SESSIONS: "replay:listSessions",
+	REPLAY_GET_SESSION: "replay:getSession",
+	REPLAY_DELETE_SESSION: "replay:deleteSession",
+	REPLAY_GET_HEATMAP: "replay:getHeatmap",
+	REPLAY_COMPARE: "replay:compare",
+	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
+	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	// Session History — the same records, as history cards
+	SESSION_HISTORY_LIST: "sessionHistory:list",
+
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",
 	TIME_TRAVEL_GET_CHECKPOINTS: "timeTravel:getCheckpoints",
