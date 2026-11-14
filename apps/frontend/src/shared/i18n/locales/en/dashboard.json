@@ -61,7 +61,13 @@
 		"in_progress": "In progress",
 		"pending": "Pending",
 		"failed": "Failed",
-		"cancelled": "Cancelled"
+		"cancelled": "Cancelled",
+		"queue": "Queued",
+		"ai_review": "AI review",
+		"human_review": "Human review",
+		"build_failed": "Build failed",
+		"pr_created": "PR open",
+		"error": "Error"
 	},
 	"complexity": {
 		"trivial": "Trivial",
