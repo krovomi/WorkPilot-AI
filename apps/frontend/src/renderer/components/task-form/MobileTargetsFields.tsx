@@ -6,7 +6,9 @@
  * On a project without one (a Web API, a CLI…), the box says up front that
  * checking a platform adds setup tasks to the board — install the framework
  * and create the app, then prepare each platform — and that this task waits
- * for them; the framework proposed follows the project's stacks.
+ * for them; the framework proposed follows the project's stacks. A WinDev
+ * project gets no setup task: its phone app is a WinDev Mobile configuration,
+ * generated in the editor, and the box says so.
  */
 
 import { Info, Smartphone } from "lucide-react";
@@ -77,6 +79,16 @@ export function MobileTargetsFields({
 			) : (
 				<p className="text-xs text-muted-foreground">
 					{t("mobile:targets.description")}
+				</p>
+			)}
+
+			{profile?.windev && (
+				<p
+					className="flex items-start gap-1.5 text-xs text-muted-foreground"
+					data-testid="mobile-windev-note"
+				>
+					<Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+					{t(hasApp ? "mobile:targets.windevMobile" : "mobile:targets.windevNoMobile")}
 				</p>
 			)}
 
