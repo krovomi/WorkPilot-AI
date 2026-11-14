@@ -69,7 +69,7 @@ def test_each_stack_has_its_build_output_found(
 def test_a_rust_release_executable_is_found_not_its_build_files(tmp_path: Path) -> None:
     name = "server.exe" if is_windows() else "server"
     binary = _touch(tmp_path, f"target/release/{name}")
-    os.chmod(binary, 0o755)
+    os.chmod(binary, 0o700)  # owner only: executable is all the test needs
     _touch(tmp_path, "target/release/server.d")
     _touch(tmp_path, "target/release/deps/libfoo.rlib")
     assert _found(tmp_path) == {f"target/release/{name}": "rust"}
