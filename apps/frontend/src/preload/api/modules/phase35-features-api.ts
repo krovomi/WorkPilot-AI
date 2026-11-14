@@ -50,7 +50,11 @@ export interface ModelChoice {
 	task_class: string;
 	tier: "budget" | "balanced" | "premium";
 	estimated_cost_usd: number;
+	/** English, for the audit trail; the app words `reason_code` instead. */
 	reason: string;
+	/** `tier_for_task` | `unpriced_provider` | `fallback` | `no_model`. */
+	reason_code?: string;
+	reason_params?: Record<string, unknown>;
 }
 export interface RouteRequest {
 	prompt?: string;
