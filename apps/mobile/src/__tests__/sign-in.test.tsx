@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import SignIn from "../app/sign-in";
 import { SessionProvider, useSession } from "../auth/session";
-import "../i18n";
+import i18n from "../i18n";
+
+const t = (key: string) => i18n.t(key);
 import { Text } from "react-native";
 
 const mockEntraIdToken = jest.fn();
@@ -107,6 +109,30 @@ describe("sign-in screen", () => {
 		await fireEvent.changeText(screen.getByLabelText("Password"), "nope");
 		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
 		expect(await screen.findByText("Sign-in failed: Wrong email or password.")).toBeTruthy();
+	});
+
+	it("says an address is not one before asking the server anything", async () => {
+		const fetchMock = jest.fn();
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "ftp://wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+		expect(await screen.findByText(t("signIn.invalidUrl"))).toBeTruthy();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("says why the server failed, other than a refused password", async () => {
+		globalThis.fetch = jest.fn(() => respond({ detail: "database down" }, 503)) as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		await fireEvent.press(screen.getByRole("button", { name: "Sign in" }));
+		expect(await screen.findByText(/^Sign-in failed: .*database down/)).toBeTruthy();
 	});
 });
 

@@ -1,6 +1,6 @@
 import type { Api } from "../api/endpoints";
 import type { AgentRun, BoardCard, CardDetails } from "../api/types";
-import { allowedActions, availableActions, sendBack, startCard, stopCard } from "../board/actions";
+import { allowedActions, availableActions, runPhase, sendBack, startCard, stopCard } from "../board/actions";
 import { groupByColumn } from "../board/columns";
 import { initialColumn } from "../board/pickColumn";
 import { BOARD_EVENTS, channelUrl, parseStreamEvent, reconnectDelay } from "../board/stream";
@@ -68,6 +68,11 @@ describe("columns", () => {
 			"done",
 		]);
 		expect(groups.find((g) => g.column === "done")?.cards.map((c) => c.id)).toEqual(["a"]);
+	});
+
+	it("puts a card of a column a newer server added in the backlog", () => {
+		const groups = groupByColumn([card({ id: "n", column: "on_hold" as never })]);
+		expect(groups.find((g) => g.column === "backlog")?.cards.map((c) => c.id)).toEqual(["n"]);
 	});
 
 	it("opens on what waits for a person first", () => {
@@ -158,6 +163,12 @@ describe("card actions", () => {
 		expect(api.startRun).toHaveBeenCalledWith("p1", "spec-1", "build");
 	});
 
+	it("runs a later phase of an indexed card", async () => {
+		const api = fakeApi();
+		await runPhase(api as unknown as Api, "p1", card(), "pr");
+		expect(api.startRun).toHaveBeenCalledWith("p1", "spec-1", "pr");
+	});
+
 	it("stops the running run", async () => {
 		const api = fakeApi();
 		await stopCard(api as unknown as Api, "p1", card());
@@ -176,6 +187,7 @@ describe("card actions", () => {
 		await expect(startCard(api as unknown as Api, "p1", unindexed, details())).rejects.toThrow("card_not_indexed");
 		await expect(stopCard(api as unknown as Api, "p1", unindexed)).rejects.toThrow("card_not_indexed");
 		await expect(sendBack(api as unknown as Api, "p1", unindexed, "fix")).rejects.toThrow("card_not_indexed");
+		await expect(runPhase(api as unknown as Api, "p1", unindexed, "merge")).rejects.toThrow("card_not_indexed");
 		expect(api.startRun).not.toHaveBeenCalled();
 		expect(api.runs).not.toHaveBeenCalled();
 	});

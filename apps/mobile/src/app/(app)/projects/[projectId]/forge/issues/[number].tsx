@@ -38,7 +38,7 @@ export default function IssueScreen() {
 			<Text style={{ color: theme.textFaint }}>
 				{[issue.state, issue.author, formatDate(issue.createdAt, i18n.language)].filter(Boolean).join(" · ")}
 			</Text>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<Section title={t("card.description")}>
 				<Text style={{ color: theme.text, lineHeight: 22 }} selectable>
 					{issue.body || t("forge.noDescription")}

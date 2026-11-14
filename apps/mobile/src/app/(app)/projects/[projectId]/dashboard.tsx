@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useApi } from "../../../../auth/session";
 import { useLoad } from "../../../../hooks/useLoad";
-import { describeError } from "../../../../i18n";
 import { count, Figures, money, top } from "../../../../insights/Figures";
 import { Button, ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { SPACE, useTheme } from "../../../../ui/theme";
@@ -29,7 +28,7 @@ export default function Dashboard() {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<View style={styles.links}>
 				<Button
 					label={t("dashboard.sessions")}
