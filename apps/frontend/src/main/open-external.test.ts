@@ -44,6 +44,7 @@ describe("openExternalUrl", () => {
 		await openExternalUrl("http://localhost:5000/swagger", {
 			openExternal,
 			linux: true,
+			wsl: false,
 			spawnOpener,
 		});
 		expect(openExternal).toHaveBeenCalledWith("http://localhost:5000/swagger");
@@ -56,6 +57,7 @@ describe("openExternalUrl", () => {
 			openExternalUrl("https://example.com", {
 				openExternal: vi.fn().mockRejectedValue(new Error("no handler")),
 				linux: false,
+				wsl: false,
 				spawnOpener,
 			}),
 		).rejects.toThrow("no handler");
@@ -71,6 +73,7 @@ describe("openExternalUrl", () => {
 		await openExternalUrl("http://localhost:5000/", {
 			openExternal: vi.fn().mockRejectedValue(new Error("portal unavailable")),
 			linux: true,
+			wsl: false,
 			spawnOpener,
 		});
 		expect(spawnOpener).toHaveBeenCalledTimes(3);
@@ -90,6 +93,7 @@ describe("openExternalUrl", () => {
 			openExternalUrl("http://localhost:5000/", {
 				openExternal: vi.fn().mockRejectedValue(new Error("xdg-open missing")),
 				linux: true,
+				wsl: false,
 				spawnOpener,
 			}),
 		).rejects.toThrow(/xdg-open missing[\s\S]*Tried: xdg-open, gio/);
@@ -102,6 +106,7 @@ describe("openExternalUrl", () => {
 			openExternalUrl("file:///etc/passwd", {
 				openExternal,
 				linux: true,
+				wsl: false,
 				spawnOpener: vi.fn(),
 			}),
 		).rejects.toThrow(/Unsafe URL protocol/);
@@ -116,9 +121,60 @@ describe("openExternalUrl", () => {
 			openExternalUrl("http://localhost:5000/", {
 				openExternal: vi.fn().mockRejectedValue(new Error("nope")),
 				linux: true,
+				wsl: false,
 				spawnOpener: spawnOpener as never,
 			}),
 		).rejects.toThrow(/Unable to open/);
+	});
+});
+
+describe("openExternalUrl — https: sous WSL", () => {
+	it("ouvre le navigateur de Windows, sans passer par xdg-open", async () => {
+		const openExternal = vi.fn();
+		const spawnOpener = vi.fn(() => fakeOpener("ok"));
+		await openExternalUrl("https://github.com/morluto/rea", {
+			openExternal,
+			linux: true,
+			wsl: true,
+			spawnOpener,
+		});
+		expect(openExternal).not.toHaveBeenCalled();
+		expect(spawnOpener).toHaveBeenCalledTimes(1);
+		expect(spawnOpener).toHaveBeenCalledWith("powershell.exe", [
+			"-NoProfile",
+			"-NonInteractive",
+			"-Command",
+			"Start-Process 'https://github.com/morluto/rea'",
+		]);
+	});
+
+	it("garde l'apostrophe d'une URL dans la chaîne PowerShell", async () => {
+		const spawnOpener = vi.fn(() => fakeOpener("ok"));
+		await openExternalUrl("https://example.com/l'app';calc", {
+			linux: true,
+			wsl: true,
+			spawnOpener,
+		});
+		const [, args] = spawnOpener.mock.calls[0] as unknown as [string, string[]];
+		expect(args[args.length - 1]).toBe("Start-Process 'https://example.com/l''app'';calc'");
+	});
+
+	it("sans interop Windows, retombe sur shell.openExternal puis les ouvreurs Linux", async () => {
+		const openExternal = vi.fn().mockRejectedValue(new Error("xdg-open missing"));
+		const spawnOpener = vi
+			.fn()
+			.mockImplementationOnce(() => fakeOpener("missing"))
+			.mockImplementationOnce(() => fakeOpener("missing"))
+			.mockImplementationOnce(() => fakeOpener("missing"))
+			.mockImplementationOnce(() => fakeOpener("ok"));
+		await openExternalUrl("https://example.com/", {
+			openExternal,
+			linux: true,
+			wsl: true,
+			spawnOpener,
+		});
+		expect(openExternal).toHaveBeenCalledWith("https://example.com/");
+		expect(spawnOpener).toHaveBeenNthCalledWith(4, "gio", ["open", "https://example.com/"]);
 	});
 });
 

@@ -51,6 +51,7 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 	const [isOpen, setIsOpen] = useState(false);
 	const [isInstalling, setIsInstalling] = useState(false);
 	const [installError, setInstallError] = useState<string | null>(null);
+	const [docsError, setDocsError] = useState<string | null>(null);
 
 	const refresh = useCallback(async () => {
 		setStatus(null);
@@ -97,6 +98,18 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 		setInstallError(answer.detail ? `${message}\n${answer.detail}` : message);
 		if (!answer.status) void refresh();
 	}, [t, refresh]);
+
+	const openDocs = useCallback(async () => {
+		setDocsError(null);
+		try {
+			await globalThis.electronAPI?.openExternal?.(REA_DOCS_URL);
+		} catch (err) {
+			// The main process says what it tried: a click that does nothing
+			// and says nothing is what the user saw under WSL.
+			const error = err instanceof Error ? err.message : String(err);
+			setDocsError(t("navigation:rea.docsFailed", { error }));
+		}
+	}, [t]);
 
 	const state: BadgeState = status ? status.state : "loading";
 	const ready = state === "ready";
@@ -219,6 +232,15 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 						<p className="text-xs p-2 bg-muted/50 rounded-md text-muted-foreground">{hint}</p>
 					)}
 
+					{status?.nodeManager && status.nodeVersion && (
+						<p className="text-2xs text-muted-foreground">
+							{t("navigation:rea.nodeFromManager", {
+								node: status.nodeVersion,
+								manager: status.nodeManager,
+							})}
+						</p>
+					)}
+
 					{canInstall && (
 						<>
 							<p className="text-xs font-mono bg-muted px-1 rounded break-all">
@@ -272,11 +294,19 @@ export function ReaStatusBadge({ isCollapsed = false, onPresenceChange }: ReaSta
 						variant="link"
 						size="sm"
 						className="w-full text-xs text-muted-foreground gap-1"
-						onClick={() => globalThis.electronAPI?.openExternal?.(REA_DOCS_URL)}
+						onClick={() => {
+							void openDocs();
+						}}
 					>
 						{t("navigation:agentCli.viewDocs", { name: NAME })}
 						<ExternalLink className="h-3 w-3" />
 					</Button>
+
+					{docsError && (
+						<p role="alert" className="text-xs text-destructive break-words">
+							{docsError}
+						</p>
+					)}
 				</div>
 			</PopoverContent>
 		</Popover>
