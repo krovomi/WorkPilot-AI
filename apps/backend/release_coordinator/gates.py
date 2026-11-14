@@ -9,6 +9,13 @@ credentials plus the variables the file names in ``pass_env``. A program
 named by a path (``./deploy.sh``) must be a file inside the project; a bare
 name (``gh``, ``kubectl``) is looked up on ``PATH``.
 
+An exposure step reads the service's build output with REA's static audit
+(`rea`, the pinned release, never run on the artifact): it passes when no
+check is exposed at its ``fail_on`` or above, ``unknown`` and ``not_assessed``
+included; an artifact that is missing or outside the project, or REA unable to
+run here, is an error (nothing was decided). Under the project's strict offline
+policy only an installed REA runs.
+
 A URL step sends GET requests until the expected status answers or the
 retries run out, a few seconds apart. Redirects are not followed: the status
 read is the one the address gave.
@@ -33,6 +40,9 @@ from pathlib import Path
 
 from foundation.log_redaction import redact_text
 from foundation.platform import build_windows_command, is_windows
+from offline_policy import airgap_status
+from rea import ReaRun, locate, run_rea
+from rea.exposure import blocking_checks
 from security.child_env import env_without_credentials
 
 from .train_file import PLACEHOLDER, Step
@@ -268,6 +278,72 @@ def check_url(
     )
 
 
+def _offline(root: Path) -> bool:
+    try:
+        return bool(airgap_status(root)["airgapStrict"])
+    except (OSError, KeyError, ValueError):
+        return True  # an unreadable policy: no download on doubt
+
+
+def run_exposure(
+    step: Step,
+    *,
+    root: Path,
+    folder: str,
+    rea_runner: Callable[..., ReaRun] = run_rea,
+    locator: Callable[..., object] = locate,
+) -> StepResult:
+    """REA's audit of ``step.artifact``, inside the service folder. Never raises."""
+    started = time.monotonic()
+    try:
+        cwd = service_folder(root, folder)
+    except GateError as exc:
+        return StepResult("error", detail=str(exc))
+    base = root.resolve()
+    artifact = (cwd / step.artifact).resolve()
+    if artifact != base and base not in artifact.parents:
+        return StepResult("error", detail=f"{step.artifact} is outside the project")
+    if not artifact.exists():
+        return StepResult(
+            "error", detail=f"{step.artifact} does not exist: build the service first"
+        )
+    fail_on = step.fail_on or "high"
+    run = rea_runner(
+        "audit-release-exposure",
+        [artifact],
+        {"--fail_on": fail_on},
+        project_dir=root,
+        launcher=locator(allow_download=not _offline(root)),
+        timeout=step.timeout,
+    )
+    duration = round(time.monotonic() - started, 2)
+    if not run.ok or run.result is None:
+        return StepResult(
+            "timeout" if run.error == "timeout" else "error",
+            detail=f"REA did not answer ({run.error}): {redact_text(run.detail)[:300]}",
+            exit_code=run.exit_code,
+            duration_s=duration,
+        )
+    checks = [c for c in run.result.get("checks") or [] if isinstance(c, dict)]
+    exposed = blocking_checks(checks, fail_on)
+    summary = ", ".join(f"{c.get('id')}={c.get('status')}" for c in checks[:20])
+    if exposed:
+        names = ", ".join(f"{c.get('id')} ({c.get('severity')})" for c in exposed[:5])
+        return StepResult(
+            "failed",
+            detail=f"exposed at {fail_on} or above: {names}",
+            exit_code=run.exit_code,
+            duration_s=duration,
+            output=redact_text(summary)[-OUTPUT_TAIL:],
+        )
+    return StepResult(
+        "passed",
+        exit_code=run.exit_code,
+        duration_s=duration,
+        output=redact_text(summary)[-OUTPUT_TAIL:],
+    )
+
+
 def run_step(
     step: Step,
     *,
@@ -280,7 +356,9 @@ def run_step(
     fetch: Callable[[str], int] = http_status,
     sleep: Callable[[float], None] = time.sleep,
 ) -> StepResult:
-    """The command when the step has one, then its URL when it has one."""
+    """An exposure audit; else the command when the step has one, then its URL."""
+    if step.artifact:
+        return run_exposure(step, root=root, folder=folder)
     if step.command:
         result = run_command(
             step,
@@ -304,6 +382,7 @@ __all__ = [
     "http_status",
     "resolve_program",
     "run_command",
+    "run_exposure",
     "run_step",
     "service_folder",
     "substitute",

@@ -163,17 +163,50 @@ describe("GitLab, from the phone", () => {
 	});
 });
 
+describe("forge answers with fields missing", () => {
+	it("reads GitHub's without a number or an id, and names the status of a refusal without a message", async () => {
+		const { forge } = await forgeWith("github", "https://github.com/acme/shop", (body, url) => {
+			if (url.includes("/forge/github/pulls")) return { status: 200, body: { data: { repository: { pullRequests: { nodes: [{ title: "T" }] } } } } };
+			if (body.endpoint.endsWith("/issues/1")) return { status: 500, body: {} };
+			if (body.endpoint.includes("/comments")) return { status: 200, body: [{ body: "hi" }] };
+			if (body.endpoint.includes("/issues?")) return { status: 200, body: [{ title: "No number" }] };
+			return { status: 200, body: {} };
+		});
+		expect((await forge.issues())[0].number).toBe(0);
+		expect((await forge.issueComments(2))[0].id).toBe("");
+		expect((await forge.pulls())[0].number).toBe(0);
+		expect(await forge.pull(7)).toMatchObject({ number: 7, mergeable: null });
+		await expect(forge.issue(1)).rejects.toEqual(new ApiError(500, "github 500"));
+	});
+
+	it("reads GitLab's without an iid, an id or a merge status", async () => {
+		const { forge } = await forgeWith("gitlab", "https://gitlab.com/g/app", (body) => {
+			if (body.endpoint.includes("/notes")) return { status: 200, body: [{ body: "hi" }] };
+			if (body.endpoint.endsWith("/merge_requests/3")) return { status: 200, body: { title: "MR" } };
+			return { status: 200, body: [{ title: "No iid" }] };
+		});
+		expect((await forge.issues())[0].number).toBe(0);
+		expect((await forge.issueComments(2))[0].id).toBe("");
+		expect((await forge.pulls())[0].number).toBe(0);
+		expect(await forge.pull(3)).toMatchObject({ number: 0, mergeable: null });
+	});
+});
+
 describe("reviews", () => {
 	it("reads a saved review defensively", () => {
 		const review = readReview(
 			JSON.stringify({
 				summary: "Two issues",
 				verdict: "needs_revision",
-				findings: [{ id: "f1", severity: "high", title: "SQL injection", file: "a.py", line: 3 }, { severity: "low" }],
+				findings: [{ id: "f1", severity: "high", title: "SQL injection", file: "a.py", line: 3 }, { severity: "low" }, { title: "Naming" }],
 			}),
 		);
 		expect(review).toMatchObject({ summary: "Two issues", verdict: "needs_revision" });
-		expect(review?.findings.map((f) => f.id)).toEqual(["f1"]);
+		// A finding without a title is dropped; one without an id or a severity gets its place and "info".
+		expect(review?.findings.map((f) => [f.id, f.severity])).toEqual([
+			["f1", "high"],
+			["2", "info"],
+		]);
 		expect(readReview("{")).toBeNull();
 		expect(readReview(null)).toBeNull();
 	});

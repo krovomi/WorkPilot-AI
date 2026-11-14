@@ -1,11 +1,13 @@
 /**
  * #3.11 Agent Health Monitor panel.
  *
- * Lists every agent the monitor has heard about, with score / status /
- * suggested actions. Refresh button + reset button.
+ * Scores each agent (planner, coder, QA) on each provider and model from the
+ * project's own Kanban tasks: the backend reads their `task_logs.json`. It used
+ * to show an in-memory monitor nothing ever fed, so it always said "no run".
  */
 
 import { useEffect } from "react";
+import type { ProjectAgentHealthPending } from "../../../preload/api/modules/phase35-features-api";
 import { useTranslation } from "react-i18next";
 import { useAgentHealthStore } from "../../stores/phase35-stores";
 import { Badge } from "../ui/badge";
@@ -19,15 +21,29 @@ const STATUS_COLOR: Record<string, string> = {
 	burned_out: "bg-destructive/20 text-destructive border-destructive/40",
 };
 
-export function AgentHealthPanel() {
+function ModelName({ provider, model }: Pick<ProjectAgentHealthPending, "provider" | "model">) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, scores, refresh, resetMonitor } = useAgentHealthStore();
+	if (!provider && !model) {
+		return <span className="text-xs text-muted-foreground">{t("agentHealth.unknownModel")}</span>;
+	}
+	return <code className="text-xs">{[provider, model].filter(Boolean).join(" · ")}</code>;
+}
+
+interface AgentHealthPanelProps {
+	projectPath?: string;
+}
+
+export function AgentHealthPanel({ projectPath = "" }: AgentHealthPanelProps) {
+	const { t } = useTranslation("phase35");
+	const { phase, error, health, refresh } = useAgentHealthStore();
 
 	useEffect(() => {
-		refresh();
-	}, [refresh]);
+		if (projectPath) refresh(projectPath);
+	}, [projectPath, refresh]);
 
 	const isRunning = phase === "running";
+	const scores = health?.scores ?? [];
+	const pending = health?.pending ?? [];
 
 	return (
 		<PanelShell
@@ -35,17 +51,23 @@ export function AgentHealthPanel() {
 			subtitle={t("agentHealth.subtitle")}
 			error={error}
 			actions={
-				<>
-					<Button size="sm" variant="outline" onClick={() => refresh()} disabled={isRunning}>
-						{t("agentHealth.refresh")}
-					</Button>
-					<Button size="sm" variant="ghost" onClick={() => resetMonitor()}>
-						{t("agentHealth.reset")}
-					</Button>
-				</>
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() => refresh(projectPath)}
+					disabled={isRunning || !projectPath}
+				>
+					{t("agentHealth.refresh")}
+				</Button>
 			}
 		>
-			{scores.length === 0 && !isRunning && (
+			{!projectPath && <p className="text-sm text-muted-foreground">{t("agentHealth.noProject")}</p>}
+			{health && (
+				<p className="mb-3 text-xs text-muted-foreground">
+					{t("agentHealth.source", { count: health.tasks_read })}
+				</p>
+			)}
+			{health && scores.length === 0 && pending.length === 0 && !isRunning && (
 				<p className="text-sm text-muted-foreground">{t("agentHealth.noAgents")}</p>
 			)}
 			<ul className="space-y-3">
@@ -53,7 +75,8 @@ export function AgentHealthPanel() {
 					<li key={s.agent_name} className="rounded border p-3">
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
-								<span className="font-mono font-medium">{s.agent_name}</span>
+								<span className="font-medium">{t(`agentHealth.roles.${s.role}` as never)}</span>
+								<ModelName provider={s.provider} model={s.model} />
 								<Badge className={STATUS_COLOR[s.status] ?? "bg-muted"}>
 									{t(`agentHealth.status${s.status[0].toUpperCase()}${s.status.slice(1).replace("_o", "O")}` as never)}
 								</Badge>
@@ -82,6 +105,22 @@ export function AgentHealthPanel() {
 					</li>
 				))}
 			</ul>
+			{pending.length > 0 && (
+				<div className="mt-4">
+					<p className="text-xs font-medium text-muted-foreground">
+						{t("agentHealth.pendingTitle", { min: health?.min_runs ?? 3 })}
+					</p>
+					<ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+						{pending.map((p) => (
+							<li key={p.agent_name} className="flex flex-wrap items-center gap-2">
+								<span>{t(`agentHealth.roles.${p.role}` as never)}</span>
+								<ModelName provider={p.provider} model={p.model} />
+								<span>{t("agentHealth.pendingRuns", { count: p.runs })}</span>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 		</PanelShell>
 	);
 }

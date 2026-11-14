@@ -109,7 +109,8 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Stack detection, including the UI and test stacks moved here in M10,
     # and the WinDev-family project (a leaf).
     "project": {"mobile", "windev"},
-    "mobile": {"foundation"},
+    # The WinDev Mobile app of a WinDev project (`windev` is a leaf).
+    "mobile": {"foundation", "windev"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
     # client factory from its runner instead of importing core. Formula Lab
@@ -159,6 +160,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
+    # REA's runner (rea-agents CLI, static readers): PATH lookup, the strict
+    # offline policy and the credential-free child env; nothing above them.
+    "rea": {"foundation", "offline_policy", "security"},
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),

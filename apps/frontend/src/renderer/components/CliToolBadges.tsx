@@ -4,6 +4,7 @@ import { ClaudeCodeStatusBadge } from "./ClaudeCodeStatusBadge";
 import { CodexCliStatusBadge } from "./CodexCliStatusBadge";
 import { CopilotCliStatusBadge } from "./CopilotCliStatusBadge";
 import { HermesStatusBadge } from "./HermesStatusBadge";
+import { ReaStatusBadge } from "./ReaStatusBadge";
 import { type CliPresence, type CliToolId, orderCliTools } from "./cli-tool-order";
 
 interface CliToolBadgesProps {
@@ -22,6 +23,7 @@ export const CLI_TOOLS: readonly CliToolId[] = [
 	"pi",
 	"gemini-cli",
 	"hermes",
+	"rea",
 ];
 
 /**
@@ -90,6 +92,10 @@ export function CliToolBadges({
 						isCollapsed={isCollapsed}
 						onPresenceChange={onPresenceChange}
 					/>
+				);
+			case "rea":
+				return (
+					<ReaStatusBadge key={id} isCollapsed={isCollapsed} onPresenceChange={onPresenceChange} />
 				);
 			default:
 				return (

@@ -229,6 +229,56 @@ def test_concurrent_processes_lose_no_record(tmp_path):
     assert not ledger.with_name("cost_data.json.lock").exists()
 
 
+def _refuse_lock(monkeypatch, lock: Path, refusals: int, then_release: bool = False):
+    """``os.open`` refuses the lock ``refusals`` times, as Windows does a file being deleted."""
+    real_open = os.open
+    calls = {"n": 0}
+
+    def fake_open(path, flags, *args):
+        if Path(path) == lock:
+            calls["n"] += 1
+            if calls["n"] <= refusals:
+                raise PermissionError(13, "Access is denied", str(path))
+            if then_release:
+                lock.unlink(missing_ok=True)
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(json_ledger.os, "open", fake_open)
+    return calls
+
+
+def test_a_lock_still_being_deleted_is_waited_for_not_skipped(tmp_path, monkeypatch):
+    ledger = tmp_path / "cost_data.json"
+    lock = tmp_path / "cost_data.json.lock"
+    lock.write_text("", encoding="utf-8")
+    calls = _refuse_lock(monkeypatch, lock, refusals=3, then_release=True)
+
+    with json_ledger.process_lock(ledger) as held:
+        assert held
+    assert calls["n"] == 4
+    assert not lock.exists()
+
+
+def test_a_deletion_that_ends_in_between_still_gives_the_lock(tmp_path, monkeypatch):
+    ledger = tmp_path / "cost_data.json"
+    calls = _refuse_lock(monkeypatch, tmp_path / "cost_data.json.lock", refusals=1)
+
+    with json_ledger.process_lock(ledger) as held:
+        assert held
+    assert calls["n"] == 2
+
+
+def test_an_unwritable_folder_writes_without_the_lock_at_once(tmp_path, monkeypatch):
+    monkeypatch.setattr(json_ledger, "WAIT_S", 30.0)
+    ledger = tmp_path / "cost_data.json"
+    _refuse_lock(monkeypatch, tmp_path / "cost_data.json.lock", refusals=99)
+
+    started = time.monotonic()
+    with json_ledger.process_lock(ledger) as held:
+        assert not held
+    assert time.monotonic() - started < 5
+
+
 def test_a_lock_left_by_a_dead_process_is_taken_over(tmp_path, monkeypatch):
     ledger = tmp_path / "dashboard_snapshot.json"
     lock = tmp_path / "dashboard_snapshot.json.lock"

@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import type { ThinkingLevel } from "../../shared/types/settings";
+import { localBackendFetch } from "../lib/local-backend";
 
 /**
  * `native` : la valeur est envoyée ; `none` : aucun réglage n'atteint ce
@@ -52,9 +53,8 @@ export function fetchEffortPlan(
 	if (known) return known;
 	const request = (async () => {
 		try {
-			const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
 			const query = new URLSearchParams({ provider, model });
-			const res = await fetch(`${baseUrl}/providers/effort?${query}`);
+			const res = await localBackendFetch(`/providers/effort?${query}`);
 			if (!res.ok) return null;
 			const data: unknown = await res.json();
 			return isPlan(data) ? data : null;

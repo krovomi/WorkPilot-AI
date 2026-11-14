@@ -10,6 +10,7 @@ import {
 import { useVerifyStore } from "../../stores/verify-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { BackendDownloadLink, BackendImage, BackendVideo } from "./BackendMedia";
 import { compareShotIndices, VerifyCompare } from "./VerifyCompare";
 import { measured, statusVariant } from "./verify-view";
 
@@ -344,7 +345,7 @@ function Screenshots({
 			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				{shots.map((shot) => (
 					<figure key={shot.index} className="overflow-hidden rounded border border-border">
-						<img
+						<BackendImage
 							src={verifyScreenshotUrl(query, shot.index)}
 							alt={shot.label || t("tasks:verify.screenshotAlt")}
 							className="block w-full bg-background object-contain"
@@ -395,7 +396,7 @@ function CardScenario({
 							</div>
 							{item?.note && <p className="mt-1 text-xs text-muted-foreground">{item.note}</p>}
 							{item?.screenshotIndex !== undefined && (
-								<img
+								<BackendImage
 									src={verifyScreenshotUrl(query, item.screenshotIndex)}
 									alt={t("tasks:verify.stepCapture", { number })}
 									className="mt-2 block max-h-48 rounded border border-border bg-background object-contain"
@@ -410,15 +411,14 @@ function CardScenario({
 			<p className="mt-2 text-xs text-muted-foreground">
 				{record.trace ? (
 					<>
-						{/* Opened by the OS browser (the window's open handler), which saves the zip. */}
-						<a
+						{/* Saved through Electron's dialog: main fetched the zip, the page holds a blob. */}
+						<BackendDownloadLink
 							href={verifyTraceUrl(query)}
-							target="_blank"
-							rel="noreferrer"
+							fileName="trace.zip"
 							className="font-medium text-primary underline"
 						>
 							{t("tasks:verify.trace.download")}
-						</a>{" "}
+						</BackendDownloadLink>{" "}
 						{t("tasks:verify.trace.hint")}
 					</>
 				) : (
@@ -441,7 +441,7 @@ function Walkthrough({
 	return (
 		<div className="mt-3 space-y-2">
 			{record.video ? (
-				<video
+				<BackendVideo
 					src={verifyMediaUrl(query, "video")}
 					controls
 					preload="metadata"
@@ -449,7 +449,7 @@ function Walkthrough({
 					className="block w-full max-w-2xl rounded border border-border bg-background"
 				>
 					<track kind="captions" />
-				</video>
+				</BackendVideo>
 			) : (
 				record.video_note && (
 					<p className="text-xs text-muted-foreground">
@@ -459,7 +459,7 @@ function Walkthrough({
 			)}
 			{record.walkthrough && (
 				<figure className="max-w-2xl overflow-hidden rounded border border-border">
-					<img
+					<BackendImage
 						src={verifyMediaUrl(query, "walkthrough")}
 						alt={t("tasks:verify.walkthrough.gif")}
 						className="block w-full bg-background object-contain"

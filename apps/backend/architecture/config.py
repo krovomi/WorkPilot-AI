@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .clean_layers import domain_framework_rules, infer_clean_layers
 from .models import (
     ArchitectureConfig,
     BoundedContextConfig,
@@ -48,6 +49,7 @@ def _parse_config(data: dict) -> ArchitectureConfig:
             patterns=layer.get("patterns", []),
             allowed_imports=layer.get("allowed_imports", []),
             forbidden_imports=layer.get("forbidden_imports", []),
+            module_prefixes=layer.get("module_prefixes", []),
         )
         for layer in data.get("layers", [])
     ]
@@ -124,8 +126,14 @@ def infer_architecture_config(
                 )
             )
 
+    # Clean / Onion / Hexagonal layout, any stack (.NET projects, Java/Kotlin
+    # modules or packages, Go, PHP, Rust, Dart, Swift, Python, TypeScript).
+    clean_layers = infer_clean_layers(project_dir)
+    layers.extend(clean_layers)
+    forbidden_patterns.extend(domain_framework_rules(clean_layers))
+
     # React/Vue/Angular: presentation/logic separation
-    if _has_frontend_framework(frameworks):
+    if _has_frontend_framework(frameworks) and not clean_layers:
         layers.extend(_infer_frontend_layers(services, project_type))
         forbidden_patterns.append(
             ForbiddenPattern(
@@ -136,15 +144,15 @@ def infer_architecture_config(
         )
 
     # Django: MVC separation
-    if "django" in frameworks:
+    if "django" in frameworks and not clean_layers:
         layers.extend(_infer_django_layers())
 
     # FastAPI/Flask: service layer separation
-    if "fastapi" in frameworks or "flask" in frameworks:
+    if ("fastapi" in frameworks or "flask" in frameworks) and not clean_layers:
         layers.extend(_infer_python_api_layers())
 
     # NestJS: module boundaries
-    if "nestjs" in frameworks or "nest" in frameworks:
+    if ("nestjs" in frameworks or "nest" in frameworks) and not clean_layers:
         layers.extend(_infer_nestjs_layers())
 
     # General: if no specific framework detected, try common patterns

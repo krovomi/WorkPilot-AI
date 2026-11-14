@@ -153,6 +153,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its parents: HEAD^1 is the base branch's tip.
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -173,6 +176,13 @@ jobs:
           # covered on 29 October 2026. Raise it when the suite grows.
           python -m coverage report --fail-under=58 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
+
+      # The floor above holds the whole suite; this holds each change at
+      # 100 %: every line the pull request adds that the report measures was
+      # run by a test (scripts/diff_coverage.py, docs/rules/workflow.md).
+      - name: Every changed line run by a test
+        if: github.event_name == 'pull_request'
+        run: python scripts/diff_coverage.py --base HEAD^1 --cobertura apps/backend/coverage.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
@@ -232,6 +242,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its parents: HEAD^1 is the base branch's tip.
+          fetch-depth: 2
 
       - name: Setup Node.js frontend
         uses: ./.github/actions/setup-node-frontend
@@ -249,10 +262,16 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            pnpm run test:coverage --coverage.reporter=text-summary
+            pnpm run test:coverage --coverage.reporter=text-summary --coverage.reporter=json
           else
             pnpm run test
           fi
+
+      # Each change at 100 %, as coverage-python does for Python: lines and
+      # branches the pull request adds, in the report the step above wrote.
+      - name: Every changed line run by a test
+        if: runner.os == 'Linux' && github.event_name == 'pull_request'
+        run: python3 scripts/diff_coverage.py --base HEAD^1 --istanbul apps/frontend/coverage/coverage-final.json
 
       - name: Build application
         working-directory: apps/frontend
