@@ -957,6 +957,7 @@ export const IPC_CHANNELS = {
 	AGENT_HEALTH_SCORE: "agentHealth:score",
 	AGENT_HEALTH_SCORES: "agentHealth:scores",
 	AGENT_HEALTH_RESET: "agentHealth:reset",
+	AGENT_HEALTH_PROJECT: "agentHealth:project",
 	// Adaptive Model Routing (#3.1)
 	MODEL_ROUTER_ROUTE: "modelRouter:route",
 	MODEL_ROUTER_COMPARE: "modelRouter:compare",

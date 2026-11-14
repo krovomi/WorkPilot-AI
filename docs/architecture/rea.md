@@ -106,3 +106,42 @@ version installée compte comme présente mais n'est pas lancée : le badge prop
 à sa place, et il n'y a pas de mise à jour vers `@latest`. Les deux canaux ne prennent aucun
 argument. `REA_PIN` (`shared/types/rea.ts`) est la copie de `pin.json` que le renderer importe ;
 `tests/rea/test_rea_frontend_pin.py` les garde égaux.
+
+## Lot B : la porte « Exposition de l'artefact »
+
+Ce que livre une tâche, et pas seulement WorkPilot : après l'approbation du relecteur, avec les
+autres portes qui peuvent la renverser (`qa/loop.py`), `qa/exposure_gate.py` lit par
+`audit-release-exposure` la sortie de build que la tâche a laissée dans son worktree. La porte ne
+construit jamais (un build lance le code du projet) : un worktree de tâche part sans sortie de
+build, donc ce qu'elle trouve vient de la tâche.
+
+- **Toutes les stacks** (`rea/artifacts.py`), par nom, dans une table fermée des dossiers de sortie
+  de chaque stack et sous un parcours borné (profondeur 8, 50 000 entrées, 6 artefacts) qui
+  saute dépendances et caches : bundle Electron ou Tauri (`*-unpacked/`, `.app`, `.AppImage`,
+  `.dmg`, `.msi`, `.deb`, `.rpm`, `.exe` d'un dossier de release), Android et iOS (`.apk`,
+  `.aab`, `.ipa`), build web contenant du JavaScript (`dist/`, `build/`, `out/`, `.next/`,
+  `.output/`, `wwwroot/_framework` de Blazor), dossier `publish/` de .NET, `.jar` / `.war` de
+  `target/` ou `build/libs/`, exécutables de `target/release/` de Rust (un `.exe` seulement sous
+  Windows, où tout fichier se dit exécutable), `.whl` de `dist/`, `.nupkg`, `.vsix`, `.wasm`. Aucun
+  lien symbolique n'est suivi ; tout chemin est résolu et gardé seulement dans le projet.
+- **Le verdict vient des checks** (`rea/exposure.py`) : un check `exposed` au seuil ou au-dessus
+  (`high` par défaut) échoue ; `unknown` et `not_assessed`, ce que l'analyse statique n'a pas pu
+  trancher, ne bloquent jamais. Pas de sortie de build, pas de Node.js, REA absent, un délai
+  dépassé, un artefact que REA n'a pas pu lire : `unchecked`, lu comme inconnu, jamais comme un
+  succès.
+- **Mode** : `WORKPILOT_QA_ARTIFACT_EXPOSURE`. `warn` (défaut) ne bloque pas et n'utilise que REA
+  déjà installé à la version figée : la QA ne télécharge pas un outil d'elle-même. `strict` renvoie
+  au fixer un `QA_FIX_REQUEST.md` avec les remédiations de REA, citées comme sortie d'outil non
+  fiable (`quote_untrusted`), et peut récupérer la release figée par npx, sauf en hors-ligne strict
+  (une politique illisible compte comme hors-ligne). `off` l'arrête. Le seuil :
+  `WORKPILOT_QA_ARTIFACT_EXPOSURE_FAIL_ON`. Une valeur inconnue revient au défaut : une faute de
+  frappe ne doit ni bloquer ni éteindre la porte.
+- **La porte dure `artifact-exposure`** (`workflows/hard_gates.py`) lit `artifact_exposure.json`
+  dans le dossier de la spec ; un workflow qui la déclare rend la porte QA `strict`.
+- **Mode serveur** : la porte fait partie de la boucle QA, donc d'un run du serveur, confiné à son
+  clone comme le reste. REA n'y tourne jamais par son serveur MCP HTTP.
+- **Release Train** (`release_coordinator`) : une étape `exposure: {artifact, fail_on, timeout}`
+  par service, avant `deploy` (voir [release-train.md](release-train.md)). Un artefact absent ou
+  hors du projet, ou REA qui ne peut pas tourner, est une erreur qui arrête le train : une
+  vérification déclarée qui n'a pas pu tourner n'est pas un succès. Un service arrêté là n'a rien
+  déployé, donc un retour arrière ne lance pas sa commande de rollback.
