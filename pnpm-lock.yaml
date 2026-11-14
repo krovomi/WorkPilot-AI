@@ -361,8 +361,8 @@ importers:
         specifier: ^2.0.5
         version: 2.0.5
       i18next:
-        specifier: ^26.7.1
-        version: 26.7.1(typescript@7.0.2)
+        specifier: ^27.0.1
+        version: 27.0.1(typescript@7.0.2)
       lucide-react:
         specifier: ^1.68.0
         version: 1.70.0(@types/react@19.3.0)(react@19.3.1)
@@ -3616,8 +3616,9 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
-  i18next@26.7.1:
-    resolution: {integrity: sha512-cX+3RRVczel/V2kCMTACckSGSpqgtWYEA6beXNYVms7dOQiHojdPYHD26lT4IKimNeoGWrLvtPgjftbRvmZJVw==}
+  i18next@27.0.1:
+    resolution: {integrity: sha512-KaE5ozP8UUeVpOJIwMVbbnpRKpyYQuxd9ZbseJoDzezE3nvLnZZQn20pkzyIJwPI2Uet/Qs3WzPTG812f6F/Eg==}
+    engines: {node: '>=22'}
     peerDependencies:
       typescript: ^5 || ^6 || ^7
     peerDependenciesMeta:
@@ -8579,7 +8580,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  i18next@26.7.1(typescript@7.0.2):
+  i18next@27.0.1(typescript@7.0.2):
     optionalDependencies:
       typescript: 7.0.2
 
@@ -9539,7 +9540,7 @@ snapshots:
   react-i18next@18.0.1(@types/react@19.3.0)(i18next@26.7.1(typescript@7.0.2))(react@19.3.1)(typescript@7.0.2):
     dependencies:
       html-parse-stringify: 4.0.1
-      i18next: 26.7.1(typescript@7.0.2)
+      i18next: 27.0.1(typescript@7.0.2)
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
