@@ -2550,5 +2550,20 @@
 			"switch": "Switch : déployer le code qui ne lit plus que la nouvelle structure.",
 			"contract": "Contract : quand plus aucune version en service ne s'en sert, supprimer l'ancienne structure dans une migration suivante."
 		}
+	},
+	"budgetPause": {
+		"chip": "Budget atteint : {{spent}} / {{limit}}",
+		"stallChip": "En pause : aucun progrès",
+		"floor": " (au moins, un modèle sans prix connu)",
+		"task": "Cette tâche a dépensé {{spent}}{{floor}} sur son plafond de {{limit}}. Elle s'est mise en pause avant sa prochaine session, sans rien perdre.",
+		"project": "Le projet a dépensé {{spent}}{{floor}} sur son budget de {{limit}} pour la période. La tâche s'est mise en pause avant sa prochaine session.",
+		"projectHint": "Relevez le budget du projet dans Coûts, ou passez-le en simple avertissement, puis reprenez la tâche.",
+		"stall": "{{spent}} dépensés depuis la dernière sous-tâche terminée ({{done}}/{{total}}), au-delà des {{limit}} que la tâche s'accordait.",
+		"stallHint": "Lisez les journaux pour voir où elle tourne en rond. Reprendre lui redonne la même marge.",
+		"newLimit": "Nouveau plafond de la tâche (USD)",
+		"raise": "Relever et reprendre",
+		"tooLow": "Le plafond doit dépasser les {{spent}} déjà dépensés",
+		"saveFailed": "Le plafond n'a pas pu être enregistré",
+		"resumed": "Plafond relevé à {{limit}}, la tâche reprend"
 	}
 }

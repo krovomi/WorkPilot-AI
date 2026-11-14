@@ -15,6 +15,7 @@ import {
 	useCicdAnomalyStore,
 	useCogContextStore,
 	useDomainAgentsStore,
+	useI18nScalerStore,
 	useLicenseStore,
 	useModelRouterStore,
 } from "../../../stores/phase35-stores";
@@ -23,6 +24,7 @@ import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
 import { CogContextPanel } from "../CogContextPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
+import { I18nScalerPanel } from "../I18nScalerPanel";
 import { LicensePanel } from "../LicensePanel";
 import { ModelRouterPanel } from "../ModelRouterPanel";
 
@@ -46,6 +48,7 @@ afterEach(() => {
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
 	useCogContextStore.setState({ context: null, phase: "idle", error: null });
+	useI18nScalerStore.setState({ report: null, formats: [], scannedDir: null, phase: "idle", error: null });
 	useModelRouterStore.setState({ chosen: null, comparison: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
 		scanReport: null,
@@ -129,6 +132,21 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText("Conflit de dépendances")).toBeInTheDocument();
 		expect(screen.getByText("élevée")).toBeInTheDocument();
 		expect(screen.queryByText("dependency_conflict")).not.toBeInTheDocument();
+	});
+
+	it("names the other stacks' catalogs it read and offers the open project as the folder", () => {
+		useI18nScalerStore.setState({
+			phase: "ok",
+			report: { source_locale: "en", diffs: [], coverage: [] },
+			scannedDir: "/work/shop",
+			redirectedFrom: null,
+			formats: ["resx", "android"],
+		});
+		render(<I18nScalerPanel projectPath="/work/shop" />);
+		expect(
+			screen.getByText(/Catalogues lus : RESX \(\.NET\), strings\.xml \(Android\)/),
+		).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Analyser tout le projet ouvert" })).toBeInTheDocument();
 	});
 
 	it("words each CI fix in French from its id and shows the fixes that recur across builds", async () => {

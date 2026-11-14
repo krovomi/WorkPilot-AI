@@ -2550,5 +2550,20 @@
 			"switch": "Switch: deploy the code that reads only the new structure.",
 			"contract": "Contract: once no running version uses it, drop the old structure in a later migration."
 		}
+	},
+	"budgetPause": {
+		"chip": "Budget reached: {{spent}} / {{limit}}",
+		"stallChip": "Paused: no progress",
+		"floor": " (at least, a model with no known price)",
+		"task": "This task spent {{spent}}{{floor}} of its {{limit}} limit. It paused before its next session, with nothing lost.",
+		"project": "The project spent {{spent}}{{floor}} of its {{limit}} budget for the period. The task paused before its next session.",
+		"projectHint": "Raise the project's budget in Costs, or make it a warning only, then resume the task.",
+		"stall": "{{spent}} spent since the last completed subtask ({{done}}/{{total}}), over the {{limit}} the task allowed itself.",
+		"stallHint": "Read the logs to see where it goes in circles. Resuming gives it the same allowance again.",
+		"newLimit": "New limit for the task (USD)",
+		"raise": "Raise and resume",
+		"tooLow": "The limit must be above the {{spent}} already spent",
+		"saveFailed": "The limit could not be saved",
+		"resumed": "Limit raised to {{limit}}, the task resumes"
 	}
 }

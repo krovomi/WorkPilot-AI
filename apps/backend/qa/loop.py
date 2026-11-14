@@ -18,6 +18,7 @@ from typing import Any
 from core.client import create_agent_client
 from core.progress import count_subtasks, is_build_complete
 from core.task_event import TaskEventEmitter
+from cost_budget import check_before_session
 from foundation.base_branch import detect_base_branch
 from foundation.build_signals import BuildPaused
 from foundation.change_scope import ChangeScope, change_scope
@@ -479,6 +480,9 @@ async def run_qa_validation_loop(
             over := budget_exceeded(goal, spec_dir, source_spec_dir)
         ):
             return _stop_on_goal(scope, state, over)
+        # The cost budget pauses the build before a pass, as in the coder loop.
+        if check_before_session(spec_dir, "qa_review") is not None:
+            raise BuildPaused("qa_review")
 
         state.qa_iteration += 1
         iteration_start = time_module.time()
