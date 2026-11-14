@@ -73,6 +73,7 @@ detection names an area once and each hop keeps the files it has.
 | Kanban palette | each skill as a bundled command | only for a project on its source or target release (`slash_commands.api._bundled_applies`) |
 | `dotnet_upgrade.preflight` (before planning) | each hop's skill copied to `<spec_dir>/dotnet-upgrade/<skill>/`, plus `result.json` | see below |
 | `dotnet_upgrade.prompt` | a short section: the staged procedures in order and the references this project needs from each | planner, every coding subtask, QA reviewer, workflow skill phases |
+| `qa/dotnet_api_gate.py` (after QA approves) | each library project built at the base and after the task, its public API compared by REA; `strict` for a staged `migrate` or `chain` ([rea.md](rea.md), lot D) | every task whose diff touches .NET |
 
 The preflight decides, from the worktree and the task's words. The target is the newest
 release the task names (".NET 10", "net11.0", "C# 14"…; "de .NET 9 vers .NET 10" → 10):

@@ -224,7 +224,7 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.analyseCicdLogs(samples);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, signals: res.report.signals });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
