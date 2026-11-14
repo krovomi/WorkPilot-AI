@@ -24,12 +24,14 @@ import {
 import type { GeneratedReview } from "../shared/types/generated-review";
 import { getAppLanguage } from "./app-language";
 import { findOpenReviewCard } from "./generated-review/review-card";
+import { MAX_RUN_LOG_LINES } from "./generated-review/review-log";
 import {
 	findLocalProject,
 	openReviewRun,
 	type ReviewRun,
 	ReviewUnavailableError,
 } from "./generated-review/review-run";
+import { reviewSubject } from "./generated-review/review-subject";
 import { getRunnerEnv } from "./ipc-handlers/github/utils/runner-env";
 
 /**
@@ -98,6 +100,7 @@ const INSTALL_TIMEOUT_MS = 240_000;
 interface ReviewStep {
 	readonly message: string;
 	readonly summary: string;
+	readonly log?: readonly string[];
 }
 
 const STEP_SUMMARY = {
@@ -115,13 +118,12 @@ function reviewStep(kind: keyof typeof STEP_SUMMARY, subject: string, message: s
 	};
 }
 
-/** A short subject for a card title: the file name, or the start of a sentence. */
-function subjectOf(text: string): string {
-	const trimmed = text.trim();
-	const looksLikePath = /[\\/]/.test(trimmed) && !/\s/.test(trimmed);
-	const flat = (looksLikePath ? path.basename(trimmed) : trimmed).replace(/\s+/g, " ");
-	// Short enough that "test: add generated unit tests for <subject>" stays a one-line subject.
-	return flat.length > 40 ? `${flat.slice(0, 39)}…` : flat;
+/** One stage event as a plain log line for the card (no code, no prompt). */
+function stageLine(evt: TestGenStageEvent): string {
+	const facts = [evt.language, evt.framework, evt.path].filter(Boolean).join(" · ");
+	const head = evt.status ? `${evt.stage} (${evt.status})` : evt.stage;
+	const tail = evt.detail || facts;
+	return tail ? `${head}: ${tail}` : head;
 }
 
 export class TestGenerationService extends EventEmitter {
@@ -223,7 +225,7 @@ export class TestGenerationService extends EventEmitter {
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<void> {
-		const subject = subjectOf(filePath);
+		const subject = reviewSubject(filePath);
 		const run = await this.openRun(projectPath, subject);
 		if (!run) return;
 		const source = run.map(filePath);
@@ -273,7 +275,7 @@ export class TestGenerationService extends EventEmitter {
 		testDir?: string,
 		testLibraries?: string[],
 	): Promise<void> {
-		const subject = subjectOf(targetModule || userStory);
+		const subject = reviewSubject(targetModule || userStory);
 		const run = await this.openRun(projectPath, subject);
 		if (!run) return;
 		const args = [
@@ -321,7 +323,7 @@ export class TestGenerationService extends EventEmitter {
 		const snippet = (TDD_SNIPPET_TYPES as readonly string[]).includes(snippetType)
 			? snippetType
 			: "function";
-		const subject = subjectOf(description.split("\n")[0] ?? description);
+		const subject = reviewSubject(description.split("\n")[0] ?? description);
 		const run = await this.openRun(projectPath, subject);
 		if (!run) return;
 		const args = [
@@ -427,7 +429,7 @@ export class TestGenerationService extends EventEmitter {
 	): Promise<{ report: PackageInstallReport | null; review: GeneratedReview | null }> {
 		const subject = selected.join(", ");
 		// The manifests are edited on the card's branch, beside the tests they serve.
-		const run = await openReviewRun(projectPath, "test-studio", subjectOf(subject));
+		const run = await openReviewRun(projectPath, "test-studio", reviewSubject(subject));
 		const args = [
 			"--action",
 			"add-packages",
@@ -640,6 +642,12 @@ export class TestGenerationService extends EventEmitter {
 		// mid-way (common now that we stream many small __TG_EVENT__ lines), so
 		// we only process complete '\n'-terminated lines and keep the remainder.
 		let stdoutBuffer = "";
+		// What the card's log keeps of this run: its stage and status lines.
+		const runLog: string[] = [];
+		const keep = (line: string) => {
+			runLog.push(line);
+			if (runLog.length > MAX_RUN_LOG_LINES) runLog.shift();
+		};
 
 		const handleLine = (line: string): void => {
 			if (line.startsWith(RESULT_PREFIX)) {
@@ -677,6 +685,7 @@ export class TestGenerationService extends EventEmitter {
 					if (evt?.type === "code" && typeof evt.delta === "string") {
 						this.emit("code", evt.delta);
 					} else if (evt?.type === "stage") {
+						keep(stageLine(evt as TestGenStageEvent));
 						this.emit("progress", evt as TestGenStageEvent);
 					}
 				} catch (parseErr) {
@@ -684,6 +693,7 @@ export class TestGenerationService extends EventEmitter {
 				}
 			} else if (line.trim()) {
 				// Plain progress/status line
+				keep(line.trim());
 				this.emit("status", line.trim());
 			}
 		};
@@ -723,7 +733,11 @@ export class TestGenerationService extends EventEmitter {
 
 			if (generationResult !== null) {
 				if (review) {
-					void this.commitToReview(review, generationResult, successEvent);
+					void this.commitToReview(
+						{ ...review, step: { ...review.step, log: runLog } },
+						generationResult,
+						successEvent,
+					);
 				} else {
 					this.emit(successEvent, generationResult);
 				}
