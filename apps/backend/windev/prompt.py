@@ -94,7 +94,8 @@ _ROLE_RULES = {
         "Compilation and automated tests are not verifiable here unless the "
         "project declares a command in `.workpilot/worktree.toml` `[proofs]`: "
         "report them as not verified, never as passed, and never reject a task "
-        "only because they could not run.",
+        "only because they could not run. Coverage cannot be measured either: "
+        "record it as not measured.",
     ),
 }
 
