@@ -8,6 +8,14 @@
 
 import { ipcMain, type BrowserWindow } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
+import { runOneShotLLM } from "../oneshot-llm";
+import {
+	askPairPartner,
+	PAIR_AI_USER_ID,
+	type PairOp,
+	type PairPartnerDeps,
+} from "../pair-ai-partner";
+import { getPageFeatureSettings } from "../services/page-llm-config";
 import { backendFetch, getBackendUrl } from "./_backend-fetch";
 
 // ---------------------------------------------------------------------------
@@ -717,4 +725,63 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 			return { success: true, closed: true };
 		},
 	);
+
+	// The AI participant's turn: the room and the open project's file go to
+	// the provider chosen for this page, the answer comes back as the AI.
+	ipcMain.handle(
+		IPC_CHANNELS.PAIR_RT_ASK_AI,
+		async (_e, { roomId, projectPath }: { roomId: unknown; projectPath: unknown }) => {
+			if (typeof roomId !== "string" || !ROOM_ID_RE.test(roomId)) {
+				return { success: false, error: "invalid" };
+			}
+			if (typeof projectPath !== "string" || !projectPath) {
+				return { success: false, error: "invalid" };
+			}
+			return askPairPartner(roomId, projectPath, pairPartnerDeps(projectPath));
+		},
+	);
+}
+
+const ROOM_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const PAIR_AI_TIMEOUT_MS = 120_000;
+
+function pairPartnerDeps(projectDir: string): PairPartnerDeps {
+	const room = (roomId: string) => `/api/pair-realtime/rooms/${encodeURIComponent(roomId)}`;
+	return {
+		getOps: async (roomId) => {
+			const res = await backendFetch<{ ops: PairOp[] }>(`${room(roomId)}/ops?since_sequence=0`);
+			return res.success ? res.ops : null;
+		},
+		complete: async (prompt, systemPrompt) => {
+			const { provider, model } = getPageFeatureSettings("phase35-hub");
+			return runOneShotLLM({
+				prompt,
+				systemPrompt,
+				provider: provider || undefined,
+				model: model || undefined,
+				projectDir,
+				timeoutMs: PAIR_AI_TIMEOUT_MS,
+				debugLabel: "PairAI",
+			});
+		},
+		postChat: async (roomId, text) => {
+			const res = await backendFetch(`${room(roomId)}/chat`, {
+				method: "POST",
+				body: JSON.stringify({ actor: PAIR_AI_USER_ID, text }),
+			});
+			return res.success;
+		},
+		postSuggestion: async (roomId, filePath, suggestion, rationale) => {
+			const res = await backendFetch(`${room(roomId)}/suggestion`, {
+				method: "POST",
+				body: JSON.stringify({
+					actor: PAIR_AI_USER_ID,
+					file_path: filePath,
+					suggestion,
+					rationale,
+				}),
+			});
+			return res.success;
+		},
+	};
 }

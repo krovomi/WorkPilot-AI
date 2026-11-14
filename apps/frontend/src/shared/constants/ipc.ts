@@ -1017,6 +1017,7 @@ export const IPC_CHANNELS = {
 	PAIR_RT_OPS: "pairRT:ops",
 	PAIR_RT_SUBSCRIBE: "pairRT:subscribe",
 	PAIR_RT_UNSUBSCRIBE: "pairRT:unsubscribe",
+	PAIR_RT_ASK_AI: "pairRT:askAi",
 	// Pair Programming SSE event (main -> renderer)
 	PAIR_RT_OP_EVENT: "pairRT:opEvent",
 	PAIR_RT_STREAM_ERROR: "pairRT:streamError",
