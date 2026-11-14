@@ -330,6 +330,7 @@ export type TestGenErrorCode =
 	| "write_failed"
 	| "parse_failed"
 	| "invalid_input"
+	| "unsupported_stack"
 	| "backend_missing"
 	| "runner_crashed"
 	| "no_output"
@@ -348,6 +349,7 @@ export const TEST_GEN_ERROR_CODES: readonly TestGenErrorCode[] = [
 	"write_failed",
 	"parse_failed",
 	"invalid_input",
+	"unsupported_stack",
 	"backend_missing",
 	"runner_crashed",
 	"no_output",

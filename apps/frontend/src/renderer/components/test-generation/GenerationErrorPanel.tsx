@@ -43,6 +43,7 @@ const SEVERITY: Record<TestGenErrorCode, "hard" | "soft"> = {
 	write_failed: "hard",
 	parse_failed: "hard",
 	invalid_input: "soft",
+	unsupported_stack: "soft",
 	backend_missing: "hard",
 	runner_crashed: "hard",
 	no_output: "hard",
