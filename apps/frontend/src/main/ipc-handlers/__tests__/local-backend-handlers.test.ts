@@ -10,6 +10,12 @@ vi.mock("../../security/renderer-path", () => ({
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }));
 
+import {
+	markLocalBackendFailed,
+	markLocalBackendReady,
+	markLocalBackendStarting,
+	resetLocalBackendReadinessForTests,
+} from "../../local-backend-readiness";
 import { checkRequest, localBackendRequest, ROUTES } from "../local-backend-handlers";
 
 const fetchMock = vi.fn();
@@ -24,6 +30,8 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.unstubAllEnvs();
+	vi.useRealTimers();
+	resetLocalBackendReadinessForTests();
 });
 
 function refused(raw: unknown): string | undefined {
@@ -157,5 +165,76 @@ describe("the answer handed back", () => {
 			success: false,
 			error: "Refused: route",
 		});
+	});
+});
+
+describe("a backend main is still starting", () => {
+	const ok = () =>
+		new Response('{"success":true}', {
+			status: 200,
+			headers: { "content-type": "application/json" },
+		});
+
+	it("waits for the launch, then asks once more", async () => {
+		markLocalBackendStarting();
+		fetchMock.mockRejectedValueOnce(new TypeError("fetch failed")).mockResolvedValueOnce(ok());
+
+		const pending = localBackendRequest({ method: "GET", url: "/api/hermes/status" });
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		markLocalBackendReady();
+
+		expect(await pending).toMatchObject({ status: 200, text: '{"success":true}' });
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("reports it unreachable when the launch fails", async () => {
+		markLocalBackendStarting();
+		fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+		const pending = localBackendRequest({ method: "GET", url: "/api/hermes/status" });
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		markLocalBackendFailed();
+
+		expect(await pending).toEqual({ unreachable: true });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("asks a backend that started and then stopped only once more", async () => {
+		markLocalBackendStarting();
+		markLocalBackendReady();
+		fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+		expect(await localBackendRequest({ method: "GET", url: "/api/hermes/status" })).toEqual({
+			unreachable: true,
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not wait when main is not starting a backend", async () => {
+		fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+		expect(await localBackendRequest({ method: "GET", url: "/api/hermes/status" })).toEqual({
+			unreachable: true,
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not ask again after its own timeout", async () => {
+		vi.useFakeTimers();
+		markLocalBackendStarting();
+		fetchMock.mockImplementationOnce(
+			(_url: URL, init: RequestInit) =>
+				new Promise((_resolve, reject) => {
+					init.signal?.addEventListener("abort", () =>
+						reject(new DOMException("aborted", "AbortError")),
+					);
+				}),
+		);
+
+		const pending = localBackendRequest({ method: "GET", url: "/api/hermes/status" });
+		await vi.advanceTimersByTimeAsync(60_000);
+
+		expect(await pending).toEqual({ unreachable: true });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
