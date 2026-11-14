@@ -8,6 +8,12 @@ vi.mock("../../server-connection", () => ({
 	refreshSession: vi.fn(async () => true),
 }));
 
+import {
+	markLocalBackendFailed,
+	markLocalBackendReady,
+	markLocalBackendStarting,
+	resetLocalBackendReadinessForTests,
+} from "../../local-backend-readiness";
 import { backendFetch, getBackendUrl } from "../_backend-fetch";
 
 const fetchMock = vi.fn();
@@ -22,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.unstubAllEnvs();
+	resetLocalBackendReadinessForTests();
 });
 
 describe("machine features keep talking to the local backend while signed in to a server", () => {
@@ -48,6 +55,37 @@ describe("machine features keep talking to the local backend while signed in to 
 		const result = await backendFetch("/api/hooks/emit", { method: "POST" });
 
 		expect(result).toEqual({ success: false, error: "nope" });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("a backend main is still starting", () => {
+	it("waits for the launch instead of reporting it unreachable", async () => {
+		markLocalBackendStarting();
+		fetchMock
+			.mockRejectedValueOnce(new TypeError("fetch failed"))
+			.mockResolvedValueOnce(new Response(JSON.stringify({ success: true, n: 2 })));
+
+		const pending = backendFetch("/api/brain/status");
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		markLocalBackendReady();
+
+		expect(await pending).toEqual({ success: true, n: 2 });
+	});
+
+	it("reports it unreachable once the launch failed", async () => {
+		markLocalBackendStarting();
+		fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+		const pending = backendFetch("/api/brain/status");
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		markLocalBackendFailed();
+
+		expect(await pending).toEqual({
+			success: false,
+			error: "fetch failed",
+			unreachable: true,
+		});
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });

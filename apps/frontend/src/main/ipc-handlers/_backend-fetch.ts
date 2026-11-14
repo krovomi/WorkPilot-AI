@@ -13,6 +13,8 @@
  * forward the JSON response back. This module hides the boilerplate.
  */
 
+import { waitForLocalBackend } from "../local-backend-readiness";
+
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:9000";
 
 export function getBackendUrl(): string {
@@ -62,7 +64,19 @@ export async function backendFetch<T = Record<string, unknown>>(
 	};
 
 	try {
-		const res = await doFetch();
+		let res: Response;
+		try {
+			res = await doFetch();
+		} catch (err) {
+			// Nothing listening while main is still starting the backend: wait
+			// for that launch, then ask once more (local-backend-readiness.ts).
+			// A timeout of ours is an AbortError and is not retried.
+			const startingUp =
+				(err as { name?: string })?.name !== "AbortError" &&
+				(await waitForLocalBackend());
+			if (!startingUp) throw err;
+			res = await doFetch();
+		}
 		const text = await res.text();
 		if (!res.ok) {
 			return { success: false, error: text || `HTTP ${res.status}` };

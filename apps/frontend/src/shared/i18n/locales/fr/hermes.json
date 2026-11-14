@@ -121,5 +121,8 @@
 		"pending_one": "{{count}} skill attend votre relecture dans le panneau d'une tâche.",
 		"pending_other": "{{count}} skills attendent votre relecture dans le panneau d'une tâche.",
 		"docs": "Documentation de {{name}}"
+	},
+	"errors": {
+		"backendUnreachable": "Le backend local de WorkPilot n’a pas répondu. Démarrez-le (ou relancez l’application), puis actualisez."
 	}
 }
