@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +63,10 @@ def _run(project: Path, *args: str) -> tuple[int, list[dict], list[str]]:
     done = subprocess.run(
         [sys.executable, str(RUNNER), "--project-dir", str(project), *args],
         cwd=BACKEND,
+        # The app starts its runners with UTF-8 output (pythonRunnerEnv);
+        # without it, Windows writes the banner's dash in its code page and
+        # the UTF-8 read below fails.
+        env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
         capture_output=True,
         text=True,
         encoding="utf-8",
