@@ -88,8 +88,11 @@ def test_breaking_footer_and_template_answer_make_a_major():
 
 
 def test_the_untouched_template_and_a_mention_are_not_breaking():
-    template = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(
-        encoding="utf-8"
+    # The "Breaking Changes" section of the pull request template, unanswered.
+    template = (
+        "## Breaking Changes\n\n"
+        "<!-- Does this PR introduce breaking changes? If yes, describe what breaks. -->\n\n"
+        "**Breaking:** Yes / No\n\n**Details:**\n"
     )
     assert ra.classify("fix: x", template) == "patch"
     assert ra.classify("fix: x", "**Breaking:** No") == "patch"
