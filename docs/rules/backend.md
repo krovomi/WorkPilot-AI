@@ -30,7 +30,7 @@ client = create_client(
     max_thinking_tokens=get_phase_thinking_budget(spec_dir, "coding", cli_thinking=None),
 )
 async with client:
-    status, response = await run_agent_session(client, prompt, spec_dir)
+    status, response, _error = await run_agent_session(client, prompt, spec_dir)
 ```
 
 Exemples vivants : `agents/planner.py`, `agents/coder.py`, `qa/reviewer.py`, `qa/fixer.py`, `spec/`.

@@ -177,9 +177,11 @@ async def generate_pipelines(
             agent_type="coder",
         )
         async with client:
-            from core.session import run_agent_session
+            from agents.session import run_agent_session
 
-            _, response_text = await run_agent_session(client, prompt, None)
+            _status, response_text, _error = await run_agent_session(
+                client, prompt, None
+            )
 
         # Parse the response to extract each platform's pipeline
         for platform in platforms_to_generate:

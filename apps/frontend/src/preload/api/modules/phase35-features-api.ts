@@ -95,7 +95,8 @@ export interface DomainProfile extends DomainSummary {
 	required_skills: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
-	suggested_libraries: string[];
+	/** Per stack (`project.stack.detect_languages` names: "python", "c#"…). */
+	suggested_libraries: Record<string, string[]>;
 }
 export interface DomainAgentBundle {
 	domain: string;
@@ -106,6 +107,13 @@ export interface DomainAgentBundle {
 	guardrails: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
+	/** The project's stacks only when built for a project, else every stack. */
+	suggested_libraries: Record<string, string[]>;
+}
+export interface ProjectDomain {
+	/** The domain every task of the project gets, unless its spec names one. */
+	domain: string | null;
+	languages: string[];
 }
 
 // #3.4 CI/CD Anomaly
@@ -356,6 +364,10 @@ export interface OptimizedContext {
 	tokens_used: number;
 	files_skipped: string[];
 	summary: Record<string, unknown>;
+	/** True when the project's own sources were proposed (no list sent). */
+	discovered?: boolean;
+	/** Paths not read, with why: outside | missing | binary | too_large. */
+	refused?: Array<{ path: string; reason: string }>;
 }
 
 // #3.3 Audit Trail
@@ -434,7 +446,13 @@ export interface Phase35FeaturesAPI {
 	buildDomainBundle: (
 		domain: string,
 		role: string,
+		projectPath?: string,
 	) => Promise<Phase35Result<{ bundle: DomainAgentBundle }>>;
+	getProjectDomain: (projectPath: string) => Promise<Phase35Result<ProjectDomain>>;
+	setProjectDomain: (
+		projectPath: string,
+		domain: string | null,
+	) => Promise<Phase35Result<{ domain: string | null }>>;
 
 	// #3.4 CI/CD Anomaly
 	scanCicdLog: (
@@ -704,6 +722,14 @@ export interface Phase35FeaturesAPI {
 	unsubscribePairRoom: (
 		subscriptionId: string,
 	) => Promise<Phase35Result<{ closed: boolean }>>;
+	/** The AI participant's turn in a room, with the page's provider. */
+	pairAskAi: (
+		roomId: string,
+		projectPath: string,
+	) => Promise<
+		| { success: true; suggested: boolean }
+		| { success: false; error: "room" | "unavailable" | "empty" | "invalid" }
+	>;
 	onPairOpEvent: (
 		callback: (data: { subscriptionId: string; op: PairOperation }) => void,
 	) => () => void;
@@ -738,8 +764,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	listDomains: () => ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_LIST),
 	getDomainProfile: (domain) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROFILE, { domain }),
-	buildDomainBundle: (domain, role) =>
-		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role }),
+	buildDomainBundle: (domain, role, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role, projectPath }),
+	getProjectDomain: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_GET, { projectPath }),
+	setProjectDomain: (projectPath, domain) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_SET, { projectPath, domain }),
 
 	// #3.4
 	scanCicdLog: (log, label) =>
@@ -897,6 +927,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_SUBSCRIBE, { roomId, sinceSequence }),
 	unsubscribePairRoom: (subscriptionId) =>
 		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_UNSUBSCRIBE, { subscriptionId }),
+	pairAskAi: (roomId, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.PAIR_RT_ASK_AI, { roomId, projectPath }),
 	onPairOpEvent: (callback) => {
 		const listener = (
 			_event: unknown,

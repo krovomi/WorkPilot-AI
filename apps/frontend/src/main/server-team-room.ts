@@ -65,6 +65,22 @@ interface Room {
 
 const rooms = new Map<string, Room>();
 
+/** Who else reads the chat (the AI of `team-chat-ai.ts`), set at startup. */
+export interface TeamChatObserver {
+	observe: (projectId: string, messages: TeamChatMessage[], replace: boolean) => unknown;
+	forget: (projectId: string) => void;
+}
+let chatObserver: TeamChatObserver | null = null;
+
+export function setTeamChatObserver(observer: TeamChatObserver | null): void {
+	chatObserver = observer;
+}
+
+/** Tell the window of a joined room that something it asked for failed. */
+export function rejectInTeamRoom(projectId: string, reason: TeamChatRejection): void {
+	rooms.get(projectId)?.notify({ kind: "rejected", projectId, reason });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -219,6 +235,7 @@ function onEvent(room: Room, event: StreamEvent): void {
 		const replace = event.type === "chat_history";
 		if (replace || messages.length > 0) {
 			room.notify({ kind: "chat", projectId: room.projectId, messages, replace });
+			void chatObserver?.observe(room.projectId, messages, replace);
 		}
 		return;
 	}
@@ -279,6 +296,7 @@ export function leaveTeamRoom(projectId: unknown): void {
 	const room = rooms.get(projectId);
 	if (!room) return;
 	rooms.delete(projectId);
+	chatObserver?.forget(projectId);
 	if (room.locksTimer) clearTimeout(room.locksTimer);
 	room.release?.();
 }

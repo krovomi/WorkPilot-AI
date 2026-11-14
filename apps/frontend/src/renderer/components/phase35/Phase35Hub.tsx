@@ -79,15 +79,15 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 				{tab === "longevity" && <LongevityPanel projectPath={projectPath} />}
 				{tab === "agentHealth" && <AgentHealthPanel projectPath={projectPath} />}
 				{tab === "modelRouter" && <ModelRouterPanel />}
-				{tab === "domainAgents" && <DomainAgentsPanel />}
+				{tab === "domainAgents" && <DomainAgentsPanel projectPath={projectPath} />}
 				{tab === "cicdAnomaly" && <CicdAnomalyPanel />}
 				{tab === "license" && <LicensePanel projectPath={projectPath} />}
 				{tab === "archDrift" && <ArchDriftPanel projectPath={projectPath} />}
 				{tab === "genTests" && <GenTestsPanel projectPath={projectPath} />}
 				{tab === "i18nScaler" && <I18nScalerPanel projectPath={projectPath} />}
-				{tab === "cogContext" && <CogContextPanel />}
+				{tab === "cogContext" && <CogContextPanel projectPath={projectPath} />}
 				{tab === "audit" && <AuditTrailPanel projectPath={projectPath} />}
-				{tab === "pair" && <PairProgrammingPanel />}
+				{tab === "pair" && <PairProgrammingPanel projectPath={projectPath} />}
 			</Page>
 		</ModuleStage>
 	);

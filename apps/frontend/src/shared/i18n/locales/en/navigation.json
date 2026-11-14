@@ -479,7 +479,8 @@
 		"otherVersion": "rea on your PATH is {{installed}}; WorkPilot only runs {{version}}. Installing replaces it with {{version}}.",
 		"otherVersionUnknown": "rea on your PATH is not the rea-agents release WorkPilot runs ({{version}}). Installing puts {{version}} in its place.",
 		"absentHint": "Without it, WorkPilot fetches release {{version}} with npx each time it needs it (refused in strict offline mode).",
-		"nodeTooOld": "REA {{version}} needs Node.js {{ranges}}; found {{node}}.",
+		"nodeTooOld": "REA {{version}} needs Node.js {{ranges}}; the one on PATH is {{node}}, and nvm, fnm, Volta, mise and asdf hold none that fits.",
+		"nodeFromManager": "Node.js {{node}} from {{manager}}: the one on PATH is too old or missing.",
 		"nodeMissing": "REA needs Node.js {{ranges}}. Install Node.js (nodejs.org), then refresh.",
 		"installButton": "Install REA {{version}}",
 		"error": {
@@ -488,7 +489,8 @@
 			"not_on_path": "REA was installed but rea on your PATH still does not lead to {{version}}. Restart WorkPilot, then refresh.",
 			"busy": "REA is already being installed."
 		},
-		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files."
+		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files.",
+		"docsFailed": "The link did not open: {{error}}"
 	},
 	"stopAll": {
 		"label": "Stop all agents",

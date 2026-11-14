@@ -8,6 +8,7 @@ duplicate tests for the same incident pattern.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,12 +64,7 @@ class DedupChecker:
         for test_dir in self._test_dirs:
             if not test_dir.exists():
                 continue
-            for test_file in test_dir.rglob("*"):
-                if not test_file.is_file():
-                    continue
-                if not _is_test_file(test_file.name):
-                    continue
-
+            for test_file in _test_files(test_dir):
                 try:
                     content = test_file.read_text(encoding="utf-8", errors="replace")
                 except OSError:
@@ -121,6 +117,29 @@ class DedupChecker:
                 score += 0.3
 
         return min(score, 1.0)
+
+
+# Dependencies and build output hold other people's tests, never the project's.
+_SKIPPED_DIRS = frozenset(
+    {"node_modules", "vendor", "dist", "build", "bin", "obj", "target", "venv"}
+)
+_MAX_TEST_FILES = 5_000
+
+
+def _test_files(root: Path) -> list[Path]:
+    """The test files under ``root``, dependency, build and hidden folders
+    pruned, so a whole project can be handed in."""
+    found: list[Path] = []
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = sorted(
+            d for d in dirs if not d.startswith(".") and d.lower() not in _SKIPPED_DIRS
+        )
+        for name in sorted(files):
+            if _is_test_file(name):
+                found.append(Path(folder) / name)
+                if len(found) >= _MAX_TEST_FILES:
+                    return found
+    return found
 
 
 def _is_test_file(filename: str) -> bool:

@@ -222,7 +222,19 @@
 				"description": "ETL, traitements par lots, qualité des données."
 			}
 		},
-		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent."
+		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent.",
+		"libraries": "Bibliothèques conseillées pour ce projet",
+		"librariesFor": "{{language}} : {{libraries}}",
+		"project": {
+			"current": "Domaine appliqué à ce projet : {{domain}}",
+			"none": "Aucun domaine appliqué à ce projet : les tâches n'ont pas d'addendum de domaine.",
+			"languages": "Stacks détectées : {{languages}}",
+			"noLanguages": "Aucune stack détectée : les bibliothèques de toutes les stacks sont listées.",
+			"effect": "Appliqué, le domaine est enregistré dans .workpilot/domain.json et chaque tâche Kanban du projet reçoit ses consignes (planification, code, QA). Une spec qui nomme son propre domaine garde le sien.",
+			"apply": "Appliquer à ce projet",
+			"clear": "Retirer du projet",
+			"noProject": "Ouvrez un projet pour appliquer un domaine à ses tâches ; l'aperçu ci-dessous reste disponible."
+		}
 	},
 	"cicdAnomaly": {
 		"title": "Détecteur d'Anomalies CI/CD",
@@ -624,33 +636,25 @@
 		"title": "Optimiseur de Contexte Cognitif",
 		"subtitle": "Sélectionne les bons fichiers pour le budget tokens de la tâche",
 		"prompt": "Prompt de la tâche",
-		"candidateFiles": "Fichiers candidats (un par ligne)",
-		"candidateFilesPlaceholder": "/chemin/absolu/fichier1.py\n/chemin/absolu/fichier2.py",
+		"candidateFiles": "Fichiers du projet",
 		"tokenBudget": "Budget tokens",
 		"optimize": "Optimiser",
 		"included": "Inclus",
-		"truncated": "Tronqué",
+		"truncated": "Extrait",
 		"skipped": "Ignoré",
 		"fillRatio": "Taux de remplissage",
-		"colFile": "Fichier",
-		"colScore": "Score",
-		"colTokens": "Tokens",
-		"colTruncated": "Tronqué",
 		"addFiles": "Ajouter des fichiers…",
-		"addManually": "Ajouter manuellement",
-		"manualPathPlaceholder": "/chemin/absolu/fichier.py",
+		"addManually": "Chemin relatif au projet",
+		"manualPathPlaceholder": "src/Orders/OrderService.cs",
 		"add": "Ajouter",
 		"removeFile": "Retirer ce fichier",
 		"clearFiles": "Tout vider",
-		"noFiles": "Aucun fichier — cliquez sur « Ajouter des fichiers… » pour en sélectionner.",
-		"fileCount": "{{count}} fichier(s) sélectionné(s)",
+		"noFiles": "Aucun fichier choisi : WorkPilot proposera les sources du projet les plus proches de la tâche.",
 		"validation": {
 			"promptRequired": "Saisissez un prompt",
-			"filesRequired": "Indiquez au moins un fichier",
 			"budgetTooSmall": "Le budget doit être ≥ 100 tokens",
-			"budgetTooLarge": "Le budget doit être ≤ 1 000 000 tokens",
+			"budgetTooLarge": "Le budget doit être ≤ 200 000 tokens",
 			"duplicatePath": "Ce fichier est déjà dans la liste",
-			"pathNotAbsolute": "Le chemin doit être absolu",
 			"pathTooLong": "Chemin trop long (limite : {{max}} caractères)"
 		},
 		"estimatedCost": "Coût estimé",
@@ -659,7 +663,24 @@
 		"costFlatRate": "Modèle facturé à l'abonnement — pas de coût au token",
 		"costUnknown": "Tarif inconnu pour ce modèle",
 		"costNoModel": "Aucun modèle configuré dans les paramètres",
-		"outputRatio": "Ratio sortie/entrée"
+		"outputRatio": "Ratio sortie/entrée",
+		"fileCount_one": "{{count}} fichier choisi",
+		"fileCount_other": "{{count}} fichiers choisis",
+		"discovered_one": "{{count}} source du projet examinée (aucun fichier choisi).",
+		"discovered_other": "{{count}} sources du projet examinées (aucun fichier choisi).",
+		"keywords": "Mots-clés lus dans la tâche : {{list}}",
+		"copy": "Copier le contexte",
+		"copied": "Contexte copié",
+		"refusedTitle": "Fichiers non lus",
+		"refused": {
+			"outside": "hors du projet",
+			"missing": "introuvable",
+			"binary": "fichier binaire",
+			"too_large": "trop volumineux"
+		},
+		"noneIncluded": "Aucun fichier n'a pu être inclus.",
+		"scoreTokens": "score {{score}} · {{included}}/{{full}} tokens",
+		"skippedList": "Hors budget : {{list}}"
 	},
 	"audit": {
 		"title": "Piste d'Audit",
@@ -699,9 +720,8 @@
 	},
 	"pair": {
 		"title": "Pair Programming Temps Réel",
-		"subtitle": "Sessions collaboratives multi-utilisateurs, opérations en direct",
+		"subtitle": "Une salle sur le projet ouvert : chat, fichier partagé et participant IA",
 		"roomId": "ID de la salle",
-		"createRoom": "Créer la salle",
 		"joinRoom": "Rejoindre la salle",
 		"leave": "Quitter",
 		"yourName": "Votre nom",
@@ -730,6 +750,27 @@
 			"join": "arrivée",
 			"leave": "départ",
 			"role_change": "changement de rôle"
+		},
+		"localNotice": "Cette salle vit sur cet ordinateur : seules les fenêtres de WorkPilot ouvertes ici peuvent la rejoindre. Le participant IA répond avec le fournisseur et le modèle choisis pour les Fonctions avancées (en haut à droite). Sur un projet du serveur, toute l'équipe a déjà un chat dans le Kanban : écrivez-y @ia et votre IA répond à tous.",
+		"offline": "Hors ligne",
+		"aiName": "WorkPilot IA",
+		"inviteAi": "Inviter l'IA",
+		"aiInRoom": "L'IA est dans la salle",
+		"file": "Fichier de la salle",
+		"noFile": "Aucun fichier : l'IA ne lit que la conversation.",
+		"filePath": "Chemin du fichier, relatif au projet",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Travailler sur ce fichier",
+		"pickFile": "Choisir…",
+		"noOps": "Rien pour l'instant.",
+		"suggestionFor": "Proposition pour {{file}} (rien n'est écrit sur le disque)",
+		"aiThinking": "L'IA prépare sa réponse…",
+		"chatPlaceholderAi": "Écrivez à la salle : l'IA répondra",
+		"aiErrors": {
+			"room": "La salle n'a pas répondu : l'IA n'a pas pu lire ni écrire.",
+			"unavailable": "Le fournisseur n'a pas répondu. Vérifiez le fournisseur choisi pour les Fonctions avancées.",
+			"empty": "Le fournisseur a renvoyé une réponse vide.",
+			"invalid": "Salle ou projet invalide."
 		}
 	},
 	"hubDescription": "Douze outils avancés au même endroit : longévité du code, santé des agents, routage des modèles, agents de domaine, anomalies CI/CD, licences, dérive d’architecture, tests générés, i18n à grande échelle, contexte cognitif, piste d’audit et pair programming."

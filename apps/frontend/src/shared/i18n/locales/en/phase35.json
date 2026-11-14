@@ -222,7 +222,19 @@
 				"description": "ETL, batch jobs, data quality."
 			}
 		},
-		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt."
+		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt.",
+		"libraries": "Suggested libraries for this project",
+		"librariesFor": "{{language}}: {{libraries}}",
+		"project": {
+			"current": "Domain applied to this project: {{domain}}",
+			"none": "No domain applied to this project: tasks get no domain addendum.",
+			"languages": "Detected stacks: {{languages}}",
+			"noLanguages": "No stack detected: libraries for every stack are listed.",
+			"effect": "Once applied, the domain is saved in .workpilot/domain.json and every Kanban task of the project receives its guidance (planning, coding, QA). A spec that names its own domain keeps it.",
+			"apply": "Apply to this project",
+			"clear": "Remove from project",
+			"noProject": "Open a project to apply a domain to its tasks; the preview below stays available."
+		}
 	},
 	"cicdAnomaly": {
 		"title": "CI/CD Anomaly Detective",
@@ -624,33 +636,25 @@
 		"title": "Cognitive Context Optimizer",
 		"subtitle": "Pack the right files into the token budget for your task",
 		"prompt": "Task prompt",
-		"candidateFiles": "Candidate files (one per line)",
-		"candidateFilesPlaceholder": "/abs/path/file1.py\n/abs/path/file2.py",
+		"candidateFiles": "Project files",
 		"tokenBudget": "Token budget",
 		"optimize": "Optimize",
 		"included": "Included",
-		"truncated": "Truncated",
+		"truncated": "Excerpt",
 		"skipped": "Skipped",
 		"fillRatio": "Fill ratio",
-		"colFile": "File",
-		"colScore": "Score",
-		"colTokens": "Tokens",
-		"colTruncated": "Truncated",
 		"addFiles": "Add files…",
-		"addManually": "Add manually",
-		"manualPathPlaceholder": "/abs/path/file.py",
+		"addManually": "Path relative to the project",
+		"manualPathPlaceholder": "src/Orders/OrderService.cs",
 		"add": "Add",
 		"removeFile": "Remove this file",
 		"clearFiles": "Clear all",
-		"noFiles": "No files yet — click \"Add files…\" to pick some.",
-		"fileCount": "{{count}} file(s) selected",
+		"noFiles": "No file chosen: WorkPilot will propose the project sources closest to the task.",
 		"validation": {
 			"promptRequired": "Enter a prompt",
-			"filesRequired": "Provide at least one file",
 			"budgetTooSmall": "Budget must be ≥ 100 tokens",
-			"budgetTooLarge": "Budget must be ≤ 1,000,000 tokens",
+			"budgetTooLarge": "Budget must be ≤ 200,000 tokens",
 			"duplicatePath": "This file is already in the list",
-			"pathNotAbsolute": "Path must be absolute",
 			"pathTooLong": "Path too long (limit: {{max}} characters)"
 		},
 		"estimatedCost": "Estimated cost",
@@ -659,7 +663,24 @@
 		"costFlatRate": "Flat-rate seat licence — no per-token cost",
 		"costUnknown": "Pricing unknown for this model",
 		"costNoModel": "No model configured in settings",
-		"outputRatio": "Output / input ratio"
+		"outputRatio": "Output / input ratio",
+		"fileCount_one": "{{count}} file chosen",
+		"fileCount_other": "{{count}} files chosen",
+		"discovered_one": "{{count}} project source examined (no file chosen).",
+		"discovered_other": "{{count}} project sources examined (no file chosen).",
+		"keywords": "Keywords read in the task: {{list}}",
+		"copy": "Copy the context",
+		"copied": "Context copied",
+		"refusedTitle": "Files not read",
+		"refused": {
+			"outside": "outside the project",
+			"missing": "not found",
+			"binary": "binary file",
+			"too_large": "too large"
+		},
+		"noneIncluded": "No file could be included.",
+		"scoreTokens": "score {{score}} · {{included}}/{{full}} tokens",
+		"skippedList": "Over budget: {{list}}"
 	},
 	"audit": {
 		"title": "Audit Trail",
@@ -699,9 +720,8 @@
 	},
 	"pair": {
 		"title": "Real-time Pair Programming",
-		"subtitle": "Multi-user collaborative sessions with live operations",
+		"subtitle": "A room on the open project: chat, a shared file and an AI participant",
 		"roomId": "Room ID",
-		"createRoom": "Create room",
 		"joinRoom": "Join room",
 		"leave": "Leave",
 		"yourName": "Your display name",
@@ -730,6 +750,27 @@
 			"join": "joined",
 			"leave": "left",
 			"role_change": "role change"
+		},
+		"localNotice": "This room lives on this computer: only WorkPilot windows open here can join it. The AI participant answers with the provider and model chosen for Advanced features (top right). On a server project, the whole team already has a chat in the Kanban: write @ai there and your AI answers everyone.",
+		"offline": "Offline",
+		"aiName": "WorkPilot AI",
+		"inviteAi": "Invite the AI",
+		"aiInRoom": "The AI is in the room",
+		"file": "Room file",
+		"noFile": "No file: the AI only reads the conversation.",
+		"filePath": "File path, relative to the project",
+		"filePlaceholder": "src/Orders/OrderService.cs",
+		"setFile": "Work on this file",
+		"pickFile": "Choose…",
+		"noOps": "Nothing yet.",
+		"suggestionFor": "Proposal for {{file}} (nothing is written to disk)",
+		"aiThinking": "The AI is preparing its answer…",
+		"chatPlaceholderAi": "Write to the room: the AI will answer",
+		"aiErrors": {
+			"room": "The room did not answer: the AI could not read or write.",
+			"unavailable": "The provider did not answer. Check the provider chosen for Advanced features.",
+			"empty": "The provider returned an empty answer.",
+			"invalid": "Invalid room or project."
 		}
 	},
 	"hubDescription": "Twelve advanced tools in one place: codebase longevity, agent health, model routing, domain agents, CI/CD anomalies, licenses, architecture drift, generated tests, i18n at scale, cognitive context, audit trail and pair programming."

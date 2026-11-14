@@ -30,6 +30,8 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	listDomains: () => browserUnavailable("Domain agents"),
 	getDomainProfile: () => browserUnavailable("Domain agents"),
 	buildDomainBundle: () => browserUnavailable("Domain agents"),
+	getProjectDomain: () => browserUnavailable("Domain agents"),
+	setProjectDomain: () => browserUnavailable("Domain agents"),
 
 	scanCicdLog: () => browserUnavailable("CI/CD anomaly detection"),
 	analyseCicdLogs: () => browserUnavailable("CI/CD anomaly detection"),
@@ -80,6 +82,7 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	pairOps: () => browserUnavailable("Pair programming"),
 	subscribePairRoom: () => browserUnavailable("Pair programming"),
 	unsubscribePairRoom: () => browserUnavailable("Pair programming"),
+	pairAskAi: async () => ({ success: false as const, error: "unavailable" as const }),
 	onPairOpEvent: () => () => undefined,
 	onPairStreamError: () => () => undefined,
 };

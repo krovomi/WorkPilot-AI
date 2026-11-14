@@ -6,24 +6,28 @@
  * listed "Generic", "Healthcare", "unknown", "approved".
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../../../shared/i18n";
 import {
 	useAgentHealthStore,
 	useArchDriftStore,
 	useCicdAnomalyStore,
+	useCogContextStore,
 	useDomainAgentsStore,
 	useI18nScalerStore,
 	useLicenseStore,
+	usePairRealtimeStore,
 	useModelRouterStore,
 } from "../../../stores/phase35-stores";
 import { AgentHealthPanel } from "../AgentHealthPanel";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
+import { CogContextPanel } from "../CogContextPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
 import { I18nScalerPanel } from "../I18nScalerPanel";
 import { LicensePanel } from "../LicensePanel";
+import { PairProgrammingPanel } from "../PairProgrammingPanel";
 import { ModelRouterPanel } from "../ModelRouterPanel";
 
 const DOMAINS = [
@@ -41,10 +45,20 @@ beforeEach(async () => {
 
 afterEach(() => {
 	cleanup();
-	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
+	useDomainAgentsStore.setState({
+		domains: [],
+		bundle: null,
+		phase: "idle",
+		error: null,
+		projectPath: null,
+		projectDomain: null,
+		projectLanguages: [],
+	});
 	useCicdAnomalyStore.setState({ signals: [], report: null, phase: "idle", error: null });
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
+	usePairRealtimeStore.setState({ currentRoom: null, ops: [], isStreaming: false, aiError: null });
+	useCogContextStore.setState({ context: null, phase: "idle", error: null });
 	useI18nScalerStore.setState({ report: null, formats: [], scannedDir: null, phase: "idle", error: null });
 	useModelRouterStore.setState({ chosen: null, comparison: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
@@ -65,6 +79,30 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByRole("option", { name: "Pipeline de données" })).toBeInTheDocument();
 		expect(screen.queryByRole("option", { name: "Healthcare" })).not.toBeInTheDocument();
 		expect(screen.getByText(/Aucune hypothèse de domaine/)).toBeInTheDocument();
+	});
+
+	it("shows the project's domain and stacks, and applies the chosen domain to the project", async () => {
+		const setProjectDomain = vi.fn().mockResolvedValue({ success: true, domain: "data_pipeline" });
+		const api = (globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
+		api.getProjectDomain = vi
+			.fn()
+			.mockResolvedValue({ success: true, domain: "healthcare", languages: ["c#", "go"] });
+		api.setProjectDomain = setProjectDomain;
+		render(<DomainAgentsPanel projectPath="/work/shop" />);
+		expect(await screen.findByText("Domaine appliqué à ce projet : Santé")).toBeInTheDocument();
+		expect(screen.getByText("Stacks détectées : c#, go")).toBeInTheDocument();
+		await screen.findByRole("option", { name: "Santé" });
+		const apply = screen.getByRole("button", { name: "Appliquer à ce projet" });
+		const domainSelect = screen.getByRole("combobox", { name: "Domaine" }) as HTMLSelectElement;
+		await waitFor(() => expect(domainSelect.value).toBe("healthcare"));
+		expect(apply).toBeDisabled();
+		fireEvent.change(domainSelect, { target: { value: "data_pipeline" } });
+		expect(apply).toBeEnabled();
+		fireEvent.click(apply);
+		await waitFor(() => expect(setProjectDomain).toHaveBeenCalledWith("/work/shop", "data_pipeline"));
+		expect(
+			await screen.findByText("Domaine appliqué à ce projet : Pipeline de données"),
+		).toBeInTheDocument();
 	});
 
 	it("scores agents from the project's tasks, by role and model, and lists those without enough phases", async () => {
@@ -335,6 +373,99 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText(/Aucune référence enregistrée/)).toBeInTheDocument();
 		expect(screen.queryByText("Nouvelles violations")).not.toBeInTheDocument();
 	});
+	it("shows a pair room in French, with the AI's proposal and roles", () => {
+		usePairRealtimeStore.setState({
+			isStreaming: true,
+			subscribe: () => Promise.resolve(),
+			currentRoom: {
+				room_id: "pair",
+				created_at: 0,
+				participants: [
+					{ user_id: "ana", display_name: "Ana", role: "driver", joined_at: 0, last_seen: 0 },
+					{
+						user_id: "workpilot-ai",
+						display_name: "WorkPilot IA",
+						role: "ai",
+						joined_at: 0,
+						last_seen: 0,
+					},
+				],
+				op_count: 2,
+				last_op_sequence: 2,
+				closed: false,
+			},
+			ops: [
+				{
+					op_id: "1",
+					sequence: 1,
+					kind: "cursor",
+					actor: "ana",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs" },
+				},
+				{
+					op_id: "2",
+					sequence: 2,
+					kind: "suggestion",
+					actor: "workpilot-ai",
+					timestamp: 0,
+					payload: { file_path: "src/Orders.cs", suggestion: "class Orders {}" },
+				},
+			],
+			aiError: "unavailable",
+		});
+		render(<PairProgrammingPanel projectPath="/work/shop" />);
+		expect(screen.getByText(/Pilote/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /L'IA est dans la salle/ })).toBeDisabled();
+		expect(screen.getByText(/Proposition pour src\/Orders.cs/)).toBeInTheDocument();
+		expect(screen.getByText(/Le fournisseur n'a pas répondu/)).toBeInTheDocument();
+		expect(screen.getByText(/Cette salle vit sur cet ordinateur/)).toBeInTheDocument();
+	});
+
+	it("asks for a project before optimizing a context", () => {
+		render(<CogContextPanel />);
+		expect(screen.queryByRole("button", { name: "Optimiser" })).not.toBeInTheDocument();
+	});
+
+	it("lists the files it refused to read, in French, and the sources it proposed", () => {
+		useCogContextStore.setState({
+			phase: "ok",
+			context: {
+				slices: [
+					{
+						file_path: "src/Orders/OrderService.cs",
+						content: "public class OrderService {}",
+						full_size_tokens: 900,
+						included_tokens: 120,
+						truncated: true,
+						relevance: {
+							file_path: "src/Orders/OrderService.cs",
+							score: 1.5,
+							keyword_hits: 2,
+							path_score: 0.5,
+							explicit_mention: false,
+							recency_score: 0,
+							breakdown: {},
+						},
+					},
+				],
+				token_budget: 8000,
+				tokens_used: 120,
+				files_skipped: [],
+				summary: { candidates: 12, keywords_detected: ["order", "total"] },
+				discovered: true,
+				refused: [{ path: "/etc/hosts", reason: "outside" }],
+			},
+		});
+		render(<CogContextPanel projectPath="/work/shop" />);
+		expect(screen.getByText("Fichiers non lus")).toBeInTheDocument();
+		expect(screen.getByText(/hors du projet/)).toBeInTheDocument();
+		expect(screen.getByText("Extrait")).toBeInTheDocument();
+		expect(screen.getByText(/12 sources du projet examinées/)).toBeInTheDocument();
+		expect(screen.getByText(/Mots-clés lus dans la tâche : order, total/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Copier le contexte/ })).toBeInTheDocument();
+	});
+
 
 	it("words the router's reason in French and says when a provider has no model", () => {
 		useModelRouterStore.setState({

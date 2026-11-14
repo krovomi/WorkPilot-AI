@@ -92,7 +92,8 @@ Le reste du script :
 
 - `pin.py` lit `pin.json` et refuse une plage ou `latest` ;
 - `locate.py` trouve un Node.js que la release accepte (sinon `node_missing` / `node_too_old`, jamais
-  contourné), puis REA **installé à la version figée** (le `rea` du PATH résolu jusqu'à
+  contourné) : celui du PATH, sinon la release la plus récente qu'un gestionnaire de versions a déjà
+  installée et que REA accepte (`node_installs.py`, voir plus bas), puis REA **installé à la version figée** (le `rea` du PATH résolu jusqu'à
   `rea-agents/scripts/rea.mjs`, lien npm sous macOS et Linux, `rea.cmd` voisin de
   `node_modules/` sous Windows, et son `package.json` lu), sinon `npx-cli.js` à côté de Node.js
   pour la récupérer. npx est un téléchargement : un projet en hors-ligne strict (`airgapStrict`)
@@ -114,6 +115,30 @@ version installée compte comme présente mais n'est pas lancée : le badge prop
 à sa place, et il n'y a pas de mise à jour vers `@latest`. Les deux canaux ne prennent aucun
 argument. `REA_PIN` (`shared/types/rea.ts`) est la copie de `pin.json` que le renderer importe ;
 `tests/rea/test_rea_frontend_pin.py` les garde égaux.
+
+### Le Node.js d'un gestionnaire de versions
+
+nvm, fnm, Volta, mise et asdf choisissent un Node.js par shell : celui que montre un terminal n'est
+pas forcément celui dont l'app a hérité. Sous WSL, l'alias par défaut de nvm décide de ce que
+reçoit tout nouveau shell, donc WorkPilot, alors qu'un `nvm use` ne change que son terminal : le
+badge disait « Node.js trop ancien » (26.10.0) devant un `node -v` à 27.0.0-alpha (14 novembre
+2026). Quand le Node.js du PATH manque ou ne convient pas, le backend (`rea/node_installs.py`) et le
+badge (`main/node-installs.ts`) lisent les dossiers où ces gestionnaires rangent leurs releases,
+sous le home ou la variable du gestionnaire (`NVM_DIR`, `FNM_DIR`, `VOLTA_HOME`, `MISE_DATA_DIR`,
+`ASDF_DATA_DIR`, `NVM_HOME` sous Windows), et prennent la plus récente que REA accepte, après
+l'avoir lancée en `node --version` (un nom de dossier n'est qu'un indice). Les dispositions vivent
+dans un seul JSON (`rea/node_installs.json`, copié dans `shared/constants/node-installs.json`,
+gardés égaux par `tests/rea/test_rea_node_installs.py`) : le badge et le runner choisissent le même
+Node.js. Le `rea` cherché ensuite est celui du PATH, puis celui que npm a écrit à côté de ce
+Node.js ; le bouton d'installation passe par le npm de ce Node.js (`node npm-cli.js install -g`,
+sans shell), dans son propre préfixe. Une préversion compte comme sa release
+(`27.0.0-alpha.1` satisfait `>=26.12.1`), comme npm lit `engines`. Le badge nomme le gestionnaire
+quand le Node.js retenu n'est pas celui du PATH.
+
+Le lien « Voir la documentation de REA » passe par `openExternalUrl` : sous WSL, une Ubuntu n'a ni
+`xdg-open` ni `wslview`, donc un lien `https:` est confié d'abord à Windows (`powershell.exe
+Start-Process`, lien entre apostrophes, chacune doublée), puis à `shell.openExternal` et aux
+lanceurs Linux. Un échec s'affiche sous le lien au lieu d'être avalé.
 
 ## Lot B : la porte « Exposition de l'artefact »
 
