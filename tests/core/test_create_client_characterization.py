@@ -332,6 +332,8 @@ def test_the_hooks_run_in_their_documented_order(harness):
         "Read",
         *GUARDED_WRITE_TOOLS,
         *CLEANED_TOOLS,
+        # The Agent Debugger, on every run so a person can attach mid-run.
+        None,
     ]
     assert pre[0].hooks == [bash_security_hook]
     assert pre[2].hooks == [rtk_rewrite_hook]
