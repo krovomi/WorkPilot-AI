@@ -48,7 +48,12 @@ def _run(
         [sys.executable, str(RUNNER), "--cache", str(cache), *args],
         cwd=BACKEND,
         input=stdin,
-        env={**os.environ, **(env or {})},
+        env={
+            **os.environ,
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
+            **(env or {}),
+        },
         capture_output=True,
         text=True,
         encoding="utf-8",
