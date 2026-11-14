@@ -17,8 +17,10 @@
  * refresh stays for the impatient.
  */
 
+import i18n from "i18next";
 import { create } from "zustand";
 import {
+	type ApiResult,
 	type HermesCycle,
 	type HermesDecision,
 	type HermesReviewOutcome,
@@ -70,6 +72,14 @@ export interface HermesState {
 }
 
 let inFlight: AbortController | null = null;
+
+/**
+ * What a failed call says to the person. A backend that did not answer is
+ * named as such: the bare "Failed to fetch" read as hermes being broken.
+ */
+function errorOf(res: Extract<ApiResult<unknown>, { ok: false }>): string {
+	return res.unreachable ? i18n.t("hermes:errors.backendUnreachable") : res.error;
+}
 
 export const useHermesStore = create<HermesState>((set, get) => ({
 	status: null,
@@ -123,7 +133,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 				// is "this feature is not in use here", which the card renders
 				// by rendering nothing.
 				unavailable: res.error.includes("desktop feature"),
-				error: res.error.includes("desktop feature") ? null : res.error,
+				error: res.error.includes("desktop feature") ? null : errorOf(res),
 			});
 			return;
 		}
@@ -135,7 +145,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 		set({ running: true, error: null });
 		const res = await runHermesCycle(surface);
 		if (!res.ok) {
-			set({ running: false, error: res.error, lastRunAt: Date.now() });
+			set({ running: false, error: errorOf(res), lastRunAt: Date.now() });
 			return;
 		}
 		const { cycle, status: fresh } = res.data;
@@ -183,7 +193,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 			deciding: state.deciding.filter((f) => !todo.includes(f)),
 		}));
 		if (!res.ok) {
-			set({ error: res.error });
+			set({ error: errorOf(res) });
 			return;
 		}
 		set({
@@ -196,7 +206,7 @@ export const useHermesStore = create<HermesState>((set, get) => ({
 		set({ running: true, error: null });
 		const res = await installHermesSoul(overwrite);
 		if (!res.ok) {
-			set({ running: false, error: res.error });
+			set({ running: false, error: errorOf(res) });
 			return;
 		}
 		set((state) => ({
