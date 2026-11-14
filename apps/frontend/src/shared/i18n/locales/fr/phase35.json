@@ -533,7 +533,7 @@
 			"leave": "départ",
 			"role_change": "changement de rôle"
 		},
-		"localNotice": "Cette salle vit sur cet ordinateur : seules les fenêtres de WorkPilot ouvertes ici peuvent la rejoindre. Le participant IA répond avec le fournisseur et le modèle choisis pour les Fonctions avancées (en haut à droite).",
+		"localNotice": "Cette salle vit sur cet ordinateur : seules les fenêtres de WorkPilot ouvertes ici peuvent la rejoindre. Le participant IA répond avec le fournisseur et le modèle choisis pour les Fonctions avancées (en haut à droite). Sur un projet du serveur, toute l'équipe a déjà un chat dans le Kanban : écrivez-y @ia et votre IA répond à tous.",
 		"offline": "Hors ligne",
 		"aiName": "WorkPilot IA",
 		"inviteAi": "Inviter l'IA",

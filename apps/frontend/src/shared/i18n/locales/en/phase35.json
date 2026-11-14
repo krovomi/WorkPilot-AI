@@ -533,7 +533,7 @@
 			"leave": "left",
 			"role_change": "role change"
 		},
-		"localNotice": "This room lives on this computer: only WorkPilot windows open here can join it. The AI participant answers with the provider and model chosen for Advanced features (top right).",
+		"localNotice": "This room lives on this computer: only WorkPilot windows open here can join it. The AI participant answers with the provider and model chosen for Advanced features (top right). On a server project, the whole team already has a chat in the Kanban: write @ai there and your AI answers everyone.",
 		"offline": "Offline",
 		"aiName": "WorkPilot AI",
 		"inviteAi": "Invite the AI",

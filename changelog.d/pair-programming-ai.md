@@ -9,3 +9,7 @@ section: ✨ Nouveautés
   fichier, sans rien écrire. La salle dit qu'elle reste sur cet ordinateur. Corrigés au passage :
   le départ d'une salle prévient enfin le backend, la liste des participants suit les arrivées,
   et un message part sous le bon nom quand d'autres sont arrivés avant.
+- **`@ia` dans le chat d'équipe** (projets du serveur) : un message qui mentionne `@ia` reçoit une
+  réponse de l'IA, en réponse à ce message et marquée 🤖, calculée par l'app de son auteur avec
+  le fournisseur de sa page Insights. Toute l'équipe la voit ; une mention d'un coéquipier ne
+  coûte rien aux autres.
