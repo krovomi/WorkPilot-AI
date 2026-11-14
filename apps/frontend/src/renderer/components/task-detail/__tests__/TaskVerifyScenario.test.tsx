@@ -81,7 +81,8 @@ describe("TaskVerify — card scenario", () => {
 		expect(screen.getByAltText('tasks:verify.stepCapture:{"number":1}')).toHaveAttribute("src", "shot://0");
 		const link = screen.getByRole("link", { name: "tasks:verify.trace.download" });
 		expect(link).toHaveAttribute("href", "trace://zip");
-		expect(link).toHaveAttribute("target", "_blank");
+		expect(link).toHaveAttribute("download", "trace.zip");
+		expect(link).not.toHaveAttribute("target");
 	});
 
 	it("says when there is no trace, and shows nothing without a scenario", () => {

@@ -8,6 +8,7 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { localBackendFetch } from "../../lib/local-backend";
 
 interface Suggestion {
 	value: string;
@@ -43,9 +44,8 @@ export function OfficialModelSearch({
 		const timeout = setTimeout(() => controller.abort(), 12000);
 		const debounce = setTimeout(async () => {
 			try {
-				const base = import.meta.env?.VITE_BACKEND_URL || "";
-				const response = await fetch(
-					`${base}/providers/ollama/library/search?q=${encodeURIComponent(query)}`,
+				const response = await localBackendFetch(
+					`/providers/ollama/library/search?q=${encodeURIComponent(query)}`,
 					{ signal: controller.signal },
 				);
 				if (!response.ok) throw new Error("search failed");

@@ -23,6 +23,10 @@ import {
 } from "./modules/agent-debugger-api";
 import { createReplayAPI, type ReplayAPI } from "./modules/replay-api";
 import {
+	createLocalBackendAPI,
+	type LocalBackendAPI,
+} from "./modules/local-backend-api";
+import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
 } from "./modules/blast-radius-api";
@@ -329,6 +333,7 @@ export interface ElectronAPI
 		InjectionGuardAPI,
 		GuardrailsAPI,
 		AgentDebuggerAPI,
+		LocalBackendAPI,
 		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
@@ -484,6 +489,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
 		...createAgentDebuggerAPI(),
+		...createLocalBackendAPI(),
 		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),

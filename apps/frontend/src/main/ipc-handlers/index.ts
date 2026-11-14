@@ -147,6 +147,7 @@ import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
+import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
 import {
 	registerVisualProgrammingHandlers,
@@ -540,6 +541,9 @@ export function setupIpcHandlers(
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
+
+	// The local backend for renderer views that read it (closed route list)
+	registerLocalBackendHandlers();
 
 	// Accessibility Agent handlers (WCAG scanner)
 	registerAccessibilityHandlers();
