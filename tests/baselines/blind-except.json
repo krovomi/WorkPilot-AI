@@ -72,6 +72,7 @@
   "apps/backend/core/agent_clients/base.py": {"blind": 2, "silent": 0},
   "apps/backend/core/agent_clients/copilot.py": {"blind": 7, "silent": 1},
   "apps/backend/core/agent_clients/local.py": {"blind": 6, "silent": 0},
+  "apps/backend/core/agent_clients/mcp_bridge.py": {"blind": 1, "silent": 0},
   "apps/backend/core/agent_clients/openai.py": {"blind": 2, "silent": 0},
   "apps/backend/core/agent_clients/windsurf.py": {"blind": 12, "silent": 0},
   "apps/backend/core/anthropic_usage.py": {"blind": 2, "silent": 0},
