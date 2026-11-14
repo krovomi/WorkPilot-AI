@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import type { Api } from "../api/endpoints";
 import type { CardDetails } from "../api/types";
 import "../i18n";
@@ -96,6 +97,29 @@ describe("ChangesSection", () => {
 		expect(screen.getByText("-old")).toBeTruthy();
 	});
 
+	it("colours a diff like git: additions, removals, hunks and headers apart from context", async () => {
+		await render(
+			<ChangesSection
+				changes={{
+					exists: true,
+					files: [
+						{
+							path: "src/a.cs",
+							status: "modified",
+							additions: 1,
+							deletions: 1,
+							patch: "diff --git a/src/a.cs b/src/a.cs\n@@ -1,2 +1,2 @@\n unchanged\n-old\n+new",
+						},
+					],
+				}}
+			/>,
+		);
+		await fireEvent.press(screen.getByRole("button", { name: /src\/a\.cs/ }));
+		const color = (text: string) => StyleSheet.flatten(screen.getByText(text).props.style).color;
+		const colors = ["diff --git a/src/a.cs b/src/a.cs", "@@ -1,2 +1,2 @@", " unchanged", "-old", "+new"].map(color);
+		expect(new Set(colors).size).toBe(5);
+	});
+
 	it("says when a file has no diff to show", async () => {
 		await render(
 			<ChangesSection
@@ -166,6 +190,38 @@ describe("LogsSection", () => {
 		expect(screen.queryByText("planned it")).toBeNull();
 		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
 		expect(screen.getByText("planned it")).toBeTruthy();
+	});
+
+	it("tells errors, successes and tool calls apart, and says when an opened phase is empty", async () => {
+		const entries = [
+			{ timestamp: "t", type: "error", content: "Build failed" },
+			{ timestamp: "t", type: "success", content: "Tests pass" },
+			{ timestamp: "t", type: "tool_start", content: "dotnet test", tool_name: "Bash" },
+			{ timestamp: "t", type: "text", content: "Thinking" },
+		];
+		await render(
+			<LogsSection
+				logs={{
+					phases: {
+						planning: phase("planning", "completed", []),
+						coding: { ...phase("coding", "failed", []), entries },
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText("failed")).toBeTruthy();
+		const color = (text: string | RegExp) => StyleSheet.flatten(screen.getByText(text).props.style).color;
+		expect(new Set([color("Build failed"), color("Tests pass"), color(/dotnet test/), color("Thinking")]).size).toBe(4);
+		expect(screen.getByText(/\[Bash\] /)).toBeTruthy();
+		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
+		expect(screen.getByText("Nothing written in this phase yet.")).toBeTruthy();
+	});
+
+	it("shows only the phases an older server sends", async () => {
+		await render(<LogsSection logs={{ phases: { coding: phase("coding", "active", ["coding it"]) } } as never} />);
+		expect(screen.getByText("coding it")).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /Planning/ })).toBeNull();
 	});
 
 	it("says when no run wrote anything yet", async () => {

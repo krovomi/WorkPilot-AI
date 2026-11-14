@@ -129,8 +129,6 @@ export function api(client: ServerClient) {
 				featurePath("insights", `/sessions/${enc(sessionId)}/messages`, projectId),
 				{ message },
 			),
-		cancelInsightJob: (projectId: string, jobId: string) =>
-			client.request<{ cancelled: boolean }>("POST", featurePath("insights", `/jobs/${enc(jobId)}/cancel`, projectId)),
 		featureSnapshot: (feature: JobFeature, projectId: string) =>
 			client.request<FeatureSnapshot>("GET", featurePath(feature, "/snapshot", projectId)),
 		startFeatureJob: (feature: JobFeature, projectId: string, options: Record<string, unknown> = {}) =>
