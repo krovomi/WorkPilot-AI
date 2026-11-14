@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
@@ -59,10 +60,6 @@ export function EditableTaskTitle({
 	// Changer de tâche l'incrémente aussi, si bien qu'un aller-retour A → B → A
 	// ne rend pas au champ rouvert sur A l'issue d'un enregistrement d'avant.
 	const saveSeq = useRef(0);
-	// Un enregistrement refusé rend la main au champ une fois réactivé : focus
-	// et nouvel essai attendent le rendu où `disabled` est retiré, sinon le
-	// blur du champ encore désactivé relancerait l'enregistrement tout seul.
-	const [retry, setRetry] = useState(0);
 
 	useEffect(() => {
 		if (!editing) setDraft(displayTitle);
@@ -79,12 +76,6 @@ export function EditableTaskTitle({
 	useEffect(() => {
 		if (!editable) setEditing(false);
 	}, [editable]);
-
-	useEffect(() => {
-		if (retry === 0) return;
-		settled.current = false;
-		input.current?.focus();
-	}, [retry]);
 
 	// Le dialogue navigue d'une tâche à l'autre sans démonter ce composant : un
 	// champ encore ouvert enregistrerait le titre de l'une sous l'id de l'autre.
@@ -129,15 +120,14 @@ export function EditableTaskTitle({
 			ok = await persistUpdateTask(task.id, { title: next });
 		} catch {
 			ok = false;
-		} finally {
-			// Toujours rendu au champ : un enregistrement refusé ne doit pas
-			// laisser un titre gelé en lecture seule — mais seulement par le
-			// dernier enregistrement lancé.
-			if (saveSeq.current === seq) setSaving(false);
 		}
+		// Seul le dernier enregistrement lancé agit encore sur le champ.
 		const stillShown = saveSeq.current === seq;
 		if (ok) {
-			if (stillShown) setEditing(false);
+			if (stillShown) {
+				setSaving(false);
+				setEditing(false);
+			}
 			return;
 		}
 		toast({
@@ -145,7 +135,16 @@ export function EditableTaskTitle({
 			description: t("tasks:inlineEdit.titleSaveError"),
 			variant: "destructive",
 		});
-		if (stillShown) setRetry((n) => n + 1);
+		if (!stillShown) return;
+		// Un refus rend le champ, actif et avec le focus, pour corriger et
+		// réessayer. Il est réactivé d'abord, de façon synchrone : un champ
+		// désactivé refuse le focus, et le navigateur retire le focus d'un champ
+		// désactivé au rendu suivant (« focus fixup ») ; ce blur, arrivé après
+		// `settled = false`, relancerait l'enregistrement dans le dos de
+		// l'utilisateur.
+		flushSync(() => setSaving(false));
+		settled.current = false;
+		input.current?.focus();
 	};
 
 	const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
