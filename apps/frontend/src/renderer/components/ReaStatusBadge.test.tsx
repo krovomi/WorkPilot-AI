@@ -78,6 +78,36 @@ describe("ReaStatusBadge", () => {
 		expect(screen.queryByRole("button", { name: "navigation:rea.installButton" })).toBeNull();
 	});
 
+	it("names the version manager whose Node.js REA runs with", async () => {
+		checkRea.mockResolvedValue({
+			state: "ready",
+			pinned,
+			installedVersion: pinned,
+			nodeVersion: "27.0.0",
+			nodeManager: "nvm",
+		});
+		renderBadge();
+		fireEvent.click(await screen.findByRole("button", { name: /REA/ }));
+		expect(await screen.findByText("navigation:rea.nodeFromManager")).toBeInTheDocument();
+	});
+
+	it("opens the documentation, and says so when the link does not open", async () => {
+		const openExternal = vi
+			.fn()
+			.mockResolvedValueOnce(undefined)
+			.mockRejectedValueOnce(new Error("Unable to open"));
+		(globalThis as { electronAPI?: unknown }).electronAPI = { checkRea, installRea, openExternal };
+		checkRea.mockResolvedValue({ state: "absent", pinned });
+		renderBadge();
+		fireEvent.click(await screen.findByRole("button", { name: /REA/ }));
+		const link = screen.getByRole("button", { name: /navigation:agentCli.viewDocs/ });
+		fireEvent.click(link);
+		await waitFor(() => expect(openExternal).toHaveBeenCalledWith("https://github.com/morluto/rea"));
+		expect(screen.queryByRole("alert")).toBeNull();
+		fireEvent.click(link);
+		expect(await screen.findByRole("alert")).toHaveTextContent("navigation:rea.docsFailed");
+	});
+
 	it("shows why an install failed, with npm's output", async () => {
 		checkRea.mockResolvedValue({ state: "absent", pinned });
 		installRea.mockResolvedValue({ success: false, error: "failed", detail: "network down" });

@@ -21,6 +21,11 @@ vi.mock("../platform", async (importOriginal) => {
 		getPathDelimiter: vi.fn(() => ":"),
 	};
 });
+vi.mock("../node-installs", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../node-installs")>();
+	// The real home of whoever runs the tests is never read.
+	return { ...actual, managedNodeInstalls: vi.fn(() => []) };
+});
 vi.mock("./agent-cli-install", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("./agent-cli-install")>();
 	return {
@@ -45,7 +50,9 @@ import {
 	checkRea,
 	installedReaVersion,
 	installRea,
+	pickManagedNode,
 	planReaInstall,
+	type ReaNode,
 	readReaStatus,
 	registerReaHandlers,
 } from "./rea-handlers";
@@ -185,6 +192,94 @@ describe("readReaStatus", () => {
 	it("checkRea turns a failing host read into an answer", async () => {
 		vi.mocked(readHost).mockRejectedValueOnce(new Error("boom"));
 		await expect(checkRea()).resolves.toMatchObject({ state: "absent", error: "boom" });
+	});
+});
+
+describe("a Node.js from a version manager", () => {
+	// Under WSL the app inherits nvm's default alias (26.10.0) while the
+	// user's terminal switched to 27.0.0-alpha: REA said « too old ».
+	const wsl: InstallHost = { ...linux, nodeVersion: "26.10.0" };
+	const install = (version: string, manager = "nvm") => ({
+		path: `/home/me/.nvm/versions/node/v${version}/bin/node`,
+		version: version.split(/[.-]/).slice(0, 3).map(Number) as [number, number, number],
+		manager,
+	});
+
+	it("keeps the PATH's Node.js when REA accepts it", async () => {
+		const readVersion = vi.fn();
+		await expect(
+			pickManagedNode(linux, {}, [install("27.0.0")], readVersion),
+		).resolves.toBeUndefined();
+		expect(readVersion).not.toHaveBeenCalled();
+	});
+
+	it("takes the newest accepted release, a prerelease included", async () => {
+		const answers: Record<string, string> = {
+			[install("27.0.0-alpha.0.1.0").path]: "27.0.0",
+			[install("26.10.0").path]: "26.10.0",
+		};
+		const node = await pickManagedNode(
+			wsl,
+			{},
+			[install("27.0.0-alpha.0.1.0"), install("26.10.0")],
+			async (path) => answers[path] ?? null,
+		);
+		expect(node).toEqual({
+			path: install("27.0.0-alpha.0.1.0").path,
+			version: "27.0.0",
+			manager: "nvm",
+		});
+		expect(nodeSatisfies("27.0.0-alpha.1", REA_PIN.node)).toBe(true);
+	});
+
+	it("believes the binary, not its directory name, and skips Windows under WSL", async () => {
+		const liar = install("30.0.0");
+		const windows = { ...install("26.12.1"), path: "/mnt/c/nvm/v26.12.1/node.exe" };
+		const readVersion = vi.fn(async (path: string) => (path === liar.path ? "18.0.0" : "26.12.1"));
+		await expect(pickManagedNode(wsl, {}, [liar, windows], readVersion)).resolves.toBeUndefined();
+		expect(readVersion).toHaveBeenCalledTimes(1);
+	});
+
+	it("is ready with the rea npm wrote beside that Node.js", () => {
+		const bin = path.join(root, "v27", "bin");
+		const entry = writePackage(path.join(bin, "node_modules"), REA_PIN.version);
+		const node: ReaNode = { path: path.join(bin, "node"), version: "27.0.0", manager: "nvm" };
+		expect(readReaStatus(wsl, { PATH: "/usr/bin" }, node)).toEqual({
+			state: "ready",
+			pinned: REA_PIN.version,
+			installedVersion: REA_PIN.version,
+			nodeVersion: "27.0.0",
+			nodeManager: "nvm",
+		});
+		expect(fs.existsSync(entry)).toBe(true);
+		const bare: ReaNode = { ...node, path: path.join(root, "v28", "bin", "node") };
+		expect(readReaStatus(wsl, { PATH: "/usr/bin" }, bare)).toMatchObject({
+			state: "absent",
+			nodeManager: "nvm",
+		});
+		expect(readReaStatus(wsl, { PATH: "/usr/bin" })).toMatchObject({
+			state: "node_too_old",
+			nodeVersion: "26.10.0",
+		});
+	});
+
+	it("installs with that Node.js's own npm, without a shell", () => {
+		const prefix = path.join(root, "v27");
+		const npmCli = path.join(prefix, "lib", "node_modules", "npm", "bin", "npm-cli.js");
+		fs.mkdirSync(path.dirname(npmCli), { recursive: true });
+		fs.writeFileSync(npmCli, "", "utf-8");
+		const node: ReaNode = {
+			path: path.join(prefix, "bin", "node"),
+			version: "27.0.0",
+			manager: "nvm",
+		};
+		expect(planReaInstall({ ...wsl, platform: "win32" }, node)).toEqual({
+			method: "npm",
+			command: node.path,
+			args: [npmCli, "install", "-g", "--ignore-scripts", REA_SPEC],
+			shell: false,
+		});
+		expect(planReaInstall(wsl, { ...node, path: path.join(root, "none", "node") })).toBeNull();
 	});
 });
 
