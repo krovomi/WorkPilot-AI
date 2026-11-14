@@ -86,9 +86,7 @@ def test_the_pin_names_one_exact_release():
 
 
 def test_the_audit_runs_the_pinned_release_never_latest():
-    args = _node(
-        "m.auditArgs(m.readPin(args[0]), '/dist/app', 'high')", str(PIN)
-    )
+    args = _node("m.auditArgs(m.readPin(args[0]), '/dist/app', 'high')", str(PIN))
     pin = json.loads(PIN.read_text(encoding="utf-8"))
     assert f"rea-agents@{pin['version']}" in args
     assert not any("latest" in a for a in args)
@@ -110,9 +108,9 @@ def test_node_versions_follow_the_pin_ranges():
         "not-a-version": False,
     }
     for version, expected in cases.items():
-        assert _node("m.nodeSatisfies(args[0], args[1])", version, ranges) is expected, (
-            version
-        )
+        assert (
+            _node("m.nodeSatisfies(args[0], args[1])", version, ranges) is expected
+        ), version
 
 
 def test_the_install_and_the_fuse_binary_are_both_audited():
