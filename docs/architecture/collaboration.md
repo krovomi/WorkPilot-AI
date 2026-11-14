@@ -70,6 +70,17 @@ sur un flux ouvert d'une salle rejointe.
   `@nom` dans le chat ; chaque type se coupe dans Réglages → Collaboration d'équipe, gardé sur
   cet ordinateur.
 
+## WorkPilot IA dans le chat (`@ia`)
+
+Un message qui mentionne `@ia` (ou `@ai`) reçoit une réponse de l'IA, posée en réponse à ce
+message et marquée `🤖`. C'est l'app de l'auteur qui répond (`main/team-chat-ai.ts`), avec le
+fournisseur et le modèle de sa page Insights : l'IA de chacun est la sienne, une mention d'un
+coéquipier ne coûte rien aux autres, et deux apps ne répondent jamais à la même question. Les
+30 derniers messages de la salle partent au modèle cités comme données ; un message marqué ne
+déclenche jamais de tour, et un tour à la fois par salle. La réponse est un message de l'auteur
+pour le serveur (mêmes droits, même débit) ; sans réponse du fournisseur, la fenêtre l'affiche
+(`ai_unavailable`).
+
 ## Ce qui reste vrai
 
 - Le contenu d'un message est une donnée : affiché comme texte, jamais comme balisage ni comme
