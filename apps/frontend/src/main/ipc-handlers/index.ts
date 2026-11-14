@@ -147,6 +147,7 @@ import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
+import { registerReplayHandlers } from "./replay-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -259,6 +260,7 @@ export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
+export { registerReplayHandlers } from "./replay-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -532,6 +534,9 @@ export function setupIpcHandlers(
 
 	// Agent Time Travel handlers (Temporal debugger for AI agents)
 	registerTimeTravelHandlers();
+
+	// Agent Replay + Session History (recorded sessions, via the local backend)
+	registerReplayHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
