@@ -79,6 +79,9 @@
 		"failed": "Scan failed: {{error}}",
 		"no_command": "No supported test command was found in this project.",
 		"no_results": "The test command wrote no test report: it probably failed before running the tests (build error, missing tool). Its output:",
+		"no_tests": "The test command ran without running a single test: what it targets probably holds no test. Its output:",
+		"no_dotnet_tests": "This .NET project has no test project (xUnit, NUnit, MSTest or TUnit): dotnet test would build and run nothing. Add a test project (for example dotnet new xunit) and run again.",
+		"fullLog": "Full output:",
 		"start_failed": "The test command could not start. Is the tool installed and on the PATH?",
 		"details": "Details"
 	},

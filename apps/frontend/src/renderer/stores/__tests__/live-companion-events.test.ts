@@ -6,13 +6,19 @@
  * changes, fed by no call at all, stayed empty.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	CompanionState,
 	FileChangeEvent,
 	LiveSuggestion,
 	TakeoverProposal,
 } from "../../../shared/types/live-companion";
+vi.mock("../project-store", () => ({
+	useProjectStore: {
+		getState: () => ({ getActiveProject: () => ({ path: "/work/shop" }) }),
+	},
+}));
+
 import {
 	setupLiveCompanionListeners,
 	useLiveCompanionStore,
@@ -57,6 +63,25 @@ describe("setupLiveCompanionListeners", () => {
 		const store = useLiveCompanionStore.getState();
 		expect(store.suggestions.map((s) => s.suggestion_id)).toEqual(["s1"]);
 		expect(store.takeovers.map((t) => t.proposal_id)).toEqual(["p1"]);
+	});
+
+	it("keeps another project's suggestions out of the open project's list", () => {
+		setupLiveCompanionListeners();
+		listeners.get("suggestion")?.({
+			suggestion_id: "mine",
+			project_dir: "/work/shop/",
+		} as LiveSuggestion);
+		listeners.get("suggestion")?.({
+			suggestion_id: "other",
+			project_dir: "/work/other",
+		} as LiveSuggestion);
+		listeners.get("suggestion")?.({
+			suggestion_id: "mine",
+			project_dir: "/work/shop",
+		} as LiveSuggestion);
+		expect(
+			useLiveCompanionStore.getState().suggestions.map((s) => s.suggestion_id),
+		).toEqual(["mine"]);
 	});
 
 	it("lists the file changes, newest first", () => {

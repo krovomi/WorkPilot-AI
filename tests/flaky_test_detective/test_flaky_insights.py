@@ -266,6 +266,14 @@ def test_ci_is_read_from_the_usual_variables() -> None:
             ["-Dtest=CartTest#adds", "-Dsurefire.failIfNoSpecifiedTests=false"],
         ),
         ("gradle", ["com.shop.CartTest::adds"], ["--tests", "com.shop.CartTest.adds"]),
+        ("node", ["test::adds (1)"], ["--test-name-pattern=adds \\(1\\)"]),
+        ("cargo", ["src/lib.rs::cart::adds"], ["--", "cart::adds"]),
+        ("phpunit", ["CartTest::testAdds"], ["--filter=testAdds"]),
+        ("pest", ["CartTest::testAdds"], ["--filter=testAdds"]),
+        ("rspec", ["spec/cart_spec.rb::Cart adds"], ["--example=Cart adds"]),
+        ("dart", ["test/cart_test.dart::cart adds"], ["--name=cart adds"]),
+        ("flutter", ["test/w_test.dart::shows"], ["--name=shows"]),
+        ("swift", ["CartTests.CartTests::testAdds"], ["--filter=testAdds"]),
     ],
 )
 def test_each_stack_keeps_only_the_suspects(
@@ -282,7 +290,9 @@ def test_a_name_never_becomes_an_option() -> None:
         "FullyQualifiedName~A.BFullyQualifiedNamex|FullyQualifiedName~A.C",
     ]
     assert filter_args("go", ["$(id)"]) == []
-    assert filter_args("cargo", ["a::b"]) == []
+    assert filter_args("cargo", ["src/lib.rs::tests::b"]) == ["--", "tests::b"]
+    assert filter_args("cargo", ["--nocapture", "src/lib.rs::-q"]) == []
+    assert filter_args("rspec", ["--require evil"]) == ["--example=--require evil"]
 
 
 # --- the report --------------------------------------------------------------------------

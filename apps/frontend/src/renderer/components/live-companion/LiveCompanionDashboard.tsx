@@ -1,7 +1,11 @@
 import type React from "react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SuggestionPriority } from "../../../shared/types/live-companion";
+import type {
+	LiveSuggestion,
+	SuggestionPriority,
+	TakeoverProposal,
+} from "../../../shared/types/live-companion";
 import {
 	acceptTakeover,
 	applySuggestion,
@@ -17,7 +21,9 @@ import {
 	useLiveCompanionStore,
 } from "../../stores/live-companion-store";
 import { useProjectStore } from "../../stores/project-store";
-import { Check, Hand, Lightbulb, Play, Radio, Square, X } from "lucide-react";
+import { createTask } from "../../stores/task-store";
+import { useShallow } from "zustand/react/shallow";
+import { AlertTriangle, Hand, KanbanSquare, Lightbulb, Play, Radio, Square, X } from "lucide-react";
 import {
 	CharterButton,
 	Column,
@@ -34,6 +40,7 @@ import {
 	StepCard,
 	type Tone,
 } from "../charter";
+import { formatPause, suggestionTask, takeoverTask } from "./companion-tasks";
 
 const PRIORITY_TONE: Record<SuggestionPriority, Tone> = {
 	critical: "red",
@@ -43,40 +50,51 @@ const PRIORITY_TONE: Record<SuggestionPriority, Tone> = {
 	info: "muted",
 };
 
-/** The companion watches files in the main process and pushes nothing to the
- *  renderer, so this view polls for as long as it is running. */
-const REFRESH_INTERVAL_MS = 5000;
+function samePath(a: string | undefined, b: string | undefined): boolean {
+	if (!a || !b) return false;
+	const normalize = (p: string) => p.replace(/[\\/]+$/, "").replaceAll("\\", "/");
+	return normalize(a) === normalize(b);
+}
 
 export function LiveCompanionDashboard(): React.ReactElement {
-	const { t } = useTranslation(["liveCompanion", "navigation"]);
+	const { t } = useTranslation(["liveCompanion", "navigation", "common"]);
 	const activeProject = useProjectStore((s) => s.getActiveProject());
 	const projectPath = activeProject?.path;
 
-	const {
-		companionState,
-		config,
-		suggestions,
-		takeovers,
-		recentChanges,
-		isLoading,
-	} = useLiveCompanionStore();
+	const activeProjectId = activeProject?.id;
+	const { companionState, config, suggestions, takeovers, recentChanges, isLoading, error } =
+		useLiveCompanionStore(
+			useShallow((s) => ({
+				companionState: s.companionState,
+				config: s.config,
+				suggestions: s.suggestions,
+				takeovers: s.takeovers,
+				recentChanges: s.recentChanges,
+				isLoading: s.isLoading,
+				error: s.error,
+			})),
+		);
+	const [taskNotice, setTaskNotice] = useState<"created" | "failed" | null>(null);
+	const [busyId, setBusyId] = useState<string | null>(null);
 
+	// Main pushes the state, each suggestion and each proposal
+	// (global-listeners.ts); the page only loads what was stored, per project.
 	const refresh = useCallback(() => {
 		loadCompanionState();
-		loadSuggestions();
-		loadTakeovers();
-	}, []);
+		loadSuggestions(projectPath);
+		loadTakeovers(projectPath);
+	}, [projectPath]);
 
 	useEffect(() => {
 		loadCompanionConfig();
 		refresh();
 	}, [refresh]);
 
-	useEffect(() => {
-		if (!companionState.active) return;
-		const id = setInterval(refresh, REFRESH_INTERVAL_MS);
-		return () => clearInterval(id);
-	}, [companionState.active, refresh]);
+	const watchingOther =
+		companionState.active &&
+		!!projectPath &&
+		!samePath(companionState.watching_project, projectPath);
+	const lastError = companionState.last_error;
 
 	async function handleToggle() {
 		if (companionState.active) {
@@ -87,6 +105,37 @@ export function LiveCompanionDashboard(): React.ReactElement {
 		refresh();
 	}
 
+	async function handleWatchThis() {
+		if (!projectPath) return;
+		await startCompanion(projectPath);
+		refresh();
+	}
+
+	async function toTask(
+		id: string,
+		task: { title: string; description: string },
+		markDone: () => Promise<boolean>,
+	) {
+		if (!activeProjectId) return;
+		setBusyId(id);
+		try {
+			const created = await createTask(activeProjectId, task.title, task.description);
+			if (created) await markDone();
+			setTaskNotice(created ? "created" : "failed");
+		} finally {
+			setBusyId(null);
+		}
+	}
+
+	const suggestionToTask = (suggestion: LiveSuggestion) =>
+		toTask(suggestion.suggestion_id, suggestionTask(t, suggestion), () =>
+			applySuggestion(suggestion.suggestion_id),
+		);
+	const takeoverToTask = (proposal: TakeoverProposal) =>
+		toTask(proposal.proposal_id, takeoverTask(t, proposal), () =>
+			acceptTakeover(proposal.proposal_id),
+		);
+
 	return (
 		<ModuleStage data-testid="live-companion-view">
 			<ModuleHeader
@@ -96,8 +145,12 @@ export function LiveCompanionDashboard(): React.ReactElement {
 				description={t("liveCompanion:description")}
 				tone="green"
 				actions={
-					<Chip tone={companionState.active ? "green" : "muted"}>
-						{companionState.active ? t("liveCompanion:state.active") : t("liveCompanion:state.inactive")}
+					<Chip tone={companionState.analyzing ? "amber" : companionState.active ? "green" : "muted"}>
+						{companionState.analyzing
+							? t("liveCompanion:state.analyzing")
+							: companionState.active
+								? t("liveCompanion:state.active")
+								: t("liveCompanion:state.inactive")}
 					</Chip>
 				}
 			/>
@@ -115,20 +168,18 @@ export function LiveCompanionDashboard(): React.ReactElement {
 						)}
 						<Stats>
 							<Stat
-								label={t("liveCompanion:state.changesDetected", { count: companionState.changes_detected })}
+								label={t("liveCompanion:state.changesDetected")}
 								value={companionState.changes_detected}
 								tone="blue"
 							/>
 							<Stat
-								label={t("liveCompanion:state.suggestionsGenerated", {
-									count: companionState.suggestions_generated,
-								})}
-								value={companionState.suggestions_generated}
+								label={t("liveCompanion:state.suggestionsGenerated")}
+								value={suggestions.length}
 								tone="amber"
 							/>
 							<Stat
-								label={t("liveCompanion:state.takeoversPending", { count: companionState.takeovers_proposed })}
-								value={companionState.takeovers_proposed}
+								label={t("liveCompanion:state.takeoversPending")}
+								value={takeovers.length}
 								tone="violet"
 							/>
 						</Stats>
@@ -189,9 +240,16 @@ export function LiveCompanionDashboard(): React.ReactElement {
 									tone="violet"
 									kicker={t("liveCompanion:takeover.proposal")}
 									title={<span className="wp-mono text-[0.8rem]">{proposal.file_path}</span>}
-									meta={`${t("liveCompanion:takeover.reason")}: ${proposal.reason}`}
+									meta={t(`liveCompanion:takeover.reasons.${proposal.reason}`, {
+										defaultValue: proposal.reason,
+									})}
 								>
-									<span className="wp-muted mt-1 text-xs whitespace-normal">{proposal.description}</span>
+									<span className="wp-muted mt-1 text-xs whitespace-normal">
+										{t("liveCompanion:takeover.description", {
+											duration: formatPause(t, proposal.inactivity_seconds),
+											count: proposal.change_count ?? 0,
+										})}
+									</span>
 									{proposal.ai_plan && (
 										<details className="mt-2">
 											<summary className="cursor-pointer text-xs text-primary">
@@ -201,7 +259,13 @@ export function LiveCompanionDashboard(): React.ReactElement {
 										</details>
 									)}
 									<span className="mt-2 flex items-center gap-2">
-										<CharterButton size="sm" icon={Check} onClick={() => acceptTakeover(proposal.proposal_id)}>
+										<CharterButton
+											size="sm"
+											icon={KanbanSquare}
+											busy={busyId === proposal.proposal_id}
+											disabled={!activeProjectId || busyId !== null}
+											onClick={() => takeoverToTask(proposal)}
+										>
 											{t("liveCompanion:takeover.accept")}
 										</CharterButton>
 										<CharterButton
@@ -227,7 +291,9 @@ export function LiveCompanionDashboard(): React.ReactElement {
 				>
 					{suggestions.length === 0 ? (
 						<EmptyStage icon={Lightbulb} title={t("liveCompanion:suggestions.emptyTitle")} tone="amber">
-							{t("liveCompanion:suggestions.empty")}
+							{companionState.active && !watchingOther
+								? t("liveCompanion:suggestions.emptyActive")
+								: t("liveCompanion:suggestions.empty")}
 						</EmptyStage>
 					) : (
 						<div className="flex flex-col gap-3">
@@ -263,8 +329,14 @@ export function LiveCompanionDashboard(): React.ReactElement {
 										</details>
 									)}
 									<span className="mt-2 flex items-center gap-2">
-										<CharterButton size="sm" icon={Check} onClick={() => applySuggestion(suggestion.suggestion_id)}>
-											{t("liveCompanion:actions.apply")}
+										<CharterButton
+											size="sm"
+											icon={KanbanSquare}
+											busy={busyId === suggestion.suggestion_id}
+											disabled={!activeProjectId || busyId !== null}
+											onClick={() => suggestionToTask(suggestion)}
+										>
+											{t("liveCompanion:actions.createTask")}
 										</CharterButton>
 										<CharterButton
 											size="sm"
@@ -284,6 +356,62 @@ export function LiveCompanionDashboard(): React.ReactElement {
 			{!projectPath && !companionState.active && (
 				<Notice tone="amber" className="relative z-[2] mx-5 mb-2">
 					{t("liveCompanion:errors.noProject")}
+				</Notice>
+			)}
+			{watchingOther && (
+				<Notice tone="amber" className="relative z-[2] mx-5 mb-2">
+					<span className="flex flex-wrap items-center gap-2">
+						<span>
+							{t("liveCompanion:state.watchingOther", { project: companionState.watching_project })}
+						</span>
+						<CharterButton size="sm" variant="ghost" icon={Play} onClick={handleWatchThis}>
+							{t("liveCompanion:actions.watchThis")}
+						</CharterButton>
+					</span>
+				</Notice>
+			)}
+			{error && !companionState.active && (
+				<Notice tone="red" role="alert" icon={AlertTriangle} className="relative z-[2] mx-5 mb-2">
+					{t("liveCompanion:errors.startFailed", { message: error })}
+				</Notice>
+			)}
+			{lastError && (
+				<Notice tone="red" role="alert" icon={AlertTriangle} className="relative z-[2] mx-5 mb-2">
+					<span className="block whitespace-pre-line">
+						{lastError.file_path
+							? t("liveCompanion:errors.analysisFailedFile", {
+									file: lastError.file_path,
+									message: lastError.message,
+								})
+							: t("liveCompanion:errors.analysisFailed", { message: lastError.message })}
+					</span>
+					<span className="wp-meta block">
+						{t("liveCompanion:errors.code", { code: lastError.code })}
+						{lastError.provider ? ` · ${lastError.provider}` : ""}
+						{lastError.model ? ` · ${lastError.model}` : ""}
+					</span>
+					<span className="wp-muted block text-xs">{t("liveCompanion:errors.providerHint")}</span>
+				</Notice>
+			)}
+			{taskNotice && (
+				<Notice
+					tone={taskNotice === "created" ? "green" : "red"}
+					role="status"
+					className="relative z-[2] mx-5 mb-2"
+				>
+					<span className="flex items-center gap-2">
+						<span className="flex-1">
+							{taskNotice === "created" ? t("liveCompanion:task.created") : t("liveCompanion:task.failed")}
+						</span>
+						<button
+							type="button"
+							className="wp-muted"
+							aria-label={t("common:buttons.close")}
+							onClick={() => setTaskNotice(null)}
+						>
+							<X className="h-3.5 w-3.5" aria-hidden="true" />
+						</button>
+					</span>
 				</Notice>
 			)}
 			<Composer

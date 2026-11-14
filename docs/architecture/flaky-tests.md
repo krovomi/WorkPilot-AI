@@ -12,12 +12,48 @@ apps/backend/flaky_test_detective/
   history.py    l'historique local .workpilot/flaky-tests/history.json
   enrich.py     ajoute tout cela au rapport, et l'auteur du dernier changement (git log -1)
 apps/backend/suite_runner/
+  runs.py       la commande de test de la stack, lancée avec l'option qui écrit un rapport
+  dotnet.py     ce que reçoit dotnet test : les projets de test, VSTest ou Microsoft.Testing.Platform
+  converters.py JUnit depuis go test -json, jest --json, cargo test, dart/flutter (json), rspec (json)
   names.py      les parties d'un nom de test (conteneur, test) tel que le rapport le donne
   only.py       le filtre de chaque stack pour ne relancer que certains tests
 apps/frontend/src/renderer/components/flaky-tests/
   FlakyTestCard.tsx   un test du rapport : verdict, preuves, historique, boutons de carte
   flaky-task.ts       la spec de la carte, traduite, dans les termes de la stack du test
 ```
+
+## Lancer la suite de chaque stack (F204)
+
+| Stack | Commande | Rapport |
+|---|---|---|
+| .NET | `dotnet test` sur ce qui contient les tests (voir plus bas) | TRX |
+| pytest | `python -m pytest --junitxml` (virtualenv du projet s'il existe) | JUnit |
+| Vitest | `npx vitest run --reporter=junit` | JUnit |
+| Jest | `npx jest --json --outputFile` (aucun plugin requis) | JSON → JUnit |
+| `node --test` | `--test-reporter=junit` (Node ≥ 20) | JUnit |
+| Maven, Gradle (Java, Kotlin, Android) | `mvn test`, `gradle cleanTest test --continue` | Surefire / JUnit modifiés par la passe |
+| Go | `go test -json -count=1 ./...` | JSON → JUnit |
+| Rust | `cargo test --no-fail-fast` | sortie de libtest → JUnit |
+| PHP | `vendor/bin/phpunit` ou `vendor/bin/pest`, `--log-junit` | JUnit |
+| Ruby | `bundle exec rspec --format json --out` | JSON → JUnit |
+| Dart, Flutter | `dart test` / `flutter test --file-reporter json:` | JSON → JUnit |
+| Swift | `swift test --parallel --xunit-output` | JUnit |
+
+**.NET.** `dotnet test Rag.sln` sur une solution qui ne liste aucun projet de test restaure,
+compile, ne lance rien et sort en 0 : le détective disait alors « la commande a échoué avant les
+tests ». La cible se choisit donc par les projets de test (`IsTestProject`, `MSTest.Sdk`, un paquet
+xUnit, NUnit, MSTest, TUnit ou `Microsoft.NET.Test.Sdk`, ou un nom en `Tests`) : la solution la moins
+profonde qui en liste un, sinon le projet de test seul, sinon un `dotnet test` par projet (préfixe
+TRX distinct). Sans projet de test, aucune commande .NET n'est proposée et l'erreur
+`no_dotnet_tests` le dit. Avec `"test": {"runner": "Microsoft.Testing.Platform"}` dans
+`global.json` (.NET 10), `--logger` est refusé : chaque projet de test tourne seul avec
+`--report-xunit-trx` (xunit.v3) ou `--report-trx` (MSTest, NUnit, TUnit). Un TRX de MSTest ne
+donne que le nom de la méthode : la classe lue dans `TestDefinitions` le complète.
+
+**Une passe sans test.** Si la première passe n'écrit aucun rapport, la suite s'arrête : `no_tests`
+quand la commande a réussi ou a écrit un rapport vide (rien à tester dans la cible), `no_results`
+quand elle a échoué (compilation, outil manquant). Le message montre la fin de la sortie (12 000
+caractères) et le chemin du journal complet (`output.log` de la passe).
 
 ## Verdict
 
@@ -57,8 +93,10 @@ test, 2 000 tests), jamais écrit à travers un lien symbolique. La lecture de r
 Une suite trop longue pour cinq passes peut confirmer ses suspects : `--only` (liste JSON, au plus
 50 noms de 300 caractères, revalidée dans le main puis dans `FlakyOptions` en mode serveur) ajoute
 le filtre de la stack : `pytest -k`, `vitest`/`jest -t`, `dotnet test --filter
-FullyQualifiedName~`, `go test -run`, `mvn -Dtest` (+ `failIfNoSpecifiedTests=false`),
-`gradle --tests`. Les noms sont réduits aux caractères d'un nom de test et chaque caractère spécial
+FullyQualifiedName~` (`--filter-method` pour xunit.v3 sous Microsoft.Testing.Platform),
+`go test -run`, `mvn -Dtest` (+ `failIfNoSpecifiedTests=false`), `gradle --tests`,
+`cargo test -- <chemin>` (chemins Rust seuls), `--filter=` (PHPUnit, Pest, Swift), `--name=`
+(Dart, Flutter), `--example=` (RSpec), `--test-name-pattern=` (Node), toujours en un seul jeton. Les noms sont réduits aux caractères d'un nom de test et chaque caractère spécial
 de la syntaxe du filtre est échappé : le filtre choisit des tests, il n'ajoute jamais d'option. Une
 stack sans filtre (ou des noms inutilisables) rend une erreur au lieu de relancer toute la suite.
 
