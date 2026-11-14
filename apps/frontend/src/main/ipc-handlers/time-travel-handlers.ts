@@ -9,10 +9,8 @@
 import { debugLog } from "../../shared/utils/debug-logger";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants";
-
-const getBackendUrl = (): string => {
-	return process.env.VITE_BACKEND_URL || "http://127.0.0.1:8321";
-};
+// The backend the app starts (port 9000), not a port nothing listens on.
+import { getBackendUrl } from "./_backend-fetch";
 
 async function timeTravelFetch<T = Record<string, unknown>>(
 	path: string,
