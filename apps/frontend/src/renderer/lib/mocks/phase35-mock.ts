@@ -22,6 +22,7 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	scoreAgentHealth: () => browserUnavailable("Agent health"),
 	scoreAllAgentHealth: () => browserUnavailable("Agent health"),
 	resetAgentHealth: () => browserUnavailable("Agent health"),
+	scoreProjectAgentHealth: () => browserUnavailable("Agent health"),
 
 	routeModel: () => browserUnavailable("Model routing"),
 	compareModels: () => browserUnavailable("Model routing"),
