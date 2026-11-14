@@ -9,7 +9,7 @@
  */
 
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom";
 import type { Task, TaskLogs as TaskLogsType } from "../../../shared/types";
@@ -247,7 +247,7 @@ describe("local model log status icons", () => {
 
 it("opens official search outside the header when the select restores focus", async () => {
 	HTMLElement.prototype.scrollIntoView = vi.fn();
-	render(
+	const view = render(
 		<TaskLogs
 			task={{
 				...baseTask,
@@ -276,6 +276,10 @@ it("opens official search outside the header when the select restores focus", as
 	expect(screen.getByRole("dialog")).toContainElement(input);
 	fireEvent.keyDown(input, { key: "Escape" });
 	expect(screen.queryByLabelText("tasks:logs.model.customAria")).toBeNull();
+	// Radix's focus scopes dispatch their unmount event from a timer: let it
+	// fire while this file's jsdom is still installed, not after teardown.
+	view.unmount();
+	await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 });
 
 it("keeps the active execution visible after selecting another model", () => {
