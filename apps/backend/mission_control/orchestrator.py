@@ -176,10 +176,16 @@ class MissionControlOrchestrator:
     # ---------------------------------------------------------------
 
     def start_agent(self, agent_id: str, task: str = "") -> bool:
-        """Start or restart an agent."""
+        """Mark an agent running on ``task``; a restart without one reuses the last.
+
+        This only records the state. The model call itself runs in the Electron
+        main process (``main/mission-control/``), which has the user's provider
+        credentials, and reports back through ``/agents/{id}/update``.
+        """
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        task = task or slot.current_task
         slot.start(task)
         tree = self._decision_trees.get(agent_id)
         if tree:
@@ -288,17 +294,44 @@ class MissionControlOrchestrator:
         if current_step:
             slot.current_step = current_step
 
+    def update_agent_output(self, agent_id: str, text: str):
+        """Append a chunk of the agent's answer, while it is still running."""
+        slot = self._slots.get(agent_id)
+        if not slot or slot.status != AgentStatus.RUNNING:
+            return
+        slot.append_output(text)
+
     def update_agent_status(self, agent_id: str, status: str, error: str = ""):
-        """Update agent status directly."""
+        """Update agent status; an end of run stops its clock and closes its tree."""
         slot = self._slots.get(agent_id)
         if not slot:
             return
         try:
-            slot.status = AgentStatus(status)
+            new_status = AgentStatus(status)
         except ValueError:
             return
+        if new_status in (AgentStatus.COMPLETED, AgentStatus.ERROR):
+            self._finish_agent(slot, new_status, error)
+            return
+        slot.status = new_status
         if error:
             slot.error_message = error
+
+    def _finish_agent(self, slot: AgentSlot, status: AgentStatus, error: str):
+        """Record the end of a run once; a stopped agent is not reopened by it."""
+        if slot.status != AgentStatus.RUNNING:
+            return
+        tree = self._decision_trees.get(slot.id)
+        if status == AgentStatus.COMPLETED:
+            slot.complete()
+            if tree:
+                tree.add_result("Answer", slot.output, success=True)
+            self._log_event("agent_completed", {"agent_id": slot.id})
+            return
+        slot.fail(error)
+        if tree:
+            tree.add_result("Error", error, success=False)
+        self._log_event("agent_failed", {"agent_id": slot.id, "error": error[:300]})
 
     # ---------------------------------------------------------------
     # Decision tree access

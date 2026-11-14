@@ -187,6 +187,45 @@ describe("recordReviewStep", () => {
 		expect(findOpenReviewCard(project, "test-studio")?.specId).toBe(ws.specId);
 	});
 
+	it("writes each run into the card's log, which no pipeline writes for it", async () => {
+		const ws = await openReviewWorkspace(project, { source: "test-studio", subject: "A" }, deps);
+		await recordReviewStep(
+			ws,
+			{
+				message: "test: add generated unit tests for A",
+				summary: "Tests unitaires de A",
+				log: ["detect (done): Python · pytest", "write (done): tests/test_a.py"],
+			},
+			deps,
+		);
+		commitAnswer = { committed: true, files: ["requirements-dev.txt"] };
+		const next = await openReviewWorkspace(project, { source: "test-studio", subject: "B" }, deps);
+		await recordReviewStep(next, { message: "test: add test packages B", summary: "Paquets B" }, deps);
+
+		const logs = readSpec(ws.specId, "task_logs.json");
+		expect(logs.spec_id).toBe(ws.specId);
+		expect(logs.phases.coding.status).toBe("completed");
+		expect(logs.phases.coding.entries.map((e: { type: string; content: string }) => [e.type, e.content])).toEqual([
+			["phase_start", "Tests unitaires de A"],
+			["text", "detect (done): Python · pytest"],
+			["text", "write (done): tests/test_a.py"],
+			["info", "Écrit tests/test_a.py"],
+			["success", "Commit : test: add generated unit tests for A"],
+			["phase_end", "Tests unitaires de A"],
+			["phase_start", "Paquets B"],
+			["info", "Écrit requirements-dev.txt"],
+			["success", "Commit : test: add test packages B"],
+			["phase_end", "Paquets B"],
+		]);
+	});
+
+	it("leaves no log behind for a run that wrote nothing", async () => {
+		commitAnswer = { committed: false, files: [] };
+		const ws = await openReviewWorkspace(project, { source: "test-studio", subject: "A" }, deps);
+		await recordReviewStep(ws, { message: "test: a", summary: "A", log: ["x"] }, deps);
+		expect(existsSync(path.join(root, ".workpilot", "specs", ws.specId, "task_logs.json"))).toBe(false);
+	});
+
 	it("counts the commits the run's own agent made since it began", async () => {
 		const run = deps.run;
 		deps = {
