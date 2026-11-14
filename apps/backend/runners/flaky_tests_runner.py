@@ -41,9 +41,12 @@ from flaky_test_detective.flaky_analyzer import (  # noqa: E402
     FlakyAnalyzer,
     TestRun,
 )
+from suite_runner.dotnet import has_dotnet_projects  # noqa: E402
 from suite_runner.runs import (  # noqa: E402
     COMMAND_IDS,
     HISTORY_DIR,
+    OUTPUT_TAIL_CHARS,
+    RunOutcome,
     TestCommand,
     detect_test_commands,
     install_cancel_handler,
@@ -185,13 +188,35 @@ def _trx_error_message(result: ET.Element) -> str:
     return ""
 
 
+def _trx_classes(root: ET.Element) -> dict[str, str]:
+    """``testId`` → the test's class, from the TRX ``TestDefinitions``."""
+    classes: dict[str, str] = {}
+    for unit in _iter_local(root, "UnitTest"):
+        for method in _iter_local(unit, "TestMethod"):
+            name = method.attrib.get("className", "")
+            if name:
+                classes[unit.attrib.get("id", "")] = name.split(",")[0].strip()
+    return classes
+
+
+def _trx_name(result: ET.Element, classes: dict[str, str]) -> str:
+    """The test's full name. MSTest writes the method alone (``Flaky``) where
+    xunit writes ``Ns.Class.Flaky``: two classes with a ``Flaky`` would merge."""
+    name = result.attrib.get("testName", "")
+    owner = classes.get(result.attrib.get("testId", ""), "")
+    if owner and not name.startswith(owner + "."):
+        return f"{owner}.{name}"
+    return name
+
+
 def _parse_trx_root(root: ET.Element, run_id: str, timestamp: float) -> list[TestRun]:
     runs: list[TestRun] = []
+    classes = _trx_classes(root)
     for result in _iter_local(root, "UnitTestResult"):
         outcome = result.attrib.get("outcome", "").lower()
         if outcome in _TRX_SKIPPED_OUTCOMES:
             continue
-        name = result.attrib.get("testName", "")
+        name = _trx_name(result, classes)
         passed = outcome == "passed"
         error_message = "" if passed else _trx_error_message(result)
         runs.append(
@@ -247,13 +272,13 @@ def _flaky_test_to_dict(test: Any) -> dict[str, Any]:
 _LANGUAGE_REPORT_HINTS: list[tuple[str, tuple[str, ...], str]] = [
     (
         "C# / .NET",
-        ("*.sln", "*.csproj", "*.fsproj", "*.vbproj"),
-        "dotnet test --logger trx",
+        ("*.sln", "*.slnx", "*.csproj", "*.fsproj", "*.vbproj"),
+        "dotnet test <test project> --logger trx",
     ),
     (
         "JavaScript / TypeScript",
         ("package.json",),
-        "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)",
+        "vitest run --reporter=junit, jest --json or node --test --test-reporter=junit",
     ),
     (
         "Python",
@@ -265,26 +290,16 @@ _LANGUAGE_REPORT_HINTS: list[tuple[str, tuple[str, ...], str]] = [
         ("pom.xml", "build.gradle", "build.gradle.kts"),
         "mvn test (Surefire emits JUnit XML) or gradle test",
     ),
-    (
-        "Go",
-        ("go.mod",),
-        "gotestsum --junitfile test-results/junit.xml",
-    ),
-    (
-        "Ruby",
-        ("Gemfile",),
-        "rspec --format RspecJunitFormatter --out test-results/junit.xml",
-    ),
-    (
-        "Rust",
-        ("Cargo.toml",),
-        "cargo nextest run --profile ci (emits JUnit)",
-    ),
+    ("Go", ("go.mod",), "go test -json ./..."),
+    ("Rust", ("Cargo.toml",), "cargo test"),
     (
         "PHP",
         ("composer.json",),
-        "phpunit --log-junit test-results/junit.xml",
+        "phpunit --log-junit test-results/junit.xml (or pest)",
     ),
+    ("Ruby", ("Gemfile",), "rspec --format json --out test-results/rspec.json"),
+    ("Dart / Flutter", ("pubspec.yaml",), "dart test or flutter test"),
+    ("Swift", ("Package.swift",), "swift test --parallel --xunit-output junit.xml"),
 ]
 
 # Stop walking once we've seen enough of the tree to identify the stack;
@@ -429,17 +444,53 @@ class RunError(Exception):
     """The suite could not produce a single report; the message says why."""
 
 
+def _no_report_error(outcome: RunOutcome, project_path: Path) -> RunError:
+    """Why the first run gave nothing, with where its whole output is.
+
+    ``no_tests``: the command ended well, or wrote an empty report, so the
+    target holds no test (a .NET solution without a test project, a pytest
+    run that collected nothing). ``no_results``: it failed before any test
+    (build error, missing tool). The second line names the full log; the
+    rest is the end of the output.
+    """
+    empty_report = bool(outcome.reports)
+    if empty_report or (outcome.exit_code == 0 and not outcome.timed_out):
+        head = "no_tests: the test command ran no test"
+    else:
+        head = "no_results: the test command produced no test report"
+    lines = [f"{head} (exit code {outcome.exit_code})."]
+    if outcome.log is not None:
+        try:
+            shown = outcome.log.relative_to(project_path).as_posix()
+        except ValueError:
+            shown = str(outcome.log)
+        lines.append(f"log: {shown}")
+    tail = outcome.output_tail
+    if outcome.log is not None and len(tail) >= OUTPUT_TAIL_CHARS:
+        tail = "…\n" + tail.split("\n", 1)[-1]
+    lines.append(tail)
+    return RunError("\n".join(lines))
+
+
 def _pick_command(project_path: Path, command_id: str) -> TestCommand:
     """A command of the project's stack, never a command line from outside:
     the caller names one of the detected commands, or takes the first."""
     detected = detect_test_commands(project_path)
     if command_id in ("", "auto"):
-        if not detected:
-            raise RunError("no_command: no test command was detected in this project")
-        return detected[0]
-    for command in detected:
-        if command.id == command_id:
-            return command
+        if detected:
+            return detected[0]
+    else:
+        for command in detected:
+            if command.id == command_id:
+                return command
+    if command_id in ("", "auto", "dotnet") and has_dotnet_projects(project_path):
+        # ``dotnet test`` on a solution without a test project runs nothing.
+        raise RunError(
+            "no_dotnet_tests: this .NET project has no test project "
+            "(xUnit, NUnit, MSTest, TUnit)"
+        )
+    if command_id in ("", "auto"):
+        raise RunError("no_command: no test command was detected in this project")
     raise RunError(f"no_command: the {command_id} test command was not detected")
 
 
@@ -474,7 +525,7 @@ def run_repeated(
 
     all_runs: list[TestRun] = []
     produced = 0
-    last_tail = ""
+    first_empty: RunOutcome | None = None
     for index in range(1, runs + 1):
         _progress(
             "run_started",
@@ -499,8 +550,8 @@ def run_repeated(
             results.extend(_parse_report_file(file, run_id=f"{stamp}-{index}"))
         if results:
             produced += 1
-        else:
-            last_tail = outcome.output_tail
+        elif first_empty is None:
+            first_empty = outcome
         all_runs.extend(results)
         failed = sum(1 for r in results if not r.passed)
         _progress(
@@ -520,9 +571,7 @@ def run_repeated(
             break
 
     if not all_runs:
-        raise RunError(
-            "no_results: the test command produced no test report.\n" + last_tail
-        )
+        raise _no_report_error(first_empty or RunOutcome(None), project_path)
 
     _progress("analysing", f"Analysing {len(all_runs)} test results...")
     result = _build_report(
