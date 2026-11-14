@@ -466,5 +466,28 @@
 		"hideAll_other": "Hide all {{count}}",
 		"count": "Hidden pages ({{count}})",
 		"show": "Show again"
+	},
+	"rea": {
+		"description": "Reads what a shipped build reveals (Electron fuses, binary hardening, .NET public API), without running it. WorkPilot runs release {{version}} only.",
+		"state": {
+			"ready": "Release {{version}} installed",
+			"other_version": "Another version is installed",
+			"absent": "Not installed",
+			"node_missing": "Node.js not found",
+			"node_too_old": "Node.js too old"
+		},
+		"otherVersion": "rea on your PATH is {{installed}}; WorkPilot only runs {{version}}. Installing replaces it with {{version}}.",
+		"otherVersionUnknown": "rea on your PATH is not the rea-agents release WorkPilot runs ({{version}}). Installing puts {{version}} in its place.",
+		"absentHint": "Without it, WorkPilot fetches release {{version}} with npx each time it needs it (refused in strict offline mode).",
+		"nodeTooOld": "REA {{version}} needs Node.js {{ranges}}; found {{node}}.",
+		"nodeMissing": "REA needs Node.js {{ranges}}. Install Node.js (nodejs.org), then refresh.",
+		"installButton": "Install REA {{version}}",
+		"error": {
+			"node_required": "REA cannot be installed here: it needs npm and Node.js {{ranges}}.",
+			"failed": "Installing REA {{version}} failed.",
+			"not_on_path": "REA was installed but rea on your PATH still does not lead to {{version}}. Restart WorkPilot, then refresh.",
+			"busy": "REA is already being installed."
+		},
+		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files."
 	}
 }

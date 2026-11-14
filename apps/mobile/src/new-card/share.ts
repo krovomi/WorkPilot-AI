@@ -38,7 +38,8 @@ export function cleanText(raw: string, max: number): string {
 	const text = raw.replace(/\r\n?/g, "\n").slice(0, max * 2);
 	let out = "";
 	for (const char of text) {
-		if (!isControl(char.codePointAt(0) ?? 0)) out += char;
+		// A string iterator yields whole code points, never an empty string.
+		if (!isControl(char.codePointAt(0) as number)) out += char;
 		if (out.length >= max) break;
 	}
 	return out.slice(0, max).trim();
@@ -54,7 +55,8 @@ export function draftFromShare(items: readonly SharedItem[]): ShareDraft | null 
 	}
 	const description = parts.join("\n\n").slice(0, MAX_DESCRIPTION).trim();
 	if (!description) return null;
-	const firstLine = description.split("\n").find((line) => line.trim()) ?? "";
+	// The description is trimmed and not empty: its first line has text.
+	const firstLine = description.split("\n")[0];
 	const title = firstLine.replace(/\s+/g, " ").trim().slice(0, Math.min(SHARED_TITLE_LENGTH, MAX_TITLE)).trim();
 	return { title, description };
 }

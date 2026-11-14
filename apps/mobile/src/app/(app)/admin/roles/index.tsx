@@ -5,7 +5,6 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text } from "react-n
 import { useAdminApi } from "../../../../admin/api";
 import { useSession } from "../../../../auth/session";
 import { useLoad } from "../../../../hooks/useLoad";
-import { describeError } from "../../../../i18n";
 import { Button, ErrorBanner, Loading } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
@@ -27,7 +26,7 @@ export default function Roles() {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			{can("org.role.write") ? <Button label={t("admin.roles.new")} onPress={() => open("new")} /> : null}
 			{roles.map((r) => (
 				<Pressable

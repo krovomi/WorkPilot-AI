@@ -70,6 +70,7 @@
 		"flagLine": "Flag {{key}} ({{provider}}) on once {{services}} shipped"
 	},
 	"approval": {
+		"exposure": "REA audit of {{artifact}}, stops at {{failOn}} and above",
 		"title": "Approve this train file before it runs anything",
 		"hint": "{{path}} runs these commands on your computer. Read them. A change to the file (hash {{sha}}) will ask you again.",
 		"approve": "Approve this version",
@@ -81,6 +82,7 @@
 		"noDeploy": "{{service}} has no deploy command."
 	},
 	"steps": {
+		"exposure": "artifact exposure",
 		"deploy": "deploy",
 		"rollback": "rollback",
 		"health": "health check",
