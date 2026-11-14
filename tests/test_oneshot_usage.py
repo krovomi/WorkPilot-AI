@@ -238,3 +238,58 @@ def test_every_provider_that_drives_itself_passes_the_gate():
         assert oneshot.drives_itself(provider)
     for provider in ("meta", "aws", "cursor", "custom", ""):
         assert not oneshot.drives_itself(provider)
+
+
+def test_a_cli_provider_answers_for_itself_in_a_project(monkeypatch, tmp_path):
+    # Mission Control runs pi, OpenCode, Antigravity or Gemini CLI agents: with
+    # a project and a spec directory their own agent client answers, so a
+    # caller that refuses substitutes may take them.
+    from core import oneshot
+
+    built = []
+    monkeypatch.setattr(
+        oneshot,
+        "_build_client",
+        lambda provider, *a, **k: built.append(provider) or FakeClient(None),
+    )
+    for provider in ("pi", "opencode", "antigravity", "gemini-cli"):
+        asyncio.run(
+            oneshot.oneshot_completion(
+                "hello",
+                provider=provider,
+                model="m",
+                project_dir=str(tmp_path),
+                spec_dir=str(tmp_path),
+                require_provider=True,
+            )
+        )
+    assert built == ["pi", "opencode", "antigravity", "gemini-cli"]
+
+
+def test_a_cli_provider_without_a_project_is_still_refused(monkeypatch):
+    from core import oneshot
+
+    monkeypatch.setattr(
+        oneshot,
+        "_build_client",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("built")),
+    )
+    reported = []
+    result = asyncio.run(
+        oneshot.oneshot_completion(
+            "hello",
+            provider="pi",
+            model="m",
+            require_provider=True,
+            on_error=reported.append,
+        )
+    )
+    assert result == ""
+    assert reported and "pi" in reported[0]["message"]
+
+
+def test_a_project_does_not_let_an_adapterless_provider_through(tmp_path):
+    from core import oneshot
+
+    for provider in ("meta", "aws", "cursor", "custom"):
+        assert not oneshot.runs_own_agent(provider, str(tmp_path), str(tmp_path))
