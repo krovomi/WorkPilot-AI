@@ -12,12 +12,14 @@
  * is supported on every call (for useEffect cleanup).
  */
 
+import { localBackendFetch } from "./local-backend";
+
 export type ApiResult<T> =
 	| { ok: true; data: T }
 	/** `detail`: the backend's own words, when it has any worth showing. */
 	| { ok: false; error: string; detail?: string };
 
-const backendUrl = (): string => import.meta.env?.VITE_BACKEND_URL ?? "";
+// Main reaches the backend for the renderer, which has no URL for it.
 
 async function _post<T>(
 	path: string,
@@ -25,9 +27,8 @@ async function _post<T>(
 	signal?: AbortSignal,
 ): Promise<ApiResult<T>> {
 	try {
-		const res = await fetch(`${backendUrl()}${path}`, {
+		const res = await localBackendFetch(path, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(body),
 			signal,
 		});
@@ -61,7 +62,7 @@ async function _get<T>(
 ): Promise<ApiResult<T>> {
 	try {
 		const qs = new URLSearchParams(params).toString();
-		const res = await fetch(`${backendUrl()}${path}?${qs}`, { signal });
+		const res = await localBackendFetch(`${path}?${qs}`, { signal });
 		const json = (await res.json()) as Record<string, unknown>;
 		if (json.success === true) {
 			return { ok: true, data: json as T };
@@ -1781,7 +1782,10 @@ export function compareVerify(
 	return _post<VerifyPayload>("/api/verify/compare", specAddress(query), signal);
 }
 
-/** The URL of one screenshot the record names — by index, never by path. */
+/**
+ * The backend URL of one screenshot the record names — by index, never by path.
+ * Backend-relative: render it through `useLocalBackendFile`, which asks main.
+ */
 export function verifyScreenshotUrl(
 	query: SpecTraceabilityQuery,
 	index: number,
@@ -1790,19 +1794,19 @@ export function verifyScreenshotUrl(
 		...specAddress(query),
 		index: String(index),
 	}).toString();
-	return `${backendUrl()}/api/verify/screenshot?${qs}`;
+	return `/api/verify/screenshot?${qs}`;
 }
 
 /** The Playwright trace of the card's scenario, served by the record, never by path. */
 export function verifyTraceUrl(query: SpecTraceabilityQuery): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
-	return `${backendUrl()}/api/verify/trace?${qs}`;
+	return `/api/verify/trace?${qs}`;
 }
 
 /** The scenario's video or GIF, served by the record, never by path. */
 export function verifyMediaUrl(query: SpecTraceabilityQuery, kind: "video" | "walkthrough"): string {
 	const qs = new URLSearchParams(specAddress(query)).toString();
-	return `${backendUrl()}/api/verify/${kind}?${qs}`;
+	return `/api/verify/${kind}?${qs}`;
 }
 
 // ── Red team (`red_team/`, `qa/red_team_api.py`) ─────────────────────────────

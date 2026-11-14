@@ -13,8 +13,10 @@ Comprehensive test suite for rate limiting system covering:
 
 import asyncio
 import time
+import types
 
 import pytest
+import rate_limiter as rate_limiter_module
 from rate_limiter import (
     CostLimitExceeded,
     CostTracker,
@@ -26,8 +28,40 @@ from rate_limiter import (
 )
 
 
+class _Clock:
+    """``time`` for the rate limiter, with a monotonic clock the test moves."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def install(self, monkeypatch) -> None:
+        fake = types.SimpleNamespace(
+            **{k: getattr(time, k) for k in dir(time) if not k.startswith("_")}
+        )
+        fake.monotonic = lambda: self.now
+        monkeypatch.setattr(rate_limiter_module, "time", fake)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """A frozen clock: an exact token count never depends on the runner's speed.
+
+    At 100 tokens a second, 10 ms between two calls on a busy macOS runner
+    refilled one token, and `available() == 50` read 51.
+    """
+    frozen = _Clock()
+    frozen.install(monkeypatch)
+    return frozen
+
+
 class TestTokenBucket:
     """Test token bucket algorithm."""
+
+    @pytest.fixture(autouse=True)
+    def _frozen(self, request):
+        # The asyncio tests below wait on real time; the others read exact counts.
+        if not request.node.get_closest_marker("asyncio"):
+            request.getfixturevalue("clock")
 
     def test_initial_state(self):
         """Bucket starts full."""
@@ -74,15 +108,16 @@ class TestTokenBucket:
         assert result is False
         assert elapsed < 0.5  # Should timeout quickly
 
-    def test_refill_over_time(self):
+    def test_refill_over_time(self, clock):
         """Tokens refill at correct rate."""
         bucket = TokenBucket(capacity=100, refill_rate=100.0)  # 100 tokens/sec
         bucket.try_acquire(50)  # Take 50
         assert bucket.available() == 50
 
-        time.sleep(0.5)  # Wait 0.5s = 50 tokens
-        available = bucket.available()
-        assert 95 <= available <= 100  # Should be near full
+        clock.now += 0.25  # 25 tokens
+        assert bucket.available() == 75
+        clock.now += 0.5  # 50 more, capped at the capacity
+        assert bucket.available() == 100
 
     def test_time_until_available(self):
         """Calculate wait time correctly."""
