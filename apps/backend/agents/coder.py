@@ -112,6 +112,7 @@ from .base import (
     RESUME_FILE,
     sanitize_error_message,
 )
+from .iteration_guards import guard_iteration
 from .manual_verification import skip_manual_verification, take_human_unblock
 from .memory_manager import debug_memory_system_status, get_memory_context
 from .rate_limit_time import parse_rate_limit_reset_time
@@ -2012,55 +2013,11 @@ async def run_autonomous_agent(
     while True:
         iteration += 1
 
-        # Anti-burnout loop detector (opt-in via WORKPILOT_LOOP_DETECTION_ENABLED).
-        # If iteration N produces the same diff as a recent earlier iteration,
-        # we're flip-flopping — pause the agent for human review instead of
-        # burning more tokens.
-        try:
-            from agents.loop_detection import (
-                get_detector,
-                loop_detection_enabled,
-            )
-
-            if loop_detection_enabled() and iteration > 1:
-                detector = get_detector(spec_dir)
-                diff_hash = detector.hash_diff(project_dir)
-                if detector.record_and_check(diff_hash):
-                    audit_event(
-                        project_dir,
-                        kind="policy_violated",
-                        actor="coder",
-                        correlation_id=spec_dir.name,
-                        summary=(
-                            f"Circular fix detected at iteration {iteration} — "
-                            "agent paused for human review"
-                        ),
-                        payload={
-                            "iteration": iteration,
-                            "diff_hash_prefix": diff_hash[:16],
-                            "buffer": detector.buffer_snapshot(),
-                        },
-                    )
-                    print_status(
-                        "Circular fix detected — pausing for human intervention",
-                        "warning",
-                    )
-                    pause_file = spec_dir / HUMAN_INTERVENTION_FILE
-                    pause_file.write_text(
-                        f"Loop detector triggered at iteration {iteration}.\n"
-                        f"The coder produced the same diff it had a few "
-                        f"iterations ago — likely a flip-flop between two "
-                        f"fixes. Inspect the diff and decide whether to:\n"
-                        f"  - delete this PAUSE file to resume,\n"
-                        f"  - or restart with a different approach.\n",
-                        encoding="utf-8",
-                    )
-                    status_manager.update(state=BuildState.PAUSED)
-                    raise BuildPaused("planning" if is_planning_phase else "coding")
-        except BuildPaused:
-            raise
-        except Exception as exc:
-            logger.debug(f"Loop detection check skipped: {exc}")
+        # The loop detector and the cost budget, read before each session
+        # (agents/iteration_guards.py): either can pause the build here.
+        guard_iteration(
+            spec_dir, project_dir, iteration, is_planning_phase, status_manager
+        )
 
         # Cooperative pause. Read from `pause_state.json`, which exists as soon
         # as the spec does — the flag used to live in the implementation plan,

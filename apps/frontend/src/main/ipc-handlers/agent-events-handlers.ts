@@ -26,6 +26,7 @@ import type {
 } from "../agent";
 import type { TaskEventPayload } from "../agent/task-event-schema";
 import { getClaudeProfileManager } from "../claude-profile-manager";
+import { announceBudgetPause } from "../cost-budget-notify";
 import { fileWatcher } from "../file-watcher";
 import { taskStateManager } from "../task-state-manager";
 import { titleGenerator } from "../title-generator";
@@ -445,6 +446,13 @@ export function registerAgenteventsHandlers(
 				rateLimitedTaskIds.delete(taskId);
 			} else if (!isPaused) {
 				taskStateManager.handleProcessExited(taskId, code, exitTask, exitProject);
+			} else if (exitTask && exitProject) {
+				// The backend pauses a task itself when its cost budget says so.
+				announceBudgetPause(
+					exitProject.id,
+					path.dirname(getPlanPath(exitProject, exitTask)),
+					exitTask.title,
+				);
 			}
 
 			// Send final plan state to renderer BEFORE unwatching
