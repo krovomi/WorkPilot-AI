@@ -112,6 +112,14 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_SCORES, async () =>
 		backendFetch("/api/agent-health/scores"),
 	);
+	// The project's tasks are read by the backend; the path is checked by the IPC path policy
+	// (projectPath key) here and by validated_dir there.
+	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_PROJECT, async (_e, { projectPath }: { projectPath: string }) =>
+		backendFetch("/api/agent-health/project", {
+			method: "POST",
+			body: JSON.stringify({ project_path: projectPath }),
+		}),
+	);
 	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_RESET, async (_e, { agentName }: { agentName?: string }) =>
 		backendFetch("/api/agent-health/reset", {
 			method: "POST",
