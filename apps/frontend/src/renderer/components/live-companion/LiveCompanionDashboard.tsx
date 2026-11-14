@@ -377,7 +377,7 @@ export function LiveCompanionDashboard(): React.ReactElement {
 			)}
 			{lastError && (
 				<Notice tone="red" role="alert" icon={AlertTriangle} className="relative z-[2] mx-5 mb-2">
-					<span className="block">
+					<span className="block whitespace-pre-line">
 						{lastError.file_path
 							? t("liveCompanion:errors.analysisFailedFile", {
 									file: lastError.file_path,
