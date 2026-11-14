@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { Task } from "../../../shared/types";
 import { useToast } from "../../hooks/use-toast";
@@ -119,15 +120,14 @@ export function EditableTaskTitle({
 			ok = await persistUpdateTask(task.id, { title: next });
 		} catch {
 			ok = false;
-		} finally {
-			// Toujours rendu au champ : un enregistrement refusé ne doit pas
-			// laisser un titre gelé en lecture seule — mais seulement par le
-			// dernier enregistrement lancé.
-			if (saveSeq.current === seq) setSaving(false);
 		}
+		// Seul le dernier enregistrement lancé agit encore sur le champ.
 		const stillShown = saveSeq.current === seq;
 		if (ok) {
-			if (stillShown) setEditing(false);
+			if (stillShown) {
+				setSaving(false);
+				setEditing(false);
+			}
 			return;
 		}
 		toast({
@@ -136,6 +136,13 @@ export function EditableTaskTitle({
 			variant: "destructive",
 		});
 		if (!stillShown) return;
+		// Un refus rend le champ, actif et avec le focus, pour corriger et
+		// réessayer. Il est réactivé d'abord, de façon synchrone : un champ
+		// désactivé refuse le focus, et le navigateur retire le focus d'un champ
+		// désactivé au rendu suivant (« focus fixup ») ; ce blur, arrivé après
+		// `settled = false`, relancerait l'enregistrement dans le dos de
+		// l'utilisateur.
+		flushSync(() => setSaving(false));
 		settled.current = false;
 		input.current?.focus();
 	};
