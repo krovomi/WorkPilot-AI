@@ -1,31 +1,35 @@
 {
 	"title": "Live Companion",
-	"description": "Real-time AI companion that watches your code, detects issues as you type, and proposes intelligent takeover when you're stuck.",
+	"description": "Real-time AI companion: it reviews each file you save, flags issues while you code and offers to take over when you are stuck.",
 	"state": {
 		"active": "Active",
 		"inactive": "Inactive",
+		"analyzing": "Analyzing…",
 		"watching": "Watching {{project}}",
-		"changesDetected": "{{count}} change(s) detected",
-		"suggestionsGenerated": "{{count}} suggestion(s)",
-		"takeoversPending": "{{count}} takeover(s) pending"
+		"watchingOther": "The companion is watching {{project}}, not the open project.",
+		"changesDetected": "Changes detected",
+		"suggestionsGenerated": "Suggestions",
+		"takeoversPending": "Pending takeovers"
 	},
 	"suggestions": {
 		"title": "Suggestions",
-		"empty": "No active suggestions. Companion will analyze changes as you code.",
+		"emptyTitle": "No suggestion yet",
+		"empty": "Start the companion, then save a file of the project: it will analyze the change.",
+		"emptyActive": "Listening. Each saved file is analyzed with the selected AI provider; nothing to report so far.",
 		"confidence": "{{value}}% confidence",
 		"relatedFiles": "Related files",
 		"codeFix": "Suggested fix",
 		"types": {
-			"bug_detection": "Bug Detected",
-			"duplicate_code": "Duplicate Code",
-			"missing_update": "Missing Update",
-			"contract_violation": "Contract Violation",
-			"performance_issue": "Performance Issue",
-			"security_issue": "Security Issue",
-			"missing_test": "Missing Test",
-			"refactor_opportunity": "Refactor Opportunity",
-			"import_suggestion": "Import Suggestion",
-			"convention_mismatch": "Convention Mismatch",
+			"bug_detection": "Bug detected",
+			"duplicate_code": "Duplicate code",
+			"missing_update": "Missing update",
+			"contract_violation": "Contract violation",
+			"performance_issue": "Performance issue",
+			"security_issue": "Security issue",
+			"missing_test": "Missing test",
+			"refactor_opportunity": "Refactoring opportunity",
+			"import_suggestion": "Import suggestion",
+			"convention_mismatch": "Convention mismatch",
 			"general": "General"
 		},
 		"priorities": {
@@ -34,38 +38,48 @@
 			"medium": "Medium",
 			"low": "Low",
 			"info": "Info"
-		},
-		"emptyTitle": "No suggestion yet"
+		}
 	},
 	"takeover": {
-		"title": "AI Takeover",
-		"proposal": "AI wants to help",
-		"reason": "Reason",
-		"inactivity": "Inactivity detected on {{file}} ({{duration}})",
-		"accept": "Let AI help",
+		"title": "AI takeover",
+		"proposal": "AI can take over",
+		"reasons": {
+			"inactivity": "Pause after several edits"
+		},
+		"description": "Paused for {{duration}} after {{count}} edits of this file. A Kanban task can pick the work up where you left it.",
+		"accept": "Create a takeover task",
 		"decline": "No thanks",
-		"inProgress": "AI is working on {{file}}...",
-		"completed": "AI completed work on {{file}}",
 		"emptyTitle": "No takeover proposed",
-		"emptyHint": "When the companion sees you stuck on a file, it proposes to take over here."
+		"emptyHint": "When you stop after several edits of a file, the companion offers here to turn it into a Kanban task."
+	},
+	"duration": {
+		"seconds": "{{seconds}}s",
+		"minutes": "{{minutes}}m {{seconds}}s"
+	},
+	"task": {
+		"suggestionTitle": "{{title}} ({{file}})",
+		"takeoverTitle": "Pick up the work on {{file}}",
+		"takeoverBody": "The developer stopped after {{count}} edits of this file. Read the work in progress (git diff) and finish what was started, without starting over.",
+		"file": "File: {{file}}",
+		"lines": "Lines: {{start}} to {{end}}",
+		"fix": "Suggested fix:",
+		"related": "Related files: {{files}}",
+		"origin": "Proposed by the Live Companion: {{type}}, {{priority}} priority, {{confidence}}% confidence.",
+		"created": "Task created in the Kanban backlog.",
+		"failed": "The task could not be created."
 	},
 	"config": {
-		"title": "Companion Settings",
-		"enabled": "Enable Live Companion",
-		"suggestions": "Enable suggestions",
-		"takeover": "Enable takeover detection",
-		"debounce": "Analysis debounce (ms)",
-		"inactivityThreshold": "Inactivity threshold (seconds)",
-		"minConfidence": "Minimum confidence",
-		"maxSuggestionsPerFile": "Max suggestions per file"
+		"title": "Companion settings",
+		"suggestions": "Analyze changes",
+		"takeover": "Offer to take over"
 	},
 	"actions": {
-		"start": "Start Companion",
-		"stop": "Stop Companion",
+		"start": "Start the companion",
+		"stop": "Stop the companion",
+		"watchThis": "Watch this project",
 		"dismiss": "Dismiss",
-		"apply": "Apply Fix",
-		"viewDetails": "View Details",
-		"close": "Close"
+		"createTask": "Create a task",
+		"viewDetails": "View details"
 	},
 	"fileChange": {
 		"title": "Recent changes",
@@ -75,9 +89,12 @@
 		"renamed": "Renamed"
 	},
 	"errors": {
-		"noProject": "Please select a project before starting the companion.",
-		"startFailed": "Failed to start the Live Companion. Check if chokidar is available.",
-		"analysisFailed": "Analysis failed for {{file}}."
+		"noProject": "Select a project before starting the companion.",
+		"startFailed": "The companion could not start: {{message}}",
+		"analysisFailed": "The last analysis failed: {{message}}",
+		"analysisFailedFile": "The last analysis of {{file}} failed: {{message}}",
+		"providerHint": "Check the selected AI provider and its connection, then save the file again.",
+		"code": "Code: {{code}}"
 	},
 	"kickers": {
 		"session": "Session",

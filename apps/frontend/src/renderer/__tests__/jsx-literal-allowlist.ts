@@ -165,10 +165,6 @@ export const FILE_EXEMPTIONS: Readonly<
 		{ text: "git add -A", reason: SHELL },
 		{ text: 'git commit -m "Initial commit"', reason: SHELL },
 	],
-	"components/phase35/AuditTrailPanel.tsx": [
-		{ text: "actor=", reason: "audit record field key" },
-		{ text: "cid=", reason: "audit record field key" },
-	],
 	"components/api-explorer/ApiExplorer.tsx": [
 		{ text: "deprecated", reason: OPENAPI },
 	],
