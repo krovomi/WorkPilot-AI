@@ -1,23 +1,45 @@
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { type FSWatcher, watch } from "chokidar";
 import { app } from "electron";
 import type {
 	CompanionConfig,
+	CompanionError,
 	CompanionState,
 	FileChangeEvent,
 	LiveSuggestion,
 	TakeoverProposal,
 } from "../shared/types/live-companion";
+import { getAppLanguage } from "./app-language";
+import {
+	buildIgnoredPredicate,
+	DEFAULT_IGNORE_PATTERNS,
+	DEFAULT_WATCH_PATTERNS,
+	detectLanguage,
+	isLegacyIgnorePatterns,
+	isLegacyWatchPatterns,
+	readChangeContent,
+} from "./live-companion-watch";
 import { pythonRunnerEnv } from "./utils/python-runner-env";
-
 
 const CONFIG_DIR = path.join(os.homedir(), ".workpilot", "live_companion");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 const SUGGESTIONS_FILE = path.join(CONFIG_DIR, "suggestions.json");
 const TAKEOVERS_FILE = path.join(CONFIG_DIR, "takeovers.json");
+
+const EVENT_PREFIX = "LIVE_COMPANION_EVENT:";
+/** A file needs this many saves before a pause on it reads as "stuck". */
+const TAKEOVER_MIN_CHANGES = 3;
+const TAKEOVER_CHECK_MS = 15_000;
 
 const DEFAULT_CONFIG: CompanionConfig = {
 	enabled: false,
@@ -27,49 +49,46 @@ const DEFAULT_CONFIG: CompanionConfig = {
 	takeover_inactivity_seconds: 120,
 	min_suggestion_confidence: 0.5,
 	max_suggestions_per_file: 5,
-	watch_patterns: [
-		"**/*.ts",
-		"**/*.tsx",
-		"**/*.js",
-		"**/*.jsx",
-		"**/*.py",
-		"**/*.rs",
-		"**/*.go",
-		"**/*.java",
-		"**/*.cs",
-		"**/*.rb",
-		"**/*.php",
-		"**/*.vue",
-		"**/*.svelte",
-	],
-	ignore_patterns: [
-		"**/node_modules/**",
-		"**/.git/**",
-		"**/dist/**",
-		"**/build/**",
-		"**/__pycache__/**",
-		"**/venv/**",
-		"**/.venv/**",
-		"**/*.min.js",
-		"**/*.map",
-	],
+	watch_patterns: [...DEFAULT_WATCH_PATTERNS],
+	ignore_patterns: [...DEFAULT_IGNORE_PATTERNS],
 };
+
+const CONFIG_KEYS = Object.keys(DEFAULT_CONFIG) as (keyof CompanionConfig)[];
+
+function samePath(a: string | undefined, b: string): boolean {
+	if (!a) return false;
+	return path.resolve(a) === path.resolve(b);
+}
+
+function readJson<T>(file: string, fallback: T): T {
+	try {
+		if (existsSync(file)) return JSON.parse(readFileSync(file, "utf-8")) as T;
+	} catch {
+		/* unreadable: start over */
+	}
+	return fallback;
+}
 
 /**
  * Live Development Companion Service
  *
- * Manages file watching via chokidar, debounced AI analysis,
- * suggestion tracking, and takeover detection.
+ * Watches the project folder (chokidar), sends the debounced changes to
+ * `runners/live_companion_runner.py`, which asks the selected provider for
+ * suggestions, and proposes a takeover when the developer stops after
+ * several edits of a file. Suggestions and proposals are stored per project.
  *
  * Events emitted:
- * - 'state-changed' (state: CompanionState)
+ * - 'state-changed' (state: CompanionState): also carries `last_error`, the
+ *   reason the last start or analysis failed, which the page shows
  * - 'suggestion' (suggestion: LiveSuggestion)
  * - 'takeover-proposal' (proposal: TakeoverProposal)
  * - 'file-change' (event: FileChangeEvent)
- * - 'error' (error: string)
+ *
+ * No 'error' event: an EventEmitter throws on an 'error' nobody listens to,
+ * which made a failed start reject instead of saying why.
  */
 export class LiveCompanionService extends EventEmitter {
-	private watcher: unknown = null; // chokidar FSWatcher
+	private watcher: FSWatcher | null = null;
 	private pythonPath: string = "python";
 	private autoBuildSourcePath: string | null = null;
 	private activeProcess: ChildProcess | null = null;
@@ -80,6 +99,8 @@ export class LiveCompanionService extends EventEmitter {
 		string,
 		{ lastChange: number; changeCount: number }
 	> = new Map();
+	private lastActivity = 0;
+	private config: CompanionConfig | null = null;
 
 	private state: CompanionState = {
 		active: false,
@@ -92,6 +113,8 @@ export class LiveCompanionService extends EventEmitter {
 		takeovers_accepted: 0,
 		started_at: "",
 		last_change_at: "",
+		analyzing: false,
+		last_error: null,
 	};
 
 	/**
@@ -110,29 +133,44 @@ export class LiveCompanionService extends EventEmitter {
 	}
 
 	/**
-	 * Get companion config
+	 * Get companion config: the defaults, overlaid by what the user changed.
 	 */
 	getConfig(): CompanionConfig {
-		try {
-			if (existsSync(CONFIG_FILE)) {
-				return {
-					...DEFAULT_CONFIG,
-					...JSON.parse(readFileSync(CONFIG_FILE, "utf-8")),
-				};
+		const stored = readJson<Partial<CompanionConfig>>(CONFIG_FILE, {});
+		const config: CompanionConfig = { ...DEFAULT_CONFIG };
+		for (const key of CONFIG_KEYS) {
+			if (stored[key] !== undefined) {
+				(config as unknown as Record<string, unknown>)[key] = stored[key];
 			}
-		} catch {
-			/* ignore */
 		}
-		return { ...DEFAULT_CONFIG };
+		if (isLegacyWatchPatterns(stored.watch_patterns)) {
+			config.watch_patterns = [...DEFAULT_WATCH_PATTERNS];
+		}
+		if (isLegacyIgnorePatterns(stored.ignore_patterns)) {
+			config.ignore_patterns = [...DEFAULT_IGNORE_PATTERNS];
+		}
+		return config;
 	}
 
 	/**
-	 * Update companion config
+	 * Update companion config. Only the fields the user changed are written,
+	 * so later defaults (a new stack, a new ignored folder) still reach them.
+	 * A running companion applies the change at once.
 	 */
 	updateConfig(updates: Partial<CompanionConfig>): CompanionConfig {
-		const config = { ...this.getConfig(), ...updates };
+		const stored = readJson<Record<string, unknown>>(CONFIG_FILE, {});
+		for (const key of CONFIG_KEYS) {
+			const value = (updates as Record<string, unknown>)[key];
+			if (value === undefined) continue;
+			if (typeof value !== typeof DEFAULT_CONFIG[key]) continue;
+			if (Array.isArray(DEFAULT_CONFIG[key]) !== Array.isArray(value)) continue;
+			stored[key] = value;
+		}
 		mkdirSync(CONFIG_DIR, { recursive: true });
-		writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+		writeFileSync(CONFIG_FILE, JSON.stringify(stored, null, 2), "utf-8");
+		const config = this.getConfig();
+		this.config = config;
+		if (this.state.active) this.applyTakeoverTimer(config);
 		return config;
 	}
 
@@ -145,14 +183,15 @@ export class LiveCompanionService extends EventEmitter {
 		}
 
 		const config = this.getConfig();
+		this.config = config;
 
 		try {
-			// Dynamic import of chokidar (available in Electron)
-			const chokidar = require("chokidar");
-
-			this.watcher = chokidar.watch(config.watch_patterns, {
-				cwd: projectDir,
-				ignored: config.ignore_patterns,
+			const watcher = watch(projectDir, {
+				ignored: buildIgnoredPredicate(
+					projectDir,
+					config.watch_patterns,
+					config.ignore_patterns,
+				),
 				persistent: true,
 				ignoreInitial: true,
 				awaitWriteFinish: {
@@ -160,52 +199,50 @@ export class LiveCompanionService extends EventEmitter {
 					pollInterval: 100,
 				},
 			});
+			this.watcher = watcher;
 
-			const watcher = this.watcher as {
-				on: (event: string, cb: (...args: unknown[]) => void) => void;
-				getWatched: () => Record<string, string[]>;
-				close: () => Promise<void>;
-			};
+			const relative = (file: string) =>
+				path.relative(projectDir, path.resolve(projectDir, file));
+			watcher.on("change", (file: string) =>
+				this.handleFileChange(projectDir, relative(file), "modified"),
+			);
+			watcher.on("add", (file: string) =>
+				this.handleFileChange(projectDir, relative(file), "created"),
+			);
+			watcher.on("unlink", (file: string) =>
+				this.handleFileChange(projectDir, relative(file), "deleted"),
+			);
+			watcher.on("error", (error: unknown) =>
+				this.setError({
+					message: error instanceof Error ? error.message : String(error),
+					code: "watch_failed",
+				}),
+			);
 
-			watcher.on("change", (...args: unknown[]) => {
-				this.handleFileChange(
-					projectDir,
-					args[0] as string,
-					"modified",
-					config,
-				);
-			});
-
-			watcher.on("add", (...args: unknown[]) => {
-				this.handleFileChange(projectDir, args[0] as string, "created", config);
-			});
-
-			watcher.on("unlink", (...args: unknown[]) => {
-				this.handleFileChange(projectDir, args[0] as string, "deleted", config);
-			});
-
-			// Start takeover check interval
-			if (config.takeover_enabled) {
-				this.takeoverCheckInterval = setInterval(() => {
-					this.checkForTakeover(config);
-				}, 30_000); // Check every 30s
-			}
-
-			// Update state
 			this.state = {
 				...this.state,
 				active: true,
 				watching_project: projectDir,
 				started_at: new Date().toISOString(),
+				changes_detected: 0,
+				suggestions_generated: 0,
+				suggestions_accepted: 0,
+				takeovers_proposed: 0,
+				takeovers_accepted: 0,
+				last_change_at: "",
+				analyzing: false,
+				last_error: null,
 			};
+			this.lastActivity = Date.now();
+			this.applyTakeoverTimer(config);
 
-			this.emit("state-changed", this.state);
+			this.emit("state-changed", this.getState());
 			return true;
 		} catch (error) {
-			this.emit(
-				"error",
-				`Failed to start file watcher: ${(error as Error).message}`,
-			);
+			this.setError({
+				message: (error as Error).message,
+				code: "watch_failed",
+			});
 			return false;
 		}
 	}
@@ -215,7 +252,7 @@ export class LiveCompanionService extends EventEmitter {
 	 */
 	stop(): void {
 		if (this.watcher) {
-			(this.watcher as { close: () => Promise<void> }).close();
+			void this.watcher.close();
 			this.watcher = null;
 		}
 
@@ -240,26 +277,25 @@ export class LiveCompanionService extends EventEmitter {
 		this.state = {
 			...this.state,
 			active: false,
+			analyzing: false,
 		};
 
-		this.emit("state-changed", this.state);
+		this.emit("state-changed", this.getState());
 	}
 
 	/**
-	 * Get stored suggestions
+	 * The active suggestions of `projectDir` (of the watched project when
+	 * none is named).
 	 */
-	getSuggestions(): LiveSuggestion[] {
-		try {
-			if (existsSync(SUGGESTIONS_FILE)) {
-				const data = JSON.parse(readFileSync(SUGGESTIONS_FILE, "utf-8"));
-				return (data.suggestions || []).filter(
-					(s: LiveSuggestion) => s.status === "active",
-				);
-			}
-		} catch {
-			/* ignore */
-		}
-		return [];
+	getSuggestions(projectDir?: string): LiveSuggestion[] {
+		const project = projectDir || this.state.watching_project;
+		const data = readJson<{ suggestions?: LiveSuggestion[] }>(
+			SUGGESTIONS_FILE,
+			{},
+		);
+		return (data.suggestions || []).filter(
+			(s) => s.status === "active" && samePath(s.project_dir, project),
+		);
 	}
 
 	/**
@@ -270,42 +306,40 @@ export class LiveCompanionService extends EventEmitter {
 	}
 
 	/**
-	 * Mark a suggestion as applied
+	 * Mark a suggestion as handled: the page turned it into a Kanban task.
 	 */
 	applySuggestion(suggestionId: string): boolean {
 		const result = this.updateSuggestionStatus(suggestionId, "applied");
 		if (result) {
 			this.state.suggestions_accepted++;
-			this.emit("state-changed", this.state);
+			this.emit("state-changed", this.getState());
 		}
 		return result;
 	}
 
 	/**
-	 * Get takeover proposals
+	 * The pending takeover proposals of `projectDir` (of the watched project
+	 * when none is named).
 	 */
-	getTakeovers(): TakeoverProposal[] {
-		try {
-			if (existsSync(TAKEOVERS_FILE)) {
-				const data = JSON.parse(readFileSync(TAKEOVERS_FILE, "utf-8"));
-				return (data.takeovers || []).filter(
-					(t: TakeoverProposal) => t.status === "proposed",
-				);
-			}
-		} catch {
-			/* ignore */
-		}
-		return [];
+	getTakeovers(projectDir?: string): TakeoverProposal[] {
+		const project = projectDir || this.state.watching_project;
+		const data = readJson<{ takeovers?: TakeoverProposal[] }>(
+			TAKEOVERS_FILE,
+			{},
+		);
+		return (data.takeovers || []).filter(
+			(t) => t.status === "proposed" && samePath(t.project_dir, project),
+		);
 	}
 
 	/**
-	 * Accept a takeover proposal
+	 * Mark a takeover as accepted: the page turned it into a Kanban task.
 	 */
 	acceptTakeover(proposalId: string): boolean {
 		const result = this.updateTakeoverStatus(proposalId, "accepted");
 		if (result) {
 			this.state.takeovers_accepted++;
-			this.emit("state-changed", this.state);
+			this.emit("state-changed", this.getState());
 		}
 		return result;
 	}
@@ -319,104 +353,108 @@ export class LiveCompanionService extends EventEmitter {
 
 	// ── Private methods ──────────────────────────────────────────
 
+	private currentConfig(): CompanionConfig {
+		if (!this.config) this.config = this.getConfig();
+		return this.config;
+	}
+
+	private setError(error: Omit<CompanionError, "at">): void {
+		this.state = {
+			...this.state,
+			last_error: { ...error, at: new Date().toISOString() },
+		};
+		this.emit("state-changed", this.getState());
+	}
+
+	private applyTakeoverTimer(config: CompanionConfig): void {
+		if (config.takeover_enabled && !this.takeoverCheckInterval) {
+			this.takeoverCheckInterval = setInterval(() => {
+				this.checkForTakeover(this.currentConfig());
+			}, TAKEOVER_CHECK_MS);
+		} else if (!config.takeover_enabled && this.takeoverCheckInterval) {
+			clearInterval(this.takeoverCheckInterval);
+			this.takeoverCheckInterval = null;
+		}
+	}
+
 	private handleFileChange(
 		projectDir: string,
 		filePath: string,
-		changeType: string,
-		config: CompanionConfig,
+		changeType: FileChangeEvent["change_type"],
 	): void {
-		const fullPath = path.join(projectDir, filePath);
+		if (!filePath || filePath.startsWith("..")) return;
+		const now = Date.now();
+		this.lastActivity = now;
 
-		// Track file activity for takeover detection
-		const existing = this.fileActivityMap.get(fullPath) || {
-			lastChange: 0,
-			changeCount: 0,
-		};
-		this.fileActivityMap.set(fullPath, {
-			lastChange: Date.now(),
-			changeCount: existing.changeCount + 1,
-		});
-
-		this.state.changes_detected++;
-		this.state.last_change_at = new Date().toISOString();
-
-		// Get diff for modified files
-		let diff = "";
-		if (changeType === "modified") {
-			try {
-				// execFileSync (argv array), not a shell string: `filePath` comes
-				// from the file watcher, so it is whatever the repo contains. A
-				// tracked file named `a" & calc & ".ts` would otherwise break out
-				// of the quotes and run as a command.
-				diff = execFileSync("git", ["diff", "--", filePath], {
-					cwd: projectDir,
-					encoding: "utf-8",
-					timeout: 5000,
-				}).slice(0, 4000);
-			} catch {
-				/* non-git or git error */
-			}
+		const existing = this.fileActivityMap.get(filePath);
+		if (changeType === "deleted") {
+			this.fileActivityMap.delete(filePath);
+		} else {
+			this.fileActivityMap.set(filePath, {
+				lastChange: now,
+				changeCount: (existing?.changeCount ?? 0) + 1,
+			});
 		}
 
+		this.state.changes_detected++;
+		this.state.last_change_at = new Date(now).toISOString();
+
+		const content = readChangeContent(projectDir, filePath, changeType);
 		const event: FileChangeEvent = {
 			file_path: filePath,
-			change_type: changeType as FileChangeEvent["change_type"],
-			diff,
-			language: this.detectLanguage(filePath),
-			timestamp: new Date().toISOString(),
+			change_type: changeType,
+			diff: content.text,
+			content_kind: content.kind,
+			language: detectLanguage(filePath),
+			timestamp: new Date(now).toISOString(),
 		};
 
 		this.emit("file-change", event);
+		this.emit("state-changed", this.getState());
 
-		if (!config.suggestion_enabled) return;
+		const config = this.currentConfig();
+		if (!config.suggestion_enabled || !event.diff.trim()) return;
 
-		// Debounced analysis
 		this.pendingChanges.push(event);
+		this.scheduleAnalysis(projectDir, config.watch_debounce_ms);
+	}
 
-		if (this.debounceTimer) {
-			clearTimeout(this.debounceTimer);
-		}
-
+	private scheduleAnalysis(projectDir: string, delayMs: number): void {
+		if (this.debounceTimer) clearTimeout(this.debounceTimer);
 		this.debounceTimer = setTimeout(() => {
-			this.analyzePendingChanges(projectDir);
-		}, config.watch_debounce_ms);
+			this.debounceTimer = null;
+			void this.analyzePendingChanges(projectDir);
+		}, delayMs);
 	}
 
 	private async analyzePendingChanges(projectDir: string): Promise<void> {
 		if (this.pendingChanges.length === 0) return;
-		if (this.activeProcess) return; // Don't overlap analyses
-
-		const changes = [...this.pendingChanges];
-		this.pendingChanges = [];
+		// One analysis at a time; the changes wait and run when it ends.
+		if (this.activeProcess) return;
 
 		const autoBuildSource = this.getAutoBuildSourcePath();
-		if (!autoBuildSource) return;
-
+		if (!autoBuildSource) {
+			this.setError({
+				message: "runners/live_companion_runner.py not found",
+				code: "backend_missing",
+			});
+			return;
+		}
 		const runnerPath = path.join(
 			autoBuildSource,
 			"runners",
 			"live_companion_runner.py",
 		);
-		if (!existsSync(runnerPath)) return;
 
-		// Write changes to temp file for batch analysis
+		const changes = [...this.pendingChanges];
+		this.pendingChanges = [];
+		const config = this.currentConfig();
+
 		const tmpFile = path.join(
 			os.tmpdir(),
-			`workpilot_companion_${Date.now()}.json`,
+			`workpilot_companion_${process.pid}_${Date.now()}.json`,
 		);
-		writeFileSync(
-			tmpFile,
-			JSON.stringify({
-				changes: changes.map((c) => ({
-					file_path: c.file_path,
-					change_type: c.change_type,
-					diff: c.diff,
-					language: c.language,
-					timestamp: c.timestamp,
-				})),
-			}),
-			"utf-8",
-		);
+		writeFileSync(tmpFile, JSON.stringify({ changes }), "utf-8");
 
 		const args = [
 			runnerPath,
@@ -425,107 +463,186 @@ export class LiveCompanionService extends EventEmitter {
 			projectDir,
 			"--changes-file",
 			tmpFile,
+			"--min-confidence",
+			String(config.min_suggestion_confidence),
+			"--max-per-file",
+			String(config.max_suggestions_per_file),
+			"--language",
+			getAppLanguage(),
 		];
 
-		const processEnv = await this.buildProcessEnvironment();
+		let processEnv: Record<string, string>;
+		try {
+			processEnv = await this.buildProcessEnvironment();
+		} catch (error) {
+			this.removeTmp(tmpFile);
+			this.setError({ message: (error as Error).message, code: "env_failed" });
+			return;
+		}
+		if (!this.state.active || !samePath(this.state.watching_project, projectDir)) {
+			this.removeTmp(tmpFile);
+			return;
+		}
 
 		const proc = spawn(this.pythonPath, args, {
 			cwd: autoBuildSource,
 			env: processEnv,
-			stdio: ["pipe", "pipe", "pipe"],
+			stdio: ["ignore", "pipe", "pipe"],
 		});
-
 		this.activeProcess = proc;
+		this.state = { ...this.state, analyzing: true };
+		this.emit("state-changed", this.getState());
 
 		let stdout = "";
+		let stderr = "";
 		proc.stdout?.on("data", (data: Buffer) => {
 			stdout += data.toString("utf-8");
 		});
-
-		proc.on("close", () => {
-			this.activeProcess = null;
-
-			// Clean up temp file
-			try {
-				require("node:fs").unlinkSync(tmpFile);
-			} catch {
-				/* ignore */
-			}
-
-			// Parse events from stdout
-			for (const line of stdout.split("\n")) {
-				if (line.startsWith("LIVE_COMPANION_EVENT:")) {
-					try {
-						const event = JSON.parse(
-							line.substring("LIVE_COMPANION_EVENT:".length),
-						);
-						if (event.type === "complete" && event.data?.suggestions) {
-							for (const suggestion of event.data.suggestions) {
-								this.state.suggestions_generated++;
-								this.storeSuggestion(suggestion);
-								this.emit("suggestion", suggestion);
-							}
-							this.emit("state-changed", this.state);
-						}
-					} catch {
-						/* ignore parse errors */
-					}
-				}
-			}
+		proc.stderr?.on("data", (data: Buffer) => {
+			stderr = (stderr + data.toString("utf-8")).slice(-4000);
 		});
 
-		proc.on("error", () => {
+		const finish = (code: number | null, spawnError?: Error) => {
+			if (this.activeProcess !== proc) return;
 			this.activeProcess = null;
+			this.removeTmp(tmpFile);
+			this.state = { ...this.state, analyzing: false };
+			this.handleRunnerOutput(projectDir, stdout, stderr, code, spawnError);
+			if (this.state.active && this.pendingChanges.length > 0) {
+				this.scheduleAnalysis(projectDir, 0);
+			}
+		};
+		proc.on("close", (code) => finish(code));
+		proc.on("error", (error) => finish(null, error));
+	}
+
+	private handleRunnerOutput(
+		projectDir: string,
+		stdout: string,
+		stderr: string,
+		exitCode: number | null,
+		spawnError?: Error,
+	): void {
+		let sawEvent = false;
+		for (const line of stdout.split("\n")) {
+			if (!line.startsWith(EVENT_PREFIX)) continue;
+			let event: {
+				type?: string;
+				message?: string;
+				data?: {
+					suggestions?: LiveSuggestion[];
+					errors?: Omit<CompanionError, "at">[];
+					message?: string;
+					code?: string;
+					provider?: string;
+					model?: string;
+				};
+			};
+			try {
+				event = JSON.parse(line.substring(EVENT_PREFIX.length));
+			} catch {
+				continue;
+			}
+			sawEvent = true;
+			if (event.type === "complete") {
+				for (const raw of event.data?.suggestions ?? []) {
+					const suggestion = { ...raw, project_dir: projectDir };
+					this.state.suggestions_generated++;
+					this.storeSuggestion(suggestion);
+					this.emit("suggestion", suggestion);
+				}
+				const failed = event.data?.errors?.[0];
+				this.state = {
+					...this.state,
+					last_error: failed
+						? { ...failed, at: new Date().toISOString() }
+						: null,
+				};
+				this.emit("state-changed", this.getState());
+			} else if (event.type === "error") {
+				this.setError({
+					message: event.data?.message || event.message || "analysis failed",
+					code: event.data?.code || "analysis_failed",
+					provider: event.data?.provider,
+					model: event.data?.model,
+				});
+			}
+		}
+		if (sawEvent) return;
+		const tail = stderr.trim().split("\n").slice(-3).join("\n");
+		this.setError({
+			message:
+				spawnError?.message ||
+				tail ||
+				`live_companion_runner.py exited with code ${exitCode}`,
+			code: spawnError ? "python_missing" : "runner_crashed",
 		});
 	}
 
+	private removeTmp(file: string): void {
+		try {
+			unlinkSync(file);
+		} catch {
+			/* already gone */
+		}
+	}
+
+	/**
+	 * A takeover is proposed when the whole project has been quiet for the
+	 * configured time right after several edits of one file: the developer
+	 * stopped there. Moving on to another file is not being stuck, so the
+	 * pause is measured on the project, and the file is the last one edited.
+	 */
 	private checkForTakeover(config: CompanionConfig): void {
+		if (!config.takeover_enabled || !this.state.active) return;
 		const now = Date.now();
-		const thresholdMs = config.takeover_inactivity_seconds * 1000;
+		const inactive = now - this.lastActivity;
+		if (inactive < config.takeover_inactivity_seconds * 1000) return;
 
+		let lastFile: string | null = null;
+		let lastActivity: { lastChange: number; changeCount: number } | null = null;
 		for (const [filePath, activity] of this.fileActivityMap.entries()) {
-			if (activity.changeCount < 3) continue; // Need min activity first
-			const inactive = now - activity.lastChange;
-
-			if (inactive >= thresholdMs) {
-				const inactiveSeconds = Math.floor(inactive / 1000);
-				const fileName = path.basename(filePath);
-
-				const proposal: TakeoverProposal = {
-					proposal_id: `tkv-${Date.now().toString(36)}`,
-					file_path: filePath,
-					reason: "inactivity",
-					description: `You've been inactive on ${fileName} for ${Math.floor(inactiveSeconds / 60)}m${inactiveSeconds % 60}s after ${activity.changeCount} edits. Would you like AI to help?`,
-					inactivity_seconds: inactiveSeconds,
-					complexity_score: 0,
-					status: "proposed",
-					ai_plan: "",
-					ai_result_summary: "",
-					created_at: new Date().toISOString(),
-				};
-
-				this.storeTakeover(proposal);
-				this.state.takeovers_proposed++;
-				this.emit("takeover-proposal", proposal);
-				this.emit("state-changed", this.state);
-
-				// Don't re-propose for this file
-				this.fileActivityMap.delete(filePath);
+			if (!lastActivity || activity.lastChange > lastActivity.lastChange) {
+				lastFile = filePath;
+				lastActivity = activity;
 			}
 		}
+		// One proposal per pause: the next one needs new edits.
+		this.fileActivityMap.clear();
+		if (!lastFile || !lastActivity) return;
+		if (lastActivity.changeCount < TAKEOVER_MIN_CHANGES) return;
+
+		const inactiveSeconds = Math.floor((now - lastActivity.lastChange) / 1000);
+		const proposal: TakeoverProposal = {
+			proposal_id: `tkv-${now.toString(36)}`,
+			file_path: lastFile,
+			reason: "inactivity",
+			// The page writes the sentence in the app language from the fields.
+			description: "",
+			inactivity_seconds: inactiveSeconds,
+			complexity_score: 0,
+			status: "proposed",
+			ai_plan: "",
+			ai_result_summary: "",
+			created_at: new Date(now).toISOString(),
+			change_count: lastActivity.changeCount,
+			project_dir: this.state.watching_project,
+		};
+
+		this.storeTakeover(proposal);
+		this.state.takeovers_proposed++;
+		this.emit("takeover-proposal", proposal);
+		this.emit("state-changed", this.getState());
 	}
 
 	private storeSuggestion(suggestion: LiveSuggestion): void {
 		try {
 			mkdirSync(CONFIG_DIR, { recursive: true });
-			const data = existsSync(SUGGESTIONS_FILE)
-				? JSON.parse(readFileSync(SUGGESTIONS_FILE, "utf-8"))
-				: { suggestions: [] };
-			data.suggestions.push(suggestion);
-			// Keep last 100 suggestions
-			if (data.suggestions.length > 100) {
-				data.suggestions = data.suggestions.slice(-100);
-			}
+			const data = readJson<{ suggestions: LiveSuggestion[] }>(
+				SUGGESTIONS_FILE,
+				{ suggestions: [] },
+			);
+			data.suggestions = [...(data.suggestions || []), suggestion].slice(-200);
 			writeFileSync(SUGGESTIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
 		} catch {
 			/* ignore */
@@ -535,13 +652,11 @@ export class LiveCompanionService extends EventEmitter {
 	private storeTakeover(proposal: TakeoverProposal): void {
 		try {
 			mkdirSync(CONFIG_DIR, { recursive: true });
-			const data = existsSync(TAKEOVERS_FILE)
-				? JSON.parse(readFileSync(TAKEOVERS_FILE, "utf-8"))
-				: { takeovers: [] };
-			data.takeovers.push(proposal);
-			if (data.takeovers.length > 50) {
-				data.takeovers = data.takeovers.slice(-50);
-			}
+			const data = readJson<{ takeovers: TakeoverProposal[] }>(
+				TAKEOVERS_FILE,
+				{ takeovers: [] },
+			);
+			data.takeovers = [...(data.takeovers || []), proposal].slice(-50);
 			writeFileSync(TAKEOVERS_FILE, JSON.stringify(data, null, 2), "utf-8");
 		} catch {
 			/* ignore */
@@ -550,7 +665,7 @@ export class LiveCompanionService extends EventEmitter {
 
 	private updateSuggestionStatus(
 		suggestionId: string,
-		status: string,
+		status: LiveSuggestion["status"],
 	): boolean {
 		try {
 			if (!existsSync(SUGGESTIONS_FILE)) return false;
@@ -567,7 +682,10 @@ export class LiveCompanionService extends EventEmitter {
 		}
 	}
 
-	private updateTakeoverStatus(proposalId: string, status: string): boolean {
+	private updateTakeoverStatus(
+		proposalId: string,
+		status: TakeoverProposal["status"],
+	): boolean {
 		try {
 			if (!existsSync(TAKEOVERS_FILE)) return false;
 			const data = JSON.parse(readFileSync(TAKEOVERS_FILE, "utf-8"));
@@ -613,25 +731,6 @@ export class LiveCompanionService extends EventEmitter {
 	 */
 	private buildProcessEnvironment(): Promise<Record<string, string>> {
 		return pythonRunnerEnv(this.getAutoBuildSourcePath() ?? "");
-	}
-
-	private detectLanguage(filePath: string): string {
-		const extMap: Record<string, string> = {
-			".ts": "TypeScript",
-			".tsx": "TypeScript",
-			".js": "JavaScript",
-			".jsx": "JavaScript",
-			".py": "Python",
-			".rs": "Rust",
-			".go": "Go",
-			".java": "Java",
-			".cs": "C#",
-			".rb": "Ruby",
-			".php": "PHP",
-			".vue": "Vue",
-			".svelte": "Svelte",
-		};
-		return extMap[path.extname(filePath).toLowerCase()] || "Unknown";
 	}
 }
 
