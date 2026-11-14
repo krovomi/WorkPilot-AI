@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type { Api } from "../api/endpoints";
 import type { SteeringMessage } from "../api/types";
 import "../i18n";
@@ -37,6 +37,34 @@ describe("SteeringSection", () => {
 		await fireEvent.press(screen.getByRole("button", { name: "Send" }));
 		await waitFor(() => expect(mockApi.steer).toHaveBeenCalledWith("p1", "004-x", "And log it"));
 		expect(await screen.findByText("Waiting for the next session")).toBeTruthy();
+	});
+
+	it("keeps the message and says why it was not sent", async () => {
+		mockApi.steer.mockRejectedValueOnce(new Error("The card is not running"));
+		await render(<SteeringSection projectId="p1" cardId="004-x" canSend working />);
+		await fireEvent.changeText(await screen.findByLabelText("Message for the next session"), "Stop there");
+		await fireEvent.press(screen.getByRole("button", { name: "Send" }));
+		expect(await screen.findByText(/The card is not running/)).toBeTruthy();
+		expect(screen.getByLabelText("Message for the next session").props.value).toBe("Stop there");
+	});
+
+	it("reads the messages again while the card works, and stops when the screen leaves", async () => {
+		jest.useFakeTimers();
+		try {
+			const view = await render(<SteeringSection projectId="p1" cardId="004-x" canSend working />);
+			expect(mockApi.steering).toHaveBeenCalledTimes(1);
+			await act(async () => {
+				jest.advanceTimersByTime(10_000);
+			});
+			expect(mockApi.steering).toHaveBeenCalledTimes(2);
+			await view.unmount();
+			await act(async () => {
+				jest.advanceTimersByTime(30_000);
+			});
+			expect(mockApi.steering).toHaveBeenCalledTimes(2);
+		} finally {
+			jest.useRealTimers();
+		}
 	});
 
 	it("offers no composer without agent.execute", async () => {
