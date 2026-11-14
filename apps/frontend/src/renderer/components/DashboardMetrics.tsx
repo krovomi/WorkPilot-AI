@@ -31,6 +31,12 @@ const STATUS_TONE: Record<string, Tone> = {
 	pending: "amber",
 	failed: "red",
 	cancelled: "muted",
+	queue: "amber",
+	ai_review: "violet",
+	human_review: "violet",
+	build_failed: "red",
+	pr_created: "blue",
+	error: "red",
 };
 
 const EMPTY_SNAPSHOT: DashboardSnapshot = {
