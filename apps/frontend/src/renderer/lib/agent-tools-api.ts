@@ -16,8 +16,24 @@ import { localBackendFetch } from "./local-backend";
 
 export type ApiResult<T> =
 	| { ok: true; data: T }
-	/** `detail`: the backend's own words, when it has any worth showing. */
-	| { ok: false; error: string; detail?: string };
+	/**
+	 * `detail`: the backend's own words, when it has any worth showing.
+	 * `unreachable`: nothing answered (the local backend is stopped, or did not
+	 * start in time); `error` is then the bare "Failed to fetch".
+	 */
+	| { ok: false; error: string; detail?: string; unreachable?: true };
+
+/** A request that reached nothing, said so rather than as "Failed to fetch". */
+function failure(err: unknown): { ok: false; error: string; unreachable?: true } {
+	if ((err as { name?: string })?.name === "AbortError") {
+		return { ok: false, error: "aborted" };
+	}
+	return {
+		ok: false,
+		error: err instanceof Error ? err.message : "network error",
+		...(err instanceof TypeError ? { unreachable: true as const } : {}),
+	};
+}
 
 // Main reaches the backend for the renderer, which has no URL for it.
 
@@ -45,13 +61,7 @@ async function _post<T>(
 			...(typeof json.detail === "string" ? { detail: json.detail } : {}),
 		};
 	} catch (err) {
-		if ((err as { name?: string })?.name === "AbortError") {
-			return { ok: false, error: "aborted" };
-		}
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : "network error",
-		};
+		return failure(err);
 	}
 }
 
@@ -75,13 +85,7 @@ async function _get<T>(
 					: `request failed with HTTP ${res.status}`,
 		};
 	} catch (err) {
-		if ((err as { name?: string })?.name === "AbortError") {
-			return { ok: false, error: "aborted" };
-		}
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : "network error",
-		};
+		return failure(err);
 	}
 }
 

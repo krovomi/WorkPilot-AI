@@ -121,6 +121,12 @@ import {
 	writeSettingsFile,
 } from "./settings-utils";
 import { teamBotConfigPath } from "./team-bot-config";
+import {
+	localBackendLaunchState,
+	markLocalBackendFailed,
+	markLocalBackendReady,
+	markLocalBackendStarting,
+} from "./local-backend-readiness";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
 
@@ -640,8 +646,35 @@ async function waitForBackendReady(url: string, timeoutMs = 10000) {
 	});
 }
 
+/**
+ * How long a backend this app spawned may take to answer. A cold start (the
+ * first launch after an update compiles the whole backend; slower still under
+ * WSL) takes tens of seconds: the former 10 s reported a backend that was only
+ * starting as failed, with an error dialog.
+ */
+const BACKEND_START_TIMEOUT_MS = 90_000;
+
+/** Rejects as soon as the spawned backend exits: no point waiting for it then. */
+function rejectOnExit(child: ChildProcessWithoutNullStreams): Promise<never> {
+	return new Promise<never>((_resolve, reject) => {
+		child.once("exit", (code) =>
+			reject(new Error(`Le backend s'est arrêté au démarrage (code ${code}).`)),
+		);
+	});
+}
+
 // Fonction pour lancer le backend si nécessaire
 async function launchBackendIfNeeded() {
+	try {
+		await startBackend();
+		markLocalBackendReady();
+	} catch (err) {
+		markLocalBackendFailed();
+		throw err;
+	}
+}
+
+async function startBackend() {
 	// Lancé aussi quand l'app est connectée à un serveur WorkPilot : les
 	// projets locaux et les outils propres à la machine (hooks, mémoire,
 	// notifications) parlent à ce backend local, le serveur ne les sert pas.
@@ -705,7 +738,10 @@ async function launchBackendIfNeeded() {
 		},
 	);
 	// Attend qu'il soit prêt
-	await waitForBackendReady("http://127.0.0.1:9000/providers", 10000);
+	await Promise.race([
+		waitForBackendReady("http://127.0.0.1:9000/providers", BACKEND_START_TIMEOUT_MS),
+		rejectOnExit(backendProcess),
+	]);
 }
 
 async function ensureBackendLaunched() {
@@ -722,7 +758,13 @@ async function ensureBackendLaunched() {
 			);
 		}
 	} else {
+		// No Python, no backend: the views waiting for it stop waiting.
+		const onEnvError = () => {
+			if (localBackendLaunchState() === "pending") markLocalBackendFailed();
+		};
+		pythonEnvManager.once("error", onEnvError);
 		pythonEnvManager.once("ready", async () => {
+			pythonEnvManager.off("error", onEnvError);
 			try {
 				await launchBackendIfNeeded();
 			} catch (err: unknown) {
@@ -1282,6 +1324,10 @@ async function main() {
 	initializeCredentialIntegration().catch((error) => {
 		console.warn("[main] Failed to initialize credential integration:", error);
 	});
+
+	// The window opens before the backend answers: views that ask it at mount
+	// wait for this launch instead of reporting it unreachable.
+	markLocalBackendStarting();
 
 	// Create window
 	createWindow();
