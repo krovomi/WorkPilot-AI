@@ -52,6 +52,13 @@ from suite_runner.runs import (  # noqa: E402
     install_cancel_handler,
     run_once,
 )
+from suite_runner.trx import SKIPPED_OUTCOMES as _TRX_SKIPPED_OUTCOMES  # noqa: E402
+from suite_runner.trx import class_names as _trx_classes  # noqa: E402
+from suite_runner.trx import duration_ms as _trx_duration  # noqa: E402
+from suite_runner.trx import error_message as _trx_error_message  # noqa: E402
+from suite_runner.trx import full_name as _trx_name  # noqa: E402
+from suite_runner.trx import iter_local as _iter_local  # noqa: E402
+from suite_runner.trx import local_name as _local  # noqa: E402
 
 REPORT_GLOBS = [
     # JUnit XML
@@ -94,23 +101,6 @@ def _discover_reports(root: Path) -> list[Path]:
             ):
                 found.add(path)
     return sorted(found)
-
-
-def _local(tag: str) -> str:
-    """Return the local part of a (possibly namespaced) XML tag.
-
-    TRX documents declare a default namespace, so ElementTree reports
-    tags as ``{http://…/2010}UnitTestResult``. Matching on the local
-    name keeps the parser namespace-agnostic.
-    """
-    return tag.rsplit("}", 1)[-1]
-
-
-def _iter_local(root: ET.Element, name: str):
-    """Yield descendant elements whose local tag name equals ``name``."""
-    for el in root.iter():
-        if _local(el.tag) == name:
-            yield el
 
 
 # --- JUnit ------------------------------------------------------------
@@ -160,53 +150,6 @@ def _parse_junit_root(root: ET.Element, run_id: str, timestamp: float) -> list[T
 
 
 # --- TRX (native .NET / vstest) ---------------------------------------
-
-# TRX outcomes that mean "the test did not run" — treated like a JUnit
-# <skipped> and excluded from flakiness accounting.
-_TRX_SKIPPED_OUTCOMES = {"notexecuted", "inconclusive", "pending", "warning"}
-
-
-def _trx_duration(result: ET.Element) -> float:
-    """Parse a TRX ``duration`` attribute (``HH:MM:SS.fffffff``) to ms."""
-    raw = result.attrib.get("duration", "")
-    if not raw:
-        return 0.0
-    try:
-        hms, _, frac = raw.partition(".")
-        hours, minutes, seconds = (int(p) for p in hms.split(":"))
-        total = hours * 3600 + minutes * 60 + seconds
-        frac_ms = float(f"0.{frac}") * 1000 if frac else 0.0
-        return total * 1000 + frac_ms
-    except (ValueError, TypeError):
-        return 0.0
-
-
-def _trx_error_message(result: ET.Element) -> str:
-    for msg in _iter_local(result, "Message"):
-        if msg.text:
-            return msg.text
-    return ""
-
-
-def _trx_classes(root: ET.Element) -> dict[str, str]:
-    """``testId`` → the test's class, from the TRX ``TestDefinitions``."""
-    classes: dict[str, str] = {}
-    for unit in _iter_local(root, "UnitTest"):
-        for method in _iter_local(unit, "TestMethod"):
-            name = method.attrib.get("className", "")
-            if name:
-                classes[unit.attrib.get("id", "")] = name.split(",")[0].strip()
-    return classes
-
-
-def _trx_name(result: ET.Element, classes: dict[str, str]) -> str:
-    """The test's full name. MSTest writes the method alone (``Flaky``) where
-    xunit writes ``Ns.Class.Flaky``: two classes with a ``Flaky`` would merge."""
-    name = result.attrib.get("testName", "")
-    owner = classes.get(result.attrib.get("testId", ""), "")
-    if owner and not name.startswith(owner + "."):
-        return f"{owner}.{name}"
-    return name
 
 
 def _parse_trx_root(root: ET.Element, run_id: str, timestamp: float) -> list[TestRun]:
