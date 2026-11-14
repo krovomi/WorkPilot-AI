@@ -21,6 +21,7 @@ services:
     rollback: {command: [./rollback.sh, "{environment}", "{previous_version}"]}
     health:   {url: "https://auth.example.com/health", expect_status: 200, retries: 5}
     smoke:    {command: [npm, run, smoke, --, "{environment}"]}
+    exposure: {artifact: dist/linux-unpacked, fail_on: high}  # REA's static audit, before deploy
     pass_env: [AWS_PROFILE, KUBECONFIG]  # project variables the commands receive
 flags:
   - key: new-checkout
@@ -36,6 +37,15 @@ calendar:
 A command gets the app's environment without its credentials (``CI=1``),
 plus the variables named in ``pass_env``, read from the project's environment
 (Settings, Project, environment variables): nothing else reaches it.
+
+``exposure`` names the build output the service ships (a path inside its
+folder) and runs before ``deploy``: REA's ``audit-release-exposure``, the pinned
+release (``apps/backend/rea/``), read without running it. A check exposed at
+``fail_on`` (``high`` by default) or above stops the train like a failed step;
+``unknown`` and ``not_assessed`` never do. The artifact missing, or REA unable
+to run here (no Node.js it accepts; not installed under strict offline mode),
+is an error that stops the train too: a declared check that could not run is
+not a pass.
 
 A deployment run by CI is a command too: ``[gh, workflow, run, deploy.yml, -f,
 "env={environment}"]`` then ``[gh, run, watch, --exit-status]`` in ``smoke``,
@@ -66,6 +76,7 @@ PLACEHOLDERS = {"environment", "version", "previous_version", "service"}
 PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 PROVIDERS = {"unleash", "launchdarkly", "configcat", "manual"}
 CRITICALITY = {"high": 0, "normal": 1, "low": 2}
+FAIL_LEVELS = ("high", "medium", "low")
 
 
 class TrainFileError(ValueError):
@@ -81,15 +92,21 @@ class Step:
     timeout: int = 600
     expect_status: int = 200
     retries: int = 3
+    artifact: str = ""
+    """An exposure step: the build output to audit, relative to the service folder."""
+    fail_on: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "command": self.command,
             "url": self.url,
             "timeout": self.timeout,
             "expectStatus": self.expect_status,
             "retries": self.retries,
         }
+        if self.artifact:
+            data.update(artifact=self.artifact, failOn=self.fail_on)
+        return data
 
 
 @dataclass
@@ -103,12 +120,14 @@ class TrainService:
     rollback: Step | None = None
     health: Step | None = None
     smoke: Step | None = None
+    exposure: Step | None = None
     pass_env: list[str] = field(default_factory=list)
 
     def steps(self) -> dict[str, Step]:
         return {
             kind: step
             for kind, step in (
+                ("exposure", self.exposure),
                 ("deploy", self.deploy),
                 ("rollback", self.rollback),
                 ("health", self.health),
@@ -254,6 +273,38 @@ def _step(
     return step
 
 
+def _relative_path(value: object, what: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or "\x00" in value
+        or ".." in Path(value).parts
+        or Path(value).is_absolute()
+        or value.startswith(("/", "\\"))
+        or len(value) > 300
+    ):
+        raise TrainFileError(f"{what} must be a path inside the service folder")
+    return value
+
+
+def _exposure(value: object, what: str) -> Step | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise TrainFileError(f"{what} must be a mapping")
+    unknown = set(value) - {"artifact", "fail_on", "timeout"}
+    if unknown:
+        raise TrainFileError(f"{what}: unknown key {sorted(unknown)[0]}")
+    fail_on = value.get("fail_on", "high")
+    if fail_on not in FAIL_LEVELS:
+        raise TrainFileError(f"{what}.fail_on must be high, medium or low")
+    return Step(
+        timeout=_int(value.get("timeout"), f"{what}.timeout", 1, 7200, 900),
+        artifact=_relative_path(value.get("artifact"), f"{what}.artifact"),
+        fail_on=str(fail_on),
+    )
+
+
 def _service(raw: object, index: int) -> TrainService:
     if (
         not isinstance(raw, dict)
@@ -290,6 +341,7 @@ def _service(raw: object, index: int) -> TrainService:
             raw.get("health"), f"{name}.health", url_allowed=True, command_allowed=False
         ),
         smoke=_step(raw.get("smoke"), f"{name}.smoke", url_allowed=True),
+        exposure=_exposure(raw.get("exposure"), f"{name}.exposure"),
         pass_env=pass_env,
     )
 

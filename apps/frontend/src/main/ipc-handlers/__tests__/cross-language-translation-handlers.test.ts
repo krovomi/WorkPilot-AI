@@ -201,6 +201,13 @@ describe("cross-language translation handlers", () => {
 		expect(await translate({ code: "  " })).toMatchObject({ success: false });
 		expect(state.spawned).toHaveLength(0);
 	});
+
+	it("refuses WLangage as a target: it is a source only", async () => {
+		expect(await translate({ targetLang: "wlangage" })).toMatchObject({
+			success: false,
+		});
+		expect(state.spawned).toHaveLength(0);
+	});
 });
 
 describe("parseRunnerLine", () => {

@@ -7,6 +7,7 @@
  */
 
 import type { ElectronAPI } from "../../shared/types";
+import { REA_PIN } from "../../shared/types/rea";
 import {
 	changelogMock,
 	claudeProfileMock,
@@ -684,6 +685,8 @@ const browserMockAPI: Partial<ElectronAPI> = {
 	installAgentCli: async (tool) => ({ tool, success: false, error: "node_required" }),
 	checkCliUpdate: async (tool) => ({ tool, installed: false, isOutdated: false }),
 	updateCli: async (tool) => ({ tool, success: false, error: "not_installed" }),
+	checkRea: async () => ({ state: "absent", pinned: REA_PIN.version }),
+	installRea: async () => ({ success: false, error: "node_required" }),
 	listTaskPermissions: async () => [],
 	answerTaskPermission: async () => ({ ok: false, reason: "not_pending" }),
 	onTaskPermissionRequest: () => () => {

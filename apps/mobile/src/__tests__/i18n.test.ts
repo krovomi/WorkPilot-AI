@@ -32,6 +32,7 @@ describe("i18n", () => {
 
 	it("turns failures into sentences", () => {
 		expect(describeError(new ApiError(0, "network"))).toBe(en.errors.network);
+		expect(describeError(new ApiError(0, "timeout"))).toBe(en.errors.timeout);
 		expect(describeError(new ApiError(403, "Missing permission"))).toBe(en.errors.forbidden);
 		expect(describeError(new ApiError(429, "HTTP 429"))).toBe(en.errors.too_many);
 		expect(describeError(new ApiError(409, "Busy"))).toBe("Something went wrong: Busy");
@@ -59,5 +60,19 @@ describe("labels for server keys", () => {
 		expect(orgRoleLabel("contributor")).toBe("Contributeur");
 		expect(orgRoleLabel("release-managers")).toBe("release-managers");
 		await i18n.changeLanguage("en");
+	});
+});
+
+describe("loading the translations", () => {
+	it("keeps an i18next that is already set up (a reload during development)", () => {
+		jest.isolateModules(() => {
+			const i18next = require("i18next");
+			const shared = i18next.default ?? i18next;
+			void shared.init({ lng: "fr", resources: {} });
+			const init = jest.spyOn(shared, "init");
+			require("../i18n");
+			expect(init).not.toHaveBeenCalled();
+			expect(shared.language).toBe("fr");
+		});
 	});
 });

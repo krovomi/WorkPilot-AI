@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 import urllib.error
@@ -191,6 +192,212 @@ def pypi_resolver(dep: DependencyRecord) -> str | None:
 
     _cache.put(f"pypi:{dep.name}", license_value)
     return license_value
+
+
+# ---------------------------------------------------------------------------
+# deps.dev (Go, Maven, Cargo, NuGet — and npm / PyPI as a second source)
+
+# deps.dev names its systems in upper case; the scanner's ecosystems map 1:1.
+_DEPS_DEV_SYSTEMS = {
+    "npm": "NPM",
+    "pypi": "PYPI",
+    "go": "GO",
+    "maven": "MAVEN",
+    "cargo": "CARGO",
+    "nuget": "NUGET",
+}
+
+
+def _exact(version: str) -> str | None:
+    cleaned = (version or "").strip().lstrip("=").strip()
+    if re.fullmatch(r"v?\d+(?:\.[0-9A-Za-z\-+]+)*", cleaned):
+        return cleaned
+    return None
+
+
+def deps_dev_resolver(dep: DependencyRecord) -> str | None:
+    """Look a package up on deps.dev (Google's Open Source Insights).
+
+    One API answers for six ecosystems. A range (``^1.2``) is not a version:
+    the package's default version stands in for it, since a licence rarely
+    changes between releases.
+    """
+    system = _DEPS_DEV_SYSTEMS.get(dep.ecosystem)
+    if system is None or not dep.name:
+        return None
+    key = f"depsdev:{system}:{dep.name}:{dep.version}"
+    cached = _cache.get(key)
+    if cached is not _MISS:
+        return cached
+    name = urllib.parse.quote(dep.name, safe="")
+    base = f"https://api.deps.dev/v3/systems/{system}/packages/{name}"
+    version = _exact(dep.version)
+    if version and system == "GO" and not version.startswith("v"):
+        version = f"v{version}"
+    if version is None:
+        package = _http_get_json(base)
+        if package is None:
+            return None
+        versions = package.get("versions") or []
+        default = next(
+            (v for v in versions if v.get("isDefault")),
+            versions[-1] if versions else None,
+        )
+        version = ((default or {}).get("versionKey") or {}).get("version")
+        if not version:
+            _cache.put(key, None)
+            return None
+    payload = _http_get_json(f"{base}/versions/{urllib.parse.quote(version, safe='')}")
+    if payload is None:
+        return None
+    licenses = [lic for lic in payload.get("licenses") or [] if isinstance(lic, str)]
+    value = (
+        " OR ".join(lic for lic in licenses if lic.lower() != "non-standard") or None
+    )
+    _cache.put(key, value)
+    return value
+
+
+# ---------------------------------------------------------------------------
+# Packagist (PHP), RubyGems, pub.dev (Dart)
+
+
+def packagist_resolver(dep: DependencyRecord) -> str | None:
+    if dep.ecosystem != "composer" or "/" not in dep.name:
+        return None
+    key = f"packagist:{dep.name}"
+    cached = _cache.get(key)
+    if cached is not _MISS:
+        return cached
+    payload = _http_get_json(f"https://repo.packagist.org/p2/{dep.name.lower()}.json")
+    if payload is None:
+        return None
+    releases = (payload.get("packages") or {}).get(dep.name.lower()) or []
+    licenses = (releases[0].get("license") if releases else None) or []
+    value = " OR ".join(lic for lic in licenses if isinstance(lic, str)) or None
+    _cache.put(key, value)
+    return value
+
+
+def rubygems_resolver(dep: DependencyRecord) -> str | None:
+    if dep.ecosystem != "rubygems" or not dep.name:
+        return None
+    key = f"rubygems:{dep.name}"
+    cached = _cache.get(key)
+    if cached is not _MISS:
+        return cached
+    payload = _http_get_json(
+        f"https://rubygems.org/api/v1/gems/{urllib.parse.quote(dep.name, safe='')}.json"
+    )
+    if payload is None:
+        return None
+    licenses = payload.get("licenses") or []
+    value = " OR ".join(lic for lic in licenses if isinstance(lic, str)) or None
+    _cache.put(key, value)
+    return value
+
+
+def pub_resolver(dep: DependencyRecord) -> str | None:
+    """pub.dev tags each package's analysed licence as ``license:<spdx>``."""
+    if dep.ecosystem != "pub" or not dep.name:
+        return None
+    key = f"pub:{dep.name}"
+    cached = _cache.get(key)
+    if cached is not _MISS:
+        return cached
+    payload = _http_get_json(
+        f"https://pub.dev/api/packages/{urllib.parse.quote(dep.name, safe='')}/score"
+    )
+    if payload is None:
+        return None
+    tags = [t for t in payload.get("tags") or [] if isinstance(t, str)]
+    spdx = [
+        t.split(":", 1)[1]
+        for t in tags
+        if t.startswith("license:") and t != "license:fsf-libre"
+    ]
+    spdx = [s for s in spdx if s not in ("osi-approved", "unknown")]
+    value = " OR ".join(s.upper() if s in ("mit", "isc") else s for s in spdx) or None
+    _cache.put(key, value)
+    return value
+
+
+_REGISTRY_BY_ECOSYSTEM: dict[
+    str, tuple[Callable[[DependencyRecord], str | None], ...]
+] = {
+    "npm": (npm_resolver, deps_dev_resolver),
+    "pypi": (pypi_resolver, deps_dev_resolver),
+    "go": (deps_dev_resolver,),
+    "maven": (deps_dev_resolver,),
+    "cargo": (deps_dev_resolver,),
+    "nuget": (deps_dev_resolver,),
+    "composer": (packagist_resolver,),
+    "rubygems": (rubygems_resolver,),
+    "pub": (pub_resolver,),
+}
+
+
+def registry_lookup(dep: DependencyRecord) -> str | None:
+    """Ask the registries that know this ecosystem, first answer wins."""
+    for resolver in _REGISTRY_BY_ECOSYSTEM.get(dep.ecosystem, ()):
+        value = resolver(dep)
+        if value:
+            return value
+    return None
+
+
+class LicenseResolution:
+    """Manifest, then installed copy, then registry; remembers which answered.
+
+    ``source_of(dep)`` says where a licence came from (``manifest``,
+    ``installed``, ``registry`` or ``override``) so the report can show it,
+    and an unresolved one is told apart from a lookup that was never made
+    (``online`` false under a strict offline policy).
+    """
+
+    def __init__(
+        self,
+        *,
+        local: Callable[[DependencyRecord], str | None] | None = None,
+        online: bool = True,
+        overrides: dict[str, str | None] | None = None,
+        registry: Callable[[DependencyRecord], str | None] = registry_lookup,
+    ) -> None:
+        self.local = local
+        self.online = online
+        self.overrides = overrides or {}
+        self.registry = registry
+        self._sources: dict[tuple[str, str, str], str] = {}
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _key(dep: DependencyRecord) -> tuple[str, str, str]:
+        return (dep.ecosystem, dep.name, dep.version)
+
+    def source_of(self, dep: DependencyRecord) -> str:
+        with self._lock:
+            return self._sources.get(self._key(dep), "")
+
+    def _found(self, dep: DependencyRecord, source: str, value: str) -> str:
+        with self._lock:
+            self._sources[self._key(dep)] = source
+        return value
+
+    def __call__(self, dep: DependencyRecord) -> str | None:
+        override = self.overrides.get(dep.name)
+        if override:
+            return self._found(dep, "override", override)
+        if dep.declared_license:
+            return self._found(dep, "manifest", dep.declared_license)
+        if self.local is not None:
+            value = self.local(dep)
+            if value:
+                return self._found(dep, "installed", value)
+        if self.online:
+            value = self.registry(dep)
+            if value:
+                return self._found(dep, "registry", value)
+        return None
 
 
 # ---------------------------------------------------------------------------

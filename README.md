@@ -325,7 +325,7 @@ To report a vulnerability, follow [docs/SECURITY.md](docs/SECURITY.md), never a 
 
 ## Contributing and community
 
-Contributions are welcome: start with [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Pull requests target `develop`.
+Contributions are welcome: start with [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Pull requests target `develop`. New versions are published on their own, at most once a day: the release autopilot computes major, minor or patch from the merged pull requests, writes the version's documentation and merges `develop` into `main` ([release process](docs/RELEASE.md#automatic-releases-release-autopilot)).
 
 - **Issues**: [report a bug or request a feature](https://github.com/krovomi/WorkPilot-AI/issues)
 - **Discussions**: [ask a question](https://github.com/krovomi/WorkPilot-AI/discussions)

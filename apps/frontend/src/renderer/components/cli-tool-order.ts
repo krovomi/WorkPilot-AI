@@ -8,7 +8,7 @@ import type { AgentCliTool } from "../../shared/types/agent-cli";
 export type CliPresence = "installed" | "missing";
 
 /** The CLIs the panel lists, by a stable id. */
-export type CliToolId = "claude-code" | "copilot" | "codex" | AgentCliTool | "hermes";
+export type CliToolId = "claude-code" | "copilot" | "codex" | AgentCliTool | "hermes" | "rea";
 
 /** Names the badges show: proper nouns, identical in every language. */
 export const AGENT_CLI_SHORT_NAMES: Readonly<Record<AgentCliTool, string>> = {
@@ -24,6 +24,7 @@ export const CLI_TOOL_NAMES: Readonly<Record<CliToolId, string>> = {
 	codex: "Codex",
 	...AGENT_CLI_SHORT_NAMES,
 	hermes: "Hermes",
+	rea: "REA",
 };
 
 /**

@@ -466,5 +466,28 @@
 		"hideAll_other": "Masquer les {{count}}",
 		"count": "Pages masquées ({{count}})",
 		"show": "Réafficher"
+	},
+	"rea": {
+		"description": "Lit ce que révèle un build livré (fusibles Electron, durcissement des binaires, API publique .NET), sans le lancer. WorkPilot n'exécute que la version {{version}}.",
+		"state": {
+			"ready": "Version {{version}} installée",
+			"other_version": "Une autre version est installée",
+			"absent": "Non installé",
+			"node_missing": "Node.js introuvable",
+			"node_too_old": "Node.js trop ancien"
+		},
+		"otherVersion": "Le rea de votre PATH est en {{installed}} ; WorkPilot n'exécute que la {{version}}. Installer le remplace par la {{version}}.",
+		"otherVersionUnknown": "Le rea de votre PATH n'est pas la version de rea-agents qu'exécute WorkPilot ({{version}}). Installer met la {{version}} à sa place.",
+		"absentHint": "Sans lui, WorkPilot récupère la version {{version}} avec npx à chaque besoin (refusé en mode hors-ligne strict).",
+		"nodeTooOld": "REA {{version}} demande Node.js {{ranges}} ; trouvé {{node}}.",
+		"nodeMissing": "REA demande Node.js {{ranges}}. Installez Node.js (nodejs.org), puis actualisez.",
+		"installButton": "Installer REA {{version}}",
+		"error": {
+			"node_required": "REA ne peut pas être installé ici : il faut npm et Node.js {{ranges}}.",
+			"failed": "L'installation de REA {{version}} a échoué.",
+			"not_on_path": "REA a été installé mais le rea de votre PATH ne mène toujours pas à la {{version}}. Redémarrez WorkPilot, puis actualisez.",
+			"busy": "REA est déjà en cours d'installation."
+		},
+		"noCredentials": "REA tourne sans vos identifiants, depuis un dossier à lui, et ne fait que lire des fichiers."
 	}
 }
