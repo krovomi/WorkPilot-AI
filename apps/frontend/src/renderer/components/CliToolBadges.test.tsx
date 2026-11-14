@@ -45,6 +45,11 @@ vi.mock("./HermesStatusBadge", () => ({
 		<Stub id="hermes" {...p} />
 	),
 }));
+vi.mock("./ReaStatusBadge", () => ({
+	ReaStatusBadge: (p: { onPresenceChange?: (x: CliPresence) => void }) => (
+		<Stub id="rea" {...p} />
+	),
+}));
 vi.mock("./AgentCliStatusBadge", () => ({
 	AgentCliStatusBadge: (p: { tool: string; onPresenceChange?: (x: CliPresence) => void }) => (
 		<Stub id={p.tool} onPresenceChange={p.onPresenceChange} />
@@ -73,6 +78,7 @@ describe("CliToolBadges", () => {
 			pi: "missing",
 			"gemini-cli": "missing",
 			hermes: "installed",
+			rea: "missing",
 		});
 		render(<CliToolBadges isCollapsed={false} onNavigateToTerminals={vi.fn()} />);
 		expect(shown()).toEqual([
@@ -84,6 +90,7 @@ describe("CliToolBadges", () => {
 			"antigravity",
 			"gemini-cli",
 			"pi",
+			"rea",
 		]);
 	});
 
