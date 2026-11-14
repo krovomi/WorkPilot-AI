@@ -54,7 +54,7 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 					<div className="flex items-center gap-4">
 						<div className="text-4xl font-bold">{report.score.toFixed(1)}</div>
 						<Badge className={GRADE_COLOR[report.grade] ?? "bg-muted"}>
-							{t("longevity.grade")} {report.grade}
+							{t("longevity.gradeValue", { grade: report.grade })}
 						</Badge>
 						<div className="text-sm text-muted-foreground">
 							{t("longevity.loc")}: {report.summary.loc.toLocaleString()} ·{" "}
@@ -68,7 +68,9 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 							<ul className="space-y-1">
 								{Object.entries(report.penalties).map(([k, v]) => (
 									<li key={k} className="flex justify-between">
-										<span className="text-muted-foreground">{k}</span>
+										<span className="text-muted-foreground">
+											{t(`longevity.signals.${k}` as never, { defaultValue: k })}
+										</span>
 										<span>−{v.toFixed(2)}</span>
 									</li>
 								))}
@@ -82,7 +84,9 @@ export function LongevityPanel({ projectPath }: LongevityPanelProps) {
 								) : (
 									Object.entries(report.bonuses).map(([k, v]) => (
 										<li key={k} className="flex justify-between">
-											<span className="text-muted-foreground">{k}</span>
+											<span className="text-muted-foreground">
+												{t(`longevity.signals.${k}` as never, { defaultValue: k })}
+											</span>
 											<span>{v >= 0 ? "+" : ""}{v.toFixed(2)}</span>
 										</li>
 									))

@@ -92,6 +92,7 @@
 		"copied": "Copied",
 		"copyAll": "Copy all logs",
 		"waitingForLogs": "Waiting for logs…",
+		"noLogs": "No log was recorded for this task.",
 		"sendPlaceholder": "Give an order to the terminal…",
 		"sendPlaceholderWaiting": "Reply to the agent…",
 		"sendHint": "↵ Enter to send · Typed straight into the terminal",

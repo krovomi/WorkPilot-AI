@@ -13,7 +13,7 @@
   "apps/backend/agents/pr_template_filler.py": {"blind": 4, "silent": 0},
   "apps/backend/agents/refactorer.py": {"blind": 1, "silent": 0},
   "apps/backend/agents/scanner_base.py": {"blind": 1, "silent": 0},
-  "apps/backend/agents/session.py": {"blind": 36, "silent": 16},
+  "apps/backend/agents/session.py": {"blind": 27, "silent": 8},
   "apps/backend/agents/swarm/orchestrator.py": {"blind": 2, "silent": 0},
   "apps/backend/agents/swarm/wave_executor.py": {"blind": 1, "silent": 0},
   "apps/backend/agents/tools_pkg/models.py": {"blind": 2, "silent": 0},
