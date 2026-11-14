@@ -44,6 +44,11 @@ class ViolationDelta:
     file: str
     line: int | None
     description: str
+    import_target: str = ""
+    rule: str = ""
+    source_layer: str = ""
+    target_layer: str = ""
+    rule_id: str = ""
 
     @classmethod
     def from_violation(cls, v: ArchitectureViolation) -> ViolationDelta:
@@ -54,6 +59,11 @@ class ViolationDelta:
             file=v.file,
             line=v.line,
             description=v.description,
+            import_target=v.import_target,
+            rule=v.rule,
+            source_layer=v.source_layer,
+            target_layer=v.target_layer,
+            rule_id=v.rule_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -233,6 +243,9 @@ def _violation_from_dict(raw: dict[str, Any]) -> ArchitectureViolation:
         rule=raw.get("rule", ""),
         description=raw.get("description", ""),
         suggestion=raw.get("suggestion", ""),
+        source_layer=raw.get("source_layer", ""),
+        target_layer=raw.get("target_layer", ""),
+        rule_id=raw.get("rule_id", ""),
     )
 
 

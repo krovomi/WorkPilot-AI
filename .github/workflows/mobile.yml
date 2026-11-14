@@ -49,6 +49,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its parents: HEAD^1 is the base branch's tip.
+          fetch-depth: 2
 
       - name: Setup pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -70,7 +73,13 @@ jobs:
         run: pnpm run typecheck
 
       - name: Unit tests
-        run: pnpm run test:coverage --coverageReporters=text-summary
+        run: pnpm run test:coverage --coverageReporters=text-summary --coverageReporters=json
+
+      # The floor in package.json holds the whole app; this holds each change
+      # at 100 %, lines and branches (scripts/diff_coverage.py).
+      - name: Every changed line run by a test
+        if: github.event_name == 'pull_request'
+        run: python3 ../../scripts/diff_coverage.py --base HEAD^1 --istanbul coverage/coverage-final.json
 
       # Metro resolves every route and import here; a screen that would only
       # fail to bundle on a phone fails this step instead. Offline: the

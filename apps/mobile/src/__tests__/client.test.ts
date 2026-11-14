@@ -124,6 +124,26 @@ describe("ServerClient", () => {
 		await expect(client.request("POST", "/x", {})).rejects.toEqual(new ApiError(409, "Spec already claimed by Bob"));
 		expect(errorMessage(500, "<html>")).toBe("HTTP 500");
 		expect(errorMessage(400, JSON.stringify({ detail: "y".repeat(1000) }))).toHaveLength(300);
+		// FastAPI's validation errors put a list in `detail`: the status says enough.
+		expect(errorMessage(422, JSON.stringify({ detail: [{ loc: ["body"], msg: "field required" }] }))).toBe("HTTP 422");
+		expect(errorMessage(400, JSON.stringify({ detail: "" }))).toBe("HTTP 400");
+	});
+
+	it("reads an empty answer as null", async () => {
+		const { impl } = fakeFetch(({ url }) =>
+			url.endsWith("/auth/refresh") ? json(200, tokens(1)) : new Response(null, { status: 204 }),
+		);
+		const client = new ServerClient({ baseUrl: "https://x.io", refreshToken: "r", fetchImpl: impl });
+		await expect(client.request("DELETE", "/x")).resolves.toBeNull();
+	});
+
+	it("signs out without calling the server or anyone when there was no session", async () => {
+		const { calls, impl } = fakeFetch(() => json(200, {}));
+		const onSignedOut = jest.fn();
+		const client = new ServerClient({ baseUrl: "https://x.io", fetchImpl: impl, onSignedOut });
+		await client.logout();
+		expect(calls).toEqual([]);
+		expect(onSignedOut).not.toHaveBeenCalled();
 	});
 
 	it("switches organization by adopting the new pair", async () => {

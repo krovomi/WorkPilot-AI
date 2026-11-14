@@ -327,7 +327,7 @@ Pour signaler une vulnérabilité, suivez [docs/SECURITY.md](docs/SECURITY.md), 
 
 ## Contribuer et communauté
 
-Les contributions sont les bienvenues : commencez par [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Les pull requests ciblent `develop`.
+Les contributions sont les bienvenues : commencez par [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Les pull requests ciblent `develop`. Les nouvelles versions sortent toutes seules, au plus une fois par jour : le pilote de release déduit majeure, mineure ou patch des pull requests fusionnées, écrit la documentation de la version et fusionne `develop` dans `main` ([processus de release](docs/RELEASE.md#automatic-releases-release-autopilot)).
 
 - **Tickets** : [signaler un bug ou demander une feature](https://github.com/krovomi/WorkPilot-AI/issues)
 - **Discussions** : [poser une question](https://github.com/krovomi/WorkPilot-AI/discussions)

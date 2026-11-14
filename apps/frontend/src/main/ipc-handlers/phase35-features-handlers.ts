@@ -174,10 +174,12 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 				projectPath,
 				policy,
 				licenseOverrides,
+				online,
 			}: {
 				projectPath: string;
 				policy?: string;
 				licenseOverrides?: { name: string; license: string | null }[];
+				online?: boolean;
 			},
 		) =>
 			backendFetch("/api/license-governance/scan", {
@@ -186,6 +188,9 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 					project_path: projectPath,
 					policy: policy ?? "permissive_only",
 					license_overrides: licenseOverrides ?? null,
+					// Registries are asked unless the caller opts out; the backend
+					// still refuses under a strict offline policy.
+					online: online !== false,
 				}),
 			}),
 	);
