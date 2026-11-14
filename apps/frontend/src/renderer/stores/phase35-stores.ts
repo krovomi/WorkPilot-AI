@@ -525,6 +525,7 @@ export const useI18nScalerStore = create<I18nScalerState>((set) => ({
 interface CogContextState extends BaseSlice {
 	context: OptimizedContext | null;
 	optimize: (
+		projectPath: string,
 		prompt: string,
 		candidateFiles: string[],
 		tokenBudget: number,
@@ -535,13 +536,14 @@ export const useCogContextStore = create<CogContextState>((set) => ({
 	phase: "idle",
 	error: null,
 	context: null,
-	optimize: async (prompt, candidateFiles, tokenBudget) => {
+	optimize: async (projectPath, prompt, candidateFiles, tokenBudget) => {
 		set({ phase: "running", error: null });
 		try {
 			const res = await globalThis.electronAPI.optimizeContext(
 				prompt,
 				candidateFiles,
 				tokenBudget,
+				{ projectDir: projectPath },
 			);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", context: res.context });

@@ -364,6 +364,10 @@ export interface OptimizedContext {
 	tokens_used: number;
 	files_skipped: string[];
 	summary: Record<string, unknown>;
+	/** True when the project's own sources were proposed (no list sent). */
+	discovered?: boolean;
+	/** Paths not read, with why: outside | missing | binary | too_large. */
+	refused?: Array<{ path: string; reason: string }>;
 }
 
 // #3.3 Audit Trail

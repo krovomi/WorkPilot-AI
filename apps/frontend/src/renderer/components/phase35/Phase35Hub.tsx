@@ -85,7 +85,7 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 				{tab === "archDrift" && <ArchDriftPanel projectPath={projectPath} />}
 				{tab === "genTests" && <GenTestsPanel projectPath={projectPath} />}
 				{tab === "i18nScaler" && <I18nScalerPanel projectPath={projectPath} />}
-				{tab === "cogContext" && <CogContextPanel />}
+				{tab === "cogContext" && <CogContextPanel projectPath={projectPath} />}
 				{tab === "audit" && <AuditTrailPanel projectPath={projectPath} />}
 				{tab === "pair" && <PairProgrammingPanel />}
 			</Page>
