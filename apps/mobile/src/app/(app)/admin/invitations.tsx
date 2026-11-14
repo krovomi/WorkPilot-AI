@@ -8,7 +8,6 @@ import type { CreatedInvitation } from "../../../admin/types";
 import { useAction } from "../../../admin/useAction";
 import { useSession } from "../../../auth/session";
 import { useLoad } from "../../../hooks/useLoad";
-import { describeError } from "../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../ui/components";
 import { formatDate } from "../../../ui/format";
 import { RADIUS, SPACE, useTheme } from "../../../ui/theme";
@@ -52,7 +51,7 @@ export default function Invitations() {
 			keyboardShouldPersistTaps="handled"
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={action.error ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={action.error} error={error} />
 			{canWrite ? (
 				<Section title={t("admin.invitations.new")}>
 					<Field

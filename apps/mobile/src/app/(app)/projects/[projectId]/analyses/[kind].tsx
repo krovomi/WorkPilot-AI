@@ -7,7 +7,6 @@ import { JobBar } from "../../../../../features/JobBar";
 import { type FeatureJob, JOB_ACTIVE } from "../../../../../features/types";
 import { JOB_POLL_MS } from "../../../../../features/useFeature";
 import { useLoad } from "../../../../../hooks/useLoad";
-import { describeError } from "../../../../../i18n";
 import { digest, readSaved } from "../../../../../insights/digest";
 import { Figures } from "../../../../../insights/Figures";
 import { ANALYSES, type AnalysisKind } from "../../../../../insights/types";
@@ -60,7 +59,7 @@ export default function Analysis() {
 		>
 			<Stack.Screen options={{ title: t(`analyses.kinds.${kind}.title`) }} />
 			<Text style={{ color: theme.textMuted }}>{t(`analyses.kinds.${kind}.body`)}</Text>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<JobBar
 				job={job}
 				active={active}
@@ -70,8 +69,9 @@ export default function Analysis() {
 					setLastLine(null);
 					setJob(await api.startAnalysis(kind, projectId));
 				}}
+				// The bar offers Stop only while a job runs, so there is one to cancel.
 				onCancel={async () => {
-					if (jobId) await api.cancelAnalysis(kind, projectId, jobId);
+					await api.cancelAnalysis(kind, projectId, (job as FeatureJob).id);
 				}}
 			/>
 			{!data || !report ? (

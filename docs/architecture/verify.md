@@ -120,8 +120,13 @@ drives them through the accessibility tree Windows keeps for every window.
   copy of the screen; a capture that comes back one colour is refused as
   evidence.
 - *The helper.* `verify/uia/driver.ps1` runs in Windows PowerShell 5.1, present
-  on every Windows, so no dependency is added. It compiles its C# once per
-  session and answers one JSON line per request; a request that hangs (an app
+  on every Windows, so no dependency is added. It is a few lines: it says it is
+  starting, then dot-sources `uia/helper.ps1`, which holds the C# (compiled once
+  per version into the user's local app data). PowerShell parses a whole script
+  file before running its first line, so the sign of life no longer waits for
+  the big one; the start budget (120 s) only covers PowerShell itself starting,
+  and each later sign of life gets the compile budget. It answers one JSON line
+  per request; a request that hangs (an app
   that does not answer) kills it, and the next request starts a fresh one. Its
   environment is built (Windows' own directories, no credential). Element names
   and values go through `docintel.redact`, and one that reads like an

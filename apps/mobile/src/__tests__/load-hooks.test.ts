@@ -191,6 +191,7 @@ describe("useFeature", () => {
 			.mockResolvedValueOnce({ files: { "roadmap.json": { content: "{}", sha256: "x" } }, job: job("succeeded") });
 		mockApi.featureJob
 			.mockResolvedValueOnce({ ...job("running"), lines: ["Reading", "  ", ""], next: 2 })
+			.mockResolvedValueOnce({ ...job("running"), lines: [" "], next: 2 })
 			.mockResolvedValueOnce({ ...job("succeeded"), lines: ["x".repeat(400)], next: 3 });
 		const { result } = await renderHook(() => useFeature("roadmap", "p1"));
 		await waitFor(() => expect(result.current.active).toBe(true));
@@ -201,6 +202,13 @@ describe("useFeature", () => {
 		});
 		await waitFor(() => expect(result.current.lastLine).toBe("Reading"));
 		expect(mockApi.featureJob).toHaveBeenLastCalledWith("roadmap", "p1", "job-1", 0);
+
+		// A poll with only blank lines keeps the last line shown.
+		await act(async () => {
+			jest.advanceTimersByTime(JOB_POLL_MS);
+		});
+		await waitFor(() => expect(mockApi.featureJob).toHaveBeenCalledTimes(2));
+		expect(result.current.lastLine).toBe("Reading");
 
 		await act(async () => {
 			jest.advanceTimersByTime(JOB_POLL_MS);

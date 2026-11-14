@@ -1,7 +1,8 @@
 /**
  * Syntax highlighting of a diff, for every language the code editor knows
  * (CodeMirror's language-data: C#, TypeScript, Python, Go, Rust, Java, Kotlin,
- * Swift, Dart, PHP, Ruby, SQL, YAML, Vue, HTML…).
+ * Swift, Dart, PHP, Ruby, SQL, YAML, Vue, HTML…), plus WLangage, which it
+ * does not have (`diff-wlangage.ts`).
  *
  * A hunk is a fragment of a file, so each side is rebuilt as text (old side =
  * context + removed lines, new side = context + added lines) and parsed whole:
@@ -18,6 +19,7 @@ import {
 } from "@lezer/highlight";
 import { useEffect, useMemo, useState } from "react";
 import type { DiffLine } from "./diff-model";
+import { WLANGAGE, WLANGAGE_EXTENSIONS } from "./diff-wlangage";
 
 /** A [from, to) range of a line and its token classes (`tok-keyword`…). */
 export interface SyntaxToken {
@@ -53,9 +55,10 @@ const EXTRA_EXTENSIONS: Record<string, string> = {
 
 export function findLanguage(path: string): LanguageDescription | null {
 	const basename = path.replaceAll("\\", "/").split("/").pop() ?? "";
+	const extension = basename.split(".").pop()?.toLowerCase() ?? "";
+	if (WLANGAGE_EXTENSIONS.includes(extension)) return WLANGAGE;
 	const direct = LanguageDescription.matchFilename(languages, basename);
 	if (direct) return direct;
-	const extension = basename.split(".").pop()?.toLowerCase() ?? "";
 	const name = EXTRA_EXTENSIONS[extension];
 	return name ? LanguageDescription.matchLanguageName(languages, name) : null;
 }

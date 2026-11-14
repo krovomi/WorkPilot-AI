@@ -43,6 +43,26 @@ export interface AgentHealthScoreData {
 	diagnostics: Record<string, number>;
 }
 
+/** One agent role on one provider and model, scored from the project's own tasks. */
+export interface ProjectAgentHealthScore extends AgentHealthScoreData {
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+}
+export interface ProjectAgentHealthPending {
+	agent_name: string;
+	role: "planner" | "coder" | "qa";
+	provider: string;
+	model: string;
+	runs: number;
+}
+export interface ProjectAgentHealth {
+	scores: ProjectAgentHealthScore[];
+	pending: ProjectAgentHealthPending[];
+	tasks_read: number;
+	min_runs: number;
+}
+
 // #3.1 Model Routing
 export interface ModelChoice {
 	provider: string;
@@ -109,15 +129,28 @@ export interface LicenseScanReport {
 		ecosystem: string;
 		declared_license: string | null;
 		is_direct: boolean;
+		/** manifest | installed | registry | override, or "" when unresolved. */
+		license_source?: string;
 	}>;
 	conflicts: Array<{
-		dependency: { name: string; version: string; ecosystem: string };
+		dependency: {
+			name: string;
+			version: string;
+			ecosystem: string;
+			declared_license?: string | null;
+		};
 		category: string;
 		reason: string;
 		remediation: string;
 	}>;
 	by_category: Record<string, number>;
-	summary: Record<string, unknown>;
+	summary: {
+		total_dependencies?: number;
+		by_ecosystem?: Record<string, number>;
+		unresolved?: number;
+		by_source?: Record<string, number>;
+		[k: string]: unknown;
+	};
 	passed: boolean;
 }
 
@@ -131,6 +164,11 @@ export interface ArchViolation {
 	rule?: string;
 	description?: string;
 	fingerprint?: string;
+	/** Layer violation: the importing layer and the layer it must not reach. */
+	source_layer?: string;
+	target_layer?: string;
+	/** Built-in forbidden pattern (`domain_framework`), empty for a project's own rule. */
+	rule_id?: string;
 }
 export interface ArchitectureScanReport {
 	status: string;
@@ -369,6 +407,7 @@ export interface Phase35FeaturesAPI {
 		Phase35Result<{ scores: AgentHealthScoreData[]; agents_known: string[] }>
 	>;
 	resetAgentHealth: (agentName?: string) => Promise<Phase35Result<{}>>;
+	scoreProjectAgentHealth: (projectPath: string) => Promise<Phase35Result<ProjectAgentHealth>>;
 
 	// #3.1 Model Router
 	routeModel: (req: RouteRequest) => Promise<Phase35Result<{ choice: ModelChoice }>>;
@@ -398,7 +437,8 @@ export interface Phase35FeaturesAPI {
 		projectPath: string,
 		policy?: "permissive_only" | "open_source_friendly" | "saas_safe",
 		licenseOverrides?: { name: string; license: string | null }[],
-	) => Promise<Phase35Result<{ report: LicenseScanReport }>>;
+		online?: boolean,
+	) => Promise<Phase35Result<{ report: LicenseScanReport; online?: boolean }>>;
 	classifyLicense: (
 		license: string,
 	) => Promise<
@@ -671,6 +711,8 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	scoreAllAgentHealth: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_SCORES),
 	resetAgentHealth: (agentName) =>
 		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_RESET, { agentName }),
+	scoreProjectAgentHealth: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENT_HEALTH_PROJECT, { projectPath }),
 
 	// #3.1
 	routeModel: (req) => ipcRenderer.invoke(IPC_CHANNELS.MODEL_ROUTER_ROUTE, req),
@@ -690,11 +732,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.CICD_ANOMALY_ANALYSE, { samples }),
 
 	// #3.7
-	scanLicenses: (projectPath, policy, licenseOverrides) =>
+	scanLicenses: (projectPath, policy, licenseOverrides, online) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_SCAN, {
 			projectPath,
 			policy,
 			licenseOverrides,
+			online,
 		}),
 	classifyLicense: (license) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_CLASSIFY, { license }),

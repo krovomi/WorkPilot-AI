@@ -1,7 +1,8 @@
 """The release train itself: a run that deploys the services one after another.
 
 A run ships the train file's services to one environment in the order of the
-graph (waves, critical first). For each service: its ``deploy`` command, then
+graph (waves, critical first). For each service: REA's audit of its build
+output when the file declares ``exposure``, its ``deploy`` command, then
 its ``health`` URL, then its ``smoke`` step; the next service starts only when
 all three passed. A service of a production environment, an external service
 (the person says it is ready) and every service of an express run wait for the
@@ -37,7 +38,7 @@ from .train_file import TrainFile, TrainService
 
 TERMINAL = {"done", "rolled_back", "rollback_failed", "aborted"}
 OPEN_ITEM = {"pending", "waiting_confirmation"}
-GATE_STEPS = ("deploy", "health", "smoke")
+GATE_STEPS = ("exposure", "deploy", "health", "smoke")
 MAX_JOURNAL = 500
 
 
@@ -468,6 +469,13 @@ def _rollback(ctx: Context, run: dict[str, Any], name: str) -> None:
     for target in targets:
         entry = _item(run, target)
         service = ctx.train.services[target]
+        if entry["status"] == "failed" and "deploy" not in entry.get("steps", {}):
+            # Stopped before its deploy (the exposure audit): nothing reached
+            # the environment, so its rollback command must not run.
+            entry["status"] = "rolled_back"
+            entry["detail"] = "never deployed: nothing to roll back"
+            _journal(run, entry["detail"], target)
+            continue
         if entry["external"]:
             entry["status"] = "rolled_back"
             entry["detail"] = "external service: roll it back by hand"
