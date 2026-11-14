@@ -945,6 +945,9 @@ export const IPC_CHANNELS = {
 	TIME_TRAVEL_GET_DECISION_SCORES: "timeTravel:getDecisionScores",
 	TIME_TRAVEL_GET_DECISION_HEATMAP: "timeTravel:getDecisionHeatmap",
 
+	// The local backend for the renderer views that read it (closed route list)
+	LOCAL_BACKEND_REQUEST: "localBackend:request",
+
 	// === Phase 3-5 backend modules (one HTTP-backed channel per module) ===
 	// Longevity Score (#3.8)
 	LONGEVITY_SCORE: "longevity:score",

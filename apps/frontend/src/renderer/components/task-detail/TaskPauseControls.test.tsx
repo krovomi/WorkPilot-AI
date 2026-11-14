@@ -28,6 +28,7 @@ vi.mock("../../hooks/use-toast", () => ({
 	useToast: () => ({ toast: vi.fn() }),
 }));
 
+import { fetchLocalBackend } from "../../../__tests__/local-backend-shim";
 import type { Task } from "../../../shared/types";
 import { useSettingsStore } from "../../stores/settings-store";
 import { TooltipProvider } from "../ui/tooltip";
@@ -37,7 +38,7 @@ const fakeStoreState = { settings: {}, profiles: [] };
 
 it("replaces a stale Claude model when the task provider is OpenAI", async () => {
 	const resume = vi.fn().mockResolvedValue({ success: true });
-	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume, localBackendRequest: fetchLocalBackend });
 	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
 	const task = {
 		id: "stale-provider",
@@ -127,7 +128,7 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 		}),
 	);
 	const resume = vi.fn().mockResolvedValue({ success: true });
-	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume, localBackendRequest: fetchLocalBackend });
 	const task = {
 		id: "task-local",
 		// The effort shown is the task's own; without one it would come from the
@@ -156,7 +157,7 @@ it("keeps the downloaded phase model and sends its exact ID when resuming", asyn
 
 it("applies the change to the paused phase only when asked", async () => {
 	const resume = vi.fn().mockResolvedValue({ success: true });
-	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume, localBackendRequest: fetchLocalBackend });
 	vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
 	const task = {
 		id: "only-phase",
@@ -182,7 +183,7 @@ it("applies the change to the paused phase only when asked", async () => {
 it("names the paused task and takes its model from the official library", async () => {
 	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 	const resume = vi.fn().mockResolvedValue({ success: true });
-	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume });
+	vi.stubGlobal("electronAPI", { resumeTaskWithProvider: resume, localBackendRequest: fetchLocalBackend });
 	vi.stubGlobal(
 		"fetch",
 		vi.fn().mockResolvedValue({
