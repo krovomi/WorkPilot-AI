@@ -83,6 +83,7 @@ import { registerInjectionGuardHandlers } from "../injection-guard-handlers";
 import { registerNotebookAgentHandlers } from "../notebook-agent-handlers";
 import { registerOnboardingAgentHandlers } from "../onboarding-agent-handlers";
 import { registerRegressionGuardianHandlers } from "../regression-guardian-handlers";
+import { registerSandboxHandlers } from "../sandbox-handlers";
 
 const MESSAGE = 'Project path does not exist: /p/"shop"\nsee the logs';
 
@@ -126,6 +127,7 @@ describe.each([
 		IPC_CHANNELS.REGRESSION_GUARDIAN_RUN,
 		IPC_CHANNELS.REGRESSION_GUARDIAN_ERROR,
 	],
+	["SANDBOX_ERROR", registerSandboxHandlers, IPC_CHANNELS.SANDBOX_RUN, IPC_CHANNELS.SANDBOX_ERROR],
 ])("a run whose runner prints %s", (prefix, register, runChannel, errorChannel) => {
 	it("shows the message, without the JSON quotes", async () => {
 		register();
@@ -166,6 +168,20 @@ describe("a one-shot runner that fails", () => {
 
 		const { result } = await runCompliance(project, ["--framework", "soc2"]);
 		await expect(result).rejects.toThrow(MESSAGE);
+	});
+
+	it("without an error line, says how the runner exited", async () => {
+		mocks.stdout = "";
+		registerOnboardingAgentHandlers();
+		const status = mocks.handlers.get(IPC_CHANNELS.ONBOARDING_AGENT_STATUS);
+
+		await expect(status?.({}, { projectPath: project })).rejects.toThrow("onboarding runner exited with code 1");
+		await expect(runNotebookRunner([], "NOTEBOOK_EXECUTE:", 1000)).rejects.toThrow(
+			"notebook runner exited with code 1",
+		);
+		await expect(runTranslator(project, { referenceLocale: "en", locales: [] } as never)).rejects.toThrow(
+			"i18n translator exited with code 1",
+		);
 	});
 
 	it("a runner that printed plain text is shown as it is", async () => {
