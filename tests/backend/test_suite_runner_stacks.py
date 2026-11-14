@@ -256,7 +256,12 @@ def test_php_and_ruby_use_the_installed_binaries(tmp_path: Path) -> None:
         ("cargo", "cargo test --no-fail-fast", ["--no-fail-fast"], "cargo"),
         ("phpunit", "phpunit", ["--log-junit", "{out}/junit.xml"], ""),
         ("pest", "pest", ["--log-junit", "{out}/junit.xml"], ""),
-        ("rspec", "rspec", ["progress", "--format", "json", "--out", "{out}/rspec.json"], "rspec"),
+        (
+            "rspec",
+            "rspec",
+            ["progress", "--format", "json", "--out", "{out}/rspec.json"],
+            "rspec",
+        ),
         ("dart", "dart test", ["--file-reporter", "json:{out}/dart.json"], "dart"),
         (
             "flutter",

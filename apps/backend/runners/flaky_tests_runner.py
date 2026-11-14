@@ -273,7 +273,7 @@ _LANGUAGE_REPORT_HINTS: list[tuple[str, tuple[str, ...], str]] = [
     (
         "C# / .NET",
         ("*.sln", "*.slnx", "*.csproj", "*.fsproj", "*.vbproj"),
-        "dotnet test <test project> --logger trx",
+        "dotnet test --logger trx (on a test project)",
     ),
     (
         "JavaScript / TypeScript",
