@@ -14,6 +14,7 @@ from agents.feature_wiring import (
     load_domain_addendum,
     maybe_optimize_context,
     model_router_override_enabled,
+    optimized_subtask_context,
     suggest_routed_model,
 )
 
@@ -100,20 +101,30 @@ class TestCognitiveContextEnabled:
 
 
 class TestMaybeOptimizeContext:
-    def test_no_op_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_op_when_disabled(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         monkeypatch.delenv(COGNITIVE_CONTEXT_ENV_VAR, raising=False)
-        result = maybe_optimize_context(prompt="task", candidate_files=["a.py", "b.py"])
+        result = maybe_optimize_context(
+            prompt="task", candidate_files=["a.py", "b.py"], project_dir=tmp_path
+        )
         assert result is None
 
-    def test_no_op_when_no_files(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_op_when_no_files(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         monkeypatch.setenv(COGNITIVE_CONTEXT_ENV_VAR, "1")
-        assert maybe_optimize_context(prompt="task", candidate_files=[]) is None
+        assert (
+            maybe_optimize_context(
+                prompt="task", candidate_files=[], project_dir=tmp_path
+            )
+            is None
+        )
 
     def test_runs_when_enabled(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setenv(COGNITIVE_CONTEXT_ENV_VAR, "1")
-        # Create a small file so the optimiser has something to read.
         f = tmp_path / "x.py"
         f.write_text("def foo():\n    return 1\n", encoding="utf-8")
         result = maybe_optimize_context(
@@ -122,10 +133,69 @@ class TestMaybeOptimizeContext:
             project_dir=tmp_path,
             token_budget=2_000,
         )
-        # Either ran successfully (returned a dict) or skipped due to internal
-        # error (returned None) — both are acceptable; what matters is that
-        # the helper doesn't crash the caller.
-        assert result is None or isinstance(result, dict)
+        assert result is not None
+        assert [s["file_path"] for s in result["slices"]] == ["x.py"]
+
+    def test_files_outside_the_project_are_not_read(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv(COGNITIVE_CONTEXT_ENV_VAR, "1")
+        project = tmp_path / "project"
+        project.mkdir()
+        outside = tmp_path / "secret.txt"
+        outside.write_text("not for the prompt\n", encoding="utf-8")
+        assert (
+            maybe_optimize_context(
+                prompt="x", candidate_files=[outside], project_dir=project
+            )
+            is None
+        )
+
+
+class TestOptimizedSubtaskContext:
+    def _subtask(self) -> dict:
+        return {
+            "description": "Add a Total method to OrderService",
+            "files_to_modify": ["Shop/OrderService.cs"],
+            "patterns_from": ["Shop/InvoiceService.cs"],
+        }
+
+    def _project(self, tmp_path: Path) -> Path:
+        shop = tmp_path / "Shop"
+        shop.mkdir()
+        (shop / "OrderService.cs").write_text(
+            "public class OrderService\n{\n}\n", encoding="utf-8"
+        )
+        (shop / "InvoiceService.cs").write_text(
+            "public class InvoiceService\n{\n    public decimal Total() => 0;\n}\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_off_by_default(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv(COGNITIVE_CONTEXT_ENV_VAR, raising=False)
+        assert (
+            optimized_subtask_context(self._project(tmp_path), self._subtask()) is None
+        )
+
+    def test_packs_the_declared_files_when_on(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv(COGNITIVE_CONTEXT_ENV_VAR, "1")
+        section = optimized_subtask_context(self._project(tmp_path), self._subtask())
+        assert section is not None
+        assert "### `Shop/OrderService.cs`" in section
+        assert "### `Shop/InvoiceService.cs`" in section
+        # The file to modify is named by the subtask: it comes first.
+        assert section.index("OrderService.cs") < section.index("InvoiceService.cs")
+
+    def test_nothing_declared_gives_none(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv(COGNITIVE_CONTEXT_ENV_VAR, "1")
+        assert optimized_subtask_context(tmp_path, {"description": "x"}) is None
 
 
 # ---------------------------------------------------------------------------

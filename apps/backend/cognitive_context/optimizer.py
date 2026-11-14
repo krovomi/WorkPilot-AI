@@ -30,19 +30,58 @@ logger = logging.getLogger(__name__)
 _CHARS_PER_TOKEN = 4
 
 _KEYWORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
-_SIGNATURE_PREFIXES = (
-    "def ",
-    "class ",
-    "async def ",
-    "function ",
-    "export function ",
-    "export const ",
-    "export class ",
-    "interface ",
-    "type ",
-    "@",
+# Declaration lines kept when a file is sliced, in every stack: Python,
+# TypeScript/JavaScript, C#/F#/VB, Java/Kotlin/Scala, Go, Rust, PHP, Swift,
+# Dart, Ruby, Elixir. Leading modifiers (public, static, async, export…) are
+# skipped before the keyword is looked at.
+_MODIFIERS = re.compile(
+    r"^(?:(?:public|private|protected|internal|fileprivate|open|export|default|"
+    r"static|final|abstract|sealed|override|virtual|async|partial|readonly|"
+    r"data|inline|suspend|pub(?:\([a-z]+\))?|unsafe|const|extern|mutating)\s+)*"
 )
-_IMPORT_PREFIXES = ("import ", "from ", "require(", "use ")
+_SIGNATURE_KEYWORDS = re.compile(
+    r"^(?:def|class|record|struct|interface|enum|trait|impl|mod|object|protocol|"
+    r"extension|namespace|module|function|fun|fn|func|type|"
+    r"defmodule|defp?|mixin|typedef|delegate|event)\b"
+)
+# Bindings count only at the top of a file, not inside a function body.
+_TOP_LEVEL_BINDING = re.compile(
+    r"^(?:export\s+)?(?:pub\s+)?(?:const|let|val|var|static)\b"
+)
+# A method or property declared without a keyword (C#, Java, Kotlin, Dart):
+# modifiers, a return type, a name and an opening parenthesis.
+_TYPED_MEMBER = re.compile(
+    r"^(?:public|private|protected|internal|static|override|virtual|abstract)\s+"
+    r"[\w<>\[\],.?\s]+?\s+\w+\s*\("
+)
+_IMPORT_PREFIXES = (
+    "import ",
+    "from ",
+    "require(",
+    "require ",
+    "use ",
+    "using ",
+    "package ",
+    "#include",
+    "@import",
+    "@use ",
+    "library ",
+    "part ",
+)
+
+
+def _is_signature(line: str) -> bool:
+    stripped = line.lstrip()
+    if stripped.startswith("@") or (
+        stripped.startswith("[") and stripped.endswith("]")
+    ):
+        return True  # decorators / attributes / annotations
+    if _TYPED_MEMBER.match(stripped):
+        return True
+    rest = _MODIFIERS.sub("", stripped, count=1)
+    if _SIGNATURE_KEYWORDS.match(rest):
+        return True
+    return line == stripped and bool(_TOP_LEVEL_BINDING.match(stripped))
 
 
 def estimate_tokens(text: str) -> int:
@@ -341,7 +380,7 @@ class CognitiveContextOptimizer:
             stripped = line.lstrip()
             if any(stripped.startswith(p) for p in _IMPORT_PREFIXES):
                 imports.append(line)
-            if any(stripped.startswith(p) for p in _SIGNATURE_PREFIXES):
+            elif _is_signature(line):
                 signatures.append((idx, line))
 
         # Lines matching keywords + window
@@ -373,7 +412,7 @@ class CognitiveContextOptimizer:
         prev_idx = -2
         for idx in sorted(kept_indices):
             if idx > prev_idx + 1 and body_lines:
-                body_lines.append("# ...")
+                body_lines.append("...")
             body_lines.append(lines[idx])
             prev_idx = idx
 
@@ -383,5 +422,5 @@ class CognitiveContextOptimizer:
         # truncate by characters as a last resort.
         target_chars = target_tokens * _CHARS_PER_TOKEN
         if len(result) > target_chars:
-            result = result[: target_chars - 20] + "\n# [truncated]"
+            result = result[: target_chars - 20] + "\n[truncated]"
         return result

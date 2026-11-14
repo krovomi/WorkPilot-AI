@@ -394,18 +394,25 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 				explicitMentions?: string[];
 				recentFiles?: string[];
 			},
-		) =>
-			backendFetch("/api/cognitive-context/optimize", {
+		) => {
+			// Every file read is the project's: the backend confines each path
+			// to project_dir, so it is required here.
+			if (!projectDir) return { success: false, error: "projectPath is required" };
+			const paths = Array.isArray(candidateFiles)
+				? candidateFiles.filter((f): f is string => typeof f === "string").slice(0, 2000)
+				: [];
+			return backendFetch("/api/cognitive-context/optimize", {
 				method: "POST",
 				body: JSON.stringify({
 					prompt,
-					candidate_files: candidateFiles,
+					candidate_files: paths,
 					token_budget: tokenBudget,
-					project_dir: projectDir ?? null,
+					project_dir: projectDir,
 					explicit_mentions: explicitMentions ?? null,
 					recent_files: recentFiles ?? null,
 				}),
-			}),
+			});
+		},
 	);
 
 	// === #3.3 Audit Trail ===

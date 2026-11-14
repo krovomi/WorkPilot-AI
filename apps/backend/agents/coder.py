@@ -22,6 +22,7 @@ from agents.feature_wiring import (
     card_kind,
     cognitive_context_enabled,
     load_domain_addendum,
+    optimized_subtask_context,
     suggest_routed_model,
 )
 from context_mgmt.reset_limit import ResetLimit
@@ -1191,19 +1192,18 @@ async def _coding_prompt(
     if resume_directive:
         prompt += "\n\n" + resume_directive
 
-    # Load and append relevant file context — only when the
-    # (provider, effort) pair benefits from inlining. Claude agents
-    # and high-effort runs re-read files via tools anyway, so inline
-    # content there is duplicated input paid on every turn.
-    # Provider of this phase (get_phase_provider), which a per-phase
-    # override can set apart from the task-wide one.
+    # Inline file context only where this phase's (provider, effort) gains from
+    # it (tool readers pay it twice); packed by the cognitive context optimizer.
     inline_provider = phase_provider or get_phase_provider(
         spec_dir, phase=current_phase
     )
     if should_inline_file_context(inline_provider, phase_thinking_budget):
-        context = load_subtask_context(spec_dir, project_dir, next_subtask)
-        if context.get("patterns") or context.get("files_to_modify"):
-            prompt += "\n\n" + format_context_for_prompt(context)
+        packed = optimized_subtask_context(project_dir, next_subtask)
+        context = (
+            {} if packed else load_subtask_context(spec_dir, project_dir, next_subtask)
+        )
+        if packed or context.get("patterns") or context.get("files_to_modify"):
+            prompt += "\n\n" + (packed or format_context_for_prompt(context))
     else:
         print(
             muted(

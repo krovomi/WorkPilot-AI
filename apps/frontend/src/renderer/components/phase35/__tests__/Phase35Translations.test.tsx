@@ -12,11 +12,13 @@ import i18n from "../../../../shared/i18n";
 import {
 	useArchDriftStore,
 	useCicdAnomalyStore,
+	useCogContextStore,
 	useDomainAgentsStore,
 	useLicenseStore,
 } from "../../../stores/phase35-stores";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
+import { CogContextPanel } from "../CogContextPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
 import { LicensePanel } from "../LicensePanel";
 
@@ -38,6 +40,7 @@ afterEach(() => {
 	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
 	useCicdAnomalyStore.setState({ signals: [], phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, phase: "idle", error: null });
+	useCogContextStore.setState({ context: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
 		scanReport: null,
 		driftReport: null,
@@ -146,5 +149,48 @@ describe("Fonctions avancées in French", () => {
 		render(<ArchDriftPanel projectPath="/p" />);
 		expect(screen.getByText(/Aucune référence enregistrée/)).toBeInTheDocument();
 		expect(screen.queryByText("Nouvelles violations")).not.toBeInTheDocument();
+	});
+	it("asks for a project before optimizing a context", () => {
+		render(<CogContextPanel />);
+		expect(screen.queryByRole("button", { name: "Optimiser" })).not.toBeInTheDocument();
+	});
+
+	it("lists the files it refused to read, in French, and the sources it proposed", () => {
+		useCogContextStore.setState({
+			phase: "ok",
+			context: {
+				slices: [
+					{
+						file_path: "src/Orders/OrderService.cs",
+						content: "public class OrderService {}",
+						full_size_tokens: 900,
+						included_tokens: 120,
+						truncated: true,
+						relevance: {
+							file_path: "src/Orders/OrderService.cs",
+							score: 1.5,
+							keyword_hits: 2,
+							path_score: 0.5,
+							explicit_mention: false,
+							recency_score: 0,
+							breakdown: {},
+						},
+					},
+				],
+				token_budget: 8000,
+				tokens_used: 120,
+				files_skipped: [],
+				summary: { candidates: 12, keywords_detected: ["order", "total"] },
+				discovered: true,
+				refused: [{ path: "/etc/hosts", reason: "outside" }],
+			},
+		});
+		render(<CogContextPanel projectPath="/work/shop" />);
+		expect(screen.getByText("Fichiers non lus")).toBeInTheDocument();
+		expect(screen.getByText(/hors du projet/)).toBeInTheDocument();
+		expect(screen.getByText("Extrait")).toBeInTheDocument();
+		expect(screen.getByText(/12 sources du projet examinées/)).toBeInTheDocument();
+		expect(screen.getByText(/Mots-clés lus dans la tâche : order, total/)).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /Copier le contexte/ })).toBeInTheDocument();
 	});
 });
