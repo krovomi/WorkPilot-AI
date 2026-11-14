@@ -36,7 +36,6 @@ vi.mock("../server-analyses", () => ({
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import {
 	checkRunRequest,
-	decodeRunnerError,
 	registerFlakyTestsHandlers,
 	runnerArgs,
 } from "../flaky-tests-handlers";
@@ -121,16 +120,6 @@ describe("checkRunRequest", () => {
 			"--project-path",
 			"/p",
 		]);
-	});
-});
-
-describe("decodeRunnerError", () => {
-	it("reads the runner's JSON string, newlines included", () => {
-		expect(decodeRunnerError('"no_results: none\\nerror CS1002"')).toBe(
-			"no_results: none\nerror CS1002",
-		);
-		expect(decodeRunnerError("plain message")).toBe("plain message");
-		expect(decodeRunnerError('"broken')).toBe('"broken');
 	});
 });
 

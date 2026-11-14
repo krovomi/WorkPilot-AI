@@ -37,6 +37,7 @@ import {
 	relayServerAnalysis,
 	serverProjectAtPath,
 } from "./server-analyses";
+import { decodeRunnerError } from "../utils/runner-error";
 
 const EVENT_PREFIX = "FLAKY_EVENT:";
 const RESULT_PREFIX = "FLAKY_RESULT:";
@@ -160,19 +161,6 @@ function readLines(child: ChildProcess, onLine: (line: string) => void): void {
 	child.stderr?.on("data", (chunk: Buffer) => {
 		console.error("[FlakyTests] stderr:", chunk.toString());
 	});
-}
-
-/** The runner prints its error as a JSON string; older ones printed it raw. */
-export function decodeRunnerError(raw: string): string {
-	if (raw.startsWith('"')) {
-		try {
-			const decoded: unknown = JSON.parse(raw);
-			if (typeof decoded === "string") return decoded;
-		} catch {
-			/* not JSON after all */
-		}
-	}
-	return raw;
 }
 
 export function registerFlakyTestsHandlers(): void {

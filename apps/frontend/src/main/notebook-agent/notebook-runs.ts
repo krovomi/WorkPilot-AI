@@ -25,6 +25,7 @@ import { getAppLanguage } from "../app-language";
 import { openReviewRun, type ReviewRun } from "../generated-review/review-run";
 import { requirePythonPath } from "../utils/ensure-python";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { decodeRunnerError } from "../utils/runner-error";
 
 const SUFFIXES = new Set([".ipynb", ".dib", ".qmd", ".rmd"]);
 const MAX_EXTRACT = 50;
@@ -95,7 +96,7 @@ export const runNotebookRunner: RunNotebookRunner = async <T>(
 			const error = lines.find((l) => l.startsWith(ERROR_PREFIX));
 			const result = lines.find((l) => l.startsWith(prefix));
 			if (code !== 0 || !result) {
-				reject(new Error(error?.slice(ERROR_PREFIX.length) || `notebook runner exited with code ${code}`));
+				reject(new Error((error && decodeRunnerError(error.slice(ERROR_PREFIX.length))) || `notebook runner exited with code ${code}`));
 				return;
 			}
 			try {

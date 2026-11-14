@@ -35,6 +35,7 @@ import {
 } from "../onboarding-agent/export-document";
 import { resolveKnownProject } from "../security/renderer-path";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { decodeRunnerError } from "../utils/runner-error";
 
 interface RunRequest {
 	projectPath: string;
@@ -81,7 +82,7 @@ async function runOnce<T>(projectPath: string, args: string[], prefix: string): 
 			const result = lines.find((line) => line.startsWith(prefix));
 			const error = lines.find((line) => line.startsWith(ERROR_PREFIX));
 			if (code !== 0 || !result) {
-				reject(new Error(error?.slice(ERROR_PREFIX.length) || `onboarding runner exited with code ${code}`));
+				reject(new Error((error && decodeRunnerError(error.slice(ERROR_PREFIX.length))) || `onboarding runner exited with code ${code}`));
 				return;
 			}
 			try {
@@ -167,7 +168,7 @@ export function registerOnboardingAgentHandlers(): void {
 							console.error("[Onboarding] Bad result line:", err);
 						}
 					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
+						errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 					}
 				}
 			});

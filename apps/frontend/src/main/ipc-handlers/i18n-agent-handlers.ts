@@ -27,6 +27,7 @@ import {
 	relayServerAnalysis,
 	serverProjectAtPath,
 } from "./server-analyses";
+import { decodeRunnerError } from "../utils/runner-error";
 
 interface RunRequest {
 	projectPath: string;
@@ -130,7 +131,7 @@ export function registerI18nAgentHandlers(): void {
 							console.error("[i18nAgent] Bad result line:", err);
 						}
 					} else if (line.startsWith(ERROR_PREFIX)) {
-						errorMessage = line.slice(ERROR_PREFIX.length);
+						errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 					}
 				}
 			});
