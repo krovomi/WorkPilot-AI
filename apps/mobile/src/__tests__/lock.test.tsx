@@ -10,7 +10,7 @@ import {
 	RELOCK_AFTER_MS,
 	saveLockSettings,
 } from "../auth/lock";
-import { LockGate } from "../auth/LockGate";
+import { LockGate, useLock } from "../auth/LockGate";
 import { LockSection } from "../auth/LockSection";
 
 const authenticateAsync = LocalAuthentication.authenticateAsync as jest.Mock;
@@ -142,6 +142,76 @@ describe("LockGate", () => {
 	});
 });
 
+describe("LockGate, edge cases", () => {
+	it("gives a screen outside the gate the defaults and an update that does nothing", async () => {
+		let lock!: ReturnType<typeof useLock>;
+		function Probe() {
+			lock = useLock();
+			return null;
+		}
+		await render(<Probe />);
+		expect(lock.settings).toEqual(DEFAULT_LOCK);
+		expect(lock.available).toBe(false);
+		await expect(lock.update({ atLaunch: true, sensitive: true })).resolves.toBeUndefined();
+	});
+
+	it("opens one prompt however many times Unlock is pressed", async () => {
+		await saveLockSettings({ atLaunch: true, sensitive: true });
+		authenticateAsync.mockResolvedValueOnce({ success: false, error: "user_cancel" });
+		await render(
+			<LockGate>
+				<Text>Board</Text>
+			</LockGate>,
+		);
+		await screen.findByText("Not recognized. Try again.");
+		let answer!: (value: { success: boolean }) => void;
+		authenticateAsync.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+		const unlockButton = screen.getByRole("button", { name: "Unlock" });
+		await fireEvent.press(unlockButton);
+		await fireEvent.press(unlockButton);
+		await act(async () => answer({ success: true }));
+		await waitFor(() => expect(screen.queryByText("WorkPilot AI is locked")).toBeNull());
+		expect(authenticateAsync).toHaveBeenCalledTimes(2);
+	});
+
+	it("does nothing when it is closed before its settings are read", async () => {
+		await saveLockSettings({ atLaunch: true, sensitive: true });
+		let level!: (value: number) => void;
+		enrolledLevel.mockImplementationOnce(() => new Promise((resolve) => (level = resolve)));
+		const view = await render(
+			<LockGate>
+				<Text>Board</Text>
+			</LockGate>,
+		);
+		await view.unmount();
+		await act(async () => level(LocalAuthentication.SecurityLevel.BIOMETRIC_STRONG));
+		expect(authenticateAsync).not.toHaveBeenCalled();
+	});
+
+	it("does not lock on a passing notification shade, nor on a return without a stay in the background", async () => {
+		await saveLockSettings({ atLaunch: true, sensitive: true });
+		const listeners = new Set<(state: string) => void>();
+		jest.spyOn(AppState, "addEventListener").mockImplementation((_type, listener) => {
+			listeners.add(listener as (state: string) => void);
+			return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
+		});
+		await render(
+			<LockGate>
+				<Text>Board</Text>
+			</LockGate>,
+		);
+		await waitFor(() => expect(screen.queryByText("WorkPilot AI is locked")).toBeNull());
+		await act(() => {
+			for (const listener of listeners) {
+				listener("inactive");
+				listener("active");
+			}
+		});
+		expect(screen.queryByText("WorkPilot AI is locked")).toBeNull();
+		expect(authenticateAsync).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe("LockSection", () => {
 	const renderSection = () =>
 		render(
@@ -161,6 +231,22 @@ describe("LockSection", () => {
 		fireEvent(sensitive, "valueChange", false);
 		await waitFor(() => expect(screen.getByLabelText(/Ask before merging/).props.value).toBe(false));
 		await expect(loadLockSettings()).resolves.toEqual({ atLaunch: false, sensitive: false });
+	});
+
+	it("turns the lock at launch on once the person is recognized", async () => {
+		await renderSection();
+		await fireEvent(await screen.findByLabelText("Ask when the app opens"), "valueChange", true);
+		await waitFor(() => expect(screen.getByLabelText("Ask when the app opens").props.value).toBe(true));
+		await expect(loadLockSettings()).resolves.toEqual({ atLaunch: true, sensitive: true });
+	});
+
+	it("says so when the setting cannot be saved", async () => {
+		await renderSection();
+		const toggle = await screen.findByLabelText("Ask when the app opens");
+		(jest.requireMock("expo-secure-store").setItemAsync as jest.Mock).mockRejectedValueOnce(new Error("Keystore is full"));
+		await fireEvent(toggle, "valueChange", true);
+		expect(await screen.findByText(/Keystore is full/)).toBeTruthy();
+		expect(screen.getByLabelText("Ask when the app opens").props.value).toBe(false);
 	});
 
 	it("cannot be turned on where the phone has no lock", async () => {

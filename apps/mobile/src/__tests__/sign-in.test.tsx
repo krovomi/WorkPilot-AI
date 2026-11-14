@@ -78,6 +78,22 @@ describe("sign-in screen", () => {
 		});
 	});
 
+	it("says so when the server takes no password, and sends none", async () => {
+		const fetchMock = jest.fn((url: string) =>
+			url.endsWith("/auth/config") ? respond({ local_enabled: false, entra_enabled: true }) : respond({}, 500),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		await app();
+		await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("signedOut:"));
+		await fireEvent.changeText(screen.getByLabelText("Server address"), "wp.example.com");
+		await fireEvent.changeText(screen.getByLabelText("Email"), "ada@x.io");
+		await fireEvent.changeText(screen.getByLabelText("Password"), "secret");
+		// The keyboard's return key signs in like the button.
+		await fireEvent(screen.getByLabelText("Password"), "submitEditing");
+		expect(await screen.findByText("This server only accepts Microsoft sign-in: use Sign in with Microsoft.")).toBeTruthy();
+		expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/auth/login"))).toBe(false);
+	});
+
 	it("shows the server's refusal", async () => {
 		globalThis.fetch = jest.fn((url: string) =>
 			url.endsWith("/auth/config")

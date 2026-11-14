@@ -1,3 +1,5 @@
+import { severityColor } from "../forge/AiReview";
+import type { Theme } from "../ui/theme";
 import { ApiError, ServerClient } from "../api/client";
 import { makeForge, readReview, repoPath } from "../forge/forge";
 
@@ -125,6 +127,39 @@ describe("GitLab", () => {
 			],
 		}));
 		expect((await forge.issueComments(5)).map((c) => c.body)).toEqual(["Looks good"]);
+	});
+});
+
+describe("severityColor", () => {
+	it("draws critical and high as danger, medium as the accent, the rest muted", () => {
+		const theme = { danger: "red", accent: "blue", textMuted: "grey" } as unknown as Theme;
+		expect(["critical", "high", "medium", "low", "info"].map((s) => severityColor(theme, s))).toEqual([
+			"red",
+			"red",
+			"blue",
+			"grey",
+			"grey",
+		]);
+	});
+});
+
+describe("makeForge", () => {
+	it("has no forge for a repository address it cannot read, and asks nothing for no review", async () => {
+		const { forge, sent } = await forgeWith("github", "https://github.com/acme/shop", () => ({}));
+		expect(makeForge(new ServerClient({ baseUrl: "https://x.io" }), "p1", "github", "not a repo")).toBeNull();
+		await expect(forge.reviews([])).resolves.toEqual({});
+		expect(sent).toEqual([]);
+	});
+});
+
+describe("GitLab, from the phone", () => {
+	it("refuses an issue comment, shows no merge request thread, and merges by PUT", async () => {
+		const { forge, sent } = await forgeWith("gitlab", "https://gitlab.com/g/app", () => ({ status: 200, body: {} }));
+		await expect(forge.commentIssue(5, "hi")).rejects.toMatchObject({ status: 403 });
+		await expect(forge.pullComments(3)).resolves.toEqual([]);
+		await expect(forge.checks("abc1234")).resolves.toBeNull();
+		await forge.merge(3);
+		expect(sent.map((s) => s.body)).toEqual([{ method: "PUT", endpoint: "/projects/g%2Fapp/merge_requests/3/merge", body: {} }]);
 	});
 });
 

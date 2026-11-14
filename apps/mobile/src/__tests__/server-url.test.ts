@@ -42,5 +42,6 @@ describe("streamBase", () => {
 	it("falls back to the API host on the stream port, wss behind https", () => {
 		expect(streamBase("https://x.io:8443", null)).toBe("wss://x.io:8765");
 		expect(streamBase("http://localhost:9000", "javascript:alert(1)")).toBe("ws://localhost:8765");
+		expect(streamBase("not a url", null)).toBeNull();
 	});
 });

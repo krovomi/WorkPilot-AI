@@ -30,6 +30,19 @@ describe("analysis digest", () => {
 		]);
 	});
 
+	it("shows a false check as a cross, a short text as is, a numbered item by its number, and an id never as a title", () => {
+		const out = digest({ passed: false, grade: "B+", notes: "x".repeat(61), tests: [{ id: 7, flakiness: 0.4 }, { id: "t-1", priority: 2 }] });
+		// A short text is a figure; a long one is not.
+		expect(out.figures).toEqual([
+			{ label: "Passed", value: "✗" },
+			{ label: "Grade", value: "B+" },
+		]);
+		expect(out.lists[0].items).toEqual([
+			{ n: 0, title: "—", detail: null, level: "0.4" },
+			{ n: 1, title: "t-1", detail: null, level: "2" },
+		]);
+	});
+
 	it("caps a long list", () => {
 		const out = digest({ items: Array.from({ length: 50 }, (_, i) => ({ name: `t${i}` })) });
 		expect(out.lists[0].total).toBe(50);
