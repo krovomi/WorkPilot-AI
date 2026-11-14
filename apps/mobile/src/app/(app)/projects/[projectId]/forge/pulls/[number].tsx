@@ -76,7 +76,7 @@ export default function PullScreen() {
 					{t("forge.checks", checks)}
 				</Text>
 			) : null}
-			<ErrorBanner message={actionError ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={actionError} error={error} />
 			{open && can("vcs.write") && can("vcs.pr.merge") ? (
 				<Button
 					label={t("actions.merge")}

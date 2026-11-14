@@ -119,6 +119,7 @@ génération de tests ;
 | `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |
 | `bounty_board/` | N modèles sur une spec, preuves mesurées, juge anonyme |
+| `rea/` | REA (npm `rea-agents`, version figée dans `pin.json`) : `locate` (Node.js accepté, REA installé à la version figée, sinon npx, refusé en hors-ligne strict), `run_rea` (lecteurs statiques en liste fermée, chemins absolus, sans shell ni identifiants) ; [justification](../../docs/architecture/rea.md) |
 | `vendor/archify/`, `vendor/watermarks/` | code vendorisé et épinglé (`scripts/vendor_*.py`) |
 
 ## Imports et tests

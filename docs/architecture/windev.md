@@ -38,6 +38,15 @@ WinDev 25 à 28 ; le YAML écrit par l'éditeur n'est pas toujours valide (une l
 | Encart « Plateformes mobiles » | `mobile.bootstrap.mobile_profile` → `windev.project.WinDevProject.mobile_platforms` | un projet WinDev Mobile montre ses plateformes (lues dans les configurations de génération) et dit que l'application se génère dans l'éditeur ; un projet WinDev sans configuration mobile ne se voit proposer aucune tâche d'installation (Flutter, MAUI…) |
 | Sous-agents | `subagents/languages/windev.py` | le `test-runner` ne reçoit aucune commande : rien n'exécute les tests hors de l'éditeur |
 
+## Les features annexes
+
+| Feature | Ce qu'elle fait d'un projet WinDev | Pourquoi |
+|---|---|---|
+| Traduction inter-langages | WLangage est une langue **source** seulement (`wlangage` dans `cross_language_translation_runner.py` et la liste du main) : un élément au format texte collé ou ouvert est réduit à son code (`windev.text_format.wlangage_source`, un commentaire par propriétaire et événement), sans le YAML ni le base64 de l'éditeur | une traduction vers WLangage n'aurait aucun élément où aller : seul l'éditeur en crée un. C'est le chemin d'une migration WinDev → .NET, TypeScript… |
+| Studio de tests | refus explicite (`unsupported_stack`) pour une source WinDev, ou un projet WinDev sans source ni langage choisi | un test WinDev est un scénario `.wxt`, binaire, que seul l'éditeur crée et exécute ; avant, le studio retombait sur Python et écrivait un fichier pytest |
+| Détective de tests instables | aucune commande de test détectée, il le dit (`no_command`) | rien n'exécute les tests hors de l'éditeur |
+| Import Design, Visuel vers Code, licences, i18n | rien de propre à WinDev | les fenêtres et leurs libellés sont dans `internal_properties`, opaques ; WinDev n'a pas de gestionnaire de paquets |
+
 ## Ce qui n'est pas vérifiable ici
 
 Rien ne compile du WLangage hors de l'éditeur WinDev (Windows, licence). La compilation et les tests

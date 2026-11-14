@@ -34,6 +34,20 @@ describe("roadmap and ideation files", () => {
 		expect(view.features.map((f) => f.id)).toEqual(["f1", "f2", "f3"]);
 	});
 
+	it("orders phases without an order by their place, and adds no empty group", () => {
+		const view = readRoadmap(
+			JSON.stringify({ phases: [{ id: "a", name: "First" }, { id: "b", name: "Second" }], features: [{ id: "f", title: "T", phase_id: "b" }] }),
+		);
+		if (!view) throw new Error("roadmap not read");
+		expect(view.phases.map((p) => [p.id, p.order])).toEqual([
+			["a", 1],
+			["b", 2],
+		]);
+		expect(featuresByPhase(view).map((g) => g.phase?.id ?? null)).toEqual(["b"]);
+		// Lists that are not lists are empty, not a crash.
+		expect(readRoadmap(JSON.stringify({ phases: "x", features: {} }))).toEqual({ vision: "", phases: [], features: [] });
+	});
+
 	it("draws nothing from a broken file", () => {
 		expect(readRoadmap("{not json")).toBeNull();
 		expect(readRoadmap("[]")).toBeNull();
@@ -154,6 +168,10 @@ describe("JobBar", () => {
 			/>,
 		);
 		expect(screen.getByText(/The last run failed\. no model/)).toBeTruthy();
+		await view.rerender(
+			<JobBar job={{ ...job, status: "failed" }} active={false} lastLine={null} hasContent onStart={jest.fn()} onCancel={jest.fn()} />,
+		);
+		expect(screen.getByText("The last run failed.")).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Generate again" })).toBeTruthy();
 	});
 });
