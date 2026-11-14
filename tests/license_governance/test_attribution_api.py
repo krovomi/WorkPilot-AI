@@ -36,6 +36,7 @@ class TestAttributionEndpoint:
             json={
                 "project_path": str(tmp_path),
                 "project_name": "demo-app",
+                "online": False,
                 "license_overrides": [
                     {"name": "react", "license": "MIT"},
                     {"name": "leftpad", "license": "MIT"},
@@ -60,6 +61,7 @@ class TestAttributionEndpoint:
                 "project_path": str(tmp_path),
                 "license_overrides": [{"name": "react", "license": "MIT"}],
                 "write_to_disk": True,
+                "online": False,
             },
         )
         body = resp.json()
