@@ -49,6 +49,43 @@ describe("context", () => {
 		expect(screen.queryByText("kept out")).toBeNull();
 	});
 
+	it("shows a thin index: no type, a bare service, and no infrastructure", async () => {
+		fakeServer(
+			{
+				"GET /api/features/context/snapshot": {
+					files: {
+						"project_index.json": {
+							content: JSON.stringify({ services: { solo: {} }, conventions: { js_linting: "biome" } }),
+							sha256: "x",
+						},
+					},
+					job: null,
+				},
+			},
+			WRITE,
+		);
+		await openApp("/projects/p1/context");
+		expect(await screen.findByText("1 service")).toBeTruthy();
+		expect(screen.getByText("solo")).toBeTruthy();
+		expect(screen.queryByText(/^Project:/)).toBeNull();
+		expect(screen.queryByText("Infrastructure")).toBeNull();
+		expect(screen.getByText("biome")).toBeTruthy();
+	});
+
+	it("names a project type it has no word for as the index writes it", async () => {
+		fakeServer(
+			{
+				"GET /api/features/context/snapshot": {
+					files: { "project_index.json": { content: JSON.stringify({ project_type: "polyglot_lab" }), sha256: "x" } },
+					job: null,
+				},
+			},
+			WRITE,
+		);
+		await openApp("/projects/p1/context");
+		expect(await screen.findByText("Project: polyglot_lab")).toBeTruthy();
+	});
+
 	it("offers to generate the index when there is none", async () => {
 		const server = fakeServer(
 			{
@@ -168,6 +205,18 @@ describe("insights", () => {
 		await openApp("/projects/p1/insights");
 		await fireEvent.press(await screen.findByRole("button", { name: "New conversation" }));
 		expect(await screen.findByText("Too many attempts. Wait a minute, then try again.")).toBeTruthy();
+	});
+
+	it("shows why the list cannot be read, and someone whose name the server does not give", async () => {
+		fakeServer({ "GET /api/features/insights/sessions": reply(500, { detail: "insights down" }) }, READ);
+		await openApp("/projects/p1/insights");
+		expect(await screen.findByText(/insights down/)).toBeTruthy();
+		expect(screen.getByText("No conversation yet.")).toBeTruthy();
+		restoreFetch();
+
+		fakeServer({ "GET /api/features/insights/sessions": [{ ...SUMMARY, mine: false, ownerName: null }] }, READ);
+		await openApp("/projects/p1/insights");
+		expect(await screen.findByText(/^\? · 2 messages · /)).toBeTruthy();
 	});
 
 	it("asks a question and reads the conversation until the answer lands", async () => {
@@ -383,5 +432,40 @@ describe("dashboard and sessions", () => {
 		fakeServer({ "GET /api/features/workspace/sessions": { sessions: [] } }, READ);
 		await openApp("/projects/p1/sessions");
 		expect(await screen.findByText("No session yet.")).toBeTruthy();
+	});
+
+	it("shows a succeeded session, and why the sessions cannot be read", async () => {
+		fakeServer(
+			{
+				"GET /api/features/workspace/sessions": {
+					sessions: [
+						{
+							id: "r2",
+							kind: "run",
+							spec: "008-cart",
+							phase: "build",
+							status: "succeeded",
+							model: null,
+							started_by: "Ada",
+							started_at: null,
+							finished_at: null,
+							duration_seconds: null,
+							tokens: null,
+							cost: null,
+							error: null,
+						},
+					],
+				},
+			},
+			READ,
+		);
+		await openApp("/projects/p1/sessions");
+		expect(await screen.findByText("Succeeded")).toBeTruthy();
+		restoreFetch();
+
+		fakeServer({ "GET /api/features/workspace/sessions": reply(500, { detail: "sessions down" }) }, READ);
+		await openApp("/projects/p1/sessions");
+		expect(await screen.findByText(/sessions down/)).toBeTruthy();
+		expect(screen.getByText("No session yet.")).toBeTruthy();
 	});
 });

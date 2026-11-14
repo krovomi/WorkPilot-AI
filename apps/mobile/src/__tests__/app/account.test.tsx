@@ -193,6 +193,28 @@ describe("share into a card", () => {
 		await fireEvent.press(screen.getByRole("button", { name: "Shop" }));
 		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/new"));
 	});
+
+	it("shows why the projects cannot be read, without saying there is none", async () => {
+		(getSharedPayloads as jest.Mock).mockReturnValue([{ contentType: "text", value: "Login fails on Safari" }]);
+		fakeServer({ "GET /projects": reply(500, { detail: "projects down" }) });
+		await openApp("/share");
+		expect(await screen.findByText(/projects down/)).toBeTruthy();
+		expect(screen.queryByText(/No project yet/)).toBeNull();
+	});
+});
+
+describe("without an organization", () => {
+	it("titles the projects plainly and lists no organization when the server names none", async () => {
+		fakeServer({ "GET /projects": [SHOP] }, ["board.read"], { organizations: [] });
+		await openApp("/");
+		expect(await screen.findByText("Shop")).toBeTruthy();
+		restoreFetch();
+
+		fakeServer({}, ["board.read"], { organizations: [] });
+		await openApp("/settings");
+		expect(await screen.findByText("ada@x.io")).toBeTruthy();
+		expect(screen.queryByText("Organization")).toBeNull();
+	});
 });
 
 describe("unreachable server", () => {

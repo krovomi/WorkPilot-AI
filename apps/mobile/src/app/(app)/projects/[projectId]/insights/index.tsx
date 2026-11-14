@@ -47,7 +47,7 @@ export default function Insights() {
 			ListHeaderComponent={
 				<View style={{ gap: SPACE.sm }}>
 					<Text style={{ color: theme.textMuted }}>{t("insights.intro")}</Text>
-					<ErrorBanner message={actionError ?? (error ? describeError(error) : null)} />
+					<ErrorBanner message={actionError} error={error} />
 					{can("insight.write") ? (
 						<Button label={t("insights.new")} busy={busy} onPress={() => void create()} />
 					) : null}

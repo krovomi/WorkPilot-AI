@@ -132,3 +132,39 @@ describe("board", () => {
 		expect(screen.queryByRole("button", { name: "New card" })).toBeNull();
 	});
 });
+
+describe("board over the live stream", () => {
+	/** A stream that opens at once, and lets the test push a board event. */
+	class OpenSocket {
+		static last: OpenSocket | null = null;
+		onopen: (() => void) | null = null;
+		onmessage: ((message: { data: unknown }) => void) | null = null;
+		onclose: (() => void) | null = null;
+		constructor() {
+			OpenSocket.last = this;
+			queueMicrotask(() => this.onopen?.());
+		}
+		close() {}
+	}
+	const realWebSocket = globalThis.WebSocket;
+	afterEach(() => {
+		globalThis.WebSocket = realWebSocket;
+	});
+
+	it("says it is live, and shows an empty column when its last card moves away", async () => {
+		globalThis.WebSocket = OpenSocket as unknown as typeof WebSocket;
+		let cards = [card("005-red", "Red build", { column: "build_failed" })];
+		fakeServer({ "GET /api/board/cards": () => ({ cards }), "GET /projects/p1": PROJECT });
+		await openApp("/projects/p1");
+		expect(await screen.findByText("Live")).toBeTruthy();
+		await fireEvent.press(await screen.findByRole("tab", { name: /Red Build/ }));
+		expect(screen.getByText("Red build")).toBeTruthy();
+
+		cards = [{ ...cards[0], column: "done" }];
+		OpenSocket.last?.onmessage?.({ data: JSON.stringify({ event_type: "spec_updated", data: {} }) });
+		// The column the person chose is gone with its card.
+		await waitFor(() => expect(screen.queryByText("Red build")).toBeNull());
+		expect(screen.queryByRole("tab", { name: /Red Build/ })).toBeNull();
+		expect(screen.getByText("No card here.")).toBeTruthy();
+	});
+});

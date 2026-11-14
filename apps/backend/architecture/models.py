@@ -18,6 +18,12 @@ class LayerConfig:
     patterns: list[str]  # glob patterns matching files in this layer
     allowed_imports: list[str] = field(default_factory=list)
     forbidden_imports: list[str] = field(default_factory=list)
+    # Module names that belong to this layer, for languages whose imports name
+    # a namespace or package rather than a file: ``MyApp.Domain`` (C#),
+    # ``com.acme.domain`` (Java/Kotlin), ``github.com/acme/shop/internal/domain``
+    # (Go), ``App.Domain`` (PHP ``App\Domain``), ``crate.domain`` (Rust),
+    # ``package:shop/domain`` (Dart), ``Domain`` (a Swift target).
+    module_prefixes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -36,6 +42,9 @@ class ForbiddenPattern:
     from_pattern: str  # glob pattern for source files
     import_pattern: str  # regex pattern for forbidden imports
     description: str = ""
+    # Stable name of a built-in rule (``domain_framework``), so the app can
+    # word it in the user's language; empty for a rule the project wrote.
+    rule_id: str = ""
 
 
 @dataclass
@@ -109,6 +118,11 @@ class ArchitectureViolation:
     rule: str = ""
     description: str = ""
     suggestion: str = ""
+    # Structured form of ``rule`` for the app to translate: the two layers of
+    # a layer violation, the id of a built-in forbidden pattern.
+    source_layer: str = ""
+    target_layer: str = ""
+    rule_id: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -120,6 +134,9 @@ class ArchitectureViolation:
             "rule": self.rule,
             "description": self.description,
             "suggestion": self.suggestion,
+            "source_layer": self.source_layer,
+            "target_layer": self.target_layer,
+            "rule_id": self.rule_id,
         }
 
 

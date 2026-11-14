@@ -30,7 +30,7 @@ export default function Tokens() {
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
 			<Text style={{ color: theme.textMuted, lineHeight: 21 }}>{t("tokens.intro")}</Text>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			{SECRET_KINDS.map((kind) => (
 				<TokenRow key={kind} kind={kind} isSet={set.has(kind)} onChanged={reload} />
 			))}

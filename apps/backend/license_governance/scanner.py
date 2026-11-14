@@ -24,6 +24,7 @@ import json
 import logging
 import re
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -114,6 +115,55 @@ _REMEDIATION_HINT = {
 }
 
 
+def _spdx_from_name(text: str) -> str:
+    """A licence written out in words (a POM ``<name>``, a PyPI classifier)
+    → the SPDX id the table knows, or ``""``.
+
+    ``The Apache Software License, Version 2.0``, ``MIT License``, ``BSD
+    License``, ``GNU General Public License v3 (GPLv3)``… are how Maven and
+    PyPI spell the common licences; reading them only as SPDX ids left every
+    Java dependency ``unknown``.
+    """
+    t = " ".join(text.lower().replace(",", " ").split())
+    if "affero" in t or "agpl" in t:
+        return "agpl-3.0"
+    if "lesser" in t or "lgpl" in t or "library general public" in t:
+        return "lgpl-2.1" if "2.1" in t or "v2" in t else "lgpl-3.0"
+    if "general public license" in t or re.search(r"\bgpl", t):
+        return (
+            "gpl-2.0"
+            if re.search(r"\bv ?2\b|2\.0|version 2\b|gplv2|gpl-2", t)
+            else "gpl-3.0"
+        )
+    if "mozilla" in t or t.startswith("mpl"):
+        return "mpl-2.0"
+    if "eclipse" in t or t.startswith("epl"):
+        return "epl-1.0" if "1.0" in t else "epl-2.0"
+    if "cddl" in t or "common development and distribution" in t:
+        return "cddl-1.1"
+    if "apache" in t:
+        return "apache-2.0"
+    if re.search(r"\bmit\b", t) or "expat" in t:
+        return "mit"
+    if re.search(r"\bisc\b", t):
+        return "isc"
+    if "bsd" in t:
+        return (
+            "bsd-2-clause" if "2-clause" in t or "simplified" in t else "bsd-3-clause"
+        )
+    if "unlicense" in t:
+        return "unlicense"
+    if "cc0" in t or "public domain" in t:
+        return "cc0-1.0"
+    if "zlib" in t:
+        return "zlib"
+    if "boost" in t:
+        return "bsl-1.0"
+    if "python software foundation" in t or t == "psf":
+        return "psf-2.0"
+    return ""
+
+
 def classify_license(raw: str | None) -> LicenseCategory:
     """Map a free-form licence string to a category.
 
@@ -144,7 +194,9 @@ def classify_license(raw: str | None) -> LicenseCategory:
     best: LicenseCategory | None = None
     for part in parts:
         cleaned = part.strip().strip("()")
-        cat = _LICENSE_TABLE.get(cleaned, LicenseCategory.UNKNOWN)
+        cat = _LICENSE_TABLE.get(cleaned) or _LICENSE_TABLE.get(
+            _spdx_from_name(cleaned), LicenseCategory.UNKNOWN
+        )
         if best is None or rank[cat] < rank[best]:
             best = cat
     return best or LicenseCategory.UNKNOWN
@@ -158,9 +210,12 @@ def classify_license(raw: str | None) -> LicenseCategory:
 class DependencyRecord:
     name: str
     version: str
-    ecosystem: str  # npm | pypi | cargo | go
+    # npm | pypi | cargo | go | nuget | maven | composer | rubygems | pub
+    ecosystem: str
     declared_license: str | None = None
     is_direct: bool = True
+    # Where the licence was read: manifest | installed | registry | override.
+    license_source: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -169,6 +224,7 @@ class DependencyRecord:
             "ecosystem": self.ecosystem,
             "declared_license": self.declared_license,
             "is_direct": self.is_direct,
+            "license_source": self.license_source,
         }
 
 
@@ -390,6 +446,31 @@ def _parse_go_mod(path: Path) -> list[DependencyRecord]:
     return deps
 
 
+# Installed copies, build output and caches: their manifests are not the
+# project's own dependencies.
+_SKIP_DIRS = frozenset(
+    {
+        "node_modules",
+        ".venv",
+        "venv",
+        "vendor",
+        ".git",
+        "bin",
+        "obj",
+        "target",
+        "build",
+        "dist",
+        ".gradle",
+        "Pods",
+        ".dart_tool",
+        ".workpilot",
+        "site-packages",
+    }
+)
+
+# Parallel registry lookups; small enough not to look like a flood.
+_RESOLVE_WORKERS = 8
+
 _PARSERS: list[tuple[str, Callable[[Path], list[DependencyRecord]]]] = [
     ("package.json", _parse_package_json),
     ("requirements.txt", _parse_requirements_txt),
@@ -430,13 +511,14 @@ class LicenseScanner:
 
     def discover(self) -> list[DependencyRecord]:
         """Walk the project tree and parse every supported manifest."""
+        from .manifests import EXTRA_PARSERS
+
         all_deps: list[DependencyRecord] = []
         seen: set[tuple[str, str, str]] = set()
-        for filename, parser in _PARSERS:
+        for filename, parser in [*_PARSERS, *EXTRA_PARSERS]:
             for path in self.project_dir.rglob(filename):
-                if any(
-                    p in {"node_modules", ".venv", "venv", "vendor"} for p in path.parts
-                ):
+                rel_parts = path.relative_to(self.project_dir).parts[:-1]
+                if any(p in _SKIP_DIRS for p in rel_parts):
                     continue
                 # If this is package.json itself: pull "license" too.
                 license_field: str | None = None
@@ -466,10 +548,13 @@ class LicenseScanner:
 
     def scan(self) -> LicenseReport:
         deps = self.discover()
-        # Resolve licences via the injected resolver.
+        # Resolve licences via the injected resolver. A registry lookup waits
+        # on the network, so they run side by side; the order is kept.
+        with ThreadPoolExecutor(max_workers=_RESOLVE_WORKERS) as pool:
+            declared_all = list(pool.map(self.resolver, deps))
+        source_of = getattr(self.resolver, "source_of", None)
         resolved: list[DependencyRecord] = []
-        for dep in deps:
-            declared = self.resolver(dep)
+        for dep, declared in zip(deps, declared_all, strict=True):
             resolved.append(
                 DependencyRecord(
                     name=dep.name,
@@ -477,6 +562,9 @@ class LicenseScanner:
                     ecosystem=dep.ecosystem,
                     declared_license=declared,
                     is_direct=dep.is_direct,
+                    license_source=(source_of(dep) if callable(source_of) else "")
+                    if declared
+                    else "",
                 )
             )
 
@@ -506,6 +594,10 @@ class LicenseScanner:
             "direct": sum(1 for d in resolved if d.is_direct),
             "transitive": sum(1 for d in resolved if not d.is_direct),
             "conflict_count": len(conflicts),
+            "unresolved": sum(1 for d in resolved if not d.declared_license),
+            "by_source": _count(
+                [d for d in resolved if d.license_source], lambda d: d.license_source
+            ),
             "policy_allowed": sorted(c.value for c in self.policy.allowed),
         }
 

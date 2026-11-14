@@ -243,6 +243,33 @@ def test_a_first_compile_gets_its_own_budget(helper):
         stuck.request("ping")
 
 
+def test_the_helper_says_it_is_alive_before_powershell_reads_its_body():
+    # PowerShell parses a whole script file before its first statement runs:
+    # with the C# source in driver.ps1, the first line waited behind that and
+    # a cold Windows runner went past the start budget. The entry point says
+    # it is starting, then dot-sources the body, and the body does not say it
+    # again (each line it writes moves the start to the compile budget).
+    from verify.window import _START_SECONDS, DRIVER_SCRIPT
+
+    entry = DRIVER_SCRIPT.read_text(encoding="utf-8")
+    body = (DRIVER_SCRIPT.parent / "helper.ps1").read_text(encoding="utf-8")
+    statements = [
+        line.strip()
+        for line in entry.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert statements[-3:] == [
+        """[Console]::Out.WriteLine('{"starting":true}')""",
+        "[Console]::Out.Flush()",
+        ". (Join-Path $PSScriptRoot 'helper.ps1')",
+    ]
+    assert len(statements) <= 8
+    assert "Add-Type" not in entry and "public static class" not in entry
+    assert '{"starting":true}' not in body
+    assert '{"ready":true}' in body and "public static class WorkPilotUia" in body
+    assert _START_SECONDS >= 120
+
+
 def test_the_helper_environment_carries_no_credential(monkeypatch):
     monkeypatch.setenv("SystemRoot", r"C:\Windows")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-0000")
