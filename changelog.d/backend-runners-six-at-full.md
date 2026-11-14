@@ -9,6 +9,7 @@ section: 🧪 Filets de test
   - Bac à sable : `sandbox_runner.py` (fichiers ajoutés, supprimés, renommés et modifiés, avec leurs hunks).
   - Déclencheurs CI/CD : `cicd_triggers_runner.py` (GitLab et Jenkins contre un serveur local, GitHub Actions et Azure DevOps).
   - Agent navigateur : `browser_agent_runner.py` (références visuelles, comparaison, tableau de bord, échec propre sans Chromium).
+  - Le backend passe de 69,9 % à 70,6 % de couverture, et son plancher de 69 % à 70 %.
 - **Déclencheurs CI/CD** :
   - le statut et l'annulation d'un run GitHub acceptent l'alias `github_actions`, comme le déclenchement : ils lisaient `CICD_GITHUB_ACTIONS_TOKEN` au lieu de `CICD_GITHUB_TOKEN` ;
   - Jenkins reçoit la branche et l'URL de la PR encodées : un `&` dans l'une d'elles coupait les paramètres du build.
