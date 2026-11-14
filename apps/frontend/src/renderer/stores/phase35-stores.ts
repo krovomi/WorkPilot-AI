@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import type {
-	AgentHealthScoreData,
+	ProjectAgentHealth,
 	AnomalyReport,
 	AnomalySignal,
 	AuditEvent,
@@ -84,34 +84,27 @@ export const useLongevityStore = create<LongevityState>((set) => ({
 // ---------- #3.11 Agent Health ----------
 
 interface AgentHealthState extends BaseSlice {
-	scores: AgentHealthScoreData[];
-	knownAgents: string[];
-	refresh: () => Promise<void>;
-	resetMonitor: (agentName?: string) => Promise<void>;
+	projectPath: string | null;
+	health: ProjectAgentHealth | null;
+	/** Score the agents that ran the project's Kanban tasks, read from their logs. */
+	refresh: (projectPath: string) => Promise<void>;
 }
 
 export const useAgentHealthStore = create<AgentHealthState>((set) => ({
 	phase: "idle",
 	error: null,
-	scores: [],
-	knownAgents: [],
-	refresh: async () => {
-		set({ phase: "running", error: null });
+	projectPath: null,
+	health: null,
+	refresh: async (projectPath) => {
+		set({ phase: "running", error: null, projectPath });
 		try {
-			const res = await globalThis.electronAPI.scoreAllAgentHealth();
+			const res = await globalThis.electronAPI.scoreProjectAgentHealth(projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({
-				phase: "ok",
-				scores: res.scores,
-				knownAgents: res.agents_known,
-			});
+			const { scores, pending, tasks_read, min_runs } = res;
+			set({ phase: "ok", health: { scores, pending, tasks_read, min_runs } });
 		} catch (e) {
-			set({ phase: "error", error: errorMessage(e) });
+			set({ phase: "error", error: errorMessage(e), health: null });
 		}
-	},
-	resetMonitor: async (agentName) => {
-		await globalThis.electronAPI.resetAgentHealth(agentName);
-		set({ scores: [], knownAgents: [] });
 	},
 }));
 
@@ -231,7 +224,7 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.analyseCicdLogs(samples);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, signals: res.report.signals });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
