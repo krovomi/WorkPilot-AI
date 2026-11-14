@@ -1,3 +1,11 @@
+---
+feature: Règles issues des revues
+summary: >-
+  Un fil de revue corrigé par le suivi de PR ou le retour d'un plan rejeté devient une règle
+  candidate ; seule une personne l'adopte, et seule une règle adoptée entre dans les prompts, à
+  chaque phase. Hors du cerveau tant qu'elle n'est pas adoptée (S2).
+---
+
 # Rules learned from reviews
 
 Plan of 29 October, IA1. Two moments say how a project wants its code written

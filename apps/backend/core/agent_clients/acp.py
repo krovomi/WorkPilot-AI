@@ -218,6 +218,7 @@ class AcpAgentClient(CliSubprocessAgentClient):
             )
         self.spec = spec
         self.provider = provider
+        self.hands_mcp_servers = True
         self.cli_label = spec.label or provider
         super().__init__(
             model=acp_model(model, spec.model_prefixes, self.cli_label) or "default",
@@ -611,7 +612,14 @@ class AcpAgentClient(CliSubprocessAgentClient):
         return f"{head}; declares: {', '.join(declared) if declared else 'nothing beyond prompts'}"
 
     async def _open_session(self) -> None:
-        params = {"cwd": str(Path(self._project_dir).resolve()), "mcpServers": []}
+        from core.cli_mcp import acp_mcp_servers
+
+        params = {
+            "cwd": str(Path(self._project_dir).resolve()),
+            "mcpServers": acp_mcp_servers(
+                await self.custom_mcp_servers(), self.agent_capabilities
+            ),
+        }
         result: Any = None
         if self.session_id and self.agent_capabilities.get("loadSession") is True:
             self._session = self.session_id

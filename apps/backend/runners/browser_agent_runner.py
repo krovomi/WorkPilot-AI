@@ -223,12 +223,9 @@ def main():
                 if isinstance(data, dict):
                     for key, value in data.items():
                         print(f"  {key}: {value}")
-                elif isinstance(data, list):
+                else:  # the baselines: a list of dicts
                     for item in data:
-                        if isinstance(item, dict):
-                            print(f"  - {item.get('name', item)}")
-                        else:
-                            print(f"  - {item}")
+                        print(f"  - {item['name']}")
             else:
                 print(f"Error: {result.get('error', 'Unknown error')}", file=sys.stderr)
 

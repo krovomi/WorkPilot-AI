@@ -1,3 +1,11 @@
+---
+feature: Assistant vocal
+summary: >-
+  Raccourci global, Whisper local, commandes simples lues localement puis modèle « Assistant vocal
+  » ; liste fermée d'actions (vue de la barre latérale, tâche après confirmation, réglages),
+  réponse revalidée dans le main.
+---
+
 # Assistant vocal
 
 Un raccourci clavier, partout dans l'app, ouvre un panneau qui écoute. On dit ce

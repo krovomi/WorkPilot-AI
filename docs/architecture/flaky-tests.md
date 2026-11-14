@@ -1,3 +1,10 @@
+---
+feature: Tests instables
+summary: >-
+  Verdict par taux, cause lue dans le code du test (toutes stacks), historique local, relance des
+  seuls suspects par le filtre de la stack ; carte pour corriger ou mettre en quarantaine.
+---
+
 # Tests instables : verdict, cause dans le code, historique, quarantaine (F195)
 
 Le Flaky Test Detective lance la suite plusieurs fois (ou lit des rapports JUnit / TRX existants)

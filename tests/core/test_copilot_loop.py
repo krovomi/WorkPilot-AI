@@ -237,16 +237,20 @@ async def test_a_failing_tool_and_a_missing_executor():
 
 
 @pytest.mark.asyncio
-async def test_mcp_tools_are_not_routed_on_copilot():
-    """Copilot executes every call through the tool executor, even a name an
-    MCP manager would answer."""
+async def test_mcp_tools_are_routed_through_the_bridge_on_copilot():
+    """Copilot bridges the project's MCP servers like OpenAI: a tool the
+    manager serves is answered by it, never by the executor."""
 
     class _Mcp:
-        def has_tool(self, name):
-            return True
+        def __init__(self):
+            self.calls = []
 
-        async def call(self, name, args):  # pragma: no cover - must not run
-            raise AssertionError("Copilot does not route MCP tools")
+        def has_tool(self, name):
+            return name == "hf_search"
+
+        async def call(self, name, args):
+            self.calls.append((name, args))
+            return "3 models"
 
     executor = _Executor()
     client, _session = _client(
@@ -256,11 +260,13 @@ async def test_mcp_tools_are_not_routed_on_copilot():
         ],
         executor=executor,
     )
-    client._mcp_manager = _Mcp()
+    mcp = _Mcp()
+    client._mcp_manager = mcp
 
     await _collect(client)
 
-    assert executor.calls == [("hf_search", {})]
+    assert mcp.calls == [("hf_search", {})]
+    assert executor.calls == []
 
 
 @pytest.mark.asyncio

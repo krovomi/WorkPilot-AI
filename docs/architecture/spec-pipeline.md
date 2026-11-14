@@ -1,3 +1,9 @@
+---
+feature: Pipeline de spec
+summary: >-
+  Reprise de plan, traçabilité `FR-###`, `[NEEDS CLARIFICATION]`, constitutions spec-kit.
+---
+
 # Spec pipeline: plan recovery, traceability, spec-kit
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

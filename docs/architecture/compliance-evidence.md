@@ -1,3 +1,10 @@
+---
+feature: Preuves de conformité
+summary: >-
+  Preuves datées (tâches, git, config) ; contrôles en YAML, ceux du projet compris ; rapport
+  mensuel, alerte à 30 jours, sans modèle.
+---
+
 # Compliance evidence collector
 
 Issue #357. Page « Collecteur de preuves de conformité » (Toolbox, expérimentale),

@@ -1,3 +1,10 @@
+---
+feature: Mode objectif
+summary: >-
+  Une commande dit « fini » : chemins protégés, plafond de passes et de dépense, fichier qu'aucun
+  agent n'écrit.
+---
+
 # Mode objectif (`goal`)
 
 Une tâche était finie quand le relecteur QA écrivait `approved`. C'était l'avis

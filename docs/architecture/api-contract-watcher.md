@@ -1,3 +1,10 @@
+---
+feature: Veille des contrats d'API
+summary: >-
+  OpenAPI, GraphQL, protobuf comparés à la base de fusion, sans modèle ; consommateurs ;
+  `x-breaking-acknowledged` ; porte QA `warn`/`strict`.
+---
+
 # Veille des contrats d'API (#389)
 
 Une tâche qui modifie un contrat d'API peut casser des clients que personne n'a prévenus. La

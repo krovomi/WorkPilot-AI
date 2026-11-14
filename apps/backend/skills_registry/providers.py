@@ -176,7 +176,7 @@ def _parse_acp(name: str, raw: object) -> AcpSpec | None:
 
 
 #: The closed vocabularies of the `standards` field (see providers.yaml).
-MCP_SUPPORT = ("native", "bridged", "own", "none", "unverified")
+MCP_SUPPORT = ("native", "bridged", "handed", "own", "none", "unverified")
 INSTRUCTION_SUPPORT = ("agents_md", "claude_md", "injected", "unverified")
 
 
