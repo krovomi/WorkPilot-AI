@@ -109,15 +109,28 @@ export interface LicenseScanReport {
 		ecosystem: string;
 		declared_license: string | null;
 		is_direct: boolean;
+		/** manifest | installed | registry | override, or "" when unresolved. */
+		license_source?: string;
 	}>;
 	conflicts: Array<{
-		dependency: { name: string; version: string; ecosystem: string };
+		dependency: {
+			name: string;
+			version: string;
+			ecosystem: string;
+			declared_license?: string | null;
+		};
 		category: string;
 		reason: string;
 		remediation: string;
 	}>;
 	by_category: Record<string, number>;
-	summary: Record<string, unknown>;
+	summary: {
+		total_dependencies?: number;
+		by_ecosystem?: Record<string, number>;
+		unresolved?: number;
+		by_source?: Record<string, number>;
+		[k: string]: unknown;
+	};
 	passed: boolean;
 }
 
@@ -382,7 +395,8 @@ export interface Phase35FeaturesAPI {
 		projectPath: string,
 		policy?: "permissive_only" | "open_source_friendly" | "saas_safe",
 		licenseOverrides?: { name: string; license: string | null }[],
-	) => Promise<Phase35Result<{ report: LicenseScanReport }>>;
+		online?: boolean,
+	) => Promise<Phase35Result<{ report: LicenseScanReport; online?: boolean }>>;
 	classifyLicense: (
 		license: string,
 	) => Promise<
@@ -651,11 +665,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 		ipcRenderer.invoke(IPC_CHANNELS.CICD_ANOMALY_ANALYSE, { samples }),
 
 	// #3.7
-	scanLicenses: (projectPath, policy, licenseOverrides) =>
+	scanLicenses: (projectPath, policy, licenseOverrides, online) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_SCAN, {
 			projectPath,
 			policy,
 			licenseOverrides,
+			online,
 		}),
 	classifyLicense: (license) =>
 		ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GOV_CLASSIFY, { license }),

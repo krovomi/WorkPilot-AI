@@ -90,7 +90,8 @@ export function decodedSize(base64: string): number {
 }
 
 function filenameFor(asset: PickedAsset, mime: ImageMime, index: number): string {
-	const raw = (asset.fileName ?? "").split(/[\\/]/).pop() ?? "";
+	// `split` always gives at least one part.
+	const raw = (asset.fileName ?? "").split(/[\\/]/).pop() as string;
 	const name = raw.replace(/[^A-Za-z0-9._ -]+/g, "_").trim();
 	return (name || `image-${index + 1}.${EXTENSIONS[mime]}`).slice(-MAX_FILENAME);
 }
@@ -124,16 +125,18 @@ export function addImages(
 		const data = asset.base64?.replace(/\s/g, "") ?? "";
 		const mime = data ? sniffMime(data) : null;
 		const reason = refusalFor(data, mime, images.length);
-		if (reason || !mime) {
-			refused.push({ name, reason: reason ?? "unsupported" });
+		if (reason) {
+			refused.push({ name, reason });
 			continue;
 		}
+		// `refusalFor` refuses an image of no known type.
+		const type = mime as ImageMime;
 		counter += 1;
 		images.push({
 			id: `img-${counter}`,
 			uri: asset.uri,
-			filename: filenameFor(asset, mime, images.length),
-			mimeType: mime,
+			filename: filenameFor(asset, type, images.length),
+			mimeType: type,
 			data,
 		});
 	}

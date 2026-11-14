@@ -242,9 +242,12 @@ export const useCicdAnomalyStore = create<CicdAnomalyState>((set) => ({
 
 interface LicenseState extends BaseSlice {
 	report: LicenseScanReport | null;
+	/** Whether the last scan could ask the public registries. */
+	online: boolean | null;
 	scan: (
 		projectPath: string,
 		policy?: "permissive_only" | "open_source_friendly" | "saas_safe",
+		online?: boolean,
 	) => Promise<void>;
 }
 
@@ -252,16 +255,22 @@ export const useLicenseStore = create<LicenseState>((set) => ({
 	phase: "idle",
 	error: null,
 	report: null,
-	scan: async (projectPath, policy) => {
+	online: null,
+	scan: async (projectPath, policy, online = true) => {
 		if (!projectPath) {
 			set({ phase: "error", error: "projectPath is required" });
 			return;
 		}
 		set({ phase: "running", error: null });
 		try {
-			const res = await globalThis.electronAPI.scanLicenses(projectPath, policy);
+			const res = await globalThis.electronAPI.scanLicenses(
+				projectPath,
+				policy,
+				undefined,
+				online,
+			);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", report: res.report });
+			set({ phase: "ok", report: res.report, online: res.online ?? online });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}

@@ -10,7 +10,7 @@ import { groupColor, inGroup } from "../../../../board/splitGroup";
 import { useBoard } from "../../../../board/useBoard";
 import { forgeKind, useProject } from "../../../../forge/useForge";
 import { describeError } from "../../../../i18n";
-import { ErrorBanner, Loading } from "../../../../ui/components";
+import { ErrorBanner, Loading, rowOpacity } from "../../../../ui/components";
 import { columnColor, RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
 export default function Board() {
@@ -164,6 +164,7 @@ function CardRow({
 	const { t } = useTranslation();
 	const theme = useTheme();
 	const { completed, total } = card.subtasks;
+	const { group } = card;
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -171,7 +172,7 @@ function CardRow({
 			onPress={onPress}
 			style={({ pressed }) => [
 				styles.card,
-				{ backgroundColor: theme.surface, borderColor: theme.border, opacity: pressed ? 0.85 : 1 },
+				{ backgroundColor: theme.surface, borderColor: theme.border, opacity: rowOpacity(pressed) },
 			]}
 		>
 			<View style={styles.cardTop}>
@@ -182,7 +183,7 @@ function CardRow({
 					</Text>
 				) : null}
 			</View>
-			{card.group ? <GroupMark group={card.group} onPress={() => onGroup(card.group?.id ?? "")} /> : null}
+			{group ? <GroupMark group={group} onPress={() => onGroup(group.id)} /> : null}
 			<Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{card.title}</Text>
 			{total > 0 ? (
 				<View style={{ gap: 4 }}>

@@ -149,6 +149,7 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 		id: string,
 		value: string,
 		onChange: (lang: string) => void,
+		asTarget = false,
 	): React.ReactElement {
 		return (
 			<Select value={value} onValueChange={onChange} disabled={isTranslating}>
@@ -156,7 +157,9 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
-					{languages.map((lang) => (
+					{languages
+						.filter((lang) => !(asTarget && lang.sourceOnly))
+						.map((lang) => (
 						<SelectItem key={lang.id} value={lang.id}>
 							{lang.label}
 						</SelectItem>
@@ -298,13 +301,16 @@ export function CrossLanguageTranslationDashboard(): React.ReactElement {
 							variant="ghost"
 							icon={ArrowLeftRight}
 							onClick={swapLanguages}
-							disabled={isTranslating}
+							disabled={
+								isTranslating ||
+								languages.some((lang) => lang.id === sourceLang && lang.sourceOnly)
+							}
 							aria-label={t("crossLanguageTranslation:languages.swap")}
 							title={t("crossLanguageTranslation:languages.swap")}
 						/>
 						<span className="wp-field">
 							<label htmlFor="translation-target">{t("crossLanguageTranslation:languages.target")}</label>
-							{languageSelect("translation-target", targetLang, setTargetLang)}
+							{languageSelect("translation-target", targetLang, setTargetLang, true)}
 						</span>
 					</span>
 				}

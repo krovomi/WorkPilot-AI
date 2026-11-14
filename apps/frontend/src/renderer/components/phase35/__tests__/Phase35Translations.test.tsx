@@ -37,7 +37,7 @@ afterEach(() => {
 	cleanup();
 	useDomainAgentsStore.setState({ domains: [], bundle: null, phase: "idle", error: null });
 	useCicdAnomalyStore.setState({ signals: [], phase: "idle", error: null });
-	useLicenseStore.setState({ report: null, phase: "idle", error: null });
+	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
 		scanReport: null,
 		driftReport: null,
@@ -98,6 +98,37 @@ describe("Fonctions avancées in French", () => {
 		expect(screen.getByText("Inconnue")).toBeInTheDocument();
 		expect(screen.getByText(/Chercher la licence en amont/)).toBeInTheDocument();
 		expect(screen.queryByText(/Look up the upstream/)).not.toBeInTheDocument();
+	});
+
+	it("keeps licences it could not find apart from real conflicts", () => {
+		const dep = (name: string, licence: string | null) => ({
+			name,
+			version: "1.0.0",
+			ecosystem: "nuget",
+			declared_license: licence,
+		});
+		useLicenseStore.setState({
+			online: false,
+			report: {
+				dependencies: [
+					{ ...dep("MediatR", "Apache-2.0"), is_direct: true, license_source: "installed" },
+					{ ...dep("Internal.Lib", null), is_direct: true, license_source: "" },
+				],
+				conflicts: [
+					{ dependency: dep("Internal.Lib", null), category: "unknown", reason: "", remediation: "" },
+				],
+				by_category: { permissive: 1, unknown: 1 },
+				summary: { by_ecosystem: { nuget: 2 }, by_source: { installed: 1 }, unresolved: 1 },
+				passed: false,
+			},
+		});
+		render(<LicensePanel projectPath="/p" />);
+		// Nothing breaks the policy: only one licence is left to check.
+		expect(screen.getByText("Licences à vérifier")).toBeInTheDocument();
+		expect(screen.queryByText("Conflits trouvés")).not.toBeInTheDocument();
+		expect(screen.getByText("1 dépendance dont la licence est introuvable")).toBeInTheDocument();
+		expect(screen.getByText("1 lue dans le paquet installé")).toBeInTheDocument();
+		expect(screen.getByText(/Les registres n’ont pas été interrogés/)).toBeInTheDocument();
 	});
 
 	it("shows the architecture verdict in French and lists each violation", () => {

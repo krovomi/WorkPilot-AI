@@ -6,7 +6,6 @@ import { useAdminApi } from "../../../../admin/api";
 import { useAction } from "../../../../admin/useAction";
 import { useSession } from "../../../../auth/session";
 import { useLoad } from "../../../../hooks/useLoad";
-import { describeError } from "../../../../i18n";
 import { Button, ErrorBanner, Field, Loading, Section } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
@@ -34,7 +33,7 @@ export default function Groups() {
 			keyboardShouldPersistTaps="handled"
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={action.error ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={action.error} error={error} />
 			{can("org.member.write") ? (
 				<Section title={t("admin.groups.new")}>
 					<Field label={t("admin.groups.name")} value={name} onChangeText={setName} maxLength={120} />
