@@ -6,6 +6,7 @@ import type {
 	LiveSuggestion,
 	TakeoverProposal,
 } from "../../shared/types/live-companion";
+import { useProjectStore } from "./project-store";
 
 interface LiveCompanionStoreState {
 	// State
@@ -66,7 +67,12 @@ export const useLiveCompanionStore = create<LiveCompanionStoreState>((set) => ({
 
 	addSuggestion: (suggestion) =>
 		set((state) => ({
-			suggestions: [suggestion, ...state.suggestions].slice(0, 50),
+			suggestions: [
+				suggestion,
+				...state.suggestions.filter(
+					(s) => s.suggestion_id !== suggestion.suggestion_id,
+				),
+			].slice(0, 50),
 		})),
 
 	removeSuggestion: (suggestionId) =>
@@ -80,7 +86,10 @@ export const useLiveCompanionStore = create<LiveCompanionStoreState>((set) => ({
 
 	addTakeover: (proposal) =>
 		set((state) => ({
-			takeovers: [proposal, ...state.takeovers],
+			takeovers: [
+				proposal,
+				...state.takeovers.filter((t) => t.proposal_id !== proposal.proposal_id),
+			],
 		})),
 
 	removeTakeover: (proposalId) =>
@@ -100,14 +109,30 @@ export const useLiveCompanionStore = create<LiveCompanionStoreState>((set) => ({
 	reset: () => set(initialState),
 }));
 
+/**
+ * True when `projectDir` is the project the page shows: a suggestion pushed
+ * for the watched project must not land in another project's list.
+ */
+function isShownProject(projectDir: string | undefined): boolean {
+	if (!projectDir) return true;
+	const shown = useProjectStore.getState().getActiveProject()?.path;
+	if (!shown) return true;
+	const normalize = (p: string) => p.replace(/[\\/]+$/, "").replaceAll("\\", "/");
+	return normalize(shown) === normalize(projectDir);
+}
+
 /** Keeps the store in step with what the companion pushes from main. */
 export function setupLiveCompanionListeners(): () => void {
 	const api = window.electronAPI;
 	const store = () => useLiveCompanionStore.getState();
 	const cleanups = [
 		api.onLiveCompanionStateChanged((state) => store().setCompanionState(state)),
-		api.onLiveCompanionSuggestion((suggestion) => store().addSuggestion(suggestion)),
-		api.onLiveCompanionTakeoverProposal((proposal) => store().addTakeover(proposal)),
+		api.onLiveCompanionSuggestion((suggestion) => {
+			if (isShownProject(suggestion.project_dir)) store().addSuggestion(suggestion);
+		}),
+		api.onLiveCompanionTakeoverProposal((proposal) => {
+			if (isShownProject(proposal.project_dir)) store().addTakeover(proposal);
+		}),
 		api.onLiveCompanionFileChange((event) => store().addFileChange(event)),
 	];
 	return () => {
@@ -120,14 +145,13 @@ export function setupLiveCompanionListeners(): () => void {
 export async function startCompanion(projectDir: string): Promise<boolean> {
 	const store = useLiveCompanionStore.getState();
 	store.setIsLoading(true);
+	store.setError(null);
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:start",
-			projectDir,
-		);
+		const result = await window.electronAPI.liveCompanionStart(projectDir);
+		if (!result.success) store.setError(result.error ?? null);
 		return result.success;
 	} catch (error) {
-		console.error("[LiveCompanion] Failed to start:", error);
+		store.setError(error instanceof Error ? error.message : String(error));
 		return false;
 	} finally {
 		store.setIsLoading(false);
@@ -136,7 +160,7 @@ export async function startCompanion(projectDir: string): Promise<boolean> {
 
 export async function stopCompanion(): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke("liveCompanion:stop");
+		const result = await window.electronAPI.liveCompanionStop();
 		return result.success;
 	} catch (error) {
 		console.error("[LiveCompanion] Failed to stop:", error);
@@ -146,8 +170,8 @@ export async function stopCompanion(): Promise<boolean> {
 
 export async function loadCompanionState(): Promise<void> {
 	try {
-		const result = await window.electronAPI.invoke("liveCompanion:getState");
-		if (result.success) {
+		const result = await window.electronAPI.liveCompanionGetState();
+		if (result.success && result.data) {
 			useLiveCompanionStore.getState().setCompanionState(result.data);
 		}
 	} catch (error) {
@@ -157,8 +181,8 @@ export async function loadCompanionState(): Promise<void> {
 
 export async function loadCompanionConfig(): Promise<void> {
 	try {
-		const result = await window.electronAPI.invoke("liveCompanion:getConfig");
-		if (result.success) {
+		const result = await window.electronAPI.liveCompanionGetConfig();
+		if (result.success && result.data) {
 			useLiveCompanionStore.getState().setConfig(result.data);
 		}
 	} catch (error) {
@@ -170,11 +194,8 @@ export async function updateCompanionConfig(
 	updates: Partial<CompanionConfig>,
 ): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:updateConfig",
-			updates,
-		);
-		if (result.success) {
+		const result = await window.electronAPI.liveCompanionUpdateConfig(updates);
+		if (result.success && result.data) {
 			useLiveCompanionStore.getState().setConfig(result.data);
 			return true;
 		}
@@ -185,13 +206,12 @@ export async function updateCompanionConfig(
 	}
 }
 
-export async function loadSuggestions(): Promise<void> {
+/** The active suggestions of `projectDir`. */
+export async function loadSuggestions(projectDir?: string): Promise<void> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:getSuggestions",
-		);
-		if (result.success) {
-			useLiveCompanionStore.getState().setSuggestions(result.data);
+		const result = await window.electronAPI.liveCompanionGetSuggestions(projectDir);
+		if (result.success && result.data) {
+			useLiveCompanionStore.getState().setSuggestions([...result.data].reverse());
 		}
 	} catch (error) {
 		console.error("[LiveCompanion] Failed to load suggestions:", error);
@@ -202,10 +222,8 @@ export async function dismissSuggestion(
 	suggestionId: string,
 ): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:dismissSuggestion",
-			suggestionId,
-		);
+		const result =
+			await window.electronAPI.liveCompanionDismissSuggestion(suggestionId);
 		if (result.success) {
 			useLiveCompanionStore.getState().removeSuggestion(suggestionId);
 			return true;
@@ -217,12 +235,11 @@ export async function dismissSuggestion(
 	}
 }
 
+/** Mark a suggestion handled once the page turned it into a Kanban task. */
 export async function applySuggestion(suggestionId: string): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:applySuggestion",
-			suggestionId,
-		);
+		const result =
+			await window.electronAPI.liveCompanionApplySuggestion(suggestionId);
 		if (result.success) {
 			useLiveCompanionStore.getState().removeSuggestion(suggestionId);
 			return true;
@@ -234,25 +251,22 @@ export async function applySuggestion(suggestionId: string): Promise<boolean> {
 	}
 }
 
-export async function loadTakeovers(): Promise<void> {
+/** The pending takeover proposals of `projectDir`. */
+export async function loadTakeovers(projectDir?: string): Promise<void> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:getTakeovers",
-		);
-		if (result.success) {
-			useLiveCompanionStore.getState().setTakeovers(result.data);
+		const result = await window.electronAPI.liveCompanionGetTakeovers(projectDir);
+		if (result.success && result.data) {
+			useLiveCompanionStore.getState().setTakeovers([...result.data].reverse());
 		}
 	} catch (error) {
 		console.error("[LiveCompanion] Failed to load takeovers:", error);
 	}
 }
 
+/** Mark a proposal accepted once the page turned it into a Kanban task. */
 export async function acceptTakeover(proposalId: string): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:acceptTakeover",
-			proposalId,
-		);
+		const result = await window.electronAPI.liveCompanionAcceptTakeover(proposalId);
 		if (result.success) {
 			useLiveCompanionStore.getState().removeTakeover(proposalId);
 			return true;
@@ -266,10 +280,8 @@ export async function acceptTakeover(proposalId: string): Promise<boolean> {
 
 export async function declineTakeover(proposalId: string): Promise<boolean> {
 	try {
-		const result = await window.electronAPI.invoke(
-			"liveCompanion:declineTakeover",
-			proposalId,
-		);
+		const result =
+			await window.electronAPI.liveCompanionDeclineTakeover(proposalId);
 		if (result.success) {
 			useLiveCompanionStore.getState().removeTakeover(proposalId);
 			return true;

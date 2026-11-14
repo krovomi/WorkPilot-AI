@@ -1,10 +1,10 @@
 """What the agents of a server project spent, read from the ledgers they keep in its clone.
 
 Every agent session records its tokens and cost (``core.usage_tracker``) in
-``.workpilot/cost_data.json`` of the directory it works in, and its QA verdicts
-and merges in ``.workpilot/dashboard_snapshot.json`` beside it: the clone
-itself for the spec phase and the project's jobs, a card's build workspace
-(``.workpilot/worktrees/tasks/<card>/``) for its build and its QA. The
+``.workpilot/cost_data.json`` of the clone, and its QA verdicts, merges and
+build times in ``.workpilot/dashboard_snapshot.json`` beside it. Builds that
+ran before ``usage_tracker.ledger_root`` wrote them in the card's build
+workspace (``.workpilot/worktrees/tasks/<card>/``), so those are read too. The
 server's database records who ran what and when, not what it cost, so the
 workspace views (``shared_features.workspace``) read these files, and only
 these: the two names below, in the clone's ``.workpilot`` and in each build
@@ -70,6 +70,8 @@ class Ledgers:
     qa_score_sum: float = 0.0
     merge_auto: int = 0
     merge_manual: int = 0
+    #: Seconds each completed build took, by the spec's complexity.
+    durations: dict[str, list[float]] = field(default_factory=dict)
 
 
 def _label(value: object) -> str:
@@ -201,7 +203,20 @@ def read_ledgers(clone: Path) -> Ledgers:
                 found.qa_score_sum += _amount(value.get("_qa_score_sum"))
                 found.merge_auto += _count(value.get("merge_auto_count"))
                 found.merge_manual += _count(value.get("merge_manual_count"))
+                _add_durations(found, value.get("avg_completion_by_complexity"))
     return found
+
+
+def _add_durations(found: Ledgers, by_complexity: object) -> None:
+    """Each completed build's seconds, by complexity (an older snapshot: a mean)."""
+    if not isinstance(by_complexity, dict):
+        return
+    for complexity, value in list(by_complexity.items())[:20]:
+        key = _label(complexity)
+        values = value if isinstance(value, list) else [value]
+        seconds = [s for s in (_amount(v) for v in values[:10_000]) if s > 0]
+        if key and seconds:
+            found.durations.setdefault(key, []).extend(seconds)
 
 
 def cost_summary(usages: list[Usage], now: datetime) -> dict[str, Any]:
@@ -243,20 +258,24 @@ def dashboard(ledgers: Ledgers, tasks_by_status: dict[str, int]) -> dict[str, An
     workspace of the project together; the cards counted by the server."""
     tokens_by_provider: dict[str, int] = defaultdict(int)
     cost_by_model: dict[str, float] = defaultdict(float)
-    for usage in ledgers.usages:
+    # A session that recorded neither a token nor a cent says nothing about
+    # a model: older builds left such rows behind.
+    spent = [u for u in ledgers.usages if u.tokens or u.cost]
+    for usage in spent:
         tokens_by_provider[usage.provider] += usage.tokens
         cost_by_model[f"{usage.provider}/{usage.model}"] += usage.cost
     qa_total = ledgers.qa_total
     return {
         "tasks_by_status": tasks_by_status,
-        # Nothing records how long a card took by complexity, on the desktop
-        # either: the view shows it empty.
-        "avg_completion_by_complexity": {},
+        "avg_completion_by_complexity": {
+            complexity: sum(seconds) / len(seconds)
+            for complexity, seconds in ledgers.durations.items()
+        },
         "qa_first_pass_rate": ledgers.qa_passed / qa_total * 100 if qa_total else 0.0,
         "qa_avg_score": ledgers.qa_score_sum / qa_total if qa_total else 0.0,
-        "total_tokens": sum(u.tokens for u in ledgers.usages),
+        "total_tokens": sum(u.tokens for u in spent),
         "tokens_by_provider": dict(tokens_by_provider),
-        "total_cost": sum(u.cost for u in ledgers.usages),
+        "total_cost": sum(u.cost for u in spent),
         "cost_by_model": dict(cost_by_model),
         "merge_auto_count": ledgers.merge_auto,
         "merge_manual_count": ledgers.merge_manual,
