@@ -287,5 +287,6 @@ def test_commands_per_stack(tmp_path):
         encoding="utf-8",
     )
     argv, _ = commands.command_for_tests(tmp_path, "Order.cs", ["OrderTests.cs"])
-    assert argv[:2] == ["dotnet", "test"] and "Shop.Tests/Shop.Tests.csproj" in argv
+    # Windows resolves the program to its full path (dotnet.EXE).
+    assert argv[1] == "test" and "Shop.Tests/Shop.Tests.csproj" in argv
     assert commands.command_for_tests(tmp_path, "notes.swift", []) is None

@@ -11,6 +11,7 @@ Dart/Flutter, Swift). The fixtures are trimmed from real runs.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -285,7 +286,7 @@ def test_report_options_per_stack(
         tr.TestCommand(cid, cid, command), tmp_path, out, no_build=False
     )
     argv = invocation.argv
-    wanted = [part.replace("{out}", str(out)) for part in expected]
+    wanted = [part.replace("{out}/", str(out) + os.sep) for part in expected]
     start = next(i for i, part in enumerate(argv) if part == wanted[0])
     assert argv[start : start + len(wanted)] == wanted
     assert invocation.convert == convert

@@ -535,10 +535,9 @@ def _run_steps(
             code = process.wait(timeout=max(1.0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             _kill_tree(process)
-            try:
+            # A tree that outlives its kill leaves nothing more to wait for.
+            with contextlib.suppress(subprocess.TimeoutExpired):
                 process.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                pass
             return None, True, ""
         finally:
             _current = None
