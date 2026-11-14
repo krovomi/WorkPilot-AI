@@ -62,6 +62,13 @@ describe("roadmap", () => {
 		expect(screen.getByRole("button", { name: "Generate again" })).toBeTruthy();
 	});
 
+	it("shows a roadmap without a vision", async () => {
+		fakeServer({ "GET /api/features/roadmap/snapshot": snapshot("roadmap.json", { ...ROADMAP, vision: "" }) }, RUNNERS);
+		await openApp("/projects/p1/roadmap");
+		expect(await screen.findByText("Launch")).toBeTruthy();
+		expect(screen.queryByText("Vision")).toBeNull();
+	});
+
 	it("regenerates an existing roadmap, and shows why the last run failed", async () => {
 		const server = fakeServer(
 			{
@@ -171,6 +178,20 @@ describe("ideas", () => {
 		expect(screen.queryByText("Stop brute force")).toBeNull();
 	});
 
+	it("shows an idea with no level and no rationale", async () => {
+		fakeServer(
+			{
+				"GET /api/features/ideation/snapshot": snapshot("ideation.json", {
+					ideas: [{ id: "i5", type: "code_quality", title: "Rename the helpers", description: "Clearer names" }],
+				}),
+			},
+			RUNNERS,
+		);
+		await openApp("/projects/p1/ideas");
+		await fireEvent.press(await screen.findByRole("button", { name: "Rename the helpers" }));
+		expect(screen.getByText("Clearer names")).toBeTruthy();
+	});
+
 	it("asks for more ideas on top of the existing ones, and for a first batch otherwise", async () => {
 		const server = fakeServer(
 			{
@@ -241,6 +262,14 @@ describe("new card", () => {
 			kind: "bug_fix",
 			require_review: false,
 		});
+	});
+
+	it("offers no engine when the server answers without a list", async () => {
+		const server = fakeServer({ "GET /api/board/engines": {} }, RUNNERS);
+		await openApp("/projects/p1/new");
+		expect(await screen.findByLabelText("Title")).toBeTruthy();
+		await waitFor(() => expect(server.called("GET /api/board/engines")).toHaveLength(1));
+		expect(screen.queryByText("Engine")).toBeNull();
 	});
 
 	it("shows why the server refused the card and keeps the form", async () => {

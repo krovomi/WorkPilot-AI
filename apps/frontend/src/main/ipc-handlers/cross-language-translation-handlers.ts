@@ -180,7 +180,14 @@ const SUPPORTED_LANGUAGES = [
 	{ id: "kotlin", label: "Kotlin", extension: ".kt" },
 	{ id: "swift", label: "Swift", extension: ".swift" },
 	{ id: "php", label: "PHP", extension: ".php" },
+	// A source only: nothing outside the WinDev editor can create the element a
+	// WLangage translation would go in.
+	{ id: "wlangage", label: "WLangage (WinDev)", extension: ".wdg", sourceOnly: true },
 ];
+
+const SOURCE_ONLY_IDS = new Set(
+	SUPPORTED_LANGUAGES.filter((l) => l.sourceOnly).map((l) => l.id),
+);
 
 const LANGUAGE_IDS = new Set(SUPPORTED_LANGUAGES.map((l) => l.id));
 
@@ -252,7 +259,8 @@ export function registerCrossLanguageTranslationHandlers(): void {
 		async (event, params: TranslateParams) => {
 			if (
 				!LANGUAGE_IDS.has(params?.sourceLang) ||
-				!LANGUAGE_IDS.has(params?.targetLang)
+				!LANGUAGE_IDS.has(params?.targetLang) ||
+				SOURCE_ONLY_IDS.has(params.targetLang)
 			) {
 				return { success: false, error: "Unsupported language" };
 			}

@@ -142,6 +142,14 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
   et exige que le renderer monte (`src/main/smoke-test.ts`) ; `ci.yml` le fait sur le build des
   trois OS, `release.yml` sur chaque app packagée avant publication (`--packaged`).
   `tests/test_smoke_test_wiring.py` garde ces étapes.
+- **Couverture du changement** : sur une PR, chaque ligne ajoutée ou modifiée que le rapport mesure
+  est lancée par un test, et chaque branche qui y commence est prise (`scripts/diff_coverage.py`,
+  pas « Every changed line run by a test » de `coverage-python`, de `test-frontend` sous Linux et
+  de `mobile.yml`). En local, après la suite avec couverture :
+  `python scripts/diff_coverage.py --base origin/develop --cobertura apps/backend/coverage.xml`
+  (ou `--istanbul apps/frontend/coverage/coverage-final.json`). Une ligne vraiment intestable sort
+  du rapport par `# pragma: no cover` ou `/* v8 ignore next */`, visible dans le diff et justifiée
+  dans la PR ; jamais pour une ligne qu'un test peut atteindre.
 - **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
   suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
 - **Téléchargements depuis les releases GitHub** : elles ont répondu 504 toute une matinée

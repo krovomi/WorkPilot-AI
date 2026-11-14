@@ -6,7 +6,7 @@ import type { ServerProject } from "../../api/types";
 import { useApi, useSession } from "../../auth/session";
 import { useLoad } from "../../hooks/useLoad";
 import { describeError } from "../../i18n";
-import { ErrorBanner, Loading } from "../../ui/components";
+import { ErrorBanner, Loading, rowOpacity } from "../../ui/components";
 import { repoLabel } from "../../ui/format";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
 import { projectRoleLabel } from "../../i18n/labels";
@@ -51,7 +51,7 @@ export default function Projects() {
 						}
 						style={({ pressed }) => [
 							styles.row,
-							{ backgroundColor: theme.surface, borderColor: theme.border, opacity: pressed ? 0.85 : 1 },
+							{ backgroundColor: theme.surface, borderColor: theme.border, opacity: rowOpacity(pressed) },
 						]}
 					>
 						<View style={{ flex: 1, gap: 2 }}>
