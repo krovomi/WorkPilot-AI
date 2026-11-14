@@ -21,11 +21,11 @@
 	"scripts": {
 		"postinstall": "install-electron && node -e \"if (!process.env.CI) { var r = require('child_process').spawnSync('electron-rebuild', [], {stdio:'inherit', shell:true}); process.exit(r.status || 0) }\"",
 		"dev": "node scripts/dev-elevated.cjs",
-		"dev:vite": "npm run sync-backend-port && electron-vite dev",
+		"dev:vite": "node ../../scripts/sync-backend-port-to-frontend-env.cjs && electron-vite dev",
 		"dev:noadmin": "cross-env WORKPILOT_NO_ELEVATE=1 node scripts/dev-elevated.cjs",
 		"dev:debug": "cross-env DEBUG=true node scripts/dev-elevated.cjs",
 		"dev:mcp": "electron-vite dev -- --remote-debugging-port=9222",
-		"build": "npm run sync-backend-port && electron-vite build",
+		"build": "node ../../scripts/sync-backend-port-to-frontend-env.cjs && electron-vite build",
 		"start": "electron .",
 		"start:mcp": "electron . --remote-debugging-port=9222",
 		"preview": "electron-vite preview",
