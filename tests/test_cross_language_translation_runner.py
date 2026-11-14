@@ -229,3 +229,36 @@ def test_extract_reads_unfenced_and_reordered_answers(runner):
     }
     csharp = "```c#\npublic class A {}\n```"
     assert runner.extract_code_blocks(csharp)["translated_code"] == "public class A {}"
+
+
+def test_a_windev_element_is_translated_from_its_code_only(
+    runner, monkeypatch, capsys, tmp_path
+):
+    from tests.windev.samples import procedure_set
+
+    element = tmp_path / "COL_Clients.wdg"
+    element.write_text(procedure_set(), encoding="utf-8")
+    argv = base_args(element)
+    argv[1] = "wlangage"
+    argv[3] = "csharp"
+    code, _, seen = drive(
+        runner, monkeypatch, capsys, argv, chunks=["```csharp\nclass A {}\n```"]
+    )
+    assert code == 0
+    prompt = seen["prompt"]
+    assert "Translate this WLangage (WinDev) code to C#" in prompt
+    assert "// CalculeRemise, event 458752" in prompt
+    assert "RENVOYER nMontant * 0.1" in prompt
+    # The editor's YAML and base64 are not the code.
+    assert "internal_properties" not in prompt
+    assert "procedure_id" not in prompt
+
+
+def test_wlangage_is_a_source_only(runner, monkeypatch, capsys, source):
+    argv = base_args(source)
+    argv[3] = "wlangage"
+    code, out, seen = drive(runner, monkeypatch, capsys, argv)
+    assert code == 1
+    [error] = [json.loads(e) for e in lines_with(out, runner.ERROR_MARKER)]
+    assert error["code"] == "unsupported_language"
+    assert "prompt" not in seen

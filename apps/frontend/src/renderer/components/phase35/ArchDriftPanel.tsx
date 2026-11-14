@@ -30,6 +30,20 @@ const SEV_COLOR: Record<string, string> = {
 /** How many findings a list shows before it stops; the counts stay exact. */
 const MAX_LISTED = 50;
 
+/** The rule a finding breaks, worded in the app language when the backend says which one. */
+function ViolationRule({ violation: v }: { violation: ArchViolation }) {
+	const { t } = useTranslation("phase35");
+	const layerName = (name: string) => t(`archDrift.layers.${name}` as never, { defaultValue: name });
+	let text = v.rule ?? "";
+	if (v.source_layer && v.target_layer) {
+		text = t("archDrift.layerRule", { source: layerName(v.source_layer), target: layerName(v.target_layer) });
+	} else if (v.rule_id) {
+		text = t(`archDrift.ruleIds.${v.rule_id}` as never, { defaultValue: v.rule ?? v.rule_id });
+	}
+	if (!text) return null;
+	return <div className="mt-1 text-muted-foreground">{text}</div>;
+}
+
 function ViolationList({ title, items }: { title: string; items: ArchViolation[] }) {
 	const { t } = useTranslation("phase35");
 	if (items.length === 0) return null;
@@ -53,7 +67,7 @@ function ViolationList({ title, items }: { title: string; items: ArchViolation[]
 								<span className="font-mono text-muted-foreground">→ {v.import_target}</span>
 							)}
 						</div>
-						{v.rule && <div className="mt-1 font-mono text-muted-foreground">{v.rule}</div>}
+						<ViolationRule violation={v} />
 					</li>
 				))}
 			</ul>
@@ -114,6 +128,7 @@ export function ArchDriftPanel({ projectPath }: ArchDriftPanelProps) {
 					{t("common.projectPathRequired")}
 				</p>
 			)}
+			<p className="mb-3 text-xs text-muted-foreground">{t("archDrift.languagesNote")}</p>
 			{configSource && (
 				<Notice tone={configSource === "none" ? "amber" : "accent"} icon={Info} className="mb-3">
 					{t(`archDrift.configSource.${configSource}` as never, { defaultValue: configSource })}

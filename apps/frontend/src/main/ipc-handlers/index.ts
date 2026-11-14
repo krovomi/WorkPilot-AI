@@ -63,6 +63,7 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerReaHandlers } from "./rea-handlers";
 import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
@@ -147,6 +148,7 @@ import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
+import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
 import {
 	registerVisualProgrammingHandlers,
@@ -191,6 +193,7 @@ export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
 export { registerAgentCliHandlers } from "./agent-cli-handlers";
+export { registerReaHandlers } from "./rea-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -421,6 +424,9 @@ export function setupIpcHandlers(
 	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
 	registerAgentCliHandlers();
 
+	// REA (static reader of shipped artifacts): the pinned release installed?
+	registerReaHandlers();
+
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();
 
@@ -540,6 +546,9 @@ export function setupIpcHandlers(
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
+
+	// The local backend for renderer views that read it (closed route list)
+	registerLocalBackendHandlers();
 
 	// Accessibility Agent handlers (WCAG scanner)
 	registerAccessibilityHandlers();

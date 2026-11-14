@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import type { CardKind } from "../../../../api/types";
 import { useApi } from "../../../../auth/session";
 import { describeError } from "../../../../i18n";
@@ -12,7 +12,7 @@ import { attachmentsPayload, type PendingImage } from "../../../../new-card/imag
 import { ImagesSection } from "../../../../new-card/ImagesSection";
 import { MAX_DESCRIPTION, MAX_TITLE } from "../../../../new-card/limits";
 import { takeShareDraft } from "../../../../new-card/share";
-import { Button, ErrorBanner, Field } from "../../../../ui/components";
+import { Button, ErrorBanner, Field, KeyboardAvoiding } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
 const KINDS: readonly (CardKind | null)[] = [null, "feature", "bug_fix", "refactoring", "investigation", "docs", "test"];
@@ -68,7 +68,7 @@ export default function NewCard() {
 	};
 
 	return (
-		<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+		<KeyboardAvoiding>
 			<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 				{draft ? (
 					<Text accessibilityRole="alert" style={{ color: theme.textMuted }}>
@@ -109,7 +109,7 @@ export default function NewCard() {
 				<ErrorBanner message={error} />
 				<Button label={t("newCard.create")} busy={busy} disabled={!title.trim() || !isModelValid(engine.model)} onPress={() => void create()} />
 			</ScrollView>
-		</KeyboardAvoidingView>
+		</KeyboardAvoiding>
 	);
 }
 

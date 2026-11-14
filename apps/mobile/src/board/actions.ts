@@ -88,6 +88,17 @@ export async function stopCard(client: Api, projectId: string, card: BoardCard):
 	if (!result.cancelled) throw new Error("nothing_to_stop");
 }
 
+/** Run one of the card's later phases again: its build, its merge, or its pull request. */
+export async function runPhase(
+	client: Api,
+	projectId: string,
+	card: BoardCard,
+	phase: "build" | "merge" | "pr",
+): Promise<void> {
+	if (!card.specId) throw new Error("card_not_indexed");
+	await client.startRun(projectId, card.specId, phase);
+}
+
 /** Send the work back with what to change, then build again. */
 export async function sendBack(client: Api, projectId: string, card: BoardCard, feedback: string): Promise<void> {
 	if (!card.specId) throw new Error("card_not_indexed");

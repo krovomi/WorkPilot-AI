@@ -4,6 +4,8 @@ export interface SupportedLanguage {
 	id: string;
 	label: string;
 	extension: string;
+	/** Offered as a source only (WLangage: no element to translate into). */
+	sourceOnly?: boolean;
 }
 
 export type TranslationStatus = "idle" | "translating" | "complete" | "failed";
@@ -62,7 +64,12 @@ const DEFAULT_LANGUAGES: SupportedLanguage[] = [
 	{ id: "kotlin", label: "Kotlin", extension: ".kt" },
 	{ id: "swift", label: "Swift", extension: ".swift" },
 	{ id: "php", label: "PHP", extension: ".php" },
+	{ id: "wlangage", label: "WLangage (WinDev)", extension: ".wdg", sourceOnly: true },
 ];
+
+function isSourceOnly(languages: SupportedLanguage[], id: string): boolean {
+	return languages.some((lang) => lang.id === id && lang.sourceOnly);
+}
 
 export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 	(set, get) => ({
@@ -94,12 +101,16 @@ export const useCrossLangTranslationStore = create<CrossLangTranslationState>(
 		},
 
 		setSourceLang: (lang) => set({ sourceLang: lang }),
-		setTargetLang: (lang) => set({ targetLang: lang }),
+		setTargetLang: (lang) => {
+			if (!isSourceOnly(get().languages, lang)) set({ targetLang: lang });
+		},
 		setInputCode: (code) => set({ inputCode: code }),
 		setPreserveComments: (v) => set({ preserveComments: v }),
 		setGenerateTests: (v) => set({ generateTests: v }),
 		swapLanguages: () => {
-			const { sourceLang, targetLang, outputCode } = get();
+			const { sourceLang, targetLang, outputCode, languages } = get();
+			// A source-only language cannot become the target.
+			if (isSourceOnly(languages, sourceLang)) return;
 			// Once there is a result, it becomes the new source, so that
 			// "swap" means "now translate this back" rather than mislabelling
 			// the pasted code with the other language.
