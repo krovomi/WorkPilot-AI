@@ -23,6 +23,7 @@ try:
         StructuralIssue,
     )
     from .io_utils import safe_print
+    from .learned_suppression import learned_prompt_block
     from .prompt_manager import PromptManager
     from .response_parsers import ResponseParser
 except (ImportError, ValueError, SystemError):
@@ -44,6 +45,7 @@ except (ImportError, ValueError, SystemError):
         StructuralIssue,
     )
     from runners.github.services.io_utils import safe_print
+    from runners.github.services.learned_suppression import learned_prompt_block
     from runners.github.services.prompt_manager import PromptManager
     from runners.github.services.response_parsers import ResponseParser
 
@@ -263,6 +265,9 @@ class PRReviewEngine:
         # reviewer re-raises findings the team already decided about, which is
         # the single most common complaint about automated review.
         full_prompt += _learning_context(project_root)
+        # The kinds of remark this project rejected (#361); the same rules are
+        # applied to the findings afterwards, so this only saves the effort.
+        full_prompt += learned_prompt_block(project_root)
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")

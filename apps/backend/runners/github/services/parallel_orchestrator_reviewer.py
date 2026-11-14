@@ -43,6 +43,7 @@ try:
     from .agent_utils import create_working_dir_injector
     from .category_utils import map_category
     from .io_utils import safe_print
+    from .learned_suppression import learned_prompt_block
     from .pr_worktree_manager import PRWorktreeManager
     from .pydantic_models import (
         AgentAgreement,
@@ -68,6 +69,7 @@ except (ImportError, ValueError, SystemError):
     from services.agent_utils import create_working_dir_injector
     from services.category_utils import map_category
     from services.io_utils import safe_print
+    from services.learned_suppression import learned_prompt_block
     from services.pr_worktree_manager import PRWorktreeManager
     from services.pydantic_models import (
         AgentAgreement,
@@ -339,7 +341,11 @@ Use the Read, Grep, and Glob tools to explore the codebase as needed.
 Report findings with specific file paths, line numbers, and code evidence.
 """
 
-        return prompt_with_cwd + pr_context
+        # The kinds of remark this project rejected (#361), read in the
+        # project's own checkout: `project_root` is the PR's worktree, whose
+        # `.workpilot/` the PR author controls. The orchestrator applies the
+        # same rules to the findings once the review is done.
+        return prompt_with_cwd + pr_context + learned_prompt_block(self.project_dir)
 
     async def _run_specialist_session(
         self,
