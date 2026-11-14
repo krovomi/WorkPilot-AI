@@ -31,6 +31,13 @@
  *
  * Opt out (no UAC, no separate console — e.g. when iterating on main-process
  * code): `pnpm run dev:noadmin`, or set WORKPILOT_NO_ELEVATE=1.
+ *
+ * pnpm exports some of its own settings to every script it runs as
+ * `npm_config_*` variables (`npm_config_manage_package_manager_versions=false`
+ * at least). npm reads every `npm_config_*` variable as one of its settings and
+ * warns on each it does not know ("npm warn Unknown env config
+ * "manage-package-manager-versions""), so the npm we start gets an env without
+ * them (`npmEnv`).
  */
 const { spawnSync, execFileSync } = require("node:child_process");
 
@@ -49,6 +56,18 @@ const FORWARD_ENV_EXCLUDE = new Set([
 	"WORKPILOT_NO_ELEVATE",
 	"WORKPILOT_DEV_DRYRUN",
 ]);
+// pnpm settings that pnpm hands its scripts as `npm_config_*` and npm does not
+// know. Matched case-insensitively: npm reads both `npm_config_` and
+// `NPM_CONFIG_`, and Windows env names are case-insensitive.
+const PNPM_ONLY_NPM_CONFIG = new Set(["npm_config_manage_package_manager_versions"]);
+
+/** `env` without the pnpm-only `npm_config_*` variables npm would warn about. */
+function npmEnv(env) {
+	return Object.fromEntries(
+		Object.entries(env).filter(([key]) => !PNPM_ONLY_NPM_CONFIG.has(key.toLowerCase())),
+	);
+}
+
 function shouldForwardEnv(key) {
 	if (FORWARD_ENV_EXCLUDE.has(key)) return false;
 	return /^(DEBUG|NODE_ENV|APP_LANGUAGE)$/.test(key) || /^(WORKPILOT_|WP_)/.test(key);
@@ -71,16 +90,18 @@ function isWindowsElevated() {
 /**
  * Run the real dev stack (`dev:vite`) in this process, inheriting stdio.
  * `shell: true` makes the bare `npm` resolve cross-OS (npm.cmd on Windows via
- * PATHEXT, npm on POSIX).
+ * PATHEXT, npm on POSIX). The command is one fixed string, not a command plus
+ * arguments: Node deprecates passing arguments with `shell: true` (DEP0190).
  */
 function runDevInProcess() {
 	if (dryRun) {
 		console.log("[dev:dryrun] would run in-process: npm run dev:vite");
 		process.exit(0);
 	}
-	const result = spawnSync("npm", ["run", "dev:vite"], {
+	const result = spawnSync("npm run dev:vite", {
 		stdio: "inherit",
 		shell: true,
+		env: npmEnv(process.env),
 	});
 	process.exit(result.status == null ? 1 : result.status);
 }
@@ -141,10 +162,15 @@ function relaunchElevated() {
 	}
 }
 
-// macOS/Linux never elevate (short-circuits before the Windows-only probe).
-// On Windows we elevate only when not already admin and not opted out.
-if (process.platform !== "win32" || optedOut || isWindowsElevated()) {
-	runDevInProcess();
-} else {
-	relaunchElevated();
+module.exports = { npmEnv };
+
+// Required (tests): export only. Run (`pnpm run dev`): launch.
+if (require.main === module) {
+	// macOS/Linux never elevate (short-circuits before the Windows-only probe).
+	// On Windows we elevate only when not already admin and not opted out.
+	if (process.platform !== "win32" || optedOut || isWindowsElevated()) {
+		runDevInProcess();
+	} else {
+		relaunchElevated();
+	}
 }
