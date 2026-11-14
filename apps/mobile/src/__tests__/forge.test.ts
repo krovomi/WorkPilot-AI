@@ -1,3 +1,5 @@
+import { severityColor } from "../forge/AiReview";
+import type { Theme } from "../ui/theme";
 import { ApiError, ServerClient } from "../api/client";
 import { makeForge, readReview, repoPath } from "../forge/forge";
 
@@ -128,17 +130,83 @@ describe("GitLab", () => {
 	});
 });
 
+describe("severityColor", () => {
+	it("draws critical and high as danger, medium as the accent, the rest muted", () => {
+		const theme = { danger: "red", accent: "blue", textMuted: "grey" } as unknown as Theme;
+		expect(["critical", "high", "medium", "low", "info"].map((s) => severityColor(theme, s))).toEqual([
+			"red",
+			"red",
+			"blue",
+			"grey",
+			"grey",
+		]);
+	});
+});
+
+describe("makeForge", () => {
+	it("has no forge for a repository address it cannot read, and asks nothing for no review", async () => {
+		const { forge, sent } = await forgeWith("github", "https://github.com/acme/shop", () => ({}));
+		expect(makeForge(new ServerClient({ baseUrl: "https://x.io" }), "p1", "github", "not a repo")).toBeNull();
+		await expect(forge.reviews([])).resolves.toEqual({});
+		expect(sent).toEqual([]);
+	});
+});
+
+describe("GitLab, from the phone", () => {
+	it("refuses an issue comment, shows no merge request thread, and merges by PUT", async () => {
+		const { forge, sent } = await forgeWith("gitlab", "https://gitlab.com/g/app", () => ({ status: 200, body: {} }));
+		await expect(forge.commentIssue(5, "hi")).rejects.toMatchObject({ status: 403 });
+		await expect(forge.pullComments(3)).resolves.toEqual([]);
+		await expect(forge.checks("abc1234")).resolves.toBeNull();
+		await forge.merge(3);
+		expect(sent.map((s) => s.body)).toEqual([{ method: "PUT", endpoint: "/projects/g%2Fapp/merge_requests/3/merge", body: {} }]);
+	});
+});
+
+describe("forge answers with fields missing", () => {
+	it("reads GitHub's without a number or an id, and names the status of a refusal without a message", async () => {
+		const { forge } = await forgeWith("github", "https://github.com/acme/shop", (body, url) => {
+			if (url.includes("/forge/github/pulls")) return { status: 200, body: { data: { repository: { pullRequests: { nodes: [{ title: "T" }] } } } } };
+			if (body.endpoint.endsWith("/issues/1")) return { status: 500, body: {} };
+			if (body.endpoint.includes("/comments")) return { status: 200, body: [{ body: "hi" }] };
+			if (body.endpoint.includes("/issues?")) return { status: 200, body: [{ title: "No number" }] };
+			return { status: 200, body: {} };
+		});
+		expect((await forge.issues())[0].number).toBe(0);
+		expect((await forge.issueComments(2))[0].id).toBe("");
+		expect((await forge.pulls())[0].number).toBe(0);
+		expect(await forge.pull(7)).toMatchObject({ number: 7, mergeable: null });
+		await expect(forge.issue(1)).rejects.toEqual(new ApiError(500, "github 500"));
+	});
+
+	it("reads GitLab's without an iid, an id or a merge status", async () => {
+		const { forge } = await forgeWith("gitlab", "https://gitlab.com/g/app", (body) => {
+			if (body.endpoint.includes("/notes")) return { status: 200, body: [{ body: "hi" }] };
+			if (body.endpoint.endsWith("/merge_requests/3")) return { status: 200, body: { title: "MR" } };
+			return { status: 200, body: [{ title: "No iid" }] };
+		});
+		expect((await forge.issues())[0].number).toBe(0);
+		expect((await forge.issueComments(2))[0].id).toBe("");
+		expect((await forge.pulls())[0].number).toBe(0);
+		expect(await forge.pull(3)).toMatchObject({ number: 0, mergeable: null });
+	});
+});
+
 describe("reviews", () => {
 	it("reads a saved review defensively", () => {
 		const review = readReview(
 			JSON.stringify({
 				summary: "Two issues",
 				verdict: "needs_revision",
-				findings: [{ id: "f1", severity: "high", title: "SQL injection", file: "a.py", line: 3 }, { severity: "low" }],
+				findings: [{ id: "f1", severity: "high", title: "SQL injection", file: "a.py", line: 3 }, { severity: "low" }, { title: "Naming" }],
 			}),
 		);
 		expect(review).toMatchObject({ summary: "Two issues", verdict: "needs_revision" });
-		expect(review?.findings.map((f) => f.id)).toEqual(["f1"]);
+		// A finding without a title is dropped; one without an id or a severity gets its place and "info".
+		expect(review?.findings.map((f) => [f.id, f.severity])).toEqual([
+			["f1", "high"],
+			["2", "info"],
+		]);
 		expect(readReview("{")).toBeNull();
 		expect(readReview(null)).toBeNull();
 	});

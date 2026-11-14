@@ -69,10 +69,9 @@
 	},
 	"agentHealth": {
 		"title": "Agent Health",
-		"subtitle": "Reliability score per agent over its recent history",
+		"subtitle": "Reliability of each agent, per provider and model, read from the project's Kanban tasks",
 		"refresh": "Refresh scores",
-		"reset": "Reset history",
-		"noAgents": "No agent runs recorded yet.",
+		"noAgents": "No finished phase in this project's tasks yet.",
 		"successRate": "Success rate",
 		"errorRate": "Error rate",
 		"retryRate": "Retry rate",
@@ -93,6 +92,18 @@
 			"retrain_prompt": "Refresh the prompt examples",
 			"rotate_model": "Try another model",
 			"alert_operator": "Needs your attention"
+		},
+		"noProject": "Open a project: agent health is read from its Kanban tasks.",
+		"source_one": "Read from {{count}} task of the project (finished planning, coding and QA).",
+		"source_other": "Read from {{count}} tasks of the project (finished planning, coding and QA).",
+		"unknownModel": "model not named in the logs",
+		"pendingTitle": "Not enough phases for a score yet ({{min}} needed):",
+		"pendingRuns_one": "{{count}} phase",
+		"pendingRuns_other": "{{count}} phases",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"qa": "QA"
 		}
 	},
 	"modelRouter": {
@@ -284,6 +295,36 @@
 			"public_domain": "—",
 			"commercial": "Confirm a paid licence covers your usage; track renewals.",
 			"unknown": "Look up the upstream licence and add it to the policy."
+		},
+		"colLicense": "Licence",
+		"toCheck": "To check",
+		"toCheckBadge": "Licences to check",
+		"toCheckTitle_one": "{{count}} dependency whose licence was not found",
+		"toCheckTitle_other": "{{count}} dependencies whose licence was not found",
+		"askRegistries": "Ask the public registries",
+		"askRegistriesHint": "For licences no lock file or installed package gives (deps.dev, npm, PyPI, Packagist, RubyGems, pub.dev). Never under a strict offline policy.",
+		"offlineNote": "The registries were not asked (option off or strict offline policy): install the dependencies or allow the registries to resolve the rest.",
+		"noManifest": "No dependency manifest found (package.json, requirements.txt, pyproject.toml, *.csproj, pom.xml, build.gradle, Cargo.toml, go.mod, composer, Gemfile.lock, pubspec.lock).",
+		"ecosystems": {
+			"npm": "npm",
+			"pypi": "PyPI",
+			"cargo": "Cargo",
+			"go": "Go",
+			"nuget": "NuGet",
+			"maven": "Maven / Gradle",
+			"composer": "Composer",
+			"rubygems": "RubyGems",
+			"pub": "pub (Dart)"
+		},
+		"sources": {
+			"manifest_one": "{{count}} from a lock file",
+			"manifest_other": "{{count}} from a lock file",
+			"installed_one": "{{count}} from the installed package",
+			"installed_other": "{{count}} from the installed packages",
+			"registry_one": "{{count}} from a public registry",
+			"registry_other": "{{count}} from public registries",
+			"override_one": "{{count}} set by hand",
+			"override_other": "{{count}} set by hand"
 		}
 	},
 	"archDrift": {

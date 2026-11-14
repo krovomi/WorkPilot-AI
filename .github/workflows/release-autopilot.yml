@@ -1,0 +1,105 @@
+name: Release autopilot
+
+# Publishes develop to main as a new version, without anyone: computes the
+# level (major / minor / patch) from the merged pull requests, opens
+# `release/vX.Y.Z` -> main with the version and the changelog, merges it with
+# a merge commit once every check is green (prepare-release.yml then tags and
+# release.yml builds), and merges main back into develop.
+# Cadence: develop quiet for 2 h, previous version at least 24 h old.
+# Logic and rules: scripts/release_autopilot.py; docs: docs/RELEASE.md.
+#
+# Secrets and variables:
+#   PAT_TOKEN                               pushes, pull request, merge. A push
+#                                           made with the default token never
+#                                           starts CI, so without it nothing is
+#                                           prepared.
+#   CLAUDE_CODE_OAUTH_TOKEN                 (or ANTHROPIC_API_KEY) writes each
+#                                           version's documentation (README
+#                                           EN/FR, docs, wiki patch); without it
+#                                           the release waits for a person.
+#   vars.RELEASE_AUTOPILOT                  `off` stops it.
+#   vars.RELEASE_AUTOPILOT_MODEL            optional model for the documentation.
+#   vars.RELEASE_AUTOPILOT_QUIET_HOURS      hours without a merge on develop (2).
+#   vars.RELEASE_AUTOPILOT_MIN_INTERVAL_HOURS  hours between two versions (24).
+
+on:
+  workflow_run:
+    workflows: [CI, Lint, "CodeQL Advanced", Quality Security, Mobile]
+    types: [completed]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only say what would be done
+        type: boolean
+        default: false
+      now:
+        description: Skip the cadence (quiet time, interval) this once
+        type: boolean
+        default: false
+
+# One run at a time: each run re-reads everything, so a queued run replacing
+# an older queued one loses nothing.
+concurrency:
+  group: release-autopilot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+  actions: read
+
+jobs:
+  release-autopilot:
+    name: Release autopilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: vars.RELEASE_AUTOPILOT != 'off'
+    env:
+      HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      # Always develop's copy of the script.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML (changelog fragments)
+        run: python -m pip install pyyaml==6.0.3
+
+      - name: Set up Node.js
+        if: env.HAS_CLAUDE == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        if: env.HAS_CLAUDE == 'true'
+        run: npm install -g @anthropic-ai/claude-code@2.1.314
+
+      - name: Release develop when it is ready, merge a green release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RELEASE_AUTOPILOT_MODEL: ${{ vars.RELEASE_AUTOPILOT_MODEL }}
+          RELEASE_AUTOPILOT: ${{ vars.RELEASE_AUTOPILOT }}
+          RELEASE_AUTOPILOT_QUIET_HOURS: ${{ vars.RELEASE_AUTOPILOT_QUIET_HOURS }}
+          RELEASE_AUTOPILOT_MIN_INTERVAL_HOURS: ${{ vars.RELEASE_AUTOPILOT_MIN_INTERVAL_HOURS }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          NOW: ${{ github.event.inputs.now || 'false' }}
+        run: |
+          args=()
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ "$NOW" = "true" ]; then args+=(--now); fi
+          python scripts/release_autopilot.py "${args[@]}"

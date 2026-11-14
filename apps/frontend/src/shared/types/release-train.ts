@@ -6,6 +6,9 @@ export interface TrainStepSpec {
 	timeout: number;
 	expectStatus: number;
 	retries: number;
+	/** An exposure step: the build output REA audits, relative to the service folder. */
+	artifact?: string;
+	failOn?: "high" | "medium" | "low";
 }
 
 export interface TrainServiceView {
@@ -14,7 +17,7 @@ export interface TrainServiceView {
 	dependsOn: string[];
 	criticality: "high" | "normal" | "low";
 	external: boolean;
-	steps: Partial<Record<"deploy" | "rollback" | "health" | "smoke", TrainStepSpec>>;
+	steps: Partial<Record<"exposure" | "deploy" | "rollback" | "health" | "smoke", TrainStepSpec>>;
 	passEnv: string[];
 }
 
@@ -71,7 +74,7 @@ export interface TrainItem {
 	confirmed: boolean;
 	status: ItemStatus;
 	phase: string;
-	steps: Partial<Record<"deploy" | "health" | "smoke", StepOutcome>>;
+	steps: Partial<Record<"exposure" | "deploy" | "health" | "smoke", StepOutcome>>;
 	rollback: StepOutcome | null;
 	detail: string;
 }

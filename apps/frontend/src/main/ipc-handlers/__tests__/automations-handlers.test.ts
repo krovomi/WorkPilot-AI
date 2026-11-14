@@ -27,7 +27,11 @@ vi.mock("../github/pr-handlers", () => ({
 }));
 // The feature runners it can start build their environment there, which
 // needs the Electron app this test does not have.
-vi.mock("../../utils/python-runner-env", () => ({ pythonRunnerEnv: vi.fn(async () => ({})) }));
+vi.mock("../../utils/python-runner-env", () => ({
+	pythonRunnerEnv: vi.fn(async () => ({})),
+	pythonStaticRunnerEnv: vi.fn(() => ({})),
+}));
+vi.mock("../../utils/ensure-python", () => ({ requirePythonPath: vi.fn(async () => "python3") }));
 vi.mock("../../project-store", () => ({
 	projectStore: {
 		getProject: (id: string) => state.projects.get(id),

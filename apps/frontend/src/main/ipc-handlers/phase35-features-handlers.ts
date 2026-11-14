@@ -112,6 +112,14 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_SCORES, async () =>
 		backendFetch("/api/agent-health/scores"),
 	);
+	// The project's tasks are read by the backend; the path is checked by the IPC path policy
+	// (projectPath key) here and by validated_dir there.
+	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_PROJECT, async (_e, { projectPath }: { projectPath: string }) =>
+		backendFetch("/api/agent-health/project", {
+			method: "POST",
+			body: JSON.stringify({ project_path: projectPath }),
+		}),
+	);
 	ipcMain.handle(IPC_CHANNELS.AGENT_HEALTH_RESET, async (_e, { agentName }: { agentName?: string }) =>
 		backendFetch("/api/agent-health/reset", {
 			method: "POST",
@@ -190,10 +198,12 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 				projectPath,
 				policy,
 				licenseOverrides,
+				online,
 			}: {
 				projectPath: string;
 				policy?: string;
 				licenseOverrides?: { name: string; license: string | null }[];
+				online?: boolean;
 			},
 		) =>
 			backendFetch("/api/license-governance/scan", {
@@ -202,6 +212,9 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 					project_path: projectPath,
 					policy: policy ?? "permissive_only",
 					license_overrides: licenseOverrides ?? null,
+					// Registries are asked unless the caller opts out; the backend
+					// still refuses under a strict offline policy.
+					online: online !== false,
 				}),
 			}),
 	);

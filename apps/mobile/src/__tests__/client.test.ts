@@ -87,6 +87,35 @@ describe("ServerClient", () => {
 		expect(onSignedOut).not.toHaveBeenCalled();
 	});
 
+	it("gives up on a server that does not answer in time", async () => {
+		jest.useFakeTimers();
+		try {
+			const impl = jest.fn(
+				(_url: string, init: RequestInit) =>
+					new Promise<Response>((_resolve, reject) => {
+						init.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+					}),
+			) as unknown as typeof fetch;
+			const client = new ServerClient({ baseUrl: "https://x.io", fetchImpl: impl });
+			const pending = client.publicRequest("GET", "/auth/config");
+			jest.advanceTimersByTime(20_000);
+			await expect(pending).rejects.toEqual(new ApiError(0, "timeout"));
+		} finally {
+			jest.useRealTimers();
+		}
+	});
+
+	it("keeps the session when the server fails the refresh, and does not retry the request", async () => {
+		const { calls, impl } = fakeFetch(() => json(500, { detail: "boom" }));
+		const onSignedOut = jest.fn();
+		const client = new ServerClient({ baseUrl: "https://x.io", refreshToken: "keep", fetchImpl: impl, onSignedOut });
+		await expect(client.refresh()).resolves.toBe(false);
+		await expect(client.request("GET", "/projects")).rejects.toEqual(new ApiError(401, "signed_out"));
+		expect(client.hasSession).toBe(true);
+		expect(onSignedOut).not.toHaveBeenCalled();
+		expect(calls.every((c) => c.url.endsWith("/auth/refresh"))).toBe(true);
+	});
+
 	it("surfaces the server's detail, cut short", async () => {
 		const { impl } = fakeFetch(({ url }) =>
 			url.endsWith("/auth/refresh") ? json(200, tokens(1)) : json(409, { detail: "Spec already claimed by Bob" }),
@@ -95,6 +124,26 @@ describe("ServerClient", () => {
 		await expect(client.request("POST", "/x", {})).rejects.toEqual(new ApiError(409, "Spec already claimed by Bob"));
 		expect(errorMessage(500, "<html>")).toBe("HTTP 500");
 		expect(errorMessage(400, JSON.stringify({ detail: "y".repeat(1000) }))).toHaveLength(300);
+		// FastAPI's validation errors put a list in `detail`: the status says enough.
+		expect(errorMessage(422, JSON.stringify({ detail: [{ loc: ["body"], msg: "field required" }] }))).toBe("HTTP 422");
+		expect(errorMessage(400, JSON.stringify({ detail: "" }))).toBe("HTTP 400");
+	});
+
+	it("reads an empty answer as null", async () => {
+		const { impl } = fakeFetch(({ url }) =>
+			url.endsWith("/auth/refresh") ? json(200, tokens(1)) : new Response(null, { status: 204 }),
+		);
+		const client = new ServerClient({ baseUrl: "https://x.io", refreshToken: "r", fetchImpl: impl });
+		await expect(client.request("DELETE", "/x")).resolves.toBeNull();
+	});
+
+	it("signs out without calling the server or anyone when there was no session", async () => {
+		const { calls, impl } = fakeFetch(() => json(200, {}));
+		const onSignedOut = jest.fn();
+		const client = new ServerClient({ baseUrl: "https://x.io", fetchImpl: impl, onSignedOut });
+		await client.logout();
+		expect(calls).toEqual([]);
+		expect(onSignedOut).not.toHaveBeenCalled();
 	});
 
 	it("switches organization by adopting the new pair", async () => {

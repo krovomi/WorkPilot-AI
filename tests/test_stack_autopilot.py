@@ -26,15 +26,26 @@ _spec.loader.exec_module(sa)
 WORKFLOW = ROOT / ".github" / "workflows" / "stack-autopilot.yml"
 
 
-def _pr(number, head=None, base="develop", body="", labels=(), auto=None):
+def _pr(
+    number,
+    head=None,
+    base="develop",
+    body="",
+    labels=(),
+    auto=None,
+    draft=False,
+    fork=False,
+):
     return sa.PullRequest(
         number=number,
         head_ref=head or f"feature/{number}",
         head_sha=f"{number:040d}",
         base_ref=base,
         body=body,
+        draft=draft,
         labels=set(labels),
         auto_merge_method=auto,
+        from_fork=fork,
     )
 
 
@@ -45,6 +56,25 @@ def test_opt_in_is_auto_merge_or_the_label():
     assert _pr(1, auto="squash").opted_in
     assert _pr(2, labels=["autopilot"]).opted_in
     assert not _pr(3).opted_in
+
+
+def test_every_pull_request_towards_develop_is_enrolled_by_default():
+    assert _pr(1).enrolled("develop", set())
+    # A stack: built on another open pull request's branch.
+    assert _pr(2, base="feature/1").enrolled("develop", {"feature/1"})
+
+
+def test_main_and_unknown_bases_are_never_enrolled_by_default():
+    assert not _pr(1, base="main").enrolled("develop", set())
+    assert not _pr(2, base="release/1.6").enrolled("develop", {"feature/9"})
+
+
+def test_drafts_forks_and_the_opt_out_label_stay_out():
+    assert not _pr(1, draft=True).enrolled("develop", set())
+    assert not _pr(2, fork=True).enrolled("develop", set())
+    assert not _pr(3, fork=True, labels=["autopilot"]).enrolled("develop", set())
+    assert not _pr(4, labels=["autopilot/off"]).enrolled("develop", set())
+    assert not _pr(5, labels=["autopilot", "autopilot/off"]).enrolled("develop", set())
 
 
 def test_method_label_wins_then_auto_merge_then_squash():
@@ -67,6 +97,49 @@ def test_from_api_reads_auto_merge_and_labels():
     assert (pr.number, pr.body, pr.auto_merge_method) == (7, "", "merge")
     assert pr.labels == {"autopilot"}
     assert sa.from_api({**raw, "auto_merge": None}).auto_merge_method is None
+
+
+def test_from_api_reads_a_fork():
+    repo = {"full_name": "krovomi/WorkPilot-AI"}
+    raw = {
+        "number": 8,
+        "head": {"ref": "feature/y", "sha": "b" * 40, "repo": repo},
+        "base": {"ref": "develop", "repo": {"full_name": "krovomi/workpilot-ai"}},
+    }
+    assert not sa.from_api(raw).from_fork
+    forked = {**raw, "head": {**raw["head"], "repo": {"full_name": "someone/fork"}}}
+    assert sa.from_api(forked).from_fork
+    # A deleted fork has no head repository: outside code all the same.
+    gone = {**raw, "head": {**raw["head"], "repo": None}}
+    assert sa.from_api(gone).from_fork
+
+
+def test_open_prs_keeps_the_enrolled_ones_only():
+    def raw(number, base="develop", head=None, user="krovomi", draft=False):
+        repo = {"full_name": "krovomi/WorkPilot-AI"}
+        return {
+            "number": number,
+            "head": {"ref": head or f"feature/{number}", "sha": "c" * 40, "repo": repo},
+            "base": {"ref": base, "repo": repo},
+            "user": {"login": user},
+            "draft": draft,
+            "labels": [],
+        }
+
+    class FakeGitHub:
+        repo = "krovomi/WorkPilot-AI"
+
+        def pages(self, path, key=None):
+            return [
+                raw(1),
+                raw(2, base="feature/1"),
+                raw(3, base="main", head="develop"),
+                raw(4, user="dependabot[bot]"),
+                raw(5, draft=True),
+            ]
+
+    pilot = sa.Autopilot(FakeGitHub(), "develop", can_push=False, claude=False)
+    assert [pr.number for pr in pilot.open_prs()] == [1, 2, 4]
 
 
 # -- order -------------------------------------------------------------------

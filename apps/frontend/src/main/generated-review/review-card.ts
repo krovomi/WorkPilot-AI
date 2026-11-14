@@ -31,6 +31,7 @@ import {
 	type RunReviewWorktree,
 	runReviewWorktree,
 } from "./review-worktree";
+import { appendReviewRunLog } from "./review-log";
 
 export interface ReviewWorkspace {
 	readonly project: Project;
@@ -222,6 +223,14 @@ export async function openReviewWorkspace(
 	}
 }
 
+/** What one run is recorded as on its card. */
+export interface ReviewStepRecord {
+	readonly message: string;
+	readonly summary: string;
+	/** The page's own progress lines, kept in the card's log (see review-log.ts). */
+	readonly log?: readonly string[];
+}
+
 interface PlanSubtaskRecord {
 	id: string;
 	description: string;
@@ -236,7 +245,7 @@ interface PlanSubtaskRecord {
  */
 export async function recordReviewStep(
 	workspace: ReviewWorkspace,
-	step: { message: string; summary: string },
+	step: ReviewStepRecord,
 	deps: ReviewDeps = defaultDeps,
 ): Promise<GeneratedReview> {
 	const { project, specId } = workspace;
@@ -298,6 +307,17 @@ export async function recordReviewStep(
 		),
 		"utf-8",
 	);
+	// The card never runs the task pipeline, so its log is written here: the
+	// Logs tab and the Pixel Office read it like any task's.
+	appendReviewRunLog({
+		specDir: path.dirname(planPath),
+		specId,
+		summary: oneLine(step.summary, 200),
+		commitMessage: oneLine(step.message, 100),
+		files: commit.files,
+		lines: step.log,
+		language: lang(deps),
+	});
 	projectStore.invalidateTasksCache(project.id);
 	return review;
 }

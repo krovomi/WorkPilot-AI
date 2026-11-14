@@ -62,7 +62,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The mutation gate (docs/architecture/mutation-gate.md): git, the test
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
-    "mutation_gate": {"foundation", "security"},
+    "mutation_gate": {"foundation", "security", "suite_runner"},
     # The schema guard (docs/architecture/schema-guard.md): migration rules
     # over text, git through foundation. The QA gate that calls it is in qa.
     "schema_guard": {"foundation"},
@@ -106,9 +106,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # fence, nothing that runs an agent (its model call is the runner's,
     # through core.oneshot).
     "changelog_generator": {"board_mcp", "foundation", "security"},
-    # Stack detection, including the UI and test stacks moved here in M10.
-    "project": {"mobile"},
-    "mobile": {"foundation"},
+    # Stack detection, including the UI and test stacks moved here in M10,
+    # and the WinDev-family project (a leaf).
+    "project": {"mobile", "windev"},
+    # The WinDev Mobile app of a WinDev project (`windev` is a leaf).
+    "mobile": {"foundation", "windev"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
     # client factory from its runner instead of importing core. Formula Lab
@@ -158,6 +160,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
+    # REA's runner (rea-agents CLI, static readers): PATH lookup, the strict
+    # offline policy and the credential-free child env; nothing above them.
+    "rea": {"foundation", "offline_policy", "security"},
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),
@@ -218,6 +223,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # and the bundled skill through skills_registry, nothing that runs an agent
     # (docs/architecture/dotnet-upgrade.md). A leaf the CLI and the prompts read.
     "dotnet_upgrade": {"skills_registry"},
+    # WinDev, WebDev and WinDev Mobile: the file formats, the integrity check,
+    # the prompt section and its staged skills, nothing that runs an agent
+    # (docs/architecture/windev.md). A leaf: the stack detection imports it.
+    "windev": set(),
 }
 
 # The largest set of units that all import one another, directly or not. It

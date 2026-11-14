@@ -1,0 +1,69 @@
+From 2fbb14f4e949d5e5150e951dfeeeea76774988b0 Mon Sep 17 00:00:00 2001
+From: WorkPilot Wiki Bot <noreply@workpilot.ai>
+Date: Sat, 14 Nov 2026 15:47:54 +0000
+Subject: [PATCH] docs(wiki): automatic releases, at most one a day (release
+ autopilot)
+
+---
+ Contributing.fr.md | 1 +
+ Contributing.md    | 2 ++
+ FAQ.fr.md          | 3 +++
+ FAQ.md             | 3 +++
+ 4 files changed, 9 insertions(+)
+
+diff --git a/Contributing.fr.md b/Contributing.fr.md
+index 056ca3d..574cd61 100644
+--- a/Contributing.fr.md
++++ b/Contributing.fr.md
+@@ -25,6 +25,7 @@ Avant de toucher au code, gardez ces règles en tête (extraites de `CLAUDE.md`)
+ - **Abstraction cross-plateforme** — jamais `process.platform` directement. Utilisez les modules `platform/`
+ - **Pas d'estimations temporelles** — utilisez la priorité, pas l'estimation en heures
+ - **PRs vers `develop`** — la branche cible par défaut est `develop`, pas `main`
++- **Releases automatiques** — le pilote de release (`release-autopilot.yml`) ouvre `release/vX.Y.Z` → `main` quand `develop` est calme depuis 2 heures (au plus une version par jour) et la fusionne par commit de merge quand elle est verte. Le niveau vient du titre de votre PR (`feat:` → mineure, `fix:` → patch, `feat!:` ou pied `BREAKING CHANGE:` → majeure) et de votre fragment `changelog.d/` ; un label `semver:major|minor|patch|none` le remplace. Détails : [`docs/RELEASE.md`](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/RELEASE.md)
+ 
+ ---
+ 
+diff --git a/Contributing.md b/Contributing.md
+index b8cef8c..da09d6c 100644
+--- a/Contributing.md
++++ b/Contributing.md
+@@ -31,6 +31,8 @@ Requirements: Node.js 22.12+, pnpm, Python 3.12+, and Git. `pnpm run install:all
+ 
+ Pull requests are never opened against `main` — it's reserved for release merges.
+ 
++Releases are automatic: the release autopilot (`release-autopilot.yml`) opens `release/vX.Y.Z` → `main` once `develop` has been quiet for 2 hours (at most one version a day) and merges it with a merge commit when green. The version level comes from your PR title (`feat:` → minor, `fix:` → patch, `feat!:` or a `BREAKING CHANGE:` footer → major) and from your `changelog.d/` fragment; a `semver:major|minor|patch|none` label overrides it. Details: [`docs/RELEASE.md`](https://github.com/krovomi/WorkPilot-AI/blob/develop/docs/RELEASE.md).
++
+ ### Before opening a PR
+ 
+ Run the local verification gate to match what CI checks:
+diff --git a/FAQ.fr.md b/FAQ.fr.md
+index 085d532..42d0d6e 100644
+--- a/FAQ.fr.md
++++ b/FAQ.fr.md
+@@ -159,6 +159,9 @@ Oui — le code est modulaire. Voir `apps/backend/integrations/` et le code de C
+ ### Les mises à jour sont-elles automatiques ?
+ Oui, sur desktop — WorkPilot AI vérifie périodiquement et propose la mise à jour en bannière. Vous pouvez désactiver dans **Paramètres → Avancé → Auto-update**.
+ 
++### À quelle fréquence sort une nouvelle version ?
++Au plus une fois par jour, toute seule. Les PR fusionnées s'accumulent sur `develop` ; quand `develop` n'a reçu aucune fusion depuis 2 heures et que la version précédente a au moins 24 heures, le pilote de release calcule la version à partir des PR fusionnées (`feat` → mineure, `fix` ou mise à jour de dépendance → patch, changement incompatible → majeure), ouvre la PR de release vers `main` et la fusionne dès que la CI est verte. Des changements de documentation, de CI ou de tests seuls ne déclenchent jamais de version.
++
+ ### Release stable vs beta ?
+ - **Stable** : recommandé pour tous
+ - **Beta** : fonctionnalités en avant-première, potentiellement instable
+diff --git a/FAQ.md b/FAQ.md
+index fd2d2e4..f83d11a 100644
+--- a/FAQ.md
++++ b/FAQ.md
+@@ -159,6 +159,9 @@ Yes — the code is modular. See `apps/backend/integrations/` and Claude/OpenAI
+ ### Are updates automatic?
+ Yes, on desktop — WorkPilot AI checks periodically and offers the update in a banner. You can disable in **Settings → Advanced → Auto-update**.
+ 
++### How often is a new version published?
++At most once a day, on its own. Merged pull requests collect on `develop`; once `develop` has had no merge for 2 hours and the previous version is at least 24 hours old, the release autopilot computes the version from the merged pull requests (`feat` → minor, `fix` or a dependency bump → patch, a breaking change → major), opens the release pull request into `main` and merges it once CI is green. Documentation, CI or test changes alone never start a version.
++
+ ### Stable release vs beta?
+ - **Stable**: recommended for everyone
+ - **Beta**: early features, potentially unstable
+-- 
+2.43.0
+

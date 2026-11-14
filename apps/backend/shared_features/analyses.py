@@ -73,7 +73,22 @@ class FlakyOptions(NoOptions):
     mode: Literal["scan", "run"] = "scan"
     runs: int = Field(default=5, ge=2, le=20)
     command_id: Literal[
-        "auto", "dotnet", "pytest", "vitest", "jest", "maven", "gradle", "go"
+        "auto",
+        "dotnet",
+        "pytest",
+        "vitest",
+        "jest",
+        "node",
+        "maven",
+        "gradle",
+        "go",
+        "cargo",
+        "phpunit",
+        "pest",
+        "rspec",
+        "dart",
+        "flutter",
+        "swift",
     ] = "auto"
     #: Run mode: only these tests (the suspects), through the stack's filter.
     only: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(

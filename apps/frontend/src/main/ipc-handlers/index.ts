@@ -42,6 +42,7 @@ import {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 import { registerArenaHandlers } from "./arena-handlers";
+import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
@@ -62,6 +63,7 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerReaHandlers } from "./rea-handlers";
 import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
@@ -146,6 +148,8 @@ import { registerTerminalHandlers } from "./terminal-handlers";
 import { registerDesignToCodeHandlers } from "./design-to-code-handlers";
 import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
+import { registerLocalBackendHandlers } from "./local-backend-handlers";
+import { registerReplayHandlers } from "./replay-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -168,6 +172,7 @@ export {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 export { registerArenaHandlers } from "./arena-handlers";
+export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
@@ -188,6 +193,7 @@ export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
 export { registerAgentCliHandlers } from "./agent-cli-handlers";
+export { registerReaHandlers } from "./rea-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -257,6 +263,7 @@ export { registerTerminalWorktreeIpcHandlers } from "./terminal";
 export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
+export { registerReplayHandlers } from "./replay-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -417,6 +424,9 @@ export function setupIpcHandlers(
 	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
 	registerAgentCliHandlers();
 
+	// REA (static reader of shipped artifacts): the pinned release installed?
+	registerReaHandlers();
+
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();
 
@@ -486,6 +496,9 @@ export function setupIpcHandlers(
 	// Arena Mode handlers (Feature 9) — Blind A/B model comparison
 	registerArenaHandlers(getMainWindow);
 
+	// Mission Control: state proxied to the backend, each agent's model call run here
+	registerMissionControlHandlers();
+
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
 
@@ -528,8 +541,14 @@ export function setupIpcHandlers(
 	// Agent Time Travel handlers (Temporal debugger for AI agents)
 	registerTimeTravelHandlers();
 
+	// Agent Replay + Session History (recorded sessions, via the local backend)
+	registerReplayHandlers();
+
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
+
+	// The local backend for renderer views that read it (closed route list)
+	registerLocalBackendHandlers();
 
 	// Accessibility Agent handlers (WCAG scanner)
 	registerAccessibilityHandlers();

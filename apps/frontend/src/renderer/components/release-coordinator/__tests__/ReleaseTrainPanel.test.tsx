@@ -29,7 +29,10 @@ const STATE: TrainState = {
 				dependsOn: [],
 				criticality: "high",
 				external: false,
-				steps: { deploy: { command: ["./deploy.sh", "{environment}"], url: "", timeout: 600, expectStatus: 200, retries: 3 } },
+				steps: {
+					exposure: { command: [], url: "", timeout: 900, expectStatus: 200, retries: 3, artifact: "dist/linux-unpacked", failOn: "high" },
+					deploy: { command: ["./deploy.sh", "{environment}"], url: "", timeout: 600, expectStatus: 200, retries: 3 },
+				},
 				passEnv: [],
 			},
 			{ name: "web", path: "", dependsOn: ["auth"], criticality: "normal", external: false, steps: {}, passEnv: [] },
@@ -106,6 +109,7 @@ describe("ReleaseTrainPanel", () => {
 		render(<ReleaseTrainPanel projectPath="/p" />);
 		expect(await screen.findByText(/Approuvez ce fichier du train/)).toBeInTheDocument();
 		expect(screen.getByText("./deploy.sh {environment}")).toBeInTheDocument();
+		expect(screen.getByText("audit REA de dist/linux-unpacked, bloque à partir de high")).toBeInTheDocument();
 		expect(screen.getByText(/AWS_PROFILE/)).toBeInTheDocument();
 		expect(screen.getByText("web n'a pas de commande de déploiement.")).toBeInTheDocument();
 		expect(screen.getByText("Vague 2")).toBeInTheDocument();

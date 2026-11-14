@@ -14,6 +14,7 @@ import { useProjectStore } from "../../stores/project-store";
 import { createTask, loadTasks } from "../../stores/task-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { localBackendFetch } from "../../lib/local-backend";
 
 /**
  * Quick slash-command bar for the Kanban toolbar.
@@ -43,10 +44,6 @@ interface QuickCommandBarProps {
 	readonly className?: string;
 	readonly variant?: "default" | "compact";
 }
-
-const BACKEND_URL: string =
-	(import.meta as { env?: { VITE_BACKEND_URL?: string } }).env
-		?.VITE_BACKEND_URL || "";
 
 /** Longest command output shown in the result toast. */
 const MAX_OUTPUT_CHARS = 2000;
@@ -96,8 +93,8 @@ export function QuickCommandBar({
 			return;
 		}
 		const controller = new AbortController();
-		const url = `${BACKEND_URL}/api/slash-commands?project_dir=${encodeURIComponent(projectPath)}`;
-		fetch(url, { signal: controller.signal })
+		const url = `/api/slash-commands?project_dir=${encodeURIComponent(projectPath)}`;
+		localBackendFetch(url, { signal: controller.signal })
 			.then((r) => (r.ok ? r.json() : null))
 			.then((data) => {
 				if (data?.success && Array.isArray(data.commands)) {
@@ -243,10 +240,10 @@ export function QuickCommandBar({
 			setIsRunning(true);
 			setOpen(false);
 			try {
-				const url = `${BACKEND_URL}/api/slash-commands/body?project_dir=${encodeURIComponent(
+				const url = `/api/slash-commands/body?project_dir=${encodeURIComponent(
 					projectPath,
 				)}&command=${encodeURIComponent(parsed.command)}`;
-				const res = await fetch(url);
+				const res = await localBackendFetch(url);
 				const data = await res.json();
 				if (!res.ok || !data?.success || !data.body) {
 					showError(data?.detail ?? data?.error ?? "unknown");

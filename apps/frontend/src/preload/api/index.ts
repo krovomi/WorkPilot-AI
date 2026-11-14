@@ -21,6 +21,11 @@ import {
 	type AgentDebuggerAPI,
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
+import { createReplayAPI, type ReplayAPI } from "./modules/replay-api";
+import {
+	createLocalBackendAPI,
+	type LocalBackendAPI,
+} from "./modules/local-backend-api";
 import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
@@ -147,6 +152,7 @@ import {
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
+import { createReaAPI, type ReaAPI } from "./modules/rea-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
 import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
@@ -198,6 +204,8 @@ import type { PairProgrammingAPI } from "./modules/pair-programming-api";
 import { createPairProgrammingAPI } from "./modules/pair-programming-api";
 import type { QuickCommandAPI } from "./modules/quick-command-api";
 import { createQuickCommandAPI } from "./modules/quick-command-api";
+import type { MissionControlAPI } from "./modules/mission-control-api";
+import { createMissionControlAPI } from "./modules/mission-control-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -272,6 +280,7 @@ export interface ElectronAPI
 		ClaudeCodeAPI,
 		CopilotCliAPI,
 		AgentCliAPI,
+		ReaAPI,
 		TaskSandboxAPI,
 		StackAPI,
 		TaskPermissionAPI,
@@ -296,6 +305,7 @@ export interface ElectronAPI
 		PerformanceProfilerAPI,
 		PairProgrammingAPI,
 		QuickCommandAPI,
+		MissionControlAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -325,6 +335,8 @@ export interface ElectronAPI
 		InjectionGuardAPI,
 		GuardrailsAPI,
 		AgentDebuggerAPI,
+		LocalBackendAPI,
+		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
 		BountyBoardAPI,
@@ -427,6 +439,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
 		...createAgentCliAPI(),
+		...createReaAPI(),
 		...createTaskPermissionAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
@@ -449,6 +462,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPerformanceProfilerAPI(),
 		...createPairProgrammingAPI(),
 		...createQuickCommandAPI(),
+		...createMissionControlAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -478,6 +492,8 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
 		...createAgentDebuggerAPI(),
+		...createLocalBackendAPI(),
+		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),
 		...createBountyBoardAPI(),
@@ -595,6 +611,8 @@ export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-a
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export type { AgentCliAPI } from "./modules/agent-cli-api";
 export { createAgentCliAPI } from "./modules/agent-cli-api";
+export type { ReaAPI } from "./modules/rea-api";
+export { createReaAPI } from "./modules/rea-api";
 export type { TaskPermissionAPI } from "./modules/task-permission-api";
 export { createTaskPermissionAPI } from "./modules/task-permission-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
@@ -613,6 +631,8 @@ export type { PairProgrammingAPI } from "./modules/pair-programming-api";
 export { createPairProgrammingAPI } from "./modules/pair-programming-api";
 export type { QuickCommandAPI } from "./modules/quick-command-api";
 export { createQuickCommandAPI } from "./modules/quick-command-api";
+export type { MissionControlAPI } from "./modules/mission-control-api";
+export { createMissionControlAPI } from "./modules/mission-control-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";

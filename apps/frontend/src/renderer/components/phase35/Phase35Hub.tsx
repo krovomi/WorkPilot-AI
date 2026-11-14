@@ -77,7 +77,7 @@ export function Phase35Hub({ projectPath = "" }: Phase35HubProps) {
 					tabs={tabs.map((item) => ({ id: item.id, label: t(`phase35:${item.titleKey}` as never) }))}
 				/>
 				{tab === "longevity" && <LongevityPanel projectPath={projectPath} />}
-				{tab === "agentHealth" && <AgentHealthPanel />}
+				{tab === "agentHealth" && <AgentHealthPanel projectPath={projectPath} />}
 				{tab === "modelRouter" && <ModelRouterPanel />}
 				{tab === "domainAgents" && <DomainAgentsPanel projectPath={projectPath} />}
 				{tab === "cicdAnomaly" && <CicdAnomalyPanel />}

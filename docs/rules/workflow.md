@@ -99,9 +99,11 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   build`), une nouvelle annexe un fichier de `docs/audit/annexes/`. Deux PR ouvertes en même temps
   ne touchent plus les mêmes lignes ; `tests/test_changelog_fragments.py` et
   `tests/test_audit_findings.py` le gardent.
-- **PR empilées : le pilote de pile** (`stack-autopilot.yml`, `scripts/stack_autopilot.py`). Une PR
-  vers `develop` avec l'auto-merge GitHub activé, ou le label `autopilot`, est fusionnée par lui,
-  dans l'ordre de sa pile : B attend A si B est basée sur la branche de A, si sa description nomme A
+- **Fusion des PR vertes : le pilote de pile** (`stack-autopilot.yml`, `scripts/stack_autopilot.py`).
+  Toute PR de ce dépôt vers `develop` (ou vers la branche d'une autre PR ouverte, une pile) est
+  inscrite d'office et fusionnée par lui, celles de Dependabot comprises, jamais une PR vers `main`.
+  Restent dehors : les brouillons, les forks et le label `autopilot/off`, qui retire une PR. Il la
+  fusionne dans l'ordre de sa pile : B attend A si B est basée sur la branche de A, si sa description nomme A
   (« built on #A », « Merge order: #A, … », « basée sur #A ») ou si les deux partagent des commits
   absents de `develop`. Pour la première de chaque pile, il fusionne `develop` dedans (un parent
   fusionné en squash est absorbé sans rejouer ses conflits), confie un conflit restant à Claude Code,
@@ -112,6 +114,21 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   `autopilot/conflit` (retiré seul au commit suivant) et `autopilot/rouge`. Secrets : `PAT_TOKEN`
   (Contents, Pull requests, Workflows en écriture), `CLAUDE_CODE_OAUTH_TOKEN` ou `ANTHROPIC_API_KEY` ;
   sans eux, le résumé du run dit ce qui manque. `tests/test_stack_autopilot.py` le garde.
+- **Releases : le pilote de release** (`release-autopilot.yml`, `scripts/release_autopilot.py`,
+  `scripts/release_docs.py`). Personne ne prépare plus une version à la main : quand `develop` n'a
+  reçu aucune fusion depuis 2 h, que la version précédente a au moins 24 h et que les workflows de
+  push de sa tête sont verts, il calcule le niveau sur les PR fusionnées depuis le dernier tag
+  (`type!:`, pied `BREAKING CHANGE:`, `**Breaking:** Yes` ou fragment `⚠️ Changement incompatible`
+  → majeure ; `feat` ou `✨ Nouveautés` → mineure ; `fix`, `perf`, `refactor`, `revert`, `build`,
+  `chore(deps)` ou autre fragment → patch ; `docs`, `ci`, `test`, `style`, autre `chore` ne
+  déclenchent rien ; un label `semver:*` l'emporte), ouvre `release/vX.Y.Z` → `main` (version dans
+  les cinq manifestes, fragments repliés, documentation de la version écrite par Claude Code :
+  README EN/FR, `docs/`, titre et intro du changelog, patch du wiki), la fusionne par **commit de
+  merge** quand tous ses checks sont verts, puis fusionne `main` dans `develop`. Rouge ou refusée :
+  `release-autopilot/rouge` ou `release-autopilot/bloquee`, puis remplacée dès qu'une correction
+  arrive sur `develop` ; sans documentation : `release-autopilot/documentation`, rien n'est
+  fusionné avant qu'une personne retire le label. `RELEASE_AUTOPILOT=off` l'arrête.
+  `tests/test_release_autopilot.py` et `tests/test_release_docs.py` le gardent.
 
 ## CI (`.github/workflows/`)
 
@@ -121,7 +138,8 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 | `lint.yml` | ruff (dont `scripts/`), pyright sur les paquets de `apps/backend/pyrightconfig.json`, Biome, fraîcheur de `requirements.lock`, `--check` des fichiers vendorisés et des skills, évaluation des skills |
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
-| `stack-autopilot.yml` | rien : il fusionne les PR inscrites dans l'ordre de leur pile (push sur `develop`, fin d'un workflow, toutes les 20 min, à la main avec `dry_run`) |
+| `stack-autopilot.yml` | rien : il fusionne les PR vertes vers `develop` dans l'ordre de leur pile (push sur `develop`, ouverture d'une PR, fin d'un workflow, toutes les 20 min, à la main avec `dry_run`) |
+| `release-autopilot.yml` | rien : il publie `develop` sur `main` en nouvelle version, documentation comprise (toutes les heures, fin d'un workflow, à la main avec `dry_run` ou `now`) |
 
 `ci.yml` et `lint.yml` tournent sur tout changement sauf les quelques fichiers que rien ne lit
 (`paths-ignore` : `LICENSE`, gabarits d'issue et de PR, `FUNDING.yml` ; `CHANGELOG.md` n'y est plus, un test le lit) ; une liste
@@ -133,12 +151,21 @@ commit vide pour relancer.
 Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
 - **Couverture** : pytest `--cov-fail-under=58` (`ci.yml`), Vitest `coverage.thresholds`
-  (`apps/frontend/vitest.config.ts`, mesuré sur Linux). Ce sont des planchers sous le niveau
+  (`apps/frontend/vitest.config.ts`, mesuré sur Linux), Jest `coverageThreshold` de l'app
+  mobile (`apps/mobile/package.json`, job `test` de `mobile.yml`). Ce sont des planchers sous le niveau
   mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.
 - **Démarrage** : `apps/frontend/scripts/smoke-test.cjs` lance l'app avec `WORKPILOT_SMOKE_TEST=1`
   et exige que le renderer monte (`src/main/smoke-test.ts`) ; `ci.yml` le fait sur le build des
   trois OS, `release.yml` sur chaque app packagée avant publication (`--packaged`).
   `tests/test_smoke_test_wiring.py` garde ces étapes.
+- **Couverture du changement** : sur une PR, chaque ligne ajoutée ou modifiée que le rapport mesure
+  est lancée par un test, et chaque branche qui y commence est prise (`scripts/diff_coverage.py`,
+  pas « Every changed line run by a test » de `coverage-python`, de `test-frontend` sous Linux et
+  de `mobile.yml`). En local, après la suite avec couverture :
+  `python scripts/diff_coverage.py --base origin/develop --cobertura apps/backend/coverage.xml`
+  (ou `--istanbul apps/frontend/coverage/coverage-final.json`). Une ligne vraiment intestable sort
+  du rapport par `# pragma: no cover` ou `/* v8 ignore next */`, visible dans le diff et justifiée
+  dans la PR ; jamais pour une ligne qu'un test peut atteindre.
 - **Actions** : chaque action externe est épinglée par SHA, version en commentaire ; Dependabot
   suit aussi `.github/actions/*` (`tests/test_action_pins.py`).
 - **Téléchargements depuis les releases GitHub** : elles ont répondu 504 toute une matinée
@@ -157,6 +184,7 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
 ## Livraison
 
+Automatique : le pilote de release ci-dessus. À la main (pilote arrêté, hotfix) :
 `node scripts/bump-version.js patch|minor|major` sur une branche issue de `develop`, puis
 `python scripts/changelog.py release X.Y.Z "Titre"` (les fragments deviennent la section de la
 version ; écrire son introduction), PR vers `develop`, puis PR `develop` → `main` fusionnée par commit de merge : la fusion déclenche la release

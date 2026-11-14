@@ -41,6 +41,10 @@ class AgentRole(str, Enum):
     CUSTOM = "custom"
 
 
+# An answer longer than this keeps its end: the state is polled every 1.5 s.
+MAX_OUTPUT_CHARS = 20_000
+
+
 # Recommended model tiers per role
 ROLE_MODEL_RECOMMENDATIONS: dict[AgentRole, str] = {
     AgentRole.ARCHITECT: "flagship",
@@ -121,16 +125,30 @@ class AgentSlot:
     # Streaming session link
     streaming_session_id: str | None = None
 
+    # The model's answer to the current task, as it streams in
+    output: str = ""
+
     # Error info
     error_message: str = ""
 
     def start(self, task: str = ""):
-        """Mark agent as running."""
+        """Mark agent as running, on a fresh answer (tokens stay cumulative)."""
         self.status = AgentStatus.RUNNING
         self.current_task = task
+        self.current_step = ""
+        self.current_thinking = ""
+        self.progress = 0.0
+        self.output = ""
         self.started_at = time.time()
         self.completed_at = None
+        self.paused_at = None
         self.error_message = ""
+
+    def append_output(self, text: str) -> None:
+        """Add a chunk of the answer, keeping the most recent ``MAX_OUTPUT_CHARS``."""
+        if not text:
+            return
+        self.output = (self.output + text)[-MAX_OUTPUT_CHARS:]
 
     def pause(self):
         """Pause the agent."""
@@ -171,6 +189,7 @@ class AgentSlot:
         self.started_at = None
         self.completed_at = None
         self.paused_at = None
+        self.output = ""
         self.error_message = ""
 
     @property
@@ -204,5 +223,6 @@ class AgentSlot:
             "completed_at": self.completed_at,
             "elapsed_seconds": self.elapsed_seconds,
             "streaming_session_id": self.streaming_session_id,
+            "output": self.output,
             "error_message": self.error_message,
         }
