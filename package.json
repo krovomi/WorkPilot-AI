@@ -58,7 +58,7 @@
 		"electron"
 	],
 	"devDependencies": {
-		"concurrently": "^10.0.6"
+		"concurrently": "^10.0.7"
 	},
 	"dependencies": {
 		"@lydell/node-pty": "1.1.0",
