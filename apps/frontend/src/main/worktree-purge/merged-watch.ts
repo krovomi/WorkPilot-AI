@@ -15,6 +15,7 @@ import { IPC_CHANNELS } from "../../shared/constants";
 import type { Project, Task } from "../../shared/types";
 import { isServerTask, prUrlOf, splitPartOf } from "../../shared/utils/task-split";
 import { appLog } from "../app-logger";
+import { autoTriggerForTask } from "../ipc-handlers/cicd-triggers-handlers";
 import { offlineStrict } from "../ipc-handlers/task/split-merge-watch";
 import { writeMetadata } from "../ipc-handlers/task/stack-handlers";
 import { safeSendToRenderer } from "../ipc-handlers/utils";
@@ -101,8 +102,6 @@ export function startMergedWatch(getMainWindow: () => BrowserWindow | null): voi
 		onMerged: async (task, project) => {
 			const url = prUrlOf(task);
 			if (!url) return;
-			// Loaded on a merge only: the CI/CD handlers pull in the env store.
-			const { autoTriggerForTask } = await import("../ipc-handlers/cicd-triggers-handlers");
 			const cicdRun = await autoTriggerForTask(project, "merge", {
 				prUrl: url,
 				// The branch the PR went into: the pipeline runs on what was merged.

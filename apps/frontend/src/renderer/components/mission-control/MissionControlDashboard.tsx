@@ -54,16 +54,19 @@ export function MissionControlDashboard() {
 		createAgent,
 		removeAgent,
 		startAgent,
-		pauseAgent,
-		resumeAgent,
 		stopAgent,
 		selectAgent,
 		startPolling,
 		stopPolling,
-		updateAgentConfig,
 	} = useMissionControlStore();
 
 	const [showAddAgent, setShowAddAgent] = useState(false);
+
+	// Coming back to the page finds the session still open in the backend,
+	// with the agents that kept running meanwhile.
+	useEffect(() => {
+		void fetchState();
+	}, [fetchState]);
 
 	// Poll while the session runs.
 	useEffect(() => {
@@ -196,12 +199,9 @@ export function MissionControlDashboard() {
 									isSelected={agent.id === selectedAgentId}
 									onSelect={() => selectAgent(agent.id)}
 									onStart={(task: string) => startAgent(agent.id, task)}
-									onPause={() => pauseAgent(agent.id)}
-									onResume={() => resumeAgent(agent.id)}
 									onStop={() => stopAgent(agent.id)}
 									onRemove={() => removeAgent(agent.id)}
 									onShowDecisionTree={() => selectAgent(agent.id)}
-									onUpdateConfig={(config: Record<string, unknown>) => updateAgentConfig(agent.id, config)}
 								/>
 							))}
 						</div>

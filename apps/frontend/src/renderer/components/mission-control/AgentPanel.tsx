@@ -1,8 +1,9 @@
 /**
  * AgentPanel — Individual agent card in the Mission Control grid.
  *
- * Shows: status badge, provider/model, progress bar, live thinking,
- * last tool call, active files, token usage, and control buttons.
+ * Shows: status badge, provider/model, what the agent is doing, its answer as
+ * it streams in, last tool call, active files, token usage, and controls.
+ * A run is one model call: it can be stopped, not paused.
  */
 
 import {
@@ -12,8 +13,8 @@ import {
 	DollarSign,
 	FileCode,
 	GitBranch,
+	MessageSquareText,
 	MoreVertical,
-	Pause,
 	Play,
 	Square,
 	Trash2,
@@ -32,7 +33,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { Progress } from "../ui/progress";
 import { useTranslation } from "react-i18next";
 
 import { Input } from "../ui/input";
@@ -41,20 +41,9 @@ interface AgentPanelProps {
 	readonly isSelected: boolean;
 	readonly onSelect: () => void;
 	readonly onStart: (task: string) => void;
-	readonly onPause: () => void;
-	readonly onResume: () => void;
 	readonly onStop: () => void;
 	readonly onRemove: () => void;
 	readonly onShowDecisionTree: () => void;
-	readonly onUpdateConfig: (
-		config: Partial<{
-			provider: string;
-			model: string;
-			model_label: string;
-			name: string;
-			role: string;
-		}>,
-	) => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -91,13 +80,9 @@ export function AgentPanel({
 	isSelected,
 	onSelect,
 	onStart,
-	onPause,
-	onResume,
 	onStop,
 	onRemove,
 	onShowDecisionTree,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	onUpdateConfig,
 }: AgentPanelProps) {
 	const { t } = useTranslation();
 	const [taskInput, setTaskInput] = useState("");
@@ -163,18 +148,36 @@ export function AgentPanel({
 					</span>
 				</div>
 
-				{/* Progress */}
+				{/* Task + what the run is waiting on: one model call has no percentage */}
+				{agent.current_task && (
+					<p className="text-xs text-foreground/80 line-clamp-2">{agent.current_task}</p>
+				)}
 				{agent.status === "running" && (
-					<div className="space-y-1">
-						<div className="flex items-center justify-between text-xs">
-							<span className="text-muted-foreground truncate">
-								{agent.current_step || agent.current_task || t("missionControl:agentPanel.working")}
-							</span>
-							<span className="text-muted-foreground shrink-0">
-								{Math.round(agent.progress * 100)}%
-							</span>
+					<div className="space-y-1" data-testid="mission-control-agent-running">
+						<span className="text-xs text-muted-foreground">
+							{agent.output
+								? t("missionControl:agentPanel.answering")
+								: t("missionControl:agentPanel.waitingForModel")}
+						</span>
+						<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+							<div className="h-full w-1/3 animate-pulse rounded-full bg-primary/60" />
 						</div>
-						<Progress value={agent.progress * 100} className="h-1.5" />
+					</div>
+				)}
+
+				{/* The agent's answer */}
+				{agent.output && (
+					<div
+						className="rounded-md bg-muted/30 p-2 text-xs"
+						data-testid="mission-control-agent-output"
+					>
+						<div className="mb-1 flex items-center gap-1.5 font-medium text-foreground/70">
+							<MessageSquareText className="h-3 w-3" />
+							{t("missionControl:agentPanel.answer")}
+						</div>
+						<p className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-foreground/90">
+							{agent.output}
+						</p>
 					</div>
 				)}
 
@@ -284,45 +287,16 @@ export function AgentPanel({
 							</Button>
 						</>
 					)}
-					{agent.status === "running" && (
-						<>
-							<Button
-								variant="outline"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onPause}
-							>
-								<Pause className="h-3 w-3" />
-							</Button>
-							<Button
-								variant="destructive"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onStop}
-							>
-								<Square className="h-3 w-3" />
-							</Button>
-						</>
-					)}
-					{agent.status === "paused" && (
-						<>
-							<Button
-								variant="default"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onResume}
-							>
-								<Play className="h-3 w-3" />
-							</Button>
-							<Button
-								variant="destructive"
-								size="icon"
-								className="h-6 w-6"
-								onClick={onStop}
-							>
-								<Square className="h-3 w-3" />
-							</Button>
-						</>
+					{(agent.status === "running" || agent.status === "paused") && (
+						<Button
+							variant="destructive"
+							size="sm"
+							className="h-6 text-xs"
+							onClick={onStop}
+						>
+							<Square className="h-3 w-3 mr-1" />
+							{t("missionControl:agentPanel.stop")}
+						</Button>
 					)}
 					{(agent.status === "completed" || agent.status === "error") && (
 						<Button
@@ -339,7 +313,10 @@ export function AgentPanel({
 
 				{/* Error message */}
 				{agent.error_message && (
-					<div className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 truncate">
+					<div
+						className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 break-words"
+						role="alert"
+					>
 						{agent.error_message}
 					</div>
 				)}
