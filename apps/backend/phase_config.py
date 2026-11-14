@@ -726,18 +726,28 @@ def get_phase_model(
     cli_model: str | None = None,
     cli_provider: str | None = None,
 ) -> str:
-    """The model of ``phase``, stepped down a tier when the carbon budget says so.
+    """The model of ``phase``, stepped down when a budget says so.
 
     A project whose monthly carbon budget is spent, with ``degrade`` on, runs
     its flagship models on the provider's standard one
-    (``carbon_profiler.budget``). Otherwise the model is the resolved one.
+    (``carbon_profiler.budget``). A task whose cost budget is past its warning
+    threshold, with ``degrade`` on, steps down one tier, two past the critical
+    one (``cost_budget``). Otherwise the model is the resolved one.
     """
     model = _resolve_phase_model(spec_dir, phase, cli_model, cli_provider)
     try:
         from carbon_profiler.budget import degraded_model
+        from cost_budget.degrade import budget_model
+        from cost_budget.guard import degrade_steps
     except ImportError:
         return model
-    return degraded_model(spec_dir, model, phase, _provider_standard_model)
+    model = degraded_model(spec_dir, model, phase, _provider_standard_model)
+    return budget_model(model, degrade_steps(spec_dir), phase, _provider_tier_model)
+
+
+def _provider_tier_model(provider: str, tier: str) -> str | None:
+    """The provider's own model for ``tier`` when its settings name one."""
+    return _provider_standard_model(provider) if tier == "standard" else None
 
 
 def _provider_standard_model(provider: str) -> str | None:

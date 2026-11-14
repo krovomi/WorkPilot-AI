@@ -3,7 +3,7 @@
   "apps/backend/agent_health/api.py": {"blind": 5, "silent": 0},
   "apps/backend/agent_health/persistence.py": {"blind": 2, "silent": 1},
   "apps/backend/agents/agent_audit.py": {"blind": 4, "silent": 0},
-  "apps/backend/agents/coder.py": {"blind": 19, "silent": 5},
+  "apps/backend/agents/coder.py": {"blind": 18, "silent": 5},
   "apps/backend/agents/debugger.py": {"blind": 1, "silent": 0},
   "apps/backend/agents/documenter.py": {"blind": 4, "silent": 4},
   "apps/backend/agents/feature_wiring.py": {"blind": 5, "silent": 0},
