@@ -118,7 +118,7 @@
   "report": [
    [
     "C# / .NET",
-    "dotnet test --logger trx"
+    "dotnet test --logger trx (on a test project)"
    ]
   ],
   "tech_languages": [
@@ -159,7 +159,7 @@
   "report": [
    [
     "JavaScript / TypeScript",
-    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+    "vitest run --reporter=junit, jest --json or node --test --test-reporter=junit"
    ]
   ],
   "tech_languages": [
@@ -230,7 +230,7 @@
   "report": [
    [
     "JavaScript / TypeScript",
-    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+    "vitest run --reporter=junit, jest --json or node --test --test-reporter=junit"
    ]
   ],
   "tech_languages": [
@@ -313,7 +313,12 @@
    ]
   ],
   "project_type": "unknown",
-  "report": [],
+  "report": [
+   [
+    "Dart / Flutter",
+    "dart test or flutter test"
+   ]
+  ],
   "tech_languages": [
    "dart"
   ],
@@ -357,7 +362,7 @@
   "report": [
    [
     "Go",
-    "gotestsum --junitfile test-results/junit.xml"
+    "go test -json ./..."
    ]
   ],
   "tech_languages": [
@@ -405,7 +410,7 @@
   "report": [
    [
     "JavaScript / TypeScript",
-    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+    "vitest run --reporter=junit, jest --json or node --test --test-reporter=junit"
    ]
   ],
   "tech_languages": [
@@ -496,7 +501,7 @@
   "report": [
    [
     "JavaScript / TypeScript",
-    "jest --reporters=default --reporters=jest-junit (or vitest --reporter=junit)"
+    "vitest run --reporter=junit, jest --json or node --test --test-reporter=junit"
    ]
   ],
   "tech_languages": [
@@ -543,7 +548,7 @@
   "report": [
    [
     "Ruby",
-    "rspec --format RspecJunitFormatter --out test-results/junit.xml"
+    "rspec --format json --out test-results/rspec.json"
    ]
   ],
   "tech_languages": [
@@ -583,7 +588,7 @@
   "report": [
    [
     "Rust",
-    "cargo nextest run --profile ci (emits JUnit)"
+    "cargo test"
    ]
   ],
   "tech_languages": [
@@ -682,7 +687,7 @@
   "report": [
    [
     "C# / .NET",
-    "dotnet test --logger trx"
+    "dotnet test --logger trx (on a test project)"
    ]
   ],
   "tech_languages": [
