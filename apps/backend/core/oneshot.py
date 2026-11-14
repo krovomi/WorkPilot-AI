@@ -65,6 +65,25 @@ def drives_itself(provider: str) -> bool:
     return (provider or "").strip().lower() in _DIRECT_PROVIDERS
 
 
+def runs_own_agent(
+    provider: str, project_dir: str | None, spec_dir: str | None
+) -> bool:
+    """True when `provider` answers through its own agent client here.
+
+    The CLIs (pi, OpenCode, Antigravity, the ACP agents such as Gemini CLI)
+    have no context-free client: with a project and a spec directory,
+    ``_build_client`` hands them to ``create_agent_client``, which drives
+    each one with its own builder. That is still the named vendor answering,
+    so a caller that refuses substitutes may take it. A name with no builder
+    there (meta, aws, cursor, custom) would degrade to Claude: never this.
+    """
+    if not (project_dir and spec_dir):
+        return False
+    from core.client import _CLIENT_BUILDERS, _normalize_provider_name
+
+    return _normalize_provider_name(provider or "") in _CLIENT_BUILDERS
+
+
 # Cheap default model per provider for these tiny one-shot calls.
 _DEFAULT_MODELS = {
     "claude": "claude-haiku-4-5",
@@ -503,7 +522,11 @@ async def oneshot_completion(
         "yes" if (project_dir and spec_dir) else "no",
     )
 
-    if require_provider and not drives_itself(resolved_provider):
+    if (
+        require_provider
+        and not drives_itself(resolved_provider)
+        and not runs_own_agent(resolved_provider, project_dir, spec_dir)
+    ):
         message = (
             f"Provider '{resolved_provider}' has no adapter of its own here: "
             "running it would answer from a different vendor's model."

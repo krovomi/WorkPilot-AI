@@ -18,6 +18,7 @@ import {
 	openReviewWorkspace,
 	recordReviewStep,
 	type ReviewDeps,
+	type ReviewStepRecord,
 	type ReviewWorkspace,
 	toWorkspacePath,
 } from "./review-card";
@@ -29,7 +30,7 @@ export interface ReviewRun {
 	/** A path of the project folder at the same place in the worktree. */
 	map(target: string | undefined): string | undefined;
 	/** Commit the run and put its card in review. */
-	finish(step: { message: string; summary: string }): Promise<GeneratedReview>;
+	finish(step: ReviewStepRecord): Promise<GeneratedReview>;
 	/** The run wrote nothing: a card it opened goes away again. */
 	abandon(): Promise<void>;
 }

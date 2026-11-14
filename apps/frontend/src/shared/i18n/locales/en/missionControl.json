@@ -32,7 +32,11 @@
 		"taskPlaceholder": "Task description...",
 		"restart": "Restart",
 		"noModel": "No model",
-		"working": "Working..."
+		"working": "Working...",
+		"answering": "Answering…",
+		"waitingForModel": "Waiting for the model…",
+		"answer": "Answer",
+		"stop": "Stop"
 	},
 	"noDecisions": "No decisions recorded yet",
 	"session": "Session",
@@ -50,5 +54,16 @@
 		"featureModelMixing": "Pick a provider and a model per agent: Claude, OpenAI, Gemini, Ollama…",
 		"featureDecisionTree": "Follow why each agent chose its next step.",
 		"featureLiveView": "Tokens, cost and events as they happen."
+	},
+	"events": {
+		"agent_created": "Agent created",
+		"agent_removed": "Agent removed",
+		"agent_started": "Agent started",
+		"agent_paused": "Agent paused",
+		"agent_resumed": "Agent resumed",
+		"agent_stopped": "Agent stopped",
+		"agent_config_updated": "Agent settings changed",
+		"agent_completed": "Agent answered",
+		"agent_failed": "Agent failed"
 	}
 }
