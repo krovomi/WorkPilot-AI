@@ -53,8 +53,9 @@ def project(tmp_path: Path) -> Path:
     _git(root, "config", "user.email", "dev@example.test")
     _git(root, "config", "user.name", "Dev")
     _git(root, "remote", "add", "origin", "https://example.test/acme/shop.git")
-    (root / "package-lock.json").write_text('{"lockfileVersion": 3}\n', "utf-8")
-    (root / ".nvmrc").write_text("22\n", encoding="utf-8")
+    # Bytes, not text: on Windows, text mode writes "\r\n" and .nvmrc is 4 bytes.
+    (root / "package-lock.json").write_bytes(b'{"lockfileVersion": 3}\n')
+    (root / ".nvmrc").write_bytes(b"22\n")
     _git(root, "add", ".")
     _git(root, "commit", "-qm", "start")
     (root / "notes.txt").write_text("wip\n", encoding="utf-8")
