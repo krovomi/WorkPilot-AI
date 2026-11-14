@@ -967,6 +967,8 @@ export const IPC_CHANNELS = {
 	DOMAIN_AGENTS_LIST: "domainAgents:list",
 	DOMAIN_AGENTS_PROFILE: "domainAgents:profile",
 	DOMAIN_AGENTS_BUILD: "domainAgents:build",
+	DOMAIN_AGENTS_PROJECT_GET: "domainAgents:projectGet",
+	DOMAIN_AGENTS_PROJECT_SET: "domainAgents:projectSet",
 	// CI/CD Anomaly Detective (#3.4)
 	CICD_ANOMALY_SCAN: "cicdAnomaly:scan",
 	CICD_ANOMALY_ANALYSE: "cicdAnomaly:analyse",
