@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, ServerClient } from "../api/client";
 import { api } from "../api/endpoints";
@@ -8,7 +8,7 @@ import { normaliseServerUrl } from "../api/server-url";
 import { entraIdToken } from "../auth/entra";
 import { useSession } from "../auth/session";
 import { describeError } from "../i18n";
-import { Button, ErrorBanner, Field } from "../ui/components";
+import { Button, ErrorBanner, Field, KeyboardAvoiding } from "../ui/components";
 import { SPACE, useTheme } from "../ui/theme";
 
 export default function SignIn() {
@@ -62,7 +62,7 @@ export default function SignIn() {
 	const ready = server.trim() && email.trim() && password;
 	return (
 		<SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-			<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+			<KeyboardAvoiding>
 				<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 					<View style={styles.header}>
 						<Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
@@ -115,7 +115,7 @@ export default function SignIn() {
 						onPress={() => void attempt("microsoft")}
 					/>
 				</ScrollView>
-			</KeyboardAvoidingView>
+			</KeyboardAvoiding>
 		</SafeAreaView>
 	);
 }

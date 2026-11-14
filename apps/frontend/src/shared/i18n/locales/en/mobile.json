@@ -45,6 +45,8 @@
 		"badgeTitle": "Mobile target: {{platforms}}",
 		"detected": "App detected: {{framework}} ({{platforms}}).",
 		"notInApp": "This platform is not part of the project's app.",
+		"windevMobile": "WinDev Mobile project: the agents write the WLangage code, and the Android or iOS app is generated in the WinDev Mobile editor. Nothing builds or runs it on this machine.",
+		"windevNoMobile": "WinDev project without a mobile configuration: no setup task is proposed. A phone app is added in the WinDev Mobile editor, as a generation configuration.",
 		"noAppTitle": "This project has no mobile app yet",
 		"noAppPreamble": "Checking Android or Apple (iOS) automatically adds the tasks that create the app to the board: one task installs the mobile framework and creates the project in the {{dir}}/ folder, then one preparation task per platform checked. This task will wait until they are done. Leave both unchecked if this task is not about a mobile app.",
 		"hostStacks": "Stacks found in the project: {{stacks}}. The proposed framework follows them.",
@@ -74,7 +76,8 @@
 		"python": "Python",
 		"php": "PHP",
 		"ruby": "Ruby",
-		"elixir": "Elixir"
+		"elixir": "Elixir",
+		"windev": "WinDev"
 	},
 	"frameworks": {
 		"android-native": "Android (Kotlin)",
@@ -84,7 +87,8 @@
 		"expo": "React Native (Expo)",
 		"dotnet-maui": ".NET MAUI",
 		"kotlin-multiplatform": "Kotlin Multiplatform",
-		"capacitor": "Capacitor"
+		"capacitor": "Capacitor",
+		"windev-mobile": "WinDev Mobile"
 	},
 	"setup": {
 		"installTitle": "Install {{framework}} and create the mobile app",

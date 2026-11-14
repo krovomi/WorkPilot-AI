@@ -21,6 +21,11 @@ import {
 	type AgentDebuggerAPI,
 	createAgentDebuggerAPI,
 } from "./modules/agent-debugger-api";
+import { createReplayAPI, type ReplayAPI } from "./modules/replay-api";
+import {
+	createLocalBackendAPI,
+	type LocalBackendAPI,
+} from "./modules/local-backend-api";
 import {
 	type BlastRadiusAPI,
 	createBlastRadiusAPI,
@@ -198,6 +203,8 @@ import type { PairProgrammingAPI } from "./modules/pair-programming-api";
 import { createPairProgrammingAPI } from "./modules/pair-programming-api";
 import type { QuickCommandAPI } from "./modules/quick-command-api";
 import { createQuickCommandAPI } from "./modules/quick-command-api";
+import type { MissionControlAPI } from "./modules/mission-control-api";
+import { createMissionControlAPI } from "./modules/mission-control-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -296,6 +303,7 @@ export interface ElectronAPI
 		PerformanceProfilerAPI,
 		PairProgrammingAPI,
 		QuickCommandAPI,
+		MissionControlAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -325,6 +333,8 @@ export interface ElectronAPI
 		InjectionGuardAPI,
 		GuardrailsAPI,
 		AgentDebuggerAPI,
+		LocalBackendAPI,
+		ReplayAPI,
 		BlastRadiusAPI,
 		Phase35FeaturesAPI,
 		BountyBoardAPI,
@@ -449,6 +459,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPerformanceProfilerAPI(),
 		...createPairProgrammingAPI(),
 		...createQuickCommandAPI(),
+		...createMissionControlAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -478,6 +489,8 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
 		...createAgentDebuggerAPI(),
+		...createLocalBackendAPI(),
+		...createReplayAPI(),
 		...createBlastRadiusAPI(),
 		...createPhase35FeaturesAPI(),
 		...createBountyBoardAPI(),
@@ -613,6 +626,8 @@ export type { PairProgrammingAPI } from "./modules/pair-programming-api";
 export { createPairProgrammingAPI } from "./modules/pair-programming-api";
 export type { QuickCommandAPI } from "./modules/quick-command-api";
 export { createQuickCommandAPI } from "./modules/quick-command-api";
+export type { MissionControlAPI } from "./modules/mission-control-api";
+export { createMissionControlAPI } from "./modules/mission-control-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";

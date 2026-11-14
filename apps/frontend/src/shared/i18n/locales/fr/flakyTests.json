@@ -79,6 +79,9 @@
 		"failed": "Échec du scan : {{error}}",
 		"no_command": "Aucune commande de test prise en charge n'a été trouvée dans ce projet.",
 		"no_results": "La commande de test n'a écrit aucun rapport : elle a sans doute échoué avant de lancer les tests (erreur de compilation, outil manquant). Sa sortie :",
+		"no_tests": "La commande de test s'est exécutée sans lancer un seul test : ce qu'elle teste ne contient sans doute aucun test. Sa sortie :",
+		"no_dotnet_tests": "Ce projet .NET n'a aucun projet de test (xUnit, NUnit, MSTest ou TUnit) : dotnet test compilerait sans rien lancer. Ajoutez un projet de test (par exemple dotnet new xunit) puis relancez.",
+		"fullLog": "Sortie complète :",
 		"start_failed": "La commande de test n'a pas pu démarrer. L'outil est-il installé et dans le PATH ?",
 		"details": "Détails"
 	},

@@ -69,7 +69,7 @@ export default function GroupScreen() {
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
 			<Stack.Screen options={{ title: group.name }} />
-			<ErrorBanner message={action.error ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={action.error} error={error} />
 			{group.description ? <Text style={{ color: theme.textMuted }}>{group.description}</Text> : null}
 
 			{data.roles.length ? (

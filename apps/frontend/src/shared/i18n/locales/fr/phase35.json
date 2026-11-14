@@ -272,6 +272,36 @@
 			"public_domain": "—",
 			"commercial": "Vérifier qu’une licence payante couvre votre usage et suivre les renouvellements.",
 			"unknown": "Chercher la licence en amont et l’ajouter à la politique."
+		},
+		"colLicense": "Licence",
+		"toCheck": "À vérifier",
+		"toCheckBadge": "Licences à vérifier",
+		"toCheckTitle_one": "{{count}} dépendance dont la licence est introuvable",
+		"toCheckTitle_other": "{{count}} dépendances dont la licence est introuvable",
+		"askRegistries": "Interroger les registres publics",
+		"askRegistriesHint": "Pour les licences qu’aucun fichier de verrouillage ni paquet installé ne donne (deps.dev, npm, PyPI, Packagist, RubyGems, pub.dev). Jamais sous une politique hors-ligne stricte.",
+		"offlineNote": "Les registres n’ont pas été interrogés (option désactivée ou politique hors-ligne stricte) : installez les dépendances ou autorisez les registres pour résoudre le reste.",
+		"noManifest": "Aucun manifeste de dépendances trouvé (package.json, requirements.txt, pyproject.toml, *.csproj, pom.xml, build.gradle, Cargo.toml, go.mod, composer, Gemfile.lock, pubspec.lock).",
+		"ecosystems": {
+			"npm": "npm",
+			"pypi": "PyPI",
+			"cargo": "Cargo",
+			"go": "Go",
+			"nuget": "NuGet",
+			"maven": "Maven / Gradle",
+			"composer": "Composer",
+			"rubygems": "RubyGems",
+			"pub": "pub (Dart)"
+		},
+		"sources": {
+			"manifest_one": "{{count}} lue dans un fichier de verrouillage",
+			"manifest_other": "{{count}} lues dans un fichier de verrouillage",
+			"installed_one": "{{count}} lue dans le paquet installé",
+			"installed_other": "{{count}} lues dans les paquets installés",
+			"registry_one": "{{count}} venue d’un registre public",
+			"registry_other": "{{count}} venues des registres publics",
+			"override_one": "{{count}} fixée à la main",
+			"override_other": "{{count}} fixées à la main"
 		}
 	},
 	"archDrift": {

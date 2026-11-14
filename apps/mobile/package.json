@@ -19,17 +19,17 @@
 		"expo-sharing": "~58.0.21",
 		"expo-status-bar": "~58.0.4",
 		"expo-web-browser": "~58.0.7",
-		"i18next": "^26.7.1",
+		"i18next": "^27.0.1",
 		"react": "19.3.0",
 		"react-dom": "19.3.0",
-		"react-i18next": "^17.1.12",
+		"react-i18next": "^18.0.1",
 		"react-native": "0.88.1",
 		"react-native-safe-area-context": "~5.11.0",
 		"react-native-screens": "~4.30.1",
 		"react-native-web": "~0.21.4"
 	},
 	"devDependencies": {
-		"@playwright/test": "1.64.1",
+		"@playwright/test": "1.65.0",
 		"@testing-library/react-native": "^14.1.0",
 		"@types/jest": "^30.0.0",
 		"@types/node": "^26.6.6",
@@ -67,7 +67,15 @@
 		"collectCoverageFrom": [
 			"src/**/*.{ts,tsx}",
 			"!src/**/*.d.ts"
-		]
+		],
+		"coverageThreshold": {
+			"global": {
+				"statements": 100,
+				"functions": 100,
+				"lines": 100,
+				"branches": 100
+			}
+		}
 	},
 	"packageManager": "pnpm@12.16.1"
 }

@@ -99,7 +99,8 @@ class DecisionTree:
         self._current_node_id: str | None = None
 
     def create_root(self, label: str = "Start") -> DecisionNode:
-        """Create the root node of the tree."""
+        """Start a new tree: a restarted agent does not keep the last run's nodes."""
+        self._nodes = {}
         node = DecisionNode(
             node_type=NodeType.ROOT,
             status=NodeStatus.ACTIVE,

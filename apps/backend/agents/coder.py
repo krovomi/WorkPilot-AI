@@ -34,17 +34,10 @@ from foundation.pause_state import is_paused, read_pause_state
 from foundation.steering import PersonNotes, deliver_notes, person_notes
 
 try:
-    from core.usage_tracker import (
-        finish_build as _ut_finish_build,
-    )
-    from core.usage_tracker import (
-        record_task_status as _ut_record_task,
-    )
-    from core.usage_tracker import (
-        start_build as _ut_start_build,
-    )
+    from core.usage_tracker import record_build_end as _ut_record_build_end
+    from core.usage_tracker import start_build as _ut_start_build
 except ImportError:
-    _ut_start_build = _ut_finish_build = _ut_record_task = None  # type: ignore[assignment]
+    _ut_start_build = _ut_record_build_end = None  # type: ignore[assignment]
 from core.progress import (
     count_subtasks,
     count_subtasks_detailed,
@@ -81,7 +74,7 @@ from prompts_pkg.prompts import (
     docintel_section,
     dotnet_section,
     is_first_run,
-    mobile_section,
+    platform_section,
     uiux_section,
     workflow_reports_section,
 )
@@ -511,7 +504,7 @@ def _coding_task_segments(
         # happens to mention a library — so it goes in whole, each time.
         section("constitution", constitution_section(project_dir), Stability.PROJECT),
         # Same reasoning: the platform rules apply to every subtask, not one.
-        section("mobile", mobile_section(project_dir), Stability.PROJECT),
+        section("platform", platform_section(project_dir, spec_dir), Stability.TASK),
         section("dotnet", dotnet_section(project_dir, spec_dir), Stability.TASK),
         section("effort", effort, Stability.TASK),
         # The ADRs bind every subtask too; the attachments come with them
@@ -1121,10 +1114,10 @@ async def _planning_prompt(
 
     # A phone app has no URL: the plan says which platform verifies each
     # subtask, and which one this machine cannot build.
-    planner_mobile = mobile_section(project_dir)
+    planner_mobile = platform_section(project_dir, spec_dir, role="planner")
     if planner_mobile:
         prompt += "\n\n" + planner_mobile
-        print_status("Mobile stack and device toolchain applied to planning", "success")
+        print_status("Platform rules (mobile, WinDev) applied to planning", "success")
     # A .NET 11 migration is planned along its procedure (`dotnet_upgrade`).
     if planner_dotnet := dotnet_section(project_dir, spec_dir, role="planner"):
         prompt += "\n\n" + planner_dotnet
@@ -1246,16 +1239,8 @@ def _record_usage(
     project_dir: Path, spec_dir: Path, build_status: str, task_status: str
 ) -> None:
     """Usage tracking is telemetry: it never costs the build anything."""
-    if _ut_finish_build is not None:
-        try:
-            _ut_finish_build(spec_dir, status=build_status)
-        except Exception:
-            pass
-    if _ut_record_task is not None:
-        try:
-            _ut_record_task(project_dir, spec_dir.name, task_status)
-        except Exception:
-            pass
+    if _ut_record_build_end is not None:
+        _ut_record_build_end(project_dir, spec_dir, build_status, task_status)
 
 
 def _report_run_end(

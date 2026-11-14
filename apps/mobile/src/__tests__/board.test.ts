@@ -1,6 +1,6 @@
 import type { Api } from "../api/endpoints";
 import type { AgentRun, BoardCard, CardDetails } from "../api/types";
-import { allowedActions, availableActions, sendBack, startCard, stopCard } from "../board/actions";
+import { allowedActions, availableActions, runPhase, sendBack, startCard, stopCard } from "../board/actions";
 import { groupByColumn } from "../board/columns";
 import { initialColumn } from "../board/pickColumn";
 import { BOARD_EVENTS, channelUrl, parseStreamEvent, reconnectDelay } from "../board/stream";
@@ -70,6 +70,11 @@ describe("columns", () => {
 		expect(groups.find((g) => g.column === "done")?.cards.map((c) => c.id)).toEqual(["a"]);
 	});
 
+	it("puts a card of a column a newer server added in the backlog", () => {
+		const groups = groupByColumn([card({ id: "n", column: "on_hold" as never })]);
+		expect(groups.find((g) => g.column === "backlog")?.cards.map((c) => c.id)).toEqual(["n"]);
+	});
+
 	it("opens on what waits for a person first", () => {
 		expect(initialColumn(groupByColumn([card({ column: "in_progress" }), card({ id: "x", column: "human_review" })]))).toBe(
 			"human_review",
@@ -110,6 +115,22 @@ describe("availableActions", () => {
 		]);
 	});
 
+	it("offers merge on an open pull request, retry and changes on a failed build, nothing once done", () => {
+		const reviewed = details({ spec: "# Spec", approval: { approved: true, approvedBy: "a", approvedAt: null } });
+		expect(availableActions(card({ column: "pr_created" }), reviewed, [])).toEqual(["merge"]);
+		expect(availableActions(card({ column: "build_failed" }), reviewed, [])).toEqual(["retry", "requestChanges"]);
+		expect(availableActions(card({ column: "error" }), reviewed, [])).toEqual(["retry", "requestChanges"]);
+		expect(availableActions(card({ column: "done" }), reviewed, [])).toEqual([]);
+	});
+
+	it("approves before starting a backlog card whose spec waits for review", () => {
+		expect(availableActions(card({ column: "backlog" }), details({ spec: "# Spec" }), [])).toEqual([
+			"approve",
+			"start",
+			"delete",
+		]);
+	});
+
 	it("offers nothing on a card the server has not indexed", () => {
 		expect(availableActions(card({ specId: null }), details(), [])).toEqual([]);
 	});
@@ -142,6 +163,12 @@ describe("card actions", () => {
 		expect(api.startRun).toHaveBeenCalledWith("p1", "spec-1", "build");
 	});
 
+	it("runs a later phase of an indexed card", async () => {
+		const api = fakeApi();
+		await runPhase(api as unknown as Api, "p1", card(), "pr");
+		expect(api.startRun).toHaveBeenCalledWith("p1", "spec-1", "pr");
+	});
+
 	it("stops the running run", async () => {
 		const api = fakeApi();
 		await stopCard(api as unknown as Api, "p1", card());
@@ -152,6 +179,24 @@ describe("card actions", () => {
 		const api = fakeApi();
 		api.cancelRun.mockResolvedValueOnce({ cancelled: false });
 		await expect(stopCard(api as unknown as Api, "p1", card())).rejects.toThrow("nothing_to_stop");
+	});
+
+	it("refuses every action on a card the server has not indexed, before any call", async () => {
+		const api = fakeApi();
+		const unindexed = card({ specId: null });
+		await expect(startCard(api as unknown as Api, "p1", unindexed, details())).rejects.toThrow("card_not_indexed");
+		await expect(stopCard(api as unknown as Api, "p1", unindexed)).rejects.toThrow("card_not_indexed");
+		await expect(sendBack(api as unknown as Api, "p1", unindexed, "fix")).rejects.toThrow("card_not_indexed");
+		await expect(runPhase(api as unknown as Api, "p1", unindexed, "merge")).rejects.toThrow("card_not_indexed");
+		expect(api.startRun).not.toHaveBeenCalled();
+		expect(api.runs).not.toHaveBeenCalled();
+	});
+
+	it("says so when no run is queued or running", async () => {
+		const api = fakeApi();
+		api.runs.mockResolvedValueOnce([]);
+		await expect(stopCard(api as unknown as Api, "p1", card())).rejects.toThrow("nothing_to_stop");
+		expect(api.cancelRun).not.toHaveBeenCalled();
 	});
 
 	it("sends the work back then builds, and refuses empty feedback", async () => {
