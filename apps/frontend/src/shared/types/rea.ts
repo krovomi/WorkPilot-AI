@@ -34,6 +34,11 @@ export interface ReaStatus {
 	/** Version of the `rea-agents` package `rea` leads to, when one is found. */
 	installedVersion?: string;
 	nodeVersion?: string;
+	/**
+	 * The version manager (nvm, fnm, volta, mise, asdf) holding the Node.js
+	 * REA runs with, when the PATH's is missing or too old.
+	 */
+	nodeManager?: string;
 	/** Set when the check itself failed. */
 	error?: string;
 }
@@ -61,6 +66,8 @@ export interface ReaInstallResult {
  * Whether `version` meets one of the `^x.y.z` / `>=x.y.z` ranges: the same
  * reading as `node_satisfies` in `apps/backend/rea/pin.py` and the release
  * script, `^22.23.4` is 22.x from 22.23.4, `>=26.12.1` anything from there on.
+ * A prerelease counts as its release (`27.0.0-alpha.1` meets `>=26.12.1`), as
+ * npm reads `engines`.
  */
 export function nodeSatisfies(version: string, ranges: readonly string[]): boolean {
 	const parse = (text: string): number[] | null => {

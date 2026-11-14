@@ -26,14 +26,15 @@
 		"reply": "Reply",
 		"replyTo": "Replying to {{user}}",
 		"cancelReply": "Cancel the reply",
-		"placeholder": "Write to the team…",
+		"placeholder": "Write to the team… (@ai to ask the AI)",
 		"send": "Send",
 		"errors": {
 			"forbidden": "Your role on this project lets you read the chat, not write in it.",
 			"invalid": "This message is empty or too long.",
 			"too_fast": "Too many messages at once. Wait a few seconds.",
 			"unavailable": "The server could not store the message. Try again.",
-			"offline": "Not connected to the project. The message was not sent."
+			"offline": "Not connected to the project. The message was not sent.",
+			"ai_unavailable": "Your provider did not answer @ai (the one chosen for Insights). Try again or switch providers."
 		}
 	},
 	"conflicts": {

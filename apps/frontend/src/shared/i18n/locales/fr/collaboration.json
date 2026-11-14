@@ -26,14 +26,15 @@
 		"reply": "Répondre",
 		"replyTo": "Réponse à {{user}}",
 		"cancelReply": "Annuler la réponse",
-		"placeholder": "Écrire à l'équipe…",
+		"placeholder": "Écrire à l'équipe… (@ia pour demander à l'IA)",
 		"send": "Envoyer",
 		"errors": {
 			"forbidden": "Votre rôle sur ce projet permet de lire le chat, pas d'y écrire.",
 			"invalid": "Ce message est vide ou trop long.",
 			"too_fast": "Trop de messages d'un coup. Patientez quelques secondes.",
 			"unavailable": "Le serveur n'a pas pu enregistrer le message. Réessayez.",
-			"offline": "Pas connecté au projet. Le message n'est pas parti."
+			"offline": "Pas connecté au projet. Le message n'est pas parti.",
+			"ai_unavailable": "Votre fournisseur n'a pas répondu à @ia (celui choisi pour Insights). Réessayez ou changez de fournisseur."
 		}
 	},
 	"conflicts": {

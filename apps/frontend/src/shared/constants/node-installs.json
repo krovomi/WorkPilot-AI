@@ -1,0 +1,26 @@
+{
+	"posix": [
+		{ "manager": "nvm", "env": "NVM_DIR", "homes": [".nvm"], "versions": "versions/node", "bin": "bin/node" },
+		{
+			"manager": "fnm",
+			"env": "FNM_DIR",
+			"homes": [".local/share/fnm", ".fnm", "Library/Application Support/fnm"],
+			"versions": "node-versions",
+			"bin": "installation/bin/node"
+		},
+		{ "manager": "volta", "env": "VOLTA_HOME", "homes": [".volta"], "versions": "tools/image/node", "bin": "bin/node" },
+		{ "manager": "mise", "env": "MISE_DATA_DIR", "homes": [".local/share/mise"], "versions": "installs/node", "bin": "bin/node" },
+		{ "manager": "asdf", "env": "ASDF_DATA_DIR", "homes": [".asdf"], "versions": "installs/nodejs", "bin": "bin/node" }
+	],
+	"windows": [
+		{ "manager": "nvm", "env": "NVM_HOME", "homes": ["AppData/Roaming/nvm"], "versions": "", "bin": "node.exe" },
+		{
+			"manager": "fnm",
+			"env": "FNM_DIR",
+			"homes": ["AppData/Roaming/fnm"],
+			"versions": "node-versions",
+			"bin": "installation/node.exe"
+		},
+		{ "manager": "volta", "env": "VOLTA_HOME", "homes": ["AppData/Local/Volta"], "versions": "tools/image/node", "bin": "node.exe" }
+	]
+}
