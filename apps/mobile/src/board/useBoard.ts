@@ -81,8 +81,9 @@ export function useBoard(projectId: string): BoardState {
 		let reconnect: ReturnType<typeof setTimeout> | null = null;
 		let debounce: ReturnType<typeof setTimeout> | null = null;
 
+		// Called only with no socket open and no reconnect pending, never after the
+		// cleanup (`open` checks `stopped`, and the cleanup detaches the socket first).
 		const retry = () => {
-			if (stopped || reconnect) return;
 			reconnect = setTimeout(() => {
 				reconnect = null;
 				void open();
