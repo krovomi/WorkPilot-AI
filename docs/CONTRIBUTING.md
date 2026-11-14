@@ -609,7 +609,14 @@ git checkout -b hotfix/critical-fix
 
 ### Release Process (Maintainers)
 
-When ready to release a new version:
+Releases are automatic: `release-autopilot.yml` opens `release/vX.Y.Z` → `main` once `develop` has
+had no merge for 2 hours (at most one version a day), with the version computed from the merged
+pull requests (`feat:` → minor, `fix:` → patch, `feat!:` or `BREAKING CHANGE:` → major, a
+`semver:*` label overrides) and the documentation written by Claude Code, then merges it with a
+merge commit when green. Give your pull request a conventional title and a `changelog.d/`
+fragment: they decide the version. Details: [docs/RELEASE.md](RELEASE.md#automatic-releases-release-autopilot).
+
+By hand, when the autopilot is off:
 
 1. On a branch from `develop`, run `node scripts/bump-version.js X.Y.Z`, then
    `python scripts/changelog.py release X.Y.Z "Title"`: the fragments of `changelog.d/` become the

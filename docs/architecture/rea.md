@@ -77,3 +77,32 @@ Le reste du script :
   `RunAsNode`, marqueur d'identifiant) ou si l'audit n'a pas pu finir. `unknown` et
   `not_assessed` ne font jamais échouer : c'est ce que l'analyse statique n'a pas pu trancher, pas
   un constat.
+
+## Lot A : le runner du backend et le badge « Outils CLI »
+
+`apps/backend/rea/` est le seul chemin du backend vers REA, et seulement par sa CLI :
+
+- `pin.py` lit `pin.json` et refuse une plage ou `latest` ;
+- `locate.py` trouve un Node.js que la release accepte (sinon `node_missing` / `node_too_old`, jamais
+  contourné), puis REA **installé à la version figée** (le `rea` du PATH résolu jusqu'à
+  `rea-agents/scripts/rea.mjs`, lien npm sous macOS et Linux, `rea.cmd` voisin de
+  `node_modules/` sous Windows, et son `package.json` lu), sinon `npx-cli.js` à côté de Node.js
+  pour la récupérer. npx est un téléchargement : un projet en hors-ligne strict (`airgapStrict`)
+  le refuse (`offline`). Les deux se lancent en `[node, <script>, …]`, sans shell ni `.cmd` ;
+- `runner.py` (`run_rea`) ne lance qu'une commande de `COMMANDS`, des lecteurs statiques
+  (`audit-release-exposure`, `inspect-electron-fuses`, `inspect-binary-hardening`,
+  `inspect-managed-members`, `compare-managed-members`), sur des chemins absolus qui existent
+  (résolus, donc jamais lus comme une option), avec des options en liste fermée, depuis un dossier
+  temporaire à lui, avec l'environnement du backend sans ses identifiants
+  (`security.child_env`). Sa réponse est `ReaRun` : `result` est le `normalized_result` de REA,
+  une donnée, à citer comme non fiable avant qu'un modèle la lise. La sortie 3 (`--fail_on`
+  atteint) est une réponse, pas un échec.
+
+Le badge REA du panneau « Outils CLI » (`ReaStatusBadge`, `main/ipc-handlers/rea-handlers.ts`) dit
+si le `rea` du PATH mène à la version figée, par la même lecture du `package.json` (jamais en
+lançant `rea`), et installe exactement cette version : `npm install -g --ignore-scripts
+rea-agents@<pin>`, réessayé dans `~/.local` si le préfixe global n'est pas inscriptible. Une autre
+version installée compte comme présente mais n'est pas lancée : le badge propose la version figée
+à sa place, et il n'y a pas de mise à jour vers `@latest`. Les deux canaux ne prennent aucun
+argument. `REA_PIN` (`shared/types/rea.ts`) est la copie de `pin.json` que le renderer importe ;
+`tests/rea/test_rea_frontend_pin.py` les garde égaux.
