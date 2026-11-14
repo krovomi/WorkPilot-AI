@@ -308,6 +308,17 @@
 			"inferred": "Règles déduites de la stack détectée (aucune configuration d’architecture dans le projet).",
 			"none": "Aucune règle n’a pu être déduite pour ce projet : rien n’a été vérifié."
 		},
+		"layers": {
+			"domain": "Domaine",
+			"application": "Application",
+			"infrastructure": "Infrastructure",
+			"presentation": "Présentation"
+		},
+		"layerRule": "La couche « {{source}} » ne doit pas dépendre de la couche « {{target}} ».",
+		"ruleIds": {
+			"domain_framework": "Le domaine ne doit dépendre d’aucun framework de persistance ou web."
+		},
+		"languagesNote": "Imports lus pour .NET (C#, F#, VB et références de projets), Java, Kotlin, Scala, Go, PHP, Rust, Dart/Flutter, Swift, Python et JavaScript/TypeScript. Sans fichier de règles, les couches Domaine, Application, Infrastructure et Présentation sont déduites des dossiers et des projets.",
 		"violationTypes": {
 			"layer_violation": "Violation de couche",
 			"circular_dependency": "Dépendance circulaire",
