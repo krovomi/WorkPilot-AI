@@ -16,17 +16,12 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-try:
-    from performance import (
-        BenchmarkRunner,
-        PerformanceOptimizer,
-        PerformanceProfiler,
-        PerformanceReport,
-    )
-
-    _PERFORMANCE_AVAILABLE = True
-except ImportError:
-    _PERFORMANCE_AVAILABLE = False
+from performance import (  # noqa: E402
+    BenchmarkRunner,
+    PerformanceOptimizer,
+    PerformanceProfiler,
+    PerformanceReport,
+)
 
 PERF_RESULT_MARKER = "__PERF_RESULT__:"
 
@@ -145,16 +140,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    if not _PERFORMANCE_AVAILABLE:
-        error_result = {
-            "status": "error",
-            "error": "Performance profiler module not yet available. This feature is under development.",
-            "report": None,
-            "summary": {},
-        }
-        print(PERF_RESULT_MARKER + json.dumps(error_result))
-        sys.exit(0)
 
     if not os.path.exists(args.project_dir):
         print(f"❌ Project directory not found: {args.project_dir}")
