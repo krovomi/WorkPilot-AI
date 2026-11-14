@@ -3,6 +3,7 @@
  */
 
 import type { BlockedKind, HumanResolution } from "../utils/subtask-unblock";
+import type { BudgetPauseDetail } from "./cost-budget";
 import type { GeneratedReviewSource } from "./generated-review";
 import type {
 	CompletablePhase,
@@ -648,9 +649,11 @@ export interface TaskMetadata {
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
 		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those.
+		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 */
 		reason?: string | null;
+		budget?: BudgetPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -782,9 +785,11 @@ export interface ImplementationPlan {
 		/**
 		 * Why the build is paused. Absent for the Pause button; "app_shutdown"
 		 * when WorkPilot was closed while it ran — the next launch resumes those
-		 * on its own, and only those.
+		 * on its own, and only those. "budget" / "budget_stall" when the
+		 * backend paused it for its cost budget (`cost_budget`), with `budget`.
 		 */
 		reason?: string | null;
+		budget?: BudgetPauseDetail;
 	};
 }
 

@@ -1,6 +1,5 @@
 import {
 	AlertTriangle,
-	Bell,
 	Coins,
 	RefreshCw,
 	TrendingDown,
@@ -9,6 +8,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { CostBudgetStatus } from "../../shared/types/cost-budget";
 import { useServerProjectId } from "../hooks/useServerProjectId";
 import { formatCurrency, getEurRate } from "../lib/currency";
 import { loadCostSummary } from "../lib/workspace-data";
@@ -28,6 +28,7 @@ import {
 	Stats,
 	type Tone,
 } from "./charter";
+import { CostBudgetSection } from "./costs/CostBudgetSection";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,15 +46,6 @@ interface CostSummary {
 	trend_pct: number;
 }
 
-interface BudgetInfo {
-	monthly_budget: number;
-	spent_this_month: number;
-	remaining: number;
-	utilization_pct: number;
-	alerts: string[];
-	forecast_end_of_month: number;
-}
-
 interface CostEstimatorProps {
 	readonly projectPath: string;
 }
@@ -62,60 +54,10 @@ type FormatAmount = (usd: number, decimals?: number) => string;
 
 const BREAKDOWN_TONES: Tone[] = ["accent", "blue", "green", "amber", "violet", "pink"];
 
-function usageTone(pct: number): Tone {
-	if (pct >= 90) return "red";
-	if (pct >= 70) return "amber";
-	return "green";
-}
-
 function trendTone(trendPct: number): Tone {
 	if (trendPct > 20) return "red";
 	if (trendPct > 0) return "amber";
 	return "green";
-}
-
-/** The month's budget: how much is spent, what is left, where it ends. */
-function BudgetPanel({
-	budget,
-	formatAmount,
-}: {
-	readonly budget: BudgetInfo;
-	readonly formatAmount: FormatAmount;
-}) {
-	const { t } = useTranslation("costEstimator");
-	const pct = Math.min(budget.utilization_pct, 100);
-	const tone = usageTone(pct);
-	const overBudget = budget.forecast_end_of_month > budget.monthly_budget;
-
-	return (
-		<Section
-			kicker={t("kickers.budget")}
-			title={t("budget.title")}
-			actions={<Chip tone={tone}>{t("budget.pctUsed", { pct: pct.toFixed(0) })}</Chip>}
-		>
-			<Panel rail tone={tone} className="space-y-3">
-				<Bar value={pct} tone={tone} />
-				<div className="wp-meta flex flex-wrap justify-between gap-2">
-					<span>{t("budget.spent", { amount: formatAmount(budget.spent_this_month, 2) })}</span>
-					<span>{t("budget.remaining", { amount: formatAmount(budget.remaining, 2) })}</span>
-					<span>{t("budget.total", { amount: formatAmount(budget.monthly_budget, 2) })}</span>
-				</div>
-				{budget.forecast_end_of_month > 0 && (
-					<div className="flex flex-wrap items-center gap-2 text-xs">
-						<TrendingUp className="h-3 w-3" aria-hidden="true" />
-						<span className="wp-muted">{t("budget.forecast")}</span>
-						<span className="font-medium">{formatAmount(budget.forecast_end_of_month, 2)}</span>
-						{overBudget && <Chip tone="red">{t("budget.overBudget")}</Chip>}
-					</div>
-				)}
-				{budget.alerts.map((alert) => (
-					<Notice key={alert} tone="amber" icon={Bell}>
-						{alert}
-					</Notice>
-				))}
-			</Panel>
-		</Section>
-	);
 }
 
 /** Cost per provider or model, largest first; unused ones as faint chips. */
@@ -173,7 +115,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 	const { t, i18n } = useTranslation(["costEstimator", "common", "navigation"]);
 	const [eurRate, setEurRate] = useState(0.92);
 	const [summary, setSummary] = useState<CostSummary | null>(null);
-	const [budget, setBudget] = useState<BudgetInfo | null>(null);
+	const [budget, setBudget] = useState<CostBudgetStatus | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const serverProjectId = useServerProjectId({ path: projectPath });
@@ -237,7 +179,7 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 				);
 				const budgetSuccess = handleApiResponse(
 					budgetRes,
-					(v) => setBudget(v as BudgetInfo | null),
+					(v) => setBudget(v as CostBudgetStatus | null),
 					silent || Boolean(serverProjectId),
 					"error",
 				);
@@ -392,7 +334,13 @@ export function CostEstimator({ projectPath }: CostEstimatorProps) {
 					</p>
 				)}
 
-				{budget && <BudgetPanel budget={budget} formatAmount={fmtCurrency} />}
+				{budget && !serverProjectId && (
+					<CostBudgetSection
+						projectPath={projectPath}
+						status={budget}
+						onSaved={() => fetchData(true)}
+					/>
+				)}
 
 				{summary && (
 					<Section kicker={t("costEstimator:kickers.breakdown")} title={t("costEstimator:breakdownTitle")}>

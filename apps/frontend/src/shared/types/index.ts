@@ -52,3 +52,5 @@ export * from "./goal";
 export * from "./best-of-n";
 // Dashboard, analytics, costs and session history (local or server project)
 export * from "./workspace";
+// Cost budgets (project, task) enforced by the backend
+export * from "./cost-budget";
