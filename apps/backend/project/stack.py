@@ -26,6 +26,10 @@ What is behind the door:
 ``detect_api_stack``
     The HTTP framework (ASP.NET Core, Spring, FastAPI…), for API test drafts
     and the verify loop's endpoints.
+``windev_project``
+    The WinDev, WebDev or WinDev Mobile project (`windev.project`): its
+    products, version, and whether its elements are saved in the text format
+    an agent can read.
 ``ui_stack`` / ``mobile_stack`` / ``test_profile``
     `project.ui_stack`, `mobile.stacks` and `project.test_stack`, imported
     lazily: they are packages of their own with readers inside them, and
@@ -56,6 +60,7 @@ __all__ = [
     "technology_stack",
     "test_profile",
     "ui_stack",
+    "windev_project",
 ]
 
 # Stack detection touches the filesystem; the answer does not change during a
@@ -126,6 +131,13 @@ def mobile_stack(project_dir: Path | str | None) -> Any:
     from mobile.stacks import detect_stack
 
     return detect_stack(project_dir)
+
+
+def windev_project(project_dir: Path | str | None) -> Any:
+    """The WinDev-family project (`windev.project.WinDevProject`), or None."""
+    from windev.project import detect_project
+
+    return detect_project(project_dir)
 
 
 def test_profile(project_dir: Path | str) -> Any:
@@ -229,6 +241,15 @@ def detect_project_stack(project_dir: Path) -> dict:
         stack["package_managers"].append("gradle")
 
     _detect_other_stacks(project_dir, stack)
+
+    # WinDev, WebDev and WinDev Mobile: a project file at the root or one or
+    # two levels down. No package manager and no test runner outside the
+    # editor, so only the language is reported.
+    from windev.project import find_project_files
+
+    if find_project_files(project_dir):
+        stack["languages"].append("wlangage")
+        stack["frameworks"].append("windev")
 
     # Docker
     if (project_dir / "Dockerfile").exists():
@@ -349,6 +370,12 @@ def detect_project_type(project_dir: Path) -> str:
         return "go"
     if (project_dir / "Gemfile").exists():
         return "ruby"
+
+    # WinDev-family: its own kind, so nothing validates it as a web page.
+    from windev.project import find_project_files
+
+    if find_project_files(project_dir):
+        return "windev"
 
     # Check for simple HTML/CSS
     html_files = list(project_dir.glob("*.html"))
