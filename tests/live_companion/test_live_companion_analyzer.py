@@ -275,3 +275,35 @@ def test_a_missing_changes_file_is_an_error_event(tmp_path, capsys):
     assert asyncio.run(runner.run_batch(args)) == 1
     [event] = _events(capsys)
     assert event["data"]["code"] == "changes_missing"
+
+
+def test_the_app_sends_the_batch_on_stdin(monkeypatch, tmp_path, capsys):
+    """No temp file: the diffs of the user's code never sit in a shared folder."""
+    import io
+
+    calls = _fake_oneshot(monkeypatch)
+    payload = json.dumps(
+        {"changes": [{"file_path": "a.ts", "change_type": "modified", "diff": "+é"}]}
+    )
+    monkeypatch.setattr(
+        "sys.stdin", io.TextIOWrapper(io.BytesIO(payload.encode("utf-8")))
+    )
+    args = runner.build_parser().parse_args(
+        ["analyze-batch", "--project-dir", str(tmp_path), "--changes-file", "-"]
+    )
+
+    assert asyncio.run(runner.run_batch(args)) == 0
+
+    assert "+é" in calls[0]["prompt"]
+    assert _events(capsys)[0]["type"] == "complete"
+
+
+def test_a_batch_that_is_not_an_object_is_refused(monkeypatch, tmp_path, capsys):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(b"[1, 2]")))
+    args = runner.build_parser().parse_args(
+        ["analyze-batch", "--project-dir", str(tmp_path), "--changes-file", "-"]
+    )
+    assert asyncio.run(runner.run_batch(args)) == 1
+    assert _events(capsys)[0]["data"]["code"] == "changes_invalid"

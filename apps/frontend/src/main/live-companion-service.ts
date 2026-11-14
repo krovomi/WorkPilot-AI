@@ -4,7 +4,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readFileSync,
-	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -450,11 +449,10 @@ export class LiveCompanionService extends EventEmitter {
 		this.pendingChanges = [];
 		const config = this.currentConfig();
 
-		const tmpFile = path.join(
-			os.tmpdir(),
-			`workpilot_companion_${process.pid}_${Date.now()}.json`,
-		);
-		writeFileSync(tmpFile, JSON.stringify({ changes }), "utf-8");
+		// The changes (diffs of the user's code) go to the runner on stdin: a
+		// file in the shared temp folder could be read or swapped by another
+		// local user before the runner opens it.
+		const payload = JSON.stringify({ changes });
 
 		const args = [
 			runnerPath,
@@ -462,7 +460,7 @@ export class LiveCompanionService extends EventEmitter {
 			"--project-dir",
 			projectDir,
 			"--changes-file",
-			tmpFile,
+			"-",
 			"--min-confidence",
 			String(config.min_suggestion_confidence),
 			"--max-per-file",
@@ -475,21 +473,23 @@ export class LiveCompanionService extends EventEmitter {
 		try {
 			processEnv = await this.buildProcessEnvironment();
 		} catch (error) {
-			this.removeTmp(tmpFile);
 			this.setError({ message: (error as Error).message, code: "env_failed" });
 			return;
 		}
 		if (!this.state.active || !samePath(this.state.watching_project, projectDir)) {
-			this.removeTmp(tmpFile);
 			return;
 		}
 
 		const proc = spawn(this.pythonPath, args, {
 			cwd: autoBuildSource,
 			env: processEnv,
-			stdio: ["ignore", "pipe", "pipe"],
+			stdio: ["pipe", "pipe", "pipe"],
 		});
 		this.activeProcess = proc;
+		proc.stdin?.on("error", () => {
+			/* the runner exited before reading: its exit code says why */
+		});
+		proc.stdin?.end(payload, "utf-8");
 		this.state = { ...this.state, analyzing: true };
 		this.emit("state-changed", this.getState());
 
@@ -505,7 +505,6 @@ export class LiveCompanionService extends EventEmitter {
 		const finish = (code: number | null, spawnError?: Error) => {
 			if (this.activeProcess !== proc) return;
 			this.activeProcess = null;
-			this.removeTmp(tmpFile);
 			this.state = { ...this.state, analyzing: false };
 			this.handleRunnerOutput(projectDir, stdout, stderr, code, spawnError);
 			if (this.state.active && this.pendingChanges.length > 0) {
@@ -579,13 +578,6 @@ export class LiveCompanionService extends EventEmitter {
 		});
 	}
 
-	private removeTmp(file: string): void {
-		try {
-			unlinkSync(file);
-		} catch {
-			/* already gone */
-		}
-	}
 
 	/**
 	 * A takeover is proposed when the whole project has been quiet for the

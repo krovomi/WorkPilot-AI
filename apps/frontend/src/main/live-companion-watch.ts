@@ -14,7 +14,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { closeSync, openSync, readSync, statSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import path from "node:path";
 
 /** Every stack the app supports: web front ends, back ends, mobile, scripts. */
@@ -288,10 +288,13 @@ function git(projectDir: string, args: string[]): string | null {
 
 function readHead(fullPath: string): string {
 	try {
-		if (statSync(fullPath).size > MAX_FILE_BYTES) return "";
-		const buffer = Buffer.alloc(MAX_CHANGE_CHARS);
+		// Size checked on the descriptor that is read, not on the path before
+		// opening it: the file may be replaced in between.
 		const fd = openSync(fullPath, "r");
 		try {
+			const stats = fstatSync(fd);
+			if (!stats.isFile() || stats.size > MAX_FILE_BYTES) return "";
+			const buffer = Buffer.alloc(MAX_CHANGE_CHARS);
 			const read = readSync(fd, buffer, 0, buffer.length, 0);
 			const head = buffer.subarray(0, read);
 			// A NUL byte means binary content: nothing to review.

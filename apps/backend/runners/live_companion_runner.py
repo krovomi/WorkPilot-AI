@@ -100,24 +100,42 @@ async def run_change(args: argparse.Namespace) -> int:
     return _finish(result, 1)
 
 
+def _read_changes(source: str) -> str:
+    """The JSON batch: from stdin when `source` is ``-`` (what the app sends,
+    so no diff of the user's code sits in a shared temp folder), else a file."""
+    if source == "-":
+        return sys.stdin.buffer.read().decode("utf-8")
+    path = Path(source)
+    if not path.is_file():
+        raise FileNotFoundError(source)
+    return path.read_text(encoding="utf-8")
+
+
 async def run_batch(args: argparse.Namespace) -> int:
     from live_companion.types import FileChangeEvent
 
-    changes_path = Path(args.changes_file)
-    if not changes_path.is_file():
+    try:
+        raw = json.loads(_read_changes(args.changes_file))
+    except FileNotFoundError:
         emit_event(
             "error",
             data={"message": "Changes file not found.", "code": "changes_missing"},
         )
         return 1
-
-    try:
-        raw = json.loads(changes_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         emit_event(
             "error",
             data={
-                "message": f"Unreadable changes file: {exc}",
+                "message": f"Unreadable changes: {exc}",
+                "code": "changes_invalid",
+            },
+        )
+        return 1
+    if not isinstance(raw, dict):
+        emit_event(
+            "error",
+            data={
+                "message": "Changes must be a JSON object.",
                 "code": "changes_invalid",
             },
         )
@@ -177,7 +195,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_common(batch_parser)
     batch_parser.add_argument(
-        "--changes-file", required=True, help="JSON file with changes"
+        "--changes-file",
+        required=True,
+        help="JSON file with changes, or - to read them from stdin",
     )
     return parser
 

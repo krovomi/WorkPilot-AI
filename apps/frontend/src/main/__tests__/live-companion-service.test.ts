@@ -31,6 +31,28 @@ vi.mock("../utils/python-runner-env", () => ({
 }));
 vi.mock("../app-language", () => ({ getAppLanguage: () => "fr" }));
 
+const spawned = vi.hoisted(
+	() => [] as { command: string; args: string[]; stdin: string[] }[],
+);
+vi.mock("node:child_process", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:child_process")>();
+	const { EventEmitter } = await import("node:events");
+	const spawn = (command: string, args: string[]) => {
+		const record = { command, args, stdin: [] as string[] };
+		spawned.push(record);
+		const proc = Object.assign(new EventEmitter(), {
+			stdout: new EventEmitter(),
+			stderr: new EventEmitter(),
+			stdin: Object.assign(new EventEmitter(), {
+				end: (chunk: string) => record.stdin.push(chunk),
+			}),
+			kill: () => true,
+		});
+		return proc;
+	};
+	return { ...actual, spawn, default: { ...actual, spawn } };
+});
+
 import type {
 	CompanionState,
 	FileChangeEvent,
@@ -182,6 +204,41 @@ describe("runner output", () => {
 		expect(() =>
 			(service as unknown as Internals).handleRunnerOutput(project, "", "", 1),
 		).not.toThrow();
+	});
+});
+
+describe("analysis", () => {
+	it("hands the changes to the runner on stdin, not in a temp file", async () => {
+		spawned.length = 0;
+		const backend = mkdtempSync(path.join(os.tmpdir(), "wp-companion-backend-"));
+		mkdirSync(path.join(backend, "runners"));
+		writeFileSync(path.join(backend, "runners", "live_companion_runner.py"), "");
+		service.configure("python3", backend);
+		const internals = service as unknown as Internals & {
+			pendingChanges: FileChangeEvent[];
+			analyzePendingChanges(projectDir: string): Promise<void>;
+		};
+		internals.state = { ...internals.state, active: true, watching_project: project };
+		internals.pendingChanges = [
+			{
+				file_path: "src/a.ts",
+				change_type: "modified",
+				diff: "+const secretish = 1;",
+				content_kind: "diff",
+				language: "TypeScript",
+				timestamp: "2026-11-14T10:00:00Z",
+			},
+		];
+
+		await internals.analyzePendingChanges(project);
+
+		expect(spawned).toHaveLength(1);
+		const { args, stdin } = spawned[0];
+		expect(args[args.indexOf("--changes-file") + 1]).toBe("-");
+		expect(args).toContain("--language");
+		expect(JSON.parse(stdin.join("")).changes[0].diff).toBe("+const secretish = 1;");
+		expect(service.getState().analyzing).toBe(true);
+		rmSync(backend, { recursive: true, force: true });
 	});
 });
 
