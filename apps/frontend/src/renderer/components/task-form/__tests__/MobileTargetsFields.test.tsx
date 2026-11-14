@@ -127,4 +127,46 @@ describe("MobileTargetsFields", () => {
 		expect(screen.getByText("mobile:targets.description")).toBeInTheDocument();
 		expect(document.getElementById("mobile-ios")).not.toBeDisabled();
 	});
+	it("says a WinDev Mobile app is generated in the editor, with no setup task", () => {
+		render(
+			<MobileTargetsFields
+				targets={[]}
+				onTargetsChange={vi.fn()}
+				setup={state({
+					success: true,
+					isMobile: true,
+					windev: true,
+					stack: { framework: "windev-mobile", platforms: ["android"] },
+				})}
+				idPrefix="t-"
+			/>,
+		);
+		expect(screen.getByTestId("mobile-windev-note")).toHaveTextContent(
+			"mobile:targets.windevMobile",
+		);
+		expect(screen.queryByTestId("mobile-setup-preamble")).toBeNull();
+		expect(document.getElementById("t-mobile-ios")).toBeDisabled();
+	});
+
+	it("offers nothing to install on a WinDev project without a mobile configuration", () => {
+		render(
+			<MobileTargetsFields
+				targets={[]}
+				onTargetsChange={vi.fn()}
+				setup={state({
+					success: true,
+					isMobile: false,
+					windev: true,
+					hostStacks: ["windev"],
+					frameworks: [],
+				})}
+				idPrefix="t-"
+			/>,
+		);
+		expect(screen.getByTestId("mobile-windev-note")).toHaveTextContent(
+			"mobile:targets.windevNoMobile",
+		);
+		expect(screen.queryByTestId("mobile-setup-preamble")).toBeNull();
+		expect(screen.queryByTestId("mobile-setup-plan")).toBeNull();
+	});
 });
