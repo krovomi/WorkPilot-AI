@@ -98,6 +98,32 @@ def test_a_migration_is_planned_and_handed_to_a_task(
     assert ("Dry run mode" in done.stdout) is dry_run
 
 
+def test_a_pair_the_planner_knows_gets_a_real_plan(tmp_path: Path) -> None:
+    root = tmp_path / "api"
+    root.mkdir()
+    (root / "requirements.txt").write_text("flask==3.0\n", encoding="utf-8")
+    (root / "app.py").write_text(
+        "from flask import Flask\n\napp = Flask(__name__)\n", encoding="utf-8"
+    )
+
+    done = _process(
+        "--project-dir",
+        str(root),
+        "--migration-description",
+        "Move from Flask to FastAPI",
+        "--dry-run",
+    )
+
+    assert done.returncode == 0, done.stdout + done.stderr
+    result = _result(done.stdout)
+    assert result["plan"]["migration_id"] != "fallback"
+    assert "note" not in result["plan"]
+    assert result["plan"]["target"] == "fastapi / auto"
+    assert "python" in result["plan"]["source"].lower()
+    assert result["summary"]["plan_status"] == "ready"
+    assert "Migration start warning" not in done.stdout
+
+
 @pytest.fixture
 def runner(monkeypatch):
     monkeypatch.syspath_prepend(str(BACKEND))
