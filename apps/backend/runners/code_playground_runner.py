@@ -21,14 +21,6 @@ from cli.utils import import_dotenv
 from core.dependency_validator import validate_platform_dependencies
 from phase_config import get_thinking_budget, resolve_model_id
 
-try:
-    # Availability only: the client comes from `create_simple_client`.
-    import claude_agent_sdk  # noqa: F401
-
-    SDK_AVAILABLE = True
-except ImportError:
-    SDK_AVAILABLE = False
-
 validate_platform_dependencies()
 
 # Load .env file with centralized error handling
@@ -100,15 +92,9 @@ For Node.js playgrounds:
         self.idea = idea
         self.playground_type = playground_type
         self.sandbox_type = sandbox_type
-        self.model = resolve_model_id(model) if model else "claude-3-5-sonnet-20241022"
+        # No model chosen: the user's Sonnet, not a retired id written here.
+        self.model = resolve_model_id(model or "sonnet")
         self.thinking_level = thinking_level or "medium"
-
-        if not SDK_AVAILABLE:
-            print(
-                "❌ Claude SDK not available. Please install the claude-agent-sdk package.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
 
     async def generate_playground(self) -> dict:
         """Generate a code playground based on the idea and configuration"""
@@ -224,10 +210,7 @@ Respond with a structured JSON object containing:
 
     def _handle_tool_use_block(self, block):
         """Handle tool use block by printing tool start marker"""
-        try:
-            print(f"__TOOL_START__:{json.dumps({'tool': block.name})}", flush=True)
-        except Exception:
-            pass
+        print(f"__TOOL_START__:{json.dumps({'tool': str(block.name)})}", flush=True)
 
     def _get_base_prompt(self) -> str:
         """Get the base system prompt"""
@@ -283,6 +266,8 @@ Guidelines:
     def _extract_json_from_text(self, response: str) -> str:
         """Extract JSON object from plain text"""
         start = response.find("{")
+        # An object that never closes is passed whole, and fails as bad JSON.
+        end = len(response)
         brace_count = 0
 
         for i, char in enumerate(response[start:]):

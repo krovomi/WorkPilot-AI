@@ -250,8 +250,8 @@ class ContextMeshService:
     ) -> str:
         """Run AI analysis using the Claude Agent SDK (works with any configured provider)."""
         try:
+            from agents.session import run_agent_session
             from core.client import create_client
-            from core.session import run_agent_session
             from phase_config import get_thinking_budget, resolve_model_id
 
             model_id = resolve_model_id(self.model)
@@ -268,7 +268,9 @@ class ContextMeshService:
             )
 
             async with client:
-                status, response = await run_agent_session(client, prompt)
+                _status, response, _error = await run_agent_session(
+                    client, prompt, None
+                )
 
             return response or ""
 
