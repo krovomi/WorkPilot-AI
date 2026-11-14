@@ -72,9 +72,16 @@ def write_pause_state(
     subtask_id: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    reason: str | None = None,
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Mark the build paused, recording where it stopped."""
-    state = {
+    """Mark the build paused, recording where it stopped.
+
+    ``reason`` says why when the backend paused the build itself (``budget``
+    when a cost limit was reached); the UI reads it, with ``detail``, to say
+    what a resume needs. A pause from the Pause button has none.
+    """
+    state: dict[str, Any] = {
         "enabled": True,
         "paused_at": datetime.now(UTC).isoformat(),
         "paused_phase": phase if phase in PAUSE_PHASES else "coding",
@@ -82,6 +89,10 @@ def write_pause_state(
         "provider": provider,
         "model": model,
     }
+    if reason:
+        state["reason"] = reason
+    if detail:
+        state.update(detail)
     _write(spec_dir, state)
     return state
 
