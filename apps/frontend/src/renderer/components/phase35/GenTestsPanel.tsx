@@ -250,7 +250,7 @@ export function GenTestsPanel({ projectPath }: GenTestsPanelProps) {
 								>
 									<span className="truncate">{it.test_id}</span>
 									<span className="text-muted-foreground whitespace-nowrap">
-										{it.kind}
+										{t(`genTests.kinds.${it.kind}` as never, { defaultValue: it.kind })}
 									</span>
 								</li>
 							))}

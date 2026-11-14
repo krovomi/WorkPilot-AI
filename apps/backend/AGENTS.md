@@ -26,7 +26,7 @@ Toute interaction LLM passe par ces fichiers ; les modifier touche tout le produ
 
 `foundation/` est la couche la plus basse et n'importe rien du backend : `platform/`,
 `api_safety.py`, `file_utils.py`, `git_executable.py`, `phase_event.py`, `dotnet_tools.py`,
-`codex_catalog_rpc.py`, `vendor_manifest.py`, `workpilot_layout.py`, `ci_logs.py` (parseurs de
+`codex_catalog_rpc.py`, `vendor_manifest.py`, `json_ledger.py` (relevé JSON partagé entre processus, verrou par fichier), `workpilot_layout.py`, `ci_logs.py` (parseurs de
 journaux de CI, partagés par `self_healing`, `docintel` et `verify`), `traceability.py`
 (identifiants `FR-###` et couverture du plan), `paging.py`. `core/` est la racine de
 composition, qui importe les agents. Les autres modules sortis de `core` par le lot M10 :

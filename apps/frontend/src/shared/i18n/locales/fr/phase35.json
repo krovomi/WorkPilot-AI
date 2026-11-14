@@ -18,7 +18,7 @@
 		"selected": "{{count}} sélectionné(s)",
 		"none": "Aucun",
 		"status": "Statut",
-		"violations": "violations",
+		"violations": "violation(s)",
 		"warnings": "avertissements",
 		"backendErrors": {
 			"projectPathInvalid": "Chemin de projet invalide : {{path}}",
@@ -29,6 +29,13 @@
 			"backendUnreachable": "Backend inaccessible. Le backend tourne-t-il sur le port 9000 ?",
 			"timeout": "Délai dépassé — le backend n'a pas répondu à temps.",
 			"unknown": "Erreur backend : {{message}}"
+		},
+		"severity": {
+			"critical": "critique",
+			"high": "élevée",
+			"medium": "moyenne",
+			"low": "faible",
+			"none": "aucune"
 		}
 	},
 	"longevity": {
@@ -47,7 +54,18 @@
 		"directionDegrading": "dégradation",
 		"riskiest": "Fichiers les plus à risque",
 		"items": "éléments",
-		"cost": "coût"
+		"cost": "coût",
+		"signals": {
+			"todo_fixme": "TODO / FIXME",
+			"long_function": "Fonctions longues",
+			"deep_complexity": "Imbrication profonde",
+			"duplication": "Duplication",
+			"stale_deps": "Dépendances obsolètes",
+			"low_coverage": "Couverture de tests faible",
+			"vulnerabilities": "Vulnérabilités connues",
+			"trend": "Tendance de la dette"
+		},
+		"gradeValue": "Note {{grade}}"
 	},
 	"agentHealth": {
 		"title": "Santé des Agents",
@@ -57,7 +75,7 @@
 		"noAgents": "Aucune exécution d'agent enregistrée pour l'instant.",
 		"successRate": "Taux de succès",
 		"errorRate": "Taux d'erreur",
-		"retryRate": "Taux de retry",
+		"retryRate": "Taux de relance",
 		"slowness": "Ratio de lenteur",
 		"runs": "exécutions",
 		"actions": "Actions recommandées",
@@ -67,7 +85,15 @@
 		"statusHealthy": "sain",
 		"statusDegraded": "dégradé",
 		"statusFailing": "défaillant",
-		"statusBurnedOut": "épuisé"
+		"statusBurnedOut": "épuisé",
+		"actionLabels": {
+			"none": "aucune",
+			"throttle": "Ralentir les lancements",
+			"reduce_parallelism": "Réduire le parallélisme",
+			"retrain_prompt": "Revoir les exemples du prompt",
+			"rotate_model": "Essayer un autre modèle",
+			"alert_operator": "Demande votre attention"
+		}
 	},
 	"modelRouter": {
 		"title": "Routage Adaptatif de Modèles",
@@ -83,7 +109,7 @@
 		"providerGoogle": "Google",
 		"providerMistral": "Mistral",
 		"providerOllama": "Ollama (local)",
-		"compare": "Comparer entre tiers",
+		"compare": "Comparer les niveaux",
 		"chosen": "Modèle choisi",
 		"estimatedCost": "Coût estimé (USD)",
 		"reason": "Raison",
@@ -93,7 +119,23 @@
 		"validation": {
 			"promptRequired": "Saisissez un prompt à router",
 			"providersRequired": "Choisissez au moins un provider"
-		}
+		},
+		"tiers": {
+			"budget": "Économique",
+			"balanced": "Équilibré",
+			"premium": "Premium"
+		},
+		"taskClasses": {
+			"trivial": "modification triviale",
+			"simple_edit": "modification simple",
+			"multi_file": "modification multi-fichiers",
+			"architecture": "architecture",
+			"review": "relecture",
+			"planning": "planification",
+			"ideation": "idéation",
+			"documentation": "documentation"
+		},
+		"tierFor": "Niveau {{tier}} pour une {{task}}"
 	},
 	"domainAgents": {
 		"title": "Agents Spécialisés par Domaine",
@@ -104,7 +146,7 @@
 		"rolePlanner": "Planificateur",
 		"roleReviewer": "Relecteur",
 		"roleDocumenter": "Documenteur",
-		"build": "Construire le bundle",
+		"build": "Générer les consignes",
 		"guardrails": "Garde-fous",
 		"requiredSkills": "Compétences requises",
 		"forbidden": "Patterns interdits",
@@ -113,7 +155,50 @@
 		"validation": {
 			"domainRequired": "Sélectionnez un domaine",
 			"noDomainsLoaded": "Aucun domaine disponible — vérifiez la connexion au backend."
-		}
+		},
+		"domains": {
+			"generic": {
+				"label": "Générique",
+				"description": "Aucune hypothèse de domaine : réglages neutres."
+			},
+			"ecommerce": {
+				"label": "E-commerce",
+				"description": "Boutique, panier, paiement, stock, encaissement."
+			},
+			"fintech": {
+				"label": "Fintech",
+				"description": "Paiements, grands livres, virements, processus réglementés."
+			},
+			"healthcare": {
+				"label": "Santé",
+				"description": "Dossiers patients, données de santé, flux conformes HIPAA / RGPD santé."
+			},
+			"gaming": {
+				"label": "Jeu vidéo",
+				"description": "Multijoueur temps réel, anti-triche, télémétrie."
+			},
+			"iot": {
+				"label": "IoT",
+				"description": "Objets embarqués, connexion intermittente, mises à jour à distance (OTA)."
+			},
+			"govtech": {
+				"label": "Secteur public",
+				"description": "Démarches publiques : accessibilité, audit, transparence administrative."
+			},
+			"education": {
+				"label": "Éducation",
+				"description": "Edtech : utilisateurs mineurs, données scolaires protégées, usages en classe."
+			},
+			"saas": {
+				"label": "SaaS / B2B",
+				"description": "SaaS multi-locataire avec facturation, rôles et audit."
+			},
+			"data_pipeline": {
+				"label": "Pipeline de données",
+				"description": "ETL, traitements par lots, qualité des données."
+			}
+		},
+		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent."
 	},
 	"cicdAnomaly": {
 		"title": "Détecteur d'Anomalies CI/CD",
@@ -129,6 +214,17 @@
 		"validation": {
 			"logRequired": "Collez un log non vide",
 			"logTooLarge": "Log trop volumineux (limite : {{max}} caractères)"
+		},
+		"kinds": {
+			"timeout": "Délai dépassé",
+			"oom": "Mémoire saturée",
+			"dependency_conflict": "Conflit de dépendances",
+			"network_failure": "Panne réseau",
+			"disk_full": "Disque plein",
+			"rate_limited": "Limite de requêtes atteinte",
+			"auth_failure": "Échec d'authentification",
+			"infrastructure_flake": "Instabilité de l'infrastructure",
+			"slow_build": "Build lent"
 		}
 	},
 	"license": {
@@ -145,26 +241,64 @@
 		"dependencies": "Dépendances",
 		"colPackage": "Paquet",
 		"colCategory": "Catégorie",
-		"colRemediation": "Remédiation"
+		"colRemediation": "Remédiation",
+		"categories": {
+			"permissive": "Permissive",
+			"weak_copyleft": "Copyleft faible",
+			"strong_copyleft": "Copyleft fort",
+			"network_copyleft": "Copyleft réseau (AGPL)",
+			"public_domain": "Domaine public",
+			"commercial": "Commerciale",
+			"unknown": "Inconnue"
+		},
+		"remediations": {
+			"permissive": "—",
+			"weak_copyleft": "Acceptable en liaison dynamique ; faire vérifier le risque juridique.",
+			"strong_copyleft": "Remplacer par une alternative permissive ou l’isoler derrière une frontière de processus.",
+			"network_copyleft": "L’AGPL contamine un déploiement SaaS : trouver un remplaçant MIT ou Apache.",
+			"public_domain": "—",
+			"commercial": "Vérifier qu’une licence payante couvre votre usage et suivre les renouvellements.",
+			"unknown": "Chercher la licence en amont et l’ajouter à la politique."
+		}
 	},
 	"archDrift": {
 		"title": "Détection de Dérive Architecturale",
-		"subtitle": "Suivre la dérive architecturale depuis une baseline",
+		"subtitle": "Suivre la dérive de l'architecture par rapport à une référence",
 		"scan": "Scanner",
-		"saveBaseline": "Sauver la baseline",
+		"saveBaseline": "Enregistrer la référence",
 		"compare": "Comparer la dérive",
 		"severity": "Sévérité",
 		"newViolations": "Nouvelles violations",
 		"resolvedViolations": "Résolues",
-		"persistentViolations": "Persistantes"
+		"persistentViolations": "Persistantes",
+		"statusApproved": "Conforme",
+		"statusRejected": "Violations trouvées",
+		"configSource": {
+			"explicit": "Règles lues dans la configuration d’architecture du projet.",
+			"inferred": "Règles déduites de la stack détectée (aucune configuration d’architecture dans le projet).",
+			"none": "Aucune règle n’a pu être déduite pour ce projet : rien n’a été vérifié."
+		},
+		"violationTypes": {
+			"layer_violation": "Violation de couche",
+			"circular_dependency": "Dépendance circulaire",
+			"forbidden_import": "Import interdit",
+			"bounded_context": "Contexte borné franchi",
+			"architecture_reviewer": "Remarque de la revue IA",
+			"ai_review_error": "Échec de la revue IA"
+		},
+		"violationsTitle": "Violations",
+		"warningsTitle": "Avertissements",
+		"noBaseline": "Aucune référence enregistrée : enregistrez-en une, puis comparez.",
+		"baselineSaved": "Référence enregistrée ({{count}} constats).",
+		"filesAnalyzed": "{{count}} fichiers analysés"
 	},
 	"genTests": {
 		"title": "Tests Générationnels",
 		"subtitle": "Snapshot des résultats de tests + comparaison entre générations",
-		"label": "Label de la génération",
+		"label": "Nom de la génération",
 		"junitXml": "JUnit XML",
 		"capture": "Capturer la génération",
-		"baseline": "Label de la baseline",
+		"baseline": "Nom de la génération de référence",
 		"current": "JUnit XML du run courant",
 		"compare": "Comparer",
 		"generations": "Générations stockées",
@@ -174,10 +308,17 @@
 		"vanished": "Tests disparus",
 		"added": "Nouveaux tests",
 		"validation": {
-			"labelRequired": "Saisissez un label de génération",
+			"labelRequired": "Saisissez un nom de génération",
 			"junitRequired": "Collez un contenu JUnit XML",
 			"junitInvalid": "Le contenu ne ressemble pas à du XML JUnit valide",
-			"baselineRequired": "Saisissez un label de baseline existant"
+			"baselineRequired": "Saisissez le nom d’une génération existante"
+		},
+		"kinds": {
+			"vanished": "disparu",
+			"regressed": "régressé",
+			"slowed_down": "ralenti",
+			"new_failure": "nouvel échec",
+			"added": "ajouté"
 		}
 	},
 	"i18nScaler": {
@@ -325,31 +466,46 @@
 	},
 	"audit": {
 		"title": "Piste d'Audit",
-		"subtitle": "Replay infalsifiable de chaque décision d'agent",
+		"subtitle": "Rejeu infalsifiable de chaque décision d'agent",
 		"storageDir": "Répertoire de stockage",
-		"storageDirPlaceholder": ".workpilot/audit",
-		"trailName": "Nom du trail",
+		"storageDirPlaceholder": ".workpilot/audit-trail",
+		"trailName": "Nom de la piste",
 		"correlationId": "ID de corrélation",
 		"correlationIdPlaceholder": "spec-001",
-		"replay": "Replay",
+		"replay": "Rejouer",
 		"verify": "Vérifier l'intégrité",
 		"events": "Événements",
 		"intact": "Chaîne intacte",
 		"tampered": "Chaîne falsifiée",
 		"eventsChecked": "événements vérifiés",
-		"replayLabel": "Replay",
+		"replayLabel": "Rejeu",
 		"validation": {
 			"storageDirRequired": "Renseignez un répertoire de stockage",
-			"trailNameRequired": "Renseignez un nom de trail",
+			"trailNameRequired": "Renseignez un nom de piste",
 			"correlationIdRequired": "Renseignez un ID de corrélation"
-		}
+		},
+		"kinds": {
+			"agent_invoked": "Agent lancé",
+			"agent_completed": "Agent terminé",
+			"agent_failed": "Agent en échec",
+			"agent_paused": "Agent en pause",
+			"decision_made": "Décision",
+			"approval_given": "Approbation donnée",
+			"approval_revoked": "Approbation retirée",
+			"file_changed": "Fichier modifié",
+			"policy_violated": "Politique enfreinte",
+			"user_action": "Action utilisateur",
+			"system_event": "Événement système"
+		},
+		"actor": "Acteur",
+		"correlation": "Corrélation"
 	},
 	"pair": {
 		"title": "Pair Programming Temps Réel",
-		"subtitle": "Sessions collaboratives multi-utilisateurs avec opérations live",
-		"roomId": "ID de la room",
-		"createRoom": "Créer la room",
-		"joinRoom": "Rejoindre la room",
+		"subtitle": "Sessions collaboratives multi-utilisateurs, opérations en direct",
+		"roomId": "ID de la salle",
+		"createRoom": "Créer la salle",
+		"joinRoom": "Rejoindre la salle",
 		"leave": "Quitter",
 		"yourName": "Votre nom",
 		"role": "Rôle",
@@ -360,14 +516,23 @@
 		"send": "Envoyer",
 		"participants": "Participants",
 		"recentOps": "Opérations récentes",
-		"streaming": "Live",
-		"roomLabel": "room",
+		"streaming": "En direct",
+		"roomLabel": "salle",
 		"validation": {
-			"roomIdRequired": "Saisissez un ID de room",
-			"roomIdInvalid": "ID de room invalide (lettres, chiffres, _ et -, 1–64 caractères)",
+			"roomIdRequired": "Saisissez un ID de salle",
+			"roomIdInvalid": "ID de salle invalide (lettres, chiffres, _ et -, 1–64 caractères)",
 			"nameRequired": "Saisissez votre nom",
 			"messageEmpty": "Le message est vide",
 			"messageTooLong": "Message trop long (limite : {{max}} caractères)"
+		},
+		"opKinds": {
+			"edit": "modification",
+			"cursor": "curseur",
+			"chat": "message",
+			"suggestion": "suggestion",
+			"join": "arrivée",
+			"leave": "départ",
+			"role_change": "changement de rôle"
 		}
 	},
 	"hubDescription": "Douze outils avancés au même endroit : longévité du code, santé des agents, routage des modèles, agents de domaine, anomalies CI/CD, licences, dérive d’architecture, tests générés, i18n à grande échelle, contexte cognitif, piste d’audit et pair programming."

@@ -274,6 +274,8 @@ interface ArchDriftState extends BaseSlice {
 	scanReport: ArchitectureScanReport | null;
 	driftReport: DriftReport | null;
 	configSource: string | null;
+	/** Findings recorded by the last "save baseline", or null when none was saved this session. */
+	baselineCount: number | null;
 	scan: (projectPath: string) => Promise<void>;
 	saveBaseline: (projectPath: string) => Promise<void>;
 	compare: (projectPath: string) => Promise<void>;
@@ -285,6 +287,7 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 	scanReport: null,
 	driftReport: null,
 	configSource: null,
+	baselineCount: null,
 	scan: async (projectPath) => {
 		set({ phase: "running", error: null });
 		try {
@@ -300,7 +303,7 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.saveArchBaseline(projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok" });
+			set({ phase: "ok", baselineCount: res.violation_count, configSource: res.config_source });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}
@@ -310,7 +313,7 @@ export const useArchDriftStore = create<ArchDriftState>((set) => ({
 		try {
 			const res = await globalThis.electronAPI.compareArchDrift(projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
-			set({ phase: "ok", driftReport: res.drift });
+			set({ phase: "ok", driftReport: res.drift, configSource: res.config_source });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}

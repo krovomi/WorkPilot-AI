@@ -122,10 +122,21 @@ export interface LicenseScanReport {
 }
 
 // #3.9 Architecture Drift
+export interface ArchViolation {
+	type: string;
+	severity: string;
+	file: string;
+	line?: number | null;
+	import_target?: string;
+	rule?: string;
+	description?: string;
+	fingerprint?: string;
+}
 export interface ArchitectureScanReport {
 	status: string;
-	violations: unknown[];
-	warnings: unknown[];
+	violations: ArchViolation[];
+	warnings: ArchViolation[];
+	files_analyzed?: number;
 	violation_count: number;
 	warning_count: number;
 	summary: string;
@@ -134,9 +145,9 @@ export interface ArchitectureScanReport {
 export interface DriftReport {
 	has_baseline: boolean;
 	severity: "none" | "low" | "medium" | "high" | "critical";
-	new_violations: unknown[];
-	resolved_violations: unknown[];
-	persistent_violations: unknown[];
+	new_violations: ArchViolation[];
+	resolved_violations: ArchViolation[];
+	persistent_violations: ArchViolation[];
 	summary: Record<string, number | string>;
 }
 
@@ -379,10 +390,12 @@ export interface Phase35FeaturesAPI {
 	) => Promise<Phase35Result<{ config_source: string; report: ArchitectureScanReport }>>;
 	saveArchBaseline: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ baseline_path: string; violation_count: number }>>;
+	) => Promise<
+		Phase35Result<{ baseline_path: string; violation_count: number; config_source: string }>
+	>;
 	compareArchDrift: (
 		projectPath: string,
-	) => Promise<Phase35Result<{ drift: DriftReport }>>;
+	) => Promise<Phase35Result<{ drift: DriftReport; config_source: string }>>;
 
 	// #3.10 Generational Tests
 	listGenerations: (

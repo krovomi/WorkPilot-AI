@@ -29,6 +29,13 @@
 			"backendUnreachable": "Backend unreachable. Is the backend running on port 9000?",
 			"timeout": "Timed out — the backend did not respond in time.",
 			"unknown": "Backend error: {{message}}"
+		},
+		"severity": {
+			"critical": "critical",
+			"high": "high",
+			"medium": "medium",
+			"low": "low",
+			"none": "none"
 		}
 	},
 	"longevity": {
@@ -47,7 +54,18 @@
 		"directionDegrading": "degrading",
 		"riskiest": "Riskiest files",
 		"items": "items",
-		"cost": "cost"
+		"cost": "cost",
+		"signals": {
+			"todo_fixme": "TODO / FIXME",
+			"long_function": "Long functions",
+			"deep_complexity": "Deep nesting",
+			"duplication": "Duplication",
+			"stale_deps": "Outdated dependencies",
+			"low_coverage": "Low test coverage",
+			"vulnerabilities": "Known vulnerabilities",
+			"trend": "Debt trend"
+		},
+		"gradeValue": "Grade {{grade}}"
 	},
 	"agentHealth": {
 		"title": "Agent Health",
@@ -67,7 +85,15 @@
 		"statusHealthy": "healthy",
 		"statusDegraded": "degraded",
 		"statusFailing": "failing",
-		"statusBurnedOut": "burned out"
+		"statusBurnedOut": "burned out",
+		"actionLabels": {
+			"none": "none",
+			"throttle": "Slow down dispatch",
+			"reduce_parallelism": "Reduce parallelism",
+			"retrain_prompt": "Refresh the prompt examples",
+			"rotate_model": "Try another model",
+			"alert_operator": "Needs your attention"
+		}
 	},
 	"modelRouter": {
 		"title": "Adaptive Model Routing",
@@ -93,7 +119,23 @@
 		"validation": {
 			"promptRequired": "Enter a prompt to route",
 			"providersRequired": "Pick at least one provider"
-		}
+		},
+		"tiers": {
+			"budget": "Budget",
+			"balanced": "Balanced",
+			"premium": "Premium"
+		},
+		"taskClasses": {
+			"trivial": "trivial change",
+			"simple_edit": "simple edit",
+			"multi_file": "multi-file change",
+			"architecture": "architecture",
+			"review": "review",
+			"planning": "planning",
+			"ideation": "ideation",
+			"documentation": "documentation"
+		},
+		"tierFor": "{{tier}} tier for a {{task}}"
 	},
 	"domainAgents": {
 		"title": "Domain-Specific Agents",
@@ -113,7 +155,50 @@
 		"validation": {
 			"domainRequired": "Select a domain",
 			"noDomainsLoaded": "No domains available — check the backend connection."
-		}
+		},
+		"domains": {
+			"generic": {
+				"label": "Generic",
+				"description": "No domain assumptions: neutral defaults."
+			},
+			"ecommerce": {
+				"label": "E-commerce",
+				"description": "Storefront, cart, checkout, inventory, payment."
+			},
+			"fintech": {
+				"label": "Fintech",
+				"description": "Payments, ledgers, transfers, regulated workflows."
+			},
+			"healthcare": {
+				"label": "Healthcare",
+				"description": "EHR, PHI, HIPAA-aware data flows."
+			},
+			"gaming": {
+				"label": "Gaming",
+				"description": "Realtime multiplayer, anti-cheat, telemetry."
+			},
+			"iot": {
+				"label": "IoT",
+				"description": "Embedded devices, intermittent connectivity, OTA updates."
+			},
+			"govtech": {
+				"label": "GovTech",
+				"description": "Public-sector workflows: accessibility, audit, FOIA-readiness."
+			},
+			"education": {
+				"label": "Education",
+				"description": "Edtech: minor users, FERPA-aware, classroom workflows."
+			},
+			"saas": {
+				"label": "SaaS / B2B",
+				"description": "Multi-tenant SaaS with billing, RBAC, audit."
+			},
+			"data_pipeline": {
+				"label": "Data Pipeline",
+				"description": "ETL, batch jobs, data quality."
+			}
+		},
+		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt."
 	},
 	"cicdAnomaly": {
 		"title": "CI/CD Anomaly Detective",
@@ -129,6 +214,17 @@
 		"validation": {
 			"logRequired": "Paste a non-empty log",
 			"logTooLarge": "Log too large (limit: {{max}} characters)"
+		},
+		"kinds": {
+			"timeout": "Timeout",
+			"oom": "Out of memory",
+			"dependency_conflict": "Dependency conflict",
+			"network_failure": "Network failure",
+			"disk_full": "Disk full",
+			"rate_limited": "Rate limited",
+			"auth_failure": "Authentication failure",
+			"infrastructure_flake": "Infrastructure flake",
+			"slow_build": "Slow build"
 		}
 	},
 	"license": {
@@ -145,7 +241,25 @@
 		"dependencies": "Dependencies",
 		"colPackage": "Package",
 		"colCategory": "Category",
-		"colRemediation": "Remediation"
+		"colRemediation": "Remediation",
+		"categories": {
+			"permissive": "Permissive",
+			"weak_copyleft": "Weak copyleft",
+			"strong_copyleft": "Strong copyleft",
+			"network_copyleft": "Network copyleft (AGPL)",
+			"public_domain": "Public domain",
+			"commercial": "Commercial",
+			"unknown": "Unknown"
+		},
+		"remediations": {
+			"permissive": "—",
+			"weak_copyleft": "Acceptable if linked dynamically; review legal exposure.",
+			"strong_copyleft": "Replace with a permissive alternative or wall it off behind an IPC boundary.",
+			"network_copyleft": "AGPL contaminates SaaS deployments: find an MIT/Apache replacement.",
+			"public_domain": "—",
+			"commercial": "Confirm a paid licence covers your usage; track renewals.",
+			"unknown": "Look up the upstream licence and add it to the policy."
+		}
 	},
 	"archDrift": {
 		"title": "Architecture Drift Detection",
@@ -156,7 +270,27 @@
 		"severity": "Severity",
 		"newViolations": "New violations",
 		"resolvedViolations": "Resolved",
-		"persistentViolations": "Persistent"
+		"persistentViolations": "Persistent",
+		"statusApproved": "Compliant",
+		"statusRejected": "Violations found",
+		"configSource": {
+			"explicit": "Rules read from the project architecture config.",
+			"inferred": "Rules inferred from the detected stack (no architecture config in the project).",
+			"none": "No rule could be inferred for this project: nothing was checked."
+		},
+		"violationTypes": {
+			"layer_violation": "Layer violation",
+			"circular_dependency": "Circular dependency",
+			"forbidden_import": "Forbidden import",
+			"bounded_context": "Bounded context crossed",
+			"architecture_reviewer": "AI review finding",
+			"ai_review_error": "AI review failed"
+		},
+		"violationsTitle": "Violations",
+		"warningsTitle": "Warnings",
+		"noBaseline": "No baseline saved yet: save one first, then compare.",
+		"baselineSaved": "Baseline saved ({{count}} findings).",
+		"filesAnalyzed": "{{count}} files analysed"
 	},
 	"genTests": {
 		"title": "Generational Testing",
@@ -178,6 +312,13 @@
 			"junitRequired": "Paste JUnit XML content",
 			"junitInvalid": "Content does not look like valid JUnit XML",
 			"baselineRequired": "Enter an existing baseline label"
+		},
+		"kinds": {
+			"vanished": "vanished",
+			"regressed": "regressed",
+			"slowed_down": "slowed down",
+			"new_failure": "new failure",
+			"added": "added"
 		}
 	},
 	"i18nScaler": {
@@ -327,7 +468,7 @@
 		"title": "Audit Trail",
 		"subtitle": "Tamper-evident replay of every agent decision",
 		"storageDir": "Trail storage directory",
-		"storageDirPlaceholder": ".workpilot/audit",
+		"storageDirPlaceholder": ".workpilot/audit-trail",
 		"trailName": "Trail name",
 		"correlationId": "Correlation ID",
 		"correlationIdPlaceholder": "spec-001",
@@ -342,7 +483,22 @@
 			"storageDirRequired": "Enter a storage directory",
 			"trailNameRequired": "Enter a trail name",
 			"correlationIdRequired": "Enter a correlation ID"
-		}
+		},
+		"kinds": {
+			"agent_invoked": "Agent started",
+			"agent_completed": "Agent finished",
+			"agent_failed": "Agent failed",
+			"agent_paused": "Agent paused",
+			"decision_made": "Decision",
+			"approval_given": "Approval given",
+			"approval_revoked": "Approval revoked",
+			"file_changed": "File changed",
+			"policy_violated": "Policy violated",
+			"user_action": "User action",
+			"system_event": "System event"
+		},
+		"actor": "Actor",
+		"correlation": "Correlation"
 	},
 	"pair": {
 		"title": "Real-time Pair Programming",
@@ -368,6 +524,15 @@
 			"nameRequired": "Enter your display name",
 			"messageEmpty": "Message is empty",
 			"messageTooLong": "Message too long (limit: {{max}} characters)"
+		},
+		"opKinds": {
+			"edit": "edit",
+			"cursor": "cursor",
+			"chat": "chat",
+			"suggestion": "suggestion",
+			"join": "joined",
+			"leave": "left",
+			"role_change": "role change"
 		}
 	},
 	"hubDescription": "Twelve advanced tools in one place: codebase longevity, agent health, model routing, domain agents, CI/CD anomalies, licenses, architecture drift, generated tests, i18n at scale, cognitive context, audit trail and pair programming."
