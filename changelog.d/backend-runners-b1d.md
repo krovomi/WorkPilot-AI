@@ -10,3 +10,4 @@ section: 🧪 Filets de test
   - Swarm : `swarm_runner.py` (vagues de sous-tâches indépendantes, code de sortie selon l'issue).
   - Cerveau partagé : `brain_runner.py` (création, mémorisation, rappel, promotion, synchronisation, import des mémoires d'agents, ponts, MCP, surveillance).
 - **La prédiction de conflits ne compte plus le projet lui-même comme une branche à fusionner** : la première ligne de `git worktree list` (le checkout du projet) apparaissait dans les branches actives et dans l'ordre de fusion conseillé. Une branche ouverte dans un autre worktree apparaissait aussi en double, sous le nom `+ branche`.
+- **Le plancher de couverture backend passe à 71 %** : la suite complète en couvre 72,0 % (70,6 % avant ce lot).
