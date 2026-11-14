@@ -238,4 +238,4 @@ def test_a_file_given_as_the_project_is_an_error(tmp_path: Path) -> None:
     code, _events, (kind, message) = _run(tmp_path / "openapi.yaml")
 
     assert (code, kind) == (1, "API_WATCHER_ERROR")
-    assert "Not a directory" in message
+    assert message.startswith("Project path is not a directory")

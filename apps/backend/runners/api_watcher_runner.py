@@ -333,6 +333,10 @@ def main() -> None:
     if not project_path.exists():
         _emit("API_WATCHER_ERROR", f"Project path does not exist: {project_path}")
         sys.exit(1)
+    if not project_path.is_dir():
+        # Said here, not left to the OS: Windows answers "[WinError 267]".
+        _emit("API_WATCHER_ERROR", f"Project path is not a directory: {project_path}")
+        sys.exit(1)
 
     if args.save_baseline:
         baseline = project_path / ".workpilot" / "api-contract-baseline.json"
