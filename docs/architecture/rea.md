@@ -145,3 +145,43 @@ build, donc ce qu'elle trouve vient de la tâche.
   hors du projet, ou REA qui ne peut pas tourner, est une erreur qui arrête le train : une
   vérification déclarée qui n'a pas pu tourner n'est pas un succès. Un service arrêté là n'a rien
   déployé, donc un retour arrière ne lance pas sa commande de rollback.
+
+## Lot D : l'API publique des bibliothèques .NET
+
+Migrer une bibliothèque de .NET 9 à .NET 10 ne doit pas changer ce que ses consommateurs appellent.
+Rien ne le vérifiait : le build et les tests du projet passent même quand un membre public a
+disparu. `qa/dotnet_api_gate.py` le vérifie après l'approbation du relecteur, avec les autres
+portes (`qa/loop.py`).
+
+- **Quels projets** (`rea/dotnet_api.py`) : une tâche dont le diff touche du .NET (`.cs`, `.fs`,
+  `.vb`, un `.csproj` / `.fsproj` / `.vbproj`, un `.props` ou `.targets`, `global.json`). Chaque
+  fichier appartient au projet du dossier le plus proche qui en contient un ; un fichier que
+  tous les projets importent (`Directory.Build.*`, `global.json`, un `.props`) les touche tous.
+  Jamais un projet de test, au plus 8 projets : au-delà, le verdict est inconnu.
+- **Deux builds, jamais dans le worktree** : chaque projet est construit (`dotnet build -c
+  Release`) au commit de base de la tâche puis tel que la QA l'a relu, chacun dans une copie
+  jetable (`mutation_gate.sandbox.scratch_copy`, avec `revision=` pour la base). L'assembly vient
+  du `TargetPath` de MSBuild pour chaque framework cible, donc un `OutputPath` personnalisé ou la
+  disposition `artifacts/` se trouvent sans deviner ; un exécutable ou un projet de test
+  (`IsTestProject`) n'est pas une bibliothèque. Le build lance le MSBuild du projet, comme le
+  `dotnet build` du relecteur, avec l'environnement du backend sans ses identifiants. Les
+  assemblies de la base sont gardées sous `<spec_dir>/dotnet-api/base/<sha>/` : une seconde passe
+  de QA ne reconstruit que la tâche.
+- **Les frameworks** : ceux que les deux côtés construisent, sinon le plus récent de chaque côté,
+  ce que fait une migration (`net9.0` → `net10.0`). Un framework abandonné est noté, pas bloquant.
+- **Le verdict vient de REA** (`rea/managed_api.py`) : `inspect-managed-members` de chaque côté
+  donne la visibilité (masque d'accès ECMA-335 des membres, et des types le long de leur
+  imbrication), `compare-managed-members` apparie les membres par type, nom, signature et IL. Un
+  membre public retiré, rendu invisible, renommé ou dont la signature change casse ; un ajout, un
+  corps changé, tout ce qui n'est pas public, non. Une lecture partielle de REA (capacité,
+  métadonnées malformées), un membre public qu'il n'a pas pu apparier, un build qui échoue, pas de
+  SDK : inconnu, jamais un succès, jamais un blocage.
+- **Mode** : `WORKPILOT_QA_DOTNET_API`. `warn` (défaut) ne bloque pas, et sans REA déjà installé à
+  la version figée rien n'est construit. `strict` renvoie au fixer les membres cassés, cités comme
+  sortie d'outil non fiable ; une migration que la préparation a posée (`dotnet_upgrade`, modes
+  `migrate` et `chain`) ou un workflow qui déclare la porte dure `public-api-stable` le rendent
+  `strict`. Délai de chaque commande : `WORKPILOT_QA_DOTNET_API_TIMEOUT`. La section de migration
+  du prompt dit au planner, au codeur et à la QA que l'API est comparée ; une rupture que la
+  nouvelle version impose est remontée à une personne, jamais cachée.
+- **La porte dure `public-api-stable`** lit `dotnet_public_api.json` : tenue quand rien de .NET n'a
+  changé ou que l'API est gardée.
