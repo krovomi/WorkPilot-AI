@@ -39,9 +39,9 @@ class LanguageOverlay:
 
 
 def _load() -> dict[str, LanguageOverlay]:
-    from . import dotnet, go, java, python, rust, typescript
+    from . import dotnet, go, java, python, rust, typescript, windev
 
-    modules = (python, typescript, dotnet, go, rust, java)
+    modules = (python, typescript, dotnet, go, rust, java, windev)
     return {m.OVERLAY.language: m.OVERLAY for m in modules}
 
 
@@ -75,5 +75,6 @@ def overlays_for(languages: list[str]) -> list[LanguageOverlay]:
         "go": {"go", "golang"},
         "rust": {"rust"},
         "java": {"java", "kotlin"},
+        "windev": {"wlangage", "windev", "webdev"},
     }
     return [OVERLAYS[name] for name, keys in aliases.items() if tokens & keys]

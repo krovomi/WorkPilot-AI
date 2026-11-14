@@ -197,6 +197,14 @@
 				"to": "backend/skills_registry/bundled/migrate-dotnet9-to-dotnet10"
 			},
 			{
+				"from": "../../skills/windev/windev-text-format",
+				"to": "backend/skills_registry/bundled/windev-text-format"
+			},
+			{
+				"from": "../../skills/windev/wlangage",
+				"to": "backend/skills_registry/bundled/wlangage"
+			},
+			{
 				"from": "../../.agents/skills/ui-ux-pro-max",
 				"to": "backend/skills_registry/bundled/ui-ux-pro-max",
 				"filter": [

@@ -15,6 +15,8 @@ BUNDLED_SKILLS = (
     "migrate-dotnet8-to-dotnet9",
     "migrate-dotnet9-to-dotnet10",
     "ui-ux-pro-max",
+    "windev-text-format",
+    "wlangage",
 )
 
 

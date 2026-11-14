@@ -222,6 +222,37 @@ def mobile_section(project_dir: Path) -> str:
         return ""
 
 
+def windev_section(
+    project_dir: Path, spec_dir: Path | None = None, *, role: str = "coder"
+) -> str:
+    """What a WinDev, WebDev or WinDev Mobile project adds to a phase's prompt.
+
+    What an agent may write (code blocks of the text format) and may not (the
+    editor's opaque properties, binary elements, new elements), staged skills
+    included when ``spec_dir`` is given. "" for every other project; never
+    raises (`windev.prompt`).
+    """
+    from windev import windev_section as _section
+
+    return _section(project_dir, spec_dir, role=role)
+
+
+def platform_section(
+    project_dir: Path, spec_dir: Path | None = None, *, role: str = "coder"
+) -> str:
+    """The rules of what the project runs on: a phone app, a WinDev application.
+
+    The planner, every coding subtask, the QA reviewer and the workflow's
+    skill phases get both through this one call, each "" when it does not
+    apply.
+    """
+    parts = (
+        mobile_section(project_dir),
+        windev_section(project_dir, spec_dir, role=role),
+    )
+    return "\n\n".join(part for part in parts if part)
+
+
 def dotnet_section(
     project_dir: Path, spec_dir: Path | None, *, role: str = "coder"
 ) -> str:
@@ -416,8 +447,10 @@ This shows only changes made in the spec branch since it diverged from `{base_br
     # URL to open, the evidence is a screenshot from a device, and one of the
     # two platforms may not be buildable on this machine at all. A reviewer
     # that does not know which is which reports "could not verify" as a defect.
-    if mobile := mobile_section(project_dir):
-        spec_context += mobile + "\n\n---\n\n"
+    # A WinDev project is judged on its code alone: the format around it is
+    # checked mechanically, and compiling needs the editor.
+    if platform := platform_section(project_dir, spec_dir, role="qa"):
+        spec_context += platform + "\n\n---\n\n"
 
     # A .NET 11 migration is judged against its procedure: what was retargeted,
     # and which behavioral changes were handled or ruled out. Empty otherwise.
@@ -681,4 +714,8 @@ The project root is: `{project_dir}`
 """
     if verification := verify_section(spec_dir):
         spec_context += verification + "\n\n---\n\n"
+    # The fixer edits code like the coder: on a WinDev project, only inside
+    # the code blocks (the integrity gate rejects anything else).
+    if windev := windev_section(project_dir, spec_dir, role="coder"):
+        spec_context += windev + "\n\n---\n\n"
     return spec_context + base_prompt

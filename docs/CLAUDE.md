@@ -74,6 +74,7 @@ fichier-ci reste l'autorité sur les règles.
 | archify | [archify.md](architecture/archify.md) | Cartes d'architecture et deltas par tâche ; la continuité des identifiants est la contrainte. |
 | Applications mobiles | [mobile.md](architecture/mobile.md) | Détection de pile, appareils, chaîne d'outils ; iOS seulement sur macOS. |
 | Migrations .NET 8 → 11 / C# 15 | [dotnet-upgrade.md](architecture/dotnet-upgrade.md) | Skills de migration 8 → 9, 9 → 10, 10 → 11 adaptées de dotnet/skills, une étape par version, copiées dans la spec des seules tâches qui en ont besoin, lisibles par tous les providers. |
+| WinDev, WebDev, WinDev Mobile | [windev.md](architecture/windev.md) | Format texte seulement : code WLangage modifiable, propriétés de l'éditeur et binaires jamais ; contrôle d'intégrité ; compilation hors de portée. |
 | Boucle de vérification | [verify.md](architecture/verify.md) | Lancer l'app, corriger, confirmer, mesurer, garder la preuve ; Windows par UI Automation, web par Playwright (trace, vidéo, GIF sur demande), jamais un succès inachevé ; rejeu sur la base pour lister ce qui change. |
 | Traces GenAI | [genai-traces.md](architecture/genai-traces.md) | Spans `gen_ai.*` pour chaque AgentClient ; jamais de contenu ; usage non remonté estimé, jamais 0. |
 | MCP 2026 : tasks et Apps | [mcp-2026.md](architecture/mcp-2026.md) | `ToolServer` dans les deux ères, tâche seulement au client qui la déclare ; vues MCP Apps en iframe `allow-scripts` sans `allow-same-origin`, avec CSP. |
