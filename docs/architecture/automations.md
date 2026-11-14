@@ -1,3 +1,11 @@
+---
+feature: Automatisations
+summary: >-
+  Un événement (issue étiquetée, CI rouge, horaire, incident de prod lu sans port ouvert) crée une
+  carte du Kanban, en brouillon par défaut, dédoublonnée, sous plafond du jour ; une PR ouverte
+  par quelqu'un d'autre reçoit la revue de GitHub PRs, jamais publiée.
+---
+
 # Automatisations : un événement crée une carte
 
 Le démon « Continuous AI » (`apps/backend/continuous_ai/`) tournait à côté du

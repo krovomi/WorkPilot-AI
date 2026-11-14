@@ -19,7 +19,6 @@ from agent_trace import model_id_of, session_start
 from agents.agent_audit import audit_decision, audit_event
 from agents.feature_wiring import (
     apply_router_override,
-    card_kind,
     cognitive_context_enabled,
     load_domain_addendum,
     suggest_routed_model,
@@ -1751,8 +1750,8 @@ async def run_autonomous_agent(
             suggestion = suggest_routed_model(
                 prompt=f"coder run on spec {spec_dir.name}",
                 task_hint=jev_hint or "coding",
-                project_dir=project_dir,
-                kind=card_kind(spec_dir),
+                spec_dir=spec_dir,
+                phase="coding",
             )
             if suggestion and suggestion["model"] != model:
                 audit_decision(

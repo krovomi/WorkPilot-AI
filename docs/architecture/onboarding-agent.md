@@ -1,3 +1,11 @@
+---
+feature: Agent d'onboarding
+summary: >-
+  Visite par rôle, points chauds (churn git, points de décision, zones sensibles, tests),
+  décisions (ADR, commits cassants, Brain), quiz ; sans modèle sauf la narration ; régénérée quand
+  les modules changent ; export échappé.
+---
+
 # Agent d'onboarding : l'histoire du code
 
 Page **Onboarding**. Un nouveau venu génère le paquet d'onboarding de son projet : visite guidée,

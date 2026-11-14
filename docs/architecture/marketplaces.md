@@ -1,3 +1,11 @@
+---
+feature: Marketplaces MCP et plugins
+summary: >-
+  Un serveur MCP installé va dans `CUSTOM_MCP_SERVERS` du projet ; un plugin écrit son skill dans
+  `.agents/skills/` et `.claude/skills/`, marqué, jamais sur un skill étranger ; serveurs vérifiés
+  à la source.
+---
+
 # Marketplaces MCP et plugins
 
 > Code : `apps/frontend/src/shared/mcp-catalog/`, `apps/frontend/src/shared/plugin-catalog/`,

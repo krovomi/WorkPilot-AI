@@ -1,3 +1,9 @@
+---
+feature: Prompts d'agents
+summary: >-
+  Quel prompt de `apps/backend/prompts/` sert quel agent.
+---
+
 # Agent prompts
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

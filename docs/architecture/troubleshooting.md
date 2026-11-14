@@ -1,3 +1,9 @@
+---
+feature: Dépannage
+summary: >-
+  Problèmes courants et où regarder.
+---
+
 # Troubleshooting
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
