@@ -244,6 +244,12 @@ export async function openExternalUrl(
 	if (parsed.protocol === "obsidian:") return openObsidianUrl(parsed, resolved);
 	const target = parsed.toString();
 
+	// Sous WSL, le navigateur de l'utilisateur est une application Windows :
+	// sans `xdg-open` ni `wslview` (une Ubuntu de WSL n'en a pas d'office),
+	// `shell.openExternal` échouait et le lien de la doc de REA ne faisait rien.
+	// Windows d'abord, les lanceurs Linux ensuite pour un WSL sans interop.
+	if (resolved.wsl && (await startFromWsl(resolved.spawnOpener, target))) return;
+
 	let firstFailure: unknown;
 	try {
 		await openExternal(target);
@@ -295,6 +301,30 @@ function obsidianUrlForWindows(
 }
 
 /**
+ * Confie `target` à Windows depuis WSL (`Start-Process`, qui suit le
+ * gestionnaire du schéma : navigateur par défaut, Obsidian). La cible entre
+ * entre apostrophes, où PowerShell n'interprète rien sauf l'apostrophe, doublée
+ * ici ; `URL` a déjà encodé tout caractère non ASCII, guillemets typographiques
+ * compris. Vrai si un PowerShell l'a acceptée.
+ */
+async function startFromWsl(
+	spawnOpener: OpenExternalDeps["spawnOpener"],
+	target: string,
+): Promise<boolean> {
+	const command = `Start-Process '${target.replace(/'/g, "''")}'`;
+	for (const powershell of WSL_POWERSHELL_CANDIDATES) {
+		const ok = await runOpener(spawnOpener, powershell, [
+			"-NoProfile",
+			"-NonInteractive",
+			"-Command",
+			command,
+		]);
+		if (ok) return true;
+	}
+	return false;
+}
+
+/**
  * Ouvre une note dans Obsidian.
  *
  * Sous WSL, l'application tourne sous Linux mais Obsidian est installé sous
@@ -314,17 +344,7 @@ async function openObsidianUrl(
 
 	if (deps.wsl) {
 		const target = obsidianUrlForWindows(parsed, deps.toWindowsPath);
-		// PowerShell entre apostrophes : une apostrophe s'y double.
-		const command = `Start-Process '${target.replace(/'/g, "''")}'`;
-		for (const powershell of WSL_POWERSHELL_CANDIDATES) {
-			const ok = await runOpener(deps.spawnOpener, powershell, [
-				"-NoProfile",
-				"-NonInteractive",
-				"-Command",
-				command,
-			]);
-			if (ok) return;
-		}
+		if (await startFromWsl(deps.spawnOpener, target)) return;
 		throw new Error(`Unable to open ${target} in Obsidian from WSL. ${hint}`);
 	}
 

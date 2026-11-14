@@ -170,7 +170,7 @@ def test_npx_is_found_in_either_layout(tmp_path: Path):
 
 
 def test_without_node_rea_is_unavailable(tmp_path: Path):
-    found = locate(PIN, node=str(tmp_path / "no-node"))
+    found = locate(PIN, node=str(tmp_path / "no-node"), installs=())
     assert isinstance(found, ReaUnavailable)
     assert found.reason == "node_missing"
 
@@ -178,7 +178,7 @@ def test_without_node_rea_is_unavailable(tmp_path: Path):
 def test_a_node_older_than_the_pin_is_reported():
     assert NODE
     pin = Pin(package="rea-agents", version="6.9.0", node=(">=99.0.0",))
-    found = locate(pin, node=NODE)
+    found = locate(pin, node=NODE, installs=())
     assert isinstance(found, ReaUnavailable)
     assert found.reason == "node_too_old"
 
