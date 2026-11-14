@@ -6,7 +6,6 @@ import { Choice } from "../../../admin/Choice";
 import { useAction } from "../../../admin/useAction";
 import { useSession } from "../../../auth/session";
 import { useLoad } from "../../../hooks/useLoad";
-import { describeError } from "../../../i18n";
 import { Button, ErrorBanner, Loading } from "../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../ui/theme";
 
@@ -45,7 +44,7 @@ export default function Members() {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={action.error ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={action.error} error={error} />
 			{(data?.members ?? []).map((m) => {
 				const expanded = open === m.user_id;
 				const self = m.user_id === user?.id;

@@ -536,6 +536,33 @@ _ACTION_HANDLERS = {
 }
 
 
+def _windev_refusal(args) -> str | None:
+    """Why the studio cannot write tests for this WinDev source or project, or None.
+
+    A WinDev test is a test scenario (`.wxt`), a binary element only the
+    WinDev editor creates and runs, and a new element written outside the
+    editor is not registered in the project (docs/architecture/windev.md).
+    Without this, a WinDev project fell back to Python and got a pytest file.
+    """
+    from test_generation.stacks import SUPPORTED_LANGUAGES
+    from windev.files import is_windev_path
+    from windev.project import detect_project
+
+    source = args.file_path or args.target_module or ""
+    if source and is_windev_path(source):
+        pass
+    elif source or args.language in SUPPORTED_LANGUAGES:
+        return None
+    elif detect_project(args.project_path) is None:
+        return None
+    return (
+        "This is a WinDev project: its automated tests are test scenarios that only "
+        "the WinDev editor creates and runs, so the studio cannot write or run them. "
+        "Create the scenario in the editor; a Kanban task can then write the "
+        "WLangage it calls."
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Test Generation Runner")
     parser.add_argument(
@@ -598,6 +625,12 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if refusal := _windev_refusal(args):
+        from foundation.error_details import UNSUPPORTED_STACK
+
+        _print_error(refusal, code=UNSUPPORTED_STACK)
+        sys.exit(1)
 
     try:
         # The generator reaches the model through the agent_runtime port,

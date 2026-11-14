@@ -43,6 +43,12 @@ describe("analysis digest", () => {
 		]);
 	});
 
+	it("keeps the first twelve figures", () => {
+		const report = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`m${i}`, i]));
+		expect(digest(report).figures.map((f) => f.label)).toHaveLength(12);
+		expect(digest(report).figures.at(-1)).toEqual({ label: "M11", value: "11" });
+	});
+
 	it("caps a long list", () => {
 		const out = digest({ items: Array.from({ length: 50 }, (_, i) => ({ name: `t${i}` })) });
 		expect(out.lists[0].total).toBe(50);
@@ -69,6 +75,7 @@ describe("figures", () => {
 		expect(money(1.234)).toBe("$1.23");
 		expect(money(null)).toBe("—");
 		expect(count(1234.4, "en")).toBe("1,234");
+		expect(count(Number.NaN, "en")).toBe("—");
 		expect(duration(42)).toBe("42 s");
 		expect(duration(600)).toBe("10 min");
 		expect(duration(3_900)).toBe("1 h 5 min");
@@ -80,5 +87,6 @@ describe("figures", () => {
 			["b", 5],
 			["d", 3],
 		]);
+		expect(top(undefined)).toEqual([]);
 	});
 });

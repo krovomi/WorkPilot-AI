@@ -7,7 +7,6 @@ import { ConvertButton } from "../../../../features/ConvertButton";
 import { featuresByPhase, type RoadmapFeature, readRoadmap } from "../../../../features/files";
 import { JobBar } from "../../../../features/JobBar";
 import { useFeature } from "../../../../features/useFeature";
-import { describeError } from "../../../../i18n";
 import { ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
@@ -25,7 +24,7 @@ export default function Roadmap() {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<JobBar
 				job={feature.job}
 				active={feature.active}
@@ -72,12 +71,13 @@ function FeatureRow({
 	const [open, setOpen] = useState(false);
 	const label = (group: string, value: string | null) =>
 		value && i18n.exists(`roadmap.${group}.${value}`) ? t(`roadmap.${group}.${value}`) : value;
+	// Never empty: a feature always has a status ("idea" when the file names none).
 	const tags = [label("priority", feature.priority), label("status", feature.status)].filter(Boolean).join(" · ");
 	return (
 		<View style={[styles.feature, { borderColor: theme.border, backgroundColor: theme.surface }]}>
 			<Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)}>
 				<Text style={{ color: theme.text, fontWeight: "600" }}>{feature.title}</Text>
-				{tags ? <Text style={{ color: theme.textFaint, fontSize: 12 }}>{tags}</Text> : null}
+				<Text style={{ color: theme.textFaint, fontSize: 12 }}>{tags}</Text>
 			</Pressable>
 			{open ? (
 				<>
