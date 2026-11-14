@@ -14,6 +14,7 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { app } from "electron";
 import type {
 	AutomationReason,
 	AutomationRule,
@@ -21,6 +22,8 @@ import type {
 	Project,
 } from "../../shared/types";
 import { readMergedProjectEnv } from "../ci-pipeline-service";
+import { requirePythonPath } from "../utils/ensure-python";
+import { pythonStaticRunnerEnv } from "../utils/python-runner-env";
 import { type AutomationEvent, SourceError, type SourceResult } from "./sources";
 
 const RUNNER = "regression_guardian_runner.py";
@@ -47,12 +50,6 @@ export interface FeedRequest {
 export type FeedRunner = (project: Project, request: FeedRequest) => Promise<string>;
 
 export const runFeed: FeedRunner = async (project, request) => {
-	// Loaded on use: the scheduler's importers need no Electron app to load.
-	const [{ app }, { requirePythonPath }, { pythonStaticRunnerEnv }] = await Promise.all([
-		import("electron"),
-		import("../utils/ensure-python"),
-		import("../utils/python-runner-env"),
-	]);
 	const backend = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");

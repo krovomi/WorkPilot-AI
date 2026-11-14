@@ -869,6 +869,15 @@ export const IPC_CHANNELS = {
 	// Kanban quick-command bar: a command runs on a review card (F182)
 	QUICK_COMMAND_RUN: "quickCommand:run",
 
+	// Mission Control: state proxied to the local backend, model calls run in main
+	MISSION_CONTROL_GET_STATE: "missionControl:getState",
+	MISSION_CONTROL_START_SESSION: "missionControl:startSession",
+	MISSION_CONTROL_STOP_SESSION: "missionControl:stopSession",
+	MISSION_CONTROL_CREATE_AGENT: "missionControl:createAgent",
+	MISSION_CONTROL_REMOVE_AGENT: "missionControl:removeAgent",
+	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
+	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
+
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",
 	CONTEXT_MESH_REGISTER_PROJECT: "contextMesh:registerProject",
@@ -908,6 +917,17 @@ export const IPC_CHANNELS = {
 	LIVE_COMPANION_SUGGESTION: "liveCompanion:suggestion",
 	LIVE_COMPANION_TAKEOVER_PROPOSAL: "liveCompanion:takeoverProposal",
 	LIVE_COMPANION_FILE_CHANGE: "liveCompanion:fileChange",
+
+	// Agent Replay — recorded agent sessions, read from the local backend by main
+	REPLAY_LIST_SESSIONS: "replay:listSessions",
+	REPLAY_GET_SESSION: "replay:getSession",
+	REPLAY_DELETE_SESSION: "replay:deleteSession",
+	REPLAY_GET_HEATMAP: "replay:getHeatmap",
+	REPLAY_COMPARE: "replay:compare",
+	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
+	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	// Session History — the same records, as history cards
+	SESSION_HISTORY_LIST: "sessionHistory:list",
 
 	// Agent Time Travel — Temporal debugger for AI agents
 	TIME_TRAVEL_GENERATE_CHECKPOINTS: "timeTravel:generateCheckpoints",

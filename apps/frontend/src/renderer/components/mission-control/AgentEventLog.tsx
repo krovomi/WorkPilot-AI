@@ -6,6 +6,7 @@
 
 import {
 	Activity,
+	CheckCircle2,
 	Pause,
 	Play,
 	Plus,
@@ -13,6 +14,7 @@ import {
 	Settings2,
 	Square,
 	Trash2,
+	XCircle,
 } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "../../lib/utils";
@@ -35,6 +37,8 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 	agent_resumed: RotateCcw,
 	agent_stopped: Square,
 	agent_config_updated: Settings2,
+	agent_completed: CheckCircle2,
+	agent_failed: XCircle,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -45,6 +49,8 @@ const EVENT_COLORS: Record<string, string> = {
 	agent_resumed: "text-cyan-500",
 	agent_stopped: "text-gray-500",
 	agent_config_updated: "text-purple-500",
+	agent_completed: "text-success",
+	agent_failed: "text-destructive",
 };
 
 function formatTaskDisplay(task: unknown): string {
@@ -111,8 +117,10 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 							<Icon className={cn("h-3.5 w-3.5 shrink-0 mt-0.5", color)} />
 							<div className="flex-1 min-w-0">
 								<div className="flex items-center gap-1.5">
-									<span className="font-medium capitalize">
-										{event.type.replaceAll("_", " ")}
+									<span className="font-medium">
+										{t(`missionControl:events.${event.type}`, {
+											defaultValue: event.type.replaceAll("_", " "),
+										})}
 									</span>
 									{agentName && (
 										<Badge variant="outline" className="text-3xs px-1 py-0">
@@ -120,6 +128,9 @@ export function AgentEventLog({ events, agents }: AgentEventLogProps) {
 										</Badge>
 									)}
 								</div>
+								{typeof event.data?.error === "string" && event.data.error && (
+									<p className="text-destructive truncate mt-0.5">{event.data.error}</p>
+								)}
 								{(() => {
 									const task = event.data?.task;
 									if (task == null) return null;
