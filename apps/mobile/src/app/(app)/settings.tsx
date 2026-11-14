@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { MyPermissions } from "../../api/types";
 import { visiblePages } from "../../admin/pages";
 import { LockSection } from "../../auth/LockSection";
 import { useSession } from "../../auth/session";
@@ -33,7 +34,8 @@ export default function Settings() {
 		}
 	};
 
-	const organizations = permissions?.organizations ?? [];
+	// Signed in, so read: the session sets the permissions with the signed-in status.
+	const organizations = (permissions as MyPermissions).organizations;
 	const administers = visiblePages(can).length > 0;
 	return (
 		<ScrollView contentContainerStyle={styles.content}>

@@ -3,7 +3,9 @@ Import Analyzer
 ================
 
 Parses source files and builds a dependency/import graph.
-Supports Python (AST-based) and JavaScript/TypeScript (regex-based).
+Python is read with its AST, JavaScript/TypeScript with regexes, and every
+other stack (C#, F#, VB, Java, Kotlin, Scala, Go, PHP, Rust, Dart, Swift, and
+MSBuild ``ProjectReference``) by the readers of :mod:`.lang_imports`.
 """
 
 from __future__ import annotations
@@ -14,6 +16,11 @@ import os
 import re
 from pathlib import Path
 
+from .lang_imports import (
+    MSBUILD_PROJECT_EXTENSIONS,
+    PARSERS,
+    parse_msbuild_references,
+)
 from .models import (
     ArchitectureConfig,
     ArchitectureViolation,
@@ -40,11 +47,25 @@ SKIP_DIRS = {
     ".pytest_cache",
     ".ruff_cache",
     "egg-info",
+    # Build outputs and dependency caches of the other stacks
+    "bin",
+    "obj",
+    "target",
+    "vendor",
+    "Pods",
+    ".gradle",
+    ".dart_tool",
+    "DerivedData",
 }
 
 # File extensions to analyze
 PYTHON_EXTENSIONS = {".py"}
 JS_TS_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
+OTHER_EXTENSIONS = set(PARSERS) | MSBUILD_PROJECT_EXTENSIONS
+ANALYZABLE_EXTENSIONS = PYTHON_EXTENSIONS | JS_TS_EXTENSIONS | OTHER_EXTENSIONS
+
+#: Characters that may follow a module prefix inside a longer module name.
+_MODULE_SEPARATORS = (".", "/", "\\", ":")
 
 # JS/TS import patterns
 _JS_IMPORT_FROM_RE = re.compile(
@@ -104,6 +125,10 @@ class ImportAnalyzer:
                 edges = self._parse_python_imports(rel_path, content)
             elif ext in JS_TS_EXTENSIONS:
                 edges = self._parse_js_ts_imports(rel_path, content)
+            elif ext in MSBUILD_PROJECT_EXTENSIONS:
+                edges = self._edges(rel_path, parse_msbuild_references(content))
+            elif ext in PARSERS:
+                edges = self._edges(rel_path, PARSERS[ext](content))
             else:
                 continue
 
@@ -150,6 +175,8 @@ class ImportAnalyzer:
                             f"Move this import to use an abstraction or interface "
                             f"that respects the '{source_layer.name}' layer boundaries"
                         ),
+                        source_layer=source_layer.name,
+                        target_layer=target_layer_name,
                     )
                 )
 
@@ -188,6 +215,7 @@ class ImportAnalyzer:
                             suggestion=(
                                 f"Remove or replace this import. {pattern.description}"
                             ),
+                            rule_id=pattern.rule_id,
                         )
                     )
 
@@ -232,6 +260,18 @@ class ImportAnalyzer:
                     )
 
         return edges
+
+    @staticmethod
+    def _edges(rel_path: str, found: list[tuple[str, int, str]]) -> list[ImportEdge]:
+        return [
+            ImportEdge(
+                source_file=rel_path,
+                target_module=target,
+                line=line,
+                import_statement=statement,
+            )
+            for target, line, statement in found
+        ]
 
     def _resolve_relative_import(
         self, source_file: str, module: str, level: int
@@ -320,9 +360,18 @@ class ImportAnalyzer:
         """
         Try to resolve an import target to a layer name.
 
-        For relative imports (./foo, ../bar), resolve relative to source file.
-        For named imports, check if any layer's patterns match.
+        A layer's declared module prefixes come first (namespaces, packages,
+        Go import paths, crates, Dart packages, Swift targets). Then relative
+        imports (./foo, ../bar) are resolved against the source file, and
+        named imports against the layers' file patterns.
         """
+        for layer in self.config.layers:
+            if any(
+                _has_module_prefix(import_target, prefix)
+                for prefix in layer.module_prefixes
+            ):
+                return layer.name
+
         # Convert module path to potential file paths
         candidate_paths = self._import_to_file_paths(import_target, source_file)
 
@@ -332,7 +381,12 @@ class ImportAnalyzer:
                     if fnmatch.fnmatch(candidate, pattern):
                         return layer.name
 
-        # Also check by module name segments (e.g., "infrastructure" in "src/infrastructure/db")
+        # Also check by module name segments (e.g., "infrastructure" in "src/infrastructure/db").
+        # Only for Python and JS/TS: elsewhere a layer is known by its module
+        # prefixes, and a segment would take ``io.ktor.server.application`` or
+        # ``org.springframework.data.domain`` for one of the project's layers.
+        if os.path.splitext(source_file)[1].lower() in OTHER_EXTENSIONS:
+            return None
         import_parts = import_target.replace(".", "/").replace("\\", "/").split("/")
         for part in import_parts:
             if part in layer_map:
@@ -401,14 +455,25 @@ class ImportAnalyzer:
 
             for fname in files:
                 ext = os.path.splitext(fname)[1].lower()
-                if ext in PYTHON_EXTENSIONS or ext in JS_TS_EXTENSIONS:
+                if ext in ANALYZABLE_EXTENSIONS:
                     yield Path(root) / fname
 
     def _is_analyzable(self, file_path: str) -> bool:
         """Check if a file path has an analyzable extension."""
         ext = os.path.splitext(file_path)[1].lower()
-        return ext in PYTHON_EXTENSIONS or ext in JS_TS_EXTENSIONS
+        return ext in ANALYZABLE_EXTENSIONS
 
     def _file_matches_pattern(self, file_path: str, pattern: str) -> bool:
         """Check if a file path matches a glob pattern."""
         return fnmatch.fnmatch(file_path, pattern)
+
+
+def _has_module_prefix(module: str, prefix: str) -> bool:
+    """``MyApp.Domain`` covers ``MyApp.Domain`` and ``MyApp.Domain.Users``, not ``MyApp.DomainEvents``."""
+    if not prefix:
+        return False
+    if module == prefix:
+        return True
+    return module.startswith(prefix) and (
+        prefix.endswith(_MODULE_SEPARATORS) or module[len(prefix)] in _MODULE_SEPARATORS
+    )

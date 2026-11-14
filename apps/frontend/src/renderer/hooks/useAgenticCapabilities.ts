@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { localBackendFetch } from "../lib/local-backend";
 
 export interface AgenticCapability {
 	hasAdapter: boolean;
@@ -37,8 +38,7 @@ export type AgenticCapabilities = Record<string, AgenticCapability>;
  */
 export async function fetchAgenticCapabilities(): Promise<AgenticCapabilities> {
 	try {
-		const baseUrl = import.meta.env?.VITE_BACKEND_URL || "";
-		const res = await fetch(`${baseUrl}/providers/agentic-capabilities`);
+		const res = await localBackendFetch("/providers/agentic-capabilities");
 		if (!res.ok) return {};
 		const data = (await res.json()) as {
 			providers?: AgenticCapabilities;

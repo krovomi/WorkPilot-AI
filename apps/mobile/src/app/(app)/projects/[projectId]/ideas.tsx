@@ -7,7 +7,6 @@ import { ConvertButton } from "../../../../features/ConvertButton";
 import { IDEA_TYPES, type Idea, readIdeas } from "../../../../features/files";
 import { JobBar } from "../../../../features/JobBar";
 import { useFeature } from "../../../../features/useFeature";
-import { describeError } from "../../../../i18n";
 import { ErrorBanner, Loading, Section } from "../../../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
 
@@ -28,7 +27,7 @@ export default function Ideas() {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<JobBar
 				job={feature.job}
 				active={feature.active}

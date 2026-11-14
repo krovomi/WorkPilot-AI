@@ -45,6 +45,8 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `validate-release.js` | Vérifie qu'une release est cohérente avant publication. | `bump-version.js` |
 | `mobile_device_check.py` | Installe une app mobile sur un appareil réel et rend compte. | `mobile-device-check.yml`, à la main |
 | `stack_autopilot.py` | Fusionne les PR inscrites vers `develop` dans l'ordre de leur pile : merge de `develop`, conflits résolus (Claude Code), fusion quand tous les checks sont verts. | `stack-autopilot.yml` ; `--dry-run` à la main |
+| `release_autopilot.py` | Publie `develop` sur `main` en nouvelle version : niveau majeur/mineur/patch tiré des PR fusionnées, `release/vX.Y.Z` (version, changelog, documentation), fusion par commit de merge quand tout est vert, puis `main` dans `develop`. Au plus une version par jour, après 2 h sans fusion. | `release-autopilot.yml` ; `--dry-run`, `--now` à la main |
+| `release_docs.py` | Fait écrire par Claude Code la documentation d'une version sur sa branche (README EN/FR, `docs/`, titre et intro du changelog, patch du wiki), tenue à ces fichiers. | `release_autopilot.py` |
 
 ## Fusion intelligente des worktrees
 
@@ -65,4 +67,5 @@ Une ligne par fichier et par dossier de `scripts/`, et rien d'autre :
 | `quality_cli.py` | Lance le Quality Scorer de la revue de code sur des fichiers. | `quality-handlers.ts` (main) |
 | `audit_findings.py` | Écrit la carte `F<n>.js` de chaque constat `docs/audit/findings/F<n>.md` (`build`) ou vérifie qu'elles sont à jour (`check`). | `pre-push.js`, `tests/test_audit_findings.py` ; `build` à la main après un constat |
 | `quality_baselines.py` | Plafonds par fichier des `except` aveugles (backend), des `biome-ignore` (frontend) et de la taille des fichiers de plus de 2 000 lignes dans `tests/baselines/` : `check`, et `update` qui ne fait que les baisser. | `pre-push.js`, `tests/test_quality_baselines.py` ; `update` à la main après une correction |
+| `diff_coverage.py` | Chaque ligne qu'une PR ajoute ou modifie, et chaque branche qui y commence, est lancée par un test : lit le diff (`--base`) et un rapport Cobertura (`--cobertura`) ou Istanbul (`--istanbul`), une annotation par trou. | `ci.yml` (`coverage-python`, `test-frontend` sous Linux), `mobile.yml`, `tests/test_diff_coverage.py` ; à la main après la suite avec couverture |
 | `audit-large-files.js` | Liste les fichiers source de plus de 500 lignes. | à la main |

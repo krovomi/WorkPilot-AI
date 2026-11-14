@@ -43,6 +43,8 @@ export default function RoleScreen() {
 
 	if (loading && !data) return <Loading />;
 	if (!creating && !role) return <ErrorBanner message={error ? describeError(error) : t("admin.roles.gone")} />;
+	// Past this point, a role is shown unless a new one is being made ("new" is no role's id).
+	const title = role ? role.name : t("admin.roles.new");
 
 	const toggle = (key: string, on: boolean) =>
 		setGranted((current) => {
@@ -64,7 +66,7 @@ export default function RoleScreen() {
 		}
 	};
 	const remove = () =>
-		Alert.alert(t("admin.roles.deleteTitle", { name: role?.name ?? "" }), t("admin.roles.deleteBody"), [
+		Alert.alert(t("admin.roles.deleteTitle", { name: title }), t("admin.roles.deleteBody"), [
 			{ text: t("common.cancel"), style: "cancel" },
 			{
 				text: t("admin.roles.delete"),
@@ -81,8 +83,8 @@ export default function RoleScreen() {
 			keyboardShouldPersistTaps="handled"
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<Stack.Screen options={{ title: creating ? t("admin.roles.new") : (role?.name ?? "") }} />
-			<ErrorBanner message={action.error ?? (error ? describeError(error) : null)} />
+			<Stack.Screen options={{ title }} />
+			<ErrorBanner message={action.error} error={error} />
 			{editable ? (
 				<>
 					<Field label={t("admin.roles.name")} value={name} onChangeText={setName} maxLength={120} />

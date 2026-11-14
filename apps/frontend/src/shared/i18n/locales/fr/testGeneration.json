@@ -187,6 +187,10 @@
 				"title": "Il manque un élément à la requête",
 				"hint": "Complétez le champ concerné puis relancez la génération."
 			},
+			"unsupported_stack": {
+				"title": "Les tests de ce projet s'écrivent dans son éditeur",
+				"hint": "Les tests WinDev sont des scénarios de test que seul l'éditeur WinDev crée et exécute. Créez le scénario dans l'éditeur ; une tâche du Kanban peut ensuite écrire le code WLangage qu'il appelle."
+			},
 			"backend_missing": {
 				"title": "Le backend WorkPilot AI est introuvable",
 				"hint": "Le backend Python qui exécute le générateur est absent de cette installation. Réinstallez l'application, ou lancez-la depuis le dépôt pour que apps/backend soit présent."
