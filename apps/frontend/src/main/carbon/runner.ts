@@ -3,7 +3,11 @@
  * built here from checked values, the process runs without a shell (S4), and
  * its result line is returned.
  */
-import type { ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
+import path from "node:path";
+import { app } from "electron";
+import { requirePythonPath } from "../utils/ensure-python";
+import { pythonRunnerEnv } from "../utils/python-runner-env";
 
 const EVENT_PREFIX = "CARBON_EVENT:";
 const RESULT_PREFIX = "CARBON_RESULT:";
@@ -22,14 +26,6 @@ export async function runCarbon(
 	args: string[],
 	onEvent?: (payload: unknown) => void,
 ): Promise<RunHandle> {
-	// Loaded here so a module that only needs the checks above stays free of Electron.
-	const [{ spawn }, path, { app }, { requirePythonPath }, { pythonRunnerEnv }] = await Promise.all([
-		import("node:child_process"),
-		import("node:path"),
-		import("electron"),
-		import("../utils/ensure-python"),
-		import("../utils/python-runner-env"),
-	]);
 	const backendPath = app.isPackaged
 		? path.resolve(process.resourcesPath, "backend")
 		: path.resolve(app.getAppPath(), "..", "backend");
