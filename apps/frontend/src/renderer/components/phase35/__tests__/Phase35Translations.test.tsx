@@ -15,12 +15,14 @@ import {
 	useCicdAnomalyStore,
 	useDomainAgentsStore,
 	useLicenseStore,
+	useModelRouterStore,
 } from "../../../stores/phase35-stores";
 import { AgentHealthPanel } from "../AgentHealthPanel";
 import { ArchDriftPanel } from "../ArchDriftPanel";
 import { CicdAnomalyPanel } from "../CicdAnomalyPanel";
 import { DomainAgentsPanel } from "../DomainAgentsPanel";
 import { LicensePanel } from "../LicensePanel";
+import { ModelRouterPanel } from "../ModelRouterPanel";
 
 const DOMAINS = [
 	{ tag: "generic", label: "Generic", description: "No domain assumptions — neutral defaults." },
@@ -41,6 +43,7 @@ afterEach(() => {
 	useCicdAnomalyStore.setState({ signals: [], report: null, phase: "idle", error: null });
 	useAgentHealthStore.setState({ health: null, projectPath: null, phase: "idle", error: null });
 	useLicenseStore.setState({ report: null, online: null, phase: "idle", error: null });
+	useModelRouterStore.setState({ chosen: null, comparison: null, phase: "idle", error: null });
 	useArchDriftStore.setState({
 		scanReport: null,
 		driftReport: null,
@@ -313,5 +316,39 @@ describe("Fonctions avancées in French", () => {
 		render(<ArchDriftPanel projectPath="/p" />);
 		expect(screen.getByText(/Aucune référence enregistrée/)).toBeInTheDocument();
 		expect(screen.queryByText("Nouvelles violations")).not.toBeInTheDocument();
+	});
+
+	it("words the router's reason in French and says when a provider has no model", () => {
+		useModelRouterStore.setState({
+			chosen: {
+				provider: "copilot",
+				model: "claude-haiku-4.5",
+				task_class: "trivial",
+				tier: "budget",
+				estimated_cost_usd: 0,
+				reason: "subscription provider copilot (no per-token price)",
+				reason_code: "unpriced_provider",
+				reason_params: { provider: "copilot", billing: "subscription" },
+			},
+			comparison: {
+				budget: {
+					provider: "opencode",
+					model: "",
+					task_class: "trivial",
+					tier: "budget",
+					estimated_cost_usd: 0,
+					reason: "no model of the available providers in the catalog",
+					reason_code: "no_model",
+					reason_params: { provider: "opencode", providers: ["opencode"] },
+				},
+			},
+		});
+		render(<ModelRouterPanel />);
+		expect(
+			screen.getByText(/GitHub Copilot est facturé à l’abonnement : aucun coût par token\./),
+		).toBeInTheDocument();
+		expect(screen.queryByText(/no per-token price/)).not.toBeInTheDocument();
+		expect(screen.getByText("aucun modèle à proposer")).toBeInTheDocument();
+		expect(screen.getByRole("option", { name: "Déduit du prompt" })).toBeInTheDocument();
 	});
 });

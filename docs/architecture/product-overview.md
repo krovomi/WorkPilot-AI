@@ -1,3 +1,11 @@
+---
+feature: Vue produit
+summary: >-
+  Les features, et une ligne par vue de l'app (`SidebarView`), vérifiée par
+  `tests/test_product_overview_views.py` ; une vue sans conception ni test y est marquée
+  expérimentale, comme dans la barre latérale.
+---
+
 # Product overview
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

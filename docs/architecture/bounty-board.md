@@ -1,3 +1,9 @@
+---
+feature: Bounty Board
+summary: >-
+  Concours notés sur artefacts ; une preuve absente renormalise, ne vaut jamais zéro.
+---
+
 # Competitive rounds (Bounty Board)
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

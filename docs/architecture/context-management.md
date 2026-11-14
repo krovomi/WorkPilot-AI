@@ -1,3 +1,9 @@
+---
+feature: Gestion du contexte
+summary: >-
+  Artefacts sobres (un fait, un endroit) et politique compact / clear par tâche, native ou émulée.
+---
+
 # Context management: lean artifacts, compact and clear
 
 > Design rationale. [`docs/CLAUDE.md`](../CLAUDE.md) stays the

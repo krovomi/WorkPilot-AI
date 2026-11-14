@@ -1,3 +1,9 @@
+---
+feature: Mode hors-ligne
+summary: >-
+  `airgapStrict` comme barrière, sinon comme défaut.
+---
+
 # Le mode hors-ligne
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),

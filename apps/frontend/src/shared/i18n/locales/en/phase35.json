@@ -111,8 +111,7 @@
 		"subtitle": "Pick the cheapest model that probably works for this task",
 		"prompt": "Task prompt",
 		"promptPlaceholder": "e.g. rename foo to bar",
-		"hint": "Task class hint (optional)",
-		"hintPlaceholder": "e.g. trivial, architecture, review",
+		"hint": "Task type",
 		"availableProviders": "Available providers",
 		"providersPlaceholder": "Select providers to compare",
 		"providerAnthropic": "Anthropic",
@@ -146,7 +145,21 @@
 			"ideation": "ideation",
 			"documentation": "documentation"
 		},
-		"tierFor": "{{tier}} tier for a {{task}}"
+		"tierFor": "{{tier}} tier for a {{task}}",
+		"providerDeepseek": "DeepSeek",
+		"providerGrok": "Grok (xAI)",
+		"providerCopilot": "GitHub Copilot",
+		"hintAuto": "Inferred from the prompt",
+		"removeProvider": "Remove {{provider}}",
+		"noModel": "no model to suggest",
+		"reasons": {
+			"local": "{{provider}} runs locally: no per-token cost.",
+			"subscription": "{{provider}} is billed by subscription: no per-token cost.",
+			"noModel": "No catalog model for {{providers}}: this provider picks its own.",
+			"fallback": "No available provider has a known price: fallback model.",
+			"bench": "Replay bench: {{resolved}}/{{judged}} cards resolved.",
+			"passedOver": "Passed over on replay bench evidence: {{models}}."
+		}
 	},
 	"domainAgents": {
 		"title": "Domain-Specific Agents",

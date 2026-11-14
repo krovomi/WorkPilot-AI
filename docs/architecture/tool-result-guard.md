@@ -1,3 +1,11 @@
+---
+feature: Garde des résultats d'outils
+summary: >-
+  Chaque résultat d'outil scanné avant le modèle (`run_tool` des boucles, hook `PostToolUse`
+  Claude) : suspect encadré, bloqué retenu en mode `block` ; sources de confiance écrites par main
+  seul ; alertes sans contenu.
+---
+
 # Garde des résultats d'outils (injection de prompt indirecte)
 
 Un fichier que l'agent lit, une page qu'il récupère, la sortie d'une commande, la réponse d'un

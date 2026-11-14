@@ -1,3 +1,10 @@
+---
+feature: Skills
+summary: >-
+  `skills/` est la source, `scripts/skills_cli.py` le seul écrivain ; frontmatter lu par
+  `parse_frontmatter` ; gate 4 : un corps qui s'adresse à l'agent n'est pas émis.
+---
+
 # Skills system
 
 > Design rationale moved verbatim out of [`docs/CLAUDE.md`](../CLAUDE.md),
