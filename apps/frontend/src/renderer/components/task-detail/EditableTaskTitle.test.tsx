@@ -167,3 +167,32 @@ it("does not close a field reopened on the same task by a save started before a 
 	await Promise.resolve();
 	expect(screen.getByRole("textbox", { name: "Task title" })).toBeInTheDocument();
 });
+
+// The browser takes focus away from a field that becomes disabled at its next
+// rendering update (the HTML "focus fixup", which jsdom runs too), so a save
+// that lasts longer than a frame always loses the focus while it runs.
+const nextFrames = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+it("gives the focus back to the field when a save that outlasted a frame fails", async () => {
+	const pending: { settle?: (ok: boolean) => void } = {};
+	persist.mockReturnValueOnce(
+		new Promise<boolean>((resolve) => {
+			pending.settle = resolve;
+		}),
+	);
+	setup();
+	fireEvent.click(screen.getByRole("button", { name: /Exporter en CSV/ }));
+	const field = screen.getByRole("textbox", { name: "Task title" });
+	fireEvent.change(field, { target: { value: "Nouveau" } });
+	fireEvent.keyDown(field, { key: "Enter" });
+	await nextFrames();
+	expect(field).not.toHaveFocus();
+
+	pending.settle?.(false);
+	await waitFor(() => expect(field).not.toBeDisabled());
+	expect(field).toHaveFocus();
+	await nextFrames();
+	// Still open, still focused, and nothing saved again behind the user's back.
+	expect(screen.getByRole("textbox", { name: "Task title" })).toHaveFocus();
+	expect(persist).toHaveBeenCalledTimes(1);
+});
