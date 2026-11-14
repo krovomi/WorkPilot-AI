@@ -23,6 +23,8 @@ apps/backend/suite_runner/
   dotnet.py     ce que reçoit dotnet test : les projets de test, VSTest ou Microsoft.Testing.Platform
   converters.py JUnit depuis go test -json, jest --json, cargo test, dart/flutter (json), rspec (json)
   names.py      les parties d'un nom de test (conteneur, test) tel que le rapport le donne
+  trx.py        le TRX de .NET (nom complet par TestDefinitions, durée, issue), lu aussi par
+                les tests générationnels (generational_tests/reports.py)
   only.py       le filtre de chaque stack pour ne relancer que certains tests
 apps/frontend/src/renderer/components/flaky-tests/
   FlakyTestCard.tsx   un test du rapport : verdict, preuves, historique, boutons de carte

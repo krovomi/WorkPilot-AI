@@ -981,6 +981,10 @@ export const IPC_CHANNELS = {
 	GEN_TESTS_CAPTURE: "genTests:capture",
 	GEN_TESTS_COMPARE: "genTests:compare",
 	GEN_TESTS_DELETE: "genTests:delete",
+	GEN_TESTS_DETECT: "genTests:detect",
+	GEN_TESTS_RUN: "genTests:run",
+	GEN_TESTS_CANCEL: "genTests:cancel",
+	GEN_TESTS_IMPORT_FILE: "genTests:importFile",
 	// i18n Auto-Scaling (#3.12)
 	I18N_SCALER_DIFF: "i18nScaler:diff",
 	I18N_SCALER_SKELETON: "i18nScaler:skeleton",

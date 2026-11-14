@@ -123,7 +123,9 @@ class ConflictPredictorService:
             )
 
             if result.returncode == 0:
-                for line in result.stdout.strip().split("\n"):
+                # The first line is the project's own checkout, not a worktree
+                # to merge.
+                for line in result.stdout.strip().split("\n")[1:]:
                     if line.strip():
                         # Extract worktree path (first part of each line)
                         worktree_path = line.split()[0]
@@ -139,10 +141,10 @@ class ConflictPredictorService:
             )
 
             if result.returncode == 0:
-                for line in result.stdout.strip().split("\n"):
-                    branch = (
-                        line.strip().replace("* ", "").replace("remotes/origin/", "")
-                    )
+                for line in result.stdout.splitlines():
+                    # Two marker columns: `*` the current branch, `+` one
+                    # checked out in another worktree.
+                    branch = line[2:].strip().replace("remotes/origin/", "")
                     if (
                         branch
                         and branch not in ["main", "master", "develop"]
