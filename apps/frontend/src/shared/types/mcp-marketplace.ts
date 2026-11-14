@@ -98,6 +98,12 @@ export interface McpMarketplaceServer {
 	vars: McpCatalogVar[];
 	/** Tool the machine needs besides Node.js: uv (uvx) or the Azure CLI */
 	requires?: "uv" | "az";
+	/**
+	 * The agents offered at install, all checked: a server meant for one kind
+	 * of task (REA for investigations, `analyzer`) names them. Default:
+	 * `DEFAULT_MCP_AGENTS`.
+	 */
+	agents?: string[];
 	tools: McpToolInfo[];
 	tags: string[];
 	homepage: string;

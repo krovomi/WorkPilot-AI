@@ -60,7 +60,9 @@ session, `core/mcp_pinning.py` ouvre le serveur lui-même : démarrage, liste de
 sans jamais appeler un outil. Une sonde sert dix minutes par serveur et configuration, et
 l'approbation est relue à chaque session. Le pont WorkPilot (`MCPToolManager`, providers
 OpenAI-compatibles et locaux) liste les outils de toute façon et n'expose que les approuvés. Les
-agents en CLI (Codex, OpenCode, Gemini CLI…) ne reçoivent pas `CUSTOM_MCP_SERVERS`.
+agents en CLI (Codex, OpenCode, les agents ACP comme Gemini CLI) ouvrent le serveur eux-mêmes, comme
+Claude Code : ils reçoivent un serveur à la même condition que le SDK, chacun dans ses mots
+(`core/cli_mcp.py`, [rea.md](rea.md) lot E). pi n'a pas de client MCP.
 
 ## La détection (`mcp_pins/scan.py`)
 

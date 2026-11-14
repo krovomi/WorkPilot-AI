@@ -122,8 +122,15 @@ def test_mcp_claim_matches_the_client(name):
         assert cls.__name__ == "ClaudeAgentClient", (
             "only the Claude SDK takes MCP servers"
         )
-    if claim == "own":
+    if claim in ("own", "handed"):
         assert issubclass(cls, CliSubprocessAgentClient), f"{name} is not a CLI"
+    hands = getattr(cls, "hands_mcp_servers", False)
+    if cls.__name__ == "AcpAgentClient":
+        hands = True  # set per instance, for every ACP agent
+    assert (claim == "handed") == bool(hands), (
+        f"{name}: {cls.__name__} {'hands' if hands else 'does not hand'} the "
+        f"custom MCP servers, providers.yaml says {claim!r}"
+    )
 
 
 @pytest.mark.parametrize("name", WITH_ADAPTER)
