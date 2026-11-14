@@ -43,16 +43,66 @@ def _ids(project: Path) -> list[str]:
     return [c.id for c in tr.detect_test_commands(project)]
 
 
+_SLN_ENTRY = (
+    'Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "{name}", "{path}", '
+    '"{{11111111-1111-1111-1111-111111111111}}"\nEndProject\n'
+)
+
+
+def _dotnet_solution(root: Path, name: str = "App.sln") -> Path:
+    """A solution that lists a test project, as ``dotnet new sln`` writes it."""
+    _write(
+        root / "tests" / "App.Tests" / "App.Tests.csproj",
+        '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup>'
+        '<PackageReference Include="xunit" Version="2.9.3" />'
+        "</ItemGroup></Project>",
+    )
+    entry = _SLN_ENTRY.replace("{name}", "App.Tests").replace(
+        "{path}", "tests\\App.Tests\\App.Tests.csproj"
+    )
+    return _write(root / name, "Microsoft Visual Studio Solution File\n" + entry)
+
+
 # --- detection --------------------------------------------------------
 
 
-def test_dotnet_targets_the_shallowest_solution(tmp_path: Path) -> None:
-    _write(tmp_path / "samples" / "Demo" / "Demo.sln")
-    _write(tmp_path / "src" / "App.sln")
-    _write(tmp_path / "Root.slnx")
+def test_dotnet_targets_the_shallowest_solution_with_tests(tmp_path: Path) -> None:
+    _dotnet_solution(tmp_path / "samples" / "Demo", "Demo.sln")
+    _write(
+        tmp_path / "Root.slnx",
+        '<Solution><Project Path="samples/Demo/tests/App.Tests/App.Tests.csproj" />'
+        "</Solution>",
+    )
     (command,) = tr.detect_test_commands(tmp_path)
     assert command.id == "dotnet"
     assert command.command == "dotnet test Root.slnx"
+
+
+def test_dotnet_skips_a_solution_without_test_project(tmp_path: Path) -> None:
+    # The bug: "dotnet test Rag.sln" restored, built, ran nothing, exited 0.
+    _write(tmp_path / "src" / "Rag.Api" / "Rag.Api.csproj", "<Project/>")
+    _write(
+        tmp_path / "Rag.sln",
+        _SLN_ENTRY.replace("{name}", "Rag.Api").replace(
+            "{path}", "src\\Rag.Api\\Rag.Api.csproj"
+        ),
+    )
+    _write(
+        tmp_path / "tests" / "Rag.Tests" / "Rag.Tests.csproj",
+        '<Project><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" />'
+        "</ItemGroup></Project>",
+    )
+    (command,) = tr.detect_test_commands(tmp_path)
+    assert command.command == "dotnet test tests/Rag.Tests/Rag.Tests.csproj"
+
+
+def test_dotnet_without_test_project_offers_nothing(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "App" / "App.csproj", "<Project/>")
+    _write(tmp_path / "src" / "Contest" / "Contest.csproj", "<Project/>")
+    _write(tmp_path / "App.sln")
+    assert tr.detect_test_commands(tmp_path) == []
+    with pytest.raises(ftr.RunError, match="^no_dotnet_tests:"):
+        ftr._pick_command(tmp_path, "auto")
 
 
 def test_dotnet_without_solution_prefers_a_test_project(tmp_path: Path) -> None:
@@ -68,13 +118,15 @@ def test_js_commands_need_their_runner(tmp_path: Path) -> None:
         tmp_path / "package.json",
         json.dumps({"devDependencies": {"vitest": "^3", "jest": "^29"}}),
     )
-    # jest without jest-junit writes no report: not offered.
-    assert _ids(tmp_path) == ["vitest"]
+    # Jest's own --json report: no jest-junit needed.
+    assert _ids(tmp_path) == ["vitest", "jest"]
+    _write(tmp_path / "package.json", json.dumps({"scripts": {"test": "lint"}}))
+    assert _ids(tmp_path) == []
     _write(
         tmp_path / "package.json",
-        json.dumps({"devDependencies": {"jest": "^29", "jest-junit": "^16"}}),
+        json.dumps({"scripts": {"test": "node --test test/"}}),
     )
-    assert _ids(tmp_path) == ["jest"]
+    assert _ids(tmp_path) == ["node"]
 
 
 def test_pytest_uses_the_project_virtualenv(tmp_path: Path) -> None:
@@ -131,10 +183,7 @@ def test_report_flags_per_runner(tmp_path: Path) -> None:
     assert f"--junitxml={out / 'junit.xml'}" in argv("pytest", "python3 -m pytest")
     assert f"--outputFile.junit={out / 'junit.xml'}" in argv("vitest", "npx vitest run")
     assert argv("go", "go test ./...")[1:4] == ["test", "-json", "-count=1"]
-    jest = tr._invocation(
-        tr.TestCommand("jest", "Jest", "npx jest --ci"), tmp_path, out, no_build=False
-    )
-    assert jest.env["JEST_JUNIT_OUTPUT_DIR"] == str(out)
+    assert f"--outputFile={out / 'jest.json'}" in argv("jest", "npx jest --ci")
     maven = tr._invocation(
         tr.TestCommand("maven", "Maven", "mvn test"), tmp_path, out, no_build=False
     )
@@ -309,7 +358,7 @@ def _fake_runs(
 def test_run_mode_finds_the_flaky_test(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
-    _write(tmp_path / "App.sln")
+    _dotnet_solution(tmp_path)
     no_build = _fake_runs(monkeypatch, ["Passed", "Failed", "Passed", "Failed"])
     result = ftr.run_repeated(
         tmp_path, runs=4, command_id="auto", threshold=0.05, min_runs=2, timeout_s=60
@@ -339,7 +388,7 @@ def test_run_mode_finds_the_flaky_test(
 def test_run_mode_lists_tests_failing_every_time(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _write(tmp_path / "App.sln")
+    _dotnet_solution(tmp_path)
     _fake_runs(monkeypatch, ["Failed", "Failed", "Failed"])
     result = ftr.run_repeated(
         tmp_path, runs=3, command_id="dotnet", threshold=0.05, min_runs=2, timeout_s=60
@@ -352,7 +401,7 @@ def test_run_mode_lists_tests_failing_every_time(
 def test_run_mode_stops_when_the_first_run_writes_no_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _write(tmp_path / "App.sln")
+    _dotnet_solution(tmp_path)
     no_build = _fake_runs(monkeypatch, [None, "Passed", "Passed"])
     with pytest.raises(ftr.RunError) as error:
         ftr.run_repeated(
@@ -388,7 +437,7 @@ def test_scan_reads_the_kept_runs(tmp_path: Path) -> None:
 
 
 def test_scan_without_reports_offers_the_detected_command(tmp_path: Path) -> None:
-    _write(tmp_path / "App.sln")
+    _dotnet_solution(tmp_path)
     result = ftr.run_scan(tmp_path, threshold=0.05, min_runs=2)
     assert result["summaryCode"] == "no_reports"
     assert result["detectedCommands"] == [

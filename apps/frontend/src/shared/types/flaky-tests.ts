@@ -21,9 +21,17 @@ export const FLAKY_COMMAND_IDS = [
 	"pytest",
 	"vitest",
 	"jest",
+	"node",
 	"maven",
 	"gradle",
 	"go",
+	"cargo",
+	"phpunit",
+	"pest",
+	"rspec",
+	"dart",
+	"flutter",
+	"swift",
 ] as const;
 export type FlakyCommandId = (typeof FLAKY_COMMAND_IDS)[number];
 
