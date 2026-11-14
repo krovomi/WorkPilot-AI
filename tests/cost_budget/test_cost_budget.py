@@ -34,7 +34,9 @@ def _project(tmp_path: Path, budget: dict | None, usages: list[dict]) -> Path:
     return root
 
 
-def _usage(cost: float, spec: str = "001-task", at: datetime | None = None, tokens: int = 100) -> dict:
+def _usage(
+    cost: float, spec: str = "001-task", at: datetime | None = None, tokens: int = 100
+) -> dict:
     return {
         "spec_id": spec,
         "cost": cost,
@@ -51,7 +53,15 @@ def _spec(root: Path) -> Path:
 def _plan(spec_dir: Path, statuses: list[str]) -> None:
     (spec_dir / "implementation_plan.json").write_text(
         json.dumps(
-            {"phases": [{"subtasks": [{"id": str(i), "status": s} for i, s in enumerate(statuses)]}]}
+            {
+                "phases": [
+                    {
+                        "subtasks": [
+                            {"id": str(i), "status": s} for i, s in enumerate(statuses)
+                        ]
+                    }
+                ]
+            }
         ),
         encoding="utf-8",
     )
@@ -89,9 +99,13 @@ def test_no_budget_means_no_check(tmp_path):
 
 def test_legacy_budget_in_cost_data_is_read(tmp_path):
     root = _project(tmp_path, None, [_usage(3.0)])
-    data = json.loads((root / ".workpilot" / "cost_data.json").read_text(encoding="utf-8"))
+    data = json.loads(
+        (root / ".workpilot" / "cost_data.json").read_text(encoding="utf-8")
+    )
     data["budgets"] = {str(root): {"limit": 2.0, "period": "total"}}
-    (root / ".workpilot" / "cost_data.json").write_text(json.dumps(data), encoding="utf-8")
+    (root / ".workpilot" / "cost_data.json").write_text(
+        json.dumps(data), encoding="utf-8"
+    )
     found = evaluate(_spec(root))
     assert found is not None and found.exceeded() is not None
 
@@ -100,7 +114,17 @@ def test_legacy_budget_in_cost_data_is_read(tmp_path):
 
 
 def test_project_root_of_a_worktree_spec_is_the_main_project(tmp_path):
-    spec = tmp_path / "p" / ".workpilot" / "worktrees" / "tasks" / "t" / ".workpilot" / "specs" / "t"
+    spec = (
+        tmp_path
+        / "p"
+        / ".workpilot"
+        / "worktrees"
+        / "tasks"
+        / "t"
+        / ".workpilot"
+        / "specs"
+        / "t"
+    )
     spec.mkdir(parents=True)
     assert project_root(spec) == (tmp_path / "p").resolve()
 
@@ -113,7 +137,9 @@ def test_spend_is_a_floor_when_a_session_has_no_price(tmp_path):
 
 def test_project_period_counts_this_month_only(tmp_path):
     old = NOW - timedelta(days=60)
-    root = _project(tmp_path, None, [_usage(4.0, at=old), _usage(1.0, spec="002", at=NOW)])
+    root = _project(
+        tmp_path, None, [_usage(4.0, at=old), _usage(1.0, spec="002", at=NOW)]
+    )
     assert project_spend(root, "monthly", NOW).usd == 1.0
     assert project_spend(root, "total", NOW).usd == 5.0
 
@@ -140,7 +166,9 @@ def test_task_limit_pauses_the_build_with_its_reason(tmp_path, capsys):
 def test_a_raised_task_budget_lets_it_go_on(tmp_path):
     root = _project(tmp_path, {"task_limit": 2.0}, [_usage(2.5)])
     spec = _spec(root)
-    (spec / "task_metadata.json").write_text(json.dumps({"budgetUsd": 5}), encoding="utf-8")
+    (spec / "task_metadata.json").write_text(
+        json.dumps({"budgetUsd": 5}), encoding="utf-8"
+    )
     assert check_before_session(spec, "coding") is None
 
 
@@ -161,7 +189,16 @@ def test_each_threshold_is_announced_once(tmp_path, capsys):
 
 def test_worktree_build_pauses_the_main_copy_too(tmp_path):
     root = _project(tmp_path, {"task_limit": 1.0}, [_usage(2.0)])
-    wt_spec = root / ".workpilot" / "worktrees" / "tasks" / "001-task" / ".workpilot" / "specs" / "001-task"
+    wt_spec = (
+        root
+        / ".workpilot"
+        / "worktrees"
+        / "tasks"
+        / "001-task"
+        / ".workpilot"
+        / "specs"
+        / "001-task"
+    )
     wt_spec.mkdir(parents=True)
     assert check_before_session(wt_spec, "qa_review") == "budget"
     assert is_paused(wt_spec) and is_paused(_spec(root))
@@ -199,9 +236,7 @@ def test_progress_resets_the_stall_mark(tmp_path):
 # -- degradation ----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("spent", "steps"), [(1.0, 0), (7.6, 1), (9.5, 2)]
-)
+@pytest.mark.parametrize(("spent", "steps"), [(1.0, 0), (7.6, 1), (9.5, 2)])
 def test_degrade_steps_follow_the_thresholds(tmp_path, spent, steps):
     root = _project(tmp_path, {"task_limit": 10.0, "degrade": True}, [_usage(spent)])
     assert degrade_steps(_spec(root)) == steps
@@ -230,5 +265,9 @@ def test_phase_model_steps_down_when_the_budget_says_so(tmp_path, monkeypatch):
     import phase_config
 
     root = _project(tmp_path, {"task_limit": 10.0, "degrade": True}, [_usage(9.5)])
-    monkeypatch.setattr(phase_config, "_resolve_phase_model", lambda *a, **k: "claude-opus-5-5")
-    assert phase_config.get_phase_model(_spec(root), "coding") == newest("anthropic", "fast")
+    monkeypatch.setattr(
+        phase_config, "_resolve_phase_model", lambda *a, **k: "claude-opus-5-5"
+    )
+    assert phase_config.get_phase_model(_spec(root), "coding") == newest(
+        "anthropic", "fast"
+    )

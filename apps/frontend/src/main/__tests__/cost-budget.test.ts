@@ -18,11 +18,22 @@ import {
 	writeTaskBudget,
 } from "../cost-budget";
 import { budgetPauseMessage } from "../cost-budget-notify";
+import type { LedgerUsage } from "../workspace-ledgers";
 
 let project: string;
 
-function usage(cost: number, spec: string, timestamp: string, tokens = 10) {
-	return { provider: "openai", model: "gpt-5.5", input_tokens: tokens, output_tokens: 0, cost, spec_id: spec, timestamp };
+function usage(cost: number, spec: string, timestamp: string, tokens = 10): LedgerUsage {
+	return {
+		provider: "openai",
+		model: "gpt-5.5",
+		input_tokens: tokens,
+		output_tokens: 0,
+		cost,
+		phase: "coding",
+		agent_type: "coder",
+		spec_id: spec,
+		timestamp,
+	};
 }
 
 beforeEach(() => {
