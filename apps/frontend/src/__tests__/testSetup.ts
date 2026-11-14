@@ -5,6 +5,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import "@shared/i18n";
+import { fetchLocalBackend } from "./local-backend-shim";
 
 // Mock localStorage for tests that need it
 const createLocalStorageMock = () => {
@@ -118,6 +119,9 @@ if (typeof globalThis !== "undefined") {
 		getAutoSwitchSettings: () => Promise.resolve({ success: true, data: {} }),
 		// Account priority order methods
 		getAccountPriorityOrder: () => Promise.resolve({ success: true, data: [] }),
+		// The local backend, as main reaches it (local-backend-handlers.ts):
+		// through the global `fetch`, which the tests of those views stub.
+		localBackendRequest: fetchLocalBackend,
 	};
 }
 

@@ -109,7 +109,8 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Stack detection, including the UI and test stacks moved here in M10,
     # and the WinDev-family project (a leaf).
     "project": {"mobile", "windev"},
-    "mobile": {"foundation"},
+    # The WinDev Mobile app of a WinDev project (`windev` is a leaf).
+    "mobile": {"foundation", "windev"},
     "rtk": {"foundation"},
     # Read by the scheduler and the phase config: its LLM refine takes the
     # client factory from its runner instead of importing core. Formula Lab
