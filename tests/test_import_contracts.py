@@ -158,6 +158,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The cross review's verdict, read by the pull request step in core: a
     # leaf, or it joins the cycle. Its session is `workflows/cross_review_phase.py`.
     "cross_review": {"foundation"},
+    # REA's runner (rea-agents CLI, static readers): PATH lookup, the strict
+    # offline policy and the credential-free child env; nothing above them.
+    "rea": {"foundation", "offline_policy", "security"},
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),

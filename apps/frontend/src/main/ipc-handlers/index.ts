@@ -62,6 +62,7 @@ import { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 import { registerContextHandlers } from "./context-handlers";
 import { registerContextMeshHandlers } from "./context-mesh-handlers";
 import { registerAgentCliHandlers } from "./agent-cli-handlers";
+import { registerReaHandlers } from "./rea-handlers";
 import { registerTaskPermissionHandlers } from "./task-permission-handlers";
 import { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 import { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
@@ -188,6 +189,7 @@ export { registerContextAwareSnippetsHandlers } from "./context-aware-snippets-h
 export { registerContextHandlers } from "./context-handlers";
 export { registerContextMeshHandlers } from "./context-mesh-handlers";
 export { registerAgentCliHandlers } from "./agent-cli-handlers";
+export { registerReaHandlers } from "./rea-handlers";
 export { registerCopilotCliHandlers } from "./copilot-cli-handlers";
 export { registerCopilotOAuthHandlers } from "./copilot-oauth-handlers";
 export { registerCostHandlers } from "./cost-handlers";
@@ -416,6 +418,9 @@ export function setupIpcHandlers(
 
 	// Agent CLIs driven as providers (OpenCode, Google Antigravity): installed?
 	registerAgentCliHandlers();
+
+	// REA (static reader of shipped artifacts): the pinned release installed?
+	registerReaHandlers();
 
 	// GitHub Copilot CLI handlers (CLI-based authentication)
 	registerGitHubCopilotHandlers();

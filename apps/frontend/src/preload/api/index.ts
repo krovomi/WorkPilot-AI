@@ -147,6 +147,7 @@ import {
 	createAutoRefactorAPI,
 } from "./modules/auto-refactor-api";
 import { type AgentCliAPI, createAgentCliAPI } from "./modules/agent-cli-api";
+import { createReaAPI, type ReaAPI } from "./modules/rea-api";
 import { createTaskSandboxAPI, type TaskSandboxAPI } from "./modules/task-sandbox-api";
 import { type StackAPI, createStackAPI } from "./modules/stack-api";
 import {
@@ -272,6 +273,7 @@ export interface ElectronAPI
 		ClaudeCodeAPI,
 		CopilotCliAPI,
 		AgentCliAPI,
+		ReaAPI,
 		TaskSandboxAPI,
 		StackAPI,
 		TaskPermissionAPI,
@@ -427,6 +429,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createClaudeCodeAPI(),
 		...createCopilotCliAPI(),
 		...createAgentCliAPI(),
+		...createReaAPI(),
 		...createTaskPermissionAPI(),
 		...createCopilotOAuthAPI(),
 		...createMcpAPI(),
@@ -595,6 +598,8 @@ export type { ContextAwareSnippetsAPI } from "./modules/context-aware-snippets-a
 export { createContextAwareSnippetsAPI } from "./modules/context-aware-snippets-api";
 export type { AgentCliAPI } from "./modules/agent-cli-api";
 export { createAgentCliAPI } from "./modules/agent-cli-api";
+export type { ReaAPI } from "./modules/rea-api";
+export { createReaAPI } from "./modules/rea-api";
 export type { TaskPermissionAPI } from "./modules/task-permission-api";
 export { createTaskPermissionAPI } from "./modules/task-permission-api";
 export type { CopilotCliAPI } from "./modules/copilot-cli-api";
