@@ -31,17 +31,30 @@ RUNNER = (
 )
 
 
+_RUNNER_PACKAGES = ("runners", "runners.github", "runners.github.services")
+
+
 @pytest.fixture(scope="module")
 def runner():
     # The runner puts its own folders first on sys.path; the rest of the
     # session must not inherit that order.
     saved = list(sys.path)
+    # A test module collected earlier may have left bare stand-ins for these
+    # packages (no spec, only a __path__), which the runner's imports would
+    # resolve against. Import the real ones, then put the stand-ins back for
+    # the tests that rely on them.
+    stand_ins = {
+        name: sys.modules.pop(name)
+        for name in _RUNNER_PACKAGES
+        if name in sys.modules and getattr(sys.modules[name], "__spec__", None) is None
+    }
     spec = importlib.util.spec_from_file_location("github_runner_cli", RUNNER)
     module = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(module)
     finally:
         sys.path[:] = saved
+        sys.modules.update(stand_ins)
     return module
 
 
