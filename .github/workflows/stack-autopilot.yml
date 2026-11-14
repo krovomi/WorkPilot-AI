@@ -1,10 +1,11 @@
 name: Stack autopilot
 
-# Merges the opted-in pull requests into develop in stack order (#771, then
-# the one built on it…): merges develop into the next one, resolves the
-# conflicts (Claude Code for the ones a rule cannot settle), pushes, and
-# merges once every check of that commit is green. Opt-in: GitHub auto-merge
-# enabled on the pull request, or the `autopilot` label.
+# Merges the pull requests into develop in stack order (#771, then the one
+# built on it…): merges develop into the next one, resolves the conflicts
+# (Claude Code for the ones a rule cannot settle), pushes, and merges once
+# every check of that commit is green. Enrolled by default: every non-draft
+# pull request of this repository towards develop, Dependabot's included
+# (never main). Left out: drafts, forks and the `autopilot/off` label.
 # Logic and rules: scripts/stack_autopilot.py; docs: docs/rules/workflow.md.
 #
 # Secrets (all optional, the run says what is missing):
@@ -22,7 +23,7 @@ on:
     workflows: [CI, Lint, "CodeQL Advanced", Quality Security, Mobile]
     types: [completed]
   pull_request:
-    types: [auto_merge_enabled, labeled, reopened, ready_for_review]
+    types: [opened, auto_merge_enabled, labeled, reopened, ready_for_review]
   schedule:
     - cron: "*/20 * * * *"
   workflow_dispatch:
@@ -49,12 +50,13 @@ jobs:
     name: Stack autopilot
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # A pull request event from a fork has no secrets and must not drive
-    # pushes; of the labels, only `autopilot` is an opt-in (the run's own
-    # labels must not start another run).
+    # A pull request event from a fork or sent by Dependabot has no secrets
+    # and must not drive pushes; of the labels, only `autopilot` is an opt-in
+    # (the run's own labels must not start another run).
     if: >-
       github.event_name != 'pull_request' || (
         github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]' &&
         (github.event.action != 'labeled' || github.event.label.name == 'autopilot'))
     env:
       HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
