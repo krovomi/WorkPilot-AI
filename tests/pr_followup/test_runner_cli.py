@@ -18,8 +18,16 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gh_fake import write_fake_gh  # noqa: E402
+# Loaded by path, not through sys.path: putting tests/ on the path while the
+# suite is collected lets a test folder (tests/release_coordinator) shadow the
+# backend package of the same name for every module collected after this one.
+_spec = importlib.util.spec_from_file_location(
+    "pr_followup_gh_fake", Path(__file__).resolve().parents[1] / "gh_fake.py"
+)
+_gh_fake = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _gh_fake  # its dataclasses look their module up there
+_spec.loader.exec_module(_gh_fake)
+write_fake_gh = _gh_fake.write_fake_gh
 
 BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
 RUNNER = BACKEND / "runners" / "pr_followup_runner.py"
