@@ -114,6 +114,21 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
   `autopilot/conflit` (retiré seul au commit suivant) et `autopilot/rouge`. Secrets : `PAT_TOKEN`
   (Contents, Pull requests, Workflows en écriture), `CLAUDE_CODE_OAUTH_TOKEN` ou `ANTHROPIC_API_KEY` ;
   sans eux, le résumé du run dit ce qui manque. `tests/test_stack_autopilot.py` le garde.
+- **Releases : le pilote de release** (`release-autopilot.yml`, `scripts/release_autopilot.py`,
+  `scripts/release_docs.py`). Personne ne prépare plus une version à la main : quand `develop` n'a
+  reçu aucune fusion depuis 2 h, que la version précédente a au moins 24 h et que les workflows de
+  push de sa tête sont verts, il calcule le niveau sur les PR fusionnées depuis le dernier tag
+  (`type!:`, pied `BREAKING CHANGE:`, `**Breaking:** Yes` ou fragment `⚠️ Changement incompatible`
+  → majeure ; `feat` ou `✨ Nouveautés` → mineure ; `fix`, `perf`, `refactor`, `revert`, `build`,
+  `chore(deps)` ou autre fragment → patch ; `docs`, `ci`, `test`, `style`, autre `chore` ne
+  déclenchent rien ; un label `semver:*` l'emporte), ouvre `release/vX.Y.Z` → `main` (version dans
+  les cinq manifestes, fragments repliés, documentation de la version écrite par Claude Code :
+  README EN/FR, `docs/`, titre et intro du changelog, patch du wiki), la fusionne par **commit de
+  merge** quand tous ses checks sont verts, puis fusionne `main` dans `develop`. Rouge ou refusée :
+  `release-autopilot/rouge` ou `release-autopilot/bloquee`, puis remplacée dès qu'une correction
+  arrive sur `develop` ; sans documentation : `release-autopilot/documentation`, rien n'est
+  fusionné avant qu'une personne retire le label. `RELEASE_AUTOPILOT=off` l'arrête.
+  `tests/test_release_autopilot.py` et `tests/test_release_docs.py` le gardent.
 
 ## CI (`.github/workflows/`)
 
@@ -124,6 +139,7 @@ positif se traite par la règle S1 de [`security.md`](security.md), jamais par `
 | `quality-security.yml` | CodeQL étendu, Bandit, pip-audit, pnpm audit |
 | `codeql.yml` | CodeQL sur Actions, JS/TS, Python |
 | `stack-autopilot.yml` | rien : il fusionne les PR vertes vers `develop` dans l'ordre de leur pile (push sur `develop`, ouverture d'une PR, fin d'un workflow, toutes les 20 min, à la main avec `dry_run`) |
+| `release-autopilot.yml` | rien : il publie `develop` sur `main` en nouvelle version, documentation comprise (toutes les heures, fin d'un workflow, à la main avec `dry_run` ou `now`) |
 
 `ci.yml` et `lint.yml` tournent sur tout changement sauf les quelques fichiers que rien ne lit
 (`paths-ignore` : `LICENSE`, gabarits d'issue et de PR, `FUNDING.yml` ; `CHANGELOG.md` n'y est plus, un test le lit) ; une liste
@@ -168,6 +184,7 @@ Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
 ## Livraison
 
+Automatique : le pilote de release ci-dessus. À la main (pilote arrêté, hotfix) :
 `node scripts/bump-version.js patch|minor|major` sur une branche issue de `develop`, puis
 `python scripts/changelog.py release X.Y.Z "Titre"` (les fragments deviennent la section de la
 version ; écrire son introduction), PR vers `develop`, puis PR `develop` → `main` fusionnée par commit de merge : la fusion déclenche la release
