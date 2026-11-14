@@ -211,7 +211,19 @@
 				"description": "ETL, traitements par lots, qualité des données."
 			}
 		},
-		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent."
+		"promptNote": "Ces garde-fous sont injectés tels quels (en anglais) dans le prompt de l’agent.",
+		"libraries": "Bibliothèques conseillées pour ce projet",
+		"librariesFor": "{{language}} : {{libraries}}",
+		"project": {
+			"current": "Domaine appliqué à ce projet : {{domain}}",
+			"none": "Aucun domaine appliqué à ce projet : les tâches n'ont pas d'addendum de domaine.",
+			"languages": "Stacks détectées : {{languages}}",
+			"noLanguages": "Aucune stack détectée : les bibliothèques de toutes les stacks sont listées.",
+			"effect": "Appliqué, le domaine est enregistré dans .workpilot/domain.json et chaque tâche Kanban du projet reçoit ses consignes (planification, code, QA). Une spec qui nomme son propre domaine garde le sien.",
+			"apply": "Appliquer à ce projet",
+			"clear": "Retirer du projet",
+			"noProject": "Ouvrez un projet pour appliquer un domaine à ses tâches ; l'aperçu ci-dessous reste disponible."
+		}
 	},
 	"cicdAnomaly": {
 		"title": "Détecteur d'Anomalies CI/CD",

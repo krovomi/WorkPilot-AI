@@ -134,11 +134,35 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.DOMAIN_AGENTS_BUILD,
-		async (_e, { domain, role }: { domain: string; role: string }) =>
+		async (_e, { domain, role, projectPath }: { domain: string; role: string; projectPath?: string }) =>
 			backendFetch("/api/domain-agents/build", {
 				method: "POST",
-				body: JSON.stringify({ domain, role }),
+				body: JSON.stringify({
+					domain,
+					role,
+					project_path: typeof projectPath === "string" && projectPath ? projectPath : null,
+				}),
 			}),
+	);
+	// `projectPath` is checked by ipc-path-policy before these run; the domain is
+	// a catalogue tag (the backend refuses one it does not know).
+	ipcMain.handle(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_GET, async (_e, { projectPath }: { projectPath: string }) =>
+		backendFetch("/api/domain-agents/project", {
+			method: "POST",
+			body: JSON.stringify({ project_path: projectPath }),
+		}),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_SET,
+		async (_e, { projectPath, domain }: { projectPath: string; domain: string | null }) => {
+			if (domain !== null && (typeof domain !== "string" || !/^[a-z_]{1,64}$/.test(domain))) {
+				return { success: false, error: "Invalid domain" };
+			}
+			return backendFetch("/api/domain-agents/project/set", {
+				method: "POST",
+				body: JSON.stringify({ project_path: projectPath, domain }),
+			});
+		},
 	);
 
 	// === #3.4 CI/CD Anomaly ===

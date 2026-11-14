@@ -211,7 +211,19 @@
 				"description": "ETL, batch jobs, data quality."
 			}
 		},
-		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt."
+		"promptNote": "These guardrails are injected verbatim (in English) into the agent prompt.",
+		"libraries": "Suggested libraries for this project",
+		"librariesFor": "{{language}}: {{libraries}}",
+		"project": {
+			"current": "Domain applied to this project: {{domain}}",
+			"none": "No domain applied to this project: tasks get no domain addendum.",
+			"languages": "Detected stacks: {{languages}}",
+			"noLanguages": "No stack detected: libraries for every stack are listed.",
+			"effect": "Once applied, the domain is saved in .workpilot/domain.json and every Kanban task of the project receives its guidance (planning, coding, QA). A spec that names its own domain keeps it.",
+			"apply": "Apply to this project",
+			"clear": "Remove from project",
+			"noProject": "Open a project to apply a domain to its tasks; the preview below stays available."
+		}
 	},
 	"cicdAnomaly": {
 		"title": "CI/CD Anomaly Detective",

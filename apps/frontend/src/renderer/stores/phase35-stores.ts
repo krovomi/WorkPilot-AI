@@ -158,9 +158,15 @@ interface DomainAgentsState extends BaseSlice {
 	selectedDomain: string | null;
 	profile: DomainProfile | null;
 	bundle: DomainAgentBundle | null;
+	/** The project the next two fields belong to. */
+	projectPath: string | null;
+	projectDomain: string | null;
+	projectLanguages: string[];
 	loadDomains: () => Promise<void>;
 	loadProfile: (domain: string) => Promise<void>;
-	build: (domain: string, role: string) => Promise<void>;
+	build: (domain: string, role: string, projectPath?: string) => Promise<void>;
+	loadProjectDomain: (projectPath: string) => Promise<void>;
+	applyProjectDomain: (projectPath: string, domain: string | null) => Promise<void>;
 }
 
 export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
@@ -170,6 +176,9 @@ export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
 	selectedDomain: null,
 	profile: null,
 	bundle: null,
+	projectPath: null,
+	projectDomain: null,
+	projectLanguages: [],
 	loadDomains: async () => {
 		set({ phase: "running", error: null });
 		try {
@@ -190,12 +199,32 @@ export const useDomainAgentsStore = create<DomainAgentsState>((set) => ({
 			set({ phase: "error", error: errorMessage(e) });
 		}
 	},
-	build: async (domain, role) => {
+	build: async (domain, role, projectPath) => {
 		set({ phase: "running", error: null });
 		try {
-			const res = await globalThis.electronAPI.buildDomainBundle(domain, role);
+			const res = await globalThis.electronAPI.buildDomainBundle(domain, role, projectPath);
 			if (!res.success) throw new Error(res.error ?? "Backend error");
 			set({ phase: "ok", bundle: res.bundle });
+		} catch (e) {
+			set({ phase: "error", error: errorMessage(e) });
+		}
+	},
+	loadProjectDomain: async (projectPath) => {
+		set({ projectPath, projectDomain: null, projectLanguages: [] });
+		try {
+			const res = await globalThis.electronAPI.getProjectDomain(projectPath);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ projectPath, projectDomain: res.domain, projectLanguages: res.languages });
+		} catch (e) {
+			set({ phase: "error", error: errorMessage(e) });
+		}
+	},
+	applyProjectDomain: async (projectPath, domain) => {
+		set({ phase: "running", error: null });
+		try {
+			const res = await globalThis.electronAPI.setProjectDomain(projectPath, domain);
+			if (!res.success) throw new Error(res.error ?? "Backend error");
+			set({ phase: "ok", projectPath, projectDomain: res.domain });
 		} catch (e) {
 			set({ phase: "error", error: errorMessage(e) });
 		}

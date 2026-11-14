@@ -75,7 +75,8 @@ export interface DomainProfile extends DomainSummary {
 	required_skills: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
-	suggested_libraries: string[];
+	/** Per stack (`project.stack.detect_languages` names: "python", "c#"…). */
+	suggested_libraries: Record<string, string[]>;
 }
 export interface DomainAgentBundle {
 	domain: string;
@@ -86,6 +87,13 @@ export interface DomainAgentBundle {
 	guardrails: string[];
 	forbidden_patterns: string[];
 	validation_rules: string[];
+	/** The project's stacks only when built for a project, else every stack. */
+	suggested_libraries: Record<string, string[]>;
+}
+export interface ProjectDomain {
+	/** The domain every task of the project gets, unless its spec names one. */
+	domain: string | null;
+	languages: string[];
 }
 
 // #3.4 CI/CD Anomaly
@@ -370,7 +378,13 @@ export interface Phase35FeaturesAPI {
 	buildDomainBundle: (
 		domain: string,
 		role: string,
+		projectPath?: string,
 	) => Promise<Phase35Result<{ bundle: DomainAgentBundle }>>;
+	getProjectDomain: (projectPath: string) => Promise<Phase35Result<ProjectDomain>>;
+	setProjectDomain: (
+		projectPath: string,
+		domain: string | null,
+	) => Promise<Phase35Result<{ domain: string | null }>>;
 
 	// #3.4 CI/CD Anomaly
 	scanCicdLog: (
@@ -645,8 +659,12 @@ export const createPhase35FeaturesAPI = (): Phase35FeaturesAPI => ({
 	listDomains: () => ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_LIST),
 	getDomainProfile: (domain) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROFILE, { domain }),
-	buildDomainBundle: (domain, role) =>
-		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role }),
+	buildDomainBundle: (domain, role, projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_BUILD, { domain, role, projectPath }),
+	getProjectDomain: (projectPath) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_GET, { projectPath }),
+	setProjectDomain: (projectPath, domain) =>
+		ipcRenderer.invoke(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_SET, { projectPath, domain }),
 
 	// #3.4
 	scanCicdLog: (log, label) =>
