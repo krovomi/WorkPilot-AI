@@ -299,4 +299,32 @@ describe("card screen", () => {
 		await fireEvent.press(await screen.findByRole("button", { name: "Build again" }));
 		expect(await screen.findByText("Too many attempts. Wait a minute, then try again.")).toBeTruthy();
 	});
+
+	it("keeps the feedback open with its text when the server refuses it", async () => {
+		const state = {
+			card: card({ column: "build_failed" }),
+			details: details({ column: "build_failed", spec: "x" }),
+			runs: [] as AgentRun[],
+		};
+		const server = serveCard(state, { [`POST ${CARD_PATH}/request-changes`]: reply(409, { detail: "card is running" }) });
+		await openApp("/projects/p1/cards/007-search");
+		await fireEvent.press(await screen.findByRole("button", { name: "Request changes" }));
+		await fireEvent.changeText(screen.getByPlaceholderText("What should the agents change?"), "Use the index");
+		await fireEvent.press(screen.getAllByRole("button", { name: "Send" })[0]);
+		expect(await screen.findByText(/card is running/)).toBeTruthy();
+		expect(screen.getByDisplayValue("Use the index")).toBeTruthy();
+		expect(started(server)).toEqual([]);
+	});
+
+	it("shows a run's status and phase as the server names them when it does not know them", async () => {
+		const state = {
+			card: card({ column: "in_progress" }),
+			details: details({ column: "in_progress", spec: "x" }),
+			runs: [run("paused", "lint")],
+		};
+		serveCard(state);
+		await openApp("/projects/p1/cards/007-search");
+		expect(await screen.findByText("lint")).toBeTruthy();
+		expect(screen.getByText("paused")).toBeTruthy();
+	});
 });

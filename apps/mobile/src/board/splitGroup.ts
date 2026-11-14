@@ -23,7 +23,8 @@ const COLORS: Record<GroupTone, { light: string; dark: string }> = {
 function utf8(text: string): number[] {
 	const bytes: number[] = [];
 	for (const char of text) {
-		const code = char.codePointAt(0) ?? 0;
+		// A string iterator yields whole code points, never an empty string.
+		const code = char.codePointAt(0) as number;
 		if (code < 0x80) bytes.push(code);
 		else if (code < 0x800) bytes.push(0xc0 | (code >> 6), 0x80 | (code & 63));
 		else if (code < 0x10000) bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 63), 0x80 | (code & 63));

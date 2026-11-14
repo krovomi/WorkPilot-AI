@@ -361,6 +361,51 @@ describe("forge", () => {
 		expect(screen.getByRole("button", { name: "Review what changed since" })).toBeTruthy();
 	});
 
+	it("keeps following a review still running, then says it failed even without a reason", async () => {
+		jest.useFakeTimers();
+		let ticks = 0;
+		pullServer({}, VCS, {
+			"POST /api/features/forge/github/reviews/jobs": { id: "rev-3", status: "queued" },
+			"GET /api/features/forge/github/reviews/jobs/rev-3": () => {
+				ticks += 1;
+				return { id: "rev-3", status: ticks < 2 ? "running" : "failed", lines: [], next: 0 };
+			},
+		});
+		await openApp("/projects/p1/forge/pulls/41");
+		await fireEvent.press(await screen.findByRole("button", { name: "Run the AI review" }));
+		await act(async () => {
+			jest.advanceTimersByTime(3_000);
+		});
+		expect(screen.getByText("An agent is working on it…")).toBeTruthy();
+		await act(async () => {
+			jest.advanceTimersByTime(3_000);
+		});
+		expect(await screen.findByText("The last run failed.")).toBeTruthy();
+	});
+
+	it("shows a review with a verdict it does not know, no summary, and a finding on no file", async () => {
+		pullServer({}, VCS, {
+			"GET /api/features/forge/github/reviews": {
+				reviews: { "41": JSON.stringify({ verdict: "ship_it", findings: [{ id: "a", severity: "medium", title: "Too broad", description: "Split it" }] }) },
+			},
+		});
+		await openApp("/projects/p1/forge/pulls/41");
+		expect(await screen.findByText("ship_it")).toBeTruthy();
+		expect(screen.getByText("MEDIUM")).toBeTruthy();
+		expect(screen.getByText("Too broad")).toBeTruthy();
+	});
+
+	it("shows a review that gives no verdict", async () => {
+		pullServer({}, VCS, {
+			"GET /api/features/forge/github/reviews": {
+				reviews: { "41": JSON.stringify({ summary: "Looks fine overall", findings: [] }) },
+			},
+		});
+		await openApp("/projects/p1/forge/pulls/41");
+		expect(await screen.findByText("Looks fine overall")).toBeTruthy();
+		expect(screen.queryByText("Not reviewed yet.")).toBeNull();
+	});
+
 	it("says why the review run failed or was refused", async () => {
 		jest.useFakeTimers();
 		pullServer({}, VCS, {
@@ -392,5 +437,46 @@ describe("forge", () => {
 		await openApp("/projects/p1/forge/pulls/41");
 		expect(await screen.findByText("Add search")).toBeTruthy();
 		expect(screen.queryByText(/^Checks:/)).toBeNull();
+	});
+
+	it("shows a pull request whose checks all passed, and asks before merging into an unnamed base", async () => {
+		pullServer({
+			[`GET ${REPO}/pulls/41`]: { ...PULL, head: { sha: "abc1234" }, base: {} },
+			[`GET ${REPO}/commits/abc1234/check-runs?per_page=100`]: {
+				check_runs: [{ status: "completed", conclusion: "success" }],
+			},
+		});
+		const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+		await openApp("/projects/p1/forge/pulls/41");
+		expect(await screen.findByText("Checks: 1 passed, 0 failed, 0 pending")).toBeTruthy();
+		expect(screen.getByText("Open · bob ·  → ")).toBeTruthy();
+		await fireEvent.press(screen.getByRole("button", { name: "Merge" }));
+		expect(alert).toHaveBeenCalledWith("Merge #41?", "It is merged into  with your token.", expect.any(Array));
+	});
+
+	it("shows checks still running", async () => {
+		pullServer({
+			[`GET ${REPO}/commits/abc1234/check-runs?per_page=100`]: { check_runs: [{ status: "queued" }] },
+		});
+		await openApp("/projects/p1/forge/pulls/41");
+		expect(await screen.findByText("Checks: 0 passed, 0 failed, 1 pending")).toBeTruthy();
+	});
+
+	it("opens a pull request from the list, which names no base it does not know", async () => {
+		const nodes = [{ ...PULLS.data.repository.pullRequests.nodes[0], baseRefName: null }];
+		github({ [`GET ${REPO}/pulls/41`]: PULL }, VCS, {
+			"POST /api/features/forge/github/pulls": relayed(200, { data: { repository: { pullRequests: { nodes } } } }),
+		});
+		const app = await openApp("/projects/p1/forge");
+		expect(await screen.findByText(/bob · feat\/search → (?!develop)/)).toBeTruthy();
+		await fireEvent.press(screen.getByRole("button", { name: /Add search/ }));
+		await waitFor(() => expect(app.getPathname()).toBe("/projects/p1/forge/pulls/41"));
+	});
+
+	it("says why the project, and so its forge, cannot be read", async () => {
+		fakeServer({ "GET /projects/p1": reply(500, { detail: "projects down" }) }, VCS);
+		await openApp("/projects/p1/forge");
+		expect(await screen.findByText(/projects down/)).toBeTruthy();
+		expect(screen.queryByText("This project's repository is not on a forge the server serves.")).toBeNull();
 	});
 });

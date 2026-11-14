@@ -7,7 +7,6 @@ import { INDEX_FILE, readIndex } from "../../../../context/index-file";
 import { JobBar } from "../../../../features/JobBar";
 import { useFeature } from "../../../../features/useFeature";
 import { useLoad } from "../../../../hooks/useLoad";
-import { describeError } from "../../../../i18n";
 import { ErrorBanner, Field, Loading, Section } from "../../../../ui/components";
 import { formatDate } from "../../../../ui/format";
 import { RADIUS, SPACE, useTheme } from "../../../../ui/theme";
@@ -58,7 +57,7 @@ function IndexTab({ projectId }: { projectId: string }) {
 			contentContainerStyle={styles.content}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
 		>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			<JobBar
 				job={feature.job}
 				active={feature.active}
@@ -140,7 +139,7 @@ function MemoriesTab({ projectId }: { projectId: string }) {
 				autoCapitalize="none"
 				returnKeyType="search"
 			/>
-			<ErrorBanner message={error ? describeError(error) : null} />
+			<ErrorBanner error={error} />
 			{loading && !data ? (
 				<Loading />
 			) : !data?.available ? (

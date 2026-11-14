@@ -15,7 +15,7 @@ import { useLoad } from "../../hooks/useLoad";
 import { describeError } from "../../i18n";
 import { readIncomingShare } from "../../new-card/incoming";
 import { holdShareDraft } from "../../new-card/share";
-import { Button, Centered, ErrorBanner, Loading } from "../../ui/components";
+import { Button, Centered, ErrorBanner, Loading, rowOpacity } from "../../ui/components";
 import { RADIUS, SPACE, useTheme } from "../../ui/theme";
 
 export default function ShareIntoCard() {
@@ -66,7 +66,7 @@ export default function ShareIntoCard() {
 					onPress={() => pick(item)}
 					style={({ pressed }) => [
 						styles.row,
-						{ backgroundColor: theme.surface, borderColor: theme.border, opacity: pressed ? 0.85 : 1 },
+						{ backgroundColor: theme.surface, borderColor: theme.border, opacity: rowOpacity(pressed) },
 					]}
 				>
 					<Text style={{ color: theme.text, fontSize: 17, fontWeight: "600" }}>{item.name}</Text>

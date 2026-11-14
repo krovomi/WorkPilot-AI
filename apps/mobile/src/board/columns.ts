@@ -27,15 +27,12 @@ export interface ColumnGroup {
 
 /** The cards under their column, in board order; a card of an unknown column goes to backlog. */
 export function groupByColumn(cards: readonly BoardCard[]): ColumnGroup[] {
-	const groups = new Map<Column, BoardCard[]>(COLUMN_ORDER.map((c) => [c, []]));
+	const groups = COLUMN_ORDER.map((column) => ({ column, cards: [] as BoardCard[] }));
+	const backlog = groups[0]; // COLUMN_ORDER starts with it
 	for (const card of cards) {
-		const target = groups.get(card.column) ?? groups.get("backlog");
-		target?.push(card);
+		(groups.find((g) => g.column === card.column) ?? backlog).cards.push(card);
 	}
-	return COLUMN_ORDER.filter((c) => ALWAYS_SHOWN.has(c) || (groups.get(c)?.length ?? 0) > 0).map((column) => ({
-		column,
-		cards: groups.get(column) ?? [],
-	}));
+	return groups.filter((g) => ALWAYS_SHOWN.has(g.column) || g.cards.length > 0);
 }
 
 /** Columns where an agent is at work on the card. */

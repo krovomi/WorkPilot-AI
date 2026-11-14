@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from .files import TEXT_HEADER
 
 __all__ = [
+    "wlangage_source",
     "CodeBlock",
     "TextElement",
     "OPAQUE_KEYS",
@@ -151,3 +152,21 @@ def parse_text_element(text: str) -> TextElement:
         )
         i = j
     return element
+
+
+def wlangage_source(text: str) -> str:
+    """The WLangage of an element saved in the text format, for a reader.
+
+    Each code block under a comment naming what it belongs to (a control, the
+    window, a procedure) and its event; the YAML around it, and the editor's
+    base64, are dropped. Text that is not a text-format element is returned
+    as it is: it is already WLangage someone pasted.
+    """
+    element = parse_text_element(text)
+    if not element.header_ok:
+        return text
+    parts = []
+    for block in element.blocks:
+        event = f", event {block.event_type}" if block.event_type else ""
+        parts.append(f"// {block.owner or element.name}{event}\n{block.code}")
+    return "\n\n".join(parts)
