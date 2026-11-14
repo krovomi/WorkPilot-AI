@@ -44,6 +44,10 @@ export const phase35Mock: Phase35FeaturesAPI = {
 	captureGeneration: () => browserUnavailable("Generational testing"),
 	compareGeneration: () => browserUnavailable("Generational testing"),
 	deleteGeneration: () => browserUnavailable("Generational testing"),
+	detectGenTestCommands: () => browserUnavailable("Generational testing"),
+	runGenTests: () => browserUnavailable("Generational testing"),
+	cancelGenTests: async () => false,
+	importGenTestsReport: () => browserUnavailable("Generational testing"),
 
 	diffI18n: () => browserUnavailable("i18n auto-scaling"),
 	skeletonI18n: () => browserUnavailable("i18n auto-scaling"),

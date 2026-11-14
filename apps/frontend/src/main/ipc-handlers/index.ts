@@ -140,6 +140,7 @@ import { registerConsensusArbiterHandlers } from "./consensus-arbiter-handlers";
 import { registerInjectionGuardHandlers } from "./injection-guard-handlers";
 import { registerSpecApprovalHandlers } from "./spec-approval-handlers";
 import { registerPhase35FeatureHandlers } from "./phase35-features-handlers";
+import { registerGenTestsRunHandlers } from "./gen-tests-run-handlers";
 import { registerPipelineHandlers } from "./pipeline-handlers";
 import { registerTaskHandlers } from "./task-handlers";
 import { registerTerminalWorktreeIpcHandlers } from "./terminal";
@@ -540,6 +541,7 @@ export function setupIpcHandlers(
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);
+	registerGenTestsRunHandlers();
 
 	// Accessibility Agent handlers (WCAG scanner)
 	registerAccessibilityHandlers();

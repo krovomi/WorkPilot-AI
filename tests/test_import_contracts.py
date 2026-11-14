@@ -75,6 +75,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # A suite run with its machine report, for the flaky detective and the
     # red team: the platform's command splitting, the child environment.
     "suite_runner": {"foundation", "security"},
+    # The generational test archive: the suite runner's report converters and
+    # TRX reader, so a generation reads every stack's report like the flaky
+    # detective; the route's API helpers in foundation.
+    "generational_tests": {"foundation", "suite_runner"},
     # Requirement -> subtask -> files -> tests (docs/architecture/requirement-links.md):
     # the plan's references, the Agent Trace records and the test conventions.
     # The build and the traceability route read it.

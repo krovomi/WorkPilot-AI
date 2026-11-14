@@ -293,25 +293,93 @@
 		"filesAnalyzed": "{{count}} files analysed"
 	},
 	"genTests": {
-		"title": "Generational Testing",
-		"subtitle": "Snapshot test results and compare across generations",
-		"label": "Generation label",
-		"junitXml": "JUnit XML",
-		"capture": "Capture generation",
-		"baseline": "Baseline label",
-		"current": "Current run JUnit XML",
-		"compare": "Compare",
+		"title": "Generational Tests",
+		"subtitle": "Keep one run of your tests as a reference, then compare later runs to it: regressions, vanished tests, slowdowns, new failures.",
+		"source": {
+			"heading": "Results to read",
+			"run": "Run the project's tests",
+			"report": "Import or paste a report"
+		},
+		"detecting": "Looking for the project's test command…",
+		"noCommand": "No test command was detected in this project (or this .NET project has no test project). Import a report produced elsewhere, by CI for example.",
+		"useReport": "Import a report",
+		"command": "Test command",
+		"willRun": "Command run:",
+		"report": {
+			"import": "Import a file…",
+			"paste": "Or paste a test report here",
+			"formats": "Formats read: JUnit XML, TRX (.NET), Jest or Vitest JSON, go test -json, cargo test output, dart/flutter test JSON, RSpec JSON. The format is recognised from the content."
+		},
+		"label": "Generation name",
+		"capture": "Capture a generation",
+		"captureRun": "Run and capture",
+		"captureReport": "Capture this report",
+		"baseline": "Baseline generation",
+		"noBaseline": "Capture a generation first to compare against it.",
+		"compare": "Compare with a generation",
+		"compareRun": "Run and compare",
+		"compareReport": "Compare this report",
+		"runningSuite": "Running the project's tests…",
+		"readingReport": "Reading the report…",
+		"cancel": "Stop",
+		"lastRun": "Last run: {{command}}",
+		"lastReport": "Last report read: {{format}}",
 		"generations": "Stored generations",
+		"emptyTitle": "No generation yet",
+		"emptyHint": "Capture the current state of the tests before a refactoring or an upgrade.",
+		"fromRun": "run of {{command}}",
+		"fromReport": "{{format}} report",
+		"delete": "Delete generation {{label}}",
+		"counts": {
+			"passed_one": "{{count}} passed",
+			"passed_other": "{{count}} passed",
+			"failed_one": "{{count}} failed",
+			"failed_other": "{{count}} failed",
+			"skipped_one": "{{count}} skipped",
+			"skipped_other": "{{count}} skipped"
+		},
+		"resultTitle": "Compared with {{baseline}}",
+		"noChange": "No difference: every test that passed in the baseline still passes, with no slowdown.",
 		"regressions": "Regressions",
 		"slowdowns": "Slowdowns",
 		"newFailures": "New failures",
 		"vanished": "Vanished tests",
 		"added": "New tests",
+		"formats": {
+			"junit": "JUnit XML",
+			"trx": "TRX (.NET)",
+			"jest": "Jest / Vitest JSON",
+			"go": "go test -json",
+			"cargo": "cargo test",
+			"dart": "Dart / Flutter JSON",
+			"rspec": "RSpec JSON"
+		},
 		"validation": {
-			"labelRequired": "Enter a generation label",
-			"junitRequired": "Paste JUnit XML content",
-			"junitInvalid": "Content does not look like valid JUnit XML",
-			"baselineRequired": "Enter an existing baseline label"
+			"labelInvalid": "Letters, digits, dot, dash and underscore only, starting with a letter or a digit.",
+			"labelTaken": "A generation already has this name: capturing will replace it."
+		},
+		"errors": {
+			"report": {
+				"empty": "The report is empty.",
+				"too_large": "The report is larger than 5 MB.",
+				"invalid_xml": "The report is not valid XML.",
+				"unknown_format": "This content is not a test report of a known format.",
+				"no_tests": "The report holds no test.",
+				"unreadable": "The file could not be read."
+			},
+			"run": {
+				"no_command": "No test command was detected for this project.",
+				"no_dotnet_tests": "This .NET project has no test project (xUnit, NUnit, MSTest, TUnit).",
+				"start_failed": "The test command could not start.",
+				"timed_out": "The tests ran longer than 30 minutes and were stopped.",
+				"no_tests": "The command ended without running any test.",
+				"no_results": "The command produced no test result (build error or missing tool?).",
+				"no_baseline": "This baseline generation no longer exists.",
+				"busy": "A run is already in progress.",
+				"invalid": "Generation name refused.",
+				"runner_failed": "The run stopped without a result.",
+				"not_a_directory": "The project folder cannot be found."
+			}
 		},
 		"kinds": {
 			"vanished": "vanished",

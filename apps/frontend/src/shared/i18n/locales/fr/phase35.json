@@ -293,25 +293,93 @@
 		"filesAnalyzed": "{{count}} fichiers analysés"
 	},
 	"genTests": {
-		"title": "Tests Générationnels",
-		"subtitle": "Snapshot des résultats de tests + comparaison entre générations",
+		"title": "Tests générationnels",
+		"subtitle": "Gardez une exécution de vos tests comme référence, puis comparez-y les suivantes : régressions, tests disparus, ralentissements, nouveaux échecs.",
+		"source": {
+			"heading": "Résultats à lire",
+			"run": "Lancer les tests du projet",
+			"report": "Importer ou coller un rapport"
+		},
+		"detecting": "Recherche de la commande de test du projet…",
+		"noCommand": "Aucune commande de test n'a été détectée dans ce projet (ou ce projet .NET n'a pas de projet de test). Importez un rapport produit ailleurs, par exemple par la CI.",
+		"useReport": "Importer un rapport",
+		"command": "Commande de test",
+		"willRun": "Commande lancée :",
+		"report": {
+			"import": "Importer un fichier…",
+			"paste": "Ou collez ici le contenu d'un rapport de tests",
+			"formats": "Formats lus : JUnit XML, TRX (.NET), JSON de Jest ou Vitest, go test -json, sortie de cargo test, JSON de dart/flutter test, JSON de RSpec. Le format est reconnu au contenu."
+		},
 		"label": "Nom de la génération",
-		"junitXml": "JUnit XML",
-		"capture": "Capturer la génération",
-		"baseline": "Nom de la génération de référence",
-		"current": "JUnit XML du run courant",
-		"compare": "Comparer",
+		"capture": "Capturer une génération",
+		"captureRun": "Lancer et capturer",
+		"captureReport": "Capturer ce rapport",
+		"baseline": "Génération de référence",
+		"noBaseline": "Capturez d'abord une génération pour pouvoir comparer.",
+		"compare": "Comparer à une génération",
+		"compareRun": "Lancer et comparer",
+		"compareReport": "Comparer ce rapport",
+		"runningSuite": "Exécution des tests du projet…",
+		"readingReport": "Lecture du rapport…",
+		"cancel": "Arrêter",
+		"lastRun": "Dernière exécution : {{command}}",
+		"lastReport": "Dernier rapport lu : {{format}}",
 		"generations": "Générations stockées",
+		"emptyTitle": "Aucune génération",
+		"emptyHint": "Capturez l'état actuel des tests avant un refactoring ou une montée de version.",
+		"fromRun": "exécution de {{command}}",
+		"fromReport": "rapport {{format}}",
+		"delete": "Supprimer la génération {{label}}",
+		"counts": {
+			"passed_one": "{{count}} réussi",
+			"passed_other": "{{count}} réussis",
+			"failed_one": "{{count}} en échec",
+			"failed_other": "{{count}} en échec",
+			"skipped_one": "{{count}} ignoré",
+			"skipped_other": "{{count}} ignorés"
+		},
+		"resultTitle": "Comparaison avec {{baseline}}",
+		"noChange": "Aucune différence : chaque test réussi de la référence réussit encore, sans ralentissement.",
 		"regressions": "Régressions",
 		"slowdowns": "Ralentissements",
 		"newFailures": "Nouveaux échecs",
 		"vanished": "Tests disparus",
 		"added": "Nouveaux tests",
+		"formats": {
+			"junit": "JUnit XML",
+			"trx": "TRX (.NET)",
+			"jest": "Jest / Vitest JSON",
+			"go": "go test -json",
+			"cargo": "cargo test",
+			"dart": "Dart / Flutter JSON",
+			"rspec": "RSpec JSON"
+		},
 		"validation": {
-			"labelRequired": "Saisissez un nom de génération",
-			"junitRequired": "Collez un contenu JUnit XML",
-			"junitInvalid": "Le contenu ne ressemble pas à du XML JUnit valide",
-			"baselineRequired": "Saisissez le nom d’une génération existante"
+			"labelInvalid": "Lettres, chiffres, point, tiret et souligné seulement, en commençant par une lettre ou un chiffre.",
+			"labelTaken": "Une génération porte déjà ce nom : la capturer la remplacera."
+		},
+		"errors": {
+			"report": {
+				"empty": "Le rapport est vide.",
+				"too_large": "Le rapport dépasse 5 Mo.",
+				"invalid_xml": "Le rapport n'est pas un XML valide.",
+				"unknown_format": "Ce contenu n'est pas un rapport de tests d'un format reconnu.",
+				"no_tests": "Le rapport ne contient aucun test.",
+				"unreadable": "Le fichier n'a pas pu être lu."
+			},
+			"run": {
+				"no_command": "Aucune commande de test détectée pour ce projet.",
+				"no_dotnet_tests": "Ce projet .NET n'a pas de projet de test (xUnit, NUnit, MSTest, TUnit).",
+				"start_failed": "La commande de test n'a pas pu démarrer.",
+				"timed_out": "Les tests ont dépassé 30 minutes et ont été arrêtés.",
+				"no_tests": "La commande s'est terminée sans lancer aucun test.",
+				"no_results": "La commande n'a produit aucun résultat de test (erreur de build ou outil manquant ?).",
+				"no_baseline": "Cette génération de référence n'existe plus.",
+				"busy": "Une exécution est déjà en cours.",
+				"invalid": "Nom de génération refusé.",
+				"runner_failed": "L'exécution s'est arrêtée sans résultat.",
+				"not_a_directory": "Le dossier du projet est introuvable."
+			}
 		},
 		"kinds": {
 			"vanished": "disparu",
