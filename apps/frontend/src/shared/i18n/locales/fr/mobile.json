@@ -45,6 +45,8 @@
 		"badgeTitle": "Cible mobile : {{platforms}}",
 		"detected": "Application détectée : {{framework}} ({{platforms}}).",
 		"notInApp": "Cette plateforme n'existe pas dans l'application du projet.",
+		"windevMobile": "Projet WinDev Mobile : les agents écrivent le code WLangage, l'application Android ou iOS se génère dans l'éditeur WinDev Mobile. Rien ne la construit ni ne la lance sur cette machine.",
+		"windevNoMobile": "Projet WinDev sans configuration mobile : aucune tâche d'installation n'est proposée. Une application pour téléphone s'ajoute dans l'éditeur WinDev Mobile, comme configuration de génération.",
 		"noAppTitle": "Ce projet n'a pas encore d'application mobile",
 		"noAppPreamble": "Cocher Android ou Apple (iOS) ajoute automatiquement au tableau les tâches qui créent l'application : une tâche qui installe le framework mobile et crée le projet dans le dossier {{dir}}/, puis une tâche de préparation par plateforme cochée. Cette tâche-ci attendra qu'elles soient terminées. Ne cochez rien si la tâche ne concerne pas une application mobile.",
 		"hostStacks": "Stacks détectées dans le projet : {{stacks}}. Le framework proposé en tient compte.",
@@ -74,7 +76,8 @@
 		"python": "Python",
 		"php": "PHP",
 		"ruby": "Ruby",
-		"elixir": "Elixir"
+		"elixir": "Elixir",
+		"windev": "WinDev"
 	},
 	"frameworks": {
 		"android-native": "Android (Kotlin)",
@@ -84,7 +87,8 @@
 		"expo": "React Native (Expo)",
 		"dotnet-maui": ".NET MAUI",
 		"kotlin-multiplatform": "Kotlin Multiplatform",
-		"capacitor": "Capacitor"
+		"capacitor": "Capacitor",
+		"windev-mobile": "WinDev Mobile"
 	},
 	"setup": {
 		"installTitle": "Installer {{framework}} et créer l'application mobile",
