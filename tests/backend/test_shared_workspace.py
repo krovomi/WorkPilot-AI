@@ -549,3 +549,48 @@ def test_the_desktop_dashboard_routes_answer_only_in_local_mode(monkeypatch):
         ):
             assert client.get(path).status_code == 404, path
     server_config.reset_settings_cache()
+
+
+def test_the_dashboard_averages_build_times_and_skips_empty_sessions(tmp_path):
+    """Build times by complexity are averaged across workspaces; a session that
+    recorded neither a token nor a cent (older builds left such rows) names no
+    model."""
+    from shared_features import usage_ledger
+
+    clone = tmp_path / "clone"
+    root = clone / ".workpilot"
+    workspace = root / "worktrees" / "tasks" / "004-tutu" / ".workpilot"
+    workspace.mkdir(parents=True)
+    now = datetime.now(UTC).isoformat()
+    (root / "cost_data.json").write_text(
+        json.dumps(
+            {
+                "usages": [
+                    {"provider": "claude", "model": "old", "timestamp": now},
+                    {
+                        "provider": "claude",
+                        "model": "claude-haiku-4-5",
+                        "input_tokens": 82,
+                        "output_tokens": 2411,
+                        "cost": 0.11,
+                        "timestamp": now,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "dashboard_snapshot.json").write_text(
+        json.dumps({"avg_completion_by_complexity": {"simple": [100.0, 200.0]}}),
+        encoding="utf-8",
+    )
+    (workspace / "dashboard_snapshot.json").write_text(
+        json.dumps({"avg_completion_by_complexity": {"simple": 300.0}}),
+        encoding="utf-8",
+    )
+
+    snapshot = usage_ledger.dashboard(usage_ledger.read_ledgers(clone), {})
+
+    assert snapshot["avg_completion_by_complexity"] == {"simple": 200.0}
+    assert snapshot["cost_by_model"] == {"claude/claude-haiku-4-5": 0.11}
+    assert snapshot["total_tokens"] == 82 + 2411
