@@ -61,7 +61,13 @@
 		"in_progress": "En cours",
 		"pending": "En attente",
 		"failed": "Échouées",
-		"cancelled": "Annulées"
+		"cancelled": "Annulées",
+		"queue": "En file",
+		"ai_review": "Revue IA",
+		"human_review": "Revue humaine",
+		"build_failed": "Build rouge",
+		"pr_created": "PR ouverte",
+		"error": "En erreur"
 	},
 	"complexity": {
 		"trivial": "Triviale",
