@@ -22,7 +22,8 @@ def _load(name: str) -> dict:
 
 
 @pytest.mark.parametrize(
-    "workflow", ["release.yml", "prepare-release.yml", "beta-release.yml"]
+    "workflow",
+    ["release.yml", "prepare-release.yml", "beta-release.yml", "release-autopilot.yml"],
 )
 def test_release_workflows_never_squash_or_rebase(workflow):
     text = (WORKFLOWS / workflow).read_text(encoding="utf-8")

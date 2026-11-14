@@ -69,10 +69,9 @@
 	},
 	"agentHealth": {
 		"title": "Agent Health",
-		"subtitle": "Reliability score per agent over its recent history",
+		"subtitle": "Reliability of each agent, per provider and model, read from the project's Kanban tasks",
 		"refresh": "Refresh scores",
-		"reset": "Reset history",
-		"noAgents": "No agent runs recorded yet.",
+		"noAgents": "No finished phase in this project's tasks yet.",
 		"successRate": "Success rate",
 		"errorRate": "Error rate",
 		"retryRate": "Retry rate",
@@ -93,6 +92,18 @@
 			"retrain_prompt": "Refresh the prompt examples",
 			"rotate_model": "Try another model",
 			"alert_operator": "Needs your attention"
+		},
+		"noProject": "Open a project: agent health is read from its Kanban tasks.",
+		"source_one": "Read from {{count}} task of the project (finished planning, coding and QA).",
+		"source_other": "Read from {{count}} tasks of the project (finished planning, coding and QA).",
+		"unknownModel": "model not named in the logs",
+		"pendingTitle": "Not enough phases for a score yet ({{min}} needed):",
+		"pendingRuns_one": "{{count}} phase",
+		"pendingRuns_other": "{{count}} phases",
+		"roles": {
+			"planner": "Planner",
+			"coder": "Coder",
+			"qa": "QA"
 		}
 	},
 	"modelRouter": {

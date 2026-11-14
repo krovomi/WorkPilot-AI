@@ -69,10 +69,9 @@
 	},
 	"agentHealth": {
 		"title": "Santé des Agents",
-		"subtitle": "Score de fiabilité par agent sur l'historique récent",
+		"subtitle": "Fiabilité de chaque agent, par provider et modèle, lue dans les tâches Kanban du projet",
 		"refresh": "Actualiser",
-		"reset": "Réinitialiser l'historique",
-		"noAgents": "Aucune exécution d'agent enregistrée pour l'instant.",
+		"noAgents": "Aucune phase terminée dans les tâches de ce projet pour l'instant.",
 		"successRate": "Taux de succès",
 		"errorRate": "Taux d'erreur",
 		"retryRate": "Taux de relance",
@@ -93,6 +92,18 @@
 			"retrain_prompt": "Revoir les exemples du prompt",
 			"rotate_model": "Essayer un autre modèle",
 			"alert_operator": "Demande votre attention"
+		},
+		"noProject": "Ouvrez un projet : la santé des agents se lit dans ses tâches Kanban.",
+		"source_one": "Lu dans {{count}} tâche du projet (planification, code et QA terminés).",
+		"source_other": "Lu dans {{count}} tâches du projet (planification, code et QA terminés).",
+		"unknownModel": "modèle non indiqué dans les logs",
+		"pendingTitle": "Pas encore assez de phases pour un score (il en faut {{min}}) :",
+		"pendingRuns_one": "{{count}} phase",
+		"pendingRuns_other": "{{count}} phases",
+		"roles": {
+			"planner": "Planificateur",
+			"coder": "Codeur",
+			"qa": "QA"
 		}
 	},
 	"modelRouter": {
