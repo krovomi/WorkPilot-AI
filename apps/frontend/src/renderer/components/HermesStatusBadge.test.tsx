@@ -119,6 +119,20 @@ describe("HermesStatusBadge", () => {
 		expect(screen.queryByRole("button", { name: /install/i })).not.toBeInTheDocument();
 	});
 
+	it("names a backend that did not answer instead of « Failed to fetch »", async () => {
+		mockFetchStatus.mockResolvedValue({
+			ok: false,
+			error: "Failed to fetch",
+			unreachable: true,
+		});
+		renderBadge();
+		await waitFor(() => expect(useHermesStore.getState().error).not.toBeNull());
+		expect(useHermesStore.getState().error).not.toBe("Failed to fetch");
+		openPopover();
+		expect(screen.queryByText("Failed to fetch")).not.toBeInTheDocument();
+		expect(screen.getByRole("alert")).toHaveTextContent(/backend/i);
+	});
+
 	it("counts what waits for review and offers the persona", async () => {
 		mockFetchStatus.mockResolvedValue({
 			ok: true,

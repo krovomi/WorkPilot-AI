@@ -121,5 +121,8 @@
 		"pending_one": "{{count}} skill waiting for your review in a task panel.",
 		"pending_other": "{{count}} skills waiting for your review in a task panel.",
 		"docs": "{{name}} documentation"
+	},
+	"errors": {
+		"backendUnreachable": "The local WorkPilot backend did not answer. Start it (or restart the app), then refresh."
 	}
 }
