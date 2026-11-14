@@ -150,6 +150,9 @@ def _empty_diff(fmt: ContractFormat = ContractFormat.UNKNOWN) -> dict[str, Any]:
 
 
 def run_scan(project_path: Path) -> dict[str, Any]:
+    # Resolved like the files found under it: through a symlinked or relative
+    # path, every contract fell outside it and none could be parsed.
+    project_path = project_path.resolve()
     _emit_event("start", {"status": "Discovering API specifications..."})
     specs = _discover_specs(project_path)
 
@@ -212,6 +215,13 @@ def run_scan(project_path: Path) -> dict[str, Any]:
             "diff": _empty_diff(),
             "migrationGuideMarkdown": "",
             "summary": f"Failed to read baseline: {exc}",
+        }
+    if not isinstance(baseline_data, dict) or not baseline_data:
+        # An empty baseline stopped the runner with an empty error message.
+        return {
+            "diff": _empty_diff(),
+            "migrationGuideMarkdown": "",
+            "summary": "Failed to read baseline: it holds no contract",
         }
 
     _emit_event("progress", {"status": "Diffing against baseline..."})
