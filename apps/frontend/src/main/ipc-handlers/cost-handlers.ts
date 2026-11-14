@@ -12,6 +12,7 @@ import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { logger } from "../app-logger";
+import { BUDGET_FILE, budgetStatus, writeBudget, writeTaskBudget } from "../cost-budget";
 import { projectStore } from "../project-store";
 import {
 	buildDashboardSnapshot,
@@ -20,6 +21,8 @@ import {
 	readUsages,
 	SNAPSHOT_FILE,
 } from "../workspace-ledgers";
+import { allSpecDirs, getSpecPaths } from "./task/resume-task";
+import { findTaskAndProject } from "./task/shared";
 
 // ---------------------------------------------------------------------------
 // Load all configured provider IDs from configured_providers.json
@@ -98,7 +101,7 @@ function watchLedgers(projectPath: string): void {
 	try {
 		const watcher = fs.watch(dir, { persistent: false }, (_event, filename) => {
 			const name = filename ? String(filename) : "";
-			if (name === COST_DATA_FILE) {
+			if (name === COST_DATA_FILE || name === BUDGET_FILE) {
 				debounce(`${projectPath}:costs`, () =>
 					notifyWindows(IPC_CHANNELS.COSTS_DATA_UPDATED, projectPath),
 				);
@@ -119,6 +122,12 @@ function watchLedgers(projectPath: string): void {
 	}
 }
 
+function isRegisteredProject(projectPath: unknown): projectPath is string {
+	if (typeof projectPath !== "string" || !projectPath) return false;
+	const wanted = path.resolve(projectPath);
+	return projectStore.getProjects().some((p) => path.resolve(p.path) === wanted);
+}
+
 /** The board's tasks of the project at `projectPath`, or none if it is not registered. */
 function boardTasks(projectPath: string) {
 	const wanted = path.resolve(projectPath);
@@ -126,66 +135,6 @@ function boardTasks(projectPath: string) {
 		.getProjects()
 		.find((p) => path.resolve(p.path) === wanted);
 	return project ? projectStore.getTasks(project.id) : [];
-}
-
-// ---------------------------------------------------------------------------
-// JSON file shape (mirrors Python CostEstimator.save_to_file)
-// ---------------------------------------------------------------------------
-
-interface RawBudget {
-	project_id: string;
-	limit: number;
-	currency: string;
-	warning_threshold: number;
-	critical_threshold: number;
-	period: string;
-}
-
-interface CostDataFile {
-	usages: unknown[];
-	budgets: Record<string, RawBudget>;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getCostDataPath(projectPath: string): string {
-	return path.join(projectPath, ".workpilot", COST_DATA_FILE);
-}
-
-function loadCostData(projectPath: string): CostDataFile {
-	const filePath = getCostDataPath(projectPath);
-	if (!fs.existsSync(filePath)) {
-		return { usages: [], budgets: {} };
-	}
-	try {
-		const raw = fs.readFileSync(filePath, "utf-8");
-		return JSON.parse(raw) as CostDataFile;
-	} catch (err) {
-		logger.warn("[costs] Failed to parse cost_data.json", err);
-		return { usages: [], budgets: {} };
-	}
-}
-
-function saveCostData(projectPath: string, data: CostDataFile): void {
-	const filePath = getCostDataPath(projectPath);
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
-}
-
-function getPeriodStart(period: string): Date | null {
-	const now = new Date();
-	if (period === "monthly") {
-		return new Date(now.getFullYear(), now.getMonth(), 1);
-	}
-	if (period === "weekly") {
-		const start = new Date(now);
-		start.setDate(now.getDate() - now.getDay());
-		start.setHours(0, 0, 0, 0);
-		return start;
-	}
-	return null; // 'total' — no filter
 }
 
 // ---------------------------------------------------------------------------
@@ -310,70 +259,13 @@ export function registerCostHandlers(): void {
 	);
 
 	/**
-	 * costs:getBudget — returns budget info for the current period
+	 * costs:getBudget — the project's budget and where it stands
+	 * (`cost-budget.ts`; the backend enforces the same file).
 	 */
 	ipcMain.handle(IPC_CHANNELS.COSTS_GET_BUDGET, async (_, projectPath: string) => {
 		try {
-			const data = loadCostData(projectPath);
-			// Use project path as key (same convention as Python CostEstimator)
-			const budget = data.budgets[projectPath];
-			if (!budget) {
-				return { success: false, error: "No budget configured" };
-			}
-
-			const periodStart = getPeriodStart(budget.period);
-			const usages = readUsages(projectPath);
-			const relevant = periodStart
-				? usages.filter((u) => new Date(u.timestamp) >= periodStart)
-				: usages;
-
-			const spent = relevant.reduce((s, u) => s + u.cost, 0);
-			const remaining = Math.max(0, budget.limit - spent);
-			const utilizationPct =
-				budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
-
-			// Forecast end-of-month
-			let forecastEndOfMonth = 0;
-			if (budget.period === "monthly") {
-				const now = new Date();
-				const daysInMonth = new Date(
-					now.getFullYear(),
-					now.getMonth() + 1,
-					0,
-				).getDate();
-				const dayOfMonth = now.getDate();
-				forecastEndOfMonth =
-					dayOfMonth > 0 ? (spent / dayOfMonth) * daysInMonth : 0;
-			}
-
-			// Build alert messages
-			const alerts: string[] = [];
-			const pct = utilizationPct / 100;
-			if (pct >= 1) {
-				alerts.push(
-					`Budget dépassé ! Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)}`,
-				);
-			} else if (pct >= budget.critical_threshold) {
-				alerts.push(
-					`Critique : proche du plafond. Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)} (${utilizationPct.toFixed(0)}%)`,
-				);
-			} else if (pct >= budget.warning_threshold) {
-				alerts.push(
-					`Attention : utilisation élevée. Dépensé $${spent.toFixed(2)} / $${budget.limit.toFixed(2)} (${utilizationPct.toFixed(0)}%)`,
-				);
-			}
-
-			return {
-				success: true,
-				budget: {
-					monthly_budget: budget.limit,
-					spent_this_month: spent,
-					remaining,
-					utilization_pct: utilizationPct,
-					alerts,
-					forecast_end_of_month: forecastEndOfMonth,
-				},
-			};
+			watchLedgers(projectPath);
+			return { success: true, budget: budgetStatus(projectPath) };
 		} catch (err) {
 			logger.error("[costs] getBudget failed", err);
 			return { success: false, error: String(err) };
@@ -399,30 +291,42 @@ export function registerCostHandlers(): void {
 	});
 
 	/**
-	 * costs:setBudget — create/update budget for a project
+	 * costs:setBudget — the project's budget, revalidated here (`parseBudget`)
 	 */
 	ipcMain.handle(
 		IPC_CHANNELS.COSTS_SET_BUDGET,
-		async (
-			_,
-			projectPath: string,
-			limit: number,
-			period: string = "monthly",
-		) => {
+		async (_, projectPath: string, budget: unknown) => {
 			try {
-				const data = loadCostData(projectPath);
-				data.budgets[projectPath] = {
-					project_id: projectPath,
-					limit,
-					currency: "USD",
-					warning_threshold: 0.75,
-					critical_threshold: 0.9,
-					period,
-				};
-				saveCostData(projectPath, data);
-				return { success: true };
+				if (!isRegisteredProject(projectPath)) {
+					return { success: false, error: "Unknown project" };
+				}
+				return { success: true, budget: writeBudget(projectPath, budget) };
 			} catch (err) {
 				logger.error("[costs] setBudget failed", err);
+				return { success: false, error: String(err) };
+			}
+		},
+	);
+
+	/**
+	 * costs:setTaskBudget — one task's own limit (0 clears it), in every copy of
+	 * its spec directory. A task paused at its budget resumes once it is raised.
+	 */
+	ipcMain.handle(
+		IPC_CHANNELS.COSTS_SET_TASK_BUDGET,
+		async (_, projectId: string, taskId: string, amount: unknown) => {
+			try {
+				if (typeof projectId !== "string" || typeof taskId !== "string") {
+					return { success: false, error: "Invalid task" };
+				}
+				const { task, project } = findTaskAndProject(taskId, projectId);
+				if (!task || !project) return { success: false, error: "Task not found" };
+				const written = writeTaskBudget(allSpecDirs(getSpecPaths(task, project)), amount);
+				return written > 0
+					? { success: true }
+					: { success: false, error: "Task folder not found" };
+			} catch (err) {
+				logger.error("[costs] setTaskBudget failed", err);
 				return { success: false, error: String(err) };
 			}
 		},

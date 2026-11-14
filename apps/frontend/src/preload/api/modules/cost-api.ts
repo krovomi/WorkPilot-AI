@@ -5,6 +5,7 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 import type {
 	CostSummary,
 	DashboardSnapshot,
@@ -14,14 +15,7 @@ import type {
 
 export type { CostSummary, DashboardSnapshot };
 
-export interface BudgetInfo {
-	monthly_budget: number;
-	spent_this_month: number;
-	remaining: number;
-	utilization_pct: number;
-	alerts: string[];
-	forecast_end_of_month: number;
-}
+export type { CostBudgetConfig, CostBudgetStatus } from "../../../shared/types/cost-budget";
 
 export interface ContextUsage {
 	provider: string;
@@ -46,11 +40,16 @@ export interface CostAPI {
 	}>;
 	getCostBudget(
 		projectPath: string,
-	): Promise<{ success: boolean; budget?: BudgetInfo; error?: string }>;
+	): Promise<{ success: boolean; budget?: CostBudgetStatus; error?: string }>;
 	setCostBudget(
 		projectPath: string,
-		limit: number,
-		period?: string,
+		budget: CostBudgetConfig,
+	): Promise<{ success: boolean; budget?: CostBudgetConfig; error?: string }>;
+	/** One task's own limit in USD; 0 clears it. */
+	setTaskBudget(
+		projectId: string,
+		taskId: string,
+		amountUsd: number,
 	): Promise<{ success: boolean; error?: string }>;
 	getDashboardSnapshot(projectPath: string): Promise<{
 		success: boolean;
@@ -79,8 +78,11 @@ export const createCostAPI = (): CostAPI => ({
 	getCostBudget: (projectPath: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.COSTS_GET_BUDGET, projectPath),
 
-	setCostBudget: (projectPath: string, limit: number, period = "monthly") =>
-		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_BUDGET, projectPath, limit, period),
+	setCostBudget: (projectPath: string, budget: CostBudgetConfig) =>
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_BUDGET, projectPath, budget),
+
+	setTaskBudget: (projectId: string, taskId: string, amountUsd: number) =>
+		ipcRenderer.invoke(IPC_CHANNELS.COSTS_SET_TASK_BUDGET, projectId, taskId, amountUsd),
 
 	getDashboardSnapshot: (projectPath: string) =>
 		ipcRenderer.invoke(IPC_CHANNELS.DASHBOARD_GET_SNAPSHOT, projectPath),

@@ -224,6 +224,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - **App mobile** pour iOS et Android, chat d'équipe, inscription sur invitation uniquement.
 
 **Coûts et suivi**
+- Budgets de coût appliqués pendant l'exécution : un budget du projet par période et un plafond par tâche, vérifiés avant chaque session d'agent sur tous les fournisseurs ; la tâche se met en pause à son plafond, peut passer à un modèle plus léger du même fournisseur, et une tâche qui dépense sans avancer est mise en pause elle aussi.
 - Tableau de bord analytique, estimateur de coûts, Formula Lab (estimation du coût et de la réussite par provider, modèle et effort), moniteur de limites de débit avec bascule de compte, profileur carbone avec un budget mensuel et un export ESG, traces OpenTelemetry GenAI pour chaque provider.
 
 **Apparence**

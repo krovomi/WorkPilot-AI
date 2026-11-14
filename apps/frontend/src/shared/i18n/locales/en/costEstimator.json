@@ -23,13 +23,51 @@
 		}
 	},
 	"budget": {
-		"title": "Monthly Budget",
-		"pctUsed": "{{pct}}% used",
+		"title": "Budget",
+		"description": "Read before every agent session of a task, whatever the provider: thresholds noted in the task's log, a pause at the limit, an optional lighter model.",
+		"notSet": "No budget",
+		"noProjectLimit": "No project budget: only the per-task limit applies.",
 		"spent": "{{amount}} spent",
-		"remaining": "{{amount}} remaining",
-		"total": "{{amount}} total",
-		"forecast": "End-of-month forecast:",
-		"overBudget": "Over budget"
+		"spentFloor": "at least {{amount}} spent (a model with no known price)",
+		"remaining": "{{amount}} left",
+		"total": "{{amount}} in all",
+		"forecast": "End-of-period forecast:",
+		"overBudget": "Overrun expected",
+		"tasksNearLimit": "Tasks close to their {{limit}} limit:",
+		"period": {
+			"monthly": "This month",
+			"weekly": "This week",
+			"total": "Since the start"
+		},
+		"level": {
+			"ok": "{{pct}}% used",
+			"warning": "{{pct}}%: watch out",
+			"critical": "{{pct}}%: critical",
+			"exceeded": "Budget reached"
+		},
+		"alert": {
+			"warning": "{{spent}} spent of {{limit}}. At the limit, running tasks are {{action}}.",
+			"critical": "{{spent}} spent of {{limit}}, the limit is close. At the limit, running tasks are {{action}}.",
+			"exceeded": "{{spent}} spent of {{limit}}. Running tasks are {{action}}."
+		},
+		"action": {
+			"pause": "paused before their next session",
+			"warn": "warned only"
+		},
+		"form": {
+			"projectLimit": "Project budget",
+			"period": "Period",
+			"taskLimit": "Limit per task",
+			"usdHint": "Amounts in US dollars, like the providers' prices. Empty or 0: no limit.",
+			"onExceed": "When a limit is reached",
+			"degrade": "Switch to a lighter model as the budget runs out",
+			"degradeHint": "At the warning threshold, a flagship model moves to the same provider's standard tier; at the critical one, to its fast tier.",
+			"stall": "Pause a task that spends without making progress",
+			"stallHint": "A task that spends three times the average cost of its completed subtasks without completing another one is paused.",
+			"save": "Save the budget",
+			"saved": "Budget saved",
+			"saveFailed": "The budget could not be saved"
+		}
 	},
 	"breakdown": {
 		"costByProvider": "Cost by Provider",
