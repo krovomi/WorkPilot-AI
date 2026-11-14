@@ -66,7 +66,7 @@ interface I18nScalerPanelProps {
 
 export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 	const { t } = useTranslation("phase35");
-	const { phase, error, report, scannedDir, redirectedFrom, runReport } =
+	const { phase, error, report, scannedDir, redirectedFrom, formats, runReport } =
 		useI18nScalerStore();
 	const editor = useI18nEditorStore();
 	const [mode, setMode] = useState<"report" | "editor">("report");
@@ -212,6 +212,20 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 								{t("i18nScaler.browseDir")}
 							</Button>
 						</div>
+						{mode === "report" && projectPath && dir !== projectPath && (
+							<Button
+								type="button"
+								size="sm"
+								variant="link"
+								className="mt-1 h-auto p-0 text-xs"
+								onClick={() => setDir(projectPath)}
+							>
+								{t("i18nScaler.useProject")}
+							</Button>
+						)}
+						{mode === "report" && (
+							<p className="mt-1 text-xs text-muted-foreground">{t("i18nScaler.formatsNote")}</p>
+						)}
 						{dirError && (
 							<p id="dir-error" className="mt-1 text-xs text-destructive">
 								{dirError}
@@ -336,6 +350,16 @@ export function I18nScalerPanel({ projectPath = "" }: I18nScalerPanelProps) {
 									dir: scannedDir,
 								})
 							: t("i18nScaler.scannedDir", { dir: scannedDir })}
+					</p>
+				)}
+
+				{mode === "report" && report && formats.length > 0 && (
+					<p className="text-xs text-muted-foreground">
+						{t("i18nScaler.formatsRead", {
+							formats: formats
+								.map((f) => t(`i18nScaler.formats.${f}` as never, { defaultValue: f }))
+								.join(", "),
+						})}
 					</p>
 				)}
 
