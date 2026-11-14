@@ -1298,6 +1298,20 @@ def _learning_loop_model_off_by_default(monkeypatch):
     monkeypatch.setenv("WORKPILOT_LEARNING_LOOP_MODEL", "0")
 
 
+# The desktop app starts every Python runner with PYTHONUTF8=1 and
+# PYTHONIOENCODING=utf-8 (`apps/frontend/src/main/utils/python-runner-env.ts`).
+# A test that starts a runner from this environment gets the same switches:
+# without them, a runner printing an emoji on Windows died on the cp1252
+# console encoding and the test read an empty stdout. A test about the
+# platform encoding sets its own (`tests/test_brain.py`).
+
+
+@pytest.fixture(autouse=True)
+def _python_children_speak_utf8(monkeypatch):
+    monkeypatch.setenv("PYTHONUTF8", "1")
+    monkeypatch.setenv("PYTHONIOENCODING", "utf-8")
+
+
 # ── Ambient state is not input ─────────────────────────────────────────
 #
 # These two lived in a repository-root `conftest.py` while some tests still

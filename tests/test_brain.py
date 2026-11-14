@@ -710,7 +710,9 @@ def test_the_registered_command_starts_a_working_server(tmp_path, platform_encod
 
     env = {**os.environ, "WORKPILOT_BRAIN_DIR": str(tmp_path / "brain")}
     if platform_encoding:
+        # Windows without the app's UTF-8 switches (tests/conftest.py sets them).
         env["PYTHONIOENCODING"] = platform_encoding
+        env.pop("PYTHONUTF8", None)
     done = subprocess.run(
         [sys.executable, str(BACKEND / "runners" / "brain_mcp.py")],
         input=(
