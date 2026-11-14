@@ -10,6 +10,7 @@ import {
 	allowedActions,
 	availableActions,
 	type CardAction,
+	runPhase,
 	sendBack,
 	startCard,
 	stopCard,
@@ -97,11 +98,11 @@ export default function CardScreen() {
 			case "stop":
 				return run(action, () => stopCard(api, projectId, card));
 			case "retry":
-				return run(action, () => api.startRun(projectId, card.specId ?? "", "build"));
+				return run(action, () => runPhase(api, projectId, card, "build"));
 			case "merge":
-				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "merge"));
+				return runConfirmed(action, () => runPhase(api, projectId, card, "merge"));
 			case "createPr":
-				return runConfirmed(action, () => api.startRun(projectId, card.specId ?? "", "pr"));
+				return runConfirmed(action, () => runPhase(api, projectId, card, "pr"));
 			case "requestChanges":
 				setFeedbackOpen(true);
 				return;
@@ -157,7 +158,7 @@ export default function CardScreen() {
 				) : null}
 			</View>
 
-			<ErrorBanner message={actionError ?? (error ? describeError(error) : null)} />
+			<ErrorBanner message={actionError} error={error} />
 
 			{actions.length > 0 ? (
 				<View style={styles.actions}>

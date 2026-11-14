@@ -95,6 +95,7 @@ from .report import (
 )
 from .reviewer import classify_qa_error, run_qa_agent_session
 from .schema_gate import schema_gate
+from .windev_gate import windev_gate, windev_only
 
 
 def _ensure_fix_request_file(
@@ -559,6 +560,13 @@ async def run_qa_validation_loop(
                     spec_dir,
                     project_dir,
                     state.qa_iteration,
+                    task_logger=scope.task_logger,
+                )
+                or windev_gate(
+                    spec_dir,
+                    project_dir,
+                    state.qa_iteration,
+                    state.review_scope,
                     task_logger=scope.task_logger,
                 )
                 or await _architecture_gate(scope, state.qa_iteration, qa_model)
@@ -1253,12 +1261,20 @@ def _coverage_gate(
     suite of the repository with coverage for a `.txt`, then the fixer to
     invent placeholder test projects to produce a number. Decided from
     `review_scope` (git), never from what the reviewer wrote in its sign-off.
+    Not applicable either when every code file is a WinDev one: its tests
+    run in the WinDev editor only, so no number can exist.
 
     A targeted pass is judged by `qa.targeted_gate` instead: its mapped tests
     ran and passed, and the touched files reach the threshold.
     """
     if review_scope is not None and not review_scope.touches_code:
         debug("qa_loop", "Coverage gate not applicable: no code in the change set")
+        return None
+    if windev_only(review_scope):
+        debug(
+            "qa_loop",
+            "Coverage gate not applicable: WinDev code, tests run in the editor",
+        )
         return None
     if review_scope is not None and review_scope.is_targeted:
         return _targeted_gate(spec_dir, qa_iteration, review_scope, review_commands)

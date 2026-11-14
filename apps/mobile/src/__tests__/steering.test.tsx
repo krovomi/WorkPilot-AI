@@ -67,6 +67,12 @@ describe("SteeringSection", () => {
 		}
 	});
 
+	it("says it was delivered even when the server does not know to which session", async () => {
+		mockApi.steering.mockResolvedValueOnce([{ ...delivered, deliveredSession: null }]);
+		await render(<SteeringSection projectId="p1" cardId="004-x" canSend working={false} />);
+		expect(await screen.findByText(/Delivered to session \?/)).toBeTruthy();
+	});
+
 	it("offers no composer without agent.execute", async () => {
 		await render(<SteeringSection projectId="p1" cardId="004-x" canSend={false} working={false} />);
 		expect(await screen.findByText("Keep the old route")).toBeTruthy();

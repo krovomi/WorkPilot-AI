@@ -134,6 +134,30 @@ describe("ChangesSection", () => {
 	});
 });
 
+describe("ChangesSection, edges", () => {
+	it("says when the card has no workspace yet, and shows nothing without an answer", async () => {
+		await render(<ChangesSection changes={{ exists: false, files: [] }} />);
+		expect(screen.getByText("No build workspace yet.")).toBeTruthy();
+		const view = await render(<ChangesSection changes={null} />);
+		expect(view.toJSON()).toBeNull();
+	});
+
+	it("counts the files an older server lists without totals, closes a diff on a second tap, and cuts a long one", async () => {
+		const long = ["@@ -1 +1 @@", "", ...Array.from({ length: MAX_PATCH_LINES + 5 }, (_, i) => `+line ${i}`)].join("\n");
+		await render(
+			<ChangesSection
+				changes={{ exists: true, files: [{ path: "src/big.go", status: "added", additions: 405, deletions: 0, patch: long }] }}
+			/>,
+		);
+		expect(screen.getByText("1 files · +0 −0")).toBeTruthy();
+		const row = screen.getByRole("button", { name: /src\/big\.go/ });
+		await fireEvent.press(row);
+		expect(screen.getByText("The diff is cut here; read the rest on the desktop.")).toBeTruthy();
+		await fireEvent.press(row);
+		expect(screen.queryByText("+line 0")).toBeNull();
+	});
+});
+
 describe("SettingsSection", () => {
 	it("shows the engine, priority and goal the card runs with", async () => {
 		await render(
@@ -150,6 +174,42 @@ describe("SettingsSection", () => {
 		expect(screen.getByText("Engine: openai · gpt-5.5 · high")).toBeTruthy();
 		expect(screen.getByText("Priority: urgent")).toBeTruthy();
 		expect(screen.getByText("pytest -q")).toBeTruthy();
+	});
+
+	it("names the automatic profile, a priority it does not know, and a goal it cannot read", async () => {
+		await render(
+			<SettingsSection
+				settings={{
+					engine: { provider: "claude", model: "x", isAutoProfile: true },
+					priority: "someday" as never,
+					category: null,
+					goal: null,
+					goalError: "bad TOML",
+				}}
+			/>,
+		);
+		expect(screen.getByText("Engine: claude · auto")).toBeTruthy();
+		expect(screen.getByText("Priority: someday")).toBeTruthy();
+		expect(screen.getByText("The goal cannot be read: bad TOML")).toBeTruthy();
+		expect(screen.queryByText("Done when this passes:")).toBeNull();
+	});
+
+	it("shows a priority without an engine", async () => {
+		await render(
+			<SettingsSection settings={{ engine: null, priority: "high", category: null, goal: null, goalError: null }} />,
+		);
+		expect(screen.getByText("Priority: high")).toBeTruthy();
+		expect(screen.queryByText(/^Engine:/)).toBeNull();
+	});
+
+	it("shows the engine alone when the card sets nothing else", async () => {
+		await render(
+			<SettingsSection
+				settings={{ engine: { provider: "codex", model: "gpt-5.5" }, priority: null, category: null, goal: null, goalError: null }}
+			/>,
+		);
+		expect(screen.getByText("Engine: codex · gpt-5.5")).toBeTruthy();
+		expect(screen.queryByText(/Priority/)).toBeNull();
 	});
 
 	it("shows nothing when the card sets none, or the server is older", async () => {
@@ -216,6 +276,29 @@ describe("LogsSection", () => {
 		expect(screen.getByText(/\[Bash\] /)).toBeTruthy();
 		await fireEvent.press(screen.getByRole("button", { name: /Planning/ }));
 		expect(screen.getByText("Nothing written in this phase yet.")).toBeTruthy();
+	});
+
+	it("opens the last phase that wrote when none is running, and says when the server cut the log", async () => {
+		await render(
+			<LogsSection
+				logs={{
+					truncated: true,
+					phases: {
+						planning: phase("planning", "completed", ["planned it"]),
+						coding: phase("coding", "completed", ["coded it"]),
+						validation: phase("validation", "pending", []),
+					},
+				}}
+			/>,
+		);
+		expect(screen.getByText("coded it")).toBeTruthy();
+		expect(screen.queryByText("planned it")).toBeNull();
+		expect(screen.getByText("The server sent only the latest lines.")).toBeTruthy();
+	});
+
+	it("opens the only phase that wrote when an older server sends no others", async () => {
+		await render(<LogsSection logs={{ phases: { planning: phase("planning", "completed", ["planned it"]) } } as never} />);
+		expect(screen.getByText("planned it")).toBeTruthy();
 	});
 
 	it("shows only the phases an older server sends", async () => {
