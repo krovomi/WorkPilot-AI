@@ -170,11 +170,12 @@ jobs:
 
       - name: Combine and hold the floor
         run: |
-          python -m pip install --quiet 'coverage>=7.4'
+          # 7.10: `patch = subprocess` in .coveragerc.
+          python -m pip install --quiet 'coverage>=7.10'
           python -m coverage combine .coverage.shard*
-          # A floor, not a goal: about two points under the 60 % the suite
-          # covered on 29 October 2026. Raise it when the suite grows.
-          python -m coverage report --fail-under=58 | tail -n 3
+          # A floor, not a goal: just under what the suite covers, raised by
+          # each lot of the 100 % plan (69.9 % on 14 November 2026).
+          python -m coverage report --fail-under=69 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
 
       # The floor above holds the whole suite; this holds each change at
