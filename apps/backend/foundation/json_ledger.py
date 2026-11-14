@@ -52,13 +52,30 @@ def _lock_path(path: Path) -> Path:
     return path.with_name(path.name + ".lock")
 
 
-def _try_create(lock: Path) -> bool:
+def _create(lock: Path) -> bool:
     try:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         return False
     os.close(fd)
     return True
+
+
+def _try_create(lock: Path) -> bool:
+    """Create the lock file; False while another process holds it.
+
+    Windows refuses to create a file that is still being deleted, which is what
+    the lock its holder just released is for a moment: that is "busy", not an
+    unwritable folder. Without this, every writer that arrived then wrote
+    without the lock, and two of them could replace the ledger at once.
+    """
+    try:
+        return _create(lock)
+    except PermissionError:
+        if os.path.lexists(lock):
+            return False
+        # Its deletion finished in between: once more, then the folder is unwritable.
+        return _create(lock)
 
 
 def _is_stale(lock: Path) -> bool:

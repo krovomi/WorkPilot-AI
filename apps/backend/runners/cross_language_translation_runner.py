@@ -58,6 +58,14 @@ SUPPORTED_LANGUAGES = {
     "kotlin": {"ext": ".kt", "label": "Kotlin", "fence": "kotlin"},
     "swift": {"ext": ".swift", "label": "Swift", "fence": "swift"},
     "php": {"ext": ".php", "label": "PHP", "fence": "php"},
+    # A source only: a translation into WLangage would have no element to go
+    # in, since only the WinDev editor creates one (docs/architecture/windev.md).
+    "wlangage": {
+        "ext": ".wdg",
+        "label": "WLangage (WinDev)",
+        "fence": "wlangage",
+        "source_only": True,
+    },
 }
 
 TEST_MARKER = "TEST FILE"
@@ -206,6 +214,13 @@ def main(argv: list[str] | None = None) -> int:
         if lang not in SUPPORTED_LANGUAGES:
             emit_error(f"Unsupported language: {lang}", "unsupported_language")
             return 1
+    if SUPPORTED_LANGUAGES[target_lang].get("source_only"):
+        emit_error(
+            f"{SUPPORTED_LANGUAGES[target_lang]['label']} can only be translated "
+            "from: its code lives in elements only its editor creates.",
+            "unsupported_language",
+        )
+        return 1
     if source_lang == target_lang:
         emit_error("Source and target languages are the same.", "same_language")
         return 1
@@ -217,6 +232,11 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, UnicodeDecodeError) as exc:
         emit_error(f"Could not read the source: {exc}", "invalid_input")
         return 1
+    if source_lang == "wlangage":
+        # A whole element pasted or opened: keep its code, drop the editor's YAML.
+        from windev.text_format import wlangage_source
+
+        source_code = wlangage_source(source_code)
     if not source_code.strip():
         emit_error("The source code is empty.", "empty_source")
         return 1
