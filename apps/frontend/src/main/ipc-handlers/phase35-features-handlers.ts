@@ -142,11 +142,35 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.DOMAIN_AGENTS_BUILD,
-		async (_e, { domain, role }: { domain: string; role: string }) =>
+		async (_e, { domain, role, projectPath }: { domain: string; role: string; projectPath?: string }) =>
 			backendFetch("/api/domain-agents/build", {
 				method: "POST",
-				body: JSON.stringify({ domain, role }),
+				body: JSON.stringify({
+					domain,
+					role,
+					project_path: typeof projectPath === "string" && projectPath ? projectPath : null,
+				}),
 			}),
+	);
+	// `projectPath` is checked by ipc-path-policy before these run; the domain is
+	// a catalogue tag (the backend refuses one it does not know).
+	ipcMain.handle(IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_GET, async (_e, { projectPath }: { projectPath: string }) =>
+		backendFetch("/api/domain-agents/project", {
+			method: "POST",
+			body: JSON.stringify({ project_path: projectPath }),
+		}),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.DOMAIN_AGENTS_PROJECT_SET,
+		async (_e, { projectPath, domain }: { projectPath: string; domain: string | null }) => {
+			if (domain !== null && (typeof domain !== "string" || !/^[a-z_]{1,64}$/.test(domain))) {
+				return { success: false, error: "Invalid domain" };
+			}
+			return backendFetch("/api/domain-agents/project/set", {
+				method: "POST",
+				body: JSON.stringify({ project_path: projectPath, domain }),
+			});
+		},
 	);
 
 	// === #3.4 CI/CD Anomaly ===
@@ -399,18 +423,25 @@ export function registerPhase35FeatureHandlers(getMainWindow: () => BrowserWindo
 				explicitMentions?: string[];
 				recentFiles?: string[];
 			},
-		) =>
-			backendFetch("/api/cognitive-context/optimize", {
+		) => {
+			// Every file read is the project's: the backend confines each path
+			// to project_dir, so it is required here.
+			if (!projectDir) return { success: false, error: "projectPath is required" };
+			const paths = Array.isArray(candidateFiles)
+				? candidateFiles.filter((f): f is string => typeof f === "string").slice(0, 2000)
+				: [];
+			return backendFetch("/api/cognitive-context/optimize", {
 				method: "POST",
 				body: JSON.stringify({
 					prompt,
-					candidate_files: candidateFiles,
+					candidate_files: paths,
 					token_budget: tokenBudget,
-					project_dir: projectDir ?? null,
+					project_dir: projectDir,
 					explicit_mentions: explicitMentions ?? null,
 					recent_files: recentFiles ?? null,
 				}),
-			}),
+			});
+		},
 	);
 
 	// === #3.3 Audit Trail ===
