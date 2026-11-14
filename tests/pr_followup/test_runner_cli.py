@@ -200,7 +200,11 @@ def test_the_fixer_runs_on_the_tasks_qa_engine_in_the_worktree(
     runner, monkeypatch, tmp_path: Path
 ) -> None:
     import core.client
-    import qa.fixer
+
+    # By its module entry: a test that swaps the `qa` package in sys.modules
+    # leaves `qa.fixer` without its attribute on the package, and the runner
+    # imports the function from sys.modules["qa.fixer"].
+    qa_fixer = importlib.import_module("qa.fixer")
 
     project = _layout(tmp_path)
     worktree = project / ".workpilot" / "worktrees" / "tasks" / "001-x"
@@ -222,7 +226,7 @@ def test_the_fixer_runs_on_the_tasks_qa_engine_in_the_worktree(
         return "fixed", f"session {session} in {project_dir.name}"
 
     monkeypatch.setattr(core.client, "create_agent_client", create_agent_client)
-    monkeypatch.setattr(qa.fixer, "run_qa_fixer_session", run_qa_fixer_session)
+    monkeypatch.setattr(qa_fixer, "run_qa_fixer_session", run_qa_fixer_session)
     monkeypatch.delenv("PROJECT_DIR", raising=False)
     assert asyncio.run(runner._qa_fixer(worktree, spec, 2)) == (
         "fixed",

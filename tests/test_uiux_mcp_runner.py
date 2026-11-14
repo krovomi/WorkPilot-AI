@@ -44,7 +44,12 @@ def _talk(cwd: Path, *args: str, env: dict | None = None) -> list[dict]:
         capture_output=True,
         text=True,
         encoding="utf-8",
-        env={**os.environ, **(env or {})},
+        env={
+            **os.environ,
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
+            **(env or {}),
+        },
         timeout=60,
         check=False,
     )
