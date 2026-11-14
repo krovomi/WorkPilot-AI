@@ -111,13 +111,22 @@ export interface AnomalySignal {
 	matching_line: string;
 	line_number: number;
 	suggested_fix: string;
+	/** Stable id of the fix; the app words it from `cicdAnomaly.fixes.<fix_id>`. */
+	fix_id?: string;
 	log_label: string;
+}
+export interface AnomalyRecommendation {
+	kind: string;
+	fix_id: string;
+	suggested_fix: string;
+	recurring: boolean;
 }
 export interface AnomalyReport {
 	signals: AnomalySignal[];
 	recurring_kinds: string[];
 	summary: { samples: number; total_signals: number; by_kind: Record<string, number>; by_severity: Record<string, number> };
 	fix_recommendations: string[];
+	recommendations?: AnomalyRecommendation[];
 	has_critical: boolean;
 }
 
