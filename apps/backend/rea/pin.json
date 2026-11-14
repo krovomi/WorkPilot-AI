@@ -1,0 +1,6 @@
+{
+	"$comment": "The one REA release WorkPilot runs (npm rea-agents). Raised by a PR, never @latest: REA ships every week and its tool list changes. Read by apps/frontend/scripts/release-exposure-audit.cjs and by the rea package. `node` lists the Node.js versions this release accepts, as its package.json engines field does.",
+	"package": "rea-agents",
+	"version": "6.9.0",
+	"node": ["^22.23.4", "^24.22.1", ">=26.12.1"]
+}

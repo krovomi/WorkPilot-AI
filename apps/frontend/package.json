@@ -172,8 +172,15 @@
 		},
 		"files": [
 			"out",
-			"package.json"
+			"package.json",
+			"!**/node_modules/**/*.map"
 		],
+		"electronFuses": {
+			"runAsNode": false,
+			"enableNodeCliInspectArguments": false,
+			"onlyLoadAppFromAsar": true,
+			"enableEmbeddedAsarIntegrityValidation": true
+		},
 		"asarUnpack": [
 			"out/main/node_modules/@lydell/node-pty-*/**",
 			"out/main/node_modules/node-pty/**",

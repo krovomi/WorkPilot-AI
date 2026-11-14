@@ -95,6 +95,21 @@ jobs:
       - name: Start the packaged app once (smoke test)
         run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
 
+      # What anyone can recover from the packaged app (shipped source maps,
+      # Electron fuses, debug files, credential markers) before it is uploaded.
+      # REA reads the files and never starts the app; version in apps/backend/rea/pin.json.
+      - name: Audit what the packaged app exposes (REA)
+        run: cd apps/frontend && node scripts/release-exposure-audit.cjs --packaged --fail-on high
+
+      - name: Upload the release exposure report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-exposure-macos-intel
+          retention-days: 3
+          if-no-files-found: ignore
+          path: apps/frontend/dist/release-exposure/*.json
+
       - name: Submit notarization (async)
         id: notarize
         uses: ./.github/actions/submit-macos-notarization
@@ -178,6 +193,21 @@ jobs:
       - name: Start the packaged app once (smoke test)
         run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
 
+      # What anyone can recover from the packaged app (shipped source maps,
+      # Electron fuses, debug files, credential markers) before it is uploaded.
+      # REA reads the files and never starts the app; version in apps/backend/rea/pin.json.
+      - name: Audit what the packaged app exposes (REA)
+        run: cd apps/frontend && node scripts/release-exposure-audit.cjs --packaged --fail-on high
+
+      - name: Upload the release exposure report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-exposure-macos-arm64
+          retention-days: 3
+          if-no-files-found: ignore
+          path: apps/frontend/dist/release-exposure/*.json
+
       - name: Submit notarization (async)
         id: notarize
         uses: ./.github/actions/submit-macos-notarization
@@ -253,6 +283,21 @@ jobs:
       # main process threw while loading (F114) and shipped.
       - name: Start the packaged app once (smoke test)
         run: cd apps/frontend && node scripts/smoke-test.cjs --packaged
+
+      # What anyone can recover from the packaged app (shipped source maps,
+      # Electron fuses, debug files, credential markers) before it is uploaded.
+      # REA reads the files and never starts the app; version in apps/backend/rea/pin.json.
+      - name: Audit what the packaged app exposes (REA)
+        run: cd apps/frontend && node scripts/release-exposure-audit.cjs --packaged --fail-on high
+
+      - name: Upload the release exposure report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-exposure-windows
+          retention-days: 3
+          if-no-files-found: ignore
+          path: apps/frontend/dist/release-exposure/*.json
 
       - name: Azure Login (OIDC)
         if: env.AZURE_CLIENT_ID != ''
@@ -431,6 +476,21 @@ jobs:
       # main process threw while loading (F114) and shipped.
       - name: Start the packaged app once (smoke test)
         run: cd apps/frontend && xvfb-run -a node scripts/smoke-test.cjs --packaged
+
+      # What anyone can recover from the packaged app (shipped source maps,
+      # Electron fuses, debug files, credential markers) before it is uploaded.
+      # REA reads the files and never starts the app; version in apps/backend/rea/pin.json.
+      - name: Audit what the packaged app exposes (REA)
+        run: cd apps/frontend && node scripts/release-exposure-audit.cjs --packaged --fail-on high
+
+      - name: Upload the release exposure report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-exposure-linux
+          retention-days: 3
+          if-no-files-found: ignore
+          path: apps/frontend/dist/release-exposure/*.json
 
       - name: Verify Linux packages
         run: cd apps/frontend && pnpm run verify:linux
