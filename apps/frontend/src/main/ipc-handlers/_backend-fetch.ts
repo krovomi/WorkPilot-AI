@@ -26,6 +26,8 @@ export function getBackendUrl(): string {
 export interface BackendError {
 	success: false;
 	error: string;
+	/** Nothing answered: the local backend is stopped or still starting. */
+	unreachable?: true;
 }
 
 export type BackendResult<T> = ({ success: true } & T) | BackendError;
@@ -72,6 +74,6 @@ export async function backendFetch<T = Record<string, unknown>>(
 		}
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
-		return { success: false, error: msg };
+		return { success: false, error: msg, unreachable: true };
 	}
 }

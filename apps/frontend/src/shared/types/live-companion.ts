@@ -34,6 +34,8 @@ export interface FileChangeEvent {
 	file_path: string;
 	change_type: "created" | "modified" | "deleted" | "renamed";
 	diff: string;
+	/** `diff` for a git diff, `file` for the head of a new or untracked file. */
+	content_kind?: "diff" | "file";
 	language: string;
 	timestamp: string;
 }
@@ -52,6 +54,8 @@ export interface LiveSuggestion {
 	confidence: number;
 	created_at: string;
 	status: "active" | "applied" | "dismissed" | "expired";
+	/** The project the suggestion is about (set by main when it stores it). */
+	project_dir?: string;
 }
 
 export interface TakeoverProposal {
@@ -65,6 +69,10 @@ export interface TakeoverProposal {
 	ai_plan: string;
 	ai_result_summary: string;
 	created_at: string;
+	/** How many saves of the file preceded the pause. */
+	change_count?: number;
+	/** The project the proposal is about. */
+	project_dir?: string;
 }
 
 export interface CompanionConfig {
@@ -90,4 +98,18 @@ export interface CompanionState {
 	takeovers_accepted: number;
 	started_at: string;
 	last_change_at: string;
+	/** An analysis is running. */
+	analyzing?: boolean;
+	/** Why the last start or analysis failed; null once one succeeds. */
+	last_error?: CompanionError | null;
+}
+
+/** A failure the page explains, from the runner's redacted error detail. */
+export interface CompanionError {
+	message: string;
+	code: string;
+	provider?: string;
+	model?: string;
+	file_path?: string;
+	at: string;
 }

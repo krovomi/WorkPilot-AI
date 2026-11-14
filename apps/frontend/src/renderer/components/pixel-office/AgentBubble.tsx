@@ -38,15 +38,13 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { stripAnsiCodes } from "../../../shared/utils/ansi-sanitizer";
-import { flattenTaskLogsToLines } from "../../../shared/utils/task-logs";
 import type { PixelAgent } from "../../stores/pixel-office-store";
-import { useTaskStore } from "../../stores/task-store";
 import type { Terminal } from "../../stores/terminal-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
 import { Input } from "../ui/input";
+import { useAgentLogLines } from "./use-agent-log-lines";
 /**
  * Phase and activity icons.
  *
@@ -160,8 +158,6 @@ function ProgressBar({
 
 // ── Live log stream ───────────────────────────────────────────
 
-const LOG_KEEP = 5000;
-
 function logLineColor(line: string): string {
 	if (/\[ERROR\]|error:/i.test(line) || /\bError\b/.test(line))
 		return "#F87171";
@@ -174,44 +170,11 @@ function logLineColor(line: string): string {
 
 function LogStream({ taskId }: { readonly taskId: string }) {
 	const { t } = useTranslation(["pixelOffice"]);
-	const task = useTaskStore((s) => s.tasks.find((t) => t.id === taskId));
-	const liveLogs = task?.logs ?? [];
-	const specId = task?.specId;
-	const projectId = task?.projectId;
+	const { lines: visibleLines, running, loading } = useAgentLogLines(taskId);
 	const [open, setOpen] = useState(true);
 	const [copied, setCopied] = useState(false);
-	const [persistedLines, setPersistedLines] = useState<string[]>([]);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const atBottomRef = useRef(true);
-
-	// A finished task streams no live logs into `task.logs` (that array is only
-	// filled while the pipeline runs). Fall back to the persisted phase logs
-	// (task_logs.json) — the same source the Kanban's Logs tab reads — so the
-	// bubble isn't stuck on "waiting for logs" for a completed task.
-	const hasLiveLogs = liveLogs.length > 0;
-	useEffect(() => {
-		if (hasLiveLogs || !projectId || !specId) return;
-		let cancelled = false;
-		window.electronAPI
-			.getTaskLogs(projectId, specId)
-			.then((res) => {
-				if (!cancelled && res.success && res.data) {
-					setPersistedLines(flattenTaskLogsToLines(res.data));
-				}
-			})
-			.catch(() => {
-				/* best-effort: bubble simply shows no logs */
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [hasLiveLogs, projectId, specId]);
-
-	const sourceLines = hasLiveLogs ? liveLogs : persistedLines;
-	const visibleLines = sourceLines
-		.slice(-LOG_KEEP)
-		.map((l) => stripAnsiCodes(l).trim())
-		.filter((l) => l.length > 0);
 
 	const handleScroll = () => {
 		const el = scrollRef.current;
@@ -219,11 +182,13 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 		atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
 	};
 
+	// Follow the tail as lines arrive, unless the person scrolled up to read.
+	const lineCount = visibleLines.length;
 	useEffect(() => {
-		if (open && atBottomRef.current && scrollRef.current) {
+		if (open && lineCount > 0 && atBottomRef.current && scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 		}
-	}, [open]);
+	}, [open, lineCount]);
 
 	const copyLogs = useCallback(() => {
 		navigator.clipboard.writeText(visibleLines.join("\n")).then(() => {
@@ -315,7 +280,9 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 						<div className="flex flex-col items-center justify-center h-full gap-2 text-white/20">
 							<TerminalIcon className="h-5 w-5" />
 							<p className="text-3xs font-mono">
-								{t("pixelOffice:bubble.waitingForLogs")}
+								{running || loading
+									? t("pixelOffice:bubble.waitingForLogs")
+									: t("pixelOffice:bubble.noLogs")}
 							</p>
 						</div>
 					) : (
@@ -415,9 +382,13 @@ function TaskPanel({
 	const { t } = useTranslation(["pixelOffice"]);
 	const taskId = agent.taskId ?? "";
 	const phase = agent.phase ?? "idle";
-	const isRunning = agent.activity !== "idle" && agent.activity !== "exited";
-	const isPaused =
-		phase === "rate_limit_paused" || phase === "auth_failure_paused";
+	// Only a task that is executing can be stopped. "waiting" covers a paused
+	// task and a task in human review (done, waiting for the person): offering
+	// "Stop" there was offering to stop something that had already finished.
+	const isRunning =
+		agent.activity === "typing" ||
+		agent.activity === "reading" ||
+		agent.activity === "running";
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
@@ -472,7 +443,7 @@ function TaskPanel({
 					{t("pixelOffice:bubble.goToKanban")}
 				</Button>
 
-				{isRunning && !isPaused && (
+				{isRunning && (
 					<Button
 						size="sm"
 						variant="ghost"
@@ -842,7 +813,10 @@ export function AgentBubble({
 							style={{ color }}
 							aria-hidden
 						/>
-						<span className="font-mono font-bold text-xl text-white leading-tight truncate">
+						<span
+							className="font-mono font-bold text-xl text-white leading-tight truncate"
+							title={agent.fullName}
+						>
 							{agent.fullName}
 						</span>
 
