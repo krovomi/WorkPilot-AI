@@ -21,6 +21,7 @@ import type {
 	LocalBackendResponse,
 } from "../../shared/types/local-backend";
 import { resolveInProject } from "../security/renderer-path";
+import { waitForLocalBackend } from "../local-backend-readiness";
 import { getBackendUrl } from "./_backend-fetch";
 import { ipcMain } from "electron";
 
@@ -130,17 +131,9 @@ export function checkRequest(
 	return { url: target, method, body, binary };
 }
 
-export async function localBackendRequest(
-	raw: unknown,
-): Promise<LocalBackendResponse> {
-	const checked = checkRequest(raw);
-	if ("refused" in checked) {
-		return {
-			status: 400,
-			contentType: "application/json",
-			text: JSON.stringify({ success: false, error: `Refused: ${checked.refused}` }),
-		};
-	}
+type Checked = Exclude<ReturnType<typeof checkRequest>, { refused: string }>;
+
+async function send(checked: Checked): Promise<LocalBackendResponse | "no-answer"> {
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 	try {
@@ -163,10 +156,35 @@ export async function localBackendRequest(
 		}
 		return { status: res.status, contentType, text: await res.text() };
 	} catch {
-		return { unreachable: true };
+		// Our own timeout: the backend is up but did not answer in time, and
+		// waiting for its launch would change nothing.
+		return controller.signal.aborted ? { unreachable: true } : "no-answer";
 	} finally {
 		clearTimeout(timer);
 	}
+}
+
+export async function localBackendRequest(
+	raw: unknown,
+): Promise<LocalBackendResponse> {
+	const checked = checkRequest(raw);
+	if ("refused" in checked) {
+		return {
+			status: 400,
+			contentType: "application/json",
+			text: JSON.stringify({ success: false, error: `Refused: ${checked.refused}` }),
+		};
+	}
+	const first = await send(checked);
+	if (first !== "no-answer") return first;
+	// Nothing listening: the window opens before main has started the backend,
+	// so a view asking at mount waits for the launch, then asks once more. A
+	// backend already up is asked once more at once (it may have just come up).
+	if (!(await waitForLocalBackend())) {
+		return { unreachable: true };
+	}
+	const second = await send(checked);
+	return second === "no-answer" ? { unreachable: true } : second;
 }
 
 export function registerLocalBackendHandlers(): void {

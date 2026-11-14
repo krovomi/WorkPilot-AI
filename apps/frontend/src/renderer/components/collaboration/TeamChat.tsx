@@ -16,7 +16,14 @@ import { Input } from "../ui/input";
 import { initialsOf } from "./PresenceIndicator";
 import { formatAppTime } from "@/lib/date-format";
 
-const SEND_ERRORS = new Set(["forbidden", "invalid", "too_fast", "unavailable", "offline"]);
+const SEND_ERRORS = new Set([
+	"forbidden",
+	"invalid",
+	"too_fast",
+	"unavailable",
+	"offline",
+	"ai_unavailable",
+]);
 
 function formatTime(iso: string): string {
 	const d = new Date(iso);
