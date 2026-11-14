@@ -5,7 +5,8 @@ several runs of the same suite, and few projects keep the report of every CI
 run on the developer's disk: the detective that only read reports already
 there answered "0 tests" on most projects. So the detective runs the suite
 itself, N times, with the flag that makes the stack write a machine-readable
-report (TRX for .NET, JUnit XML elsewhere), and keeps each run's report under
+report (TRX for .NET, JUnit XML elsewhere, converted by ``converters`` when the
+runner speaks another format), and keeps each run's report under
 ``.workpilot/flaky-tests/runs/`` so later scans see the history too.
 
 The command is one of the stack's own, detected from the project's manifests
@@ -19,18 +20,26 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
+import re
 import shutil
 import signal
 import subprocess
 import time
-import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from foundation.platform import is_windows, split_command
 from security.child_env import env_without_credentials
+
+from .converters import (
+    cargo_output_to_junit,
+    dart_json_to_junit,
+    go_json_to_junit,
+    jest_json_to_junit,
+    rspec_json_to_junit,
+)
+from .dotnet import DotnetPlan, dotnet_plan, dotnet_steps
 
 __all__ = [
     "COMMAND_IDS",
@@ -38,6 +47,7 @@ __all__ = [
     "RunOutcome",
     "TestCommand",
     "detect_test_commands",
+    "go_json_to_junit",
     "install_cancel_handler",
     "run_once",
 ]
@@ -46,23 +56,26 @@ __all__ = [
 HISTORY_DIR = Path(".workpilot") / "flaky-tests" / "runs"
 
 #: The commands the detective knows how to make write a report.
-COMMAND_IDS = ("dotnet", "pytest", "vitest", "jest", "maven", "gradle", "go")
+COMMAND_IDS = (
+    "dotnet",
+    "pytest",
+    "vitest",
+    "jest",
+    "node",
+    "maven",
+    "gradle",
+    "go",
+    "cargo",
+    "phpunit",
+    "pest",
+    "rspec",
+    "dart",
+    "flutter",
+    "swift",
+)
 
-_IGNORED_DIRS = {
-    "node_modules",
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "bin",
-    "obj",
-    ".workpilot",
-    ".worktrees",
-    "dist",
-    "build",
-    "target",
-}
-OUTPUT_TAIL_CHARS = 4000
+#: What a failed run shows of its output; the whole log stays in the run folder.
+OUTPUT_TAIL_CHARS = 12000
 
 
 @dataclass(frozen=True)
@@ -77,6 +90,8 @@ class TestCommand:
     command: str
     #: For .NET: the solution or project ``dotnet test`` is given.
     target: str = ""
+    #: For .NET: the test projects and the runner (``dotnet.DotnetPlan``).
+    dotnet: DotnetPlan | None = None
 
     def to_dict(self) -> dict[str, str]:
         return {"id": self.id, "label": self.label, "command": self.command}
@@ -93,40 +108,18 @@ class RunOutcome:
     duration_s: float = 0.0
     reports: list[Path] = field(default_factory=list)
     output_tail: str = ""
+    #: The run's whole output.
+    log: Path | None = None
 
 
 # --- detection --------------------------------------------------------
 
 
-def _shallow_files(root: Path, suffixes: tuple[str, ...], max_depth: int) -> list[Path]:
-    """Files ending in ``suffixes`` at most ``max_depth`` levels down,
-    shallowest first, then by path: the root solution wins over a sample's."""
-    found: list[tuple[int, str, Path]] = []
-    root_depth = len(root.parts)
-    for dirpath, dirnames, files in os.walk(root):
-        here = Path(dirpath)
-        depth = len(here.parts) - root_depth
-        dirnames[:] = sorted(
-            d for d in dirnames if d not in _IGNORED_DIRS and not d.startswith(".")
-        )
-        if depth >= max_depth:
-            dirnames[:] = []
-        for name in files:
-            if name.lower().endswith(suffixes):
-                path = here / name
-                found.append((depth, path.as_posix().lower(), path))
-    return [p for _d, _k, p in sorted(found)]
-
-
-def _dotnet_target(root: Path) -> str | None:
-    solutions = _shallow_files(root, (".sln", ".slnx"), max_depth=2)
-    if solutions:
-        return solutions[0].relative_to(root).as_posix()
-    projects = _shallow_files(root, (".csproj", ".fsproj", ".vbproj"), max_depth=3)
-    if not projects:
-        return None
-    tests = [p for p in projects if "test" in p.stem.lower()]
-    return (tests or projects)[0].relative_to(root).as_posix()
+def _read(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def _package_json(root: Path) -> dict:
@@ -147,15 +140,22 @@ def _js_dependencies(root: Path) -> set[str]:
     return names
 
 
+def _uses_node_test(root: Path) -> bool:
+    """A ``node --test`` in a script of ``package.json``."""
+    scripts = _package_json(root).get("scripts")
+    if not isinstance(scripts, dict):
+        return False
+    return any(
+        isinstance(line, str) and re.search(r"\bnode\b[^&|;]*\s--test\b", line)
+        for line in scripts.values()
+    )
+
+
 def _has_pytest(root: Path) -> bool:
     if any((root / name).is_file() for name in ("pytest.ini", "conftest.py")):
         return True
     for name in ("pyproject.toml", "setup.cfg", "tox.ini"):
-        try:
-            text = (root / name).read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if "pytest" in text:
+        if "pytest" in _read(root / name):
             return True
     tests = root / "tests"
     return tests.is_dir() and any(tests.glob("test_*.py"))
@@ -173,21 +173,74 @@ def _python(root: Path) -> str:
     return "python" if is_windows() else "python3"
 
 
+def _composer_packages(root: Path) -> set[str]:
+    try:
+        data = json.loads(_read(root / "composer.json") or "{}")
+    except ValueError:
+        return set()
+    names: set[str] = set()
+    for key in ("require", "require-dev"):
+        section = data.get(key) if isinstance(data, dict) else None
+        if isinstance(section, dict):
+            names.update(str(n).lower() for n in section)
+    return names
+
+
+def _vendor_bin(root: Path, name: str) -> str:
+    """Composer's ``vendor/bin/<name>`` when installed, else the tool on PATH."""
+    return f"vendor/bin/{name}" if (root / "vendor" / "bin" / name).is_file() else name
+
+
+def _php_command(root: Path) -> TestCommand | None:
+    packages = _composer_packages(root)
+    if "pestphp/pest" in packages:
+        return TestCommand("pest", "Pest", _vendor_bin(root, "pest"))
+    has_config = any(
+        (root / n).is_file()
+        for n in ("phpunit.xml", "phpunit.xml.dist", "phpunit.dist.xml")
+    )
+    if "phpunit/phpunit" in packages or has_config:
+        return TestCommand("phpunit", "PHPUnit", _vendor_bin(root, "phpunit"))
+    return None
+
+
+def _uses_rspec(root: Path) -> bool:
+    if (root / ".rspec").is_file() or re.search(
+        r"""['"]rspec""", _read(root / "Gemfile")
+    ):
+        return True
+    spec = root / "spec"
+    return spec.is_dir() and any(spec.rglob("*_spec.rb"))
+
+
+def _dart_command(root: Path) -> TestCommand | None:
+    pubspec = _read(root / "pubspec.yaml")
+    if not pubspec:
+        return None
+    if re.search(r"(?m)^\s*sdk:\s*flutter\s*$", pubspec):
+        return TestCommand("flutter", "Flutter", "flutter test")
+    return TestCommand("dart", "Dart", "dart test")
+
+
 def detect_test_commands(project: Path) -> list[TestCommand]:
     """The test commands of the project's stack, most likely first."""
     commands: list[TestCommand] = []
 
-    target = _dotnet_target(project)
-    if target:
+    plan = dotnet_plan(project)
+    if plan:
         commands.append(
-            TestCommand("dotnet", "C# / .NET", f"dotnet test {target}", target=target)
+            TestCommand(
+                "dotnet", "C# / .NET", plan.command, target=plan.target, dotnet=plan
+            )
         )
 
     js = _js_dependencies(project)
     if "vitest" in js:
         commands.append(TestCommand("vitest", "Vitest", "npx vitest run"))
-    if "jest" in js and "jest-junit" in js:
+    if "jest" in js:
         commands.append(TestCommand("jest", "Jest", "npx jest --ci"))
+    if not {"vitest", "jest"} & js and _uses_node_test(project):
+        commands.append(TestCommand("node", "Node.js test runner", "node --test"))
 
     if _has_pytest(project):
         commands.append(
@@ -205,6 +258,20 @@ def detect_test_commands(project: Path) -> list[TestCommand]:
 
     if (project / "go.mod").is_file():
         commands.append(TestCommand("go", "Go", "go test ./..."))
+    if (project / "Cargo.toml").is_file():
+        commands.append(TestCommand("cargo", "Rust", "cargo test --no-fail-fast"))
+
+    php = _php_command(project)
+    if php:
+        commands.append(php)
+    if _uses_rspec(project):
+        rspec = "bundle exec rspec" if (project / "Gemfile").is_file() else "rspec"
+        commands.append(TestCommand("rspec", "RSpec", rspec))
+    dart = _dart_command(project)
+    if dart:
+        commands.append(dart)
+    if (project / "Package.swift").is_file():
+        commands.append(TestCommand("swift", "Swift", "swift test"))
 
     return commands
 
@@ -212,22 +279,63 @@ def detect_test_commands(project: Path) -> list[TestCommand]:
 # --- one run ----------------------------------------------------------
 
 
+class _Unselectable(Exception):
+    """The stack has no filter for the tests named."""
+
+
 @dataclass(frozen=True)
 class _Invocation:
-    argv: list[str]
+    #: The command lines of one run, in order (one per .NET test project at most).
+    steps: list[list[str]]
     env: dict[str, str] = field(default_factory=dict)
     #: Reports are found by what changed in the tree, not in ``out_dir``.
     collect_changed: bool = False
-    #: ``go test -json``: the report is built from the output.
-    go_json: bool = False
+    #: The converter that turns the runner's own output into JUnit
+    #: (``converters``): go, jest, cargo, dart, rspec; "" for none.
+    convert: str = ""
+
+    @property
+    def argv(self) -> list[str]:
+        return self.steps[0] if self.steps else []
 
 
 def _invocation(
-    command: TestCommand, project: Path, out_dir: Path, *, no_build: bool
+    command: TestCommand,
+    project: Path,
+    out_dir: Path,
+    *,
+    no_build: bool,
+    only: list[str] | None = None,
 ) -> _Invocation:
+    names = list(only or [])
+    if command.id == "dotnet" and command.dotnet is not None:
+        from .only import dotnet_filters
+
+        filters = dotnet_filters(names) if names else None
+        return _Invocation(
+            dotnet_steps(command.dotnet, out_dir, no_build=no_build, filters=filters)
+        )
     out = str(out_dir)
     base = split_command(command.command, project)
-    if command.id == "dotnet":
+    invocation = _report_invocation(command.id, base, out_dir, out, no_build=no_build)
+    if names:
+        from .only import filter_args
+
+        extra = filter_args(command.id, names)
+        if not extra:
+            raise _Unselectable("the tests named cannot be selected with this command")
+        invocation = replace(
+            invocation, steps=[[*step, *extra] for step in invocation.steps]
+        )
+    return invocation
+
+
+def _report_invocation(
+    cid: str, base: list[str], out_dir: Path, out: str, *, no_build: bool
+) -> _Invocation:
+    """The stack's own command with the options that make it write a report."""
+    junit = str(out_dir / "junit.xml")
+    if cid == "dotnet":  # a command built by hand, without its projects
         argv = [
             *base,
             "--logger",
@@ -235,34 +343,64 @@ def _invocation(
             "--results-directory",
             out,
         ]
-        if no_build:
-            argv.append("--no-build")
-        return _Invocation(argv)
-    if command.id == "pytest":
-        return _Invocation([*base, "-q", f"--junitxml={out_dir / 'junit.xml'}"])
-    if command.id == "vitest":
+        return _Invocation([[*argv, "--no-build"] if no_build else argv])
+    if cid == "pytest":
+        return _Invocation([[*base, "-q", f"--junitxml={junit}"]])
+    if cid == "vitest":
         return _Invocation(
             [
-                *base,
-                "--reporter=default",
-                "--reporter=junit",
-                f"--outputFile.junit={out_dir / 'junit.xml'}",
+                [
+                    *base,
+                    "--reporter=default",
+                    "--reporter=junit",
+                    f"--outputFile.junit={junit}",
+                ]
             ]
         )
-    if command.id == "jest":
+    if cid == "jest":
+        # Jest's own JSON: no reporter package needed in the project.
+        json_file = str(out_dir / "jest.json")
         return _Invocation(
-            [*base, "--reporters=default", "--reporters=jest-junit"],
-            env={"JEST_JUNIT_OUTPUT_DIR": out, "JEST_JUNIT_OUTPUT_NAME": "junit.xml"},
+            [[*base, "--json", f"--outputFile={json_file}"]], convert="jest"
         )
-    if command.id == "go":
+    if cid == "node":
+        return _Invocation(
+            [
+                [
+                    *base,
+                    "--test-reporter=spec",
+                    "--test-reporter-destination=stdout",
+                    "--test-reporter=junit",
+                    f"--test-reporter-destination={junit}",
+                ]
+            ]
+        )
+    if cid == "go":
         # -count=1: a cached result is not a run.
-        return _Invocation([*base[:2], "-json", "-count=1", *base[2:]], go_json=True)
+        return _Invocation([[*base[:2], "-json", "-count=1", *base[2:]]], convert="go")
+    if cid == "cargo":
+        return _Invocation([base], convert="cargo")
+    if cid in ("phpunit", "pest"):
+        return _Invocation([[*base, "--log-junit", junit]])
+    if cid == "rspec":
+        json_file = str(out_dir / "rspec.json")
+        return _Invocation(
+            [[*base, "--format", "progress", "--format", "json", "--out", json_file]],
+            convert="rspec",
+        )
+    if cid in ("dart", "flutter"):
+        json_file = str(out_dir / "dart.json")
+        return _Invocation(
+            [[*base, "--file-reporter", f"json:{json_file}"]], convert="dart"
+        )
+    if cid == "swift":
+        return _Invocation([[*base, "--parallel", "--xunit-output", junit]])
     # Maven and Gradle write their reports where they always do; the run
     # collects what it changed.
-    return _Invocation(base, collect_changed=True)
+    return _Invocation([base], collect_changed=True)
 
 
-_current: subprocess.Popen | None = None
+_current: subprocess.Popen | None = None  # the step running now
 
 
 def _kill_tree(process: subprocess.Popen) -> None:
@@ -331,50 +469,81 @@ def _copy_changed(
     return copied
 
 
-def go_json_to_junit(lines: Iterable[str], out_file: Path) -> Path | None:
-    """A JUnit XML report from ``go test -json`` output, or None if no test ran."""
-    results: dict[tuple[str, str], tuple[str, float, list[str]]] = {}
-    output: dict[tuple[str, str], list[str]] = {}
-    for line in lines:
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(event, dict) or not event.get("Test"):
-            continue
-        key = (str(event.get("Package", "")), str(event["Test"]))
-        action = event.get("Action")
-        if action == "output":
-            output.setdefault(key, []).append(str(event.get("Output", "")))
-        elif action in ("pass", "fail", "skip"):
-            results[key] = (
-                action,
-                float(event.get("Elapsed") or 0),
-                output.get(key, []),
-            )
-    if not results:
-        return None
-    suite = ET.Element("testsuite", name="go test", tests=str(len(results)))
-    for (package, test), (action, elapsed, out) in sorted(results.items()):
-        case = ET.SubElement(
-            suite, "testcase", classname=package, name=test, time=f"{elapsed:.3f}"
-        )
-        if action == "fail":
-            text = "".join(out)[-2000:]
-            failure = ET.SubElement(case, "failure", message=text.strip()[:500])
-            failure.text = text
-        elif action == "skip":
-            ET.SubElement(case, "skipped")
-    ET.ElementTree(suite).write(out_file, encoding="utf-8", xml_declaration=True)
-    return out_file
-
-
 def _tail(path: Path) -> str:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
     return text[-OUTPUT_TAIL_CHARS:]
+
+
+def _convert(kind: str, log: Path, out_dir: Path, project: Path) -> list[Path]:
+    """The JUnit report built from a runner's own format (``converters``)."""
+    junit = out_dir / "junit.xml"
+    if kind == "jest":
+        report = jest_json_to_junit(out_dir / "jest.json", junit, project)
+    elif kind == "rspec":
+        report = rspec_json_to_junit(out_dir / "rspec.json", junit)
+    else:
+        source = out_dir / "dart.json" if kind == "dart" else log
+        try:
+            lines = source.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            lines = []
+        convert = {
+            "go": go_json_to_junit,
+            "cargo": cargo_output_to_junit,
+            "dart": dart_json_to_junit,
+        }[kind]
+        report = convert(lines, junit)
+    return [report] if report else []
+
+
+def _run_steps(
+    steps: list[list[str]],
+    project: Path,
+    env: dict[str, str],
+    sink,
+    *,
+    timeout_s: float,
+    popen: Callable[..., subprocess.Popen],
+) -> tuple[int | None, bool, str]:
+    """Run each command line in turn into ``sink``: (exit code, timed out, error).
+
+    The exit code is the first that is not 0; the timeout covers them all.
+    """
+    global _current
+    deadline = time.monotonic() + timeout_s
+    worst: int | None = 0
+    for argv in steps:
+        if len(steps) > 1:
+            sink.write(f"$ {' '.join(argv)}\n")
+            sink.flush()
+        try:
+            process = popen(  # noqa: S603 - argv list, no shell
+                argv,
+                cwd=str(project),
+                env=env,
+                stdout=sink,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+            )
+        except (OSError, ValueError) as exc:
+            return None, False, f"the command could not start: {exc}"
+        _current = process
+        try:
+            code = process.wait(timeout=max(1.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            _kill_tree(process)
+            # A tree that outlives its kill leaves nothing more to wait for.
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=30)
+            return None, True, ""
+        finally:
+            _current = None
+        if worst == 0 and code != 0:
+            worst = code
+    return worst, False, ""
 
 
 def run_once(
@@ -392,30 +561,18 @@ def run_once(
 
     ``only`` keeps the tests named, through the stack's own filter.
     """
-    global _current
     out_dir.mkdir(parents=True, exist_ok=True)
     log = out_dir / "output.log"
     try:
-        invocation = _invocation(command, project, out_dir, no_build=no_build)
+        invocation = _invocation(
+            command, project, out_dir, no_build=no_build, only=list(only)
+        )
+    except _Unselectable as exc:
+        return RunOutcome(None, error=str(exc))
     except ValueError as exc:
         return RunOutcome(None, error=f"the command cannot be parsed: {exc}")
     if not invocation.argv:
         return RunOutcome(None, error="the command is empty")
-    names = list(only)
-    if names:
-        from .only import filter_args
-
-        extra = filter_args(command.id, names)
-        if not extra:
-            return RunOutcome(
-                None, error="the tests named cannot be selected with this command"
-            )
-        invocation = _Invocation(
-            [*invocation.argv, *extra],
-            invocation.env,
-            invocation.collect_changed,
-            invocation.go_json,
-        )
 
     globs = list(report_globs)
     before = _report_snapshot(project, globs) if invocation.collect_changed else {}
@@ -423,45 +580,22 @@ def run_once(
         extra={"CI": "1", "NO_COLOR": "1", "FORCE_COLOR": "0", **invocation.env}
     )
     started = time.monotonic()
-    timed_out = False
     with log.open("w", encoding="utf-8", errors="replace") as sink:
-        try:
-            process = popen(  # noqa: S603 - argv list, no shell
-                invocation.argv,
-                cwd=str(project),
-                env=env,
-                stdout=sink,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-            )
-        except (OSError, ValueError) as exc:
-            return RunOutcome(None, error=f"the command could not start: {exc}")
-        _current = process
-        try:
-            exit_code = process.wait(timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            _kill_tree(process)
-            try:
-                exit_code = process.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                exit_code = None
-        finally:
-            _current = None
+        exit_code, timed_out, error = _run_steps(
+            invocation.steps, project, env, sink, timeout_s=timeout_s, popen=popen
+        )
+    if error:
+        return RunOutcome(None, error=error, log=log)
 
     outcome = RunOutcome(
         exit_code,
         timed_out=timed_out,
         duration_s=time.monotonic() - started,
         output_tail=_tail(log),
+        log=log,
     )
-    if invocation.go_json:
-        try:
-            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            lines = []
-        report = go_json_to_junit(lines, out_dir / "junit.xml")
-        outcome.reports = [report] if report else []
+    if invocation.convert:
+        outcome.reports = _convert(invocation.convert, log, out_dir, project)
     elif invocation.collect_changed:
         outcome.reports = _copy_changed(
             before, _report_snapshot(project, globs), out_dir
