@@ -333,6 +333,11 @@ def main() -> None:
     if not project_path.exists():
         _emit("API_WATCHER_ERROR", f"Project path does not exist: {project_path}")
         sys.exit(1)
+    if not project_path.is_dir():
+        # Said here, in the same words on every OS: the error the scan would
+        # raise is worded by the system ("[WinError 267] ..." on Windows).
+        _emit("API_WATCHER_ERROR", f"Not a directory: {project_path}")
+        sys.exit(1)
 
     if args.save_baseline:
         baseline = project_path / ".workpilot" / "api-contract-baseline.json"

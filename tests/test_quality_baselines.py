@@ -1,4 +1,4 @@
-"""Blind excepts, biome-ignore comments and large files can only go down, file by file.
+"""Blind excepts, biome-ignore comments, large files and native paths only go down.
 
 The ceilings are tests/baselines/*.json, written by scripts/quality_baselines.py.
 """
@@ -24,7 +24,7 @@ UPDATE = "python scripts/quality_baselines.py update"
 @pytest.mark.parametrize(
     ("baseline", "counter", "what"),
     quality_baselines.CHECKS,
-    ids=["blind-except", "biome-ignore", "file-size"],
+    ids=["blind-except", "biome-ignore", "file-size", "native-path"],
 )
 def test_no_file_goes_above_its_ceiling_and_every_fix_lowers_it(
     baseline, counter, what
@@ -59,6 +59,23 @@ def test_blind_and_silent_handlers_are_counted(source, blind, silent):
         "blind": blind,
         "silent": silent,
     }
+
+
+@pytest.mark.parametrize(
+    ("source", "native"),
+    [
+        ("rel = str(path.relative_to(root))\n", 1),
+        ("rel = str(Path(raw))\n", 1),
+        ("rel = os.path.relpath(path, root)\n", 1),
+        ("rel = path.relative_to(root).as_posix()\n", 0),
+        ("rel = Path(raw).as_posix()\n", 0),
+        ('rel = str(path.relative_to(root)).replace("\\\\", "/")\n', 0),
+        ("name = str(path)\n", 0),
+    ],
+)
+def test_native_paths_are_counted_and_posix_ones_are_not(source, native):
+    """A path made on Windows holds backslashes; .as_posix() reads the same everywhere."""
+    assert quality_baselines.count_native_paths(source) == native
 
 
 def test_a_new_blind_except_is_refused():
