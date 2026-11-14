@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -215,7 +216,8 @@ def trigger_jenkins(env: dict, branch: str, pr_url: str | None = None) -> dict:
             "error": "Jenkins config incomplete (need CICD_JENKINS_URL, CICD_JENKINS_JOB)"
         }
 
-    url = f"{jenkins_url}/job/{job}/buildWithParameters?BRANCH={branch or 'main'}&PR_URL={pr_url or ''}"
+    query = urllib.parse.urlencode({"BRANCH": branch or "main", "PR_URL": pr_url or ""})
+    url = f"{jenkins_url}/job/{urllib.parse.quote(job)}/buildWithParameters?{query}"
     headers: dict = {}
     if user and token:
         import base64
@@ -264,9 +266,9 @@ def action_trigger(
 def action_status(env: dict, provider: str, run_id: str) -> dict:
     """Get pipeline run status (provider-specific)."""
     p = provider.lower()
-    token = env.get(f"CICD_{p.upper()}_TOKEN", "")
 
     if p in ("github", "github_actions"):
+        token = env.get("CICD_GITHUB_TOKEN", "")
         repo = env.get("CICD_GITHUB_REPO", "")
         if not repo or not token:
             return {"error": "Missing CICD_GITHUB_REPO or CICD_GITHUB_TOKEN"}
@@ -295,9 +297,9 @@ def action_status(env: dict, provider: str, run_id: str) -> dict:
 def action_cancel(env: dict, provider: str, run_id: str) -> dict:
     """Cancel a running pipeline."""
     p = provider.lower()
-    token = env.get(f"CICD_{p.upper()}_TOKEN", "")
 
     if p in ("github", "github_actions"):
+        token = env.get("CICD_GITHUB_TOKEN", "")
         repo = env.get("CICD_GITHUB_REPO", "")
         if not repo or not token:
             return {"error": "Missing CICD_GITHUB_REPO or CICD_GITHUB_TOKEN"}
@@ -339,10 +341,8 @@ def main():
             )
         elif args.action == "status":
             result = action_status(env, provider, args.run_id)
-        elif args.action == "cancel":
-            result = action_cancel(env, provider, args.run_id)
         else:
-            result = {"error": f"Unknown action: {args.action}"}
+            result = action_cancel(env, provider, args.run_id)
 
         print(json.dumps(result, ensure_ascii=False))
         sys.exit(0 if "error" not in result else 1)
