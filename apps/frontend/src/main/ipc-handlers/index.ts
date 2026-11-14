@@ -42,6 +42,7 @@ import {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 import { registerArenaHandlers } from "./arena-handlers";
+import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
@@ -169,6 +170,7 @@ export {
 	setupArchitectureVisualizerEventForwarding,
 } from "./architecture-visualizer-handlers";
 export { registerArenaHandlers } from "./arena-handlers";
+export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
@@ -487,6 +489,9 @@ export function setupIpcHandlers(
 
 	// Arena Mode handlers (Feature 9) — Blind A/B model comparison
 	registerArenaHandlers(getMainWindow);
+
+	// Mission Control: state proxied to the backend, each agent's model call run here
+	registerMissionControlHandlers();
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
