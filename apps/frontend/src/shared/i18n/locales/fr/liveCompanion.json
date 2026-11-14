@@ -1,32 +1,36 @@
 {
 	"title": "Compagnon en direct",
-	"description": "Compagnon IA en temps reel qui surveille votre code, detecte les problemes pendant que vous codez, et propose une prise en charge intelligente quand vous etes bloque.",
+	"description": "Compagnon IA en temps réel : il relit chaque fichier que vous enregistrez, signale les problèmes pendant que vous codez et propose de prendre le relais quand vous êtes bloqué.",
 	"state": {
 		"active": "Actif",
 		"inactive": "Inactif",
+		"analyzing": "Analyse en cours…",
 		"watching": "Surveillance de {{project}}",
-		"changesDetected": "{{count}} modification(s) detectee(s)",
-		"suggestionsGenerated": "{{count}} suggestion(s)",
-		"takeoversPending": "{{count}} prise(s) en charge en attente"
+		"watchingOther": "Le compagnon surveille {{project}}, pas le projet ouvert.",
+		"changesDetected": "Modifications détectées",
+		"suggestionsGenerated": "Suggestions",
+		"takeoversPending": "Reprises en attente"
 	},
 	"suggestions": {
 		"title": "Suggestions",
-		"empty": "Aucune suggestion active. Le compagnon analysera les modifications pendant que vous codez.",
-		"confidence": "{{value}}% de confiance",
-		"relatedFiles": "Fichiers lies",
-		"codeFix": "Correction suggeree",
+		"emptyTitle": "Pas encore de suggestion",
+		"empty": "Démarrez le compagnon puis enregistrez un fichier du projet : il analysera la modification.",
+		"emptyActive": "En écoute. Chaque fichier enregistré est analysé avec le fournisseur IA sélectionné ; rien à signaler pour l'instant.",
+		"confidence": "{{value}} % de confiance",
+		"relatedFiles": "Fichiers liés",
+		"codeFix": "Correction suggérée",
 		"types": {
-			"bug_detection": "Bug detecte",
-			"duplicate_code": "Code duplique",
-			"missing_update": "Mise a jour manquante",
-			"contract_violation": "Violation de contrat",
-			"performance_issue": "Probleme de performance",
-			"security_issue": "Probleme de securite",
+			"bug_detection": "Bug détecté",
+			"duplicate_code": "Code dupliqué",
+			"missing_update": "Mise à jour manquante",
+			"contract_violation": "Contrat non respecté",
+			"performance_issue": "Problème de performance",
+			"security_issue": "Problème de sécurité",
 			"missing_test": "Test manquant",
-			"refactor_opportunity": "Opportunite de refactoring",
-			"import_suggestion": "Suggestion d'import",
-			"convention_mismatch": "Non-conformite de convention",
-			"general": "General"
+			"refactor_opportunity": "Refactorisation possible",
+			"import_suggestion": "Import suggéré",
+			"convention_mismatch": "Convention non respectée",
+			"general": "Général"
 		},
 		"priorities": {
 			"critical": "Critique",
@@ -34,50 +38,63 @@
 			"medium": "Moyenne",
 			"low": "Basse",
 			"info": "Info"
-		},
-		"emptyTitle": "Pas encore de suggestion"
+		}
 	},
 	"takeover": {
-		"title": "Prise en charge IA",
-		"proposal": "L'IA veut aider",
-		"reason": "Raison",
-		"inactivity": "Inactivite detectee sur {{file}} ({{duration}})",
-		"accept": "Laisser l'IA aider",
+		"title": "Prise de relais par l'IA",
+		"proposal": "L'IA peut prendre le relais",
+		"reasons": {
+			"inactivity": "Pause après plusieurs modifications"
+		},
+		"description": "Pause de {{duration}} après {{count}} modifications de ce fichier. Une tâche Kanban peut reprendre le travail là où vous l'avez laissé.",
+		"accept": "Créer une tâche de reprise",
 		"decline": "Non merci",
-		"inProgress": "L'IA travaille sur {{file}}...",
-		"completed": "L'IA a termine le travail sur {{file}}",
 		"emptyTitle": "Aucune reprise proposée",
-		"emptyHint": "Quand le compagnon vous voit bloqué sur un fichier, il propose ici de prendre le relais."
+		"emptyHint": "Quand vous vous arrêtez après plusieurs modifications d'un fichier, le compagnon propose ici d'en faire une tâche Kanban."
+	},
+	"duration": {
+		"seconds": "{{seconds}} s",
+		"minutes": "{{minutes}} min {{seconds}} s"
+	},
+	"task": {
+		"suggestionTitle": "{{title}} ({{file}})",
+		"takeoverTitle": "Reprendre le travail sur {{file}}",
+		"takeoverBody": "Le développeur s'est arrêté après {{count}} modifications de ce fichier. Lire ses changements en cours (git diff) et terminer le travail commencé, sans repartir de zéro.",
+		"file": "Fichier : {{file}}",
+		"lines": "Lignes : {{start}} à {{end}}",
+		"fix": "Correction proposée :",
+		"related": "Fichiers liés : {{files}}",
+		"origin": "Proposé par le Compagnon en direct : {{type}}, priorité {{priority}}, confiance {{confidence}} %.",
+		"created": "Tâche créée dans le Kanban (backlog).",
+		"failed": "La tâche n'a pas pu être créée."
 	},
 	"config": {
-		"title": "Parametres du compagnon",
-		"enabled": "Activer le compagnon en direct",
-		"suggestions": "Activer les suggestions",
-		"takeover": "Activer la detection de prise en charge",
-		"debounce": "Delai d'analyse (ms)",
-		"inactivityThreshold": "Seuil d'inactivite (secondes)",
-		"minConfidence": "Confiance minimale",
-		"maxSuggestionsPerFile": "Max suggestions par fichier"
+		"title": "Réglages du compagnon",
+		"suggestions": "Analyser les modifications",
+		"takeover": "Proposer de prendre le relais"
 	},
 	"actions": {
-		"start": "Demarrer le compagnon",
-		"stop": "Arreter le compagnon",
-		"dismiss": "Rejeter",
-		"apply": "Appliquer la correction",
-		"viewDetails": "Voir les details",
-		"close": "Fermer"
+		"start": "Démarrer le compagnon",
+		"stop": "Arrêter le compagnon",
+		"watchThis": "Surveiller ce projet",
+		"dismiss": "Ignorer",
+		"createTask": "Créer une tâche",
+		"viewDetails": "Voir les détails"
 	},
 	"fileChange": {
-		"title": "Modifications recentes",
-		"created": "Cree",
-		"modified": "Modifie",
-		"deleted": "Supprime",
-		"renamed": "Renomme"
+		"title": "Modifications récentes",
+		"created": "Créé",
+		"modified": "Modifié",
+		"deleted": "Supprimé",
+		"renamed": "Renommé"
 	},
 	"errors": {
-		"noProject": "Veuillez selectionner un projet avant de demarrer le compagnon.",
-		"startFailed": "Impossible de demarrer le compagnon en direct. Verifiez que chokidar est disponible.",
-		"analysisFailed": "L'analyse a echoue pour {{file}}."
+		"noProject": "Sélectionnez un projet avant de démarrer le compagnon.",
+		"startFailed": "Le compagnon n'a pas pu démarrer : {{message}}",
+		"analysisFailed": "La dernière analyse a échoué : {{message}}",
+		"analysisFailedFile": "La dernière analyse de {{file}} a échoué : {{message}}",
+		"providerHint": "Vérifiez le fournisseur IA sélectionné et sa connexion, puis enregistrez de nouveau le fichier.",
+		"code": "Code : {{code}}"
 	},
 	"kickers": {
 		"session": "Session",

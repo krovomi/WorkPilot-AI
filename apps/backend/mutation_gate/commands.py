@@ -86,12 +86,20 @@ def _has_pytest(root: Path) -> bool:
     return tests.is_dir() and any(tests.rglob("test_*.py"))
 
 
-def _dotnet_target(root: Path) -> str | None:
-    for pattern in ("*.sln", "*.slnx", "*.csproj", "*.fsproj"):
-        found = sorted(root.glob(pattern))
-        if found:
-            return found[0].name
-    return None
+def _dotnet_command(root: Path) -> list[str] | None:
+    """``dotnet test`` on what holds the tests: a solution without a test
+    project builds, runs nothing and exits 0, so every mutant would pass."""
+    from suite_runner.dotnet import dotnet_plan
+
+    plan = dotnet_plan(root)
+    if plan is None or not plan.target:
+        return None
+    if plan.mtp:
+        option = (
+            "--solution" if plan.target.endswith((".sln", ".slnx")) else "--project"
+        )
+        return ["dotnet", "test", option, plan.target]
+    return ["dotnet", "test", plan.target, "--nologo"]
 
 
 def _flutter(root: Path) -> bool:
@@ -128,8 +136,7 @@ def _command(root: Path, source: str, tests: list[str]) -> list[str] | None:
     ):
         return _js(root, tests)
     if suffix in (".cs", ".fs", ".razor", ".cshtml"):
-        target = _dotnet_target(root)
-        return ["dotnet", "test", target, "--nologo"] if target else None
+        return _dotnet_command(root)
     if suffix in (".java", ".kt", ".kts", ".scala", ".groovy"):
         if (root / "pom.xml").is_file():
             return ["./mvnw" if (root / "mvnw").is_file() else "mvn", "-q", "test"]
