@@ -83,14 +83,31 @@ export function ledgerDirs(projectPath: string): string[] {
 	return [root, ...workspaces.map((dir) => path.join(dir, ".workpilot"))];
 }
 
+/**
+ * A ledger's JSON, or null for a missing, oversized, non-regular or unreadable
+ * file. Opened without following a link and checked on the open descriptor,
+ * so a file swapped in after the check is never the one read.
+ */
 function readLedger(dir: string, name: string): unknown {
-	const file = path.join(dir, name);
+	const limit = MAX_FILE_BYTES[name];
+	let fd: number | null = null;
 	try {
-		const stat = fs.statSync(file);
-		if (!stat.isFile() || stat.size > MAX_FILE_BYTES[name]) return null;
-		return JSON.parse(fs.readFileSync(file, "utf-8"));
+		fd = fs.openSync(path.join(dir, name), fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+		const stat = fs.fstatSync(fd);
+		if (!stat.isFile() || stat.size > limit) return null;
+		const buffer = Buffer.alloc(limit + 1);
+		let length = 0;
+		for (;;) {
+			const read = fs.readSync(fd, buffer, length, buffer.length - length, null);
+			if (read === 0) break;
+			length += read;
+			if (length > limit) return null;
+		}
+		return JSON.parse(buffer.subarray(0, length).toString("utf-8"));
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) fs.closeSync(fd);
 	}
 }
 

@@ -103,6 +103,32 @@ describe("workspace ledgers", () => {
 		expect(snapshot.qa_first_pass_rate).toBe(0);
 	});
 
+	it("does not read a ledger over its size", () => {
+		write(".workpilot/cost_data.json", {
+			usages: [{ provider: "x", model: "y", input_tokens: 5, cost: 1, timestamp: at }],
+			padding: "x".repeat(8_000_001),
+		});
+		expect(readUsages(project)).toEqual([]);
+	});
+
+	// Windows has no O_NOFOLLOW: a link there is read like the file it names.
+	it.skipIf(fs.constants.O_NOFOLLOW === undefined)("does not follow a ledger that is a link", () => {
+		const outside = fs.mkdtempSync(path.join(os.tmpdir(), "wp-outside-"));
+		try {
+			const target = path.join(outside, "cost_data.json");
+			fs.writeFileSync(
+				target,
+				JSON.stringify({ usages: [{ provider: "x", model: "y", input_tokens: 5, cost: 1, timestamp: at }] }),
+			);
+			const ledgers = path.join(project, ".workpilot", "worktrees", "tasks", "001-a", ".workpilot");
+			fs.mkdirSync(ledgers, { recursive: true });
+			fs.symlinkSync(target, path.join(ledgers, "cost_data.json"));
+			expect(readUsages(project)).toEqual([]);
+		} finally {
+			fs.rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
 	it("counts every status of the board, archived tasks left out", () => {
 		expect(
 			tasksByStatus([
