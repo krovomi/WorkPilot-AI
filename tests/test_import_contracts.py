@@ -62,7 +62,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The mutation gate (docs/architecture/mutation-gate.md): git, the test
     # conventions and the platform through foundation; the child environment
     # without credentials from security. The QA gate that calls it is in qa.
-    "mutation_gate": {"foundation", "security"},
+    "mutation_gate": {"foundation", "security", "suite_runner"},
     # The schema guard (docs/architecture/schema-guard.md): migration rules
     # over text, git through foundation. The QA gate that calls it is in qa.
     "schema_guard": {"foundation"},

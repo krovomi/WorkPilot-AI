@@ -40,7 +40,16 @@ import {
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
 
-const ERROR_CODES = ["no_command", "no_results", "start_failed"] as const;
+const ERROR_CODES = [
+	"no_command",
+	"no_dotnet_tests",
+	"no_results",
+	"no_tests",
+	"start_failed",
+] as const;
+
+/** Codes whose message is followed by the run's output: an English first line, then the output. */
+const OUTPUT_CODES: ReadonlySet<string> = new Set(["no_results", "no_tests"]);
 
 /**
  * The runner's error, ``<code>: <message>`` (wrapped by the IPC layer as
@@ -325,6 +334,25 @@ function ActivityView({
 	);
 }
 
+/**
+ * What follows the code: for a run that gave nothing, an English first line,
+ * then ``log: <path>`` (the whole output, kept in the run folder), then the
+ * end of the output. A code without output shows nothing more (its words say it).
+ */
+export function splitRunOutput(
+	code: (typeof ERROR_CODES)[number],
+	detail: string,
+): { output: string; logPath: string | null } {
+	if (code === "no_dotnet_tests") return { output: "", logPath: null };
+	const lines = detail.split("\n");
+	if (OUTPUT_CODES.has(code)) lines.shift();
+	let logPath: string | null = null;
+	if (lines[0]?.startsWith("log: ")) {
+		logPath = lines.shift()?.slice(5).trim() || null;
+	}
+	return { output: lines.join("\n").trim(), logPath };
+}
+
 function ErrorView({
 	error,
 	t,
@@ -340,12 +368,16 @@ function ErrorView({
 			</Notice>
 		);
 	}
-	// The first line repeats the code in English; the rest is the tool's output.
-	const output = detail.split("\n").slice(code === "no_results" ? 1 : 0).join("\n");
+	const { output, logPath } = splitRunOutput(code, detail);
 	return (
 		<Notice tone="red" icon={AlertTriangle} role="alert">
 			<p>{t(`errors.${code}`)}</p>
-			{output.trim() && <pre className="wp-code mt-2 max-h-64 overflow-auto">{output.trim()}</pre>}
+			{output && <pre className="wp-code mt-2 max-h-96 overflow-auto">{output}</pre>}
+			{logPath && (
+				<p className="mt-2 text-xs">
+					{t("errors.fullLog")} <code>{logPath}</code>
+				</p>
+			)}
 		</Notice>
 	);
 }

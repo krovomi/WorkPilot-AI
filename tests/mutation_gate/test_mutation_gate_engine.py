@@ -277,7 +277,16 @@ def test_commands_per_stack(tmp_path):
         tmp_path, "web/src/a.ts", ["web/src/a&b.test.ts"]
     )
     assert not any("a&b" in part for part in argv)
+    # A project that holds no test: "dotnet test" would pass every mutant.
     (tmp_path / "Shop.csproj").write_text("<Project/>", encoding="utf-8")
+    assert commands.command_for_tests(tmp_path, "Order.cs", ["OrderTests.cs"]) is None
+    tests = tmp_path / "Shop.Tests"
+    tests.mkdir()
+    (tests / "Shop.Tests.csproj").write_text(
+        '<Project><ItemGroup><PackageReference Include="xunit" /></ItemGroup></Project>',
+        encoding="utf-8",
+    )
     argv, _ = commands.command_for_tests(tmp_path, "Order.cs", ["OrderTests.cs"])
-    assert "test" in argv and "Shop.csproj" in argv
+    # Windows resolves the program to its full path (dotnet.EXE).
+    assert argv[1] == "test" and "Shop.Tests/Shop.Tests.csproj" in argv
     assert commands.command_for_tests(tmp_path, "notes.swift", []) is None
