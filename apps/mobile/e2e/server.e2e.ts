@@ -16,7 +16,10 @@
  * says so; a theme chosen in Settings is kept on the person's account and
  * applies on another device; the team's pull requests, issues and merge
  * requests read and commented through the server with each person's own
- * token, which the fake forge saw and the page never shows. The browser cannot set headers on a WebSocket, so on the web the
+ * token, which the fake forge saw and the page never shows; a card's spec
+ * approved from the phone, built (the fake agent checks the approval as a
+ * build does and commits in the card's workspace), reviewed with its changes
+ * and sent back to a build that runs. The browser cannot set headers on a WebSocket, so on the web the
  * board follows by its periodic read; the header handshake is the native
  * app's (unit-tested in `src/__tests__`).
  *
@@ -470,4 +473,47 @@ test("Alice adds her GitLab token and reads the team's merge requests", async ()
 	const calls = (await forgeCalls()).filter((c) => c.host === "gitlab.e2e.test");
 	expect(calls.map((c) => c.path)).toContain("/api/v4/projects/e2e-team%2Fteam-docs/merge_requests");
 	expect(new Set(calls.map((c) => c.token))).toEqual(new Set([tokenTag(token)]));
+});
+
+test("Alice approves a card's spec from the phone, builds it, and sends it back", async () => {
+	// Two runs of the fake agent, each released at once, and a second build.
+	test.setTimeout(300_000);
+	const alice = signedInPage("alice");
+	await home(alice, world.project);
+	await alice.getByRole("button", { name: world.project }).click();
+	await alice.getByRole("button", { name: "New card" }).click();
+	await alice.getByLabel("Title").fill("Greet the team by name");
+	await alice.getByLabel("Description").fill("hello() takes the team's name.");
+	// The review before coding stays on: the spec waits for an approval.
+	await alice.getByRole("button", { name: "Create" }).click();
+	await expect(alice.getByRole("heading", { name: "Greet the team by name" })).toBeVisible({ timeout: 30_000 });
+
+	// The spec phase runs on the server; the fake agent writes the spec.
+	await alice.getByRole("button", { name: "Start" }).click();
+	const approve = alice.getByRole("button", { name: "Approve the spec" });
+	await expect(approve).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByText("Spec written by the fake agent")).toBeVisible();
+	await approve.click();
+	await expect(alice.getByText("Approved by alice")).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "19-approved");
+
+	// The build checks that approval, then the card waits for the team's
+	// review, its changes read from its workspace on the server. The build
+	// moved the plan on: the card still counts as approved.
+	await alice.getByRole("button", { name: "Start" }).click();
+	const requestChanges = alice.getByRole("button", { name: "Request changes" });
+	await expect(requestChanges).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByRole("button", { name: "Merge" })).toBeVisible();
+	await expect(alice.getByText("BUILD_NOTES.md").first()).toBeVisible({ timeout: 30_000 });
+	await shot(alice, "20-review");
+
+	// Sent back with what to change: the build it starts is not stopped for
+	// a new approval, and the card comes back to review.
+	await requestChanges.click();
+	await alice.getByPlaceholder("What should the agents change?").fill("Say good morning before noon.");
+	await alice.getByRole("button", { name: "Send", exact: true, disabled: false }).click();
+	await expect(alice.getByText(/^(Queued|Running)$/).first()).toBeVisible({ timeout: 60_000 });
+	await expect(requestChanges).toBeVisible({ timeout: 90_000 });
+	await expect(alice.getByText(/Failed/)).toHaveCount(0);
+	await shot(alice, "21-sent-back");
 });

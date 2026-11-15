@@ -18,21 +18,34 @@ What it does, in order:
    with the stream token the server minted for it, until the test drops
    ``e2e-release`` in the spec directory (it gives up, and fails, after
    ``RELEASE_TIMEOUT_S``);
-3. writes ``spec.md`` (the ``spec`` phase) and exits 0.
+3. writes ``spec.md`` (the ``spec`` phase, approved at once when the card
+   asks for no review, ``--auto-approve``), or, for the ``build`` phase,
+   commits one file in the card's workspace (a git worktree on
+   ``workpilot/<spec>``, as the coder leaves it) and moves the plan to
+   ``human_review``, then exits 0.
+
+A build checks the spec's approval first, as the real one does
+(``cli/build_commands.py``, with the backend's own ``review/state.py``): a
+spec that is not, or no longer, approved stops the build with exit 1.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import importlib.util
 import json
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 RELEASE_FILE = "e2e-release"
 REPORT_FILE = "fake_agent_report.json"
 RELEASE_TIMEOUT_S = 120.0
+#: The approval a build checks, read with the backend's own code.
+_REVIEW_STATE = Path(__file__).resolve().parents[3] / "apps/backend/review/state.py"
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
@@ -41,6 +54,7 @@ def _parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--project-dir", required=True)
     parser.add_argument("--spec-dir")
     parser.add_argument("--task-file")
+    parser.add_argument("--auto-approve", action="store_true")
     args, _ = parser.parse_known_args(argv)
     return args
 
@@ -102,6 +116,59 @@ def _publish_until_released(spec_dir: Path) -> bool:
     return False
 
 
+#: The commit is the fake agent's own: whoever runs the test may sign theirs.
+_GIT_IDENTITY = (
+    "-c",
+    "user.name=Fake agent",
+    "-c",
+    "user.email=agent@e2e.test",
+    "-c",
+    "commit.gpgsign=false",
+)
+
+
+def _review_state() -> type:
+    spec = importlib.util.spec_from_file_location("e2e_review_state", _REVIEW_STATE)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.ReviewState
+
+
+def _git(cwd: Path, *args: str) -> None:
+    done = subprocess.run(
+        ["git", *_GIT_IDENTITY, *args], cwd=cwd, capture_output=True, text=True
+    )
+    if done.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {done.stderr.strip()}")
+
+
+def _build(project: Path, spec_dir: Path, task: str) -> None:
+    """What a build leaves behind: a commit in the card's workspace and a plan
+    waiting for the team's review."""
+    spec = spec_dir.name
+    workspace = project / ".workpilot" / "worktrees" / "tasks" / spec
+    if not workspace.is_dir():
+        _git(
+            project,
+            "worktree",
+            "add",
+            "-b",
+            f"workpilot/{spec}",
+            str(workspace),
+            "HEAD",
+        )
+    notes = workspace / "BUILD_NOTES.md"
+    previous = notes.read_text(encoding="utf-8") if notes.is_file() else ""
+    notes.write_text(f"{previous}Built by the fake agent.\n{task}\n", encoding="utf-8")
+    _git(workspace, "add", "BUILD_NOTES.md")
+    _git(workspace, "commit", "-m", "Fake agent build")
+    plan = spec_dir / "implementation_plan.json"
+    content = json.loads(plan.read_text(encoding="utf-8")) if plan.is_file() else {}
+    content["status"] = "human_review"
+    plan.write_text(json.dumps(content, indent=1), encoding="utf-8")
+
+
 def main(phase: str, argv: list[str]) -> int:
     args = _parse(argv)
     project = Path(args.project_dir)
@@ -122,10 +189,18 @@ def main(phase: str, argv: list[str]) -> int:
     }
     (spec_dir / REPORT_FILE).write_text(json.dumps(report, indent=1), encoding="utf-8")
 
+    review_state = _review_state()
+    if phase == "build" and not review_state.load(spec_dir).is_approval_valid(spec_dir):
+        print("BUILD BLOCKED - REVIEW REQUIRED", file=sys.stderr)
+        return 1
     if not _publish_until_released(spec_dir):
         return 1
     if phase == "spec":
         (spec_dir / "spec.md").write_text(
             "# Spec written by the fake agent\n\n" + task, encoding="utf-8"
         )
+        if args.auto_approve:
+            review_state().approve(spec_dir, approved_by="auto")
+    elif phase == "build":
+        _build(project, spec_dir, task)
     return 0
