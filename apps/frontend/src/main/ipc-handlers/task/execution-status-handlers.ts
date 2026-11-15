@@ -37,6 +37,8 @@ import {
 	getPlanPath,
 	persistPlanStatus,
 } from "./plan-file-utils";
+import { getToolPath } from "../../cli-tool-manager";
+import { taskWorkAlreadyMerged } from "./merged-task-branch";
 import { findTaskAndProject } from "./shared";
 import { discardSpecIfStale } from "./stale-spec";
 import { convertTaskMetadataToSpecCreation } from "./resume-task";
@@ -92,8 +94,28 @@ export function registerTaskStatusHandlers(ctx: ExecutionHandlerContext): void {
 				// Check if worktree exists (task.specId matches worktree folder name)
 				const worktreePath = findTaskWorktree(project.path, task.specId);
 				const hasWorktree = worktreePath !== null;
+				// Get base branch from task metadata or project settings
+				const baseBranch =
+					task.metadata?.baseBranch ||
+					project.settings?.mainBranch ||
+					"develop";
+				// Merged locally already ("Merge to <base>"): no PR to open.
+				const alreadyMerged =
+					worktreePath !== null &&
+					taskWorkAlreadyMerged(
+						getToolPath("git"),
+						project.path,
+						worktreePath,
+						task.specId,
+						baseBranch,
+					);
 
-				if (!existingPrUrl && hasWorktree && !options?.skipPrCreation) {
+				if (
+					!existingPrUrl &&
+					hasWorktree &&
+					!alreadyMerged &&
+					!options?.skipPrCreation
+				) {
 					// Worktree exists - create PR for human validation
 					console.warn(
 						`[TASK_UPDATE_STATUS] Creating PR for task ${taskId} (status: done)`,
@@ -162,12 +184,6 @@ print(json.dumps(result))
 							mkdirSync(tmpDir, { recursive: true });
 						}
 						writeFileSync(tmpScriptPath, scriptContent, "utf-8");
-
-						// Get base branch from task metadata or project settings
-						const baseBranch =
-							task.metadata?.baseBranch ||
-							project.settings?.mainBranch ||
-							"develop";
 
 						// Build the parameters payload. The description is stripped of
 						// HTML so the PR body stays clean (no raw tags) and small
@@ -289,14 +305,15 @@ print(json.dumps(result))
 					}
 				} else if (!existingPrUrl) {
 					// Mark done without creating a PR. Either there is no worktree
-					// (limbo-state recovery) or the user explicitly chose to close
-					// without a PR (skipPrCreation) — e.g. the remote push is blocked
-					// (Azure 403) or the change will be handled outside WorkPilot. The
+					// (limbo-state recovery), its work is already merged into the
+					// base branch, or the user explicitly chose to close without a
+					// PR (skipPrCreation) — e.g. the remote push is blocked (Azure
+					// 403) or the change will be handled outside WorkPilot. The
 					// worktree, if any, is left intact for reference.
 					console.warn(
 						`[TASK_UPDATE_STATUS] Allowing status 'done' for task ${taskId} without PR creation (skipPrCreation=${Boolean(
 							options?.skipPrCreation,
-						)}, hasWorktree=${hasWorktree})`,
+						)}, hasWorktree=${hasWorktree}, alreadyMerged=${alreadyMerged})`,
 					);
 				}
 			}

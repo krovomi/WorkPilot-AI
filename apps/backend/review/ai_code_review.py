@@ -106,7 +106,8 @@ class DiffFile:
     Attributes:
         file_path: The file path.
         added_lines: Dict mapping line number → content for added lines.
-        removed_lines: Dict mapping line number → content for removed lines.
+        removed_lines: Dict mapping old-file line number → content for removed
+            lines (each removed line has its own number in the old file).
         hunks: List of (start_line, end_line) tuples for changed regions.
         language: The detected programming language.
         is_new_file: Whether this file is newly created.
@@ -423,6 +424,8 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
     files: list[DiffFile] = []
     current_file: DiffFile | None = None
     current_new_line = 0
+    current_old_line = 0
+    in_hunk = False
 
     for line in diff_text.splitlines():
         # New file header
@@ -434,6 +437,8 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
             file_path = parts[-1].removeprefix("b/") if len(parts) >= 4 else ""
             current_file = DiffFile(file_path=file_path)
             current_new_line = 0
+            current_old_line = 0
+            in_hunk = False
             continue
 
         if current_file is None:
@@ -444,9 +449,9 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
             current_file.is_new_file = True
         elif line.startswith("deleted file"):
             current_file.is_deleted = True
-        elif line.startswith("--- "):
+        elif line.startswith("--- ") and not in_hunk:
             pass  # old file header
-        elif line.startswith("+++ "):
+        elif line.startswith("+++ ") and not in_hunk:
             # Detect language from extension
             path = line[4:].split("\t", 1)[0].removeprefix("b/")
             if path != "/dev/null":
@@ -454,23 +459,31 @@ def parse_unified_diff(diff_text: str) -> list[DiffFile]:
             current_file.language = _detect_language(path)
         elif line.startswith("@@"):
             # Hunk header: @@ -old_start,old_count +new_start,new_count @@
-            match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
+            in_hunk = True
+            match = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line)
             if match:
-                start = int(match.group(1))
-                count = int(match.group(2) or "1")
+                start = int(match.group(2))
+                count = int(match.group(3) or "1")
+                current_old_line = int(match.group(1))
                 current_new_line = start
                 current_file.hunks.append((start, start + count - 1))
             else:
-                current_new_line = 1
+                current_old_line = current_new_line = 1
         elif line.startswith("+"):
             current_file.added_lines[current_new_line] = line[1:]
             current_new_line += 1
         elif line.startswith("-"):
-            current_file.removed_lines[current_new_line] = line[1:]
-            # Don't increment new line for removed lines
+            # Keyed by the old file's line: consecutive removed lines share
+            # one new-file position, so keying them by it kept only the last
+            # one and undercounted every deletion.
+            current_file.removed_lines[current_old_line] = line[1:]
+            current_old_line += 1
+        elif line.startswith("\\"):
+            pass  # "\ No newline at end of file"
         else:
             # Context line
             current_new_line += 1
+            current_old_line += 1
 
     if current_file:
         files.append(current_file)
@@ -998,7 +1011,9 @@ class AICodeReviewer:
         for line in response.splitlines():
             line = line.strip()
             if line.startswith("- LINE:"):
-                if current:
+                # A finding without a message is dropped here as it is at the
+                # end of the response, instead of becoming an empty comment.
+                if "message" in current:
                     comments.append(self._build_comment_from_dict(current))
                 current = {"line": line.split(":", 1)[1].strip()}
             elif line.startswith("- SEVERITY:"):

@@ -19,6 +19,8 @@ interface ToolUsage {
 
 interface InsightsState {
 	// Data
+	/** The project the Insights view shows; events of any other project are not its own. */
+	projectId: string | null;
 	session: InsightsSession | null;
 	sessions: InsightsSessionSummary[]; // List of all sessions
 	status: InsightsChatStatus;
@@ -38,7 +40,6 @@ interface InsightsState {
 	setStatus: (status: InsightsChatStatus) => void;
 	setPendingMessage: (message: string) => void;
 	addMessage: (message: InsightsChatMessage) => void;
-	updateLastAssistantMessage: (content: string) => void;
 	appendStreamingContent: (content: string) => void;
 	clearStreamingContent: () => void;
 	setCurrentTool: (tool: ToolUsage | null) => void;
@@ -63,6 +64,7 @@ const initialStatus: InsightsChatStatus = {
 
 export const useInsightsStore = create<InsightsState>((set, _get) => ({
 	// Initial state
+	projectId: null,
 	session: null,
 	sessions: [],
 	status: initialStatus,
@@ -104,27 +106,6 @@ export const useInsightsStore = create<InsightsState>((set, _get) => ({
 				session: {
 					...state.session,
 					messages: [...state.session.messages, message],
-					updatedAt: new Date(),
-				},
-			};
-		}),
-
-	updateLastAssistantMessage: (content) =>
-		set((state) => {
-			if (!state.session || state.session.messages.length === 0) return state;
-
-			const messages = [...state.session.messages];
-			const lastIndex = messages.length - 1;
-			const lastMessage = messages[lastIndex];
-
-			if (lastMessage.role === "assistant") {
-				messages[lastIndex] = { ...lastMessage, content };
-			}
-
-			return {
-				session: {
-					...state.session,
-					messages,
 					updatedAt: new Date(),
 				},
 			};
@@ -249,6 +230,7 @@ export async function loadInsightsSessions(projectId: string): Promise<void> {
 }
 
 export async function loadInsightsSession(projectId: string): Promise<void> {
+	useInsightsStore.setState({ projectId });
 	const result = await window.electronAPI.getInsightsSession(projectId);
 	if (result.success && result.data) {
 		useInsightsStore.getState().setSession(result.data);
@@ -411,10 +393,14 @@ export async function createTaskFromSuggestion(
 // IPC listener setup - call this once when the app initializes
 export function setupInsightsListeners(): () => void {
 	const store = useInsightsStore.getState;
+	// A chat keeps streaming after the person opens another project: its chunks
+	// belong to the session of the project that asked, not to the one on screen.
+	const isShown = (projectId: string) => store().projectId === projectId;
 
 	// Listen for streaming chunks
 	const unsubStreamChunk = window.electronAPI.onInsightsStreamChunk(
-		(_projectId, chunk: InsightsStreamChunk) => {
+		(projectId, chunk: InsightsStreamChunk) => {
+			if (!isShown(projectId)) return;
 			switch (chunk.type) {
 				case "text":
 					if (chunk.content) {
@@ -480,13 +466,15 @@ export function setupInsightsListeners(): () => void {
 
 	// Listen for status updates
 	const unsubStatus = window.electronAPI.onInsightsStatus(
-		(_projectId, status) => {
+		(projectId, status) => {
+			if (!isShown(projectId)) return;
 			store().setStatus(status);
 		},
 	);
 
 	// Listen for errors
-	const unsubError = window.electronAPI.onInsightsError((_projectId, error) => {
+	const unsubError = window.electronAPI.onInsightsError((projectId, error) => {
+		if (!isShown(projectId)) return;
 		store().setStatus({
 			phase: "error",
 			error,

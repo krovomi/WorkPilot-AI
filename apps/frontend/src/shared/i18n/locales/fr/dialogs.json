@@ -187,7 +187,11 @@
 		"deleteTerminal": "Supprimer le worktree de terminal ?",
 		"deleteTerminalWarning": "Le worktree et sa branche seront supprimés définitivement. Les modifications non commitées seront perdues.",
 		"mergeSuccess": "Fusion réussie",
-		"mergeFailed": "Échec de la fusion"
+		"mergeFailed": "Échec de la fusion",
+		"loadFailed": "Impossible de charger les worktrees.",
+		"taskNotFound": "Aucune tâche ne correspond à ce worktree.",
+		"deleteFailed": "Impossible de supprimer le worktree.",
+		"deleteTerminalFailed": "Impossible de supprimer le worktree du terminal."
 	},
 	"worktreeCleanup": {
 		"title": "Terminer la tâche",
@@ -444,7 +448,17 @@
 		"browserLoginHint": "Cliquez ci-dessous pour ouvrir votre navigateur et vous connecter à votre compte Claude.",
 		"authenticateNew": "Authentifier un nouveau compte",
 		"hideToken": "Masquer le jeton",
-		"showToken": "Afficher le jeton"
+		"showToken": "Afficher le jeton",
+		"defaultTitle": "Authentification Claude requise",
+		"defaultDescription": "Un jeton OAuth Claude Code est nécessaire pour les fonctions d'IA comme l'Idéation et la génération de feuille de route.",
+		"errors": {
+			"checkFailed": "Impossible de vérifier le jeton.",
+			"profileWithoutToken": "Le compte choisi n'a pas de jeton valide.",
+			"saveFailed": "Impossible d'enregistrer le jeton.",
+			"noProject": "Sélectionnez d'abord un projet.",
+			"authStartFailed": "Impossible de lancer l'authentification."
+		},
+		"copyCommand": "Copier la commande"
 	},
 	"azureConfig": {
 		"title": "Configurer Azure DevOps",
