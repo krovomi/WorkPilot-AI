@@ -45,7 +45,10 @@ WS_URL = f"ws://127.0.0.1:{WS_PORT}"
 
 #: What the server processes inherit from the test's environment; the rest is
 #: built (docs/rules/security.md, S4). No proxy: everything is on the loopback.
+#: The second line is what Windows needs to start a process at all: without
+#: SYSTEMROOT, git cannot open a socket, so a clone over HTTP fails there.
 _INHERITED = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "USER", "LOGNAME", "TMPDIR")
+_INHERITED += ("SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE")
 
 
 @dataclass

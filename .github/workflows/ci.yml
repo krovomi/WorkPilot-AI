@@ -99,9 +99,10 @@ jobs:
           # runner is meant to have a sandbox.
           WORKPILOT_EXPECT_SANDBOX: ${{ runner.os != 'Windows' && '1' || '' }}
           WORKPILOT_TEST_SHARD: ${{ matrix.shard }}
-          # sys.monitoring (Python 3.12+) instead of a trace function: the
-          # Linux run with coverage took 10 minutes, 6 without.
-          COVERAGE_CORE: sysmon
+          # No COVERAGE_CORE=sysmon: sys.monitoring cannot follow greenlets
+          # (.coveragerc measures them), so coverage fell back to its tracer
+          # anyway and every measured runner printed that warning in the
+          # output the tests read.
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
             source apps/backend/.venv/Scripts/activate
