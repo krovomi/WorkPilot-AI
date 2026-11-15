@@ -489,8 +489,11 @@
 			"pastBugs": "Past Bugs in Area",
 			"regressionRisks": "Regression Risks",
 			"gatheringTime": "Context gathered in {{ms}}ms",
-			"noContext": "No deep context available",
-			"canImportFrom": "Can import from: {{imports}}"
+			"canImportFrom": "Can import from: {{imports}}",
+			"violationSeverity": {
+				"error": "Error",
+				"warning": "Warning"
+			}
 		},
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",

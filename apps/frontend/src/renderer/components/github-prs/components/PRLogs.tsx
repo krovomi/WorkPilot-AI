@@ -27,6 +27,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "../../ui/collapsible";
+import { withUniqueKeys } from "../utils/unique-keys";
 import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
 interface PRLogsProps {
@@ -680,18 +681,11 @@ function formatLogTime(timestamp: string): string {
 	});
 }
 
-/**
- * Keys for log lines: several lines often share a timestamp (to the second),
- * and a key made of it alone made React drop or repeat them.
- */
-function keyed(entries: PRLogEntry[]): Array<{ key: string; entry: PRLogEntry }> {
-	const seen = new Map<string, number>();
-	return entries.map((entry) => {
-		const n = seen.get(entry.timestamp) ?? 0;
-		seen.set(entry.timestamp, n + 1);
-		return { key: `${entry.timestamp}#${n}`, entry };
-	});
-}
+const keyed = (entries: PRLogEntry[]) =>
+	withUniqueKeys(entries, (entry) => entry.timestamp).map(({ key, item }) => ({
+		key,
+		entry: item,
+	}));
 
 // Log Entry Component
 interface LogEntryProps {

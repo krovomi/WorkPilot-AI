@@ -489,8 +489,11 @@
 			"pastBugs": "Bugs passés dans cette zone",
 			"regressionRisks": "Risques de régression",
 			"gatheringTime": "Contexte collecté en {{ms}}ms",
-			"noContext": "Pas de contexte profond disponible",
-			"canImportFrom": "Peut importer depuis : {{imports}}"
+			"canImportFrom": "Peut importer depuis : {{imports}}",
+			"violationSeverity": {
+				"error": "Erreur",
+				"warning": "Avertissement"
+			}
 		},
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
