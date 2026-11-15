@@ -24,6 +24,7 @@ from types import SimpleNamespace
 
 import pytest
 from core import auth
+from foundation.platform import is_windows as host_is_windows
 
 TOKEN = "sk-ant-oat01-placeholder-0000"  # pragma: allowlist secret
 OTHER = "sk-ant-oat01-placeholder-1111"  # pragma: allowlist secret
@@ -677,10 +678,34 @@ class TestLogsAndNames:
             == (hashlib.sha256(b"/Users/dana/.claude-work").hexdigest()[:8])
         )
 
-    def test_a_tilde_names_the_same_entry_as_the_home_path(self, machine):
+    def test_a_tilde_names_the_same_entry_as_the_home_path(self, machine, monkeypatch):
+        # On the machine the test runs on: "~" expands with its own separators.
+        monkeypatch.setattr(auth, "is_windows", host_is_windows)
+
         assert auth._get_keychain_service_name("~/work") == (
             auth._get_keychain_service_name(str(machine / "work"))
         )
+
+    def test_windows_separators_are_normalized_like_the_app_does(self, monkeypatch):
+        # credential-utils.ts hashes C:\Users\ada\.claude-work, whichever
+        # slashes the path was written with.
+        on(monkeypatch, "Windows")
+        app = (
+            "Claude Code-credentials-"
+            + (hashlib.sha256(b"C:\\Users\\ada\\.claude-work").hexdigest()[:8])
+        )
+
+        assert auth._get_keychain_service_name("C:/Users/ada/.claude-work") == app
+        assert auth._get_keychain_service_name("C:\\Users\\ada/.claude-work") == app
+        assert auth._get_keychain_service_name("//srv/share/x") == (
+            auth._get_keychain_service_name("\\\\srv\\share\\x")
+        )
+        # A relative path is not a Windows path the app rewrites.
+        assert auth._get_keychain_service_name("rel/dir") == (
+            "Claude Code-credentials-" + hashlib.sha256(b"rel/dir").hexdigest()[:8]
+        )
+        on(monkeypatch, "Linux")
+        assert auth._get_keychain_service_name("C:/Users/ada/.claude-work") != app
 
     def test_a_plaintext_token_passes_the_encryption_check(self):
         auth.validate_token_not_encrypted(TOKEN)

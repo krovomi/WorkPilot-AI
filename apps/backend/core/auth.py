@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -123,8 +124,12 @@ def _get_keychain_service_name(config_dir: str | None = None) -> str:
     if not config_dir:
         return "Claude Code-credentials"
 
-    # Expand ~ to home directory (matching frontend normalization)
+    # Expand ~ to home directory, then the frontend's normalizeWindowsPath:
+    # on Windows "~/x" expands to "C:\Users\me/x", and the mixed separators
+    # would hash to another entry than the one the app names.
     expanded_dir = os.path.expanduser(config_dir)
+    if is_windows() and re.match(r"^[A-Za-z]:|^[\\/]{2}", expanded_dir):
+        expanded_dir = expanded_dir.replace("/", "\\")
 
     # Calculate hash and return hash-based service name
     hash_suffix = _calculate_config_dir_hash(expanded_dir)
