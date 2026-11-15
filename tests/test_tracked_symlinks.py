@@ -29,6 +29,7 @@ def _tracked_links() -> list[tuple[str, str]]:
         ).stdout
     except (OSError, subprocess.CalledProcessError):
         pytest.skip("not a git checkout")
+        return []  # pytest.skip raises; this tells CodeQL so
     links: list[tuple[str, str]] = []
     for entry in listing.split(b"\0"):
         if not entry.startswith(b"120000 "):
