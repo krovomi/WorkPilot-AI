@@ -230,7 +230,7 @@ async function runPRReview(
 	mainWindow: BrowserWindow,
 ): Promise<PRReviewResult> {
 	// Comprehensive validation of GitHub module
-	const validation = await validateGitHubModule(project);
+	const validation = await validateGitHubModule();
 
 	if (!validation.valid) {
 		throw new Error(validation.error);
@@ -396,7 +396,7 @@ export async function startDraftPRReview(
 	};
 
 	try {
-		const validation = await validateGitHubModule(project);
+		const validation = await validateGitHubModule();
 		if (!validation.valid) throw new Error(validation.error);
 		if (abortController.signal.aborted) throw new Error("The review was cancelled");
 	} catch (error) {
@@ -1632,7 +1632,7 @@ export function registerPRHandlers(
 						);
 
 					// Comprehensive validation of GitHub module
-					const validation = await validateGitHubModule(project);
+					const validation = await validateGitHubModule();
 					if (!validation.valid) {
 						sendError({
 							prNumber,
