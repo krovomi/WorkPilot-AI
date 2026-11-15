@@ -172,3 +172,121 @@ describe("the Lifecycle tab", () => {
 		expect(screen.getAllByRole("button", { name: "Garder celle-ci" })).toHaveLength(2);
 	});
 });
+
+describe("what the tab says when things go wrong or there is nothing", () => {
+	function empty(): MemoryLifecycleView {
+		return { ...view(), journal: [], trash: [], conflicts: [] };
+	}
+
+	it("says there is no conflict, nothing forgotten and no decision yet", async () => {
+		api.getMemoryLifecycle.mockResolvedValue({ success: true, data: empty() });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByText("No conflict waiting.")).toBeInTheDocument();
+		expect(screen.getByText("Nothing forgotten.")).toBeInTheDocument();
+		expect(screen.getByText("No decision recorded yet.")).toBeInTheDocument();
+	});
+
+	it("says why the lifecycle could not be read", async () => {
+		api.getMemoryLifecycle.mockResolvedValue({ success: false, error: "no-brain" });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByRole("alert")).toHaveTextContent(
+			"Could not read the memory's lifecycle: no shared brain yet",
+		);
+	});
+
+	it("says the action failed when the call throws or names no reason", async () => {
+		api.getMemoryLifecycle.mockRejectedValueOnce(new Error("ipc down"));
+		const first = render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByRole("alert")).toHaveTextContent("the action failed");
+		first.unmount();
+
+		api.getMemoryLifecycle.mockResolvedValueOnce({ success: false });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByRole("alert")).toHaveTextContent("the action failed");
+	});
+
+	it("names a forgotten memory by its preview when it has no title", async () => {
+		const data = view();
+		data.trash[0] = { ...data.trash[0], title: "", preview: "Run tests twice" };
+		api.getMemoryLifecycle.mockResolvedValue({ success: true, data });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByText("Run tests twice")).toBeInTheDocument();
+	});
+
+	it("says a memory was restored, or why it was not", async () => {
+		api.restoreMemory.mockResolvedValueOnce({
+			success: true,
+			data: { path: `${BASE}/gotchas/old.md`, contradicts: [] },
+		});
+		render(<LifecycleTab projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
+		expect(await screen.findByRole("status")).toHaveTextContent("Memory restored.");
+
+		api.restoreMemory.mockResolvedValueOnce({ success: false, error: "expired" });
+		fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
+		await waitFor(() =>
+			expect(screen.getByRole("status")).toHaveTextContent("the retention period is over"),
+		);
+	});
+});
+
+describe("ConflictResolver, every way out", () => {
+	it("keeps the received side, and marks a pinned side", async () => {
+		const data = view();
+		data.conflicts[0].a.pinned = true;
+		api.getMemoryLifecycle.mockResolvedValue({ success: true, data });
+		api.resolveMemoryConflict.mockResolvedValue({ success: true, data: { canonical: null } });
+		render(<LifecycleTab projectId="p1" />);
+		expect(await screen.findByText("Pinned")).toBeInTheDocument();
+		const [, keepB] = screen.getAllByRole("button", { name: "Keep this one" });
+		fireEvent.click(keepB);
+		await waitFor(() =>
+			expect(api.resolveMemoryConflict).toHaveBeenCalledWith("p1", "0123456789abcdef", "b", ""),
+		);
+	});
+
+	it("writes a canonical note by hand, or puts the pen down", async () => {
+		api.resolveMemoryConflict.mockResolvedValue({ success: true, data: { canonical: "x" } });
+		render(<LifecycleTab projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Write the canonical note" }));
+		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+		expect(screen.queryByLabelText("What the team should follow from now on")).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole("button", { name: "Write the canonical note" }));
+		fireEvent.change(screen.getByLabelText("What the team should follow from now on"), {
+			target: { value: "Run the migrations in CI." },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save the canonical note" }));
+		await waitFor(() =>
+			expect(api.resolveMemoryConflict).toHaveBeenCalledWith(
+				"p1",
+				"0123456789abcdef",
+				"custom",
+				"Run the migrations in CI.",
+			),
+		);
+	});
+
+	it("dismisses a false conflict, and says why one was refused", async () => {
+		api.resolveMemoryConflict.mockResolvedValueOnce({ success: false, error: "stale" });
+		render(<LifecycleTab projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Not a conflict" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("already settled elsewhere");
+		expect(api.resolveMemoryConflict).toHaveBeenCalledWith("p1", "0123456789abcdef", "dismiss", "");
+
+		api.resolveMemoryConflict.mockRejectedValueOnce(new Error("ipc down"));
+		fireEvent.click(screen.getByRole("button", { name: "Not a conflict" }));
+		await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("the action failed"));
+	});
+
+	it("says when the model had no answer, or could not be asked", async () => {
+		api.suggestMemoryResolution.mockResolvedValueOnce({ success: false, error: "no-answer" });
+		render(<LifecycleTab projectId="p1" />);
+		fireEvent.click(await screen.findByRole("button", { name: "Ask the model" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("the model gave no usable answer");
+
+		api.suggestMemoryResolution.mockRejectedValueOnce(new Error("ipc down"));
+		fireEvent.click(screen.getByRole("button", { name: "Ask the model" }));
+		await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("the action failed"));
+	});
+});

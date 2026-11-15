@@ -71,3 +71,57 @@ describe("MemoryActions", () => {
 		).toBeInTheDocument();
 	});
 });
+
+describe("MemoryActions when things go wrong", () => {
+	it("says the action failed when the call throws", async () => {
+		api.pinMemory.mockRejectedValue(new Error("ipc down"));
+		render(<MemoryActions projectId="p1" memoryId={ID} pinned={false} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole("button", { name: "Pin" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("the action failed");
+	});
+
+	it("keeps the confirmation open when the forget is refused", async () => {
+		api.forgetMemory.mockResolvedValue({ success: false, error: "pinned" });
+		render(<MemoryActions projectId="p1" memoryId={ID} pinned onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole("button", { name: "Forget" }));
+		fireEvent.click(screen.getByRole("button", { name: "Forget it" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("this memory is pinned");
+		expect(screen.getByRole("button", { name: "Forget it" })).toBeInTheDocument();
+	});
+
+	it("hides the timeline again, says when it is empty and when it cannot be read", async () => {
+		api.getMemoryHistory.mockResolvedValueOnce({ success: true });
+		render(<MemoryActions projectId="p1" memoryId={ID} pinned={false} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole("button", { name: "History" }));
+		expect(await screen.findByText("No decision recorded yet.")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Hide history" }));
+		expect(screen.queryByText("No decision recorded yet.")).not.toBeInTheDocument();
+
+		api.getMemoryHistory.mockResolvedValueOnce({ success: false, error: "not-found" });
+		fireEvent.click(screen.getByRole("button", { name: "History" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("this memory no longer exists");
+	});
+
+	it("names an agent by its type in the timeline", async () => {
+		api.getMemoryHistory.mockResolvedValue({
+			success: true,
+			data: [
+				{
+					id: "e2",
+					ts: "2026-11-14T10:00:00+00:00",
+					action: "merge",
+					actor: "agent:coder",
+					note: "gotchas/x.md",
+					title: "",
+					preview: "",
+					reason_code: "similar-merged",
+					reason: "",
+					related: [],
+				},
+			],
+		});
+		render(<MemoryActions projectId="p1" memoryId={ID} pinned={false} onChanged={vi.fn()} />);
+		fireEvent.click(screen.getByRole("button", { name: "History" }));
+		expect(await screen.findByText(/by the coder agent/)).toBeInTheDocument();
+	});
+});
