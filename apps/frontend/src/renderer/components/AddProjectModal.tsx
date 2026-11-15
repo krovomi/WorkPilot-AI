@@ -12,7 +12,6 @@ import { addProject } from "@/stores/project-store";
 import { useServerSessionStore } from "@/stores/server-session-store";
 import { AzureDevOpsRemoteConfigModal } from "./AzureDevOpsRemoteConfigModal";
 import { GitHubRemoteConfigModal } from "./GitHubRemoteConfigModal";
-import { GitSetupModal } from "./GitSetupModal";
 import { ServerProjectDialog } from "./server-projects/ServerProjectDialog";
 import { Button } from "./ui/button";
 import {
@@ -38,6 +37,7 @@ interface AddProjectModalProps {
 
 type RemoteType = "github" | "azure" | "jira" | null;
 type RemoteConfigType = "github" | "azure" | null;
+type DetectedProvider = "github" | "azure_devops" | "unknown";
 
 interface RemoteConfig {
 	githubToken?: string;
@@ -81,12 +81,7 @@ export function AddProjectModal({
 	const [remoteConfig, setRemoteConfig] = useState<RemoteConfig>({});
 	const [isCreating, setIsCreating] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
-	const [_, setCreatedProject] = useState<Project | null>(null);
 	const [providerSelected, setProviderSelected] = useState<boolean>(false);
-	const [showGitCommitModal, setShowGitCommitModal] = useState<boolean>(false);
-	const [pendingProjectPath, setPendingProjectPath] = useState<string | null>(
-		null,
-	);
 	// What "Create" would actually do here — see the effect below.
 	const [locationCheck, setLocationCheck] = useState<{
 		targetExists: boolean;
@@ -95,54 +90,8 @@ export function AddProjectModal({
 		insideRepository: string | null;
 		markers: string[];
 	} | null>(null);
-	const [detectedProvider, setDetectedProvider] = useState<
-		"github" | "azure_devops" | "unknown" | null
-	>(null);
-
-	// Git setup modal handlers
-	const handleGitInitialized = () => {
-		setShowGitCommitModal(false);
-		setPendingProjectPath(null);
-
-		onOpenChange(false);
-
-		// Nettoyer tous les états pour éviter les ré-rendres
-		setStep(0);
-		setError(null);
-	};
-
-	// Get remote config for Git setup
-	const getRemoteConfigForGitSetup = () => {
-		if (
-			remoteType === "github" &&
-			(remoteConfig.githubRepo || remoteConfig.repo)
-		) {
-			const config = {
-				url: `https://github.com/${remoteConfig.githubRepo || remoteConfig.repo}.git`,
-				name: "origin",
-			};
-			return config;
-		}
-		if (
-			remoteType === "azure" &&
-			(remoteConfig.azureOrg || remoteConfig.orgUrl)
-		) {
-			// Extract repo name from org URL or construct a default one
-			const orgUrl = remoteConfig.azureOrg || remoteConfig.orgUrl || "";
-			const repoName =
-				projectName?.replaceAll(/[^A-Za-z0-9_.-]/g, "-") || "project";
-			const config = {
-				url: `${orgUrl.replace(/\/$/, "")}/_git/${repoName}`,
-				name: "origin",
-			};
-			return config;
-		}
-		return undefined;
-	};
-
-	useEffect(() => {
-		/* intentionally empty */
-	}, []);
+	const [detectedProvider, setDetectedProvider] =
+		useState<DetectedProvider | null>(null);
 
 	useEffect(() => {
 		if (open) {
@@ -154,7 +103,6 @@ export function AddProjectModal({
 			setRemoteType(null);
 			setRemoteConfig({});
 			setError(null);
-			setCreatedProject(null);
 			setProviderSelected(false);
 			setDetectedProvider(null);
 		}
@@ -167,67 +115,34 @@ export function AddProjectModal({
 	}, [step]);
 
 	// Function to check if a string is a repository URL (not a local path)
-	const isRepositoryUrl = useCallback((url: string): boolean => {
-		try {
-			// Check if it starts with http:// or https://
-			if (url.startsWith("http://") || url.startsWith("https://")) {
-				return true;
-			}
-			return false;
-		} catch {
-			return false;
-		}
-	}, []);
+	const isRepositoryUrl = useCallback(
+		(url: string): boolean =>
+			url.startsWith("http://") || url.startsWith("https://"),
+		[],
+	);
 
 	// Function to extract repository name from various URL formats or local directory paths
 	const extractRepoNameFromUrl = useCallback((url: string): string | null => {
-		try {
-			// Azure DevOps URL pattern: https://dev.azure.com/{org}/{project}/_git/{repo}
-			const azurePattern = /\/_git\/([^/\s?#]+)/;
-			const azureMatch = azurePattern.exec(url);
-			if (azureMatch) {
-				return azureMatch[1];
-			}
-
-			// GitHub URL pattern: https://github.com/{owner}/{repo}
-			const githubPattern = /github\.com\/([^/\s?#]+)\/([^/\s?#]+)/;
-			const githubMatch = githubPattern.exec(url);
-			if (githubMatch) {
-				return githubMatch[2];
-			}
-
-			// GitLab URL pattern: https://gitlab.com/{owner}/{repo}
-			const gitlabPattern = /gitlab\.com\/([^/\s?#]+)\/([^/\s?#]+)/;
-			const gitlabMatch = gitlabPattern.exec(url);
-			if (gitlabMatch) {
-				return gitlabMatch[2];
-			}
-
-			// Bitbucket URL pattern: https://bitbucket.org/{owner}/{repo}
-			const bitbucketPattern = /bitbucket\.org\/([^/\s?#]+)\/([^/\s?#]+)/;
-			const bitbucketMatch = bitbucketPattern.exec(url);
-			if (bitbucketMatch) {
-				return bitbucketMatch[2];
-			}
-
-			// Local directory path (Windows: C:\path\to\folder, Unix: /path/to/folder)
-			// Extract the last component of the path
-			if (url.includes("\\") || url.includes("/")) {
-				const parts = url.split(/[\\/]/);
-				const lastPart = parts.at(-1);
-				if (lastPart && lastPart.trim() !== "") {
-					return lastPart;
-				}
-			}
-
-			return null;
-		} catch {
-			return null;
-		}
+		// Azure DevOps https://dev.azure.com/{org}/{project}/_git/{repo}, then
+		// GitHub, GitLab and Bitbucket https://{host}/{owner}/{repo}
+		const patterns = [
+			/\/_git\/([^/\s?#]+)/,
+			/github\.com\/[^/\s?#]+\/([^/\s?#]+)/,
+			/gitlab\.com\/[^/\s?#]+\/([^/\s?#]+)/,
+			/bitbucket\.org\/[^/\s?#]+\/([^/\s?#]+)/,
+		];
+		// A local directory (C:\path\to\folder, /path/to/folder): its last part
+		const name =
+			patterns.map((pattern) => pattern.exec(url)?.[1]).find(Boolean) ??
+			(/[\\/]/.test(url) ? url.split(/[\\/]/).at(-1)?.trim() : undefined);
+		// A clone URL ends in ".git", which is not part of the name.
+		return name ? name.replace(/\.git$/, "") || null : null;
 	}, []);
 
 	// Function to detect repository provider from existing git repository
-	const detectRepositoryProvider = useCallback(async (projectPath: string) => {
+	const detectRepositoryProvider = useCallback(async (
+		projectPath: string,
+	): Promise<DetectedProvider> => {
 		// First try to read the .git/config file directly for more reliable detection
 		const gitConfigPath = `${projectPath}/.git/config`;
 
@@ -244,8 +159,9 @@ export function AddProjectModal({
 					for (const match of urlMatches) {
 						const url = match.split("=")[1].trim();
 
-						// Extract hostname from URL (supports both https:// and git@ formats)
-						const hostMatch = url.match(/(?:\/\/|@)([^/:]+)/);
+						// Extract hostname from URL (https:// with or without a user, as
+						// Azure DevOps writes its clone URLs, and git@ formats)
+						const hostMatch = url.match(/(?:\/\/(?:[^@/]+@)?|@)([^/:]+)/);
 						const host = hostMatch?.[1]?.toLowerCase() ?? "";
 
 						// Check for Azure DevOps patterns
@@ -255,8 +171,6 @@ export function AddProjectModal({
 							host === "visualstudio.com" ||
 							host.endsWith(".visualstudio.com")
 						) {
-							setDetectedProvider("azure_devops");
-							setRemoteType("azure");
 							return "azure_devops";
 						}
 
@@ -265,8 +179,6 @@ export function AddProjectModal({
 							host === "github.com" ||
 							host.endsWith(".github.com")
 						) {
-							setDetectedProvider("github");
-							setRemoteType("github");
 							return "github";
 						}
 					}
@@ -282,17 +194,18 @@ export function AddProjectModal({
 			await globalThis.electronAPI.detectRepoProvider(projectPath);
 
 		if (gitResult.success && gitResult.data) {
-			setDetectedProvider(gitResult.data.provider);
-			// Also set the remoteType for consistency in the UI
-			if (gitResult.data.provider === "github") {
-				setRemoteType("github");
-			} else if (gitResult.data.provider === "azure_devops") {
-				setRemoteType("azure");
-			}
 			return gitResult.data.provider;
 		}
 
 		return "unknown";
+	}, []);
+
+	// What a detection means for the form: the providers offered, and the one
+	// picked when it is known.
+	const applyDetectedProvider = useCallback((detected: DetectedProvider) => {
+		setDetectedProvider(detected);
+		if (detected === "github") setRemoteType("github");
+		else if (detected === "azure_devops") setRemoteType("azure");
 	}, []);
 
 	// The folder the main process will actually create. It kebab-cases the
@@ -357,41 +270,46 @@ export function AddProjectModal({
 			: null;
 	}, [locationCheck, targetProjectPath, projectLocation]);
 
-	// Auto-detect repository type when project path changes
+	// Auto-detect repository type when project path changes. Each keystroke
+	// starts a new check; one that finishes after a newer one (or after the
+	// user picked a provider) is dropped, or it put "Skip" back over the pick.
 	useEffect(() => {
+		if (!targetProjectPath || step !== 0) return;
+		const projectPath = targetProjectPath;
+		let current = true;
 		const autoDetectProvider = async () => {
-			if (targetProjectPath && step === 0) {
-				const projectPath = targetProjectPath;
+			// Check if it's an existing git repository
+			const gitStatus = await globalThis.electronAPI.checkGitStatus(projectPath);
+			if (!current) return;
 
-				// Check if it's an existing git repository
-				const gitStatus =
-					await globalThis.electronAPI.checkGitStatus(projectPath);
-
-				if (gitStatus?.success && gitStatus?.data?.isGitRepo) {
-					const detected = await detectRepositoryProvider(projectPath);
-
-					if (detected === "github") {
-						// Auto-select GitHub provider
-						setRemoteType("github");
-						setProviderSelected(true);
-					} else if (detected === "azure_devops") {
-						// Auto-select Azure DevOps provider
-						setRemoteType("azure");
-						setProviderSelected(true);
-					} else if (!providerSelected) {
-						// Unknown provider detected, keep current selection or default to skip
-						setRemoteType(null);
-						setProviderSelected(true);
-					}
+			if (gitStatus?.success && gitStatus?.data?.isGitRepo) {
+				const detected = await detectRepositoryProvider(projectPath);
+				if (!current) return;
+				applyDetectedProvider(detected);
+				if (detected !== "unknown") {
+					setProviderSelected(true);
 				} else if (!providerSelected) {
-					// No git repo, don't auto-select anything unless user already selected
+					// Unknown provider: default to skip
 					setRemoteType(null);
+					setProviderSelected(true);
 				}
+			} else if (!providerSelected) {
+				// No git repo, don't auto-select anything unless user already selected
+				setRemoteType(null);
 			}
 		};
 
-		autoDetectProvider();
-	}, [targetProjectPath, step, providerSelected, detectRepositoryProvider]);
+		void autoDetectProvider();
+		return () => {
+			current = false;
+		};
+	}, [
+		targetProjectPath,
+		step,
+		providerSelected,
+		detectRepositoryProvider,
+		applyDetectedProvider,
+	]);
 
 	// Determine which provider options to show.
 	// Jira is always offered as an explicit option because it cannot be detected from a git remote.
@@ -630,14 +548,7 @@ export function AddProjectModal({
 						)}
 					</div>
 				</div>
-				{error && (
-					<div
-						className="text-sm text-destructive bg-destructive/10 rounded-lg p-3"
-						role="alert"
-					>
-						{error}
-					</div>
-				)}
+				{/* Its error shows under the footer, as on the summary: once. */}
 			</div>
 		</>
 	);
@@ -821,11 +732,8 @@ export function AddProjectModal({
 
 	// Création effective du projet
 	const handleCreate = async () => {
-		if (!projectName || !projectLocation) {
-			setError(t("addProject.fillRequiredFields"));
-			return;
-		}
-
+		// Create is only offered on the summary, which Next reaches with both
+		// fields filled.
 		// Check if projectLocation is a repository URL instead of a local path
 		if (isRepositoryUrl(projectLocation)) {
 			setError(t("addProject.locationMustBeLocalPath"));
@@ -842,15 +750,11 @@ export function AddProjectModal({
 				initGit,
 			);
 			if (!result.success || !result.data) {
-				setError(result.error || "Failed to create project folder");
+				const reason = result.error || t("addProject.failedToCreate");
+				setError(reason);
 				toast({
-					title: t(
-						"addProject.failedToCreateTitle",
-						"Erreur lors de la création",
-					),
-					description:
-						result.error ||
-						t("addProject.failedToCreate", "Impossible de créer le projet."),
+					title: t("addProject.failedToCreateTitle"),
+					description: reason,
 					variant: "destructive",
 				});
 				setIsCreating(false);
@@ -859,13 +763,9 @@ export function AddProjectModal({
 			// Ajoute le projet à notre store
 			const added = await addProject(result.data.path);
 			const project = added?.project ?? null;
-			setCreatedProject(project);
 			if (added?.warning) {
 				toast({
-					title: t(
-						"addProject.gitRootWarningTitle",
-						"Possible misconfiguration",
-					),
+					title: t("addProject.gitRootWarningTitle"),
 					description: added.warning,
 					variant: "default",
 				});
@@ -919,24 +819,9 @@ export function AddProjectModal({
 	};
 
 	// Navigation
-	const canNext = () => {
-		if (step === 0) {
-			// "Skip for now" is the default and shows as chosen: requiring a click
-			// on it kept Next disabled with a complete form.
-			return !!projectName && !!projectLocation;
-		}
-		if (step === 1 && remoteType === "github")
-			return (
-				!!(remoteConfig.githubToken || remoteConfig.token) &&
-				!!(remoteConfig.githubRepo || remoteConfig.repo)
-			);
-		if (step === 1 && remoteType === "azure")
-			return (
-				!!(remoteConfig.azureOrg || remoteConfig.orgUrl) &&
-				!!(remoteConfig.azurePat || remoteConfig.pat)
-			);
-		return true;
-	};
+	// Next is only on the first step. "Skip for now" is the default and shows
+	// as chosen: requiring a click on it kept Next disabled with a complete form.
+	const canNext = () => !!projectName && !!projectLocation;
 
 	if (serverMode && !localFolder) {
 		return (
@@ -963,7 +848,7 @@ export function AddProjectModal({
 									onClick={() => setStep(step - 1)}
 									disabled={isCreating}
 								>
-									{t("addProject.back", "Précédent")}
+									{t("addProject.back")}
 								</Button>
 							)}
 							{step < 1 && (
@@ -988,6 +873,7 @@ export function AddProjectModal({
 												if (gitStatus?.success && gitStatus.data?.isGitRepo) {
 													const detected =
 														await detectRepositoryProvider(projectPath);
+													applyDetectedProvider(detected);
 													if (detected === "github") {
 														setRemoteConfigType("github");
 														setShowRemoteConfigModal(true);
@@ -1043,29 +929,12 @@ export function AddProjectModal({
 						open={showRemoteConfigModal}
 						onOpenChange={setShowRemoteConfigModal}
 						initialConfig={remoteConfig}
-						onSave={async (config: AzureDevOpsConfig) => {
+						onSave={(config: AzureDevOpsConfig) => {
+							// The project is created on the summary; the sidebar asks for
+							// its first commit once it is selected.
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (targetProjectPath) {
-								const projectPath = targetProjectPath;
-								const status =
-									await globalThis.electronAPI.checkGitStatus(projectPath);
-
-								if (
-									status?.success &&
-									status.data &&
-									!status.data.hasCommits &&
-									!showGitCommitModal &&
-									!pendingProjectPath
-								) {
-									setPendingProjectPath(projectPath);
-									setShowGitCommitModal(true);
-								} else {
-									setStep(1);
-								}
-							} else {
-								setStep(1);
-							}
+							setStep(1);
 						}}
 					/>
 				)}
@@ -1076,76 +945,16 @@ export function AddProjectModal({
 						open={showRemoteConfigModal}
 						onOpenChange={setShowRemoteConfigModal}
 						initialConfig={remoteConfig}
-						onSave={async (config: GitHubConfig) => {
+						onSave={(config: GitHubConfig) => {
+							// The project is created on the summary; the sidebar asks for
+							// its first commit once it is selected.
 							setRemoteConfig(config);
 							setShowRemoteConfigModal(false);
-							if (targetProjectPath) {
-								const projectPath = targetProjectPath;
-								const status =
-									await globalThis.electronAPI.checkGitStatus(projectPath);
-								if (
-									status?.success &&
-									status.data &&
-									!status.data.hasCommits &&
-									!showGitCommitModal &&
-									!pendingProjectPath
-								) {
-									setPendingProjectPath(projectPath);
-									setShowGitCommitModal(true);
-								} else {
-									setStep(1);
-								}
-							} else {
-								setStep(1);
-							}
+							setStep(1);
 						}}
 					/>
 				)}
 
-			{/* Git Setup Modal */}
-			{showGitCommitModal && pendingProjectPath && (
-				<GitSetupModal
-					open={showGitCommitModal}
-					onOpenChange={(isOpen) => {
-						setShowGitCommitModal(isOpen);
-						if (!isOpen) {
-							setPendingProjectPath(null);
-						}
-					}}
-					project={{
-						id: "temp",
-						name: projectName?.trim() || "temp-project",
-						path: pendingProjectPath,
-						autoBuildPath: "",
-						settings: {
-							model: "claude-3-5-sonnet-20241022",
-							linearSync: false,
-							notifications: {
-								onTaskComplete: true,
-								onTaskFailed: true,
-								onReviewNeeded: true,
-								sound: true,
-							},
-						},
-						createdAt: new Date(),
-						updatedAt: new Date(),
-					}}
-					gitStatus={{
-						isGitRepo: true,
-						hasCommits: false,
-						currentBranch: "main",
-					}}
-					onGitInitialized={handleGitInitialized}
-					onSkip={() => {
-						setShowGitCommitModal(false);
-						setPendingProjectPath(null);
-						setTimeout(() => {
-							onOpenChange(false);
-						}, 200);
-					}}
-					remoteConfig={getRemoteConfigForGitSetup()}
-				/>
-			)}
 		</>
 	);
 }

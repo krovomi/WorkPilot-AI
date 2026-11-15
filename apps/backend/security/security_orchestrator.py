@@ -6,7 +6,7 @@ Security Orchestrator
 Main orchestrator for Feature 8: Security-First Features.
 
 This module coordinates:
-1. Automatic vulnerability scanning on every commit
+1. Vulnerability scanning (QA loop, or this module run by hand)
 2. Secret detection
 3. Compliance analysis (GDPR, SOC2, HIPAA, PCI-DSS)
 4. Security report generation
@@ -27,6 +27,7 @@ Usage:
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +76,8 @@ class SecurityScanResult:
     compliance_report: dict[str, Any] | None = None
     reports_generated: dict[str, Path] = field(default_factory=dict)
     scan_timestamp: datetime = field(default_factory=datetime.now)
+    # `SecurityScanConfig.block_on_compliance_critical` of the scan that made it.
+    block_on_compliance: bool = True
 
     @property
     def should_block(self) -> bool:
@@ -84,7 +87,7 @@ class SecurityScanResult:
             return True
 
         # Check compliance
-        if self.compliance_report:
+        if self.block_on_compliance and self.compliance_report:
             if not self.compliance_report.get("summary", {}).get("is_compliant", True):
                 return True
 
@@ -153,7 +156,7 @@ class SecurityOrchestrator:
         if self.config.output_dir is None:
             self.config.output_dir = self.project_path / ".security-reports"
         self.output_dir: Path = self.config.output_dir
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def run_full_scan(self) -> SecurityScanResult:
         """
@@ -195,6 +198,7 @@ class SecurityOrchestrator:
             vulnerability_scan=vuln_dict,
             compliance_report=comp_dict,
             reports_generated=reports,
+            block_on_compliance=self.config.block_on_compliance_critical,
         )
 
         # Print summary
@@ -300,6 +304,12 @@ class SecurityOrchestrator:
             ),
             "total": len(vuln_dict["vulnerabilities"]),
         }
+        # The verdict follows the files kept: a finding in a file this commit
+        # does not touch does not block it.
+        vuln_dict["should_block"] = vuln_dict["summary"]["critical"] > 0
+        vuln_dict["should_warn"] = (
+            vuln_dict["summary"]["high"] + vuln_dict["summary"]["medium"] > 0
+        )
 
         result = SecurityScanResult(vulnerability_scan=vuln_dict)
 
@@ -343,7 +353,11 @@ class SecurityOrchestrator:
                 return False, f"Found {critical_count} critical vulnerabilities"
 
         if self.config.block_on_secrets:
-            secrets_count = len(result.vulnerability_scan.get("secrets", []))
+            secrets_count = sum(
+                1
+                for v in result.vulnerability_scan.get("vulnerabilities", [])
+                if v.get("source") == "secrets"
+            )
             if secrets_count > 0:
                 return False, f"Found {secrets_count} hardcoded secrets"
 
@@ -490,11 +504,11 @@ def main():
     if result.should_block and not args.no_block:
         print()
         print("❌ Security scan FAILED - blocking deployment")
-        exit(1)
+        sys.exit(1)
     else:
         print()
         print("✅ Security scan PASSED")
-        exit(0)
+        sys.exit(0)
 
 
 if __name__ == "__main__":

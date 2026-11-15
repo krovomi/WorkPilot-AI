@@ -2211,7 +2211,7 @@ exit $launched.ExitCode
 		return new Promise<void>((resolve, reject) => {
 			const proc = spawn(pm, ["install"], {
 				cwd: projectDir,
-				env: process.env as Record<string, string>,
+				env: envWithoutCredentials(process.env),
 				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});
@@ -2290,7 +2290,7 @@ exit $launched.ExitCode
 			const [cmd, ...args] = installCmd?.split(" ") || [];
 			const proc = spawn(cmd, args, {
 				cwd: projectDir,
-				env: process.env as Record<string, string>,
+				env: envWithoutCredentials(process.env),
 				shell: isWindows() ? true : undefined,
 				stdio: ["ignore", "pipe", "pipe"],
 			});

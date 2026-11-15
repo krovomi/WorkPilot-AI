@@ -430,20 +430,31 @@ def scan_content(content: str, file_path: str) -> list[SecretMatch]:
     return matches
 
 
-def get_staged_files() -> list[str]:
+def get_staged_files(project_dir: Path | None = None) -> list[str]:
     """Get list of staged files from git (excluding deleted files).
 
     Renamed files count (`R`): a file moved and edited in the same commit is
     new content. `-z` keeps a non-ASCII path as is — without it git quotes it,
     and the quoted name matches no file.
     """
+    return _changed_files(["--cached"], project_dir)
+
+
+def get_unstaged_files(project_dir: Path | None = None) -> list[str]:
+    """Tracked files changed in the working tree and not staged yet: what a
+    `git commit -a` stages on its way."""
+    return _changed_files([], project_dir)
+
+
+def _changed_files(scope: list[str], project_dir: Path | None) -> list[str]:
     try:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
+            ["git", "diff", *scope, "--name-only", "--diff-filter=ACMR", "-z"],
             capture_output=True,
             encoding="utf-8",
             errors="surrogateescape",
             check=True,
+            cwd=project_dir,
         )
         return [f for f in result.stdout.split("\0") if f]
     except (OSError, subprocess.CalledProcessError):
@@ -492,18 +503,19 @@ def read_staged_blobs(files: list[str], project_dir: Path) -> dict[str, str]:
     return blobs
 
 
-def get_all_tracked_files() -> list[str]:
-    """Get all tracked files in the repository."""
+def get_all_tracked_files(project_dir: Path | None = None) -> list[str]:
+    """Get all tracked files of the repository at `project_dir` (default: cwd)."""
     try:
         result = subprocess.run(
             ["git", "ls-files"],
             capture_output=True,
             text=True,
             check=True,
+            cwd=project_dir,
         )
         files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
         return files
-    except subprocess.CalledProcessError:
+    except (OSError, subprocess.CalledProcessError):
         return []
 
 
