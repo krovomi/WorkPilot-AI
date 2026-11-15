@@ -13,7 +13,6 @@ from .discovery_phases import DiscoveryPhaseMixin
 from .planning_phases import PlanningPhaseMixin
 from .requirements_phases import RequirementsPhaseMixin
 from .spec_phases import SpecPhaseMixin
-from .utils import run_script
 
 
 class PhaseExecutor(
@@ -73,16 +72,3 @@ class PhaseExecutor(
         return advice_text(
             await assess_planning(self.jev_run, self.task_description or "")
         )
-
-    def _run_script(self, script: str, args: list[str]) -> tuple[bool, str]:
-        """
-        Run a Python script and return (success, output).
-
-        Args:
-            script: Name of the script to run
-            args: Command-line arguments for the script
-
-        Returns:
-            Tuple of (success: bool, output: str)
-        """
-        return run_script(self.project_dir, script, args)

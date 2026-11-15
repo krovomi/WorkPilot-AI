@@ -177,43 +177,22 @@ export function fixMisconfiguredBareRepo(projectPath: string): boolean {
 		if (hasExactMatch) {
 			// Found a project marker, proceed to fix
 		} else {
-			// Check glob patterns - read directory once and cache for all patterns
-			let directoryFiles: string[] | null = null;
+			// Check glob patterns against one listing of the folder. git just ran
+			// in it, so it is readable; an error would reach the outer catch and
+			// leave the repository alone, as an unreadable one should be.
 			const MAX_FILES_TO_CHECK = 500; // Limit to avoid reading huge directories
-
-			const hasGlobMatch = GLOB_MARKERS.some((pattern) => {
-				// Validate pattern - only support simple glob patterns for security
-				if (pattern.includes("..") || pattern.includes("/")) {
-					console.warn(`[GIT] Unsupported glob pattern ignored: ${pattern}`);
-					return false;
-				}
-
-				// Lazy-load directory listing, cached across patterns
-				if (directoryFiles === null) {
-					try {
-						const allFiles = readdirSync(projectPath);
-						// Limit to first N entries to avoid performance issues
-						directoryFiles = allFiles.slice(0, MAX_FILES_TO_CHECK);
-						if (allFiles.length > MAX_FILES_TO_CHECK) {
-							console.warn(
-								`[GIT] Directory has ${allFiles.length} entries, checking only first ${MAX_FILES_TO_CHECK}`,
-							);
-						}
-					} catch (error) {
-						// Log the error for debugging instead of silently swallowing
-						console.warn(
-							`[GIT] Failed to read directory ${projectPath}:`,
-							error instanceof Error ? error.message : String(error),
-						);
-						directoryFiles = [];
-					}
-				}
-
-				// Use minimatch for proper glob pattern matching
-				return directoryFiles.some((file) =>
-					minimatch(file, pattern, { nocase: true }),
+			const allFiles = readdirSync(projectPath);
+			if (allFiles.length > MAX_FILES_TO_CHECK) {
+				console.warn(
+					`[GIT] Directory has ${allFiles.length} entries, checking only first ${MAX_FILES_TO_CHECK}`,
 				);
-			});
+			}
+			const directoryFiles = allFiles.slice(0, MAX_FILES_TO_CHECK);
+
+			// The patterns are the constants above: simple globs, no path parts.
+			const hasGlobMatch = GLOB_MARKERS.some((pattern) =>
+				directoryFiles.some((file) => minimatch(file, pattern, { nocase: true })),
+			);
 
 			if (!hasGlobMatch) {
 				return false; // Legitimately bare repo

@@ -1,7 +1,8 @@
 {
 	"tabs": {
 		"projectIndex": "Index du Projet",
-		"memories": "Mémoires"
+		"memories": "Mémoires",
+		"lifecycle": "Cycle de vie"
 	},
 	"projectIndex": {
 		"title": "Structure du Projet",
@@ -138,5 +139,133 @@
 		"health": "Santé : {{checks}}",
 		"metrics": "Métriques :",
 		"unknownType": "inconnu"
+	},
+	"lifecycle": {
+		"description": "Chaque décision sur la mémoire du projet, les mémoires oubliées que tu peux restaurer, et les conflits de synchronisation à trancher",
+		"refresh": "Actualiser",
+		"error": "Impossible de lire le cycle de vie de la mémoire : {{error}}",
+		"serverProject": "Le cycle de vie de la mémoire d'un projet du serveur n'est pas encore disponible.",
+		"pins": "{{count}} / {{limit}} épinglées",
+		"entry": "{{action}} {{actor}} — {{reason}}",
+		"conflicts": {
+			"title": "À trancher",
+			"empty": "Aucun conflit en attente.",
+			"keep": "Garder celle-ci",
+			"writeCanonical": "Écrire la note canonique",
+			"canonicalPlaceholder": "Ce que l'équipe suit désormais",
+			"save": "Enregistrer la note canonique",
+			"cancel": "Annuler",
+			"dismiss": "Pas un conflit",
+			"ask": "Demander au modèle",
+			"asking": "Question en cours…",
+			"opinionTitle": "L'avis du modèle (c'est toi qui décides)",
+			"useDraft": "Partir de ce brouillon",
+			"sideA": "Déjà ici",
+			"sideB": "Reçue",
+			"pinned": "Épinglée",
+			"updated": "Mise à jour le {{date}}",
+			"confidence": "Confiance {{value}}",
+			"agents": "Écrite par {{agents}}",
+			"signal": {
+				"value": "Deux valeurs pour le même réglage",
+				"recommendation": "Recommandations opposées",
+				"negation": "L'une dit de le faire, l'autre non",
+				"textual": "Modifiée sur deux machines"
+			},
+			"verdict": {
+				"contradiction": "Elles se contredisent",
+				"complementary": "Elles se complètent",
+				"duplicate": "Elles disent la même chose"
+			},
+			"prefer": {
+				"a": "préfère la note déjà ici",
+				"b": "préfère la note reçue",
+				"none": "pas de préférence"
+			}
+		},
+		"trash": {
+			"title": "Oubliées récemment",
+			"empty": "Rien d'oublié.",
+			"restore": "Restaurer",
+			"until": "Restaurable jusqu'au {{date}}",
+			"expiring": "{{count}} mémoires oubliées seront supprimées dans les 7 jours : restaure celles qui comptent encore.",
+			"restored": "Mémoire restaurée.",
+			"contradicts": "Mémoire restaurée, mais elle contredit {{count}} mémoire(s) actuelle(s) : vérifie avant de t'y fier."
+		},
+		"journal": {
+			"title": "Journal",
+			"empty": "Aucune décision enregistrée pour l'instant."
+		},
+		"actions": {
+			"pin": "Épingler",
+			"unpin": "Désépingler",
+			"pinnedBadge": "Épinglée",
+			"forget": "Oublier",
+			"forgetReason": "Pourquoi (facultatif)",
+			"confirmForget": "L'oublier",
+			"forgetHint": "Une mémoire oubliée reste restaurable depuis l'onglet Cycle de vie pendant la durée de rétention.",
+			"history": "Historique",
+			"hideHistory": "Masquer l'historique"
+		},
+		"action": {
+			"create": "Créée",
+			"update": "Mise à jour",
+			"forget": "Oubliée",
+			"restore": "Restaurée",
+			"purge": "Supprimée définitivement",
+			"pin": "Épinglée",
+			"unpin": "Désépinglée",
+			"protect": "Gardée (épinglée)",
+			"merge": "Fusionnée",
+			"archive": "Archivée",
+			"resolve": "Conflit tranché",
+			"conflict": "Conflit détecté"
+		},
+		"actor": {
+			"user": "par toi",
+			"agent": "par un agent",
+			"agentType": "par l'agent {{type}}",
+			"sync": "par la synchronisation",
+			"learning-loop": "par le learning loop",
+			"lifecycle": "par la règle de rétention"
+		},
+		"reason": {
+			"recorded": "enregistrée",
+			"edited": "son texte a changé",
+			"user-request": "à la demande d'une personne",
+			"pattern-retired": "retirée automatiquement",
+			"similar-merged": "un pattern similaire y a été fusionné",
+			"retention-expired": "durée de rétention écoulée",
+			"pinned-protected": "une suppression automatique a été refusée : elle est épinglée",
+			"restored": "restaurée depuis la corbeille",
+			"pinned": "protégée des suppressions automatiques",
+			"unpinned": "n'est plus protégée",
+			"pinned-wins": "la version épinglée l'emporte",
+			"higher-confidence": "le pattern le plus sûr l'emporte",
+			"more-recent": "la note bien plus récente l'emporte",
+			"same-statement": "les deux versions disaient la même chose",
+			"contradiction-detected": "contredit une autre mémoire",
+			"textual-conflict": "modifiée sur deux machines",
+			"person-chose": "une personne a choisi",
+			"person-wrote": "une personne a écrit la note canonique",
+			"not-a-conflict": "une personne a dit que ce n'était pas un conflit"
+		},
+		"errors": {
+			"failed": "l'action a échoué",
+			"invalid": "requête invalide",
+			"not-found": "cette mémoire n'existe plus",
+			"pin-limit": "limite d'épingles atteinte (50 par projet)",
+			"pinned": "cette mémoire est épinglée",
+			"exists": "une mémoire du même nom existe à nouveau",
+			"expired": "la durée de rétention est écoulée",
+			"stale": "déjà tranché ailleurs",
+			"no-brain": "pas encore de cerveau partagé",
+			"project-not-found": "projet introuvable",
+			"server-project": "indisponible pour un projet du serveur",
+			"no-runtime": "aucun modèle disponible",
+			"provider-refused": "le fournisseur a refusé (mode hors-ligne ?)",
+			"no-answer": "le modèle n'a rien donné d'exploitable",
+			"server-mode": "indisponible en mode serveur"
+		}
 	}
 }

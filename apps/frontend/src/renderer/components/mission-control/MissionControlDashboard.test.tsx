@@ -3,6 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useMissionControlStore } from "../../stores/mission-control-store";
 import { MissionControlDashboard } from "./MissionControlDashboard";
 
+// Its own test: WavesView.test.tsx. It adds buttons these tests do not click.
+vi.mock("../conflict-predictor/WavesView", () => ({ WavesView: () => null }));
+
 vi.mock("./index", () => ({
 	AddAgentDialog: () => null,
 	AgentEventLog: () => null,
