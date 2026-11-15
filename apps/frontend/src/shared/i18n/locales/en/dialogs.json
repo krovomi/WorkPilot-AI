@@ -149,17 +149,6 @@
 		"skip": "Skip for now",
 		"skipDescription": "Don't connect a remote provider now."
 	},
-	"azureDevOpsSetup": {
-		"title": "Connect to Azure DevOps",
-		"description": "Add your Azure DevOps credentials to import and sync work items.",
-		"loading": "Loading settings...",
-		"save": "Save Settings",
-		"saving": "Saving...",
-		"skip": "Skip for now",
-		"orgUrlRequired": "Organization URL is required",
-		"patRequired": "Personal Access Token is required",
-		"repositoryNote": "You can select the repository in the project settings after this step."
-	},
 	"worktrees": {
 		"count": "{{count}} worktrees",
 		"title": "Worktrees",
