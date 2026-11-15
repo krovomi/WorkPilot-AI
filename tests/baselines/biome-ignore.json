@@ -93,7 +93,6 @@
   "apps/frontend/src/renderer/components/PRFilesModal.tsx": 4,
   "apps/frontend/src/renderer/components/PhaseProgressIndicator.tsx": 1,
   "apps/frontend/src/renderer/components/ProjectTabBar.tsx": 1,
-  "apps/frontend/src/renderer/components/ProviderSelector.tsx": 2,
   "apps/frontend/src/renderer/components/RateLimitModal.tsx": 1,
   "apps/frontend/src/renderer/components/RefactoringView.tsx": 1,
   "apps/frontend/src/renderer/components/RoadmapGenerationProgress.tsx": 1,
