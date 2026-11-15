@@ -133,6 +133,7 @@ import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
+import { registerSmartEstimationCalibrationHandlers } from "./smart-estimation-calibration-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
 import { registerOnboardingAgentHandlers } from "./onboarding-agent-handlers";
 import { registerSandboxHandlers } from "./sandbox-handlers";
@@ -436,6 +437,7 @@ export function setupIpcHandlers(
 
 	// Smart Estimation handlers
 	setupSmartEstimationHandlers();
+	registerSmartEstimationCalibrationHandlers();
 
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();

@@ -32,7 +32,9 @@ sys.modules["claude_agent_sdk.types"] = mock_sdk.types
 # `core.context_manager` is deliberately NOT mocked here: it does not exist in
 # the repo, and stubbing it is what let this suite pass while the runner failed
 # its import on every real machine and only ever answered "under development".
-sys.modules["services.smart_estimation_service"] = unittest.mock.MagicMock()
+_real_service = sys.modules.get("services.smart_estimation_service")
+mock_service_module = unittest.mock.MagicMock()
+sys.modules["services.smart_estimation_service"] = mock_service_module
 
 # Mock QA modules to prevent import chain issues
 mock_qa = unittest.mock.MagicMock()
@@ -60,6 +62,14 @@ for _qa_name in ("qa", "qa.loop", "qa.reviewer"):
     if sys.modules.get(_qa_name) in (mock_qa, mock_qa.loop, mock_qa.reviewer):
         del sys.modules[_qa_name]
 
+# The service stub too: left in place, `tests/services/test_smart_estimation_service.py`
+# imported it when collected after this file and asserted against a MagicMock.
+if sys.modules.get("services.smart_estimation_service") is mock_service_module:
+    if _real_service is None:
+        del sys.modules["services.smart_estimation_service"]
+    else:
+        sys.modules["services.smart_estimation_service"] = _real_service
+
 
 class TestSmartEstimationRunner:
     """Test suite for SmartEstimationRunner"""
@@ -84,6 +94,8 @@ class TestSmartEstimationRunner:
         mock_result.estimated_duration_hours = 3.5  # stripped by the runner
         mock_result.estimated_qa_iterations = 2.0
         mock_result.token_cost_estimate = 1.75
+        mock_result.estimated_tokens = 40_000.0
+        mock_result.estimated_files_impacted = 3
         mock_result.recommendations = ["Test recommendation"]
         service.analyze_task_description.return_value = mock_result
         return service
@@ -138,6 +150,59 @@ class TestSmartEstimationRunner:
 
         assert "estimated_duration_hours" not in result
         assert all("duration_hours" not in task for task in result["similar_tasks"])
+
+    def test_run_estimation_without_history_shows_the_generic_figures(
+        self, tmp_path, runner, mock_estimation_service
+    ):
+        """A new repository: generic figures, a breakdown, and the warning."""
+        runner.estimation_service = mock_estimation_service
+
+        with patch("builtins.print"):
+            result = runner.run_estimation(str(tmp_path), "Add an API endpoint")
+
+        assert result["category"] == "backend"
+        assert result["complexity_score"] == 7
+        assert result["token_cost_estimate"] == 1.75
+        assert result["estimated_tokens"] == 40_000.0
+        assert result["estimated_files"] == 3.0
+        assert result["calibration"]["status"] == "insufficient_history"
+        assert [d["key"] for d in result["dimensions"]] == [
+            "algorithmic",
+            "integration",
+            "conflict_risk",
+            "test_effort",
+        ]
+        json.dumps(result)  # crosses the IPC boundary as JSON
+
+    def test_run_estimation_applies_the_repository_calibration(
+        self, tmp_path, runner, mock_estimation_service
+    ):
+        """Five merged backend specs that cost twice their estimate double it."""
+        from estimation_calibration import record_adjustment, record_sample
+
+        for i in range(5):
+            record_sample(
+                tmp_path,
+                {
+                    "spec": f"00{i}",
+                    "category": "backend",
+                    "estimated": {"cost_usd": 1.0},
+                    "actual": {"cost_usd": 2.0},
+                },
+            )
+        for _ in range(3):
+            record_adjustment(tmp_path, "backend", 5, 7)
+        runner.estimation_service = mock_estimation_service
+
+        with patch("builtins.print"):
+            result = runner.run_estimation(str(tmp_path), "Add an API endpoint")
+
+        cost = result["calibration"]["metrics"]["cost_usd"]
+        assert cost["base"] == 1.75
+        assert result["token_cost_estimate"] == 3.5
+        assert result["complexity_score"] == 9
+        assert result["calibration"]["complexity"]["base"] == 7
+        assert result["calibration"]["red_flags"][0]["metric"] == "cost_usd"
 
     def test_run_estimation_unknown_project_path(self, tmp_path, runner):
         """A path that is not a directory fails loudly rather than silently."""
@@ -370,6 +435,8 @@ class TestSmartEstimationRunnerIntegration:
         mock_result.estimated_duration_hours = 3.0
         mock_result.estimated_qa_iterations = 2.5
         mock_result.token_cost_estimate = 4.0
+        mock_result.estimated_tokens = 80_000.0
+        mock_result.estimated_files_impacted = 6
         mock_result.recommendations = [
             "Consider creating a separate branch for this high-risk task",
             "Implement comprehensive testing before deployment",
