@@ -120,11 +120,10 @@ export function BulkPRDialog({
 		[t],
 	);
 
+	const branchError = validateBranchName(targetBranch);
+
+	// Not reachable with an invalid branch: the button is disabled.
 	const handleCreatePRs = useCallback(async () => {
-		const branchError = validateBranchName(targetBranch);
-		if (branchError) {
-			return;
-		}
 
 		setStep("creating");
 		isCancelledRef.current = false;
@@ -136,9 +135,8 @@ export function BulkPRDialog({
 		}));
 		setTaskResults(results);
 
+		// Cancelling happens while a PR is awaited: each await checks it.
 		for (let i = 0; i < tasks.length; i++) {
-			if (isCancelledRef.current) break;
-
 			setCurrentIndex(i);
 
 			setTaskResults((prev) =>
@@ -148,7 +146,7 @@ export function BulkPRDialog({
 			);
 
 			try {
-				const prResult = await window.electronAPI?.createWorktreePR(
+				const prResult = await globalThis.electronAPI.createWorktreePR(
 					tasks[i].id,
 					{
 						targetBranch: targetBranch || undefined,
@@ -158,7 +156,7 @@ export function BulkPRDialog({
 
 				if (isCancelledRef.current) break;
 
-				if (prResult?.success && prResult.data) {
+				if (prResult.success && prResult.data) {
 					const data = prResult.data;
 					setTaskResults((prev) =>
 						prev.map((r, idx) =>
@@ -187,7 +185,7 @@ export function BulkPRDialog({
 						});
 					}
 				} else {
-					const errorMsg = prResult?.error || "";
+					const errorMsg = prResult.error || "";
 					setTaskResults((prev) =>
 						prev.map((r, idx) =>
 							idx === i
@@ -198,7 +196,7 @@ export function BulkPRDialog({
 											: ("error" as const),
 										error: isWorktreeRelatedError(errorMsg)
 											? t("taskReview:bulkPR.noWorktree")
-											: prResult?.error || t("taskReview:pr.errors.unknown"),
+											: prResult.error || t("taskReview:pr.errors.unknown"),
 									}
 								: r,
 						),
@@ -231,7 +229,7 @@ export function BulkPRDialog({
 		if (!isCancelledRef.current) {
 			setStep("results");
 		}
-	}, [tasks, targetBranch, isDraft, t, validateBranchName]);
+	}, [tasks, targetBranch, isDraft, t]);
 
 	const handleClose = () => {
 		isCancelledRef.current = true;
@@ -242,9 +240,7 @@ export function BulkPRDialog({
 	};
 
 	const handleOpenPR = (url: string) => {
-		if (window.electronAPI?.openExternal) {
-			window.electronAPI.openExternal(url);
-		}
+		void globalThis.electronAPI.openExternal(url);
 	};
 
 	// Calculate progress
@@ -258,7 +254,14 @@ export function BulkPRDialog({
 	const progress = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				// No trigger opens it: this is Escape or the X, which stop the
+				// remaining PRs like the Close button.
+				if (!next) handleClose();
+			}}
+		>
 			<DialogContent className="sm:max-w-[600px]">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
@@ -319,9 +322,18 @@ export function BulkPRDialog({
 									value={targetBranch}
 									onChange={(e) => setTargetBranch(e.target.value)}
 									placeholder="main"
+									aria-invalid={branchError ? true : undefined}
+									aria-describedby="bulkTargetBranchHint"
 								/>
-								<p className="text-xs text-muted-foreground">
-									{t("taskReview:bulkPR.targetBranchHint")}
+								<p
+									id="bulkTargetBranchHint"
+									className={
+										branchError
+											? "text-xs text-destructive"
+											: "text-xs text-muted-foreground"
+									}
+								>
+									{branchError ?? t("taskReview:bulkPR.targetBranchHint")}
 								</p>
 							</div>
 
@@ -346,7 +358,7 @@ export function BulkPRDialog({
 							</Button>
 							<Button
 								onClick={handleCreatePRs}
-								disabled={tasks.length === 0 || step !== "options"}
+								disabled={tasks.length === 0 || branchError !== null}
 							>
 								<GitPullRequest className="mr-2 h-4 w-4" />
 								{t("taskReview:bulkPR.createAll", { count: tasks.length })}
