@@ -3,11 +3,40 @@ Stack Analyzer: Detects and analyzes technology stacks.
 """
 
 import json
+import os
 import re
+import tomllib
+from collections.abc import Iterator
 from pathlib import Path
 
-from .config import RISK_ASSESSMENT_THRESHOLDS, SUPPORTED_MIGRATIONS
-from .models import RiskLevel, StackInfo
+from .models import StackInfo
+
+#: Directories never read: dependencies, virtualenvs, build output, and the
+#: task worktrees under `.workpilot/`, each a full copy of the project. A walk
+#: into `node_modules` or `.venv` counted their files as the project's own
+#: language and took minutes on a real project.
+_SKIPPED_DIRS = frozenset(
+    {
+        ".git",
+        ".hg",
+        ".svn",
+        ".workpilot",
+        ".venv",
+        "venv",
+        "env",
+        "__pycache__",
+        "node_modules",
+        "bower_components",
+        "dist",
+        "build",
+        "out",
+        "target",
+        "vendor",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+    }
+)
 
 
 class StackAnalyzer:
@@ -46,7 +75,7 @@ class StackAnalyzer:
             return "react"
         if self._check_file_exists("node_modules/vue"):
             return "vue"
-        if self._check_file_exists("node_modules/angular"):
+        if self._check_file_exists("node_modules/@angular/core"):
             return "angular"
         if self._check_file_exists("node_modules/svelte"):
             return "svelte"
@@ -71,7 +100,7 @@ class StackAnalyzer:
         if self._check_file_exists("requirements.txt") or self._check_file_exists(
             "pyproject.toml"
         ):
-            reqs = self._read_requirements_txt()
+            reqs = self._python_requirements_text()
             if "django" in reqs.lower():
                 return "django"
             if "flask" in reqs.lower():
@@ -123,23 +152,21 @@ class StackAnalyzer:
             return "rust"
 
         # Check file extensions
-        py_count = len(list(self.project_dir.rglob("*.py")))
-        js_count = len(list(self.project_dir.rglob("*.js")))
-        ts_count = len(list(self.project_dir.rglob("*.ts")))
-        jsx_count = len(list(self.project_dir.rglob("*.jsx")))
-        tsx_count = len(list(self.project_dir.rglob("*.tsx")))
-        java_count = len(list(self.project_dir.rglob("*.java")))
-        go_count = len(list(self.project_dir.rglob("*.go")))
-        rs_count = len(list(self.project_dir.rglob("*.rs")))
-
-        counts = {
-            "python": py_count,
-            "javascript": js_count + jsx_count,
-            "typescript": ts_count + tsx_count,
-            "java": java_count,
-            "go": go_count,
-            "rust": rs_count,
+        languages = {
+            ".py": "python",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".java": "java",
+            ".go": "go",
+            ".rs": "rust",
         }
+        counts = dict.fromkeys(languages.values(), 0)
+        for path in self._project_files():
+            language = languages.get(path.suffix)
+            if language:
+                counts[language] += 1
 
         if max(counts.values()) == 0:
             return "unknown"
@@ -163,7 +190,7 @@ class StackAnalyzer:
         # TypeScript version
         if language == "typescript":
             tsconfig = self._read_tsconfig()
-            if tsconfig:
+            if tsconfig is not None:
                 return tsconfig.get("compilerOptions", {}).get("target", "es2020")
 
         # Package.json based detection
@@ -197,8 +224,8 @@ class StackAnalyzer:
             if "redis" in deps:
                 return "redis"
 
-        # Check requirements.txt
-        reqs = self._read_requirements_txt()
+        # Check the Python dependencies
+        reqs = self._python_requirements_text()
         if reqs:
             if "mysql" in reqs.lower() or "mysqlclient" in reqs.lower():
                 return "mysql"
@@ -210,11 +237,14 @@ class StackAnalyzer:
                 return "redis"
 
         # Check for SQL files
-        sql_files = list(self.project_dir.rglob("**/*.sql"))
-        if sql_files:
-            content = "\n".join(f.read_text(encoding="utf-8") for f in sql_files[:5])
-            if "PRAGMA" in content or "sqlite" in content.lower():
-                return "sqlite"
+        sql_files = [f for f in self._project_files() if f.suffix == ".sql"][:5]
+        # A dump is not always UTF-8: an undecodable byte must not stop the
+        # analysis (it made the page report the migration as unsupported).
+        content = "\n".join(
+            f.read_text(encoding="utf-8", errors="replace") for f in sql_files
+        )
+        if "PRAGMA" in content or "sqlite" in content.lower():
+            return "sqlite"
 
         return None
 
@@ -258,11 +288,8 @@ class StackAnalyzer:
             for line in reqs.split("\n"):
                 line = line.strip()
                 if line and not line.startswith("#"):
-                    parts = re.split(r"[=<>!]", line)
-                    if parts:
-                        name = parts[0].strip()
-                        version = self._extract_version_from_requirement(line)
-                        dependencies[name] = version
+                    name = re.split(r"[=<>!~]", line)[0].strip()
+                    dependencies[name] = self._extract_version_from_requirement(line)
 
         # Limit to top dependencies to avoid bloat
         sorted_deps = sorted(dependencies.items())[:30]
@@ -297,7 +324,7 @@ class StackAnalyzer:
             if "docker" in str(scripts).lower():
                 tools.append("docker")
 
-        return list(set(tools))
+        return sorted(set(tools))
 
     def _detect_package_manager(self) -> str:
         """Detect package manager (npm, pip, etc.)."""
@@ -320,100 +347,6 @@ class StackAnalyzer:
 
         return "unknown"
 
-    def assess_migration_complexity(self, source: StackInfo, target: StackInfo) -> dict:
-        """Assess complexity of migrating from source to target."""
-        key = (source.framework, target.framework)
-        if key not in SUPPORTED_MIGRATIONS:
-            return {
-                "supported": False,
-                "reason": f"Migration from {source.framework} to {target.framework} not supported",
-            }
-
-        config = SUPPORTED_MIGRATIONS[key]
-
-        # Count affected files
-        affected_files = self._count_affected_files(key)
-
-        # Calculate complexity score
-        complexity_score = self._calculate_complexity_score(
-            source, target, affected_files
-        )
-
-        # Determine risk level
-        risk_level = self._determine_risk_level(affected_files, complexity_score)
-
-        return {
-            "supported": True,
-            "affected_files": affected_files,
-            "complexity_score": complexity_score,
-            "risk_level": risk_level.value,
-            "estimated_effort": config.get("estimated_effort_hours", 0),
-            "has_breaking_changes": config.get("breaking_changes", False),
-            "data_preservation": config.get("data_preservation", False),
-        }
-
-    def _count_affected_files(self, migration_key: tuple[str, str]) -> int:
-        """Count files affected by migration."""
-        source_framework, target_framework = migration_key
-
-        patterns = []
-        if source_framework == "react":
-            patterns = ["**/*.jsx", "**/*.tsx"]
-        elif source_framework == "vue":
-            patterns = ["**/*.vue", "**/*.ts"]
-        elif source_framework == "mysql":
-            patterns = ["**/*.sql", "**/migrations/**"]
-        elif source_framework == "python":
-            patterns = ["**/*.py"]
-
-        count = 0
-        for pattern in patterns:
-            count += len(list(self.project_dir.rglob(pattern)))
-
-        return count
-
-    def _calculate_complexity_score(
-        self, source: StackInfo, target: StackInfo, affected_files: int
-    ) -> float:
-        """Calculate migration complexity score (0-10)."""
-        score = 1.0
-
-        # Factor in affected files
-        if affected_files > 500:
-            score += 3.0
-        elif affected_files > 200:
-            score += 2.0
-        elif affected_files > 50:
-            score += 1.0
-
-        # Factor in dependency complexity
-        dep_count = len(source.dependencies)
-        if dep_count > 50:
-            score += 2.0
-        elif dep_count > 20:
-            score += 1.0
-
-        # Database migration complexity
-        if source.database and source.database != target.database:
-            score += 2.0
-
-        return min(score, 10.0)
-
-    def _determine_risk_level(
-        self, affected_files: int, complexity_score: float
-    ) -> RiskLevel:
-        """Determine risk level based on various factors."""
-        thresholds = RISK_ASSESSMENT_THRESHOLDS
-
-        if affected_files > thresholds["high"]["max_affected_files"]:
-            return RiskLevel.CRITICAL
-        elif complexity_score > 8.0:
-            return RiskLevel.HIGH
-        elif complexity_score > 5.0:
-            return RiskLevel.MEDIUM
-        else:
-            return RiskLevel.LOW
-
     # Helper methods
     def _check_file_exists(self, path: str) -> bool:
         """Check if file or directory exists in project."""
@@ -422,14 +355,24 @@ class StackAnalyzer:
 
     def _check_python_version_file(self, pattern: str) -> bool:
         """Check for Python version markers."""
-        for py_file in self.project_dir.rglob("*.py"):
+        for py_file in self._project_files():
+            if py_file.suffix != ".py":
+                continue
             try:
-                content = py_file.read_text(encoding="utf-8")[:100]
-                if pattern in content:
-                    return True
-            except Exception:
-                pass
+                with open(py_file, encoding="utf-8", errors="replace") as f:
+                    head = f.read(100)
+            except OSError:
+                continue
+            if pattern in head:
+                return True
         return False
+
+    def _project_files(self) -> Iterator[Path]:
+        """Every file of the project, outside dependencies and build output."""
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = [d for d in dirs if d not in _SKIPPED_DIRS]
+            for name in files:
+                yield Path(root, name)
 
     def _read_package_json(self) -> dict | None:
         """Read package.json."""
@@ -452,28 +395,38 @@ class StackAnalyzer:
             return self.cache["requirements"]
 
         path = self.project_dir / "requirements.txt"
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
-            self.cache["requirements"] = content
-            return content
-        return ""
+        content = ""
+        if path.is_file():
+            content = path.read_text(encoding="utf-8", errors="replace")
+        self.cache["requirements"] = content
+        return content
+
+    def _python_requirements_text(self) -> str:
+        """requirements.txt, plus the dependencies pyproject.toml declares.
+
+        A project that only has a pyproject.toml (Poetry, uv, PDM) named its
+        framework nowhere the analyzer read, so a Django or Flask project
+        came out as plain "python" and no migration pair matched.
+        """
+        parts = [self._read_requirements_txt()]
+        pyproject = self._read_pyproject_toml() or {}
+        project = pyproject.get("project", {})
+        parts.extend(project.get("dependencies", []))
+        for extra in project.get("optional-dependencies", {}).values():
+            parts.extend(extra)
+        poetry = pyproject.get("tool", {}).get("poetry", {})
+        parts.extend(poetry.get("dependencies", {}))
+        return "\n".join(str(part) for part in parts)
 
     def _read_pyproject_toml(self) -> dict | None:
         """Read pyproject.toml."""
         path = self.project_dir / "pyproject.toml"
-        if path.exists():
-            try:
-                import tomllib  # Python 3.11+
-
-                return tomllib.loads(path.read_text(encoding="utf-8"))
-            except (ImportError, Exception):
-                try:
-                    import tomli
-
-                    return tomli.loads(path.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
-        return None
+        if not path.is_file():
+            return None
+        try:
+            return tomllib.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except tomllib.TOMLDecodeError:
+            return None
 
     def _read_tsconfig(self) -> dict | None:
         """Read tsconfig.json."""

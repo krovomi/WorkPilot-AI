@@ -24,6 +24,15 @@ vi.mock("../project-store", () => ({
 	},
 }));
 
+const serverMirrors = vi.hoisted(() => ({ paths: [] as string[] }));
+
+vi.mock("../server-projects", () => ({
+	serverProjectAtPath: (value: unknown) =>
+		typeof value === "string" && serverMirrors.paths.includes(value)
+			? { path: value }
+			: undefined,
+}));
+
 import {
 	argsAllowed,
 	DIRECTORY_ARGS,
@@ -177,6 +186,24 @@ describe("argsAllowed", () => {
 		expect(argsAllowed("any:channel", [{ projectPath: outside }])).toBe(false);
 		expect(argsAllowed("any:channel", [{ project_dir: outside }])).toBe(false);
 		expect(argsAllowed("any:channel", [{ other: outside }])).toBe(true);
+	});
+
+	it("lets a server project's mirror through, and nothing under or beside it", () => {
+		const mirror = path.join(outside, "server-boards", "abc", "project-1");
+		serverMirrors.paths = [mirror];
+		try {
+			expect(argsAllowed("analyses:sharedReport", ["tech-debt", mirror])).toBe(true);
+			expect(argsAllowed("any:channel", [{ projectPath: mirror }])).toBe(true);
+			for (const dir of [
+				path.join(mirror, ".."),
+				path.join(mirror, "sub"),
+				path.join(outside, "server-boards", "abc", "project-2"),
+			]) {
+				expect(argsAllowed("any:channel", [{ projectPath: dir }]), dir).toBe(false);
+			}
+		} finally {
+			serverMirrors.paths = [];
+		}
 	});
 
 	it("lets an absent optional argument through", () => {

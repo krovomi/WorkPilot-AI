@@ -17,7 +17,6 @@
   "apps/backend/i18n_scaler/editor.py": 1,
   "apps/backend/libdocs/detect.py": 1,
   "apps/backend/merge/file_evolution/storage.py": 1,
-  "apps/backend/migration/transformer.py": 11,
   "apps/backend/onboarding_agent/onboarding_engine.py": 1,
   "apps/backend/qa/loop.py": 1,
   "apps/backend/runners/api_watcher_runner.py": 1,
