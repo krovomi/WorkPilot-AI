@@ -35,6 +35,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerDeviceMatrixHandlers } from "./device-matrix-handlers";
 import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
@@ -453,6 +454,8 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	// Device matrix: presets rendered and captured by the main (#383)
+	registerDeviceMatrixHandlers();
 	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
