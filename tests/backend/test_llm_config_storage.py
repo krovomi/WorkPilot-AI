@@ -169,7 +169,7 @@ def test_a_file_whose_mode_cannot_be_changed_is_still_loaded(
     _isolated_config, monkeypatch
 ):
     _isolated_config.write_text(json.dumps({"x": {}}), encoding="utf-8")
-    os.chmod(_isolated_config, 0o640)  # group-readable: the loader tightens it
+    os.chmod(_isolated_config, 0o600)  # owner-only
     monkeypatch.setattr(llm_config, "is_windows", lambda: False)
 
     def no_chmod(*_a, **_k):
