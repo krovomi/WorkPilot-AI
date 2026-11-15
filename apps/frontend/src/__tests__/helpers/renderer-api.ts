@@ -7,7 +7,9 @@
  *
  * - `on…` / `subscribe…` listeners return an unsubscribe function;
  * - every other method resolves `{ success: true }` (no data), the answer of
- *   a main process with nothing to report.
+ *   a main process with nothing to report;
+ * - a namespace (`electronAPI.github.onPRReviewProgress`) answers the same
+ *   way, its methods named `github.onPRReviewProgress` in `fn`.
  *
  * A test passes the methods it cares about in `overrides` and asserts on the
  * returned `calls`, so the behaviour under test stays explicit.
@@ -45,15 +47,30 @@ export function installRendererApi(
 				mock = vi.isMockFunction(override)
 					? (override as Mock)
 					: vi.fn(override as (...args: unknown[]) => unknown);
-			} else if (LISTENER.test(name)) {
-				mock = vi.fn(() => () => undefined);
 			} else {
-				mock = vi.fn(async () => ({ success: true }));
+				const method = name.slice(name.lastIndexOf(".") + 1);
+				mock = namespace(
+					name,
+					LISTENER.test(method)
+						? vi.fn(() => () => undefined)
+						: vi.fn(async () => ({ success: true })),
+				);
 			}
 			mocks.set(name, mock);
 		}
 		return mock;
 	};
+
+	// A made-up method is also a namespace: what it lacks is a method of it.
+	const namespace = (name: string, mock: Mock): Mock =>
+		new Proxy(mock, {
+			get(target, prop, receiver) {
+				if (prop in target || typeof prop !== "string" || prop === "then") {
+					return Reflect.get(target, prop, receiver);
+				}
+				return fn(`${name}.${prop}`);
+			},
+		});
 
 	const api = new Proxy({} as Record<string, unknown>, {
 		get(_target, prop) {
