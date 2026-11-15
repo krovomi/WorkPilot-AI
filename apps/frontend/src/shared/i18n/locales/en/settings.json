@@ -1382,7 +1382,6 @@
 		"addServer": "Add Server",
 		"addMcpTo": "Add MCP Server to {{agent}}",
 		"addMcpDescription": "Select an MCP server to add to this agent",
-		"allMcpsAdded": "All available MCP servers are already added",
 		"added": "added",
 		"removed": "removed",
 		"remove": "Remove",
@@ -1461,6 +1460,10 @@
 			"teams": {
 				"name": "Microsoft Teams",
 				"description": "Send messages to Teams channels. Requires TEAMS_WEBHOOK_URL env var."
+			},
+			"workpilotVerify": {
+				"name": "WorkPilot Verify",
+				"description": "Launches the app, reads its logs, drives it in a browser and traces its performance during verification"
 			}
 		},
 		"customServers": "Custom Servers",
@@ -1542,7 +1545,9 @@
 				"long": "unusually long ({{detail}} characters)",
 				"injection": "prompt injection: {{detail}}"
 			}
-		}
+		},
+		"healthCheckFailed": "Health check failed",
+		"connectionTestFailed": "Connection test failed"
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",
@@ -1758,6 +1763,10 @@
 		"pr_template_filler": {
 			"label": "PR Template Filler",
 			"description": "AI-fills GitHub PR templates from code changes"
+		},
+		"verifier": {
+			"label": "Verifier",
+			"description": "Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP)."
 		}
 	},
 	"agentProfile": {

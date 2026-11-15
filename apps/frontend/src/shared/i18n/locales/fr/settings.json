@@ -735,6 +735,10 @@
 		"pr_template_filler": {
 			"label": "Remplisseur de template PR",
 			"description": "Remplit automatiquement les templates de PR GitHub à partir des changements de code"
+		},
+		"verifier": {
+			"label": "Vérificateur",
+			"description": "Mène la boucle de vérification : lance l'app, corrige ce qui casse, la conduit jusqu'au changement, trace les performances (MCP Chrome DevTools)."
 		}
 	},
 	"agentProfile": {
@@ -1677,7 +1681,6 @@
 		"addServer": "Ajouter un serveur",
 		"added": "ajouté",
 		"advancedHeaders": "En-têtes supplémentaires",
-		"allMcpsAdded": "Tous les serveurs MCP disponibles sont déjà ajoutés",
 		"alwaysEnabled": "toujours activé",
 		"args": "Arguments",
 		"argsHint": "Arguments séparés par des espaces",
@@ -1797,6 +1800,10 @@
 			"teams": {
 				"name": "Microsoft Teams",
 				"description": "Envoyer des messages aux canaux Teams. Nécessite la variable d'env TEAMS_WEBHOOK_URL."
+			},
+			"workpilotVerify": {
+				"name": "WorkPilot Verify",
+				"description": "Lance l'app, lit ses logs, la pilote dans un navigateur et trace ses performances pendant la vérification"
 			}
 		},
 		"serversEnabled": "{{count}} serveurs activés",
@@ -1847,7 +1854,9 @@
 				"long": "anormalement longue ({{detail}} caractères)",
 				"injection": "injection de prompt : {{detail}}"
 			}
-		}
+		},
+		"healthCheckFailed": "La vérification de l'état a échoué",
+		"connectionTestFailed": "Le test de connexion a échoué"
 	},
 	"modelSelect": {
 		"discoveryNotAvailable": "Découverte de modèles non disponible. Saisissez le nom du modèle manuellement.",
