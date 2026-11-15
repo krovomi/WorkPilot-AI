@@ -171,7 +171,10 @@ class TestReviewApplies:
         monkeypatch.setattr(orchestrator_module, "PRContextGatherer", _Gatherer)
         monkeypatch.setattr(orchestrator_module, "store_review_learnings", _nothing)
         monkeypatch.setattr(orchestrator_module, "observe_with_hermes", _nothing)
-        monkeypatch.setattr("integrations.jev.reviews.evaluate_context", _nothing)
+        # By module object: a dotted string walks `integrations` attribute by
+        # attribute, and that walk depends on which tests imported what first.
+        jev_reviews = importlib.import_module("integrations.jev.reviews")
+        monkeypatch.setattr(jev_reviews, "evaluate_context", _nothing)
         return orch
 
     def test_the_saved_review_carries_what_the_feedback_did(
