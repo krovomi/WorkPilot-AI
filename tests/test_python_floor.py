@@ -1,8 +1,7 @@
 """One Python floor, said the same way by every place that checks it.
 
-The backend uses 3.12 syntax (`src/connectors/jira/work_items.py` nests
-quotes inside an f-string, PEP 701), so an interpreter the detector accepts
-must be one the code imports under. The Electron detector and the two Python
+The backend uses 3.12 syntax (quotes nested inside f-strings, PEP 701), so an
+interpreter the detector accepts must be one the code imports under. The Electron detector and the two Python
 entry points each refuse an older interpreter; they used to say 3.10.
 """
 

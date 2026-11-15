@@ -112,6 +112,10 @@ def get_session_diff(
             cwd=project_dir,
             capture_output=True,
             text=True,
+            # A diff is the project's bytes: the locale codec (cp1252 on
+            # Windows) failed on the first non-ASCII line.
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         diff = result.stdout
@@ -157,6 +161,8 @@ def get_changed_files(
             cwd=project_dir,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         files = [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
@@ -182,6 +188,8 @@ def get_commit_messages(
             cwd=project_dir,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         return result.stdout.strip() if result.stdout.strip() else "(No commits)"
@@ -527,44 +535,3 @@ def _get_generic_insights(subtask_id: str, success: bool) -> dict:
         "success": success,
         "changed_files": [],
     }
-
-
-# =============================================================================
-# CLI for Testing
-# =============================================================================
-
-if __name__ == "__main__":
-    import argparse
-    import asyncio
-
-    parser = argparse.ArgumentParser(description="Test insight extraction")
-    parser.add_argument("--spec-dir", type=Path, required=True, help="Spec directory")
-    parser.add_argument(
-        "--project-dir", type=Path, required=True, help="Project directory"
-    )
-    parser.add_argument(
-        "--commit-before", type=str, required=True, help="Commit before session"
-    )
-    parser.add_argument(
-        "--commit-after", type=str, required=True, help="Commit after session"
-    )
-    parser.add_argument(
-        "--subtask-id", type=str, default="test-subtask", help="Subtask ID"
-    )
-
-    args = parser.parse_args()
-
-    async def main():
-        insights = await extract_session_insights(
-            spec_dir=args.spec_dir,
-            project_dir=args.project_dir,
-            subtask_id=args.subtask_id,
-            session_num=1,
-            commit_before=args.commit_before,
-            commit_after=args.commit_after,
-            success=True,
-            recovery_manager=None,
-        )
-        print(json.dumps(insights, indent=2))
-
-    asyncio.run(main())

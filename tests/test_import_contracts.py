@@ -185,7 +185,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "phase_config",
         "server",
     },
-    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    "analysis": {"agent_runtime", "foundation"},
     # The subagent registry, out of agents (it never imported it): read by
     # core, the skills emitter and the learning loop.
     "subagents": {"mobile", "project", "skills_registry"},
@@ -213,7 +213,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The shared brain and what sits on it: with docintel, a cycle of five of
     # their own below the agents' one; none of them imports core, agents or a
     # phase.
-    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    # agent_runtime (a leaf) and security (clean_untrusted): the model's
+    # opinion on a queued memory conflict, asked by a person
+    # (brain/lifecycle/advisor.py); neither reaches back to brain.
+    "brain": {
+        "agent_runtime",
+        "docintel",
+        "foundation",
+        "learning_loop",
+        "security",
+        "skills_registry",
+    },
     # The model analysis (F178) asks the agent_runtime port, never core.
     "learning_loop": {
         "agent_runtime",

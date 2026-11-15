@@ -111,7 +111,7 @@ class PerformanceOptimizer:
         )
 
     def _suggest_for_react(self, b: Bottleneck) -> OptimizationSuggestion:
-        if "inline arrow" in b.description:
+        if "inline arrow" in b.description.lower():
             return OptimizationSuggestion(
                 suggestion_id=str(uuid.uuid4())[:8],
                 bottleneck_id=b.bottleneck_id,
@@ -178,7 +178,28 @@ class PerformanceOptimizer:
         )
 
     def _suggest_for_io(self, b: Bottleneck) -> OptimizationSuggestion:
-        if ".py" in b.file_path:
+        if b.file_path.endswith(".cs"):
+            return OptimizationSuggestion(
+                suggestion_id=str(uuid.uuid4())[:8],
+                bottleneck_id=b.bottleneck_id,
+                title="Await the async file and task APIs",
+                description=(
+                    "Use File.ReadAllTextAsync / WriteAllTextAsync and await tasks "
+                    "instead of .Result or .Wait() inside async methods."
+                ),
+                implementation=(
+                    "// Before (blocks a thread-pool thread):\n"
+                    "var text = File.ReadAllText(path);\n"
+                    "var user = repository.GetAsync(id).Result;\n\n"
+                    "// After:\n"
+                    "var text = await File.ReadAllTextAsync(path, cancellationToken);\n"
+                    "var user = await repository.GetAsync(id);"
+                ),
+                estimated_improvement="Frees request threads and avoids deadlocks",
+                effort=OptimizationEffort.LOW,
+                auto_implementable=False,
+            )
+        if b.file_path.endswith(".py"):
             return OptimizationSuggestion(
                 suggestion_id=str(uuid.uuid4())[:8],
                 bottleneck_id=b.bottleneck_id,

@@ -1,16 +1,16 @@
-"""
-Runtime Factory: Choix du runtime agent selon ProviderConfig
+"""The runtime of a one-shot agent session (``agent_runtime.create_agent_runtime``).
+
+Its one caller is the insight extractor, which always asks for Claude
+(`analysis/insight_extractor.EXTRACTION_PROVIDER`). The Copilot and LiteLLM
+runtimes it could also return were never reached and are gone; a session on
+another provider goes through `core.client.create_agent_client`, which applies
+the agent's declared tools on every provider.
 """
 
 import sys
 from pathlib import Path
 
 from core.runtimes.claude_sdk_runtime import ClaudeSDKRuntime
-from core.runtimes.copilot_runtime import CopilotRuntime
-
-# ProviderConfig is imported lazily inside the factory: `src.connectors` lives
-# under the project root, which the factory puts on sys.path first.
-from core.runtimes.litellm_runtime import LiteLLMRuntime
 
 
 def create_agent_runtime(
@@ -23,10 +23,10 @@ def create_agent_runtime(
     cli_thinking=None,
     config=None,
 ):
-    """
-    Factory pour choisir le runtime agent selon ProviderConfig.
-    Utilise CopilotRuntime si provider = 'copilot',
-    ClaudeSDKRuntime si provider = 'anthropic-sdk', sinon LiteLLMRuntime.
+    """The Claude Agent SDK runtime for this phase's provider configuration.
+
+    Raises:
+        ValueError: if the configuration names a provider other than Claude.
     """
     if config is None:
         # Lazy import: the project root may not be on sys.path yet.
@@ -39,19 +39,11 @@ def create_agent_runtime(
             phase, spec_dir, cli_provider, cli_model
         )
 
-    # Copilot CLI runtime
-    if cli_provider == "copilot" or (
-        hasattr(config, "provider") and config.provider == "copilot"
-    ):
-        return CopilotRuntime(
-            spec_dir, phase, project_dir, agent_type, config, cli_thinking
+    if not getattr(config, "is_claude_sdk", False):
+        provider = getattr(config, "provider", cli_provider)
+        raise ValueError(
+            f"No agent runtime for provider {provider!r}: use create_agent_client"
         )
-
-    if hasattr(config, "is_claude_sdk") and config.is_claude_sdk:
-        return ClaudeSDKRuntime(
-            spec_dir, phase, project_dir, agent_type, config, cli_thinking
-        )
-    else:
-        return LiteLLMRuntime(
-            spec_dir, phase, project_dir, agent_type, config, cli_thinking
-        )
+    return ClaudeSDKRuntime(
+        spec_dir, phase, project_dir, agent_type, config, cli_thinking
+    )

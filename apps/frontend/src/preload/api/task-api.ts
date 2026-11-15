@@ -9,6 +9,7 @@ import type {
 	ImageAttachment,
 	ImplementationPlan,
 	IPCResult,
+	StopAllResult,
 	MergeProgress,
 	PRDetailsResult,
 	PrFollowupStartOptions,
@@ -22,6 +23,7 @@ import type {
 	TaskContextEvent,
 	TaskGoal,
 	TaskGoalState,
+	AppliedLessonsState,
 	TaskLogStreamChunk,
 	TaskLogs,
 	TaskMetadata,
@@ -64,6 +66,8 @@ export interface TaskAPI {
 	) => Promise<TaskUpdateResult>;
 	startTask: (taskId: string, options?: TaskStartOptions) => void;
 	stopTask: (taskId: string) => void;
+	/** "Stop all agents": every running task paused, every other agent process stopped. */
+	stopAllAgents: () => Promise<IPCResult<StopAllResult>>;
 	submitReview: (
 		taskId: string,
 		approved: boolean,
@@ -135,6 +139,14 @@ export interface TaskAPI {
 		taskId: string,
 		goal: TaskGoal | null,
 	) => Promise<IPCResult<TaskGoalState>>;
+	/** The lessons the task's prompts carried, and the ones turned off for it. */
+	getAppliedLessons: (taskId: string) => Promise<IPCResult<AppliedLessonsState>>;
+	/** Turn one lesson off for this task (or back on); every spec dir copy. */
+	setLessonDisabled: (
+		taskId: string,
+		lessonId: string,
+		disabled: boolean,
+	) => Promise<IPCResult<AppliedLessonsState>>;
 	/** CONTEXT_USAGE / CONTEXT_ACTION_APPLIED events of running tasks. */
 	onTaskContextUsage: (
 		callback: (
@@ -478,6 +490,9 @@ export const createTaskAPI = (): TaskAPI => ({
 	stopTask: (taskId: string): void =>
 		ipcRenderer.send(IPC_CHANNELS.TASK_STOP, taskId),
 
+	stopAllAgents: (): Promise<IPCResult<StopAllResult>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.AGENTS_STOP_ALL),
+
 	submitReview: (
 		taskId: string,
 		approved: boolean,
@@ -597,6 +612,16 @@ export const createTaskAPI = (): TaskAPI => ({
 		goal: TaskGoal | null,
 	): Promise<IPCResult<TaskGoalState>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_SET, taskId, goal),
+
+	getAppliedLessons: (taskId: string): Promise<IPCResult<AppliedLessonsState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_LESSONS_GET, taskId),
+
+	setLessonDisabled: (
+		taskId: string,
+		lessonId: string,
+		disabled: boolean,
+	): Promise<IPCResult<AppliedLessonsState>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, taskId, lessonId, disabled),
 
 	onTaskContextUsage: (
 		callback: (

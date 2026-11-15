@@ -34,6 +34,8 @@ export const taskMock = {
 	deleteTask: async () => ({ success: true }),
 
 	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	getAppliedLessons: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
+	setLessonDisabled: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
 	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
 
 	updateTask: async (
@@ -62,6 +64,11 @@ export const taskMock = {
 	stopTask: () => {
 		console.warn("[Browser Mock] stopTask called");
 	},
+
+	stopAllAgents: async () => ({
+		success: true,
+		data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+	}),
 
 	submitReview: async () => ({ success: true }),
 
@@ -219,4 +226,9 @@ export const taskMock = {
 	onBestOfNEvent: () => () => {
 		/* noop */
 	},
+	// Execution waves (#358): the planner reads worktrees, only in Electron.
+	planExecutionWaves: async () => ({
+		success: false as const,
+		error: "Execution waves are not available in the browser preview",
+	}),
 };

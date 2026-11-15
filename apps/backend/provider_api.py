@@ -1007,16 +1007,6 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
         if not oauth_token:
             return {"success": False, "error": "OAuth token required for Windsurf"}
         try:
-            from integrations.windsurf_mcp import get_windsurf_mcp
-
-            mcp = await get_windsurf_mcp()
-            status = await mcp.check_status()
-            if status.get("connected", False):
-                set_validated(provider, oauth_token, True)
-                return {"success": True, "method": "MCP"}
-        except Exception as mcp_error:
-            logging.warning(f"MCP test failed, trying direct API: {mcp_error}")
-        try:
             safe_url = (
                 _validate_url_ssrf("windsurf", "https://server.codeium.com")
                 + "/api"
@@ -1600,31 +1590,6 @@ async def get_provider_usage(provider: str):
         except Exception as e:
             return {
                 "error": f"Erreur lors de la récupération des métriques Copilot: {_safe_error_message(e)}"
-            }
-    elif provider == "anthropic" or provider == "claude":
-        try:
-            from core.anthropic_usage import get_anthropic_usage_metrics
-
-            usage_data = get_anthropic_usage_metrics()
-
-            # Formater les données pour le frontend
-            if "error" in usage_data:
-                return usage_data
-
-            return {
-                "provider": "anthropic",
-                "available": True,
-                "usage": usage_data.get("usage", {}),
-                "fetched_at": usage_data.get("fetched_at"),
-                "providerName": "anthropic",
-            }
-        except ImportError as e:
-            return {
-                "error": f"Module Anthropic usage non disponible: {_safe_error_message(e)}"
-            }
-        except Exception as e:
-            return {
-                "error": f"Erreur lors de la récupération des métriques Anthropic: {_safe_error_message(e)}"
             }
     elif provider == "windsurf":
         # Windsurf (Codeium) — multi-strategy auth for GetTeamCreditBalance

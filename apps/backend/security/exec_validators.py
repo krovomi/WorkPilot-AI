@@ -53,7 +53,21 @@ _FIND_EXEC_OPTIONS = frozenset({"-exec", "-execdir", "-ok", "-okdir"})
 #: several verbs and only `exec=` runs anything, but the others are
 #: `dot`/`echo`/`sleep`/`ttyout` — refusing the option wholesale costs a
 #: progress indicator and removes the need to parse its grammar.
-_TAR_EXEC_OPTIONS = ("--checkpoint-action", "--to-command", "--use-compress-program")
+_TAR_EXEC_OPTIONS = (
+    "--checkpoint-action",
+    "--to-command",
+    "--use-compress-program",
+    # The remote shell for a `host:file` archive, and the script run between
+    # the volumes of a multi-volume archive.
+    "--rsh-command",
+    "--info-script",
+    "--new-volume-script",
+)
+#: Short forms: `-I` is `--use-compress-program`, `-F` is `--info-script`.
+_TAR_EXEC_SHORT = ("I", "F")
+#: Real options that a prefix of an exec option names exactly, so GNU tar
+#: picks them and not the longer one.
+_TAR_EXACT_OPTIONS = frozenset({"--checkpoint"})
 
 
 def _tokenize(command_string: str) -> list[str] | None:
@@ -176,12 +190,40 @@ def validate_tar_command(command_string: str) -> ValidationResult:
     if not tokens or _cross_platform_basename(tokens[0]) != "tar":
         return True, ""
 
-    for token in tokens[1:]:
-        for option in _TAR_EXEC_OPTIONS:
-            if token == option or token.startswith(f"{option}="):
-                return (
-                    False,
-                    f"tar option '{option}' runs an external command and is "
-                    "not allowed: its argument bypasses the command allowlist.",
-                )
+    for position, token in enumerate(tokens[1:]):
+        option = _tar_exec_option(token, first=position == 0)
+        if option:
+            return (
+                False,
+                f"tar option '{option}' runs an external command and is "
+                "not allowed: its argument bypasses the command allowlist.",
+            )
     return True, ""
+
+
+def _tar_exec_option(token: str, first: bool) -> str | None:
+    """The exec option `token` spells, or None.
+
+    GNU tar takes a long option by any unambiguous prefix (`--to-com=…`),
+    short options bundled (`-xIprog`), and, in the first argument only, the
+    old style without a dash (`xIf prog a.tar`).
+    """
+    if token.startswith("--"):
+        name = token.split("=", 1)[0]
+        if len(name) <= 2 or name in _TAR_EXACT_OPTIONS:
+            return None
+        return next((o for o in _TAR_EXEC_OPTIONS if o.startswith(name)), None)
+    if token.startswith("-"):
+        letters = token[1:]
+    elif first:
+        letters = token
+    else:
+        return None
+    # In a bundle, the letters after one that takes a value are that value:
+    # `-fI.tar` names an archive, it does not compress.
+    for letter in letters:
+        if letter in _TAR_EXEC_SHORT:
+            return f"-{letter}"
+        if letter in "fCKNTVXbgL":
+            return None
+    return None

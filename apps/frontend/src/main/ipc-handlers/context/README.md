@@ -7,10 +7,11 @@ these handlers read it through the backend (`/api/brain/*`), never from disk.
 
 | File | What it does |
 |---|---|
-| `index.ts` | `registerContextHandlers`: registers the three modules below |
+| `index.ts` | `registerContextHandlers`: registers the four modules below |
 | `project-context-handlers.ts` | `CONTEXT_GET`, `CONTEXT_REFRESH_INDEX` — the project index |
 | `memory-status-handlers.ts` | `CONTEXT_MEMORY_STATUS` — where the vault is and whether it exists yet |
 | `memory-data-handlers.ts` | `CONTEXT_GET_MEMORIES`, `CONTEXT_SEARCH_MEMORIES` — the Memories tab |
+| `memory-lifecycle-handlers.ts` | `CONTEXT_MEMORY_*` — the journal, trash, pins and sync conflicts (`/api/brain/memory/*`); every argument revalidated by `memory-lifecycle-validation.ts` |
 | `brain-memory.ts` | the `backendFetch` calls those handlers share (`/api/brain/status`, `/api/brain/memories`) |
 | `utils.ts` | `.env` parsing, project and global settings loading, backend source lookup |
 

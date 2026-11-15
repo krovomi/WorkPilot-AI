@@ -491,5 +491,20 @@
 		},
 		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files.",
 		"docsFailed": "The link did not open: {{error}}"
+	},
+	"cliStatus": {
+		"installFailed": "Installation failed",
+		"terminalUnavailable": "Could not open a terminal.",
+		"pathSwitchUnavailable": "Switching the CLI installation is not available.",
+		"pathSwitchFailed": "Could not switch the CLI installation."
+	},
+	"stopAll": {
+		"label": "Stop all agents",
+		"tooltip": "Stop all agents (Ctrl+Shift+.): every running task is paused, to resume from its card",
+		"done_one": "{{count}} task paused",
+		"done_other": "{{count}} tasks paused",
+		"resumeHint": "Every agent has stopped. Resume each task from its card when you are ready.",
+		"nothing": "No agent was running",
+		"failed": "The agents could not be stopped"
 	}
 }

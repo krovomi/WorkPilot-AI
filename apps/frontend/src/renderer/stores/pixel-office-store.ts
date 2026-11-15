@@ -134,19 +134,13 @@ interface PixelOfficeState {
 	// Actions
 	syncAll: (terminals: Terminal[], tasks: Task[]) => void;
 	/** Sync swarm agents from wave/subtask data */
-	syncSwarmAgents: (
-		nodes: Record<string, SubtaskNode>,
-		currentWave?: number,
-	) => void;
+	syncSwarmAgents: (nodes: Record<string, SubtaskNode>) => void;
 	/** Drop every swarm character (the run ended, or swarm mode was turned off) */
 	clearSwarmAgents: () => void;
-	/** @deprecated use syncAll */
-	syncFromTerminals: (terminals: Terminal[]) => void;
 	selectAgent: (id: string | null) => void;
 	/** Move the selection to the next/previous seated agent (keyboard nav) */
 	cycleSelection: (direction: 1 | -1) => string | null;
 	updateSettings: (updates: Partial<PixelOfficeSettings>) => void;
-	setSpeechBubble: (agentId: string, text: string | undefined) => void;
 }
 
 // ── Activity mapping ──────────────────────────────────────────
@@ -154,8 +148,9 @@ interface PixelOfficeState {
 function mapTerminalToActivity(terminal: Terminal): AgentActivity {
 	if (terminal.status === "exited") return "exited";
 	if (terminal.isClaudeBusy) return "typing";
+	// Busy was answered above: a Claude session that is not busy waits on you.
 	if (terminal.isClaudeMode && terminal.status === "claude-active") {
-		return terminal.isClaudeBusy ? "typing" : "waiting";
+		return "waiting";
 	}
 	if (terminal.status === "running") return "running";
 	return "idle";
@@ -476,11 +471,6 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 				set({ agents: allocateSeats(remaining.map((a) => ({ ...a }))) });
 			},
 
-			/** @deprecated use syncAll */
-			syncFromTerminals: (terminals: Terminal[]) => {
-				get().syncAll(terminals, []);
-			},
-
 			selectAgent: (id) => set({ selectedAgentId: id }),
 
 			cycleSelection: (direction) => {
@@ -506,12 +496,6 @@ export const usePixelOfficeStore = create<PixelOfficeState>()(
 			updateSettings: (updates) =>
 				set((state) => ({ settings: { ...state.settings, ...updates } })),
 
-			setSpeechBubble: (agentId, text) =>
-				set((state) => ({
-					agents: state.agents.map((a) =>
-						a.id === agentId ? { ...a, speechBubble: text } : a,
-					),
-				})),
 		}),
 		{
 			name: "pixel-office-settings",
