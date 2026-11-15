@@ -11,16 +11,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
-_BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
-if str(_BACKEND) not in sys.path:
-    sys.path.insert(0, str(_BACKEND))
-
-from server import config as server_config  # noqa: E402
+from server import config as server_config
 
 _VALID_SECRET = "x" * 48
 
@@ -98,9 +92,6 @@ class _Build:
         self._plan.write_text(json.dumps(plan), encoding="utf-8")
         return None, b""
 
-    def terminate(self) -> None:
-        pass
-
 
 async def _run(monkeypatch, clone: Path, spec_dir: Path, phase: str = "build"):
     import shared_board.review  # noqa: F401  (installs the approval carry-over)
@@ -127,9 +118,9 @@ async def _run(monkeypatch, clone: Path, spec_dir: Path, phase: str = "build"):
     await manager.start_run(spec, project_id, str(clone), phase, "u1")
     for _ in range(200):
         if not manager.is_running(spec.id):
-            return
+            break
         await asyncio.sleep(0.01)
-    raise AssertionError("the run never ended")
+    assert not manager.is_running(spec.id), "the run never ended"
 
 
 @pytest.mark.asyncio
