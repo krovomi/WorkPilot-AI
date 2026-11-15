@@ -107,14 +107,15 @@ def test_diagrams_of_a_module_a_file_and_nothing(tmp_path: Path) -> None:
 def test_a_file_deleted_while_its_folder_is_read_is_left_out(tmp_path: Path) -> None:
     pkg = tmp_path / "jobs"
     pkg.mkdir()
-    (pkg / "gone.py").write_text("class Gone:\n    pass\n", encoding="utf-8")
+    gone = pkg / "gone.py"
+    gone.write_text("class Gone:\n    pass\n", encoding="utf-8")
     (pkg / "kept.py").write_text("def kept():\n    pass\n", encoding="utf-8")
 
     class RacingAnalyzer(DocAnalyzer):
         # Another process removes gone.py between the listing and the read.
         def analyze_file(self, file_path: str) -> list[SymbolDoc]:
-            if file_path.endswith("gone.py"):
-                Path(file_path).unlink()
+            if gone.exists() and Path(file_path) == gone:
+                gone.unlink()
             return super().analyze_file(file_path)
 
     info = RacingAnalyzer().analyze_directory(str(pkg))
