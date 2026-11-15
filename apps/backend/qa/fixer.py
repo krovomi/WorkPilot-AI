@@ -130,7 +130,9 @@ async def run_qa_fixer_session(
     try:
         from learning_loop.prompt_injection import get_learning_context
 
-        learning_context = get_learning_context(project_dir, "qa_fixing")
+        learning_context = get_learning_context(
+            project_dir, "qa_fixing", spec_dir=spec_dir
+        )
         if learning_context:
             prompt += "\n\n" + learning_context
             debug_success("qa_fixer", "Learning loop patterns injected for fixer")

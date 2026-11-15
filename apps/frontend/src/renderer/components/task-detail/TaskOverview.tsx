@@ -6,6 +6,7 @@ import { useHermesStore } from "../../stores/hermes-store";
 import { useTaskPanelStore } from "../../stores/task-panel-store";
 import { TaskPermissionPrompt } from "../task-permission/TaskPermissionPrompt";
 import { ScrollArea } from "../ui/scroll-area";
+import { AppliedLessonsCard } from "./AppliedLessonsCard";
 import { BestOfNCard } from "./BestOfNCard";
 import { BrainTaskCard } from "./BrainTaskCard";
 import { CiPipelineCard } from "./CiPipelineCard";
@@ -129,6 +130,8 @@ export function TaskOverview({
 		redTeam: <RedTeamCard task={task} projectPath={projectPath} />,
 		workflowProfile: <WorkflowProfileCard task={task} projectPath={projectPath} />,
 		documents: <DocumentInsightsCard task={task} projectPath={projectPath} />,
+		// Ce que la boucle d'apprentissage a donné aux prompts de la tâche ; une leçon se désactive pour elle seule.
+		lessons: <AppliedLessonsCard task={task} />,
 		hermes: <HermesLearningCard task={task} projectPath={projectPath} />,
 		brain: <BrainTaskCard task={task} projectPath={projectPath} />,
 		rtk: <RtkSavingsCard projectPath={projectPath} />,
