@@ -821,7 +821,9 @@ class TestSpecNumberLock:
         (specs / "notes").mkdir()
         task = tmp_path / ".workpilot" / "worktrees" / "tasks" / "x"
         (task / ".workpilot" / "specs" / "007-b").mkdir(parents=True)
-        (tmp_path / ".workpilot" / "worktrees" / "tasks" / "file").write_text("")
+        (tmp_path / ".workpilot" / "worktrees" / "tasks" / "file").write_text(
+            "", encoding="utf-8"
+        )
 
         with SpecNumberLock(tmp_path) as lock:
             assert lock.get_next_spec_number() == 8

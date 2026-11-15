@@ -956,9 +956,12 @@ class TestFindExistingPullRequest:
 
 @pytest.fixture
 def template(forge):
+    # The directory form (.github/PULL_REQUEST_TEMPLATE/<name>.md): this
+    # repository's own single-file template must stay unread by tests
+    # (tests/test_ci_triggers.py), and the filler reads both forms.
     github = forge.repo / ".github"
-    github.mkdir()
-    (github / "PULL_REQUEST_TEMPLATE.md").write_text(
+    (github / "PULL_REQUEST_TEMPLATE").mkdir(parents=True)
+    (github / "PULL_REQUEST_TEMPLATE" / "default.md").write_text(
         "## What\n\n## Why\n", encoding="utf-8"
     )
     return github
