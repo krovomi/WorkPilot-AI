@@ -413,7 +413,8 @@ describe("CopilotCliStatusBadge installation switch", () => {
 		api.setCopilotCliActivePath
 			.mockResolvedValueOnce({ success: false, error: "not a gh binary" })
 			.mockResolvedValueOnce({ success: false })
-			.mockRejectedValueOnce(new Error("denied"));
+			.mockRejectedValueOnce(new Error("denied"))
+			.mockRejectedValueOnce("EPERM");
 		renderBadge();
 		await openPopover();
 		await pickSecond();
@@ -427,6 +428,13 @@ describe("CopilotCliStatusBadge installation switch", () => {
 		await pickSecond();
 		fireEvent.click(screen.getByRole("button", { name: "Switch" }));
 		expect(await screen.findByText("denied")).toBeInTheDocument();
+		// A rejection that is not an Error is worded, not shown raw.
+		await pickSecond();
+		fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+		expect(
+			await screen.findByText("Could not switch the CLI installation."),
+		).toBeInTheDocument();
+		expect(screen.queryByText("EPERM")).toBeNull();
 	});
 
 	it("says switching is unavailable without the IPC, and cancels cleanly", async () => {

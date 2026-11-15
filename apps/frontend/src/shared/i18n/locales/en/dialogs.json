@@ -456,8 +456,7 @@
 			"profileWithoutToken": "The selected account has no valid token.",
 			"saveFailed": "Could not save the token.",
 			"noProject": "Select a project first.",
-			"authStartFailed": "Could not start the authentication.",
-			"tokenRequired": "Enter a token."
+			"authStartFailed": "Could not start the authentication."
 		},
 		"copyCommand": "Copy the command"
 	},

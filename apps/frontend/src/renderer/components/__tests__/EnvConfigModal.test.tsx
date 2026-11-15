@@ -250,6 +250,31 @@ describe("EnvConfigModal", () => {
 		expect(await screen.findByText("EACCES")).toBeInTheDocument();
 	});
 
+	it("offers Save only once a token is typed", async () => {
+		renderModal();
+		fireEvent.click(await screen.findByRole("button", { name: /Enter token manually/ }));
+		fireEvent.change(screen.getByLabelText("Claude Code OAuth Token"), {
+			target: { value: "   " },
+		});
+		expect(screen.queryByRole("button", { name: "Save Token" })).toBeNull();
+	});
+
+	it("words a save or a check that rejects with something other than an Error", async () => {
+		api.updateSourceEnv.mockRejectedValueOnce("EACCES");
+		const first = renderModal();
+		fireEvent.click(await screen.findByRole("button", { name: /Enter token manually/ }));
+		fireEvent.change(screen.getByLabelText("Claude Code OAuth Token"), {
+			target: { value: "tok" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save Token" }));
+		expect(await screen.findByText("An unknown error occurred")).toBeInTheDocument();
+		first.unmount();
+		api.checkSourceToken.mockRejectedValueOnce("down");
+		renderModal();
+		expect(await screen.findByText("An unknown error occurred")).toBeInTheDocument();
+		expect(screen.queryByText("down")).toBeNull();
+	});
+
 	it("names the default .env place when the backend gives no path", async () => {
 		api.checkSourceToken.mockResolvedValue({ success: true, data: { hasToken: false } });
 		api.getClaudeProfiles.mockResolvedValue({ success: true, data: { profiles: [] } });

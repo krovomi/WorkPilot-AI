@@ -500,6 +500,27 @@ describe("ClaudeCodeStatusBadge installation switch", () => {
 		expect(await screen.findByText("denied")).toBeInTheDocument();
 	});
 
+	it("words a refusal without reason and a non-Error throw", async () => {
+		setClaude("installed", { installed: "2.1.0" });
+		api.setClaudeCodeActivePath
+			.mockResolvedValueOnce({ success: false })
+			.mockRejectedValueOnce("EPERM");
+		renderBadge();
+		await openPopover();
+		await pickSecondInstallation();
+		fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+		expect(
+			await screen.findByText("Could not switch the CLI installation."),
+		).toBeInTheDocument();
+		await pickSecondInstallation();
+		fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+		await waitFor(() => expect(api.setClaudeCodeActivePath).toHaveBeenCalledTimes(2));
+		expect(
+			await screen.findByText("Could not switch the CLI installation."),
+		).toBeInTheDocument();
+		expect(screen.queryByText("EPERM")).toBeNull();
+	});
+
 	it("says path switching is unavailable without the IPC", async () => {
 		setClaude("installed", { installed: "2.1.0" });
 		Object.assign(globalThis.electronAPI, { setClaudeCodeActivePath: undefined });

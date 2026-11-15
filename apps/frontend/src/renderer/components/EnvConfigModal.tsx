@@ -217,12 +217,8 @@ export function EnvConfigModal({
 		}
 	};
 
+	// Only reachable from the Save button, which is shown once a token is typed.
 	const handleSave = async () => {
-		if (!token.trim()) {
-			setError(t("dialogs:envConfig.errors.tokenRequired"));
-			return;
-		}
-
 		setIsSaving(true);
 		setError(null);
 
