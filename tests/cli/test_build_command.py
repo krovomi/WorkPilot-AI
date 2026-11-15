@@ -8,13 +8,12 @@ verdict reached the card, and how each kind of stop is reported.
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import core.agent
 import pytest
-import qa
 from cli import build_commands as bc
 from core.task_event import TASK_EVENT_PREFIX
 from core.workspace import WorkspaceMode
@@ -72,7 +71,17 @@ class _Worktree:
 
 @pytest.fixture
 def build(tmp_path, monkeypatch):
-    """A build whose every collaborator records what it was asked to do."""
+    """A build whose every collaborator records what it was asked to do.
+
+    `handle_build_command` imports most collaborators when it runs, so they
+    are patched on the modules `sys.modules` holds now, not on the ones this
+    file saw at collection: another test may have reloaded one since.
+    """
+    cli_utils = importlib.import_module("cli.utils")
+    agent_module = importlib.import_module("core.agent")
+    qa = importlib.import_module("qa")
+    jev_adapters = importlib.import_module("integrations.jev.adapters")
+    encoding_repair = importlib.import_module("core.encoding_repair")
     project = tmp_path / "project"
     spec = project / ".workpilot" / "specs" / "001-feature"
     spec.mkdir(parents=True)
@@ -105,8 +114,8 @@ def build(tmp_path, monkeypatch):
             problems.append("Claude n'est pas connecté")
         return knobs.env_ok
 
-    monkeypatch.setattr("cli.utils.validate_environment", validate_environment)
-    monkeypatch.setattr("cli.utils.print_banner", lambda: None)
+    monkeypatch.setattr(cli_utils, "validate_environment", validate_environment)
+    monkeypatch.setattr(cli_utils, "print_banner", lambda: None)
     monkeypatch.setattr(bc, "get_existing_build_worktree", lambda p, n: knobs.existing)
     monkeypatch.setattr(bc, "split_before_build", lambda s, e: knobs.split)
 
@@ -183,9 +192,9 @@ def build(tmp_path, monkeypatch):
         if knobs.agent_raises is not None:
             raise knobs.agent_raises
 
-    monkeypatch.setattr(core.agent, "run_autonomous_agent", agent)
+    monkeypatch.setattr(agent_module, "run_autonomous_agent", agent)
     monkeypatch.setattr(
-        core.agent,
+        agent_module,
         "sync_spec_to_source",
         lambda s, src: log.append(("sync", s.name)) or True,
     )
@@ -198,7 +207,7 @@ def build(tmp_path, monkeypatch):
         return knobs.qa_result
 
     monkeypatch.setattr(qa, "run_qa_validation_loop", qa_loop)
-    monkeypatch.setattr("integrations.jev.adapters.capture_base", lambda run, ref: None)
+    monkeypatch.setattr(jev_adapters, "capture_base", lambda run, ref: None)
 
     def repair(working_dir, base):
         log.append(("repair", base))
@@ -206,7 +215,7 @@ def build(tmp_path, monkeypatch):
             raise knobs.repair
         return knobs.repair or {}
 
-    monkeypatch.setattr("core.encoding_repair.repair_worktree_changed_files", repair)
+    monkeypatch.setattr(encoding_repair, "repair_worktree_changed_files", repair)
 
     def run(**overrides):
         args = {
@@ -316,7 +325,9 @@ def test_a_direct_build_runs_the_coder_in_the_project(build, capsys):
 def test_phase_models_are_listed_when_they_differ(build, monkeypatch, capsys):
     models = {"planning": "claude-opus-1", "coding": "claude-sonnet-2", "qa": "haiku"}
     monkeypatch.setattr(
-        "phase_config.get_phase_model", lambda spec, phase, default: models[phase]
+        importlib.import_module("phase_config"),
+        "get_phase_model",
+        lambda spec, phase, default: models[phase],
     )
 
     build.run()
@@ -543,14 +554,14 @@ def test_a_crash_is_named_on_the_card(build, capsys):
 def test_an_unwritable_event_stream_does_not_fail_a_finished_build(
     build, monkeypatch, capsys
 ):
-    import core.task_event
+    task_event = importlib.import_module("core.task_event")
 
     _plan(build.spec, done=True, qa_status="approved")
 
     def unwritable(spec_dir):
         raise OSError("stdout closed")
 
-    monkeypatch.setattr(core.task_event.TaskEventEmitter, "from_spec_dir", unwritable)
+    monkeypatch.setattr(task_event.TaskEventEmitter, "from_spec_dir", unwritable)
 
     build.run(skip_qa=True)
 
