@@ -40,7 +40,7 @@ class EnvironmentDetector(BaseAnalyzer):
         self._parse_env_files(env_vars)
         self._parse_env_example(env_vars, required_vars)
         self._parse_docker_compose(env_vars)
-        self._parse_code_references(env_vars, optional_vars)
+        self._parse_code_references(env_vars, optional_vars, required_vars)
 
         # Mark required vs optional
         for key in env_vars:
@@ -81,13 +81,18 @@ class EnvironmentDetector(BaseAnalyzer):
                     continue
 
                 # Parse KEY=value or KEY="value" or KEY='value'
-                match = re.match(r"^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$", line)
+                # (`export KEY=value` is the shell form many .env files use)
+                match = re.match(r"^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$", line)
                 if match:
                     key = match.group(1)
                     value = match.group(2).strip().strip('"').strip("'")
 
-                    # Detect if sensitive
-                    is_sensitive = self._is_sensitive_key(key)
+                    # Detect if sensitive: by its name, or a URL that carries
+                    # a password (DATABASE_URL=postgres://app:pw@db/app), which
+                    # was copied as is into the project index.
+                    is_sensitive = self._is_sensitive_key(key) or _has_credentials(
+                        value
+                    )
 
                     # Detect type
                     var_type = self._infer_env_var_type(value)
@@ -114,7 +119,7 @@ class EnvironmentDetector(BaseAnalyzer):
             if not line or line.startswith("#"):
                 continue
 
-            match = re.match(r"^([A-Z_][A-Z0-9_]*)\s*=", line)
+            match = re.match(r"^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=", line)
             if match:
                 key = match.group(1)
                 required_vars.add(key)
@@ -135,21 +140,29 @@ class EnvironmentDetector(BaseAnalyzer):
             if not content:
                 continue
 
-            # Look for environment variables in docker-compose
-            in_env_section = False
+            # Look for environment variables in docker-compose: the list form
+            # (`- KEY=value`) and the mapping form (`KEY: value`), until a line
+            # at the "environment:" key's indentation or above.
+            env_indent: int | None = None
             for line in content.split("\n"):
-                if "environment:" in line:
-                    in_env_section = True
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                indent = len(line) - len(line.lstrip())
+                if re.match(r"^environment\s*:\s*$", stripped):
+                    env_indent = indent
                     continue
 
-                if in_env_section:
+                if env_indent is not None:
                     # Check if we left the environment section
-                    if line and not line.startswith((" ", "\t", "-")):
-                        in_env_section = False
+                    if indent <= env_indent and not stripped.startswith("-"):
+                        env_indent = None
                         continue
 
-                    # Parse - KEY=value or - KEY
-                    match = re.match(r"^\s*-\s*([A-Z_][A-Z0-9_]*)", line)
+                    # Parse - KEY=value, - KEY or KEY: value
+                    match = re.match(r"^-\s*([A-Z_][A-Z0-9_]*)", stripped) or re.match(
+                        r"^([A-Z_][A-Z0-9_]*)\s*:", stripped
+                    )
                     if match:
                         key = match.group(1)
                         if key not in env_vars:
@@ -157,11 +170,16 @@ class EnvironmentDetector(BaseAnalyzer):
                                 "value": None,
                                 "source": compose_file,
                                 "type": "string",
-                                "sensitive": False,
+                                # By name, as in the .env files: a compose
+                                # DB_PASSWORD was listed as not sensitive.
+                                "sensitive": self._is_sensitive_key(key),
                             }
 
     def _parse_code_references(
-        self, env_vars: dict[str, Any], optional_vars: set[str]
+        self,
+        env_vars: dict[str, Any],
+        optional_vars: set[str],
+        required_vars: set[str],
     ) -> None:
         """Scan code for os.getenv() / process.env usage to find optional vars."""
         entry_files = [
@@ -182,29 +200,27 @@ class EnvironmentDetector(BaseAnalyzer):
             if not content:
                 continue
 
-            # Python: os.getenv("VAR") or os.environ.get("VAR")
-            python_patterns = [
-                r'os\.getenv\(["\']([A-Z_][A-Z0-9_]*)["\']',
-                r'os\.environ\.get\(["\']([A-Z_][A-Z0-9_]*)["\']',
-                r'os\.environ\[["\']([A-Z_][A-Z0-9_]*)["\']',
+            # Python: os.getenv("VAR") or os.environ.get("VAR") may be unset;
+            # os.environ["VAR"] raises KeyError without it, so it is required
+            # (it was listed as optional), and read first so that a later
+            # getenv of the same name does not make it optional. JS: process.env.VAR.
+            patterns = [
+                (r'os\.environ\[["\']([A-Z_][A-Z0-9_]*)["\']', True),
+                (r'os\.getenv\(["\']([A-Z_][A-Z0-9_]*)["\']', False),
+                (r'os\.environ\.get\(["\']([A-Z_][A-Z0-9_]*)["\']', False),
+                (r"process\.env\.([A-Z_][A-Z0-9_]*)", False),
             ]
 
-            # JavaScript: process.env.VAR
-            js_patterns = [
-                r"process\.env\.([A-Z_][A-Z0-9_]*)",
-            ]
-
-            for pattern in python_patterns + js_patterns:
-                matches = re.findall(pattern, content)
-                for var_name in matches:
+            for pattern, required in patterns:
+                for var_name in re.findall(pattern, content):
                     if var_name not in env_vars:
-                        optional_vars.add(var_name)
+                        (required_vars if required else optional_vars).add(var_name)
                         env_vars[var_name] = {
                             "value": None,
                             "source": f"code:{entry_file}",
                             "type": "string",
                             "sensitive": self._is_sensitive_key(var_name),
-                            "required": False,
+                            "required": required,
                         }
 
     @staticmethod
@@ -221,3 +237,8 @@ class EnvironmentDetector(BaseAnalyzer):
             "auth",
         ]
         return any(keyword in key.lower() for keyword in sensitive_keywords)
+
+
+def _has_credentials(value: str) -> bool:
+    """A URL with a user and password in it (``scheme://user:pw@host``)."""
+    return bool(re.match(r"^[a-z][a-z0-9+.-]*://[^/@\s]*:[^/@\s]*@", value, re.I))

@@ -309,9 +309,13 @@ export function createEmptyPRLogs(
 }
 
 /**
- * Get PR logs file path
+ * Get PR logs file path. The number comes from the renderer: anything but a
+ * positive integer could name a file outside the project's PR folder.
  */
 export function getPRLogsPath(project: Project, prNumber: number): string {
+	if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+		throw new Error("Invalid PR number");
+	}
 	return path.join(getGitHubDir(project), "pr", `logs_${prNumber}.json`);
 }
 
@@ -319,10 +323,8 @@ export function getPRLogsPath(project: Project, prNumber: number): string {
  * Load PR logs from disk
  */
 export function loadPRLogs(project: Project, prNumber: number): PRLogs | null {
-	const logsPath = getPRLogsPath(project, prNumber);
-
 	try {
-		const rawData = fs.readFileSync(logsPath, "utf-8");
+		const rawData = fs.readFileSync(getPRLogsPath(project, prNumber), "utf-8");
 		const sanitizedData = sanitizeNetworkData(rawData);
 		return JSON.parse(sanitizedData) as PRLogs;
 	} catch {

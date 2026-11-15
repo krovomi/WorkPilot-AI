@@ -176,10 +176,16 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	deleteCheckpoint: async (sessionId: string, checkpointId: string) => {
 		try {
-			await window.electronAPI.deleteTimeTravelCheckpoint(
+			const res = await window.electronAPI.deleteTimeTravelCheckpoint(
 				sessionId,
 				checkpointId,
 			);
+			// The handler answers a refusal rather than throwing it: the
+			// checkpoint is still there, so it stays in the list.
+			if (!res.success) {
+				set({ error: res.error || "Failed to delete checkpoint" });
+				return;
+			}
 			set((s) => ({
 				checkpoints: s.checkpoints.filter((cp) => cp.id !== checkpointId),
 				selectedCheckpoint:
@@ -251,7 +257,11 @@ export const useTimeTravelStore = create<TimeTravelState>((set) => ({
 
 	deleteFork: async (forkId: string) => {
 		try {
-			await window.electronAPI.deleteTimeTravelFork(forkId);
+			const res = await window.electronAPI.deleteTimeTravelFork(forkId);
+			if (!res.success) {
+				set({ error: res.error || "Failed to delete fork" });
+				return;
+			}
 			set((s) => ({
 				forks: s.forks.filter((f) => f.fork_id !== forkId),
 				selectedFork:

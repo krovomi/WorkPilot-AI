@@ -77,7 +77,9 @@ class DependencyGraphCache:
         for path in sorted(self.project_dir.rglob("*")):
             if not path.is_file():
                 continue
-            if any(part in _SKIP_DIRS for part in path.parts):
+            if any(
+                part in _SKIP_DIRS for part in path.relative_to(self.project_dir).parts
+            ):
                 continue
             if path.suffix.lower() not in _SUPPORTED_EXTS:
                 continue
