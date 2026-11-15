@@ -13,12 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
 	gh: "/usr/bin/gh" as string | null,
+	windows: false,
 	auth: { error: null as Error | null, stdout: "", stderr: "" },
 	calls: [] as Array<{ file: string; args: string[]; options: unknown }>,
 }));
 vi.mock("../../../../platform", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../../../platform")>()),
 	findExecutable: (name: string) => (name === "gh" ? state.gh : null),
+	isWindows: () => state.windows,
 }));
 vi.mock("node:child_process", async (importOriginal) => {
 	const original = await importOriginal<typeof import("node:child_process")>();
@@ -31,7 +33,8 @@ vi.mock("node:child_process", async (importOriginal) => {
 	return { ...original, default: { ...original, execFile }, execFile };
 });
 
-import { getPythonPath, validateGitHubModule } from "../subprocess-runner";
+import type { ChildProcess } from "node:child_process";
+import { getPythonPath, killProcessTree, validateGitHubModule } from "../subprocess-runner";
 
 let appRoot: string;
 const backend = () => path.join(appRoot, "apps", "backend");
@@ -48,6 +51,7 @@ beforeEach(() => {
 	appRoot = mkdtempSync(path.join(tmpdir(), "gh-module-"));
 	vi.spyOn(process, "cwd").mockReturnValue(appRoot);
 	state.gh = "/usr/bin/gh";
+	state.windows = false;
 	state.auth = { error: null, stdout: "", stderr: "" };
 	state.calls = [];
 });
@@ -105,5 +109,42 @@ describe("validateGitHubModule", () => {
 		expect(result).toMatchObject({ valid: false, ghAuthenticated: true, pythonEnvValid: false });
 		expect(result.error).toContain("Python virtual environment not found");
 		expect(result.error).toContain(backend());
+	});
+});
+
+describe("killProcessTree", () => {
+	const child = (pid?: number) => ({ pid, kill: vi.fn() }) as unknown as ChildProcess & { kill: ReturnType<typeof vi.fn> };
+
+	it("kills the runner's process group on Unix, or the runner alone when the group is gone", () => {
+		const kill = vi.spyOn(process, "kill").mockImplementation(() => true);
+		const running = child(4242);
+		killProcessTree(running, "SIGTERM");
+		expect(kill).toHaveBeenCalledWith(-4242, "SIGTERM");
+		expect(running.kill).not.toHaveBeenCalled();
+
+		kill.mockImplementation(() => {
+			throw new Error("ESRCH");
+		});
+		killProcessTree(running, "SIGKILL");
+		expect(running.kill).toHaveBeenCalledWith("SIGKILL");
+	});
+
+	it("kills the runner's tree with taskkill on Windows, and says so when it had already exited", () => {
+		state.windows = true;
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+		killProcessTree(child(77), "SIGKILL");
+		expect(state.calls).toEqual([{ file: "taskkill", args: ["/pid", "77", "/T", "/F"], options: undefined }]);
+		expect(warn).not.toHaveBeenCalled();
+
+		state.auth.error = new Error("not found");
+		killProcessTree(child(78), "SIGKILL");
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining("taskkill error"), "not found");
+	});
+
+	it("kills a runner that never got a process id directly", () => {
+		const unborn = child();
+		killProcessTree(unborn, "SIGTERM");
+		expect(unborn.kill).toHaveBeenCalledWith("SIGTERM");
 	});
 });

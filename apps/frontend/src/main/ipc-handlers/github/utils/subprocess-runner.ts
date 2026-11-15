@@ -31,7 +31,7 @@ import {
  * Kill a runner and the processes it started: its process group on Unix
  * (it is spawned detached), its tree through `taskkill` on Windows.
  */
-function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+export function killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
 	if (!child.pid) {
 		child.kill(signal);
 		return;
@@ -62,9 +62,10 @@ function lineReader(onLine: (line: string) => void) {
 	};
 	return {
 		push(text: string) {
-			const lines = (pending + text).split("\n");
-			pending = lines.pop() ?? "";
-			for (const line of lines) emit(line);
+			const combined = pending + text;
+			const end = combined.lastIndexOf("\n");
+			pending = combined.slice(end + 1);
+			if (end >= 0) for (const line of combined.slice(0, end).split("\n")) emit(line);
 		},
 		flush() {
 			emit(pending);
@@ -77,7 +78,7 @@ function lineReader(onLine: (line: string) => void) {
 function runGh(gh: string, args: string[]): Promise<void> {
 	return new Promise((resolve, reject) => {
 		execFile(gh, args, (error, stdout, stderr) => {
-			if (error) reject(Object.assign(error, { output: `${stdout ?? ""}${stderr ?? ""}` }));
+			if (error) reject(Object.assign(error, { output: `${stdout}${stderr}` }));
 			else resolve();
 		});
 	});
@@ -576,7 +577,7 @@ export async function validateGitHubModule(
 	try {
 		await runGh(gh, ["auth", "status"]);
 	} catch (error) {
-		const output = (error as { output?: string }).output ?? "";
+		const { output } = error as { output: string };
 		if (output.includes("not logged in") || output.includes("not authenticated")) {
 			result.error = "GitHub CLI is not authenticated. Run:\n  gh auth login";
 			return result;
