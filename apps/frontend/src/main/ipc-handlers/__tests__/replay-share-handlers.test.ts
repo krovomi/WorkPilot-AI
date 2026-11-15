@@ -16,7 +16,7 @@ const dialogs = vi.hoisted(() => ({
 const files = vi.hoisted(() => ({
 	writeFile: vi.fn(async () => undefined),
 	readFile: vi.fn(async () => Buffer.from("bundle")),
-	stat: vi.fn(async () => ({ isFile: () => true, size: 6 })),
+	stat: vi.fn(async () => ({ isFile: (): boolean => true, size: 6 })),
 }));
 
 vi.mock("electron", () => ({
