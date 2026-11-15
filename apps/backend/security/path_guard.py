@@ -127,6 +127,10 @@ PROTECTED_CONFIG_NAMES: tuple[str, ...] = (
     # The person's line comments and their status (`foundation/review_comments.py`):
     # an agent that could write it would mark its own work reviewed.
     "review-comments.json",
+    # The lessons the person turned off for this task (`learning_loop/applied.py`):
+    # an agent that could write it would lift the project's adopted rules from
+    # every later prompt of its own task.
+    "applied_lessons.json",
 )
 
 #: Why a protected file that is not security configuration is refused.
@@ -145,6 +149,11 @@ _REFUSAL_REASONS: dict[str, str] = {
         "it holds the person's line comments on the review and their status; "
         "WorkPilot marks what your session changed. Fix the code the comments "
         "point to, and say in your output what you did."
+    ),
+    "applied_lessons.json": (
+        "it records the lessons WorkPilot gave this task's prompts and the ones "
+        "the person turned off; only WorkPilot and the person write it. If a "
+        "lesson does not fit this task, say so in your output."
     ),
 }
 
