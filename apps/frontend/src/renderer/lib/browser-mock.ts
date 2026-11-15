@@ -306,6 +306,14 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		mergePR: async () => true,
 		assignPR: async () => true,
 		markReviewPosted: async () => true,
+		setReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
+		getReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
 		getPRReview: async () => null,
 		getPRReviewsBatch: async () => ({}),
 		deletePRReview: async () => true,

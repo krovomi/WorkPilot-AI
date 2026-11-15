@@ -72,6 +72,8 @@ export const IPC_CHANNELS = {
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
 	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
 	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
+	TASK_LESSONS_GET: "task:lessonsGet", // The lessons the task's prompts carried, from every spec dir copy
+	TASK_LESSONS_SET_DISABLED: "task:lessonsSetDisabled", // Turn one lesson off (or back on) for this task, in every spec dir copy
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
 	TASK_PERMISSION_REQUEST: "task:permissionRequest", // Event (main -> renderer): an ACP agent asks before it acts (PERMISSION_REQUESTED, validated)
 	TASK_PERMISSION_CLEARED: "task:permissionCleared", // Event (main -> renderer): that question is answered, timed out or its process is gone
@@ -535,6 +537,9 @@ export const IPC_CHANNELS = {
 	GITHUB_PR_CHECK_MERGE_READINESS: "github:pr:checkMergeReadiness",
 	GITHUB_PR_MARK_REVIEW_POSTED: "github:pr:markReviewPosted",
 	GITHUB_PR_UPDATE_BRANCH: "github:pr:updateBranch",
+	// Accept / reject / not applicable on a review finding (#361)
+	GITHUB_PR_REVIEW_FEEDBACK_SET: "github:pr:reviewFeedback:set",
+	GITHUB_PR_REVIEW_FEEDBACK_GET: "github:pr:reviewFeedback:get",
 
 	// GitHub PR Review events (main -> renderer)
 	GITHUB_PR_REVIEW_PROGRESS: "github:pr:reviewProgress",

@@ -104,6 +104,39 @@ class EnvironmentCapture:
         }
 
 
+def _split_image(reference: str) -> tuple[str, str]:
+    """``registry:5000/app:1.2`` -> (``registry:5000/app``, ``1.2``).
+
+    The tag is what follows the last ``:`` *after* the last ``/``: a registry
+    port is not a tag (``localhost:5000/app`` used to become image
+    ``localhost``, tag ``5000/app``).
+    """
+    name, sep, tag = reference.rpartition(":")
+    if sep and "/" not in tag:
+        return name, tag
+    return reference, "latest"
+
+
+def _parse_port(entry: Any) -> dict[str, int] | None:
+    """One compose ``ports`` entry -> ``{"host", "container"}``, or None.
+
+    Short syntax ``"8080:80"``, ``"127.0.0.1:8080:80"``, ``"8080:80/tcp"``
+    and the long syntax ``{target, published}``; a port with no host side is
+    not reachable from the host and is left out.
+    """
+    if isinstance(entry, dict):
+        published, target = entry.get("published"), entry.get("target")
+    else:
+        parts = str(entry).split("/")[0].split(":")
+        if len(parts) < 2:
+            return None
+        published, target = parts[-2], parts[-1]
+    try:
+        return {"host": int(published), "container": int(target)}
+    except (TypeError, ValueError):
+        return None
+
+
 def _sanitize_env_value(key: str, value: str) -> str:
     """Replace secret-looking values with placeholders."""
     if _SECRET_PATTERNS.search(key):
@@ -147,15 +180,16 @@ class EnvironmentCapturer:
             import yaml
 
             with open(compose_path, encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+                # An empty file loads as None, an empty section too.
+                data = yaml.safe_load(f) or {}
 
-            for name, config in data.get("services", {}).items():
+            for name, config in (data.get("services") or {}).items():
                 if not isinstance(config, dict):
                     continue
                 services.append(self._parse_compose_service(name, config))
 
-            networks = list(data.get("networks", {}).keys())
-            volumes = list(data.get("volumes", {}).keys())
+            networks = list(data.get("networks") or {})
+            volumes = list(data.get("volumes") or {})
 
         except ImportError:
             # Fallback: basic parsing without pyyaml
@@ -300,20 +334,11 @@ class EnvironmentCapturer:
         self, name: str, config: dict[str, Any]
     ) -> ServiceCapture:
         """Parse a single service from compose YAML data."""
-        image = config.get("image", "")
-        tag = "latest"
-        if ":" in image:
-            image, tag = image.rsplit(":", 1)
+        image, tag = _split_image(config.get("image", ""))
 
-        ports: list[dict[str, int]] = []
-        for p in config.get("ports", []):
-            port_str = str(p)
-            if ":" in port_str:
-                try:
-                    host, container = port_str.split(":")[:2]
-                    ports.append({"host": int(host), "container": int(container)})
-                except (ValueError, IndexError):
-                    pass
+        ports = [
+            port for port in (_parse_port(p) for p in config.get("ports") or []) if port
+        ]
 
         environment: dict[str, str] = {}
         env_config = config.get("environment", {})
@@ -327,9 +352,8 @@ class EnvironmentCapturer:
                     environment[k] = _sanitize_env_value(k, v)
 
         volumes = [str(v) for v in config.get("volumes", [])]
-        depends_on = list(config.get("depends_on", []))
-        if isinstance(depends_on, dict):
-            depends_on = list(depends_on.keys())
+        # A list, or the long syntax (a mapping of service -> condition)
+        depends_on = list(config.get("depends_on") or [])
 
         health_check: dict[str, Any] = {}
         hc = config.get("healthcheck", {})
@@ -361,17 +385,30 @@ class EnvironmentCapturer:
         )
 
     def _parse_compose_basic(self, compose_path: Path) -> list[ServiceCapture]:
-        """Basic compose parsing without pyyaml."""
+        """Basic compose parsing without pyyaml: the keys directly under ``services:``.
+
+        The first indented line fixes the service indentation (two spaces, four,
+        a tab); the block ends at the next top-level key.
+        """
         services: list[ServiceCapture] = []
         content = compose_path.read_text(encoding="utf-8")
-        lines = content.split("\n")
         in_services = False
-        for line in lines:
-            if line.strip() == "services:":
-                in_services = True
+        indent: str | None = None
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
                 continue
-            if in_services and line.startswith("  ") and not line.startswith("    "):
-                name = line.strip().rstrip(":")
+            if not line[0].isspace():
+                in_services = stripped == "services:"
+                indent = None
+                continue
+            if not in_services:
+                continue
+            current = line[: len(line) - len(line.lstrip())]
+            if indent is None:
+                indent = current
+            if current == indent and ":" in stripped:
+                name = stripped.split(":", 1)[0].strip().strip("'\"")
                 if name:
                     services.append(ServiceCapture(name=name))
         return services
@@ -398,10 +435,7 @@ class EnvironmentCapturer:
             config = info.get("Config", {})
 
             # Parse image and tag
-            img = config.get("Image", image)
-            tag = "latest"
-            if ":" in img:
-                img, tag = img.rsplit(":", 1)
+            img, tag = _split_image(config.get("Image", image))
 
             # Parse environment
             environment: dict[str, str] = {}

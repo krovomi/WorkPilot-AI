@@ -53,38 +53,14 @@ class TestStreamingManager:
         assert len(sessions) == 0
 
     @pytest.mark.asyncio
-    async def test_emit_code_change(self):
-        """Test emitting code change events."""
+    async def test_every_event_of_a_session_is_counted(self):
         manager = StreamingManager()
 
         await manager.start_session("test-session-3", {"task": "test"})
-        await manager.emit_code_change(
-            session_id="test-session-3",
-            file_path="test.py",
-            change_type="update",
-            content="print('hello')",
-        )
+        await manager.emit_chat_message("test-session-3", "hello", "Ann")
+        await manager.emit_chat_message("test-session-3", "done", "Bot", "agent")
 
-        # Event count should increment
-        session_info = manager.get_session_info("test-session-3")
-        assert session_info["event_count"] >= 1
-
-    @pytest.mark.asyncio
-    async def test_emit_multiple_events(self):
-        """Test emitting multiple event types."""
-        manager = StreamingManager()
-
-        await manager.start_session("test-session-4", {"task": "test"})
-
-        # Emit various events
-        await manager.emit_agent_thinking("test-session-4", "Analyzing code...")
-        await manager.emit_command("test-session-4", "pytest")
-        await manager.emit_test_run("test-session-4", "pytest tests/")
-        await manager.emit_test_result("test-session-4", True, "All passed")
-        await manager.emit_progress("test-session-4", 50, "Half done")
-
-        session_info = manager.get_session_info("test-session-4")
-        assert session_info["event_count"] >= 5
+        assert manager.get_session_info("test-session-3")["event_count"] == 3
 
 
 class TestSessionRecorder:

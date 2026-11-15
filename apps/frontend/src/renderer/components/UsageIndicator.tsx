@@ -255,22 +255,14 @@ export function UsageIndicator() {
 	 * Uses optimistic UI update for immediate feedback, then fetches fresh data
 	 */
 	const handleSwapProfile = useCallback(
-		async (e: React.MouseEvent, profileId: string) => {
+		async (e: React.MouseEvent, targetProfile: ProfileUsageSummary) => {
 			e.preventDefault();
 			e.stopPropagation();
+			const profileId = targetProfile.profileId;
 
 			// Capture previous state for revert (before any changes)
 			const previousUsage = usage;
 			const previousOtherProfiles = otherProfiles;
-
-			// Find the profile we're swapping to
-			const targetProfile = otherProfiles.find(
-				(p) => p.profileId === profileId,
-			);
-			if (!targetProfile) {
-				console.error("[UsageIndicator] Target profile not found:", profileId);
-				return;
-			}
 
 			// Optimistic update: immediately swap profiles in the UI
 			// 1. Convert a current active profile to a ProfileUsageSummary for the "other" list
@@ -469,11 +461,7 @@ export function UsageIndicator() {
 
 	// Real-time polling effect - refresh usage data every 30 seconds
 	useEffect(() => {
-		// Clear any existing interval
-		if (pollingIntervalRef.current) {
-			clearInterval(pollingIntervalRef.current);
-		}
-
+		// The previous run's cleanup already cleared its interval.
 		// Helper to fetch and apply fresh usage data (uses deduplicated fetch)
 		const fetchAndApplyUsage = async () => {
 			await fetchUsageDeduplicated(selectedProvider);
@@ -678,23 +666,7 @@ export function UsageIndicator() {
 	if (!isAvailable || !usage) {
 		const needsReauth = activeProfileNeedsReauth;
 
-		// Debug: Log current provider and known providers
-
-		// Debug OpenAI
 		if (selectedProvider?.toLowerCase() === "openai") {
-			const globalAny = globalThis as Record<string, unknown>;
-			let debugProfiles: Array<{
-				name: string;
-				baseUrl: string;
-				detectedProvider: string;
-			}> = [];
-			if (typeof globalThis !== "undefined" && globalAny.debugProfiles) {
-				debugProfiles = globalAny.debugProfiles as typeof debugProfiles;
-			}
-			const openaiError =
-				typeof globalThis === "undefined"
-					? undefined
-					: (globalAny.lastOpenAIUsageError as string | undefined);
 			return (
 				<TooltipProvider delayDuration={200}>
 					<Tooltip>
@@ -728,31 +700,6 @@ export function UsageIndicator() {
 										</a>
 									</span>
 								</p>
-								{openaiError && (
-									<div className="mt-2 p-1 bg-destructive/10 border border-destructive/30 rounded text-3xs text-destructive">
-										<b>{t("common:usage.openaiError")}</b> {openaiError}
-									</div>
-								)}
-								<div className="mt-2 p-1 bg-muted/30 rounded text-3xs">
-									<b>{t("common:usage.debugProfiles")}</b>
-									<ul>
-										{debugProfiles.length > 0 ? (
-											debugProfiles.map((p) => (
-												<li key={`${p.name}-${p.baseUrl}`}>
-													{p.name} | {p.baseUrl} | {t("common:usage.debugProvider")}{" "}
-													{p.detectedProvider}
-												</li>
-											))
-										) : (
-											<li>{t("common:usage.noProfileDetected")}</li>
-										)}
-									</ul>
-									<div>
-										{t("common:usage.selectedProvider", {
-											provider: selectedProvider,
-										})}
-									</div>
-								</div>
 							</div>
 						</TooltipContent>
 					</Tooltip>
@@ -1236,7 +1183,7 @@ export function UsageIndicator() {
 											rateLimitEvents: [],
 										}}
 										isActive={false}
-										onClick={(e) => handleSwapProfile(e, profile.profileId)}
+										onClick={(e) => handleSwapProfile(e, profile)}
 									/>
 								);
 							})}
