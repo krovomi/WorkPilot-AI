@@ -195,6 +195,10 @@ import {
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import {
+	createMemoryLifecycleAPI,
+	type MemoryLifecycleAPI,
+} from "./modules/memory-lifecycle-api";
 import type { McpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
@@ -206,6 +210,8 @@ import type { QuickCommandAPI } from "./modules/quick-command-api";
 import { createQuickCommandAPI } from "./modules/quick-command-api";
 import type { MissionControlAPI } from "./modules/mission-control-api";
 import { createMissionControlAPI } from "./modules/mission-control-api";
+import type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+import { createConflictWavesAPI } from "./modules/conflict-waves-api";
 import type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 import type { PipelineGeneratorAPI } from "./modules/pipeline-generator-api";
@@ -298,6 +304,7 @@ export interface ElectronAPI
 		AppEmulatorAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		MemoryLifecycleAPI,
 		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
@@ -306,6 +313,7 @@ export interface ElectronAPI
 		PairProgrammingAPI,
 		QuickCommandAPI,
 		MissionControlAPI,
+		ConflictWavesAPI,
 		PipelineGeneratorAPI,
 		ArenaAPI,
 		TestGenerationAPI,
@@ -455,6 +463,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAppEmulatorAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMemoryLifecycleAPI(),
 		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),
@@ -463,6 +472,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createPairProgrammingAPI(),
 		...createQuickCommandAPI(),
 		...createMissionControlAPI(),
+		...createConflictWavesAPI(),
 		...createPipelineGeneratorAPI(),
 		...createArenaAPI(),
 		...createTestGenerationAPI(),
@@ -633,6 +643,8 @@ export type { QuickCommandAPI } from "./modules/quick-command-api";
 export { createQuickCommandAPI } from "./modules/quick-command-api";
 export type { MissionControlAPI } from "./modules/mission-control-api";
 export { createMissionControlAPI } from "./modules/mission-control-api";
+export type { ConflictWavesAPI } from "./modules/conflict-waves-api";
+export { createConflictWavesAPI } from "./modules/conflict-waves-api";
 export type { PerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPerformanceProfilerAPI } from "./modules/performance-profiler-api";
 export { createPromptOptimizerAPI } from "./modules/prompt-optimizer-api";
