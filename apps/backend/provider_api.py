@@ -64,8 +64,6 @@ except ImportError:  # pragma: no cover - alternate package layout
 PROVIDER_CONFIG_NOT_FOUND = "Provider config not found"
 API_KEY_VALIDATION_FAILED_INVALID = "API key validation failed: invalid key"
 API_KEY_VALIDATION_FAILED_ERROR = "API key validation failed: {e}"
-HOOK_NOT_FOUND = "Hook not found"
-TEMPLATE_NOT_FOUND = "Template not found"
 GITHUB_CLI_AUTH_SUCCESS = "Logged in to github.com"
 API_MODELS_ENDPOINT = "/v1/models"
 

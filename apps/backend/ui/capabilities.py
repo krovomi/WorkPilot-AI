@@ -12,6 +12,8 @@ import io
 import os
 import sys
 
+from foundation.platform import is_windows
+
 
 def enable_windows_ansi_support() -> bool:
     """
@@ -23,7 +25,7 @@ def enable_windows_ansi_support() -> bool:
     Returns:
         True if ANSI support was enabled, False otherwise
     """
-    if sys.platform != "win32":
+    if not is_windows():
         return True  # Non-Windows always has ANSI support
 
     try:
@@ -80,7 +82,7 @@ def configure_safe_encoding() -> None:
     1. Regular console output (reconfigure method)
     2. Piped output from subprocess (TextIOWrapper replacement)
     """
-    if sys.platform != "win32":
+    if not is_windows():
         return
 
     # Method 1: Try reconfigure (works for TTY)
