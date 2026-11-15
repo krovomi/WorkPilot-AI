@@ -9,7 +9,9 @@ from integrations.jev.runtime import JevRun
 from spec.phases.executor import PhaseExecutor
 
 
-def test_spec_planning_evaluates_before_script_without_env_key(tmp_path, monkeypatch):
+def test_spec_planning_evaluates_before_the_planner_without_env_key(
+    tmp_path, monkeypatch
+):
     monkeypatch.setenv("TYPESAFE_API_KEY", "private-jev")
     monkeypatch.setenv("WORKPILOT_JEV_ENABLED", "1")
     run = JevRun.from_env(JevContext("feature-build", tmp_path, tmp_path))
@@ -28,7 +30,7 @@ def test_spec_planning_evaluates_before_script_without_env_key(tmp_path, monkeyp
         jev_run=run,
     )
 
-    def script(*args):
+    async def planner(*args, **kwargs):
         assert "TYPESAFE_API_KEY" not in os.environ
         assert run.evaluate.await_count == 1
         (tmp_path / "implementation_plan.json").write_text(
@@ -36,7 +38,7 @@ def test_spec_planning_evaluates_before_script_without_env_key(tmp_path, monkeyp
         )
         return True, ""
 
-    monkeypatch.setattr(executor, "_run_script", script)
+    executor.run_agent_fn = planner
     assert asyncio.run(executor.phase_planning()).success
     assert run.has_credential
 

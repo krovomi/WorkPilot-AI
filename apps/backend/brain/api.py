@@ -11,6 +11,7 @@ the server's and not the tenant's.
 | ``GET /task`` | what the brain learned on one Kanban task — the task panel's card |
 | ``POST /instruction`` | activate or turn down an instruction an agent proposed |
 | ``POST /sync``, ``POST /recall``, ``POST /learn``, ``GET /status`` | the rest |
+| ``/memory/*`` | the memory's journal, trash, pins and conflicts (`lifecycle/api.py`) |
 
 **The folder chosen here stays under the user's home directory.** The backend
 listens on localhost, and a page open in a browser can send it a request: an
@@ -585,6 +586,7 @@ def sync(request: SyncRequest) -> dict:
         "pushed": result.pushed,
         "remote": result.remote,
         "conflicts": list(result.conflicts),
+        "memory_conflicts": dict(result.memory_conflicts),
         "skipped": result.skipped,
         "error": code,
         "code": code,
@@ -621,3 +623,10 @@ def learn(request: LearnRequest) -> dict:
         tags=request.tags,
     )
     return {"success": rel is not None, "path": rel}
+
+
+# The memory's lifecycle (journal, trash, pins, conflicts): its own module,
+# under this router so it is mounted, and refused in server mode, with it.
+from .lifecycle.api import router as _lifecycle_router  # noqa: E402
+
+router.include_router(_lifecycle_router)
