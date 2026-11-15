@@ -67,6 +67,17 @@ class TestRecordFile:
             tmp_path / f"scores_{record_id}.json"
         )
 
+    def test_a_record_that_links_out_of_the_store_is_not_one(self, tmp_path):
+        store = tmp_path / "store"
+        store.mkdir()
+        (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
+        try:
+            (store / "s1.json").symlink_to(tmp_path / "elsewhere.json")
+        except OSError:
+            pytest.skip("this system does not let the test create a symlink")
+
+        assert record_file(store, "s1") is None
+
     def test_a_store_reached_through_a_link_still_names_its_own_files(self, tmp_path):
         real = tmp_path / "real"
         real.mkdir()
@@ -134,6 +145,24 @@ class TestStorage:
             engine._save_checkpoints("../x", [])
         with pytest.raises(ValueError):
             engine._save_decision_scores("../x", [])
+
+    def test_records_are_never_read_under_another_name(self, store):
+        root, _recorder, engine = store
+        (root / "data" / "replays" / "scores_x.json").write_text("[]", encoding="utf-8")
+
+        assert engine._load_checkpoints("../time_travel/x") == []
+        assert engine._load_decision_scores("../x") == []
+        assert engine.get_fork("../time_travel/x") is None
+
+    def test_checkpoints_and_scores_round_trip(self, store):
+        _root, _recorder, engine = store
+
+        engine._save_checkpoints("s1", [])
+        engine._save_decision_scores("s1", [])
+
+        assert engine._load_checkpoints("s1") == []
+        assert engine._load_decision_scores("s1") == []
+        assert (engine._checkpoints_dir / "s1.json").exists()
 
     def test_a_valid_record_round_trips(self, store):
         _root, recorder, engine = store
