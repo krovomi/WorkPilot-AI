@@ -73,9 +73,10 @@ import fnmatch
 import logging
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Any
+
+from .scratch_dir import workpilot_scratch_dir
 
 logger = logging.getLogger(__name__)
 
@@ -301,16 +302,6 @@ def protected_config_refusal(path: str, base: Path | None) -> str | None:
         "command or a permission it does not have, say so in your output and "
         "leave the change to the user."
     )
-
-
-def workpilot_scratch_dir() -> Path:
-    """The one directory under the system temp root a build may write to.
-
-    Kept narrow deliberately: `tempfile.gettempdir()` is shared with every
-    process on the machine, and naming it as a root would also re-open a
-    worktree that happens to sit under it.
-    """
-    return Path(tempfile.gettempdir()) / "workpilot"
 
 
 def _resolved(path: Path | str) -> Path | None:

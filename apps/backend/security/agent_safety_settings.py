@@ -14,6 +14,7 @@ Pure (no I/O beyond the environment); read by ``security.sandbox``,
 from __future__ import annotations
 
 import json
+import math
 import os
 import posixpath
 from dataclasses import dataclass, field
@@ -99,7 +100,7 @@ def _number(
     value = raw.get(key)
     if isinstance(value, bool) or not isinstance(value, int | float):
         return default
-    if value != value:  # NaN
+    if math.isnan(value):
         return default
     return float(min(max(value, low), high))
 

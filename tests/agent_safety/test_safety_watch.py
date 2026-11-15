@@ -56,7 +56,8 @@ def test_tool_calls_of_every_provider_become_events(tmp_path: Path):
 def test_paths_inside_the_project_are_relative_and_resolved(tmp_path: Path):
     assert event_path("src/../README.md", tmp_path) == "README.md"
     outside = event_path("../../etc/passwd", tmp_path)
-    assert outside.startswith("/") and outside.endswith("etc/passwd")
+    # Absolute, forward slashes on every system (``C:/…`` on Windows).
+    assert outside == (tmp_path / "../../etc/passwd").resolve().as_posix()
 
 
 # -- snapshot and score ----------------------------------------------------------

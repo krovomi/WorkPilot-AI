@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from .agent_safety_settings import SandboxSettings, load_settings
-from .path_guard import workpilot_scratch_dir
+from .scratch_dir import workpilot_scratch_dir
 
 MODE_NORMAL = "normal"
 MODE_RESTRICTED = "restricted"
