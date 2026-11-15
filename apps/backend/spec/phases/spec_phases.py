@@ -15,19 +15,31 @@ if TYPE_CHECKING:
     pass
 
 
-def learning_context_for(project_dir, agent_type: str) -> str:
+def learning_context_for(project_dir, agent_type: str, spec_dir=None) -> str:
     """What the Learning Loop learned for `agent_type`, as a prompt block or "".
 
     The spec writer and its critic decide what is to be done, the job the
     planner's lessons are about (`learning_loop.prompt_injection`, both map to
     the `planning` phase). Before this, nothing in `spec/` asked for them, so a
     lesson the planner adopted was missing from the spec that frames its plan.
+
+    With the task's ``spec_dir``, the lessons its person turned off are left
+    out, what the prompt carried is recorded for the task panel, and the
+    checkpoints of the task's kind (``tasks.metadata``, written by
+    ``classify_spec`` before the spec) come along when this repository's QA
+    history asks for them (``learning_loop.kind_checkpoints``).
     Never raises: a spec is written with or without lessons.
     """
     from learning_loop.prompt_injection import context_for_agent
 
+    kind = None
+    if spec_dir is not None:
+        from tasks.metadata import read_task_metadata
+
+        value = read_task_metadata(spec_dir).get("kind")
+        kind = value if isinstance(value, str) else None
     # context_for_agent answers "" on any error of its own.
-    context = context_for_agent(project_dir, agent_type)
+    context = context_for_agent(project_dir, agent_type, spec_dir=spec_dir, kind=kind)
     return f"\n\n{context}" if context else ""
 
 
@@ -68,7 +80,7 @@ Create:
                 "spec_quick.md",
                 additional_context=context_str
                 + ("\n\n" + jev_advice if jev_advice else "")
-                + learning_context_for(self.project_dir, "spec_writer"),
+                + learning_context_for(self.project_dir, "spec_writer", self.spec_dir),
                 phase_name="quick_spec",
             )
 
@@ -204,7 +216,7 @@ It's OK to make reasonable assumptions to create a complete spec. The goal is to
             success, output = await self.run_agent_fn(
                 "spec_writer.md",
                 additional_context=additional_context
-                + learning_context_for(self.project_dir, "spec_writer"),
+                + learning_context_for(self.project_dir, "spec_writer", self.spec_dir),
                 phase_name="spec_writing",
             )
 
@@ -260,7 +272,9 @@ It's OK to make reasonable assumptions to create a complete spec. The goal is to
             except Exception:
                 pass
 
-        # Create a basic but complete spec
+        # A basic but complete spec, in no particular stack: it used to
+        # prescribe Python ("python -m src.main", a "Backend Service" on port
+        # 8000) to every project, whatever it was written in.
         fallback_spec = f"""# Specification: {task_desc[:50]}{"..." if len(task_desc) > 50 else ""}
 
 ## Overview
@@ -276,7 +290,7 @@ This task addresses: {task_desc}
 ## Task Scope
 
 ### Services Involved
-- **Backend Service** (primary) - Main implementation service
+- To be determined from project_index.json
 
 ### This Task Will:
 - [ ] Implement the requirements described in the task
@@ -289,23 +303,15 @@ This task addresses: {task_desc}
 
 ## Service Context
 
-### Backend Service
+**Tech Stack:** the languages and frameworks listed in project_index.json.
 
-**Tech Stack:**
-- Language: Python
-- Framework: Based on project structure
-
-**How to Run:**
-```bash
-# Standard Python run commands
-python -m src.main
-```
+**How to Run:** the project's own run commands (project_index.json, README).
 
 ## Files to Modify
 
 | File | Service | What to Change |
 |------|---------|---------------|
-| *To be determined* | Backend | Implementation based on task requirements |
+| *To be determined* | *To be determined* | Implementation based on task requirements |
 
 ## Files to Reference
 
@@ -353,13 +359,7 @@ Follow existing codebase patterns for:
 
 ### Start Services
 
-```bash
-# Start the application as per project conventions
-python -m src.main
-```
-
-### Service URLs
-- Backend: http://localhost:8000 (typical)
+Start the application with the project's own commands (project_index.json, README).
 
 ## Success Criteria
 
@@ -383,7 +383,7 @@ The task is complete when:
 ### Integration Tests
 | Test | Services | What to Verify |
 |------|----------|----------------|
-| Integration test | Backend | Component interaction |
+| Integration test | *To be determined* | Component interaction |
 
 ### QA Sign-off Requirements
 - [ ] All unit tests pass
@@ -412,11 +412,10 @@ The task is complete when:
                 "self_critique", False, [], ["spec.md does not exist"], 0
             )
 
+        # is_placeholder reads the file and answers True for one that is
+        # unreadable, not JSON or not an object: past it, this one is all three.
         if critique_file.exists() and not validator.is_placeholder(critique_file):
-            try:
-                critique = json.loads(critique_file.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                critique = {}
+            critique = json.loads(critique_file.read_text(encoding="utf-8"))
             if critique.get("issues_fixed", False) or critique.get(
                 "no_issues_found", False
             ):
@@ -456,7 +455,9 @@ Output critique_report.json with:
             success, output = await self.run_agent_fn(
                 "spec_critic.md",
                 additional_context=context_str
-                + learning_context_for(self.project_dir, "spec_self_critique"),
+                + learning_context_for(
+                    self.project_dir, "spec_self_critique", self.spec_dir
+                ),
                 phase_name="self_critique",
             )
 

@@ -1,6 +1,5 @@
 import { AlertCircle, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
-import { initializeMRReviewListeners } from "../../stores/gitlab";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { CreateMergeRequestDialog } from "./components/CreateMergeRequestDialog";
 import { MergeRequestList } from "./components/MergeRequestList";
@@ -22,11 +21,6 @@ export function GitLabMergeRequests({
 		"opened" | "closed" | "merged" | "all"
 	>("opened");
 	const [showCreateDialog, setShowCreateDialog] = useState(false);
-
-	// Initialize MR review listeners on mount
-	useEffect(() => {
-		initializeMRReviewListeners();
-	}, []);
 
 	// Use the new hook for MR state management
 	const {

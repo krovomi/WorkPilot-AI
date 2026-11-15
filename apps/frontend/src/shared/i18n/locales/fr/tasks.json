@@ -842,7 +842,11 @@
 					"bug_fix": "Correction de bug",
 					"refactoring": "Refactoring",
 					"documentation": "Documentation",
-					"security": "Sécurité"
+					"security": "Sécurité",
+					"performance": "Performance",
+					"ui_ux": "UI/UX",
+					"infrastructure": "Infrastructure",
+					"testing": "Tests"
 				},
 				"priority": {
 					"low": "Basse",
@@ -2565,6 +2569,31 @@
 		"tooLow": "Le plafond doit dépasser les {{spent}} déjà dépensés",
 		"saveFailed": "Le plafond n'a pas pu être enregistré",
 		"resumed": "Plafond relevé à {{limit}}, la tâche reprend"
+	},
+	"appliedLessons": {
+		"title_one": "{{count}} leçon appliquée à cette tâche",
+		"title_other": "{{count}} leçons appliquées à cette tâche",
+		"description": "Ce que la boucle d'apprentissage a donné aux agents de cette tâche : les règles adoptées en revue, les motifs appris des builds précédents, et les points de contrôle du type de tâche quand l'historique QA de ce dépôt les demande.",
+		"disabledCount": "{{count}} désactivée(s)",
+		"show": "Afficher",
+		"hide": "Masquer",
+		"kind": {
+			"rule": "Règle",
+			"pattern": "Motif",
+			"checkpoint": "Point de contrôle"
+		},
+		"patternType": {
+			"success": "à appliquer",
+			"failure": "à éviter",
+			"optimization": "astuce"
+		},
+		"confidence": "confiance {{value}}",
+		"agents": "Donnée à",
+		"off": "Désactivée pour cette tâche",
+		"disable": "Désactiver pour cette tâche",
+		"enable": "Réactiver",
+		"disabledHint": "Les prochains prompts de cette tâche la laissent de côté ; les autres tâches la gardent.",
+		"error": "Impossible de modifier la leçon : {{error}}"
 	},
 	"breakerPause": {
 		"chip": "Coupe-circuit : {{tool}}",

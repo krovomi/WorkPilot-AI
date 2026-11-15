@@ -341,12 +341,20 @@ class PullRequestFileChange:
         Returns:
             A PullRequestFileChange instance populated from the API response.
         """
+        # The SDK's GitPullRequestChange maps only ``changeTrackingId``:
+        # msrest leaves ``item``, ``changeType`` and ``originalPath`` in
+        # ``additional_properties``, under the API's own names.
+        extra = getattr(api_change, "additional_properties", None) or {}
+        item = getattr(api_change, "item", None) or extra.get("item") or {}
+        source = getattr(api_change, "source", None) or {}
+        additions = getattr(api_change, "additions", 0)
+        deletions = getattr(api_change, "deletions", 0)
         return cls(
-            path=getattr(api_change, "item", {}).get("path", ""),
-            change_type=getattr(api_change, "change_type", ""),
-            additions=getattr(api_change, "additions", 0),
-            deletions=getattr(api_change, "deletions", 0),
-            changes=getattr(api_change, "additions", 0)
-            + getattr(api_change, "deletions", 0),
-            old_path=getattr(api_change, "source", {}).get("path", None),
+            path=item.get("path", ""),
+            change_type=getattr(api_change, "change_type", None)
+            or extra.get("changeType", ""),
+            additions=additions,
+            deletions=deletions,
+            changes=additions + deletions,
+            old_path=source.get("path") or extra.get("originalPath"),
         )
