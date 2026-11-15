@@ -213,6 +213,5 @@ export const FILE_EXEMPTIONS: Readonly<
  * entry. Counts may only go down.
  */
 export const PENDING: Readonly<Record<string, number>> = {
-	"components/task-detail/TaskDetailModal.tsx": 1,
 	"components/task-detail/GoalCard.tsx": 1,
 };

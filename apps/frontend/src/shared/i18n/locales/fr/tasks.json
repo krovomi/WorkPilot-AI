@@ -1218,6 +1218,7 @@
 			"stopTask": "Arrêter la tâche",
 			"startTask": "Démarrer la tâche",
 			"deleteTask": "Supprimer la tâche",
+			"edit": "Modifier la tâche",
 			"close": "Fermer",
 			"watchLive": "Regarder en direct",
 			"activating": "Activation...",
