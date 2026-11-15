@@ -27,7 +27,16 @@
  *   invoke TASK_LESSONS_SET_DISABLED (taskId, lessonId, disabled) → IPCResult<AppliedLessonsState>
  */
 
-import { lstatSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+	closeSync,
+	constants,
+	fstatSync,
+	lstatSync,
+	openSync,
+	readFileSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
@@ -54,15 +63,30 @@ const MAX_DISABLED = 200;
 
 type Raw = Record<string, unknown>;
 
-/** The file of one copy, or `{}` when it is absent, a link, or not an object. */
+/**
+ * The file of one copy, or `{}` when it is absent, a link, or not an object.
+ *
+ * Checked on the descriptor that is read, so nothing can swap a link in
+ * between the check and the read. O_NOFOLLOW refuses a link where it exists;
+ * Windows has none (the constant is undefined there, which `|` reads as 0),
+ * so the name must still be the very file that was opened.
+ */
 export function readAppliedFile(dir: string): Raw {
 	const file = path.join(dir, APPLIED_FILE);
+	let fd: number | null = null;
 	try {
-		if (!lstatSync(file).isFile()) return {};
-		const data: unknown = JSON.parse(readFileSync(file, "utf-8"));
+		fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+		const opened = fstatSync(fd);
+		const named = lstatSync(file);
+		if (!opened.isFile() || !named.isFile() || named.ino !== opened.ino || named.dev !== opened.dev) {
+			return {};
+		}
+		const data: unknown = JSON.parse(readFileSync(fd, "utf-8"));
 		return data && typeof data === "object" && !Array.isArray(data) ? (data as Raw) : {};
 	} catch {
 		return {};
+	} finally {
+		if (fd !== null) closeSync(fd);
 	}
 }
 

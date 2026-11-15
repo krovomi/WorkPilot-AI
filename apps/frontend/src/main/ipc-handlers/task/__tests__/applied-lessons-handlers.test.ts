@@ -51,6 +51,7 @@ vi.mock("../../../server-board-actions", () => ({
 import {
 	APPLIED_FILE,
 	mergeApplied,
+	readAppliedFile,
 	registerAppliedLessonsHandlers,
 } from "../applied-lessons-handlers";
 
@@ -146,6 +147,11 @@ describe("applied lessons handlers", () => {
 		await call(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, "t1", RULE.id, true);
 		expect(JSON.parse(readFileSync(outside, "utf-8")).disabled).toEqual([]);
 		expect(lstatSync(file(state.dirs.main)).isSymbolicLink()).toBe(false);
+	});
+
+	it("reads nothing from a folder in the file's place", async () => {
+		mkdirSync(file(state.dirs.main));
+		expect(readAppliedFile(state.dirs.main)).toEqual({});
 	});
 
 	it("shows nothing for a server card and refuses to change it", async () => {
