@@ -80,9 +80,8 @@ class CodeMigrationRunner:
                 target_language=target_language or "auto",
             )
             plan_summary = {
-                "migration_id": context.migration_id
-                if hasattr(context, "migration_id")
-                else "unknown",
+                # A required field of MigrationContext.
+                "migration_id": context.migration_id,
                 "source": source,
                 "target": f"{target_framework or 'modern'} / {target_language or 'auto'}",
                 "description": self.migration_description,

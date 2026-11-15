@@ -215,7 +215,9 @@ class CognitiveContextOptimizer:
 
         keywords = _extract_keywords(prompt)
         explicit_set = {Path(p).name.lower() for p in (explicit_mentions or [])}
-        recent_set = {str(Path(p)) for p in (recent_files or [])}
+        # Paths are reported in POSIX form on every OS: the coder, the UI and
+        # the recent-files match all read "src/a.cs", never "src\\a.cs".
+        recent_set = {Path(p).as_posix() for p in (recent_files or [])}
 
         candidates = list(candidate_files)
 
@@ -229,7 +231,7 @@ class CognitiveContextOptimizer:
                 logger.debug("Skipping unreadable file %s: %s", path, e)
                 continue
             score = self._score_file(
-                file_path=str(path),
+                file_path=path.as_posix(),
                 content=content,
                 keywords=keywords,
                 explicit_set=explicit_set,
@@ -336,7 +338,7 @@ class CognitiveContextOptimizer:
         # 4. Recency bonus.
         recency = (
             1.0
-            if file_path in recent_set or str(Path(file_path)) in recent_set
+            if file_path in recent_set or Path(file_path).as_posix() in recent_set
             else 0.0
         )
 

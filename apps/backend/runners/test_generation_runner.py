@@ -40,6 +40,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
+from typing import NoReturn
 
 # Ensure the backend root (parent of 'runners/') is on sys.path so that
 # 'agents', 'services', etc. are importable regardless of how the script is invoked.
@@ -88,7 +89,7 @@ def _print_error_detail(payload: dict) -> None:
     )
 
 
-def _fail(exc: BaseException, *, stage: str | None = None) -> None:
+def _fail(exc: BaseException, *, stage: str | None = None) -> NoReturn:
     """Report an exception, then exit non-zero.
 
     An exception that already carries an ``ErrorDetail`` (``DetailedError``) is
@@ -474,7 +475,6 @@ def _run_add_packages(agent, args) -> None:  # noqa: ARG001 — no LLM needed
         report = install_missing(selection, args.project_path, args.test_dir)
     except Exception as exc:  # noqa: BLE001 — every failure is reported, not raised
         _fail(exc, stage="write")
-        return
 
     for step in report.steps:
         _status(f"{'ok' if step.ok else 'failed'}: {' '.join(step.command)}")

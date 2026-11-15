@@ -24,6 +24,7 @@ import { requirePythonPath } from "../utils/ensure-python";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
 import { findSpecDir } from "./bounty-board-handlers";
+import { decodeRunnerError } from "../utils/runner-error";
 
 interface RunRequest {
 	projectPath: string;
@@ -60,16 +61,6 @@ export function buildSandboxArgs(runnerPath: string, request: unknown): string[]
 	if (!SAFE_REF.test(ref)) throw new Error(`Not a git ref: ${ref}`);
 	args.push("--base-ref", ref);
 	return args;
-}
-
-/** The runner prints its error as JSON; older runners printed plain text. */
-function readErrorLine(raw: string): string {
-	try {
-		const parsed = JSON.parse(raw);
-		return typeof parsed === "string" ? parsed : raw;
-	} catch {
-		return raw;
-	}
 }
 
 const EVENT_PREFIX = "SANDBOX_EVENT:";
@@ -152,7 +143,7 @@ export function registerSandboxHandlers(): void {
 						console.error("[Sandbox] Bad result line:", err);
 					}
 				} else if (line.startsWith(ERROR_PREFIX)) {
-					errorMessage = readErrorLine(line.slice(ERROR_PREFIX.length));
+					errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 				}
 			}
 		});

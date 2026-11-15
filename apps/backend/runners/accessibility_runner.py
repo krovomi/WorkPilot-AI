@@ -65,6 +65,12 @@ def _emit(prefix: str, payload: Any) -> None:
     print(f"{prefix}:{json.dumps(payload, default=str)}", flush=True)
 
 
+def _emit_error(message: str) -> None:
+    # Plain text, as the protocol says: the view shows the line as it is, so a
+    # JSON-encoded message reached the person wrapped in quotes.
+    print(f"A11Y_ERROR:{message}", flush=True)
+
+
 def _emit_event(event_type: str, data: dict[str, Any]) -> None:
     _emit("A11Y_EVENT", {"type": event_type, "data": data})
 
@@ -246,7 +252,7 @@ def main() -> None:
 
     project_path = Path(args.project_path)
     if not project_path.exists():
-        _emit("A11Y_ERROR", f"Project path does not exist: {project_path}")
+        _emit_error(f"Project path does not exist: {project_path}")
         sys.exit(1)
 
     page_lang = args.page_lang if _LANG.match(args.page_lang or "") else "en"
@@ -257,7 +263,7 @@ def main() -> None:
         result = run_scan(project_path, WcagLevel(args.target_level), page_lang)
         _emit("A11Y_RESULT", result)
     except Exception as exc:  # noqa: BLE001
-        _emit("A11Y_ERROR", str(exc))
+        _emit_error(str(exc))
         sys.exit(1)
 
 
