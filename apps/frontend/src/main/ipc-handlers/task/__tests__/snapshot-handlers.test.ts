@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
 	handlers: new Map<string, (...args: unknown[]) => unknown>(),
 	runs: [] as string[][],
 	stdout: "" as string,
-	spawnError: null as Error | null,
+	spawnError: null as unknown,
 	childMode: "close" as "close" | "error" | "hang",
 	packaged: false,
 	task: undefined as unknown,
@@ -158,6 +158,8 @@ describe("listTaskSnapshots", () => {
 		state.python = "python3";
 		state.spawnError = new Error("ENOENT");
 		expect(await listTaskSnapshots("t1")).toEqual({ success: false, error: "ENOENT" });
+		state.spawnError = "not an Error";
+		expect(await listTaskSnapshots("t1")).toEqual({ success: false, error: "Failed to start" });
 	});
 });
 
