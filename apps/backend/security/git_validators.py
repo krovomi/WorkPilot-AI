@@ -7,6 +7,7 @@ Validators for git operations:
 - Config protection (prevent setting test users)
 """
 
+import os
 import shlex
 from pathlib import Path
 
@@ -74,26 +75,35 @@ def validate_git_config(command_string: str) -> ValidationResult:
     except ValueError:
         return False, "Could not parse git command"  # Fail closed on parse errors
 
-    if len(tokens) < 2 or tokens[0] != "git" or tokens[1] != "config":
+    if not tokens or tokens[0] != "git":
+        return True, ""
+    # `git -C dir config …` is a config command too.
+    index, _repo = _git_invocation(tokens)
+    if index is None or tokens[index] != "config":
         return True, ""  # Not a git config command
+    args = tokens[index + 1 :]
 
     # Check for read-only operations first - these are always allowed
     # --get, --get-all, --get-regexp, --list are all read operations
     read_only_flags = {"--get", "--get-all", "--get-regexp", "--list", "-l"}
-    for token in tokens[2:]:
-        if token in read_only_flags:
-            return True, ""  # Read operation, allow it
+    if any(token in read_only_flags for token in args):
+        return True, ""  # Read operation, allow it
 
-    # Extract the config key from the command
-    # git config [options] <key> [value] - key is typically after config and any options
-    config_key = None
-    for token in tokens[2:]:
-        # Skip options (start with -)
-        if token.startswith("-"):
+    # The config key: the first operand past the options and their values.
+    # git 2.46 also spells it `git config set <key> <value>`.
+    operands: list[str] = []
+    skip_next = False
+    for token in args:
+        if skip_next:
+            skip_next = False
             continue
-        # First non-option token is the config key
-        config_key = token.lower()
-        break
+        if token.startswith("-"):
+            skip_next = token in _CONFIG_VALUE_OPTIONS
+            continue
+        operands.append(token)
+    if operands and operands[0] in _CONFIG_SUBCOMMANDS:
+        operands = operands[1:] if operands[0] in ("set", "unset") else []
+    config_key = operands[0].lower() if operands else None
 
     if not config_key:
         return True, ""  # No config key specified (e.g., git config --list)
@@ -205,37 +215,10 @@ def validate_git_command(command_string: str) -> ValidationResult:
     if not is_valid:
         return is_valid, error_msg
 
-    # Find the actual subcommand (skip global options AND their values).
-    # Without this, `git -C /tmp commit` and `git --git-dir=… commit` resolve
-    # to subcommand="/tmp" and silently bypass commit secret-scanning.
-    # See: git(1) "OPTIONS" section for the value-bearing global flags.
-    _value_bearing_global_opts = {
-        "-C",
-        "-c",
-        "--git-dir",
-        "--work-tree",
-        "--namespace",
-        "--super-prefix",
-        "--exec-path",
-        "--config-env",
-        "--list-cmds",
-        "--attr-source",
-    }
-    subcommand = None
-    skip_next = False
-    for token in tokens[1:]:
-        if skip_next:
-            skip_next = False
-            continue
-        if token.startswith("-"):
-            # `--git-dir=…` (value attached) carries its own value, no skip needed.
-            if "=" in token:
-                continue
-            if token in _value_bearing_global_opts:
-                skip_next = True
-            continue
-        subcommand = token
-        break
+    # Find the actual subcommand past the global options and their values:
+    # `git -C /tmp commit` and `git --git-dir=… commit` are commits.
+    index, _repo = _git_invocation(tokens)
+    subcommand = tokens[index] if index is not None else None
 
     if not subcommand:
         return True, ""  # No subcommand found
@@ -272,23 +255,31 @@ def validate_git_commit_secrets(command_string: str) -> ValidationResult:
     if not tokens or tokens[0] != "git":
         return True, ""
 
-    # Only intercept 'git commit' commands (not git add, git push, etc.)
-    if len(tokens) < 2 or tokens[1] != "commit":
+    # Only intercept 'git commit' commands (not git add, git push, etc.),
+    # wherever the global options put the subcommand.
+    index, repo = _git_invocation(tokens)
+    if index is None or tokens[index] != "commit":
         return True, ""
 
-    # Import the secret scanner
-    try:
-        from security.scan_secrets import get_staged_files, mask_secret, scan_files
-    except ImportError:
-        # Scanner not available, allow commit (don't break the build)
-        return True, ""
+    from .scan_secrets import (
+        get_staged_files,
+        get_unstaged_files,
+        mask_secret,
+        scan_files,
+    )
 
-    # Get staged files and scan them
-    staged_files = get_staged_files()
-    if not staged_files:
-        return True, ""  # No staged files, allow commit
+    # What the commit will hold: the index as it stands, plus the tracked
+    # changes `commit -a` stages on its way, read from the working tree.
+    staged = get_staged_files(repo)
+    unstaged = (
+        [f for f in get_unstaged_files(repo) if f not in staged]
+        if _commits_all(tokens[index + 1 :])
+        else []
+    )
+    if not staged and not unstaged:
+        return True, ""  # Nothing to commit, allow it
 
-    matches = scan_files(staged_files, Path.cwd())
+    matches = scan_files(staged, repo, staged=True) + scan_files(unstaged, repo)
 
     if not matches:
         return True, ""  # No secrets found, allow commit
@@ -339,6 +330,88 @@ def validate_git_commit_secrets(command_string: str) -> ValidationResult:
     )
 
     return False, "\n".join(error_lines)
+
+
+# `git config` options that take the next token as their value.
+_CONFIG_VALUE_OPTIONS = {
+    "-f",
+    "--file",
+    "--blob",
+    "--type",
+    "--default",
+    "--comment",
+    "--value",
+}
+# git 2.46 subcommands of `git config`; only `set` and `unset` name a key to change.
+_CONFIG_SUBCOMMANDS = {
+    "set",
+    "unset",
+    "get",
+    "list",
+    "edit",
+    "rename-section",
+    "remove-section",
+}
+
+# Global options of git(1) that take the next token as their value.
+_VALUE_BEARING_GLOBAL_OPTS = {
+    "-C",
+    "-c",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+    "--super-prefix",
+    "--exec-path",
+    "--config-env",
+    "--list-cmds",
+    "--attr-source",
+}
+
+
+def _git_invocation(tokens: list[str]) -> tuple[int | None, Path]:
+    """The index of the subcommand in `tokens`, and the folder git works in.
+
+    The folder starts at the project the hooks were given (or the current
+    directory), then follows each `-C` (relative to the previous one, as git
+    does) and `--work-tree`.
+    """
+    from .constants import PROJECT_DIR_ENV_VAR
+
+    repo = Path(os.environ.get(PROJECT_DIR_ENV_VAR) or Path.cwd())
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if not token.startswith("-"):
+            return i, repo
+        name, _, attached = token.partition("=")
+        if name in _VALUE_BEARING_GLOBAL_OPTS and "=" not in token:
+            value = tokens[i + 1] if i + 1 < len(tokens) else ""
+            i += 2
+        else:
+            value = attached
+            i += 1
+        if name == "-C" and value:
+            repo = repo / value
+        elif name == "--work-tree" and value:
+            repo = repo / value
+    return None, repo
+
+
+def _commits_all(args: list[str]) -> bool:
+    """Whether `git commit` stages every tracked change itself (`-a`, `-am`)."""
+    for arg in args:
+        if arg == "--":
+            return False
+        if arg == "--all":
+            return True
+        if arg.startswith("-") and not arg.startswith("--"):
+            # A short cluster: letters until the first one that takes a value.
+            for letter in arg[1:]:
+                if letter == "a":
+                    return True
+                if letter in "mFcCtS":
+                    break
+    return False
 
 
 # Backwards compatibility alias - the registry uses this name

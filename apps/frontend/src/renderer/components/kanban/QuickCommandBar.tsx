@@ -175,7 +175,7 @@ export function QuickCommandBar({
 				});
 				const outcome = res.data;
 				if (!res.success || !outcome) {
-					showError(res.error ?? "unknown");
+					showError(res.error);
 					return;
 				}
 				const { review } = outcome;
@@ -246,7 +246,7 @@ export function QuickCommandBar({
 				const res = await localBackendFetch(url);
 				const data = await res.json();
 				if (!res.ok || !data?.success || !data.body) {
-					showError(data?.detail ?? data?.error ?? "unknown");
+					showError(data?.detail ?? data?.error);
 					return;
 				}
 				const description = parsed.args.trim()

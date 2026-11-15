@@ -85,6 +85,14 @@ def validate_pkill_command(command_string: str) -> ValidationResult:
     # The target is typically the last non-flag argument
     target = args[-1]
 
+    # The pattern is a regular expression: an alternation names a second
+    # process, whatever the first word is (`pkill -f "node x|sshd"`).
+    if "|" in target:
+        return (
+            False,
+            "pkill pattern with '|' is not allowed: it names more than one process",
+        )
+
     # For -f flag (full command line match), extract the first word
     if " " in target:
         target = target.split()[0]

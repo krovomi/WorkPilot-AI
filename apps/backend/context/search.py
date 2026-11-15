@@ -65,7 +65,7 @@ class CodeSearcher:
                                 found += 1
 
                 if score > 0:
-                    rel_path = str(file_path.relative_to(self.project_dir))
+                    rel_path = file_path.relative_to(self.project_dir).as_posix()
                     matches.append(
                         FileMatch(
                             path=rel_path,

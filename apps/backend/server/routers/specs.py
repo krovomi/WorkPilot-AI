@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from server.auth.deps import (
     CurrentUser,
-    get_project_role,
+    effective_project_role,
     require_project_role,
 )
 from server.authz.principal import get_principal
@@ -120,7 +120,7 @@ async def claim_spec(
     spec = await _get_spec_or_404(db, project_id, spec_id)
 
     if spec.claimed_by and spec.claimed_by != user.id:
-        role = await get_project_role(db, user, project_id)
+        role = effective_project_role(request)
         if not (body.force and role == ProjectRole.OWNER.value):
             holder = await db.scalar(
                 select(User.display_name).where(User.id == spec.claimed_by)
@@ -173,7 +173,7 @@ async def release_spec(
     _require(request, "task.claim")
     spec = await _get_spec_or_404(db, project_id, spec_id)
     if spec.claimed_by and spec.claimed_by != user.id:
-        role = await get_project_role(db, user, project_id)
+        role = effective_project_role(request)
         if role != ProjectRole.OWNER.value:
             raise HTTPException(
                 status_code=403, detail="Only the claim holder or an owner can release"

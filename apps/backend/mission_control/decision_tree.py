@@ -147,30 +147,6 @@ class DecisionTree:
         self._current_node_id = node.id
         return node
 
-    def add_decision(
-        self,
-        label: str,
-        options: list[str],
-        chosen: str,
-        reasoning: str = "",
-        parent_id: str | None = None,
-    ) -> DecisionNode:
-        """Add a decision node with options considered."""
-        pid = parent_id or self._current_node_id
-        node = DecisionNode(
-            parent_id=pid,
-            node_type=NodeType.DECISION,
-            label=label,
-            options_considered=options,
-            chosen_option=chosen,
-            reasoning=reasoning[:300],
-        )
-        self._nodes[node.id] = node
-        if pid and pid in self._nodes:
-            self._nodes[pid].children.append(node.id)
-        self._current_node_id = node.id
-        return node
-
     def add_result(
         self,
         label: str,
@@ -192,21 +168,6 @@ class DecisionTree:
             self._nodes[pid].children.append(node.id)
             self._nodes[pid].status = NodeStatus.COMPLETED
         return node
-
-    def complete_current(self, duration_ms: float = 0.0):
-        """Mark the current node as completed."""
-        if self._current_node_id and self._current_node_id in self._nodes:
-            node = self._nodes[self._current_node_id]
-            node.status = NodeStatus.COMPLETED
-            node.duration_ms = duration_ms
-            # Move back to parent
-            if node.parent_id:
-                self._current_node_id = node.parent_id
-
-    def update_tool_output(self, node_id: str, output: str):
-        """Update the output of a tool call node."""
-        if node_id in self._nodes:
-            self._nodes[node_id].tool_output = output[:500]
 
     @property
     def node_count(self) -> int:

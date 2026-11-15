@@ -289,9 +289,8 @@ def quote_untrusted(
 ) -> str:
     """Clean `content` and return it fenced, ready to drop into a prompt.
 
-    The fence and the instruction that goes with it are
-    `ContentSanitizer.wrap_user_content`'s — the model is told, in the prompt,
-    that what is between the markers is data. That instruction is not a
+    The fence is `ContentSanitizer.wrap_user_content`'s: it marks where the
+    data starts and ends, for the prompt that names it. A fence is not a
     guarantee and is not treated as one; it is the layer above the stripping,
     which is the one that does not depend on the model cooperating.
 

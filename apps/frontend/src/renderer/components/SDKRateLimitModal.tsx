@@ -14,7 +14,7 @@ import {
 	User,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SDKRateLimitInfo } from "../../shared/types";
 import { debugError } from "../../shared/utils/debug-logger";
@@ -46,25 +46,15 @@ import { Switch } from "./ui/switch";
 
 const CLAUDE_UPGRADE_URL = "https://claude.ai/upgrade";
 
-/**
- * Get a human-readable name for the source
- */
-function getSourceName(source: SDKRateLimitInfo["source"]): string {
-	switch (source) {
-		case "changelog":
-			return "Changelog Generation";
-		case "task":
-			return "Task Execution";
-		case "roadmap":
-			return "Roadmap Generation";
-		case "ideation":
-			return "Ideation";
-		case "title-generator":
-			return "Title Generation";
-		default:
-			return "Claude Operation";
-	}
-}
+/** The translation key naming the feature that hit the limit. */
+const SOURCE_KEYS: Record<SDKRateLimitInfo["source"], string> = {
+	changelog: "rateLimit.sources.changelog",
+	task: "rateLimit.sources.task",
+	roadmap: "rateLimit.sources.roadmap",
+	ideation: "rateLimit.sources.ideation",
+	"title-generator": "rateLimit.sources.titleGenerator",
+	other: "rateLimit.sources.claude",
+};
 
 /**
  * Get an icon for the source
@@ -102,52 +92,36 @@ export function SDKRateLimitModal() {
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [isAddingProfile, setIsAddingProfile] = useState(false);
 	const [newProfileName, setNewProfileName] = useState("");
-	const [swapInfo, setSwapInfo] = useState<{
-		wasAutoSwapped: boolean;
-		swapReason?: "proactive" | "reactive";
-		swappedFrom?: string;
-		swappedTo?: string;
-	} | null>(null);
+	const newProfileInputRef = useRef<HTMLInputElement>(null);
+	// Set by "Add new account": the menu then gives the focus to the name field
+	// instead of back to its trigger.
+	const focusNewProfileRef = useRef(false);
 
-	const loadAutoSwitchSettings = async () => {
-		try {
-			const result = await globalThis.electronAPI.getAutoSwitchSettings();
-			if (result.success && result.data) {
-				setAutoSwitchEnabled(result.data.autoSwitchOnRateLimit);
-			}
-		} catch (err) {
-			debugError(
-				"[SDKRateLimitModal] Failed to load auto-switch settings:",
-				err,
-			);
-		}
-	};
-
-	// Load profiles and auto-switch settings when modal opens
+	// Load profiles and auto-switch settings when the modal opens, and pre-select
+	// the suggested profile. Only then: this effect also depended on the profile
+	// list and on a function made anew each render, so it ran again on every
+	// render, put the suggestion back over the account the user picked, and
+	// looped on its own state update.
 	useEffect(() => {
-		if (isSDKModalOpen) {
-			loadClaudeProfiles();
-			loadAutoSwitchSettings();
-
-			// Pre-select the suggested profile if available
-			if (sdkRateLimitInfo?.suggestedProfile?.id) {
-				setSelectedProfileId(sdkRateLimitInfo.suggestedProfile.id);
-			}
-
-			// Set swap info if auto-swap occurred
-			if (sdkRateLimitInfo) {
-				setSwapInfo({
-					wasAutoSwapped: sdkRateLimitInfo.wasAutoSwapped ?? false,
-					swapReason: sdkRateLimitInfo.swapReason,
-					swappedFrom: profiles.find((p) => p.id === sdkRateLimitInfo.profileId)
-						?.name,
-					swappedTo: sdkRateLimitInfo.swappedToProfile?.name,
-				});
-			}
+		if (!isSDKModalOpen) return;
+		loadClaudeProfiles();
+		globalThis.electronAPI
+			.getAutoSwitchSettings()
+			.then((result) => {
+				if (result.success && result.data) {
+					setAutoSwitchEnabled(result.data.autoSwitchOnRateLimit);
+				}
+			})
+			.catch((err: unknown) => {
+				debugError(
+					"[SDKRateLimitModal] Failed to load auto-switch settings:",
+					err,
+				);
+			});
+		if (sdkRateLimitInfo?.suggestedProfile?.id) {
+			setSelectedProfileId(sdkRateLimitInfo.suggestedProfile.id);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [isSDKModalOpen, sdkRateLimitInfo, profiles, loadAutoSwitchSettings]);
+	}, [isSDKModalOpen, sdkRateLimitInfo]);
 
 	// Reset selection when modal closes
 	useEffect(() => {
@@ -181,9 +155,8 @@ export function SDKRateLimitModal() {
 		window.open(CLAUDE_UPGRADE_URL, "_blank");
 	};
 
+	// Reachable only with a name typed: the button and Enter both need one.
 	const handleAddProfile = async () => {
-		if (!newProfileName.trim()) return;
-
 		setIsAddingProfile(true);
 		try {
 			// Create a new profile - the backend will set the proper configDir
@@ -199,29 +172,31 @@ export function SDKRateLimitModal() {
 				createdAt: new Date(),
 			});
 
-			if (result.success && result.data) {
-				// Reload profiles
-				loadClaudeProfiles();
-				setNewProfileName("");
-				// Close the modal
-				hideSDKRateLimitModal();
-
-				// Direct user to Settings to complete authentication
-				toast({
-					variant: "success",
-					title: t("profileCreated.title", { profileName }),
-					description: (
-						<span className="whitespace-pre-line">
-							{`${t("profileCreated.instructions")}\n` +
-								`1. ${t("profileCreated.step1")}\n` +
-								`2. ${t("profileCreated.step2")}\n` +
-								`3. ${t("profileCreated.step3")}\n\n` +
-								t("profileCreated.footer")}
-						</span>
-					),
-					duration: 15000,
-				});
+			// A refused save is reported like a failed one.
+			if (!result.success || !result.data) {
+				throw new Error(result.error || "saveClaudeProfile failed");
 			}
+			// Reload profiles
+			loadClaudeProfiles();
+			setNewProfileName("");
+			// Close the modal
+			hideSDKRateLimitModal();
+
+			// Direct user to Settings to complete authentication
+			toast({
+				variant: "success",
+				title: t("profileCreated.title", { profileName }),
+				description: (
+					<span className="whitespace-pre-line">
+						{`${t("profileCreated.instructions")}\n` +
+							`1. ${t("profileCreated.step1")}\n` +
+							`2. ${t("profileCreated.step2")}\n` +
+							`3. ${t("profileCreated.step3")}\n\n` +
+							t("profileCreated.footer")}
+					</span>
+				),
+				duration: 15000,
+			});
 		} catch (err) {
 			debugError("[SDKRateLimitModal] Failed to add profile:", err);
 			toast({
@@ -235,6 +210,8 @@ export function SDKRateLimitModal() {
 	};
 
 	const handleRetryWithProfile = async () => {
+		// Retry is disabled until a profile is picked; an operation without a
+		// project cannot be retried from here.
 		if (!selectedProfileId || !sdkRateLimitInfo?.projectId) return;
 
 		setIsRetrying(true);
@@ -281,7 +258,9 @@ export function SDKRateLimitModal() {
 		: null;
 
 	const SourceIcon = getSourceIcon(sdkRateLimitInfo.source);
-	const sourceName = getSourceName(sdkRateLimitInfo.source);
+	const sourceName = t(SOURCE_KEYS[sdkRateLimitInfo.source] ?? SOURCE_KEYS.other);
+	const swappedFrom = currentProfile?.name;
+	const swappedTo = sdkRateLimitInfo.swappedToProfile?.name;
 
 	return (
 		<Dialog
@@ -309,22 +288,22 @@ export function SDKRateLimitModal() {
 				<div className="py-4 space-y-4">
 					{/* Swap notification info */}
 					<div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
-						{swapInfo?.wasAutoSwapped ? (
+						{sdkRateLimitInfo.wasAutoSwapped ? (
 							<>
 								<p className="font-medium mb-1">
-									{swapInfo.swapReason === "proactive"
+									{sdkRateLimitInfo.swapReason === "proactive"
 										? t("rateLimit.sdk.proactiveSwap")
 										: t("rateLimit.sdk.reactiveSwap")}
 								</p>
 								<p>
-									{swapInfo.swapReason === "proactive"
+									{sdkRateLimitInfo.swapReason === "proactive"
 										? t("rateLimit.sdk.proactiveSwapDesc", {
-												from: swapInfo.swappedFrom,
-												to: swapInfo.swappedTo,
+												from: swappedFrom,
+												to: swappedTo,
 											})
 										: t("rateLimit.sdk.reactiveSwapDesc", {
-												from: swapInfo.swappedFrom,
-												to: swapInfo.swappedTo,
+												from: swappedFrom,
+												to: swappedTo,
 											})}
 								</p>
 								<p className="mt-2 text-3xs">
@@ -338,7 +317,7 @@ export function SDKRateLimitModal() {
 								</p>
 								<p>
 									{t("rateLimit.sdk.operationStopped", {
-										account: currentProfile?.name || "your account",
+										account: currentProfile?.name || t("rateLimit.sdk.yourAccount"),
 									})}
 									{hasMultipleProfiles
 										? ` ${t("rateLimit.sdk.switchBelow")}`
@@ -421,6 +400,12 @@ export function SDKRateLimitModal() {
 										<DropdownMenuContent
 											align="start"
 											className="w-[220px] bg-popover border border-border shadow-lg"
+											onCloseAutoFocus={(event) => {
+												if (!focusNewProfileRef.current) return;
+												focusNewProfileRef.current = false;
+												event.preventDefault();
+												newProfileInputRef.current?.focus();
+											}}
 										>
 											{availableProfiles.map((profile) => (
 												<DropdownMenuItem
@@ -445,12 +430,11 @@ export function SDKRateLimitModal() {
 											))}
 											<DropdownMenuSeparator />
 											<DropdownMenuItem
+												// The field was looked up by its placeholder, which is
+												// translated, and the menu gave the focus back to its
+												// trigger as it closed: it never reached the field.
 												onClick={() => {
-													// Focus the add account input
-													const input = document.querySelector(
-														'input[placeholder*="Account name"]',
-													) as HTMLInputElement;
-													if (input) input.focus();
+													focusNewProfileRef.current = true;
 												}}
 												className="flex items-center gap-2 text-muted-foreground"
 											>
@@ -524,6 +508,7 @@ export function SDKRateLimitModal() {
 							</p>
 							<div className="flex items-center gap-2">
 								<Input
+									ref={newProfileInputRef}
 									placeholder={t("common:rateLimit.accountNamePlaceholder")}
 									value={newProfileName}
 									onChange={(e) => setNewProfileName(e.target.value)}
@@ -582,7 +567,7 @@ export function SDKRateLimitModal() {
 						<p>
 							{t("rateLimit.sdk.whatHappenedDesc", {
 								source: sourceName.toLowerCase(),
-								account: currentProfile?.name || "Default",
+								account: currentProfile?.name || t("rateLimit.sdk.defaultAccount"),
 							})}
 							{hasMultipleProfiles
 								? ` ${t("rateLimit.sdk.switchRetryOrAdd")}`

@@ -77,6 +77,21 @@ describe("readProjectFile", () => {
 		writeFileSync(path.join(project, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x00]));
 		expect(readProjectFile(project, "logo.png")).toBeNull();
 	});
+
+	it("refuses a file that does not exist", () => {
+		expect(readProjectFile(project, "src/Missing.cs")).toBeNull();
+	});
+
+	it("refuses a file over the size limit and a folder", () => {
+		writeFileSync(path.join(project, "dump.sql"), "x".repeat(64_001));
+		expect(readProjectFile(project, "dump.sql")).toBeNull();
+		expect(readProjectFile(project, "src")).toBeNull();
+	});
+
+	it("reads a file right at the size limit", () => {
+		writeFileSync(path.join(project, "full.txt"), "y".repeat(64_000));
+		expect(readProjectFile(project, "full.txt")).toHaveLength(64_000);
+	});
 });
 
 describe("buildPairPrompt", () => {

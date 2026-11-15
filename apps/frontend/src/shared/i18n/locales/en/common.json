@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Add another Claude subscription to automatically switch when you hit rate limits.",
 			"willOpenClaudeLogin": "This will open Claude login to authenticate the new account.",
 			"switchClaudeRetry": "Switch to another Claude account and retry the operation:",
-			"connectClaude": "Connect a Claude account:"
+			"connectClaude": "Connect a Claude account:",
+			"yourAccount": "your account",
+			"defaultAccount": "Default"
 		},
 		"recommendedAria": "Recommended"
 	},
@@ -666,10 +668,6 @@
 			"text": "Check that your OpenAI API key is linked to a billing-enabled organization.",
 			"link": "View OpenAI dashboard"
 		},
-		"debugProfiles": "Debug detected profiles:",
-		"noProfileDetected": "No profile detected",
-		"selectedProvider": "Selected provider: {{provider}}",
-		"openaiError": "OpenAI Error:",
 		"openaiDetailTitle": "OpenAI Detail",
 		"completionsLabel": "Completions (tokens by model):",
 		"costByModelLabel": "Cost by model:",
@@ -706,7 +704,6 @@
 		"lensAutoWith": "Automatic ({{provider}})",
 		"lensRunning": "{{provider}} — running",
 		"lensTooltip": "Which provider's usage the badges show. Automatic follows the tasks in progress. This changes nothing about what a task runs on.",
-		"debugProvider": "provider:",
 		"needsReauthTitle": "Needs re-authentication",
 		"sessionUsage": "Session usage",
 		"weeklyUsage": "Weekly usage",
