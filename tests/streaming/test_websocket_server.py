@@ -101,8 +101,8 @@ class TestStreamingManager:
         streaming_manager.subscribe(session_id, mock_client2)
 
         # Emit an event using the API
-        await streaming_manager.emit_agent_thinking(
-            session_id=session_id, thinking="test message"
+        await streaming_manager.emit_chat_message(
+            session_id=session_id, message="test message", author="Ann"
         )
 
         # Verify both clients received the event
@@ -113,10 +113,10 @@ class TestStreamingManager:
         sent_data1 = json.loads(mock_client1.send.call_args[0][0])
         sent_data2 = json.loads(mock_client2.send.call_args[0][0])
 
-        assert sent_data1["event_type"] == "agent_thinking"
-        assert sent_data2["event_type"] == "agent_thinking"
-        assert sent_data1["data"]["thinking"] == "test message"
-        assert sent_data2["data"]["thinking"] == "test message"
+        assert sent_data1["event_type"] == "chat_message"
+        assert sent_data2["event_type"] == "chat_message"
+        assert sent_data1["data"]["message"] == "test message"
+        assert sent_data2["data"]["message"] == "test message"
 
     @pytest.mark.asyncio
     async def test_broadcast_event_no_clients(self, streaming_manager):
@@ -127,7 +127,7 @@ class TestStreamingManager:
         await streaming_manager.start_session(session_id, {"task": "test"})
 
         # Emit event (should not raise error)
-        await streaming_manager.emit_agent_thinking(session_id, "test")
+        await streaming_manager.emit_chat_message(session_id, "test", "Ann")
 
         # If we reach this point, the test passed (no exceptions raised)
         # Verify session still exists and is properly managed
@@ -139,7 +139,7 @@ class TestStreamingManager:
     async def test_broadcast_event_nonexistent_session(self, streaming_manager):
         """Test broadcasting to a nonexistent session."""
         # Should not raise error
-        await streaming_manager.emit_agent_thinking("nonexistent-session", "test")
+        await streaming_manager.emit_chat_message("nonexistent-session", "test", "Ann")
 
         # If we reach this point, the test passed (no exceptions raised)
         # Verify the session doesn't exist (as expected for nonexistent session)

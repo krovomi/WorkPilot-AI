@@ -259,6 +259,40 @@ async def test_a_request_for_changes_is_written_where_the_build_reads_it(
 
 
 @pytest.mark.asyncio
+async def test_the_build_a_request_for_changes_starts_is_approved_by_its_author(
+    tmp_path,
+):
+    """The approval taken before the first build covered the plan as it was:
+    the build moved it on, and the request adds a subtask. Without a new
+    approval, the build the request starts stopped at "review required"."""
+    from review.state import ReviewState
+    from shared_board.review import ChangeRequest, request_changes
+
+    pid, oid, clone = await _project(tmp_path)
+    card_id = await _card(pid, oid, clone)
+    spec = clone / ".workpilot/specs" / card_id
+    spec.mkdir(parents=True, exist_ok=True)
+    (spec / "spec.md").write_text("# Login\n", encoding="utf-8")
+    (spec / "implementation_plan.json").write_text("{}", encoding="utf-8")
+    ReviewState().approve(spec, approved_by="a@x")
+    _build(clone, card_id)
+    assert not ReviewState.load(spec).is_approval_valid(spec)
+
+    async with await _db() as db:
+        await request_changes(
+            card_id,
+            ChangeRequest(feedback="Keep the session for 30 days."),
+            _request(id="u-2", email="b@x"),
+            _scope(pid, oid, clone, "member"),
+            db,
+        )
+
+    state = ReviewState.load(spec)
+    assert state.is_approval_valid(spec)
+    assert state.approved_by == "b@x"
+
+
+@pytest.mark.asyncio
 async def test_changes_cannot_be_requested_without_work_or_during_a_run(
     tmp_path, monkeypatch
 ):

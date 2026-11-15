@@ -36,8 +36,9 @@ import json
 import sys
 from pathlib import Path
 
-# Add auto-claude to path
-sys.path.insert(0, str(Path(__file__).parent))
+# ccstatusline runs this file by its path: make the backend root importable
+# (the folder above ui/), so ``from ui import`` resolves to this package.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from ui import (
     BuildState,
@@ -52,20 +53,10 @@ from ui import (
 def find_project_root() -> Path:
     """Find the project root by looking for .workpilot or .workpilot-status."""
     cwd = Path.cwd()
-
-    # Check current directory - prioritize .workpilot (installed instance)
-    if (cwd / ".workpilot").exists():
-        return cwd
-    if (cwd / ".workpilot-status").exists():
-        return cwd
-
-    # Walk up to find project root
-    for parent in cwd.parents:
-        if (parent / ".workpilot").exists():
-            return parent
-        if (parent / ".workpilot-status").exists():
-            return parent
-
+    # The nearest folder, from here upwards, holding either marker.
+    for folder in (cwd, *cwd.parents):
+        if (folder / ".workpilot").exists() or (folder / ".workpilot-status").exists():
+            return folder
     return cwd
 
 
