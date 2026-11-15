@@ -11,9 +11,10 @@ Handles recording and analyzing file modifications:
 from __future__ import annotations
 
 import logging
-import subprocess
 from datetime import datetime
 from pathlib import Path
+
+from foundation.git_executable import run_git
 
 from ..semantic_analyzer import SemanticAnalyzer
 from ..types import FileEvolution, TaskSnapshot, compute_content_hash
@@ -179,139 +180,95 @@ class ModificationTracker:
             else "all",
         )
 
-        try:
-            # Get the merge-base to accurately identify task-only changes
-            # Using two-dot diff (merge-base..HEAD) returns only files changed by the task,
-            # not files changed on the target branch since divergence
-            merge_base_result = subprocess.run(
-                ["git", "merge-base", target_branch, "HEAD"],
-                cwd=worktree_path,
-                capture_output=True,
-                text=True,
-                check=True,
+        # Every git call reads UTF-8 and replaces what is not: one file in
+        # another encoding must not stop the others from being recorded.
+        merge_base_result = run_git(
+            ["merge-base", target_branch, "HEAD"], worktree_path
+        )
+        if merge_base_result.returncode != 0:
+            logger.error(
+                f"Failed to refresh from git: no merge-base with {target_branch}: "
+                f"{merge_base_result.stderr.strip()}"
             )
-            merge_base = merge_base_result.stdout.strip()
+            return
+        merge_base = merge_base_result.stdout.strip()
 
-            # Get list of files changed in the worktree since the merge-base
-            result = subprocess.run(
-                ["git", "diff", "--name-only", f"{merge_base}..HEAD"],
-                cwd=worktree_path,
-                capture_output=True,
-                text=True,
-                check=True,
+        # Names NUL-separated: git does not quote a name with non-ASCII
+        # characters there, so it is the file on disk.
+        result = run_git(
+            ["diff", "--name-only", "-z", f"{merge_base}..HEAD"], worktree_path
+        )
+        if result.returncode != 0:
+            logger.error(f"Failed to refresh from git: {result.stderr.strip()}")
+            return
+        changed_files = [f for f in result.stdout.split("\0") if f]
+
+        debug(
+            MODULE,
+            f"Found {len(changed_files)} changed files",
+            changed_files=changed_files[:10],
+        )
+
+        processed_count = 0
+        for file_path in changed_files:
+            diff_result = run_git(
+                ["diff", f"{merge_base}..HEAD", "--", file_path], worktree_path
             )
-            changed_files = [f for f in result.stdout.strip().split("\n") if f]
-
-            debug(
-                MODULE,
-                f"Found {len(changed_files)} changed files",
-                changed_files=changed_files[:10]
-                if len(changed_files) > 10
-                else changed_files,
-            )
-
-            processed_count = 0
-            for file_path in changed_files:
-                try:
-                    # Get the diff for this file (using merge-base for accurate task-only diff)
-                    diff_result = subprocess.run(
-                        ["git", "diff", f"{merge_base}..HEAD", "--", file_path],
-                        cwd=worktree_path,
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                    )
-
-                    # Get content before (from merge-base - the point where task branched)
-                    try:
-                        show_result = subprocess.run(
-                            ["git", "show", f"{merge_base}:{file_path}"],
-                            cwd=worktree_path,
-                            capture_output=True,
-                            text=True,
-                            encoding="utf-8",
-                            errors="replace",  # Replace invalid UTF-8 with U+FFFD
-                            check=True,
-                        )
-                        old_content = show_result.stdout
-                    except subprocess.CalledProcessError:
-                        # File is new
-                        old_content = ""
-
-                    current_file = worktree_path / file_path
-                    if current_file.exists():
-                        try:
-                            new_content = current_file.read_text(encoding="utf-8")
-                        except UnicodeDecodeError:
-                            new_content = current_file.read_text(
-                                encoding="utf-8", errors="replace"
-                            )
-                    else:
-                        # File was deleted
-                        new_content = ""
-
-                    # Auto-create FileEvolution entry if not already tracked
-                    # This handles retroactive tracking when capture_baselines wasn't called
-                    rel_path = self.storage.get_relative_path(file_path)
-                    if rel_path not in evolutions:
-                        evolutions[rel_path] = FileEvolution(
-                            file_path=rel_path,
-                            baseline_commit=merge_base,
-                            baseline_captured_at=datetime.now(),
-                            baseline_content_hash=compute_content_hash(old_content),
-                            baseline_snapshot_path="",  # Not storing baseline file
-                            task_snapshots=[],
-                        )
-                        debug(
-                            MODULE,
-                            f"Auto-created evolution entry for {rel_path}",
-                            baseline_commit=merge_base[:8],
-                        )
-
-                    # Determine if this file needs full semantic analysis
-                    # If analyze_only_files is provided, only analyze files in that set
-                    # Otherwise, analyze all files (backward compatible)
-                    skip_analysis = False
-                    if analyze_only_files is not None:
-                        skip_analysis = rel_path not in analyze_only_files
-
-                    # Record the modification
-                    self.record_modification(
-                        task_id=task_id,
-                        file_path=file_path,
-                        old_content=old_content,
-                        new_content=new_content,
-                        evolutions=evolutions,
-                        raw_diff=diff_result.stdout,
-                        skip_semantic_analysis=skip_analysis,
-                    )
-                    processed_count += 1
-
-                except subprocess.CalledProcessError as e:
-                    # Log error but continue with remaining files
-                    logger.warning(
-                        f"Failed to process {file_path} in refresh_from_git: {e}"
-                    )
-                    continue
-
-            # Calculate how many files were fully analyzed vs just tracked
-            if analyze_only_files is not None:
-                analyzed_count = len(
-                    [f for f in changed_files if f in analyze_only_files]
+            if diff_result.returncode != 0:
+                logger.warning(
+                    f"Failed to process {file_path} in refresh_from_git: "
+                    f"{diff_result.stderr.strip()}"
                 )
-                tracked_only_count = processed_count - analyzed_count
-                logger.info(
-                    f"Refreshed {processed_count}/{len(changed_files)} files from worktree for task {task_id} "
-                    f"(analyzed: {analyzed_count}, tracked only: {tracked_only_count})"
-                )
+                continue
+
+            # Content before: the file at the merge-base, or nothing if it is new
+            show_result = run_git(["show", f"{merge_base}:{file_path}"], worktree_path)
+            old_content = show_result.stdout if show_result.returncode == 0 else ""
+
+            current_file = worktree_path / file_path
+            if current_file.exists():
+                new_content = current_file.read_text(encoding="utf-8", errors="replace")
             else:
-                logger.info(
-                    f"Refreshed {processed_count}/{len(changed_files)} files from worktree for task {task_id} "
-                    "(full analysis on all files)"
+                # File was deleted
+                new_content = ""
+
+            # Auto-create FileEvolution entry if not already tracked
+            rel_path = self.storage.get_relative_path(file_path)
+            if rel_path not in evolutions:
+                evolutions[rel_path] = FileEvolution(
+                    file_path=rel_path,
+                    baseline_commit=merge_base,
+                    baseline_captured_at=datetime.now(),
+                    baseline_content_hash=compute_content_hash(old_content),
+                    baseline_snapshot_path="",  # Not storing baseline file
+                    task_snapshots=[],
+                )
+                debug(
+                    MODULE,
+                    f"Auto-created evolution entry for {rel_path}",
+                    baseline_commit=merge_base[:8],
                 )
 
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to refresh from git: {e}")
+            # Only files in analyze_only_files get a semantic analysis, when given
+            skip_analysis = (
+                analyze_only_files is not None and rel_path not in analyze_only_files
+            )
+
+            self.record_modification(
+                task_id=task_id,
+                file_path=file_path,
+                old_content=old_content,
+                new_content=new_content,
+                evolutions=evolutions,
+                raw_diff=diff_result.stdout,
+                skip_semantic_analysis=skip_analysis,
+            )
+            processed_count += 1
+
+        logger.info(
+            f"Refreshed {processed_count}/{len(changed_files)} files from worktree "
+            f"for task {task_id}"
+        )
 
     def mark_task_completed(
         self,
@@ -351,41 +308,13 @@ class ModificationTracker:
         # Try common branch names and find which one has a valid merge-base
         # This is the reliable way to find what branch the worktree diverged from
         for branch in ["main", "master", "develop"]:
-            try:
-                result = subprocess.run(
-                    ["git", "merge-base", branch, "HEAD"],
-                    cwd=worktree_path,
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode == 0:
-                    debug(
-                        MODULE,
-                        f"Detected base branch: {branch}",
-                        worktree_path=str(worktree_path),
-                    )
-                    return branch
-            except subprocess.CalledProcessError:
-                continue
-
-        # Before defaulting to 'main', verify it exists
-        # This handles non-standard projects that use trunk, production, etc.
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--verify", "main"],
-                cwd=worktree_path,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                debug_warning(
+            if run_git(["merge-base", branch, "HEAD"], worktree_path).returncode == 0:
+                debug(
                     MODULE,
-                    "Could not find merge-base with standard branches, defaulting to 'main'",
+                    f"Detected base branch: {branch}",
                     worktree_path=str(worktree_path),
                 )
-                return "main"
-        except subprocess.CalledProcessError:
-            pass  # 'main' branch doesn't exist - fall through to last resort
+                return branch
 
         # Last resort: use HEAD~10 as a fallback comparison point
         # This allows modification tracking even on non-standard branch setups
