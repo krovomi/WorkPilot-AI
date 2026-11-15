@@ -98,29 +98,15 @@ def _detect_provider_from_env() -> str | None:
 def _is_copilot_available() -> bool:
     """Check if GitHub Copilot is available via gh CLI.
 
-    The `gh` is the one the rest of the backend uses (`core.gh_executable`:
-    GITHUB_CLI_PATH, then the PATH, then the usual install folders). A bare
-    "gh" passed to a subprocess missed a `gh` set in the settings and, on
-    Windows, any `gh.cmd`: CreateProcess does not try PATHEXT.
+    `run_gh` starts the gh that `get_gh_executable` found (`GITHUB_CLI_PATH`,
+    the PATH with its Windows extensions, the usual install folders): a bare
+    `gh` never starts a `gh.cmd` on Windows nor one only `GITHUB_CLI_PATH`
+    names. It reports a missing gh or a timeout in its result rather than
+    raising, so a machine without gh simply reads as "not logged in".
     """
-    import subprocess
+    from core.gh_executable import run_gh
 
-    from core.gh_executable import get_gh_executable
-
-    gh = get_gh_executable()
-    if gh is None:
-        return False
-    try:
-        result = subprocess.run(
-            [gh, "auth", "status"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=10,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return False
+    result = run_gh(["auth", "status"], timeout=10)
     return "Logged in to github.com" in result.stdout + result.stderr
 
 
