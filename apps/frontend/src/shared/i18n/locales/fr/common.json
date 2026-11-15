@@ -308,7 +308,8 @@
 			"largest": "Plus grand"
 		},
 		"pullRequests": "Pull Requests",
-		"open": "ouvert",
+		"openCount_one": "{{count}} ouverte",
+		"openCount_other": "{{count}} ouvertes",
 		"selectPRToView": "Sélectionner une pull request pour voir les détails",
 		"loadingPRs": "Chargement des pull requests...",
 		"noOpenPRs": "Aucune pull request ouverte",

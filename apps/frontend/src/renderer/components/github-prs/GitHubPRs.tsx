@@ -11,6 +11,7 @@ import { Button } from "../ui/button";
 import { ResizablePanels } from "../ui/resizable-panels";
 import { PRDetail, PRFilterBar, PRList } from "./components";
 import { useGitHubPRs, usePRFiltering } from "./hooks";
+import type { PRData } from "./hooks/useGitHubPRs";
 import { EmptyState as SharedEmptyState } from "../ui/empty-state";
 
 interface GitHubPRsProps {
@@ -48,29 +49,25 @@ function EmptyState({ message }: { message: string }) {
 	return <SharedEmptyState icon={GitPullRequest} description={message} />;
 }
 
-export function GitHubPRs({
-	onOpenSettings,
-	isActive = false,
-}: GitHubPRsProps) {
-	const { t } = useTranslation("common");
-	const projects = useProjectStore((state) => state.projects);
-	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
-	const selectedProject = projects.find((p) => p.id === selectedProjectId);
+type PRReview = ReturnType<typeof useGitHubPRs>;
 
+/**
+ * The selected PR's page. Its actions are bound to that PR here, so none of
+ * them has to wonder whether a PR is selected.
+ */
+function SelectedPRDetail({
+	pr,
+	projectId,
+	isActive,
+	review,
+}: {
+	readonly pr: PRData;
+	readonly projectId: string;
+	readonly isActive: boolean;
+	readonly review: PRReview;
+}) {
+	const prNumber = pr.number;
 	const {
-		prs,
-		isLoading,
-		isLoadingMore,
-		isLoadingPRDetails,
-		error,
-		selectedPRNumber,
-		reviewResult,
-		reviewProgress,
-		startedAt,
-		isReviewing,
-		previousReviewResult,
-		hasMore,
-		selectPR,
 		runReview,
 		runFollowupReview,
 		checkNewCommits,
@@ -80,19 +77,96 @@ export function GitHubPRs({
 		mergePR,
 		assignPR,
 		markReviewPosted,
+	} = review;
+
+	const onRunReview = useCallback(() => runReview(prNumber), [prNumber, runReview]);
+	const onRunFollowupReview = useCallback(
+		() => runFollowupReview(prNumber),
+		[prNumber, runFollowupReview],
+	);
+	const onCheckNewCommits = useCallback(
+		() => checkNewCommits(prNumber),
+		[prNumber, checkNewCommits],
+	);
+	const onCancelReview = useCallback(
+		() => cancelReview(prNumber),
+		[prNumber, cancelReview],
+	);
+	const onPostReview = useCallback(
+		(ids?: string[], options?: { forceApprove?: boolean }) =>
+			postReview(prNumber, ids, options),
+		[prNumber, postReview],
+	);
+	const onPostComment = useCallback(
+		(body: string) => postComment(prNumber, body),
+		[prNumber, postComment],
+	);
+	const onMergePR = useCallback(
+		(method?: "merge" | "squash" | "rebase") => mergePR(prNumber, method),
+		[prNumber, mergePR],
+	);
+	const onAssignPR = useCallback(
+		(username: string) => assignPR(prNumber, username),
+		[prNumber, assignPR],
+	);
+	const onGetLogs = useCallback(
+		() => window.electronAPI.github.getPRLogs(projectId, prNumber),
+		[projectId, prNumber],
+	);
+
+	return (
+		<PRDetail
+			pr={pr}
+			projectId={projectId}
+			reviewResult={review.reviewResult}
+			previousReviewResult={review.previousReviewResult}
+			reviewProgress={review.reviewProgress}
+			startedAt={review.startedAt}
+			isReviewing={review.isReviewing}
+			initialNewCommitsCheck={
+				review.getReviewStateForPR(prNumber)?.newCommitsCheck ?? null
+			}
+			isActive={isActive}
+			isLoadingFiles={review.isLoadingPRDetails}
+			onRunReview={onRunReview}
+			onRunFollowupReview={onRunFollowupReview}
+			onCheckNewCommits={onCheckNewCommits}
+			onCancelReview={onCancelReview}
+			onPostReview={onPostReview}
+			onPostComment={onPostComment}
+			onMergePR={onMergePR}
+			onAssignPR={onAssignPR}
+			onGetLogs={onGetLogs}
+			onMarkReviewPosted={markReviewPosted}
+		/>
+	);
+}
+
+export function GitHubPRs({
+	onOpenSettings,
+	isActive = false,
+}: GitHubPRsProps) {
+	const { t } = useTranslation("common");
+	const projects = useProjectStore((state) => state.projects);
+	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
+	const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
+	const review = useGitHubPRs(selectedProject?.id, { isActive });
+	const {
+		prs,
+		isLoading,
+		isLoadingMore,
+		error,
+		selectedPRNumber,
+		hasMore,
+		selectPR,
 		refresh,
 		loadMore,
 		isConnected,
 		repoFullName,
 		getReviewStateForPR,
 		selectedPR,
-	} = useGitHubPRs(selectedProject?.id, { isActive });
-
-	// Get newCommitsCheck for the selected PR (other values come from hook to ensure consistency)
-	const selectedPRReviewState = selectedPRNumber
-		? getReviewStateForPR(selectedPRNumber)
-		: null;
-	const storedNewCommitsCheck = selectedPRReviewState?.newCommitsCheck ?? null;
+	} = review;
 
 	// PR filtering
 	const {
@@ -107,91 +181,8 @@ export function GitHubPRs({
 		hasActiveFilters,
 	} = usePRFiltering(prs, getReviewStateForPR);
 
-	const handleRunReview = useCallback(() => {
-		if (selectedPRNumber) {
-			runReview(selectedPRNumber);
-		}
-	}, [selectedPRNumber, runReview]);
-
-	const handleRunFollowupReview = useCallback(() => {
-		if (selectedPRNumber) {
-			runFollowupReview(selectedPRNumber);
-		}
-	}, [selectedPRNumber, runFollowupReview]);
-
-	const handleCheckNewCommits = useCallback(async () => {
-		if (selectedPRNumber) {
-			return await checkNewCommits(selectedPRNumber);
-		}
-		return { hasNewCommits: false, newCommitCount: 0 };
-	}, [selectedPRNumber, checkNewCommits]);
-
-	const handleCancelReview = useCallback(() => {
-		if (selectedPRNumber) {
-			cancelReview(selectedPRNumber);
-		}
-	}, [selectedPRNumber, cancelReview]);
-
-	const handlePostReview = useCallback(
-		async (
-			selectedFindingIds?: string[],
-			options?: { forceApprove?: boolean },
-		): Promise<boolean> => {
-			if (selectedPRNumber && reviewResult) {
-				return await postReview(selectedPRNumber, selectedFindingIds, options);
-			}
-			return false;
-		},
-		[selectedPRNumber, reviewResult, postReview],
-	);
-
-	const handlePostComment = useCallback(
-		async (body: string): Promise<boolean> => {
-			if (selectedPRNumber) {
-				return await postComment(selectedPRNumber, body);
-			}
-			return false;
-		},
-		[selectedPRNumber, postComment],
-	);
-
-	const handleMergePR = useCallback(
-		async (mergeMethod?: "merge" | "squash" | "rebase") => {
-			if (selectedPRNumber) {
-				await mergePR(selectedPRNumber, mergeMethod);
-			}
-		},
-		[selectedPRNumber, mergePR],
-	);
-
-	const handleAssignPR = useCallback(
-		async (username: string) => {
-			if (selectedPRNumber) {
-				await assignPR(selectedPRNumber, username);
-			}
-		},
-		[selectedPRNumber, assignPR],
-	);
-
-	const handleGetLogs = useCallback(async () => {
-		if (selectedProjectId && selectedPRNumber) {
-			return await window.electronAPI.github.getPRLogs(
-				selectedProjectId,
-				selectedPRNumber,
-			);
-		}
-		return null;
-	}, [selectedProjectId, selectedPRNumber]);
-
-	const handleMarkReviewPosted = useCallback(
-		async (prNumber: number) => {
-			await markReviewPosted(prNumber);
-		},
-		[markReviewPosted],
-	);
-
 	// Not connected state
-	if (!isConnected) {
+	if (!isConnected || !selectedProject) {
 		return (
 			<NotConnectedState error={error} onOpenSettings={onOpenSettings} t={t} />
 		);
@@ -218,7 +209,7 @@ export function GitHubPRs({
 						</a>
 					)}
 					<span className="text-xs text-muted-foreground">
-						{prs.length} {t("prReview.open")}
+						{t("prReview.openCount", { count: prs.length })}
 					</span>
 				</div>
 				<Button
@@ -226,6 +217,7 @@ export function GitHubPRs({
 					size="icon"
 					onClick={refresh}
 					disabled={isLoading}
+					aria-label={t("accessibility.refreshAriaLabel")}
 				>
 					<RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
 				</Button>
@@ -265,27 +257,11 @@ export function GitHubPRs({
 				}
 				rightPanel={
 					selectedPR ? (
-						<PRDetail
+						<SelectedPRDetail
 							pr={selectedPR}
-							projectId={selectedProjectId || ""}
-							reviewResult={reviewResult}
-							previousReviewResult={previousReviewResult}
-							reviewProgress={reviewProgress}
-							startedAt={startedAt}
-							isReviewing={isReviewing}
-							initialNewCommitsCheck={storedNewCommitsCheck}
+							projectId={selectedProject.id}
 							isActive={isActive}
-							isLoadingFiles={isLoadingPRDetails}
-							onRunReview={handleRunReview}
-							onRunFollowupReview={handleRunFollowupReview}
-							onCheckNewCommits={handleCheckNewCommits}
-							onCancelReview={handleCancelReview}
-							onPostReview={handlePostReview}
-							onPostComment={handlePostComment}
-							onMergePR={handleMergePR}
-							onAssignPR={handleAssignPR}
-							onGetLogs={handleGetLogs}
-							onMarkReviewPosted={handleMarkReviewPosted}
+							review={review}
 						/>
 					) : (
 						<EmptyState message={t("prReview.selectPRToView")} />
