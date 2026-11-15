@@ -236,7 +236,6 @@
   "apps/backend/provider_api.py": {"blind": 30, "silent": 1},
   "apps/backend/provider_models_catalog.py": {"blind": 4, "silent": 1},
   "apps/backend/qa/auto_fix_loop.py": {"blind": 1, "silent": 0},
-  "apps/backend/qa/auto_fix_metrics.py": {"blind": 3, "silent": 0},
   "apps/backend/qa/budget.py": {"blind": 1, "silent": 0},
   "apps/backend/qa/fixer.py": {"blind": 2, "silent": 1},
   "apps/backend/qa/loop.py": {"blind": 13, "silent": 1},

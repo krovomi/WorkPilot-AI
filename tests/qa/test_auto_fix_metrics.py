@@ -236,3 +236,73 @@ class TestAutoFixPublicAPI:
         captured = capsys.readouterr()
         assert "Total Runs: 1" in captured.out
         assert "Successful: 1" in captured.out
+
+
+class TestAHandEditedPlan:
+    @pytest.mark.parametrize("text", ["{not json", "[1, 2]"])
+    def test_an_unreadable_plan_reads_as_no_run(self, mock_spec_dir, text):
+        (mock_spec_dir / "implementation_plan.json").write_text(text, encoding="utf-8")
+        tracker = AutoFixMetricsTracker(mock_spec_dir)
+
+        assert tracker.load_stats().total_runs == 0
+        tracker.record_run(success=True, attempts=1, duration=1.0)  # never raises
+        tracker.reset_stats()  # never raises
+        assert tracker.get_summary() == "No auto-fix runs recorded yet."
+
+    def test_without_a_plan_nothing_is_recorded_or_reset(self, mock_spec_dir):
+        (mock_spec_dir / "implementation_plan.json").unlink()
+        tracker = AutoFixMetricsTracker(mock_spec_dir)
+
+        tracker.record_run(success=True, attempts=1, duration=1.0)
+        tracker.reset_stats()
+
+        assert not (mock_spec_dir / "implementation_plan.json").exists()
+
+    def test_stats_written_before_patterns_were_kept_get_them(self, mock_spec_dir):
+        plan_file = mock_spec_dir / "implementation_plan.json"
+        plan = json.loads(plan_file.read_text(encoding="utf-8"))
+        plan["auto_fix_stats"] = {
+            "total_runs": 1,
+            "successful_runs": 1,
+            "total_attempts": 2,
+            "runs": [],
+        }
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+
+        record_auto_fix_run(
+            mock_spec_dir, success=False, attempts=3, duration=5.0, error_patterns=["x"]
+        )
+
+        stats = get_auto_fix_stats(mock_spec_dir)
+        assert stats.total_runs == 2 and stats.common_patterns == {"x": 1}
+
+    def test_only_the_last_fifty_runs_are_kept(self, mock_spec_dir):
+        tracker = AutoFixMetricsTracker(mock_spec_dir)
+        for n in range(52):
+            tracker.record_run(success=n % 2 == 0, attempts=n + 1, duration=1.0)
+
+        stats = tracker.load_stats()
+        assert stats.total_runs == 52
+        assert [r["attempts"] for r in stats.runs][0] == 3
+        assert len(stats.runs) == 50
+
+    def test_an_empty_history_has_no_recent_run(self, mock_spec_dir):
+        dashboard = get_auto_fix_dashboard_data(mock_spec_dir)
+
+        assert dashboard["recentRuns"] == [] and dashboard["commonPatterns"] == []
+
+    def test_the_dashboard_lists_the_five_most_common_patterns(self, mock_spec_dir):
+        for n, pattern in enumerate("abcdef"):
+            for _ in range(n + 1):
+                record_auto_fix_run(
+                    mock_spec_dir,
+                    success=True,
+                    attempts=1,
+                    duration=1.0,
+                    error_patterns=[pattern],
+                )
+
+        patterns = get_auto_fix_dashboard_data(mock_spec_dir)["commonPatterns"]
+
+        assert [p["pattern"] for p in patterns] == ["f", "e", "d", "c", "b"]
+        assert patterns[0]["count"] == 6
