@@ -15,7 +15,6 @@ Detects external service integrations based on dependencies:
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
@@ -142,9 +141,7 @@ class ServicesDetector(BaseAnalyzer):
         all_deps = set()
 
         # Python dependencies
-        if self._exists("requirements.txt"):
-            content = self._read_file("requirements.txt")
-            all_deps.update(re.findall(r"^([a-zA-Z0-9_-]+)", content, re.MULTILINE))
+        all_deps.update(self._python_requirements())
 
         # Node.js dependencies
         pkg = self._read_json("package.json")
