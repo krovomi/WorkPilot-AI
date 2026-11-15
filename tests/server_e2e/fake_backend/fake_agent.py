@@ -36,6 +36,7 @@ import base64
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -158,15 +159,21 @@ def _build(project: Path, spec_dir: Path, task: str) -> None:
             str(workspace),
             "HEAD",
         )
+    # The build works on its own copy of the spec, in the workspace, and the
+    # board reads the card from it (``shared_board/listing.card_source``).
+    copy = workspace / ".workpilot" / "specs" / spec
+    if not (copy / "spec.md").is_file():
+        shutil.copytree(spec_dir, copy, dirs_exist_ok=True)
     notes = workspace / "BUILD_NOTES.md"
     previous = notes.read_text(encoding="utf-8") if notes.is_file() else ""
     notes.write_text(f"{previous}Built by the fake agent.\n{task}\n", encoding="utf-8")
     _git(workspace, "add", "BUILD_NOTES.md")
     _git(workspace, "commit", "-m", "Fake agent build")
-    plan = spec_dir / "implementation_plan.json"
-    content = json.loads(plan.read_text(encoding="utf-8")) if plan.is_file() else {}
-    content["status"] = "human_review"
-    plan.write_text(json.dumps(content, indent=1), encoding="utf-8")
+    for directory in (copy, spec_dir):
+        plan = directory / "implementation_plan.json"
+        content = json.loads(plan.read_text(encoding="utf-8")) if plan.is_file() else {}
+        content["status"] = "human_review"
+        plan.write_text(json.dumps(content, indent=1), encoding="utf-8")
 
 
 def main(phase: str, argv: list[str]) -> int:
