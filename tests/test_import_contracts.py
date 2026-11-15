@@ -50,6 +50,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # registries and its record; git through foundation. The QA gate that
     # calls it, and offline_policy, live in qa. A leaf.
     "dependency_guard": {"foundation"},
+    # The watch after a deployment (docs/architecture/deploy-watch.md): git and
+    # atomic writes through foundation, the strict offline policy. A leaf the
+    # deploy watch runner calls.
+    "deploy_watch": {"foundation", "offline_policy"},
     # The API contract watcher (docs/architecture/api-contract-watcher.md):
     # git through foundation; the consumer registry is read in the main
     # checkout (security.guardrail_policy.main_project). Its QA gate is in qa,
