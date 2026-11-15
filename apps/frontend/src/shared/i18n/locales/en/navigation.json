@@ -491,5 +491,11 @@
 		},
 		"noCredentials": "REA runs without your credentials, from a folder of its own, and only reads files.",
 		"docsFailed": "The link did not open: {{error}}"
+	},
+	"cliStatus": {
+		"installFailed": "Installation failed",
+		"terminalUnavailable": "Could not open a terminal.",
+		"pathSwitchUnavailable": "Switching the CLI installation is not available.",
+		"pathSwitchFailed": "Could not switch the CLI installation."
 	}
 }

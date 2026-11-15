@@ -491,5 +491,11 @@
 		},
 		"noCredentials": "REA tourne sans vos identifiants, depuis un dossier à lui, et ne fait que lire des fichiers.",
 		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}"
+	},
+	"cliStatus": {
+		"installFailed": "Échec de l'installation",
+		"terminalUnavailable": "Impossible d'ouvrir un terminal.",
+		"pathSwitchUnavailable": "Le changement d'installation du CLI n'est pas disponible.",
+		"pathSwitchFailed": "Impossible de changer d'installation du CLI."
 	}
 }
