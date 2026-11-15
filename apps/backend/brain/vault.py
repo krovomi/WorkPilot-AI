@@ -215,6 +215,8 @@ class Brain:
 
     def before_read(self) -> SyncResult | None:
         result = pull_if_stale(self.root) if _auto("BRAIN_AUTO_PULL") else None
+        if result is not None:
+            self._review_pull(result)
         if (result and result.pulled) or self.graph_is_stale():
             self._refresh()
         return result
@@ -232,10 +234,23 @@ class Brain:
         """
         refresh_bridges(self.root)
         result = sync(self.root, message, push=push)
+        self._review_pull(result)
         if result.pulled or self.graph_is_stale():
             self._refresh()
             refresh_bridges(self.root)
         return result
+
+    def _review_pull(self, result: SyncResult) -> None:
+        """Contradictions the pull brought into a project memory: settled by
+        the safe rules or queued for a person (`lifecycle.arbitration`). What
+        an automatic rule archived is committed by the next sync."""
+        if not (result.pulled and (result.received or result.conflicts)):
+            return
+        from .lifecycle.arbitration import review_pull
+
+        result.memory_conflicts = review_pull(
+            self.root, result.received, result.conflicts
+        )
 
     # -- write -------------------------------------------------------------
 
