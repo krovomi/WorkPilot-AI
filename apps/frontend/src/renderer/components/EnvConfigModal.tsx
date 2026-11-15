@@ -127,7 +127,7 @@ export function EnvConfigModal({
 		loadData();
 	// Not on the selected profile: picking another account must not reload
 	// the dialog (that showed the spinner and refetched on every click).
-	}, [open]);
+	}, [open, t]);
 
 	// Listen for OAuth token from terminal
 	useEffect(() => {

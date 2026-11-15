@@ -5,7 +5,7 @@
  * The Claude token dialog: reuse an authenticated account, log in through the
  * browser, or paste a token; and the errors of each path.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EnvConfigModal } from "../EnvConfigModal";
 import { TooltipProvider } from "../ui/tooltip";
@@ -111,7 +111,10 @@ describe("EnvConfigModal", () => {
 		await screen.findByText("Select Account");
 		expect(api.getClaudeProfiles).toHaveBeenCalledTimes(1);
 		fireEvent.click(screen.getByRole("button", { name: /Personal/ }));
-		await act(async () => {});
+		// Let a reload, if one were triggered, start.
+		await act(async () => {
+			await Promise.resolve();
+		});
 		expect(api.getClaudeProfiles).toHaveBeenCalledTimes(1);
 		expect(api.checkSourceToken).toHaveBeenCalledTimes(1);
 		expect(screen.getByText("Select Account")).toBeInTheDocument();
