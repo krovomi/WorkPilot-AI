@@ -62,12 +62,14 @@ from .base import sanitize_error_message
 from .manual_verification import settle_block
 from .memory_manager import save_session_memory
 from .session_recording import SessionRecording, client_usage
+from .tool_breaker import ToolBreaker
 from .tool_display import (
     extract_streaming_command,
     extract_streaming_file_change,
     format_tool_input_display,
     is_command_tool,
 )
+from .tool_results import show_tool_result
 from .utils import (
     find_subtask_in_plan,
     get_commit_count,
@@ -1119,6 +1121,7 @@ async def run_agent_session(
         provider="claude",
         model=getattr(getattr(client, "options", None), "model", "") or "",
     )
+    breaker = ToolBreaker(spec_dir, phase.value)
 
     try:
         # Send the query
@@ -1225,6 +1228,7 @@ async def run_agent_session(
                         current_tool = tool_name
 
                         _rec.tool_use(tool_name, inp)
+                        breaker.call(tool_name, inp, getattr(block, "id", None))
 
                         # Stream tool use events to live view
                         if streaming_wrapper and inp:
@@ -1258,76 +1262,19 @@ async def run_agent_session(
                         result_content = getattr(block, "content", "")
                         is_error = getattr(block, "is_error", False)
 
-                        # Check if this is an error (not just content containing "blocked")
-                        if is_error and "blocked" in str(result_content).lower():
-                            # Actual blocked command by security hook
-                            debug_error(
-                                "session",
-                                f"Tool BLOCKED: {current_tool}",
-                                result=str(result_content)[:300],
-                            )
-                            print(f"   [BLOCKED] {result_content}", flush=True)
-                            if task_logger and current_tool:
-                                task_logger.tool_end(
-                                    current_tool,
-                                    success=False,
-                                    result="BLOCKED",
-                                    detail=str(result_content),
-                                    phase=phase,
-                                )
-                        elif is_error:
-                            # Show errors (truncated)
-                            error_str = str(result_content)[:500]
-                            debug_error(
-                                "session",
-                                f"Tool error: {current_tool}",
-                                error=error_str[:200],
-                            )
-                            print(f"   [Error] {error_str}", flush=True)
-                            if task_logger and current_tool:
-                                # Store full error in detail for expandable view
-                                task_logger.tool_end(
-                                    current_tool,
-                                    success=False,
-                                    result=error_str[:100],
-                                    detail=str(result_content),
-                                    phase=phase,
-                                )
-                        else:
-                            # Tool succeeded
-                            debug_detailed(
-                                "session",
-                                f"Tool success: {current_tool}",
-                                result_length=len(str(result_content)),
-                            )
-                            if verbose:
-                                result_str = str(result_content)[:200]
-                                print(f"   [Done] {result_str}", flush=True)
-                            else:
-                                print("   [Done]", flush=True)
-                            if task_logger and current_tool:
-                                # Store full result in detail for expandable view (only for certain tools)
-                                # Skip storing for very large outputs like Glob results
-                                detail_content = None
-                                if current_tool in (
-                                    "Read",
-                                    "Grep",
-                                    "Bash",
-                                    "Edit",
-                                    "Write",
-                                ):
-                                    result_str = str(result_content)
-                                    # Only store if not too large (detail truncation happens in logger)
-                                    if (
-                                        len(result_str) < 50000
-                                    ):  # 50KB max before truncation
-                                        detail_content = result_str
-                                task_logger.tool_end(
-                                    current_tool,
-                                    success=True,
-                                    detail=detail_content,
-                                    phase=phase,
-                                )
+                        show_tool_result(
+                            task_logger,
+                            current_tool,
+                            result_content,
+                            is_error,
+                            verbose=verbose,
+                            phase=phase,
+                        )
+                        breaker.result(
+                            result_content,
+                            is_error,
+                            getattr(block, "tool_use_id", None),
+                        )
 
                         # Stream command output to live view
                         if streaming_wrapper and current_tool:
@@ -1343,6 +1290,8 @@ async def run_agent_session(
                         _rec.tool_result(result_content, is_error=is_error)
 
                         current_tool = None
+            if breaker.tripped:
+                break
 
         print("\n" + "-" * 70 + "\n")
 
@@ -1793,6 +1742,7 @@ async def _run_agent_client_session(
     message_count = 0
     tool_count = 0
     recording = recording or SessionRecording(None, phase, provider="", model="")
+    breaker = ToolBreaker(spec_dir, phase.value)
 
     # Conversation log context: provider, model and subtask_id are persisted on
     # every message so a different provider can replay the transcript later.
@@ -1985,6 +1935,7 @@ async def _run_agent_client_session(
                             print(f"   Input: {input_str}", flush=True)
                     current_tool = tool_name
                     recording.tool_use(tool_name, inp)
+                    breaker.call(tool_name, inp, block.tool_id)
 
                     # Stream tool use events to live view
                     if streaming_wrapper and inp:
@@ -2011,66 +1962,15 @@ async def _run_agent_client_session(
                     is_error = block.is_error
                     result_content = block.result_content or ""
 
-                    if is_error and "blocked" in str(result_content).lower():
-                        debug_error(
-                            "session",
-                            f"Tool BLOCKED: {current_tool}",
-                            result=str(result_content)[:300],
-                        )
-                        print(f"   [BLOCKED] {result_content}", flush=True)
-                        if task_logger and current_tool:
-                            task_logger.tool_end(
-                                current_tool,
-                                success=False,
-                                result="BLOCKED",
-                                detail=str(result_content),
-                                phase=phase,
-                            )
-                    elif is_error:
-                        error_str = str(result_content)[:500]
-                        debug_error(
-                            "session",
-                            f"Tool error: {current_tool}",
-                            error=error_str[:200],
-                        )
-                        print(f"   [Error] {error_str}", flush=True)
-                        if task_logger and current_tool:
-                            task_logger.tool_end(
-                                current_tool,
-                                success=False,
-                                result=error_str[:100],
-                                detail=str(result_content),
-                                phase=phase,
-                            )
-                    else:
-                        debug_detailed(
-                            "session",
-                            f"Tool success: {current_tool}",
-                            result_length=len(str(result_content)),
-                        )
-                        if verbose:
-                            result_str = str(result_content)[:200]
-                            print(f"   [Done] {result_str}", flush=True)
-                        else:
-                            print("   [Done]", flush=True)
-                        if task_logger and current_tool:
-                            detail_content = None
-                            if current_tool in (
-                                "Read",
-                                "Grep",
-                                "Bash",
-                                "Edit",
-                                "Write",
-                            ):
-                                result_str = str(result_content)
-                                if len(result_str) < 50000:
-                                    detail_content = result_str
-                            task_logger.tool_end(
-                                current_tool,
-                                success=True,
-                                detail=detail_content,
-                                phase=phase,
-                            )
+                    show_tool_result(
+                        task_logger,
+                        current_tool,
+                        result_content,
+                        is_error,
+                        verbose=verbose,
+                        phase=phase,
+                    )
+                    breaker.result(result_content, is_error, block.tool_use_id)
 
                     # Stream command output to live view
                     if streaming_wrapper and current_tool:
@@ -2155,6 +2055,8 @@ async def _run_agent_client_session(
                     f"{BUDGET_ENV} to allow more.",
                     flush=True,
                 )
+                break
+            if breaker.tripped:
                 break
 
         print("\n" + "-" * 70 + "\n")

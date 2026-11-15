@@ -174,8 +174,8 @@ jobs:
           python -m pip install --quiet 'coverage>=7.10'
           python -m coverage combine .coverage.shard*
           # A floor, not a goal: just under what the suite covers, raised by
-          # each lot of the 100 % plan (74.6 % on 15 November 2026).
-          python -m coverage report --fail-under=74.5 | tail -n 3
+          # each lot of the 100 % plan (75.1 % on 15 November 2026).
+          python -m coverage report --fail-under=75 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
 
       # The floor above holds the whole suite; this holds each change at
