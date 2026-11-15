@@ -7,8 +7,7 @@ section: 🐛 Corrections
 - **Contexte d'une tâche** : un projet rangé sous un dossier nommé `build`, `dist` ou `out` n'est
   plus ignoré en entier ; les imports relatifs JavaScript (`./`, `../`) et `from paquet import
   module` en Python relient enfin les fichiers ; la recherche de code lit aussi C#, Java, Kotlin,
-  Go, Rust, PHP, Ruby, Swift… et nomme les fichiers `src/a.cs` sur tous les systèmes ; les
-  dépendances circulaires sont rapportées dans le même ordre sur tous les systèmes.
+  Go, Rust, PHP, Ruby, Swift… et nomme les fichiers `src/a.cs` sur tous les systèmes.
 - **Clonage d'environnement** : une image d'un registre avec port (`registry:5000/api`), les ports
   en syntaxe longue ou `127.0.0.1:8000:80`, un `docker-compose.yml` vide et la sortie JSON en
   tableau des versions récentes de Compose ne font plus échouer la capture ; sans PyYAML, les
@@ -22,3 +21,4 @@ section: 🐛 Corrections
   la recherche se faisait par chemin) ; la pile vient du détecteur commun à toute l'app ; un projet
   se retire avec le chemin tapé ; un enregistrement illisible ne masque plus tous les autres et
   chaque fichier s'écrit de façon atomique.
+- **Cycles d'imports du contexte** : un cycle est nommé à partir du même fichier sur toutes les machines ; le premier fichier dépendait de l'ordre dans lequel le disque listait les fichiers.

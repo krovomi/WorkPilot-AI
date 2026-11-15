@@ -632,6 +632,15 @@ class TestDependencyGraph:
 
 
 class TestAnalyzer:
+    def test_a_cycle_reads_the_same_whatever_the_disk_order(self, graph_project):
+        """`rglob` lists files in the filesystem's order, not in name order."""
+        graph = DependencyGraphBuilder(graph_project).build()
+        graph.nodes = dict(reversed(list(graph.nodes.items())))
+
+        cycles = DependencyAnalyzer(graph).detect_cycles()
+
+        assert [c.cycle for c in cycles] == [["pkg/a.py", "pkg/b.py"]]
+
     def test_cycles_orphans_and_neighbours(self, graph_project):
         analyzer = DependencyAnalyzer(DependencyGraphBuilder(graph_project).build())
 
@@ -649,21 +658,6 @@ class TestAnalyzer:
         related = analyzer.get_related_files(["web/src/lib/x.ts"])
         assert related[0] in {"web/src/index.ts", "web/shared/y.jsx"}
         assert "web/src/lib/z.js" in related
-
-    def test_a_cycle_reads_the_same_whatever_the_disk_order(self):
-        def cycles(order):
-            graph = DependencyGraph()
-            nodes = {
-                "b.py": DependencyNode("b.py", imports=["a.py"], imported_by=["a.py"]),
-                "a.py": DependencyNode("a.py", imports=["b.py"], imported_by=["b.py"]),
-            }
-            for path in order:
-                graph.add_node(nodes[path])
-            return [c.cycle for c in DependencyAnalyzer(graph).detect_cycles()]
-
-        assert (
-            cycles(["b.py", "a.py"]) == cycles(["a.py", "b.py"]) == [["a.py", "b.py"]]
-        )
 
     def test_an_orphan_with_imports(self):
         graph = DependencyGraph()
@@ -698,7 +692,7 @@ class TestAnalyzer:
         analyzer = DependencyAnalyzer(graph)
         analyzer.MAX_CYCLES_REPORTED = 3
 
-        # Path order: a0, a1, a10, a11, a2...
+        # The first three in name order: a0, a1, then a10.
         assert analyzer.detect_cycles() == [
             CircularDependency([f"a{i}", f"b{i}"]) for i in (0, 1, 10)
         ]

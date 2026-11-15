@@ -132,7 +132,7 @@ class DependencyAnalyzer:
 
             node = self.graph.nodes.get(node_path)
             if node:
-                for dep in sorted(node.imports):
+                for dep in node.imports:
                     if dep not in self.graph.nodes:
                         continue
                     if dep not in visited:
@@ -146,8 +146,8 @@ class DependencyAnalyzer:
             in_stack.pop()
             in_stack_set.discard(node_path)
 
-        # Walked in path order, so the same project reports the same cycles,
-        # starting from the same file, whatever order the disk listed it in.
+        # Sorted: the graph's order is the disk's (`rglob`), which differs from
+        # one filesystem to another, and so did the first file of each cycle.
         for path in sorted(self.graph.nodes):
             if path not in visited:
                 dfs(path)
