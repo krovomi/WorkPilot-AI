@@ -22,6 +22,7 @@ from agents.swarm.wave_executor import (
     WaveExecutor,
     emit_swarm_event,
 )
+from foundation.platform import is_windows
 
 
 def _events(out: str) -> list[dict]:
@@ -224,7 +225,10 @@ async def test_cancelling_kills_the_running_subtasks(world: dict[str, Path]) -> 
         ("one", False),
         ("two", False),
     ]
-    assert all(r.error and r.error.startswith("Exit code -") for r in result.results)
+    # A killed process exits on SIGKILL on POSIX; Windows' TerminateProcess
+    # leaves exit code 1.
+    killed = "Exit code 1" if is_windows() else "Exit code -9"
+    assert all(r.error and r.error.startswith(killed) for r in result.results)
 
 
 @pytest.mark.asyncio
