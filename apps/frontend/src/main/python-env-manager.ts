@@ -13,6 +13,18 @@ import { getPathDelimiter, isLinux, isWindows } from "./platform";
 import { findPythonCommand, getBundledPythonPath } from "./python-detector";
 import { getIsolatedGitEnv } from "./utils/git-isolation";
 
+/**
+ * The modules whose presence says the backend's requirements are installed.
+ * Each one must come from a package `apps/backend/requirements.txt` installs
+ * (python-env-manager-deps.test.ts): a module nothing installs reads as
+ * "missing" forever, and every start of the app ran a full `pip install`.
+ */
+export const BACKEND_PRESENCE_MODULES = [
+	"claude_agent_sdk",
+	"dotenv",
+	"faster_whisper",
+] as const;
+
 export interface PythonEnvStatus {
 	ready: boolean;
 	pythonPath: string | null;
@@ -219,15 +231,10 @@ export class PythonEnvManager extends EventEmitter {
 		// This prevents issues where partial installs leave some packages missing
 		// See: https://github.com/AndyMik90/Auto-Claude/issues/359
 		//
-		// Dependencies checked:
-		// - claude_agent_sdk: Core agent SDK (required)
-		// - dotenv: Environment variable loading (required)
-		// - google.generativeai: Google AI/Gemini support (required for full functionality)
-		// - faster_whisper: local dictation
+		// Dependencies checked: BACKEND_PRESENCE_MODULES.
 		//
 		// IMPORTANT: we use importlib.util.find_spec (presence check) instead of
-		// actually `import`-ing the modules. Importing google.generativeai and
-		// its peers cold on Windows cost ~28s, which blew past the old 15s
+		// actually `import`-ing the modules. Importing the SDKs cold on Windows cost ~28s, which blew past the old 15s
 		// timeout — so a cold `pnpm run dev` wrongly concluded deps were missing
 		// and re-ran a full `pip install` on EVERY startup, freezing the main
 		// process. find_spec resolves the module locations without executing their
@@ -235,7 +242,7 @@ export class PythonEnvManager extends EventEmitter {
 		// child process (not execSync) so it never blocks the main event loop.
 		const checkScript = [
 			"import importlib.util as u, sys",
-			"mods = ['claude_agent_sdk', 'dotenv', 'google.generativeai', 'faster_whisper']",
+			`mods = ${JSON.stringify(BACKEND_PRESENCE_MODULES)}`,
 			"def present(m):",
 			"    try:",
 			"        return u.find_spec(m) is not None",

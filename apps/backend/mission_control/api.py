@@ -284,12 +284,16 @@ async def get_decision_tree(agent_id: str):
     return {"success": True, "tree": tree}
 
 
-@router.get("/agents/{agent_id}/decision-path")
+@router.get(
+    "/agents/{agent_id}/decision-path",
+    responses={404: {"description": AGENT_NOT_FOUND}},
+)
 async def get_decision_path(agent_id: str):
     """Get the flat decision path for an agent."""
     mc = get_mission_control()
-    path = mc.get_decision_path(agent_id)
-    return {"success": True, "path": path}
+    if mc.get_agent(agent_id) is None:
+        raise HTTPException(status_code=404, detail=AGENT_NOT_FOUND)
+    return {"success": True, "path": mc.get_decision_path(agent_id)}
 
 
 # ---------------------------------------------------------------------------

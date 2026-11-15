@@ -67,10 +67,16 @@ class ApiDocsDetector(BaseAnalyzer):
             return None
 
         deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
-        if "swagger-ui-express" in deps or "swagger-jsdoc" in deps:
+        # The library actually installed: swagger-jsdoc alone was reported as
+        # swagger-ui-express.
+        library = next(
+            (lib for lib in ("swagger-ui-express", "swagger-jsdoc") if lib in deps),
+            None,
+        )
+        if library:
             return {
                 "type": "openapi",
-                "library": "swagger-ui-express",
+                "library": library,
                 "docs_url": "/api-docs",
             }
 
@@ -86,10 +92,17 @@ class ApiDocsDetector(BaseAnalyzer):
             return None
 
         deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
-        if "graphql" in deps or "apollo-server" in deps or "@apollo/server" in deps:
-            return {
-                "playground_url": "/graphql",
-                "library": "apollo-server" if "apollo-server" in deps else "graphql",
-            }
+        # Apollo first (it depends on graphql); @apollo/server, Apollo 4, was
+        # reported as plain "graphql".
+        library = next(
+            (
+                lib
+                for lib in ("@apollo/server", "apollo-server", "graphql")
+                if lib in deps
+            ),
+            None,
+        )
+        if library:
+            return {"playground_url": "/graphql", "library": library}
 
         return None

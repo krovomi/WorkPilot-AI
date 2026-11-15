@@ -2,127 +2,19 @@
 Input Handlers
 ==============
 
-Reusable user input collection utilities for CLI commands.
+What the build asks the user to type or load: instructions from a file or
+typed over several lines.
 """
 
-import sys
 from pathlib import Path
-
-# Ensure parent directory is in path for imports (before other imports)
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
 
 from ui import (
     Icons,
-    MenuOption,
     box,
     icon,
     muted,
     print_status,
-    select_menu,
 )
-
-
-def collect_user_input_interactive(
-    title: str,
-    subtitle: str,
-    prompt_text: str,
-    allow_file: bool = True,
-    allow_paste: bool = True,
-) -> str | None:
-    """
-    Collect user input through an interactive menu.
-
-    Provides multiple input methods:
-    - Type directly
-    - Paste from clipboard
-    - Read from file (optional)
-
-    Args:
-        title: Menu title
-        subtitle: Menu subtitle
-        prompt_text: Text to display in the input box
-        allow_file: Whether to allow file input (default: True)
-        allow_paste: Whether to allow paste option (default: True)
-
-    Returns:
-        The collected input string, or None if cancelled
-    """
-    # Build options list
-    options = [
-        MenuOption(
-            key="type",
-            label="Type instructions",
-            icon=Icons.EDIT,
-            description="Enter text directly",
-        ),
-    ]
-
-    if allow_paste:
-        options.append(
-            MenuOption(
-                key="paste",
-                label="Paste from clipboard",
-                icon=Icons.CLIPBOARD,
-                description="Paste text you've copied (Cmd+V / Ctrl+Shift+V)",
-            )
-        )
-
-    if allow_file:
-        options.append(
-            MenuOption(
-                key="file",
-                label="Read from file",
-                icon=Icons.DOCUMENT,
-                description="Load text from a file",
-            )
-        )
-
-    options.extend(
-        [
-            MenuOption(
-                key="skip",
-                label="Continue without input",
-                icon=Icons.SKIP,
-                description="Skip this step",
-            ),
-            MenuOption(
-                key="quit",
-                label="Quit",
-                icon=Icons.DOOR,
-                description="Exit",
-            ),
-        ]
-    )
-
-    choice = select_menu(
-        title=title,
-        options=options,
-        subtitle=subtitle,
-        allow_quit=False,  # We have explicit quit option
-    )
-
-    if choice == "quit" or choice is None:
-        return None
-
-    if choice == "skip":
-        return ""
-
-    user_input = ""
-
-    if choice == "file":
-        # Read from file
-        user_input = read_from_file()
-        if user_input is None:
-            return None
-
-    elif choice in ["type", "paste"]:
-        user_input = read_multiline_input(prompt_text)
-        if user_input is None:
-            return None
-
-    return user_input
 
 
 def read_from_file() -> str | None:
@@ -165,7 +57,7 @@ def read_from_file() -> str | None:
     except PermissionError:
         print_status(f"Permission denied: cannot read {file_path_input}", "error")
         return None
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         print_status(f"Error reading file: {e}", "error")
         return None
 
@@ -189,17 +81,12 @@ def read_multiline_input(prompt_text: str) -> str | None:
     print()
 
     lines = []
-    empty_count = 0
     while True:
         try:
             line = input()
-            if line == "":
-                empty_count += 1
-                if empty_count >= 1:  # Stop on first empty line
-                    break
-            else:
-                empty_count = 0
-                lines.append(line)
+            if line == "":  # an empty line ends the input
+                break
+            lines.append(line)
         except KeyboardInterrupt:
             print()
             print_status("Cancelled.", "warning")

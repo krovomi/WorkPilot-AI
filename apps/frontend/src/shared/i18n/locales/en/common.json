@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Add another Claude subscription to automatically switch when you hit rate limits.",
 			"willOpenClaudeLogin": "This will open Claude login to authenticate the new account.",
 			"switchClaudeRetry": "Switch to another Claude account and retry the operation:",
-			"connectClaude": "Connect a Claude account:"
+			"connectClaude": "Connect a Claude account:",
+			"yourAccount": "your account",
+			"defaultAccount": "Default"
 		},
 		"recommendedAria": "Recommended"
 	},
@@ -480,7 +482,42 @@
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
 		"verdictOutdated": "AI verdict may be outdated",
-		"rerunReviewSuggestion": "Consider re-running the review after resolving these issues."
+		"rerunReviewSuggestion": "Consider re-running the review after resolving these issues.",
+		"feedback": {
+			"groupLabel": "Feedback on this finding",
+			"accept": "Accept",
+			"reject": "Reject",
+			"notApplicable": "Not applicable",
+			"reasonLabel": "Reason (optional)",
+			"noReason": "No reason",
+			"reasons": {
+				"too_pedantic": "Too pedantic",
+				"project_convention": "Project convention differs",
+				"false_positive": "False positive",
+				"legacy_exception": "Legacy code exception",
+				"other": "Other"
+			},
+			"noteLabel": "Details (optional)",
+			"notePlaceholder": "Why this does not apply here",
+			"save": "Save",
+			"cancel": "Cancel",
+			"show": "Show",
+			"hide": "Hide",
+			"learnedBadge_one": "Rejected {{count}} time on this project",
+			"learnedBadge_other": "Rejected {{count}} times on this project",
+			"learnedHint": "This kind of finding was rejected often on this project, so its severity was lowered.",
+			"suppressed_one": "{{count}} finding hidden by what this project rejected before",
+			"suppressed_other": "{{count}} findings hidden by what this project rejected before",
+			"suppressedHint": "Kinds of finding rejected often enough are no longer raised. Security and critical findings are never hidden.",
+			"rejectedCount_one": "(rejected {{count}} time)",
+			"rejectedCount_other": "(rejected {{count}} times)",
+			"errors": {
+				"invalid": "This feedback could not be read.",
+				"not_found": "This finding is no longer in the saved review.",
+				"server_project": "Feedback on findings is not available for server projects yet.",
+				"write_failed": "The feedback could not be saved."
+			}
+		}
 	},
 	"downloads": {
 		"toggleExpand": "Toggle download details",
@@ -631,10 +668,6 @@
 			"text": "Check that your OpenAI API key is linked to a billing-enabled organization.",
 			"link": "View OpenAI dashboard"
 		},
-		"debugProfiles": "Debug detected profiles:",
-		"noProfileDetected": "No profile detected",
-		"selectedProvider": "Selected provider: {{provider}}",
-		"openaiError": "OpenAI Error:",
 		"openaiDetailTitle": "OpenAI Detail",
 		"completionsLabel": "Completions (tokens by model):",
 		"costByModelLabel": "Cost by model:",
@@ -671,7 +704,6 @@
 		"lensAutoWith": "Automatic ({{provider}})",
 		"lensRunning": "{{provider}} — running",
 		"lensTooltip": "Which provider's usage the badges show. Automatic follows the tasks in progress. This changes nothing about what a task runs on.",
-		"debugProvider": "provider:",
 		"needsReauthTitle": "Needs re-authentication",
 		"sessionUsage": "Session usage",
 		"weeklyUsage": "Weekly usage",

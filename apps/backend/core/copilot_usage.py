@@ -158,9 +158,6 @@ class CopilotUsageConnector:
                 ["api", "user/enterprises", "--jq", ".[].slug"]
             )
 
-            if enterprises_result.returncode != 0:
-                raise RuntimeError("Failed to fetch user enterprises")
-
             enterprises = [
                 line.strip()
                 for line in enterprises_result.stdout.strip().split("\n")
@@ -189,7 +186,7 @@ class CopilotUsageConnector:
                         ]
                     )
 
-                    if usage_result.returncode == 0 and usage_result.stdout.strip():
+                    if usage_result.stdout.strip():
                         usage_data = json.loads(usage_result.stdout)
 
                         # Les données retournées contiennent des liens de téléchargement
@@ -282,7 +279,7 @@ class CopilotUsageConnector:
             ]
         )
 
-        if usage_result.returncode == 0 and usage_result.stdout.strip():
+        if usage_result.stdout.strip():
             usage_data = json.loads(usage_result.stdout)
 
             if "download_links" in usage_data and usage_data["download_links"]:
@@ -331,9 +328,6 @@ class CopilotUsageConnector:
             orgs_result = self._run_gh_command(
                 ["api", "user/orgs", "--jq", ".[].login"]
             )
-
-            if orgs_result.returncode != 0:
-                raise RuntimeError("Failed to fetch user organizations")
 
             organizations = [
                 line.strip()
@@ -387,10 +381,7 @@ class CopilotUsageConnector:
         """
         if permission_errors:
             raise RuntimeError(f"Insufficient permissions: {permission_errors[0]}")
-        elif not_found_errors:
-            raise RuntimeError("No Copilot usage data found for any organization")
-        else:
-            raise RuntimeError("No Copilot usage data found for any organization")
+        raise RuntimeError("No Copilot usage data found for any organization")
 
     def get_copilot_personal_quotas(self) -> dict[str, Any]:
         """
