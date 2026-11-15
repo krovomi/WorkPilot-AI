@@ -5,7 +5,6 @@
   "apps/backend/agents/agent_audit.py": {"blind": 4, "silent": 0},
   "apps/backend/agents/coder.py": {"blind": 18, "silent": 5},
   "apps/backend/agents/debugger.py": {"blind": 1, "silent": 0},
-  "apps/backend/agents/documenter.py": {"blind": 4, "silent": 4},
   "apps/backend/agents/feature_wiring.py": {"blind": 4, "silent": 0},
   "apps/backend/agents/impact_analyzer.py": {"blind": 3, "silent": 0},
   "apps/backend/agents/memory_manager.py": {"blind": 2, "silent": 0},
