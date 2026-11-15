@@ -15,19 +15,31 @@ if TYPE_CHECKING:
     pass
 
 
-def learning_context_for(project_dir, agent_type: str) -> str:
+def learning_context_for(project_dir, agent_type: str, spec_dir=None) -> str:
     """What the Learning Loop learned for `agent_type`, as a prompt block or "".
 
     The spec writer and its critic decide what is to be done, the job the
     planner's lessons are about (`learning_loop.prompt_injection`, both map to
     the `planning` phase). Before this, nothing in `spec/` asked for them, so a
     lesson the planner adopted was missing from the spec that frames its plan.
+
+    With the task's ``spec_dir``, the lessons its person turned off are left
+    out, what the prompt carried is recorded for the task panel, and the
+    checkpoints of the task's kind (``tasks.metadata``, written by
+    ``classify_spec`` before the spec) come along when this repository's QA
+    history asks for them (``learning_loop.kind_checkpoints``).
     Never raises: a spec is written with or without lessons.
     """
     from learning_loop.prompt_injection import context_for_agent
 
+    kind = None
+    if spec_dir is not None:
+        from tasks.metadata import read_task_metadata
+
+        value = read_task_metadata(spec_dir).get("kind")
+        kind = value if isinstance(value, str) else None
     # context_for_agent answers "" on any error of its own.
-    context = context_for_agent(project_dir, agent_type)
+    context = context_for_agent(project_dir, agent_type, spec_dir=spec_dir, kind=kind)
     return f"\n\n{context}" if context else ""
 
 
@@ -68,7 +80,7 @@ Create:
                 "spec_quick.md",
                 additional_context=context_str
                 + ("\n\n" + jev_advice if jev_advice else "")
-                + learning_context_for(self.project_dir, "spec_writer"),
+                + learning_context_for(self.project_dir, "spec_writer", self.spec_dir),
                 phase_name="quick_spec",
             )
 
@@ -204,7 +216,7 @@ It's OK to make reasonable assumptions to create a complete spec. The goal is to
             success, output = await self.run_agent_fn(
                 "spec_writer.md",
                 additional_context=additional_context
-                + learning_context_for(self.project_dir, "spec_writer"),
+                + learning_context_for(self.project_dir, "spec_writer", self.spec_dir),
                 phase_name="spec_writing",
             )
 
@@ -456,7 +468,9 @@ Output critique_report.json with:
             success, output = await self.run_agent_fn(
                 "spec_critic.md",
                 additional_context=context_str
-                + learning_context_for(self.project_dir, "spec_self_critique"),
+                + learning_context_for(
+                    self.project_dir, "spec_self_critique", self.spec_dir
+                ),
                 phase_name="self_critique",
             )
 
