@@ -521,6 +521,10 @@ def test_the_green_record_is_bounded_and_may_fail(repo, monkeypatch):
     record_green(root, "main", shas[1])
     record_green(root, "develop", shas[2])
     assert (last_green(root, "main"), last_green(root, "develop")) == ("", shas[2])
+    monkeypatch.setattr(green_module, "_MAX_BRANCHES", 2)
+    record_green(root, "main", shas[1])
+    record_green(root, "develop", shas[3])
+    assert (last_green(root, "main"), last_green(root, "develop")) == (shas[1], shas[3])
 
     def refuse(*_a, **_k):
         raise OSError("read-only")

@@ -25,7 +25,7 @@ import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
 __all__ = [
@@ -160,12 +160,17 @@ def fingerprint_incident(
     )
 
 
+def _is_absolute(path: str) -> bool:
+    """Absolute on any OS: a trace may come from a server other than this one."""
+    return PurePosixPath(path).is_absolute() or bool(PureWindowsPath(path).drive)
+
+
 def frame_files(trace: Any, limit: int = 10) -> list[str]:
     """The repository files of the trace, innermost first, each once."""
     files: list[str] = []
     for frame in getattr(trace, "project_frames", []) or []:
         path = str(getattr(frame, "path", "") or "").replace("\\", "/")
-        if path and path not in files and not Path(path).is_absolute():
+        if path and path not in files and not _is_absolute(path):
             files.append(path)
         if len(files) >= limit:
             break

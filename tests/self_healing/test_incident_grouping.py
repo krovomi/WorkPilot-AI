@@ -357,6 +357,7 @@ def test_frames_without_a_repository_path_are_passed_over():
             _frame("app\\orders.py", "Create"),
             _frame("app/orders.py"),
             _frame("/srv/abs.py"),
+            _frame("C:\\srv\\abs.py"),
             _frame("app/billing.py"),
             _frame("app/third.py"),
         ]
