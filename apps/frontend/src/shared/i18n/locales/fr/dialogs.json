@@ -85,7 +85,6 @@
 		"branchDescription": "Choisissez quelle branche WorkPilot AI doit utiliser comme base pour créer les branches de tâches.",
 		"whyBranch": "Pourquoi sélectionner une branche ?",
 		"branchExplanation": "WorkPilot AI crée des espaces de travail isolés pour chaque tâche. Sélectionner la bonne branche de base garantit que vos tâches démarrent avec le code le plus récent de votre ligne de développement principale.",
-		"ready": "WorkPilot AI est prêt à l'emploi ! Vous pouvez maintenant créer des tâches qui seront automatiquement basées sur la branche {{branchName}}.",
 		"createRepoAriaLabel": "Créer un nouveau dépôt sur GitHub",
 		"linkRepoAriaLabel": "Lier à un dépôt existant",
 		"goBackAriaLabel": "Retourner à la sélection du dépôt",
@@ -126,9 +125,17 @@
 		"recommended": "Recommandée",
 		"branchHintBefore": "Toutes les tâches seront créées depuis des branches comme",
 		"branchHintBasedOn": "basées sur",
-		"setupComplete": "Configuration terminée",
-		"readyBefore": "WorkPilot AI est prêt ! Vous pouvez maintenant créer des tâches qui partiront automatiquement de",
-		"retryDetection": "Relancer la détection"
+		"retryDetection": "Relancer la détection",
+		"progressAuthenticate": "Authentification",
+		"progressConfigure": "Configuration",
+		"errors": {
+			"detectFailed": "Impossible de détecter le dépôt.",
+			"branchesFailed": "Impossible de charger les branches.",
+			"ownerRequired": "Choisissez le propriétaire du dépôt.",
+			"createFailed": "Impossible de créer le dépôt.",
+			"repoPathInvalid": "Utilisez la forme propriétaire/dépôt, par exemple utilisateur/mon-projet.",
+			"linkFailed": "Impossible d'ajouter le dépôt distant."
+		}
 	},
 	"repoProvider": {
 		"title": "Choisir le fournisseur distant",
@@ -141,17 +148,6 @@
 		"jiraDescription": "Connecter à Jira pour le suivi des tickets et la gestion de projet (nécessite un dépôt Git séparé).",
 		"skip": "Ignorer pour le moment",
 		"skipDescription": "Ne pas connecter de fournisseur distant maintenant."
-	},
-	"azureDevOpsSetup": {
-		"title": "Connecter ? Azure DevOps",
-		"description": "Ajoutez vos identifiants Azure DevOps pour importer et synchroniser les work items.",
-		"loading": "Chargement des param?tres...",
-		"save": "Enregistrer",
-		"saving": "Enregistrement...",
-		"skip": "Ignorer pour le moment",
-		"orgUrlRequired": "L'URL d'organisation est requise",
-		"patRequired": "Le jeton d'accès personnel est requis",
-		"repositoryNote": "Vous pourrez sélectionner le repository dans les paramètres du projet après cette étape."
 	},
 	"worktrees": {
 		"count": "{{count}} worktrees",
@@ -282,7 +278,6 @@
 		"token": "Token",
 		"organization": "Organisation",
 		"pat": "PAT",
-		"fillRequiredFields": "Veuillez remplir tous les champs obligatoires",
 		"locationMustBeLocalPath": "L’emplacement doit être un chemin local, pas une URL de dépôt. Cliquez sur « Parcourir » pour choisir un dossier.",
 		"willBeCreatedAt": "Sera créé dans",
 		"successTitle": "Projet créé",
@@ -415,7 +410,11 @@
 		"create": "Ajouter au serveur",
 		"creating": "Clonage sur le serveur…",
 		"failed": "Le serveur n'a pas pu ajouter le projet",
-		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur"
+		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur",
+		"existingTitle": "Les projets de votre équipe",
+		"openExisting": "Ouvrir",
+		"openExistingNamed": "Ouvrir {{name}}",
+		"orAddNew": "Ou ajoutez un autre dépôt au serveur :"
 	},
 	"envConfig": {
 		"accountsCount_one": "Vous avez {{count}} compte Claude authentifié. Choisissez celui à utiliser :",

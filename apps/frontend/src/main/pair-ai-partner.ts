@@ -13,7 +13,7 @@
  * to the app: the answer can only be a chat message and a suggestion.
  */
 
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { isPathWithinBase } from "./worktree-paths";
 
@@ -59,19 +59,35 @@ export function readRoom(ops: PairOp[]): PairTurnContext {
 /**
  * The file's content, when `relPath` resolves inside `projectDir` (links
  * included) to a text file of a reasonable size; null otherwise.
+ *
+ * Type and size are checked on the open descriptor, which is also what is
+ * read, so nothing can swap the file between the check and the read.
+ * O_NOFOLLOW refuses a link put in its place where it exists; Windows has
+ * none, so the name must still be the file opened.
  */
 export function readProjectFile(projectDir: string, relPath: string): string | null {
 	if (!relPath || relPath.includes("\0")) return null;
+	let fd: number | null = null;
 	try {
 		const root = realpathSync(projectDir);
 		const resolved = realpathSync(path.resolve(root, relPath));
 		if (resolved === root || !isPathWithinBase(resolved, root)) return null;
-		const info = statSync(resolved);
-		if (!info.isFile() || info.size > MAX_FILE_BYTES) return null;
-		const content = readFileSync(resolved, "utf-8");
+		// O_NOFOLLOW is undefined on Windows, and `| undefined` adds nothing.
+		fd = openSync(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
+		const info = fstatSync(fd);
+		const named = lstatSync(resolved);
+		if (!info.isFile() || !named.isFile() || named.ino !== info.ino || named.dev !== info.dev) return null;
+		// Size is read, not trusted from fstat: one byte more than the limit
+		// tells a file too large, even one that grew since the check.
+		const buffer = Buffer.alloc(MAX_FILE_BYTES + 1);
+		const read = readSync(fd, buffer, 0, buffer.length, 0);
+		if (read > MAX_FILE_BYTES) return null;
+		const content = buffer.subarray(0, read).toString("utf-8");
 		return content.includes("\0") ? null : content;
 	} catch {
 		return null;
+	} finally {
+		if (fd !== null) closeSync(fd);
 	}
 }
 

@@ -98,3 +98,16 @@ premier `did-navigate` qui ne fait que la confirmer — le diff de la tâche est
 une seconde après le montage, donc une racine mémorisée comme un choix gagnerait
 contre la route que ce diff révèle. C'est la même distinction que porte le second
 argument d'`onNavigate`.
+
+## Ce que lance un démarrage (`ipc-handlers/app-emulator-handlers.ts`)
+
+La détection rend une configuration au renderer, qui l'affiche puis demande le
+démarrage. Le démarrage n'en reprend que le `projectDir` : la commande, les ports
+et les services lancés sont ceux que le main a détectés pour ce dossier, gardés
+par le handler de détection. Une configuration jamais détectée est refusée
+(`NOT_DETECTED`), et chaque démarrage repart d'une copie de la détection, si bien
+qu'un port changé lors d'un démarrage précédent ne s'hérite pas.
+
+L'installation des dépendances (`npm install`, `pip install`…) tourne avec le même
+environnement que le serveur de développement, `envWithoutCredentials` : elle
+exécute les scripts du projet comme lui.
