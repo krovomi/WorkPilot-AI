@@ -49,6 +49,9 @@ Référence complète : [`docs/CLI-USAGE.md`](../CLI-USAGE.md).
 | Comme la CI, sans pousser | `pnpm verify` : ruff, Biome, fichiers générés, pytest ciblé sur le diff, typecheck, Vitest | — |
 | Comme le hook pre-push | `pnpm run test:all` (lint et fichiers générés seulement) | — |
 
+**Vert sous Linux, rouge sous Windows ?** Lire les pièges que Linux ne voit pas et ce qui les tient :
+[`windows-development.md`](../windows-development.md#what-a-linux-run-does-not-see).
+
 **Versions épinglées** : ruff `0.15.7`, Biome `2.5.11`, pyright `1.1.408`. Toute autre version produit un diff que la
 CI refuse. Biome n'est écrit qu'à un endroit, `apps/frontend/package.json`, que `lint.yml` lit et
 que Dependabot ne bouge pas ; `tests/test_tool_pins.py` le tient égal à cette règle. ruff vise
@@ -152,7 +155,7 @@ commit vide pour relancer.
 
 Planchers et démarrage (plan du 29 octobre 2026, lot N2) :
 
-- **Couverture** : pytest `--fail-under=73` (`ci.yml` ; `.coveragerc` mesure aussi les runners lancés en sous-processus), Vitest `coverage.thresholds`
+- **Couverture** : pytest `--fail-under=74` (`ci.yml` ; `.coveragerc` mesure aussi les runners lancés en sous-processus), Vitest `coverage.thresholds`
   (`apps/frontend/vitest.config.ts`, mesuré sur Linux), Jest `coverageThreshold` de l'app
   mobile (`apps/mobile/package.json`, job `test` de `mobile.yml`). Ce sont des planchers sous le niveau
   mesuré : on les monte quand la suite grandit, on ne les baisse jamais pour merger.

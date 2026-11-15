@@ -9,7 +9,7 @@ dashboard.
 Output protocol (one JSON object per line, prefixed):
     REGRESSION_GUARDIAN_EVENT:{"type": "progress", "data": {"status": "..."}}
     REGRESSION_GUARDIAN_RESULT:{"results": [...]}
-    REGRESSION_GUARDIAN_ERROR:<message>
+    REGRESSION_GUARDIAN_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

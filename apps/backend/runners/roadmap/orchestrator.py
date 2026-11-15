@@ -72,7 +72,7 @@ class RoadmapOrchestrator:
             self.output_dir, competitor_should_refresh, self.agent_executor
         )
         self.project_index_phase = ProjectIndexPhase(
-            self.output_dir, self.refresh, self.script_executor
+            self.output_dir, self.refresh, self.script_executor, self.project_dir
         )
         self.discovery_phase = DiscoveryPhase(
             self.output_dir, self.refresh, self.agent_executor
