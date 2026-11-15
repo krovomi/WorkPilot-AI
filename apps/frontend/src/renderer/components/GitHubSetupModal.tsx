@@ -155,7 +155,11 @@ export function GitHubSetupModal({
 		}
 	};
 
-	// Reset state and check existing auth when modal opens
+	// Reset state and check existing auth when modal opens. Only on open:
+	// `detectRepository` is a new function each render, and as a dependency it
+	// re-ran this reset after every render, a loop React stops with "Maximum
+	// update depth exceeded".
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs on open only, see above
 	useEffect(() => {
 		if (open) {
 			// Reset all state first
@@ -224,10 +228,6 @@ export function GitHubSetupModal({
 
 			checkExistingAuth();
 		}
-		// Only on open: `detectRepository` is a new function each render, and as
-		// a dependency it re-ran this reset after every render, a loop React
-		// stops with "Maximum update depth exceeded".
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
 	}, [open]);
 
 	// Load branches from GitHub
