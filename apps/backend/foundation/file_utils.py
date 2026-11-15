@@ -18,10 +18,36 @@ import json
 import logging
 import os
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import IO, Any, Literal
+
+from foundation.platform import is_windows
+
+#: Attempts and pause of a rename that Windows refuses while the target is open.
+REPLACE_ATTEMPTS = 10
+REPLACE_PAUSE_S = 0.05
+
+
+def replace_file(source: str | Path, target: str | Path) -> None:
+    """``os.replace``, waiting out the moment Windows holds the target open.
+
+    Windows refuses to rename over a file that any process has open, even for
+    an instant: a reader closing its handle, the search indexer, an antivirus
+    scan. Every writer of a shared ledger then lost its update with
+    ``PermissionError [WinError 5]``. The rename is retried for about half a
+    second there; elsewhere a refusal is real and raised at once.
+    """
+    for attempt in range(1, REPLACE_ATTEMPTS + 1):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if not is_windows() or attempt == REPLACE_ATTEMPTS:
+                raise
+            time.sleep(REPLACE_PAUSE_S)
 
 
 @contextmanager
@@ -88,8 +114,8 @@ def atomic_write(
         raise
     else:
         # Atomic replace - only runs if no exception was raised
-        # If os.replace itself fails, do NOT clean up (may be partially renamed)
-        os.replace(tmp_path, filepath)
+        # If the replace itself fails, do NOT clean up (may be partially renamed)
+        replace_file(tmp_path, filepath)
 
 
 def write_json_atomic(
