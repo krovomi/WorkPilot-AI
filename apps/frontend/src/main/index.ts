@@ -60,6 +60,7 @@ import { AgentManager } from "./agent";
 import { getAppLanguage, initAppLanguage } from "./app-language";
 import { setupErrorLogging } from "./app-logger";
 import { initializeAppUpdater, stopPeriodicUpdates } from "./app-updater";
+import { backendReloadArgs } from "./backend-reload-args";
 import { isProfileAuthenticated } from "./claude-profile/profile-utils";
 import { getUsageMonitor } from "./claude-profile/usage-monitor";
 import {
@@ -700,30 +701,10 @@ async function startBackend() {
 		);
 	}
 	const providerApiModule = "provider_api:app";
-	// `--reload` belongs to development only. In a packaged app the backend
-	// source never changes, and the watcher costs a second supervisor process
-	// plus roughly double the memory — while a stray write under backendDir
-	// (a log, a cache) can restart the API under the user's feet mid-task.
-	const reloadArgs = is.dev
-		? [
-				"--reload",
-				// Watch only backend source; the shared virtualenv lives at the repo
-				// root, so scoping the watcher to backendDir keeps pip installs (from
-				// the PythonEnvManager) from triggering an endless reload storm.
-				// NOTE: do not add glob --reload-exclude patterns (e.g. ".venv/*"):
-				// the bundled Windows python.exe expands wildcard argv, turning the
-				// pattern into extra positional args and making uvicorn exit code 2.
-				"--reload-dir",
-				backendDir,
-				// PythonEnvManager installs into backendDir/.venv, which is INSIDE
-				// the watched dir — exclude it or every pip install reload-storms
-				// the server. No wildcard => safe from the argv expansion issue
-				// above. Must be ABSOLUTE: uvicorn's FileFilter matches exclude
-				// dirs against the changed file's (absolute) parents.
-				"--reload-exclude",
-				resolve(backendDir, ".venv"),
-			]
-		: [];
+	// main/index.ts is never loaded by a unit test (it starts the app on
+	// import); the arguments are tested in backend-reload-args.test.ts.
+	/* v8 ignore next */
+	const reloadArgs = backendReloadArgs(backendDir, is.dev);
 	backendProcess = spawn(
 		pythonPath,
 		[
