@@ -196,7 +196,11 @@ def select_menu(
         elif key == "q" and allow_quit:
             return None
 
-        elif key in "123456789":
+        elif key == "\x03":
+            # Ctrl+C arrives as a character in raw mode: let it interrupt.
+            raise KeyboardInterrupt
+
+        elif len(key) == 1 and key in "123456789":
             # Number key - direct selection
             idx = int(key) - 1
             if idx < len(options) and not options[idx].disabled:

@@ -124,7 +124,9 @@ def resolve_candidates(
     ``project_dir`` is expected resolved (``validated_dir``). Each path is
     resolved, symlinks included, before the containment check.
     """
-    root = project_dir.resolve()
+    base = os.path.realpath(project_dir)
+    root = Path(base)
+    prefix = base if base.endswith(os.sep) else base + os.sep
     accepted: list[str] = []
     refused: list[Refusal] = []
     seen: set[str] = set()
@@ -132,17 +134,18 @@ def resolve_candidates(
         text = str(raw).strip()
         if not text:
             continue
-        candidate = Path(text).expanduser()
-        if not candidate.is_absolute():
-            candidate = root / candidate
+        # realpath, then a prefix check on the result, before any file access:
+        # an absolute path replaces the root in the join and is held to the
+        # same check. ``~`` is not expanded: a caller's path is the project's.
         try:
-            resolved = candidate.resolve()
-        except (OSError, RuntimeError):
+            real = os.path.realpath(os.path.join(base, text))
+        except (OSError, ValueError):
             refused.append(Refusal(text, "missing"))
             continue
-        if resolved != root and not resolved.is_relative_to(root):
+        if real != base and not real.startswith(prefix):
             refused.append(Refusal(text, "outside"))
             continue
+        resolved = Path(real)
         try:
             if not resolved.is_file():
                 refused.append(Refusal(text, "missing"))
