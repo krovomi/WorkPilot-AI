@@ -37,10 +37,13 @@ async def _run_streaming_server(args):
         stop_streaming_server,
     )
 
-    # Start server
+    server = get_websocket_server()
+    # `--streaming-port`: the port the server listens on (8765 by default).
+    port = getattr(args, "streaming_port", None)
+    if port:
+        server.port = port
     await start_streaming_server()
 
-    server = get_websocket_server()
     print(f"✅ Streaming server running on ws://{server.host}:{server.port}")
     print(
         "\n📺 Open the frontend and click 'Watch Live' on any task to start streaming"
@@ -96,14 +99,16 @@ def handle_replay_recording_command(args):
     """Handle replay recording command."""
     from streaming import SessionRecorder
 
-    if not args.recording_file:
-        print("\n❌ Please specify a recording file with --recording-file")
+    # `--replay-recording FILE`
+    recording_file = getattr(args, "replay_recording", None)
+    if not recording_file:
+        print("\n❌ Please specify a recording file with --replay-recording")
         return 1
 
     recorder = SessionRecorder()
 
     try:
-        recording_path = Path(args.recording_file)
+        recording_path = Path(recording_file)
         recording = recorder.load_recording(recording_path)
 
         print("\n" + "=" * 70)
@@ -121,7 +126,7 @@ def handle_replay_recording_command(args):
         print("\n✅ Replay completed\n")
 
     except FileNotFoundError:
-        print(f"\n❌ Recording file not found: {args.recording_file}")
+        print(f"\n❌ Recording file not found: {recording_file}")
         return 1
     except Exception as e:
         logger.error(f"Error replaying recording: {e}")
