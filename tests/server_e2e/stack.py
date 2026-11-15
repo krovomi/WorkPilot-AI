@@ -85,8 +85,9 @@ def _git(*args: str, cwd: Path | None = None) -> None:
     )
 
 
-def make_origin_repo(root: Path) -> Path:
-    """A bare repository with a `main` branch, ready for git's HTTP protocol."""
+def make_origin_repo(root: Path, extra_files: dict[str, str] | None = None) -> Path:
+    """A bare repository with a `main` branch, ready for git's HTTP protocol;
+    `extra_files` (relative path → text) are in its first commit too."""
     work = root / "work"
     work.mkdir(parents=True)
     _git("init", "-q", "-b", "main", str(work))
@@ -94,6 +95,10 @@ def make_origin_repo(root: Path) -> Path:
     (work / "app.py").write_text(
         "def hello() -> str:\n    return 'hi'\n", encoding="utf-8"
     )
+    for name, text in (extra_files or {}).items():
+        target = work / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
     _git("add", ".", cwd=work)
     _git("commit", "-q", "-m", "initial", cwd=work)
     bare = root / "origin.git"

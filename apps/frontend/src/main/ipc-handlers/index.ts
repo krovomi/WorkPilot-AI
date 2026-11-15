@@ -43,6 +43,7 @@ import {
 } from "./architecture-visualizer-handlers";
 import { registerArenaHandlers } from "./arena-handlers";
 import { registerMissionControlHandlers } from "./mission-control-handlers";
+import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
@@ -174,6 +175,7 @@ export {
 } from "./architecture-visualizer-handlers";
 export { registerArenaHandlers } from "./arena-handlers";
 export { registerMissionControlHandlers } from "./mission-control-handlers";
+export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
@@ -499,6 +501,9 @@ export function setupIpcHandlers(
 
 	// Mission Control: state proxied to the backend, each agent's model call run here
 	registerMissionControlHandlers();
+
+	// Execution waves across specs (#358): plan by task id, started by the renderer
+	registerConflictWavesHandlers();
 
 	// CI/CD Deployment Triggers handlers (Feature 44)
 	registerCICDTriggersHandlers();
