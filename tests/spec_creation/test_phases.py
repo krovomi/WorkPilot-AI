@@ -144,7 +144,7 @@ async def test_an_existing_context_is_kept(spec_dir: Path) -> None:
     assert result.success and result.retries == 0
 
 
-async def test_without_a_context_script_the_minimal_context_stands_in(
+async def test_the_context_comes_from_the_task_itself(
     spec_dir: Path,
 ) -> None:
     (spec_dir / "requirements.json").write_text(
@@ -159,7 +159,7 @@ async def test_without_a_context_script_the_minimal_context_stands_in(
 
     result = await executor(spec_dir).phase_context()
 
-    assert result.success and len(result.errors) == 3
+    assert result.success and result.errors == []
     context = json.loads((spec_dir / "context.json").read_text("utf-8"))
     assert context["files_to_modify"] == [
         "Controllers/InvoiceController.cs",
