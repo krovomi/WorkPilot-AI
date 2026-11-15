@@ -115,7 +115,7 @@ This can cause git diffs to show every line as changed.
 
 A session in a Linux container can have every suite green and still turn the
 Windows CI red; pytest runs there with `-x`, so each shard shows only its first
-failure. Five traps keep coming back, and three are held on Linux too:
+failure. Seven traps keep coming back, and three are held on Linux too:
 
 | Trap on Windows | What holds it on Linux |
 |---|---|
@@ -124,6 +124,8 @@ failure. Five traps keep coming back, and three are held on Linux too:
 | `open` / `read_text` / `write_text` without an encoding | `tests/test_text_io_encoding.py` |
 | a tool started by its bare name (`["claude", ...]`) when it is an npm `.cmd` shim: Windows only looks for `claude.exe` | nothing: start the path `shutil.which` (or `foundation.platform.find_executable`) returned, and pass a minimal env with `SYSTEMROOT` |
 | `write_text("x\n")` writes `\r\n`; a text pipe (`text=True`) changes a patch's line endings; an OS error (`str(exc)`) has other words | nothing: write in bytes what must be bytes (`write_bytes`, `git diff --output=<file>`), and word yourself the message a test reads |
+| `time.time()` moves in ~16 ms steps: two records written one after the other carry the same time, and "newest first" falls back to another order | nothing: never order by a timestamp alone; make the next one strictly greater (`generational_tests/archive.py`) or add a sequence |
+| `os.replace` over a file another handle holds for an instant (a reader, the indexer, an antivirus) raises `PermissionError [WinError 5]`, lock or no lock | nothing: write through `foundation.file_utils` (`atomic_write`, `write_json_atomic`, `replace_file`), which waits it out on Windows |
 
 ## Path Separators
 
