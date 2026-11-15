@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 import { useProjectStore } from "@/stores/project-store";
 import { Button } from "../ui/button";
@@ -27,9 +28,12 @@ interface ServerProjectDialogProps {
 }
 
 /**
- * Server mode: add a project for the whole team. The server clones the
- * repository and every member works on that clone; the app sends the URL,
- * never a path, and the server decides who may (`server-mode.md`).
+ * Server mode: open one of the team's projects, or add a project for the
+ * whole team. The app opens a tab for the first project only, and a person
+ * may be a member of several: the projects of the server not open in a tab
+ * come first, each with its own button. A new project is cloned by the
+ * server and every member works on that clone; the app sends the URL, never
+ * a path, and the server decides who may (`server-mode.md`).
  */
 export function ServerProjectDialog({
 	open,
@@ -44,6 +48,20 @@ export function ServerProjectDialog({
 	const [error, setError] = useState<string | null>(null);
 
 	const effectiveName = name.trim() || repoNameFromUrl(repoUrl);
+	const { projects, openProjectIds } = useProjectStore(
+		useShallow((s) => ({ projects: s.projects, openProjectIds: s.openProjectIds })),
+	);
+	const notOpen = useMemo(
+		() => projects.filter((p) => p.remote && !openProjectIds.includes(p.id)),
+		[projects, openProjectIds],
+	);
+
+	const openExisting = (projectId: string) => {
+		const store = useProjectStore.getState();
+		store.selectProject(projectId);
+		store.openProjectTab(projectId);
+		onOpenChange(false);
+	};
 
 	const submit = async () => {
 		setBusy(true);
@@ -75,6 +93,34 @@ export function ServerProjectDialog({
 					<DialogTitle>{t("serverProject.title")}</DialogTitle>
 					<DialogDescription>{t("serverProject.description")}</DialogDescription>
 				</DialogHeader>
+				{notOpen.length > 0 && (
+					<section aria-labelledby="server-projects-existing" className="space-y-2">
+						<h3 id="server-projects-existing" className="text-sm font-medium">
+							{t("serverProject.existingTitle")}
+						</h3>
+						<ul className="space-y-1">
+							{notOpen.map((project) => (
+								<li
+									key={project.id}
+									className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+								>
+									<span className="truncate text-sm">{project.name}</span>
+									<Button
+										size="sm"
+										variant="secondary"
+										onClick={() => openExisting(project.id)}
+										aria-label={t("serverProject.openExistingNamed", {
+											name: project.name,
+										})}
+									>
+										{t("serverProject.openExisting")}
+									</Button>
+								</li>
+							))}
+						</ul>
+						<p className="text-xs text-muted-foreground">{t("serverProject.orAddNew")}</p>
+					</section>
+				)}
 				<div className="space-y-4 py-2">
 					<div className="space-y-2">
 						<Label htmlFor="server-project-repo">{t("serverProject.repoUrl")}</Label>
@@ -83,7 +129,7 @@ export function ServerProjectDialog({
 							placeholder="https://github.com/acme/app.git"
 							value={repoUrl}
 							onChange={(e) => setRepoUrl(e.target.value)}
-							autoFocus
+							autoFocus={notOpen.length === 0}
 						/>
 						<p className="text-xs text-muted-foreground">
 							{t("serverProject.repoUrlHelp")}
