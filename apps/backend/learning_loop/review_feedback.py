@@ -236,16 +236,6 @@ class LearnedRule:
             return None
         return max(sorted(self.reasons), key=lambda key: self.reasons[key])
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "signature": self.signature,
-            "category": self.category,
-            "label": self.label,
-            "rejections": self.rejections,
-            "accepts": self.accepts,
-            "top_reason": self.top_reason,
-        }
-
 
 def _label(title: str) -> str:
     cleaned = clean_untrusted(title, kind="comment", source="review_feedback").text
@@ -330,11 +320,7 @@ def rules_by_signature(
 
 def prompt_block(project_dir: str | Path, threshold: int | None = None) -> str:
     """The learned suppressions as a prompt section, or "" without any."""
-    try:
-        rules = learned_rules(project_dir, threshold)[:MAX_RULES_IN_PROMPT]
-    except (OSError, ValueError) as exc:
-        logger.warning("review feedback skipped: %s", type(exc).__name__)
-        return ""
+    rules = learned_rules(project_dir, threshold)[:MAX_RULES_IN_PROMPT]
     lines: list[str] = []
     size = 0
     for rule in rules:
@@ -349,16 +335,3 @@ def prompt_block(project_dir: str | Path, threshold: int | None = None) -> str:
         return ""
     quoted = quote_untrusted("\n".join(lines), kind="comment", source="review_feedback")
     return f"{PROMPT_HEADING}\n\n{_PROMPT_INTRO}\n\n{quoted}\n"
-
-
-def summary(project_dir: str | Path, threshold: int | None = None) -> dict[str, Any]:
-    """Counts for a view: votes cast, acceptance rate, rules learned."""
-    records = load_feedback(project_dir)
-    accepted = sum(1 for record in records if record["verdict"] == "accepted")
-    return {
-        "total": len(records),
-        "accepted": accepted,
-        "rejected": len(records) - accepted,
-        "acceptance_rate": round(accepted / len(records), 3) if records else None,
-        "learned": [rule.to_dict() for rule in learned_rules(project_dir, threshold)],
-    }

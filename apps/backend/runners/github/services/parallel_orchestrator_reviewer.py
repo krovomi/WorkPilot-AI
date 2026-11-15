@@ -43,7 +43,6 @@ try:
     from .agent_utils import create_working_dir_injector
     from .category_utils import map_category
     from .io_utils import safe_print
-    from .learned_suppression import learned_prompt_block
     from .pr_worktree_manager import PRWorktreeManager
     from .pydantic_models import (
         AgentAgreement,
@@ -66,7 +65,6 @@ except (ImportError, ValueError, SystemError):
         ReviewSeverity,
     )
     from phase_config import get_thinking_budget, resolve_model_id
-    from runners.github.services.learned_suppression import learned_prompt_block
     from services.agent_utils import create_working_dir_injector
     from services.category_utils import map_category
     from services.io_utils import safe_print
@@ -345,6 +343,8 @@ Report findings with specific file paths, line numbers, and code evidence.
         # project's own checkout: `project_root` is the PR's worktree, whose
         # `.workpilot/` the PR author controls. The orchestrator applies the
         # same rules to the findings once the review is done.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
         return prompt_with_cwd + pr_context + learned_prompt_block(self.project_dir)
 
     async def _run_specialist_session(

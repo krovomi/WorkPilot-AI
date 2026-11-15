@@ -52,7 +52,6 @@ try:
         store_review_learnings,
     )
     from .services.io_utils import safe_print
-    from .services.learned_suppression import apply_learned_suppressions
 except (ImportError, ValueError, SystemError):
     # When imported directly (runner.py adds github dir to path)
     import sys
@@ -95,9 +94,6 @@ except (ImportError, ValueError, SystemError):
         store_review_learnings,
     )
     from runners.github.services.io_utils import safe_print
-    from runners.github.services.learned_suppression import (
-        apply_learned_suppressions,
-    )
 
 
 @dataclass
@@ -487,15 +483,13 @@ class GitHubOrchestrator:
 
             # What this project rejected often enough is downgraded or dropped
             # here, after the review, so it holds on every provider (#361).
+            from runners.github.services.learned_suppression import (
+                apply_learned_suppressions,
+            )
+
             findings, learned_suppressions = apply_learned_suppressions(
                 self.project_dir, findings
             )
-            if learned_suppressions:
-                safe_print(
-                    f"[orchestrator] {len(learned_suppressions)} finding(s) dropped "
-                    "by what this project rejected before",
-                    flush=True,
-                )
 
             self._report_progress(
                 "generating",

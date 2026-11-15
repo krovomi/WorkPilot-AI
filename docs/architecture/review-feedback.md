@@ -93,5 +93,5 @@ in the PR's worktree, whose `.workpilot/` the PR author controls.
 - Feedback on a server project (a route on the server, scoped by `project_id`).
 - The generated `.workpilot/review-conventions.md`, a self-critique pass before
   posting, the maintainer's review of a newcomer's rejections, a reset or
-  per-period dataset, and the acceptance-rate metrics in a view
-  (`review_feedback.summary` computes them).
+  per-period dataset, and the acceptance-rate metrics in a
+  view.

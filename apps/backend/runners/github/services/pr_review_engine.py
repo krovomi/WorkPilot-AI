@@ -23,7 +23,6 @@ try:
         StructuralIssue,
     )
     from .io_utils import safe_print
-    from .learned_suppression import learned_prompt_block
     from .prompt_manager import PromptManager
     from .response_parsers import ResponseParser
 except (ImportError, ValueError, SystemError):
@@ -45,7 +44,6 @@ except (ImportError, ValueError, SystemError):
         StructuralIssue,
     )
     from runners.github.services.io_utils import safe_print
-    from runners.github.services.learned_suppression import learned_prompt_block
     from runners.github.services.prompt_manager import PromptManager
     from runners.github.services.response_parsers import ResponseParser
 
@@ -267,6 +265,8 @@ class PRReviewEngine:
         full_prompt += _learning_context(project_root)
         # The kinds of remark this project rejected (#361); the same rules are
         # applied to the findings afterwards, so this only saves the effort.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
         full_prompt += learned_prompt_block(project_root)
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility

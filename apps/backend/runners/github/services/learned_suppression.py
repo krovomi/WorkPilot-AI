@@ -6,13 +6,13 @@ review is done, whatever the provider and whatever the model made of the
 prompt block, so a remark the project rejected stays downgraded or removed
 on Claude, Codex, Copilot, Ollama and the rest alike.
 
-Never raises: a review that runs without its history is worse, a review that
-crashes is useless.
+It never raises: an unreadable dataset reads as empty
+(`review_feedback.load_feedback`), and a review runs without its history
+rather than not at all.
 """
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -20,8 +20,6 @@ from learning_loop import review_feedback
 
 if TYPE_CHECKING:
     from runners.github.models import PRReviewFinding
-
-logger = logging.getLogger(__name__)
 
 
 def apply_learned_suppressions(
@@ -35,11 +33,7 @@ def apply_learned_suppressions(
     shown in the review; a dropped one is listed in the result's
     ``learned_suppressions`` so nothing disappears without a trace.
     """
-    try:
-        rules = review_feedback.rules_by_signature(project_dir, threshold)
-    except (OSError, ValueError) as exc:
-        logger.warning("learned suppressions skipped: %s", type(exc).__name__)
-        return findings, []
+    rules = review_feedback.rules_by_signature(project_dir, threshold)
     if not rules:
         return findings, []
 
@@ -79,9 +73,5 @@ def apply_learned_suppressions(
 
 def learned_prompt_block(project_dir: str | Path) -> str:
     """The prompt section for the reviewers, framed like the other context blocks."""
-    try:
-        block = review_feedback.prompt_block(project_dir)
-    except (OSError, ValueError) as exc:
-        logger.warning("learned prompt block skipped: %s", type(exc).__name__)
-        return ""
+    block = review_feedback.prompt_block(project_dir)
     return f"\n\n---\n\n{block}" if block else ""
