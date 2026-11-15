@@ -91,8 +91,15 @@ def _spec(project: Path) -> Path:
     return project / ".workpilot" / "specs" / "001-login"
 
 
+SINGLE = "single"
+
+
 def _template(project: Path, relative: str, content: str | bytes) -> Path:
-    path = project / ".github" / relative
+    """A template in the project, at the path the filler reads (`SINGLE` or a
+    file of the template folder)."""
+    path = project / (
+        filler.SINGLE_TEMPLATE if relative == SINGLE else filler.TEMPLATE_DIR / relative
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(content, bytes):
         path.write_bytes(content)
@@ -116,22 +123,22 @@ def _model(monkeypatch: pytest.MonkeyPatch, client: _Client) -> list[dict]:
 
 
 def test_the_single_template_file_is_used(project: Path) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE.md", TEMPLATE)
+    _template(project, SINGLE, TEMPLATE)
 
     assert filler.detect_pr_template(str(project)) == TEMPLATE
 
 
 def test_the_first_template_of_the_folder_is_used(project: Path) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE/b_feature.md", "feature")
-    _template(project, "PULL_REQUEST_TEMPLATE/a_bugfix.md", "bugfix")
-    _template(project, "PULL_REQUEST_TEMPLATE/notes.txt", "not a template")
+    _template(project, "b_feature.md", "feature")
+    _template(project, "a_bugfix.md", "bugfix")
+    _template(project, "notes.txt", "not a template")
 
     assert filler.detect_pr_template(project) == "bugfix"
 
 
 def test_an_empty_single_template_falls_back_to_the_folder(project: Path) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE.md", "  \n")
-    _template(project, "PULL_REQUEST_TEMPLATE/default.md", "from the folder")
+    _template(project, SINGLE, "  \n")
+    _template(project, "default.md", "from the folder")
 
     assert filler.detect_pr_template(project) == "from the folder"
 
@@ -141,12 +148,12 @@ def test_no_template_an_empty_one_or_an_unreadable_one_is_none(
 ) -> None:
     assert filler.detect_pr_template(project) is None
 
-    _template(project, "PULL_REQUEST_TEMPLATE/default.md", "\n")
+    _template(project, "default.md", "\n")
     assert filler.detect_pr_template(project) is None
 
     # Not UTF-8: the read fails and the PR keeps its default body.
-    _template(project, "PULL_REQUEST_TEMPLATE.md", b"\xff\xfe\x00broken")
-    _template(project, "PULL_REQUEST_TEMPLATE/default.md", b"\xff\xfe\x00broken")
+    _template(project, SINGLE, b"\xff\xfe\x00broken")
+    _template(project, "default.md", b"\xff\xfe\x00broken")
     assert filler.detect_pr_template(project) is None
 
 
@@ -234,7 +241,7 @@ def test_the_spec_is_given_cut_or_said_to_be_missing(project: Path) -> None:
 async def test_the_template_is_filled_from_the_change(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE.md", TEMPLATE)
+    _template(project, SINGLE, TEMPLATE)
     (_spec(project) / "spec.md").write_text("# Add a login form\n", encoding="utf-8")
     client = _Client("```markdown\n## Summary\n\n- [ ] Bug fix\n- [x] Feature\n```")
     calls = _model(monkeypatch, client)
@@ -296,7 +303,7 @@ async def test_without_a_template_the_agent_is_not_run(
 async def test_no_usable_answer_leaves_the_default_body(
     project: Path, monkeypatch: pytest.MonkeyPatch, client: _Client
 ) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE.md", TEMPLATE)
+    _template(project, SINGLE, TEMPLATE)
     _model(monkeypatch, client)
 
     assert await filler.run_pr_template_filler(project, _spec(project), "m") is None
@@ -306,7 +313,7 @@ async def test_no_usable_answer_leaves_the_default_body(
 async def test_a_client_that_cannot_open_leaves_the_default_body(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _template(project, "PULL_REQUEST_TEMPLATE.md", TEMPLATE)
+    _template(project, SINGLE, TEMPLATE)
 
     class _Unreachable(_Client):
         async def __aenter__(self) -> _Client:
