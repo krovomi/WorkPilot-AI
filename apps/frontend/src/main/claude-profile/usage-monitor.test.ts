@@ -119,6 +119,14 @@ global.fetch = vi.fn(
 	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
 ) as any;
 
+/** The OAuth profile every fetch is made for (the caller always names it). */
+const oauthActiveProfile = {
+	isAPIProfile: false,
+	profileId: "test-profile-1",
+	profileName: "Test Profile",
+	baseUrl: "https://api.anthropic.com",
+};
+
 describe("usage-monitor", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -388,6 +396,7 @@ describe("usage-monitor", () => {
 					"test-profile-1",
 					"Test Profile",
 					undefined,
+					oauthActiveProfile,
 				),
 			).rejects.toThrow("API Auth Failure: 401");
 
@@ -426,6 +435,7 @@ describe("usage-monitor", () => {
 					"test-profile-1",
 					"Test Profile",
 					undefined,
+					oauthActiveProfile,
 				),
 			).rejects.toThrow("API Auth Failure: 403");
 
@@ -453,6 +463,7 @@ describe("usage-monitor", () => {
 				"test-profile-1",
 				"Test Profile",
 				undefined,
+				oauthActiveProfile,
 			);
 
 			expect(usage).toBeNull();
@@ -475,6 +486,7 @@ describe("usage-monitor", () => {
 				"test-profile-1",
 				"Test Profile",
 				undefined,
+				oauthActiveProfile,
 			);
 
 			expect(usage).toBeNull();
@@ -504,6 +516,7 @@ describe("usage-monitor", () => {
 				"test-profile-1",
 				"Test Profile",
 				undefined,
+				oauthActiveProfile,
 			);
 
 			expect(usage).toBeNull();
@@ -537,6 +550,7 @@ describe("usage-monitor", () => {
 					"test-profile-1",
 					"Test Profile",
 					undefined,
+					oauthActiveProfile,
 				),
 			).rejects.toThrow("API Auth Failure: 401");
 
@@ -551,7 +565,11 @@ describe("usage-monitor", () => {
 			const monitor = getUsageMonitor();
 
 			// Call fetchUsage without credential
-			const usage = await monitor.fetchUsage("test-profile-1", undefined);
+			const usage = await monitor.fetchUsage(
+				"test-profile-1",
+				undefined,
+				oauthActiveProfile,
+			);
 
 			// Should fall back to CLI method (which returns null)
 			expect(usage).toBeNull();
@@ -563,7 +581,11 @@ describe("usage-monitor", () => {
 				/* noop */
 			});
 
-			const usage = await monitor.fetchUsage("test-profile-1", "");
+			const usage = await monitor.fetchUsage(
+				"test-profile-1",
+				"",
+				oauthActiveProfile,
+			);
 
 			// Should fall back to CLI method
 			expect(usage).toBeNull();
@@ -1091,6 +1113,7 @@ describe("usage-monitor", () => {
 				profileId,
 				"Test Profile",
 				undefined,
+				oauthActiveProfile,
 			);
 
 			// Verify failure timestamp was recorded
@@ -1250,56 +1273,6 @@ describe("usage-monitor", () => {
 			}
 
 			errorSpy.mockRestore();
-		});
-
-		it("should fall back to profile detection when activeProfile not provided", async () => {
-			const mockFetch = vi.mocked(global.fetch);
-			mockFetch.mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				statusText: "OK",
-				headers: {
-					get: vi.fn((name: string) =>
-						name === "content-type" ? "application/json" : null,
-					),
-				},
-				json: async () => ({
-					five_hour_utilization: 0.5,
-					seven_day_utilization: 0.3,
-					five_hour_reset_at: "2025-01-17T15:00:00Z",
-					seven_day_reset_at: "2025-01-20T12:00:00Z",
-				}),
-			} as unknown as Response);
-
-			// Mock API profile
-			mockLoadProfilesFile.mockResolvedValueOnce({
-				profiles: [
-					{
-						id: "api-profile-1",
-						name: "API Profile",
-						baseUrl: "https://api.anthropic.com",
-						apiKey: "sk-ant-api-key",
-					},
-				],
-				activeProfileId: "api-profile-1",
-				version: 1,
-			});
-
-			const monitor = getUsageMonitor();
-
-			// Call fetchUsageViaAPI WITHOUT predetermined profile
-			// Should fall back to detecting profile from activeProfileId
-			const usage = await monitor.fetchUsageViaAPI(
-				"sk-ant-api-key",
-				"api-profile-1",
-				"API Profile",
-				undefined, // No email
-				undefined, // No activeProfile passed
-			);
-
-			// Should still work by detecting the profile
-			expect(usage).not.toBeNull();
-			expect(usage?.profileId).toBe("api-profile-1");
 		});
 
 		it("should handle OAuth profile in activeProfile parameter", async () => {

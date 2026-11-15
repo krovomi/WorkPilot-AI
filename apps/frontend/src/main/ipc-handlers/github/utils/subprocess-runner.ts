@@ -10,9 +10,10 @@ import { exec, execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-
-
+import { app } from "electron";
 import type { Project } from "../../../../shared/types";
+
+
 import type {
 	AuthFailureInfo,
 	BillingFailureInfo,
@@ -533,50 +534,35 @@ export function getRunnerPath(backendPath: string): string {
 }
 
 /**
- * Get the auto-claude backend path for a project
- *
- * Auto-detects the backend location using multiple strategies:
- * 1. Development repo structure (apps/backend)
- * 2. Electron app bundle location
- * 3. Current working directory
+ * The app's backend that holds a forge runner (`runners/github/runner.py`,
+ * `runners/gitlab/runner.py`), or null. It is looked for where the app runs
+ * from, never in the project's folder: the project is what the runner works
+ * on, not where the app's code lives.
  */
-export function getBackendPath(project: Project): string | null {
-	// Import app module for production path detection
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	let app: any;
+export function findAppBackendPath(runner: string): string | null {
+	let appPath: string | null = null;
 	try {
-		app = require("electron").app;
+		appPath = app.getAppPath();
 	} catch {
-		// Electron not available in tests
+		// No Electron app here (a test that mocks electron without it)
 	}
 
-	// Check if this is a development repo (has apps/backend structure)
-	const appsBackendPath = path.join(project.path, "apps", "backend");
-	if (
-		fs.existsSync(path.join(appsBackendPath, "runners", "github", "runner.py"))
-	) {
-		return appsBackendPath;
-	}
-
-	// Auto-detect from app location (same logic as agent-process.ts)
+	// Same locations as agent-process.ts
 	const possiblePaths = [
 		// Dev mode: apps/frontend/out/main -> apps/backend
 		path.resolve(import.meta.dirname, "..", "..", "..", "backend"),
 		// Alternative: from app root -> apps/backend
-		app ? path.resolve(app.getAppPath(), "..", "backend") : null,
+		appPath ? path.resolve(appPath, "..", "backend") : null,
 		// If running from repo root with apps structure
 		path.resolve(process.cwd(), "apps", "backend"),
 	].filter((p): p is string => p !== null);
 
-	for (const backendPath of possiblePaths) {
-		// Check for runner.py as marker
-		const runnerPath = path.join(backendPath, "runners", "github", "runner.py");
-		if (fs.existsSync(runnerPath)) {
-			return backendPath;
-		}
-	}
+	return possiblePaths.find((p) => fs.existsSync(path.join(p, runner))) ?? null;
+}
 
-	return null;
+/** The app's backend that holds the GitHub runner, or null. */
+export function getBackendPath(): string | null {
+	return findAppBackendPath(path.join("runners", "github", "runner.py"));
 }
 
 /**
@@ -593,46 +579,19 @@ export interface GitHubModuleValidation {
 }
 
 /**
- * Validate that the GitHub runner exists (synchronous, legacy)
- * @deprecated Use validateGitHubModule() for comprehensive async validation
- */
-export function validateRunner(backendPath: string | null): {
-	valid: boolean;
-	error?: string;
-} {
-	if (!backendPath) {
-		return {
-			valid: false,
-			error:
-				"GitHub runner not found. Make sure the GitHub automation module is installed.",
-		};
-	}
-
-	const runnerPath = getRunnerPath(backendPath);
-	if (!fs.existsSync(runnerPath)) {
-		return {
-			valid: false,
-			error: `GitHub runner not found at: ${runnerPath}`,
-		};
-	}
-
-	return { valid: true };
-}
-
-/**
  * Comprehensive async validation of GitHub automation module
  *
  * Checks:
- * 1. runner.py exists (dev repo or production install)
+ * 1. runner.py exists in the app's backend (dev repo or production install)
  * 2. gh CLI is installed
  * 3. gh CLI is authenticated
  * 4. Python virtual environment is set up
  *
- * @param project - The project to validate
+ * @param _project - The project the review will run on; the runner is the app's
  * @returns Detailed validation result with specific error messages
  */
 export async function validateGitHubModule(
-	project: Project,
+	_project?: Project,
 ): Promise<GitHubModuleValidation> {
 	const result: GitHubModuleValidation = {
 		valid: false,
@@ -643,10 +602,10 @@ export async function validateGitHubModule(
 	};
 
 	// 1. Check runner.py location
-	const backendPath = getBackendPath(project);
+	const backendPath = getBackendPath();
 	if (!backendPath) {
 		result.error =
-			"GitHub automation module not installed. This project does not have the GitHub runner configured.";
+			"GitHub automation module not installed: the app's backend has no GitHub runner.";
 		return result;
 	}
 
