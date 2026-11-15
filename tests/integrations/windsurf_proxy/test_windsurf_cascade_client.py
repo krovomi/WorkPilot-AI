@@ -353,12 +353,17 @@ async def test_early_idle_is_ignored_during_the_grace_window(
     connect_server, credentials, fast_polls, monkeypatch
 ):
     monkeypatch.setattr(c, "_IDLE_GRACE", 60.0)
-    monkeypatch.setattr(c, "_MAX_WAIT", 0.3)
-    _script_turn(connect_server, steps=[_steps()], statuses=[_status(c.STATUS_IDLE)])
+    idle = _status(c.STATUS_IDLE)
+    _script_turn(
+        connect_server,
+        steps=[_steps()],
+        statuses=[idle, idle, idle, idle, idle, _status(RUNNING), idle],
+    )
 
     assert await c.cascade_chat(credentials, MESSAGES, 281, "MODEL_X") == ""
-    # Polled until max_wait: idle never counted, no final sweep beyond the polls.
-    assert len(connect_server.bodies(c.GET_STATUS_PATH)) >= 2
+    # The five idle polls before the cascade ever ran do not count: once it
+    # ran, four idle polls end the turn. Counted in polls, not in seconds.
+    assert len(connect_server.bodies(c.GET_STATUS_PATH)) == 10
 
 
 async def test_idle_without_text_needs_four_polls(
