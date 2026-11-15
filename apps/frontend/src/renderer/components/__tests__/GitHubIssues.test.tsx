@@ -211,6 +211,13 @@ describe("GitHubIssues", () => {
 		expect(api.getGitHubIssues).not.toHaveBeenCalled();
 	});
 
+	it("checks nothing while no project is open", async () => {
+		useProjectStore.setState({ selectedProjectId: null });
+		renderView();
+		expect(await screen.findByText("GitHub Not Connected")).toBeInTheDocument();
+		expect(api.checkGitHubConnection).not.toHaveBeenCalled();
+	});
+
 	it("forgets the last status when the check fails", async () => {
 		// The last status read was another project's.
 		useSyncStatusStore.setState({ syncStatus: { connected: true, repoFullName: "old/repo" } as never });

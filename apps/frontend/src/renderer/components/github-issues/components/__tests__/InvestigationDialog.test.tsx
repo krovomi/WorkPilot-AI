@@ -77,6 +77,20 @@ describe("InvestigationDialog", () => {
 		expect(screen.queryByText("• No comments (this issue has no comments)")).not.toBeInTheDocument();
 	});
 
+	it("says the comments could not be read without a reason given", async () => {
+		getIssueComments.mockResolvedValue({ success: false });
+		renderDialog();
+		expect(await screen.findByText("Failed to load comments")).toBeInTheDocument();
+		expect(screen.queryByText("• No comments (this issue has no comments)")).not.toBeInTheDocument();
+	});
+
+	it("gives the reason a call failed with", async () => {
+		vi.spyOn(console, "error").mockImplementation(() => undefined);
+		getIssueComments.mockRejectedValue(new Error("IPC down"));
+		renderDialog();
+		expect(await screen.findByText("IPC down")).toBeInTheDocument();
+	});
+
 	it("says the comments could not be read when the call itself fails", async () => {
 		vi.spyOn(console, "error").mockImplementation(() => undefined);
 		getIssueComments.mockRejectedValue("dropped");

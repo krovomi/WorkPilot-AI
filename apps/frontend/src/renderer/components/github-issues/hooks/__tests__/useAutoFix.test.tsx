@@ -106,6 +106,22 @@ describe("useAutoFix", () => {
 		await waitFor(() => expect(error).toHaveBeenCalled());
 	});
 
+	it("drops a queue read again for a project no longer shown", async () => {
+		const late = deferred<unknown[]>();
+		const { result, rerender } = renderHook(({ id }) => useAutoFix(id), { initialProps: { id: "p1" } });
+		await waitFor(() => expect(result.current.config).not.toBeNull());
+		github.getAutoFixQueue.mockReturnValueOnce(late.promise);
+		await act(async () => {
+			for (const cb of completeListeners) cb("p1");
+		});
+
+		github.getAutoFixQueue.mockResolvedValue([]);
+		rerender({ id: "p2" });
+		await waitFor(() => expect(github.getAutoFixConfig).toHaveBeenCalledWith("p2"));
+		await act(async () => late.resolve([{ issueNumber: 4, status: "failed" }]));
+		expect(result.current.getQueueItem(4)).toBeNull();
+	});
+
 	it("turns auto-fix on and off, and keeps the settings when saving fails", async () => {
 		const { result } = renderHook(() => useAutoFix("p1"));
 		await waitFor(() => expect(result.current.config).not.toBeNull());
