@@ -79,11 +79,16 @@ class PatternStorage:
         if self.project:
             from brain.project_memory import ProjectMemory
 
-            memory = ProjectMemory(project=self.project)
+            memory = ProjectMemory(project=self.project, actor="learning-loop")
             return memory if memory.is_enabled else None
         from memory.store import get_project_memory
 
-        return get_project_memory(None, self.project_dir)
+        memory = get_project_memory(None, self.project_dir)
+        if memory is not None:
+            # The memory journal says who acted: a retired pattern is the
+            # learning loop's decision, and a pinned one refuses it.
+            memory.actor = "learning-loop"
+        return memory
 
     def _read(self, memory) -> list[LearningPattern]:
         patterns = []
@@ -95,9 +100,18 @@ class PatternStorage:
         return patterns
 
     def _write(
-        self, memory, patterns: list[LearningPattern], *, sync: bool = True
+        self,
+        memory,
+        patterns: list[LearningPattern],
+        *,
+        sync: bool = True,
+        merged: dict[str, str] | None = None,
     ) -> bool:
-        """Write the patterns that changed, forget the ones that are gone."""
+        """Write the patterns that changed, forget the ones that are gone.
+
+        *merged* names the patterns a similar one was folded into, with the
+        folded instruction: the memory journal explains the merge.
+        """
         current = {p.pattern_id: _evidence(p) for p in self._read(memory)}
         ok = True
         wanted = set()
@@ -107,6 +121,14 @@ class PatternStorage:
             if current.get(pattern.pattern_id) == evidence:
                 continue
             title = pattern.description.strip() or pattern.actionable_instruction
+            if merged and pattern.pattern_id in merged:
+                memory.explain_next(
+                    "pattern",
+                    pattern.pattern_id,
+                    action="merge",
+                    reason_code="similar-merged",
+                    reason=merged[pattern.pattern_id],
+                )
             written = memory.record_learned_pattern(
                 evidence, title=title[:80], body=_note_body(pattern)
             )
@@ -167,38 +189,54 @@ class PatternStorage:
             return []
 
     def save_patterns(
-        self, patterns: list[LearningPattern], *, sync: bool = True
+        self,
+        patterns: list[LearningPattern],
+        *,
+        sync: bool = True,
+        merged: dict[str, str] | None = None,
+        actor: str | None = None,
     ) -> None:
-        """Save all patterns to the vault (one sync unless ``sync=False``)."""
+        """Save all patterns to the vault (one sync unless ``sync=False``).
+
+        ``actor="user"``: a person removed a pattern (the desktop's delete),
+        not the learning loop.
+        """
         memory = self._open()
         if memory is None:
             return
-        self._write(memory, patterns, sync=sync)
+        if actor:
+            memory.actor = actor
+        self._write(memory, patterns, sync=sync, merged=merged)
 
     def add_patterns(
         self, new_patterns: list[LearningPattern]
     ) -> list[LearningPattern]:
         """Add new patterns, merging duplicates. Returns the updated list."""
         existing = self.load_patterns()
+        folded: dict[str, str] = {}
         for new_p in new_patterns:
             merged = False
             for i, existing_p in enumerate(existing):
                 if self._are_similar(existing_p, new_p):
                     existing[i] = self._merge_pattern(existing_p, new_p)
+                    folded[existing_p.pattern_id] = new_p.actionable_instruction[:200]
                     merged = True
                     break
             if not merged:
                 existing.append(new_p)
-        self.save_patterns(existing)
+        self.save_patterns(existing, merged=folded)
         return existing
 
-    def delete_pattern(self, pattern_id: str) -> bool:
-        """Delete a pattern by ID. Returns True if found and deleted."""
+    def delete_pattern(self, pattern_id: str, *, actor: str = "user") -> bool:
+        """Delete a pattern by ID. Returns True if found and deleted.
+
+        The note goes to the memory's trash, restorable (`brain.lifecycle`).
+        """
         patterns = self.load_patterns()
         original_len = len(patterns)
         patterns = [p for p in patterns if p.pattern_id != pattern_id]
         if len(patterns) < original_len:
-            self.save_patterns(patterns)
+            self.save_patterns(patterns, actor=actor)
             return True
         return False
 

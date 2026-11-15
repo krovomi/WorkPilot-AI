@@ -1438,6 +1438,9 @@ export async function restoreTask(
 	taskId: string,
 ): Promise<{ success: boolean; error?: string }> {
 	try {
+		// The backup only lived in memory for BACKUP_EXPIRY_MS; nothing else
+		// expires it, so drop the old ones before looking.
+		cleanupExpiredBackups();
 		const backup = deletedTasksBackup.get(taskId);
 		if (!backup) {
 			return { success: false, error: "Task backup not found or expired" };
@@ -1484,16 +1487,6 @@ export async function restoreTask(
 }
 
 /**
- * Get backed up task for undo functionality
- */
-export function getDeletedTaskBackup(
-	taskId: string,
-): { task: Task; timestamp: number } | undefined {
-	cleanupExpiredBackups();
-	return deletedTasksBackup.get(taskId);
-}
-
-/**
  * Delete multiple tasks
  * Permanently removes tasks from the project
  */
@@ -1505,6 +1498,7 @@ export async function deleteTasks(
 
 	try {
 		// Create backups before deletion
+		cleanupExpiredBackups();
 		const now = Date.now();
 		for (const taskId of taskIds) {
 			const task = store.tasks.find(
@@ -1658,14 +1652,6 @@ export function clearDraft(projectId: string): void {
 }
 
 /**
- * Check if a draft exists for a project
- */
-export function hasDraft(projectId: string): boolean {
-	const key = getDraftKey(projectId);
-	return localStorage.getItem(key) !== null;
-}
-
-/**
  * Check if a draft has any meaningful content (title, description, or images)
  */
 export function isDraftEmpty(draft: TaskDraft | null): boolean {
@@ -1681,19 +1667,6 @@ export function isDraftEmpty(draft: TaskDraft | null): boolean {
 		!draft.acceptanceCriteria?.length &&
 		!draft.extraNote?.trim()
 	);
-}
-
-// ============================================
-// GitHub Issue Linking Helpers
-// ============================================
-
-/**
- * Find a task by GitHub issue number
- * Used to check if a task already exists for a GitHub issue
- */
-export function getTaskByGitHubIssue(issueNumber: number): Task | undefined {
-	const store = useTaskStore.getState();
-	return store.tasks.find((t) => t.metadata?.githubIssueNumber === issueNumber);
 }
 
 // ============================================
@@ -1727,14 +1700,6 @@ export function isIncompleteHumanReview(task: Task): boolean {
 
 	// If 0 completed subtasks, this task crashed before implementation
 	return completedSubtasks === 0;
-}
-
-/**
- * Get the count of completed subtasks for a task
- */
-export function getCompletedSubtaskCount(task: Task): number {
-	if (!task.subtasks || task.subtasks.length === 0) return 0;
-	return task.subtasks.filter((s) => s.status === "completed").length;
 }
 
 /**

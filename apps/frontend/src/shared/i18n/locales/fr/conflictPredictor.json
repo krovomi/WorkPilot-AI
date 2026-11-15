@@ -55,5 +55,81 @@
 	"errors": {
 		"noProject": "Veuillez sélectionner un projet",
 		"generic": "Une erreur est survenue lors de l'analyse"
+	},
+	"waves": {
+		"kicker": "Conflict Predictor",
+		"title": "Vagues d'exécution",
+		"description": "Regroupe les specs en attente (backlog ou file) en vagues qui ne partagent aucun fichier, d'après leurs plans et ce que leurs worktrees ont déjà modifié. Aucun modèle n'est appelé.",
+		"actions": {
+			"plan": "Calculer les vagues",
+			"replan": "Replanifier",
+			"execute": "Exécuter dans l'ordre optimal",
+			"stop": "Arrêter l'exécution"
+		},
+		"options": {
+			"tolerance": "Tolérance",
+			"toleranceHint": "Deux specs dont le score ne dépasse pas cette valeur peuvent partager une vague.",
+			"toleranceValue_0": "Stricte (0)",
+			"toleranceValue_1": "1 fichier commun",
+			"toleranceValue_2": "Score 2",
+			"toleranceValue_4": "Score 4",
+			"unplanned": "Specs sans plan",
+			"unplannedIsolate": "Les lancer seules",
+			"unplannedIndependent": "Les supposer indépendantes",
+			"advance": "Vague suivante",
+			"advanceMerged": "une fois la vague fusionnée",
+			"advanceReview": "une fois la vague en revue"
+		},
+		"empty": {
+			"noProject": "Sélectionnez un projet pour planifier ses vagues.",
+			"noPlan": "Calculez les vagues pour voir quelles specs peuvent tourner en parallèle.",
+			"noTasks": "Aucune spec n'attend dans le backlog ou la file."
+		},
+		"stats": {
+			"specs": "Specs planifiées",
+			"waves": "Vagues",
+			"parallel": "Tâches parallèles max",
+			"avoided": "Risque évité",
+			"avoidedValue": "{{avoided}} sur {{total}}"
+		},
+		"waveLabel": "Vague {{index}}",
+		"residual": "Risque résiduel {{value}}",
+		"files": "{{count}} fichiers",
+		"unplannedChip": "sans plan",
+		"gantt": {
+			"title": "Plan",
+			"kicker": "Ordre",
+			"task": "Spec",
+			"legend": "Chaque barre est une spec dans sa vague ; les vagues s'enchaînent, les specs d'une vague tournent côte à côte. Aucune durée n'est estimée."
+		},
+		"list": {
+			"title": "Vagues",
+			"kicker": "Ordre de merge",
+			"mergeHint": "Fusionner dans cet ordre : la première spec est celle qui partage le plus avec les vagues suivantes."
+		},
+		"pairs": {
+			"title": "Paires les plus risquées",
+			"kicker": "Scores",
+			"shared": "{{count}} fichiers communs",
+			"unknown": "empreinte inconnue",
+			"together": "peuvent partager une vague"
+		},
+		"run": {
+			"running": "Vague {{current}} sur {{total}} en cours.",
+			"done": "Toutes les vagues ont tourné.",
+			"stopped": "Exécution arrêtée à la vague {{current}} sur {{total}}. Les tâches lancées continuent.",
+			"current": "en cours",
+			"finished": "terminée",
+			"blocked": "En attente d'une dépendance non terminée : {{tasks}}",
+			"startFailed": "Impossible de lancer {{task}} : {{error}}"
+		},
+		"notices": {
+			"cycle": "Cycle de dépendances, impossible à planifier sans vous : {{tasks}}",
+			"blockedByCycle": "En attente d'une spec d'un cycle : {{tasks}}",
+			"drift": "{{task}} a touché {{count}} fichiers hors de son plan. Replanifier ?",
+			"runningConflict": "{{task}} partage des fichiers avec {{running}}, déjà en cours.",
+			"unplanned": "{{count}} specs n'ont pas encore de plan : leur empreinte est inconnue.",
+			"error": "Impossible de calculer les vagues : {{error}}"
+		}
 	}
 }
