@@ -27,6 +27,7 @@ import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
 import { setupTaskPermissionListeners } from "./task-permission-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
+import { setupDocumentationListeners } from "./documentation-store";
 import { setupExecutionWavesListeners } from "./execution-waves-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
@@ -105,6 +106,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Import Design: each step of a run reaches the page as it happens.
 	["DesignToCode", setupDesignToCodeListeners],
 	["DocDrift", setupDocDriftListeners],
+	// Documentation tab: the runner's progress line while the tab is closed.
+	["Documentation", setupDocumentationListeners],
 	// Not an IPC listener: "Execute in optimal order" starts the next wave
 	// when the task list changes, whichever page is open.
 	["ExecutionWaves", setupExecutionWavesListeners],
