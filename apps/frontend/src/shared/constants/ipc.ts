@@ -43,6 +43,7 @@ export const IPC_CHANNELS = {
 	TASK_UPDATE: "task:update",
 	TASK_START: "task:start",
 	TASK_STOP: "task:stop",
+	AGENTS_STOP_ALL: "agents:stopAll",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
 	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
