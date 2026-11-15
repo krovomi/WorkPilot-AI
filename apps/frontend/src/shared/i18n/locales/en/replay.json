@@ -191,5 +191,42 @@
 	"viewerTabs": "Replay views",
 	"errors": {
 		"backendUnreachable": "The local WorkPilot backend did not answer. Start it (or restart the app), then refresh."
+	},
+	"share": {
+		"button": "Share",
+		"title": "Share this session",
+		"masked": "Secrets, tokens and your local folders are always masked before the file is written.",
+		"options": {
+			"stripReasoning": "Remove the reasoning",
+			"stripReasoningHint": "Only the actions are shared: thinking steps and reasoning are left out.",
+			"stripTokens": "Remove tokens and costs",
+			"stripTokensHint": "Token counts and costs can hint at the model that was used.",
+			"includeFileContents": "Include file contents",
+			"includeFileContentsHint": "Diff lines are always kept; whole files before and after are left out unless you include them."
+		},
+		"exportBundle": "Export .wpreplay",
+		"exportPage": "Export a page (HTML)",
+		"import": "Import a replay",
+		"exported": "Saved to {{path}}",
+		"imported": "Imported the session of {{name}}",
+		"dismiss": "Dismiss",
+		"errors": {
+			"too_large": "This file is too large to be a replay bundle.",
+			"unreadable": "This file cannot be read as a replay bundle.",
+			"not_a_bundle": "This file is not a WorkPilot replay bundle.",
+			"unsupported_version": "This bundle was made by a newer version of WorkPilot.",
+			"not_a_file": "Choose a file, not a folder.",
+			"generic": "The replay could not be shared: {{error}}"
+		}
+	},
+	"bookmarks": {
+		"title": "Bookmarks",
+		"note": "Bookmark note",
+		"notePlaceholder": "What should a reader look at here? (Markdown)",
+		"add": "Bookmark step {{step}}",
+		"step": "Step {{step}}",
+		"remove": "Remove the bookmark",
+		"empty": "No bookmark yet.",
+		"recording": "Bookmarks can be added once the session has finished recording."
 	}
 }

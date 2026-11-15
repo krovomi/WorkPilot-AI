@@ -191,5 +191,42 @@
 	"viewerTabs": "Vues du replay",
 	"errors": {
 		"backendUnreachable": "Le backend local de WorkPilot n’a pas répondu. Démarrez-le (ou relancez l’application), puis actualisez."
+	},
+	"share": {
+		"button": "Partager",
+		"title": "Partager cette session",
+		"masked": "Les secrets, les jetons et vos dossiers locaux sont toujours masqués avant l'écriture du fichier.",
+		"options": {
+			"stripReasoning": "Retirer le raisonnement",
+			"stripReasoningHint": "Seules les actions sont partagées : les étapes de réflexion et le raisonnement sont retirés.",
+			"stripTokens": "Retirer les tokens et les coûts",
+			"stripTokensHint": "Le nombre de tokens et les coûts peuvent trahir le modèle utilisé.",
+			"includeFileContents": "Inclure le contenu des fichiers",
+			"includeFileContentsHint": "Les lignes de diff sont toujours gardées ; les fichiers entiers, avant et après, ne le sont que si vous les incluez."
+		},
+		"exportBundle": "Exporter en .wpreplay",
+		"exportPage": "Exporter une page (HTML)",
+		"import": "Importer un rejeu",
+		"exported": "Enregistré dans {{path}}",
+		"imported": "Session de {{name}} importée",
+		"dismiss": "Fermer",
+		"errors": {
+			"too_large": "Ce fichier est trop gros pour être un rejeu.",
+			"unreadable": "Ce fichier ne se lit pas comme un rejeu.",
+			"not_a_bundle": "Ce fichier n'est pas un rejeu WorkPilot.",
+			"unsupported_version": "Ce rejeu vient d'une version plus récente de WorkPilot.",
+			"not_a_file": "Choisissez un fichier, pas un dossier.",
+			"generic": "Le rejeu n'a pas pu être partagé : {{error}}"
+		}
+	},
+	"bookmarks": {
+		"title": "Signets",
+		"note": "Note du signet",
+		"notePlaceholder": "Que doit regarder le lecteur ici ? (Markdown)",
+		"add": "Marquer l'étape {{step}}",
+		"step": "Étape {{step}}",
+		"remove": "Retirer le signet",
+		"empty": "Aucun signet pour l'instant.",
+		"recording": "Les signets s'ajoutent une fois l'enregistrement de la session terminé."
 	}
 }

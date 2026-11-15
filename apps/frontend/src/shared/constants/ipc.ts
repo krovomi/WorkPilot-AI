@@ -943,6 +943,10 @@ export const IPC_CHANNELS = {
 	REPLAY_COMPARE: "replay:compare",
 	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
 	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	REPLAY_EXPORT_SESSION: "replay:exportSession",
+	REPLAY_IMPORT_SESSION: "replay:importSession",
+	REPLAY_ADD_BOOKMARK: "replay:addBookmark",
+	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 
