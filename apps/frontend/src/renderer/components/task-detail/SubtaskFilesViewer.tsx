@@ -393,9 +393,10 @@ export function SubtaskFilesViewer({
 		let folders = 0;
 		const walk = (nodes: FileTreeNode[]) => {
 			for (const node of nodes) {
-				if (node.isFolder) {
+				// A folder is a node with children.
+				if (node.children) {
 					folders += 1;
-					walk(node.children ?? []);
+					walk(node.children);
 					continue;
 				}
 				const diff = lazyDiffs[node.path] ?? node.diff;
