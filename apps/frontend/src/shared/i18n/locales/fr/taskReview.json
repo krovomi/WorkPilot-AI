@@ -417,7 +417,12 @@
 		},
 		"loadError": "{{part}} : {{error}}",
 		"loadFailed": "Impossible de charger : {{part}}",
-		"loadUnexpected": "Une erreur inattendue est survenue pendant le chargement de l'espace de travail"
+		"loadUnexpected": "Une erreur inattendue est survenue pendant le chargement de l'espace de travail",
+		"loadingInfo": "Chargement de l'espace de travail...",
+		"deleteWorktreeFailed": "Échec de la suppression du worktree",
+		"statusAfterDeleteFailed": "Worktree supprimé, mais le statut de la tâche n'a pas pu être mis à jour : {{error}}",
+		"markDoneFailed": "Impossible de marquer la tâche comme terminée",
+		"resetStagedFailed": "Impossible de réinitialiser l'état indexé"
 	},
 	"guided": {
 		"button": "Revue guidée",

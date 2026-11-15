@@ -417,7 +417,12 @@
 		},
 		"loadError": "{{part}}: {{error}}",
 		"loadFailed": "Could not load: {{part}}",
-		"loadUnexpected": "An unexpected error occurred while loading the workspace information"
+		"loadUnexpected": "An unexpected error occurred while loading the workspace information",
+		"loadingInfo": "Loading workspace info...",
+		"deleteWorktreeFailed": "Failed to delete worktree",
+		"statusAfterDeleteFailed": "Worktree deleted but failed to update task status: {{error}}",
+		"markDoneFailed": "Failed to mark as done",
+		"resetStagedFailed": "Failed to reset staged state"
 	},
 	"guided": {
 		"button": "Guided review",
