@@ -256,11 +256,9 @@ export function BulkPRDialog({
 	return (
 		<Dialog
 			open={open}
-			onOpenChange={(next) => {
-				// No trigger opens it: this is Escape or the X, which stop the
-				// remaining PRs like the Close button.
-				if (!next) handleClose();
-			}}
+			// No trigger opens it, so a change is always Escape or the X: they
+			// stop the remaining PRs like the Close button.
+			onOpenChange={() => handleClose()}
 		>
 			<DialogContent className="sm:max-w-[600px]">
 				<DialogHeader>
