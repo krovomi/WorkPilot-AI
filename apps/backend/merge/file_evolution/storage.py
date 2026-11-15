@@ -14,6 +14,8 @@ import json
 import logging
 from pathlib import Path
 
+from foundation.file_utils import write_json_atomic
+
 from ..types import FileEvolution
 
 logger = logging.getLogger(__name__)
@@ -88,8 +90,9 @@ class EvolutionStorage:
                 for file_path, evolution in evolutions.items()
             }
 
-            with open(self.evolution_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            # Written aside then moved: a save that fails halfway leaves the
+            # previous file, not a truncated one that loads as nothing.
+            write_json_atomic(self.evolution_file, data)
 
             logger.debug(f"Saved evolution data for {len(evolutions)} files")
 

@@ -133,3 +133,39 @@ def test_an_unknown_branch_records_nothing(repo):
     tracker = refresh(repo, target_branch="no-such-branch")
 
     assert tracker.get_files_modified_by_tasks(["001-task"]) == {}
+
+
+def test_a_save_that_fails_halfway_keeps_the_previous_record(repo, monkeypatch):
+    (repo / "app.py").write_bytes(b"def run():\n    return 4\n")
+    commit_task(repo)
+    tracker = refresh(repo, target_branch="main")
+    saved = tracker.storage.evolution_file.read_text(encoding="utf-8")
+
+    from merge.types import FileEvolution
+
+    monkeypatch.setattr(FileEvolution, "to_dict", lambda self: {"broken": {1, 2}})
+    tracker.storage.save_evolutions(tracker._evolutions)
+
+    assert tracker.storage.evolution_file.read_text(encoding="utf-8") == saved
+    again = FileEvolutionTracker(repo, storage_dir=repo / ".wp")
+    assert again.get_files_modified_by_tasks(["001-task"]) == {"app.py": ["001-task"]}
+
+
+def test_two_tasks_on_one_file_are_what_the_preview_reports(repo):
+    other = repo.parent / "other"
+    git(repo, "worktree", "add", "-q", "-b", "task2", str(other), "main")
+    (repo / "app.py").write_bytes(b"import os\n\ndef run():\n    return 1\n")
+    (repo / "added.py").write_bytes(b"y = 2\n")
+    commit_task(repo)
+    (other / "app.py").write_bytes(b"import sys\n\ndef run():\n    return 1\n")
+    commit_task(other)
+
+    tracker = FileEvolutionTracker(repo, storage_dir=repo / ".wp")
+    tracker.refresh_from_git("t1", repo, target_branch="main")
+    tracker.refresh_from_git("t2", other, target_branch="main")
+
+    assert tracker.get_conflicting_files(["t1", "t2"]) == ["app.py"]
+    assert tracker.get_files_modified_by_tasks(["t1", "t2"]) == {
+        "app.py": ["t1", "t2"],
+        "added.py": ["t1"],
+    }
