@@ -147,3 +147,40 @@ def test_undecodable_route_files_are_skipped(tmp_path: Path) -> None:
     paths = sorted(r["path"] for r in RouteDetector(tmp_path).detect_all_routes())
 
     assert paths == ["/a", "/ok"]
+
+
+def test_compose_ports_stop_at_the_ports_list_and_at_the_next_service(
+    tmp_path: Path,
+) -> None:
+    from analysis.analyzers.port_detector import PortDetector
+
+    _write(
+        tmp_path,
+        {
+            "docker-compose.yml": (
+                "services:\n"
+                "  api:\n"
+                "    ports:\n"
+                '      - "80:80"\n'
+                "    labels:\n"
+                '      - "9100:9100"\n'
+                "  web:\n"
+                "    ports:\n"
+                '      - "3000:3000"\n'
+            ),
+        },
+    )
+    service = tmp_path / "api"
+    service.mkdir()
+
+    # 80 is below the accepted range; the labels list and the next service's
+    # ports belong to other blocks, so the default stands.
+    assert PortDetector(service, {}).detect_port_from_sources(1234) == 1234
+
+
+def test_blast_radius_walk_stops_at_its_limit(tmp_path: Path) -> None:
+    from analysis.blast_radius import _iter_code_files
+
+    _write(tmp_path, {f"m{i}.py": "x = 1\n" for i in range(4)})
+
+    assert [p.name for p in _iter_code_files(tmp_path, limit=2)] == ["m0.py", "m1.py"]
