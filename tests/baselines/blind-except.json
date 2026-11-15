@@ -93,7 +93,7 @@
   "apps/backend/core/prompt_preview_api.py": {"blind": 1, "silent": 0},
   "apps/backend/core/runtimes/claude_sdk_runtime.py": {"blind": 2, "silent": 0},
   "apps/backend/core/runtimes/tool_executor.py": {"blind": 14, "silent": 0},
-  "apps/backend/core/sentry.py": {"blind": 6, "silent": 0},
+  "apps/backend/core/sentry.py": {"blind": 5, "silent": 0},
   "apps/backend/core/simple_client.py": {"blind": 2, "silent": 1},
   "apps/backend/core/usage_tracker.py": {"blind": 10, "silent": 1},
   "apps/backend/core/workspace.py": {"blind": 8, "silent": 0},
