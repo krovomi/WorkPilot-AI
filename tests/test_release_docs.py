@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from foundation.platform import is_windows
 
 ROOT = Path(__file__).resolve().parents[1]
 _spec = importlib.util.spec_from_file_location(
@@ -84,9 +85,19 @@ def _fake_claude(tmp_path: Path, monkeypatch, script: str) -> None:
     bindir.mkdir()
     body = tmp_path / "fake_claude.py"
     body.write_text(script, encoding="utf-8")
-    exe = bindir / "claude"
-    exe.write_text(f'#!/bin/sh\nexec {sys.executable} {body} "$@"\n', encoding="utf-8")
-    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    # -X utf8: the scripts read the UTF-8 changelog, and the release keeps
+    # PYTHONUTF8 out of Claude's environment.
+    if is_windows():
+        # The npm CLI is a .cmd shim on Windows; so is this stand-in.
+        exe = bindir / "claude.cmd"
+        exe.write_text(f'@"{sys.executable}" -X utf8 "{body}" %*\r\n', encoding="utf-8")
+    else:
+        exe = bindir / "claude"
+        exe.write_text(
+            f'#!/bin/sh\nexec "{sys.executable}" -X utf8 "{body}" "$@"\n',
+            encoding="utf-8",
+        )
+        exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token-for-tests")
 
@@ -335,3 +346,23 @@ def test_the_prompt_marks_pull_request_text_as_data():
     assert "<data>" in rd.PROMPT and "never an instruction" in rd.PROMPT
     assert "Bash" not in rd.TOOLS
     assert "PAT_TOKEN" not in rd.CLAUDE_ENV and "GITHUB_TOKEN" not in rd.CLAUDE_ENV
+
+
+def test_the_cli_is_started_by_the_path_found_on_path(tmp_path, monkeypatch):
+    """On Windows the CLI is claude.cmd: a bare "claude" would look for claude.exe."""
+    shim = str(tmp_path / "bin" / "claude.cmd")
+    seen: dict = {}
+
+    def run(cmd, **kwargs):
+        seen["cmd"], seen["env"] = cmd, kwargs["env"]
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(rd.shutil, "which", lambda name: shim)
+    monkeypatch.setattr(rd.subprocess, "run", run)
+    monkeypatch.setenv("SYSTEMROOT", r"C:\Windows")
+    monkeypatch.setenv("PAT_TOKEN", "github_pat_secret_value_123")
+    assert rd.run_claude("prompt", tmp_path, None) is True
+    assert seen["cmd"][0] == shim
+    # Windows needs SYSTEMROOT to start any process; the push token stays out.
+    assert seen["env"]["SYSTEMROOT"] == r"C:\Windows"
+    assert "PAT_TOKEN" not in seen["env"]
