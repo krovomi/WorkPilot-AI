@@ -54,7 +54,8 @@ class TestHooks:
             "success": True,
             "hooks": [],
         }
-        assert client.delete(f"/api/hooks/{hook_id}").json() == {"success": True}
+        removed = client.delete(f"/api/hooks/{hook_id}")
+        assert removed.json() == {"success": True}
         assert [h["id"] for h in client.get("/api/hooks").json()["hooks"]] == [
             copy["id"]
         ]

@@ -213,12 +213,11 @@ class TestRecorder:
         recorder = SessionRecorder(tmp_path)
         recording = SessionRecording("s1", 1.0, 2.0, {}, [])
 
-        def vanish(*_args, **_kwargs):
-            for temporary in tmp_path.glob(".*.tmp.*"):
-                temporary.unlink()
+        def vanish(source, _target):
+            Path(source).unlink()
             raise OSError("disk full")
 
-        monkeypatch.setattr("streaming.session_recorder.json.dump", vanish)
+        monkeypatch.setattr("streaming.session_recorder.os.replace", vanish)
         with pytest.raises(OSError, match="disk full"):
             recorder.save_recording(recording)
 

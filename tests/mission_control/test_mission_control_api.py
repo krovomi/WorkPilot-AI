@@ -45,7 +45,8 @@ class TestSession:
             1,
         )
 
-        assert client.post(f"{BASE}/session/stop").json() == {"success": True}
+        stopped = client.post(f"{BASE}/session/stop")
+        assert stopped.json() == {"success": True}
         after = client.get(f"{BASE}/agents/{agent['id']}").json()["agent"]
         assert after["status"] == "completed"
         assert client.get(f"{BASE}/session").json()["session"]["is_active"] is False
@@ -95,7 +96,8 @@ class TestAgents:
         client.post(f"{BASE}/agents/{agent['id']}/start", json={"task": "t"})
 
         assert len(client.get(f"{BASE}/agents").json()["agents"]) == 1
-        assert client.delete(f"{BASE}/agents/{agent['id']}").json() == {"success": True}
+        removed = client.delete(f"{BASE}/agents/{agent['id']}")
+        assert removed.json() == {"success": True}
         assert client.get(f"{BASE}/agents").json()["agents"] == []
         last = client.get(f"{BASE}/events").json()["events"][-1]
         assert (last["type"], last["data"]) == (
