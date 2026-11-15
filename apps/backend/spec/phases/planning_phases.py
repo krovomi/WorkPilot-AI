@@ -7,15 +7,11 @@ Phases for implementation planning and final validation.
 
 import json
 import logging
-from typing import TYPE_CHECKING
 
 from task_logger import LogEntryType, LogPhase
 
 from .. import writer
 from .models import MAX_RETRIES, PhaseResult
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +49,10 @@ class PlanningPhaseMixin:
                 content = plan_file.read_text(encoding="utf-8")[:500]
                 try:
                     data = json.loads(plan_file.read_text(encoding="utf-8"))
+                    # A bare list or string is valid JSON too: reading it as a
+                    # mapping raised AttributeError and ended the spec.
+                    if not isinstance(data, dict):
+                        data = {}
                     keys = list(data.keys())
                     phases = data.get("phases")
                     phase_count = len(phases) if isinstance(phases, list) else "missing"

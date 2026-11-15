@@ -35,8 +35,14 @@ class DiscoveryPhaseMixin:
             if success:
                 stats = discovery.get_project_index_stats(self.spec_dir)
                 if stats:
+                    services = stats["services"]
+                    found = (
+                        f"{len(services)} service(s): {', '.join(services)}"
+                        if services
+                        else "no service"
+                    )
                     self.task_logger.log(
-                        f"Discovered {stats.get('file_count', 0)} files in project",
+                        f"Indexed the project ({stats['project_type']}), {found}",
                         LogEntryType.SUCCESS,
                         LogPhase.PLANNING,
                     )
