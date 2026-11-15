@@ -216,6 +216,7 @@
 			"not_a_bundle": "This file is not a WorkPilot replay bundle.",
 			"unsupported_version": "This bundle was made by a newer version of WorkPilot.",
 			"not_a_file": "Choose a file, not a folder.",
+			"bad_export": "The backend built an unexpected file, so nothing was written.",
 			"generic": "The replay could not be shared: {{error}}"
 		}
 	},

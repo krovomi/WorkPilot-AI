@@ -13,11 +13,23 @@ const dialogs = vi.hoisted(() => ({
 	save: vi.fn(),
 	open: vi.fn(),
 }));
-const files = vi.hoisted(() => ({
-	writeFile: vi.fn(async () => undefined),
-	readFile: vi.fn(async () => Buffer.from("bundle")),
-	stat: vi.fn(async () => ({ isFile: (): boolean => true, size: 6 })),
-}));
+const files = vi.hoisted(() => {
+	const state = { content: Buffer.from("bundle") };
+	const handle = {
+		stat: vi.fn(async () => ({ isFile: (): boolean => true, size: state.content.length })),
+		read: vi.fn(async (buffer: Buffer, offset: number, length: number, position: number) => {
+			const bytesRead = state.content.copy(buffer, offset, position, position + length);
+			return { bytesRead };
+		}),
+		close: vi.fn(async () => undefined),
+	};
+	return {
+		state,
+		handle,
+		writeFile: vi.fn(async () => undefined),
+		open: vi.fn(async () => handle),
+	};
+});
 
 vi.mock("electron", () => ({
 	ipcMain: {
@@ -29,13 +41,14 @@ vi.mock("../../electron-utils", () => ({
 	showSaveDialog: dialogs.save,
 	showOpenDialog: dialogs.open,
 }));
-vi.mock("node:fs/promises", () => files);
+vi.mock("node:fs/promises", () => ({ writeFile: files.writeFile, open: files.open }));
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import {
 	MAX_BUNDLE_BYTES,
 	bookmarkBody,
 	exportBody,
+	exportedFile,
 	registerReplayShareHandlers,
 } from "../replay-share-handlers";
 
@@ -58,9 +71,15 @@ beforeEach(() => {
 	dialogs.save.mockReset();
 	dialogs.open.mockReset();
 	files.writeFile.mockClear();
-	files.readFile.mockClear();
-	files.stat.mockReset();
-	files.stat.mockResolvedValue({ isFile: () => true, size: 6 });
+	files.open.mockClear();
+	files.handle.read.mockClear();
+	files.handle.close.mockClear();
+	files.state.content = Buffer.from("bundle");
+	files.handle.stat.mockReset();
+	files.handle.stat.mockImplementation(async () => ({
+		isFile: () => true,
+		size: files.state.content.length,
+	}));
 	vi.stubGlobal("fetch", fetchMock);
 	vi.stubEnv("VITE_BACKEND_URL", "");
 	vi.stubEnv("BACKEND_URL", "");
@@ -122,8 +141,28 @@ describe("bookmarkBody", () => {
 	});
 });
 
+describe("exportedFile", () => {
+	const gzip = Buffer.from([0x1f, 0x8b, 8, 0]);
+	const page = Buffer.from("<!doctype html><html></html>");
+
+	it("keeps a gzip bundle or a page, as asked", () => {
+		expect(exportedFile(gzip.toString("base64"), "wpreplay")).toEqual(gzip);
+		expect(exportedFile(page.toString("base64"), "html")).toEqual(page);
+	});
+
+	it.each([
+		[7, "wpreplay"],
+		["not base64!", "wpreplay"],
+		["A".repeat(Math.ceil(MAX_BUNDLE_BYTES / 3) * 4 + 4), "wpreplay"],
+		[page.toString("base64"), "wpreplay"],
+		[gzip.toString("base64"), "html"],
+	] as const)("refuses %#", (raw, format) => {
+		expect(exportedFile(raw, format)).toBeNull();
+	});
+});
+
 describe("export", () => {
-	const content = Buffer.from("gz").toString("base64");
+	const content = Buffer.from([0x1f, 0x8b, 0]).toString("base64");
 
 	it("writes the masked file where the person chooses", async () => {
 		fetchMock.mockResolvedValueOnce(
@@ -145,7 +184,22 @@ describe("export", () => {
 			defaultPath: "replay-bot.wpreplay",
 			filters: [{ name: "WPREPLAY", extensions: ["wpreplay"] }],
 		});
-		expect(files.writeFile).toHaveBeenCalledWith("/out/r.wpreplay", Buffer.from("gz"));
+		expect(files.writeFile).toHaveBeenCalledWith(
+			"/out/r.wpreplay",
+			Buffer.from([0x1f, 0x8b, 0]),
+		);
+	});
+
+	it("writes nothing the backend did not build as asked", async () => {
+		fetchMock.mockResolvedValueOnce(ok({ file_name: "p.html", content_base64: content }));
+		dialogs.save.mockResolvedValueOnce({ canceled: false, filePath: "/out/p.html" });
+
+		const result = await call(IPC_CHANNELS.REPLAY_EXPORT_SESSION, "s-1", {
+			format: "html",
+		});
+
+		expect(result).toEqual({ success: false, error: "bad_export" });
+		expect(files.writeFile).not.toHaveBeenCalled();
 	});
 
 	it("writes nothing when the person closes the dialog", async () => {
@@ -193,7 +247,8 @@ describe("import", () => {
 			success: true,
 			session: { session_id: "n1", agent_name: "Bot" },
 		});
-		expect(files.readFile).toHaveBeenCalledWith("/in/a.wpreplay");
+		expect(files.open).toHaveBeenCalledWith("/in/a.wpreplay", "r");
+		expect(files.handle.close).toHaveBeenCalled();
 		expect(sent()).toEqual({ content_base64: Buffer.from("bundle").toString("base64") });
 	});
 
@@ -208,22 +263,34 @@ describe("import", () => {
 			success: true,
 			canceled: true,
 		});
-		expect(files.readFile).not.toHaveBeenCalled();
+		expect(files.open).not.toHaveBeenCalled();
 	});
 
 	it("refuses a folder or a file larger than a bundle", async () => {
 		dialogs.open.mockResolvedValue({ canceled: false, filePaths: ["/in/x"] });
-		files.stat.mockResolvedValueOnce({ isFile: () => false, size: 0 });
+		files.handle.stat.mockResolvedValueOnce({ isFile: () => false, size: 0 });
 		expect(await call(IPC_CHANNELS.REPLAY_IMPORT_SESSION)).toEqual({
 			success: false,
 			error: "not_a_file",
 		});
-		files.stat.mockResolvedValueOnce({ isFile: () => true, size: MAX_BUNDLE_BYTES + 1 });
+		files.handle.stat.mockResolvedValueOnce({ isFile: () => true, size: MAX_BUNDLE_BYTES + 1 });
 		expect(await call(IPC_CHANNELS.REPLAY_IMPORT_SESSION)).toEqual({
 			success: false,
 			error: "too_large",
 		});
-		expect(files.readFile).not.toHaveBeenCalled();
+		expect(files.handle.read).not.toHaveBeenCalled();
+		expect(files.handle.close).toHaveBeenCalledTimes(2);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("refuses a file that grows past a bundle while it is read", async () => {
+		dialogs.open.mockResolvedValue({ canceled: false, filePaths: ["/in/x"] });
+		files.state.content = Buffer.alloc(MAX_BUNDLE_BYTES + 1);
+		files.handle.stat.mockResolvedValueOnce({ isFile: () => true, size: 6 });
+		expect(await call(IPC_CHANNELS.REPLAY_IMPORT_SESSION)).toEqual({
+			success: false,
+			error: "too_large",
+		});
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

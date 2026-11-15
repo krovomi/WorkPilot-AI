@@ -23,6 +23,7 @@ const KNOWN_ERRORS = new Set([
 	"not_a_bundle",
 	"unsupported_version",
 	"not_a_file",
+	"bad_export",
 ]);
 
 export interface ReplayShareNotice {

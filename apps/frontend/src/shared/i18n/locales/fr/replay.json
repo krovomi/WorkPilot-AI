@@ -216,6 +216,7 @@
 			"not_a_bundle": "Ce fichier n'est pas un rejeu WorkPilot.",
 			"unsupported_version": "Ce rejeu vient d'une version plus récente de WorkPilot.",
 			"not_a_file": "Choisissez un fichier, pas un dossier.",
+			"bad_export": "Le backend a produit un fichier inattendu : rien n'a été écrit.",
 			"generic": "Le rejeu n'a pas pu être partagé : {{error}}"
 		}
 	},

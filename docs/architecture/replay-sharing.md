@@ -100,7 +100,9 @@ Quatre canaux (`replay:exportSession`, `replay:importSession`, `replay:addBookma
 `replay:removeBookmark`), un module de preload typé, un handler qui revalide : id de session
 `[A-Za-z0-9_-]`, format et langue en liste fermée, options booléennes, étape entière bornée,
 textes bornés. Le renderer ne donne jamais de chemin ; le nom de fichier proposé vient du
-backend et passe par `path.basename`.
+backend et passe par `path.basename`. Le main n'écrit que ce qui a été demandé (un gzip pour un
+`.wpreplay`, une page pour l'HTML, borné comme un bundle) et lit un bundle par une seule poignée
+de fichier : le fichier vérifié est celui qui est lu, jamais au-delà de la borne.
 
 ## Pas encore fait
 
