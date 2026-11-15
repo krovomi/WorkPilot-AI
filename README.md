@@ -196,6 +196,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Plan rehearsal** replays a spec's plan over the base branch before the build; after QA, a **red team** agent tries to break what the task built, and the **migration guard** says what the task's migrations would do to a production database, for every stack.
 - **Goal mode** (done when a command says so, e.g. `dotnet test` exits 0), **cross review** by a second engine, **spec by example** for ASP.NET Core Web APIs, **.NET upgrades** one release at a time up to .NET 11.
 - **Runtime verification** with proof videos and a comparison against the base branch; **hard gates** for invented packages, toothless tests and formal proofs.
+- **Browser Agent recorder**: drive a page by hand and get a Playwright (TypeScript or Python) or Cypress test, with robust selectors, secrets read from environment variables, proposed on a review branch.
 - **PR follow-through**: a red check or a review thread on the task's PR goes back to the fixer, never forced, never merged.
 - **Provenance**: which lines the AI wrote and with which model, an SBOM of the packages added, requirement-to-test traceability.
 - **Guardrails as code**: a versioned policy, in layers, that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it.
