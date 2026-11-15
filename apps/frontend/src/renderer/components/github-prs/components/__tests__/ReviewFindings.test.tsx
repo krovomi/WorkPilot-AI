@@ -30,7 +30,7 @@ const FINDINGS = [
 	finding("c1", "critical", { category: "test" }),
 	finding("h1", "high", { category: "verification_failed", endLine: 9 }),
 	finding("m1", "medium", { category: "docs", suggestedFix: "Add a doc" }),
-	finding("m2", "medium", { category: "brand-new" }),
+	finding("m2", "medium", { category: "brand-new" as never }),
 	finding("l1", "low"),
 ];
 
