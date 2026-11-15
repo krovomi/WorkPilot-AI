@@ -34,7 +34,7 @@ vi.mock("../../github/utils/subprocess-runner", async (importOriginal) => ({
 	runPythonSubprocess: state.run,
 }));
 
-import { type BrowserWindow, ipcMain } from "electron";
+import { type BrowserWindow, app, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import {
 	findAppBackendPath,
@@ -86,6 +86,21 @@ describe("findAppBackendPath", () => {
 		expect(findAppBackendPath(path.join("runners", "github", "runner.py"))).toBeNull();
 		expect(getBackendPath()).toBeNull();
 
+		installRunner("github");
+		expect(getBackendPath()).toBe(backend());
+	});
+
+	it("finds the backend next to the packaged app, and does without the app when there is none", () => {
+		const packaged = path.join(appRoot, "resources");
+		mkdirSync(path.join(packaged, "backend", "runners", "github"), { recursive: true });
+		writeFileSync(path.join(packaged, "backend", "runners", "github", "runner.py"), "");
+		vi.spyOn(app, "getAppPath").mockReturnValue(path.join(packaged, "app.asar"));
+		expect(getBackendPath()).toBe(path.join(packaged, "backend"));
+
+		vi.spyOn(app, "getAppPath").mockImplementation(() => {
+			throw new Error("no app");
+		});
+		expect(getBackendPath()).toBeNull();
 		installRunner("github");
 		expect(getBackendPath()).toBe(backend());
 	});

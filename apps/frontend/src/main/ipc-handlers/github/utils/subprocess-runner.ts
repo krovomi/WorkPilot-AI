@@ -10,6 +10,8 @@ import { exec, execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { app } from "electron";
+import type { Project } from "../../../../shared/types";
 
 
 import type {
@@ -538,12 +540,11 @@ export function getRunnerPath(backendPath: string): string {
  * on, not where the app's code lives.
  */
 export function findAppBackendPath(runner: string): string | null {
-	// Import app module for production path detection
 	let appPath: string | null = null;
 	try {
-		appPath = (require("electron") as typeof import("electron")).app.getAppPath();
+		appPath = app.getAppPath();
 	} catch {
-		// Electron not available in tests
+		// No Electron app here (a test that mocks electron without it)
 	}
 
 	// Same locations as agent-process.ts
@@ -586,9 +587,12 @@ export interface GitHubModuleValidation {
  * 3. gh CLI is authenticated
  * 4. Python virtual environment is set up
  *
+ * @param _project - The project the review will run on; the runner is the app's
  * @returns Detailed validation result with specific error messages
  */
-export async function validateGitHubModule(): Promise<GitHubModuleValidation> {
+export async function validateGitHubModule(
+	_project?: Project,
+): Promise<GitHubModuleValidation> {
 	const result: GitHubModuleValidation = {
 		valid: false,
 		runnerAvailable: false,

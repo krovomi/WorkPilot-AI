@@ -327,7 +327,7 @@ async function checkNewIssues(
 	}
 
 	// Validate GitHub module
-	const validation = await validateGitHubModule();
+	const validation = await validateGitHubModule(project);
 	if (!validation.valid) {
 		throw new Error(validation.error);
 	}
@@ -752,7 +752,7 @@ export function registerAutoFixHandlers(
 					});
 
 					// Comprehensive validation of GitHub module
-					const validation = await validateGitHubModule();
+					const validation = await validateGitHubModule(project);
 					if (!validation.valid) {
 						throw new Error(validation.error);
 					}
@@ -904,7 +904,7 @@ export function registerAutoFixHandlers(
 					});
 
 					// Comprehensive validation of GitHub module
-					const validation = await validateGitHubModule();
+					const validation = await validateGitHubModule(project);
 					if (!validation.valid) {
 						throw new Error(validation.error);
 					}
@@ -1046,7 +1046,7 @@ export function registerAutoFixHandlers(
 					);
 
 					// Comprehensive validation of GitHub module
-					const validation = await validateGitHubModule();
+					const validation = await validateGitHubModule(project);
 					if (!validation.valid) {
 						throw new Error(validation.error);
 					}
