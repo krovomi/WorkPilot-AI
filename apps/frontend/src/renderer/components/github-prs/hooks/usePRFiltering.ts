@@ -10,7 +10,6 @@ import type {
 } from "../../../../preload/api/modules/github-api";
 
 export type PRStatusFilter =
-	| "all"
 	| "reviewing"
 	| "not_reviewed"
 	| "reviewed"
