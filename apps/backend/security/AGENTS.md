@@ -15,7 +15,7 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Bash | allowlist par projet + validateurs par commande | `hooks.py` (`bash_security_hook`) → `command_guard.py` (`validate_command_line`) → `validator_registry.py` | `tests/test_security_command_guard.py`, `tests/security/` |
 | Bash | les étapes d'une procédure RUN jouées par Python (`workflows/execute.py`) passent par `hooks.command_refusal` avant toute exécution ; l'arrêt avant la phase irréversible est `workflows/runner.py` (`irreversible_gate`) | `hooks.py` → `command_guard.py` | `tests/test_workflows_run_execute.py` |
 | Bash | profil de sécurité du projet (commandes de base + stack + scripts + perso) | `profile.py` (`get_security_profile`), `project/command_registry/` | `tests/test_security.py`, `tests/test_security_cache.py` |
-| Bash | secrets dans un `git commit` émis par un agent | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py` |
+| Bash | secrets dans un `git commit` émis par un agent : l'index du dépôt où le commit a lieu (après `-C`, `--work-tree`), plus ce que `commit -a` indexe | `git_validators.py` → `scan_secrets.py` | `tests/test_scan_secrets.py`, `tests/security/test_git_commit_secrets.py` |
 | Bash | écriture de la configuration de sécurité (allowlist, profil, garde-fous, réglages SDK), quelle que soit la commande | `config_write_validators.py`, validateur de ligne (`LINE_VALIDATORS` de `validator_registry.py`) | `tests/security/test_config_write_validators.py` |
 | Write / Edit | écritures confinées au projet, à la spec et à `<tmp>/workpilot` ; la configuration de sécurité refusée même dans le projet, et l'objectif de la tâche (`.workpilot-goal.json`) | `path_guard.py` (`make_write_path_hook`, `protected_config_refusal`) ; hors SDK `_resolve_within_project(..., for_write=True)` | `tests/test_security_path_guard.py` |
 | write / edit (pi) | la même politique, jugée **dans le processus pi** : `core/agent_clients/pi_guard/workpilot-guard.js`, chargé par `--extension`, politique calculée depuis `path_guard` et passée par `WORKPILOT_PI_GUARD` ; le dossier de ressources de pi (.pi) et le garde-fou lui-même refusés en plus ; `bash` non jugé (comme OpenCode, Antigravity) | `tests/test_pi_cli_client.py`, fixtures réelles `tests/fixtures/pi/guard-*.jsonl` |
@@ -59,8 +59,6 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 d'exécution d'agent.
 
 - `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
-- `git_hooks.py`, `auto_integration.py` : `initialize_security` n'a aucun appelant, et le dépôt
-  utilise `.husky/` (`core.hooksPath`), que `git_hooks.py install` ne touche pas.
 - `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
   `subprocess` directement (voir la règle S4).
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.
