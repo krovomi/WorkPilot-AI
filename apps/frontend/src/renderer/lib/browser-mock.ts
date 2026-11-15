@@ -14,6 +14,7 @@ import {
 	contextMock,
 	insightsMock,
 	integrationMock,
+	memoryLifecycleMock,
 	phase35Mock,
 	projectMock,
 	settingsMock,
@@ -136,6 +137,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Context Operations
 	...contextMock,
+	...memoryLifecycleMock,
 
 	// Environment Configuration & Integration Operations
 	...integrationMock,
