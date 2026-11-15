@@ -1054,6 +1054,63 @@
 			"coder": "Codeur",
 			"qa_reviewer": "Relecteur QA",
 			"analyzer": "Enquêteur"
+		},
+		"security": {
+			"badge": "Sécurité {{score}}",
+			"badgeTitle": "Score de sécurité {{score}}/100 : {{level}}",
+			"level": {
+				"high": "élevé",
+				"medium": "moyen",
+				"low": "faible"
+			},
+			"title": "Sécurité",
+			"checking": "Lecture du registre et des vulnérabilités connues…",
+			"recheck": "Vérifier à nouveau",
+			"checkedAt": "Registre lu le {{date}}",
+			"unchecked": {
+				"remote": "Tourne sur les serveurs de son éditeur : rien ne tourne sur cette machine, et il n'y a pas de paquet à vérifier.",
+				"offline": "Ce projet est en mode hors-ligne strict : le score n'utilise que le catalogue et la dernière lecture du registre.",
+				"unreachable": "Le registre n'a pas répondu : le score n'utilise que le catalogue et la dernière lecture du registre.",
+				"notYet": "D'après le catalogue seulement ; ouvrez les détails pour lire le registre et les vulnérabilités connues."
+			},
+			"lowScore": "Score faible : ne l'installez que sur des projets de confiance, et relisez ses outils avant de les approuver.",
+			"dimensions": {
+				"publisher": "Éditeur",
+				"permissions": "Permissions",
+				"execution": "Où il tourne",
+				"freshness": "Fraîcheur",
+				"supplyChain": "Vulnérabilités connues",
+				"maintainers": "Mainteneurs"
+			},
+			"reasons": {
+				"official": "Maintenu par {{author}}, l'éditeur du produit.",
+				"community": "Serveur communautaire ({{author}}), pas l'éditeur du produit.",
+				"readsOnly": "Ses outils ne font que lire.",
+				"writes": "Certains de ses outils modifient des données.",
+				"executes": "Des outils lancent des commandes : {{tools}}.",
+				"readOnlyFlag": "Lancé en mode lecture seule.",
+				"remote": "Tourne à distance, pas sur cette machine.",
+				"localPinned": "Tourne sur cette machine avec vos droits, à une version figée.",
+				"localUnpinned": "Tourne sur cette machine avec vos droits ; sa dernière version est téléchargée à chaque démarrage.",
+				"unknown": "Pas encore vérifié.",
+				"recent": "Dernière version il y a {{days}} jours.",
+				"stale": "Aucune version depuis {{days}} jours : peut-être abandonné.",
+				"deprecated": "Déprécié par son éditeur.",
+				"vulnerable": "{{count}} vulnérabilités connues pour cette version.",
+				"noKnownVulnerability": "Aucune vulnérabilité connue pour la version {{version}}.",
+				"changed": "Nouveaux mainteneurs depuis la première vérification : {{names}}.",
+				"noSource": "Le paquet ne nomme aucun dépôt source.",
+				"stable": "Les mêmes {{count}} mainteneurs qu'à la première vérification."
+			},
+			"alerts": {
+				"maintainerChanged": "Mainteneurs changés : {{names}}. Un nouveau mainteneur peut publier n'importe quoi sous ce nom ; vérifiez avant de mettre à jour.",
+				"vulnerability": "{{id}} : {{summary}}",
+				"abandoned": "Aucune version depuis {{days}} jours : il est peut-être abandonné.",
+				"deprecated": "L'éditeur a déprécié ce paquet.",
+				"noSource": "Code source indisponible : impossible de l'auditer.",
+				"unpinned": "Version non figée : chaque démarrage lance la dernière version, quoi qu'elle contienne.",
+				"executesCommands": "Il peut lancer des commandes ({{tools}}) : ne le donnez qu'aux agents qui en ont besoin."
+			}
 		}
 	},
 	"terminalGrid": {

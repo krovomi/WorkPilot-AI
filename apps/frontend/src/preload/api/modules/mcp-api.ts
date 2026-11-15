@@ -12,6 +12,10 @@ import type {
 	HuggingFaceModelSearchParams,
 } from "../../../shared/types/mcp-marketplace";
 import type {
+	McpSecurityRequest,
+	McpSecurityScore,
+} from "../../../shared/types/mcp-security";
+import type {
 	CustomMcpServer,
 	McpHealthCheckResult,
 	McpTestConnectionResult,
@@ -30,6 +34,10 @@ export interface McpAPI {
 	searchHuggingFaceModels: (
 		params: HuggingFaceModelSearchParams,
 	) => Promise<IPCResult<HuggingFaceModelInfo[]>>;
+	/** Security score of a catalog server: catalog, registry and OSV facts */
+	getMcpServerSecurity: (
+		request: McpSecurityRequest,
+	) => Promise<IPCResult<McpSecurityScore>>;
 }
 
 export function createMcpAPI(): McpAPI {
@@ -42,5 +50,8 @@ export function createMcpAPI(): McpAPI {
 
 		searchHuggingFaceModels: (params: HuggingFaceModelSearchParams) =>
 			ipcRenderer.invoke(IPC_CHANNELS.HUGGINGFACE_SEARCH_MODELS, params),
+
+		getMcpServerSecurity: (request: McpSecurityRequest) =>
+			ipcRenderer.invoke(IPC_CHANNELS.MCP_MARKETPLACE_GET_SECURITY, request),
 	};
 }

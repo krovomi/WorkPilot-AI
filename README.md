@@ -217,7 +217,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - GitHub, GitLab, Azure DevOps, Jira and Linear: import issues, investigate them, review pull requests.
 - **AI PR review that learns**: accept, reject or mark each finding not applicable, with a reason; a kind of remark your project keeps rejecting is downgraded, then no longer raised, on every provider; security and critical findings never are ([review feedback](docs/architecture/review-feedback.md)).
 - **Automations** turn an event (an issue labelled, CI red, a time of day, a production incident from Sentry) into a draft card; **CI/CD Triggers** start your pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) when an agent opens a task's PR or the PR is merged.
-- MCP marketplace and custom MCP servers with pinned tool descriptions; the **workpilot-board** MCP server gives Claude Code, Codex, Gemini CLI, Copilot, Cursor and others your Kanban.
+- MCP marketplace and custom MCP servers with pinned tool descriptions; each catalog server shows a **security score** out of 100 (publisher, tool permissions, pinned version, release date, known vulnerabilities from OSV, maintainer changes); the **workpilot-board** MCP server gives Claude Code, Codex, Gemini CLI, Copilot, Cursor and others your Kanban.
 - Notifications on Slack, Teams, Discord, Google Chat, webhooks, ntfy and Telegram.
 
 **Team**
