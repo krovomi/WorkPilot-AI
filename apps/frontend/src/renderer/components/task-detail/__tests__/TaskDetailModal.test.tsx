@@ -389,7 +389,7 @@ describe("primary action", () => {
 
 	it("a paused task gets the run controls, and the pause panel resumes it", async () => {
 		renderModal(
-			makeTask({ status: "human_review", metadata: { paused: { enabled: true } } }),
+			makeTask({ status: "human_review", metadata: { paused: { enabled: true, paused_at: null, paused_subtask_id: null } } }),
 		);
 		expect(stubProps("TaskRunControls").isPaused).toBe(true);
 		await act(async () => {

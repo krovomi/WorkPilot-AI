@@ -198,6 +198,9 @@ export const FILE_EXEMPTIONS: Readonly<
 			reason: "example shell command",
 		},
 	],
+	"components/task-detail/GoalCard.tsx": [
+		{ text: "@placeholder=dotnet test", reason: "example shell command" },
+	],
 	"components/task-detail/TaskVerify.tsx": [
 		{ text: "?2xx", reason: "HTTP status class" },
 		{ text: "@label=LCP", reason: "Web Vitals metric name" },
@@ -212,6 +215,4 @@ export const FILE_EXEMPTIONS: Readonly<
  * and the sidebar being restructured. Translate them there, then delete the
  * entry. Counts may only go down.
  */
-export const PENDING: Readonly<Record<string, number>> = {
-	"components/task-detail/GoalCard.tsx": 1,
-};
+export const PENDING: Readonly<Record<string, number>> = {};

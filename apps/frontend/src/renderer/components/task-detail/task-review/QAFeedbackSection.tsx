@@ -31,6 +31,15 @@ import {
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 
+// MIME types whose extension is not their subtype (svg+xml -> svg).
+const MIME_EXTENSIONS: Record<string, string> = {
+	"image/svg+xml": "svg",
+	"image/jpeg": "jpg",
+	"image/png": "png",
+	"image/gif": "gif",
+	"image/webp": "webp",
+};
+
 interface QAFeedbackSectionProps {
 	feedback: string;
 	isSubmitting: boolean;
@@ -71,32 +80,13 @@ export function QAFeedbackSection({
 	const [error, setError] = useState<string | null>(null);
 
 	/**
-	 * Handle paste event for screenshot support
+	 * Add image files as attachments, within the per-task limit. `nameFor`
+	 * names a file from its extension (a pasted screenshot has no name).
 	 */
-	const handlePaste = useCallback(
-		async (e: ClipboardEvent<HTMLTextAreaElement>) => {
-			// Skip image handling if feature is not enabled
-			if (!onImagesChange) return;
+	const addImageFiles = useCallback(
+		async (files: File[], nameFor: (file: File, extension: string) => string) => {
+			if (!onImagesChange || files.length === 0) return;
 
-			const clipboardItems = e.clipboardData?.items;
-			if (!clipboardItems) return;
-
-			// Find image items in clipboard
-			const imageItems: DataTransferItem[] = [];
-			for (let i = 0; i < clipboardItems.length; i++) {
-				const item = clipboardItems[i];
-				if (item.type.startsWith("image/")) {
-					imageItems.push(item);
-				}
-			}
-
-			// If no images, allow normal paste behavior
-			if (imageItems.length === 0) return;
-
-			// Prevent default paste when we have images
-			e.preventDefault();
-
-			// Check if we can add more images
 			const remainingSlots = MAX_IMAGES_PER_TASK - images.length;
 			if (remainingSlots <= 0) {
 				setError(t("feedback.maxImagesError", { count: MAX_IMAGES_PER_TASK }));
@@ -105,15 +95,10 @@ export function QAFeedbackSection({
 
 			setError(null);
 
-			// Process image items
 			const newImages: ImageAttachment[] = [];
 			const existingFilenames = images.map((img) => img.filename);
 
-			for (const item of imageItems.slice(0, remainingSlots)) {
-				const file = item.getAsFile();
-				if (!file) continue;
-
-				// Validate image type
+			for (const file of files.slice(0, remainingSlots)) {
 				if (!isValidImageMimeType(file.type)) {
 					setError(
 						t("feedback.invalidTypeError", {
@@ -126,20 +111,9 @@ export function QAFeedbackSection({
 				try {
 					const dataUrl = await blobToBase64(file);
 					const thumbnail = await createThumbnail(dataUrl);
-
-					// Generate filename for pasted images (screenshot-timestamp.ext)
-					// Map MIME types to proper file extensions (handles svg+xml -> svg, etc.)
-					const mimeToExtension: Record<string, string> = {
-						"image/svg+xml": "svg",
-						"image/jpeg": "jpg",
-						"image/png": "png",
-						"image/gif": "gif",
-						"image/webp": "webp",
-					};
 					const extension =
-						mimeToExtension[file.type] || file.type.split("/")[1] || "png";
-					const baseFilename = `screenshot-${Date.now()}.${extension}`;
-					const resolvedFilename = resolveFilename(baseFilename, [
+						MIME_EXTENSIONS[file.type] || file.type.split("/")[1] || "png";
+					const resolvedFilename = resolveFilename(nameFor(file, extension), [
 						...existingFilenames,
 						...newImages.map((img) => img.filename),
 					]);
@@ -153,13 +127,8 @@ export function QAFeedbackSection({
 						thumbnail,
 					});
 				} catch (error) {
-					console.error(
-						"[QAFeedbackSection] Failed to process pasted image:",
-						error,
-					);
-					setError(
-						t("feedback.processingError", "Failed to process pasted image"),
-					);
+					console.error("[QAFeedbackSection] Failed to process image:", error);
+					setError(t("feedback.processingError"));
 				}
 			}
 
@@ -171,6 +140,29 @@ export function QAFeedbackSection({
 			}
 		},
 		[images, onImagesChange, t],
+	);
+
+	/**
+	 * Handle paste event for screenshot support
+	 */
+	const handlePaste = useCallback(
+		async (e: ClipboardEvent<HTMLTextAreaElement>) => {
+			// Skip image handling if feature is not enabled
+			if (!onImagesChange) return;
+
+			const items = Array.from(e.clipboardData?.items ?? []).filter((item) =>
+				item.type.startsWith("image/"),
+			);
+			// If no images, allow normal paste behavior
+			if (items.length === 0) return;
+			e.preventDefault();
+
+			const files = items
+				.map((item) => item.getAsFile())
+				.filter((file): file is File => file !== null);
+			await addImageFiles(files, (_file, extension) => `screenshot-${Date.now()}.${extension}`);
+		},
+		[addImageFiles, onImagesChange],
 	);
 
 	/**
@@ -205,98 +197,17 @@ export function QAFeedbackSection({
 			e.preventDefault();
 			e.stopPropagation();
 			setIsDragOverTextarea(false);
-
-			// Skip image handling if feature is not enabled
-			if (!onImagesChange) return;
 			if (isSubmitting) return;
 
-			const files = e.dataTransfer?.files;
-			if (!files || files.length === 0) return;
-
-			// Filter for image files
-			const imageFiles: File[] = [];
-			for (let i = 0; i < files.length; i++) {
-				const file = files[i];
-				if (file.type.startsWith("image/")) {
-					imageFiles.push(file);
-				}
-			}
-
-			if (imageFiles.length === 0) return;
-
-			// Check if we can add more images
-			const remainingSlots = MAX_IMAGES_PER_TASK - images.length;
-			if (remainingSlots <= 0) {
-				setError(t("feedback.maxImagesError", { count: MAX_IMAGES_PER_TASK }));
-				return;
-			}
-
-			setError(null);
-
-			// Process image files
-			const newImages: ImageAttachment[] = [];
-			const existingFilenames = images.map((img) => img.filename);
-
-			for (const file of imageFiles.slice(0, remainingSlots)) {
-				// Validate image type
-				if (!isValidImageMimeType(file.type)) {
-					setError(
-						t("feedback.invalidTypeError", {
-							types: ALLOWED_IMAGE_TYPES_DISPLAY,
-						}),
-					);
-					continue;
-				}
-
-				try {
-					const dataUrl = await blobToBase64(file);
-					const thumbnail = await createThumbnail(dataUrl);
-
-					// Use original filename or generate one with proper extension
-					// Map MIME types to proper file extensions (handles svg+xml -> svg, etc.)
-					const mimeToExtension: Record<string, string> = {
-						"image/svg+xml": "svg",
-						"image/jpeg": "jpg",
-						"image/png": "png",
-						"image/gif": "gif",
-						"image/webp": "webp",
-					};
-					const extension =
-						mimeToExtension[file.type] || file.type.split("/")[1] || "png";
-					const baseFilename =
-						file.name || `dropped-image-${Date.now()}.${extension}`;
-					const resolvedFilename = resolveFilename(baseFilename, [
-						...existingFilenames,
-						...newImages.map((img) => img.filename),
-					]);
-
-					newImages.push({
-						id: generateImageId(),
-						filename: resolvedFilename,
-						mimeType: file.type,
-						size: file.size,
-						data: dataUrl.split(",")[1], // Store base64 without data URL prefix
-						thumbnail,
-					});
-				} catch (error) {
-					console.error(
-						"[QAFeedbackSection] Failed to process dropped image:",
-						error,
-					);
-					setError(
-						t("feedback.processingError", "Failed to process dropped image"),
-					);
-				}
-			}
-
-			if (newImages.length > 0) {
-				onImagesChange([...images, ...newImages]);
-				// Show success feedback
-				setPasteSuccess(true);
-				setTimeout(() => setPasteSuccess(false), 2000);
-			}
+			const files = Array.from(e.dataTransfer?.files ?? []).filter((file) =>
+				file.type.startsWith("image/"),
+			);
+			await addImageFiles(
+				files,
+				(file, extension) => file.name || `dropped-image-${Date.now()}.${extension}`,
+			);
 		},
-		[images, isSubmitting, onImagesChange, t],
+		[addImageFiles, isSubmitting],
 	);
 
 	/**
