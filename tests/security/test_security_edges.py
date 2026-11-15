@@ -11,7 +11,11 @@ from security import path_guard, profile, untrusted
 from security.command_guard import validate_command_line
 from security.content_sanitizer import ContentSanitizer
 from security.filesystem_validators import validate_rm_command
-from security.git_validators import validate_git_command, validate_git_commit_secrets
+from security.git_validators import (
+    validate_git_command,
+    validate_git_commit_secrets,
+    validate_git_config,
+)
 from security.parser import (
     extract_commands,
     split_command_segments,
@@ -248,3 +252,8 @@ def test_staged_blobs_stop_at_a_short_answer(monkeypatch, tmp_path):
 )
 def test_git_config_finds_the_key_wherever_it_is(command, allowed):
     assert validate_git_command(command)[0] is allowed, command
+
+
+@pytest.mark.parametrize("line", ["", "gitk --all", "ls config"])
+def test_the_config_validator_lets_other_commands_through(line):
+    assert validate_git_config(line) == (True, "")
