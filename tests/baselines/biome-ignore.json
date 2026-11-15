@@ -72,7 +72,6 @@
   "apps/frontend/src/preload/api/modules/auto-refactor-api.ts": 1,
   "apps/frontend/src/preload/api/modules/generic-ipc-api.ts": 4,
   "apps/frontend/src/preload/api/modules/test-generation-api.ts": 8,
-  "apps/frontend/src/renderer/App.tsx": 1,
   "apps/frontend/src/renderer/__tests__/task-order.test.ts": 4,
   "apps/frontend/src/renderer/__tests__/task-store.test.ts": 1,
   "apps/frontend/src/renderer/components/AuthStatusIndicator.test.tsx": 2,
