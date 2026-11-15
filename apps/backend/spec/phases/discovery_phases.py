@@ -35,8 +35,14 @@ class DiscoveryPhaseMixin:
             if success:
                 stats = discovery.get_project_index_stats(self.spec_dir)
                 if stats:
+                    services = stats["services"]
+                    found = (
+                        f"{len(services)} service(s): {', '.join(services)}"
+                        if services
+                        else "no service"
+                    )
                     self.task_logger.log(
-                        f"Discovered {stats.get('file_count', 0)} files in project",
+                        f"Indexed the project ({stats['project_type']}), {found}",
                         LogEntryType.SUCCESS,
                         LogPhase.PLANNING,
                     )
@@ -73,35 +79,8 @@ class DiscoveryPhaseMixin:
             task = req.get("task_description", task)
             services = req.get("services_involved", [])
 
-        errors = []
-        for attempt in range(MAX_RETRIES):
-            self.ui.print_status(
-                f"Running context discovery (attempt {attempt + 1})...", "progress"
-            )
-
-            success, output = context.run_context_discovery(
-                self.project_dir,
-                self.spec_dir,
-                task or "unknown task",
-                services,
-            )
-
-            if success:
-                stats = context.get_context_stats(self.spec_dir)
-                if stats:
-                    self.task_logger.log(
-                        f"Found {stats.get('files_to_modify', 0)} files to modify, "
-                        f"{stats.get('files_to_reference', 0)} files to reference",
-                        LogEntryType.SUCCESS,
-                        LogPhase.PLANNING,
-                    )
-                self.ui.print_status("Created context.json", "success")
-                return PhaseResult("context", True, [str(context_file)], [], attempt)
-
-            errors.append(f"Attempt {attempt + 1}: {output}")
-            self.ui.print_status(f"Attempt {attempt + 1} failed", "error")
-
-        # Create minimal context if script fails
+        # The context agents and the planner read the project themselves; this
+        # file only carries the task, its services and the files it names.
         context.create_minimal_context(self.spec_dir, task or "unknown task", services)
-        self.ui.print_status("Created minimal context.json (script failed)", "success")
-        return PhaseResult("context", True, [str(context_file)], errors, MAX_RETRIES)
+        self.ui.print_status("Created context.json", "success")
+        return PhaseResult("context", True, [str(context_file)], [], 0)

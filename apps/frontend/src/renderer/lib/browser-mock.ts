@@ -14,6 +14,7 @@ import {
 	contextMock,
 	insightsMock,
 	integrationMock,
+	memoryLifecycleMock,
 	phase35Mock,
 	projectMock,
 	settingsMock,
@@ -136,6 +137,7 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Context Operations
 	...contextMock,
+	...memoryLifecycleMock,
 
 	// Environment Configuration & Integration Operations
 	...integrationMock,
@@ -300,6 +302,14 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		mergePR: async () => true,
 		assignPR: async () => true,
 		markReviewPosted: async () => true,
+		setReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
+		getReviewFindingFeedback: async () => ({
+			success: true as const,
+			feedback: {},
+		}),
 		getPRReview: async () => null,
 		getPRReviewsBatch: async () => ({}),
 		deletePRReview: async () => true,

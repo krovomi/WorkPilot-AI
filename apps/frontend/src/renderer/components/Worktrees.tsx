@@ -222,7 +222,7 @@ export function Worktrees({ projectId }: WorktreesProps) {
 			if (taskResult.success && taskResult.data) {
 				setWorktrees(taskResult.data.worktrees);
 			} else {
-				setError(taskResult.error || "Failed to load task worktrees");
+				setError(taskResult.error || t("dialogs:worktrees.loadFailed"));
 			}
 
 			if (terminalResult.success && terminalResult.data) {
@@ -235,11 +235,11 @@ export function Worktrees({ projectId }: WorktreesProps) {
 			}
 		} catch (err) {
 			console.error("[Worktrees] Error loading worktrees:", err);
-			setError(err instanceof Error ? err.message : "Failed to load worktrees");
+			setError(err instanceof Error ? err.message : t("dialogs:worktrees.loadFailed"));
 		} finally {
 			setIsLoading(false);
 		}
-	}, [projectId, selectedProject]);
+	}, [projectId, selectedProject, t]);
 
 	// Load on mount and when project changes
 	useEffect(() => {
@@ -260,7 +260,11 @@ export function Worktrees({ projectId }: WorktreesProps) {
 
 		const task = findTaskForWorktree(selectedWorktree.specName);
 		if (!task) {
-			setError("Task not found for this worktree");
+			// Said in the dialog: an error on the page would sit behind it.
+			setMergeResult({
+				success: false,
+				message: t("dialogs:worktrees.taskNotFound"),
+			});
 			return;
 		}
 
@@ -276,13 +280,13 @@ export function Worktrees({ projectId }: WorktreesProps) {
 			} else {
 				setMergeResult({
 					success: false,
-					message: result.error || "Merge failed",
+					message: result.error || t("common:errors.unknownError"),
 				});
 			}
 		} catch (err) {
 			setMergeResult({
 				success: false,
-				message: err instanceof Error ? err.message : "Merge failed",
+				message: err instanceof Error ? err.message : t("common:errors.unknownError"),
 			});
 		} finally {
 			setIsMerging(false);
@@ -330,11 +334,11 @@ export function Worktrees({ projectId }: WorktreesProps) {
 				});
 				setWorktreeToDelete(null);
 			} else {
-				setError(result.error || "Failed to delete worktree");
+				setError(result.error || t("dialogs:worktrees.deleteFailed"));
 			}
 		} catch (err) {
 			setError(
-				err instanceof Error ? err.message : "Failed to delete worktree",
+				err instanceof Error ? err.message : t("dialogs:worktrees.deleteFailed"),
 			);
 		} finally {
 			setIsDeleting(false);
@@ -558,13 +562,13 @@ export function Worktrees({ projectId }: WorktreesProps) {
 				await loadWorktrees();
 				setTerminalWorktreeToDelete(null);
 			} else {
-				setError(result.error || "Failed to delete terminal worktree");
+				setError(result.error || t("dialogs:worktrees.deleteTerminalFailed"));
 			}
 		} catch (err) {
 			setError(
 				err instanceof Error
 					? err.message
-					: "Failed to delete terminal worktree",
+					: t("dialogs:worktrees.deleteTerminalFailed"),
 			);
 		} finally {
 			setIsDeletingTerminal(false);

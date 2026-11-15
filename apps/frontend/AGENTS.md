@@ -20,7 +20,7 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 
 | Fichier | Lignes | Voisins / index |
 |---|---|---|
-| `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe |
+| `src/main/claude-profile/usage-monitor.ts` | ~4 400 | une seule classe ; tests sur une machine simulée : `__tests__/usage-monitor-world.ts` |
 | `src/main/app-emulator-service.ts` | ~3 250 | — |
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 350 | `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
@@ -91,7 +91,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | Vues MCP Apps : lues par id dans la spec de la tâche, servies sur un schéma du main avec leur propre CSP, iframe `allow-scripts` sans `allow-same-origin`, frame qui ne navigue pas ailleurs, pont qui refuse tout appel | `src/main/mcp-apps/`, `src/main/ipc-handlers/task/mcp-app-handlers.ts`, `src/renderer/components/task-detail/McpAppFrame.tsx`, `mcp-app-bridge.ts` ([mcp-2026.md](../../docs/architecture/mcp-2026.md)) | `mcp-apps.test.ts`, `mcp-app-bridge.test.ts`, `McpAppsCard.test.tsx` |
 | Backend local lu par le renderer : le main fait la requête, GET/POST sur une liste fermée de routes (`ROUTES`), sans `..`, même origine, corps JSON borné ; un dossier (`project_dir`, `spec_dir`…) dans la query ou le corps n'y passe que s'il est dans un projet enregistré ; fichiers rendus en `blob:` (CSP `media-src blob:` sans nouvel hôte) ; une requête qui ne trouve rien pendant que le main lance le backend attend ce lancement (borné, `src/main/local-backend-readiness.ts`) puis réessaie une fois | `src/main/ipc-handlers/local-backend-handlers.ts`, `src/renderer/lib/local-backend.ts`, `src/renderer/hooks/useLocalBackendFile.ts` | `local-backend-handlers.test.ts`, `local-backend.test.ts`, `local-backend-readiness.test.ts` |
 | Passthrough IPC générique : liste fermée de canaux | `src/preload/api/modules/generic-ipc-api.ts` | `generic-ipc-allowlist.test.ts` |
-| Aucune commande venue du renderer : la release passe ses notes à `gh` sur stdin, aucun canal n'ouvre un terminal sur une commande reçue | `src/main/ipc-handlers/github/release-handlers.ts`, `src/preload/api/modules/shell-api.ts` | `release-handlers.test.ts`, `no-renderer-command.test.ts` |
+| Aucune commande venue du renderer : la release passe ses notes à `gh` sur stdin, aucun canal n'ouvre un terminal sur une commande reçue, l'émulateur ne lance que la configuration détectée par le main | `src/main/ipc-handlers/github/release-handlers.ts`, `src/preload/api/modules/shell-api.ts`, `src/main/ipc-handlers/app-emulator-handlers.ts` | `release-handlers.test.ts`, `no-renderer-command.test.ts`, `app-emulator-detected-config.test.ts` |
 | Ouvrir un dossier dans l'IDE ou le terminal : dossier résolu et rattaché à un projet, lanceur lu dans les réglages, AppleScript par argv, `cmd.exe` cité | `src/main/ipc-handlers/task/worktree-ide-terminal.ts`, `src/main/ipc-handlers/task/launch-args.ts` | `worktree-open-launchers.test.ts` |
 | Détails de PR Azure DevOps : script statique, URL validée passée en argv, PAT du `.workpilot/.env` | `src/main/ipc-handlers/pr-details-handlers.ts` | `pr-details-azure-script.test.ts` |
 | Best-of-N : le renderer nomme la tâche et des moteurs, validés ici puis par le runner ; les noms de variante sont dérivés du nom de la tâche et revérifiés avant de devenir un chemin ou une branche ; rien n'est adopté ni supprimé sans confirmation ; l'arbitre prend son moteur dans les réglages du main, et une question qu'on lui pose est bornée puis citée comme donnée | `src/main/ipc-handlers/task/best-of-n-handlers.ts`, `apps/backend/best_of_n/` ([best-of-n.md](../../docs/architecture/best-of-n.md)) | `best-of-n-handlers.test.ts`, `tests/best_of_n/` |
@@ -106,5 +106,5 @@ nouveau canal n'y entre jamais.
 |---|---|---|
 | Unitaires | `src/**/__tests__/`, `*.test.ts(x)` | `pnpm test` (Vitest) |
 | Intégration | `src/__tests__/integration/` | `pnpm test` |
-| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
-| E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend) | `pnpm run build && pnpm run test:e2e:server` |
+| E2E | `e2e/`, l'app lancée par `e2e/app-harness.ts` ; un projet local ouvert par `e2e/local-project.ts` ; `menu-pages.e2e.ts` ouvre chaque entrée du menu (repère `data-nav-item`), `kanban-flow.e2e.ts` mène une carte jusqu'à Done avec l'agent factice `e2e/fake-backend/` (il lui faut `apps/backend/.venv`) | `pnpm run build && pnpm run test:e2e` (Playwright, xvfb sous Linux) |
+| E2E contre un serveur | `e2e/*.server-e2e.ts` : un vrai serveur démarré par `tests/server_e2e/app_world.py` (Python du backend), GitHub et GitLab simulés par `tests/server_e2e/fake_forge.py` ; démarrage, connexion, menu et appels vus par la forge dans `e2e/server-harness.ts` | `pnpm run build && pnpm run test:e2e:server` |

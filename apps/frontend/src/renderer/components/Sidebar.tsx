@@ -114,6 +114,7 @@ import {
 } from "./sidebar/spaces";
 import { useViewUsageStore } from "@/stores/view-usage-store";
 import { CliToolsChip } from "./sidebar/CliToolsChip";
+import { StopAllAgentsButton } from "./sidebar/StopAllAgentsButton";
 import { openNavView } from "./sidebar/nav-actions";
 import { buildNavIndex, useNavIndexStore } from "./sidebar/nav-index";
 import {
@@ -410,7 +411,7 @@ export function Sidebar({
 
 		// Apply custom per-group item order, without the experimental views
 		// when the user hid them
-		const gates = { serverProject, hideExperimental: sidebarPrefs.hideExperimental === true };
+		const gates = { serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true };
 		return orderedGroups
 			.map((group) => {
 				const actualItemIds = group.items.map((i) => i.id);
@@ -430,6 +431,7 @@ export function Sidebar({
 		gitlabEnabled,
 		canAdminister,
 		serverProject,
+		forge,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -478,8 +480,8 @@ export function Sidebar({
 
 	// The tabs a hub's entry leads to, under the same gates as the entries
 	const hubGates = useMemo<HubTabGates>(
-		() => ({ serverProject, hideExperimental: sidebarPrefs.hideExperimental === true }),
-		[serverProject, sidebarPrefs.hideExperimental],
+		() => ({ serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true }),
+		[serverProject, forge, sidebarPrefs.hideExperimental],
 	);
 
 	// Get all visible items for keyboard shortcuts; a hub's tabs keep theirs
@@ -803,6 +805,7 @@ export function Sidebar({
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					aria-current={isActive ? "page" : undefined}
+					data-nav-item={item.id}
 					className={cn(
 						// pl-5 leaves room for the drag grip shown on hover
 						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
@@ -1078,6 +1081,7 @@ export function Sidebar({
 				railIconButton(t("actions.newTask"), () => {
 					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
 				}, <Plus className="h-4 w-4" />)}
+			<StopAllAgentsButton />
 			<CliToolsChip
 				isCollapsed
 				onNavigateToTerminals={() => onViewChange?.("terminals", true)}

@@ -49,7 +49,7 @@ def detect_laravel_routes(root: Path, include: Callable[[Path], bool]) -> list[d
                     "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"]
                     if verb == "ANY"
                     else [verb],
-                    "file": str(file_path.relative_to(root)),
+                    "file": file_path.relative_to(root).as_posix(),
                     "framework": "Laravel",
                     "requires_auth": bool(_LARAVEL_AUTH.search(line)),
                 }
@@ -81,7 +81,7 @@ def detect_nestjs_routes(root: Path, include: Callable[[Path], bool]) -> list[di
                     "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"]
                     if verb == "ALL"
                     else [verb],
-                    "file": str(file_path.relative_to(root)),
+                    "file": file_path.relative_to(root).as_posix(),
                     "framework": "NestJS",
                     "requires_auth": class_guarded or bool(_NEST_AUTH.search(ctx)),
                 }

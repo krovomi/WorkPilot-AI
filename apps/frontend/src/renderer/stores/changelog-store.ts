@@ -16,7 +16,6 @@ import type {
 	GitCommit,
 	GitHistoryOptions,
 	GitTagInfo,
-	TaskSpecContent,
 } from "../../shared/types";
 import { saveSettings, useSettingsStore } from "./settings-store";
 import { useTaskStore } from "./task-store";
@@ -25,7 +24,6 @@ interface ChangelogState {
 	// Data
 	doneTasks: ChangelogTask[];
 	selectedTaskIds: string[];
-	loadedSpecs: TaskSpecContent[];
 	existingChangelog: ExistingChangelog | null;
 
 	// Source mode selection
@@ -75,7 +73,6 @@ interface ChangelogState {
 	toggleTaskSelection: (taskId: string) => void;
 	selectAllTasks: () => void;
 	deselectAllTasks: () => void;
-	setLoadedSpecs: (specs: TaskSpecContent[]) => void;
 	setExistingChangelog: (changelog: ExistingChangelog | null) => void;
 
 	// Source mode actions
@@ -134,7 +131,6 @@ const initialState = {
 	savedReview: null as GeneratedReview | null,
 	doneTasks: [] as ChangelogTask[],
 	selectedTaskIds: [] as string[],
-	loadedSpecs: [] as TaskSpecContent[],
 	existingChangelog: null as ExistingChangelog | null,
 
 	// Source mode
@@ -201,8 +197,6 @@ export const useChangelogStore = create<ChangelogState>((set, get) => ({
 		})),
 
 	deselectAllTasks: () => set({ selectedTaskIds: [] }),
-
-	setLoadedSpecs: (specs) => set({ loadedSpecs: specs }),
 
 	setExistingChangelog: (changelog) => {
 		set({ existingChangelog: changelog });
@@ -322,24 +316,6 @@ export async function loadChangelogData(projectId: string): Promise<void> {
 	} catch (error) {
 		store.setError(
 			error instanceof Error ? error.message : "Failed to load changelog data",
-		);
-	}
-}
-
-export async function loadTaskSpecs(
-	projectId: string,
-	taskIds: string[],
-): Promise<void> {
-	const store = useChangelogStore.getState();
-
-	try {
-		const result = await window.electronAPI.loadTaskSpecs(projectId, taskIds);
-		if (result.success && result.data) {
-			store.setLoadedSpecs(result.data);
-		}
-	} catch (error) {
-		store.setError(
-			error instanceof Error ? error.message : "Failed to load task specs",
 		);
 	}
 }
@@ -584,7 +560,7 @@ export async function saveChangelog(
 	}
 }
 
-export function copyChangelogToClipboard(): boolean {
+export async function copyChangelogToClipboard(): Promise<boolean> {
 	const store = useChangelogStore.getState();
 
 	if (!store.generatedChangelog) {
@@ -592,28 +568,18 @@ export function copyChangelogToClipboard(): boolean {
 		return false;
 	}
 
+	// writeText answers with a promise: a refused write (no focus, no
+	// permission) rejects it, and only awaiting it tells the copy failed.
 	try {
-		navigator.clipboard.writeText(store.generatedChangelog);
+		await navigator.clipboard.writeText(store.generatedChangelog);
 		return true;
-	} catch (_error) {
+	} catch {
 		store.setError("Failed to copy to clipboard");
 		return false;
 	}
 }
 
 // Selectors
-export function getSelectedTasks(): ChangelogTask[] {
-	const store = useChangelogStore.getState();
-	return store.doneTasks.filter((task) =>
-		store.selectedTaskIds.includes(task.id),
-	);
-}
-
-export function getTasksWithSpecs(): ChangelogTask[] {
-	const store = useChangelogStore.getState();
-	return store.doneTasks.filter((task) => task.hasSpecs);
-}
-
 export function canGenerate(): boolean {
 	const store = useChangelogStore.getState();
 
@@ -634,9 +600,4 @@ export function canGenerate(): boolean {
 		default:
 			return false;
 	}
-}
-
-export function canSave(): boolean {
-	const store = useChangelogStore.getState();
-	return store.generatedChangelog.length > 0 && !store.isGenerating;
 }

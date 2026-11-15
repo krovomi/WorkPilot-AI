@@ -2571,5 +2571,36 @@
 		"tooLow": "The limit must be above the {{spent}} already spent",
 		"saveFailed": "The limit could not be saved",
 		"resumed": "Limit raised to {{limit}}, the task resumes"
+	},
+	"appliedLessons": {
+		"title_one": "{{count}} lesson applied to this task",
+		"title_other": "{{count}} lessons applied to this task",
+		"description": "What the Learning Loop gave this task's agents: the rules adopted from reviews, the patterns learned from earlier builds, and the checkpoints of the task's kind when this repository's QA history asks for them.",
+		"disabledCount": "{{count}} turned off",
+		"show": "Show",
+		"hide": "Hide",
+		"kind": {
+			"rule": "Rule",
+			"pattern": "Pattern",
+			"checkpoint": "Checkpoint"
+		},
+		"patternType": {
+			"success": "to apply",
+			"failure": "to avoid",
+			"optimization": "tip"
+		},
+		"confidence": "confidence {{value}}",
+		"agents": "Given to",
+		"off": "Off for this task",
+		"disable": "Turn off for this task",
+		"enable": "Turn back on",
+		"disabledHint": "Later prompts of this task leave it out; every other task keeps it.",
+		"error": "Could not update the lesson: {{error}}"
+	},
+	"breakerPause": {
+		"chip": "Circuit breaker: {{tool}}",
+		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
+		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
+		"killSwitch": "Stopped by Stop all agents"
 	}
 }

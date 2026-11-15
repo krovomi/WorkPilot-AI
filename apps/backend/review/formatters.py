@@ -25,6 +25,7 @@ from ui import (
 )
 
 from .diff_analyzer import (
+    CHECKBOX_PATTERN,
     extract_checkboxes,
     extract_section,
     extract_table_rows,
@@ -128,10 +129,8 @@ def display_spec_summary(spec_dir: Path) -> None:
             summary_lines.append(
                 f"  {icon(Icons.PENDING)} {item[:60]}{'...' if len(item) > 60 else ''}"
             )
-        if len(re.findall(r"^\s*[-*]\s*\[[ x]\]\s*(.+)$", criteria, re.MULTILINE)) > 5:
-            total_count = len(
-                re.findall(r"^\s*[-*]\s*\[[ x]\]\s*(.+)$", criteria, re.MULTILINE)
-            )
+        total_count = len(re.findall(CHECKBOX_PATTERN, criteria, re.MULTILINE))
+        if total_count > 5:
             summary_lines.append(f"  {muted(f'... and {total_count - 5} more')}")
 
     # Print the summary box

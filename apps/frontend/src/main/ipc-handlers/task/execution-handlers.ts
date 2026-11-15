@@ -17,20 +17,17 @@ import type {
 import type { AgentManager } from "../../agent";
 import { appLog } from "../../app-logger";
 import { fileWatcher } from "../../file-watcher";
-import { projectStore } from "../../project-store";
 import { taskStateManager } from "../../task-state-manager";
 import { parsePlanEdit } from "./plan-edit";
 import { getPlanPath, updatePlanSubtasks } from "./plan-file-utils";
 import {
 	clearPauseState,
-	type PauseStateRecord,
-	writePauseState,
 } from "./pause-state-utils";
+import { registerPauseHandler } from "./pause-task";
 import { findTaskAndProject } from "./shared";
 import {
 	allSpecDirs,
 	convertTaskMetadataToSpecCreation,
-	currentPausePhase,
 	getSpecPaths,
 	resumePausedTask,
 } from "./resume-task";
@@ -228,14 +225,9 @@ export function registerTaskExecutionHandlers(
 		const startEvent = determineStartEvent(taskId, task);
 		const taskToUse = startEvent.resetTask || task;
 
-		// Create proper event object based on type
-		let event: TaskEvent;
-		if (startEvent.type === "PR_CREATED") {
-			// This case shouldn't happen in start event, but handle for type safety
-			event = { type: startEvent.type, prUrl: "" };
-		} else {
-			event = { type: startEvent.type } as TaskEvent;
-		}
+		// A start event carries nothing but its type (determineStartEvent never
+		// answers PR_CREATED, the one event with a payload).
+		const event = { type: startEvent.type } as TaskEvent;
 
 		taskStateManager.handleUiEvent(taskId, event, taskToUse, project);
 
@@ -315,7 +307,20 @@ export function registerTaskExecutionHandlers(
 			let sessionId: string | undefined;
 			try {
 				const raw = readFileSync(sessionFile, "utf-8");
-				const parsed = JSON.parse(raw) as { session_id?: string };
+				const parsed = JSON.parse(raw) as {
+					session_id?: string;
+					provider?: string | null;
+				};
+				// Codex records its thread id in the same file: handed to the
+				// Claude SDK as a session to resume, it fails the run. A marker
+				// with no provider predates the field and is Claude's.
+				const provider = parsed.provider ?? "claude";
+				if (provider !== "claude" && provider !== "anthropic") {
+					return {
+						success: false,
+						error: `The saved session belongs to ${provider}: only a Claude session can be resumed.`,
+					};
+				}
 				sessionId = parsed.session_id;
 			} catch (err) {
 				return {
@@ -488,84 +493,7 @@ export function registerTaskExecutionHandlers(
 		},
 	);
 
-	/**
-	 * Pause task execution, at whatever phase it is in.
-	 *
-	 * The flag goes to `pause_state.json`, not into `implementation_plan.json`:
-	 * that file does not exist during spec creation or planning, so the previous
-	 * version answered "Implementation plan not found" for a task the user could
-	 * see running. The backend reads the same file from its coder loop, its QA
-	 * loop and its spec pipeline, so one Pause click stops all three.
-	 */
-	ipcMain.handle(
-		IPC_CHANNELS.TASK_PAUSE,
-		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
-			try {
-				const { task, project } = findTaskAndProject(taskId);
-				if (!task || !project) {
-					return { success: false, error: "Task not found" };
-				}
-
-				const specPaths = getSpecPaths(task, project);
-				const specDirs = allSpecDirs(specPaths);
-				if (specDirs.length === 0) {
-					return { success: false, error: "Spec directory not found" };
-				}
-
-				const phase = currentPausePhase(task, specPaths);
-				const pausedState: PauseStateRecord = {
-					enabled: true,
-					paused_at: new Date().toISOString(),
-					paused_phase: phase,
-					paused_subtask_id:
-						subtaskId ?? task.executionProgress?.currentSubtask ?? null,
-					provider: task.metadata?.provider ?? null,
-					model: task.metadata?.model ?? null,
-				};
-
-				const written = writePauseState(specDirs, pausedState);
-
-				if (written === 0) {
-					return { success: false, error: "Could not write pause state" };
-				}
-
-				// Re-scan so the scanner surfaces the pause on task.metadata; the
-				// UI uses that to switch the controls into the paused state.
-				projectStore.invalidateTasksCache(project.id);
-
-				// Immediate pause: stop the running subprocess NOW rather than
-				// waiting for the backend to reach its next cooperative checkpoint
-				// (which, mid-session, can be a long way off). haltTask marks the
-				// spawn as killed (its exit handler returns early WITHOUT emitting
-				// "exit" — no PROCESS_EXITED/USER_STOPPED, so the card keeps its
-				// current column) AND unregisters the task from the
-				// OperationRegistry so the proactive profile-swap / usage monitor
-				// cannot resurrect the paused process when a token limit is hit.
-				// The flag written above drives the UI and a clean resume.
-				const wasRunning = agentManager.haltTask(taskId);
-
-				appLog.info(
-					`[TASK_PAUSE] Task ${taskId} paused during ${phase} at subtask ` +
-						`${pausedState.paused_subtask_id ?? "none"} (${written} spec ` +
-						`dir(s)); subprocess ${wasRunning ? "killed" : "was not running"}.`,
-				);
-
-				return {
-					success: true,
-					data: {
-						taskId,
-						paused: true,
-						pausedAt: pausedState.paused_at,
-						pausedPhase: phase,
-						specDirs: written,
-					},
-				};
-			} catch (error) {
-				appLog.error("[TASK_PAUSE] Error:", error);
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	registerPauseHandler(agentManager);
 
 	/**
 	 * Resume a paused task from where it stopped. See `resumePausedTask`, which

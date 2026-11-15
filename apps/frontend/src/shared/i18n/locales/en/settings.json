@@ -1382,7 +1382,6 @@
 		"addServer": "Add Server",
 		"addMcpTo": "Add MCP Server to {{agent}}",
 		"addMcpDescription": "Select an MCP server to add to this agent",
-		"allMcpsAdded": "All available MCP servers are already added",
 		"added": "added",
 		"removed": "removed",
 		"remove": "Remove",
@@ -1461,6 +1460,10 @@
 			"teams": {
 				"name": "Microsoft Teams",
 				"description": "Send messages to Teams channels. Requires TEAMS_WEBHOOK_URL env var."
+			},
+			"workpilotVerify": {
+				"name": "WorkPilot Verify",
+				"description": "Launches the app, reads its logs, drives it in a browser and traces its performance during verification"
 			}
 		},
 		"customServers": "Custom Servers",
@@ -1482,10 +1485,7 @@
 		"headerName": "Header Name",
 		"headerValue": "Header Value",
 		"noCustomServers": "No custom servers configured. Add one to use with your agents.",
-		"errorNameRequired": "Server name is required",
 		"errorIdExists": "A server with this ID already exists",
-		"errorCommandRequired": "Command is required for command-based servers",
-		"errorUrlRequired": "URL is required for HTTP-based servers",
 		"testConnection": "Test",
 		"testing": "Testing...",
 		"authToken": "Authentication Token",
@@ -1542,7 +1542,11 @@
 				"long": "unusually long ({{detail}} characters)",
 				"injection": "prompt injection: {{detail}}"
 			}
-		}
+		},
+		"healthCheckFailed": "Health check failed",
+		"connectionTestFailed": "Connection test failed",
+		"errorNameNoId": "The name needs at least one letter or digit",
+		"removeHeader": "Remove header {{name}}"
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",
@@ -1758,6 +1762,10 @@
 		"pr_template_filler": {
 			"label": "PR Template Filler",
 			"description": "AI-fills GitHub PR templates from code changes"
+		},
+		"verifier": {
+			"label": "Verifier",
+			"description": "Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP)."
 		}
 	},
 	"agentProfile": {
@@ -2170,7 +2178,7 @@
 		"role": "Role",
 		"roleMember": "Member",
 		"roleViewer": "Viewer",
-		"roleAdmin": "Administrator",
+		"roleAdmin": "Server administrator",
 		"create": "Invite",
 		"emailSent": "Invitation sent by email. You can also share the link:",
 		"emailNotSent": "Email not sent (SMTP not configured). Share this single-use link:",

@@ -7,15 +7,8 @@ Phases for implementation planning and final validation.
 
 import json
 import logging
-from typing import TYPE_CHECKING
 
-from task_logger import LogEntryType, LogPhase
-
-from .. import writer
 from .models import MAX_RETRIES, PhaseResult
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +46,10 @@ class PlanningPhaseMixin:
                 content = plan_file.read_text(encoding="utf-8")[:500]
                 try:
                     data = json.loads(plan_file.read_text(encoding="utf-8"))
+                    # A bare list or string is valid JSON too: reading it as a
+                    # mapping raised AttributeError and ended the spec.
+                    if not isinstance(data, dict):
+                        data = {}
                     keys = list(data.keys())
                     phases = data.get("phases")
                     phase_count = len(phases) if isinstance(phases, list) else "missing"
@@ -101,39 +98,6 @@ class PlanningPhaseMixin:
         errors = []
 
         jev_advice = await self._jev_planning_advice()
-
-        # Try Python script first (deterministic)
-        self.ui.print_status("Trying planner.py (deterministic)...", "progress")
-        success, output = self._run_script(
-            "planner.py", ["--spec-dir", str(self.spec_dir)]
-        )
-
-        if success and plan_file.exists():
-            result = self.spec_validator.validate_implementation_plan()
-            if result.valid:
-                self.ui.print_status(
-                    "Created valid implementation_plan.json via script", "success"
-                )
-                stats = writer.get_plan_stats(self.spec_dir)
-                if stats:
-                    self.task_logger.log(
-                        f"Implementation plan created with {stats.get('total_subtasks', 0)} subtasks",
-                        LogEntryType.SUCCESS,
-                        LogPhase.PLANNING,
-                    )
-                return PhaseResult("planning", True, [str(plan_file)], [], 0)
-            else:
-                if auto_fix_plan(self.spec_dir):
-                    result = self.spec_validator.validate_implementation_plan()
-                    if result.valid:
-                        self.ui.print_status(
-                            "Auto-fixed implementation_plan.json", "success"
-                        )
-                        return PhaseResult("planning", True, [str(plan_file)], [], 0)
-                self._log_plan_content(plan_file, "script output (invalid)")
-                errors.append(f"Script output invalid: {result.errors}")
-                # Delete the invalid script output before agent attempts
-                self._ensure_plan_deleted(plan_file)
 
         # Verify spec.md exists before running planner agent — it's the main input
         spec_file = self.spec_dir / "spec.md"
