@@ -409,7 +409,7 @@
   "apps/backend/verify/loop.py": {"blind": 5, "silent": 3},
   "apps/backend/verify/mcp_server.py": {"blind": 1, "silent": 0},
   "apps/backend/verify/mobile.py": {"blind": 1, "silent": 0},
-  "apps/backend/verify/phase.py": {"blind": 3, "silent": 1},
+  "apps/backend/verify/phase.py": {"blind": 2, "silent": 0},
   "apps/backend/verify/replay.py": {"blind": 1, "silent": 0},
   "apps/backend/verify/tools.py": {"blind": 3, "silent": 0},
   "apps/backend/verify/window.py": {"blind": 2, "silent": 1},
