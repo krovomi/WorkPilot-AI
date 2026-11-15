@@ -70,8 +70,6 @@
   "apps/backend/core/agent_clients/mcp_bridge.py": {"blind": 1, "silent": 0},
   "apps/backend/core/agent_clients/openai.py": {"blind": 2, "silent": 0},
   "apps/backend/core/agent_clients/windsurf.py": {"blind": 12, "silent": 0},
-  "apps/backend/core/anthropic_usage.py": {"blind": 2, "silent": 0},
-  "apps/backend/core/auth.py": {"blind": 6, "silent": 0},
   "apps/backend/core/client.py": {"blind": 28, "silent": 8},
   "apps/backend/core/codex_cli_client.py": {"blind": 1, "silent": 0},
   "apps/backend/core/conversation_log.py": {"blind": 2, "silent": 0},
