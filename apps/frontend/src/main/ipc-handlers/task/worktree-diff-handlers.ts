@@ -46,11 +46,13 @@ export function isWorkpilotArtifact(p: string): boolean {
  * the build writes it there after each session. Null when there is none.
  */
 async function readTraceSummary(
+	worktreePath: string,
 	...located: Parameters<typeof getSpecPaths>
 ): Promise<TraceSummary | null> {
-	const { worktreeSpecDir, mainSpecDir } = getSpecPaths(...located);
+	const [task] = located;
+	const { specsBaseDir, mainSpecDir } = getSpecPaths(...located);
+	const worktreeSpecDir = path.join(worktreePath, specsBaseDir, task.specId);
 	for (const dir of [worktreeSpecDir, mainSpecDir]) {
-		if (!dir) continue;
 		try {
 			return parseTraceSummary(
 				await fsPromises.readFile(path.join(dir, TRACE_SUMMARY_FILE), "utf-8"),
@@ -188,7 +190,7 @@ export function registerWorktreeDiffHandlers(): void {
 				// Who wrote the added lines (Agent Trace, F3), when the build recorded it.
 				const traced = applyTraceSummary(
 					filteredFiles,
-					await readTraceSummary(task, project),
+					await readTraceSummary(worktreePath, task, project),
 				);
 				return {
 					success: true,
@@ -290,13 +292,13 @@ export function registerWorktreeDiffHandlers(): void {
 					nameStatus: string,
 				): WorktreeDiffFile["status"] => {
 					const first = nameStatus.split("\n").filter(Boolean)[0];
+					// No "R": the diff is limited to this one path, so git never
+					// pairs it with the other side of a rename.
 					switch (first?.[0]) {
 						case "A":
 							return "added";
 						case "D":
 							return "deleted";
-						case "R":
-							return "renamed";
 						default:
 							return "modified";
 					}
@@ -304,9 +306,9 @@ export function registerWorktreeDiffHandlers(): void {
 				const parseNumstat = (
 					numstat: string,
 				): { additions: number; deletions: number } => {
-					const first = numstat.split("\n").filter(Boolean)[0];
-					if (!first) return { additions: 0, deletions: 0 };
-					const [adds, dels] = first.split("\t");
+					// One path, so one line: "<adds>\t<dels>\t<path>". A binary file
+					// reads "-\t-" and no output at all: both count as 0.
+					const [adds, dels] = numstat.split("\t");
 					return {
 						additions: Number.parseInt(adds, 10) || 0,
 						deletions: Number.parseInt(dels, 10) || 0,

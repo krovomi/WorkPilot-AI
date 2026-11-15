@@ -19,12 +19,15 @@ import {
 	memoryTypeIcons,
 	memoryTypeLabels,
 } from "./constants";
+import { MemoryActions } from "./lifecycle/MemoryActions";
 import { PRReviewCard } from "./PRReviewCard";
 import { formatDate } from "./utils";
 import { useTranslation } from "react-i18next";
 
 interface MemoryCardProps {
 	readonly memory: MemoryEpisode;
+	/** Pin, forget and history (`lifecycle/MemoryActions.tsx`), on a local project. */
+	readonly actions?: { projectId: string; onChanged: () => void };
 }
 
 interface ParsedSessionInsight {
@@ -142,7 +145,7 @@ function isPRReviewMemory(memory: MemoryEpisode): boolean {
 	}
 }
 
-export function MemoryCard({ memory }: MemoryCardProps) {
+export function MemoryCard({ memory, actions }: MemoryCardProps) {
 	const { t } = useTranslation();
 	const [expanded, setExpanded] = useState(false);
 	const parsed = useMemo(
@@ -247,6 +250,15 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 						</Button>
 					)}
 				</div>
+
+				{actions && memory.path && (
+					<MemoryActions
+						projectId={actions.projectId}
+						memoryId={memory.path}
+						pinned={memory.pinned === true}
+						onChanged={actions.onChanged}
+					/>
+				)}
 
 				{/* Expanded Content */}
 				{expanded && parsed && (
