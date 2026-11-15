@@ -12,3 +12,4 @@ section: 🧪 Filets de test
 - **Enseignements de session** : le diff git est lu en UTF-8 (un caractère accentué faisait perdre tout le diff sous Windows).
 - **Analyseur** : `analyzer.py --quiet` n'écrit plus rien d'autre que le JSON promis.
 - **Tests du merge** : trois fichiers de tests plaçaient `tests/` devant le backend dans `sys.path`, si bien que le dossier `tests/accessibility_agent` masquait le vrai paquet pour les tests collectés après eux ; ils l'ajoutent désormais en fin de chemin.
+- **Générations de tests** : deux captures faites dans le même tic d'horloge (environ 16 ms sous Windows) restent dans leur ordre ; la plus récente pouvait passer derrière l'autre.

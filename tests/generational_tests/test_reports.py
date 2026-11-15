@@ -213,6 +213,20 @@ def test_summaries_give_counts_newest_first(tmp_path: Path) -> None:
     }
 
 
+def test_two_captures_in_one_clock_tick_keep_their_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows' clock ticks every ~16 ms: the second capture must still be newer."""
+    monkeypatch.setattr("generational_tests.archive.time.time", lambda: 1_700_000_000.0)
+    archive = GenerationalArchive(project_dir=tmp_path)
+    _, outcomes = parse_report(TRX)
+    archive.capture("v1", outcomes=outcomes)
+    archive.capture("v2", outcomes=outcomes)
+    assert [s["label"] for s in archive.summaries()] == ["v2", "v1"]
+    archive.capture("v1", outcomes=outcomes[:1])
+    assert [s["label"] for s in archive.summaries()] == ["v1", "v2"]
+
+
 class TestRoutes:
     @pytest.fixture
     def client(self) -> TestClient:
