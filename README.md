@@ -207,6 +207,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Release Train** deploys your services itself, in dependency order, with health and smoke checks and a click per production service; the **Git history surgeon** cleans up a branch's commits onto a new branch, same code.
 - **Personal coach**: learns your coding style per language from your git history and lint config, and gives your clear preferences to the coder and the QA fixer.
 - **Shared memory**: one Obsidian vault and graph every agent reads and writes, across sessions and providers; the learning loop analyses each build with a model of whichever provider is selected, and its lessons reach the spec, the plan, the code and QA; provider-agnostic **skills** packs.
+- **Memory you can audit**: every decision on a project's memory is journalled in plain words (who, when, why), a forgotten memory stays restorable for 30 days, a pinned one escapes every automatic removal, and when a team sync brings a contradicting note the safe cases are settled on their own and the rest are shown side by side for you to decide.
 
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer, code review rules and code smells for every major stack, risk classifier.

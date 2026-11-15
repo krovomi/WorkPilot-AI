@@ -209,6 +209,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - Le **Release Train** livre lui-même vos services, dans l'ordre des dépendances, avec contrôles de santé et smoke tests et un clic par service de production ; le **chirurgien de l'historique Git** nettoie les commits d'une branche sur une nouvelle branche, au code identique.
 - **Coach personnel** : il apprend votre style de code par langage à partir de votre historique git et de la config du lint, et donne vos préférences nettes au codeur et au correcteur QA.
 - **Mémoire partagée** : un coffre Obsidian et un graphe que tous les agents lisent et écrivent, entre sessions et providers ; la boucle d'apprentissage analyse chaque build avec un modèle du provider choisi, et ses leçons atteignent la spec, le plan, le code et la QA ; des packs de **skills** indépendants du provider.
+- **Une mémoire qu'on peut auditer** : chaque décision sur la mémoire d'un projet est journalisée en clair (qui, quand, pourquoi), une mémoire oubliée reste restaurable 30 jours, une mémoire épinglée échappe à toute suppression automatique, et quand une synchronisation d'équipe apporte une note contradictoire, les cas sûrs se règlent seuls et les autres sont présentés côte à côte pour que tu tranches.
 
 **Comprendre et planifier**
 - **Insights**, **Idéation**, **Feuille de route**, visualiseur d'architecture, règles de revue de code et code smells pour chaque grande stack, classificateur de risque.

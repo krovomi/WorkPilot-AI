@@ -195,6 +195,10 @@ import {
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
+import {
+	createMemoryLifecycleAPI,
+	type MemoryLifecycleAPI,
+} from "./modules/memory-lifecycle-api";
 import type { McpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpPinsAPI } from "./modules/mcp-pins-api";
 import { createMcpAPI, type McpAPI } from "./modules/mcp-api";
@@ -300,6 +304,7 @@ export interface ElectronAPI
 		AppEmulatorAPI,
 		MobileAPI,
 		LearningLoopAPI,
+		MemoryLifecycleAPI,
 		McpPinsAPI,
 		MultiRepoAPI,
 		ArchitectureVisualizerAPI,
@@ -458,6 +463,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createAppEmulatorAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
+		...createMemoryLifecycleAPI(),
 		...createMcpPinsAPI(),
 		...createMultiRepoAPI(),
 		...createArchitectureVisualizerAPI(),

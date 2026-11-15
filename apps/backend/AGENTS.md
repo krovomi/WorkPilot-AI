@@ -88,6 +88,7 @@ génération de tests ;
 |---|---|
 | `brain/` | le cerveau partagé : vault Obsidian, `graph.json`, sync git, serveur MCP `workpilot-brain` |
 | `brain/project_memory.py` | **la seule mémoire** des builds (pièges, conventions, sessions) |
+| `brain/lifecycle/` | le cycle de vie de cette mémoire : journal dans le vault (`journal.py`), corbeille, restauration et épingles (`store.py`), contradictions après une synchronisation (`contradictions.py`, `arbitration.py`), avis d'un modèle demandé par une personne (`advisor.py`) ; [justification](../../docs/architecture/memory-lifecycle.md) |
 | `mem_search/` | lecture de la mémoire par paliers (index → timeline → détail) |
 | `cross_review/` | verdict de la revue croisée : lecture, enregistrement, `blocking_verdict` qui retient la PR d'un code avec lequel le second fournisseur est en désaccord ; feuille sur `foundation`. La phase `cross-review` elle-même (choix du moteur, session) est `workflows/cross_review_phase.py` |
 | `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne |
