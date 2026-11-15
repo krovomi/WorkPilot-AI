@@ -20,7 +20,7 @@
 import { type Mock, vi } from "vitest";
 
 export interface RendererApi {
-	/** The installed object (also on `globalThis.electronAPI` and `window`). */
+	/** The installed object, on `globalThis.electronAPI` (`window` is `globalThis` under jsdom). */
 	api: Record<string, unknown>;
 	/** The mock behind a method, created on first access. */
 	fn: (name: string) => Mock;
@@ -68,19 +68,12 @@ export function installRendererApi(
 	});
 
 	scope.electronAPI = api;
-	if (typeof window !== "undefined") {
-		(window as unknown as { electronAPI?: unknown }).electronAPI = api;
-	}
 
 	return {
 		api,
 		fn,
 		restore: () => {
 			scope.electronAPI = previous;
-			if (typeof window !== "undefined") {
-				(window as unknown as { electronAPI?: unknown }).electronAPI =
-					previous;
-			}
 		},
 	};
 }

@@ -280,6 +280,30 @@ describe("TaskCard — content", () => {
 		).toBeGreaterThan(0);
 	});
 
+	it("shows deleted prerequisites even on a card without metadata", async () => {
+		const user = userEvent.setup();
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": { pending: [], missing: ["gone"], resolvedCount: 0 } as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "backlog" }) });
+		await user.hover(screen.getByText("Blockers"));
+		expect(
+			(await screen.findAllByText(/1 prerequisite not found/)).length,
+		).toBeGreaterThan(0);
+	});
+
+	it("shows no blocker badge when nothing is pending or missing", () => {
+		useKanbanBlockerStore.setState({
+			blockers: {
+				"task-1": { pending: [], missing: [], resolvedCount: 3 } as never,
+			},
+		});
+		renderCard({ task: makeTask({ status: "backlog" }) });
+		expect(screen.queryByText("Blockers")).toBeNull();
+	});
+
 	it("describes blockers as context outside the queue", async () => {
 		const user = userEvent.setup();
 		useKanbanBlockerStore.setState({

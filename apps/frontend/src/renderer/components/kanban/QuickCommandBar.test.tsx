@@ -363,6 +363,21 @@ describe("lancer comme tâche", () => {
 		expect(api.fn("createTask")).not.toHaveBeenCalled();
 	});
 
+	it("une commande inconnue montre l'erreur du backend", async () => {
+		routeBackend(() => ({ body: { success: false, error: "Unknown command" } }));
+		renderBar();
+		await userEvent.type(input(), "/nope{Shift>}{Enter}{/Shift}");
+		expect(await screen.findByText("Unknown command")).toBeInTheDocument();
+	});
+
+	it("une réponse vide montre l'échec sans détail", async () => {
+		routeBackend(() => ({ body: null }));
+		renderBar();
+		await userEvent.type(input(), "/nope{Shift>}{Enter}{/Shift}");
+		expect(await screen.findByText("Slash command failed")).toBeInTheDocument();
+		expect(api.fn("createTask")).not.toHaveBeenCalled();
+	});
+
 	it("une carte refusée montre l'échec", async () => {
 		api.fn("createTask").mockResolvedValue({ success: false, error: "disk" });
 		renderBar();
