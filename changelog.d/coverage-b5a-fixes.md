@@ -21,3 +21,4 @@ section: 🐛 Corrections
   la recherche se faisait par chemin) ; la pile vient du détecteur commun à toute l'app ; un projet
   se retire avec le chemin tapé ; un enregistrement illisible ne masque plus tous les autres et
   chaque fichier s'écrit de façon atomique.
+- **Cycles d'imports du contexte** : un cycle est nommé à partir du même fichier sur toutes les machines ; le premier fichier dépendait de l'ordre dans lequel le disque listait les fichiers.

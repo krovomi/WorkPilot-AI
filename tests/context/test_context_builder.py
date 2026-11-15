@@ -632,6 +632,15 @@ class TestDependencyGraph:
 
 
 class TestAnalyzer:
+    def test_a_cycle_reads_the_same_whatever_the_disk_order(self, graph_project):
+        """`rglob` lists files in the filesystem's order, not in name order."""
+        graph = DependencyGraphBuilder(graph_project).build()
+        graph.nodes = dict(reversed(list(graph.nodes.items())))
+
+        cycles = DependencyAnalyzer(graph).detect_cycles()
+
+        assert [c.cycle for c in cycles] == [["pkg/a.py", "pkg/b.py"]]
+
     def test_cycles_orphans_and_neighbours(self, graph_project):
         analyzer = DependencyAnalyzer(DependencyGraphBuilder(graph_project).build())
 
@@ -683,8 +692,9 @@ class TestAnalyzer:
         analyzer = DependencyAnalyzer(graph)
         analyzer.MAX_CYCLES_REPORTED = 3
 
+        # The first three in name order: a0, a1, then a10.
         assert analyzer.detect_cycles() == [
-            CircularDependency([f"a{i}", f"b{i}"]) for i in range(3)
+            CircularDependency([f"a{i}", f"b{i}"]) for i in (0, 1, 10)
         ]
 
 
