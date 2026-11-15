@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -624,14 +625,19 @@ class TestStatusFile:
         manager = StatusManager(tmp_path)
         manager.update_session(1)
         manager.update_session(2)
-        manager._write_timer.join(5)
 
-        assert (
-            json.loads(manager.status_file.read_text(encoding="utf-8"))["session"][
-                "number"
-            ]
-            == 2
-        )
+        # The timer may fire before the test looks at it: wait on the file.
+        def written() -> int | None:
+            if not manager.status_file.exists():
+                return None
+            text = manager.status_file.read_text(encoding="utf-8")
+            return json.loads(text)["session"]["number"]
+
+        deadline = time.monotonic() + 5
+        while written() != 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        assert written() == 2
 
     def test_an_immediate_write_cancels_the_pending_one(self, tmp_path):
         manager = StatusManager(tmp_path)
