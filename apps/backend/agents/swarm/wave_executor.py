@@ -166,7 +166,7 @@ class WaveExecutor:
 
         # Collect results — pair each result with its scheduled subtask_id so
         # retry logic in `_retry_failed_subtasks` can locate the failed node
-        # via `nodes.get(sr.subtask_id)` instead of silently dropping.
+        # via `nodes[sr.subtask_id]` instead of silently dropping.
         wave_result = WaveResult(wave_index=wave.index)
         for subtask_id, result in zip(scheduled_ids, results, strict=True):
             if isinstance(result, Exception):

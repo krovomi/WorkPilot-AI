@@ -312,9 +312,8 @@ class SwarmOrchestrator:
             if sr.success:
                 continue
 
-            node = nodes.get(sr.subtask_id)
-            if not node:
-                continue
+            # The executor only reports the subtasks it found in ``nodes``.
+            node = nodes[sr.subtask_id]
 
             while node.retry_count < self.config.max_retries_per_subtask:
                 node.retry_count += 1
