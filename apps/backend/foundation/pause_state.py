@@ -97,6 +97,32 @@ def write_pause_state(
     return state
 
 
+def task_spec_dirs(spec_dir: Path) -> list[Path]:
+    """The task's spec directory and, for a worktree build, the main project's copy.
+
+    A worktree build runs from ``<root>/.workpilot/worktrees/tasks/<t>/.workpilot/
+    specs/<t>``; the card reads its pause from ``<root>/.workpilot/specs/<t>``.
+    Both get a pause the backend writes, as the Pause button writes both.
+    """
+    own = Path(spec_dir)
+    found = [own]
+    parts = own.resolve().parts
+    if ".workpilot" in parts[1:]:
+        root = Path(*parts[: parts.index(".workpilot", 1)])
+        main = root / ".workpilot" / "specs" / own.name
+        if main.is_dir() and main.resolve() != own.resolve():
+            found.append(main)
+    return found
+
+
+def pause_task(
+    spec_dir: Path, *, phase: str, reason: str, detail: dict[str, Any]
+) -> None:
+    """Pause the build from the backend, in every copy of its spec directory."""
+    for folder in task_spec_dirs(spec_dir):
+        write_pause_state(folder, phase=phase, reason=reason, detail=detail)
+
+
 def clear_pause_state(spec_dir: Path) -> None:
     """Lift the pause, keeping the record of where it had stopped.
 

@@ -2590,5 +2590,10 @@
 		"enable": "Turn back on",
 		"disabledHint": "Later prompts of this task leave it out; every other task keeps it.",
 		"error": "Could not update the lesson: {{error}}"
+	"breakerPause": {
+		"chip": "Circuit breaker: {{tool}}",
+		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
+		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
+		"killSwitch": "Stopped by Stop all agents"
 	}
 }

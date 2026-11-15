@@ -43,6 +43,7 @@ export const IPC_CHANNELS = {
 	TASK_UPDATE: "task:update",
 	TASK_START: "task:start",
 	TASK_STOP: "task:stop",
+	AGENTS_STOP_ALL: "agents:stopAll",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
 	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
@@ -298,6 +299,14 @@ export const IPC_CHANNELS = {
 	CONTEXT_MEMORY_STATUS: "context:memoryStatus",
 	CONTEXT_SEARCH_MEMORIES: "context:searchMemories",
 	CONTEXT_GET_MEMORIES: "context:getMemories",
+	// The memory's lifecycle (journal, trash, pins, sync conflicts): /api/brain/memory/*
+	CONTEXT_MEMORY_LIFECYCLE: "context:memoryLifecycle",
+	CONTEXT_MEMORY_HISTORY: "context:memoryHistory",
+	CONTEXT_MEMORY_FORGET: "context:memoryForget",
+	CONTEXT_MEMORY_RESTORE: "context:memoryRestore",
+	CONTEXT_MEMORY_PIN: "context:memoryPin",
+	CONTEXT_MEMORY_RESOLVE_CONFLICT: "context:memoryResolveConflict",
+	CONTEXT_MEMORY_SUGGEST_RESOLUTION: "context:memorySuggestResolution",
 
 	// Environment configuration
 	ENV_GET: "env:get",
@@ -879,6 +888,9 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_REMOVE_AGENT: "missionControl:removeAgent",
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
+
+	// Execution waves across specs (Conflict Predictor, #358): plan by task id
+	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",

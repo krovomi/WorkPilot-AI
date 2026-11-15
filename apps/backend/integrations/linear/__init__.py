@@ -2,11 +2,10 @@
 Linear Integration
 ==================
 
-Integration with Linear issue tracking.
+Integration with Linear issue tracking: one Linear task per spec, moved
+through its statuses by focused mini-agent calls (`updater.py`).
 """
 
-from .config import LinearConfig
-from .integration import LinearManager
 from .updater import (
     STATUS_CANCELED,
     STATUS_DONE,
@@ -20,16 +19,8 @@ from .updater import (
     update_linear_status,
 )
 
-# Aliases for backward compatibility
-LinearIntegration = LinearManager
-LinearUpdater = LinearTaskState  # Alias - old code may expect this name
-
 __all__ = [
-    "LinearConfig",
-    "LinearManager",
-    "LinearIntegration",
     "LinearTaskState",
-    "LinearUpdater",
     "is_linear_enabled",
     "get_linear_api_key",
     "create_linear_task",

@@ -223,7 +223,7 @@ export function registerWorktreeMergeHandlers(
 					hasConfigDir: !!profileEnv.CLAUDE_CONFIG_DIR,
 				});
 
-				return new Promise((resolve) => {
+				return await new Promise((resolve) => {
 					const MERGE_TIMEOUT_MS = 600000; // 10 minutes timeout for AI merge operations with many files
 					let timeoutId: NodeJS.Timeout | null = null;
 					let resolved = false;
@@ -724,13 +724,9 @@ export function registerWorktreeMergeHandlers(
 
 							// IMPORTANT: Wait for plan updates to complete before responding (fixes #243)
 							// Previously this was "fire and forget" which caused a race condition:
-							// resolve() would return before files were written, and UI refresh would read old status
-							try {
-								await updatePlans();
-							} catch (err) {
-								debug("Plan update failed:", err);
-								// Non-fatal: UI will still update, but status may not persist across refresh
-							}
+							// resolve() would return before files were written, and UI refresh would read old status.
+							// It never throws: each plan's failure is caught and logged above.
+							await updatePlans();
 
 							// Route status change through TaskStateManager (XState) to avoid dual emission
 							taskStateManager.handleManualStatusChange(
@@ -974,7 +970,7 @@ export function registerWorktreeMergeHandlers(
 				// Get Python environment for bundled packages
 				const previewPythonEnv = pythonEnvManagerSingleton.getPythonEnv();
 
-				return new Promise((resolve) => {
+				return await new Promise((resolve) => {
 					// Parse Python command to handle space-separated commands like "py -3"
 					const [pythonCommand, pythonBaseArgs] =
 						parsePythonCommand(pythonPath);

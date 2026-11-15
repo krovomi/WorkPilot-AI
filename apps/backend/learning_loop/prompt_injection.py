@@ -56,7 +56,6 @@ _PHASE_BY_AGENT: dict[str, str] = {
     # Writing it.
     "coder": "coding",
     "merge_resolver": "coding",
-    "migration": "coding",
     # Judging what was written.
     "qa_reviewer": "qa_review",
     "pr_reviewer": "qa_review",

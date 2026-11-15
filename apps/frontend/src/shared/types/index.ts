@@ -17,6 +17,8 @@ export * from "./common";
 export * from "./context-mesh";
 // Live context-window telemetry (CONTEXT_USAGE / CONTEXT_ACTION_APPLIED)
 export * from "./context-usage";
+// Execution waves across specs (Conflict Predictor, #358)
+export * from "./conflict-waves";
 export * from "./insights";
 export * from "./integrations";
 // IPC types (must be last to use types from other modules)
@@ -34,6 +36,7 @@ export * from "./mcp-marketplace";
 export * from "./multi-repo";
 // Domain-specific types
 export * from "./project";
+export * from "./memory-lifecycle";
 // PR follow-through (the card drives its PR to merge)
 export * from "./pr-followup";
 export * from "./roadmap";
