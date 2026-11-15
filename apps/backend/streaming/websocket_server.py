@@ -9,27 +9,15 @@ import logging
 import os
 import socket
 import time
+from http import HTTPStatus
 from typing import Any
 from urllib.parse import unquote
 
 import psutil
-
-try:
-    import warnings
-
-    import websockets
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        from websockets.server import WebSocketServerProtocol
-
-    WEBSOCKETS_AVAILABLE = True
-except ImportError:
-    WEBSOCKETS_AVAILABLE = False
-    WebSocketServerProtocol = None
+import websockets
+from websockets.asyncio.server import ServerConnection as WebSocketServerProtocol
 
 from .project_room import ProjectRooms
-from .session_recorder import SessionRecorder
 from .streaming_manager import get_streaming_manager
 
 logger = logging.getLogger(__name__)
@@ -238,7 +226,6 @@ class StreamingWebSocketServer:
         self.host = host
         self.port = port
         self.streaming_manager = get_streaming_manager()
-        self.session_recorder = SessionRecorder()
         self._server = None
         self._clients: dict[str, set[Any]] = {}
         # Server mode: who is on each project, and its team chat.
@@ -247,14 +234,6 @@ class StreamingWebSocketServer:
 
     async def start(self):
         """Start the WebSocket server."""
-        if not WEBSOCKETS_AVAILABLE:
-            logger.warning(
-                "websockets package not installed. "
-                "Streaming mode will not be available. "
-                "Install with: pip install websockets"
-            )
-            return
-
         # Try to kill processes using the port if it's occupied
         if not kill_processes_on_port(self.port):
             logger.error(
@@ -305,75 +284,31 @@ class StreamingWebSocketServer:
         ).split(",")
     )
 
-    def _process_request(self, *args, **kwargs):
-        """Process incoming WebSocket connection requests.
+    def _process_request(self, connection, request):
+        """Refuse a handshake whose `Origin` header is not on the allowlist.
 
-        Reject any handshake whose `Origin` header is not on the allowlist.
-        Variable signature handles multiple websockets-library versions:
-        v10-v12 pass `(path, headers)`, v13+ pass `(connection, request)`.
+        A connection without an `Origin` (the agents, the API) is accepted.
         """
-        # Locate the headers regardless of which positional shape was used.
-        headers = None
-        for arg in args:
-            if hasattr(arg, "headers"):
-                headers = arg.headers
-                break
-            if hasattr(arg, "get"):
-                # Plain Headers / dict-like
-                headers = arg
-                break
-        if headers is None:
-            # Cannot identify headers — fail open ONLY for tests; in prod the
-            # signature should always match. Return None to accept (legacy
-            # behavior) so unknown library versions don't lock us out.
-            return None
-
-        origin = ""
-        try:
-            origin = headers.get("Origin", "") or headers.get("origin", "")
-        except Exception:
-            return None
-
+        origin = request.headers.get("Origin") or ""
         if origin and origin not in self._ALLOWED_ORIGINS:
             logger.warning(
                 "Rejecting WebSocket connection from disallowed origin: %s",
                 origin,
             )
-            # Return a tuple/response to abort; library version-dependent.
-            try:
-                from http import HTTPStatus
-
-                return (HTTPStatus.FORBIDDEN, [], b"forbidden origin\n")
-            except Exception:
-                return None
+            return connection.respond(HTTPStatus.FORBIDDEN, "forbidden origin\n")
         return None
 
     def _extract_websocket_path(self, websocket: WebSocketServerProtocol) -> str:
         """Extract path from websocket connection.
 
-        websockets 13 and later (the asyncio server ``websockets.serve`` is
-        since 14) keep it on the handshake's request, the legacy server on the
-        connection. Missing it, every connection fell back to the default
-        path: in server mode no channel was named, so the app was refused
-        every channel, and the ``?token=`` of the API and of runs was never
-        read, so none of their events was published.
+        The asyncio server keeps it on the handshake's request. Missing it,
+        every connection fell back to the default path: in server mode no
+        channel was named, so the app was refused every channel, and the
+        ``?token=`` of the API and of runs was never read, so none of their
+        events was published.
         """
-        path = "/stream/default"  # Default fallback
-
-        try:
-            request = getattr(websocket, "request", None)
-            if isinstance(getattr(request, "path", None), str):
-                path = request.path
-            elif hasattr(websocket, "path"):
-                path = websocket.path
-            elif hasattr(websocket, "scope"):
-                scope = websocket.scope
-                if scope and "path" in scope:
-                    path = scope["path"]
-        except Exception as e:
-            logger.error(f"Error extracting path: {e}")
-
-        return path
+        path = getattr(getattr(websocket, "request", None), "path", None)
+        return path if isinstance(path, str) else "/stream/default"
 
     def _extract_session_id(self, path: str, websocket: WebSocketServerProtocol) -> str:
         """Extract session ID from path and websocket."""
@@ -468,17 +403,14 @@ class StreamingWebSocketServer:
             await self._handle_client_messages(websocket, ctx)
         except Exception as e:
             logger.error(f"Critical error in _handle_client: {e}")
-            self._handle_critical_error(ctx, websocket, e)
         finally:
-            self._ensure_cleanup(ctx, websocket)
+            if ctx.get("session_id"):
+                self._cleanup_client(ctx["session_id"], websocket)
 
     @staticmethod
     def _request_headers(websocket) -> Any:
-        """The handshake's headers, whichever websockets version accepted it."""
-        request = getattr(websocket, "request", None)
-        headers = getattr(request, "headers", None)
-        if headers is None:
-            headers = getattr(websocket, "request_headers", None)
+        """The handshake's headers."""
+        headers = getattr(getattr(websocket, "request", None), "headers", None)
         return headers if hasattr(headers, "get") else None
 
     def _authenticate_connection(
@@ -610,45 +542,8 @@ class StreamingWebSocketServer:
         try:
             async for message in websocket:
                 await self._handle_message(ctx, websocket, message)
-        except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Client disconnected from session {ctx['session_id']}")
-        except websockets.exceptions.ConnectionClosedOK:
-            logger.info(f"Client cleanly disconnected from session {ctx['session_id']}")
-        except websockets.exceptions.ConnectionClosedError as e:
-            logger.warning(
-                f"Client connection closed with error from session {ctx['session_id']}: {e}"
-            )
-        except websockets.exceptions.InvalidMessage as e:
-            logger.warning(
-                f"Invalid message received from session {ctx['session_id']}: {e}"
-            )
-        except Exception as e:
-            logger.error(
-                f"Unexpected error in client handler for session {ctx['session_id']}: {e}"
-            )
-        finally:
-            self._cleanup_client(ctx["session_id"], websocket)
-
-    def _handle_critical_error(
-        self, ctx: dict, websocket: WebSocketServerProtocol, _error: Exception
-    ):
-        """Handle critical errors during client setup."""
-        # Ensure cleanup even if connection fails early
-        try:
-            if ctx["session_id"]:
-                self._cleanup_client(ctx["session_id"], websocket)
-        except Exception as cleanup_error:
-            logger.error(f"Error during cleanup: {cleanup_error}")
-
-    def _ensure_cleanup(self, ctx: dict, websocket: WebSocketServerProtocol):
-        """Ensure cleanup is performed if not already done."""
-        # Only cleanup if we haven't already done so in the message handler
-        if ctx.get("session_id") and not ctx.get("cleaned_up", False):
-            try:
-                self._cleanup_client(ctx["session_id"], websocket)
-                ctx["cleaned_up"] = True
-            except Exception as cleanup_error:
-                logger.error(f"Error during final cleanup: {cleanup_error}")
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.info(f"Client left session {ctx['session_id']}: {e}")
 
     async def _handle_message(
         self, ctx: dict, websocket: WebSocketServerProtocol, message: str

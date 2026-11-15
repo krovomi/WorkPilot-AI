@@ -193,7 +193,8 @@ function getCommitsSinceTag(
 ): GitCommit[] {
 	try {
 		const range = tag ? `${tag}..HEAD` : "HEAD";
-		const format = "%H|%s|%an|%ae|%aI";
+		// Fields split on the unit separator: a subject or a name may hold `|`.
+		const format = "%H%x1f%s%x1f%an%x1f%ae%x1f%aI";
 		const output = execFileSync(
 			getToolPath("git"),
 			["log", range, `--pretty=format:${format}`],
@@ -207,7 +208,7 @@ function getCommitsSinceTag(
 
 		return output.split("\n").map((line) => {
 			const [fullHash, subject, authorName, authorEmail, date] =
-				line.split("|");
+				line.split("\x1f");
 			return {
 				hash: fullHash.substring(0, 7),
 				fullHash,
@@ -232,10 +233,38 @@ function getCurrentVersion(projectPath: string): string {
 			return "0.0.0";
 		}
 		const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-		return pkg.version || "0.0.0";
+		return typeof pkg?.version === "string" && pkg.version
+			? pkg.version
+			: "0.0.0";
 	} catch {
 		return "0.0.0";
 	}
+}
+
+/** The `major.minor.patch` a version starts with (`2.1` is 2.1.0), or null. */
+function semverParts(version: string): [number, number, number] | null {
+	const match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(version);
+	if (!match) return null;
+	return [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+}
+
+/** The next patch version; a version that is not semver counts as 0.0.0. */
+function nextPatch(version: string): string {
+	const [major, minor, patch] = semverParts(version) ?? [0, 0, 0];
+	return `${major}.${minor}.${patch + 1}`;
+}
+
+/** Which part a suggestion bumps, read from the versions, not from its wording. */
+function bumpTypeOf(
+	currentVersion: string,
+	suggestedVersion: string,
+): VersionSuggestion["bumpType"] {
+	const [major, minor] = semverParts(currentVersion) ?? [0, 0, 0];
+	const suggested = semverParts(suggestedVersion);
+	if (!suggested) return "patch";
+	if (suggested[0] > major) return "major";
+	if (suggested[0] === major && suggested[1] > minor) return "minor";
+	return "patch";
 }
 
 /**
@@ -262,11 +291,10 @@ export function registerSuggestVersion(): void {
 
 				if (commits.length === 0) {
 					// No commits since last release, suggest patch bump
-					const [major, minor, patch] = currentVersion.split(".").map(Number);
 					return {
 						success: true,
 						data: {
-							suggestedVersion: `${major}.${minor}.${patch + 1}`,
+							suggestedVersion: nextPatch(currentVersion),
 							currentVersion,
 							bumpType: "patch",
 							reason: "No new commits since last release",
@@ -287,12 +315,7 @@ export function registerSuggestVersion(): void {
 					data: {
 						suggestedVersion: suggestion.version,
 						currentVersion,
-						bumpType: suggestion.reason.includes("breaking")
-							? "major"
-							: suggestion.reason.includes("feature") ||
-									suggestion.reason.includes("minor")
-								? "minor"
-								: "patch",
+						bumpType: bumpTypeOf(currentVersion, suggestion.version),
 						reason: suggestion.reason,
 						commitCount: commits.length,
 					},
@@ -300,12 +323,11 @@ export function registerSuggestVersion(): void {
 			} catch (_error) {
 				// Fallback to patch bump on error
 				const currentVersion = getCurrentVersion(project.path);
-				const [major, minor, patch] = currentVersion.split(".").map(Number);
 
 				return {
 					success: true,
 					data: {
-						suggestedVersion: `${major}.${minor}.${patch + 1}`,
+						suggestedVersion: nextPatch(currentVersion),
 						currentVersion,
 						bumpType: "patch",
 						reason: "Fallback suggestion (AI analysis unavailable)",

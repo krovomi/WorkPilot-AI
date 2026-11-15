@@ -263,6 +263,11 @@ class PRReviewEngine:
         # reviewer re-raises findings the team already decided about, which is
         # the single most common complaint about automated review.
         full_prompt += _learning_context(project_root)
+        # The kinds of remark this project rejected (#361); the same rules are
+        # applied to the findings afterwards, so this only saves the effort.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
+        full_prompt += learned_prompt_block(project_root)
 
         # Resolve model shorthand (e.g., "sonnet") to full model ID for API compatibility
         model = resolve_model_id(self.config.model or "sonnet")

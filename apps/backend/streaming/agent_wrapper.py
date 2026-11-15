@@ -13,20 +13,28 @@ Architecture:
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Any
 
+import websockets
+from foundation.log_redaction import redact_text
+
 from .session_recorder import SessionRecorder
+from .streaming_manager import EventType, StreamingEvent
 
 logger = logging.getLogger(__name__)
 
-# Try to import websockets for client connection
-try:
-    import websockets
 
-    WEBSOCKETS_AVAILABLE = True
-except ImportError:
-    WEBSOCKETS_AVAILABLE = False
+def _redacted(value: Any) -> Any:
+    """`value` with every secret-looking text masked, for a recording on disk."""
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, dict):
+        return {key: _redacted(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redacted(item) for item in value]
+    return value
 
 
 class StreamingAgentWrapper:
@@ -67,16 +75,10 @@ class StreamingAgentWrapper:
 
     async def _connect(self) -> bool:
         """Connect to the WebSocket server, trying multiple addresses."""
-        if not WEBSOCKETS_AVAILABLE:
-            logger.warning("websockets package not installed, streaming unavailable")
-            return False
-
         # On reconnect, go straight back to the address that worked before.
         # Otherwise probe multiple URLs in case of IPv4/IPv6 issues.
         # Server mode: the run manager injects WORKPILOT_WS_TOKEN into the
         # agent's environment; the WS server requires it on the handshake.
-        import os
-
         ws_token = os.environ.get("WORKPILOT_WS_TOKEN", "")
         token_suffix = f"?token={ws_token}" if ws_token else ""
 
@@ -90,6 +92,7 @@ class StreamingAgentWrapper:
             ]
 
         for url in urls_to_try:
+            address = url.split("?", 1)[0]  # never log the token
             try:
                 self._ws = await asyncio.wait_for(
                     websockets.connect(
@@ -118,9 +121,11 @@ class StreamingAgentWrapper:
                 # invisible to operators ("agents start successfully but
                 # emit zero events" was unsolvable without raising log
                 # level on a hidden code path).
-                logger.debug("WS connect timed out for %s", url)
+                logger.debug("WS connect timed out for %s", address)
             except Exception as exc:
-                logger.debug("WS connect failed for %s: %s", url, exc)
+                logger.debug(
+                    "WS connect failed for %s: %s", address, type(exc).__name__
+                )
 
         logger.warning("Could not connect to streaming server on any address")
         self._ws = None
@@ -158,7 +163,20 @@ class StreamingAgentWrapper:
         return await self._connect()
 
     async def _send_event(self, event_type: str, data: dict[str, Any]):
-        """Send an event to the WebSocket server for broadcasting."""
+        """Record an event, and send it to the WebSocket server for broadcasting.
+
+        The recording keeps the events the server could not be reached for.
+        """
+        timestamp = time.time()
+        if self.recorder:
+            self.recorder.record_event(
+                StreamingEvent(
+                    event_type=EventType(event_type),
+                    timestamp=timestamp,
+                    data=_redacted(data),
+                    session_id=self.session_id,
+                )
+            )
         if not await self._ensure_connected():
             return
 
@@ -167,7 +185,7 @@ class StreamingAgentWrapper:
                 "type": "agent_event",
                 "event": {
                     "event_type": event_type,
-                    "timestamp": time.time(),
+                    "timestamp": timestamp,
                     "data": data,
                     "session_id": self.session_id,
                 },
@@ -183,6 +201,8 @@ class StreamingAgentWrapper:
     async def start_session(self, metadata: dict[str, Any]):
         """Start a streaming session."""
         self._is_active = True
+        if self.recorder:
+            self.recorder.start_recording(self.session_id, _redacted(metadata))
 
         # Connect to WebSocket server
         connected = await self._connect()
@@ -200,9 +220,6 @@ class StreamingAgentWrapper:
             },
         )
 
-        if self.recorder:
-            self.recorder.start_recording(self.session_id, metadata)
-
     async def end_session(self):
         """End a streaming session."""
         self._is_active = False
@@ -215,10 +232,7 @@ class StreamingAgentWrapper:
         )
 
         if self.recorder:
-            recording = self.recorder.stop_recording(self.session_id)
-            if recording:
-                # Recording was saved successfully
-                pass
+            self.recorder.stop_recording(self.session_id)
 
         await self._disconnect()
 

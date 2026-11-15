@@ -13,6 +13,10 @@ from pathlib import Path
 def create_minimal_plan(spec_dir: Path, task_description: str) -> Path:
     """Create a minimal implementation plan for simple tasks."""
     plan = {
+        # "feature" is required: without it the stand-in failed the plan
+        # checkpoint it was written to pass. The placeholder is the one
+        # auto_fix_plan writes, which the UI reads as "no title here".
+        "feature": "Unnamed Feature",
         "spec_name": spec_dir.name,
         "workflow_type": "simple",
         "total_phases": 1,

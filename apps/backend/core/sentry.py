@@ -37,28 +37,18 @@ _sentry_enabled = False
 PRODUCTION_TRACE_SAMPLE_RATE = 0.1
 
 
-def _get_version() -> str:
-    """
-    Get the application version.
+_PACKAGE_JSON = Path(__file__).resolve().parents[2] / "frontend" / "package.json"
 
-    Tries to read from package.json in the frontend directory,
-    falling back to a default version.
-    """
+
+def _get_version(package_json: Path = _PACKAGE_JSON) -> str:
+    """The app version, read from the frontend's package.json ("0.0.0" without it)."""
+    import json
+
     try:
-        # Try to find package.json relative to this file
-        backend_dir = Path(__file__).parent.parent
-        frontend_dir = backend_dir.parent / "frontend"
-        package_json = frontend_dir / "package.json"
-
-        if package_json.exists():
-            import json
-
-            with open(package_json, encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("version", "0.0.0")
-    except Exception as e:
+        with open(package_json, encoding="utf-8") as f:
+            return json.load(f).get("version", "0.0.0")
+    except (OSError, ValueError) as e:
         logger.debug(f"Version detection failed: {e}")
-
     return "0.0.0"
 
 
@@ -136,51 +126,18 @@ def _before_send(event: dict, hint: dict) -> dict | None:
     """
     Process event before sending to Sentry.
 
-    Applies privacy masking to all paths in the event.
+    Masks the username in every string of the event, and drops the user.
+    It used to mask chosen fields only (frame file names, messages, tags,
+    contexts, extra), so each frame's local variables went out as they were:
+    an exception raised on ``/home/<name>/...`` carried that path in the
+    ``vars`` of its frame.
     """
     if not _sentry_enabled:
         return None
 
-    # Mask paths in exception stack traces
-    if "exception" in event and "values" in event["exception"]:
-        for exception in event["exception"]["values"]:
-            if "stacktrace" in exception and "frames" in exception["stacktrace"]:
-                for frame in exception["stacktrace"]["frames"]:
-                    if "filename" in frame:
-                        frame["filename"] = _mask_user_paths(frame["filename"])
-                    if "abs_path" in frame:
-                        frame["abs_path"] = _mask_user_paths(frame["abs_path"])
-            if "value" in exception:
-                exception["value"] = _mask_user_paths(exception["value"])
-
-    # Mask paths in breadcrumbs
-    if "breadcrumbs" in event:
-        for breadcrumb in event.get("breadcrumbs", {}).get("values", []):
-            if "message" in breadcrumb:
-                breadcrumb["message"] = _mask_user_paths(breadcrumb["message"])
-            if "data" in breadcrumb:
-                breadcrumb["data"] = _mask_object_paths(breadcrumb["data"])
-
-    # Mask paths in message
-    if "message" in event:
-        event["message"] = _mask_user_paths(event["message"])
-
-    # Mask paths in tags
-    if "tags" in event:
-        event["tags"] = _mask_object_paths(event["tags"])
-
-    # Mask paths in contexts
-    if "contexts" in event:
-        event["contexts"] = _mask_object_paths(event["contexts"])
-
-    # Mask paths in extra data
-    if "extra" in event:
-        event["extra"] = _mask_object_paths(event["extra"])
-
-    # Clear user info for privacy
+    event = _mask_object_paths(event)
     if "user" in event:
         event["user"] = {}
-
     return event
 
 
@@ -314,7 +271,7 @@ def capture_exception(error: Exception, **kwargs) -> None:
     try:
         import sentry_sdk
 
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             for key, value in kwargs.items():
                 # Apply defensive path masking for extra data
                 masked_value = (
@@ -324,8 +281,6 @@ def capture_exception(error: Exception, **kwargs) -> None:
                 )
                 scope.set_extra(key, masked_value)
             sentry_sdk.capture_exception(error)
-    except ImportError:
-        logger.error(f"[Sentry] SDK not installed, exception not captured: {error}")
     except Exception as e:
         logger.error(f"[Sentry] Failed to capture exception: {e}")
 
@@ -347,7 +302,7 @@ def capture_message(message: str, level: str = "info", **kwargs) -> None:
     try:
         import sentry_sdk
 
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             for key, value in kwargs.items():
                 # Apply defensive path masking for extra data (same as capture_exception)
                 masked_value = (
@@ -357,8 +312,6 @@ def capture_message(message: str, level: str = "info", **kwargs) -> None:
                 )
                 scope.set_extra(key, masked_value)
             sentry_sdk.capture_message(message, level=level)
-    except ImportError:
-        logger.debug("[Sentry] SDK not installed")
     except Exception as e:
         logger.error(f"[Sentry] Failed to capture message: {e}")
 
@@ -382,8 +335,6 @@ def set_context(name: str, data: dict) -> None:
         # Apply path masking to context data before sending to Sentry
         masked_data = _mask_object_paths(data)
         sentry_sdk.set_context(name, masked_data)
-    except ImportError:
-        logger.debug("[Sentry] SDK not installed")
     except Exception as e:
         logger.debug(f"Failed to set context '{name}': {e}")
 
@@ -407,8 +358,6 @@ def set_tag(key: str, value: str) -> None:
         # Apply path masking to tag value
         masked_value = _mask_user_paths(value) if isinstance(value, str) else value
         sentry_sdk.set_tag(key, masked_value)
-    except ImportError:
-        logger.debug("[Sentry] SDK not installed")
     except Exception as e:
         logger.debug(f"Failed to set tag '{key}': {e}")
 
