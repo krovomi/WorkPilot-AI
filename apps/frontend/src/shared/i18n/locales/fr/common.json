@@ -480,7 +480,42 @@
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
 		"verdictOutdated": "Le verdict de l'IA est peut-être dépassé",
-		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés."
+		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés.",
+		"feedback": {
+			"groupLabel": "Avis sur ce résultat",
+			"accept": "Accepter",
+			"reject": "Rejeter",
+			"notApplicable": "Non applicable",
+			"reasonLabel": "Raison (facultatif)",
+			"noReason": "Sans raison",
+			"reasons": {
+				"too_pedantic": "Trop pointilleux",
+				"project_convention": "La convention du projet diffère",
+				"false_positive": "Faux positif",
+				"legacy_exception": "Exception de code hérité",
+				"other": "Autre"
+			},
+			"noteLabel": "Précisions (facultatif)",
+			"notePlaceholder": "Pourquoi cela ne s'applique pas ici",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"show": "Afficher",
+			"hide": "Masquer",
+			"learnedBadge_one": "Rejeté {{count}} fois sur ce projet",
+			"learnedBadge_other": "Rejeté {{count}} fois sur ce projet",
+			"learnedHint": "Ce type de résultat a souvent été rejeté sur ce projet : sa gravité a été abaissée.",
+			"suppressed_one": "{{count}} résultat masqué d'après ce que ce projet a rejeté",
+			"suppressed_other": "{{count}} résultats masqués d'après ce que ce projet a rejeté",
+			"suppressedHint": "Les types de résultat rejetés assez souvent ne sont plus remontés. Les résultats de sécurité et critiques ne sont jamais masqués.",
+			"rejectedCount_one": "(rejeté {{count}} fois)",
+			"rejectedCount_other": "(rejeté {{count}} fois)",
+			"errors": {
+				"invalid": "Cet avis n'a pas pu être lu.",
+				"not_found": "Ce résultat n'est plus dans la revue enregistrée.",
+				"server_project": "L'avis sur les résultats n'est pas encore disponible pour les projets du serveur.",
+				"write_failed": "L'avis n'a pas pu être enregistré."
+			}
+		}
 	},
 	"downloads": {
 		"toggleExpand": "Basculer les détails de téléchargement",
