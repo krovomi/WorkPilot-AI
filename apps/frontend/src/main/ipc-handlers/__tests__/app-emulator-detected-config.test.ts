@@ -11,6 +11,7 @@ import { ipcMain } from "electron";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import { appEmulatorService } from "../../app-emulator-service";
+import { isWindows } from "../../platform";
 import { NOT_DETECTED, registerAppEmulatorHandlers } from "../app-emulator-handlers";
 
 interface Spawned {
@@ -38,6 +39,20 @@ vi.mock("node:child_process", async () => {
 	};
 	return { ...actual, spawn, default: { ...actual, spawn } };
 });
+
+/**
+ * What the service runs around a start on Windows: PowerShell frees the
+ * port, taskkill stops the previous tree. Not the project's own commands.
+ */
+const HELPERS = new Set(["powershell", "taskkill"]);
+const launched = () => spawned.filter(({ cmd }) => !HELPERS.has(cmd));
+
+/** A start command as spawned: whole, through the shell, on Windows; split elsewhere. */
+function spawnOf(command: string): [string, string[]] {
+	if (isWindows()) return [command, []];
+	const [cmd, ...args] = command.split(" ");
+	return [cmd, args];
+}
 
 const invoke = (channel: string, ...args: unknown[]) =>
 	(
@@ -69,7 +84,7 @@ async function start(config: unknown): Promise<unknown> {
 /** Start a web project until `count` processes ran, then stop it. */
 async function startUntilSpawned(config: unknown, count: number): Promise<void> {
 	const result = invoke(IPC_CHANNELS.APP_EMULATOR_START, { config });
-	for (let step = 0; step < 50 && spawned.length < count; step++) {
+	for (let step = 0; step < 50 && launched().length < count; step++) {
 		await vi.advanceTimersByTimeAsync(250);
 		await new Promise((resolve) => setImmediate(resolve));
 	}
@@ -137,7 +152,7 @@ describe("starting the App Emulator", () => {
 			await start({ ...detection.data, startCommand: "another-program --flag", port: 1 }),
 		).toEqual({ success: true });
 
-		expect(spawned.map(({ cmd, args }) => [cmd, args])).toEqual([["cargo", ["run"]]]);
+		expect(launched().map(({ cmd, args }) => [cmd, args])).toEqual([spawnOf("cargo run")]);
 		expect(appEmulatorService.getConfig()).toMatchObject({ startCommand: "cargo run", port: 0 });
 	});
 
@@ -150,7 +165,8 @@ describe("starting the App Emulator", () => {
 
 		await start({ projectDir: dir });
 
-		expect(spawned.map(({ cmd }) => cmd)).toEqual(["cargo", "cargo"]);
+		const [cargo] = spawnOf("cargo run");
+		expect(launched().map(({ cmd }) => cmd)).toEqual([cargo, cargo]);
 	});
 
 	it("installs dependencies without the user's credentials", async () => {
@@ -161,7 +177,7 @@ describe("starting the App Emulator", () => {
 
 		await startUntilSpawned({ projectDir: dir }, 2);
 
-		const [install, server] = spawned;
+		const [install, server] = launched();
 		expect([install.cmd, install.args]).toEqual(["npm", ["install"]]);
 		expect(install.env.ANTHROPIC_API_KEY).toBeUndefined();
 		expect(install.env.GITHUB_TOKEN).toBeUndefined();
