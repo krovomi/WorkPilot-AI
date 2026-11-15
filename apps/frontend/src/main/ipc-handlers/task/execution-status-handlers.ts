@@ -176,7 +176,10 @@ print(json.dumps(result))
 						const prParams = JSON.stringify({
 							project_path: project.path,
 							spec_id: task.specId,
-							task_title: stripHtml(task.title) || task.title,
+							// A title is one line: stripHtml turns inline tags such as
+							// <b> into line breaks, which a PR title cannot hold.
+							task_title:
+								stripHtml(task.title).replace(/\s+/g, " ").trim() || task.title,
 							task_description: stripHtml(task.description || ""),
 							base_branch: baseBranch,
 						});
@@ -188,24 +191,28 @@ print(json.dumps(result))
 						// `input` is an explicit UTF-8 Buffer (not a string) so accented
 						// characters survive the hand-off intact; PYTHONUTF8/IOENCODING
 						// keep Python's own stdio on UTF-8 regardless of the OS locale.
-						const result = execFileSync(pythonExecutable, [tmpScriptPath], {
-							cwd: backendPath,
-							encoding: "utf-8",
-							timeout: 60000, // 60 seconds timeout for PR creation
-							input: Buffer.from(prParams, "utf-8"),
-							maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
-							env: await pythonRunnerEnv(backendPath, {
-								extra: {
-									APP_LANGUAGE: getAppLanguage(),
-								},
-							}),
-						});
-
-						// Clean up temporary script
+						// The script is removed whether Python answers or fails: a
+						// failed PR must not leave it in the user's project.
+						let result: string;
 						try {
-							unlinkSync(tmpScriptPath);
-						} catch {
-							// Ignore cleanup errors
+							result = execFileSync(pythonExecutable, [tmpScriptPath], {
+								cwd: backendPath,
+								encoding: "utf-8",
+								timeout: 60000, // 60 seconds timeout for PR creation
+								input: Buffer.from(prParams, "utf-8"),
+								maxBuffer: 10 * 1024 * 1024, // PR output can be sizable
+								env: await pythonRunnerEnv(backendPath, {
+									extra: {
+										APP_LANGUAGE: getAppLanguage(),
+									},
+								}),
+							});
+						} finally {
+							try {
+								unlinkSync(tmpScriptPath);
+							} catch {
+								// Ignore cleanup errors
+							}
 						}
 
 						// Parse result
