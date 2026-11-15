@@ -285,6 +285,7 @@ describe("AddProjectModal with a remote", () => {
 		fireEvent.change(screen.getByLabelText("Project Name"), { target: { value: "" } });
 		paste("plain words");
 		paste("/trailing/");
+		paste("/repo/.git");
 		expect(screen.getByLabelText("Project Name")).toHaveValue("");
 	});
 });
@@ -302,6 +303,21 @@ describe("AddProjectModal detecting the remote of an existing repository", () =>
 		await waitFor(() => expect(provider(shown)).toHaveAttribute("aria-pressed", "true"));
 		expect(screen.queryByRole("button", { name: hidden })).toBeNull();
 		expect(provider(/Jira/)).toBeInTheDocument();
+	});
+
+	it("drops a detection that finishes after the location changed", async () => {
+		existingRepository(null);
+		let finish: (value: unknown) => void = () => undefined;
+		api.readFile.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+		renderModal();
+		fill("My App", "/code");
+		await waitFor(() => expect(api.readFile).toHaveBeenCalledTimes(1));
+		api.checkGitStatus.mockResolvedValue({ success: false });
+		fireEvent.change(screen.getByLabelText("Location"), { target: { value: "/elsewhere" } });
+		await waitFor(() => expect(api.checkGitStatus).toHaveBeenCalledWith("/elsewhere/my-app"));
+		finish({ success: true, data: '[remote "origin"]\n\turl = https://github.com/octo/app.git\n' });
+		await waitFor(() => expect(provider(/Skip for now/)).toHaveAttribute("aria-pressed", "true"));
+		expect(provider(/Azure DevOps/)).toBeInTheDocument();
 	});
 
 	it("falls back to git when the config names no known host", async () => {

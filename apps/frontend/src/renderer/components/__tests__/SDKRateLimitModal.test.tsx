@@ -96,8 +96,10 @@ describe("SDKRateLimitModal", () => {
 		["ideation", /Ideation was interrupted/],
 		["title-generator", /Title Generator was interrupted/],
 		["other", /Claude was interrupted/],
+		// A source this version does not know yet still gets a name.
+		["newer-feature", /Claude was interrupted/],
 	] as const)("names the %s source", async (source, text) => {
-		await show({ source, resetTime: "soon" });
+		await show({ source: source as SDKRateLimitInfo["source"], resetTime: "soon" });
 		expect(screen.getByText(text)).toBeInTheDocument();
 		expect(screen.getByText("Session limit - resets in a few hours")).toBeInTheDocument();
 	});
@@ -211,6 +213,11 @@ describe("SDKRateLimitModal", () => {
 		api.getAutoSwitchSettings.mockRejectedValueOnce(new Error("locked"));
 		act(() => useAuthStore.getState().rateLimit_showSDKModal(info()));
 		expect(await screen.findByRole("dialog")).toBeInTheDocument();
+		act(() => useAuthStore.getState().rateLimit_hideSDKModal());
+		api.getAutoSwitchSettings.mockResolvedValueOnce({ success: false });
+		act(() => useAuthStore.getState().rateLimit_showSDKModal(info({ taskId: "again" })));
+		await waitFor(() => expect(api.getAutoSwitchSettings).toHaveBeenCalledTimes(3));
+		expect(screen.getByRole("switch", { name: "Auto-switch & retry on rate limit" })).toBeChecked();
 	});
 
 	it("adds an account by name, then closes and explains how to sign it in", async () => {
@@ -232,11 +239,14 @@ describe("SDKRateLimitModal", () => {
 
 	it("says when the account could not be added, refused or failed", async () => {
 		const user = userEvent.setup();
-		api.saveClaudeProfile.mockResolvedValueOnce({ success: false, error: "exists" }).mockRejectedValueOnce(new Error("io"));
+		api.saveClaudeProfile
+			.mockResolvedValueOnce({ success: false, error: "exists" })
+			.mockResolvedValueOnce({ success: false })
+			.mockRejectedValueOnce(new Error("io"));
 		await show();
 		const name = await screen.findByPlaceholderText("Account name (e.g., Work, Personal)");
 		await user.type(name, "Dup");
-		for (let attempt = 1; attempt <= 2; attempt++) {
+		for (let attempt = 1; attempt <= 3; attempt++) {
 			await user.click(screen.getByRole("button", { name: "Add" }));
 			await waitFor(() => expect(toast).toHaveBeenCalledTimes(attempt));
 			expect(toast).toHaveBeenLastCalledWith(
@@ -246,7 +256,7 @@ describe("SDKRateLimitModal", () => {
 		expect(screen.getByRole("dialog")).toBeInTheDocument();
 		await user.clear(name);
 		await user.keyboard("{Enter}");
-		expect(api.saveClaudeProfile).toHaveBeenCalledTimes(2);
+		expect(api.saveClaudeProfile).toHaveBeenCalledTimes(3);
 	});
 
 	it("focuses the new account field from the account menu", async () => {
