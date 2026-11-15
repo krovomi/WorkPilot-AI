@@ -68,13 +68,15 @@ class MigrationsDetector(BaseAnalyzer):
         if not self._exists("manage.py"):
             return None
 
-        migration_dirs = list(self.path.glob("**/migrations"))
+        migration_dirs = [d for d in self._project_files("**/migrations") if d.is_dir()]
         if not migration_dirs:
             return None
 
         return {
             "tool": "django",
-            "directories": [str(d.relative_to(self.path)) for d in migration_dirs],
+            "directories": [
+                d.relative_to(self.path).as_posix() for d in migration_dirs
+            ],
             "commands": {
                 "migrate": "python manage.py migrate",
                 "makemigrations": "python manage.py makemigrations",
@@ -83,13 +85,17 @@ class MigrationsDetector(BaseAnalyzer):
 
     def _detect_knex(self) -> dict[str, Any] | None:
         """Detect Knex (Node.js) migrations."""
-        if not (self._exists("knexfile.js") or self._exists("knexfile.ts")):
+        config = next(
+            (name for name in ("knexfile.ts", "knexfile.js") if self._exists(name)),
+            None,
+        )
+        if config is None:
             return None
 
         return {
             "tool": "knex",
             "directory": "migrations",
-            "config_file": "knexfile.js",
+            "config_file": config,
             "commands": {
                 "migrate": "knex migrate:latest",
                 "rollback": "knex migrate:rollback",

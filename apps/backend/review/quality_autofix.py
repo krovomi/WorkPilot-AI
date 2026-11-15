@@ -176,7 +176,12 @@ class AutoFixEngine:
                 continue
 
             try:
-                content = file_path.read_text(encoding="utf-8")
+                # newline="" : lire et réécrire les fins de ligne telles quelles.
+                # read_text() les traduit en "\n" et write_text() en os.linesep,
+                # ce qui convertissait tout le fichier (CRLF -> LF sous Linux,
+                # LF -> CRLF sous Windows) pour une seule ligne corrigée.
+                with open(file_path, encoding="utf-8", newline="") as handle:
+                    content = handle.read()
                 lines = content.split("\n")
 
                 # Appliquer les fixes (en ordre inverse pour ne pas décaler les numéros de ligne)
@@ -186,7 +191,8 @@ class AutoFixEngine:
                     if fix.issue.line and 1 <= fix.issue.line <= len(lines):
                         line_idx = fix.issue.line - 1
                         if lines[line_idx].strip() == fix.original_line.strip():
-                            lines[line_idx] = fix.fixed_line
+                            ending = "\r" if lines[line_idx].endswith("\r") else ""
+                            lines[line_idx] = fix.fixed_line.rstrip("\r") + ending
                             applied_count += 1
                         else:
                             skipped_count += 1
@@ -195,7 +201,8 @@ class AutoFixEngine:
 
                 # Sauvegarder si pas dry run
                 if not dry_run:
-                    file_path.write_text("\n".join(lines), encoding="utf-8")
+                    with open(file_path, "w", encoding="utf-8", newline="") as handle:
+                        handle.write("\n".join(lines))
 
             except Exception:
                 error_count += len(file_fixes)

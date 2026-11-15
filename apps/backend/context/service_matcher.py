@@ -56,7 +56,8 @@ class ServiceMatcher:
                 score += 5
 
             # Check framework relevance
-            framework = service_info.get("framework", "").lower()
+            # project_index.json writes "framework": null for a plain service
+            framework = (service_info.get("framework") or "").lower()
             if framework and framework in task_lower:
                 score += 3
 
@@ -69,13 +70,14 @@ class ServiceMatcher:
         if suggested:
             return [s[0] for s in suggested[:3]]  # Top 3
 
-        # Default: return first backend and first frontend
+        # Default: the first backend and the first frontend
         default = []
+        types_taken: set[str] = set()
         for name, info in services.items():
-            if info.get("type") == "backend" and "backend" not in [s for s in default]:
+            service_type = info.get("type")
+            if service_type in ("backend", "frontend") and service_type not in (
+                types_taken
+            ):
+                types_taken.add(service_type)
                 default.append(name)
-            elif info.get("type") == "frontend" and "frontend" not in [
-                s for s in default
-            ]:
-                default.append(name)
-        return default[:2] if default else list(services.keys())[:2]
+        return default if default else list(services.keys())[:2]

@@ -8,6 +8,7 @@ Project structure analysis and indexing.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -48,6 +49,11 @@ def run_discovery_script(
             cwd=project_dir,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            # The analyzer prints paths; on a Windows pipe its default cp1252
+            # stdout raised on any character outside it.
+            env={**os.environ, "PYTHONUTF8": "1"},
             timeout=300,
         )
 
@@ -63,71 +69,24 @@ def run_discovery_script(
 
 
 def get_project_index_stats(spec_dir: Path) -> dict:
-    """Get statistics from project index if available."""
+    """What the project index found: its services and the project type.
+
+    It used to return a ``file_count`` estimated from the services ("3 config
+    files: package.json, tsconfig.json, .env.example", "8 files per key
+    directory", "1 per 2 dependencies"), logged as "Discovered N files in
+    project": a number nothing had counted, with a JavaScript layout assumed
+    for every stack.
+    """
     spec_index = spec_dir / "project_index.json"
-    if not spec_index.exists():
-        return {}
-
     try:
-        with open(spec_index, encoding="utf-8") as f:
-            index_data = json.load(f)
-
-        # Support both old and new analyzer formats
-        file_count = 0
-
-        # Old format: top-level "files" array
-        if "files" in index_data:
-            file_count = len(index_data["files"])
-        # New format: count files in services
-        elif "services" in index_data:
-            services = index_data["services"]
-
-            for service_data in services.values():
-                if isinstance(service_data, dict):
-                    # Config files
-                    file_count += 3  # package.json, tsconfig.json, .env.example
-
-                    # Entry point
-                    if service_data.get("entry_point"):
-                        file_count += 1
-
-                    # Dependencies indicate source files
-                    deps = service_data.get("dependencies", [])
-                    dev_deps = service_data.get("dev_dependencies", [])
-                    file_count += len(deps) // 2  # Rough estimate: 1 file per 2 deps
-                    file_count += len(dev_deps) // 4  # Fewer files for dev deps
-
-                    # Key directories (each represents multiple files)
-                    key_dirs = service_data.get("key_directories", {})
-                    file_count += len(key_dirs) * 8  # Estimate 8 files per directory
-
-                    # Config files
-                    if service_data.get("dockerfile"):
-                        file_count += 1
-                    if service_data.get("test_directory"):
-                        file_count += 3  # Test files
-
-            # Infrastructure files
-            if "infrastructure" in index_data:
-                infra = index_data["infrastructure"]
-                if infra.get("docker_compose"):
-                    file_count += len(infra["docker_compose"])
-                if infra.get("dockerfiles"):
-                    file_count += len(infra["dockerfiles"])
-
-            # Convention files
-            if "conventions" in index_data:
-                conv = index_data["conventions"]
-                if conv.get("linting"):
-                    file_count += 1  # eslintrc or similar
-                if conv.get("formatting"):
-                    file_count += 1  # prettier config
-                if conv.get("git_hooks"):
-                    file_count += 1  # husky/hooks
-
-        return {
-            "file_count": file_count,
-            "project_type": index_data.get("project_type", "unknown"),
-        }
-    except Exception:
+        index_data = json.loads(spec_index.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return {}
+    if not isinstance(index_data, dict):
+        return {}
+    services = index_data.get("services")
+    names = sorted(services) if isinstance(services, dict) else []
+    return {
+        "services": names,
+        "project_type": index_data.get("project_type", "unknown"),
+    }

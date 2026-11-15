@@ -23,6 +23,7 @@ regardless of which AI provider the user is configured with.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -160,18 +161,16 @@ class BlastRadiusReport:
 
 
 def _iter_code_files(root: Path, *, limit: int = 3000) -> list[Path]:
+    # Ignored folders are pruned, not walked: rglob went through all of
+    # node_modules before dropping it, file by file.
     out: list[Path] = []
-    for path in root.rglob("*"):
-        if len(out) >= limit:
-            break
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in _CODE_SUFFIXES:
-            continue
-        rel_parts = set(path.relative_to(root).parts)
-        if rel_parts & _IGNORED_DIRS:
-            continue
-        out.append(path)
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in _IGNORED_DIRS)
+        for name in sorted(files):
+            if Path(name).suffix.lower() in _CODE_SUFFIXES:
+                out.append(Path(dirpath) / name)
+                if len(out) >= limit:
+                    return out
     return out
 
 
@@ -198,12 +197,38 @@ def _module_candidates(root: Path, target: Path) -> list[str]:
     )
 
 
+# `from pkg import mod` imports pkg.mod: only "pkg" was read, so a module
+# imported that way had no dependents.
+_FROM_IMPORT = re.compile(r"^\s*from\s+([\w.]+)\s+import\s+(\w+)", re.MULTILINE)
+
+
 def _extract_imports(text: str) -> list[str]:
     out: list[str] = []
     for pat in _IMPORT_PATTERNS:
         for m in pat.finditer(text):
             out.append(m.group(1))
+    out.extend(f"{m.group(1)}.{m.group(2)}" for m in _FROM_IMPORT.finditer(text))
     return out
+
+
+_SEGMENT_SPLIT = re.compile(r"[./\\:@]+")
+
+
+def _segments(name: str) -> list[str]:
+    return [part for part in _SEGMENT_SPLIT.split(name) if part]
+
+
+def _names_module(imported: str, variants: list[str]) -> bool:
+    """Whether an import names the target: a variant's segments appear, in
+    order and whole, among the import's. A substring test made every file
+    whose import contained the stem a dependent ("a.py" of "react")."""
+    have = _segments(imported)
+    for variant in variants:
+        want = _segments(variant)
+        n = len(want)
+        if n and any(have[i : i + n] == want for i in range(len(have) - n + 1)):
+            return True
+    return False
 
 
 def _declared_types(target: Path) -> set[str]:
@@ -230,11 +255,14 @@ def analyze_blast_radius(
 
     ``targets`` are relative paths inside ``project_root``.
     """
-    project_root = Path(project_root)
+    # Resolved, then held inside the project: "../x" or a link out of it is
+    # not a target, and an unresolved root made relative_to() raise on a
+    # resolved target (a project opened through a symlink).
+    project_root = Path(project_root).resolve()
     resolved_targets: list[Path] = []
     for t in targets:
         p = (project_root / t).resolve()
-        if p.exists() and p.is_file():
+        if p.is_file() and p.is_relative_to(project_root):
             resolved_targets.append(p)
 
     if not resolved_targets:
@@ -278,7 +306,7 @@ def analyze_blast_radius(
         for target, variants in candidates_by_target.items():
             if path == target:
                 continue
-            hit = any(any(v and v in imp for v in variants) for imp in imports)
+            hit = any(_names_module(imp, variants) for imp in imports)
             if not hit and by_type and target in types_by_target:
                 hit = bool(types_by_target[target].search(text))
             if not hit:

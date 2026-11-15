@@ -22,13 +22,10 @@ export function OpenAIUsageContent({ usage }: OpenAIUsageContentProps) {
 				<TrendingUp className="h-4 w-4 text-primary shrink-0 mt-0.5" />
 				<div className="space-y-1">
 					<p className="text-xs font-medium text-primary">
-						{t("common:usage.openaiCostLabel", "Coût OpenAI (mois en cours)")}
+						{t("common:usage.openaiCostLabel")}
 					</p>
 					<p className="text-3xs text-muted-foreground leading-relaxed">
-						{t(
-							"common:usage.openaiCostDescription",
-							"Le coût affiché correspond à la consommation OpenAI du mois en cours (estimation).",
-						)}
+						{t("common:usage.openaiCostDescription")}
 						<br />
 						<a
 							href="https://platform.openai.com/usage"
@@ -36,7 +33,7 @@ export function OpenAIUsageContent({ usage }: OpenAIUsageContentProps) {
 							rel="noopener noreferrer"
 							className="underline text-primary"
 						>
-							{t("common:usage.openaiDashboard", "Voir le dashboard OpenAI")}
+							{t("common:usage.openaiDashboard")}
 						</a>
 					</p>
 					<div className="mt-2 text-lg font-bold text-primary">

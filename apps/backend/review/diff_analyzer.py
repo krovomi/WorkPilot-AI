@@ -8,6 +8,9 @@ including section extraction, table parsing, and text truncation.
 
 import re
 
+# A Markdown task item, open or checked ("[x]" or "[X]", both valid in GitHub).
+CHECKBOX_PATTERN = r"^\s*[-*]\s*\[[ xX]\]\s*(.+)$"
+
 
 def extract_section(
     content: str, header: str, next_header_pattern: str = r"^## "
@@ -71,7 +74,9 @@ def extract_table_rows(content: str, table_header: str) -> list[tuple[str, str, 
         line = line.strip()
 
         # Look for table header row containing the specified text
-        if table_header.lower() in line.lower() and "|" in line:
+        # Only before the table: a row naming a "profile.py" holds "file" and
+        # was taken for the header row of a "File" table, then dropped.
+        if not in_table and table_header.lower() in line.lower() and "|" in line:
             in_table = True
             header_found = True
             continue
@@ -119,5 +124,5 @@ def extract_checkboxes(content: str, max_items: int = 10) -> list[str]:
     Returns:
         List of checkbox item texts
     """
-    checkboxes = re.findall(r"^\s*[-*]\s*\[[ x]\]\s*(.+)$", content, re.MULTILINE)
+    checkboxes = re.findall(CHECKBOX_PATTERN, content, re.MULTILINE)
     return checkboxes[:max_items]
