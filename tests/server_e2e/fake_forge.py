@@ -451,6 +451,11 @@ def _github(method: str, path: str, body: Any, query: str = "") -> _Answer:
         return _Answer(200, [_issue_json(issue) for issue in listed])
     if len(rest) >= 2 and rest[0] == "issues" and rest[1].isdigit():
         issue = issues.get(int(rest[1]))
+        if issue is None and int(rest[1]) == GITHUB_PULL["number"]:
+            if rest[2:] != ["comments"]:
+                return _NOT_FOUND
+            # A pull request is an issue too: its conversation is the issue's.
+            issue = {"number": GITHUB_PULL["number"], "comments": []}
         if issue is None:
             return _NOT_FOUND
         if method == "GET" and len(rest) == 2:
