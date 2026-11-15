@@ -32,12 +32,16 @@ class ProjectIndexPhase:
         output_dir: Path,
         refresh: bool,
         script_executor: "ScriptExecutor",
+        project_dir: Path,
     ):
         self.output_dir = output_dir
         self.refresh = refresh
         self.script_executor = script_executor
         self.project_index = output_dir / "project_index.json"
-        self.auto_build_index = Path(__file__).parent.parent / "project_index.json"
+        # The project's own index, as the spec and ideation pipelines read it.
+        # It used to be looked up beside this backend's runners, which would
+        # have given every project the index of another one.
+        self.auto_build_index = project_dir / ".workpilot" / "project_index.json"
 
     async def execute(self) -> RoadmapPhaseResult:
         """Ensure project index exists."""
@@ -52,9 +56,7 @@ class ProjectIndexPhase:
 
         # Check if we can copy existing index
         if self.auto_build_index.exists() and not self.project_index.exists():
-            debug(
-                "roadmap_phase", "Copying existing project_index.json from auto-claude"
-            )
+            debug("roadmap_phase", "Copying the project's project_index.json")
             shutil.copy(self.auto_build_index, self.project_index)
             print_status("Copied existing project_index.json", "success")
             debug_success("roadmap_phase", "Project index copied successfully")

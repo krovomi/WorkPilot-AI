@@ -9,7 +9,7 @@ Output protocol (one JSON object per line, prefixed):
     ONBOARDING_RESULT:{"guide": {...}, "package": {...}, "freshness": {...}}
     ONBOARDING_STATUS:{"known": bool, "stale": bool, "added": [...], ...}   (--status)
     ONBOARDING_NARRATION:{"paragraphs": {chapter: text}, ...}             (--narrate)
-    ONBOARDING_ERROR:<message>
+    ONBOARDING_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

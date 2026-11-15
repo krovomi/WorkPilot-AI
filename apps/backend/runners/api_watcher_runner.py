@@ -13,7 +13,7 @@ when absent, the runner saves the current contracts and returns an empty diff.
 Output protocol (one JSON object per line, prefixed):
     API_WATCHER_EVENT:{"type": "progress", "data": {"status": "..."}}
     API_WATCHER_RESULT:{...diff dict...}
-    API_WATCHER_ERROR:<message>
+    API_WATCHER_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations
@@ -332,6 +332,11 @@ def main() -> None:
     project_path = Path(args.project_path)
     if not project_path.exists():
         _emit("API_WATCHER_ERROR", f"Project path does not exist: {project_path}")
+        sys.exit(1)
+    if not project_path.is_dir():
+        # Said here, in the same words on every OS: the error the scan would
+        # raise is worded by the system ("[WinError 267] ..." on Windows).
+        _emit("API_WATCHER_ERROR", f"Not a directory: {project_path}")
         sys.exit(1)
 
     if args.save_baseline:

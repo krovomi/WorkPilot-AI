@@ -8,6 +8,7 @@ import path from "node:path";
 import { app } from "electron";
 import { requirePythonPath } from "../utils/ensure-python";
 import { pythonRunnerEnv } from "../utils/python-runner-env";
+import { decodeRunnerError } from "../utils/runner-error";
 
 const EVENT_PREFIX = "COMPLIANCE_EVENT:";
 const RESULT_PREFIX = "COMPLIANCE_RESULT:";
@@ -53,7 +54,7 @@ export async function runCompliance(
 				console.error("[Compliance] Bad result line:", err);
 			}
 		} else if (line.startsWith(ERROR_PREFIX)) {
-			errorMessage = line.slice(ERROR_PREFIX.length);
+			errorMessage = decodeRunnerError(line.slice(ERROR_PREFIX.length));
 		}
 	};
 	child.stdout?.on("data", (chunk: Buffer) => {
