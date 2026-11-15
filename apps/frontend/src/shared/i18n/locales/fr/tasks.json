@@ -842,7 +842,11 @@
 					"bug_fix": "Correction de bug",
 					"refactoring": "Refactoring",
 					"documentation": "Documentation",
-					"security": "Sécurité"
+					"security": "Sécurité",
+					"performance": "Performance",
+					"ui_ux": "UI/UX",
+					"infrastructure": "Infrastructure",
+					"testing": "Tests"
 				},
 				"priority": {
 					"low": "Basse",
