@@ -522,3 +522,42 @@ def test_the_report_says_which_tier_ran(tmp_path):
     report = (tmp_path / "qa_report.md").read_text(encoding="utf-8")
     assert "Scope: targeted QA — QA ciblée" in report
     assert "Targeted tests: tests/test_calc.py pass" in report
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [
+        "tests/test_calc.py",  # not a list
+        ["tests/test_calc.py", {"file": "tests/test_other.py", "passed": True}],
+    ],
+)
+def test_a_record_that_does_not_name_the_test_is_absent(entries):
+    from qa.targeted_gate import evaluate_targeted
+
+    failures = evaluate_targeted(
+        _signoff(targeted_tests=entries), _classify(["src/calc.py"]), CALC, 0
+    )
+    assert any("absent" in f for f in failures)
+
+
+def test_a_recorded_path_written_from_the_current_folder_is_the_test():
+    from qa.targeted_gate import evaluate_targeted
+
+    signoff = _signoff(
+        targeted_tests=[{"file": "././tests/test_calc.py", "passed": True}],
+        coverage={
+            "touched_files": 100,
+            "per_file": {"src/calc.py": "100%", "docs/x.md": 10, "src/y.py": "n/a"},
+        },
+    )
+    assert evaluate_targeted(signoff, _classify(["src/calc.py"]), CALC, 100) == []
+
+
+def test_the_gate_rejects_even_without_a_plan_or_a_writable_request(tmp_path):
+    from qa.targeted_gate import run_targeted_gate
+
+    (tmp_path / "QA_FIX_REQUEST.md").mkdir()
+
+    issues = run_targeted_gate(tmp_path, _classify(["src/calc.py"]), [])
+
+    assert issues and all(i["type"] == "targeted_qa_gap" for i in issues)
