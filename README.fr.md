@@ -303,6 +303,7 @@ Référence complète : [docs/CLI-USAGE.md](docs/CLI-USAGE.md) (en anglais).
 1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS) ; Windows n'est pas encore couvert, et la carte indique quand une tâche tourne sans bac à sable.
 2. **Restrictions du système de fichiers** : les opérations restent dans le dossier du projet.
 3. **Liste blanche dynamique de commandes** : seules les commandes de la stack détectée sont autorisées.
+4. **Instantanés et score de confiance** : avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; chaque session démarre avec un score de confiance de 100 que les anomalies font baisser, et sous un seuil la tâche se met en pause, ou la session s'arrête et son instantané est restauré. Le mode restreint et les limites par session sont dans Paramètres > Sandbox ; un instantané se restaure depuis la carte.
 
 Les clés d'API et les jetons sont chiffrés au repos avec le trousseau du système ; Paramètres > Comptes indique depuis quand chaque clé d'API a été enregistrée et suggère de la renouveler après 90 jours. Chaque version fournit les sommes de contrôle SHA256, un SBOM CycloneDX et une attestation de provenance de build par fichier.
 

@@ -103,7 +103,7 @@ coder, la QA et la spec. Voir [`architecture/pause-resume.md`](../architecture/p
   un nouveau fichier au-delà est refusé. Le code d'une feature va dans un module à lui ; une
   découpe abaisse le plafond (`python scripts/quality_baselines.py update`).
 - **Types vérifiés** par pyright `1.1.408` (mode `basic`) sur les paquets listés dans
-  `apps/backend/pyrightconfig.json` (`bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`,
+  `apps/backend/pyrightconfig.json` (`agent_snapshots`, `bench`, `best_of_n`, `genai_trace`, `goal`, `mcp_tasks`,
   `os_sandbox`, `security`) ; on élargit la liste paquet par paquet, une fois le paquet à zéro.
 - **Contrats d'imports** entre unités de premier niveau (`tests/test_import_contracts.py`) :
   les unités listées dans `ALLOWED_IMPORTS` (`foundation`, `security`, `project`, `phase_config`,

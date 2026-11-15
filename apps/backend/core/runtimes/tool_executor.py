@@ -296,6 +296,13 @@ class ToolExecutor:
 
             if refusal := protected_config_refusal(path, self.working_directory):
                 raise ValueError(refusal)
+            # The reinforced sandbox (Settings, Sandbox), as the SDK hook applies it.
+            from security.sandbox import current_policy, write_refusal
+
+            if refusal := write_refusal(
+                current_policy(), str(candidate), self.project_dir, self.spec_dir
+            ):
+                raise ValueError(refusal)
         return candidate
 
     async def execute(self, tool_name: str, arguments: dict[str, Any]) -> Any:
@@ -490,6 +497,19 @@ class ToolExecutor:
         ):
             logger.info("write refused by a guardrail: %s", refusal)
             return f"Write refused by the project's guardrails: {refusal}"
+
+        from security.sandbox import current_policy, write_refusal
+
+        if isinstance(content, str) and (
+            refusal := write_refusal(
+                current_policy(),
+                str(file_path),
+                self.project_dir,
+                self.spec_dir,
+                len(content.encode("utf-8", errors="replace")),
+            )
+        ):
+            raise ValueError(refusal)
 
         # The other half of the product. Providers that do not use the Claude
         # SDK never reach `create_client`'s PreToolUse hooks, so the same

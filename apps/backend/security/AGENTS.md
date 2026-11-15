@@ -23,6 +23,8 @@ providers hors SDK passent par `core/runtimes/tool_executor.py`, qui appelle les
 | Write / Edit | caractères invisibles retirés | `watermarks/` | `tests/test_watermarks_hook.py` |
 | Read | fichiers retenus par la préparation des pièces jointes | `docintel/read_guard.py` | — |
 | Bash (hors SDK), CLI OpenCode et pi | le processus tourne dans le bac à sable de l'OS : écritures dans le worktree, identifiants masqués, réseau par proxy filtrant ; Claude Code et Codex gardent le leur, rapporté | `os_sandbox/` (`session_sandbox`, `bwrap_argv`, `seatbelt_profile`, `FilteringProxy`), appelé par `core/client.py` (`_sandbox_at_launch`), `tool_executor._run_command`, `CliSubprocessAgentClient._launch` | `tests/os_sandbox/` |
+| Write / Edit | mode restreint du sandbox (chemins inscriptibles listés) et taille d'un fichier, refusés avant l'écriture ; réglages lus dans `WORKPILOT_AGENT_SAFETY` | `sandbox.py` (`write_refusal`), appelé par `path_guard.py` et `tool_executor.py` ; réglages `agent_safety_settings.py` | `tests/test_sandbox.py`, `tests/security/test_agent_safety_settings.py` |
+| tous (après coup) | score de confiance de la session (`anomaly_detector.py`) et limites du sandbox comptées sur le flux des appels : pause, ou arrêt et restauration de l'instantané pris avant la session ; au mieux, pas une barrière ([conception](../../../docs/architecture/agent-safety.md)) | `agents/safety_watch.py`, `agents/safety_events.py`, `agent_snapshots/` | `tests/agent_safety/`, `tests/test_anomaly_detector.py` |
 | tous | outils non déclarés refusés | `agents/tools_pkg/permissions.py` (`undeclared_builtin_tools`) | `tests/test_agent_tool_declarations.py`, `tests/test_agent_tool_rights.py`, `tests/test_non_sdk_rights.py` |
 | commande de l'objectif | environnement du backend sans ses identifiants, pour une commande qui exécute le code de la tâche | `child_env.py` (`env_without_credentials`), appelé par `goal/check.py` | `tests/goal/test_goal_protection.py`, `tests/goal/test_goal_check.py` |
 
@@ -58,7 +60,6 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 À ne pas citer comme une barrière : ces modules existent mais ne sont branchés sur aucun chemin
 d'exécution d'agent.
 
-- `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
 - `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
   `subprocess` directement (voir la règle S4).
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.

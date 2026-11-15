@@ -2600,5 +2600,55 @@
 		"body": "The agent called {{tool}} {{repeats}} times with the same arguments and got the same result each time, with no file changed in between. The task paused itself rather than pay for a loop.",
 		"hint": "Read its logs. Resume restarts the phase with the same conversation; if it loops again, switch the model or make the task more precise.",
 		"killSwitch": "Stopped by Stop all agents"
+	},
+	"safetyPause": {
+		"anomalyChip": "Trust score: {{score}}/100",
+		"anomalyBody": "The agent's trust score fell to {{score}}/100 (pause at {{pause}}). The task paused itself; its files are as the agent left them.",
+		"anomalyStopped": "The agent's trust score fell to {{score}}/100, at or below the stop threshold ({{stop}}). The session was stopped.",
+		"types": {
+			"mass_file_deletion": "Mass file deletion",
+			"unexpected_network_access": "Network access to another machine",
+			"system_config_modification": "Write to the security configuration",
+			"excessive_token_usage": "Excessive token usage",
+			"rapid_file_changes": "Rapid file changes",
+			"sensitive_file_access": "Access to a secret or the git history",
+			"unusual_command_execution": "Dangerous command",
+			"long_running_session": "Long-running session",
+			"repetitive_errors": "Repeated errors",
+			"path_traversal_attempt": "Path outside the project or into the system"
+		},
+		"sandboxChip": {
+			"restricted_path": "Sandbox: write outside the allowed paths",
+			"file_size": "Sandbox: file too large",
+			"files_written": "Sandbox: too many files",
+			"session_time": "Sandbox: session too long"
+		},
+		"sandboxBody": {
+			"restricted_path": "The agent wrote {{path}}, outside the paths the restricted sandbox allows. The session was stopped.",
+			"file_size": "The agent wrote {{path}} ({{value}} bytes), over the sandbox's limit of {{limit}} bytes per file. The session was stopped.",
+			"files_written": "The agent wrote {{value}} files in one session, over the sandbox's limit of {{limit}}. The task paused itself; its files are as the agent left them.",
+			"session_time": "The session ran {{value}} seconds, over the sandbox's limit of {{limit}}. The task paused itself; its files are as the agent left them."
+		},
+		"rolledBack": "Its files were restored to the snapshot taken before that session. The state they replaced is kept as a snapshot too.",
+		"rollbackFailed": "Restoring the snapshot failed: the files are as the agent left them. Restore one below.",
+		"hint": "Read its logs before resuming. Limits and thresholds are in Settings, Sandbox and Anomaly detection.",
+		"snapshots": {
+			"open": "Snapshots…",
+			"none": "No snapshot for this task yet.",
+			"restore": "Restore",
+			"confirm": "Confirm restore",
+			"restored": "Snapshot restored.",
+			"failed": "Could not restore: {{error}}",
+			"listFailed": "Could not read the snapshots: {{error}}",
+			"hint": "A restore rewrites the task's worktree; the current state is saved as a snapshot first, so it can be undone.",
+			"labels": {
+				"planning": "before planning",
+				"coding": "before coding",
+				"qa_review": "before QA",
+				"before_rollback": "before a restore"
+			}
+		},
+		"anomalyLine_one": "{{label}}",
+		"anomalyLine_other": "{{label}} (×{{count}})"
 	}
 }
