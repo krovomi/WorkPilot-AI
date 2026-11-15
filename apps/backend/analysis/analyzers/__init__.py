@@ -48,7 +48,6 @@ def analyze_project(project_dir: Path, output_file: Path | None = None) -> dict:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
-        print(f"Project index saved to: {output_file}")
 
     return results
 
@@ -89,6 +88,5 @@ def analyze_service(
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
-        print(f"Service analysis saved to: {output_file}")
 
     return results

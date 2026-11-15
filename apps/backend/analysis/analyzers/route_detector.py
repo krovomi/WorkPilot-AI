@@ -22,6 +22,12 @@ from pathlib import Path
 from .base import BaseAnalyzer
 from .route_detector_extra import detect_laravel_routes, detect_nestjs_routes
 
+_NEXT_SUFFIXES = (".ts", ".js", ".tsx", ".jsx")
+
+
+_SPRING_AUTH = re.compile(r"@(?:Secured|PreAuthorize|RolesAllowed)\b")
+_MEMBER_END = re.compile(r"[{};][ \t]*\r?\n")
+
 
 class RouteDetector(BaseAnalyzer):
     """Detects API routes across multiple web frameworks."""
@@ -152,7 +158,7 @@ class RouteDetector(BaseAnalyzer):
                         {
                             "path": path,
                             "methods": methods,
-                            "file": str(file_path.relative_to(self.path)),
+                            "file": file_path.relative_to(self.path).as_posix(),
                             "framework": "FastAPI",
                             "requires_auth": requires_auth,
                         }
@@ -201,7 +207,7 @@ class RouteDetector(BaseAnalyzer):
                     {
                         "path": path,
                         "methods": methods,
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "Flask",
                         "requires_auth": requires_auth,
                     }
@@ -237,7 +243,7 @@ class RouteDetector(BaseAnalyzer):
                         {
                             "path": f"/{path}" if not path.startswith("/") else path,
                             "methods": ["GET", "POST"],  # Django allows both by default
-                            "file": str(file_path.relative_to(self.path)),
+                            "file": file_path.relative_to(self.path).as_posix(),
                             "framework": "Django",
                             "requires_auth": False,  # Can't easily detect without middleware analysis
                         }
@@ -291,7 +297,7 @@ class RouteDetector(BaseAnalyzer):
                     {
                         "path": path,
                         "methods": [method],
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "Express",
                         "requires_auth": requires_auth,
                     }
@@ -307,16 +313,24 @@ class RouteDetector(BaseAnalyzer):
         app_dir = self.path / "app"
         if app_dir.exists():
             # Find all route.ts/js files
+            # pathlib's glob has no "{ts,js}" alternation: that pattern
+            # matched nothing, and no App Router route was ever found.
             route_files = [
                 f
-                for f in app_dir.glob("**/route.{ts,js,tsx,jsx}")
+                for suffix in _NEXT_SUFFIXES
+                for f in sorted(app_dir.glob(f"**/route{suffix}"))
                 if self._should_include_file(f)
             ]
             for route_file in route_files:
                 # Convert file path to route path
-                # app/api/users/[id]/route.ts -> /api/users/:id
+                # app/api/users/[id]/route.ts -> /api/users/:id; a route group
+                # "(shop)" is not part of the URL.
                 relative_path = route_file.parent.relative_to(app_dir)
-                route_path = "/" + str(relative_path).replace("\\", "/")
+                route_path = "/" + "/".join(
+                    part
+                    for part in relative_path.parts
+                    if not (part.startswith("(") and part.endswith(")"))
+                )
 
                 # Convert [id] to :id
                 route_path = re.sub(r"\[([^\]]+)\]", r":\1", route_path)
@@ -334,7 +348,7 @@ class RouteDetector(BaseAnalyzer):
                             {
                                 "path": route_path,
                                 "methods": methods,
-                                "file": str(route_file.relative_to(self.path)),
+                                "file": route_file.relative_to(self.path).as_posix(),
                                 "framework": "Next.js",
                                 "requires_auth": "auth" in content.lower(),
                             }
@@ -347,18 +361,20 @@ class RouteDetector(BaseAnalyzer):
         if pages_api.exists():
             api_files = [
                 f
-                for f in pages_api.glob("**/*.{ts,js,tsx,jsx}")
+                for suffix in _NEXT_SUFFIXES
+                for f in sorted(pages_api.glob(f"**/*{suffix}"))
                 if self._should_include_file(f)
             ]
             for api_file in api_files:
                 if api_file.name.startswith("_"):
                     continue
 
-                # Convert file path to route
-                relative_path = api_file.relative_to(pages_api)
-                route_path = "/api/" + str(relative_path.with_suffix("")).replace(
-                    "\\", "/"
-                )
+                # Convert file path to route; pages/api/users/index.ts serves
+                # /api/users.
+                parts = list(api_file.relative_to(pages_api).with_suffix("").parts)
+                if parts and parts[-1] == "index":
+                    parts.pop()
+                route_path = "/api" + "".join(f"/{part}" for part in parts)
 
                 # Convert [id] to :id
                 route_path = re.sub(r"\[([^\]]+)\]", r":\1", route_path)
@@ -370,7 +386,7 @@ class RouteDetector(BaseAnalyzer):
                             "GET",
                             "POST",
                         ],  # Next.js API routes handle all methods
-                        "file": str(api_file.relative_to(self.path)),
+                        "file": api_file.relative_to(self.path).as_posix(),
                         "framework": "Next.js",
                         "requires_auth": False,
                     }
@@ -406,7 +422,7 @@ class RouteDetector(BaseAnalyzer):
                     {
                         "path": path,
                         "methods": [method],
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "Go",
                         "requires_auth": False,
                     }
@@ -448,7 +464,7 @@ class RouteDetector(BaseAnalyzer):
                         {
                             "path": path,
                             "methods": [method],
-                            "file": str(file_path.relative_to(self.path)),
+                            "file": file_path.relative_to(self.path).as_posix(),
                             "framework": "Rust",
                             "requires_auth": False,
                         }
@@ -478,7 +494,8 @@ class RouteDetector(BaseAnalyzer):
                 continue
 
             # Must be a Controller class
-            if not re.search(r"class\s+\w+Controller", content):
+            controller = re.search(r"class\s+(\w+)Controller", content)
+            if not controller:
                 continue
 
             # Extract class-level [Route("...")] and controller name
@@ -494,10 +511,7 @@ class RouteDetector(BaseAnalyzer):
                     "[controller]", controller_name.lower()
                 )
             else:
-                cn_match = re.search(r"class\s+(\w+)Controller", content)
-                if not cn_match:
-                    continue
-                controller_name = cn_match.group(1)
+                controller_name = controller.group(1)
                 class_base = f"/{controller_name.lower()}s"
 
             if not class_base.startswith("/"):
@@ -548,7 +562,7 @@ class RouteDetector(BaseAnalyzer):
                     {
                         "path": full_path,
                         "methods": [method],
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "ASP.NET Core",
                         "requires_auth": requires_auth,
                         "summary": summary,
@@ -590,6 +604,10 @@ class RouteDetector(BaseAnalyzer):
                 r'@RequestMapping\(["\']?([^"\')\s]+)["\']?\)', content
             )
             class_base = class_mapping.group(1) if class_mapping else ""
+            class_decl = re.search(r"\bclass\s+\w+", content)
+            class_guarded = bool(
+                class_decl and _SPRING_AUTH.search(content, 0, class_decl.start())
+            )
             if class_base and not class_base.startswith("/"):
                 class_base = f"/{class_base}"
 
@@ -608,24 +626,30 @@ class RouteDetector(BaseAnalyzer):
                     method = (m.group(3) or "GET").upper()
                     sub = (m.group(4) or "").strip()
 
+                # class_base is "" or starts with "/": so does the path.
                 full_path = (
                     f"{class_base}/{sub}".replace("//", "/")
                     if sub
                     else (class_base or "/")
                 )
-                if not full_path.startswith("/"):
-                    full_path = f"/{full_path}"
 
-                ctx = content[max(0, m.start() - 300) : m.start()]
-                requires_auth = bool(
-                    re.search(r"@(?:Secured|PreAuthorize|RolesAllowed)", ctx)
+                # The method's own annotations: those since the end of the
+                # previous member, a brace or semicolon that ends its line
+                # (the "}" of @RolesAllowed({"ADMIN"}) does not). A
+                # 300-character look-back gave a method the @PreAuthorize of
+                # the one above it.
+                window = max(0, m.start() - 2000)
+                ends = list(_MEMBER_END.finditer(content, window, m.start()))
+                start = ends[-1].end() if ends else window
+                requires_auth = class_guarded or bool(
+                    _SPRING_AUTH.search(content, start, m.start())
                 )
 
                 routes.append(
                     {
                         "path": full_path,
                         "methods": [method],
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "Spring Boot",
                         "requires_auth": requires_auth,
                     }
@@ -671,7 +695,7 @@ class RouteDetector(BaseAnalyzer):
                     {
                         "path": path,
                         "methods": [method],
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "framework": "Rails",
                         "requires_auth": False,
                     }
@@ -692,7 +716,7 @@ class RouteDetector(BaseAnalyzer):
                         {
                             "path": path,
                             "methods": [method],
-                            "file": str(file_path.relative_to(self.path)),
+                            "file": file_path.relative_to(self.path).as_posix(),
                             "framework": "Rails",
                             "requires_auth": False,
                         }

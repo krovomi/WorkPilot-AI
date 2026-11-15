@@ -23,7 +23,6 @@
   "apps/backend/analysis/analyzers/framework_analyzer.py": {"blind": 3, "silent": 3},
   "apps/backend/analysis/ci_discovery.py": {"blind": 5, "silent": 0},
   "apps/backend/analysis/insight_extractor.py": {"blind": 8, "silent": 0},
-  "apps/backend/analysis/security_scanner.py": {"blind": 4, "silent": 0},
   "apps/backend/analytics/database.py": {"blind": 1, "silent": 0},
   "apps/backend/architecture/ai_reviewer.py": {"blind": 2, "silent": 0},
   "apps/backend/architecture/validator.py": {"blind": 1, "silent": 0},
