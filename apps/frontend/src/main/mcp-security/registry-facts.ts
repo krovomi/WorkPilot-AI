@@ -92,7 +92,7 @@ interface PackageFacts {
 }
 
 async function npmFacts(fetcher: Fetcher, ref: PackageRef): Promise<PackageFacts> {
-	const encoded = ref.name.replace("/", "%2F");
+	const encoded = ref.name.replaceAll("/", "%2F");
 	const doc = record(await readJson(fetcher, `https://registry.npmjs.org/${encoded}`));
 	const tags = record(doc["dist-tags"]);
 	const latest = text(tags.latest);
