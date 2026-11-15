@@ -69,16 +69,13 @@ def _inbox(project_dir: Path) -> Path | None:
     return inbox
 
 
-def _users(payload: Any) -> int:
+def _users(payload: dict[str, Any]) -> int:
     """The users an incident affected, when the tool says so."""
     best = 0
-    scopes = [payload]
-    if isinstance(payload, dict):
-        for key in ("data", "issue", "event"):
-            scopes.append(payload.get(key))
-        data = payload.get("data")
-        if isinstance(data, dict):
-            scopes.append(data.get("issue"))
+    scopes = [payload, *(payload.get(key) for key in ("data", "issue", "event"))]
+    data = payload.get("data")
+    if isinstance(data, dict):
+        scopes.append(data.get("issue"))
     for scope in scopes:
         if not isinstance(scope, dict):
             continue

@@ -266,6 +266,7 @@ def test_every_ecosystem_declares_its_packages():
             ]
         ),
         "bad.toml": "[[",
+        "Cargo.toml": 'project = "not a table"\ntool = "nor this"\n',
         "requirements-dev.txt": "h-py[extra]==1\n-r base.txt\n",
         "go.mod": "module x\nrequire (\n\tgithub.com/i/go v1.2.0\n)\nrequire golang.org/x/j v0.1.0\n",
         "Gemfile": "gem 'k-rb'\n",

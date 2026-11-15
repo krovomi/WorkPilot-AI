@@ -1,5 +1,5 @@
 ---
-feature: "Scan de sécurité de la QA : priorité par atteignabilité et production"
+feature: "Scan de sécurité : priorité par atteignabilité et production"
 summary: >-
   Chaque faille du scan reçoit base CVSS × atteignabilité × usage en production et une section
   (exposée, dormante, moyenne, informative), d'après un graphe d'imports textuel tout langage et
