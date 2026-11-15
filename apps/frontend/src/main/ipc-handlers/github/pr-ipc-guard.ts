@@ -8,32 +8,21 @@
  * refused `send` is dropped.
  */
 
-import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
-
-type HandleListener = Parameters<typeof ipcMain.handle>[1];
-type OnListener = Parameters<typeof ipcMain.on>[1];
+import { type ArgChecks, argsAllowed, guardedIpcMain, isNumber, isNumberList, isText } from "./ipc-arg-guard";
 
 const MERGE_METHODS = ["merge", "squash", "rebase"];
 /** A GitHub login: letters, digits and dashes, at most 39. */
 const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
-/** More reviews than a list ever shows at once. */
-const MAX_BATCH = 500;
 
-const isNumber = (value: unknown) =>
-	typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-const isText = (value: unknown) => typeof value === "string";
-
-/** Each channel's check of the arguments after the project id. */
-const CHECKS: Record<string, (args: unknown[]) => boolean> = {
+const CHECKS: ArgChecks = {
 	[IPC_CHANNELS.GITHUB_PR_LIST_MORE]: ([cursor]) => isText(cursor),
-	[IPC_CHANNELS.GITHUB_PR_GET_REVIEWS_BATCH]: ([numbers]) =>
-		Array.isArray(numbers) && numbers.length <= MAX_BATCH && numbers.every(isNumber),
+	[IPC_CHANNELS.GITHUB_PR_GET_REVIEWS_BATCH]: ([numbers]) => isNumberList(numbers),
 	[IPC_CHANNELS.GITHUB_PR_POST_COMMENT]: ([prNumber, body]) => isNumber(prNumber) && isText(body),
 	[IPC_CHANNELS.GITHUB_PR_MERGE]: ([prNumber, method]) =>
 		isNumber(prNumber) && (method === undefined || MERGE_METHODS.includes(method as string)),
 	[IPC_CHANNELS.GITHUB_PR_ASSIGN]: ([prNumber, login]) =>
-		isNumber(prNumber) && isText(login) && GITHUB_LOGIN.test(login as string),
+		isNumber(prNumber) && isText(login) && GITHUB_LOGIN.test(login),
 	[IPC_CHANNELS.GITHUB_WORKFLOW_APPROVE]: ([runId]) => isNumber(runId),
 };
 for (const channel of [
@@ -56,23 +45,6 @@ for (const channel of [
 }
 
 /** Whether the arguments a channel received (project id first) may reach its handler. */
-export function prArgsAllowed(channel: string, args: unknown[]): boolean {
-	const check = CHECKS[channel];
-	return !check || check(args.slice(1));
-}
+export const prArgsAllowed = (channel: string, args: unknown[]): boolean => argsAllowed(CHECKS, channel, args);
 
-export const prIpcMain = {
-	handle(channel: string, listener: HandleListener): void {
-		ipcMain.handle(channel, (event, ...args) => {
-			if (!prArgsAllowed(channel, args)) {
-				throw new Error("Invalid pull request arguments");
-			}
-			return listener(event, ...args);
-		});
-	},
-	on(channel: string, listener: OnListener): void {
-		ipcMain.on(channel, (event, ...args) => {
-			if (prArgsAllowed(channel, args)) listener(event, ...args);
-		});
-	},
-};
+export const prIpcMain = guardedIpcMain(CHECKS, "Invalid pull request arguments");
