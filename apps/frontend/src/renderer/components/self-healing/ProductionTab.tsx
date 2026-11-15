@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { IncidentCard } from "./IncidentCard";
+import { IncidentClusters } from "./IncidentClusters";
+import { IncidentGroupInfo } from "./IncidentGroupInfo";
 
 interface ProductionTabProps {
 	readonly projectPath: string;
@@ -24,6 +26,7 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 	const { t } = useTranslation(["selfHealing"]);
 	const {
 		incidents,
+		incidentClusters,
 		productionConfig,
 		setProductionConfig,
 		triggerFix,
@@ -115,6 +118,8 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 				</p>
 			</Panel>
 
+			<IncidentClusters clusters={incidentClusters} />
+
 			{/* Live incidents */}
 			<div>
 				<h3 className="wp-kicker mb-2 block">
@@ -135,7 +140,9 @@ export function ProductionTab({ projectPath }: ProductionTabProps) {
 								onTriggerFix={(id) => triggerFix(projectPath, id)}
 								onDismiss={(id) => dismissIncident(projectPath, id)}
 								onRetry={(id) => retryIncident(projectPath, id)}
-							/>
+							>
+								<IncidentGroupInfo incident={incident} />
+							</IncidentCard>
 						))}
 					</div>
 				)}

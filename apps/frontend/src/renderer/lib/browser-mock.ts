@@ -16,6 +16,7 @@ import {
 	integrationMock,
 	phase35Mock,
 	projectMock,
+	selfHealingMock,
 	settingsMock,
 	taskMock,
 	terminalMock,
@@ -61,6 +62,9 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Settings
 	...settingsMock,
+
+	// Self-healing (the desktop app scans, groups and bisects)
+	...selfHealingMock,
 
 	// Roadmap Operations
 	getRoadmap: async () => ({
