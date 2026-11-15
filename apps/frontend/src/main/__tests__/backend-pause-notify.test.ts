@@ -72,7 +72,25 @@ describe("announceBackendPause", () => {
 		announce.mockReset();
 		writeFileSync(path.join(specDir, "pause_state.json"), JSON.stringify({ enabled: true, reason: "sandbox" }));
 		announceBackendPause("proj-1", specDir, "Add login");
+		writeFileSync(
+			path.join(specDir, "pause_state.json"),
+			JSON.stringify({ enabled: true, reason: "anomaly", anomaly: { trustScore: "low" } }),
+		);
+		announceBackendPause("proj-1", specDir, "Add login");
 		expect(announce).not.toHaveBeenCalled();
+		writeFileSync(
+			path.join(specDir, "pause_state.json"),
+			JSON.stringify({
+				enabled: true,
+				reason: "sandbox",
+				sandbox: { kind: "restricted_path", rolledBack: true },
+			}),
+		);
+		announceBackendPause("proj-1", specDir, "Add login");
+		expect(announce).toHaveBeenCalledWith(
+			"proj-1",
+			expect.objectContaining({ body: expect.stringContaining("restored") }),
+		);
 	});
 
 	it("stays quiet for the person's own pause", () => {

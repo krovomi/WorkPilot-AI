@@ -153,4 +153,27 @@ describe("TaskSafetyPause", () => {
 		expect(await screen.findByText("Could not read the snapshots: No Python")).toBeInTheDocument();
 		expect(screen.getByTestId("task-snapshots-open")).toBeInTheDocument();
 	});
+
+	it("reads a reply without data or error as empty", async () => {
+		api.listTaskSnapshots.mockResolvedValueOnce({ success: true });
+		api.listTaskSnapshots.mockResolvedValueOnce({ success: false });
+		const view = render(
+			<TaskSafetyPause task={task("sandbox", { sandbox: { kind: "restricted_path", path: "x" } })} />,
+		);
+		fireEvent.click(screen.getByTestId("task-safety-pause"));
+		fireEvent.click(await screen.findByTestId("task-snapshots-open"));
+		expect(await screen.findByText("No snapshot for this task yet.")).toBeInTheDocument();
+		view.unmount();
+
+		render(<TaskSafetyPause task={task("sandbox", { sandbox: { kind: "restricted_path", path: "x" } })} />);
+		fireEvent.click(screen.getByTestId("task-safety-pause"));
+		fireEvent.click(await screen.findByTestId("task-snapshots-open"));
+		expect(await screen.findByText("Could not read the snapshots:", { exact: false })).toBeInTheDocument();
+		api.listTaskSnapshots.mockResolvedValueOnce({ success: true, data: [SNAP] });
+		fireEvent.click(screen.getByTestId("task-snapshots-open"));
+		api.restoreTaskSnapshot.mockResolvedValueOnce({ success: false });
+		fireEvent.click(await screen.findByTestId("task-snapshot-restore"));
+		fireEvent.click(screen.getByTestId("task-snapshot-confirm"));
+		expect(await screen.findByText("Could not restore:", { exact: false })).toBeInTheDocument();
+	});
 });

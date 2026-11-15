@@ -4,6 +4,7 @@
  * task are refused before the runner starts.
  */
 import { EventEmitter } from "node:events";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../../../../shared/constants";
@@ -13,6 +14,8 @@ const state = vi.hoisted(() => ({
 	runs: [] as string[][],
 	stdout: "" as string,
 	spawnError: null as Error | null,
+	childMode: "close" as "close" | "error" | "hang",
+	packaged: false,
 	task: undefined as unknown,
 	project: undefined as unknown,
 	serverCard: false,
@@ -20,7 +23,12 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
-	app: { isPackaged: false, getAppPath: () => "/app/frontend" },
+	app: {
+		get isPackaged() {
+			return state.packaged;
+		},
+		getAppPath: () => "/app/frontend",
+	},
 	ipcMain: {
 		handle: (channel: string, fn: (...args: unknown[]) => unknown) =>
 			state.handlers.set(channel, fn),
@@ -35,7 +43,12 @@ vi.mock("node:child_process", () => ({
 			kill: vi.fn(),
 		});
 		state.runs.push(args);
+		if (state.childMode === "hang") return child;
 		setImmediate(() => {
+			if (state.childMode === "error") {
+				child.emit("error", new Error("spawn EACCES"));
+				return;
+			}
 			child.stderr.write("debug line\n");
 			child.stdout.write(state.stdout);
 			child.emit("close", 0);
@@ -80,6 +93,8 @@ beforeEach(() => {
 	state.runs = [];
 	state.stdout = "";
 	state.spawnError = null;
+	state.childMode = "close";
+	state.packaged = false;
 	state.task = { id: "t1", specId: "001-add-login" };
 	state.project = { path: "/projects/app" };
 	state.serverCard = false;
@@ -143,6 +158,30 @@ describe("listTaskSnapshots", () => {
 		state.python = "python3";
 		state.spawnError = new Error("ENOENT");
 		expect(await listTaskSnapshots("t1")).toEqual({ success: false, error: "ENOENT" });
+	});
+});
+
+describe("the runner process", () => {
+	it("runs the packaged backend, and reports a process error", async () => {
+		state.packaged = true;
+		state.childMode = "error";
+		Object.defineProperty(process, "resourcesPath", { value: "/opt/workpilot/resources", configurable: true });
+		expect(await listTaskSnapshots("t1")).toEqual({ success: false, error: "spawn EACCES" });
+		expect(state.runs[0][0]).toBe(
+			path.join(path.resolve("/opt/workpilot/resources", "backend"), "runners", "snapshot_runner.py"),
+		);
+	});
+
+	it("gives up on a runner that never answers", async () => {
+		vi.useFakeTimers();
+		try {
+			state.childMode = "hang";
+			const pending = listTaskSnapshots("t1");
+			await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+			expect(await pending).toEqual({ success: false, error: "The snapshot runner timed out" });
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 

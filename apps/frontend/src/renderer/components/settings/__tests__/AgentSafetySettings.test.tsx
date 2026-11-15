@@ -35,6 +35,12 @@ describe("SandboxSettings", () => {
 		expect(saved(change).sandbox.maxFileSizeMb).toBe(25);
 		fireEvent.change(screen.getByLabelText(`${K}.snapshots.keep`), { target: { value: "3" } });
 		expect(saved(change).snapshots.keep).toBe(3);
+		fireEvent.click(screen.getByLabelText(`${K}.snapshots.enable`));
+		expect(saved(change).snapshots.enabled).toBe(false);
+		fireEvent.change(screen.getByLabelText(`${K}.limits.maxFiles`), { target: { value: "50" } });
+		expect(saved(change).sandbox.maxFilesWritten).toBe(50);
+		fireEvent.change(screen.getByLabelText(`${K}.limits.maxSession`), { target: { value: "30" } });
+		expect(saved(change).sandbox.maxSessionMinutes).toBe(30);
 	});
 
 	it("adds a valid path, refuses one outside the project, removes one", () => {
@@ -48,6 +54,8 @@ describe("SandboxSettings", () => {
 		const input = screen.getByLabelText(`${K}.paths.placeholder`);
 		fireEvent.change(input, { target: { value: "../outside" } });
 		expect(screen.getByText(`${K}.paths.invalid`)).toBeInTheDocument();
+		fireEvent.keyDown(input, { key: "Enter" });
+		expect(change).not.toHaveBeenCalled();
 		expect(screen.getByText(`${K}.paths.add`).closest("button")).toBeDisabled();
 		fireEvent.change(input, { target: { value: "src\\app" } });
 		fireEvent.keyDown(input, { key: "Enter" });
@@ -74,6 +82,16 @@ describe("AnomalyDetectionSettings", () => {
 			target: { value: "9" },
 		});
 		expect(saved(change).anomaly.massDeletionCount).toBe(9);
+		fireEvent.change(screen.getByLabelText(`${A}.trustScore.stopThreshold`), { target: { value: "10" } });
+		expect(saved(change).anomaly.stopBelow).toBe(10);
+		fireEvent.change(screen.getByLabelText(`${A}.detectionLimits.maxRepetitiveErrors`), {
+			target: { value: "7" },
+		});
+		expect(saved(change).anomaly.maxErrorCount).toBe(7);
+		fireEvent.change(screen.getByLabelText(`${A}.detectionLimits.rapidChangeWindow`), {
+			target: { value: "20" },
+		});
+		expect(saved(change).anomaly.rapidChangeWindowS).toBe(20);
 	});
 
 	it("lists what lowers the score", () => {
