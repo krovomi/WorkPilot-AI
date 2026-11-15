@@ -93,7 +93,10 @@ def main():
     else:
         results = analyze_project(args.project_dir, args.output)
 
-    # Print results
+    # The status line is the command's, not the library's: --quiet promised
+    # "only JSON" while analyze_project() printed it to every caller.
+    if args.output and not args.quiet:
+        print(f"Saved to: {args.output.as_posix()}")
     if not args.quiet or not args.output:
         print(json.dumps(results, indent=2))
 
