@@ -155,6 +155,8 @@ describe("DeployMonitorSettings", () => {
 		);
 		const health = screen.getByLabelText("cicdTriggers:monitor.monitor_health_url");
 		fireEvent.blur(health);
+		// Typed then put back: the draft equals the saved value, so nothing is saved.
+		fireEvent.change(health, { target: { value: "https://a/x" } });
 		fireEvent.change(health, { target: { value: "https://a/h" } });
 		fireEvent.blur(health);
 		expect(onSave).not.toHaveBeenCalled();
