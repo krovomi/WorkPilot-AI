@@ -93,12 +93,6 @@ from .profile import (
     get_security_profile,
     reset_profile_cache,
 )
-from .secure_subprocess import (
-    SubprocessResult,
-    SubprocessSecurityError,
-    check_tool_available,
-    run_secure,
-)
 from .security_orchestrator import (
     SecurityOrchestrator,
     SecurityScanConfig,
@@ -196,11 +190,6 @@ __all__ = [
     # Tool input validation
     "validate_tool_input",
     "get_safe_tool_input",
-    # Secure subprocess
-    "run_secure",
-    "SubprocessResult",
-    "SubprocessSecurityError",
-    "check_tool_available",
     # Prompt Injection Guard — re-exported from `injection_guard`, which is
     # the one implementation. See the import block below.
     "InjectionScanner",

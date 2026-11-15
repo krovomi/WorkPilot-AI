@@ -13,7 +13,7 @@ import types
 from pathlib import Path
 
 import pytest
-from core import model_info
+from core import gh_executable, model_info
 
 import src.connectors.llm_config as llm_config
 
@@ -105,13 +105,18 @@ def machine(tmp_path, monkeypatch):
     gh = _gh_fake.write_fake_gh(
         tmp_path / "bin",
         {
+            "--version": {"stdout": "gh version 2.83.0"},
             "auth status": {
                 "stderr": "You are not logged into any GitHub hosts.",
                 "code": 1,
-            }
+            },
         },
     )
     monkeypatch.setenv("PATH", str(gh.directory))
+    monkeypatch.delenv("GITHUB_CLI_PATH", raising=False)
+    # The gh found is cached per process: each test finds its own.
+    gh_executable.invalidate_gh_cache()
+    monkeypatch.setattr(gh_executable, "_cached_gh_path", None)
 
     def save(configs: dict) -> None:
         saved.write_text(json.dumps(configs), encoding="utf-8")
@@ -140,10 +145,42 @@ def test_the_provider_is_read_from_its_credential(
 
 def test_a_gh_logged_in_means_copilot(machine):
     _, gh = machine
-    gh.answer({"auth status": {"stdout": "✓ Logged in to github.com account dana"}})
+    gh.answer(
+        {
+            "--version": {"stdout": "gh version 2.83.0"},
+            "auth status": {"stdout": "Logged in to github.com account dana"},
+        }
+    )
 
     assert model_info._detect_provider_from_env() == "copilot"
-    assert gh.calls() == [["auth", "status"]]
+    assert gh.calls() == [["--version"], ["auth", "status"]]
+
+
+def test_the_gh_set_in_the_settings_is_the_one_asked(machine, tmp_path, monkeypatch):
+    _, path_gh = machine
+    chosen = _gh_fake.write_fake_gh(
+        tmp_path / "chosen",
+        {
+            "--version": {"stdout": "gh version 2.83.0"},
+            "auth status": {"stdout": "Logged in to github.com account dana"},
+        },
+    )
+    monkeypatch.setenv("GITHUB_CLI_PATH", str(chosen.path))
+
+    assert model_info._is_copilot_available() is True
+    assert path_gh.calls() == []
+
+
+def test_a_gh_that_hangs_reads_as_no_copilot(machine, monkeypatch):
+    import subprocess
+
+    def hangs(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], 10)
+
+    monkeypatch.setattr(gh_executable, "get_gh_executable", lambda: "gh")
+    monkeypatch.setattr(subprocess, "run", hangs)
+
+    assert model_info._is_copilot_available() is False
 
 
 def test_nothing_configured_reads_as_unknown(machine):
@@ -156,6 +193,8 @@ def test_nothing_configured_reads_as_unknown(machine):
 
 def test_without_gh_there_is_no_copilot(machine, tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    # Nor in the install folders of this machine (a CI runner has one there).
+    monkeypatch.setattr(gh_executable, "_check_platform_paths", lambda: None)
 
     assert model_info._is_copilot_available() is False
 
