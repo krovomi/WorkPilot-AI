@@ -448,7 +448,18 @@
 		"browserLoginHint": "Click below to open your browser and log in with your Claude account.",
 		"authenticateNew": "Authenticate New Account",
 		"hideToken": "Hide token",
-		"showToken": "Show token"
+		"showToken": "Show token",
+		"defaultTitle": "Claude Authentication Required",
+		"defaultDescription": "A Claude Code OAuth token is required to use AI features like Ideation and Roadmap generation.",
+		"errors": {
+			"checkFailed": "Could not check the token.",
+			"profileWithoutToken": "The selected account has no valid token.",
+			"saveFailed": "Could not save the token.",
+			"noProject": "Select a project first.",
+			"authStartFailed": "Could not start the authentication.",
+			"tokenRequired": "Enter a token."
+		},
+		"copyCommand": "Copy the command"
 	},
 	"azureConfig": {
 		"title": "Set up Azure DevOps",

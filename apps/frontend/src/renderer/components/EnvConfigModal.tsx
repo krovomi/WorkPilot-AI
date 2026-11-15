@@ -12,10 +12,9 @@ import {
 	Loader2,
 	LogIn,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ClaudeProfile } from "../../shared/types";
 import { cn } from "../lib/utils";
-import { useSettingsStore } from "../stores/settings-store";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -43,8 +42,8 @@ export function EnvConfigModal({
 	open,
 	onOpenChange,
 	onConfigured,
-	title = "Claude Authentication Required",
-	description = "A Claude Code OAuth token is required to use AI features like Ideation and Roadmap generation.",
+	title,
+	description,
 	projectId,
 }: EnvConfigModalProps) {
 	const { t } = useTranslation();
@@ -99,7 +98,7 @@ export function EnvConfigModal({
 						setSuccess(true);
 					}
 				} else {
-					setError(tokenResult.error || "Failed to check token status");
+					setError(tokenResult.error || t("dialogs:envConfig.errors.checkFailed"));
 				}
 
 				// Handle Claude profiles
@@ -109,13 +108,16 @@ export function EnvConfigModal({
 					);
 					setClaudeProfiles(authenticatedProfiles);
 
-					// Auto-select first authenticated profile
-					if (authenticatedProfiles.length > 0 && !selectedProfileId) {
-						setSelectedProfileId(authenticatedProfiles[0].id);
+					// Auto-select the first authenticated profile, keeping a choice
+					// already made.
+					if (authenticatedProfiles.length > 0) {
+						setSelectedProfileId(
+							(current) => current ?? authenticatedProfiles[0].id,
+						);
 					}
 				}
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Unknown error");
+				setError(err instanceof Error ? err.message : t("common:errors.unknownError"));
 			} finally {
 				setIsChecking(false);
 				setIsLoadingProfiles(false);
@@ -123,7 +125,9 @@ export function EnvConfigModal({
 		};
 
 		loadData();
-	}, [open, selectedProfileId]);
+	// Not on the selected profile: picking another account must not reload
+	// the dialog (that showed the spinner and refetched on every click).
+	}, [open]);
 
 	// Listen for OAuth token from terminal
 	useEffect(() => {
@@ -158,7 +162,7 @@ export function EnvConfigModal({
 			// Get the selected profile's token
 			const profile = claudeProfiles.find((p) => p.id === selectedProfileId);
 			if (!profile?.oauthToken) {
-				setError("Selected profile does not have a valid token");
+				setError(t("dialogs:envConfig.errors.profileWithoutToken"));
 				setIsSaving(false);
 				return;
 			}
@@ -178,10 +182,10 @@ export function EnvConfigModal({
 					onOpenChange(false);
 				}, 1500);
 			} else {
-				setError(result.error || "Failed to save token");
+				setError(result.error || t("dialogs:envConfig.errors.saveFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unknown error");
+			setError(err instanceof Error ? err.message : t("common:errors.unknownError"));
 		} finally {
 			setIsSaving(false);
 		}
@@ -189,7 +193,7 @@ export function EnvConfigModal({
 
 	const handleAuthenticateWithBrowser = async () => {
 		if (!projectId) {
-			setError("No project selected. Please select a project first.");
+			setError(t("dialogs:envConfig.errors.noProject"));
 			return;
 		}
 
@@ -201,13 +205,13 @@ export function EnvConfigModal({
 			const result = await window.electronAPI.invokeClaudeSetup(projectId);
 
 			if (!result.success) {
-				setError(result.error || "Failed to start authentication");
+				setError(result.error || t("dialogs:envConfig.errors.authStartFailed"));
 				setIsAuthenticating(false);
 			}
 			// Keep isAuthenticating true - will be cleared when token is received
 		} catch (err) {
 			setError(
-				err instanceof Error ? err.message : "Failed to start authentication",
+				err instanceof Error ? err.message : t("dialogs:envConfig.errors.authStartFailed"),
 			);
 			setIsAuthenticating(false);
 		}
@@ -215,7 +219,7 @@ export function EnvConfigModal({
 
 	const handleSave = async () => {
 		if (!token.trim()) {
-			setError("Please enter a token");
+			setError(t("dialogs:envConfig.errors.tokenRequired"));
 			return;
 		}
 
@@ -238,10 +242,10 @@ export function EnvConfigModal({
 					onOpenChange(false);
 				}, 1500);
 			} else {
-				setError(result.error || "Failed to save token");
+				setError(result.error || t("dialogs:envConfig.errors.saveFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Unknown error");
+			setError(err instanceof Error ? err.message : t("common:errors.unknownError"));
 		} finally {
 			setIsSaving(false);
 		}
@@ -271,9 +275,11 @@ export function EnvConfigModal({
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2 text-foreground">
 						<Key className="h-5 w-5" />
-						{title}
+						{title ?? t("dialogs:envConfig.defaultTitle")}
 					</DialogTitle>
-					<DialogDescription>{description}</DialogDescription>
+					<DialogDescription>
+						{description ?? t("dialogs:envConfig.defaultDescription")}
+					</DialogDescription>
 				</DialogHeader>
 
 				{/* Loading state */}
@@ -516,6 +522,7 @@ export function EnvConfigModal({
 												<button
 													type="button"
 													onClick={handleCopyCommand}
+													aria-label={t("dialogs:envConfig.copyCommand")}
 													className="inline-flex items-center text-info hover:text-info/80"
 												>
 													<Copy className="h-3 w-3 ml-1" />
@@ -556,6 +563,11 @@ export function EnvConfigModal({
 													<button
 														type="button"
 														onClick={() => setShowToken(!showToken)}
+														aria-label={
+															showToken
+																? t("dialogs:envConfig.hideToken")
+																: t("dialogs:envConfig.showToken")
+														}
 														className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 													>
 														{showToken ? (
@@ -625,56 +637,4 @@ export function EnvConfigModal({
 			</DialogContent>
 		</Dialog>
 	);
-}
-
-/**
- * Hook to check if the Claude token is configured
- * Returns { hasToken, isLoading, checkToken }
- *
- * This combines two sources of authentication:
- * 1. OAuth token from source .env (checked via checkSourceToken)
- * 2. Active API profile (custom Anthropic-compatible endpoint)
- */
-export function useClaudeTokenCheck() {
-	const [hasToken, setHasToken] = useState<boolean | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-
-	// Get active API profile from settings store
-	const activeProfileId = useSettingsStore((state) => state.activeProfileId);
-
-	const checkToken = useCallback(async () => {
-		setIsLoading(true);
-		setError(null);
-
-		// Compute once - activeProfileId is captured from closure
-		const hasAPIProfile = !!activeProfileId;
-
-		try {
-			const result = await window.electronAPI.checkSourceToken();
-			const hasSourceOAuthToken = result.success && result.data?.hasToken;
-
-			// Auth is valid if either OAuth token OR API profile exists
-			setHasToken(hasSourceOAuthToken || hasAPIProfile);
-
-			// Set error if OAuth check failed and no API profile fallback
-			if (!result.success && !hasAPIProfile) {
-				setError(result.error || "Failed to check token");
-			}
-		} catch (err) {
-			// Even if OAuth check fails, API profile is still valid auth
-			setHasToken(hasAPIProfile);
-			if (!hasAPIProfile) {
-				setError(err instanceof Error ? err.message : "Unknown error");
-			}
-		} finally {
-			setIsLoading(false);
-		}
-	}, [activeProfileId]);
-
-	useEffect(() => {
-		checkToken();
-	}, [checkToken]); // Re-check when checkToken changes (i.e., when activeProfileId changes)
-
-	return { hasToken, isLoading, error, checkToken };
 }
