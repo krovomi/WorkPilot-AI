@@ -94,7 +94,57 @@ class CodeSimilarityDetector:
             return []
 
         lines = self._normalize_lines(content.split("\n"))
-        return self._find_clones(str(file), str(file), lines, lines, same_file=True)
+        return self._find_self_clones(str(file), lines)
+
+    def _find_self_clones(self, file: str, lines: list[str]) -> list[CodeClone]:
+        """Trouve les blocs répétés à l'intérieur d'un même fichier.
+
+        Comparer un fichier à lui-même avec SequenceMatcher ne rend qu'un bloc,
+        le fichier entier à la même position : aucune répétition interne n'en
+        sortait. On indexe donc chaque fenêtre de ``min_lines`` lignes non
+        vides, puis on étend chaque paire de fenêtres identiques qui ne se
+        chevauchent pas.
+        """
+        kept = [k for k, line in enumerate(lines) if line]
+        size = self.min_lines
+        windows: dict[tuple[str, ...], list[int]] = {}
+        for start in range(len(kept) - size + 1):
+            key = tuple(lines[kept[start + offset]] for offset in range(size))
+            windows.setdefault(key, []).append(start)
+
+        clones: list[CodeClone] = []
+        seen: set[tuple[int, int]] = set()
+        for positions in windows.values():
+            for rank, first in enumerate(positions):
+                for second in positions[rank + 1 :]:
+                    if second - first < size or (first, second) in seen:
+                        continue
+                    length = size
+                    while (
+                        second + length < len(kept)
+                        and first + length < second
+                        and lines[kept[first + length]] == lines[kept[second + length]]
+                    ):
+                        length += 1
+                    seen.update((first + k, second + k) for k in range(length))
+                    block = [lines[kept[first + k]] for k in range(length)]
+                    snippet = "\n".join(block[:5])
+                    if length > 5:
+                        snippet += "\n..."
+                    clones.append(
+                        CodeClone(
+                            file1=file,
+                            file2=file,
+                            line1_start=kept[first] + 1,
+                            line1_end=kept[first + length - 1] + 1,
+                            line2_start=kept[second] + 1,
+                            line2_end=kept[second + length - 1] + 1,
+                            similarity=1.0,
+                            lines_count=length,
+                            code_snippet=snippet,
+                        )
+                    )
+        return clones
 
     def _normalize_lines(self, lines: list[str]) -> list[str]:
         """Normalise les lignes pour comparaison."""
@@ -118,7 +168,6 @@ class CodeSimilarityDetector:
         file2: str,
         lines1: list[str],
         lines2: list[str],
-        same_file: bool = False,
     ) -> list[CodeClone]:
         """Trouve les clones entre deux listes de lignes."""
         clones = []
@@ -131,10 +180,6 @@ class CodeSimilarityDetector:
 
             # Ignorer les petits blocs
             if size < self.min_lines:
-                continue
-
-            # Si même fichier, ignorer les matchs identiques
-            if same_file and i == j:
                 continue
 
             # Calculer la similarité exacte pour ce bloc
