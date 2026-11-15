@@ -400,7 +400,7 @@ def test_the_targeted_reviewer_gets_no_subagent_roster(monkeypatch, tmp_path):
 
 
 def test_commands_are_noted_whatever_the_tool_input_shape():
-    from qa.reviewer import _note_command
+    from qa.session_stream import note_command as _note_command
 
     seen: list[str] = []
     _note_command(seen, {"command": "pytest tests/test_calc.py"})

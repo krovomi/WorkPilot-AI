@@ -16,15 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
-# Add tests directory to path for helper imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from qa_report_helpers import cleanup_qa_report_mocks, setup_qa_report_mocks
-
-setup_qa_report_mocks()
-
-from qa.coverage_gate import (  # noqa: E402
+from qa.coverage_gate import (
     build_coverage_issues,
     evaluate_coverage,
     get_min_coverage,
@@ -35,13 +27,6 @@ from qa.coverage_gate import (  # noqa: E402
     run_coverage_gate,
     write_coverage_fix_request,
 )
-
-
-@pytest.fixture(scope="module", autouse=True)
-def cleanup_mocked_modules():
-    """Restore original modules after all tests in this module complete."""
-    yield
-    cleanup_qa_report_mocks()
 
 
 @pytest.fixture(autouse=True)
