@@ -67,18 +67,18 @@ def render_fix_request(report: CompareReport, spec_dir: Path | None = None) -> s
         for consumer in entry.consumers.get(change.path, [])[:3]:
             files = ", ".join(consumer.get("files", [])[:3])
             details.append(f"  used by {consumer['name']}: {files}")
-    if details:
-        lines += [
-            "",
-            "## What changed, as read in the contracts",
-            "",
-            quote_untrusted(
-                "\n".join(details),
-                kind="file_content",
-                source="api_watcher",
-                spec_dir=spec_dir,
-            ),
-        ]
+    # Each break adds its own line: the request is only written for one.
+    lines += [
+        "",
+        "## What changed, as read in the contracts",
+        "",
+        quote_untrusted(
+            "\n".join(details),
+            kind="file_content",
+            source="api_watcher",
+            spec_dir=spec_dir,
+        ),
+    ]
     lines += [
         "",
         "Only if the task's spec explicitly asks for this break, mark it with",
