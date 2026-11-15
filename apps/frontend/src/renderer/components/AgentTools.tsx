@@ -42,8 +42,10 @@ import {
 } from "../../shared/constants/models";
 import type {
 	AgentMcpOverride,
+	AgentMcpOverrides,
 	CustomMcpServer,
 	McpHealthCheckResult,
+	McpTestConnectionResult,
 	ProjectEnvConfig,
 } from "../../shared/types";
 import type { ThinkingLevel } from "../../shared/types/settings";
@@ -74,9 +76,8 @@ import { Chip, ModuleHeader, ModuleStage, Page } from "./charter";
 
 // Agent configuration data - mirrors AGENT_CONFIGS from backend
 // Model and thinking are now dynamically read from user settings
+// Labels and descriptions live in settings:agents.<id>.
 interface AgentConfig {
-	label: string;
-	description: string;
 	category: string;
 	tools: string[];
 	mcp_servers: string[];
@@ -100,8 +101,6 @@ function getThinkingLabel(level: ThinkingLevel): string {
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
 	// Spec Creation Phases - all use 'spec' phase settings
 	spec_researcher: {
-		label: "Spec Researcher",
-		description: "Validates external integrations and APIs",
 		category: "spec",
 		tools: [
 			"Read",
@@ -117,32 +116,24 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		settingsSource: { type: "phase", phase: "spec" },
 	},
 	spec_writer: {
-		label: "Spec Writer",
-		description: "Creates the spec.md document",
 		category: "spec",
 		tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
 		mcp_servers: [],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
 	spec_critic: {
-		label: "Spec Critic",
-		description: "Read-only review before planning (brainstorm phase)",
 		category: "spec",
 		tools: ["Read", "Glob", "Grep"],
 		mcp_servers: [],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
 	spec_self_critique: {
-		label: "Spec Self-Critique",
-		description: "Finds the spec's issues and fixes them in spec.md",
 		category: "spec",
 		tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
 		mcp_servers: ["context7"],
 		settingsSource: { type: "phase", phase: "spec" },
 	},
 	spec_validation: {
-		label: "Spec Validation",
-		description: "Validates spec completeness and quality",
 		category: "spec",
 		tools: ["Read", "Glob", "Grep"],
 		mcp_servers: [],
@@ -151,8 +142,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 	// Build Phases
 	planner: {
-		label: "Planner",
-		description: "Creates implementation plan with subtasks",
 		category: "build",
 		tools: [
 			"Read",
@@ -169,8 +158,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		settingsSource: { type: "phase", phase: "planning" },
 	},
 	coder: {
-		label: "Coder",
-		description: "Implements individual subtasks",
 		category: "build",
 		tools: [
 			"Read",
@@ -189,9 +176,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 	// QA Phases
 	qa_reviewer: {
-		label: "QA Reviewer",
-		description:
-			"Validates acceptance criteria. Uses Electron or Puppeteer based on project type.",
 		category: "qa",
 		tools: ["Read", "Glob", "Grep", "Bash", "WebFetch", "WebSearch"],
 		mcp_servers: ["context7", "auto-claude"],
@@ -199,9 +183,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		settingsSource: { type: "phase", phase: "qa" },
 	},
 	qa_fixer: {
-		label: "QA Fixer",
-		description:
-			"Fixes QA-reported issues. Uses Electron or Puppeteer based on project type.",
 		category: "qa",
 		tools: [
 			"Read",
@@ -218,9 +199,6 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 		settingsSource: { type: "phase", phase: "qa" },
 	},
 	verifier: {
-		label: "Verifier",
-		description:
-			"Runs the verification loop: launches the app, fixes what breaks, drives it to the change, traces performance (Chrome DevTools MCP).",
 		category: "qa",
 		tools: [
 			"Read",
@@ -239,40 +217,30 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 	// Utility Phases - use feature settings
 	pr_reviewer: {
-		label: "PR Reviewer",
-		description: "Reviews GitHub pull requests",
 		category: "utility",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: ["context7"],
 		settingsSource: { type: "feature", feature: "githubPrs" },
 	},
 	commit_message: {
-		label: "Commit Message",
-		description: "Generates commit messages",
 		category: "utility",
 		tools: [],
 		mcp_servers: [],
 		settingsSource: { type: "feature", feature: "utility" },
 	},
 	merge_resolver: {
-		label: "Merge Resolver",
-		description: "Resolves merge conflicts",
 		category: "utility",
 		tools: [],
 		mcp_servers: [],
 		settingsSource: { type: "feature", feature: "utility" },
 	},
 	insights: {
-		label: "Insights",
-		description: "Extracts code insights",
 		category: "utility",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: [],
 		settingsSource: { type: "feature", feature: "insights" },
 	},
 	batch_analysis: {
-		label: "Batch Analysis",
-		description: "Batch processing of issues or items",
 		category: "utility",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: [],
@@ -282,24 +250,18 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 	// Ideation & Roadmap - use feature settings
 	ideation: {
-		label: "Ideation",
-		description: "Generates feature ideas",
 		category: "ideation",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: [],
 		settingsSource: { type: "feature", feature: "ideation" },
 	},
 	roadmap_discovery: {
-		label: "Roadmap Discovery",
-		description: "Discovers roadmap items",
 		category: "ideation",
 		tools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
 		mcp_servers: ["context7"],
 		settingsSource: { type: "feature", feature: "roadmap" },
 	},
 	pr_template_filler: {
-		label: "PR Template Filler",
-		description: "Generates AI-powered PR descriptions from templates",
 		category: "utility",
 		tools: ["Read", "Glob", "Grep"],
 		mcp_servers: [],
@@ -307,223 +269,82 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 	},
 };
 
-// MCP Server descriptions - accurate per backend models.py
+// The MCP servers an agent can be given. Name and description live in
+// settings:mcp.servers.<i18nKey>; `requiresSetup` marks the ones that need a
+// key or an integration before they start.
 const MCP_SERVERS: Record<
 	string,
-	{
-		name: string;
-		description: string;
-		icon: React.ElementType;
-		tools?: string[];
-	}
+	{ i18nKey: string; icon: React.ElementType; requiresSetup?: boolean }
 > = {
-	context7: {
-		name: "Context7",
-		description:
-			"Documentation lookup for libraries and frameworks via @upstash/context7-mcp",
-		icon: Search,
-		// Both spellings of the fetch tool: @upstash/context7-mcp renamed
-		// get-library-docs to query-docs, and the server is started unpinned.
-		tools: [
-			"mcp__context7__resolve-library-id",
-			"mcp__context7__query-docs",
-			"mcp__context7__get-library-docs",
-		],
-	},
-	"auto-claude": {
-		name: "WorkPilot AI Tools",
-		description:
-			"Build progress tracking, session context, discoveries & gotchas recording",
-		icon: ListChecks,
-		tools: [
-			"mcp__workpilot__update_subtask_status",
-			"mcp__workpilot__get_build_progress",
-			"mcp__workpilot__record_discovery",
-			"mcp__workpilot__record_gotcha",
-			"mcp__workpilot__get_session_context",
-			"mcp__workpilot__update_qa_status",
-		],
-	},
-	linear: {
-		name: "Linear",
-		description:
-			"Project management via Linear API. Requires LINEAR_API_KEY env var.",
-		icon: ClipboardList,
-		tools: [
-			"mcp__linear-server__list_teams",
-			"mcp__linear-server__list_projects",
-			"mcp__linear-server__list_issues",
-			"mcp__linear-server__create_issue",
-			"mcp__linear-server__update_issue",
-			// ... and more
-		],
-	},
-	electron: {
-		name: "Electron MCP",
-		description:
-			"Desktop app automation via Chrome DevTools Protocol. Requires ELECTRON_MCP_ENABLED=true.",
-		icon: Monitor,
-		tools: [
-			"mcp__electron__get_electron_window_info",
-			"mcp__electron__take_screenshot",
-			"mcp__electron__send_command_to_electron",
-			"mcp__electron__read_electron_logs",
-		],
-	},
-	puppeteer: {
-		name: "Puppeteer MCP",
-		description: "Web browser automation for non-Electron web frontends.",
-		icon: Globe,
-		tools: [
-			"mcp__puppeteer__puppeteer_connect_active_tab",
-			"mcp__puppeteer__puppeteer_navigate",
-			"mcp__puppeteer__puppeteer_screenshot",
-			"mcp__puppeteer__puppeteer_click",
-			"mcp__puppeteer__puppeteer_fill",
-			"mcp__puppeteer__puppeteer_select",
-			"mcp__puppeteer__puppeteer_hover",
-			"mcp__puppeteer__puppeteer_evaluate",
-		],
-	},
-	github: {
-		name: "GitHub",
-		description:
-			"GitHub API operations (repos, issues, PRs, commits). Requires GITHUB_PERSONAL_ACCESS_TOKEN env var.",
-		icon: Code,
-		tools: [
-			"mcp__github__get_file_contents",
-			"mcp__github__search_repositories",
-			"mcp__github__create_issue",
-			"mcp__github__create_pull_request",
-			"mcp__github__list_commits",
-			"mcp__github__search_code",
-		],
-	},
-	"brave-search": {
-		name: "Brave Search",
-		description:
-			"Privacy-focused web search as an alternative to WebSearch. Requires BRAVE_API_KEY env var.",
-		icon: Search,
-		tools: [
-			"mcp__brave-search__brave_web_search",
-			"mcp__brave-search__brave_local_search",
-		],
-	},
-	jira: {
-		name: "Jira",
-		description:
-			"Jira & Confluence issue tracking. Requires JIRA_URL, JIRA_USERNAME and JIRA_API_TOKEN env vars.",
-		icon: ClipboardList,
-		tools: [
-			"mcp__jira__get_issue",
-			"mcp__jira__search_issues",
-			"mcp__jira__create_issue",
-			"mcp__jira__update_issue",
-			"mcp__jira__list_projects",
-		],
-	},
+	context7: { i18nKey: "context7", icon: Search },
+	"auto-claude": { i18nKey: "autoClaude", icon: ListChecks },
+	linear: { i18nKey: "linear", icon: ClipboardList, requiresSetup: true },
+	electron: { i18nKey: "electron", icon: Monitor, requiresSetup: true },
+	puppeteer: { i18nKey: "puppeteer", icon: Globe },
+	"chrome-devtools": { i18nKey: "chromeDevtools", icon: Monitor },
+	"workpilot-verify": { i18nKey: "workpilotVerify", icon: FileCheck },
+	github: { i18nKey: "github", icon: Code, requiresSetup: true },
+	"brave-search": { i18nKey: "braveSearch", icon: Search, requiresSetup: true },
+	jira: { i18nKey: "jira", icon: ClipboardList, requiresSetup: true },
 	"azure-devops": {
-		name: "Azure DevOps",
-		description:
-			"Azure Boards, Repos, Pipelines and work items. Requires AZURE_DEVOPS_TOKEN and AZURE_DEVOPS_ORG env vars.",
+		i18nKey: "azureDevops",
 		icon: ClipboardList,
-		tools: [
-			"mcp__azure-devops__list_work_items",
-			"mcp__azure-devops__get_work_item",
-			"mcp__azure-devops__create_work_item",
-			"mcp__azure-devops__list_repositories",
-			"mcp__azure-devops__get_pipeline",
-		],
+		requiresSetup: true,
 	},
-	sentry: {
-		name: "Sentry",
-		description:
-			"Error monitoring and performance tracking. Requires SENTRY_AUTH_TOKEN env var.",
-		icon: AlertCircle,
-		tools: [
-			"mcp__sentry__get_issues",
-			"mcp__sentry__get_issue",
-			"mcp__sentry__get_event",
-			"mcp__sentry__list_projects",
-		],
-	},
-	slack: {
-		name: "Slack",
-		description:
-			"Send messages and read channels. Requires SLACK_BOT_TOKEN env var.",
-		icon: Globe,
-		tools: [
-			"mcp__slack__list_channels",
-			"mcp__slack__post_message",
-			"mcp__slack__reply_to_thread",
-			"mcp__slack__get_channel_history",
-		],
-	},
-	postman: {
-		name: "Postman",
-		description:
-			"Run and manage API collections, environments and tests. Requires POSTMAN_API_KEY env var.",
-		icon: Globe,
-		tools: [
-			"mcp__postman__list_collections",
-			"mcp__postman__get_collection",
-			"mcp__postman__run_collection",
-			"mcp__postman__list_environments",
-			"mcp__postman__get_environment",
-		],
-	},
-	teams: {
-		name: "Microsoft Teams",
-		description:
-			"Send messages to Teams channels. Requires TEAMS_WEBHOOK_URL env var (Incoming Webhook).",
-		icon: Globe,
-		tools: [
-			"mcp__teams__send_message",
-			"mcp__teams__list_channels",
-			"mcp__teams__send_adaptive_card",
-		],
-	},
+	sentry: { i18nKey: "sentry", icon: AlertCircle, requiresSetup: true },
+	slack: { i18nKey: "slack", icon: Globe, requiresSetup: true },
+	postman: { i18nKey: "postman", icon: Globe, requiresSetup: true },
+	teams: { i18nKey: "teams", icon: Globe, requiresSetup: true },
 };
+
+// Ids a custom server cannot take: the build reads them as its own servers
+// (_map_mcp_server_name in agents/tools_pkg/models.py), so a custom "github"
+// added to an agent would start the built-in one instead.
+const RESERVED_MCP_IDS = [
+	...Object.keys(MCP_SERVERS),
+	"workpilot",
+	"brain",
+	"workpilot-brain",
+	"uiux",
+	"workpilot-uiux",
+	"ui-ux-pro-max",
+	"verify",
+	"code",
+	"workpilot-code",
+	"search_code",
+];
 
 // MCP servers grouped by category for the add dialog
 const MCP_CATEGORY_GROUPS: Array<{
 	labelKey: string;
-	fallback: string;
 	ids: string[];
 }> = [
 	{
 		labelKey: "mcp.categories.core",
-		fallback: "Core",
 		ids: ["context7"],
 	},
 	{
 		labelKey: "mcp.categories.projectMgmt",
-		fallback: "Project Management",
 		ids: ["linear", "jira", "azure-devops"],
 	},
 	{
 		labelKey: "mcp.categories.devTools",
-		fallback: "Dev Tools",
 		ids: ["github"],
 	},
 	{
 		labelKey: "mcp.categories.search",
-		fallback: "Search",
 		ids: ["brave-search"],
 	},
 	{
 		labelKey: "mcp.categories.testingQA",
-		fallback: "Testing & QA",
 		ids: ["electron", "puppeteer", "postman"],
 	},
 	{
 		labelKey: "mcp.categories.monitoring",
-		fallback: "Monitoring",
 		ids: ["sentry"],
 	},
 	{
 		labelKey: "mcp.categories.communication",
-		fallback: "Communication",
 		ids: ["slack", "teams"],
 	},
 ];
@@ -546,12 +367,13 @@ const ALL_MCP_SERVERS = [
 ] as const;
 
 // Category metadata - neutral styling per design.json
+// Names live in settings:agents.categories.<id>.
 const CATEGORIES = {
-	spec: { label: "Spec Creation", icon: FileCheck },
-	build: { label: "Build", icon: Code },
-	qa: { label: "QA", icon: CheckCircle2 },
-	utility: { label: "Utility", icon: Wrench },
-	ideation: { label: "Ideation", icon: Lightbulb },
+	spec: { icon: FileCheck },
+	build: { icon: Code },
+	qa: { icon: CheckCircle2 },
+	utility: { icon: Wrench },
+	ideation: { icon: Lightbulb },
 };
 
 interface AgentCardProps {
@@ -561,37 +383,45 @@ interface AgentCardProps {
 	readonly thinkingLabel: string;
 	readonly overrides: AgentMcpOverride | undefined;
 	readonly mcpServerStates: ProjectEnvConfig["mcpServers"];
+	readonly linearEnabled: boolean;
 	readonly customServers: CustomMcpServer[];
 	readonly onAddMcp: (agentId: string, mcpId: string) => void;
 	readonly onRemoveMcp: (agentId: string, mcpId: string) => void;
 	readonly onConfigureMcp: (mcpId: string) => void;
 }
 
-// Status indicator component for MCP servers
+// Status of a custom MCP server, as an icon named for screen readers
+const STATUS_ICONS: Record<
+	"checking" | "healthy" | "needsAuth" | "unhealthy" | "unknown",
+	React.ReactNode
+> = {
+	checking: (
+		<Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+	),
+	healthy: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
+	needsAuth: <Lock className="h-3.5 w-3.5 text-warning" />,
+	unhealthy: <AlertCircle className="h-3.5 w-3.5 text-destructive" />,
+	unknown: <Circle className="h-3.5 w-3.5 text-muted-foreground" />,
+};
+
 function StatusIndicator({
 	isTesting,
-	isChecking,
 	health,
 }: {
 	readonly isTesting: boolean;
-	readonly isChecking: boolean;
 	readonly health?: McpHealthCheckResult;
 }) {
-	if (isTesting || isChecking) {
-		return (
-			<Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
-		);
-	}
-	switch (health?.status) {
-		case "healthy":
-			return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
-		case "needs_auth":
-			return <Lock className="h-3.5 w-3.5 text-warning" />;
-		case "unhealthy":
-			return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
-		default:
-			return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
-	}
+	const { t } = useTranslation(["settings"]);
+	let status: keyof typeof STATUS_ICONS = "unknown";
+	if (isTesting || health?.status === "checking") status = "checking";
+	else if (health?.status === "healthy") status = "healthy";
+	else if (health?.status === "needs_auth") status = "needsAuth";
+	else if (health?.status === "unhealthy") status = "unhealthy";
+	return (
+		<span role="img" aria-label={t(`settings:mcp.status.${status}`)}>
+			{STATUS_ICONS[status]}
+		</span>
+	);
 }
 
 function AgentCard({
@@ -601,6 +431,7 @@ function AgentCard({
 	thinkingLabel,
 	overrides,
 	mcpServerStates,
+	linearEnabled,
 	customServers,
 	onAddMcp,
 	onRemoveMcp,
@@ -613,9 +444,25 @@ function AgentCard({
 	const category = CATEGORIES[config.category as keyof typeof CATEGORIES];
 	const CategoryIcon = category.icon;
 
-	// Build combined MCP server info including custom servers
+	// Name, description and icon of every server, custom ones included
 	const allMcpServers = useMemo(() => {
-		const servers = { ...MCP_SERVERS };
+		const servers: Record<
+			string,
+			{
+				name: string;
+				description: string;
+				icon: React.ElementType;
+				requiresSetup?: boolean;
+			}
+		> = {};
+		for (const [mcpId, server] of Object.entries(MCP_SERVERS)) {
+			servers[mcpId] = {
+				name: t(`settings:mcp.servers.${server.i18nKey}.name`),
+				description: t(`settings:mcp.servers.${server.i18nKey}.description`),
+				icon: server.icon,
+				requiresSetup: server.requiresSetup,
+			};
+		}
 		for (const custom of customServers) {
 			servers[custom.id] = {
 				name: custom.name,
@@ -628,38 +475,38 @@ function AgentCard({
 			};
 		}
 		return servers;
-	}, [customServers]);
+	}, [customServers, t]);
 
-	// Calculate effective MCPs: defaults + adds - removes, then filter by project-level MCP states
+	// The servers this agent starts with, as the build resolves them
+	// (get_required_mcp_servers): a default server only when the project turns
+	// it on, a server added for this agent always, minus the ones removed.
 	const effectiveMcps = useMemo(() => {
-		const defaultMcps = [...config.mcp_servers, ...(config.mcp_optional || [])];
-		const added = overrides?.add || [];
-		const removed = overrides?.remove || [];
-		const combinedMcps = [...new Set([...defaultMcps, ...added])].filter(
-			(mcp) => !removed.includes(mcp),
-		);
-
-		// Filter out MCPs that are disabled at project level (custom servers are always enabled)
-		return combinedMcps.filter((mcp) => {
-			if (!mcpServerStates) return true; // No project config, show all
-			// Custom servers are always available if they exist
-			if (customServers.some((s) => s.id === mcp)) return true;
+		const states = mcpServerStates ?? {};
+		const startsByDefault = (mcp: string) => {
 			switch (mcp) {
 				case "context7":
-					return mcpServerStates.context7Enabled !== false;
+					return states.context7Enabled !== false;
 				case "linear":
-					return mcpServerStates.linearMcpEnabled !== false;
+					return linearEnabled && states.linearMcpEnabled !== false;
 				case "electron":
-					return mcpServerStates.electronEnabled !== false;
+					return states.electronEnabled === true;
 				case "puppeteer":
-					return mcpServerStates.puppeteerEnabled !== false;
+					return states.puppeteerEnabled === true;
 				case "chrome-devtools":
-					return mcpServerStates.chromeDevtoolsEnabled === true;
+					return states.chromeDevtoolsEnabled === true;
 				default:
 					return true;
 			}
-		});
-	}, [config, overrides, mcpServerStates, customServers]);
+		};
+		const defaults = [
+			...config.mcp_servers,
+			...(config.mcp_optional || []),
+		].filter(startsByDefault);
+		const removed = overrides?.remove || [];
+		return [...new Set([...defaults, ...(overrides?.add || [])])].filter(
+			(mcp) => !removed.includes(mcp),
+		);
+	}, [config, overrides, mcpServerStates, linearEnabled]);
 
 	// Check if an MCP is a custom addition (not in defaults)
 	const isCustomAdd = (mcpId: string) => {
@@ -685,42 +532,29 @@ function AgentCard({
 
 	// Group available MCPs by category, filtered by search query
 	const groupedAvailableMcps = useMemo(() => {
+		// Every server that can be added is a known or a custom one, so it
+		// has a name and a description to search.
 		const searchLower = mcpSearch.toLowerCase().trim();
+		const matches = (id: string) =>
+			[id, allMcpServers[id].name, allMcpServers[id].description].some(
+				(text) => text.toLowerCase().includes(searchLower),
+			);
 		const knownIds = new Set(MCP_CATEGORY_GROUPS.flatMap((g) => g.ids));
-		const result: Array<{
-			labelKey: string;
-			fallback: string;
-			items: string[];
-		}> = [];
+		const result: Array<{ labelKey: string; items: string[] }> = [];
 
 		for (const group of MCP_CATEGORY_GROUPS) {
 			const items = group.ids.filter(
-				(id) =>
-					availableMcps.includes(id) &&
-					(!searchLower ||
-						id.toLowerCase().includes(searchLower) ||
-						allMcpServers[id]?.name.toLowerCase().includes(searchLower) ||
-						allMcpServers[id]?.description
-							?.toLowerCase()
-							.includes(searchLower)),
+				(id) => availableMcps.includes(id) && matches(id),
 			);
 			if (items.length > 0) result.push({ ...group, items });
 		}
 
 		// Custom servers not in any known category
 		const customItems = availableMcps.filter(
-			(id) =>
-				!knownIds.has(id) &&
-				(!searchLower ||
-					id.toLowerCase().includes(searchLower) ||
-					allMcpServers[id]?.name.toLowerCase().includes(searchLower)),
+			(id) => !knownIds.has(id) && matches(id),
 		);
 		if (customItems.length > 0) {
-			result.push({
-				labelKey: "mcp.categories.custom",
-				fallback: "Custom",
-				items: customItems,
-			});
+			result.push({ labelKey: "mcp.categories.custom", items: customItems });
 		}
 
 		return result;
@@ -740,7 +574,7 @@ function AgentCard({
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2 flex-wrap">
 						<h3 className="font-medium text-sm text-foreground">
-							{t(`agents.${id}.label`, { defaultValue: config.label })}
+							{t(`agents.${id}.label`)}
 						</h3>
 						<span className="px-2 py-0.5 rounded text-3xs font-medium bg-secondary text-secondary-foreground">
 							{modelLabel}
@@ -750,9 +584,7 @@ function AgentCard({
 						</span>
 					</div>
 					<p className="text-xs text-muted-foreground truncate">
-						{t(`agents.${id}.description`, {
-							defaultValue: config.description,
-						})}
+						{t(`agents.${id}.description`)}
 					</p>
 				</div>
 				<div className="flex items-center gap-2 text-muted-foreground">
@@ -858,7 +690,7 @@ function AgentCard({
 								{/* Removed MCPs (grayed out with restore option) */}
 								{removedMcps.map((server) => {
 									const serverInfo = allMcpServers[server];
-									const ServerIcon = serverInfo?.icon || Server;
+									const ServerIcon = serverInfo.icon;
 
 									return (
 										<div
@@ -869,7 +701,7 @@ function AgentCard({
 												<Circle className="h-3.5 w-3.5 text-muted-foreground" />
 												<ServerIcon className="h-3.5 w-3.5 text-muted-foreground" />
 												<span className="font-medium">
-													{serverInfo?.name || server}
+													{serverInfo.name}
 												</span>
 												<span className="text-3xs text-muted-foreground no-underline">
 													({t("mcp.removed")})
@@ -934,7 +766,7 @@ function AgentCard({
 					<DialogHeader>
 						<DialogTitle>
 							{t("mcp.addMcpTo", {
-								agent: t(`agents.${id}.label`, { defaultValue: config.label }),
+								agent: t(`agents.${id}.label`),
 							})}
 						</DialogTitle>
 						<DialogDescription>{t("mcp.addMcpDescription")}</DialogDescription>
@@ -947,9 +779,7 @@ function AgentCard({
 							type="text"
 							value={mcpSearch}
 							onChange={(e) => setMcpSearch(e.target.value)}
-							placeholder={t("mcp.searchPlaceholder", {
-								defaultValue: "Search MCP servers…",
-							})}
+							placeholder={t("mcp.searchPlaceholder")}
 							className="w-full pl-9 pr-3 py-2 text-sm h-auto"
 						/>
 					</div>
@@ -962,15 +792,13 @@ function AgentCard({
 									className={index > 0 ? "pt-2" : ""}
 								>
 									<p className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 px-1">
-										{t(group.labelKey, { defaultValue: group.fallback })}
+										{t(group.labelKey)}
 									</p>
 									<div className="space-y-1">
 										{group.items.map((mcpId) => {
 											const server = allMcpServers[mcpId];
-											const ServerIcon = server?.icon || Server;
-											const needsSetup = server?.description
-												?.toLowerCase()
-												.includes("requires");
+											const ServerIcon = server.icon;
+											const needsSetup = server.requiresSetup;
 											return (
 												<button
 													type="button"
@@ -988,18 +816,16 @@ function AgentCard({
 													<div className="flex-1 min-w-0">
 														<div className="flex items-center gap-2">
 															<span className="font-medium text-sm">
-																{server?.name || mcpId}
+																{server.name}
 															</span>
 															{needsSetup && (
 																<span className="text-3xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
-																	{t("mcp.setupRequired", {
-																		defaultValue: "Setup required",
-																	})}
+																	{t("mcp.setupRequired")}
 																</span>
 															)}
 														</div>
 														<p className="text-xs text-muted-foreground truncate">
-															{server?.description}
+															{server.description}
 														</p>
 													</div>
 													<Plus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
@@ -1010,12 +836,10 @@ function AgentCard({
 								</div>
 							))
 						) : (
+							// The dialog only opens while a server can be added and
+							// closes once one is, so an empty list means the search.
 							<p className="text-sm text-muted-foreground text-center py-6">
-								{mcpSearch
-									? t("mcp.noSearchResults", {
-											defaultValue: "No servers match your search.",
-										})
-									: t("mcp.allMcpsAdded")}
+								{t("mcp.noSearchResults")}
 							</p>
 						)}
 
@@ -1028,7 +852,7 @@ function AgentCard({
 								<div className="space-y-1">
 									{removedMcps.map((mcpId) => {
 										const server = allMcpServers[mcpId];
-										const ServerIcon = server?.icon || Server;
+										const ServerIcon = server.icon;
 										return (
 											<button
 												type="button"
@@ -1044,10 +868,10 @@ function AgentCard({
 												</div>
 												<div className="flex-1 min-w-0">
 													<div className="font-medium text-sm">
-														{server?.name || mcpId}
+														{server.name}
 													</div>
 													<p className="text-xs text-muted-foreground truncate">
-														{server?.description}
+														{server.description}
 													</p>
 												</div>
 												<RotateCcw className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
@@ -1063,6 +887,10 @@ function AgentCard({
 		</div>
 	);
 }
+
+// Stable empty values: the health check runs again whenever the list changes.
+const NO_CUSTOM_SERVERS: CustomMcpServer[] = [];
+const NO_OVERRIDES: AgentMcpOverrides = {};
 
 export function AgentTools() {
 	const { t } = useTranslation(["settings", "navigation"]);
@@ -1080,6 +908,8 @@ export function AgentTools() {
 		selectedProjectId,
 		selectedProject?.autoBuildPath,
 	);
+	const customServers = envConfig?.customMcpServers ?? NO_CUSTOM_SERVERS;
+	const agentOverrides = envConfig?.agentMcpOverrides ?? NO_OVERRIDES;
 
 	// Custom MCP server dialog state
 	const [showCustomMcpDialog, setShowCustomMcpDialog] = useState(false);
@@ -1098,12 +928,13 @@ export function AgentTools() {
 	const [configuringServerId, setConfiguringServerId] = useState<string | null>(
 		null,
 	);
+	const configuringServer = configuringServerId
+		? MCP_SERVERS[configuringServerId]
+		: undefined;
 
 	const handleConfigureMcp = useCallback(
 		(mcpId: string) => {
-			const custom = (envConfig?.customMcpServers || []).find(
-				(server) => server.id === mcpId,
-			);
+			const custom = customServers.find((server) => server.id === mcpId);
 			if (custom) {
 				setEditingCustomServer(custom);
 				setShowCustomMcpDialog(true);
@@ -1111,320 +942,150 @@ export function AgentTools() {
 			}
 			setConfiguringServerId(mcpId);
 		},
-		[envConfig],
+		[customServers],
 	);
 
-	const updateMcpServer = useCallback(
-		async (
-			key: keyof NonNullable<ProjectEnvConfig["mcpServers"]>,
-			value: boolean | string,
-		) => {
+	// Saves part of the project's configuration and shows it at once. A save
+	// that throws or that the main process refuses puts the previous values
+	// back, so the screen never shows a setting the build will not read.
+	const saveEnvPatch = useCallback(
+		async (patch: Partial<ProjectEnvConfig>) => {
 			if (!selectedProjectId || !envConfig) return;
-
-			const newMcpServers = {
-				...envConfig.mcpServers,
-				[key]: value,
-			};
-
-			// Optimistic update
-			setEnvConfig((prev) =>
-				prev ? { ...prev, mcpServers: newMcpServers } : null,
-			);
-
-			// Save to backend
+			const previous: Partial<ProjectEnvConfig> = {};
+			for (const key of Object.keys(patch) as Array<keyof ProjectEnvConfig>) {
+				Object.assign(previous, { [key]: envConfig[key] });
+			}
+			setEnvConfig({ ...envConfig, ...patch });
+			let saved = false;
 			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					mcpServers: newMcpServers,
-				});
-			} catch (error) {
-				// Revert on error
-				console.error("Failed to update MCP config:", error);
-				setEnvConfig((prev) =>
-					prev ? { ...prev, mcpServers: envConfig.mcpServers } : null,
+				const result = await globalThis.electronAPI.updateProjectEnv(
+					selectedProjectId,
+					patch,
 				);
+				saved = result.success;
+			} catch (error) {
+				console.error("Failed to save the project's agent tools:", error);
+			}
+			if (!saved) {
+				setEnvConfig((prev) => (prev ? { ...prev, ...previous } : null));
 			}
 		},
 		[selectedProjectId, envConfig, setEnvConfig],
+	);
+
+	const updateMcpServer = useCallback(
+		(
+			key: keyof NonNullable<ProjectEnvConfig["mcpServers"]>,
+			value: boolean | string,
+		) => saveEnvPatch({ mcpServers: { ...envConfig?.mcpServers, [key]: value } }),
+		[envConfig, saveEnvPatch],
 	);
 
 	// rtk — same shape as updateMcpServer, separate key. rtk is not an MCP
 	// server: it is a binary on the machine, and folding it into mcpServers
 	// would have the backend look for a server that does not exist.
 	const updateTokenSavings = useCallback(
-		async (
-			key: keyof NonNullable<ProjectEnvConfig["tokenSavings"]>,
-			value: boolean,
-		) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const newTokenSavings = {
-				...envConfig.tokenSavings,
-				[key]: value,
-			};
-
-			setEnvConfig((prev) =>
-				prev ? { ...prev, tokenSavings: newTokenSavings } : null,
-			);
-
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					tokenSavings: newTokenSavings,
-				});
-			} catch (error) {
-				console.error("Failed to update rtk config:", error);
-				setEnvConfig((prev) =>
-					prev ? { ...prev, tokenSavings: envConfig.tokenSavings } : null,
-				);
-			}
-		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		(key: keyof NonNullable<ProjectEnvConfig["tokenSavings"]>, value: boolean) =>
+			saveEnvPatch({
+				tokenSavings: { ...envConfig?.tokenSavings, [key]: value },
+			}),
+		[envConfig, saveEnvPatch],
 	);
 
 	// ui-ux-pro-max — same shape as updateTokenSavings, its own key.
 	const updateUiux = useCallback(
-		async (key: keyof NonNullable<ProjectEnvConfig["uiux"]>, value: boolean) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const newUiux = { ...envConfig.uiux, [key]: value };
-
-			setEnvConfig((prev) => (prev ? { ...prev, uiux: newUiux } : null));
-
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					uiux: newUiux,
-				});
-			} catch (error) {
-				console.error("Failed to update ui-ux-pro-max config:", error);
-				setEnvConfig((prev) => (prev ? { ...prev, uiux: envConfig.uiux } : null));
-			}
-		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		(key: keyof NonNullable<ProjectEnvConfig["uiux"]>, value: boolean) =>
+			saveEnvPatch({ uiux: { ...envConfig?.uiux, [key]: value } }),
+		[envConfig, saveEnvPatch],
 	);
 
-	// Handle adding an MCP to an agent
+	// Writes one agent's override; empty lists and an empty override are left out.
+	const saveAgentOverride = useCallback(
+		(agentId: string, add: string[], remove: string[]) => {
+			const newOverrides = { ...agentOverrides };
+			delete newOverrides[agentId];
+			if (add.length > 0 || remove.length > 0) {
+				newOverrides[agentId] = {
+					...(add.length > 0 && { add }),
+					...(remove.length > 0 && { remove }),
+				};
+			}
+			return saveEnvPatch({ agentMcpOverrides: newOverrides });
+		},
+		[agentOverrides, saveEnvPatch],
+	);
+
+	// Adding a server this agent had removed restores it; any other goes to
+	// its add list.
 	const handleAddMcp = useCallback(
-		async (agentId: string, mcpId: string) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const currentOverrides = envConfig.agentMcpOverrides || {};
-			const agentOverride = currentOverrides[agentId] || {};
-
-			// If it's in the remove list, take it out (restore)
-			// Otherwise, add it to the add list
-			let newOverride: AgentMcpOverride;
-			if (agentOverride.remove?.includes(mcpId)) {
-				newOverride = {
-					...agentOverride,
-					remove: agentOverride.remove.filter((m) => m !== mcpId),
-				};
-			} else {
-				newOverride = {
-					...agentOverride,
-					add: [...(agentOverride.add || []), mcpId].filter(
-						(v, i, a) => a.indexOf(v) === i,
-					),
-				};
-			}
-
-			// Clean up empty arrays
-			if (newOverride.add?.length === 0) delete newOverride.add;
-			if (newOverride.remove?.length === 0) delete newOverride.remove;
-
-			const newOverrides = { ...currentOverrides };
-			if (Object.keys(newOverride).length === 0) {
-				delete newOverrides[agentId];
-			} else {
-				newOverrides[agentId] = newOverride;
-			}
-
-			// Optimistic update
-			setEnvConfig((prev) =>
-				prev ? { ...prev, agentMcpOverrides: newOverrides } : null,
-			);
-
-			// Save to backend
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					agentMcpOverrides: newOverrides,
-				});
-			} catch (error) {
-				console.error("Failed to update agent MCP config:", error);
-				setEnvConfig((prev) =>
-					prev ? { ...prev, agentMcpOverrides: currentOverrides } : null,
+		(agentId: string, mcpId: string) => {
+			const { add = [], remove = [] } = agentOverrides[agentId] ?? {};
+			if (remove.includes(mcpId)) {
+				return saveAgentOverride(
+					agentId,
+					add,
+					remove.filter((m) => m !== mcpId),
 				);
 			}
+			return saveAgentOverride(agentId, [...new Set([...add, mcpId])], remove);
 		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		[agentOverrides, saveAgentOverride],
 	);
 
-	// Handle removing an MCP from an agent
+	// Removing one of the agent's defaults puts it on its remove list; a
+	// server that was added leaves the add list.
 	const handleRemoveMcp = useCallback(
-		async (agentId: string, mcpId: string) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const agentConfig = AGENT_CONFIGS[agentId];
-			const defaults = [
-				...(agentConfig?.mcp_servers || []),
-				...(agentConfig?.mcp_optional || []),
-			];
-			const isDefault = defaults.includes(mcpId);
-
-			const currentOverrides = envConfig.agentMcpOverrides || {};
-			const agentOverride = currentOverrides[agentId] || {};
-
-			let newOverride: AgentMcpOverride;
-			if (isDefault) {
-				// It's a default MCP - add to remove list
-				newOverride = {
-					...agentOverride,
-					remove: [...(agentOverride.remove || []), mcpId].filter(
-						(v, i, a) => a.indexOf(v) === i,
-					),
-				};
-			} else {
-				// It's a custom addition - remove from add list
-				newOverride = {
-					...agentOverride,
-					add: (agentOverride.add || []).filter((m) => m !== mcpId),
-				};
-			}
-
-			// Clean up empty arrays
-			if (newOverride.add?.length === 0) delete newOverride.add;
-			if (newOverride.remove?.length === 0) delete newOverride.remove;
-
-			const newOverrides = { ...currentOverrides };
-			if (Object.keys(newOverride).length === 0) {
-				delete newOverrides[agentId];
-			} else {
-				newOverrides[agentId] = newOverride;
-			}
-
-			// Optimistic update
-			setEnvConfig((prev) =>
-				prev ? { ...prev, agentMcpOverrides: newOverrides } : null,
+		(agentId: string, mcpId: string) => {
+			const { mcp_servers, mcp_optional = [] } = AGENT_CONFIGS[agentId];
+			const { add = [], remove = [] } = agentOverrides[agentId] ?? {};
+			const isDefault = [...mcp_servers, ...mcp_optional].includes(mcpId);
+			return saveAgentOverride(
+				agentId,
+				add.filter((m) => m !== mcpId),
+				isDefault ? [...new Set([...remove, mcpId])] : remove,
 			);
-
-			// Save to backend
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					agentMcpOverrides: newOverrides,
-				});
-			} catch (error) {
-				console.error("Failed to update agent MCP config:", error);
-				setEnvConfig((prev) =>
-					prev ? { ...prev, agentMcpOverrides: currentOverrides } : null,
-				);
-			}
 		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		[agentOverrides, saveAgentOverride],
 	);
 
-	// Handle saving a custom MCP server
+	// Saving a custom server replaces the one with its id, or adds it.
 	const handleSaveCustomServer = useCallback(
-		async (server: CustomMcpServer) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const currentServers = envConfig.customMcpServers || [];
-			const existingIndex = currentServers.findIndex((s) => s.id === server.id);
-
-			let newServers: CustomMcpServer[];
-			if (existingIndex >= 0) {
-				// Update existing
-				newServers = [...currentServers];
-				newServers[existingIndex] = server;
-			} else {
-				// Add new
-				newServers = [...currentServers, server];
-			}
-
-			// Optimistic update
-			setEnvConfig((prev) =>
-				prev ? { ...prev, customMcpServers: newServers } : null,
-			);
-
-			// Save to backend
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					customMcpServers: newServers,
-				});
-			} catch (error) {
-				console.error("Failed to save custom MCP server:", error);
-				setEnvConfig((prev) =>
-					prev ? { ...prev, customMcpServers: currentServers } : null,
-				);
-			}
-		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		(server: CustomMcpServer) =>
+			saveEnvPatch({
+				customMcpServers: customServers.some((s) => s.id === server.id)
+					? customServers.map((s) => (s.id === server.id ? server : s))
+					: [...customServers, server],
+			}),
+		[customServers, saveEnvPatch],
 	);
 
-	// Handle deleting a custom MCP server
+	// Deleting a custom server also takes it off every agent it was added to.
 	const handleDeleteCustomServer = useCallback(
-		async (serverId: string) => {
-			if (!selectedProjectId || !envConfig) return;
-
-			const currentServers = envConfig.customMcpServers || [];
-			const newServers = currentServers.filter((s) => s.id !== serverId);
-
-			// Also remove from any agent overrides that reference it
-			const currentOverrides = envConfig.agentMcpOverrides || {};
-			const newOverrides = { ...currentOverrides };
-			for (const agentId of Object.keys(newOverrides)) {
-				const override = newOverrides[agentId];
-				if (override.add?.includes(serverId)) {
+		(serverId: string) => {
+			const newOverrides: AgentMcpOverrides = {};
+			for (const [agentId, { add = [], remove = [] }] of Object.entries(
+				agentOverrides,
+			)) {
+				const kept = add.filter((m) => m !== serverId);
+				if (kept.length > 0 || remove.length > 0) {
 					newOverrides[agentId] = {
-						...override,
-						add: override.add.filter((m) => m !== serverId),
+						...(kept.length > 0 && { add: kept }),
+						...(remove.length > 0 && { remove }),
 					};
-					if (newOverrides[agentId].add?.length === 0) {
-						delete newOverrides[agentId].add;
-					}
-					if (Object.keys(newOverrides[agentId]).length === 0) {
-						delete newOverrides[agentId];
-					}
 				}
 			}
-
-			// Optimistic update
-			setEnvConfig((prev) =>
-				prev
-					? {
-							...prev,
-							customMcpServers: newServers,
-							agentMcpOverrides: newOverrides,
-						}
-					: null,
-			);
-
-			// Save to backend
-			try {
-				await globalThis.electronAPI.updateProjectEnv(selectedProjectId, {
-					customMcpServers: newServers,
-					agentMcpOverrides: newOverrides,
-				});
-			} catch (error) {
-				console.error("Failed to delete custom MCP server:", error);
-				setEnvConfig((prev) =>
-					prev
-						? {
-								...prev,
-								customMcpServers: currentServers,
-								agentMcpOverrides: currentOverrides,
-							}
-						: null,
-				);
-			}
+			return saveEnvPatch({
+				customMcpServers: customServers.filter((s) => s.id !== serverId),
+				agentMcpOverrides: newOverrides,
+			});
 		},
-		[selectedProjectId, envConfig, setEnvConfig],
+		[agentOverrides, customServers, saveEnvPatch],
 	);
 
-	// Check health of all custom MCP servers
+	// Check health of all custom MCP servers. A check that is refused or
+	// throws leaves the server "unknown", never spinning.
 	const checkAllServersHealth = useCallback(async () => {
-		const servers = envConfig?.customMcpServers || [];
-		if (servers.length === 0) return;
-
-		for (const server of servers) {
-			// Set checking status
+		for (const server of customServers) {
 			setServerHealthStatus((prev) => ({
 				...prev,
 				[server.id]: {
@@ -1434,78 +1095,63 @@ export function AgentTools() {
 				},
 			}));
 
+			let health: McpHealthCheckResult | undefined;
 			try {
 				const result = await globalThis.electronAPI.checkMcpHealth(server);
-				if (result.success && result.data) {
-					setServerHealthStatus((prev) => ({
-						...prev,
-						// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-						[server.id]: result.data!,
-					}));
-				}
+				health = result.success ? result.data : undefined;
 			} catch (error) {
 				console.warn(`Health check failed for MCP server ${server.id}:`, error);
-				setServerHealthStatus((prev) => ({
-					...prev,
-					[server.id]: {
-						serverId: server.id,
-						status: "unknown",
-						message: "Health check failed",
-						checkedAt: new Date().toISOString(),
-					},
-				}));
 			}
+			setServerHealthStatus((prev) => ({
+				...prev,
+				[server.id]: health ?? {
+					serverId: server.id,
+					status: "unknown",
+					message: t("settings:mcp.healthCheckFailed"),
+					checkedAt: new Date().toISOString(),
+				},
+			}));
 		}
-	}, [envConfig?.customMcpServers]);
+	}, [customServers, t]);
 
 	// Check health when custom servers change
 	useEffect(() => {
-		if (envConfig?.customMcpServers && envConfig.customMcpServers.length > 0) {
-			checkAllServersHealth();
-		}
-	}, [envConfig?.customMcpServers, checkAllServersHealth]);
+		checkAllServersHealth();
+	}, [checkAllServersHealth]);
 
 	// Test a single server connection (full test)
-	const handleTestConnection = useCallback(async (server: CustomMcpServer) => {
-		setTestingServers((prev) => new Set(prev).add(server.id));
+	const handleTestConnection = useCallback(
+		async (server: CustomMcpServer) => {
+			setTestingServers((prev) => new Set(prev).add(server.id));
 
-		try {
-			const result = await globalThis.electronAPI.testMcpConnection(server);
-			if (result.success && result.data) {
-				// Update health status based on test result
-				setServerHealthStatus((prev) => ({
-					...prev,
-					[server.id]: {
-						serverId: server.id,
-						status: result.data?.success ? "healthy" : "unhealthy",
-						message: result.data?.message,
-						responseTime: result.data?.responseTime,
-						checkedAt: new Date().toISOString(),
-					},
-				}));
+			let test: McpTestConnectionResult | undefined;
+			try {
+				const result = await globalThis.electronAPI.testMcpConnection(server);
+				test = result.success ? result.data : undefined;
+			} catch (error) {
+				console.warn(
+					`Connection test failed for MCP server ${server.id}:`,
+					error,
+				);
 			}
-		} catch (error) {
-			console.warn(
-				`Connection test failed for MCP server ${server.id}:`,
-				error,
-			);
 			setServerHealthStatus((prev) => ({
 				...prev,
 				[server.id]: {
 					serverId: server.id,
-					status: "unhealthy",
-					message: "Connection test failed",
+					status: test?.success ? "healthy" : "unhealthy",
+					message: test?.message ?? t("settings:mcp.connectionTestFailed"),
+					responseTime: test?.responseTime,
 					checkedAt: new Date().toISOString(),
 				},
 			}));
-		} finally {
 			setTestingServers((prev) => {
 				const next = new Set(prev);
 				next.delete(server.id);
 				return next;
 			});
-		}
-	}, []);
+		},
+		[t],
+	);
 
 	// Resolve agent settings using the centralized utility
 	// Resolution order: custom overrides -> selected profile's config -> global defaults
@@ -1644,6 +1290,7 @@ export function AgentTools() {
 									</div>
 									<Switch
 										checked={mcpServers.context7Enabled !== false}
+										aria-label={t("settings:mcp.servers.context7.name")}
 										onCheckedChange={(checked) =>
 											updateMcpServer("context7Enabled", checked)
 										}
@@ -1692,6 +1339,7 @@ export function AgentTools() {
 										</div>
 									</div>
 									<Switch
+										aria-label={t("settings:mcp.servers.linear.name")}
 										checked={
 											mcpServers.linearMcpEnabled !== false &&
 											envConfig.linearEnabled
@@ -1727,6 +1375,7 @@ export function AgentTools() {
 										</div>
 										<Switch
 											checked={mcpServers.electronEnabled === true}
+											aria-label={t("settings:mcp.servers.electron.name")}
 											onCheckedChange={(checked) =>
 												updateMcpServer("electronEnabled", checked)
 											}
@@ -1748,6 +1397,7 @@ export function AgentTools() {
 										</div>
 										<Switch
 											checked={mcpServers.puppeteerEnabled === true}
+											aria-label={t("settings:mcp.servers.puppeteer.name")}
 											onCheckedChange={(checked) =>
 												updateMcpServer("puppeteerEnabled", checked)
 											}
@@ -1769,6 +1419,7 @@ export function AgentTools() {
 										</div>
 										<Switch
 											checked={mcpServers.chromeDevtoolsEnabled === true}
+											aria-label={t("settings:mcp.servers.chromeDevtools.name")}
 											onCheckedChange={(checked) =>
 												updateMcpServer("chromeDevtoolsEnabled", checked)
 											}
@@ -1790,7 +1441,11 @@ export function AgentTools() {
 											</p>
 										</div>
 									</div>
-									<Switch checked={true} disabled />
+									<Switch
+										aria-label={t("settings:mcp.servers.autoClaude.name")}
+										checked={true}
+										disabled
+									/>
 								</div>
 
 								{/* rtk — la condensation de sortie, toujours visible : on la découvre ici. */}
@@ -1825,12 +1480,11 @@ export function AgentTools() {
 										</button>
 									</div>
 
-									{(envConfig.customMcpServers?.length ?? 0) > 0 ? (
+									{customServers.length > 0 ? (
 										<div className="space-y-2">
-											{envConfig.customMcpServers?.map((server) => {
+											{customServers.map((server) => {
 												const health = serverHealthStatus[server.id];
 												const isTesting = testingServers.has(server.id);
-												const isChecking = health?.status === "checking";
 
 												return (
 													<div
@@ -1841,7 +1495,6 @@ export function AgentTools() {
 															{/* Status indicator */}
 															<StatusIndicator
 																isTesting={isTesting}
-																isChecking={isChecking}
 																health={health}
 															/>
 															{server.type === "command" ? (
@@ -1927,8 +1580,8 @@ export function AgentTools() {
 
 					{/* Agent Categories */}
 					{Object.entries(CATEGORIES).map(([categoryId, category]) => {
-						const agents = agentsByCategory[categoryId] || [];
-						if (agents.length === 0) return null;
+						// Every category has agents.
+						const agents = agentsByCategory[categoryId];
 
 						const isExpanded = expandedCategories.has(categoryId);
 						const CategoryIcon = category.icon;
@@ -1948,9 +1601,7 @@ export function AgentTools() {
 									)}
 									<CategoryIcon className="h-4 w-4 text-muted-foreground" />
 									<h2 className="text-sm font-semibold text-foreground">
-										{t(`agents.categories.${categoryId}`, {
-											defaultValue: category.label,
-										})}
+										{t(`agents.categories.${categoryId}`)}
 									</h2>
 									<span className="text-xs text-muted-foreground">
 										{t("agents.agentsCount", { count: agents.length })}
@@ -1969,9 +1620,10 @@ export function AgentTools() {
 													config={config}
 													modelLabel={getModelLabel(model)}
 													thinkingLabel={getThinkingLabel(thinking)}
-													overrides={envConfig?.agentMcpOverrides?.[id]}
+													overrides={agentOverrides[id]}
 													mcpServerStates={envConfig?.mcpServers}
-													customServers={envConfig?.customMcpServers || []}
+													linearEnabled={envConfig?.linearEnabled === true}
+													customServers={customServers}
 													onAddMcp={handleAddMcp}
 													onRemoveMcp={handleRemoveMcp}
 													onConfigureMcp={handleConfigureMcp}
@@ -1993,20 +1645,15 @@ export function AgentTools() {
 				}}
 				serverId={configuringServerId}
 				serverName={
-					(configuringServerId && MCP_SERVERS[configuringServerId]?.name) ||
-					configuringServerId ||
-					""
+					configuringServer
+						? t(`settings:mcp.servers.${configuringServer.i18nKey}.name`)
+						: configuringServerId || ""
 				}
 				serverDescription={
-					configuringServerId
-						? MCP_SERVERS[configuringServerId]?.description
-						: undefined
+					configuringServer &&
+					t(`settings:mcp.servers.${configuringServer.i18nKey}.description`)
 				}
-				icon={
-					configuringServerId
-						? MCP_SERVERS[configuringServerId]?.icon
-						: undefined
-				}
+				icon={configuringServer?.icon}
 				mcpServers={mcpServers}
 				envConfig={envConfig}
 				onUpdate={updateMcpServer}
@@ -2016,7 +1663,7 @@ export function AgentTools() {
 				open={showCustomMcpDialog}
 				onOpenChange={setShowCustomMcpDialog}
 				server={editingCustomServer}
-				existingIds={(envConfig?.customMcpServers || []).map((s) => s.id)}
+				existingIds={[...RESERVED_MCP_IDS, ...customServers.map((s) => s.id)]}
 				onSave={handleSaveCustomServer}
 			/>
 		</ModuleStage>

@@ -497,6 +497,7 @@
 		"terminalUnavailable": "Could not open a terminal.",
 		"pathSwitchUnavailable": "Switching the CLI installation is not available.",
 		"pathSwitchFailed": "Could not switch the CLI installation."
+	},
 	"stopAll": {
 		"label": "Stop all agents",
 		"tooltip": "Stop all agents (Ctrl+Shift+.): every running task is paused, to resume from its card",
