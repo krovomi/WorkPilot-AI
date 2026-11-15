@@ -23,7 +23,6 @@ from foundation.debug import (
     debug_section,
     debug_success,
     debug_verbose,
-    debug_warning,
 )
 
 from .conflict_detector import ConflictDetector
@@ -84,10 +83,8 @@ class MergePreview:
         # Analyze conflicts
         for file_path in conflicting:
             debug_detailed(MODULE, f"Analyzing conflicts for: {file_path}")
+            # Named by the record, so it has one
             evolution = self.evolution_tracker.get_file_evolution(file_path)
-            if not evolution:
-                debug_warning(MODULE, f"No evolution data for {file_path}")
-                continue
 
             analyses = {}
             for snapshot in evolution.task_snapshots:

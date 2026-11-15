@@ -172,3 +172,54 @@ def test_two_tasks_on_one_file_are_what_the_preview_reports(repo):
         "app.py": ["t1", "t2"],
         "added.py": ["t1"],
     }
+
+
+def test_without_main_master_or_develop_a_young_branch_records_nothing(tmp_path):
+    project = tmp_path / "p"
+    project.mkdir()
+    git(project, "init", "-q", "-b", "trunk")
+    git(project, "config", "user.email", "dev@example.invalid")
+    git(project, "config", "user.name", "Dev")
+    git(project, "config", "commit.gpgsign", "false")
+    (project / "a.py").write_bytes(b"a = 1\n")
+    git(project, "add", ".")
+    git(project, "commit", "-q", "-m", "base")
+
+    tracker = refresh(project)
+
+    assert tracker.get_files_modified_by_tasks(["001-task"]) == {}
+
+
+def git_failing_on(monkeypatch, failing: str):
+    """git as usual, except the call whose arguments contain ``failing``."""
+    import merge.file_evolution.tracker as tracker_module
+
+    real = tracker_module.run_git
+
+    def run_git(args, cwd, **kwargs):
+        if failing in args:
+            return subprocess.CompletedProcess(args, 128, "", "fatal: unreadable")
+        return real(args, cwd, **kwargs)
+
+    monkeypatch.setattr(tracker_module, "run_git", run_git)
+
+
+def test_a_file_whose_diff_git_cannot_give_does_not_hide_the_others(repo, monkeypatch):
+    (repo / "app.py").write_bytes(b"def run():\n    return 5\n")
+    (repo / "added.py").write_bytes(b"y = 2\n")
+    commit_task(repo)
+    git_failing_on(monkeypatch, "added.py")
+
+    tracker = refresh(repo, target_branch="main")
+
+    assert tracker.get_files_modified_by_tasks(["001-task"]) == {"app.py": ["001-task"]}
+
+
+def test_when_git_cannot_list_the_changes_nothing_is_recorded(repo, monkeypatch):
+    (repo / "app.py").write_bytes(b"def run():\n    return 6\n")
+    commit_task(repo)
+    git_failing_on(monkeypatch, "--name-only")
+
+    tracker = refresh(repo, target_branch="main")
+
+    assert tracker.get_files_modified_by_tasks(["001-task"]) == {}

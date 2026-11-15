@@ -98,11 +98,8 @@ def _definitions(
     lines = text.split("\n")
     found = []
     for match in pattern.finditer(text):
-        group = next(
-            (g for g in range(1, len(match.groups()) + 1) if match.group(g)), None
-        )
-        if group is None:
-            continue
+        # Each pattern's alternatives capture the name in exactly one group
+        group = match.lastindex or 0
         name = match.group(group)
         # The line of the name: a leading ``\s*`` may have crossed blank lines.
         start = text.count("\n", 0, match.start(group)) + 1
