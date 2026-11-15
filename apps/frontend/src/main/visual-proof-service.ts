@@ -58,6 +58,7 @@ import {
 	type NavUiElement,
 	visualProofNavigationService,
 } from "./visual-proof-navigation-service";
+import { navigationTargetOnOrigin } from "./visual-proof-navigation-target";
 import { copyWalkthrough, normalizePathForMarkdown, proofImageUrl, walkthroughSection } from "./visual-proof-walkthrough";
 
 const execFileAsync = promisify(execFile);
@@ -549,17 +550,17 @@ function buildFillScript(selector: string, value: string): string {
 }
 
 /**
- * Exécute une étape de navigation web dans la page chargée. Best-effort : un
- * sélecteur introuvable est journalisé sans interrompre la séquence, afin de
- * toujours produire des preuves visuelles même si l'UI a légèrement changé.
+ * Exécute une étape de navigation web, sans quitter l'origine de l'application
+ * (`navigationTargetOnOrigin`). Best-effort : un sélecteur introuvable est
+ * journalisé sans interrompre la séquence, même si l'UI a légèrement changé.
  */
 async function runWebNavigationStep(
 	webContents: WebContentsLike,
 	step: VisualProofNavigationStep,
 	baseUrl: string,
 ): Promise<void> {
-	if (step.path) {
-		const target = new URL(step.path, baseUrl).toString();
+	const target = step.path ? navigationTargetOnOrigin(step.path, baseUrl) : null;
+	if (target) {
 		await webContents.loadURL(target);
 		await delay(500);
 	}
@@ -568,9 +569,7 @@ async function runWebNavigationStep(
 			buildWaitForSelectorScript(step.waitForSelector, NAVIGATION_WAIT_TIMEOUT_MS),
 		);
 		if (found === false) {
-			logger.warn(
-				`[VisualProof] Selector never appeared: ${step.waitForSelector}`,
-			);
+			logger.warn(`[VisualProof] Selector never appeared: ${step.waitForSelector}`);
 		}
 	}
 	if (step.fill) {
