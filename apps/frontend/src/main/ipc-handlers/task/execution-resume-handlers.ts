@@ -117,12 +117,14 @@ export function registerTaskResumeHandlers(ctx: ExecutionHandlerContext): void {
 			}
 
 			const provider = providerName.trim();
-			const chosenModel = model?.trim() || undefined;
+			// The renderer is not trusted: a model that is not text is no model.
+			const chosenModel =
+				(typeof model === "string" && model.trim()) || undefined;
 			// Validate the effort against the known thinking levels; ignore garbage
 			// so a malformed value never poisons task_metadata.json.
 			const VALID_EFFORTS = ["none", "low", "medium", "high", "ultrathink"];
 			const chosenEffort =
-				effort && VALID_EFFORTS.includes(effort.trim())
+				typeof effort === "string" && VALID_EFFORTS.includes(effort.trim())
 					? (effort.trim() as ThinkingLevel)
 					: undefined;
 			const changeScope: EngineChangeScope =
@@ -410,6 +412,12 @@ export function registerTaskResumeHandlers(ctx: ExecutionHandlerContext): void {
 			}
 			if (!change || (!change.provider && !change.model && !change.effort)) {
 				return { success: false, error: "No change provided" };
+			}
+			// Each field reaches the running agent as written: text or nothing.
+			for (const value of [change.provider, change.model, change.effort]) {
+				if (value !== undefined && value !== null && typeof value !== "string") {
+					return { success: false, error: "Invalid change" };
+				}
 			}
 			const { task, project } = findTaskAndProject(taskId);
 			if (!task || !project) {
