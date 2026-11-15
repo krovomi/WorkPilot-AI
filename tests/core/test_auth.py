@@ -1,266 +1,720 @@
-"""Tests for the deterministic helpers in core.auth.
+"""Where WorkPilot finds the Claude Code OAuth token, and what it hands the SDK.
 
-Out of scope (intentionally): the OS-keychain readers
-(``_get_token_from_macos_keychain``, ``_get_token_from_linux_secret_service``,
-``_get_token_from_windows_credential_files``) and the OAuth login triggers
-(``trigger_login`` / ``ensure_authenticated``). Those depend on the host
-environment and are exercised by manual / integration QA.
-
-What we cover here are the pure routines: keychain service-name derivation,
-encrypted-token detection + format validation, the ``_try_decrypt_token``
-fallback path, the env-var resolver order in ``get_auth_token``, and the
-SDK env-var snapshot.
+Each test sets up what a machine would have (environment variables, a
+profile's credentials file, a keychain entry, a Git for Windows install) and
+asks `core.auth` the question the CLI and `create_client` ask. The OS stores
+that cannot run here are stand-ins at their edge: the `security` command on
+macOS (`subprocess.run`), the Secret Service on Linux (a `secretstorage` with
+the real library's calls, including its refusal of a missing DBus connection),
+and `where.exe` on Windows. Every token is a placeholder.
 """
 
 from __future__ import annotations
 
+import hashlib
+import importlib.util
+import json
+import logging
 import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from core.auth import (
-    AUTH_TOKEN_ENV_VARS,
-    SDK_ENV_VARS,
-    _calculate_config_dir_hash,
-    _get_keychain_service_name,
-    _token_presence,
-    _try_decrypt_token,
-    decrypt_token,
-    get_auth_token,
-    get_sdk_env_vars,
-    is_encrypted_token,
-    validate_token_not_encrypted,
-)
+from core import auth
 
-# ---------------------------------------------------------------------------
-# _token_presence — must NEVER leak token content into logs
+TOKEN = "sk-ant-oat01-placeholder-0000"  # pragma: allowlist secret
+OTHER = "sk-ant-oat01-placeholder-1111"  # pragma: allowlist secret
+ENCRYPTED = "enc:cGxhY2Vob2xkZXItMDAwMA=="  # pragma: allowlist secret
 
 
-class TestTokenPresence:
-    def test_absent_for_none(self) -> None:
-        assert _token_presence(None) == "absent"
-
-    def test_absent_for_empty_string(self) -> None:
-        assert _token_presence("") == "absent"
-
-    def test_present_with_length_for_real_token(self) -> None:
-        assert _token_presence("sk-ant-secret") == "present(len=13)"
-
-    def test_does_not_include_token_bytes(self) -> None:
-        # Defence in depth: even a fragment of the token must not appear.
-        secret = "sk-ant-AbCdEf1234567890zzzzzzzzzz"
-        out = _token_presence(secret)
-        assert "AbCdEf" not in out
-        assert "1234" not in out
-        assert "sk-" not in out
+def credentials(token: object = TOKEN, key: str = "claudeAiOauth") -> str:
+    return json.dumps({key: {"accessToken": token}})
 
 
-# ---------------------------------------------------------------------------
-# Keychain service name derivation
+@pytest.fixture(autouse=True)
+def machine(tmp_path, monkeypatch):
+    """A machine with no token anywhere, on Linux, without a Secret Service."""
+    for var in (*auth.AUTH_TOKEN_ENV_VARS, *auth.SDK_ENV_VARS, "DEBUG"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    home = tmp_path / "home"
+    home.mkdir()
+    for var in ("HOME", "USERPROFILE"):
+        monkeypatch.setenv(var, str(home))
+    for var in ("LOCALAPPDATA", "APPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)"):
+        path = tmp_path / var.lower()
+        path.mkdir()
+        monkeypatch.setenv(var, str(path))
+    on(monkeypatch, "Linux")
+    monkeypatch.setattr(auth, "secretstorage", None)
+    return home
 
 
-class TestKeychainServiceName:
-    def test_no_config_dir_returns_legacy_name(self) -> None:
-        assert _get_keychain_service_name(None) == "Claude Code-credentials"
-        assert _get_keychain_service_name("") == "Claude Code-credentials"
+def on(monkeypatch, system: str) -> None:
+    monkeypatch.setattr(auth, "is_macos", lambda: system == "Darwin")
+    monkeypatch.setattr(auth, "is_windows", lambda: system == "Windows")
+    monkeypatch.setattr(auth, "is_linux", lambda: system == "Linux")
+    if system == "Windows":
+        # `%VAR%\...` paths, as Windows expands them
+        def expandvars(path: str) -> str:
+            expanded = re.sub(
+                r"%([^%]+)%", lambda m: os.environ.get(m.group(1), m.group(0)), path
+            )
+            return expanded.replace("\\", os.sep)
 
-    def test_config_dir_appends_hash_suffix(self) -> None:
-        name = _get_keychain_service_name("/Users/x/.claude/profile-1")
-        assert name.startswith("Claude Code-credentials-")
-        # The hash is the SHA-256 prefix (8 hex chars).
-        suffix = name.removeprefix("Claude Code-credentials-")
-        assert len(suffix) == 8
-        assert all(c in "0123456789abcdef" for c in suffix)
-
-    def test_same_config_dir_yields_same_hash(self) -> None:
-        a = _get_keychain_service_name("/foo/bar")
-        b = _get_keychain_service_name("/foo/bar")
-        assert a == b
-
-    def test_tilde_expansion_is_applied(self) -> None:
-        # ~/path and the explicit home/path must hash identically — must
-        # match the frontend's normalisation in credential-utils.ts.
-        home = os.path.expanduser("~")
-        a = _get_keychain_service_name("~/x")
-        b = _get_keychain_service_name(f"{home}/x")
-        assert a == b
+        monkeypatch.setattr(os.path, "expandvars", expandvars)
 
 
-class TestCalculateConfigDirHash:
-    def test_returns_eight_hex_chars(self) -> None:
-        h = _calculate_config_dir_hash("/some/path")
-        assert len(h) == 8
-        assert all(c in "0123456789abcdef" for c in h)
-
-    def test_distinct_paths_distinct_hashes(self) -> None:
-        assert _calculate_config_dir_hash("/a") != _calculate_config_dir_hash("/b")
+def write(path: Path, text: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 # ---------------------------------------------------------------------------
-# Encrypted token detection
+# macOS Keychain: `security find-generic-password -s <service> -w`
 
 
-class TestIsEncryptedToken:
-    @pytest.mark.parametrize("tok", [None, "", "sk-ant-plain"])
-    def test_negative_cases(self, tok) -> None:
-        assert is_encrypted_token(tok) is False
+@pytest.fixture
+def keychain(monkeypatch):
+    """The macOS Keychain, by service name."""
+    entries: dict[str, str] = {}
+    asked: list[list[str]] = []
 
-    def test_recognises_enc_prefix(self) -> None:
-        assert is_encrypted_token("enc:abcdef1234567890") is True
+    def run(cmd, **kwargs):
+        asked.append(cmd)
+        assert cmd[:2] == ["/usr/bin/security", "find-generic-password"]
+        service = cmd[cmd.index("-s") + 1]
+        if service not in entries:
+            return subprocess.CompletedProcess(cmd, 44, "", "item not found")
+        return subprocess.CompletedProcess(cmd, 0, entries[service] + "\n", "")
+
+    monkeypatch.setattr(auth.subprocess, "run", run)
+    on(monkeypatch, "Darwin")
+    return SimpleNamespace(entries=entries, asked=asked)
 
 
-class TestValidateTokenNotEncrypted:
-    def test_passes_silently_for_plaintext(self) -> None:
-        validate_token_not_encrypted("sk-ant-real-token")  # no exception
+# ---------------------------------------------------------------------------
+# Linux Secret Service, with the calls of the real `secretstorage`
 
-    def test_raises_for_encrypted(self) -> None:
+
+class SecretStorageException(Exception):
+    pass
+
+
+class SecretServiceNotAvailableException(SecretStorageException):
+    pass
+
+
+class LockedException(SecretStorageException):
+    pass
+
+
+class Item:
+    def __init__(self, label: str, secret: bytes | Exception):
+        self.label = label
+        self.secret = secret
+
+    def get_label(self) -> str:
+        return self.label
+
+    def get_secret(self) -> bytes:
+        if isinstance(self.secret, Exception):
+            raise self.secret
+        return self.secret
+
+
+class Connection:
+    closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class SecretService:
+    """`secretstorage` as WorkPilot uses it, over one keyring."""
+
+    exceptions = SimpleNamespace(
+        SecretStorageException=SecretStorageException,
+        SecretServiceNotAvailableException=SecretServiceNotAvailableException,
+    )
+
+    def __init__(self):
+        self.items: list[tuple[dict, Item]] = []
+        self.available = True
+        self.locked = False
+        self.unlock_dismissed = False
+        self.connections: list[Connection] = []
+
+    def add(self, label: str, secret: bytes | Exception, app="claude-code") -> None:
+        self.items.append(({"application": app}, Item(label, secret)))
+
+    def dbus_init(self) -> Connection:
+        if not self.available:
+            raise SecretServiceNotAvailableException(
+                "Environment variable DBUS_SESSION_BUS_ADDRESS is unset"
+            )
+        connection = Connection()
+        self.connections.append(connection)
+        return connection
+
+    def get_default_collection(self, connection):
+        # The real library sends a DBus message on the connection at once,
+        # so a missing connection fails as it does there
+        if not isinstance(connection, Connection):
+            raise AttributeError(
+                "'NoneType' object has no attribute 'send_and_get_reply'"
+            )
+        return self
+
+    def is_locked(self) -> bool:
+        return self.locked
+
+    def unlock(self) -> bool:
+        self.locked = self.unlock_dismissed
+        return self.unlock_dismissed
+
+    def search_items(self, attributes: dict):
+        if self.locked:
+            raise LockedException("Collection is locked!")
+        return [item for attrs, item in self.items if attrs == attributes]
+
+
+@pytest.fixture
+def secret_service(monkeypatch):
+    service = SecretService()
+    monkeypatch.setattr(auth, "secretstorage", service)
+    yield service
+    assert all(c.closed for c in service.connections), "a DBus connection was left open"
+
+
+# ---------------------------------------------------------------------------
+
+
+class TestEnvironmentVariables:
+    def test_the_claude_code_token_comes_first(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", OTHER)
+
+        assert auth.get_auth_token() == TOKEN
+        assert auth.get_auth_token_source() == "CLAUDE_CODE_OAUTH_TOKEN"
+
+    def test_a_proxy_token_is_used_when_it_is_the_only_one(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", OTHER)
+
+        assert auth.get_auth_token() == OTHER
+        assert auth.get_auth_token_source() == "ANTHROPIC_AUTH_TOKEN"
+
+    def test_an_api_key_is_never_taken_for_a_token(self, monkeypatch):
+        monkeypatch.setenv(
+            "ANTHROPIC_API_KEY", "sk-ant-api03-0000"
+        )  # pragma: allowlist secret
+
+        assert auth.get_auth_token() is None
+        assert auth.get_auth_token_source() is None
+        with pytest.raises(ValueError, match="ANTHROPIC_API_KEY\\) are not supported"):
+            auth.require_auth_token()
+
+
+class TestAProfile:
+    """A profile (CLAUDE_CONFIG_DIR) reads its own credentials, never the default."""
+
+    @pytest.mark.parametrize(
+        ("name", "key"),
+        [
+            (".credentials.json", "claudeAiOauth"),
+            ("credentials.json", "claudeAiOauth"),
+            (".credentials.json", "oauthAccount"),
+        ],
+    )
+    def test_its_credentials_file_is_read(self, tmp_path, name, key):
+        write(tmp_path / "work" / name, credentials(key=key))
+
+        assert auth.get_auth_token(str(tmp_path / "work")) == TOKEN
+        assert auth.get_auth_token_source(str(tmp_path / "work")) == "CLAUDE_CONFIG_DIR"
+
+    def test_the_profile_set_in_the_environment_is_the_one_read(
+        self, machine, monkeypatch
+    ):
+        write(machine / "work" / ".credentials.json", credentials())
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", "~/work")
+
+        assert auth.get_auth_token() == TOKEN
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "{",
+            "[]",
+            credentials(token="sk-something-else"),
+            credentials(token=42),
+            json.dumps({"claudeAiOauth": "not an object"}),
+        ],
+    )
+    def test_a_file_without_a_usable_token_gives_none(self, tmp_path, content):
+        write(tmp_path / "work" / ".credentials.json", content)
+
+        assert auth.get_auth_token(str(tmp_path / "work")) is None
+
+    def test_an_unreadable_file_is_skipped_for_the_next(self, tmp_path):
+        (tmp_path / "work" / ".credentials.json").mkdir(parents=True)
+        write(tmp_path / "work" / "credentials.json", credentials())
+
+        assert auth.get_auth_token(str(tmp_path / "work")) == TOKEN
+
+    def test_its_keychain_entry_is_the_hashed_one(self, tmp_path, keychain):
+        profile = str(tmp_path / "work")
+        service = auth._get_keychain_service_name(profile)
+        keychain.entries[service] = credentials(OTHER)
+        keychain.entries["Claude Code-credentials"] = credentials(TOKEN)
+
+        assert auth.get_auth_token(profile) == OTHER
+        assert auth.get_auth_token_source(profile) == "macOS Keychain (profile)"
+
+    def test_without_its_own_entry_it_gets_none_not_the_default(
+        self, tmp_path, keychain, monkeypatch, caplog
+    ):
+        keychain.entries["Claude Code-credentials"] = credentials(TOKEN)
+        monkeypatch.setenv("DEBUG", "true")
+        profile = str(tmp_path / "work")
+
+        with caplog.at_level(logging.INFO, logger=auth.__name__):
+            assert auth.get_auth_token(profile) is None
+            assert auth.get_auth_token_source(profile) is None
+
+        assert auth._get_keychain_service_name(profile) in caplog.text
+        assert TOKEN not in caplog.text
+
+
+class TestMacOSKeychain:
+    def test_the_default_entry(self, keychain):
+        keychain.entries["Claude Code-credentials"] = credentials()
+
+        assert auth.get_auth_token() == TOKEN
+        assert auth.get_auth_token_source() == "macOS Keychain"
+        assert (
+            keychain.asked
+            == [
+                [
+                    "/usr/bin/security",
+                    "find-generic-password",
+                    "-s",
+                    "Claude Code-credentials",
+                    "-w",
+                ]
+            ]
+            * 2
+        )
+
+    @pytest.mark.parametrize("entry", ["", "{", credentials(token="not-oauth")])
+    def test_an_entry_without_a_usable_token_gives_none(self, keychain, entry):
+        keychain.entries["Claude Code-credentials"] = entry
+
+        assert auth.get_auth_token() is None
+
+    def test_no_entry_gives_none(self, keychain):
+        assert auth.get_auth_token() is None
+        assert auth.get_auth_token_source() is None
+
+    @pytest.mark.parametrize(
+        "error",
+        [subprocess.TimeoutExpired(["security"], 5), FileNotFoundError("security")],
+    )
+    def test_a_keychain_that_hangs_or_is_missing_gives_none(self, monkeypatch, error):
+        on(monkeypatch, "Darwin")
+
+        def run(cmd, **kwargs):
+            raise error
+
+        monkeypatch.setattr(auth.subprocess, "run", run)
+
+        assert auth.get_auth_token() is None
+
+
+class TestWindowsCredentialFiles:
+    @pytest.mark.parametrize(
+        ("var", "relative"),
+        [
+            ("USERPROFILE", ".claude/.credentials.json"),
+            ("USERPROFILE", ".claude/credentials.json"),
+            ("LOCALAPPDATA", "Claude/credentials.json"),
+            ("APPDATA", "Claude/credentials.json"),
+        ],
+    )
+    def test_each_place_claude_code_writes(self, monkeypatch, var, relative):
+        on(monkeypatch, "Windows")
+        write(Path(os.environ[var]) / relative, credentials())
+
+        assert auth.get_auth_token() == TOKEN
+        assert auth.get_auth_token_source() == "Windows Credential Files"
+
+    def test_a_broken_file_does_not_hide_the_next(self, machine, monkeypatch):
+        on(monkeypatch, "Windows")
+        write(machine / ".claude" / ".credentials.json", "{")
+        write(
+            Path(os.environ["APPDATA"]) / "Claude" / "credentials.json", credentials()
+        )
+
+        assert auth.get_auth_token() == TOKEN
+
+    def test_nothing_written_gives_none(self, monkeypatch):
+        on(monkeypatch, "Windows")
+
+        assert auth.get_auth_token() is None
+        assert auth.get_auth_token_source() is None
+
+    def test_a_profile_reads_only_its_folder(self, machine, monkeypatch, tmp_path):
+        on(monkeypatch, "Windows")
+        write(machine / ".claude" / ".credentials.json", credentials(OTHER))
+
+        assert auth.get_auth_token(str(tmp_path / "work")) is None
+
+
+class TestLinux:
+    def test_the_secret_service_entry(self, secret_service):
+        secret_service.add("Claude Code-credentials", credentials().encode())
+
+        assert auth.get_auth_token() == TOKEN
+        assert auth.get_auth_token_source() == "Linux Secret Service"
+
+    def test_a_profile_reads_its_labelled_entry_only(self, secret_service, tmp_path):
+        profile = str(tmp_path / "work")
+        secret_service.add("Claude Code-credentials", credentials(OTHER).encode())
+        secret_service.add(
+            auth._get_keychain_service_name(profile), credentials().encode()
+        )
+
+        assert auth.get_auth_token(profile) == TOKEN
+        assert auth.get_auth_token_source(profile) == "Linux Secret Service (profile)"
+
+    def test_other_applications_and_labels_are_ignored(self, secret_service):
+        secret_service.add("Claude Code-credentials", credentials().encode(), "other")
+        secret_service.add("Claude Code-credentials-old", credentials().encode())
+
+        assert auth.get_auth_token() is None
+
+    @pytest.mark.parametrize(
+        "secret", [b"", b"{", credentials(token="nope").encode(), b"\xff\xfe"]
+    )
+    def test_an_entry_without_a_usable_token_is_passed_over(
+        self, secret_service, secret
+    ):
+        secret_service.add("Claude Code-credentials", secret)
+        secret_service.add("Claude Code-credentials", credentials().encode())
+
+        assert auth.get_auth_token() == TOKEN
+
+    def test_a_locked_keyring_is_unlocked(self, secret_service):
+        secret_service.locked = True
+        secret_service.add("Claude Code-credentials", credentials().encode())
+
+        assert auth.get_auth_token() == TOKEN
+
+    def test_a_dismissed_unlock_prompt_gives_none(self, secret_service):
+        secret_service.locked = True
+        secret_service.unlock_dismissed = True
+        secret_service.add("Claude Code-credentials", credentials().encode())
+
+        assert auth.get_auth_token() is None
+
+    def test_an_entry_that_cannot_be_read_gives_none(self, secret_service):
+        secret_service.add("Claude Code-credentials", LockedException("locked item"))
+
+        assert auth.get_auth_token() is None
+
+    def test_without_a_secret_service_claude_codes_file_is_read(
+        self, secret_service, machine
+    ):
+        secret_service.available = False
+        write(machine / ".claude" / ".credentials.json", credentials())
+
+        assert auth.get_auth_token() == TOKEN
+        assert auth.get_auth_token_source() == "~/.claude/.credentials.json"
+
+    def test_without_secretstorage_claude_codes_file_is_read(self, machine):
+        write(machine / ".claude" / ".credentials.json", credentials())
+
+        assert auth.get_auth_token() == TOKEN
+
+    def test_a_profile_never_falls_back_to_the_default_file(self, machine, tmp_path):
+        write(machine / ".claude" / ".credentials.json", credentials())
+
+        assert auth.get_auth_token(str(tmp_path / "work")) is None
+
+    def test_nothing_anywhere_says_how_to_log_in(self, secret_service):
+        assert auth.get_auth_token() is None
+        with pytest.raises(ValueError, match="CLAUDE_CODE_OAUTH_TOKEN in your .env"):
+            auth.require_auth_token()
+
+
+class TestTheLoginAdvice:
+    @pytest.mark.parametrize(
+        ("system", "where"),
+        [
+            ("Darwin", "macOS Keychain"),
+            ("Windows", "Windows Credential Manager"),
+            ("Linux", "CLAUDE_CODE_OAUTH_TOKEN in your .env"),
+        ],
+    )
+    def test_it_names_where_the_token_will_be(self, monkeypatch, system, where):
+        on(monkeypatch, system)
+        monkeypatch.setattr(auth, "get_token_from_keychain", lambda *a: None)
+
+        with pytest.raises(ValueError, match="No OAuth token found") as raised:
+            auth.require_auth_token()
+
+        assert where in str(raised.value)
+        assert "/login" in str(raised.value)
+
+    def test_a_token_found_is_returned(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)
+
+        assert auth.require_auth_token() == TOKEN
+
+
+class TestWhatTheSdkIsGiven:
+    def test_the_profile_token_is_put_where_the_sdk_reads_it(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        write(tmp_path / "work" / ".credentials.json", credentials())
+
+        with caplog.at_level(logging.INFO, logger=auth.__name__):
+            auth.configure_sdk_authentication(str(tmp_path / "work"))
+
+        assert os.environ["CLAUDE_CODE_OAUTH_TOKEN"] == TOKEN
+        assert f"present(len={len(TOKEN)})" in caplog.text
+        assert TOKEN not in caplog.text
+
+    def test_an_encrypted_token_is_refused_before_the_sdk(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", ENCRYPTED)
+
+        assert auth.get_auth_token() == ENCRYPTED
+        with pytest.raises(ValueError, match="encrypted format") as raised:
+            auth.configure_sdk_authentication()
+        assert "claude setup-token" in str(raised.value)
+
+    def test_an_encrypted_token_in_a_profile_is_refused_too(self, tmp_path):
+        write(tmp_path / "work" / ".credentials.json", credentials(ENCRYPTED))
+
         with pytest.raises(ValueError, match="encrypted format"):
-            validate_token_not_encrypted("enc:wrapped")
+            auth.configure_sdk_authentication(str(tmp_path / "work"))
+
+    def test_no_token_is_refused(self):
+        with pytest.raises(ValueError, match="No OAuth token found"):
+            auth.configure_sdk_authentication()
+
+    def test_an_api_profile_uses_its_own_token(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", OTHER)
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)
+
+        auth.configure_sdk_authentication()
+
+        # The SDK prefers the OAuth token when both are set
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ
+        assert os.environ["ANTHROPIC_AUTH_TOKEN"] == OTHER
+
+    def test_an_api_profile_without_its_token_is_refused(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
+
+        with pytest.raises(ValueError, match="ANTHROPIC_AUTH_TOKEN is not set"):
+            auth.configure_sdk_authentication()
+
+    def test_a_leftover_base_url_does_not_send_the_oauth_token_to_it(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://stale.example")
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)
+
+        with caplog.at_level(logging.WARNING, logger=auth.__name__):
+            auth.configure_sdk_authentication()
+
+        assert "ANTHROPIC_BASE_URL" not in os.environ
+        assert os.environ["CLAUDE_CODE_OAUTH_TOKEN"] == TOKEN
+        assert "Removing ANTHROPIC_BASE_URL" in caplog.text
+
+    def test_the_oauth_token_is_copied_for_the_sdk_when_only_a_proxy_token_is_set(
+        self, monkeypatch
+    ):
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", OTHER)
+
+        auth.ensure_claude_code_oauth_token()
+
+        assert os.environ["CLAUDE_CODE_OAUTH_TOKEN"] == OTHER
+
+    def test_a_set_oauth_token_is_kept(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", TOKEN)
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", OTHER)
+
+        auth.ensure_claude_code_oauth_token()
+
+        assert os.environ["CLAUDE_CODE_OAUTH_TOKEN"] == TOKEN
+
+    def test_no_token_sets_nothing(self):
+        auth.ensure_claude_code_oauth_token()
+
+        assert "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ
 
 
-class TestDecryptToken:
-    def test_rejects_non_string(self) -> None:
-        with pytest.raises(ValueError, match="Invalid token type"):
-            decrypt_token(123)  # type: ignore[arg-type]
+class TestTheSdkEnvironment:
+    def test_only_set_variables_pass_and_pythonpath_is_emptied(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
+        monkeypatch.setenv("ANTHROPIC_MODEL", "")
+        monkeypatch.setenv(
+            "ANTHROPIC_API_KEY", "sk-ant-api03-0000"
+        )  # pragma: allowlist secret
+        monkeypatch.setenv("PYTHONPATH", "/somewhere")
 
-    def test_rejects_missing_prefix(self) -> None:
-        with pytest.raises(ValueError, match="enc:"):
-            decrypt_token("plaintext-no-prefix")
+        assert auth.get_sdk_env_vars() == {
+            "ANTHROPIC_BASE_URL": "https://proxy.example",
+            "PYTHONPATH": "",
+        }
 
-    def test_rejects_empty_payload(self) -> None:
-        with pytest.raises(ValueError, match="Empty"):
-            decrypt_token("enc:")
+    def test_git_bash_is_not_looked_for_outside_windows(self, monkeypatch):
+        def run(cmd, **kwargs):
+            raise AssertionError(f"ran {cmd}")
 
-    def test_rejects_too_short_payload(self) -> None:
-        with pytest.raises(ValueError, match="too short"):
-            decrypt_token("enc:short")
+        monkeypatch.setattr(auth.subprocess, "run", run)
 
-
-# ---------------------------------------------------------------------------
-# _try_decrypt_token (the centralised fallback)
-
-
-class TestTryDecryptToken:
-    def test_returns_none_for_none(self) -> None:
-        assert _try_decrypt_token(None) is None
-
-    def test_returns_none_for_empty_string(self) -> None:
-        assert _try_decrypt_token("") is None
-
-    def test_returns_plaintext_unchanged(self) -> None:
-        assert _try_decrypt_token("sk-ant-real") == "sk-ant-real"
-
-    def test_returns_encrypted_unchanged_when_decryption_fails(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # Force decrypt_token to raise — _try_decrypt_token must catch the
-        # ValueError and return the original encrypted token so downstream
-        # validation can produce a precise error message.
-        from core import auth as auth_mod
-
-        def boom(_token: str) -> str:
-            raise ValueError("simulated platform decryption failure")
-
-        monkeypatch.setattr(auth_mod, "decrypt_token", boom)
-        original = "enc:something_long_enough_to_not_be_rejected_outright"
-        assert _try_decrypt_token(original) == original
-
-    def test_returns_decrypted_when_decryption_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from core import auth as auth_mod
-
-        monkeypatch.setattr(auth_mod, "decrypt_token", lambda _t: "sk-ant-decrypted")
-        assert _try_decrypt_token("enc:wrapped") == "sk-ant-decrypted"
+        assert "CLAUDE_CODE_GIT_BASH_PATH" not in auth.get_sdk_env_vars()
 
 
-# ---------------------------------------------------------------------------
-# get_auth_token — env-var resolution order
+class TestGitBashOnWindows:
+    """Claude Code on Windows needs bash.exe; it is found next to git.exe."""
+
+    @pytest.fixture
+    def where(self, monkeypatch):
+        found: dict[str, object] = {"git": None}
+
+        def run(cmd, **kwargs):
+            assert cmd == ["where.exe", "git"]
+            assert kwargs.get("shell") is False
+            answer = found["git"]
+            if isinstance(answer, BaseException):
+                raise answer
+            if answer is None:
+                return subprocess.CompletedProcess(cmd, 1, "", "not found")
+            return subprocess.CompletedProcess(
+                cmd, 0, f"{answer}\nC:\\other\\git.exe\n", ""
+            )
+
+        monkeypatch.setattr(auth.subprocess, "run", run)
+        on(monkeypatch, "Windows")
+        return found
+
+    @staticmethod
+    def install(root: Path, git: str, bash: str | None = "bin/bash.exe") -> Path:
+        write(root / git, "")
+        if bash:
+            write(root / bash, "")
+        return root / git
+
+    @pytest.mark.parametrize(
+        "git", ["cmd/git.exe", "bin/git.exe", "mingw64/bin/git.exe"]
+    )
+    def test_each_layout_of_git_for_windows(self, where, tmp_path, git):
+        where["git"] = self.install(tmp_path / "Git", git)
+
+        env = auth.get_sdk_env_vars()
+
+        assert env["CLAUDE_CODE_GIT_BASH_PATH"] == str(
+            tmp_path / "Git" / "bin" / "bash.exe"
+        )
+
+    @pytest.mark.parametrize(
+        "error", [FileNotFoundError("where.exe"), subprocess.TimeoutExpired("where", 5)]
+    )
+    def test_without_where_the_usual_install_folders_are_tried(self, where, error):
+        where["git"] = error
+        root = Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Git"
+        self.install(root, "cmd/git.exe")
+
+        env = auth.get_sdk_env_vars()
+
+        assert env["CLAUDE_CODE_GIT_BASH_PATH"] == str(root / "bin" / "bash.exe")
+
+    def test_git_without_bash_gives_nothing(self, where, tmp_path):
+        where["git"] = self.install(tmp_path / "Git", "cmd/git.exe", bash=None)
+
+        assert "CLAUDE_CODE_GIT_BASH_PATH" not in auth.get_sdk_env_vars()
+
+    def test_no_git_gives_nothing(self, where):
+        assert "CLAUDE_CODE_GIT_BASH_PATH" not in auth.get_sdk_env_vars()
+
+    def test_a_path_set_by_the_app_is_kept(self, where, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CODE_GIT_BASH_PATH", r"D:\Git\bin\bash.exe")
+        where["git"] = AssertionError("where.exe should not run")
+
+        assert auth.get_sdk_env_vars()["CLAUDE_CODE_GIT_BASH_PATH"] == (
+            r"D:\Git\bin\bash.exe"
+        )
 
 
-class TestGetAuthTokenEnvVarOrder:
-    @pytest.fixture(autouse=True)
-    def _clear_auth_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Make sure the test never inherits a real token from the dev env.
-        for var in AUTH_TOKEN_ENV_VARS:
-            monkeypatch.delenv(var, raising=False)
-        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+class TestLogsAndNames:
+    @pytest.mark.parametrize(("token", "shown"), [(None, "absent"), ("", "absent")])
+    def test_a_missing_token_reads_as_absent(self, token, shown):
+        assert auth._token_presence(token) == shown
 
-    def test_oauth_var_takes_precedence(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Force keychain lookup to return None so env-var resolution is the
-        # only source of truth.
-        from core import auth as auth_mod
+    def test_a_token_shows_only_its_length(self):
+        shown = auth._token_presence(TOKEN)
 
-        monkeypatch.setattr(auth_mod, "get_token_from_keychain", lambda *_a, **_k: None)
-        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "from-oauth")
-        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "from-anthropic")
-        assert get_auth_token() == "from-oauth"
+        assert shown == f"present(len={len(TOKEN)})"
+        assert "sk-" not in shown and "0000" not in shown
 
-    def test_falls_back_to_anthropic_auth_token(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from core import auth as auth_mod
+    def test_the_keychain_name_matches_the_frontend(self):
+        """`credential-utils.ts` names a profile's entry the same way."""
+        assert auth._get_keychain_service_name(None) == "Claude Code-credentials"
+        assert auth._get_keychain_service_name("/Users/dana/.claude-work") == (
+            "Claude Code-credentials-"
+            + auth._calculate_config_dir_hash("/Users/dana/.claude-work")
+        )
+        assert (
+            auth._calculate_config_dir_hash("/Users/dana/.claude-work")
+            == (hashlib.sha256(b"/Users/dana/.claude-work").hexdigest()[:8])
+        )
 
-        monkeypatch.setattr(auth_mod, "get_token_from_keychain", lambda *_a, **_k: None)
-        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "ccr-token")
-        assert get_auth_token() == "ccr-token"
+    def test_a_tilde_names_the_same_entry_as_the_home_path(self, machine):
+        assert auth._get_keychain_service_name("~/work") == (
+            auth._get_keychain_service_name(str(machine / "work"))
+        )
 
-    def test_does_not_consult_anthropic_api_key(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # ANTHROPIC_API_KEY is intentionally NOT in AUTH_TOKEN_ENV_VARS to
-        # prevent silent billing — confirm the resolver still ignores it.
-        from core import auth as auth_mod
+    def test_a_plaintext_token_passes_the_encryption_check(self):
+        auth.validate_token_not_encrypted(TOKEN)
 
-        monkeypatch.setattr(auth_mod, "get_token_from_keychain", lambda *_a, **_k: None)
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-billable")
-        assert get_auth_token() is None
-
-    def test_returns_none_when_nothing_set(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from core import auth as auth_mod
-
-        monkeypatch.setattr(auth_mod, "get_token_from_keychain", lambda *_a, **_k: None)
-        assert get_auth_token() is None
+        assert auth.is_encrypted_token(ENCRYPTED)
+        assert not auth.is_encrypted_token(None)
+        assert not auth.is_encrypted_token(TOKEN)
 
 
-# ---------------------------------------------------------------------------
-# get_sdk_env_vars
+class TestLoadingWithoutSecretstorage:
+    """Without `secretstorage`, Linux warns once at import; other systems say nothing."""
 
+    @staticmethod
+    def load(monkeypatch, linux: bool):
+        import foundation.platform
 
-class TestGetSdkEnvVars:
-    @pytest.fixture(autouse=True)
-    def _clear_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        for var in SDK_ENV_VARS:
-            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setitem(sys.modules, "secretstorage", None)
+        monkeypatch.setattr(foundation.platform, "is_linux", lambda: linux)
+        spec = importlib.util.spec_from_file_location(
+            "core_auth_without_secretstorage", auth.__file__
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
 
-    def test_empty_env_yields_empty_pythonpath_only(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # Even with nothing set, PYTHONPATH must be present + empty (ACS-251).
-        # On Windows the function may also auto-detect git-bash; we only
-        # assert the contract on PYTHONPATH to keep the test cross-platform.
-        env = get_sdk_env_vars()
-        assert env.get("PYTHONPATH") == ""
+    def test_linux_warns(self, monkeypatch, caplog):
+        with caplog.at_level(logging.WARNING):
+            module = self.load(monkeypatch, linux=True)
 
-    def test_only_passes_through_non_empty_vars(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://x")
-        monkeypatch.setenv("DISABLE_TELEMETRY", "")  # empty → must be skipped
-        env = get_sdk_env_vars()
-        assert env.get("ANTHROPIC_BASE_URL") == "https://x"
-        assert "DISABLE_TELEMETRY" not in env
+        assert module.secretstorage is None
+        assert "pip install secretstorage" in caplog.text
 
-    def test_anthropic_api_key_never_leaked(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # ANTHROPIC_API_KEY is intentionally absent from SDK_ENV_VARS — make
-        # sure get_sdk_env_vars never ships it to the agent subprocess.
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-billable")
-        env = get_sdk_env_vars()
-        assert "ANTHROPIC_API_KEY" not in env
+    def test_other_systems_do_not(self, monkeypatch, caplog):
+        with caplog.at_level(logging.WARNING):
+            self.load(monkeypatch, linux=False)
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+        assert "secretstorage" not in caplog.text
