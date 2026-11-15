@@ -13,6 +13,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from foundation.platform import find_executable, is_windows, split_command
 from ui import (
     Icons,
     MenuOption,
@@ -135,21 +136,15 @@ def open_file_in_editor(file_path: Path) -> bool:
         print_status(f"File not found: {file_path}", "error")
         return False
 
-    # Get editor from environment or use fallbacks
-    editor = os.environ.get("EDITOR", "")
+    # Get editor from environment or use fallbacks. `which` does not exist on
+    # Windows (and its absence raised FileNotFoundError, not the
+    # CalledProcessError this loop caught): look the editors up ourselves.
+    editor = os.environ.get("EDITOR", "").strip()
     if not editor:
-        # Try common editors in order
-        for candidate in ["code", "nano", "vim", "vi"]:
-            try:
-                subprocess.run(
-                    ["which", candidate],
-                    capture_output=True,
-                    check=True,
-                )
-                editor = candidate
-                break
-            except subprocess.CalledProcessError:
-                continue
+        candidates = (
+            ["code", "notepad"] if is_windows() else ["code", "nano", "vim", "vi"]
+        )
+        editor = next((c for c in candidates if find_executable(c)), "")
 
     if not editor:
         print_status("No editor found. Set $EDITOR environment variable.", "error")
@@ -159,12 +154,19 @@ def open_file_in_editor(file_path: Path) -> bool:
     print()
     print_status(f"Opening {file_path.name} in {editor}...", "info")
 
+    # $EDITOR may carry arguments ("code --wait", "emacs -nw"): split it
+    # instead of looking up the whole string as one program.
+    # A quoted empty value ('""') splits to [""], which names no program.
+    argv = split_command(editor)
+    if not argv or not argv[0]:
+        print_status(f"Editor not found: {editor}", "error")
+        return False
+    # Use --wait flag for VS Code to block until closed
+    if Path(argv[0]).stem.lower() in ("code", "code-insiders") and "--wait" not in argv:
+        argv.append("--wait")
+
     try:
-        # Use --wait flag for VS Code to block until closed
-        if editor in ("code", "code-insiders"):
-            subprocess.run([editor, "--wait", str(file_path)], check=True)
-        else:
-            subprocess.run([editor, str(file_path)], check=True)
+        subprocess.run([*argv, str(file_path)], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print_status(f"Editor failed: {e}", "error")
