@@ -227,14 +227,9 @@ export function registerTaskExecutionHandlers(
 		const startEvent = determineStartEvent(taskId, task);
 		const taskToUse = startEvent.resetTask || task;
 
-		// Create proper event object based on type
-		let event: TaskEvent;
-		if (startEvent.type === "PR_CREATED") {
-			// This case shouldn't happen in start event, but handle for type safety
-			event = { type: startEvent.type, prUrl: "" };
-		} else {
-			event = { type: startEvent.type } as TaskEvent;
-		}
+		// A start event carries nothing but its type (determineStartEvent never
+		// answers PR_CREATED, the one event with a payload).
+		const event = { type: startEvent.type } as TaskEvent;
 
 		taskStateManager.handleUiEvent(taskId, event, taskToUse, project);
 
@@ -314,7 +309,20 @@ export function registerTaskExecutionHandlers(
 			let sessionId: string | undefined;
 			try {
 				const raw = readFileSync(sessionFile, "utf-8");
-				const parsed = JSON.parse(raw) as { session_id?: string };
+				const parsed = JSON.parse(raw) as {
+					session_id?: string;
+					provider?: string | null;
+				};
+				// Codex records its thread id in the same file: handed to the
+				// Claude SDK as a session to resume, it fails the run. A marker
+				// with no provider predates the field and is Claude's.
+				const provider = parsed.provider ?? "claude";
+				if (provider !== "claude" && provider !== "anthropic") {
+					return {
+						success: false,
+						error: `The saved session belongs to ${provider}: only a Claude session can be resumed.`,
+					};
+				}
 				sessionId = parsed.session_id;
 			} catch (err) {
 				return {
