@@ -112,7 +112,7 @@ jobs:
           # run measures it, the coverage job adds the shards up.
           cov=()
           if [ "$RUNNER_OS" == "Linux" ]; then
-            cov=(--cov=apps/backend --cov-report=)
+            cov=(--cov=apps/backend --cov=src --cov-report=)
           fi
           # Depuis la racine, sans argument : pytest suit `testpaths` du
           # pytest.ini racine, la seule configuration du depot (lot L11, F31),
@@ -174,8 +174,8 @@ jobs:
           python -m pip install --quiet 'coverage>=7.10'
           python -m coverage combine .coverage.shard*
           # A floor, not a goal: just under what the suite covers, raised by
-          # each lot of the 100 % plan (74.4 % on 14 November 2026).
-          python -m coverage report --fail-under=74 | tail -n 3
+          # each lot of the 100 % plan (75.4 % on 15 November 2026, src/ included).
+          python -m coverage report --fail-under=75 | tail -n 3
           python -m coverage xml -o apps/backend/coverage.xml
 
       # The floor above holds the whole suite; this holds each change at
