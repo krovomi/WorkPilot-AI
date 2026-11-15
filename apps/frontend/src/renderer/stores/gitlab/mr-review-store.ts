@@ -188,94 +188,26 @@ export const useMRReviewStore = create<MRReviewStoreState>((set, get) => ({
 }));
 
 /**
- * Global IPC listener setup for MR reviews.
- * Call this once at app startup to ensure MR review events are captured
- * regardless of which component is mounted.
+ * MR review events, registered once for the window by `global-listeners.ts`
+ * so a review that finishes while the GitLab page is closed still lands in
+ * the store. Returns the teardown.
  */
-let mrReviewListenersInitialized = false;
-let cleanupFunctions: (() => void)[] = [];
-
-export function initializeMRReviewListeners(): void {
-	if (mrReviewListenersInitialized) {
-		return;
-	}
-
+export function setupMRReviewListeners(): () => void {
 	const store = useMRReviewStore.getState();
-
-	// Check if GitLab MR Review API is available
-	if (!window.electronAPI?.onGitLabMRReviewProgress) {
-		console.warn(
-			"[GitLab MR Store] GitLab MR Review API not available, skipping listener setup",
-		);
-		return;
-	}
-
-	// Listen for MR review progress events
-	const progressHandler = (
-		projectId: string,
-		progress: GitLabMRReviewProgress,
-	) => {
-		store.setMRReviewProgress(projectId, progress);
+	const cleanups = [
+		window.electronAPI.onGitLabMRReviewProgress((projectId, progress) =>
+			store.setMRReviewProgress(projectId, progress),
+		),
+		window.electronAPI.onGitLabMRReviewComplete((projectId, result) =>
+			store.setMRReviewResult(projectId, result),
+		),
+		window.electronAPI.onGitLabMRReviewError((projectId, data) =>
+			store.setMRReviewError(projectId, data.mrIid, data.error),
+		),
+	];
+	return () => {
+		for (const cleanup of cleanups) cleanup();
 	};
-	window.electronAPI.onGitLabMRReviewProgress(progressHandler);
-
-	// Listen for MR review completion events
-	const completeHandler = (projectId: string, result: GitLabMRReviewResult) => {
-		store.setMRReviewResult(projectId, result);
-	};
-	window.electronAPI.onGitLabMRReviewComplete(completeHandler);
-
-	// Listen for MR review error events
-	const errorHandler = (
-		projectId: string,
-		data: { mrIid: number; error: string },
-	) => {
-		store.setMRReviewError(projectId, data.mrIid, data.error);
-	};
-	window.electronAPI.onGitLabMRReviewError(errorHandler);
-
-	// Store cleanup functions if the API supports removeListener
-	// Note: These are optional methods that may not exist in the ElectronAPI
-	const api = window.electronAPI as unknown as Record<string, unknown>;
-	if (typeof api.removeGitLabMRReviewProgress === "function") {
-		cleanupFunctions.push(() =>
-			(api.removeGitLabMRReviewProgress as (handler: unknown) => void)?.(
-				progressHandler,
-			),
-		);
-	}
-	if (typeof api.removeGitLabMRReviewComplete === "function") {
-		cleanupFunctions.push(() =>
-			(api.removeGitLabMRReviewComplete as (handler: unknown) => void)?.(
-				completeHandler,
-			),
-		);
-	}
-	if (typeof api.removeGitLabMRReviewError === "function") {
-		cleanupFunctions.push(() =>
-			(api.removeGitLabMRReviewError as (handler: unknown) => void)?.(
-				errorHandler,
-			),
-		);
-	}
-
-	mrReviewListenersInitialized = true;
-}
-
-/**
- * Cleanup MR review listeners.
- * Call this when the app is being unmounted or during hot-reload.
- */
-export function cleanupMRReviewListeners(): void {
-	for (const cleanup of cleanupFunctions) {
-		try {
-			cleanup();
-		} catch {
-			// Ignore cleanup errors
-		}
-	}
-	cleanupFunctions = [];
-	mrReviewListenersInitialized = false;
 }
 
 /**
