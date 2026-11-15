@@ -465,3 +465,28 @@ async def test_a_real_handshake_names_its_channel_and_its_token():
                 await ws.recv()
         assert refused.value.rcvd is not None
         assert refused.value.rcvd.code == WS_CLOSE_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_the_apps_percent_encoded_channel_is_the_channel_they_named():
+    """The desktop and phone apps encode the channel as a URL segment
+    (`project%3A<id>`): it is decoded, then checked like any other name."""
+    from streaming.websocket_server import WS_CLOSE_FORBIDDEN
+
+    w = await _world()
+    server = _server()
+    token = _token(_user(w, "alice", "org_a"))
+    headers = {"Authorization": f"Bearer {token}", "X-WorkPilot-Org": w["org_a"]}
+
+    ws, ctx = await _connect_with_headers(
+        server, f"/stream/project%3A{w['proj_a']}", headers
+    )
+    assert ws.closed is None and ctx["session_id"] == f"project:{w['proj_a']}"
+    assert ws in server._clients[f"project:{w['proj_a']}"]
+
+    # Encoded or not, another tenant's project stays closed.
+    ws, ctx = await _connect_with_headers(
+        server, f"/stream/project%3A{w['proj_b']}", headers
+    )
+    assert ws.closed is not None and ws.closed[0] == WS_CLOSE_FORBIDDEN
+    assert ctx["session_id"] is None

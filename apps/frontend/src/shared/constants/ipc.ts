@@ -43,6 +43,7 @@ export const IPC_CHANNELS = {
 	TASK_UPDATE: "task:update",
 	TASK_START: "task:start",
 	TASK_STOP: "task:stop",
+	AGENTS_STOP_ALL: "agents:stopAll",
 	TASK_REVIEW: "task:review",
 	TASK_UPDATE_STATUS: "task:updateStatus",
 	TASK_UPDATE_PLAN: "task:updatePlan", // Update plan phases and subtasks
@@ -877,6 +878,9 @@ export const IPC_CHANNELS = {
 	MISSION_CONTROL_REMOVE_AGENT: "missionControl:removeAgent",
 	MISSION_CONTROL_START_AGENT: "missionControl:startAgent",
 	MISSION_CONTROL_STOP_AGENT: "missionControl:stopAgent",
+
+	// Execution waves across specs (Conflict Predictor, #358): plan by task id
+	CONFLICT_WAVES_PLAN: "conflictWaves:plan",
 
 	// Context Mesh — Cross-Project Intelligence
 	CONTEXT_MESH_GET_PROJECTS: "contextMesh:getProjects",

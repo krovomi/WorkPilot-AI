@@ -124,17 +124,20 @@ def send_notification(
         logger.warning("team_bot: empty webhook_url, skipping")
         return False
 
+    # The scheme is checked before the request is built: `Request` raises on
+    # a string that is not a URL, and this function never raises.
+    if not config.webhook_url.startswith(("https://", "http://")):
+        logger.warning("team_bot: invalid webhook scheme")
+        return False
+
     body = build_body(config.kind, payload)
     data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(  # noqa: S310 — user-provided webhook, scheme validated below
+    req = urllib.request.Request(  # noqa: S310 — user-provided webhook, scheme validated above
         config.webhook_url,
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    if not config.webhook_url.startswith(("https://", "http://")):
-        logger.warning("team_bot: invalid webhook scheme")
-        return False
 
     try:
         ctx = ssl.create_default_context()

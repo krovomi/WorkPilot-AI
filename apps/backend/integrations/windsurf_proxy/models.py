@@ -310,11 +310,6 @@ def resolve_model(name: str) -> tuple[int, str]:
     return (int(default_enum), f"MODEL_{default_enum.name}")
 
 
-def get_available_models() -> list[str]:
-    """Return list of all available model friendly names."""
-    return sorted(MODEL_NAME_TO_ENUM.keys())
-
-
 def requires_cascade(name: str) -> bool:
     """Return True if this model must be routed through the Cascade flow.
 
