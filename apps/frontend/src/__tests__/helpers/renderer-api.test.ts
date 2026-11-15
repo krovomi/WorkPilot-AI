@@ -27,6 +27,23 @@ describe("installRendererApi", () => {
 		expect("anything" in api).toBe(true);
 	});
 
+	it("answers a namespace's methods the same way", async () => {
+		installed = installRendererApi();
+		const api = scope.electronAPI as Record<
+			string,
+			Record<string, (...a: unknown[]) => unknown>
+		>;
+		expect(typeof api.github.onPRReviewProgress(() => undefined)).toBe(
+			"function",
+		);
+		await expect(api.github.getPRs("p1")).resolves.toEqual({ success: true });
+		expect(installed.fn("github.getPRs")).toHaveBeenCalledWith("p1");
+		expect(api.github.getPRs).toBe(installed.fn("github.getPRs"));
+		// A method keeps its own mock API and is not awaited as a promise.
+		expect(vi.isMockFunction(api.github)).toBe(true);
+		expect((api.github as unknown as { then?: unknown }).then).toBeUndefined();
+	});
+
 	it("keeps a mock override, wraps a plain function, and returns a value as is", async () => {
 		const mock = vi.fn().mockResolvedValue({ success: false });
 		installed = installRendererApi({

@@ -231,7 +231,7 @@ def console_errors(console_text: str) -> list[VerifyError]:
 
 
 _NETWORK_LINE = re.compile(
-    r"(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?P<url>\S+)\s+\[(?:failed - )?(?P<status>\d{3}|net::\S+)",
+    r"(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(?P<url>\S+)\s+\[(?:failed - )?(?P<status>\d{3}|net::[^\s\]]+)",
     re.I,
 )
 
