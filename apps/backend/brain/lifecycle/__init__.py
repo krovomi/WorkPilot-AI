@@ -1,0 +1,34 @@
+"""The memory's lifecycle, explained: journal, trash, pins, conflicts.
+
+| Module | Answers |
+|---|---|
+| `journal.py` | every decision on a memory, one Markdown line in the vault (merged by union) |
+| `store.py` | forget (soft, restorable), restore, purge, pin, archive |
+| `contradictions.py` | two notes that say opposite things, found without a model |
+| `arbitration.py` | after a sync: safe rules settle a pair, the rest waits for a person |
+| `advisor.py` | a model's opinion on one queued pair, asked by a person |
+| `api.py` | ``/api/brain/memory/*`` |
+
+Everything lives under ``knowledge/projects/<project>/memory/.lifecycle/`` —
+inside the vault, so it syncs; hidden, so no agent recalls it. The conflict
+queue alone is this machine's (``.workpilot-brain/conflicts.json``).
+"""
+
+from __future__ import annotations
+
+from .arbitration import open_conflicts, resolve, review_pull
+from .journal import JournalEntry, append, read
+from .store import forget, pin, restore, trash
+
+__all__ = [
+    "JournalEntry",
+    "append",
+    "forget",
+    "open_conflicts",
+    "pin",
+    "read",
+    "resolve",
+    "restore",
+    "review_pull",
+    "trash",
+]

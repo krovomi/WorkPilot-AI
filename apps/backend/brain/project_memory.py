@@ -59,6 +59,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .lifecycle import journal as lifecycle_journal
+from .lifecycle import store as lifecycle_store
 from .memories import redact
 from .notes import inside, read_note, slugify
 from .runtime import enabled as brain_enabled
@@ -217,7 +219,11 @@ class ProjectMemory:
         *,
         brain: Brain | None = None,
         project: str | None = None,
+        actor: str = "agent",
     ) -> None:
+        self.actor = actor
+        """Who the journal says acted (`lifecycle.journal.ACTORS`)."""
+        self._explained: dict[str, tuple[str, str, str]] = {}
         self.spec_dir = Path(spec_dir) if spec_dir else None
         self.project_dir = Path(project_dir) if project_dir else None
         if project:
@@ -314,6 +320,7 @@ class ProjectMemory:
 
         project_link = _ensure_project(brain.root, self.project)
         rel = self.base / (folder or KINDS[kind]) / f"{slug or slugify(title)}.md"
+        before = self._own_text_at(brain, rel)
         fields: dict[str, Any] = {
             "memory": kind,
             "project": self.project,
@@ -334,7 +341,51 @@ class ProjectMemory:
             sync=False,
         )
         self._pending += 1
+        self._journal_write(brain, result.rel, title, body, before)
         return result.rel
+
+    @staticmethod
+    def _own_text_at(brain: Brain, rel: Path) -> str | None:
+        try:
+            return _own_text(read_note(brain.root, rel).body)
+        except (OSError, ValueError):
+            return None
+
+    def explain_next(
+        self, kind: str, slug: str, *, action: str, reason_code: str, reason: str = ""
+    ) -> None:
+        """How the journal should word the next write of this note (a merge)."""
+        self._explained[f"{KINDS[kind]}/{slugify(slug)}"] = (
+            action,
+            reason_code,
+            reason,
+        )
+
+    def _journal_write(
+        self, brain: Brain, rel: str, title: str, body: str, before: str | None
+    ) -> None:
+        """A creation, or an update whose text changed: counters alone are not news."""
+        now = _own_text(body)
+        if before is not None and before == now:
+            return
+        key = rel.split("/memory/", 1)[-1].removesuffix(".md")
+        action, code, reason = self._explained.pop(
+            key,
+            ("create", "recorded", "") if before is None else ("update", "edited", ""),
+        )
+        lifecycle_journal.append(
+            brain.root,
+            self.base,
+            lifecycle_journal.JournalEntry(
+                action=action,
+                actor=self.actor,
+                note=rel,
+                title=title,
+                preview=lifecycle_journal.preview_of(now),
+                reason_code=code,
+                reason=reason,
+            ),
+        )
 
     def flush(self) -> bool:
         """Commit, pull and push what this instance wrote. Idempotent."""
@@ -444,18 +495,37 @@ class ProjectMemory:
             for _, meta, _ in self._by_date(self._notes("pattern", learned=True))
         ]
 
-    def forget(self, kind: str, slug: str) -> bool:
-        """Remove one note of this project's memory. ``False`` when absent."""
+    def forget(
+        self, kind: str, slug: str, *, reason_code: str = "", reason: str = ""
+    ) -> bool:
+        """Move one note of this project's memory to the trash (`lifecycle.store`).
+
+        Restorable for ``BRAIN_MEMORY_RETENTION_DAYS``, and journalled. A pinned
+        note refuses every actor but the person (``False``). ``False`` when absent.
+        """
         brain = self._get_brain(create=False)
-        if brain is None:
+        if brain is None or kind not in KINDS:
             return False
+        rel = (self.base / KINDS[kind] / f"{slugify(slug)}.md").as_posix()
+        code = reason_code or (
+            "user-request" if self.actor == "user" else "pattern-retired"
+        )
         try:
-            path = inside(brain.root, self.base / KINDS[kind] / f"{slugify(slug)}.md")
-        except ValueError:
+            outcome = lifecycle_store.forget(
+                brain.root,
+                self.base,
+                rel,
+                actor=self.actor,
+                reason_code=code,
+                reason=reason,
+            )
+        except (OSError, ValueError) as exc:
+            logger.warning("brain: memory note not forgotten: %s", exc)
             return False
-        if not path.is_file():
+        if outcome.get("code") == "pinned":
+            self._pending += 1  # the refusal is journalled, and syncs
+        if not outcome.get("ok"):
             return False
-        path.unlink()
         self._pending += 1
         return True
 
@@ -978,6 +1048,7 @@ def _episode(hit: dict[str, Any]) -> dict[str, Any]:
         "content": hit["content"],
         "session_number": meta.get("session_number"),
         "path": hit["path"],
+        "pinned": meta.get("pinned") is True,
     }
 
 

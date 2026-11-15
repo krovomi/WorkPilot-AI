@@ -75,7 +75,7 @@ export function registerTaskRecoveryHandlers(ctx: ExecutionHandlerContext): void
 			const planPaths = getPlanPaths(specPaths, project);
 
 			// Read and parse the plan
-			const plan = await readAndParsePlan(planPaths.primary);
+			const plan = readAndParsePlan(planPaths.primary, task);
 			if (!plan) {
 				return {
 					success: false,
@@ -157,14 +157,26 @@ export function registerTaskRecoveryHandlers(ctx: ExecutionHandlerContext): void
 	}
 
 	/**
-	 * Read and parse the plan file
+	 * Read and parse the plan file.
+	 *
+	 * A task whose process died while its spec was being written has no plan
+	 * yet: it recovers from an empty one (no subtask, so back to the backlog,
+	 * or into spec creation again on a restart) instead of being told its plan
+	 * is corrupted.
 	 */
-	async function readAndParsePlan(
+	function readAndParsePlan(
 		planPath: string,
-	): Promise<Record<string, unknown> | null> {
+		task: { title: string; description?: string },
+	): Record<string, unknown> | null {
 		const planContent = safeReadFileSync(planPath);
-		if (!planContent) {
-			return null;
+		if (planContent === null) {
+			if (existsSync(planPath)) return null; // there, but unreadable
+			return {
+				feature: task.title,
+				description: task.description || "",
+				created_at: new Date().toISOString(),
+				phases: [],
+			};
 		}
 
 		try {
