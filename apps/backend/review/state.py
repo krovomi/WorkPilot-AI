@@ -150,6 +150,21 @@ class ReviewState:
         if auto_save:
             self.save(spec_dir)
 
+    def carry_over(self, spec_dir: Path) -> None:
+        """Keep a valid approval over the plan as a build left it.
+
+        The approval covers ``spec.md`` and the plan, and a build writes its
+        progress into the plan (each subtask's status, the card's column). That
+        progress is the approved work going on, not a change a person made, so
+        the next build of the same card (a retry, a resume) still holds the
+        approval. Call it only when the approval was valid when the build
+        started; one that was not stays as it is.
+        """
+        if not self.approved:
+            return
+        self.spec_hash = _compute_spec_hash(spec_dir)
+        self.save(spec_dir)
+
     def reject(self, spec_dir: Path, auto_save: bool = True) -> None:
         """
         Mark the spec as not approved.
