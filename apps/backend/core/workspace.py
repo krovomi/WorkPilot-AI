@@ -19,58 +19,6 @@ Public API is exported via workspace/__init__.py for backward compatibility.
 
 from pathlib import Path
 
-from core.worktree import WorktreeManager
-
-# Import git command helper for centralized logging and allowlist compliance
-from foundation.git_executable import run_git
-from ui import (
-    Icons,
-    bold,
-    box,
-    error,
-    highlight,
-    icon,
-    muted,
-    print_status,
-    success,
-    warning,
-)
-
-# Import debug utilities
-try:
-    from foundation.debug import (
-        debug,
-        debug_detailed,
-        debug_error,
-        debug_success,
-        debug_verbose,
-        debug_warning,
-        is_debug_enabled,
-    )
-except ImportError:
-
-    def debug(*args, **kwargs):
-        pass
-
-    def debug_detailed(*args, **kwargs):
-        pass
-
-    def debug_verbose(*args, **kwargs):
-        pass
-
-    def debug_success(*args, **kwargs):
-        pass
-
-    def debug_error(*args, **kwargs):
-        pass
-
-    def debug_warning(*args, **kwargs):
-        pass
-
-    def is_debug_enabled():
-        return False
-
-
 # Import merge system
 from core.workspace.display import (
     print_conflict_info as _print_conflict_info,
@@ -118,11 +66,34 @@ from core.workspace.models import (
     ParallelMergeResult,
     ParallelMergeTask,
 )
+from core.worktree import WorktreeManager
+from foundation.debug import (
+    debug,
+    debug_detailed,
+    debug_error,
+    debug_success,
+    debug_warning,
+)
+
+# Import git command helper for centralized logging and allowlist compliance
+from foundation.git_executable import run_git
 from merge import (
     FileTimelineTracker,
     MergeOrchestrator,
 )
 from merge.progress import MergeProgressCallback, MergeProgressStage, emit_progress
+from ui import (
+    Icons,
+    bold,
+    box,
+    error,
+    highlight,
+    icon,
+    muted,
+    print_status,
+    success,
+    warning,
+)
 
 MODULE = "workspace"
 
@@ -2064,6 +2035,11 @@ async def _attempt_ai_merge(
         )
         if not is_valid:
             return False, None, f"Invalid syntax: {syntax_error}"
+
+        # The answer was stripped above: give back the final newline both
+        # versions of the file end with, or every merged file loses it.
+        if task.main_content.endswith("\n") and task.worktree_content.endswith("\n"):
+            merged_content = merged_content.rstrip("\n") + "\n"
 
         return True, merged_content, ""
     else:

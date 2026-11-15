@@ -141,8 +141,13 @@ def forge(temp_git_repo, tmp_path, monkeypatch):
         impact_calls.append(kwargs)
         return None
 
+    # On the module object `from agents.x import y` reads (sys.modules): a
+    # file that mocks `agents` at collection can leave the package attribute
+    # on another copy, and the real model would then be reached.
     monkeypatch.setattr(
-        "agents.impact_analyzer.run_impact_analyzer_sync", no_model_impact
+        importlib.import_module("agents.impact_analyzer"),
+        "run_impact_analyzer_sync",
+        no_model_impact,
     )
     f = Forge(temp_git_repo, bare, tmp_path, monkeypatch)
     f.sleeps = sleeps
@@ -972,7 +977,11 @@ def filler(monkeypatch):
             raise value
         return value
 
-    monkeypatch.setattr("agents.pr_template_filler.run_pr_template_filler", fill)
+    monkeypatch.setattr(
+        importlib.import_module("agents.pr_template_filler"),
+        "run_pr_template_filler",
+        fill,
+    )
     fill.calls = calls
     fill.answer = answer
     return fill
@@ -1095,7 +1104,8 @@ class TestPreviewPrBody:
         from agents.impact_analyzer import ImpactAnalysis
 
         monkeypatch.setattr(
-            "agents.impact_analyzer.run_impact_analyzer_sync",
+            importlib.import_module("agents.impact_analyzer"),
+            "run_impact_analyzer_sync",
             lambda **_kw: ImpactAnalysis(rating="3", features="Panier"),
         )
 

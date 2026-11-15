@@ -1,0 +1,12 @@
+---
+section: 🧪 Filets de test
+---
+
+- **Couverture backend, lot B2 (worktrees et espace de travail)** : le gestionnaire de worktrees, la création des PR et MR (GitHub, GitLab, Azure DevOps) et l'ajout d'un build au projet sont testés sur de vrais dépôts git, avec un faux `gh` / `glab`, une fausse API Azure DevOps et un modèle qui répond depuis le test. `core/worktree_pr.py` passe de 43 % à 97 %, `core/worktree.py` de 71 % à 95 %, `core/workspace.py` de 36 % à 88 %, `finalization.py` de 13 % à 100 %, `display.py` de 64 % à 100 %, `git_utils.py` de 30 % à 99 %, `workspace_setup.py` de 42 % à 95 % et `models.py` de 44 % à 90 %.
+  - Code jamais exécuté retiré : `cleanup_stale_worktrees`, `list_all_spec_branches`, la recherche de branche dans le registre des worktrees (git y écrit « detached » pour un worktree détaché), `create_conflict_file_with_git`, `is_process_running`, deux constantes inutilisées et les replis d'import de `foundation.debug`.
+- **Une fusion « préparée sans commit » ne garde plus les fichiers que le projet ignore** : `git check-ignore` ne signale pas un fichier déjà indexé, donc aucun fichier ignoré n'était retiré de l'index après la fusion.
+- **Un worktree dont le fichier `.git` est abîmé peut être recréé** : git refusait de le supprimer et la tâche ne pouvait plus jamais avoir de worktree.
+- **Un fichier fusionné par l'IA garde son dernier saut de ligne** : la réponse du modèle était tronquée de ses blancs, et chaque fichier fusionné perdait sa fin de ligne.
+- **« Ajouter à mon projet » après un build est compté comme une fusion** : ce choix du menu fusionnait sans prévenir les compteurs d'usage, la boucle d'apprentissage ni la mémoire, contrairement aux autres chemins de fusion.
+- **Le message de fusion dit ce qui a changé** : il affichait « What changed: » sans rien dessous, car il lisait des statistiques qu'aucune fusion ne produit.
+- **La validation de syntaxe d'un fichier fusionné et la création des liens `node_modules` suivent les règles de plateforme** : le fichier temporaire est écrit en UTF-8 (sous Windows, un caractère hors de la page de code locale faisait sauter la validation en silence) et Windows est détecté par `foundation.platform`.

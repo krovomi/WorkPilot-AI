@@ -64,18 +64,13 @@ from .git_utils import (
     # Constants
     MAX_FILE_LINES_FOR_AI,
     MAX_PARALLEL_AI_MERGES,
-    MAX_SYNTAX_FIX_RETRIES,
-    MERGE_LOCK_TIMEOUT,
-    _create_conflict_file_with_git,
     _get_binary_file_content_from_ref,
     _get_changed_files_from_branch,
     _get_file_content_from_ref,
     _is_binary_file,
     _is_lock_file,
     # Export private names for backward compatibility
-    _is_process_running,
     _validate_merged_syntax,
-    create_conflict_file_with_git,
     get_binary_file_content_from_ref,
     get_changed_files_from_branch,
     get_current_branch,
@@ -84,7 +79,6 @@ from .git_utils import (
     has_uncommitted_changes,
     is_binary_file,
     is_lock_file,
-    is_process_running,
     validate_merged_syntax,
 )
 from .models import (
@@ -131,10 +125,8 @@ __all__ = [
     "get_file_content_from_ref",
     "get_binary_file_content_from_ref",
     "get_changed_files_from_branch",
-    "is_process_running",
     "is_binary_file",
     "validate_merged_syntax",
-    "create_conflict_file_with_git",
     # Setup
     "choose_workspace",
     "copy_spec_to_worktree",
