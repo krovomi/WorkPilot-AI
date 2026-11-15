@@ -11,6 +11,12 @@ import subprocess
 from pathlib import Path
 
 from foundation.git_executable import get_git_executable, run_git
+from foundation.platform import (
+    build_windows_command,
+    find_executable,
+    is_windows,
+    requires_shell,
+)
 
 __all__ = [
     # Exported helpers
@@ -368,6 +374,53 @@ def is_lock_file(file_path: str) -> bool:
     return Path(file_path).name in LOCK_FILES
 
 
+def _esbuild_in(package: Path) -> list[str] | None:
+    """The command that runs the esbuild package at ``package``, if it is there.
+
+    On Windows ``bin/esbuild`` is a Node script: the native ``esbuild.exe``
+    of the platform package next to it runs instead, or Node runs the script.
+    Elsewhere ``bin/esbuild`` runs itself (the native binary or a shebang).
+    """
+    script = package / "bin" / "esbuild"
+    if not script.is_file():
+        return None
+    if not is_windows():
+        return [str(script)]
+    for native in sorted(package.parent.glob("@esbuild/win32-*/esbuild.exe")):
+        return [str(native)]
+    node = find_executable("node")
+    return [node, str(script)] if node else None
+
+
+def _esbuild_command(project_dir: Path, args: list[str]) -> list[str]:
+    """How to run esbuild with ``args`` here, without a shell, on every OS.
+
+    The project's own esbuild comes first (npm, yarn or pnpm layout, in the
+    project or in its parent), then ``npx esbuild``.
+    """
+    for modules in (project_dir / "node_modules", project_dir.parent / "node_modules"):
+        packages = [
+            modules / "esbuild",
+            *sorted((modules / ".pnpm").glob("esbuild@*/node_modules/esbuild")),
+        ]
+        for package in packages:
+            command = _esbuild_in(package)
+            if command:
+                return command + args
+        shim = modules / ".bin" / "esbuild"
+        if not is_windows() and shim.is_file():
+            return [str(shim), *args]
+    npx = find_executable("npx") or "npx"
+    if requires_shell(npx):
+        return build_windows_command(npx, ["esbuild", *args])
+    return [npx, "esbuild", *args]
+
+
+def _is_esbuild_error(line: str) -> bool:
+    """Whether ``line`` is one of esbuild's error lines (``✘ [ERROR] …``)."""
+    return "[ERROR]" in line or ": error:" in line
+
+
 def validate_merged_syntax(
     file_path: str, content: str, project_dir: Path
 ) -> tuple[bool, str]:
@@ -401,34 +454,7 @@ def validate_merged_syntax(
                 tmp_path = tmp.name
 
             try:
-                # Find esbuild binary - try multiple locations
-                esbuild_cmd = None
-
-                # Try to find esbuild in node_modules (works with pnpm, npm, yarn)
-                for search_dir in [project_dir, project_dir.parent]:
-                    # pnpm stores it differently
-                    pnpm_esbuild = search_dir / "node_modules" / ".pnpm"
-                    if pnpm_esbuild.exists():
-                        for esbuild_dir in pnpm_esbuild.glob(
-                            "esbuild@*/node_modules/esbuild/bin/esbuild"
-                        ):
-                            if esbuild_dir.exists():
-                                esbuild_cmd = str(esbuild_dir)
-                                break
-                    # Standard npm/yarn location
-                    npm_esbuild = search_dir / "node_modules" / ".bin" / "esbuild"
-                    if npm_esbuild.exists():
-                        esbuild_cmd = str(npm_esbuild)
-                        break
-                    if esbuild_cmd:
-                        break
-
-                # Fall back to npx if not found
-                if not esbuild_cmd:
-                    esbuild_cmd = "npx"
-                    args = ["npx", "esbuild", tmp_path, "--log-level=error"]
-                else:
-                    args = [esbuild_cmd, tmp_path, "--log-level=error"]
+                args = _esbuild_command(project_dir, [tmp_path, "--log-level=error"])
 
                 # Use esbuild for fast, accurate syntax validation
                 # esbuild infers loader from extension (.tsx, .ts, etc.)
@@ -444,18 +470,22 @@ def validate_merged_syntax(
                 )
 
                 if result.returncode != 0:
-                    # Filter out npm warnings and extract actual errors
-                    error_output = result.stderr.strip()
+                    # Only esbuild's own diagnostic is a verdict: a missing
+                    # Node, an npx that could not fetch esbuild or a warning
+                    # printed before it says nothing about the merged file.
                     error_lines = [
-                        line
-                        for line in error_output.split("\n")
-                        if line
-                        and not line.startswith("npm warn")
-                        and not line.startswith("npm WARN")
+                        line for line in result.stderr.strip().split("\n") if line
                     ]
-                    if error_lines:
-                        # Extract just the error message, not full path
-                        error_msg = "\n".join(error_lines[:3])
+                    first = next(
+                        (
+                            index
+                            for index, line in enumerate(error_lines)
+                            if _is_esbuild_error(line)
+                        ),
+                        None,
+                    )
+                    if first is not None:
+                        error_msg = "\n".join(error_lines[first : first + 3])
                         return False, f"Syntax error: {error_msg}"
 
                 return True, ""
