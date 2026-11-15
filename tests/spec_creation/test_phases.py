@@ -144,7 +144,7 @@ async def test_an_existing_context_is_kept(spec_dir: Path) -> None:
     assert result.success and result.retries == 0
 
 
-async def test_the_context_comes_from_the_task_itself(
+async def test_the_context_is_written_from_the_task_files_in_any_language(
     spec_dir: Path,
 ) -> None:
     (spec_dir / "requirements.json").write_text(
