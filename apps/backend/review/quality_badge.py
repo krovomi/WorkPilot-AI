@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from .quality_scorer import QualityScore
 
@@ -34,8 +35,14 @@ class QualityBadgeFormatter:
     def generate_shields_badge_url(self, score: QualityScore) -> str:
         """Génère une URL de badge shields.io."""
         color = self.GRADE_COLORS.get(score.grade, "lightgrey")
-        score_text = f"{score.overall_score:.0f}/100"
-        return f"https://img.shields.io/badge/Quality-{score.grade}_{score_text}-{color}?style=flat-square"
+        # Le message est un segment du chemin : son « / » (95/100) coupait
+        # l'URL et son « + » (A+) se lisait comme une espace. shields.io lit
+        # « _ » comme une espace et « -- » comme un tiret.
+        message = f"{score.grade} {score.overall_score:.0f}/100".replace("-", "--")
+        message = quote(message.replace(" ", "_"), safe="_")
+        return (
+            f"https://img.shields.io/badge/Quality-{message}-{color}?style=flat-square"
+        )
 
     def generate_markdown_badge(self, score: QualityScore) -> str:
         """Génère un badge Markdown."""

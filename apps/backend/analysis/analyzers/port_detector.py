@@ -137,12 +137,9 @@ class PortDetector(BaseAnalyzer):
                 if matches:
                     # Return the first valid port found
                     for match in matches:
-                        try:
-                            port = int(match)
-                            if 1000 <= port <= 65535:  # Valid port range
-                                return port
-                        except ValueError:
-                            continue
+                        port = int(match)
+                        if 1000 <= port <= 65535:  # Valid port range
+                            return port
 
         return None
 
@@ -173,12 +170,9 @@ class PortDetector(BaseAnalyzer):
             for pattern in patterns:
                 matches = re.findall(pattern, content, re.MULTILINE)
                 if matches:
-                    try:
-                        port = int(matches[0])
-                        if 1000 <= port <= 65535:
-                            return port
-                    except ValueError:
-                        continue
+                    port = int(matches[0])
+                    if 1000 <= port <= 65535:
+                        return port
 
         return None
 
@@ -202,40 +196,49 @@ class PortDetector(BaseAnalyzer):
             # Match the service name if possible
             pattern = r'^\s*-\s*["\']?(\d+):\d+["\']?'
 
-            in_service = False
+            # The blocks are told apart by indentation: any "key:" line used to
+            # close the service, so its ports after an "image:" or a "build:"
+            # were never read.
+            service_indent: int | None = None
+            ports_indent: int | None = None
             in_ports = False
 
             for line in content.split("\n"):
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                indent = len(line) - len(line.lstrip())
+
                 # Check if we're in the right service block
-                if re.match(rf"^\s*{re.escape(service_name)}\s*:", line):
-                    in_service = True
+                if re.match(rf"^\s*{re.escape(service_name)}\s*:\s*$", line):
+                    service_indent = indent
+                    in_ports = False
+                    continue
+                if service_indent is None:
                     continue
 
-                # Check if we hit another service
-                if (
-                    in_service
-                    and re.match(r"^\s*\w+\s*:", line)
-                    and "ports:" not in line
-                ):
-                    in_service = False
+                # A key at the service's level (or above) closes it
+                if indent <= service_indent:
+                    service_indent = None
                     in_ports = False
                     continue
 
                 # Check if we're in the ports section
-                if in_service and "ports:" in line:
+                if re.match(r"^ports\s*:\s*$", stripped):
                     in_ports = True
+                    ports_indent = indent
                     continue
+                if in_ports and ports_indent is not None and indent <= ports_indent:
+                    if not stripped.startswith("-"):
+                        in_ports = False
 
                 # Extract port mapping
                 if in_ports:
                     match = re.match(pattern, line)
                     if match:
-                        try:
-                            port = int(match.group(1))
-                            if 1000 <= port <= 65535:
-                                return port
-                        except ValueError:
-                            continue
+                        port = int(match.group(1))
+                        if 1000 <= port <= 65535:
+                            return port
 
         return None
 
@@ -267,12 +270,9 @@ class PortDetector(BaseAnalyzer):
             for pattern in patterns:
                 matches = re.findall(pattern, content)
                 if matches:
-                    try:
-                        port = int(matches[0])
-                        if 1000 <= port <= 65535:
-                            return port
-                    except ValueError:
-                        continue
+                    port = int(matches[0])
+                    if 1000 <= port <= 65535:
+                        return port
 
         return None
 
@@ -300,12 +300,9 @@ class PortDetector(BaseAnalyzer):
             for pattern in patterns:
                 matches = re.findall(pattern, script)
                 if matches:
-                    try:
-                        port = int(matches[0])
-                        if 1000 <= port <= 65535:
-                            return port
-                    except ValueError:
-                        continue
+                    port = int(matches[0])
+                    if 1000 <= port <= 65535:
+                        return port
 
         return None
 
@@ -327,11 +324,8 @@ class PortDetector(BaseAnalyzer):
             for pattern in patterns:
                 matches = re.findall(pattern, content)
                 if matches:
-                    try:
-                        port = int(matches[0])
-                        if 1000 <= port <= 65535:
-                            return port
-                    except ValueError:
-                        continue
+                    port = int(matches[0])
+                    if 1000 <= port <= 65535:
+                        return port
 
         return None

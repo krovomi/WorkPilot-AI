@@ -187,7 +187,11 @@
 		"deleteTerminal": "Delete Terminal Worktree?",
 		"deleteTerminalWarning": "This will permanently delete the worktree and its branch. Any uncommitted changes will be lost.",
 		"mergeSuccess": "Merge Successful",
-		"mergeFailed": "Merge Failed"
+		"mergeFailed": "Merge Failed",
+		"loadFailed": "Could not load the worktrees.",
+		"taskNotFound": "No task matches this worktree.",
+		"deleteFailed": "Could not delete the worktree.",
+		"deleteTerminalFailed": "Could not delete the terminal worktree."
 	},
 	"worktreeCleanup": {
 		"title": "Complete Task",
@@ -444,7 +448,17 @@
 		"browserLoginHint": "Click below to open your browser and log in with your Claude account.",
 		"authenticateNew": "Authenticate New Account",
 		"hideToken": "Hide token",
-		"showToken": "Show token"
+		"showToken": "Show token",
+		"defaultTitle": "Claude Authentication Required",
+		"defaultDescription": "A Claude Code OAuth token is required to use AI features like Ideation and Roadmap generation.",
+		"errors": {
+			"checkFailed": "Could not check the token.",
+			"profileWithoutToken": "The selected account has no valid token.",
+			"saveFailed": "Could not save the token.",
+			"noProject": "Select a project first.",
+			"authStartFailed": "Could not start the authentication."
+		},
+		"copyCommand": "Copy the command"
 	},
 	"azureConfig": {
 		"title": "Set up Azure DevOps",

@@ -1,13 +1,4 @@
 {
-  "apps/backend/analysis/analyzers/context/jobs_detector.py": 1,
-  "apps/backend/analysis/analyzers/context/migrations_detector.py": 1,
-  "apps/backend/analysis/analyzers/database_detector.py": 5,
-  "apps/backend/analysis/analyzers/project_analyzer_module.py": 1,
-  "apps/backend/analysis/analyzers/route_detector.py": 12,
-  "apps/backend/analysis/analyzers/route_detector_extra.py": 2,
-  "apps/backend/analysis/analyzers/service_analyzer.py": 1,
-  "apps/backend/analysis/ci_discovery.py": 1,
-  "apps/backend/analysis/test_discovery.py": 1,
   "apps/backend/architecture_visualizer/analyzer.py": 7,
   "apps/backend/codex_models.py": 1,
   "apps/backend/core/agent_clients/cli_subprocess.py": 1,

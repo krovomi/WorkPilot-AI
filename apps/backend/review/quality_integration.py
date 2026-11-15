@@ -8,6 +8,7 @@ Intégration du Quality Scorer avec les plateformes (GitHub, Azure DevOps, GitLa
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -73,7 +74,10 @@ class QualityReviewIntegration:
         self._save_history(history_entry)
 
         # Sauvegarde le rapport
-        report_path = self.history_dir / f"report_{pr_id or timestamp}.md"
+        # Un nom de fichier sûr sur tous les OS : l'horodatage ISO porte des
+        # « : », refusés par Windows, et un identifiant de PR vient de la forge.
+        stem = re.sub(r"[^A-Za-z0-9._-]", "-", str(pr_id or timestamp)).strip(".")
+        report_path = self.history_dir / f"report_{stem or 'pr'}.md"
         self.formatter.save_markdown_report(score, report_path)
 
         return {
@@ -114,7 +118,9 @@ class QualityReviewIntegration:
 
     def get_quality_trends(self) -> dict[str, Any]:
         """Calcule les tendances de qualité."""
-        history = self.get_historical_scores(limit=100)
+        # get_historical_scores rend le plus récent en premier : la tendance
+        # et les derniers scores se lisent dans l'ordre chronologique.
+        history = list(reversed(self.get_historical_scores(limit=100)))
 
         if not history:
             return {
