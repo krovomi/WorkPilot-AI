@@ -35,6 +35,27 @@ import { updateExistingFile } from "../../utils/existing-file";
 import { type ExecutionHandlerContext } from "./execution-utils";
 
 /**
+ * The entries of `git diff --cached --name-status --no-renames -z`, as paths
+ * the merge added and paths it changed or deleted. git never lists a path
+ * outside the repository; one that would leave `root` is dropped all the
+ * same, since an added path is deleted from the disk.
+ */
+export function parseStagedMerge(
+	output: string,
+	root: string,
+): { added: string[]; changed: string[] } {
+	const fields = output.split("\0").filter(Boolean);
+	const added: string[] = [];
+	const changed: string[] = [];
+	for (let i = 0; i + 1 < fields.length; i += 2) {
+		const file = fields[i + 1];
+		if (!isPathWithinBase(path.join(root, file), root)) continue;
+		(fields[i] === "A" ? added : changed).push(file);
+	}
+	return { added, changed };
+}
+
+/**
  * Take the changes a stage-only merge (`git merge --no-commit`) staged in the
  * main project back out: unstage them, restore each changed file to HEAD,
  * remove each file the merge added, and close the merge. Only the staged
@@ -58,19 +79,11 @@ function undoStagedMerge(projectPath: string): void {
 		appLog.warn(`[TASK_REVIEW] Could not list the staged merge: ${staged.stderr}`);
 		return;
 	}
-	const fields = staged.stdout.split("\0").filter(Boolean);
-	const added: string[] = [];
-	const changed: string[] = [];
-	for (let i = 0; i + 1 < fields.length; i += 2) {
-		(fields[i] === "A" ? added : changed).push(fields[i + 1]);
-	}
+	const { added, changed } = parseStagedMerge(staged.stdout, root);
 	if (added.length + changed.length > 0) {
 		git(["reset", "-q", "HEAD", "--", ...added, ...changed], root);
 		if (changed.length > 0) git(["checkout", "--", ...changed], root);
-		for (const file of added) {
-			const target = path.join(root, file);
-			if (isPathWithinBase(target, root)) rmSync(target, { force: true });
-		}
+		for (const file of added) rmSync(path.join(root, file), { force: true });
 	}
 	// `merge --no-commit` also left the merge open (MERGE_HEAD): forget it, or
 	// the person's next commit would record the task branch as merged. The

@@ -45,7 +45,7 @@ vi.mock("../../../app-logger", () => ({
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { Task } from "../../../../shared/types";
-import { registerTaskReviewHandlers } from "../execution-review-handlers";
+import { parseStagedMerge, registerTaskReviewHandlers } from "../execution-review-handlers";
 
 type Result = { success: boolean; error?: string; data?: unknown };
 const review = (...args: unknown[]): Promise<Result> =>
@@ -121,6 +121,8 @@ beforeEach(() => {
 	projectDir = path.join(base, "project");
 	mkdirSync(projectDir);
 	git(projectDir, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(projectDir, "config", "core.autocrlf", "false");
 	git(projectDir, "config", "user.email", "t@example.invalid");
 	git(projectDir, "config", "user.name", "T");
 	git(projectDir, "config", "commit.gpgsign", "false");
@@ -248,6 +250,21 @@ describe("TASK_REVIEW", () => {
 			expect(p.stagedAt).toBeUndefined();
 		});
 
+		it("removes the files a merge only added", async () => {
+			const wt = addWorktree();
+			writeFileSync(path.join(wt, "only-new.txt"), "new\n", "utf-8");
+			git(wt, "add", "only-new.txt");
+			git(wt, "commit", "-q", "-m", "task");
+			git(projectDir, "merge", "-q", "--no-commit", "--no-ff", "workpilot/001-x");
+			setTask({ stagedInMainProject: true } as Partial<Task>);
+
+			expect((await review(false, "no")).success).toBe(true);
+
+			expect(git(projectDir, "status", "--porcelain")).toBe("");
+			expect(existsSync(path.join(projectDir, "only-new.txt"))).toBe(false);
+			expect(existsSync(path.join(projectDir, ".git", "MERGE_HEAD"))).toBe(false);
+		});
+
 		it("does nothing to a main project with nothing staged, or that git cannot read", async () => {
 			setTask({ stagedInMainProject: true } as Partial<Task>);
 			expect((await review(false, "no")).success).toBe(true);
@@ -357,5 +374,18 @@ describe("TASK_REVIEW", () => {
 			);
 			expect(state.logError).toHaveBeenCalledWith("[TASK_REVIEW] Failed to create images directory:", expect.anything());
 		});
+	});
+});
+
+describe("parseStagedMerge", () => {
+	it("splits added from changed paths and drops one that would leave the repository", () => {
+		const root = path.join(tmpdir(), "repo");
+		const output = ["A", "new.ts", "M", "src/a.ts", "D", "old.ts", "A", "../escape.txt", "M", path.join("..", "..", "etc", "x"), "A"].join("\0");
+
+		expect(parseStagedMerge(`${output}\0`, root)).toEqual({
+			added: ["new.ts"],
+			changed: ["src/a.ts", "old.ts"],
+		});
+		expect(parseStagedMerge("", root)).toEqual({ added: [], changed: [] });
 	});
 });
