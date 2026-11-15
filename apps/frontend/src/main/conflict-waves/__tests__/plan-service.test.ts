@@ -86,6 +86,18 @@ describe("validateWavePlanRequest refuses hostile input", () => {
 		});
 	});
 
+	it("keeps explicit options in range", () => {
+		const result = validateWavePlanRequest({
+			projectId: PROJECT_ID,
+			options: { tolerance: 2, driftThreshold: 0, unplannedPolicy: "independent" },
+		});
+		expect(result.ok && result.value).toMatchObject({
+			tolerance: 2,
+			driftThreshold: 0,
+			unplannedPolicy: "independent",
+		});
+	});
+
 	it("ignores a max parallelism sent by the renderer", () => {
 		const result = validateWavePlanRequest({ projectId: PROJECT_ID, options: { maxParallel: 99 } });
 		expect(result.ok && "maxParallel" in result.value).toBe(false);
@@ -138,6 +150,29 @@ describe("buildExecutionWavePlan", () => {
 		expect(
 			(await buildExecutionWavePlan({ projectId: PROJECT_ID, taskIds: ["006-archived"] }, deps)).ok,
 		).toBe(false);
+	});
+
+	it("orders by priority and age, reads blockers, and tolerates odd metadata", async () => {
+		const odd = [
+			makeTask("010-low", "backlog", ["x"], { metadata: { priority: "low" } } as Partial<Task>),
+			makeTask("011-urgent", "backlog", ["x"], { metadata: { priority: "urgent" } } as Partial<Task>),
+			makeTask("012-bad-date", "backlog", ["x"], { createdAt: "not a date" as unknown as Date, metadata: undefined }),
+			makeTask("013-after", "backlog", ["y"], {
+				metadata: { blockedBy: [42, "011-urgent"] },
+			} as unknown as Partial<Task>),
+			makeTask("014-weird", "backlog", ["x"], { metadata: { priority: "mega" } } as unknown as Partial<Task>),
+		];
+		const result = await buildExecutionWavePlan({ projectId: PROJECT_ID }, makeDeps(odd, { maxParallelTasks: 5 }));
+		if (!result.ok) throw new Error(result.error);
+		// All but one share `x`: one per wave, the most urgent first, then by
+		// age (the unreadable date counts as the oldest); the blocked one goes
+		// after its blocker, the first wave where it fits.
+		expect(result.value.waves.map((w) => w.taskIds)).toEqual([
+			["011-urgent"],
+			["010-low", "013-after"],
+			["012-bad-date"],
+			["014-weird"],
+		]);
 	});
 
 	it("plans only the tasks named", async () => {

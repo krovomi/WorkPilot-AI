@@ -19,6 +19,8 @@ export interface WaveExecution {
 	/** 0-based index of the wave being run. */
 	current: number;
 	advanceWhen: WaveAdvanceWhen;
+	/** The project's max parallel tasks, from the plan the run started from. */
+	maxParallel: number;
 	status: "running" | "done" | "stopped";
 	/** Tasks this execution has already tried to start. */
 	started: string[];
@@ -54,7 +56,6 @@ function isSettled(task: Task, execution: WaveExecution): boolean {
 export function stepWaveExecution(
 	execution: WaveExecution,
 	tasks: readonly Task[],
-	maxParallel: number,
 ): WaveStep {
 	const idle: WaveStep = { promote: [], blocked: [], waveSettled: false, finished: false };
 	if (execution.status !== "running") return idle;
@@ -78,7 +79,7 @@ export function stepWaveExecution(
 	const running = projectTasks.filter(
 		(t) => t.status === "in_progress" && !t.metadata?.archivedAt,
 	).length;
-	let room = Math.max(0, Math.floor(maxParallel) - running);
+	let room = Math.max(0, Math.floor(execution.maxParallel) - running);
 	const promote: string[] = [];
 	const blocked: string[] = [];
 	for (const task of members) {

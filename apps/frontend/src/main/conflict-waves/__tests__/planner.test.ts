@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { type PlannerOptions, type PlannerTask, planExecutionWaves } from "../planner";
-import { fileWeight, riskLevel } from "../scorer";
+import { buildFootprint, fileWeight, riskLevel } from "../scorer";
 
 const OPTIONS: PlannerOptions = {
 	maxParallel: 3,
@@ -61,6 +61,16 @@ describe("fileWeight", () => {
 		[9, "critical"],
 	] as const)("score %d is %s", (score, level) => {
 		expect(riskLevel(score)).toBe(level);
+	});
+});
+
+describe("buildFootprint", () => {
+	it("skips blanks and keeps the first spelling of a path", () => {
+		const footprint = buildFootprint(["", "  ", "Src\\A.cs"], ["src/a.cs", "./src/b.cs"]);
+		expect([...footprint]).toEqual([
+			["src/a.cs", "Src/A.cs"],
+			["src/b.cs", "./src/b.cs"],
+		]);
 	});
 });
 
@@ -212,6 +222,44 @@ describe("planExecutionWaves", () => {
 			{ taskId: "c", reason: "blocked_by_cycle" },
 		]);
 		expect(result.order).toEqual(["d"]);
+	});
+
+	it("reports every cycle, sorted, and every spec behind one", () => {
+		const result = planExecutionWaves(
+			[
+				task("z", ["1"], { blockedBy: ["y"] }),
+				task("y", ["2"], { blockedBy: ["z"] }),
+				task("b", ["3"], { blockedBy: ["a"] }),
+				task("a", ["4"], { blockedBy: ["b"] }),
+				task("m", ["5"], { blockedBy: ["z"] }),
+				task("c", ["6"], { blockedBy: ["a"] }),
+				task("q", ["7"], { blockedBy: ["p"] }),
+				task("p", ["8"], { blockedBy: ["q"] }),
+			],
+			[],
+			OPTIONS,
+		);
+		expect(result.cycles).toEqual([
+			["a", "b"],
+			["p", "q"],
+			["y", "z"],
+		]);
+		expect(result.excluded.map((e) => e.taskId)).toEqual(["a", "b", "c", "m", "p", "q", "y", "z"]);
+		expect(result.waves).toEqual([]);
+	});
+
+	it("lists running conflicts by score, then by spec", () => {
+		const running = task("run", ["package.json", "src/a.go", "src/b.go"], { status: "in_progress" });
+		const result = planExecutionWaves(
+			[task("q2", ["src/b.go"]), task("q1", ["src/a.go"]), task("q0", ["package.json"])],
+			[running],
+			OPTIONS,
+		);
+		expect(result.runningConflicts.map((c) => [c.taskId, c.score])).toEqual([
+			["q0", 3],
+			["q1", 1],
+			["q2", 1],
+		]);
 	});
 
 	it("ignores a blocker outside the plan and a task blocking itself", () => {

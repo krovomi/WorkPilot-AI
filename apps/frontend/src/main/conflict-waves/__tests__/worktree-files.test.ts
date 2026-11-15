@@ -42,6 +42,19 @@ beforeAll(() => {
 	writeFileSync(path.join(worktree, "base.go"), "package base // edited\n");
 	writeFileSync(path.join(worktree, "notes.txt"), "untracked\n");
 	writeFileSync(path.join(worktree, ".workpilot-discard-list"), "x\n");
+	mkdirSync(path.join(worktree, "obj"));
+	writeFileSync(path.join(worktree, "obj", "Shop.dll"), "build output\n");
+
+	// A base branch known only as a remote ref (a clone that never checked it out).
+	git(project, "update-ref", "refs/remotes/origin/trunk", "HEAD");
+
+	// A task whose branch shares no history with any base.
+	const orphan = path.join(project, ".workpilot", "worktrees", "tasks", "003-orphan");
+	git(project, "worktree", "add", "-q", "--detach", orphan);
+	git(orphan, "checkout", "-q", "--orphan", "workpilot/003-orphan");
+	writeFileSync(path.join(orphan, "alone.txt"), "x\n");
+	git(orphan, "add", "alone.txt");
+	git(orphan, "commit", "-q", "-m", "orphan");
 });
 
 afterAll(() => {
@@ -49,9 +62,22 @@ afterAll(() => {
 });
 
 describe("readWorktreeChangedFiles", () => {
-	it("lists committed, edited and untracked files of the task", async () => {
+	it("lists committed, edited and untracked files of the task, not WorkPilot's or build output", async () => {
 		const files = await readWorktreeChangedFiles(project, "001-cart", "main");
 		expect(files?.sort()).toEqual(["base.go", "cart.go", "notes.txt"]);
+	});
+
+	it("falls back on the remote copy of the base branch", async () => {
+		const files = await readWorktreeChangedFiles(project, "001-cart", "trunk");
+		expect(files?.sort()).toEqual(["base.go", "cart.go", "notes.txt"]);
+	});
+
+	it("answers null when no base branch exists", async () => {
+		expect(await readWorktreeChangedFiles(project, "001-cart", "nowhere")).toBeNull();
+	});
+
+	it("answers null when the task shares no history with its base", async () => {
+		expect(await readWorktreeChangedFiles(project, "003-orphan", "main")).toBeNull();
 	});
 
 	it("answers null for a task with no worktree", async () => {

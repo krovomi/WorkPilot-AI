@@ -9,7 +9,7 @@ import { AlertTriangle, GitMerge, Layers, Play, RefreshCw, Square } from "lucide
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import type { ExecutionWavePlan, WaveRiskLevel } from "../../../shared/types/conflict-waves";
+import type { ExecutionWavePlan, WavePlanTask, WaveRiskLevel } from "../../../shared/types/conflict-waves";
 import { useExecutionWavesStore } from "../../stores/execution-waves-store";
 import { useProjectStore } from "../../stores/project-store";
 import {
@@ -38,7 +38,7 @@ const LEVEL_TONE: Record<WaveRiskLevel, Tone> = {
 
 function useTitles(plan: ExecutionWavePlan | null): (id: string) => string {
 	return useMemo(() => {
-		const titles = new Map((plan?.tasks ?? []).map((t) => [t.taskId, t.title || t.taskId]));
+		const titles = new Map((plan?.tasks ?? []).map((t) => [t.taskId, t.title]));
 		return (id: string) => titles.get(id) ?? id;
 	}, [plan]);
 }
@@ -77,7 +77,7 @@ export function WavesView() {
 				icon={RefreshCw}
 				busy={isPlanning}
 				disabled={!projectId || isPlanning}
-				onClick={() => projectId && void computePlan(projectId)}
+				onClick={() => void computePlan(projectId as string)}
 			>
 				{shownPlan ? t("conflictPredictor:waves.actions.replan") : t("conflictPredictor:waves.actions.plan")}
 			</CharterButton>
@@ -205,7 +205,7 @@ function PlanBody({ plan, title, execution }: PlanBodyProps) {
 	const { t } = useTranslation(["conflictPredictor"]);
 	const names = (ids: readonly string[]) => ids.map(title).join(", ");
 	const byId = new Map(plan.tasks.map((task) => [task.taskId, task]));
-	const unplanned = plan.order.filter((id) => byId.get(id)?.planned === false);
+	const unplanned = plan.tasks.filter((task) => !task.planned);
 	const cyclic = plan.excluded.filter((e) => e.reason === "cycle").map((e) => e.taskId);
 	const behindCycle = plan.excluded.filter((e) => e.reason === "blocked_by_cycle").map((e) => e.taskId);
 	const avoided = Math.max(0, plan.totalRisk - plan.residualRisk);
@@ -313,17 +313,18 @@ function PlanBody({ plan, title, execution }: PlanBodyProps) {
 							</div>
 							<ol className="space-y-1">
 								{wave.taskIds.map((id) => {
-									const task = byId.get(id);
+									// Every spec of a wave is one of the plan's tasks.
+									const task = byId.get(id) as WavePlanTask;
 									return (
 										<li key={id} className="flex flex-wrap items-center gap-2 text-sm">
 											<GitMerge className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
 											<span className="min-w-0 truncate">{title(id)}</span>
-											{task?.planned === false ? (
-												<Chip tone="muted">{t("conflictPredictor:waves.unplannedChip")}</Chip>
-											) : (
+											{task.planned ? (
 												<span className="wp-meta">
-													{t("conflictPredictor:waves.files", { count: task?.fileCount ?? 0 })}
+													{t("conflictPredictor:waves.files", { count: task.fileCount })}
 												</span>
+											) : (
+												<Chip tone="muted">{t("conflictPredictor:waves.unplannedChip")}</Chip>
 											)}
 										</li>
 									);

@@ -138,13 +138,12 @@ export interface PairScore {
 }
 
 export function scorePair(a: Footprint, b: Footprint): PairScore {
-	const [small, large] = a.size <= b.size ? [a, b] : [b, a];
 	let score = 0;
 	const shared: string[] = [];
-	for (const [normalized, display] of small) {
-		if (!large.has(normalized)) continue;
+	for (const [normalized, display] of a) {
+		if (!b.has(normalized)) continue;
 		score += fileWeight(normalized);
-		shared.push(a.get(normalized) ?? display);
+		shared.push(display);
 	}
 	shared.sort((x, y) => x.localeCompare(y));
 	return { score, shared };

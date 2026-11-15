@@ -151,4 +151,115 @@ describe("WavesView", () => {
 		expect(api.updateTaskStatus).not.toHaveBeenCalled();
 		expect(screen.getByText(/Run stopped at wave 1 of 2/)).toBeInTheDocument();
 	});
+
+	it("sends the chosen options and shows an empty project", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([], { order: [], tasks: [], pairs: [], totalRisk: 0 }),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "1 shared file" }));
+		fireEvent.click(screen.getByRole("button", { name: "Assume independent" }));
+		fireEvent.click(screen.getByRole("button", { name: "Run them alone" }));
+		fireEvent.click(screen.getByRole("button", { name: "Assume independent" }));
+		fireEvent.click(screen.getByRole("button", { name: "once the wave is in review" }));
+		fireEvent.click(screen.getByRole("button", { name: "once the wave is merged" }));
+		fireEvent.click(screen.getByRole("button", { name: "once the wave is in review" }));
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText("No spec is waiting in the backlog or queue.")).toBeInTheDocument();
+		expect(api.planExecutionWaves).toHaveBeenCalledWith({
+			projectId: PROJECT,
+			options: { tolerance: 1, unplannedPolicy: "independent" },
+		});
+		expect(useExecutionWavesStore.getState().options.advanceWhen).toBe("review");
+		expect(screen.getByRole("button", { name: "Execute in optimal order" })).toBeDisabled();
+	});
+
+	it("shows a planning error", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({ success: false, error: "Project not found" });
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByRole("alert")).toHaveTextContent("Project not found");
+	});
+
+	it("shows a plan made only of a cycle, unplanned specs, residual risk and soft pairs", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([["a", "b"]], {
+				waves: [{ index: 1, taskIds: ["a", "b"], residualRisk: 1 }],
+				tasks: [
+					{ taskId: "a", title: "Spec a", status: "backlog", fileCount: 2, planned: true },
+					{ taskId: "b", title: "Spec b", status: "backlog", fileCount: 0, planned: false },
+					{ taskId: "d", title: "Spec d", status: "backlog", fileCount: 1, planned: true },
+				],
+				excluded: [{ taskId: "d", reason: "blocked_by_cycle" }],
+				pairs: [
+					{ a: "a", b: "b", score: 0, level: "none", sharedFiles: [], unknown: true, blocking: false },
+					{ a: "a", b: "d", score: 1, level: "low", sharedFiles: ["x"], unknown: false, blocking: false },
+				],
+			}),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText(/Waiting on a spec of a cycle: Spec d/)).toBeInTheDocument();
+		expect(screen.getByText("1 specs have no plan yet: their footprint is unknown.")).toBeInTheDocument();
+		expect(screen.getByText("no plan")).toBeInTheDocument();
+		expect(screen.getByText("Residual risk 1")).toBeInTheDocument();
+		expect(screen.getByText("unknown footprint")).toBeInTheDocument();
+		expect(screen.getAllByText("may share a wave")).toHaveLength(2);
+	});
+
+	it("shows a plan whose specs are all in a cycle", async () => {
+		api.planExecutionWaves.mockReset().mockResolvedValue({
+			success: true,
+			data: plan([], { order: [], pairs: [], excluded: [{ taskId: "a", reason: "cycle" }] }),
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		expect(await screen.findByText(/Dependency cycle/)).toBeInTheDocument();
+		expect(screen.queryByText("No spec is waiting in the backlog or queue.")).toBeNull();
+	});
+
+	it("marks waves done, running and pending, names a blocked task and a refused start", async () => {
+		// The re-plan fails: the first plan stays on screen, wave 1 is shown done.
+		api.planExecutionWaves
+			.mockReset()
+			.mockResolvedValueOnce({ success: true, data: plan([["a"], ["b"], ["c"]]) })
+			.mockResolvedValue({ success: false, error: "busy" });
+		useTaskStore.setState({
+			tasks: [task("a"), task("b"), { ...task("c"), metadata: { blockedBy: ["z"] } } as Task, task("z", "human_review")],
+		});
+		api.updateTaskStatus.mockImplementation(async (taskId: string, status: TaskStatus) => {
+			if (taskId === "b") return { success: false, error: "Git check failed" };
+			queueMicrotask(() => useTaskStore.getState().updateTaskStatus(taskId, status));
+			return { success: true };
+		});
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		fireEvent.click(screen.getByRole("button", { name: "Execute in optimal order" }));
+		await waitFor(() => expect(api.updateTaskStatus).toHaveBeenCalledWith("a", "in_progress", undefined));
+		await act(async () => {
+			useTaskStore.getState().updateTaskStatus("a", "done");
+		});
+		expect(await screen.findByText("Could not start Spec b: Git check failed")).toBeInTheDocument();
+		expect(await screen.findByText("Running wave 3 of 3.")).toBeInTheDocument();
+		expect(screen.getByText("Waiting on an unfinished dependency: Spec c")).toBeInTheDocument();
+		const states = [...document.querySelectorAll("td[data-state]")].map((cell) => cell.getAttribute("data-state"));
+		expect(states).toEqual(["finished", "finished", "current"]);
+		expect(screen.getAllByTitle("done")).toHaveLength(2);
+		expect(screen.getByTitle("running")).toBeInTheDocument();
+
+		// Another project selected: this run is not shown there.
+		act(() => useProjectStore.setState({ selectedProjectId: "p2" }));
+		expect(screen.queryByText("Running wave 3 of 3.")).toBeNull();
+	});
+
+	it("shows pending bars before a run", async () => {
+		render(<WavesView />);
+		fireEvent.click(screen.getByRole("button", { name: "Compute the waves" }));
+		await screen.findByTestId("wave-1");
+		const states = [...document.querySelectorAll("td[data-state]")].map((cell) => cell.getAttribute("data-state"));
+		expect(states).toEqual(["pending", "pending", "pending"]);
+	});
 });

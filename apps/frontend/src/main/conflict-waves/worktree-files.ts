@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { isBuildOutputPath } from "../../shared/utils/build-output-paths";
 import { getToolPath } from "../cli-tool-manager";
 import { isWorkpilotArtifact } from "../ipc-handlers/task/worktree-diff-handlers";
-import { getEffectiveBaseBranch, gitRefExists } from "../ipc-handlers/task/worktree-git-refs";
+import { getEffectiveBaseBranch } from "../ipc-handlers/task/worktree-git-refs";
 import { findTaskWorktree } from "../worktree-paths";
 
 const execFileAsync = promisify(execFile);
@@ -33,10 +33,19 @@ async function git(cwd: string, args: string[]): Promise<string | null> {
 	}
 }
 
-function lines(output: string | null, separator: string | RegExp): string[] {
-	return (output ?? "")
-		.split(separator)
-		.map((line) => line.trim())
+/** Changes since the merge-base with `ref`, or null when git cannot say. */
+async function changedSince(worktree: string, ref: string): Promise<string[] | null> {
+	const mergeBase = await git(worktree, ["merge-base", ref, "HEAD"]);
+	if (mergeBase === null) return null;
+	const outputs = await Promise.all([
+		git(worktree, ["diff", "--name-only", "-z", mergeBase.trim()]),
+		git(worktree, ["ls-files", "-z", "--others", "--exclude-standard"]),
+	]);
+	// A list git could not give counts as empty (`join` writes null as "").
+	return outputs
+		.join("\0")
+		.split("\0")
+		.map((file) => file.trim())
 		.filter(Boolean);
 }
 
@@ -48,25 +57,14 @@ export async function readWorktreeChangedFiles(
 	const worktree = findTaskWorktree(projectPath, specId);
 	if (!worktree) return null;
 
+	// The local base branch first, then its remote copy (a clone that never
+	// checked it out).
 	const base = getEffectiveBaseBranch(projectPath, specId, projectMainBranch);
-	const baseRef = gitRefExists(worktree, base)
-		? base
-		: gitRefExists(worktree, `origin/${base}`)
-			? `origin/${base}`
-			: null;
-	if (!baseRef) return null;
-	const mergeBase = (await git(worktree, ["merge-base", baseRef, "HEAD"]))?.trim();
-	if (!mergeBase) return null;
-
-	const changed = await git(worktree, ["diff", "--name-only", "-z", mergeBase]);
-	if (changed === null) return null;
-	const untracked = await git(worktree, ["ls-files", "-z", "--others", "--exclude-standard"]);
-
-	const files = new Set<string>();
-	for (const file of [...lines(changed, "\0"), ...lines(untracked, "\0")]) {
-		if (isWorkpilotArtifact(file) || isBuildOutputPath(file)) continue;
-		files.add(file);
-		if (files.size >= MAX_WORKTREE_FILES) break;
+	for (const ref of [base, `origin/${base}`]) {
+		const files = await changedSince(worktree, ref);
+		if (files === null) continue;
+		const kept = files.filter((file) => !isWorkpilotArtifact(file) && !isBuildOutputPath(file));
+		return [...new Set(kept)].slice(0, MAX_WORKTREE_FILES);
 	}
-	return [...files];
+	return null;
 }

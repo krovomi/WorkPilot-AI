@@ -88,7 +88,8 @@ function compareBase(a: PlannerTask, b: PlannerTask): number {
 	return (
 		b.priorityWeight - a.priorityWeight ||
 		a.createdAtMs - b.createdAtMs ||
-		(a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+		// Ids are unique: two tasks never compare equal.
+		(a.id < b.id ? -1 : 1)
 	);
 }
 
@@ -107,7 +108,7 @@ function findCycles(ids: readonly string[], edges: Map<string, string[]>): strin
 		counter++;
 		stack.push(v);
 		onStack.add(v);
-		for (const w of edges.get(v) ?? []) {
+		for (const w of edges.get(v) as string[]) {
 			if (!index.has(w)) {
 				visit(w);
 				low.set(v, Math.min(low.get(v) as number, low.get(w) as number));
@@ -186,8 +187,8 @@ export function planExecutionWaves(
 				});
 				// An unknown pair weighs one: enough to order, not to dominate.
 				const weight = score > 0 ? score : 1;
-				degree.set(a.task.id, (degree.get(a.task.id) ?? 0) + weight);
-				degree.set(b.task.id, (degree.get(b.task.id) ?? 0) + weight);
+				degree.set(a.task.id, (degree.get(a.task.id) as number) + weight);
+				degree.set(b.task.id, (degree.get(b.task.id) as number) + weight);
 			}
 		}
 	}
@@ -202,6 +203,9 @@ export function planExecutionWaves(
 			[...new Set(own)].filter((b) => b !== id && nodes.has(b)).sort(),
 		);
 	}
+	// Every id of the plan has an entry in both maps.
+	const blockersOf = (id: string): string[] => blockers.get(id) as string[];
+	const scoreOf = (x: string, y: string): number => scores.get(pairKey(x, y)) as number;
 	const cycles = findCycles(ids, blockers);
 	const excluded: WaveExclusion[] = [];
 	const out = new Set<string>();
@@ -217,7 +221,7 @@ export function planExecutionWaves(
 		grew = false;
 		for (const id of ids) {
 			if (out.has(id)) continue;
-			if ((blockers.get(id) ?? []).some((b) => out.has(b))) {
+			if (blockersOf(id).some((b) => out.has(b))) {
 				out.add(id);
 				excluded.push({ taskId: id, reason: "blocked_by_cycle" });
 				grew = true;
@@ -229,7 +233,7 @@ export function planExecutionWaves(
 	let totalRisk = 0;
 	for (let i = 0; i < plannable.length; i++) {
 		for (let j = i + 1; j < plannable.length; j++) {
-			totalRisk += scores.get(pairKey(plannable[i], plannable[j])) ?? 0;
+			totalRisk += scoreOf(plannable[i], plannable[j]);
 		}
 	}
 
@@ -238,7 +242,7 @@ export function planExecutionWaves(
 	const depthOf = (id: string): number => {
 		const known = depth.get(id);
 		if (known !== undefined) return known;
-		const d = Math.max(-1, ...(blockers.get(id) ?? []).map(depthOf)) + 1;
+		const d = Math.max(-1, ...blockersOf(id).map(depthOf)) + 1;
 		depth.set(id, d);
 		return d;
 	};
@@ -255,14 +259,14 @@ export function planExecutionWaves(
 	const members: string[][] = [];
 	const waveOf = new Map<string, number>();
 	for (const id of colouringOrder) {
-		const earliest = Math.max(-1, ...(blockers.get(id) ?? []).map((b) => waveOf.get(b) as number)) + 1;
+		const earliest = Math.max(-1, ...blockersOf(id).map((b) => waveOf.get(b) as number)) + 1;
 		let best = members.length;
 		let bestAdded = 0;
 		for (let w = earliest; w < members.length; w++) {
 			const wave = members[w];
 			if (wave.length >= maxParallel) continue;
 			if (wave.some((m) => blocking.has(pairKey(id, m)))) continue;
-			const added = wave.reduce((sum, m) => sum + (scores.get(pairKey(id, m)) ?? 0), 0);
+			const added = wave.reduce((sum, m) => sum + scoreOf(id, m), 0);
 			if (best === members.length || added < bestAdded) {
 				best = w;
 				bestAdded = added;
@@ -277,7 +281,7 @@ export function planExecutionWaves(
 	const laterShare = (id: string, w: number): number => {
 		let sum = 0;
 		for (let later = w + 1; later < members.length; later++) {
-			for (const m of members[later]) sum += scores.get(pairKey(id, m)) ?? 0;
+			for (const m of members[later]) sum += scoreOf(id, m);
 		}
 		return sum;
 	};
@@ -291,7 +295,7 @@ export function planExecutionWaves(
 		let residual = 0;
 		for (let i = 0; i < ordered.length; i++) {
 			for (let j = i + 1; j < ordered.length; j++) {
-				residual += scores.get(pairKey(ordered[i], ordered[j])) ?? 0;
+				residual += scoreOf(ordered[i], ordered[j]);
 			}
 		}
 		residualRisk += residual;
@@ -304,7 +308,6 @@ export function planExecutionWaves(
 	for (const id of plannable) {
 		const node = nodes.get(id) as Node;
 		for (const other of runningNodes) {
-			if (other.task.id === id) continue;
 			const { score } = scorePair(node.footprint, other.footprint);
 			if (score > tolerance) {
 				runningConflicts.push({ taskId: id, runningTaskId: other.task.id, score });

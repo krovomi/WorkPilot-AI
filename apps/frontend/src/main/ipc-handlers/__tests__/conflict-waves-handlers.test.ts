@@ -10,8 +10,18 @@ vi.mock("electron", () => ({
 		handle: (channel: string, handler: (...args: unknown[]) => unknown) => handlers.set(channel, handler),
 	},
 }));
-vi.mock("../../project-store", () => ({ projectStore: { getProject: vi.fn(), getTasks: vi.fn() } }));
-vi.mock("../../conflict-waves/worktree-files", () => ({ readWorktreeChangedFiles: vi.fn() }));
+const storeProject = vi.fn();
+const storeTasks = vi.fn();
+const worktreeFiles = vi.fn();
+vi.mock("../../project-store", () => ({
+	projectStore: {
+		getProject: (id: string) => storeProject(id),
+		getTasks: (id: string) => storeTasks(id),
+	},
+}));
+vi.mock("../../conflict-waves/worktree-files", () => ({
+	readWorktreeChangedFiles: (...args: unknown[]) => worktreeFiles(...args),
+}));
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
 import type { Project } from "../../../shared/types/project";
@@ -66,5 +76,20 @@ describe("conflictWaves:plan", () => {
 		const result = await invoke({ projectId: "p1" });
 		expect(result).toEqual({ success: false, error: "Planning failed" });
 		errors.mockRestore();
+	});
+
+	it("reads the project store and the worktrees by default", async () => {
+		handlers.clear();
+		registerConflictWavesHandlers();
+		storeProject.mockReturnValue(PROJECT);
+		storeTasks.mockReturnValue([
+			{ id: "001-a", specId: "001-a", title: "A", status: "backlog", subtasks: [], createdAt: "2026-11-01" },
+		]);
+		worktreeFiles.mockResolvedValue(["src/a.rs"]);
+		const result = await invoke({ projectId: "p1" });
+		expect(result.success).toBe(true);
+		expect(storeProject).toHaveBeenCalledWith("p1");
+		expect(storeTasks).toHaveBeenCalledWith("p1");
+		expect(worktreeFiles).toHaveBeenCalledWith("/projects/p1", "001-a", undefined);
 	});
 });

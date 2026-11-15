@@ -16,7 +16,6 @@ import type {
 	WaveAdvanceWhen,
 } from "../../shared/types/conflict-waves";
 import { stepWaveExecution, type WaveExecution } from "../lib/wave-execution";
-import { useProjectStore } from "./project-store";
 import { persistTaskStatus, useTaskStore } from "./task-store";
 
 export interface WaveOptions {
@@ -53,12 +52,6 @@ const NOT_STARTED = new Set(["backlog", "queue"]);
 let ticking = false;
 let tickAgain = false;
 
-function maxParallelFor(projectId: string, fallback: number): number {
-	const project = useProjectStore.getState().projects.find((p) => p.id === projectId);
-	const value = project?.settings?.maxParallelTasks;
-	return typeof value === "number" && value >= 1 ? value : fallback;
-}
-
 export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => ({
 	plan: null,
 	isPlanning: false,
@@ -78,7 +71,7 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 				projectId,
 				options: { tolerance, unplannedPolicy },
 			});
-			if (result.success && result.data) {
+			if (result.data) {
 				set({ plan: result.data, isPlanning: false });
 			} else {
 				set({ isPlanning: false, error: result.error ?? "" });
@@ -97,6 +90,7 @@ export const useExecutionWavesStore = create<ExecutionWavesState>((set, get) => 
 				waves: plan.waves.map((w) => [...w.taskIds]),
 				current: 0,
 				advanceWhen: options.advanceWhen,
+				maxParallel: plan.maxParallel,
 				status: "running",
 				started: [],
 			},
@@ -136,12 +130,7 @@ type Set = (partial: Partial<ExecutionWavesState>) => void;
 async function runStep(get: Get, set: Set): Promise<void> {
 	const execution = get().execution;
 	if (execution?.status !== "running") return;
-	const fallback = get().plan?.maxParallel ?? 3;
-	const step = stepWaveExecution(
-		execution,
-		useTaskStore.getState().tasks,
-		maxParallelFor(execution.projectId, fallback),
-	);
+	const step = stepWaveExecution(execution, useTaskStore.getState().tasks);
 
 	if (step.finished) {
 		set({ execution: { ...execution, status: "done" }, blocked: [] });
@@ -165,9 +154,10 @@ async function runStep(get: Get, set: Set): Promise<void> {
 		const result = await persistTaskStatus(taskId, "in_progress");
 		if (!result.success) failures[taskId] = result.error ?? "";
 	}
-	if (Object.keys(failures).length > 0) {
-		set({ startFailures: { ...get().startFailures, ...failures } });
-	}
+	set({ startFailures: { ...get().startFailures, ...failures } });
+	// Look again: a refused start leaves its task in the backlog, which
+	// settles it, and no task change may follow to wake the run.
+	tickAgain = true;
 }
 
 /**
@@ -196,11 +186,16 @@ async function replanRemaining(get: Get, execution: WaveExecution): Promise<Wave
 			taskIds: remaining,
 			options: { tolerance, unplannedPolicy },
 		});
-		if (result.success && result.data) {
+		if (result.data) {
 			const replanned = result.data.waves.map((w) => [...w.taskIds]);
 			// Specs the new plan leaves out (a cycle) are not started.
 			useExecutionWavesStore.setState({ plan: result.data });
-			return { ...execution, waves: [...done, ...replanned], current: next };
+			return {
+				...execution,
+				waves: [...done, ...replanned],
+				current: next,
+				maxParallel: result.data.maxParallel,
+			};
 		}
 	} catch {
 		// Keep the waves planned before.

@@ -119,9 +119,7 @@ export interface WavePlanDeps {
 }
 
 function plannedFiles(task: Task): string[] {
-	return (task.subtasks ?? []).flatMap((s) =>
-		Array.isArray(s.files) ? s.files.filter((f) => typeof f === "string") : [],
-	);
+	return task.subtasks.flatMap((s) => s.files);
 }
 
 function createdAtMs(task: Task): number {
@@ -149,11 +147,7 @@ export async function buildExecutionWavePlan(
 
 	let candidates: Task[];
 	if (request.taskIds) {
-		const byId = new Map<string, Task>();
-		for (const t of all) {
-			byId.set(t.id, t);
-			if (!byId.has(t.specId)) byId.set(t.specId, t);
-		}
+		const byId = new Map(all.map((t) => [t.id, t]));
 		candidates = [];
 		for (const id of request.taskIds) {
 			const task = byId.get(id);
@@ -161,7 +155,7 @@ export async function buildExecutionWavePlan(
 			if (!PLANNABLE.has(task.status)) {
 				return { ok: false, error: "Only backlog or queued tasks can be planned" };
 			}
-			if (!candidates.includes(task)) candidates.push(task);
+			candidates.push(task); // ids were deduplicated by the validation
 		}
 	} else {
 		candidates = all.filter((t) => PLANNABLE.has(t.status)).slice(0, MAX_PLAN_TASKS);
@@ -172,7 +166,7 @@ export async function buildExecutionWavePlan(
 		id: task.id,
 		title: task.title,
 		status: task.status,
-		priorityWeight: task.metadata?.priority ? (PRIORITY_WEIGHT[task.metadata.priority] ?? 0) : 0,
+		priorityWeight: PRIORITY_WEIGHT[task.metadata?.priority as TaskPriority] ?? 0,
 		createdAtMs: createdAtMs(task),
 		// `blockedBy` names tasks by id (the queue resolves it the same way).
 		blockedBy: (task.metadata?.blockedBy ?? []).filter((b) => typeof b === "string"),
