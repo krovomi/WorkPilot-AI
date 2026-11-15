@@ -60,6 +60,10 @@ const DYNAMIC_FORWARDERS = new Set([
 	// will find their channel reported missing here, and must teach this test to
 	// read that call rather than add the channel to an allowlist.
 	"main/electron-utils.ts",
+	// `prIpcMain`: registers on the channel it is given, after checking the
+	// arguments. `pr-handlers.ts` imports it as `ipcMain`, so each of its
+	// registrations is still read there, with its constant.
+	"main/ipc-handlers/github/pr-ipc-guard.ts",
 ]);
 
 const PRELOAD_CALL =
