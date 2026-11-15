@@ -303,8 +303,12 @@ class SwarmOrchestrator:
         result: WaveResult,
         nodes: dict[str, SubtaskNode],
     ) -> None:
-        """Retry failed subtasks that haven't exceeded max retries."""
-        for sr in result.results:
+        """Retry each failed subtask, up to ``max_retries_per_subtask`` times.
+
+        A subtask that succeeds on a retry takes its place in ``result`` as a
+        success, so the wave's merge includes it.
+        """
+        for position, sr in enumerate(result.results):
             if sr.success:
                 continue
 
@@ -312,7 +316,7 @@ class SwarmOrchestrator:
             if not node:
                 continue
 
-            if node.retry_count < self.config.max_retries_per_subtask:
+            while node.retry_count < self.config.max_retries_per_subtask:
                 node.retry_count += 1
                 node.state = SubtaskState.RETRYING
 
@@ -344,6 +348,12 @@ class SwarmOrchestrator:
                     # Fix counters: was counted as failed, now succeeded
                     self.status.failed_subtasks -= 1
                     self.status.completed_subtasks += 1
+                    result.results[position] = retry_result.results[0]
+                    break
+
+        result.all_succeeded = all(r.success for r in result.results)
+        if result.all_succeeded:
+            wave.state = SubtaskState.COMPLETED
 
     async def _merge_wave(
         self,
@@ -415,9 +425,6 @@ class SwarmOrchestrator:
                     report.stats.files_need_review,
                 )
 
-        except ImportError:
-            logger.warning("Merge system not available — skipping wave merge")
-            wave.merge_success = True
         except Exception as e:
             logger.error("Wave %d merge failed: %s", wave.index, e, exc_info=True)
             wave.merge_success = False
