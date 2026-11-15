@@ -16,7 +16,7 @@
   "apps/backend/agents/session.py": {"blind": 27, "silent": 8},
   "apps/backend/agents/swarm/orchestrator.py": {"blind": 2, "silent": 0},
   "apps/backend/agents/swarm/wave_executor.py": {"blind": 1, "silent": 0},
-  "apps/backend/agents/tools_pkg/models.py": {"blind": 2, "silent": 0},
+  "apps/backend/agents/tools_pkg/models.py": {"blind": 1, "silent": 0},
   "apps/backend/agents/tools_pkg/tools/progress.py": {"blind": 1, "silent": 0},
   "apps/backend/agents/tools_pkg/tools/qa.py": {"blind": 2, "silent": 0},
   "apps/backend/agents/tools_pkg/tools/subtask.py": {"blind": 2, "silent": 0},
