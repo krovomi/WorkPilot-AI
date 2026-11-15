@@ -366,7 +366,6 @@
   "apps/backend/spec/api.py": {"blind": 1, "silent": 0},
   "apps/backend/spec/compaction.py": {"blind": 2, "silent": 1},
   "apps/backend/spec/complexity.py": {"blind": 1, "silent": 0},
-  "apps/backend/spec/context.py": {"blind": 1, "silent": 0},
   "apps/backend/spec/discovery.py": {"blind": 1, "silent": 0},
   "apps/backend/spec/phases/requirements_phases.py": {"blind": 1, "silent": 0},
   "apps/backend/spec/phases/spec_phases.py": {"blind": 2, "silent": 2},
