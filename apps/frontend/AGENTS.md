@@ -21,7 +21,7 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | Fichier | Lignes | Voisins / index |
 |---|---|---|
 | `src/main/claude-profile/usage-monitor.ts` | ~4 600 | une seule classe |
-| `src/main/app-emulator-service.ts` | ~3 250 | — |
+| `src/main/app-emulator-service.ts` | ~3 230 | tests sur de vrais dossiers et de vrais ports : `src/main/__tests__/app-emulator-world.ts` |
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/main/ipc-handlers/github/pr-handlers.ts` | ~2 350 | `pr-graphql.ts`, `pr-logs.ts`, `pr-ci-wait.ts` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
