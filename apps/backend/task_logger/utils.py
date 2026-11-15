@@ -66,9 +66,15 @@ def update_task_logger_path(new_spec_dir: Path) -> None:
     # Lazy import to avoid cyclic import
     from .logger import TaskLogger
 
-    # Update the logger's internal paths
-    _current_logger.spec_dir = Path(new_spec_dir)
-    _current_logger.log_file = _current_logger.spec_dir / TaskLogger.LOG_FILE
+    # Update the logger's internal paths, its storages' included: they
+    # write the file, and they kept the old folder, so every entry after the
+    # rename recreated it and landed there, out of the UI's sight.
+    new_spec_dir = Path(new_spec_dir)
+    _current_logger.spec_dir = new_spec_dir
+    _current_logger.log_file = new_spec_dir / TaskLogger.LOG_FILE
+    for storage in (_current_logger.storage, *_current_logger._per_llm.values()):
+        storage.spec_dir = new_spec_dir
+        storage.log_file = new_spec_dir / storage.log_file.name
 
     # Update spec_id in the storage
     _current_logger.storage.update_spec_id(new_spec_dir.name)

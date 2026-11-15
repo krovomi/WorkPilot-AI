@@ -383,6 +383,11 @@ class PRReviewFinding:
     # findings about related files that aren't directly in the PR diff.
     is_impact_finding: bool = False
 
+    # How many times the project rejected this kind of finding when the
+    # learned suppressions downgraded it (learning_loop/review_feedback.py);
+    # 0 when they left it alone.
+    learned_rejections: int = 0
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -409,6 +414,7 @@ class PRReviewFinding:
             "cross_validated": self.cross_validated,
             # Impact finding flag
             "is_impact_finding": self.is_impact_finding,
+            "learned_rejections": self.learned_rejections,
         }
 
     @classmethod
@@ -438,6 +444,7 @@ class PRReviewFinding:
             cross_validated=data.get("cross_validated", False),
             # Impact finding flag
             is_impact_finding=data.get("is_impact_finding", False),
+            learned_rejections=data.get("learned_rejections") or 0,
         )
 
 
@@ -572,6 +579,11 @@ class PRReviewResult:
 
     jev: dict | None = None
 
+    # Findings dropped because the project rejected their kind often enough
+    # (runners/github/services/learned_suppression.py), kept here so nothing
+    # disappears without a trace.
+    learned_suppressions: list[dict] = field(default_factory=list)
+
     def to_dict(self) -> dict:
         return {
             "jev": self.jev,
@@ -605,6 +617,7 @@ class PRReviewResult:
             "has_posted_findings": self.has_posted_findings,
             "posted_finding_ids": self.posted_finding_ids,
             "posted_at": self.posted_at,
+            "learned_suppressions": self.learned_suppressions,
         }
 
     @classmethod
@@ -654,6 +667,7 @@ class PRReviewResult:
             has_posted_findings=data.get("has_posted_findings", False),
             posted_finding_ids=data.get("posted_finding_ids", []),
             posted_at=data.get("posted_at"),
+            learned_suppressions=data.get("learned_suppressions", []),
         )
 
     async def save(self, github_dir: Path) -> None:

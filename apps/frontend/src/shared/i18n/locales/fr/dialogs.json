@@ -85,7 +85,6 @@
 		"branchDescription": "Choisissez quelle branche WorkPilot AI doit utiliser comme base pour créer les branches de tâches.",
 		"whyBranch": "Pourquoi sélectionner une branche ?",
 		"branchExplanation": "WorkPilot AI crée des espaces de travail isolés pour chaque tâche. Sélectionner la bonne branche de base garantit que vos tâches démarrent avec le code le plus récent de votre ligne de développement principale.",
-		"ready": "WorkPilot AI est prêt à l'emploi ! Vous pouvez maintenant créer des tâches qui seront automatiquement basées sur la branche {{branchName}}.",
 		"createRepoAriaLabel": "Créer un nouveau dépôt sur GitHub",
 		"linkRepoAriaLabel": "Lier à un dépôt existant",
 		"goBackAriaLabel": "Retourner à la sélection du dépôt",
@@ -126,9 +125,17 @@
 		"recommended": "Recommandée",
 		"branchHintBefore": "Toutes les tâches seront créées depuis des branches comme",
 		"branchHintBasedOn": "basées sur",
-		"setupComplete": "Configuration terminée",
-		"readyBefore": "WorkPilot AI est prêt ! Vous pouvez maintenant créer des tâches qui partiront automatiquement de",
-		"retryDetection": "Relancer la détection"
+		"retryDetection": "Relancer la détection",
+		"progressAuthenticate": "Authentification",
+		"progressConfigure": "Configuration",
+		"errors": {
+			"detectFailed": "Impossible de détecter le dépôt.",
+			"branchesFailed": "Impossible de charger les branches.",
+			"ownerRequired": "Choisissez le propriétaire du dépôt.",
+			"createFailed": "Impossible de créer le dépôt.",
+			"repoPathInvalid": "Utilisez la forme propriétaire/dépôt, par exemple utilisateur/mon-projet.",
+			"linkFailed": "Impossible d'ajouter le dépôt distant."
+		}
 	},
 	"repoProvider": {
 		"title": "Choisir le fournisseur distant",
@@ -187,7 +194,11 @@
 		"deleteTerminal": "Supprimer le worktree de terminal ?",
 		"deleteTerminalWarning": "Le worktree et sa branche seront supprimés définitivement. Les modifications non commitées seront perdues.",
 		"mergeSuccess": "Fusion réussie",
-		"mergeFailed": "Échec de la fusion"
+		"mergeFailed": "Échec de la fusion",
+		"loadFailed": "Impossible de charger les worktrees.",
+		"taskNotFound": "Aucune tâche ne correspond à ce worktree.",
+		"deleteFailed": "Impossible de supprimer le worktree.",
+		"deleteTerminalFailed": "Impossible de supprimer le worktree du terminal."
 	},
 	"worktreeCleanup": {
 		"title": "Terminer la tâche",
@@ -278,7 +289,6 @@
 		"token": "Token",
 		"organization": "Organisation",
 		"pat": "PAT",
-		"fillRequiredFields": "Veuillez remplir tous les champs obligatoires",
 		"locationMustBeLocalPath": "L’emplacement doit être un chemin local, pas une URL de dépôt. Cliquez sur « Parcourir » pour choisir un dossier.",
 		"willBeCreatedAt": "Sera créé dans",
 		"successTitle": "Projet créé",
@@ -444,7 +454,17 @@
 		"browserLoginHint": "Cliquez ci-dessous pour ouvrir votre navigateur et vous connecter à votre compte Claude.",
 		"authenticateNew": "Authentifier un nouveau compte",
 		"hideToken": "Masquer le jeton",
-		"showToken": "Afficher le jeton"
+		"showToken": "Afficher le jeton",
+		"defaultTitle": "Authentification Claude requise",
+		"defaultDescription": "Un jeton OAuth Claude Code est nécessaire pour les fonctions d'IA comme l'Idéation et la génération de feuille de route.",
+		"errors": {
+			"checkFailed": "Impossible de vérifier le jeton.",
+			"profileWithoutToken": "Le compte choisi n'a pas de jeton valide.",
+			"saveFailed": "Impossible d'enregistrer le jeton.",
+			"noProject": "Sélectionnez d'abord un projet.",
+			"authStartFailed": "Impossible de lancer l'authentification."
+		},
+		"copyCommand": "Copier la commande"
 	},
 	"azureConfig": {
 		"title": "Configurer Azure DevOps",

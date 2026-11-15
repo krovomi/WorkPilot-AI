@@ -37,15 +37,15 @@ export default defineConfig({
 				"src/**/*.spec.tsx",
 				"src/**/*.d.ts",
 			],
-			// A floor, not a goal: about half a point under what the suite covered
-			// on 15 November 2026 (statements 42.6 %, lines 42.6 %, functions
-			// 41.5 %, branches 37.5 %). CI runs coverage on Linux; raise the floor
-			// when the suite grows, never lower it to merge.
+			// A floor, not a goal: just under what the suite covered on
+			// 15 November 2026 (statements and lines 44.7 %, functions 44.4 %,
+			// branches 39.7 %). CI runs coverage on Linux; raise the floor when
+			// the suite grows, never lower it to merge.
 			thresholds: {
-				statements: 42,
-				lines: 42,
-				functions: 41,
-				branches: 37,
+				statements: 44.4,
+				lines: 44.4,
+				functions: 44,
+				branches: 39.3,
 			},
 		},
 		// Mock Electron modules for unit tests

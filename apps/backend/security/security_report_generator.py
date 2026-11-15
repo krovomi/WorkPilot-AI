@@ -17,7 +17,9 @@ Part of Feature 8: Security-First Features.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -461,7 +463,7 @@ class SecurityReportGenerator:
         <h1>🔒 Security Scan Report</h1>
         <div class="subtitle">
             Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
-            Project: {vulnerability_results.get("project_path", "Unknown")}
+            Project: {escape(str(vulnerability_results.get("project_path", "Unknown")))}
         </div>
     </div>
 
@@ -512,23 +514,23 @@ class SecurityReportGenerator:
                 <div class="vulnerability critical">
                     <h4>
                         <span class="badge critical">CRITICAL</span>
-                        {vuln.get("title", "Unknown")}
+                        {escape(str(vuln.get("title", "Unknown")))}
                     </h4>
-                    <p><strong>ID:</strong> {vuln.get("id", "N/A")}</p>
-                    <p><strong>Source:</strong> {vuln.get("source", "N/A")}</p>
+                    <p><strong>ID:</strong> {escape(str(vuln.get("id", "N/A")))}</p>
+                    <p><strong>Source:</strong> {escape(str(vuln.get("source", "N/A")))}</p>
                 """
                 if vuln.get("file"):
                     location = vuln["file"]
                     if vuln.get("line"):
                         location += f":{vuln['line']}"
-                    html += f'<div class="code-location">📍 {location}</div>'
+                    html += (
+                        f'<div class="code-location">📍 {escape(str(location))}</div>'
+                    )
 
-                html += f"<p>{vuln.get('description', 'N/A')}</p>"
+                html += f"<p>{escape(str(vuln.get('description', 'N/A')))}</p>"
 
                 if vuln.get("remediation"):
-                    html += (
-                        f"<p><strong>Remediation:</strong> {vuln['remediation']}</p>"
-                    )
+                    html += f"<p><strong>Remediation:</strong> {escape(str(vuln['remediation']))}</p>"
 
                 html += "</div>"
 
@@ -542,7 +544,7 @@ class SecurityReportGenerator:
         <ul>
 """
         for rec in recommendations:
-            html += f"            <li>{rec}</li>\n"
+            html += f"            <li>{_strong(rec)}</li>\n"
 
         html += """
         </ul>
@@ -584,7 +586,7 @@ class SecurityReportGenerator:
                         "driver": {
                             "name": "WorkPilot AI Security Scanner",
                             "version": "1.0.0",
-                            "informationUri": "https://github.com/auto-claude/security",
+                            "informationUri": "https://github.com/krovomi/WorkPilot-AI",
                         }
                     },
                     "results": [],
@@ -818,3 +820,8 @@ class SecurityReportGenerator:
         )
 
         return recommendations
+
+
+def _strong(text: str) -> str:
+    """A recommendation's `**bold**` as HTML, everything else escaped."""
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escape(text))

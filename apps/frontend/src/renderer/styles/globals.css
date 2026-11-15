@@ -1323,6 +1323,13 @@ body {
   border-top-color: var(--col-accent);
 }
 
+/* « Build rouge » : a red CI run is the one column that must not read as
+   the grey backlog. */
+.column-build-failed {
+  --col-accent: var(--destructive);
+  border-top-color: var(--col-accent);
+}
+
 .column-pr-open {
   --col-accent: #818CF8;
   border-top-color: var(--col-accent);

@@ -25,9 +25,57 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+# Test file names of each stack. Only Python, JavaScript, Go, Rust and RSpec
+# were known: a .NET, Java, PHP, Swift or Dart project had no tests.
+_TEST_FILE_NAMES = (
+    "test_*.py",
+    "*_test.py",
+    "*.test.js",
+    "*.test.ts",
+    "*.test.tsx",
+    "*.test.jsx",
+    "*.spec.js",
+    "*.spec.ts",
+    "*.spec.tsx",
+    "*_test.go",
+    "*_test.rs",
+    "*_spec.rb",
+    "*_test.rb",
+    "*Tests.cs",
+    "*Test.cs",
+    "*Tests.vb",
+    "*Test.java",
+    "*Tests.java",
+    "*Test.kt",
+    "*Test.php",
+    "*Tests.swift",
+    "*_test.dart",
+    "*_test.exs",
+)
+
+# Folders never searched for tests: a dependency's own tests are not the
+# project's (node_modules made every JavaScript project "have tests").
+_NOT_THE_PROJECT = {
+    "node_modules",
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "dist",
+    "build",
+    "target",
+    "vendor",
+    "bin",
+    "obj",
+    "Pods",
+    ".workpilot",
+    ".worktrees",
+}
 
 # =============================================================================
 # DATA CLASSES
@@ -246,12 +294,13 @@ class TestDiscovery:
             self._discover_go_frameworks(project_dir, result)
         if (project_dir / "Gemfile").exists():
             self._discover_ruby_frameworks(project_dir, result)
+        self._discover_other_frameworks(project_dir, result)
 
         # Find test directories
         result.test_directories = self._find_test_directories(project_dir)
 
         # Check if tests exist
-        result.has_tests = self._has_test_files(project_dir, result.test_directories)
+        result.has_tests = self._has_test_files(project_dir)
 
         # Set primary test command
         if result.frameworks:
@@ -496,7 +545,7 @@ class TestDiscovery:
         if not gemfile.exists():
             return
 
-        content = gemfile.read_text(encoding="utf-8").lower()
+        content = gemfile.read_text(encoding="utf-8", errors="replace").lower()
 
         if "rspec" in content or (project_dir / ".rspec").exists():
             result.frameworks.append(
@@ -517,6 +566,59 @@ class TestDiscovery:
                 )
             )
 
+    def _discover_other_frameworks(
+        self, project_dir: Path, result: TestDiscoveryResult
+    ) -> None:
+        """.NET, JVM, PHP, Swift, Dart and Elixir: the runner each build tool
+        ships, found from the project file at the root."""
+        found: tuple[str, str, str] | None = None
+        dotnet = sorted(
+            f.name
+            for pattern in ("*.sln", "*.slnx", "*.csproj", "*.fsproj", "*.vbproj")
+            for f in project_dir.glob(pattern)
+        )
+        if dotnet:
+            found = ("dotnet_test", "dotnet test", dotnet[0])
+        elif (project_dir / "pom.xml").exists():
+            wrapper = (project_dir / "mvnw").exists()
+            found = ("maven", "./mvnw test" if wrapper else "mvn test", "pom.xml")
+        elif gradle := next(
+            (
+                n
+                for n in ("build.gradle.kts", "build.gradle")
+                if (project_dir / n).exists()
+            ),
+            None,
+        ):
+            wrapper = (project_dir / "gradlew").exists()
+            found = ("gradle", "./gradlew test" if wrapper else "gradle test", gradle)
+        elif (project_dir / "composer.json").exists():
+            if "phpunit" in (project_dir / "composer.json").read_text(
+                encoding="utf-8", errors="replace"
+            ):
+                found = ("phpunit", "vendor/bin/phpunit", "composer.json")
+        elif (project_dir / "Package.swift").exists():
+            found = ("swift_test", "swift test", "Package.swift")
+        elif (project_dir / "pubspec.yaml").exists():
+            pubspec = (project_dir / "pubspec.yaml").read_text(
+                encoding="utf-8", errors="replace"
+            )
+            flutter = "flutter:" in pubspec
+            found = (
+                "flutter_test" if flutter else "dart_test",
+                "flutter test" if flutter else "dart test",
+                "pubspec.yaml",
+            )
+        elif (project_dir / "mix.exs").exists():
+            found = ("exunit", "mix test", "mix.exs")
+        if found:
+            name, command, config = found
+            result.frameworks.append(
+                TestFramework(
+                    name=name, type="all", command=command, config_file=config
+                )
+            )
+
     def _find_test_directories(self, project_dir: Path) -> list[str]:
         """Find test directories in the project."""
         test_dir_patterns = [
@@ -534,7 +636,7 @@ class TestDiscovery:
                 # Glob pattern
                 for d in project_dir.glob(pattern):
                     if d.is_dir():
-                        found_dirs.append(str(d.relative_to(project_dir)))
+                        found_dirs.append(d.relative_to(project_dir).as_posix())
             else:
                 # Exact name
                 test_dir = project_dir / pattern
@@ -543,36 +645,15 @@ class TestDiscovery:
 
         return found_dirs
 
-    def _has_test_files(self, project_dir: Path, test_directories: list[str]) -> bool:
-        """Check if any test files exist."""
-        test_file_patterns = [
-            "**/test_*.py",
-            "**/*_test.py",
-            "**/*.test.js",
-            "**/*.test.ts",
-            "**/*.test.tsx",
-            "**/*.spec.js",
-            "**/*.spec.ts",
-            "**/*.spec.tsx",
-            "**/test_*.go",
-            "**/*_test.go",
-            "**/*_test.rs",
-            "**/spec/**/*_spec.rb",
-        ]
+    def _has_test_files(self, project_dir: Path) -> bool:
+        """Whether the project, outside its dependencies and build output,
+        has a test file of any stack. Stops at the first one."""
+        from fnmatch import fnmatchcase
 
-        # Check in test directories
-        for test_dir in test_directories:
-            test_path = project_dir / test_dir
-            if test_path.exists():
-                for pattern in test_file_patterns:
-                    if list(test_path.glob(pattern.replace("**/", ""))):
-                        return True
-
-        # Check project-wide
-        for pattern in test_file_patterns:
-            if list(project_dir.glob(pattern)):
+        for _root, dirs, files in os.walk(project_dir):
+            dirs[:] = [d for d in dirs if d not in _NOT_THE_PROJECT]
+            if any(fnmatchcase(f, n) for f in files for n in _TEST_FILE_NAMES):
                 return True
-
         return False
 
     def to_dict(self, result: TestDiscoveryResult) -> dict[str, Any]:
@@ -648,43 +729,3 @@ def get_test_frameworks(project_dir: Path) -> list[str]:
     discovery = TestDiscovery()
     result = discovery.discover(project_dir)
     return [f.name for f in result.frameworks]
-
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-
-def main() -> None:
-    """CLI entry point for testing."""
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Discover test frameworks")
-    parser.add_argument("project_dir", type=Path, help="Path to project root")
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
-
-    args = parser.parse_args()
-
-    discovery = TestDiscovery()
-    result = discovery.discover(args.project_dir)
-
-    if args.json:
-        print(json.dumps(discovery.to_dict(result), indent=2))
-    else:
-        print(f"Package Manager: {result.package_manager or 'unknown'}")
-        print(f"Has Tests: {result.has_tests}")
-        print(f"Test Command: {result.test_command or 'none'}")
-        print(f"Test Directories: {', '.join(result.test_directories) or 'none'}")
-        print(f"Coverage Command: {result.coverage_command or 'none'}")
-        print(f"\nFrameworks ({len(result.frameworks)}):")
-        for f in result.frameworks:
-            print(f"  - {f.name} ({f.type})")
-            print(f"    Command: {f.command}")
-            if f.config_file:
-                print(f"    Config: {f.config_file}")
-            if f.version:
-                print(f"    Version: {f.version}")
-
-
-if __name__ == "__main__":
-    main()
