@@ -259,6 +259,7 @@ export function GitHubPRs({
 							onSelectPR={selectPR}
 							onLoadMore={loadMore}
 							isLoadingMore={isLoadingMore}
+							isFiltered={hasActiveFilters}
 						/>
 					</div>
 				}

@@ -925,6 +925,8 @@
 		"daysAgo": "{{count}}d ago",
 		"daysAgo_one": "{{count}}d ago",
 		"daysAgo_other": "{{count}}d ago",
+		"weeksAgo_one": "{{count}}w ago",
+		"weeksAgo_other": "{{count}}w ago",
 		"today": "Today",
 		"yesterday": "Yesterday"
 	},

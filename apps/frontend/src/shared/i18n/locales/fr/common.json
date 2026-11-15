@@ -925,6 +925,8 @@
 		"daysAgo": "il y a {{count}} j",
 		"daysAgo_one": "il y a {{count}} j",
 		"daysAgo_other": "il y a {{count}} j",
+		"weeksAgo_one": "il y a {{count}} sem.",
+		"weeksAgo_other": "il y a {{count}} sem.",
 		"today": "Aujourd'hui",
 		"yesterday": "Hier"
 	},
