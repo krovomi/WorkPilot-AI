@@ -1494,7 +1494,21 @@
 		"less": "Moins",
 		"more": "Plus",
 		"streaming": "Diffusion",
-		"running": "En cours"
+		"running": "En cours",
+		"phase": {
+			"context": "Collecte du contexte",
+			"analysis": "Analyse IA",
+			"synthesis": "Synthèse"
+		},
+		"activity": {
+			"read_one": "{{count}} fichier lu",
+			"read_other": "{{count}} fichiers lus",
+			"search_one": "{{count}} recherche",
+			"search_other": "{{count}} recherches",
+			"other_one": "{{count}} autre",
+			"other_other": "{{count}} autres"
+		},
+		"showDetail": "Afficher le détail"
 	},
 	"githubCopilot": {
 		"authTerminal": {

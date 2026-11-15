@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import type {
 	PRLogEntry,
 	PRLogPhase,
-	PRLogs,
+	PRLogs as PRLogsData,
 	PRPhaseLog,
 } from "../../../../preload/api/modules/github-api";
 import { cn } from "../../../lib/utils";
@@ -31,16 +31,10 @@ import { formatAppDateTime, formatAppTime } from "@/lib/date-format";
 
 interface PRLogsProps {
 	readonly prNumber: number;
-	readonly logs: PRLogs | null;
+	readonly logs: PRLogsData | null;
 	readonly isLoading: boolean;
 	readonly isStreaming?: boolean;
 }
-
-const PHASE_LABELS: Record<PRLogPhase, string> = {
-	context: "Context Gathering",
-	analysis: "AI Analysis",
-	synthesis: "Synthesis",
-};
 
 const PHASE_ICONS: Record<PRLogPhase, typeof FolderOpen> = {
 	context: FolderOpen,
@@ -82,6 +76,10 @@ const SOURCE_COLORS: Record<string, string> = {
 	"Specialist:codebase-fit": "bg-success/20 text-success",
 	default: "bg-muted text-muted-foreground",
 };
+
+function sourceColor(source: string): string {
+	return SOURCE_COLORS[source] ?? SOURCE_COLORS.default;
+}
 
 // Helper type for grouped agent entries
 interface AgentGroup {
@@ -142,15 +140,13 @@ function groupEntriesByAgent(entries: PRLogEntry[]): {
 	const agentGroups: AgentGroup[] = Array.from(agentMap.entries())
 		.map(([agentName, agentEntries]) => ({ agentName, entries: agentEntries }))
 		.sort((a, b) => {
-			const aTime = a.entries[0]?.timestamp || "";
-			const bTime = b.entries[0]?.timestamp || "";
-			return aTime.localeCompare(bTime);
+			// A group holds at least the entry that opened it.
+			return a.entries[0].timestamp.localeCompare(b.entries[0].timestamp);
 		});
 
 	return { agentGroups, orchestratorActivity, otherEntries };
 }
 
-// biome-ignore lint/suspicious/noRedeclare: redeclaration is intentional in this context
 export function PRLogs({
 	prNumber,
 	logs,
@@ -272,7 +268,7 @@ export function PRLogs({
 // Phase Log Section Component
 interface PhaseLogSectionProps {
 	readonly phase: PRLogPhase;
-	readonly phaseLog: PRPhaseLog | null;
+	readonly phaseLog: PRPhaseLog;
 	readonly isExpanded: boolean;
 	readonly onToggle: () => void;
 	readonly isStreaming?: boolean;
@@ -291,8 +287,8 @@ function PhaseLogSection({
 }: PhaseLogSectionProps) {
 	const { t } = useTranslation();
 	const Icon = PHASE_ICONS[phase];
-	const status = phaseLog?.status || "pending";
-	const hasEntries = (phaseLog?.entries.length || 0) > 0;
+	const status = phaseLog.status;
+	const hasEntries = phaseLog.entries.length > 0;
 
 	const getStatusBadge = () => {
 		// Show streaming indicator for active phase during streaming
@@ -376,10 +372,12 @@ function PhaseLogSection({
 									: "text-muted-foreground",
 							)}
 						/>
-						<span className="font-medium text-sm">{PHASE_LABELS[phase]}</span>
+						<span className="font-medium text-sm">
+							{t(`common:prLogs.phase.${phase}`)}
+						</span>
 						{hasEntries && (
 							<span className="text-xs text-muted-foreground">
-								{t("common:prLogs.entries", { count: phaseLog?.entries.length })}
+								{t("common:prLogs.entries", { count: phaseLog.entries.length })}
 							</span>
 						)}
 					</div>
@@ -390,7 +388,7 @@ function PhaseLogSection({
 				<div className="mt-1 ml-6 border-l-2 border-border pl-4 py-2 space-y-2">
 					{hasEntries ? (
 						<GroupedLogEntries
-							entries={phaseLog?.entries || []}
+							entries={phaseLog.entries}
 							phase={phase}
 							expandedAgents={expandedAgents}
 							onToggleAgent={onToggleAgent}
@@ -426,8 +424,8 @@ function GroupedLogEntries({
 			{/* Render important messages first (AI response, Invoking agent, etc.) */}
 			{otherEntries.length > 0 && (
 				<div className="space-y-1">
-					{otherEntries.map((entry) => (
-						<LogEntry key={`other-${entry.timestamp}`} entry={entry} />
+					{keyed(otherEntries).map(({ key, entry }) => (
+						<LogEntry key={key} entry={entry} />
 					))}
 				</div>
 			)}
@@ -477,14 +475,15 @@ function OrchestratorActivitySection({
 	).length;
 	const otherCount = entries.length - readCount - searchCount;
 
-	// Build summary text
-	const summaryParts: string[] = [];
-	if (readCount > 0)
-		summaryParts.push(`${readCount} file${readCount > 1 ? "s" : ""} read`);
-	if (searchCount > 0)
-		summaryParts.push(`${searchCount} search${searchCount > 1 ? "es" : ""}`);
-	if (otherCount > 0) summaryParts.push(`${otherCount} other`);
-	const summary = summaryParts.join(", ") || `${entries.length} operations`;
+	// The section only shows with entries, so the summary is never empty.
+	const summary = [
+		readCount > 0 && t("common:prLogs.activity.read", { count: readCount }),
+		searchCount > 0 &&
+			t("common:prLogs.activity.search", { count: searchCount }),
+		otherCount > 0 && t("common:prLogs.activity.other", { count: otherCount }),
+	]
+		.filter(Boolean)
+		.join(", ");
 
 	return (
 		<div className="rounded-md border border-border/50 bg-secondary/10 overflow-hidden">
@@ -518,17 +517,13 @@ function OrchestratorActivitySection({
 
 			{isExpanded && (
 				<div className="border-t border-border/30 p-2 space-y-0.5 max-h-[300px] overflow-y-auto">
-					{entries.map((entry) => (
+					{keyed(entries).map(({ key, entry }) => (
 						<div
-							key={`activity-${entry.timestamp}`}
+							key={key}
 							className="flex items-start gap-2 text-3xs text-muted-foreground/80 py-0.5"
 						>
 							<span className="text-muted-foreground/50 tabular-nums shrink-0">
-								{formatAppTime(entry.timestamp, {
-									hour: "2-digit",
-									minute: "2-digit",
-									second: "2-digit",
-								})}
+								{formatLogTime(entry.timestamp)}
 							</span>
 							<span className="wrap-break-word">{entry.content}</span>
 						</div>
@@ -560,12 +555,9 @@ function isBoringSummary(content: string): boolean {
 
 // Find a meaningful summary entry - skip boring entries and prefer "AI response" or "Complete"
 function findSummaryEntry(entries: PRLogEntry[]): {
-	summaryEntry: PRLogEntry | undefined;
+	summaryEntry: PRLogEntry;
 	otherEntries: PRLogEntry[];
 } {
-	if (entries.length === 0)
-		return { summaryEntry: undefined, otherEntries: [] };
-
 	// Look for the most informative entry to show as summary
 	// Priority: 1) "Complete:" entry, 2) "AI response:" entry, 3) first non-boring entry
 	const completeEntry = entries.find((e) => e.content.startsWith("Complete:"));
@@ -615,10 +607,6 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 		.replace("Agent:", "")
 		.replace("Specialist:", "");
 
-	const getSourceColor = (source: string) => {
-		return SOURCE_COLORS[source] || SOURCE_COLORS.default;
-	};
-
 	return (
 		<div className="rounded-md border border-border/50 bg-secondary/20 overflow-hidden">
 			{/* Agent header with first message always visible */}
@@ -629,7 +617,7 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 						variant="outline"
 						className={cn(
 							"text-3xs px-1.5 py-0.5",
-							getSourceColor(agentName),
+							sourceColor(agentName),
 						)}
 					>
 						{displayName}
@@ -668,24 +656,41 @@ function AgentLogGroup({ group, isExpanded, onToggle }: AgentLogGroupProps) {
 				</div>
 
 				{/* Summary entry - always visible (most informative entry, not necessarily first) */}
-				{summaryEntry && (
-					<LogEntry entry={{ ...summaryEntry, source: undefined }} />
-				)}
+				<LogEntry entry={{ ...summaryEntry, source: undefined }} />
 			</div>
 
 			{/* Collapsible section for other entries */}
 			{hasMoreEntries && isExpanded && (
 				<div className="border-t border-border/30 bg-secondary/10 p-2 space-y-1">
-					{otherEntries.map((entry) => (
-						<LogEntry
-							key={`other-${entry.timestamp}`}
-							entry={{ ...entry, source: undefined }}
-						/>
+					{keyed(otherEntries).map(({ key, entry }) => (
+						<LogEntry key={key} entry={{ ...entry, source: undefined }} />
 					))}
 				</div>
 			)}
 		</div>
 	);
+}
+
+/** A log line's time; a timestamp that does not read as a date shows none. */
+function formatLogTime(timestamp: string): string {
+	return formatAppTime(timestamp, {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
+/**
+ * Keys for log lines: several lines often share a timestamp (to the second),
+ * and a key made of it alone made React drop or repeat them.
+ */
+function keyed(entries: PRLogEntry[]): Array<{ key: string; entry: PRLogEntry }> {
+	const seen = new Map<string, number>();
+	return entries.map((entry) => {
+		const n = seen.get(entry.timestamp) ?? 0;
+		seen.set(entry.timestamp, n + 1);
+		return { key: `${entry.timestamp}#${n}`, entry };
+	});
 }
 
 // Log Entry Component
@@ -698,24 +703,6 @@ function LogEntry({ entry }: LogEntryProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const hasDetail = Boolean(entry.detail);
 
-	const formatTime = (timestamp: string) => {
-		try {
-			const date = new Date(timestamp);
-			return formatAppTime(date, {
-				hour: "2-digit",
-				minute: "2-digit",
-				second: "2-digit",
-			});
-		} catch {
-			return "";
-		}
-	};
-
-	const getSourceColor = (source: string | undefined) => {
-		if (!source) return SOURCE_COLORS.default;
-		return SOURCE_COLORS[source] || SOURCE_COLORS.default;
-	};
-
 	if (entry.type === "error") {
 		return (
 			<div className="flex flex-col">
@@ -726,6 +713,8 @@ function LogEntry({ entry }: LogEntryProps) {
 						<button
 							type="button"
 							onClick={() => setIsExpanded(!isExpanded)}
+							aria-label={t("common:prLogs.showDetail")}
+							aria-expanded={isExpanded}
 							className={cn(
 								"flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded shrink-0",
 								"text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
@@ -774,14 +763,14 @@ function LogEntry({ entry }: LogEntryProps) {
 		<div className="flex flex-col">
 			<div className="flex items-start gap-2 text-xs text-muted-foreground py-0.5">
 				<span className="text-3xs text-muted-foreground/60 tabular-nums shrink-0">
-					{formatTime(entry.timestamp)}
+					{formatLogTime(entry.timestamp)}
 				</span>
 				{entry.source && (
 					<Badge
 						variant="outline"
 						className={cn(
 							"text-3xs px-1 py-0 shrink-0",
-							getSourceColor(entry.source),
+							sourceColor(entry.source),
 						)}
 					>
 						{entry.source}
