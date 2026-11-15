@@ -48,3 +48,30 @@ def test_a_custom_server_can_be_added_and_removed_by_its_id() -> None:
     assert "acme-docs" not in removed
     # The WorkPilot server is never removed.
     assert "workpilot" in removed
+
+
+def _ui_task(tmp_path: Path) -> Path:
+    # What the ui-ux preflight leaves for a task about the interface.
+    spec = tmp_path / "spec"
+    (spec / "uiux").mkdir(parents=True)
+    (spec / "uiux" / "result.json").write_text(
+        '{"status": "ready", "relevance": {"verdict": "ui"}}', encoding="utf-8"
+    )
+    return spec
+
+
+def test_an_interface_task_gets_the_design_server(tmp_path: Path) -> None:
+    spec = _ui_task(tmp_path)
+
+    assert "uiux" in get_required_mcp_servers("coder", spec_dir=spec)
+    assert "uiux" not in get_required_mcp_servers("coder", spec_dir=tmp_path)
+
+
+def test_the_design_server_can_be_removed_for_an_agent(tmp_path: Path) -> None:
+    servers = get_required_mcp_servers(
+        "coder",
+        mcp_config={"AGENT_MCP_coder_REMOVE": "uiux"},
+        spec_dir=_ui_task(tmp_path),
+    )
+
+    assert "uiux" not in servers
