@@ -104,7 +104,12 @@ def test_validation_tools_use_spec_directory_and_preserve_project_boundary(tmp_p
         assert not (tmp_path / "spec.md").exists()
         import sys
 
-        command = f'"{sys.executable}" -c "import os; print(os.getcwd())"'
+        # `python`, the name the allowlist knows, beside the running one: a
+        # venv's `pytest` script runs as `python3.12`, which it does not.
+        executable = Path(sys.executable)
+        suffix = ".exe" if executable.suffix.lower() == ".exe" else ""
+        python = executable.with_name(f"python{suffix}")
+        command = f'"{python}" -c "import os; print(os.getcwd())"'
         assert str(spec_dir) in await executor.execute(
             "run_command", {"command": command}
         )
