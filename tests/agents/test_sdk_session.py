@@ -18,7 +18,6 @@ from typing import Any
 import pytest
 from agents.session import run_agent_session
 from replay import recorder as replay_recorder
-from task_logger import LogPhase
 
 # -- the SDK's message shapes, by name ---------------------------------------
 
