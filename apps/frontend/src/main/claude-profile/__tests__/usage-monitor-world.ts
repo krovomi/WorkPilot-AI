@@ -65,8 +65,6 @@ function freshWorld() {
 		claude: {
 			profiles: [] as FakeClaudeProfile[],
 			activeProfileId: null as string | null,
-			/** Order of getProfilesSortedByAvailability; the list order when empty */
-			byAvailability: [] as string[],
 		},
 		autoSwitch: emptyAutoSwitch() as ReturnType<typeof emptyAutoSwitch>,
 		priorityOrder: [] as string[],
@@ -86,9 +84,9 @@ function freshWorld() {
 			{ token: string | null; email: string | null; error?: string }
 		>(),
 		/** ensureValidToken answer of each config dir; none = read from the keychain */
-		tokens: new Map<string, EnsureValidTokenResult | Error>(),
+		tokens: new Map<string | undefined, EnsureValidTokenResult | Error>(),
 		/** reactiveTokenRefresh answer of each config dir */
-		reactive: new Map<string, EnsureValidTokenResult | Error>(),
+		reactive: new Map<string | undefined, EnsureValidTokenResult | Error>(),
 		clearedKeychains: [] as Array<string | undefined>,
 		initError: null as Error | null,
 		/** First matching prefix wins; a list answers in turn, its last answer repeats */
@@ -196,12 +194,7 @@ export const profileManager = {
 	getAutoSwitchSettings: () => world.autoSwitch,
 	getActiveProfile: () => find(world.claude.activeProfileId),
 	getProfile: (id: string) => find(id),
-	getProfilesSortedByAvailability: () =>
-		world.claude.byAvailability.length > 0
-			? world.claude.byAvailability
-					.map((id) => find(id))
-					.filter((p): p is FakeClaudeProfile => !!p)
-			: [...world.claude.profiles],
+	getProfilesSortedByAvailability: () => [...world.claude.profiles],
 	setActiveProfile: (id: string) => {
 		world.calls.setActiveProfile.push(id);
 		world.claude.activeProfileId = id;
@@ -267,10 +260,10 @@ export const credentialUtilsModule = {
 };
 
 function tokenAnswer(
-	answers: Map<string, EnsureValidTokenResult | Error>,
+	answers: Map<string | undefined, EnsureValidTokenResult | Error>,
 	configDir: string | undefined,
 ): EnsureValidTokenResult {
-	const set = configDir ? answers.get(configDir) : undefined;
+	const set = answers.get(configDir);
 	if (set instanceof Error) throw set;
 	if (set) return set;
 	const stored = storeOf(configDir);

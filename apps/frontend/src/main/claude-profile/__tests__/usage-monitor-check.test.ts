@@ -516,6 +516,16 @@ describe("a proactive swap", () => {
 		expect(getProfileSelectionLock().isLocked("b")).toBe(false);
 	});
 
+	it("holds to 95 % and 99 % when the settings name no threshold", async () => {
+		usageByToken({ a: [96, 10], b: [5, 5] });
+		world.autoSwitch.sessionThreshold = undefined as never;
+		world.autoSwitch.weeklyThreshold = undefined as never;
+
+		await check();
+
+		expect(emitted("proactive-swap-completed")[0]).toMatchObject({ limitType: "session" });
+	});
+
 	it("names the week when the weekly threshold is passed", async () => {
 		usageByToken({ a: [10, 99], b: [5, 5] });
 
