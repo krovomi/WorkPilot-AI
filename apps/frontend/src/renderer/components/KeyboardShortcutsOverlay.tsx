@@ -51,6 +51,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
 			{ keys: "Ctrl+T", label: "Add Project" },
 			// The default; Settings → Voice assistant changes it.
 			{ keys: "Ctrl+Shift+Space", label: "Voice Assistant" },
+			// Pauses every running task; each resumes from its card.
+			{ keys: "Ctrl+Shift+.", label: "Stop all agents" },
 			{ keys: "Escape", label: "Close dialog / overlay" },
 		],
 	},
