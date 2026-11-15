@@ -33,7 +33,10 @@ def test_breakdown_marks_a_dimension_without_signal_uncertain():
     rows = {row["key"]: row for row in breakdown("Rename a label", 1)}
     assert list(rows) == ["algorithmic", "integration", "conflict_risk", "test_effort"]
     assert rows["algorithmic"] == {
-        "key": "algorithmic", "level": "low", "signals": [], "uncertain": True,
+        "key": "algorithmic",
+        "level": "low",
+        "signals": [],
+        "uncertain": True,
     }
     assert rows["conflict_risk"]["level"] == "medium"
     assert rows["conflict_risk"]["signals"] == ["rename"]

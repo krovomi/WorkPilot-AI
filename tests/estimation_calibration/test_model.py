@@ -37,8 +37,17 @@ def _data(samples=(), adjustments=()):
 
 @pytest.mark.parametrize(
     "value, expected",
-    [(2, 2.0), (0.5, 0.5), (0, None), (-1, None), (True, None), ("3", None),
-     (float("nan"), None), (float("inf"), None), (None, None)],
+    [
+        (2, 2.0),
+        (0.5, 0.5),
+        (0, None),
+        (-1, None),
+        (True, None),
+        ("3", None),
+        (float("nan"), None),
+        (float("inf"), None),
+        (None, None),
+    ],
 )
 def test_positive_keeps_only_finite_numbers_above_zero(value, expected):
     assert positive(value) == expected
@@ -86,11 +95,22 @@ def test_empty_repository_falls_back_to_the_generic_estimate():
     assert result["status"] == "insufficient_history"
     cost = result["metrics"]["cost_usd"]
     assert cost == {
-        "base": 2.0, "value": 2.0, "low": None, "high": None, "factor": 1.0,
-        "scope": "none", "samples": 0, "outliers": 0, "confidence": None,
+        "base": 2.0,
+        "value": 2.0,
+        "low": None,
+        "high": None,
+        "factor": 1.0,
+        "scope": "none",
+        "samples": 0,
+        "outliers": 0,
+        "confidence": None,
     }
     assert result["complexity"] == {
-        "base": 5, "value": 5, "bias": 0, "scope": "none", "adjustments": 0,
+        "base": 5,
+        "value": 5,
+        "bias": 0,
+        "scope": "none",
+        "adjustments": 0,
     }
     assert result["red_flags"] == []
     assert result["providers"] == []
@@ -154,7 +174,11 @@ def test_adjustments_move_the_complexity_score():
     ]
     result = calibrate(_data(adjustments=adjustments), "backend", BASE, 11)
     assert result["complexity"] == {
-        "base": 11, "value": 13, "bias": 3, "scope": "category", "adjustments": 4,
+        "base": 11,
+        "value": 13,
+        "bias": 3,
+        "scope": "category",
+        "adjustments": 4,
     }
     # Another category below the threshold uses the repository's bias.
     other = calibrate(_data(adjustments=adjustments), "infra", BASE, 2)
@@ -168,22 +192,35 @@ def test_providers_are_compared_once_they_have_two_samples():
         _sample(cost=(1.0, 0.9), provider="anthropic"),
         _sample(cost=(1.0, 1.2), provider="openai"),
         _sample(cost=(1.0, 1.2), provider=""),
-        {"spec": "local", "provider": "ollama", "estimated": {"cost_usd": 1},
-         "actual": {"cost_usd": 0}},
-        {"spec": "local2", "provider": "ollama", "estimated": {"cost_usd": 1},
-         "actual": {"cost_usd": 0}},
+        {
+            "spec": "local",
+            "provider": "ollama",
+            "estimated": {"cost_usd": 1},
+            "actual": {"cost_usd": 0},
+        },
+        {
+            "spec": "local2",
+            "provider": "ollama",
+            "estimated": {"cost_usd": 1},
+            "actual": {"cost_usd": 0},
+        },
     ]
     rows = calibrate(_data(samples), "backend", BASE, 5)["providers"]
     assert rows == [
-        {"provider": "anthropic", "samples": 2, "cost_ratio": 0.85,
-         "tokens_ratio": 1.2},
+        {
+            "provider": "anthropic",
+            "samples": 2,
+            "cost_ratio": 0.85,
+            "tokens_ratio": 1.2,
+        },
     ]
 
 
 def test_quality_reports_mape_acceptance_and_interval_width():
     samples = [
-        _sample("backend", (1.0, 2.0), spec="a", adjusted=True,
-                shown={"cost_usd": 1.5}),
+        _sample(
+            "backend", (1.0, 2.0), spec="a", adjusted=True, shown={"cost_usd": 1.5}
+        ),
         _sample("backend", (1.0, 2.0), spec="b"),
         _sample("backend", (1.0, 2.0), spec="c"),
         _sample("backend", (1.0, 2.0), spec="d"),

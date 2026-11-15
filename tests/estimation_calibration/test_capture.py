@@ -84,7 +84,12 @@ def test_an_unknown_category_is_read_as_feature(tmp_path):
 
 @pytest.mark.parametrize(
     "smart",
-    [None, "text", {"calibrationInputs": "x"}, {"calibrationInputs": {"files": {"base": 0}}}],
+    [
+        None,
+        "text",
+        {"calibrationInputs": "x"},
+        {"calibrationInputs": {"files": {"base": 0}}},
+    ],
 )
 def test_no_usable_estimate_means_no_sample(tmp_path, smart):
     _estimate(tmp_path, smart)
@@ -96,10 +101,20 @@ def test_read_usage_sums_the_spec_and_names_its_main_provider(tmp_path):
         tmp_path / ".workpilot" / "cost_data.json",
         {
             "usages": [
-                {"spec_id": SPEC, "provider": "openai", "cost": 0.5,
-                 "input_tokens": 100, "output_tokens": 50},
-                {"spec_id": SPEC, "provider": "anthropic", "cost": 1.0,
-                 "input_tokens": 1000, "output_tokens": 500},
+                {
+                    "spec_id": SPEC,
+                    "provider": "openai",
+                    "cost": 0.5,
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                },
+                {
+                    "spec_id": SPEC,
+                    "provider": "anthropic",
+                    "cost": 1.0,
+                    "input_tokens": 1000,
+                    "output_tokens": 500,
+                },
                 {"spec_id": SPEC, "provider": "", "cost": -3, "input_tokens": "x"},
                 {"spec_id": "other", "provider": "openai", "cost": 9.0},
                 "garbage",
@@ -107,12 +122,18 @@ def test_read_usage_sums_the_spec_and_names_its_main_provider(tmp_path):
         },
     )
     assert read_usage(tmp_path, SPEC) == {
-        "cost_usd": 1.5, "tokens": 1650.0, "provider": "anthropic",
+        "cost_usd": 1.5,
+        "tokens": 1650.0,
+        "provider": "anthropic",
     }
 
 
 def test_read_usage_without_a_ledger(tmp_path):
-    assert read_usage(tmp_path, SPEC) == {"cost_usd": 0.0, "tokens": 0.0, "provider": None}
+    assert read_usage(tmp_path, SPEC) == {
+        "cost_usd": 0.0,
+        "tokens": 0.0,
+        "provider": None,
+    }
     _write(tmp_path / ".workpilot" / "cost_data.json", {"usages": "x"})
     assert read_usage(tmp_path, SPEC)["provider"] is None
 
@@ -124,8 +145,15 @@ def test_read_qa_iterations_takes_the_highest_of_both_plans(tmp_path):
         {"qa_signoff": {"qa_session": 2}, "qa_stats": "x"},
     )
     _write(
-        tmp_path / ".workpilot" / "worktrees" / "tasks" / SPEC / ".workpilot"
-        / "specs" / SPEC / "implementation_plan.json",
+        tmp_path
+        / ".workpilot"
+        / "worktrees"
+        / "tasks"
+        / SPEC
+        / ".workpilot"
+        / "specs"
+        / SPEC
+        / "implementation_plan.json",
         {"qa_signoff": "x", "qa_stats": {"total_iterations": 3}},
     )
     assert read_qa_iterations(tmp_path, SPEC) == 3
@@ -165,8 +193,17 @@ def test_a_merge_records_the_sample(repo):
     _estimate(repo, {"category": "infra", "calibrationInputs": INPUTS})
     _write(
         repo / ".workpilot" / "cost_data.json",
-        {"usages": [{"spec_id": SPEC, "provider": "ollama", "cost": 0,
-                     "input_tokens": 10, "output_tokens": 5}]},
+        {
+            "usages": [
+                {
+                    "spec_id": SPEC,
+                    "provider": "ollama",
+                    "cost": 0,
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                }
+            ]
+        },
     )
     on_merge(MergeEvent(repo, SPEC))
     [sample] = load(repo)["samples"]
@@ -174,8 +211,12 @@ def test_a_merge_records_the_sample(repo):
     assert sample["category"] == "infra"
     assert sample["provider"] == "ollama"
     # .workpilot/ files are not staged; nothing else changed.
-    assert sample["actual"] == {"cost_usd": 0.0, "tokens": 15.0, "qa_iterations": 0,
-                                "files": 0}
+    assert sample["actual"] == {
+        "cost_usd": 0.0,
+        "tokens": 15.0,
+        "qa_iterations": 0,
+        "files": 0,
+    }
     assert "duration" not in json.dumps(sample)
 
 

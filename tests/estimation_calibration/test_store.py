@@ -14,7 +14,10 @@ def test_missing_or_broken_file_reads_as_empty(tmp_path):
     target.parent.mkdir(parents=True)
     target.write_text("{not json", encoding="utf-8")
     assert load(tmp_path) == {
-        "version": 1, "samples": [], "adjustments": [], "reset_at": None,
+        "version": 1,
+        "samples": [],
+        "adjustments": [],
+        "reset_at": None,
     }
     target.write_text("[1, 2]", encoding="utf-8")
     assert load(tmp_path)["adjustments"] == []
@@ -24,8 +27,9 @@ def test_entries_that_are_not_objects_are_dropped(tmp_path):
     target = tmp_path / RELATIVE
     target.parent.mkdir(parents=True)
     target.write_text(
-        json.dumps({"samples": [{"spec": "a"}, "x", 3], "adjustments": "no",
-                    "reset_at": 5}),
+        json.dumps(
+            {"samples": [{"spec": "a"}, "x", 3], "adjustments": "no", "reset_at": 5}
+        ),
         encoding="utf-8",
     )
     data = load(tmp_path)
