@@ -109,7 +109,7 @@ def _original_of(rel: str) -> str | None:
 
 def _pair_id(a: str, b: str) -> str:
     joined = "\n".join(sorted((a, b)))
-    return hashlib.sha1(joined.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
 
 
 # -- the queue (this machine's) ------------------------------------------------
