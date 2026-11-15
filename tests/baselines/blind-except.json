@@ -331,7 +331,7 @@
   "apps/backend/runners/offline_mode_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/onboarding_agent_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/oneshot_completion_runner.py": {"blind": 3, "silent": 1},
-  "apps/backend/runners/pair_programming_runner.py": {"blind": 2, "silent": 0},
+  "apps/backend/runners/pair_programming_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/performance_profiler_runner.py": {"blind": 2, "silent": 0},
   "apps/backend/runners/pipeline_generator_runner.py": {"blind": 1, "silent": 0},
   "apps/backend/runners/pr_followup_runner.py": {"blind": 1, "silent": 0},
