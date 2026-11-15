@@ -75,6 +75,18 @@ describe("useGitHubPRs across projects", () => {
 		expect(result.current.prs.map((p) => p.number)).toEqual([12]);
 	});
 
+	it("loads nothing before a project is selected", async () => {
+		const { rerender } = renderHook(
+			({ projectId }: { projectId: string }) => useGitHubPRs(projectId, { isActive: true }),
+			{ initialProps: { projectId: "" } },
+		);
+		await act(async () => {
+			rerender({ projectId: "" });
+		});
+		expect(checkGitHubConnection).not.toHaveBeenCalled();
+		expect(listPRs).not.toHaveBeenCalled();
+	});
+
 	it("refreshes the project's list when the view is opened again", async () => {
 		checkGitHubConnection.mockResolvedValue({
 			success: true,
