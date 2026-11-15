@@ -12,7 +12,12 @@ import type {
 import { projectStore } from "../../project-store";
 import { featureProject } from "../server-feature-files";
 import type { GitHubAPIRepository } from "./types";
-import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
+import {
+	getGitHubConfig,
+	githubFetch,
+	isRepoFullName,
+	normalizeRepoReference,
+} from "./utils";
 
 /**
  * Check GitHub connection status
@@ -40,7 +45,7 @@ export function registerCheckConnection(): void {
 			try {
 				// Normalize repo reference (handles full URLs, git URLs, etc.)
 				const normalizedRepo = normalizeRepoReference(config.repo);
-				if (!normalizedRepo) {
+				if (!isRepoFullName(normalizedRepo)) {
 					return {
 						success: true,
 						data: {
@@ -56,13 +61,16 @@ export function registerCheckConnection(): void {
 					`/repos/${normalizedRepo}`,
 				)) as { full_name: string; description?: string };
 
-				// Count open issues
+				// Count open issues: the search total, since a page of the issue
+				// list says nothing of the others (and lists pull requests too).
+				const query = encodeURIComponent(`repo:${normalizedRepo} is:issue is:open`);
 				const issuesData = (await githubFetch(
 					config.token,
-					`/repos/${normalizedRepo}/issues?state=open&per_page=1`,
-				)) as unknown[];
+					`/search/issues?q=${query}&per_page=1`,
+				)) as { total_count?: unknown };
 
-				const openCount = Array.isArray(issuesData) ? issuesData.length : 0;
+				const openCount =
+					typeof issuesData.total_count === "number" ? issuesData.total_count : 0;
 
 				return {
 					success: true,
@@ -153,14 +161,20 @@ export function registerTestConnection(): void {
 			_,
 			config: { repo: string; token: string },
 		): Promise<{ success: boolean; status?: number; error?: string }> => {
-			if (!config.repo || !config.token) {
+			// The renderer is not trusted: two strings, or nothing is sent.
+			if (
+				typeof config?.repo !== "string" ||
+				typeof config.token !== "string" ||
+				!config.repo ||
+				!config.token
+			) {
 				return { success: false, error: "Repository and token are required" };
 			}
 
 			try {
 				// Normalize repo reference (handles full URLs, git URLs, etc.)
 				const normalizedRepo = normalizeRepoReference(config.repo);
-				if (!normalizedRepo) {
+				if (!isRepoFullName(normalizedRepo)) {
 					return {
 						success: false,
 						error: "Invalid repository format. Use owner/repo or GitHub URL.",

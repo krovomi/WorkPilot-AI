@@ -10,7 +10,7 @@ import type { BrowserWindow } from "electron";
 /**
  * Generic progress sender factory
  */
-export function createProgressSender<T>(
+function createProgressSender<T>(
 	mainWindow: BrowserWindow,
 	channel: string,
 	projectId: string,
@@ -23,7 +23,7 @@ export function createProgressSender<T>(
 /**
  * Generic error sender factory
  */
-export function createErrorSender(
+function createErrorSender(
 	mainWindow: BrowserWindow,
 	channel: string,
 	projectId: string,
@@ -37,7 +37,7 @@ export function createErrorSender(
 /**
  * Generic completion sender factory
  */
-export function createCompleteSender<T>(
+function createCompleteSender<T>(
 	mainWindow: BrowserWindow,
 	channel: string,
 	projectId: string,

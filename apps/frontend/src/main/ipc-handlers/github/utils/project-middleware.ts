@@ -12,7 +12,7 @@ import { featureProject } from "../../server-feature-files";
 
 /**
  * Validate that a project path is safe for file operations
- * Prevents path traversal attacks and ensures path exists
+ * Ensures the path is absolute and is an existing directory
  */
 function validateProjectPath(projectPath: string): void {
 	// Ensure path is absolute
@@ -20,13 +20,9 @@ function validateProjectPath(projectPath: string): void {
 		throw new Error(`Project path must be absolute: ${projectPath}`);
 	}
 
-	// Normalize path and check for traversal attempts
+	// An absolute path keeps no `..` segment once normalized: refusing a path
+	// that still contains ".." only refused folder names such as `my..app`.
 	const normalizedPath = path.normalize(projectPath);
-	if (normalizedPath.includes("..")) {
-		throw new Error(
-			`Invalid project path (contains traversal): ${projectPath}`,
-		);
-	}
 
 	// Verify path exists and is a directory
 	if (!fs.existsSync(normalizedPath)) {
@@ -37,34 +33,6 @@ function validateProjectPath(projectPath: string): void {
 	if (!stats.isDirectory()) {
 		throw new Error(`Project path is not a directory: ${projectPath}`);
 	}
-}
-
-/**
- * Execute a handler with automatic project validation
- *
- * Usage:
- * ```ts
- * ipcMain.handle('channel', async (_, projectId: string) => {
- *   return withProject(projectId, async (project) => {
- *     // Your handler logic here - project is guaranteed to exist
- *     return someResult;
- *   });
- * });
- * ```
- */
-export async function withProject<T>(
-	projectId: string,
-	handler: (project: Project) => Promise<T>,
-): Promise<T> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		throw new Error(`Project not found: ${projectId}`);
-	}
-
-	// Validate project path before passing to handler
-	validateProjectPath(project.path);
-
-	return handler(project);
 }
 
 /**
@@ -112,47 +80,4 @@ export async function withForgeProjectOrNull<T>(
 	const project = featureProject(projectId);
 	if (project?.remote) return handler(project);
 	return withProjectOrNull(projectId, handler);
-}
-
-/**
- * Execute a handler with project validation, returning a default value on missing project
- */
-export async function withProjectOrDefault<T>(
-	projectId: string,
-	defaultValue: T,
-	handler: (project: Project) => Promise<T>,
-): Promise<T> {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return defaultValue;
-	}
-	return handler(project);
-}
-
-/**
- * Synchronous version of withProject for non-async handlers
- */
-export function withProjectSync<T>(
-	projectId: string,
-	handler: (project: Project) => T,
-): T {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		throw new Error(`Project not found: ${projectId}`);
-	}
-	return handler(project);
-}
-
-/**
- * Synchronous version that returns null on missing project
- */
-export function withProjectSyncOrNull<T>(
-	projectId: string,
-	handler: (project: Project) => T,
-): T | null {
-	const project = projectStore.getProject(projectId);
-	if (!project) {
-		return null;
-	}
-	return handler(project);
 }

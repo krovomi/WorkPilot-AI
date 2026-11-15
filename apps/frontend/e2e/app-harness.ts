@@ -39,10 +39,33 @@ async function mainWindow(app: ElectronApplication): Promise<Page> {
 	);
 }
 
-export async function launchIsolatedApp(): Promise<IsolatedApp> {
+export interface LaunchOptions {
+	/** Written as the profile's settings.json before the app starts. */
+	settings?: Record<string, unknown>;
+	/** A git identity in the home's ~/.gitconfig, as a set-up machine has. */
+	gitIdentity?: { name: string; email: string };
+}
+
+export async function launchIsolatedApp(
+	options: LaunchOptions = {},
+): Promise<IsolatedApp> {
 	const root = mkdtempSync(path.join(tmpdir(), "workpilot-e2e-"));
 	const home = path.join(root, "home");
 	mkdirSync(home);
+	if (options.gitIdentity) {
+		const { name, email } = options.gitIdentity;
+		writeFileSync(
+			path.join(home, ".gitconfig"),
+			`[user]\n\tname = ${name}\n\temail = ${email}\n`,
+		);
+	}
+	if (options.settings) {
+		mkdirSync(path.join(root, "profile"));
+		writeFileSync(
+			path.join(root, "profile", "settings.json"),
+			JSON.stringify(options.settings),
+		);
+	}
 	const app = await electron.launch({
 		args: [
 			FRONTEND,

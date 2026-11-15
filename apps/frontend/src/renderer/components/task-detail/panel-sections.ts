@@ -9,7 +9,7 @@
  * |---|---|---|
  * | **Progress** (Avancement) | where is the task, and what does it need from me to move on? | spec interview and execution formula (prerequisites), the agent's question, the human review (plan approval included), the CI pipeline, the PR follow-through, the task itself, goal mode, Best-of-N, the MCP Apps views of the build |
  * | **Quality** (Qualité) | is what was built right? | JEV second opinion, spec traceability, UI/UX design system, visual review (OCR), verification loop, red team |
- * | **Costs & context** (Coûts et contexte) | what does it cost, and what do the agents read and remember? | workflow profile (what the effort level buys), attachments and ADRs, hermes learning, shared brain, rtk savings |
+ * | **Costs & context** (Coûts et contexte) | what does it cost, and what do the agents read and remember? | workflow profile (what the effort level buys), attachments and ADRs, the lessons applied to the task (and the ones turned off for it), hermes learning, shared brain, rtk savings |
  *
  * The other tabs of the panel (Subtasks, Logs, Files, Change graph, Visual
  * proof, Emulator, Mobile, Verification, Architecture delta) are full-height
@@ -49,6 +49,7 @@ export type PanelCardId =
 	// Costs & context
 	| "workflowProfile"
 	| "documents"
+	| "lessons"
 	| "hermes"
 	| "brain"
 	| "rtk";
@@ -68,7 +69,7 @@ export const PANEL_CARDS: Readonly<Record<PanelSectionId, readonly PanelCardId[]
 		"mcpApps",
 	],
 	quality: ["jev", "traceability", "uiux", "visualReview", "verifyLoop", "schemaGuard", "redTeam"],
-	costs: ["workflowProfile", "documents", "hermes", "brain", "rtk"],
+	costs: ["workflowProfile", "documents", "lessons", "hermes", "brain", "rtk"],
 };
 
 export function sectionOfCard(card: PanelCardId): PanelSectionId {
