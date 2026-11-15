@@ -59,8 +59,6 @@ Tests : `tests/test_security_untrusted.py`, `tests/injection_guard/test_middlewa
 d'exécution d'agent.
 
 - `sandbox.py`, `anomaly_detector.py` : n'alimentent qu'un endpoint de statut.
-- `secure_subprocess.py` : un seul appelant ; la plupart des sous-processus appellent
-  `subprocess` directement (voir la règle S4).
 - `tool_input_validator.py` : extrait l'entrée d'un outil pour l'affichage, ne refuse rien.
 
 Brancher l'un d'eux, c'est une PR avec un test qui prouve le refus.
