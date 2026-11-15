@@ -300,6 +300,21 @@ class GenerationalArchive:
             )
         return sorted(found, key=lambda g: g["captured_at"], reverse=True)
 
+    def _next_timestamp(self) -> float:
+        """Now, but after every stored generation: "newest first" must hold.
+
+        Windows' clock moves in ~16 ms steps, so two captures in a row could
+        share a timestamp and come back in label order.
+        """
+        now = time.time()
+        stored = [
+            gen.captured_at
+            for gen in map(self.load, self.list_generations())
+            if gen is not None
+        ]
+        newest = max(stored, default=None)
+        return now if newest is None or now > newest else newest + 1e-6
+
     def load(self, label: str) -> Generation | None:
         path = self._path_for(label)
         if not path.exists():
@@ -344,7 +359,7 @@ class GenerationalArchive:
 
         gen = Generation(
             label=self._validate_label(label),
-            captured_at=self._next_capture_time(label),
+            captured_at=self._next_timestamp(),
             junit_source=junit_source,
             outcomes=parsed,
         )
@@ -353,19 +368,6 @@ class GenerationalArchive:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(gen.to_dict(), indent=2), encoding="utf-8")
         return gen
-
-    def _next_capture_time(self, label: str) -> float:
-        """Now, or just after the newest other generation when the clock has not
-        moved since it: Windows' clock ticks every ~16 ms, and two captures in
-        one tick would sort in either order."""
-        now = time.time()
-        others = [
-            gen.captured_at
-            for other in self.list_generations()
-            if other != label and (gen := self.load(other)) is not None
-        ]
-        newest = max(others, default=None)
-        return now if newest is None or now > newest else newest + 1e-6
 
     def compare(
         self,
