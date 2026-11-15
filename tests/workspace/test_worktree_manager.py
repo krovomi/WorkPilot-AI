@@ -152,6 +152,19 @@ class TestCreateWorktree:
         assert info.branch == BRANCH
         assert (info.path / "pay.py").exists()  # the branch was reused
 
+    def test_a_broken_worktree_that_cannot_be_deleted_is_reported(
+        self, manager, task, monkeypatch
+    ):
+        # On Windows a file held open by another process survives the delete.
+        (task.path / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
+        monkeypatch.setattr(
+            worktree_module.shutil, "rmtree", lambda *_a, **_k: None, raising=True
+        )
+
+        with pytest.raises(WorktreeError, match="Failed to remove corrupted worktree"):
+            manager.create_worktree(SPEC)
+        assert task.path.exists()
+
     def test_a_stale_directory_is_replaced(self, manager, repo):
         stale = manager.get_worktree_path(SPEC)
         stale.mkdir(parents=True)
