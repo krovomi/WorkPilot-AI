@@ -1591,31 +1591,6 @@ async def get_provider_usage(provider: str):
             return {
                 "error": f"Erreur lors de la récupération des métriques Copilot: {_safe_error_message(e)}"
             }
-    elif provider == "anthropic" or provider == "claude":
-        try:
-            from core.anthropic_usage import get_anthropic_usage_metrics
-
-            usage_data = get_anthropic_usage_metrics()
-
-            # Formater les données pour le frontend
-            if "error" in usage_data:
-                return usage_data
-
-            return {
-                "provider": "anthropic",
-                "available": True,
-                "usage": usage_data.get("usage", {}),
-                "fetched_at": usage_data.get("fetched_at"),
-                "providerName": "anthropic",
-            }
-        except ImportError as e:
-            return {
-                "error": f"Module Anthropic usage non disponible: {_safe_error_message(e)}"
-            }
-        except Exception as e:
-            return {
-                "error": f"Erreur lors de la récupération des métriques Anthropic: {_safe_error_message(e)}"
-            }
     elif provider == "windsurf":
         # Windsurf (Codeium) — multi-strategy auth for GetTeamCreditBalance
         service_key = os.getenv("WINDSURF_API_KEY") or os.getenv("CODEIUM_API_KEY")
