@@ -12,6 +12,12 @@ import type { Project, Task } from "../../../../shared/types";
 const mockProjects: Project[] = [];
 const mockTasksByProject: Map<string, Task[]> = new Map();
 
+const handlers = new Map<string, () => Promise<unknown>>();
+
+vi.mock("electron", () => ({
+	ipcMain: { handle: (channel: string, fn: () => Promise<unknown>) => handlers.set(channel, fn) },
+}));
+
 vi.mock("../../../project-store", () => ({
 	projectStore: {
 		getProjects: () => mockProjects,
@@ -28,9 +34,11 @@ vi.mock("../../../app-logger", () => ({
 	appLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { AgentManager } from "../../../agent";
+import { projectStore } from "../../../project-store";
 import { wasInterruptedByAppExit } from "../interrupted-runs";
-import { stopAllAgents } from "../stop-all-handlers";
+import { registerStopAllHandlers, stopAllAgents } from "../stop-all-handlers";
 
 let root: string;
 let project: Project;
@@ -111,5 +119,43 @@ describe("stopAllAgents", () => {
 			failedTasks: [],
 		});
 		expect(agents.haltTask).not.toHaveBeenCalled();
+	});
+
+	it("leaves alone a task already paused whose process is gone", () => {
+		const t1 = { ...task("t1", "001-a"), metadata: { paused: { enabled: true } } } as unknown as Task;
+		mockTasksByProject.set(project.id, [t1]);
+		const agents = manager(["t1"]);
+		agents.isRunning.mockReturnValue(false);
+
+		expect(stopAllAgents(agents as unknown as AgentManager).pausedTasks).toEqual([]);
+		expect(agents.haltTask).not.toHaveBeenCalled();
+	});
+
+	it("still stops a task whose pause threw", () => {
+		mockTasksByProject.set(project.id, [task("t1", "001-a")]);
+		vi.mocked(projectStore.invalidateTasksCache).mockImplementationOnce(() => {
+			throw new Error("store gone");
+		});
+		const agents = manager(["t1"]);
+
+		expect(stopAllAgents(agents as unknown as AgentManager).failedTasks).toEqual(["t1"]);
+		expect(agents.haltTask).toHaveBeenCalledWith("t1");
+	});
+
+	it("does not count a process that was already gone", () => {
+		const agents = manager(["roadmap:proj-1"]);
+		agents.haltTask.mockReturnValue(false);
+		expect(stopAllAgents(agents as unknown as AgentManager).stoppedProcesses).toBe(0);
+	});
+});
+
+describe("AGENTS_STOP_ALL", () => {
+	it("takes no argument and answers with what it stopped", async () => {
+		registerStopAllHandlers(manager([]) as unknown as AgentManager);
+		const handler = handlers.get(IPC_CHANNELS.AGENTS_STOP_ALL);
+		expect(await handler?.()).toEqual({
+			success: true,
+			data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+		});
 	});
 });

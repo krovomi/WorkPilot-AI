@@ -22,7 +22,7 @@ import { getPlanPath, updatePlanSubtasks } from "./plan-file-utils";
 import {
 	clearPauseState,
 } from "./pause-state-utils";
-import { pauseTaskNow } from "./pause-task";
+import { registerPauseHandler } from "./pause-task";
 import { findTaskAndProject } from "./shared";
 import {
 	allSpecDirs,
@@ -479,25 +479,7 @@ export function registerTaskExecutionHandlers(
 		},
 	);
 
-	/** Pause task execution, at whatever phase it is in (see `pauseTaskNow`). */
-	ipcMain.handle(
-		IPC_CHANNELS.TASK_PAUSE,
-		async (_, taskId: string, subtaskId?: string): Promise<IPCResult> => {
-			try {
-				const result = pauseTaskNow(agentManager, taskId, { subtaskId });
-				if (result.success && result.data) {
-					appLog.info(
-						`[TASK_PAUSE] Task ${taskId} paused during ${result.data.pausedPhase} (${result.data.specDirs} spec ` +
-							`dir(s)); subprocess ${result.data.wasRunning ? "killed" : "was not running"}.`,
-					);
-				}
-				return result;
-			} catch (error) {
-				appLog.error("[TASK_PAUSE] Error:", error);
-				return { success: false, error: String(error) };
-			}
-		},
-	);
+	registerPauseHandler(agentManager);
 
 	/**
 	 * Resume a paused task from where it stopped. See `resumePausedTask`, which

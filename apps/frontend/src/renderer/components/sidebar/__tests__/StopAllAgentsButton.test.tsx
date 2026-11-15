@@ -22,6 +22,7 @@ vi.mock("../../../stores/task-store", () => ({
 }));
 
 import type { Task } from "../../../../shared/types";
+import { taskMock } from "../../../lib/mocks/task-mock";
 import { TooltipProvider } from "../../ui/tooltip";
 import { isAgentRunning, isStopAllShortcut, StopAllAgentsButton } from "../StopAllAgentsButton";
 
@@ -106,5 +107,43 @@ describe("StopAllAgentsButton", () => {
 		await waitFor(() =>
 			expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" })),
 		);
+	});
+
+	it("sends one request while the first is still on its way", async () => {
+		tasks = [running()];
+		let answer: (value: unknown) => void = () => undefined;
+		const stopAllAgents = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					answer = resolve;
+				}),
+		);
+		vi.stubGlobal("electronAPI", { stopAllAgents });
+		view();
+		const button = screen.getByTestId("stop-all-agents");
+		fireEvent.click(button);
+		fireEvent.click(button);
+		expect(stopAllAgents).toHaveBeenCalledTimes(1);
+		await act(async () => {
+			answer({ success: true, data: { pausedTasks: ["t1"], stoppedProcesses: 0, failedTasks: [] } });
+		});
+		await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
+	});
+
+	it("ignores every other key", () => {
+		const stopAllAgents = vi.fn();
+		vi.stubGlobal("electronAPI", { stopAllAgents });
+		view();
+		act(() => {
+			globalThis.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true, code: "Period" }));
+		});
+		expect(stopAllAgents).not.toHaveBeenCalled();
+	});
+
+	it("has a browser mock that stops nothing", async () => {
+		expect(await taskMock.stopAllAgents()).toEqual({
+			success: true,
+			data: { pausedTasks: [], stoppedProcesses: 0, failedTasks: [] },
+		});
 	});
 });

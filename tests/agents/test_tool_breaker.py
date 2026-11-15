@@ -204,3 +204,80 @@ async def test_the_session_ends_and_the_task_is_paused(tmp_path, monkeypatch):
     state = read_pause_state(spec)
     assert state["reason"] == PAUSE_REASON
     assert state["breaker"]["tool"] == "run_command"
+
+
+def test_a_result_without_an_id_takes_the_oldest_call(tmp_path):
+    breaker = ToolBreaker(_spec(tmp_path), "coding", limit=2)
+    # Calls named by the provider, results that are not: oldest first.
+    breaker.call("Read", {"file_path": "a.py"}, "c1")
+    breaker.call("Read", {"file_path": "a.py"}, "c2")
+    assert breaker.result("same", False) is False
+    assert breaker.result("same", False) is True
+
+
+def test_a_result_with_no_call_left_is_ignored(tmp_path):
+    breaker = ToolBreaker(_spec(tmp_path), "coding", limit=1)
+    assert breaker.result("orphan", False, "nobody") is False
+    assert not breaker.tripped
+
+
+# --- the Claude SDK stream ---------------------------------------------------
+# The raw SDK messages are told apart by their class name, as in agents.session.
+
+
+class ToolUseBlock:
+    def __init__(self, index: int) -> None:
+        self.name = "Bash"
+        self.id = f"t{index}"
+        self.input = {"command": "ls"}
+
+
+class ToolResultBlock:
+    def __init__(self, index: int) -> None:
+        self.tool_use_id = f"t{index}"
+        self.content = "a.py\nb.py"
+        self.is_error = False
+
+
+class AssistantMessage:
+    def __init__(self, index: int) -> None:
+        self.content = [ToolUseBlock(index)]
+
+
+class UserMessage:
+    def __init__(self, index: int) -> None:
+        self.content = [ToolResultBlock(index)]
+
+
+class _LoopingSdkClient:
+    """A raw Claude SDK client (not an AgentClient) stuck on the same call."""
+
+    def __init__(self) -> None:
+        self.turns = 0
+
+    async def query(self, prompt: str) -> None:  # noqa: ARG002
+        return None
+
+    async def receive_response(self):
+        for index in range(50):
+            self.turns += 1
+            yield AssistantMessage(index)
+            yield UserMessage(index)
+
+
+@pytest.mark.asyncio
+async def test_the_claude_sdk_session_ends_and_the_task_is_paused(
+    tmp_path, monkeypatch
+):
+    from agents.session import run_agent_session
+
+    monkeypatch.delenv(LIMIT_ENV, raising=False)
+    spec = _spec(tmp_path)
+    client = _LoopingSdkClient()
+
+    await run_agent_session(client, "code it", spec, phase=LogPhase.CODING)
+
+    assert client.turns == DEFAULT_LIMIT
+    state = read_pause_state(spec)
+    assert state["reason"] == PAUSE_REASON
+    assert state["breaker"]["tool"] == "Bash"

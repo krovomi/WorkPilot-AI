@@ -1,5 +1,8 @@
+import { ipcMain } from "electron";
+import { IPC_CHANNELS } from "../../../shared/constants";
 import type { IPCResult } from "../../../shared/types";
 import type { AgentManager } from "../../agent";
+import { appLog } from "../../app-logger";
 import { projectStore } from "../../project-store";
 import { type PauseStateRecord, writePauseState } from "./pause-state-utils";
 import { allSpecDirs, currentPausePhase, getSpecPaths } from "./resume-task";
@@ -40,9 +43,10 @@ export function pauseTaskNow(
 	}
 
 	const phase = currentPausePhase(task, specPaths);
+	const pausedAt = new Date().toISOString();
 	const pausedState: PauseStateRecord = {
 		enabled: true,
-		paused_at: new Date().toISOString(),
+		paused_at: pausedAt,
 		paused_phase: phase,
 		paused_subtask_id: options.subtaskId ?? task.executionProgress?.currentSubtask ?? null,
 		provider: task.metadata?.provider ?? null,
@@ -73,10 +77,35 @@ export function pauseTaskNow(
 		data: {
 			taskId,
 			paused: true,
-			pausedAt: pausedState.paused_at ?? "",
+			pausedAt,
 			pausedPhase: phase,
 			specDirs: written,
 			wasRunning,
 		},
 	};
+}
+
+/** The Pause button: `TASK_PAUSE(taskId, subtaskId?)`. */
+export function registerPauseHandler(agentManager: AgentManager): void {
+	ipcMain.handle(
+		IPC_CHANNELS.TASK_PAUSE,
+		async (_, taskId: unknown, subtaskId?: unknown): Promise<IPCResult> => {
+			if (typeof taskId !== "string") return { success: false, error: "Task not found" };
+			try {
+				const result = pauseTaskNow(agentManager, taskId, {
+					subtaskId: typeof subtaskId === "string" ? subtaskId : undefined,
+				});
+				if (result.data) {
+					appLog.info(
+						`[TASK_PAUSE] Task ${taskId} paused during ${result.data.pausedPhase} (${result.data.specDirs} spec ` +
+							`dir(s)); subprocess ${result.data.wasRunning ? "killed" : "was not running"}.`,
+					);
+				}
+				return result;
+			} catch (error) {
+				appLog.error("[TASK_PAUSE] Error:", error);
+				return { success: false, error: String(error) };
+			}
+		},
+	);
 }
