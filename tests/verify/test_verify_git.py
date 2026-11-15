@@ -131,3 +131,16 @@ def test_without_git_on_the_path_every_answer_is_empty(repo, monkeypatch):
     assert head_sha(repo) == ""
     assert fingerprint(repo) == ""
     assert changed_files(repo) == []
+
+
+def test_an_untracked_file_that_cannot_be_read_still_counts(repo):
+    _commit(repo, "main.py", "print('v1')\n")
+    before = fingerprint(repo)
+    # A link to nothing: listed by git, unreadable by us.
+    try:
+        (repo / "data.lnk").symlink_to(repo / "gone.txt")
+    except OSError:
+        pytest.skip("this machine does not let a test create a symbolic link")
+    unreadable = fingerprint(repo)
+    assert unreadable and unreadable != before
+    assert fingerprint(repo) == unreadable

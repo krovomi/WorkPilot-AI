@@ -13,8 +13,6 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
-import agents.session as session_module
-import core.client as client_module
 import pytest
 import verify.loop as loop_module
 import workflows.runner as runner_module
@@ -47,8 +45,10 @@ def sessions(monkeypatch):
         opened[-1]["prompt"] = prompt
         return "complete", "I looked and changed nothing.", None
 
-    monkeypatch.setattr(client_module, "create_agent_client", create_agent_client)
-    monkeypatch.setattr(session_module, "run_agent_session", run_agent_session)
+    # By name: the module the phase imports at call time, even when an earlier
+    # test put a fresh `core.client` in `sys.modules`.
+    monkeypatch.setattr("core.client.create_agent_client", create_agent_client)
+    monkeypatch.setattr("agents.session.run_agent_session", run_agent_session)
     return opened
 
 
@@ -166,7 +166,7 @@ def test_a_session_that_fails_is_a_result(tmp_path, monkeypatch):
     def refuse(**kwargs):
         raise RuntimeError("no credentials for this provider " + "x" * 600)
 
-    monkeypatch.setattr(client_module, "create_agent_client", refuse)
+    monkeypatch.setattr("core.client.create_agent_client", refuse)
     runner = make_agent_runner(tmp_path, tmp_path, model="m", provider=None)
 
     status, response = asyncio.run(runner("qa_fixer", "fix it"))
