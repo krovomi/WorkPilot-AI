@@ -49,8 +49,7 @@ async function readTraceSummary(
 	...located: Parameters<typeof getSpecPaths>
 ): Promise<TraceSummary | null> {
 	const { worktreeSpecDir, mainSpecDir } = getSpecPaths(...located);
-	for (const dir of [worktreeSpecDir, mainSpecDir]) {
-		if (!dir) continue;
+	for (const dir of [worktreeSpecDir ?? mainSpecDir, mainSpecDir]) {
 		try {
 			return parseTraceSummary(
 				await fsPromises.readFile(path.join(dir, TRACE_SUMMARY_FILE), "utf-8"),
@@ -290,13 +289,13 @@ export function registerWorktreeDiffHandlers(): void {
 					nameStatus: string,
 				): WorktreeDiffFile["status"] => {
 					const first = nameStatus.split("\n").filter(Boolean)[0];
+					// No "R": the diff is limited to this one path, so git never
+					// pairs it with the other side of a rename.
 					switch (first?.[0]) {
 						case "A":
 							return "added";
 						case "D":
 							return "deleted";
-						case "R":
-							return "renamed";
 						default:
 							return "modified";
 					}
@@ -304,9 +303,8 @@ export function registerWorktreeDiffHandlers(): void {
 				const parseNumstat = (
 					numstat: string,
 				): { additions: number; deletions: number } => {
-					const first = numstat.split("\n").filter(Boolean)[0];
-					if (!first) return { additions: 0, deletions: 0 };
-					const [adds, dels] = first.split("\t");
+					// A binary file reads "-\t-": counted as 0, like a missing line.
+					const [adds, dels] = (numstat.split("\n")[0] ?? "").split("\t");
 					return {
 						additions: Number.parseInt(adds, 10) || 0,
 						deletions: Number.parseInt(dels, 10) || 0,
