@@ -12,6 +12,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+from foundation.file_utils import write_json_atomic
+
 from .colors import warning
 
 
@@ -126,7 +128,9 @@ class StatusManager:
                 data = json.load(f)
             self._status = BuildStatus.from_dict(data)
             return self._status
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        except (OSError, ValueError, AttributeError, TypeError):
+            # Unreadable, half-written by an older version, an unknown state,
+            # or not an object: the status line shows nothing rather than crash.
             return BuildStatus()
 
     def _do_write(self) -> None:
@@ -146,8 +150,9 @@ class StatusManager:
             status_dict = self._status.to_dict()
 
         try:
-            with open(self.status_file, "w", encoding="utf-8") as f:
-                json.dump(status_dict, f, indent=2)
+            # The status line reads this file every few seconds: replace it in
+            # one step so a read never sees half a file.
+            write_json_atomic(self.status_file, status_dict)
 
             if debug:
                 write_duration = (time.time() - write_start) * 1000

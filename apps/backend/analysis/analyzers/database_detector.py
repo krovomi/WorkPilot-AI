@@ -48,7 +48,7 @@ class DatabaseDetector(BaseAnalyzer):
     def _detect_sqlalchemy_models(self) -> dict:
         """Detect SQLAlchemy models."""
         models = {}
-        py_files = list(self.path.glob("**/*.py"))
+        py_files = self._project_files("**/*.py")
 
         for file_path in py_files:
             try:
@@ -60,23 +60,23 @@ class DatabaseDetector(BaseAnalyzer):
             class_pattern = (
                 r"class\s+(\w+)\([^)]*(?:Base|db\.Model|DeclarativeBase)[^)]*\):"
             )
-            matches = re.finditer(class_pattern, content)
+            matches = list(re.finditer(class_pattern, content))
 
-            for match in matches:
+            for match, body in _class_bodies(content, matches):
                 model_name = match.group(1)
 
-                # Extract table name if defined
-                table_match = re.search(r'__tablename__\s*=\s*["\'](\w+)["\']', content)
+                # Extract table name if defined, in this class only: searched
+                # in the whole file, every model took the first one's table.
+                table_match = re.search(r'__tablename__\s*=\s*["\'](\w+)["\']', body)
                 table_name = (
                     table_match.group(1) if table_match else model_name.lower() + "s"
                 )
 
-                # Extract columns
+                # Extract columns (the rest of the line: `Column(String(50),
+                # unique=True)` holds a ")" before its options).
                 fields = {}
-                column_pattern = r"(\w+)\s*=\s*Column\((.*?)\)"
-                column_matches = re.finditer(
-                    column_pattern, content[match.end() : match.end() + 2000]
-                )
+                column_pattern = r"^\s*(\w+)\s*=\s*Column\((.*)\)\s*$"
+                column_matches = re.finditer(column_pattern, body, re.MULTILINE)
 
                 for col_match in column_matches:
                     field_name = col_match.group(1)
@@ -104,7 +104,7 @@ class DatabaseDetector(BaseAnalyzer):
                     models[model_name] = {
                         "table": table_name,
                         "fields": fields,
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "orm": "SQLAlchemy",
                     }
 
@@ -113,8 +113,8 @@ class DatabaseDetector(BaseAnalyzer):
     def _detect_django_models(self) -> dict:
         """Detect Django models."""
         models = {}
-        model_files = list(self.path.glob("**/models.py")) + list(
-            self.path.glob("**/models/*.py")
+        model_files = self._project_files("**/models.py") + self._project_files(
+            "**/models/*.py"
         )
 
         for file_path in model_files:
@@ -125,18 +125,16 @@ class DatabaseDetector(BaseAnalyzer):
 
             # Find class definitions that inherit from models.Model
             class_pattern = r"class\s+(\w+)\(models\.Model\):"
-            matches = re.finditer(class_pattern, content)
+            matches = list(re.finditer(class_pattern, content))
 
-            for match in matches:
+            for match, body in _class_bodies(content, matches):
                 model_name = match.group(1)
                 table_name = model_name.lower()
 
                 # Extract fields
                 fields = {}
-                field_pattern = r"(\w+)\s*=\s*models\.(\w+Field)\((.*?)\)"
-                field_matches = re.finditer(
-                    field_pattern, content[match.end() : match.end() + 2000]
-                )
+                field_pattern = r"^\s*(\w+)\s*=\s*models\.(\w+Field)\((.*)\)\s*$"
+                field_matches = re.finditer(field_pattern, body, re.MULTILINE)
 
                 for field_match in field_matches:
                     field_name = field_match.group(1)
@@ -153,7 +151,7 @@ class DatabaseDetector(BaseAnalyzer):
                     models[model_name] = {
                         "table": table_name,
                         "fields": fields,
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "orm": "Django",
                     }
 
@@ -182,8 +180,11 @@ class DatabaseDetector(BaseAnalyzer):
 
             fields = {}
             # Parse fields: id Int @id @default(autoincrement())
-            field_pattern = r"(\w+)\s+(\w+)([^/\n]*)"
-            field_matches = re.finditer(field_pattern, model_body)
+            # The type keeps its "[]" and "?" markers: "\w+" alone left the
+            # "?" out, so no field was ever nullable. "@@" lines are model
+            # attributes, not fields.
+            field_pattern = r"^[ \t]*(\w+)[ \t]+(\w+(?:\[\])?\??)([^/\n]*)"
+            field_matches = re.finditer(field_pattern, model_body, re.MULTILINE)
 
             for field_match in field_matches:
                 field_name = field_match.group(1)
@@ -191,10 +192,10 @@ class DatabaseDetector(BaseAnalyzer):
                 field_attrs = field_match.group(3)
 
                 fields[field_name] = {
-                    "type": field_type,
+                    "type": field_type.rstrip("?"),
                     "primary_key": "@id" in field_attrs,
                     "unique": "@unique" in field_attrs,
-                    "nullable": "?" in field_type,
+                    "nullable": field_type.endswith("?"),
                 }
 
             if fields:
@@ -210,8 +211,8 @@ class DatabaseDetector(BaseAnalyzer):
     def _detect_typeorm_models(self) -> dict:
         """Detect TypeORM entities."""
         models = {}
-        ts_files = list(self.path.glob("**/*.entity.ts")) + list(
-            self.path.glob("**/entities/*.ts")
+        ts_files = self._project_files("**/*.entity.ts") + self._project_files(
+            "**/entities/*.ts"
         )
 
         for file_path in ts_files:
@@ -222,17 +223,17 @@ class DatabaseDetector(BaseAnalyzer):
 
             # Find @Entity() class declarations
             entity_pattern = r"@Entity\([^)]*\)\s*(?:export\s+)?class\s+(\w+)"
-            matches = re.finditer(entity_pattern, content)
+            matches = list(re.finditer(entity_pattern, content))
 
-            for match in matches:
+            for match, body in _class_bodies(content, matches):
                 model_name = match.group(1)
 
-                # Extract columns
+                # Extract columns of this entity only
                 fields = {}
                 column_pattern = (
                     r"@(PrimaryGeneratedColumn|Column)\(([^)]*)\)\s+(\w+):\s*(\w+)"
                 )
-                column_matches = re.finditer(column_pattern, content)
+                column_matches = re.finditer(column_pattern, body)
 
                 for col_match in column_matches:
                     decorator = col_match.group(1)
@@ -250,7 +251,7 @@ class DatabaseDetector(BaseAnalyzer):
                     models[model_name] = {
                         "table": model_name.lower(),
                         "fields": fields,
-                        "file": str(file_path.relative_to(self.path)),
+                        "file": file_path.relative_to(self.path).as_posix(),
                         "orm": "TypeORM",
                     }
 
@@ -259,9 +260,7 @@ class DatabaseDetector(BaseAnalyzer):
     def _detect_drizzle_models(self) -> dict:
         """Detect Drizzle ORM schemas."""
         models = {}
-        schema_files = list(self.path.glob("**/schema.ts")) + list(
-            self.path.glob("**/db/schema.ts")
-        )
+        schema_files = self._project_files("**/schema.ts")
 
         for file_path in schema_files:
             try:
@@ -280,7 +279,7 @@ class DatabaseDetector(BaseAnalyzer):
                 models[const_name] = {
                     "table": table_name,
                     "fields": {},  # Would need more parsing for fields
-                    "file": str(file_path.relative_to(self.path)),
+                    "file": file_path.relative_to(self.path).as_posix(),
                     "orm": "Drizzle",
                 }
 
@@ -289,8 +288,8 @@ class DatabaseDetector(BaseAnalyzer):
     def _detect_mongoose_models(self) -> dict:
         """Detect Mongoose models."""
         models = {}
-        model_files = list(self.path.glob("**/models/*.js")) + list(
-            self.path.glob("**/models/*.ts")
+        model_files = self._project_files("**/models/*.js") + self._project_files(
+            "**/models/*.ts"
         )
 
         for file_path in model_files:
@@ -309,8 +308,23 @@ class DatabaseDetector(BaseAnalyzer):
                 models[model_name] = {
                     "table": model_name.lower(),
                     "fields": {},
-                    "file": str(file_path.relative_to(self.path)),
+                    "file": file_path.relative_to(self.path).as_posix(),
                     "orm": "Mongoose",
                 }
 
         return models
+
+
+def _class_bodies(
+    content: str, matches: list[re.Match[str]]
+) -> list[tuple[re.Match[str], str]]:
+    """Each class declaration with its body, up to the next declaration.
+
+    A fixed window after the declaration ran into the next class of the same
+    file, whose columns were then counted twice.
+    """
+    bodies = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        bodies.append((match, content[match.end() : end]))
+    return bodies

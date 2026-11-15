@@ -16,6 +16,7 @@ The QA fixer can auto-resolve critical issues.
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -338,8 +339,8 @@ class QASecurityScanner:
         findings: list[Vulnerability] = []
 
         for source_file in self._iter_source_files():
-            rel_path = str(source_file.relative_to(self.project_dir)).replace("\\", "/")
-            ext = source_file.suffix.lower()
+            rel_path = source_file.relative_to(self.project_dir).as_posix()
+            ext = _scan_extension(source_file)
 
             try:
                 lines = source_file.read_text(
@@ -400,13 +401,22 @@ class QASecurityScanner:
     }
 
     def _iter_source_files(self):
-        for path in self.project_dir.rglob("*"):
-            if not path.is_file():
-                continue
-            if any(part in self._SKIP_DIRS for part in path.parts):
-                continue
-            if path.suffix.lower() in self._SCAN_EXTENSIONS:
-                yield path
+        # Only the folders *inside* the project are skipped: a task's worktree
+        # lives under `.workpilot/worktrees/`, which must not hide all of it.
+        for root, dirs, files in os.walk(self.project_dir):
+            dirs[:] = sorted(d for d in dirs if d not in self._SKIP_DIRS)
+            for name in sorted(files):
+                path = Path(root) / name
+                if _scan_extension(path) in self._SCAN_EXTENSIONS:
+                    yield path
+
+
+def _scan_extension(path: Path) -> str:
+    """`.env` and `.env.local` have no suffix worth the name: both are `.env`."""
+    name = path.name.lower()
+    if name == ".env" or name.startswith(".env."):
+        return ".env"
+    return path.suffix.lower()
 
 
 # =============================================================================

@@ -81,9 +81,9 @@ function renderCopilotErrorState(usage: UsageSnapshot) {
 		return <CopilotBackendUnavailable />;
 	}
 
-	const scope = usage.copilotUsageDetails?.scope;
-	if (scope === "personal-quotas") {
-		return <CopilotPremiumQuotas usage={usage} />;
+	const details = usage.copilotUsageDetails;
+	if (details?.scope === "personal-quotas") {
+		return <CopilotPremiumQuotas details={details} />;
 	}
 	return <CopilotMetrics usage={usage} />;
 }
@@ -156,13 +156,11 @@ function formatResetDate(raw: string | undefined): string {
 }
 
 interface CopilotPremiumQuotasProps {
-	readonly usage: UsageSnapshot;
+	readonly details: NonNullable<UsageSnapshot["copilotUsageDetails"]>;
 }
 
-function CopilotPremiumQuotas({ usage }: CopilotPremiumQuotasProps) {
+function CopilotPremiumQuotas({ details }: CopilotPremiumQuotasProps) {
 	const { t } = useTranslation(["common"]);
-	const details = usage.copilotUsageDetails;
-	if (!details) return null;
 
 	const used = details.premiumRequestsUsed ?? 0;
 	const entitlement = details.premiumRequestsEntitlement ?? 0;
