@@ -17,6 +17,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { BrowserWindow, desktopCapturer } from "electron";
 import { getSpecsDir } from "../shared/constants";
+import {
+	escapePowerShellSingleQuoted,
+	quotePowerShellSingle,
+} from "../shared/utils/powershell-quote";
 import type {
 	VisualProofApiSmoke,
 	VisualProofNavigationPlan,
@@ -719,11 +723,6 @@ function describeApiSmoke(apiSmoke: VisualProofApiSmoke | undefined): string {
 	return ` API smoke: ${apiSmoke.passed}/${apiSmoke.attempted} endpoints passed.`;
 }
 
-/** Single-quote a value for safe embedding in a PowerShell script. */
-function powerShellSingleQuote(value: string): string {
-	return `'${value.replaceAll("'", "''")}'`;
-}
-
 /**
  * Build the PowerShell script that captures a *single application window* to a
  * PNG via the Win32 PrintWindow API.
@@ -748,10 +747,10 @@ export function buildPrintWindowScript(
 		.map((name) => name.replaceAll(/[^a-z0-9 ._-]/g, "").trim())
 		.filter((name) => name.length > 0);
 	const preferredArray = preferred.length
-		? `@(${preferred.map(powerShellSingleQuote).join(",")})`
+		? `@(${preferred.map(quotePowerShellSingle).join(",")})`
 		: "@()";
 	const targetPid = Number.isInteger(pid) && pid ? pid : 0;
-	const outPath = powerShellSingleQuote(outputPath);
+	const outPath = quotePowerShellSingle(outputPath);
 
 	// NOTE: keep the here-string terminators ("@ ... "@) at column 0 and avoid
 	// any ${...} sequence (would collide with this template literal).
@@ -1452,10 +1451,6 @@ async function captureDesktopScreenshotSequence(
 	return screenshots;
 }
 
-function escapePowerShellSingleQuoted(value: string): string {
-	return value.replaceAll("'", "''");
-}
-
 /**
  * Génère un script PowerShell qui pilote la fenêtre du process cible via
  * Windows UI Automation (System.Windows.Automation). Selon l'étape, il invoque
@@ -1745,13 +1740,11 @@ async function launchDesktopApplication(
 		return spawnDirect(workpilotElevated);
 	}
 
-	const psExe = `'${runtime.command.replaceAll("'", "''")}'`;
-	const psCwd = `'${runtime.cwd.replaceAll("'", "''")}'`;
+	const psExe = quotePowerShellSingle(runtime.command);
+	const psCwd = quotePowerShellSingle(runtime.cwd);
 	const psArgs =
 		runtime.args.length > 0
-			? ` -ArgumentList @(${runtime.args
-					.map((arg) => `'${arg.replaceAll("'", "''")}'`)
-					.join(",")})`
+			? ` -ArgumentList @(${runtime.args.map(quotePowerShellSingle).join(",")})`
 			: "";
 	const { stdout } = await execFileAsync(
 		"powershell",

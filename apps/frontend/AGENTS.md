@@ -85,7 +85,7 @@ remise à zéro de la conversation) et `execution-recovery-handlers.ts` (tâche 
 | Environnement d'un runner Python lancé par une vue (provider choisi, aucun identifiant hérité) | `src/main/utils/python-runner-env.ts` | `utils/__tests__/python-runner-env.test.ts`, `ipc-handlers/__tests__/runner-env-inheritance.test.ts` |
 | Identifiants (trousseau, fichiers restreints) | `src/main/claude-profile/credential-utils.ts` | `credential-utils.test.ts` |
 | Assainissement texte / URL | `src/main/ipc-handlers/shared/sanitize.ts` | `sanitize.test.ts` |
-| Échappement shell | `src/shared/utils/shell-escape.ts` | — |
+| Échappement shell ; chaînes PowerShell entre apostrophes (toutes les apostrophes doublées) | `src/shared/utils/shell-escape.ts`, `src/shared/utils/powershell-quote.ts` | `powershell-quote.test.ts` |
 | Chemins dans un worktree | `src/main/worktree-paths.ts` (`isPathWithinBase`) | — |
 | CSP du renderer | `src/renderer/index.html` | — |
 | Vues MCP Apps : lues par id dans la spec de la tâche, servies sur un schéma du main avec leur propre CSP, iframe `allow-scripts` sans `allow-same-origin`, frame qui ne navigue pas ailleurs, pont qui refuse tout appel | `src/main/mcp-apps/`, `src/main/ipc-handlers/task/mcp-app-handlers.ts`, `src/renderer/components/task-detail/McpAppFrame.tsx`, `mcp-app-bridge.ts` ([mcp-2026.md](../../docs/architecture/mcp-2026.md)) | `mcp-apps.test.ts`, `mcp-app-bridge.test.ts`, `McpAppsCard.test.tsx` |
