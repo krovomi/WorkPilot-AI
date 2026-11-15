@@ -11,6 +11,7 @@ import socket
 import time
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote
 
 import psutil
 import websockets
@@ -319,7 +320,10 @@ class StreamingWebSocketServer:
         if path != "/stream/default":
             path_parts = path.strip("/").split("/")
             if len(path_parts) >= 2 and path_parts[0] == "stream":
-                session_id = path_parts[1]
+                # The apps percent-encode the channel's name in the path
+                # (`project%3A<id>`), as a URL segment must: decode it, or
+                # every live board and team room would be refused.
+                session_id = unquote(path_parts[1])
 
         return session_id
 

@@ -1005,16 +1005,6 @@ async def test_provider_api_key(request: Request, provider: str, payload: dict):
         if not oauth_token:
             return {"success": False, "error": "OAuth token required for Windsurf"}
         try:
-            from integrations.windsurf_mcp import get_windsurf_mcp
-
-            mcp = await get_windsurf_mcp()
-            status = await mcp.check_status()
-            if status.get("connected", False):
-                set_validated(provider, oauth_token, True)
-                return {"success": True, "method": "MCP"}
-        except Exception as mcp_error:
-            logging.warning(f"MCP test failed, trying direct API: {mcp_error}")
-        try:
             safe_url = (
                 _validate_url_ssrf("windsurf", "https://server.codeium.com")
                 + "/api"
