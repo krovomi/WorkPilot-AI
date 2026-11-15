@@ -650,6 +650,21 @@ class TestAnalyzer:
         assert related[0] in {"web/src/index.ts", "web/shared/y.jsx"}
         assert "web/src/lib/z.js" in related
 
+    def test_a_cycle_reads_the_same_whatever_the_disk_order(self):
+        def cycles(order):
+            graph = DependencyGraph()
+            nodes = {
+                "b.py": DependencyNode("b.py", imports=["a.py"], imported_by=["a.py"]),
+                "a.py": DependencyNode("a.py", imports=["b.py"], imported_by=["b.py"]),
+            }
+            for path in order:
+                graph.add_node(nodes[path])
+            return [c.cycle for c in DependencyAnalyzer(graph).detect_cycles()]
+
+        assert (
+            cycles(["b.py", "a.py"]) == cycles(["a.py", "b.py"]) == [["a.py", "b.py"]]
+        )
+
     def test_an_orphan_with_imports(self):
         graph = DependencyGraph()
         graph.add_node(DependencyNode("tool.py", imports=["lib.py"]))
@@ -683,8 +698,9 @@ class TestAnalyzer:
         analyzer = DependencyAnalyzer(graph)
         analyzer.MAX_CYCLES_REPORTED = 3
 
+        # Path order: a0, a1, a10, a11, a2...
         assert analyzer.detect_cycles() == [
-            CircularDependency([f"a{i}", f"b{i}"]) for i in range(3)
+            CircularDependency([f"a{i}", f"b{i}"]) for i in (0, 1, 10)
         ]
 
 

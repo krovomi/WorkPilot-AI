@@ -15,7 +15,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.connectors.jira.models as models_module
 from src.connectors.jira.connector import JiraConnector
 from src.connectors.jira.models import (
     JiraComment,
@@ -24,6 +23,7 @@ from src.connectors.jira.models import (
     JiraStatus,
     JiraTransition,
     JiraUser,
+    _extract_adf_text,
 )
 
 # ── Fixtures ─────────────────────────────────────────────────────
@@ -598,7 +598,7 @@ class TestJiraModels:
 class TestExtractAdfText:
     """Tests for _extract_adf_text helper (ADF → plain text extraction)."""
 
-    _extract_adf_text = staticmethod(models_module._extract_adf_text)
+    _extract_adf_text = staticmethod(_extract_adf_text)
 
     def test_plain_text_node(self):
         """Returns the text value for a leaf text node."""

@@ -21,7 +21,6 @@ from msrest import Deserializer
 import src.connectors.azure_devops.client as client_module
 from src.config.settings import Settings
 from src.connectors.azure_devops import AzureDevOpsConnector
-from src.connectors.azure_devops.client import AzureDevOpsClient
 from src.connectors.azure_devops.exceptions import (
     APIError,
     AuthenticationError,
@@ -448,7 +447,7 @@ class TestClientWithoutSdk:
         monkeypatch.setattr(client_module, "AZURE_DEVOPS_AVAILABLE", False)
 
         with pytest.raises(ConfigurationError, match="pip install azure-devops"):
-            AzureDevOpsClient(sample_settings).connect()
+            client_module.AzureDevOpsClient(sample_settings).connect()
 
     def test_module_imports_when_the_sdk_is_missing(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "azure.devops.connection", None)

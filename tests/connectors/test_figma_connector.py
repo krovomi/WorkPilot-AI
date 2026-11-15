@@ -29,6 +29,11 @@ PNG = b"\x89PNG\r\n\x1a\nfake"
 class FakeFigma(list):
     """The requests Figma received, in order, plus the scripted answers."""
 
+    __hash__ = object.__hash__
+
+    def __eq__(self, other: object) -> bool:
+        return self is other  # one fake server is only ever itself
+
     def __init__(self) -> None:
         super().__init__()
         self.routes: dict[

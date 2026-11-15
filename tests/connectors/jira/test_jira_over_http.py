@@ -19,7 +19,6 @@ from src.connectors.jira.client import JiraClient
 from src.connectors.jira.connector import JiraConnector
 from src.connectors.jira.exceptions import (
     JiraAPIError,
-    JiraAuthenticationError,
     JiraConfigurationError,
     JiraIssueNotFoundError,
 )

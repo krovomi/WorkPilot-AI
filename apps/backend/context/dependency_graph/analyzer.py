@@ -132,7 +132,7 @@ class DependencyAnalyzer:
 
             node = self.graph.nodes.get(node_path)
             if node:
-                for dep in node.imports:
+                for dep in sorted(node.imports):
                     if dep not in self.graph.nodes:
                         continue
                     if dep not in visited:
@@ -146,7 +146,9 @@ class DependencyAnalyzer:
             in_stack.pop()
             in_stack_set.discard(node_path)
 
-        for path in self.graph.nodes:
+        # Walked in path order, so the same project reports the same cycles,
+        # starting from the same file, whatever order the disk listed it in.
+        for path in sorted(self.graph.nodes):
             if path not in visited:
                 dfs(path)
 
