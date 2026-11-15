@@ -231,6 +231,13 @@ describe("adding and removing projects", () => {
 		expect(store().openProjectIds).toEqual(["b"]);
 	});
 
+	it("removes a project that has no tab open without touching the others", async () => {
+		useProjectStore.setState({ projects: [project("a"), project("b")], openProjectIds: ["b"], tabOrder: ["b"], activeProjectId: "b" });
+		api.removeProject.mockResolvedValue({ success: true });
+		expect(await removeProject("a")).toBe(true);
+		expect(store()).toMatchObject({ openProjectIds: ["b"], activeProjectId: "b" });
+	});
+
 	it("closes a tab opened while the removal was in flight", async () => {
 		useProjectStore.setState({ projects: [project("a")] });
 		let answer: (v: unknown) => void = () => undefined;
