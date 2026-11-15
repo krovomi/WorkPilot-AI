@@ -26,23 +26,6 @@ SAFE_CHMOD_MODES = {
     "664",
 }
 
-# Dangerous rm patterns
-DANGEROUS_RM_PATTERNS = [
-    r"^/$",  # Root
-    r"^\.\.$",  # Parent directory
-    r"^~$",  # Home directory
-    r"^\*$",  # Wildcard only
-    r"^/\*$",  # Root wildcard
-    r"^\.\./",  # Escaping current directory
-    r"^/home$",  # /home
-    r"^/usr$",  # /usr
-    r"^/etc$",  # /etc
-    r"^/var$",  # /var
-    r"^/bin$",  # /bin
-    r"^/lib$",  # /lib
-    r"^/opt$",  # /opt
-]
-
 
 def validate_chmod_command(command_string: str) -> ValidationResult:
     """
@@ -64,13 +47,8 @@ def validate_chmod_command(command_string: str) -> ValidationResult:
 
     mode = None
     files = []
-    skip_next = False
 
     for token in tokens[1:]:
-        if skip_next:
-            skip_next = False
-            continue
-
         if token in ("-R", "--recursive"):
             # Allow recursive for +x
             continue
@@ -145,26 +123,24 @@ def validate_rm_command(command_string: str) -> ValidationResult:
                 ),
             )
 
-        # Legacy explicit blocklist as a second layer of defense.
-        for pattern in DANGEROUS_RM_PATTERNS:
-            if re.match(pattern, token):
-                return False, f"rm target '{token}' is not allowed for safety"
-
     if not saw_target:
         return False, "rm requires at least one target"
 
     return True, ""
 
 
-_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:[\\/]")
+# `C:\…`, `c:/…`, and `C:` alone or `C:dir`: relative to that drive's own
+# current directory, which is not this one.
+_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _is_safe_relative_target(token: str) -> bool:
     """Return True only for relative paths that stay under cwd."""
     if not token:
         return False
-    # Absolute POSIX path or root-rooted glob
-    if token.startswith("/"):
+    # Absolute POSIX path or root-rooted glob; on Windows `\Windows` is
+    # rooted at the current drive, and `\\server\share` is a UNC path.
+    if token.startswith(("/", "\\")):
         return False
     # Home-relative
     if token.startswith("~"):
@@ -174,9 +150,6 @@ def _is_safe_relative_target(token: str) -> bool:
         return False
     # Windows drive-letter root (`C:\…`, `c:/…`)
     if _WINDOWS_DRIVE_RE.match(token):
-        return False
-    # Windows UNC path (`\\server\share`)
-    if token.startswith("\\\\"):
         return False
     # Parent-directory escape, including `./..` and trailing `/..`.
     # We treat any path that contains a `..` segment as unsafe — even if it

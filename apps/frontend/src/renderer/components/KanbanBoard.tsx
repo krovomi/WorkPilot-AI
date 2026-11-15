@@ -116,7 +116,6 @@ import { JiraSidePanel } from "./jira-import/JiraSidePanel";
 import { KanbanToolbar } from "./kanban/KanbanToolbar";
 import { PRFilesModal } from "./PRFilesModal";
 import { QueueSettingsModal } from "./QueueSettingsModal";
-import { AppSettingsDialog } from "./settings/AppSettings";
 import { TaskCard } from "./TaskCard";
 import { TaskEditDialog } from "./TaskEditDialog";
 import {
@@ -292,15 +291,12 @@ export function KanbanBoard({
 					setAzureDevOpsConnected(
 						result.success && result.data?.connected === true,
 					);
-					setAzureDevOpsProjectName(result.data?.projectName || null);
 				})
 				.catch(() => {
 					setAzureDevOpsConnected(null);
-					setAzureDevOpsProjectName(null);
 				});
 		} else {
 			setAzureDevOpsConnected(null);
-			setAzureDevOpsProjectName(null);
 		}
 	}, [activeProjectId, envConfig?.azureDevOpsEnabled]);
 
@@ -366,11 +362,6 @@ export function KanbanBoard({
 	// Source task for the "duplicate" dialog (edit fields before creating the copy)
 	const [duplicateSource, setDuplicateSource] = useState<Task | null>(null);
 
-	// Store recently deleted tasks for undo functionality
-	const [_recentlyDeletedTasks, setRecentlyDeletedTasks] = useState<
-		Map<string, Task>
-	>(new Map());
-
 	// Worktree cleanup dialog state
 	const [worktreeCleanupDialog, setWorktreeCleanupDialog] = useState<{
 		open: boolean;
@@ -393,9 +384,6 @@ export function KanbanBoard({
 	const [azureDevOpsConnected, setAzureDevOpsConnected] = useState<
 		boolean | null
 	>(null);
-	const [_azureDevOpsProjectName, setAzureDevOpsProjectName] = useState<
-		string | null
-	>(null);
 
 	// Jira import panel state
 	const [jiraPanelOpen, setJiraPanelOpen] = useState(false);
@@ -403,9 +391,6 @@ export function KanbanBoard({
 
 	// Azure DevOps drag state
 	const [isDraggingAzureDevOps, setIsDraggingAzureDevOps] = useState(false);
-	const [_draggedAzureDevOpsItems, setDraggedAzureDevOpsItems] = useState<
-		AzureDevOpsWorkItem[]
-	>([]);
 
 	// Import confirm dialog state (shown after dropping work items from Azure DevOps / Jira)
 	const [importConfirmDialog, setImportConfirmDialog] = useState<{
@@ -662,20 +647,13 @@ export function KanbanBoard({
 		});
 	}, []);
 
+	// Select every card of one column (the column header's checkbox).
 	const selectAllTasks = useCallback(
-		(columnStatus?: (typeof TASK_STATUS_COLUMNS)[number]) => {
-			if (columnStatus) {
-				// Select all in specific column
-				const columnTasks = tasksByStatus[columnStatus] || [];
-				const columnIds = new Set(columnTasks.map((t: Task) => t.id));
-				setSelectedTaskIds((prev) => new Set<string>([...prev, ...columnIds]));
-			} else {
-				// Select all across all columns
-				const allIds = new Set(filteredTasks.map((t) => t.id));
-				setSelectedTaskIds(allIds);
-			}
+		(columnStatus: (typeof TASK_STATUS_COLUMNS)[number]) => {
+			const columnIds = tasksByStatus[columnStatus].map((t: Task) => t.id);
+			setSelectedTaskIds((prev) => new Set<string>([...prev, ...columnIds]));
 		},
-		[tasksByStatus, filteredTasks],
+		[tasksByStatus],
 	);
 
 	const deselectAllTasks = useCallback(() => {
@@ -716,11 +694,6 @@ export function KanbanBoard({
 				const result = await restoreTask(id);
 				if (result.success) restored++;
 			}
-			setRecentlyDeletedTasks((prev) => {
-				const next = new Map(prev);
-				for (const id of taskIds) next.delete(id);
-				return next;
-			});
 			if (restored > 0) {
 				toast({
 					title: t("kanban.bulkRestoreSuccess", { count: restored }),
@@ -748,11 +721,6 @@ export function KanbanBoard({
 		setDeleteConfirmOpen(false);
 
 		if (result.success) {
-			setRecentlyDeletedTasks((prev) => {
-				const next = new Map(prev);
-				for (const task of deletedTasks) next.set(task.id, task);
-				return next;
-			});
 			const deletedIds = deletedTasks.map((task) => task.id);
 			toast({
 				title: t("kanban.deleteSuccess", { count: taskIdsToDelete.length }),
@@ -884,13 +852,6 @@ export function KanbanBoard({
 				const result = await restoreTask(taskId);
 
 				if (result.success) {
-					// Remove from recently deleted tasks (for UI state consistency)
-					setRecentlyDeletedTasks((prev) => {
-						const newMap = new Map(prev);
-						newMap.delete(taskId);
-						return newMap;
-					});
-
 					toast({
 						title: t("kanban.restoreSuccess"),
 						variant: "default",
@@ -933,11 +894,6 @@ export function KanbanBoard({
 		});
 
 		if (result.success && taskToDelete) {
-			// Store the deleted task for undo functionality
-			setRecentlyDeletedTasks((prev) =>
-				new Map(prev).set(deletedTaskId, taskToDelete),
-			);
-
 			toast({
 				title: t("kanban.deleteSuccessSingle", {
 					title: singleDeleteConfirm.taskTitle,
@@ -1492,7 +1448,6 @@ export function KanbanBoard({
 						parsed.type === "jira-workitems"
 					) {
 						setIsDraggingAzureDevOps(true);
-						setDraggedAzureDevOpsItems(parsed.workItems || []);
 
 						// Auto-scroll functionality
 						const kanbanContainer = document.querySelector(
@@ -1575,18 +1530,9 @@ export function KanbanBoard({
 			}
 
 			// Method 2: Fallback to DOM traversal
-			const fromClosest = target.closest("[data-column-status]");
-			if (fromClosest) return fromClosest as HTMLElement;
-
-			let currentElement = target.parentElement;
-			while (currentElement) {
-				if (currentElement.dataset.columnStatus !== undefined) {
-					return currentElement;
-				}
-				currentElement = currentElement.parentElement;
-			}
-
-			return null;
+			// (closest() already walks every ancestor: nothing above it carries
+			// the attribute when it finds none.)
+			return target.closest<HTMLElement>("[data-column-status]");
 		};
 
 		const handleDrop = async (event: DragEvent) => {
@@ -1639,14 +1585,12 @@ export function KanbanBoard({
 				});
 			} finally {
 				setIsDraggingAzureDevOps(false);
-				setDraggedAzureDevOpsItems([]);
 				setOverColumnId(null);
 			}
 		};
 
 		const handleDragEnd = () => {
 			setIsDraggingAzureDevOps(false);
-			setDraggedAzureDevOpsItems([]);
 			setOverColumnId(null);
 		};
 
@@ -1666,11 +1610,9 @@ export function KanbanBoard({
 	useEffect(() => {
 		let isExternalDragging = false;
 
-		const handleExternalDragStart = (event: Event) => {
-			const customEvent = event as CustomEvent;
+		const handleExternalDragStart = () => {
 			isExternalDragging = true;
 			setIsDraggingAzureDevOps(true);
-			setDraggedAzureDevOpsItems(customEvent.detail.workItems || []);
 		};
 
 		const handleDragOver = (event: DragEvent) => {
@@ -1741,7 +1683,6 @@ export function KanbanBoard({
 		const handleExternalDragEnd = () => {
 			isExternalDragging = false;
 			setIsDraggingAzureDevOps(false);
-			setDraggedAzureDevOpsItems([]);
 			setOverColumnId(null);
 		};
 
@@ -2308,14 +2249,6 @@ export function KanbanBoard({
 			kanbanSort,
 		],
 	);
-
-	// Ajout ou correction de la déclaration de l'état pour la boîte de dialogue de paramètres projet
-	// Ajout d'un compteur pour forcer le remount d'AppSettingsDialog
-	const [settingsDialogKey, _setSettingsDialogKey] = useState(0);
-	const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
-	const [settingsDialogProjectId, _setSettingsDialogProjectId] = useState<
-		string | undefined
-	>(undefined);
 
 	return (
 		<div className="flex h-full flex-col">
@@ -3128,17 +3061,6 @@ export function KanbanBoard({
 				onOpenChange={setBulkPRDialogOpen}
 				onComplete={handleBulkPRComplete}
 			/>
-
-			{/* Boîte de dialogue paramètres projet (AppSettingsDialog) */}
-			{project && settingsDialogProjectId && (
-				<AppSettingsDialog
-					key={settingsDialogKey + settingsDialogProjectId}
-					open={!!isProjectSettingsOpen}
-					onOpenChange={setIsProjectSettingsOpen}
-					initialProjectSection="general"
-					initialProjectId={settingsDialogProjectId}
-				/>
-			)}
 
 			{/* Azure DevOps Import Panel */}
 			{projectId && (

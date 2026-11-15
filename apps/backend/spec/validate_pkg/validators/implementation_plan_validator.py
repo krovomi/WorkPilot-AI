@@ -40,7 +40,8 @@ class ImplementationPlanValidator:
         if not plan_file.exists():
             errors.append("implementation_plan.json not found")
             fixes.append(
-                f"Run: python auto-claude/planner.py --spec-dir {self.spec_dir}"
+                "Write implementation_plan.json in the spec directory from spec.md "
+                "(feature, workflow_type, phases with subtasks)"
             )
             return ValidationResult(False, "plan", errors, warnings, fixes)
 
@@ -49,10 +50,7 @@ class ImplementationPlanValidator:
                 plan = json.load(f)
         except json.JSONDecodeError as e:
             errors.append(f"implementation_plan.json is invalid JSON: {e}")
-            fixes.append(
-                "Regenerate with: python auto-claude/planner.py --spec-dir "
-                + str(self.spec_dir)
-            )
+            fixes.append("Rewrite implementation_plan.json as valid JSON")
             return ValidationResult(False, "plan", errors, warnings, fixes)
 
         # A document that parses but is not an object. Reported rather than
@@ -86,18 +84,30 @@ class ImplementationPlanValidator:
                 errors.append(f"Invalid workflow_type: {plan['workflow_type']}")
                 fixes.append(f"Use one of: {schema['workflow_types']}")
 
-        # Validate phases
+        # Validate phases. Every level is checked for its type before it is
+        # read: `"phases": {"1": {...}}` (phases keyed by id, which auto-fix
+        # reshapes) or a phase written as a bare string raised AttributeError
+        # here, so the plan never reached the auto-fix that would repair it.
         phases = plan.get("phases", [])
-        if not phases:
+        if not isinstance(phases, list):
+            errors.append(
+                f"'phases' must be a list of phase objects, not {type(phases).__name__}"
+            )
+            fixes.append("Write 'phases' as a list: [{...}, {...}]")
+            phases = []
+        elif not phases:
             errors.append("No phases defined")
             fixes.append("Add at least one phase with subtasks")
         else:
             for i, phase in enumerate(phases):
                 phase_errors = self._validate_phase(phase, i)
                 errors.extend(phase_errors)
+        phases = [p for p in phases if isinstance(p, dict)]
 
         # Check for at least one subtask
-        total_subtasks = sum(len(p.get("subtasks", [])) for p in phases)
+        total_subtasks = sum(
+            len(p["subtasks"]) for p in phases if isinstance(p.get("subtasks"), list)
+        )
         if total_subtasks == 0:
             errors.append("No subtasks defined in any phase")
             fixes.append("Add subtasks to phases")
@@ -172,6 +182,9 @@ class ImplementationPlanValidator:
         errors = []
         schema = IMPLEMENTATION_PLAN_SCHEMA["phase_schema"]
 
+        if not isinstance(phase, dict):
+            return [f"Phase {index + 1}: must be an object, not {type(phase).__name__}"]
+
         # Check required fields
         for field in schema["required_fields"]:
             if field not in phase:
@@ -189,6 +202,8 @@ class ImplementationPlanValidator:
 
         # Validate subtasks
         subtasks = phase.get("subtasks", [])
+        if not isinstance(subtasks, list):
+            return [*errors, f"Phase {index + 1}: 'subtasks' must be a list"]
         for j, subtask in enumerate(subtasks):
             subtask_errors = self._validate_subtask(subtask, index, j)
             errors.extend(subtask_errors)
@@ -210,6 +225,10 @@ class ImplementationPlanValidator:
         """
         errors = []
         schema = IMPLEMENTATION_PLAN_SCHEMA["subtask_schema"]
+        where = f"Phase {phase_idx + 1}, Subtask {subtask_idx + 1}"
+
+        if not isinstance(subtask, dict):
+            return [f"{where}: must be an object, not {type(subtask).__name__}"]
 
         for field in schema["required_fields"]:
             if field not in subtask:
@@ -227,7 +246,9 @@ class ImplementationPlanValidator:
             ver = subtask["verification"]
             ver_schema = IMPLEMENTATION_PLAN_SCHEMA["verification_schema"]
 
-            if "type" not in ver:
+            if not isinstance(ver, dict):
+                errors.append(f"{where}: verification must be an object")
+            elif "type" not in ver:
                 errors.append(
                     f"Phase {phase_idx + 1}, Subtask {subtask_idx + 1}: verification missing 'type'"
                 )

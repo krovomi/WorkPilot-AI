@@ -43,8 +43,8 @@ class JobsDetector(BaseAnalyzer):
 
     def _detect_celery(self) -> dict[str, Any] | None:
         """Detect Celery (Python) task queue."""
-        celery_files = list(self.path.glob("**/celery.py")) + list(
-            self.path.glob("**/tasks.py")
+        celery_files = self._project_files("**/celery.py") + self._project_files(
+            "**/tasks.py"
         )
         if not celery_files:
             return None
@@ -61,7 +61,7 @@ class JobsDetector(BaseAnalyzer):
                     tasks.append(
                         {
                             "name": task_name,
-                            "file": str(task_file.relative_to(self.path)),
+                            "file": task_file.relative_to(self.path).as_posix(),
                         }
                     )
 

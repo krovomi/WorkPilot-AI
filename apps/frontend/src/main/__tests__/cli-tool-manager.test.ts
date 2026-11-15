@@ -201,7 +201,7 @@ vi.mock("../env-utils", () => {
 
 // Mock homebrew-python utility
 vi.mock("../utils/homebrew-python", () => ({
-	findHomebrewPython: vi.fn(() => null),
+	homebrewPythonCandidates: vi.fn(() => []),
 }));
 
 // Mock windows-paths utility

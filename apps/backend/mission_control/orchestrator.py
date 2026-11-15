@@ -28,7 +28,6 @@ class MissionControlOrchestrator:
     def __init__(self):
         self._slots: dict[str, AgentSlot] = {}
         self._decision_trees: dict[str, DecisionTree] = {}
-        self._subscribers: set[Any] = set()
         self._session_id: str = f"mc-{uuid.uuid4().hex[:8]}"
         self._created_at: float = time.time()
         self._is_active: bool = False
@@ -204,8 +203,10 @@ class MissionControlOrchestrator:
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        before = slot.status
         slot.pause()
-        self._log_event("agent_paused", {"agent_id": agent_id})
+        if slot.status != before:
+            self._log_event("agent_paused", {"agent_id": agent_id})
         return True
 
     def resume_agent(self, agent_id: str) -> bool:
@@ -213,8 +214,10 @@ class MissionControlOrchestrator:
         slot = self._slots.get(agent_id)
         if not slot:
             return False
+        before = slot.status
         slot.resume()
-        self._log_event("agent_resumed", {"agent_id": agent_id})
+        if slot.status != before:
+            self._log_event("agent_resumed", {"agent_id": agent_id})
         return True
 
     def stop_agent(self, agent_id: str) -> bool:
@@ -383,7 +386,9 @@ class MissionControlOrchestrator:
             self._event_log = self._event_log[-200:]
 
     def get_event_log(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Get recent events."""
+        """The ``limit`` most recent events (none for 0 or less)."""
+        if limit <= 0:
+            return []
         return self._event_log[-limit:]
 
 
