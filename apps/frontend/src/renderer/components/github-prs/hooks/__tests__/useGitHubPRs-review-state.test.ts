@@ -49,3 +49,9 @@ it("follows a review of the selected PR as it runs and ends", async () => {
 	act(() => reviews().setPRReviewResult("p1", done as never));
 	expect(result.current).toMatchObject({ isReviewing: false, reviewResult: done, activePRReviews: [] });
 });
+
+it("shows no review state without a project", () => {
+	const { result } = renderHook(() => useGitHubPRs(undefined));
+	expect(result.current).toMatchObject({ isReviewing: false, reviewResult: null, activePRReviews: [] });
+	expect(github.checkGitHubConnection).not.toHaveBeenCalled();
+});

@@ -224,6 +224,23 @@ describe("late answers", () => {
 		expect(result.current.error).toBeNull();
 	});
 
+	it("ignores a failure that arrives for a team no longer chosen", async () => {
+		const issues = deferred();
+		const projects = deferred();
+		api.getLinearIssues.mockReturnValueOnce(issues.promise);
+		api.getLinearProjects.mockReturnValueOnce(projects.promise);
+		const lists = renderHook(({ team }) => ({ issues: useLinearIssues("p1", team, ""), projects: useLinearProjects("p1", team) }), {
+			initialProps: { team: "a" },
+		});
+		lists.rerender({ team: "" });
+		await act(async () => {
+			issues.resolve(Promise.reject(new Error("late")));
+			projects.resolve(Promise.reject(new Error("late")));
+		});
+		expect(lists.result.current.issues.error).toBeNull();
+		expect(lists.result.current.projects.error).toBeNull();
+	});
+
 	it("ignores teams that arrive after the modal closed", async () => {
 		const slow = deferred();
 		api.getLinearTeams.mockReturnValueOnce(slow.promise);
