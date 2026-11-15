@@ -146,7 +146,9 @@ class DependencyAnalyzer:
             in_stack.pop()
             in_stack_set.discard(node_path)
 
-        for path in self.graph.nodes:
+        # Sorted: the graph's order is the disk's (`rglob`), which differs from
+        # one filesystem to another, and so did the first file of each cycle.
+        for path in sorted(self.graph.nodes):
             if path not in visited:
                 dfs(path)
 

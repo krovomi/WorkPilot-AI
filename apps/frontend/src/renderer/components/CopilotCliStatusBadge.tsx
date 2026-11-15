@@ -61,9 +61,7 @@ type StatusType =
 	| "gh-missing"
 	| "error";
 
-const _CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const VERSION_RECHECK_DELAY_MS = 5000;
-const _UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check for updates every 5 minutes when outdated
 
 /**
  * GitHub Copilot icon (simplified SVG)
@@ -240,7 +238,7 @@ export function CopilotCliStatusBadge({
 					return;
 				}
 				if (!result.error?.startsWith("gh_missing")) {
-					setInstallError(result.error || "Installation failed");
+					setInstallError(result.error || t("navigation:cliStatus.installFailed"));
 					return;
 				}
 			}
@@ -251,7 +249,7 @@ export function CopilotCliStatusBadge({
 
 			const opened = await openTerminalWithCommand(label, command);
 			if (!opened) {
-				setInstallError("Failed to open terminal");
+				setInstallError(t("navigation:cliStatus.terminalUnavailable"));
 				return;
 			}
 
@@ -261,7 +259,7 @@ export function CopilotCliStatusBadge({
 		} catch (err) {
 			console.error("Failed to install Copilot CLI:", err);
 			setInstallError(
-				err instanceof Error ? err.message : "Installation failed",
+				err instanceof Error ? err.message : t("navigation:cliStatus.installFailed"),
 			);
 		} finally {
 			setIsInstalling(false);
@@ -287,7 +285,7 @@ export function CopilotCliStatusBadge({
 
 		try {
 			if (!globalThis.electronAPI?.setCopilotCliActivePath) {
-				setInstallError("Path switching not available");
+				setInstallError(t("navigation:cliStatus.pathSwitchUnavailable"));
 				return;
 			}
 
@@ -302,12 +300,12 @@ export function CopilotCliStatusBadge({
 					fetchInstallations();
 				}, VERSION_RECHECK_DELAY_MS);
 			} else {
-				setInstallError(result.error || "Failed to switch CLI path");
+				setInstallError(result.error || t("navigation:cliStatus.pathSwitchFailed"));
 			}
 		} catch (err) {
 			console.error("Failed to switch Copilot CLI path:", err);
 			setInstallError(
-				err instanceof Error ? err.message : "Failed to switch CLI path",
+				err instanceof Error ? err.message : t("navigation:cliStatus.pathSwitchFailed"),
 			);
 		} finally {
 			setIsInstalling(false);

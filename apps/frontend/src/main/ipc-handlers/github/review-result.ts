@@ -5,6 +5,7 @@
  * (`server-pr-review.ts`).
  */
 
+import type { LearnedSuppression } from "../../../shared/types/review-feedback";
 import { sanitizeNetworkData } from "./pr-logs";
 
 /**
@@ -28,6 +29,7 @@ export interface PRReviewFinding {
 	endLine?: number;
 	suggestedFix?: string;
 	fixable: boolean;
+	learnedRejections?: number;
 }
 
 /**
@@ -56,6 +58,28 @@ export interface PRReviewResult {
 	hasPostedFindings?: boolean;
 	postedFindingIds?: string[];
 	postedAt?: string;
+	learnedSuppressions?: LearnedSuppression[];
+}
+
+/** The findings the project's feedback removed, kept to their known fields. */
+function learnedSuppressionsFrom(value: unknown): LearnedSuppression[] {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter(
+			(item): item is Record<string, unknown> =>
+				typeof item === "object" &&
+				item !== null &&
+				typeof (item as Record<string, unknown>).title === "string",
+		)
+		.map((item) => ({
+			id: String(item.id ?? ""),
+			title: String(item.title),
+			category: String(item.category ?? ""),
+			severity: String(item.severity ?? ""),
+			file: String(item.file ?? ""),
+			line: typeof item.line === "number" ? item.line : 0,
+			rejections: typeof item.rejections === "number" ? item.rejections : 0,
+		}));
 }
 
 /** A saved review, from the runner's JSON; throws when it is not JSON. */
@@ -78,6 +102,10 @@ export function reviewFromJson(rawData: string): PRReviewResult {
 				endLine: f.end_line,
 				suggestedFix: f.suggested_fix,
 				fixable: f.fixable ?? false,
+				learnedRejections:
+					typeof f.learned_rejections === "number" && f.learned_rejections > 0
+						? f.learned_rejections
+						: undefined,
 			})) ?? [],
 		summary: data.summary ?? "",
 		overallStatus: data.overall_status ?? "comment",
@@ -97,5 +125,6 @@ export function reviewFromJson(rawData: string): PRReviewResult {
 		hasPostedFindings: data.has_posted_findings ?? false,
 		postedFindingIds: data.posted_finding_ids ?? [],
 		postedAt: data.posted_at,
+		learnedSuppressions: learnedSuppressionsFrom(data.learned_suppressions),
 	};
 }

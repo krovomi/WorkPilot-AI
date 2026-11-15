@@ -65,16 +65,6 @@ export interface TestGenerationResult {
 	test_file_path: string;
 }
 
-/**
- * Post-build generation result
- */
-export interface PostBuildResult {
-	source_file: string;
-	tests_generated: number;
-	test_file_path: string;
-	test_file_content: string;
-}
-
 /** What the current (or last) run was asked to do. */
 export type TestRunKind = "analyze" | "unit" | "e2e" | "tdd";
 
@@ -124,7 +114,6 @@ interface TestGenerationState {
 	phase: TestGenerationPhase;
 	status: string;
 	result: TestGenerationResult | null;
-	postBuildResults: PostBuildResult[] | null;
 	/** Message only — kept for consumers that just print something. */
 	error: string | null;
 	/** The same failure with everything the UI needs to explain it. */
@@ -170,7 +159,6 @@ interface TestGenerationState {
 	setResult: (result: TestGenerationResult) => void;
 	/** Keep the card a run wrote to; a run that wrote nothing keeps the last one. */
 	setReview: (review: unknown) => void;
-	setPostBuildResults: (postBuildResults: PostBuildResult[]) => void;
 	setError: (error: TestGenerationError | string) => void;
 	clearError: () => void;
 	retryLastRun: () => void;
@@ -221,17 +209,12 @@ interface TestGenerationState {
 		testDir?: string,
 		testLibraries?: string[],
 	) => Promise<TestGenerationResult>;
-	runPostBuildGeneration: (
-		projectPath: string,
-		modifiedFiles: string[],
-	) => Promise<PostBuildResult[]>;
 }
 
 const initialState = {
 	phase: "idle" as TestGenerationPhase,
 	status: "",
 	result: null,
-	postBuildResults: null,
 	error: null,
 	errorDetail: null as TestGenerationError | null,
 	isOpen: false,
@@ -348,8 +331,6 @@ export const useTestGenerationStore = create<TestGenerationState>(
 			const parsed = parseGeneratedReview(review);
 			if (parsed) set({ review: parsed });
 		},
-		setPostBuildResults: (postBuildResults: PostBuildResult[]) =>
-			set({ postBuildResults }),
 		setError: (error: TestGenerationError | string) => {
 			const detail = normalizeTestGenerationError(
 				error,
@@ -731,27 +712,6 @@ export const useTestGenerationStore = create<TestGenerationState>(
 					testLibraries,
 				);
 			});
-		},
-
-		runPostBuildGeneration: async (
-			projectPath: string,
-			modifiedFiles: string[],
-		) => {
-			const { setPhase, setStatus, setError } = get();
-
-			try {
-				setPhase("generating");
-				setStatus("Running post-build test generation...");
-
-				// Post-build generation is not yet wired via IPC — placeholder for future implementation
-				throw new Error(
-					`Post-build generation for ${projectPath} with ${modifiedFiles.length} file(s) is not yet implemented via IPC`,
-				);
-			} catch (error) {
-				setPhase("error");
-				setError(error instanceof Error ? error.message : "Unknown error");
-				throw error;
-			}
 		},
 	}),
 );
