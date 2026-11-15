@@ -10,7 +10,7 @@ import {
 	blobToBase64,
 	isValidImageMimeType,
 	resolveFilename,
-} from "../../ImageUpload";
+} from "../../../lib/image-attachments";
 
 interface UseImageUploadOptions {
 	projectId: string | null;

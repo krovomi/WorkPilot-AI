@@ -1329,13 +1329,6 @@
 		"checkPath": "Check the path or your access rights.",
 		"dragReferences": "Drag files to add as references"
 	},
-	"imageUpload": {
-		"largeFile": "Large file - consider compressing",
-		"limits": "{{types}} up to 10MB each ({{count}}/{{max}})",
-		"maxImages": "{{max}} images maximum",
-		"dropOrBrowse": "Drop images here or click to browse",
-		"maxReached": "Maximum images reached"
-	},
 	"shortcutsOverlay": {
 		"title": "Keyboard Shortcuts",
 		"pressBefore": "Press",

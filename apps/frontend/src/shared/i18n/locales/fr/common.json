@@ -1329,13 +1329,6 @@
 		"checkPath": "Vérifiez le chemin ou vos droits d'accès.",
 		"dragReferences": "Glissez des fichiers pour les ajouter en référence"
 	},
-	"imageUpload": {
-		"largeFile": "Fichier volumineux : pensez à le compresser",
-		"limits": "{{types}}, 10 Mo max. chacune ({{count}}/{{max}})",
-		"maxImages": "{{max}} images au maximum",
-		"dropOrBrowse": "Déposez des images ici ou cliquez pour parcourir",
-		"maxReached": "Nombre maximal d'images atteint"
-	},
 	"shortcutsOverlay": {
 		"title": "Raccourcis clavier",
 		"pressBefore": "Appuyez sur",
