@@ -38,8 +38,8 @@ export default defineConfig({
 				"src/**/*.d.ts",
 			],
 			// A floor, not a goal: just under what the suite covered on
-			// 15 November 2026 (statements and lines 43.7 %, functions 43.3 %,
-			// branches 38.9 %). CI runs coverage on Linux; raise the floor when
+			// 15 November 2026 (statements and lines 43.4 %, functions 43.4 %,
+			// branches 38.5 %). CI runs coverage on Linux; raise the floor when
 			// the suite grows, never lower it to merge.
 			thresholds: {
 				statements: 43.4,
