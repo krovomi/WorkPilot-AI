@@ -17,7 +17,7 @@ import {
 	writeBudget,
 	writeTaskBudget,
 } from "../cost-budget";
-import { budgetPauseMessage } from "../cost-budget-notify";
+import { backendPauseMessage } from "../backend-pause-notify";
 import type { LedgerUsage } from "../workspace-ledgers";
 
 let project: string;
@@ -138,16 +138,16 @@ describe("writeTaskBudget", () => {
 	});
 });
 
-describe("budgetPauseMessage", () => {
+describe("backendPauseMessage", () => {
 	it("speaks of the task's limit, the project's, or the stall", () => {
-		const task = budgetPauseMessage(
+		const task = backendPauseMessage(
 			{ enabled: true, reason: "budget", budget: { scope: "task", spentUsd: 4.2, limitUsd: 4 } },
 			"Add login",
 			"fr",
 		);
 		expect(task?.title).toBe("Tâche en pause : budget atteint");
 		expect(task?.body).toContain("4.20 USD");
-		const stall = budgetPauseMessage(
+		const stall = backendPauseMessage(
 			{ enabled: true, reason: "budget_stall", budget: { scope: "stall", spentUsd: 3, limitUsd: 2 } },
 			"Add login",
 			"en",
@@ -155,8 +155,20 @@ describe("budgetPauseMessage", () => {
 		expect(stall?.title).toBe("Task paused: no progress");
 	});
 
+	it("names the tool the circuit breaker stopped", () => {
+		const message = backendPauseMessage(
+			{ enabled: true, reason: "tool_loop", breaker: { tool: "Read", repeats: 5, limit: 5 } },
+			"Add login",
+			"fr",
+		);
+		expect(message?.title).toBe("Tâche en pause : coupe-circuit");
+		expect(message?.body).toContain("a appelé Read 5 fois");
+		expect(backendPauseMessage({ enabled: true, reason: "tool_loop" }, "t", "en")).toBeNull();
+	});
+
 	it("says nothing for the user's own pause", () => {
-		expect(budgetPauseMessage({ enabled: true }, "t", "en")).toBeNull();
-		expect(budgetPauseMessage({ enabled: false, reason: "budget" }, "t", "en")).toBeNull();
+		expect(backendPauseMessage({ enabled: true }, "t", "en")).toBeNull();
+		expect(backendPauseMessage({ enabled: true, reason: "kill_switch" }, "t", "en")).toBeNull();
+		expect(backendPauseMessage({ enabled: false, reason: "budget" }, "t", "en")).toBeNull();
 	});
 });

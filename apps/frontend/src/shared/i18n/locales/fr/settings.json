@@ -1600,7 +1600,7 @@
 		"role": "Rôle",
 		"roleMember": "Membre",
 		"roleViewer": "Lecteur",
-		"roleAdmin": "Administrateur",
+		"roleAdmin": "Administrateur du serveur",
 		"create": "Inviter",
 		"emailSent": "Invitation envoyée par email. Vous pouvez aussi partager le lien :",
 		"emailNotSent": "Email non envoyé (SMTP non configuré). Partagez ce lien à usage unique :",

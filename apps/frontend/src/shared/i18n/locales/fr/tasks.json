@@ -2565,5 +2565,11 @@
 		"tooLow": "Le plafond doit dépasser les {{spent}} déjà dépensés",
 		"saveFailed": "Le plafond n'a pas pu être enregistré",
 		"resumed": "Plafond relevé à {{limit}}, la tâche reprend"
+	},
+	"breakerPause": {
+		"chip": "Coupe-circuit : {{tool}}",
+		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
+		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
+		"killSwitch": "Arrêtée par « Arrêter tous les agents »"
 	}
 }

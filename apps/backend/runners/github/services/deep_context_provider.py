@@ -342,12 +342,7 @@ class DeepContextProvider:
     ) -> dict:
         """Gather project patterns and conventions using the Context Builder."""
         try:
-            import sys
-
-            backend_dir = self.project_dir / "apps" / "backend"
-            if backend_dir.exists():
-                sys.path.insert(0, str(backend_dir))
-
+            # WorkPilot's own builder, which reads the project as data.
             from context.builder import ContextBuilder
 
             builder = ContextBuilder(self.project_dir)
