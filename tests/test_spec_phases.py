@@ -252,7 +252,8 @@ class TestPhaseDiscovery:
             "spec.discovery.run_discovery_script", return_value=(True, "Created")
         ):
             with patch(
-                "spec.discovery.get_project_index_stats", return_value={"file_count": 3}
+                "spec.discovery.get_project_index_stats",
+                return_value={"services": ["api"], "project_type": "single"},
             ):
                 result = await executor.phase_discovery()
 
@@ -1112,7 +1113,7 @@ class TestPhaseWorkflow:
         ):
             with patch(
                 "spec.discovery.get_project_index_stats",
-                return_value={"file_count": 10},
+                return_value={"services": [], "project_type": "single"},
             ):
                 await executor.phase_discovery()
 

@@ -481,6 +481,16 @@ class GitHubOrchestrator:
                 flush=True,
             )
 
+            # What this project rejected often enough is downgraded or dropped
+            # here, after the review, so it holds on every provider (#361).
+            from runners.github.services.learned_suppression import (
+                apply_learned_suppressions,
+            )
+
+            findings, learned_suppressions = apply_learned_suppressions(
+                self.project_dir, findings
+            )
+
             self._report_progress(
                 "generating",
                 70,
@@ -596,6 +606,7 @@ class GitHubOrchestrator:
                 # Track file blobs for rebase-resistant follow-up reviews
                 reviewed_file_blobs=file_blobs,
                 deep_context=pr_context.deep_context,
+                learned_suppressions=learned_suppressions,
             )
 
             # Post review if configured
