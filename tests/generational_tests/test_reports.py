@@ -261,3 +261,17 @@ class TestRoutes:
             },
         ).json()
         assert res == {"success": False, "error": "report.unknown_format"}
+
+
+def test_two_captures_in_the_same_clock_tick_stay_newest_first(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Windows' clock moves in ~16 ms steps: both captures can read the same time."""
+    import generational_tests.archive as archive_module
+
+    monkeypatch.setattr(archive_module.time, "time", lambda: 1_800_000_000.0)
+    archive = GenerationalArchive(project_dir=tmp_path)
+    _, outcomes = parse_report(TRX)
+    archive.capture("a-first", outcomes=outcomes)
+    archive.capture("b-second", outcomes=outcomes)
+    assert [g["label"] for g in archive.summaries()] == ["b-second", "a-first"]
