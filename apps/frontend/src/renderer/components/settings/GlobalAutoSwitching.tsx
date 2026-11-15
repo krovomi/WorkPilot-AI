@@ -28,21 +28,6 @@ import {
 	type UnifiedAccount,
 } from "./AccountPriorityList";
 
-/** Profile usage data interface */
-interface ProfileUsageData {
-	readonly sessionPercent?: number;
-	readonly weeklyPercent?: number;
-}
-
-/** Authenticated provider entry for the priority list */
-interface AuthenticatedProvider {
-	id: string;
-	name: string;
-	label: string;
-	isAuthenticated: boolean;
-	username?: string;
-}
-
 interface GlobalAutoSwitchingProps {
 	readonly settings: AppSettings;
 	readonly onSettingsChange: (settings: AppSettings) => void;
@@ -75,12 +60,9 @@ export function GlobalAutoSwitching({
 	// Priority order state
 	const [priorityOrder, setPriorityOrder] = useState<string[]>([]);
 	const [isSavingPriority, setIsSavingPriority] = useState(false);
-	const [profileUsageData] = useState<Map<string, ProfileUsageData>>(new Map());
 
-	// Authenticated providers (Copilot, OpenAI, etc.)
-	const [authenticatedProviders, setAuthenticatedProviders] = useState<
-		AuthenticatedProvider[]
-	>([]);
+	// The GitHub account Copilot is signed in with, shown on its row.
+	const [copilotUsername, setCopilotUsername] = useState<string | undefined>();
 
 	// Unified accounts state
 	const [unifiedAccounts, setUnifiedAccounts] = useState<UnifiedAccount[]>([]);
@@ -110,85 +92,23 @@ export function GlobalAutoSwitching({
 		loadGlobalClaudeProfiles();
 	}, []);
 
-	// Detect authenticated providers on mount and when relevant settings change
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
+	// Read the GitHub account Copilot is signed in with when the section opens.
 	useEffect(() => {
-		const detectAuthenticatedProviders = async () => {
-			const providers: AuthenticatedProvider[] = [];
-
-			// Check Copilot via GitHub CLI
-			try {
-				if (!globalThis.electronAPI?.checkCopilotAuth) {
-					return;
-				}
-
-				const copilotResult = await globalThis.electronAPI.checkCopilotAuth();
-
-				if (copilotResult?.success && copilotResult.data?.authenticated) {
-					const copilotProvider = {
-						id: "copilot", // Use same ID as CleanProviderSection
-						name: "copilot",
-						label: "GitHub Copilot",
-						isAuthenticated: true,
-						username: copilotResult.data.username,
-					};
-					providers.push(copilotProvider);
-				}
-			} catch (err) {
-				console.error(
-					"[GlobalAutoSwitching] Error details:",
-					err instanceof Error ? err.message : String(err),
-				);
-			}
-
-			// Check API-key based providers from settings
-			const apiKeyProviders = [
-				{ name: "openai", label: "OpenAI", key: "globalOpenAIApiKey" },
-				{
-					name: "google",
-					label: "Google (Gemini)",
-					key: "globalGoogleDeepMindApiKey",
-				},
-				{ name: "mistral", label: "Mistral AI", key: "globalMistralApiKey" },
-				{ name: "grok", label: "Grok (xAI)", key: "globalGrokApiKey" },
-				{ name: "deepseek", label: "DeepSeek", key: "globalDeepSeekApiKey" },
-				{ name: "aws", label: "AWS (Bedrock)", key: "globalAWSApiKey" },
-				{ name: "meta", label: "Meta AI", key: "globalMetaApiKey" },
-				{
-					name: "azure-openai",
-					label: "Azure OpenAI",
-					key: "globalOpenAIApiKey",
-				},
-			];
-
-			apiKeyProviders.forEach(({ name, label, key }) => {
-				if (settings[key as keyof AppSettings]) {
-					const provider = {
-						id: name, // Use same ID as CleanProviderSection (without 'provider-' prefix)
-						name,
-						label,
-						isAuthenticated: true,
-					};
-					providers.push(provider);
-				}
+		if (!isOpen) return;
+		let cancelled = false;
+		globalThis.electronAPI
+			.checkCopilotAuth()
+			.then((result) => {
+				if (cancelled) return;
+				setCopilotUsername(result?.success && result.data?.authenticated ? result.data.username : undefined);
+			})
+			.catch((err) => {
+				console.error("[GlobalAutoSwitching] Copilot auth check failed:", err);
 			});
-
-			setAuthenticatedProviders(providers);
+		return () => {
+			cancelled = true;
 		};
-
-		if (isOpen) {
-			detectAuthenticatedProviders();
-		}
-	}, [
-		isOpen,
-		settings.globalOpenAIApiKey,
-		settings.globalGoogleDeepMindApiKey,
-		settings.globalMistralApiKey,
-		settings.globalGrokApiKey,
-		settings.globalDeepSeekApiKey,
-		settings.globalAWSApiKey,
-		settings.globalMetaApiKey,
-	]);
+	}, [isOpen]);
 
 	// Sync autoSwitchEnabled with settings
 	useEffect(() => {
@@ -223,7 +143,6 @@ export function GlobalAutoSwitching({
 
 		// Step 1: OAuth Claude profiles → always displayed as "Anthropic (Claude)"
 		claudeProfiles.forEach((profile) => {
-			const usageData = profileUsageData.get(profile.id);
 			unifiedList.push({
 				id: `oauth-${profile.id}`,
 				name: profile.name,
@@ -234,8 +153,6 @@ export function GlobalAutoSwitching({
 				isNext: false,
 				isAvailable: profile.isAuthenticated ?? false,
 				hasUnlimitedUsage: false,
-				sessionPercent: usageData?.sessionPercent,
-				weeklyPercent: usageData?.weeklyPercent,
 			});
 			representedProviders.add(profile.name);
 			representedProviders.add("anthropic"); // block duplicate API Anthropic entry
@@ -251,10 +168,6 @@ export function GlobalAutoSwitching({
 			);
 		const effectiveStatus = providerStatus ?? fallbackStatus;
 
-		// Copilot username (from async auth check) for a nicer identifier
-		const copilotProvider = authenticatedProviders.find(
-			(p) => p.name === "copilot",
-		);
 		// Matching API profile for URL-based identifier
 		const findApiProfile = (providerName: string) =>
 			apiProfiles.find((p) => {
@@ -280,8 +193,8 @@ export function GlobalAutoSwitching({
 
 			const matchingProfile = findApiProfile(sp.name);
 			const identifier =
-				sp.name === "copilot" && copilotProvider?.username
-					? `@${copilotProvider.username}`
+				sp.name === "copilot" && copilotUsername
+					? `@${copilotUsername}`
 					: matchingProfile?.baseUrl ||
 						matchingProfile?.name ||
 						t("accounts.priority.providerAuth");
@@ -298,8 +211,6 @@ export function GlobalAutoSwitching({
 				isNext: false,
 				isAvailable: true,
 				hasUnlimitedUsage: sp.name !== "copilot",
-				sessionPercent: undefined,
-				weeklyPercent: undefined,
 			});
 			representedProviders.add(sp.name);
 		}
@@ -329,12 +240,20 @@ export function GlobalAutoSwitching({
 	// every render → setUnifiedAccounts → re-render → new function → infinite loop.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: deps are the data buildUnifiedAccounts reads
 	useEffect(() => {
-		buildUnifiedAccounts().then(setUnifiedAccounts);
+		let cancelled = false;
+		buildUnifiedAccounts()
+			.then((accounts) => {
+				if (!cancelled) setUnifiedAccounts(accounts);
+			})
+			.catch((err) => console.error("[GlobalAutoSwitching] Failed to list accounts:", err));
+		return () => {
+			cancelled = true;
+		};
 	}, [
 		claudeProfiles,
 		activeClaudeProfileId,
 		activeApiProfileId,
-		authenticatedProviders,
+		copilotUsername,
 		providerStatus,
 		priorityOrder,
 		apiProfiles,
@@ -354,13 +273,17 @@ export function GlobalAutoSwitching({
 
 	// Save priority order
 	const handlePriorityReorder = async (newOrder: string[]) => {
+		const savedOrder = priorityOrder;
 		setPriorityOrder(newOrder);
 		setIsSavingPriority(true);
 		try {
 			// Save to ClaudeProfileManager (single source of truth)
-			await globalThis.electronAPI.setAccountPriorityOrder(newOrder);
+			const result = await globalThis.electronAPI.setAccountPriorityOrder(newOrder);
+			if (!result.success) throw new Error(result.error);
 		} catch (err) {
 			console.warn("[GlobalAutoSwitching] Failed to save priority order:", err);
+			// The list goes back to the order that is saved, not the one refused.
+			setPriorityOrder(savedOrder);
 			toast({
 				variant: "destructive",
 				title: t("autoSwitching.toast.error"),
@@ -371,15 +294,17 @@ export function GlobalAutoSwitching({
 		}
 	};
 
-	// Load data when section is opened
+	// Load data when section is opened. Only then: loadPriorityOrder is a new
+	// function at every render, and the order it loads renders again, so
+	// depending on it read the order and the profiles again and again, forever.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the section opens, not when its loader changes
 	useEffect(() => {
 		if (isOpen) {
 			loadPriorityOrder();
 			// Also refresh Claude profiles when opening
 			loadGlobalClaudeProfiles();
 		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [isOpen, loadPriorityOrder]);
+	}, [isOpen]);
 
 	const handleToggleAutoSwitch = async (enabled: boolean) => {
 		// Update local state immediately for better UX
@@ -427,40 +352,38 @@ export function GlobalAutoSwitching({
 		}
 	};
 
-	const handleStrategyChange = async (strategy: typeof routingStrategy) => {
-		setRoutingStrategy(strategy);
-		await handleUpdateSetting({ routingStrategy: strategy });
+	const handleStrategyChange = (strategy: typeof routingStrategy) =>
+		handleUpdateSetting({ routingStrategy: strategy });
+
+	// Each value shows at once; one that could not be saved goes back to the
+	// saved value.
+	const applyLocally = (values: Partial<AppSettings>) => {
+		if (values.proactiveEnabled !== undefined) setProactiveEnabled(values.proactiveEnabled);
+		if (values.sessionThreshold !== undefined) setSessionThreshold(values.sessionThreshold);
+		if (values.rateLimitEnabled !== undefined) setRateLimitEnabled(values.rateLimitEnabled);
+		if (values.authFailureEnabled !== undefined) setAuthFailureEnabled(values.authFailureEnabled);
+		if (values.routingStrategy !== undefined) setRoutingStrategy(values.routingStrategy);
 	};
 
 	const handleUpdateSetting = async (updates: Partial<AppSettings>) => {
+		applyLocally(updates);
 		setIsLoading(true);
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 300));
-
-			// Mettre à jour les états locaux
-			if (updates.proactiveEnabled !== undefined)
-				setProactiveEnabled(updates.proactiveEnabled);
-			if (updates.sessionThreshold !== undefined)
-				setSessionThreshold(updates.sessionThreshold);
-			if (updates.rateLimitEnabled !== undefined)
-				setRateLimitEnabled(updates.rateLimitEnabled);
-			if (updates.authFailureEnabled !== undefined)
-				setAuthFailureEnabled(updates.authFailureEnabled);
-
-			// Save to global settings
-			const success = await saveSettings(updates);
-
-			if (success) {
-				// Also propagate to parent
-				onSettingsChange({
-					...settings,
-					...updates,
-				});
-			} else {
-				throw new Error("Failed to save settings");
-			}
+			if (!(await saveSettings(updates))) throw new Error("Failed to save settings");
+			// Also propagate to parent
+			onSettingsChange({
+				...settings,
+				...updates,
+			});
 		} catch (error) {
 			console.error("[GlobalAutoSwitching] Failed to update settings:", error);
+			applyLocally({
+				proactiveEnabled: settings.proactiveEnabled ?? true,
+				sessionThreshold: settings.sessionThreshold ?? 95,
+				rateLimitEnabled: settings.rateLimitEnabled ?? false,
+				authFailureEnabled: settings.authFailureEnabled ?? false,
+				routingStrategy: settings.routingStrategy ?? "best_performance",
+			});
 			toast({
 				variant: "destructive",
 				title: t("settings:autoSwitching.toast.error"),
@@ -471,12 +394,20 @@ export function GlobalAutoSwitching({
 		}
 	};
 
+	// The threshold follows the slider and is saved once it is let go, not
+	// at every step of the drag.
+	const commitSessionThreshold = () => {
+		if (sessionThreshold !== (settings.sessionThreshold ?? 95)) {
+			void handleUpdateSetting({ sessionThreshold });
+		}
+	};
+
 	return (
 		<div className="space-y-6">
 			{/* Master toggle */}
 			<div className="flex items-center justify-between">
 				<div>
-					<Label className="text-sm font-medium">
+					<Label htmlFor="auto-switch-enabled" className="text-sm font-medium">
 						{t("settings:autoSwitching.enableLabel")}
 					</Label>
 					<p className="text-xs text-muted-foreground mt-1">
@@ -484,6 +415,7 @@ export function GlobalAutoSwitching({
 					</p>
 				</div>
 				<Switch
+					id="auto-switch-enabled"
 					checked={autoSwitchEnabled}
 					onCheckedChange={handleToggleAutoSwitch}
 					disabled={isLoading}
@@ -573,7 +505,7 @@ export function GlobalAutoSwitching({
 					<div className="pl-6 space-y-4 pt-2 border-l-2 border-primary/20">
 						<div className="flex items-center justify-between">
 							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
+								<Label htmlFor="auto-switch-proactive" className="text-sm font-medium flex items-center gap-2">
 									<Activity className="h-3.5 w-3.5" />
 									{t("settings:autoSwitching.proactiveMonitoring")}
 								</Label>
@@ -582,6 +514,7 @@ export function GlobalAutoSwitching({
 								</p>
 							</div>
 							<Switch
+								id="auto-switch-proactive"
 								checked={proactiveEnabled}
 								onCheckedChange={(value) =>
 									handleUpdateSetting({ proactiveEnabled: value })
@@ -600,17 +533,16 @@ export function GlobalAutoSwitching({
 							</div>
 							<div className="flex items-center gap-2">
 								<input
+									id="session-threshold"
 									type="range"
 									min={0}
 									max={99}
 									step={1}
 									value={sessionThreshold}
-									onChange={(e) =>
-										handleUpdateSetting({
-											sessionThreshold: Number.parseInt(e.target.value, 10),
-										})
-									}
-									disabled={isLoading}
+									onChange={(e) => setSessionThreshold(Number.parseInt(e.target.value, 10))}
+									onPointerUp={commitSessionThreshold}
+									onKeyUp={commitSessionThreshold}
+									onBlur={commitSessionThreshold}
 									className="flex-1"
 								/>
 							</div>
@@ -622,7 +554,7 @@ export function GlobalAutoSwitching({
 						{/* Rate limit switching */}
 						<div className="flex items-center justify-between">
 							<div>
-								<Label className="text-sm font-medium flex items-center gap-2">
+								<Label htmlFor="auto-switch-rate-limit" className="text-sm font-medium flex items-center gap-2">
 									<AlertCircle className="h-3.5 w-3.5" />
 									{t("settings:autoSwitching.rateLimitSwitching")}
 								</Label>
@@ -631,6 +563,7 @@ export function GlobalAutoSwitching({
 								</p>
 							</div>
 							<Switch
+								id="auto-switch-rate-limit"
 								checked={rateLimitEnabled}
 								onCheckedChange={(value) =>
 									handleUpdateSetting({ rateLimitEnabled: value })
@@ -643,7 +576,7 @@ export function GlobalAutoSwitching({
 					</div>
 					<div className="flex items-center justify-between">
 						<div>
-							<Label className="text-sm font-medium">
+							<Label htmlFor="auto-switch-auth-failure" className="text-sm font-medium">
 								{t("settings:autoSwitching.authFailureSwitching")}
 							</Label>
 							<p className="text-xs text-muted-foreground mt-1">
@@ -651,6 +584,7 @@ export function GlobalAutoSwitching({
 							</p>
 						</div>
 						<Switch
+							id="auto-switch-auth-failure"
 							checked={authFailureEnabled}
 							onCheckedChange={(value) =>
 								handleUpdateSetting({ authFailureEnabled: value })

@@ -31,8 +31,7 @@ import {
 	AlertCircle,
 	Clock,
 	GripVertical,
-	// biome-ignore lint/suspicious/noShadowRestrictedNames: shadow name is intentional
-	Infinity,
+	Infinity as InfinityIcon,
 	Info,
 	Server,
 	Star,
@@ -162,13 +161,15 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 			)}
 		>
 			{/* Drag handle */}
-			<div
+			<button
+				type="button"
 				{...attributes}
 				{...listeners}
+				aria-label={t("accounts.priority.dragHandle", { name: account.displayName })}
 				className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1 -ml-1"
 			>
 				<GripVertical className="h-4 w-4" />
-			</div>
+			</button>
 
 			{/* Priority number */}
 			<div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground shrink-0">
@@ -358,7 +359,7 @@ function SortableAccountItem({ account, index }: SortableAccountItemProps) {
 			{account.type === "api" && (
 				<div className="flex items-center gap-1.5 shrink-0">
 					<span className="text-3xs bg-muted text-muted-foreground px-2 py-1 rounded flex items-center gap-1">
-						<Infinity className="h-3 w-3" />
+						<InfinityIcon className="h-3 w-3" />
 						{t("accounts.priority.payPerUse")}
 					</span>
 				</div>
