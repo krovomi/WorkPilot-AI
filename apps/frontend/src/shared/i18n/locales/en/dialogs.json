@@ -187,7 +187,11 @@
 		"deleteTerminal": "Delete Terminal Worktree?",
 		"deleteTerminalWarning": "This will permanently delete the worktree and its branch. Any uncommitted changes will be lost.",
 		"mergeSuccess": "Merge Successful",
-		"mergeFailed": "Merge Failed"
+		"mergeFailed": "Merge Failed",
+		"loadFailed": "Could not load the worktrees.",
+		"taskNotFound": "No task matches this worktree.",
+		"deleteFailed": "Could not delete the worktree.",
+		"deleteTerminalFailed": "Could not delete the terminal worktree."
 	},
 	"worktreeCleanup": {
 		"title": "Complete Task",

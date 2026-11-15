@@ -187,7 +187,11 @@
 		"deleteTerminal": "Supprimer le worktree de terminal ?",
 		"deleteTerminalWarning": "Le worktree et sa branche seront supprimés définitivement. Les modifications non commitées seront perdues.",
 		"mergeSuccess": "Fusion réussie",
-		"mergeFailed": "Échec de la fusion"
+		"mergeFailed": "Échec de la fusion",
+		"loadFailed": "Impossible de charger les worktrees.",
+		"taskNotFound": "Aucune tâche ne correspond à ce worktree.",
+		"deleteFailed": "Impossible de supprimer le worktree.",
+		"deleteTerminalFailed": "Impossible de supprimer le worktree du terminal."
 	},
 	"worktreeCleanup": {
 		"title": "Terminer la tâche",
