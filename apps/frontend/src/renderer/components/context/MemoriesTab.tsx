@@ -31,6 +31,9 @@ import { MemoryCard } from "./MemoryCard";
 type FilterCategory = keyof typeof memoryFilterCategories;
 
 interface MemoriesTabProps {
+	/** With it, each memory offers pin, forget and its history. */
+	readonly projectId?: string;
+	readonly onMemoryChanged?: () => void;
 	readonly memoryStatus: MemoryStatus | null;
 	readonly memoryState: MemoryState | null;
 	readonly recentMemories: MemoryEpisode[];
@@ -82,6 +85,8 @@ const filterIcons: Record<FilterCategory, React.ElementType> = {
 };
 
 export function MemoriesTab({
+	projectId,
+	onMemoryChanged,
 	memoryStatus,
 	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
 	memoryState,
@@ -407,7 +412,15 @@ export function MemoriesTab({
 					{filteredMemories.length > 0 && (
 						<div className="space-y-3">
 							{filteredMemories.map((memory) => (
-								<MemoryCard key={memory.id} memory={memory} />
+								<MemoryCard
+									key={memory.id}
+									memory={memory}
+									actions={
+										projectId && onMemoryChanged && !memoryStatus?.onServer
+											? { projectId, onChanged: onMemoryChanged }
+											: undefined
+									}
+								/>
 							))}
 						</div>
 					)}

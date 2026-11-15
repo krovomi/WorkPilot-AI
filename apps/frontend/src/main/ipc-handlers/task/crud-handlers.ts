@@ -287,7 +287,9 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 			if (existsSync(sourceSpecPath)) {
 				try {
 					let specContent = readFileSync(sourceSpecPath, "utf-8");
-					specContent = specContent.replace(/^#\s+.*$/m, `# ${finalTitle}`);
+					// A function, so a `$` in the title stays text.
+					const heading = `# ${finalTitle}`;
+					specContent = specContent.replace(/^#\s+.*$/m, () => heading);
 					writeFileSync(
 						path.join(newSpecDir, AUTO_BUILD_PATHS.SPEC_FILE),
 						specContent,
@@ -903,8 +905,11 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 					let specContent = readFileSync(specPath, "utf-8");
 
 					// Update title (first # heading)
+					// Replacements are functions: a `$` in the person's text
+					// ("costs $1", "$&") is text, not a replacement pattern.
 					if (finalTitle !== undefined) {
-						specContent = specContent.replace(/^#\s+.*$/m, `# ${finalTitle}`);
+						const heading = `# ${finalTitle}`;
+						specContent = specContent.replace(/^#\s+.*$/m, () => heading);
 					}
 
 					// Update description (## Overview section content)
@@ -912,7 +917,8 @@ export function registerTaskCRUDHandlers(agentManager: AgentManager): void {
 						// Replace content between ## Overview and the next ## section
 						specContent = specContent.replace(
 							/(## Overview\n)([\s\S]*?)((?=\n## )|$)/,
-							`$1${aiDescription}\n\n$3`,
+							(_match, heading: string, _old: string, next: string) =>
+								`${heading}${aiDescription}\n\n${next}`,
 						);
 					}
 

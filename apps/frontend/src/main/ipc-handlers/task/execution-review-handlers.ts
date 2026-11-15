@@ -3,7 +3,7 @@
  * Split out of execution-handlers.ts (plan of 29 October, N8 A2).
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 
@@ -23,7 +23,7 @@ import { reviewServerCard } from "../../server-board-review";
 import { getToolPath } from "../../cli-tool-manager";
 import { taskStateManager } from "../../task-state-manager";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
-import { findTaskWorktree } from "../../worktree-paths";
+import { findTaskWorktree, isPathWithinBase } from "../../worktree-paths";
 import {
 	buildChangeRequestSubtask,
 	addChangeRequestSubtaskToPlan,
@@ -33,6 +33,66 @@ import { findTaskAndProject } from "./shared";
 import { fixRequestSection } from "../../../shared/utils/review-comments";
 import { updateExistingFile } from "../../utils/existing-file";
 import { type ExecutionHandlerContext } from "./execution-utils";
+
+/**
+ * The entries of `git diff --cached --name-status --no-renames -z`, as paths
+ * the merge added and paths it changed or deleted. git never lists a path
+ * outside the repository; one that would leave `root` is dropped all the
+ * same, since an added path is deleted from the disk.
+ */
+export function parseStagedMerge(
+	output: string,
+	root: string,
+): { added: string[]; changed: string[] } {
+	const fields = output.split("\0").filter(Boolean);
+	const added: string[] = [];
+	const changed: string[] = [];
+	for (let i = 0; i + 1 < fields.length; i += 2) {
+		const file = fields[i + 1];
+		if (!isPathWithinBase(path.join(root, file), root)) continue;
+		(fields[i] === "A" ? added : changed).push(file);
+	}
+	return { added, changed };
+}
+
+/**
+ * Take the changes a stage-only merge (`git merge --no-commit`) staged in the
+ * main project back out: unstage them, restore each changed file to HEAD,
+ * remove each file the merge added, and close the merge. Only the staged
+ * paths are touched.
+ */
+function undoStagedMerge(projectPath: string): void {
+	const git = (args: string[], cwd = projectPath) =>
+		spawnSync(getToolPath("git"), args, {
+			cwd,
+			encoding: "utf-8",
+			stdio: "pipe",
+			env: getIsolatedGitEnv(),
+		});
+	// git names staged paths from the top of the repository, which a project
+	// in a subfolder of it is not.
+	const top = git(["rev-parse", "--show-toplevel"]);
+	if (top.status !== 0) return;
+	const root = top.stdout.trim();
+	const staged = git(["diff", "--cached", "--name-status", "--no-renames", "-z"], root);
+	if (staged.status !== 0) {
+		appLog.warn(`[TASK_REVIEW] Could not list the staged merge: ${staged.stderr}`);
+		return;
+	}
+	const { added, changed } = parseStagedMerge(staged.stdout, root);
+	if (added.length + changed.length > 0) {
+		git(["reset", "-q", "HEAD", "--", ...added, ...changed], root);
+		if (changed.length > 0) git(["checkout", "--", ...changed], root);
+		for (const file of added) rmSync(path.join(root, file), { force: true });
+	}
+	// `merge --no-commit` also left the merge open (MERGE_HEAD): forget it, or
+	// the person's next commit would record the task branch as merged. The
+	// tree and the index stay as they are now.
+	git(["merge", "--quit"], root);
+	appLog.info(
+		`[TASK_REVIEW] Took the staged merge back out of the main project (${changed.length} restored, ${added.length} removed)`,
+	);
+}
 
 export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 	const { agentManager } = ctx;
@@ -50,6 +110,10 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 			images?: ImageAttachment[],
 			commentIds?: unknown,
 		): Promise<IPCResult> => {
+			// The renderer is not trusted: feedback is text or nothing.
+			if (feedback !== undefined && feedback !== null && typeof feedback !== "string") {
+				return { success: false, error: "Invalid feedback" };
+			}
 			const serverCard = findServerCard(taskId);
 			if (serverCard) {
 				return reviewServerCard(serverCard, approved, feedback, images);
@@ -93,54 +157,13 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 					project,
 				);
 			} else {
-				// Reset and discard all changes from worktree merge in main
-				// The worktree still has all changes, so nothing is lost
-				if (hasWorktree) {
-					// Step 1: Unstage all changes
-					const resetResult = spawnSync(getToolPath("git"), ["reset", "HEAD"], {
-						cwd: project.path,
-						encoding: "utf-8",
-						stdio: "pipe",
-						env: getIsolatedGitEnv(),
-					});
-					if (resetResult.status === 0) {
-						appLog.info("[TASK_REVIEW] Unstaged changes in main");
-					}
-
-					// Step 2: Discard all working tree changes (restore to pre-merge state)
-					const checkoutResult = spawnSync(
-						getToolPath("git"),
-						["checkout", "--", "."],
-						{
-							cwd: project.path,
-							encoding: "utf-8",
-							stdio: "pipe",
-							env: getIsolatedGitEnv(),
-						},
-					);
-					if (checkoutResult.status === 0) {
-						appLog.info("[TASK_REVIEW] Discarded working tree changes in main");
-					}
-
-					// Step 3: Clean untracked files that came from the merge
-					// IMPORTANT: Exclude .workpilot directory to preserve specs and worktree data
-					const cleanResult = spawnSync(
-						getToolPath("git"),
-						["clean", "-fd", "-e", ".workpilot"],
-						{
-							cwd: project.path,
-							encoding: "utf-8",
-							stdio: "pipe",
-							env: getIsolatedGitEnv(),
-						},
-					);
-					if (cleanResult.status === 0) {
-						appLog.info(
-							"[TASK_REVIEW] Cleaned untracked files in main (excluding .workpilot)",
-						);
-					}
-
-					appLog.info("[TASK_REVIEW] Main branch restored to pre-merge state");
+				// A stage-only merge left this task's changes staged in the main
+				// project: take exactly those back out. Nothing else in the main
+				// project is touched: the person's own edits and untracked files
+				// are theirs (this used to reset, check out and clean the whole
+				// tree whenever a worktree existed, staged merge or not).
+				if (task.stagedInMainProject) {
+					undoStagedMerge(project.path);
 				}
 
 				// Write feedback for QA fixer - write to WORKTREE spec dir if it exists
@@ -165,9 +188,7 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 				if (images && images.length > 0) {
 					const imagesDir = path.join(targetSpecDir, "feedback_images");
 					try {
-						if (!existsSync(imagesDir)) {
-							mkdirSync(imagesDir, { recursive: true });
-						}
+						mkdirSync(imagesDir, { recursive: true });
 						const savedImages: string[] = [];
 						for (const image of images) {
 							try {
@@ -285,45 +306,39 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 				// (origin: "change_request"). This is created unconditionally — even
 				// when there is no worktree or no files have changed yet — so a request
 				// always leaves a trace.
-				try {
-					const changeRequestSubtask = buildChangeRequestSubtask(
-						feedback || "Needs fixes based on user feedback",
-					);
+				// It cannot fail the review: each plan write reports its own failure.
+				const changeRequestSubtask = buildChangeRequestSubtask(
+					feedback || "Needs fixes based on user feedback",
+				);
 
-					// Write the trace to BOTH plans:
-					//  - the worktree plan, which the agent actually reads/updates;
-					//  - the MAIN project plan, which the Subtasks tab watches. The
-					//    worktree plan is only synced back to the main one after QA, so
-					//    without this second write the new subtask would not appear in
-					//    the UI until much later (the reported "no new coloured subtask").
-					// The subtask carries no files at creation — its real changes are
-					// captured in files_changed by the backend once the agent runs.
-					const worktreePlanPath = path.join(
-						hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
-						AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
-					);
-					const mainPlanPath = path.join(
-						specDir,
-						AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
-					);
+				// Write the trace to BOTH plans:
+				//  - the worktree plan, which the agent actually reads/updates;
+				//  - the MAIN project plan, which the Subtasks tab watches. The
+				//    worktree plan is only synced back to the main one after QA, so
+				//    without this second write the new subtask would not appear in
+				//    the UI until much later (the reported "no new coloured subtask").
+				// The subtask carries no files at creation — its real changes are
+				// captured in files_changed by the backend once the agent runs.
+				const worktreePlanPath = path.join(
+					hasWorktree && worktreeSpecDir ? worktreeSpecDir : specDir,
+					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
+				);
+				const mainPlanPath = path.join(
+					specDir,
+					AUTO_BUILD_PATHS.IMPLEMENTATION_PLAN,
+				);
 
-					const wrote = addChangeRequestSubtaskToPlan(
-						worktreePlanPath,
-						changeRequestSubtask,
-					);
-					if (path.resolve(mainPlanPath) !== path.resolve(worktreePlanPath)) {
-						addChangeRequestSubtaskToPlan(mainPlanPath, changeRequestSubtask);
-					}
-
-					appLog.info(
-						`[TASK_REVIEW] Recorded change-request subtask (${changeRequestSubtask.id}, written=${wrote})`,
-					);
-				} catch (subtaskError) {
-					// Don't fail the review - continue with QA process
-					appLog.warn(
-						`[TASK_REVIEW] Failed to record change-request subtask: ${subtaskError instanceof Error ? subtaskError.message : String(subtaskError)}`,
-					);
+				const wrote = addChangeRequestSubtaskToPlan(
+					worktreePlanPath,
+					changeRequestSubtask,
+				);
+				if (path.resolve(mainPlanPath) !== path.resolve(worktreePlanPath)) {
+					addChangeRequestSubtaskToPlan(mainPlanPath, changeRequestSubtask);
 				}
+
+				appLog.info(
+					`[TASK_REVIEW] Recorded change-request subtask (${changeRequestSubtask.id}, written=${wrote})`,
+				);
 
 				// Re-open the plan for another pass WITHOUT re-running work that
 				// already passed. A "Request Changes" is a follow-up: the agent should
@@ -359,6 +374,9 @@ export function registerTaskReviewHandlers(ctx: ExecutionHandlerContext): void {
 								}
 							}
 						}
+						// The staged merge, if any, was taken back out above.
+						delete resetPlan.stagedInMainProject;
+						delete resetPlan.stagedAt;
 						// Reset QA signoff so QA re-validates the task after the change.
 						if (resetPlan.qa_signoff) {
 							resetPlan.qa_signoff.status = "pending";
