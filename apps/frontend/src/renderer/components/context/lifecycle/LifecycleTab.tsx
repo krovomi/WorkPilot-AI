@@ -1,0 +1,147 @@
+import { AlertTriangle, GitMerge, History, Pin, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { formatAppDateTime } from "../../../lib/date-format";
+import { Badge } from "../../ui/badge";
+import { Button } from "../../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
+import { ScrollArea } from "../../ui/scroll-area";
+import { ConflictResolver } from "./ConflictResolver";
+import { errorLabel, shortPath } from "./lifecycle-labels";
+import { MemoryTimeline } from "./MemoryTimeline";
+import { useMemoryLifecycle } from "./useMemoryLifecycle";
+
+interface LifecycleTabProps {
+	readonly projectId: string;
+	/** A server project's memory: its lifecycle is not served yet. */
+	readonly onServer?: boolean;
+}
+
+/** The memory's journal, its trash and the sync conflicts to resolve. */
+export function LifecycleTab({ projectId, onServer = false }: LifecycleTabProps) {
+	const { t } = useTranslation(["context"]);
+	const { view, loading, error, reload } = useMemoryLifecycle(onServer ? "" : projectId);
+	const [notice, setNotice] = useState<string | null>(null);
+
+	if (onServer) {
+		return (
+			<div className="mx-auto max-w-5xl px-5 pt-2 text-sm text-muted-foreground">
+				{t("context:lifecycle.serverProject")}
+			</div>
+		);
+	}
+
+	const restore = async (trashId: string) => {
+		const result = await window.electronAPI.restoreMemory(projectId, trashId);
+		if (!result.success) {
+			setNotice(errorLabel(t, result.error));
+		} else if (result.data && result.data.contradicts.length > 0) {
+			setNotice(t("context:lifecycle.trash.contradicts", { count: result.data.contradicts.length }));
+		} else {
+			setNotice(t("context:lifecycle.trash.restored"));
+		}
+		await reload();
+	};
+
+	const expiring = view?.trash.filter((item) => item.expiring_soon).length ?? 0;
+
+	return (
+		<ScrollArea className="h-full">
+			<div className="mx-auto max-w-5xl space-y-5 px-5 pt-2 pb-6" data-testid="memory-lifecycle">
+				<div className="flex items-center justify-between gap-2">
+					{view && (
+						<Badge variant="outline" className="gap-1">
+							<Pin className="h-3 w-3" />
+							{t("context:lifecycle.pins", { count: view.pinned, limit: view.pinLimit })}
+						</Badge>
+					)}
+					<Button variant="ghost" size="sm" className="ml-auto gap-1" disabled={loading} onClick={reload}>
+						<RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+						{t("context:lifecycle.refresh")}
+					</Button>
+				</div>
+				{error && (
+					<p role="alert" className="text-sm text-destructive">
+						{t("context:lifecycle.error", { error: errorLabel(t, error) })}
+					</p>
+				)}
+				{notice && (
+					<p role="status" className="text-sm text-muted-foreground">
+						{notice}
+					</p>
+				)}
+
+				<section className="space-y-3">
+					<h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+						<GitMerge className="h-4 w-4" />
+						{t("context:lifecycle.conflicts.title")}
+					</h3>
+					{view && view.conflicts.length === 0 && (
+						<p className="text-xs text-muted-foreground">{t("context:lifecycle.conflicts.empty")}</p>
+					)}
+					{view?.conflicts.map((conflict) => (
+						<ConflictResolver
+							key={conflict.id}
+							projectId={projectId}
+							conflict={conflict}
+							onResolved={reload}
+						/>
+					))}
+				</section>
+
+				<Card>
+					<CardHeader className="pb-3">
+						<CardTitle className="flex items-center gap-2 text-base">
+							<Trash2 className="h-4 w-4" />
+							{t("context:lifecycle.trash.title")}
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						{expiring > 0 && (
+							<p className="flex items-center gap-2 text-xs text-warning">
+								<AlertTriangle className="h-3.5 w-3.5" />
+								{t("context:lifecycle.trash.expiring", { count: expiring })}
+							</p>
+						)}
+						{view && view.trash.length === 0 && (
+							<p className="text-xs text-muted-foreground">{t("context:lifecycle.trash.empty")}</p>
+						)}
+						{view?.trash.map((item) => (
+							<div
+								key={item.id}
+								className="flex items-start justify-between gap-3 rounded-lg border border-border/50 p-3"
+							>
+								<div className="min-w-0 space-y-1 text-xs">
+									<div className="font-medium text-foreground">{item.title || item.preview}</div>
+									<code className="text-muted-foreground">{shortPath(item.path)}</code>
+									<div className="text-muted-foreground">
+										{t("context:lifecycle.trash.until", {
+											date: formatAppDateTime(item.restore_until),
+										})}
+									</div>
+									{item.reason && <div className="italic text-muted-foreground">{item.reason}</div>}
+								</div>
+								<Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => restore(item.id)}>
+									<RotateCcw className="h-3.5 w-3.5" />
+									{t("context:lifecycle.trash.restore")}
+								</Button>
+							</div>
+						))}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className="pb-3">
+						<CardTitle className="flex items-center gap-2 text-base">
+							<History className="h-4 w-4" />
+							{t("context:lifecycle.journal.title")}
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{view && <MemoryTimeline entries={view.journal} showNote />}
+					</CardContent>
+				</Card>
+			</div>
+		</ScrollArea>
+	);
+}

@@ -26,13 +26,23 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from cryptography.fernet import Fernet
 
 from tests.server_e2e import stack as e2e
+from tests.server_e2e.fake_backend.fake_agent import RELEASE_FILE, REPORT_FILE
 
 PROJECT_NAME = "Team Board"
+
+#: A guide that cites a function the code does not have: the documentation
+#: drift the team's analysis finds (``docs-drift`` scenario of the app's spec).
+DRIFTED_GUIDE = (
+    "# Usage\n\nCall `greet_everyone()` from `app.py` to welcome the whole team.\n"
+)
 
 
 def _seed(
@@ -77,6 +87,33 @@ def _seed(
 PEOPLE = ("alice", "bob", "carol")
 
 
+@contextmanager
+def runs_released(repos_root: Path) -> Iterator[None]:
+    """Let every run of the fake agent finish as soon as it starts.
+
+    The fake agent works until a test drops ``e2e-release`` in its spec
+    directory (``fake_backend/fake_agent.py``), so that the two-organization
+    test can follow a run while it is running. Here nobody holds a run back:
+    the apps see it start, write its spec and end, as with a fast model.
+    """
+    done = threading.Event()
+
+    def release() -> None:
+        while not done.wait(0.5):
+            for report in repos_root.glob(f"*/.workpilot/specs/*/{REPORT_FILE}"):
+                release_file = report.with_name(RELEASE_FILE)
+                if not release_file.exists():
+                    release_file.write_text("", encoding="utf-8")
+
+    thread = threading.Thread(target=release, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        done.set()
+        thread.join(timeout=5)
+
+
 def _read_passwords() -> dict[str, str]:
     """The spec's passwords, one JSON line on standard input."""
     given = json.loads(sys.stdin.readline() or "{}")
@@ -99,7 +136,7 @@ def main() -> int:
     root = Path(tempfile.mkdtemp(prefix="workpilot-app-e2e-"))
     try:
         forge = root / "forge"
-        e2e.make_origin_repo(forge)
+        e2e.make_origin_repo(forge, {"docs/usage.md": DRIFTED_GUIDE})
         database = os.environ.get("WORKPILOT_E2E_DATABASE_URL") or (
             f"sqlite+aiosqlite:///{(root / 'server.db').as_posix()}"
         )
@@ -113,7 +150,7 @@ def main() -> int:
         for key in PEOPLE:
             people[key].password = passwords[key]
         e2e.create_platform_admin(env, people["platform"])
-        with e2e.serve_directory(forge) as forge_url:
+        with e2e.serve_directory(forge) as forge_url, runs_released(root / "repos"):
             st = e2e.Stack(env, root)
             try:
                 st.start()

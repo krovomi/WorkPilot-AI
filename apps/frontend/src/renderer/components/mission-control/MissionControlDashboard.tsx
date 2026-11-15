@@ -20,6 +20,7 @@ import {
 	Stat,
 	Stats,
 } from "../charter";
+import { WavesView } from "../conflict-predictor/WavesView";
 import { AddAgentDialog, AgentEventLog, AgentPanel, DecisionTreeViewer } from "./index";
 
 const FEATURES = [
@@ -134,6 +135,8 @@ export function MissionControlDashboard() {
 							))}
 						</div>
 					</Section>
+					{/* The specs of the board, run wave after wave (#358). */}
+					<WavesView />
 				</Page>
 			</ModuleStage>
 		);
@@ -234,6 +237,8 @@ export function MissionControlDashboard() {
 						</Section>
 					</div>
 				)}
+
+				<WavesView />
 			</Page>
 			<AddAgentDialog open={showAddAgent} onOpenChange={setShowAddAgent} onAdd={handleAddAgent} />
 		</ModuleStage>

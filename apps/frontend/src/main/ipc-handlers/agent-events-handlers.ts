@@ -26,7 +26,7 @@ import type {
 } from "../agent";
 import type { TaskEventPayload } from "../agent/task-event-schema";
 import { getClaudeProfileManager } from "../claude-profile-manager";
-import { announceBudgetPause } from "../cost-budget-notify";
+import { announceBackendPause } from "../backend-pause-notify";
 import { fileWatcher } from "../file-watcher";
 import { taskStateManager } from "../task-state-manager";
 import { titleGenerator } from "../title-generator";
@@ -447,8 +447,8 @@ export function registerAgenteventsHandlers(
 			} else if (!isPaused) {
 				taskStateManager.handleProcessExited(taskId, code, exitTask, exitProject);
 			} else if (exitTask && exitProject) {
-				// The backend pauses a task itself when its cost budget says so.
-				announceBudgetPause(
+				// The backend pauses a task itself: its cost budget, or the circuit breaker.
+				announceBackendPause(
 					exitProject.id,
 					path.dirname(getPlanPath(exitProject, exitTask)),
 					exitTask.title,
