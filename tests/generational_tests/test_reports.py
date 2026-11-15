@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from generational_tests import GenerationalArchive, TestStatus
+from generational_tests import archive as archive_module
 from generational_tests.api import router
 from generational_tests.reports import (
     MAX_REPORT_CHARS,
@@ -194,7 +196,14 @@ def test_a_report_too_large_is_refused(tmp_path: Path) -> None:
         parse_report_file(big)
 
 
-def test_summaries_give_counts_newest_first(tmp_path: Path) -> None:
+def test_summaries_give_counts_newest_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two captures can fall in the same clock tick (Windows): give each its own time.
+    ticks = iter([1_000.0, 2_000.0])
+    monkeypatch.setattr(
+        archive_module, "time", SimpleNamespace(time=lambda: next(ticks))
+    )
     archive = GenerationalArchive(project_dir=tmp_path)
     _, outcomes = parse_report(TRX)
     archive.capture("v1", outcomes=outcomes, junit_source="trx:abc")
