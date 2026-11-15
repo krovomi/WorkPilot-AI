@@ -325,8 +325,6 @@
 		"noSubtasks": "Aucune sous-tâche définie",
 		"noSubtasksHint": "Les sous-tâches d'implémentation apparaîtront ici après la planification",
 		"editFiles": "Modifier les fichiers",
-		"filesDeleted": "{{count}} fichier(s) supprimé(s)",
-		"filesModified": "{{count}} fichier(s) modifié(s)",
 		"saveChanges": "Enregistrer les modifications",
 		"subtasksCompleted": "{{completed}}/{{total}} sous-tâches terminées",
 		"noSubtasksYet": "Aucune sous-tâche pour l'instant"
