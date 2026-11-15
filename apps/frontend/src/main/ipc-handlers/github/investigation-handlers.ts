@@ -18,7 +18,13 @@ import {
 	createSpecForIssue,
 } from "./spec-utils";
 import type { GitHubAPIComment } from "./types";
-import { getGitHubConfig, githubFetch } from "./utils";
+import {
+	getGitHubConfig,
+	githubFetch,
+	isRepoFullName,
+	issueNumberArg,
+	normalizeRepoReference,
+} from "./utils";
 
 /**
  * Send investigation progress update to renderer
@@ -77,11 +83,18 @@ export function registerInvestigateIssue(
 		async (
 			_,
 			projectId: string,
-			issueNumber: number,
-			selectedCommentIds?: number[],
+			issueNumberValue: unknown,
+			selectedCommentIds?: unknown,
 		) => {
 			const mainWindow = getMainWindow();
 			if (!mainWindow) return;
+
+			// The renderer is not trusted: the number becomes part of an API path.
+			const issueNumber = issueNumberArg(issueNumberValue);
+			if (issueNumber === null) {
+				sendError(mainWindow, projectId, "Invalid issue number");
+				return;
+			}
 
 			const project = projectStore.getProject(projectId);
 			if (!project) {
@@ -99,6 +112,16 @@ export function registerInvestigateIssue(
 				return;
 			}
 
+			const repo = normalizeRepoReference(config.repo);
+			if (!isRepoFullName(repo)) {
+				sendError(
+					mainWindow,
+					projectId,
+					"Invalid repository format. Use owner/repo or GitHub URL.",
+				);
+				return;
+			}
+
 			try {
 				// Phase 1: Fetching issue details
 				sendProgress(mainWindow, projectId, {
@@ -111,7 +134,7 @@ export function registerInvestigateIssue(
 				// Fetch the issue
 				const issue = (await githubFetch(
 					config.token,
-					`/repos/${config.repo}/issues/${issueNumber}`,
+					`/repos/${repo}/issues/${issueNumber}`,
 				)) as {
 					number: number;
 					title: string;
@@ -123,7 +146,7 @@ export function registerInvestigateIssue(
 				// Fetch issue comments for more context
 				const allComments = (await githubFetch(
 					config.token,
-					`/repos/${config.repo}/issues/${issueNumber}/comments`,
+					`/repos/${repo}/issues/${issueNumber}/comments`,
 				)) as GitHubAPIComment[];
 
 				// Filter comments based on selection (if provided)

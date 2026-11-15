@@ -17,14 +17,18 @@ from .validation_models import ValidationResult
 # Patterns that indicate destructive SQL operations.
 # Order matters slightly: tautology-DELETE rules must run alongside the
 # bare-DELETE rule because the latter alone misses `DELETE FROM x WHERE 1=1`.
+# A table name as SQL writes it: `users`, `public.users`, `"Users"`,
+# `` `users` ``, `[dbo].[users]`.
+_TABLE = r"[\w.\"`\[\]]+"
+
 DESTRUCTIVE_SQL_PATTERNS = [
     r"\bDROP\s+(DATABASE|SCHEMA|TABLE|INDEX|VIEW|FUNCTION|PROCEDURE|TRIGGER)\b",
-    r"\bTRUNCATE\s+(TABLE\s+)?\w+",
-    r"\bDELETE\s+FROM\s+\w+\s*(;|$)",  # DELETE without WHERE clause
+    rf"\bTRUNCATE\s+(TABLE\s+)?{_TABLE}",
+    rf"\bDELETE\s+FROM\s+{_TABLE}\s*(;|$)",  # DELETE without WHERE clause
     # Tautological WHERE clauses commonly used to bypass the rule above.
-    r"\bDELETE\s+FROM\s+\w+\s+WHERE\s+1\s*=\s*1\b",
-    r"\bDELETE\s+FROM\s+\w+\s+WHERE\s+TRUE\b",
-    r"\bDELETE\s+FROM\s+\w+\s+WHERE\s+\w+\s+IS\s+NOT\s+NULL\s*(;|$)",
+    rf"\bDELETE\s+FROM\s+{_TABLE}\s+WHERE\s+1\s*=\s*1\b",
+    rf"\bDELETE\s+FROM\s+{_TABLE}\s+WHERE\s+TRUE\b",
+    rf"\bDELETE\s+FROM\s+{_TABLE}\s+WHERE\s+\w+\s+IS\s+NOT\s+NULL\s*(;|$)",
     r"\bDROP\s+ALL\b",
     r"\bDESTROY\b",
 ]
@@ -158,10 +162,6 @@ def validate_dropdb_command(command_string: str) -> ValidationResult:
             "--port",
             "-U",
             "--username",
-            "-w",
-            "--no-password",
-            "-W",
-            "--password",
             "--maintenance-db",
         ):
             skip_next = True
@@ -214,10 +214,6 @@ def validate_dropuser_command(command_string: str) -> ValidationResult:
             "--port",
             "-U",
             "--username",
-            "-w",
-            "--no-password",
-            "-W",
-            "--password",
         ):
             skip_next = True
             continue
@@ -274,28 +270,23 @@ def validate_psql_command(command_string: str) -> ValidationResult:
     # Note: SQL passed via -f file or stdin is NOT statically scanned here —
     # those forms read external content, which we cannot validate without
     # also reading the file. Reject -f to keep the surface tight.
-    sql_command = None
+    # psql runs every `-c` in turn: each one is scanned.
+    sql_commands: list[str] = []
     for i, token in enumerate(tokens):
-        if token == "-c" and i + 1 < len(tokens):
-            sql_command = tokens[i + 1]
-            break
-        if token == "--command" and i + 1 < len(tokens):
-            sql_command = tokens[i + 1]
-            break
-        if token.startswith("--command="):
-            sql_command = token[len("--command=") :]
-            break
-        if token.startswith("-c") and len(token) > 2:
+        if token in ("-c", "--command") and i + 1 < len(tokens):
+            sql_commands.append(tokens[i + 1])
+        elif token.startswith("--command="):
+            sql_commands.append(token[len("--command=") :])
+        elif token.startswith("-c") and len(token) > 2:
             # Handle -c"SQL" / -cSELECT… format
-            sql_command = token[2:]
-            break
-        if token in ("-f", "--file") or token.startswith("--file="):
+            sql_commands.append(token[2:])
+        elif token in ("-f", "--file") or token.startswith("--file="):
             return False, (
                 "psql -f / --file is not allowed: SQL files cannot be statically "
                 "scanned for destructive operations. Use -c '<safe SQL>' instead."
             )
 
-    if sql_command:
+    for sql_command in sql_commands:
         is_destructive, matched = _contains_destructive_sql(sql_command)
         if is_destructive:
             return False, (
@@ -330,19 +321,16 @@ def validate_mysql_command(command_string: str) -> ValidationResult:
         return False, "Empty mysql command"
 
     # Look for -e flag (execute command)
-    sql_command = None
+    sql_commands: list[str] = []
     for i, token in enumerate(tokens):
-        if token == "-e" and i + 1 < len(tokens):
-            sql_command = tokens[i + 1]
-            break
-        if token.startswith("-e"):
-            sql_command = token[2:]
-            break
-        if token == "--execute" and i + 1 < len(tokens):
-            sql_command = tokens[i + 1]
-            break
+        if token in ("-e", "--execute") and i + 1 < len(tokens):
+            sql_commands.append(tokens[i + 1])
+        elif token.startswith("--execute="):
+            sql_commands.append(token[len("--execute=") :])
+        elif token.startswith("-e") and len(token) > 2:
+            sql_commands.append(token[2:])
 
-    if sql_command:
+    for sql_command in sql_commands:
         is_destructive, matched = _contains_destructive_sql(sql_command)
         if is_destructive:
             return False, (
@@ -388,6 +376,42 @@ def validate_mysqladmin_command(command_string: str) -> ValidationResult:
 # REDIS VALIDATORS
 # =============================================================================
 
+# redis-cli options that take the next token as their value (redis-cli --help).
+_REDIS_VALUE_FLAGS = {
+    "-h",
+    "-p",
+    "-s",
+    "-a",
+    "-u",
+    "-r",
+    "-i",
+    "-n",
+    "-d",
+    "-D",
+    "-X",
+    "-t",
+    "--user",
+    "--pass",
+    "--sni",
+    "--cacert",
+    "--cacertdir",
+    "--cert",
+    "--key",
+    "--tls-ciphers",
+    "--tls-ciphersuites",
+    "--pattern",
+    "--quoted-pattern",
+    "--count",
+    "--rdb",
+    "--functions-rdb",
+    "--pipe-timeout",
+    "--memkeys-samples",
+    "--intrinsic-latency",
+    "--lru-test",
+}
+# Options that run commands from elsewhere: a Lua file, stdin, cluster admin.
+_REDIS_REFUSED_FLAGS = {"--eval", "--pipe", "--cluster"}
+
 
 def validate_redis_cli_command(command_string: str) -> ValidationResult:
     """
@@ -429,9 +453,14 @@ def validate_redis_cli_command(command_string: str) -> ValidationResult:
             skip_next = False
             continue
         # Flags that take arguments
-        if token in ("-h", "-p", "-a", "-n", "--pass", "--user", "-u"):
+        if token in _REDIS_VALUE_FLAGS:
             skip_next = True
             continue
+        if token in _REDIS_REFUSED_FLAGS:
+            return False, (
+                f"redis-cli {token} is blocked for safety: it runs commands "
+                f"this check cannot read. Pass the Redis command itself."
+            )
         if token.startswith("-"):
             continue
 
@@ -482,13 +511,14 @@ def validate_mongosh_command(command_string: str) -> ValidationResult:
         return False, "Empty mongosh command"
 
     # Look for --eval flag
-    eval_script = None
+    scripts: list[str] = []
     for i, token in enumerate(tokens):
         if token == "--eval" and i + 1 < len(tokens):
-            eval_script = tokens[i + 1]
-            break
+            scripts.append(tokens[i + 1])
+        elif token.startswith("--eval="):
+            scripts.append(token[len("--eval=") :])
 
-    if eval_script:
+    for eval_script in scripts:
         for pattern in dangerous_mongo_patterns:
             if re.search(pattern, eval_script, re.IGNORECASE):
                 return False, (

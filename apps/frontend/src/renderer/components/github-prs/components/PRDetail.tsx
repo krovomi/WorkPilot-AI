@@ -1414,6 +1414,9 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 								selectedIds={selectedFindingIds}
 								postedIds={postedFindingIds}
 								onSelectionChange={setSelectedFindingIds}
+								projectId={projectId}
+								prNumber={pr.number}
+								learnedSuppressions={reviewResult.learnedSuppressions}
 							/>
 						</div>
 					</CollapsibleCard>

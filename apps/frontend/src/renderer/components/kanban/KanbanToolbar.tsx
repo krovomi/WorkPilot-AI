@@ -256,7 +256,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 							{PRIORITY_OPTIONS.map((priority) => (
 								<FilterChip
 									key={priority}
-									label={TASK_PRIORITY_LABELS[priority]}
+									label={t(`form.classification.values.priority.${priority}`)}
 									active={filters.priorities.includes(priority)}
 									activeClassName={TASK_PRIORITY_COLORS[priority]}
 									onToggle={() => togglePriority(priority)}
@@ -272,7 +272,7 @@ export function KanbanToolbar({ projectPath }: KanbanToolbarProps) {
 							{CATEGORY_OPTIONS.map((category) => (
 								<FilterChip
 									key={category}
-									label={TASK_CATEGORY_LABELS[category]}
+									label={t(`form.classification.values.category.${category}`)}
 									active={filters.categories.includes(category)}
 									activeClassName={TASK_CATEGORY_COLORS[category]}
 									onToggle={() => toggleCategory(category)}

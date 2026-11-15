@@ -375,11 +375,10 @@ async def run_ai_complexity_assessment(
     """
     assessment_file = spec_dir / "complexity_assessment.json"
 
-    # Prepare context for the AI
-    context = f"""
-**Project Directory**: {spec_dir.parent.parent}
-**Spec Directory**: {spec_dir}
-"""
+    # Prepare context for the AI. The runner states the project and spec
+    # directories; this used to add a "Project Directory" of its own,
+    # spec_dir.parent.parent, which is the project's .workpilot/ folder.
+    context = ""
 
     # Load requirements if available
     requirements_file = spec_dir / "requirements.json"

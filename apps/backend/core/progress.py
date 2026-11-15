@@ -32,6 +32,31 @@ from ui import (
 )
 
 
+def _read_plan(spec_dir: Path) -> dict | None:
+    """The spec's implementation_plan.json, or None if absent or unreadable."""
+    try:
+        with open(spec_dir / "implementation_plan.json", encoding="utf-8") as f:
+            plan = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return plan if isinstance(plan, dict) else None
+
+
+def _count_done(plan: dict) -> tuple[int, int]:
+    """(done, total) subtasks of `plan`.
+
+    "blocked" counts as done: a blocked subtask (an e2e test that needs a
+    person, say) cannot be processed by the agent, so it must not keep the
+    build from reaching QA / human_review.
+    """
+    statuses = [
+        subtask.get("status")
+        for phase in plan.get("phases", [])
+        for subtask in phase.get("subtasks", [])
+    ]
+    return sum(s in ("completed", "blocked") for s in statuses), len(statuses)
+
+
 def count_subtasks(spec_dir: Path) -> tuple[int, int]:
     """
     Count completed and total subtasks in implementation_plan.json.
@@ -42,32 +67,8 @@ def count_subtasks(spec_dir: Path) -> tuple[int, int]:
     Returns:
         (completed_count, total_count)
     """
-    plan_file = spec_dir / "implementation_plan.json"
-
-    if not plan_file.exists():
-        return 0, 0
-
-    try:
-        with open(plan_file, encoding="utf-8") as f:
-            plan = json.load(f)
-
-        total = 0
-        completed = 0
-
-        for phase in plan.get("phases", []):
-            for subtask in phase.get("subtasks", []):
-                total += 1
-                status = subtask.get("status")
-                # Count both "completed" and "blocked" as done.
-                # Blocked subtasks (e.g., e2e tests requiring manual execution)
-                # cannot be processed by the agent, so they should not prevent
-                # the build from progressing to QA / human_review.
-                if status in ("completed", "blocked"):
-                    completed += 1
-
-        return completed, total
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0, 0
+    plan = _read_plan(spec_dir)
+    return _count_done(plan) if plan is not None else (0, 0)
 
 
 def count_subtasks_detailed(spec_dir: Path) -> dict:
@@ -176,75 +177,62 @@ def print_session_header(
 
 def print_progress_summary(spec_dir: Path, show_next: bool = True) -> None:
     """Print a summary of current progress with enhanced formatting."""
-    completed, total = count_subtasks(spec_dir)
+    plan = _read_plan(spec_dir)
+    completed, total = _count_done(plan) if plan is not None else (0, 0)
 
-    if total > 0:
-        print()
-        # Progress bar
-        print(f"Progress: {progress_bar(completed, total, width=40)}")
-
-        # Status message
-        if completed == total:
-            print_status("BUILD COMPLETE - All subtasks completed!", "success")
-        else:
-            remaining = total - completed
-            print_status(f"{remaining} subtasks remaining", "info")
-
-        # Phase summary
-        try:
-            with open(spec_dir / "implementation_plan.json", encoding="utf-8") as f:
-                plan = json.load(f)
-
-            print("\nPhases:")
-            for phase in plan.get("phases", []):
-                phase_subtasks = phase.get("subtasks", [])
-                phase_completed = sum(
-                    1 for s in phase_subtasks if s.get("status") == "completed"
-                )
-                phase_total = len(phase_subtasks)
-                phase_name = phase.get("name", phase.get("id", "Unknown"))
-
-                if phase_completed == phase_total:
-                    status = "complete"
-                elif phase_completed > 0 or any(
-                    s.get("status") == "in_progress" for s in phase_subtasks
-                ):
-                    status = "in_progress"
-                else:
-                    # Check if blocked by dependencies
-                    deps = phase.get("depends_on", [])
-                    all_deps_complete = True
-                    for dep_id in deps:
-                        for p in plan.get("phases", []):
-                            if p.get("id") == dep_id or p.get("phase") == dep_id:
-                                p_subtasks = p.get("subtasks", [])
-                                if not all(
-                                    s.get("status") == "completed" for s in p_subtasks
-                                ):
-                                    all_deps_complete = False
-                                break
-                    status = "pending" if all_deps_complete else "blocked"
-
-                print_phase_status(phase_name, phase_completed, phase_total, status)
-
-            # Show next subtask if requested
-            if show_next and completed < total:
-                next_subtask = get_next_subtask(spec_dir)
-                if next_subtask:
-                    print()
-                    next_id = next_subtask.get("id", "unknown")
-                    next_desc = next_subtask.get("description", "")
-                    if len(next_desc) > 60:
-                        next_desc = next_desc[:57] + "..."
-                    print(
-                        f"  {icon(Icons.ARROW_RIGHT)} Next: {highlight(next_id)} - {next_desc}"
-                    )
-
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
-            logger.debug("Ignoring corrupted/unreadable progress file: %s", e)
-    else:
-        print()
+    print()
+    if total == 0:
         print_status("No implementation subtasks yet - planner needs to run", "pending")
+        return
+
+    print(f"Progress: {progress_bar(completed, total, width=40)}")
+    if completed == total:
+        print_status("BUILD COMPLETE - All subtasks completed!", "success")
+    else:
+        print_status(f"{total - completed} subtasks remaining", "info")
+
+    print("\nPhases:")
+    for phase in plan.get("phases", []):
+        phase_subtasks = phase.get("subtasks", [])
+        phase_completed = sum(
+            1 for s in phase_subtasks if s.get("status") == "completed"
+        )
+        phase_total = len(phase_subtasks)
+        phase_name = phase.get("name", phase.get("id", "Unknown"))
+
+        if phase_completed == phase_total:
+            status = "complete"
+        elif phase_completed > 0 or any(
+            s.get("status") == "in_progress" for s in phase_subtasks
+        ):
+            status = "in_progress"
+        else:
+            # Check if blocked by dependencies
+            deps = phase.get("depends_on", [])
+            all_deps_complete = True
+            for dep_id in deps:
+                for p in plan.get("phases", []):
+                    if p.get("id") == dep_id or p.get("phase") == dep_id:
+                        p_subtasks = p.get("subtasks", [])
+                        if not all(s.get("status") == "completed" for s in p_subtasks):
+                            all_deps_complete = False
+                        break
+            status = "pending" if all_deps_complete else "blocked"
+
+        print_phase_status(phase_name, phase_completed, phase_total, status)
+
+    # Show next subtask if requested
+    if show_next and completed < total:
+        next_subtask = get_next_subtask(spec_dir)
+        if next_subtask:
+            print()
+            next_id = next_subtask.get("id", "unknown")
+            next_desc = next_subtask.get("description", "")
+            if len(next_desc) > 60:
+                next_desc = next_desc[:57] + "..."
+            print(
+                f"  {icon(Icons.ARROW_RIGHT)} Next: {highlight(next_id)} - {next_desc}"
+            )
 
 
 def print_build_complete_banner(spec_dir: Path) -> None:
@@ -285,97 +273,6 @@ def print_paused_banner(
 
     print()
     print(box(content, width=70, style="heavy"))
-
-
-def get_plan_summary(spec_dir: Path) -> dict:
-    """
-    Get a detailed summary of implementation plan status.
-
-    Args:
-        spec_dir: Directory containing implementation_plan.json
-
-    Returns:
-        Dictionary with plan statistics
-    """
-    plan_file = spec_dir / "implementation_plan.json"
-
-    if not plan_file.exists():
-        return {
-            "workflow_type": None,
-            "total_phases": 0,
-            "total_subtasks": 0,
-            "completed_subtasks": 0,
-            "pending_subtasks": 0,
-            "in_progress_subtasks": 0,
-            "failed_subtasks": 0,
-            "phases": [],
-        }
-
-    try:
-        with open(plan_file, encoding="utf-8") as f:
-            plan = json.load(f)
-
-        summary = {
-            "workflow_type": plan.get("workflow_type"),
-            "total_phases": len(plan.get("phases", [])),
-            "total_subtasks": 0,
-            "completed_subtasks": 0,
-            "pending_subtasks": 0,
-            "in_progress_subtasks": 0,
-            "failed_subtasks": 0,
-            "phases": [],
-        }
-
-        for phase in plan.get("phases", []):
-            phase_info = {
-                "id": phase.get("id"),
-                "phase": phase.get("phase"),
-                "name": phase.get("name"),
-                "depends_on": phase.get("depends_on", []),
-                "subtasks": [],
-                "completed": 0,
-                "total": 0,
-            }
-
-            for subtask in phase.get("subtasks", []):
-                status = subtask.get("status", "pending")
-                summary["total_subtasks"] += 1
-                phase_info["total"] += 1
-
-                if status == "completed":
-                    summary["completed_subtasks"] += 1
-                    phase_info["completed"] += 1
-                elif status == "in_progress":
-                    summary["in_progress_subtasks"] += 1
-                elif status == "failed":
-                    summary["failed_subtasks"] += 1
-                else:
-                    summary["pending_subtasks"] += 1
-
-                phase_info["subtasks"].append(
-                    {
-                        "id": subtask.get("id"),
-                        "description": subtask.get("description"),
-                        "status": status,
-                        "service": subtask.get("service"),
-                    }
-                )
-
-            summary["phases"].append(phase_info)
-
-        return summary
-
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return {
-            "workflow_type": None,
-            "total_phases": 0,
-            "total_subtasks": 0,
-            "completed_subtasks": 0,
-            "pending_subtasks": 0,
-            "in_progress_subtasks": 0,
-            "failed_subtasks": 0,
-            "phases": [],
-        }
 
 
 def get_current_phase(spec_dir: Path) -> dict | None:
@@ -564,15 +461,3 @@ def interrupted_subtask_directive(subtask: dict) -> str:
         "3. Finish the remaining steps, verify, commit, and mark the subtask "
         "completed as usual."
     )
-
-
-def format_duration(seconds: float) -> str:
-    """Format a duration in human-readable form."""
-    if seconds < 60:
-        return f"{seconds:.0f}s"
-    elif seconds < 3600:
-        minutes = seconds / 60
-        return f"{minutes:.1f}m"
-    else:
-        hours = seconds / 3600
-        return f"{hours:.1f}h"

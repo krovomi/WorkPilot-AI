@@ -65,10 +65,6 @@ class Spinner:
 
     def _render(self) -> None:
         """Render current spinner state."""
-        frame_char = self.FRAMES[self.frame]
-        from .capabilities import COLOR
-
-        if COLOR:
-            frame_char = highlight(frame_char)
+        frame_char = highlight(self.FRAMES[self.frame])  # plain without colour
         sys.stdout.write(f"\r{frame_char} {self.message}")
         sys.stdout.flush()

@@ -339,7 +339,13 @@ Use the Read, Grep, and Glob tools to explore the codebase as needed.
 Report findings with specific file paths, line numbers, and code evidence.
 """
 
-        return prompt_with_cwd + pr_context
+        # The kinds of remark this project rejected (#361), read in the
+        # project's own checkout: `project_root` is the PR's worktree, whose
+        # `.workpilot/` the PR author controls. The orchestrator applies the
+        # same rules to the findings once the review is done.
+        from runners.github.services.learned_suppression import learned_prompt_block
+
+        return prompt_with_cwd + pr_context + learned_prompt_block(self.project_dir)
 
     async def _run_specialist_session(
         self,
