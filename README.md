@@ -201,12 +201,14 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **Guardrails as code**: a versioned policy, in layers, that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it.
 
 **Agents and orchestration**
+- **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.
 - **Mission Control** to run several agents on one goal, **agent terminals**, **Arena** and **Bounty Board** to compare engines, **Repo bench** to measure them on your own past tasks.
 - Specialised agents: test generator, flaky test detective (with the cause and a fix card), refactorer, docs and drift, accessibility (WCAG 2.2 score and fixes), i18n, API contract watcher, compliance evidence, notebooks (cell dependencies, fresh-kernel runs), migration, self-healing on CI failures, technical debt tracker; their fixes go on a review branch, never straight into your folder.
 - **Self-healing that looks further than the last commit**: risk trends per file from scan to scan (a hot list of fast-rising files, directories that degrade together), production errors from several monitoring tools grouped into one incident per bug with its suspect commits, and a bisect of a CI failure in a temporary worktree that names the first bad commit to the fixer.
 - **Release Train** deploys your services itself, in dependency order, with health and smoke checks and a click per production service; the **Git history surgeon** cleans up a branch's commits onto a new branch, same code.
 - **Personal coach**: learns your coding style per language from your git history and lint config, and gives your clear preferences to the coder and the QA fixer.
 - **Shared memory**: one Obsidian vault and graph every agent reads and writes, across sessions and providers; the learning loop analyses each build with a model of whichever provider is selected, and its lessons reach the spec, the plan, the code and QA; provider-agnostic **skills** packs.
+- **Memory you can audit**: every decision on a project's memory is journalled in plain words (who, when, why), a forgotten memory stays restorable for 30 days, a pinned one escapes every automatic removal, and when a team sync brings a contradicting note the safe cases are settled on their own and the rest are shown side by side for you to decide.
 
 **Understand and plan**
 - **Insights**, **Ideation**, **Roadmap**, architecture visualizer, code review rules and code smells for every major stack, risk classifier.
@@ -224,6 +226,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
+- Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
 - Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**

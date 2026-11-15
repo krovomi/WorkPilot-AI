@@ -31,7 +31,6 @@ import asyncio
 import json
 import logging
 import re
-import shlex
 from pathlib import Path
 from typing import Any
 
@@ -81,10 +80,6 @@ TOOLS: list[dict[str, Any]] = [
                 "restart": {
                     "type": "boolean",
                     "description": "Relaunch even if it already runs (after a code fix).",
-                },
-                "command": {
-                    "type": "string",
-                    "description": "Override the detected command (a project launcher only, e.g. `pnpm run dev`). Rarely needed.",
                 },
             }
         ),
@@ -316,62 +311,6 @@ def is_verify_tool(name: str) -> bool:
     return name in TOOL_NAMES
 
 
-# A model may name its own launch command, but only a project launcher, and
-# never a shell construct: the command runs without a shell on POSIX, and the
-# allowlist keeps `verify_launch` from becoming a second, unguarded Bash.
-_LAUNCHERS = {
-    "npm",
-    "pnpm",
-    "yarn",
-    "bun",
-    "npx",
-    "node",
-    "deno",
-    "dotnet",
-    "python",
-    "python3",
-    "uvicorn",
-    "gunicorn",
-    "flask",
-    "streamlit",
-    "go",
-    "cargo",
-    "mvn",
-    "./mvnw",
-    "mvnw",
-    "gradle",
-    "./gradlew",
-    "gradlew",
-    "java",
-    "php",
-    "rails",
-    "bundle",
-    "docker",
-    "docker-compose",
-    "uv",
-    "poetry",
-}
-_SHELL_META = re.compile(r"[;&|`$<>\n\\]|\$\(")
-
-
-def _launch_command_allowed(command: str) -> tuple[bool, str]:
-    if _SHELL_META.search(command):
-        return False, "shell operators are not accepted in a launch command"
-    try:
-        argv = shlex.split(command)
-    except ValueError as exc:
-        return False, f"unparseable command: {exc}"
-    if not argv:
-        return False, "empty command"
-    head = Path(argv[0]).name if not argv[0].startswith("./") else argv[0]
-    if head not in _LAUNCHERS:
-        return (
-            False,
-            f"`{head}` is not a project launcher ({', '.join(sorted(_LAUNCHERS)[:12])}…)",
-        )
-    return True, ""
-
-
 def _json(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=1, default=str)
 
@@ -570,18 +509,19 @@ class VerifyToolbox:
         )
         if target is None:
             return "Error: no launchable target (see verify_detect); mobile apps use verify_device"
-        command = args.get("command")
-        if command:
-            ok, why = _launch_command_allowed(str(command))
-            if not ok:
-                return f"Error: {why}"
+        if args.get("command"):
+            # The command is the detected one or the learned recipe: text a
+            # model writes never becomes a process here (`verify.launch`).
+            return (
+                "Error: verify_launch runs the detected launch command only; "
+                "it takes no command"
+            )
         result = await asyncio.to_thread(
             launch,
             target,
             self.project_dir,
             self.base,
             timeout=float(self.settings.launch_timeout),
-            command=command,
             restart=bool(args.get("restart")),
             window_title=self.window_title(),
         )

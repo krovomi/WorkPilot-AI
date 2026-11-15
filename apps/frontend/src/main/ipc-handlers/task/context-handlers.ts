@@ -46,26 +46,19 @@ export function registerTaskContextHandlers(agentManager: AgentManager): void {
 			if (!agentManager.isRunning(task.id)) {
 				return { success: false, error: "Task is not running" };
 			}
-			try {
-				const specDirs = allSpecDirs(getSpecPaths(task, project));
-				const outcome = writeContextActionMarker(specDirs, action);
-				for (const { dir, error } of outcome.failed) {
-					appLog.warn(`[TASK_CONTEXT_ACTION] Could not write marker in ${dir}:`, error);
-				}
-				if (outcome.written.length === 0) {
-					return { success: false, error: "Could not write context action marker" };
-				}
-				appLog.info(
-					`[TASK_CONTEXT_ACTION] task=${taskId} action=${action} dirs=${outcome.written.length}`,
-				);
-				return { success: true };
-			} catch (err) {
-				appLog.error(`[TASK_CONTEXT_ACTION] Failed for task ${taskId}:`, err);
-				return {
-					success: false,
-					error: err instanceof Error ? err.message : "Context action failed",
-				};
+			// Each folder's failure is caught and reported by the writer.
+			const specDirs = allSpecDirs(getSpecPaths(task, project));
+			const outcome = writeContextActionMarker(specDirs, action);
+			for (const { dir, error } of outcome.failed) {
+				appLog.warn(`[TASK_CONTEXT_ACTION] Could not write marker in ${dir}:`, error);
 			}
+			if (outcome.written.length === 0) {
+				return { success: false, error: "Could not write context action marker" };
+			}
+			appLog.info(
+				`[TASK_CONTEXT_ACTION] task=${taskId} action=${action} dirs=${outcome.written.length}`,
+			);
+			return { success: true };
 		},
 	);
 
@@ -90,29 +83,22 @@ export function registerTaskContextHandlers(agentManager: AgentManager): void {
 				...task.metadata?.contextPolicy,
 				...policy,
 			});
-			try {
-				const specDirs = allSpecDirs(getSpecPaths(task, project));
-				const outcome = mergeContextPolicyIntoSpecDirs(specDirs, contextPolicy);
-				for (const { dir, error } of outcome.failed) {
-					appLog.warn(`[TASK_CONTEXT_POLICY_UPDATE] Could not update ${dir}:`, error);
-				}
-				if (outcome.written.length === 0) {
-					return { success: false, error: "Could not write task metadata" };
-				}
-				task.metadata = { ...task.metadata, contextPolicy };
-				appLog.info(
-					`[TASK_CONTEXT_POLICY_UPDATE] task=${taskId} mode=${contextPolicy.mode} ` +
-						`threshold=${contextPolicy.thresholdPct} handoff=${contextPolicy.prepareHandoff} ` +
-						`dirs=${outcome.written.length}`,
-				);
-				return { success: true, data: { contextPolicy } };
-			} catch (err) {
-				appLog.error(`[TASK_CONTEXT_POLICY_UPDATE] Failed for task ${taskId}:`, err);
-				return {
-					success: false,
-					error: err instanceof Error ? err.message : "Context policy update failed",
-				};
+			// Each folder's failure is caught and reported by the writer.
+			const specDirs = allSpecDirs(getSpecPaths(task, project));
+			const outcome = mergeContextPolicyIntoSpecDirs(specDirs, contextPolicy);
+			for (const { dir, error } of outcome.failed) {
+				appLog.warn(`[TASK_CONTEXT_POLICY_UPDATE] Could not update ${dir}:`, error);
 			}
+			if (outcome.written.length === 0) {
+				return { success: false, error: "Could not write task metadata" };
+			}
+			task.metadata = { ...task.metadata, contextPolicy };
+			appLog.info(
+				`[TASK_CONTEXT_POLICY_UPDATE] task=${taskId} mode=${contextPolicy.mode} ` +
+					`threshold=${contextPolicy.thresholdPct} handoff=${contextPolicy.prepareHandoff} ` +
+					`dirs=${outcome.written.length}`,
+			);
+			return { success: true, data: { contextPolicy } };
 		},
 	);
 }
