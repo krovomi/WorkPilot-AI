@@ -112,8 +112,9 @@ expect(getTaskControl()).toBeNull();
 registerTaskExecutionHandlers(agent as never, () =>
 	windowOpen ? ({ webContents: { send: (...a: unknown[]) => sent.push(a) } } as never) : null,
 );
-// biome-ignore lint/style/noNonNullAssertion: registered just above
-const control = getTaskControl()!;
+const registered = getTaskControl();
+if (!registered) throw new Error("registerTaskExecutionHandlers did not register the task control");
+const control = registered;
 
 let base = "";
 let projectDir = "";
