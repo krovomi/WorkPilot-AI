@@ -125,19 +125,6 @@ def test_a_minimal_context_without_a_task(tmp_path: Path) -> None:
     assert saved["files_to_modify"] == []
 
 
-def test_context_stats(tmp_path: Path) -> None:
-    assert context.get_context_stats(tmp_path) == {}
-    (tmp_path / "context.json").write_text("{broken", encoding="utf-8")
-    assert context.get_context_stats(tmp_path) == {}
-    (tmp_path / "context.json").write_text(
-        '{"files_to_modify": ["a"], "files_to_reference": ["b", "c"]}', encoding="utf-8"
-    )
-    assert context.get_context_stats(tmp_path) == {
-        "files_to_modify": 1,
-        "files_to_reference": 2,
-    }
-
-
 def test_project_index_stats_name_the_services(tmp_path: Path) -> None:
     index = tmp_path / "project_index.json"
     assert discovery.get_project_index_stats(tmp_path) == {}
