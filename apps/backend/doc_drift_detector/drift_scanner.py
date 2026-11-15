@@ -65,7 +65,8 @@ class DriftReport:
 
 
 # Patterns to extract code references from documentation
-_CODE_REF_PATTERN = re.compile(r"`([a-zA-Z_]\w*(?:\.\w+)*)\(`")
+# A call as docs write it: `name(`, `name()` or `name(args)`.
+_CODE_REF_PATTERN = re.compile(r"`([a-zA-Z_]\w*(?:\.\w+)*)\((?:[^`()]*\))?`")
 _FILE_REF_PATTERN = re.compile(r"`([a-zA-Z0-9_/\\.-]+\.\w{1,5})`")
 _IMPORT_REF_PATTERN = re.compile(r"(?:from|import)\s+`?([a-zA-Z_]\w*(?:\.\w+)*)`?")
 
