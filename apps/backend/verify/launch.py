@@ -150,7 +150,6 @@ def launch(
     base: Path,
     *,
     timeout: float = 120.0,
-    command: str | None = None,
     restart: bool = False,
     window_title: str = "",
 ) -> LaunchResult:
@@ -211,7 +210,7 @@ def launch(
     if existing:
         stop_process(base, target.name)
 
-    raw_command = (command or target.command or "").strip()
+    raw_command = (target.command or "").strip()
     if not raw_command:
         return LaunchResult(target.name, "refused", detail="no launch command detected")
 
