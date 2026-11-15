@@ -12,7 +12,7 @@
   "apps/frontend/src/main/ipc-handlers/github/pr-handlers.ts": 2153,
   "apps/frontend/src/main/services/credential-manager.ts": 2476,
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
-  "apps/frontend/src/main/visual-proof-service.ts": 2698,
+  "apps/frontend/src/main/visual-proof-service.ts": 2695,
   "apps/frontend/src/renderer/App.tsx": 2314,
   "apps/frontend/src/renderer/components/AgentTools.tsx": 2024,
   "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3217,

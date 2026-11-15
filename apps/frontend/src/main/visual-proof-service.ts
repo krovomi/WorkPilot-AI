@@ -1739,19 +1739,16 @@ async function launchDesktopApplication(
 		return spawnDirect(workpilotElevated);
 	}
 
+	// On Windows the runtime is the executable itself, never Mono or Wine: no arguments.
 	const psExe = quotePowerShellSingle(runtime.command);
 	const psCwd = quotePowerShellSingle(runtime.cwd);
-	const psArgs =
-		runtime.args.length > 0
-			? ` -ArgumentList @(${runtime.args.map(quotePowerShellSingle).join(",")})`
-			: "";
 	const { stdout } = await execFileAsync(
 		"powershell",
 		[
 			"-NoProfile",
 			"-NonInteractive",
 			"-Command",
-			`$ErrorActionPreference='Stop'; $p = Start-Process -FilePath ${psExe} -WorkingDirectory ${psCwd} -Verb RunAs -PassThru${psArgs}; [Console]::Out.Write($p.Id)`,
+			`$ErrorActionPreference='Stop'; $p = Start-Process -FilePath ${psExe} -WorkingDirectory ${psCwd} -Verb RunAs -PassThru; [Console]::Out.Write($p.Id)`,
 		],
 		{ windowsHide: true, maxBuffer: 64 * 1024 },
 	);
