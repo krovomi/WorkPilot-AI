@@ -1697,10 +1697,7 @@
 		"description": "Configurer quels serveurs MCP sont disponibles pour les agents dans ce projet",
 		"descriptionNoProject": "Sélectionnez un projet pour configurer les serveurs MCP",
 		"editCustomServer": "Modifier le serveur personnalisé",
-		"errorCommandRequired": "La commande est requise pour les serveurs basés sur une commande",
 		"errorIdExists": "Un serveur avec cet ID existe déjà",
-		"errorNameRequired": "Le nom du serveur est requis",
-		"errorUrlRequired": "L'URL est requise pour les serveurs HTTP",
 		"headerName": "Nom de l'en-tête",
 		"headerValue": "Valeur de l'en-tête",
 		"headers": "En-têtes",
@@ -1856,7 +1853,9 @@
 			}
 		},
 		"healthCheckFailed": "La vérification de l'état a échoué",
-		"connectionTestFailed": "Le test de connexion a échoué"
+		"connectionTestFailed": "Le test de connexion a échoué",
+		"errorNameNoId": "Le nom doit contenir au moins une lettre ou un chiffre",
+		"removeHeader": "Retirer l'en-tête {{name}}"
 	},
 	"modelSelect": {
 		"discoveryNotAvailable": "Découverte de modèles non disponible. Saisissez le nom du modèle manuellement.",

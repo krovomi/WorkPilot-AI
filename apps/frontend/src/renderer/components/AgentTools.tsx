@@ -297,6 +297,23 @@ const MCP_SERVERS: Record<
 	teams: { i18nKey: "teams", icon: Globe, requiresSetup: true },
 };
 
+// Ids a custom server cannot take: the build reads them as its own servers
+// (_map_mcp_server_name in agents/tools_pkg/models.py), so a custom "github"
+// added to an agent would start the built-in one instead.
+const RESERVED_MCP_IDS = [
+	...Object.keys(MCP_SERVERS),
+	"workpilot",
+	"brain",
+	"workpilot-brain",
+	"uiux",
+	"workpilot-uiux",
+	"ui-ux-pro-max",
+	"verify",
+	"code",
+	"workpilot-code",
+	"search_code",
+];
+
 // MCP servers grouped by category for the add dialog
 const MCP_CATEGORY_GROUPS: Array<{
 	labelKey: string;
@@ -1646,7 +1663,7 @@ export function AgentTools() {
 				open={showCustomMcpDialog}
 				onOpenChange={setShowCustomMcpDialog}
 				server={editingCustomServer}
-				existingIds={customServers.map((s) => s.id)}
+				existingIds={[...RESERVED_MCP_IDS, ...customServers.map((s) => s.id)]}
 				onSave={handleSaveCustomServer}
 			/>
 		</ModuleStage>

@@ -1485,10 +1485,7 @@
 		"headerName": "Header Name",
 		"headerValue": "Header Value",
 		"noCustomServers": "No custom servers configured. Add one to use with your agents.",
-		"errorNameRequired": "Server name is required",
 		"errorIdExists": "A server with this ID already exists",
-		"errorCommandRequired": "Command is required for command-based servers",
-		"errorUrlRequired": "URL is required for HTTP-based servers",
 		"testConnection": "Test",
 		"testing": "Testing...",
 		"authToken": "Authentication Token",
@@ -1547,7 +1544,9 @@
 			}
 		},
 		"healthCheckFailed": "Health check failed",
-		"connectionTestFailed": "Connection test failed"
+		"connectionTestFailed": "Connection test failed",
+		"errorNameNoId": "The name needs at least one letter or digit",
+		"removeHeader": "Remove header {{name}}"
 	},
 	"terminalFonts": {
 		"title": "Terminal Fonts",

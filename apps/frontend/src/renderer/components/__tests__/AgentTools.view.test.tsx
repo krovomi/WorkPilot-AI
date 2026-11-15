@@ -535,7 +535,8 @@ describe("custom servers", () => {
 		await userEvent.click(screen.getByRole("button", { name: /Add Custom Server/ }));
 		expect(seen.customDialog.open).toBe(true);
 		expect(seen.customDialog.server).toBeNull();
-		expect(seen.customDialog.existingIds).toEqual(["docs"]);
+		// Built-in ids are taken too: a custom "github" would start the built-in one.
+		expect(seen.customDialog.existingIds).toEqual(expect.arrayContaining(["github", "brain", "docs"]));
 		await act(async () => {
 			await (seen.customDialog.onSave as (s: CustomMcpServer) => Promise<void>)(WIKI);
 		});
