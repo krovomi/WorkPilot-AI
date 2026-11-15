@@ -328,6 +328,17 @@
 		"reviewComplete": "Review Complete",
 		"reviewStatus": "Review Status",
 		"files": "files",
+		"files_one": "file",
+		"files_other": "files",
+		"fileStatus": {
+			"added": "added",
+			"removed": "removed",
+			"modified": "modified",
+			"renamed": "renamed",
+			"copied": "copied",
+			"changed": "changed",
+			"unchanged": "unchanged"
+		},
 		"filesChanged": "{{count}} files changed",
 		"clickToViewFiles": "Click to view changed files",
 		"loadingFiles": "Loading files...",

@@ -328,6 +328,17 @@
 		"reviewComplete": "Révision terminée",
 		"reviewStatus": "Statut de la révision",
 		"files": "fichiers",
+		"files_one": "fichier",
+		"files_other": "fichiers",
+		"fileStatus": {
+			"added": "ajouté",
+			"removed": "supprimé",
+			"modified": "modifié",
+			"renamed": "renommé",
+			"copied": "copié",
+			"changed": "changé",
+			"unchanged": "inchangé"
+		},
 		"filesChanged": "{{count}} fichiers modifiés",
 		"clickToViewFiles": "Cliquer pour voir les fichiers modifiés",
 		"loadingFiles": "Chargement des fichiers...",
