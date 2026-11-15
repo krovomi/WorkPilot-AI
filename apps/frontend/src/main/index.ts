@@ -129,6 +129,7 @@ import {
 } from "./local-backend-readiness";
 import { migrateSourceEnvSecrets } from "./source-env";
 import { TerminalManager } from "./terminal-manager";
+import { guardMainWindow } from "./window-recovery";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Window sizing constants
@@ -560,6 +561,11 @@ function createWindow(): void {
 
 	// WORKPILOT_SMOKE_TEST=1: quit once the renderer has mounted (CI, release)
 	armSmokeTest(mainWindow);
+	// A dead renderer or a failed first load left the window white for good:
+	// reload it within a budget and log why (window-recovery.ts, tested there;
+	// this file starts the app on import and no unit test loads it).
+	/* v8 ignore next */
+	guardMainWindow(mainWindow);
 
 	// Initialize spell check languages
 	initializeSpellCheckLanguages();
