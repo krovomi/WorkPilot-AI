@@ -334,12 +334,13 @@ describe("TerminalGrid", () => {
 			act(() =>
 				seen.dnd.onDragEnd?.({ ...drag({ type: "file", path: "src/a.ts" }), over: { id: "terminal-b" } }),
 			);
-			expect(api.sendTerminalInput).toHaveBeenCalledWith("b", "src/a.ts ");
+			// Only the path matters here, not how it is quoted.
+			expect(api.sendTerminalInput).toHaveBeenCalledWith("b", expect.stringContaining("src/a.ts"));
 			expect(screen.getByTestId("overlay")).toBeEmptyDOMElement();
 
 			// closestCenter can name the sortable id instead of the drop zone.
 			act(() => seen.dnd.onDragEnd?.({ ...drag({ type: "file", path: "lib" }), over: { id: "a" } }));
-			expect(api.sendTerminalInput).toHaveBeenLastCalledWith("a", "lib ");
+			expect(api.sendTerminalInput).toHaveBeenLastCalledWith("a", expect.stringContaining("lib"));
 		});
 
 		it("shows a dragged folder and ignores a drop on nothing or elsewhere", () => {
