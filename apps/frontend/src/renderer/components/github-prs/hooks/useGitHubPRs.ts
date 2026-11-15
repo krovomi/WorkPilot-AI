@@ -88,8 +88,9 @@ export function useGitHubPRs(
 
 	// Track previous isActive state to detect tab navigation
 	const wasActiveRef = useRef(isActive);
-	// Track if initial load has happened
-	const hasLoadedRef = useRef(false);
+	// The project whose PRs were loaded: a project switch loads the new one
+	// (the view stays mounted, hidden, across projects).
+	const loadedForRef = useRef<string | null>(null);
 	// Track the current PR being fetched (for race condition prevention)
 	const currentFetchPRNumberRef = useRef<number | null>(null);
 	// AbortController for cancelling pending checkNewCommits calls on rapid PR switching
@@ -233,8 +234,8 @@ export function useGitHubPRs(
 
 	// Initial load
 	useEffect(() => {
-		if (projectId && !hasLoadedRef.current) {
-			hasLoadedRef.current = true;
+		if (projectId && loadedForRef.current !== projectId) {
+			loadedForRef.current = projectId;
 			fetchPRs();
 		}
 	}, [projectId, fetchPRs]);
@@ -242,17 +243,16 @@ export function useGitHubPRs(
 	// Auto-refresh when tab becomes active (navigating to GitHub PRs tab)
 	useEffect(() => {
 		// Only refresh if transitioning from inactive to active AND we've loaded before
-		if (isActive && !wasActiveRef.current && hasLoadedRef.current) {
+		if (isActive && !wasActiveRef.current && loadedForRef.current === projectId) {
 			fetchPRs();
 		}
 		wasActiveRef.current = isActive;
-	}, [isActive, fetchPRs]);
+	}, [isActive, fetchPRs, projectId]);
 
 	// Reset state and selected PR when project changes
 	useEffect(() => {
 		currentProjectIdRef.current = projectId;
 		fetchGenerationRef.current += 1;
-		hasLoadedRef.current = false;
 		setHasMore(false);
 		setEndCursor(null);
 		setPrs([]);

@@ -114,7 +114,14 @@ export const useAdminStore = create<AdminState>((set, get) => {
 			return false;
 		}
 		set((s) => ({ loading: { ...s.loading, [key]: true }, error: null }));
-		const result = await run(bridge);
+		let result: { ok: true; data: T } | { ok: false; error: string };
+		try {
+			result = await run(bridge);
+		} catch (err) {
+			// A rejected IPC call (the main process refused the sender, the
+			// handler threw) must not leave the spinner on for ever.
+			result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+		}
 		set((s) => ({ loading: { ...s.loading, [key]: false } }));
 		if (!result.ok) {
 			set({ error: result.error });

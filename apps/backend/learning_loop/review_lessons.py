@@ -272,20 +272,41 @@ def adopted_rules(project_dir: str | Path) -> list[str]:
     ]
 
 
-def rules_block(project_dir: str | Path) -> str:
-    """The adopted rules as a prompt section, newest first, or "" without any.
+def rules_for_prompt(
+    project_dir: str | Path, exclude: frozenset[str] = frozenset()
+) -> list[tuple[str, str]]:
+    """The adopted rules a prompt carries, as ``(id, rule)``, newest first.
 
-    Bounded by count and size; a rule is never cut in the middle.
+    Bounded by count and size; a rule is never cut in the middle. ``exclude``
+    names the rules a person turned off for one task.
     """
-    rules = list(reversed(adopted_rules(project_dir)))[:MAX_RULES_IN_PROMPT]
+    adopted = [
+        (str(lesson["id"]), str(lesson["rule"]))
+        for lesson in load_lessons(project_dir)
+        if lesson["status"] == "adopted" and lesson.get("rule")
+    ]
+    kept: list[tuple[str, str]] = []
+    size = sum(len(line) + 1 for line in (RULES_HEADING, "", _RULES_INTRO, ""))
+    for lesson_id, rule in reversed(adopted):
+        if lesson_id in exclude:
+            continue
+        if (
+            len(kept) >= MAX_RULES_IN_PROMPT
+            or size + len(rule) + 3 > MAX_RULES_BLOCK_CHARS
+        ):
+            break
+        kept.append((lesson_id, rule))
+        size += len(rule) + 3
+    return kept
+
+
+def render_rules(rules: list[tuple[str, str]]) -> str:
     if not rules:
         return ""
-    lines = [RULES_HEADING, "", _RULES_INTRO, ""]
-    size = sum(len(line) + 1 for line in lines)
-    for rule in rules:
-        line = f"- {rule}"
-        if size + len(line) + 1 > MAX_RULES_BLOCK_CHARS:
-            break
-        lines.append(line)
-        size += len(line) + 1
+    lines = [RULES_HEADING, "", _RULES_INTRO, ""] + [f"- {rule}" for _, rule in rules]
     return "\n".join(lines) + "\n"
+
+
+def rules_block(project_dir: str | Path) -> str:
+    """The adopted rules as a prompt section, newest first, or "" without any."""
+    return render_rules(rules_for_prompt(project_dir))

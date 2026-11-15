@@ -71,24 +71,13 @@ export function getGitHubConfig(project: Project): GitHubConfig | null {
 	const envPath = getProjectEnvPath(project);
 	if (!envPath || !existsSync(envPath)) return null;
 
-	try {
-		const vars = readProjectEnvFile(envPath);
-		let token: string | undefined = vars.GITHUB_TOKEN;
-		const repo = vars.GITHUB_REPO;
-
-		// If no token in .env, try to get it from gh CLI (sync version for sync function)
-		if (!token) {
-			const ghToken = getTokenFromGhCliSync();
-			if (ghToken) {
-				token = ghToken;
-			}
-		}
-
-		if (!token || !repo) return null;
-		return { token, repo };
-	} catch {
-		return null;
-	}
+	// Neither reading the file nor asking gh throws: each answers "nothing".
+	const vars = readProjectEnvFile(envPath);
+	const repo = vars.GITHUB_REPO;
+	// If no token in .env, try to get it from gh CLI (sync version for sync function)
+	const token = vars.GITHUB_TOKEN || getTokenFromGhCliSync();
+	if (!token || !repo) return null;
+	return { token, repo };
 }
 
 /**
@@ -115,6 +104,16 @@ export function normalizeRepoReference(repo: string): string {
 	}
 
 	return normalized.trim();
+}
+
+/**
+ * `owner/repo` as GitHub names them: the only form a repository reference may
+ * take before it becomes part of an API path (no `..`, no extra segment, no
+ * query).
+ */
+export function isRepoFullName(value: string): boolean {
+	const match = /^[A-Za-z0-9-]+\/([A-Za-z0-9._-]+)$/.exec(value);
+	return match !== null && match[1] !== "." && match[1] !== "..";
 }
 
 /**
@@ -148,4 +147,15 @@ export async function githubFetch(
 	}
 
 	return response.json();
+}
+
+/**
+ * An issue or pull request number received from the renderer: a positive
+ * whole number, or null. It becomes part of an API path, so nothing else may
+ * pass.
+ */
+export function issueNumberArg(value: unknown): number | null {
+	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+		? value
+		: null;
 }
