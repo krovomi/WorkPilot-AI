@@ -34,13 +34,10 @@ from src.connectors.jira.models import (
     JiraTransition,
     JiraUser,
 )
-from src.connectors.jira.work_items import JiraWorkItemsClient
 
 __all__ = [
     # Main connector
     "JiraConnector",
-    # Work items client (high-level interface)
-    "JiraWorkItemsClient",
     # Underlying client
     "JiraClient",
     # Data models

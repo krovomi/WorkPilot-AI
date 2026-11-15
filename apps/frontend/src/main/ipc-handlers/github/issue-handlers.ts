@@ -12,13 +12,20 @@ import type {
 import { debugLog } from "../../../shared/utils/debug-logger";
 import { featureProject } from "../server-feature-files";
 import type { GitHubAPIComment, GitHubAPIIssue } from "./types";
-import { getGitHubConfig, githubFetch, normalizeRepoReference } from "./utils";
+import {
+	getGitHubConfig,
+	githubFetch,
+	isRepoFullName,
+	issueNumberArg,
+	normalizeRepoReference,
+} from "./utils";
 
 // Pagination constants
 const ISSUES_PER_PAGE = 50; // Target number of issues per page (after filtering PRs)
 const GITHUB_API_PER_PAGE = 100; // GitHub API's max items per request
 const MAX_PAGES_PAGINATED = 5; // Max API pages to fetch in paginated mode
 const MAX_PAGES_FETCH_ALL = 30; // Max API pages to fetch in fetchAll mode
+const ISSUE_STATES = ["open", "closed", "all"] as const;
 
 /**
  * Transform GitHub API issue to application format
@@ -56,8 +63,8 @@ function transformIssue(
 /**
  * Get list of issues from repository with pagination support
  *
- * When page > 0: Returns paginated results (for infinite scroll)
- * When page = 0 or fetchAll = true: Returns ALL issues (for search functionality)
+ * fetchAll = false: the requested page (from 1), for infinite scroll
+ * fetchAll = true: ALL issues, up to MAX_PAGES_FETCH_ALL API pages (for search)
  *
  * Note: GitHub's /issues endpoint returns both issues and PRs mixed together,
  * so we need to over-fetch and filter to get enough actual issues per page.
@@ -68,10 +75,19 @@ export function registerGetIssues(): void {
 		async (
 			_,
 			projectId: string,
-			state: "open" | "closed" | "all" = "open",
-			page: number = 1,
-			fetchAll: boolean = false,
+			stateArg?: unknown,
+			pageArg?: unknown,
+			fetchAllArg?: unknown,
 		): Promise<IPCResult<PaginatedIssuesResult>> => {
+			// The renderer is not trusted: the state comes from a closed list and
+			// the page is a positive whole number, before either reaches the URL.
+			// An argument left out may arrive as null.
+			const state = ISSUE_STATES.find((s) => s === (stateArg ?? "open"));
+			const page = issueNumberArg(pageArg ?? 1);
+			if (!state || page === null) {
+				return { success: false, error: "Invalid issue query" };
+			}
+			const fetchAll = fetchAllArg === true;
 			debugLog("[GitHub Issues] getIssues handler called", {
 				projectId,
 				state,
@@ -96,7 +112,7 @@ export function registerGetIssues(): void {
 
 			try {
 				const normalizedRepo = normalizeRepoReference(config.repo);
-				if (!normalizedRepo) {
+				if (!isRepoFullName(normalizedRepo)) {
 					return {
 						success: false,
 						error: "Invalid repository format. Use owner/repo or GitHub URL.",
@@ -109,10 +125,6 @@ export function registerGetIssues(): void {
 					"state:",
 					state,
 				);
-
-				const maxPagesPerRequest = fetchAll
-					? MAX_PAGES_FETCH_ALL
-					: MAX_PAGES_PAGINATED;
 
 				if (fetchAll) {
 					// Fetch ALL issues (for search functionality)
@@ -172,7 +184,7 @@ export function registerGetIssues(): void {
 				// Keep fetching until we have enough issues or run out of API pages
 				while (
 					collectedIssues.length < targetEndIndex &&
-					apiPage <= maxPagesPerRequest &&
+					apiPage <= MAX_PAGES_PAGINATED &&
 					hasMoreFromAPI
 				) {
 					debugLog(
@@ -278,8 +290,12 @@ export function registerGetIssue(): void {
 		async (
 			_,
 			projectId: string,
-			issueNumber: number,
+			issueNumberValue: unknown,
 		): Promise<IPCResult<GitHubIssue>> => {
+			const issueNumber = issueNumberArg(issueNumberValue);
+			if (issueNumber === null) {
+				return { success: false, error: "Invalid issue number" };
+			}
 			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -295,7 +311,7 @@ export function registerGetIssue(): void {
 
 			try {
 				const normalizedRepo = normalizeRepoReference(config.repo);
-				if (!normalizedRepo) {
+				if (!isRepoFullName(normalizedRepo)) {
 					return {
 						success: false,
 						error: "Invalid repository format. Use owner/repo or GitHub URL.",
@@ -330,8 +346,12 @@ export function registerGetIssueComments(): void {
 		async (
 			_,
 			projectId: string,
-			issueNumber: number,
+			issueNumberValue: unknown,
 		): Promise<IPCResult<GitHubAPIComment[]>> => {
+			const issueNumber = issueNumberArg(issueNumberValue);
+			if (issueNumber === null) {
+				return { success: false, error: "Invalid issue number" };
+			}
 			const project = featureProject(projectId);
 			if (!project) {
 				return { success: false, error: "Project not found" };
@@ -347,7 +367,7 @@ export function registerGetIssueComments(): void {
 
 			try {
 				const normalizedRepo = normalizeRepoReference(config.repo);
-				if (!normalizedRepo) {
+				if (!isRepoFullName(normalizedRepo)) {
 					return {
 						success: false,
 						error: "Invalid repository format. Use owner/repo or GitHub URL.",
