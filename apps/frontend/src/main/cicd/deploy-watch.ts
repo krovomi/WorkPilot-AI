@@ -139,12 +139,29 @@ export function readDeployWatch(
 ): DeployWatch | undefined {
 	if (!RUN_ID.test(runId)) return undefined;
 	const file = deployWatchPath(projectPath, runId);
+	let fd: number | undefined;
 	try {
-		const stat = fs.lstatSync(file);
-		if (!stat.isFile() || stat.size > MAX_STATE_BYTES) return undefined;
-		return parseDeployWatch(JSON.parse(fs.readFileSync(file, "utf-8")), live);
+		// One descriptor, opened without following a link: the file checked
+		// is the file read, and only up to the size measured.
+		fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+		const stat = fs.fstatSync(fd);
+		const named = fs.lstatSync(file);
+		if (
+			!stat.isFile() ||
+			!named.isFile() ||
+			named.ino !== stat.ino ||
+			named.dev !== stat.dev ||
+			stat.size > MAX_STATE_BYTES
+		) {
+			return undefined;
+		}
+		const buffer = Buffer.alloc(stat.size);
+		const read = fs.readSync(fd, buffer, 0, stat.size, 0);
+		return parseDeployWatch(JSON.parse(buffer.toString("utf-8", 0, read)), live);
 	} catch {
 		return undefined;
+	} finally {
+		if (fd !== undefined) fs.closeSync(fd);
 	}
 }
 
