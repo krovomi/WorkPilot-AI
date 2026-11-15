@@ -37,6 +37,23 @@ def test_drift_in_every_language_is_reported(tmp_path):
     assert _refs(tmp_path) == {"OrderService.Place", "Charge", "billing/payments.go"}
 
 
+def test_a_call_is_cited_with_or_without_its_arguments(tmp_path):
+    _write(tmp_path, "app.py", "def hello(name):\n    return name\n")
+    _write(
+        tmp_path,
+        "docs/usage.md",
+        "Call `hello()` or `hello(name)`, then `greet_everyone()`, "
+        "`notify(team, 'hi')` and `Team.welcome(`.\n",
+    )
+    assert _refs(tmp_path) == {"greet_everyone", "notify", "Team.welcome"}
+
+
+def test_a_call_inside_a_longer_snippet_is_not_a_citation(tmp_path):
+    _write(tmp_path, "app.py", "def hello():\n    pass\n")
+    _write(tmp_path, "README.md", "Run `x = gone()` or `gone() + 1` in a shell.\n")
+    assert _refs(tmp_path) == set()
+
+
 def test_library_calls_the_code_uses_are_not_drift(tmp_path):
     _write(
         tmp_path,

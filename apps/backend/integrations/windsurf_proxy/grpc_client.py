@@ -348,31 +348,28 @@ def _extract_text_from_response(payload: bytes) -> str:
     offset = 0
 
     while offset < len(payload):
-        try:
-            tag, new_offset = _decode_varint(payload, offset)
-            field_number = tag >> 3
-            wire_type = tag & 0x07
+        tag, new_offset = _decode_varint(payload, offset)
+        field_number = tag >> 3
+        wire_type = tag & 0x07
 
-            if wire_type == WIRE_VARINT:
-                _, new_offset = _decode_varint(payload, new_offset)
-                offset = new_offset
-            elif wire_type == WIRE_LENGTH_DELIMITED:
-                length, new_offset = _decode_varint(payload, new_offset)
-                field_data = payload[new_offset : new_offset + length]
-                offset = new_offset + length
+        if wire_type == WIRE_VARINT:
+            _, new_offset = _decode_varint(payload, new_offset)
+            offset = new_offset
+        elif wire_type == WIRE_LENGTH_DELIMITED:
+            length, new_offset = _decode_varint(payload, new_offset)
+            field_data = payload[new_offset : new_offset + length]
+            offset = new_offset + length
 
-                # Field 1: delta_message (RawChatMessage)
-                if field_number == 1:
-                    text = _extract_text_from_raw_chat_message(field_data)
-                    if text:
-                        texts.append(text)
-            elif wire_type == 5:  # 32-bit fixed
-                offset = new_offset + 4
-            elif wire_type == 1:  # 64-bit fixed
-                offset = new_offset + 8
-            else:
-                break
-        except (IndexError, ValueError):
+            # Field 1: delta_message (RawChatMessage)
+            if field_number == 1:
+                text = _extract_text_from_raw_chat_message(field_data)
+                if text:
+                    texts.append(text)
+        elif wire_type == 5:  # 32-bit fixed
+            offset = new_offset + 4
+        elif wire_type == 1:  # 64-bit fixed
+            offset = new_offset + 8
+        else:
             break
 
     return "".join(texts)
@@ -382,57 +379,31 @@ def _extract_text_from_raw_chat_message(data: bytes) -> str:
     """Extract text from RawChatMessage (field 5 is direct string)."""
     offset = 0
     while offset < len(data):
-        try:
-            tag, new_offset = _decode_varint(data, offset)
-            field_number = tag >> 3
-            wire_type = tag & 0x07
+        tag, new_offset = _decode_varint(data, offset)
+        field_number = tag >> 3
+        wire_type = tag & 0x07
 
-            if wire_type == WIRE_VARINT:
-                _, new_offset = _decode_varint(data, new_offset)
-                offset = new_offset
-            elif wire_type == WIRE_LENGTH_DELIMITED:
-                length, new_offset = _decode_varint(data, new_offset)
-                field_data = data[new_offset : new_offset + length]
-                offset = new_offset + length
+        if wire_type == WIRE_VARINT:
+            _, new_offset = _decode_varint(data, new_offset)
+            offset = new_offset
+        elif wire_type == WIRE_LENGTH_DELIMITED:
+            length, new_offset = _decode_varint(data, new_offset)
+            field_data = data[new_offset : new_offset + length]
+            offset = new_offset + length
 
-                # Field 5: text (direct string in RawChatMessage)
-                if field_number == 5:
-                    try:
-                        return field_data.decode("utf-8")
-                    except UnicodeDecodeError:
-                        pass
-            elif wire_type == 5:
-                offset = new_offset + 4
-            elif wire_type == 1:
-                offset = new_offset + 8
-            else:
-                break
-        except (IndexError, ValueError):
+            # Field 5: text (direct string in RawChatMessage)
+            if field_number == 5:
+                try:
+                    return field_data.decode("utf-8")
+                except UnicodeDecodeError:
+                    pass
+        elif wire_type == 5:
+            offset = new_offset + 4
+        elif wire_type == 1:
+            offset = new_offset + 8
+        else:
             break
     return ""
-
-
-def _parse_connect_frames(data: bytes) -> list[tuple[int, bytes]]:
-    """Parse Connect protocol frames from raw response data.
-
-    Each frame: [flags: 1 byte] [length: 4 bytes BE] [payload: length bytes]
-    flags=0x00: data frame, flags=0x02: trailer frame (JSON)
-    """
-    frames = []
-    offset = 0
-
-    while offset + 5 <= len(data):
-        flags = data[offset]
-        length = struct.unpack(">I", data[offset + 1 : offset + 5])[0]
-        offset += 5
-
-        if offset + length > len(data):
-            break
-
-        frames.append((flags, data[offset : offset + length]))
-        offset += length
-
-    return frames
 
 
 def _check_connect_trailer(trailer_data: bytes) -> str | None:
@@ -673,22 +644,3 @@ async def stream_chat(
             WindsurfErrorCode.STREAM_ERROR,
             details=e,
         )
-
-
-async def chat(
-    credentials: WindsurfCredentials,
-    messages: list[dict[str, str]],
-    model_enum: int,
-    model_name: str,
-    system_prompt: str | None = None,
-) -> str:
-    """Send a chat request and return the full response text.
-
-    Non-streaming convenience wrapper around stream_chat().
-    """
-    text_parts = []
-    async for chunk in stream_chat(
-        credentials, messages, model_enum, model_name, system_prompt
-    ):
-        text_parts.append(chunk)
-    return "".join(text_parts)

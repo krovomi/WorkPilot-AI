@@ -265,6 +265,10 @@ export interface MemoryEpisode {
 	content: string;
 	session_number?: number;
 	score?: number;
+	/** The note's vault path: how the lifecycle actions name it. */
+	path?: string;
+	/** Pinned: no automatic removal (`brain/lifecycle/store.py`). */
+	pinned?: boolean;
 	// For PR reviews - extracted from content for quick access
 	prNumber?: number;
 	repo?: string;
