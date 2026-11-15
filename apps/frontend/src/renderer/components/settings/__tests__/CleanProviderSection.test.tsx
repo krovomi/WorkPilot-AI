@@ -244,6 +244,9 @@ describe("CleanProviderSection", () => {
 		// The service turns a broken channel into a failed answer.
 		await run("ollama");
 		expect(toast.mock.calls.at(-1)?.[0].description).toBe("The Ollama provider failed: IPC");
+		// A provider the list no longer has is named by its id.
+		await run("gone");
+		expect(toast.mock.calls.at(-1)?.[0].description).toBe("The gone provider failed: IPC");
 		expect(stubProps("CleanProviderGrid").testingProviders).toEqual(new Set());
 		expect(useSettingsStore.getState().settings).toMatchObject({ testResult_gemini: { success: false } });
 	});

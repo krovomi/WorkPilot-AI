@@ -156,6 +156,9 @@ describe("GitHubCopilotAuthTerminal", () => {
 		emit("exit", "copilot-auth-1", 0);
 		expect(second.onAuthSuccess).not.toHaveBeenCalled();
 		emit("output", "copilot-auth-1", "gh auth login");
+		// The prompt echoed again while signing in changes nothing.
+		emit("output", "copilot-auth-1", "? What is your preferred protocol for Git operations?");
+		expect(screen.getByText("Finish the sign-in in your browser…")).toBeInTheDocument();
 		emit("exit", "other", 0);
 		emit("exit", "copilot-auth-1", 1);
 		expect(second.onAuthSuccess).not.toHaveBeenCalled();

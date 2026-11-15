@@ -210,6 +210,25 @@ describe("GlobalAutoSwitching", () => {
 		expect(saved()).toHaveBeenCalledTimes(1);
 	});
 
+	it("saves no threshold when it is let go where the default already is", () => {
+		renderSwitching();
+		fireEvent.blur(screen.getByLabelText("Session Threshold"));
+		expect(saved()).not.toHaveBeenCalled();
+	});
+
+	it("asks Copilot for its account only while the section is open, and drops an answer after closing", async () => {
+		const check = globalThis.electronAPI.checkCopilotAuth as unknown as ReturnType<typeof vi.fn>;
+		const { rerender, props, unmount } = renderSwitching();
+		rerender(<GlobalAutoSwitching {...props} isOpen={false} />);
+		expect(check).toHaveBeenCalledTimes(1);
+		let answer: (value: unknown) => void = () => undefined;
+		check.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+		rerender(<GlobalAutoSwitching {...props} />);
+		expect(check).toHaveBeenCalledTimes(2);
+		unmount();
+		await act(async () => answer({ success: true, data: { authenticated: true, username: "late" } }));
+	});
+
 	it("follows settings changed elsewhere, and still lists accounts when Copilot cannot be asked", async () => {
 		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 		(globalThis.electronAPI.checkCopilotAuth as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("gh"));
