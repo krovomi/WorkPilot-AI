@@ -201,8 +201,6 @@ PHASE_ALIASES: dict[str, str] = {
     "pr_template_filler": "solo",
     "spec_compaction": "solo",
     "merge_resolver": "solo",
-    # One snippet in, one rewritten snippet out (migration/llm_transformer.py).
-    "migration": "solo",
     # The one-shot features that built their own SDK options until lot L16:
     # one request in the prompt, one answer out as text, no tool.
     "git_command": "solo",

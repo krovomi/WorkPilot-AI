@@ -28,6 +28,7 @@ from .models import (
     ReplayStepType,
 )
 from .recorder import get_replay_recorder
+from .storage import record_file, require_record_file
 
 logger = logging.getLogger(__name__)
 
@@ -247,8 +248,8 @@ class TimeTravelEngine:
 
     def delete_fork(self, fork_id: str) -> bool:
         """Delete a fork."""
-        filepath = self._forks_dir / f"{fork_id}.json"
-        if filepath.exists():
+        filepath = record_file(self._forks_dir, fork_id)
+        if filepath is not None and filepath.exists():
             filepath.unlink()
             return True
         return False
@@ -446,15 +447,15 @@ class TimeTravelEngine:
     # -------------------------------------------------------------------
 
     def _save_checkpoints(self, session_id: str, checkpoints: list[Checkpoint]) -> None:
-        filepath = self._checkpoints_dir / f"{session_id}.json"
+        filepath = require_record_file(self._checkpoints_dir, session_id)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(
                 [cp.to_dict() for cp in checkpoints], f, indent=2, ensure_ascii=False
             )
 
     def _load_checkpoints(self, session_id: str) -> list[Checkpoint]:
-        filepath = self._checkpoints_dir / f"{session_id}.json"
-        if not filepath.exists():
+        filepath = record_file(self._checkpoints_dir, session_id)
+        if filepath is None or not filepath.exists():
             return []
         try:
             with open(filepath, encoding="utf-8") as f:
@@ -476,13 +477,13 @@ class TimeTravelEngine:
         return fork
 
     def _save_fork(self, fork: ForkSession) -> None:
-        filepath = self._forks_dir / f"{fork.fork_id}.json"
+        filepath = require_record_file(self._forks_dir, fork.fork_id)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(fork.to_dict(), f, indent=2, ensure_ascii=False)
 
     def _load_fork(self, fork_id: str) -> ForkSession | None:
-        filepath = self._forks_dir / f"{fork_id}.json"
-        if not filepath.exists():
+        filepath = record_file(self._forks_dir, fork_id)
+        if filepath is None or not filepath.exists():
             return None
         try:
             return self._read_fork_file(filepath)
@@ -493,13 +494,13 @@ class TimeTravelEngine:
     def _save_decision_scores(
         self, session_id: str, scores: list[DecisionScore]
     ) -> None:
-        filepath = self._storage_dir / f"scores_{session_id}.json"
+        filepath = require_record_file(self._storage_dir, session_id, "scores_")
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump([s.to_dict() for s in scores], f, indent=2, ensure_ascii=False)
 
     def _load_decision_scores(self, session_id: str) -> list[DecisionScore]:
-        filepath = self._storage_dir / f"scores_{session_id}.json"
-        if not filepath.exists():
+        filepath = record_file(self._storage_dir, session_id, "scores_")
+        if filepath is None or not filepath.exists():
             return []
         try:
             with open(filepath, encoding="utf-8") as f:

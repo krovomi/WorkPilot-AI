@@ -17,6 +17,8 @@ any agent over MCP (``workpilot-brain``).
 | `mcp_server.py` | the stdio MCP server |
 | `runtime.py` | how every WorkPilot feature reaches it: MCP server, prompt section, tool executor |
 | `learn.py` | what WorkPilot records itself: every build, every merge, other surfaces |
+| `project_memory.py` | the builds' memory: gotchas, patterns, files, outcomes, sessions |
+| `lifecycle/` | what happens to a memory: journal, trash, pins, conflicts after a sync |
 | `api.py` | ``/api/brain/*``: settings (vault folder, git remote), a task's learning, proposals |
 """
 
