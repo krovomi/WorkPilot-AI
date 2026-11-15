@@ -46,20 +46,20 @@ class MergeHelpers:
 
     @staticmethod
     def extract_hook_call(change: SemanticChange) -> str | None:
-        """Extract the hook call from a change."""
+        """The hook call a change adds, with the declaration that receives it.
+
+        ``const [count, setCount] = useState(0);`` keeps its array
+        destructuring: without it the merged component calls the hook and
+        drops the names the rest of the function reads.
+        """
         if change.content_after:
-            # Look for useXxx() pattern
             match = re.search(
-                r"(const\s+\{[^}]+\}\s*=\s*)?use\w+\([^)]*\);?", change.content_after
+                r"(?:(?:const|let|var)\s+(?:\{[^}]+\}|\[[^\]]+\]|\w+)\s*=\s*)?"
+                r"use\w+\([^)]*\);?",
+                change.content_after,
             )
             if match:
                 return match.group(0)
-
-            # Also check for simple hook calls
-            match = re.search(r"use\w+\([^)]*\);?", change.content_after)
-            if match:
-                return match.group(0)
-
         return None
 
     @staticmethod
@@ -73,31 +73,35 @@ class MergeHelpers:
         return None
 
     @staticmethod
+    def find_function_body_start(content: str, func_name: str) -> int | None:
+        """Where the body of ``func_name`` starts, just after its opening brace."""
+        name = re.escape(func_name)
+        patterns = [
+            # function Component() {
+            rf"function\s+{name}\s*\([^)]*\)\s*\{{",
+            # const Component = () => {
+            rf"(?:const|let|var)\s+{name}\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=]+)\s*=>\s*\{{",
+            # const Component = function() {
+            rf"(?:const|let|var)\s+{name}\s*=\s*function\s*\([^)]*\)\s*\{{",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, content)
+            if match:
+                return match.end()
+        return None
+
+    @staticmethod
     def insert_hooks_into_function(
         content: str,
         func_name: str,
         hooks: list[str],
     ) -> str:
         """Insert hooks at the start of a function."""
-        # Find function and insert hooks after opening brace
-        patterns = [
-            # function Component() {
-            rf"(function\s+{re.escape(func_name)}\s*\([^)]*\)\s*\{{)",
-            # const Component = () => {
-            rf"((?:const|let|var)\s+{re.escape(func_name)}\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=]+)\s*=>\s*\{{)",
-            # const Component = function() {
-            rf"((?:const|let|var)\s+{re.escape(func_name)}\s*=\s*function\s*\([^)]*\)\s*\{{)",
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, content)
-            if match:
-                insert_pos = match.end()
-                hook_text = "\n  " + "\n  ".join(hooks)
-                content = content[:insert_pos] + hook_text + content[insert_pos:]
-                break
-
-        return content
+        insert_pos = MergeHelpers.find_function_body_start(content, func_name)
+        if insert_pos is None or not hooks:
+            return content
+        hook_text = "\n  " + "\n  ".join(hooks)
+        return content[:insert_pos] + hook_text + content[insert_pos:]
 
     @staticmethod
     def wrap_function_return(
@@ -106,24 +110,35 @@ class MergeHelpers:
         wrapper_name: str,
         wrapper_props: str,
     ) -> str:
-        """Wrap the return statement of a function in a JSX component."""
-        # This is simplified - a real implementation would use AST
+        """Wrap the JSX that ``func_name`` returns in ``<wrapper_name>``.
 
-        # Find return statement with JSX
-        return_pattern = r"(return\s*\(\s*)(<[^>]+>)"
-
-        def replacer(match):
-            return_start = match.group(1)
-            jsx_start = match.group(2)
-            props = f" {wrapper_props}" if wrapper_props else ""
-            return f"{return_start}<{wrapper_name}{props}>\n      {jsx_start}"
-
-        content = re.sub(return_pattern, replacer, content, count=1)
-
-        # Also need to close the wrapper - this is tricky without proper parsing
-        # For now, we'll rely on the AI resolver for complex cases
-
-        return content
+        Both tags are written: the element is opened after ``return (`` and
+        closed before the parenthesis that matches it. A function that is not
+        found, or returns no parenthesized JSX, is left as it was.
+        """
+        body = MergeHelpers.find_function_body_start(content, func_name)
+        if body is None:
+            return content
+        match = re.compile(r"return\s*\(\s*(?=<)").search(content, body)
+        if match is None:
+            return content
+        depth = 0
+        close = None
+        for index in range(content.index("(", match.start()), len(content)):
+            if content[index] == "(":
+                depth += 1
+            elif content[index] == ")":
+                depth -= 1
+                if depth == 0:
+                    close = index
+                    break
+        if close is None:
+            return content
+        inner = content[match.end() : close]
+        jsx = inner.rstrip()
+        props = f" {wrapper_props}" if wrapper_props else ""
+        wrapped = f"<{wrapper_name}{props}>\n      {jsx}\n    </{wrapper_name}>"
+        return content[: match.end()] + wrapped + inner[len(jsx) :] + content[close:]
 
     @staticmethod
     def find_function_insert_position(content: str, ext: str) -> int | None:

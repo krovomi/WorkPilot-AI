@@ -139,13 +139,12 @@ class ConflictResolver:
                 ai_calls += ai_result.ai_calls_made
                 tokens_used += ai_result.tokens_used
 
-                if ai_result.success:
-                    # Apply AI-merged content
-                    merged_content = apply_ai_merge(
-                        merged_content,
-                        conflict.location,
-                        ai_result.merged_content or "",
-                    )
+                region = ai_result.merged_content or ""
+                placed = apply_ai_merge(merged_content, conflict.location, region)
+                # A region that could not be put back (the location was not
+                # found in the file) leaves the conflict open.
+                if ai_result.success and (placed != merged_content or region in placed):
+                    merged_content = placed
                     resolved.append(conflict)
                     continue
 

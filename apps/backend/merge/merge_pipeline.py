@@ -17,7 +17,8 @@ import logging
 
 from .conflict_detector import ConflictDetector
 from .conflict_resolver import ConflictResolver
-from .file_merger import apply_single_task_changes, combine_non_conflicting_changes
+from .faithfulness import describe, missing_changes
+from .file_merger import combine_non_conflicting_changes
 from .progress import MergeProgressCallback, MergeProgressStage
 from .types import (
     ChangeType,
@@ -83,27 +84,16 @@ class MergePipeline:
                 details={"current_file": file_path},
             )
 
-        # If only one task modified the file, no conflict possible
+        # One task: its worktree file is the merge. The baseline is the file
+        # as that task found it, so replaying its changes onto the baseline can
+        # only reproduce the worktree version, or lose what a pattern missed.
         if len(task_snapshots) == 1:
             snapshot = task_snapshots[0]
-
-            # Check if file has modifications but semantic analysis returned empty
-            # This happens for: function body changes, unsupported file types (Rust, Go, etc.)
-            # In this case, signal that the caller should use the worktree version directly
-            if snapshot.has_modifications and not snapshot.semantic_changes:
-                return MergeResult(
-                    decision=MergeDecision.DIRECT_COPY,
-                    file_path=file_path,
-                    merged_content=None,  # Caller must read from worktree
-                    explanation=f"File modified by {snapshot.task_id} but no semantic changes detected - use worktree version",
-                )
-
-            merged = apply_single_task_changes(baseline_content, snapshot, file_path)
             return MergeResult(
-                decision=MergeDecision.AUTO_MERGED,
+                decision=MergeDecision.DIRECT_COPY,
                 file_path=file_path,
-                merged_content=merged,
-                explanation=f"Single task ({snapshot.task_id}) changes applied",
+                merged_content=None,  # Caller must read from worktree
+                explanation=f"Only {snapshot.task_id} changed this file - use its version",
             )
 
         # Multiple tasks - need conflict detection
@@ -117,21 +107,41 @@ class MergePipeline:
             merged = combine_non_conflicting_changes(
                 baseline_content, task_snapshots, file_path
             )
-            return MergeResult(
-                decision=MergeDecision.AUTO_MERGED,
-                file_path=file_path,
-                merged_content=merged,
-                explanation="All changes compatible, combined automatically",
+            return self._checked(
+                MergeResult(
+                    decision=MergeDecision.AUTO_MERGED,
+                    file_path=file_path,
+                    merged_content=merged,
+                    explanation="All changes compatible, combined automatically",
+                ),
+                task_snapshots,
             )
 
         # Handle conflicts
-        return self.conflict_resolver.resolve_conflicts(
-            file_path=file_path,
-            baseline_content=baseline_content,
-            task_snapshots=task_snapshots,
-            conflicts=conflicts,
-            progress_callback=progress_callback,
+        return self._checked(
+            self.conflict_resolver.resolve_conflicts(
+                file_path=file_path,
+                baseline_content=baseline_content,
+                task_snapshots=task_snapshots,
+                conflicts=conflicts,
+                progress_callback=progress_callback,
+            ),
+            task_snapshots,
         )
+
+    @staticmethod
+    def _checked(
+        result: MergeResult, task_snapshots: list[TaskSnapshot]
+    ) -> MergeResult:
+        """A deterministic merge that left out a task's lines goes to review."""
+        if result.decision != MergeDecision.AUTO_MERGED or not result.merged_content:
+            return result
+        missing = missing_changes(result.merged_content, task_snapshots)
+        if missing:
+            logger.warning(f"Automatic merge of {result.file_path} left out changes")
+            result.decision = MergeDecision.NEEDS_HUMAN_REVIEW
+            result.explanation = describe(missing)
+        return result
 
     def _build_task_analyses(
         self,

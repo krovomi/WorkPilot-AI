@@ -34,17 +34,18 @@ class HooksStrategy(MergeStrategyHandler):
                 else:
                     other_changes.append(change)
 
-        # Find the function to modify
+        # The other task's edits first: they are written against the function
+        # as it was, before any hook moved its text.
+        for change in other_changes:
+            if change.content_after:
+                content = MergeHelpers.apply_content_change(
+                    content, change.content_before, change.content_after
+                )
+
         func_location = context.conflict.location
         if func_location.startswith("function:"):
             func_name = func_location.split(":")[1]
             content = MergeHelpers.insert_hooks_into_function(content, func_name, hooks)
-
-        # Apply other changes (simplified - just take the latest version)
-        for change in other_changes:
-            if change.content_after:
-                # This is a simplification - in production we'd need smarter merging
-                pass
 
         return MergeResult(
             decision=MergeDecision.AUTO_MERGED,

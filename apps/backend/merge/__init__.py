@@ -31,7 +31,6 @@ from .conflict_resolver import ConflictResolver
 from .file_evolution import FileEvolutionTracker
 from .file_merger import (
     apply_ai_merge,
-    apply_single_task_changes,
     combine_non_conflicting_changes,
     extract_location_content,
     find_import_end,
@@ -99,7 +98,6 @@ __all__ = [
     # Utilities
     "find_worktree",
     "get_file_from_branch",
-    "apply_single_task_changes",
     "combine_non_conflicting_changes",
     "find_import_end",
     "extract_location_content",
