@@ -549,14 +549,6 @@ AGENT_CONFIGS = {
         "auto_claude_tools": [],
         "thinking_default": "low",
     },
-    "migration": {
-        # migration/llm_transformer.py — before/after code in, improved code
-        # out as text; the transformer writes the file, not the model.
-        "tools": BASE_READ_TOOLS,
-        "mcp_servers": [],
-        "auto_claude_tools": [],
-        "thinking_default": "medium",
-    },
     # ═══════════════════════════════════════════════════════════════════════
     # ONE-SHOT FEATURES
     # ═══════════════════════════════════════════════════════════════════════

@@ -305,9 +305,10 @@ def _parse_trajectory_steps(buf: bytes) -> list[dict]:
             for fnum in (1, 2, 3):
                 val = _get_field(ed, fnum, 2)
                 if isinstance(val, bytes):
+                    # The first non-blank line, without its own padding.
                     s = val.decode("utf-8", errors="replace").strip()
                     if s:
-                        return s.split("\n")[0][:300]
+                        return s.split("\n")[0].strip()[:300]
             return ""
 
         err_msg = _get_field(sf, 24, 2)
