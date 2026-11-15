@@ -26,6 +26,7 @@ import {
 	writeProjectEnvFile,
 } from "../project-env-file";
 import { ensureProjectEnvIgnored } from "../project-initializer";
+import { withGhCliToken } from "./github/oauth-token";
 import { projectStore } from "../project-store";
 import {
 	envTemplateKeys,
@@ -1167,9 +1168,10 @@ ${otherLines.join("\n")}
 				}
 
 				// Generate new content
-				// A secret sent back as the mask ENV_GET showed keeps its stored value.
+				// A secret sent back as the mask ENV_GET showed keeps its stored value;
+				// the mask of a gh sign-in stands for the token gh holds now.
 				const newContent = generateEnvContent(
-					unmaskProjectEnvUpdate(config),
+					await withGhCliToken(config, unmaskProjectEnvUpdate(config)),
 					existingContent,
 				);
 
