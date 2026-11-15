@@ -10,6 +10,8 @@ import re
 from .capabilities import FANCY_UI
 from .icons import Icons, icon
 
+_ANSI = re.compile(r"\033\[[0-9;]*m")
+
 
 def box(
     content: str | list[str],
@@ -140,8 +142,12 @@ def box(
                             visible_chars += len(truncated)
                             break
 
-                line = "".join(result_segments) + "..."
-                padding = 0
+                # Close any colour left open, and pad to what is really shown
+                # (a cut at a word boundary leaves the line shorter).
+                styled = any(_ANSI.fullmatch(seg) for seg in result_segments)
+                reset = "\033[0m" if styled else ""
+                line = "".join(result_segments) + reset + "..."
+                padding = inner_width - (visible_chars + 3) - 2
 
         lines.append(v + " " + line + " " * (padding + 1) + v)
 

@@ -95,6 +95,19 @@ async def get_project_role(
     return highest_role(own, await group_project_role(db, user.id, project_id))
 
 
+def _administers_projects(request: Request) -> bool:
+    """Whether the caller manages who is on the projects of the organization
+    they act in (``project.member.write``, an organization administrator)."""
+    principal = getattr(request.state, "principal", None)
+    return principal is not None and principal.has("project.member.write")
+
+
+def effective_project_role(request: Request) -> str | None:
+    """The role ``require_project_role`` gave the caller on this request's
+    project: their own, their groups', or owner for an administrator."""
+    return getattr(request.state, "project_role", None)
+
+
 def require_project_role(minimum: str = ProjectRole.VIEWER.value):
     """Dependency factory: the route must have a ``project_id`` path param.
 
@@ -115,17 +128,29 @@ def require_project_role(minimum: str = ProjectRole.VIEWER.value):
     ) -> CurrentUser:
         org_id = getattr(request.state, "org_id", None)
         role = await get_project_role(db, user, project_id, org_id=org_id)
-        if role is None:
-            # As `server.authz.scope`: a project of another organization, or
-            # one the caller acts in no organization of, is reported missing
-            # like an unknown id, never as forbidden; only a project of the
-            # caller's own organization says that they are not a member.
+        if role != ProjectRole.OWNER.value:
             owner_org = await db.scalar(
                 select(Project.org_id).where(Project.id == project_id)
             )
-            if owner_org is None or owner_org != org_id:
+            if owner_org is not None and owner_org == org_id:
+                if _administers_projects(request):
+                    # An administrator of the organization owns each of its
+                    # projects, member or not, as the project list says
+                    # (`visible_projects`) and the project scope of the
+                    # shared features agrees (`load_project_scope`).
+                    role = ProjectRole.OWNER.value
+                elif role is None:
+                    raise HTTPException(
+                        status_code=403, detail="Not a member of this project"
+                    )
+            elif role is None:
+                # As `server.authz.scope`: a project of another organization,
+                # or one the caller acts in no organization of, is reported
+                # missing like an unknown id, never as forbidden; only a
+                # project of the caller's own organization says that they are
+                # not a member.
                 raise HTTPException(status_code=404, detail="Project not found")
-            raise HTTPException(status_code=403, detail="Not a member of this project")
+        request.state.project_role = role
         if _PROJECT_ROLE_RANK.get(role, -1) < _PROJECT_ROLE_RANK[minimum]:
             raise HTTPException(
                 status_code=403, detail=f"Requires project role '{minimum}' or higher"
