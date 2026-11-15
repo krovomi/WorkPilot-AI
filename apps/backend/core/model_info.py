@@ -98,13 +98,16 @@ def _detect_provider_from_env() -> str | None:
 def _is_copilot_available() -> bool:
     """Check if GitHub Copilot is available via gh CLI.
 
-    `run_secure` reports a missing `gh` or a timeout in its result rather than
+    `run_gh` starts the gh that `get_gh_executable` found (`GITHUB_CLI_PATH`,
+    the PATH with its Windows extensions, the usual install folders): a bare
+    `gh` never starts a `gh.cmd` on Windows nor one only `GITHUB_CLI_PATH`
+    names. It reports a missing gh or a timeout in its result rather than
     raising, so a machine without gh simply reads as "not logged in".
     """
-    from security.secure_subprocess import run_secure
+    from core.gh_executable import run_gh
 
-    result = run_secure(["gh", "auth", "status"], timeout=10)
-    return "Logged in to github.com" in result.output
+    result = run_gh(["auth", "status"], timeout=10)
+    return "Logged in to github.com" in result.stdout + result.stderr
 
 
 def _saved_model(*names: str) -> str | None:

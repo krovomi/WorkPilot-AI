@@ -13,7 +13,7 @@ import types
 from pathlib import Path
 
 import pytest
-from core import model_info
+from core import gh_executable, model_info
 
 import src.connectors.llm_config as llm_config
 
@@ -73,6 +73,9 @@ _gh_fake = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = _gh_fake
 _spec.loader.exec_module(_gh_fake)
 
+#: What `get_gh_executable` asks before it trusts a gh.
+GH_VERSION = {"--version": {"stdout": "gh version 2.83.0"}}
+
 PROVIDER_ENV = (
     "SELECTED_LLM_PROVIDER",
     "AUTO_CLAUDE_PROVIDER",
@@ -105,13 +108,18 @@ def machine(tmp_path, monkeypatch):
     gh = _gh_fake.write_fake_gh(
         tmp_path / "bin",
         {
+            **GH_VERSION,
             "auth status": {
                 "stderr": "You are not logged into any GitHub hosts.",
                 "code": 1,
-            }
+            },
         },
     )
     monkeypatch.setenv("PATH", str(gh.directory))
+    # Found on this PATH only: no cached gh, no GITHUB_CLI_PATH, no install folder.
+    monkeypatch.delenv("GITHUB_CLI_PATH", raising=False)
+    monkeypatch.setattr(gh_executable, "_cached_gh_path", None)
+    monkeypatch.setattr(gh_executable, "_check_platform_paths", lambda: None)
 
     def save(configs: dict) -> None:
         saved.write_text(json.dumps(configs), encoding="utf-8")
@@ -140,10 +148,30 @@ def test_the_provider_is_read_from_its_credential(
 
 def test_a_gh_logged_in_means_copilot(machine):
     _, gh = machine
-    gh.answer({"auth status": {"stdout": "✓ Logged in to github.com account dana"}})
+    gh.answer(
+        {
+            **GH_VERSION,
+            "auth status": {"stdout": "✓ Logged in to github.com account dana"},
+        }
+    )
 
     assert model_info._detect_provider_from_env() == "copilot"
-    assert gh.calls() == [["auth", "status"]]
+    assert gh.calls()[-1] == ["auth", "status"]
+
+
+def test_a_gh_named_only_by_its_setting_is_found(machine, tmp_path, monkeypatch):
+    """The desktop app passes the gh it found as GITHUB_CLI_PATH, off the PATH."""
+    _, gh = machine
+    gh.answer(
+        {
+            **GH_VERSION,
+            "auth status": {"stderr": "✓ Logged in to github.com account dana"},
+        }
+    )
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setenv("GITHUB_CLI_PATH", str(gh.path))
+
+    assert model_info._is_copilot_available() is True
 
 
 def test_nothing_configured_reads_as_unknown(machine):
