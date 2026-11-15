@@ -542,6 +542,37 @@ async def test_a_job_left_running_by_a_stopped_server_is_settled(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_a_job_that_finishes_as_a_teammate_looks_keeps_its_result(
+    tmp_path, fake_runner, monkeypatch
+):
+    """A teammate opening the feature settles orphans. Doing so in the moment
+    the job is storing its result must not take it for a job a stopped server
+    left behind and record it failed."""
+    from server.services import project_jobs
+
+    project_id, org_id, clone = await _project(tmp_path)
+    routes = _routes()
+    scope = _scope(project_id, org_id, clone)
+    seen: list[str] = []
+    store = project_jobs._set_status
+
+    async def a_teammate_looks_first(job_id, status, error=None):
+        if status in project_jobs.FINAL:
+            async with await _session() as db:
+                snapshot = await routes[("GET", "/snapshot")](
+                    scope=_scope(project_id, org_id, clone, "viewer"), db=db
+                )
+            seen.append(snapshot["job"]["status"])
+        await store(job_id, status, error)
+
+    monkeypatch.setattr(project_jobs, "_set_status", a_teammate_looks_first)
+    job = await routes[("POST", "/jobs")](request=_request(), options={}, scope=scope)
+    done = await _wait_final(job["id"])
+    assert seen == ["running"]
+    assert done.status == "succeeded", done.error
+
+
+@pytest.mark.asyncio
 async def test_an_idea_becomes_a_card_of_the_shared_board(tmp_path, events):
     from fastapi import HTTPException
     from shared_features.ideation import convert_idea

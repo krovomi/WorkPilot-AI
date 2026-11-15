@@ -9,33 +9,42 @@ summarized and passed as context to subsequent phases.
 
 from pathlib import Path
 
-from core.auth import require_auth_token
-from core.simple_client import create_simple_client
+_SYSTEM_PROMPT = (
+    "You are a concise technical summarizer. Extract only the most "
+    "critical information from phase outputs. Use bullet points. "
+    "Focus on decisions, discoveries, and actionable insights."
+)
 
 
 async def summarize_phase_output(
     phase_name: str,
     phase_output: str,
-    model: str = "sonnet",  # Shorthand - resolved via API Profile if configured
+    *,
+    project_dir: Path,
+    spec_dir: Path,
+    model: str = "sonnet",  # Shorthand - resolved for the task's provider
     target_words: int = 500,
 ) -> str:
     """
     Summarize phase output to a concise summary for subsequent phases.
 
-    Uses Sonnet for cost efficiency since this is a simple summarization task.
+    The summary runs on the task's own provider (``create_agent_client``),
+    like the spec phases it summarizes. It used to demand the Claude Code OAuth
+    token and open a Claude-only client, so on any other provider every phase
+    printed "Phase summarization skipped: No OAuth token found" and no later
+    phase got a summary.
 
     Args:
         phase_name: Name of the completed phase (e.g., 'discovery', 'requirements')
         phase_output: Full output content from the phase (file contents, decisions)
-        model: Model to use for summarization (defaults to Sonnet for efficiency)
+        project_dir: The project the spec is for
+        spec_dir: The spec directory (provider and usage ledger)
+        model: The spec pipeline's model
         target_words: Target summary length in words (~500-1000 recommended)
 
     Returns:
         Concise summary of key findings, decisions, and insights from the phase
     """
-    # Validate auth token
-    require_auth_token()
-
     # Limit input size to avoid token overflow
     max_input_chars = 15000
     truncated_output = phase_output[:max_input_chars]
@@ -58,29 +67,27 @@ Be concise and use bullet points. Skip boilerplate and meta-commentary.
 ## Summary:
 """
 
-    client = create_simple_client(
-        agent_type="spec_compaction",
-        model=model,
-        system_prompt=(
-            "You are a concise technical summarizer. Extract only the most "
-            "critical information from phase outputs. Use bullet points. "
-            "Focus on decisions, discoveries, and actionable insights."
-        ),
-    )
-
     try:
+        from agents.session import record_client_usage
+        from core.agent_client import ContentBlockType
+        from core.client import create_agent_client
+
+        client = create_agent_client(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            agent_type="spec_compaction",
+            system_prompt=_SYSTEM_PROMPT,
+        )
+        response_text = ""
         async with client:
             await client.query(prompt)
-            response_text = ""
             async for msg in client.receive_response():
-                msg_type = type(msg).__name__
-                if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                    for block in msg.content:
-                        # Must check block type - only TextBlock has .text attribute
-                        block_type = type(block).__name__
-                        if block_type == "TextBlock" and hasattr(block, "text"):
-                            response_text += block.text
-            return response_text.strip()
+                for block in getattr(msg, "content", None) or []:
+                    if block.type == ContentBlockType.TEXT and block.text:
+                        response_text += block.text
+        record_client_usage(client, spec_dir, "spec", agent_type="spec_compaction")
+        return response_text.strip()
     except Exception as e:
         # Fallback: return truncated raw output on error
         # This ensures we don't block the pipeline if summarization fails
@@ -127,13 +134,13 @@ def gather_phase_outputs(spec_dir: Path, phase_name: str) -> str:
 
     # Map phases to their expected output files
     phase_outputs: dict[str, list[str]] = {
-        "discovery": ["context.json"],
+        "discovery": ["project_index.json"],
         "requirements": ["requirements.json"],
         "research": ["research.json"],
         "context": ["context.json"],
         "quick_spec": ["spec.md"],
         "spec_writing": ["spec.md"],
-        "self_critique": ["spec.md", "critique_notes.md"],
+        "self_critique": ["spec.md", "critique_report.json"],
         "planning": ["implementation_plan.json"],
         "validation": [],  # No output files to summarize
     }

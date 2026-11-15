@@ -15,60 +15,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
-# Helper function to import modules directly
-def import_module_direct(module_name, file_path):
-    """Import a module directly from file path, bypassing package __init__.py"""
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-# Import modules directly to avoid circular import issues in __init__.py
-# First import exceptions and models, then connector (which depends on them)
-project_root = Path(__file__).parent.parent.parent.parent
-
-# Import exceptions first
-exceptions_module = import_module_direct(
-    "jira_exceptions", project_root / "src" / "connectors" / "jira" / "exceptions.py"
+from src.connectors.jira.connector import JiraConnector
+from src.connectors.jira.models import (
+    JiraComment,
+    JiraIssue,
+    JiraProject,
+    JiraStatus,
+    JiraTransition,
+    JiraUser,
+    _extract_adf_text,
 )
-models_module = import_module_direct(
-    "jira_models", project_root / "src" / "connectors" / "jira" / "models.py"
-)
-client_module = import_module_direct(
-    "jira_client", project_root / "src" / "connectors" / "jira" / "client.py"
-)
-
-# Make modules available in sys.modules so connector can import them
-# Create a proper package structure
-jira_package = type(
-    "Package",
-    (),
-    {"exceptions": exceptions_module, "models": models_module, "client": client_module},
-)()
-sys.modules["src.connectors.jira.exceptions"] = exceptions_module
-sys.modules["src.connectors.jira.models"] = models_module
-sys.modules["src.connectors.jira.client"] = client_module
-sys.modules["src.connectors.jira"] = jira_package
-sys.modules["src.connectors"] = type("Package", (), {"jira": jira_package})()
-
-# Now import connector
-connector_module = import_module_direct(
-    "jira_connector", project_root / "src" / "connectors" / "jira" / "connector.py"
-)
-
-JiraConnector = connector_module.JiraConnector
-JiraComment = models_module.JiraComment
-JiraIssue = models_module.JiraIssue
-JiraProject = models_module.JiraProject
-JiraStatus = models_module.JiraStatus
-JiraTransition = models_module.JiraTransition
-JiraUser = models_module.JiraUser
-
 
 # ── Fixtures ─────────────────────────────────────────────────────
 
@@ -642,7 +598,7 @@ class TestJiraModels:
 class TestExtractAdfText:
     """Tests for _extract_adf_text helper (ADF → plain text extraction)."""
 
-    _extract_adf_text = staticmethod(models_module._extract_adf_text)
+    _extract_adf_text = staticmethod(_extract_adf_text)
 
     def test_plain_text_node(self):
         """Returns the text value for a leaf text node."""

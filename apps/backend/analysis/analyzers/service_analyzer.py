@@ -144,7 +144,7 @@ class ServiceAnalyzer(BaseAnalyzer):
             dir_path = self.path / dir_name
             if dir_path.exists() and dir_path.is_dir():
                 key_dirs[dir_name] = {
-                    "path": str(dir_path.relative_to(self.path)),
+                    "path": dir_path.relative_to(self.path).as_posix(),
                     "purpose": purpose,
                 }
 
@@ -262,8 +262,9 @@ class ServiceAnalyzer(BaseAnalyzer):
             self.analysis["api"] = {
                 "routes": routes,
                 "total_routes": len(routes),
-                "methods": list(
-                    set(method for r in routes for method in r.get("methods", []))
+                # Sorted: a set's order changed the index from run to run.
+                "methods": sorted(
+                    {method for r in routes for method in r.get("methods", [])}
                 ),
                 "protected_routes": [
                     r["path"] for r in routes if r.get("requires_auth")
