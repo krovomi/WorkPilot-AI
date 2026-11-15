@@ -238,8 +238,8 @@ export function useChangelog() {
 		}
 	};
 
-	const handleCopy = () => {
-		const success = copyChangelogToClipboard();
+	const handleCopy = async () => {
+		const success = await copyChangelogToClipboard();
 		if (success) {
 			setCopySuccess(true);
 			setTimeout(() => setCopySuccess(false), 2000);
