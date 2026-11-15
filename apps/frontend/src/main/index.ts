@@ -695,6 +695,9 @@ async function startBackend() {
 		);
 	}
 	const providerApiModule = "provider_api:app";
+	// main/index.ts is never loaded by a unit test (it starts the app on
+	// import); the arguments are tested in backend-reload-args.test.ts.
+	/* v8 ignore next */
 	const reloadArgs = backendReloadArgs(backendDir, is.dev);
 	backendProcess = spawn(
 		pythonPath,
