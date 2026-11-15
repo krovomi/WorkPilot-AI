@@ -1,21 +1,22 @@
 """
 ClaudeSDKRuntime: AgentRuntime for Claude Agent SDK
 
-Uses the Claude Agent SDK for direct integration with Claude models.
-Provides tool execution through MCP servers and streaming capabilities.
+Uses the Claude Agent SDK for direct integration with Claude models: one
+prompt, one answer (`run_session`). It had a `stream_session` too, which
+awaited an async generator and so failed on its first message; nothing called
+it, and it is gone with the abstract method that required it.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from src.connectors.llm_config import ProviderConfig
 
-from core.runtime import AgentRuntime, SessionResult, SessionStatus, StreamEvent
+from core.runtime import AgentRuntime, SessionResult, SessionStatus
 from core.simple_client import create_simple_client
 
 logger = logging.getLogger(__name__)
@@ -166,80 +167,6 @@ class ClaudeSDKRuntime(AgentRuntime):
             response_text += f"\n[Thinking] {block.thinking}\n"
 
         return response_text, tool_calls_count
-
-    async def stream_session(
-        self,
-        prompt: str,
-        tools: list[dict[str, Any]] | None = None,
-        **kwargs,
-    ):
-        """
-        Run a Claude SDK session with streaming events.
-
-        Emits events for text, tool execution, and completion.
-        """
-        if not self.client:
-            yield StreamEvent("error", {"error": "Claude SDK client not initialized"})
-            return
-
-        try:
-            async with self.client:
-                await self.client.query(prompt)
-
-                # Stream response messages as events
-                async for msg in self.client.receive_response():
-                    await self._stream_message_events(msg)
-
-                # Signal completion
-                yield StreamEvent("done", {"status": "completed"})
-
-        except Exception as e:
-            # Avoid surfacing str(e) to streaming subscribers — it can leak
-            # request IDs and local paths to anyone watching the WS.
-            logger.exception("Claude SDK streaming failed")
-            yield StreamEvent("error", {"error": type(e).__name__})
-            yield StreamEvent("done", {"status": "error"})
-
-    async def _stream_message_events(self, msg) -> AsyncGenerator[StreamEvent, None]:
-        """Stream events from a single SDK message."""
-        msg_type = type(msg).__name__
-
-        if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-            for block in msg.content:
-                async for event in self._stream_content_block_events(block):
-                    yield event
-
-        # Emit usage information if available
-        if hasattr(msg, "usage") and msg.usage:
-            yield StreamEvent("usage", {"usage": msg.usage})
-
-    async def _stream_content_block_events(
-        self, block
-    ) -> AsyncGenerator[StreamEvent, None]:
-        """Stream events from a content block."""
-        block_type = type(block).__name__
-
-        if block_type == "TextBlock" and hasattr(block, "text"):
-            # Stream text content
-            yield StreamEvent("text", {"content": block.text})
-
-        elif block_type == "ToolUseBlock":
-            # Stream tool execution events
-            async for event in self._stream_tool_events(block):
-                yield event
-
-        elif block_type == "ThinkingBlock" and hasattr(block, "thinking"):
-            # Stream thinking content
-            yield StreamEvent("thinking", {"content": block.thinking})
-
-    async def _stream_tool_events(self, block) -> AsyncGenerator[StreamEvent, None]:
-        """Stream tool execution events."""
-        tool_name = getattr(block, "name", "unknown")
-        yield StreamEvent("tool_start", {"tool": tool_name})
-
-        # Tool execution happens automatically in SDK
-        # We'll emit tool_end when we see the result
-        yield StreamEvent("tool_end", {"tool": tool_name})
 
     async def __aenter__(self):
         """Async context manager entry."""

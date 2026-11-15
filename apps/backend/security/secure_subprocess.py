@@ -162,21 +162,3 @@ def run_secure(
             stderr=f"Command not found: {args[0]}",
             command=cmd_str,
         )
-
-
-def check_tool_available(tool: str, *, timeout: int = 5) -> bool:
-    """
-    Check if a CLI tool is available on the system.
-
-    Args:
-        tool: The tool name (must be in ALLOWED_COMMANDS).
-        timeout: Timeout for the version check.
-
-    Returns:
-        True if the tool is available and responds to --version.
-    """
-    try:
-        result = run_secure([tool, "--version"], timeout=timeout)
-        return result.returncode == 0
-    except SubprocessSecurityError:
-        return False

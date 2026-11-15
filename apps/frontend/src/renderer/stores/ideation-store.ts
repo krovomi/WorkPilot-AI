@@ -395,7 +395,9 @@ export async function loadIdeation(projectId: string): Promise<void> {
 	// Set the current project ID (this clears state if switching projects)
 	store.setCurrentProjectId(projectId);
 
-	if (store.isGenerating) {
+	// Read the state again: switching project resets isGenerating, and the
+	// snapshot taken above still says the previous project was generating.
+	if (useIdeationStore.getState().isGenerating) {
 		store.setIsLoadingSession(false);
 		return;
 	}
@@ -423,10 +425,6 @@ export async function loadIdeation(projectId: string): Promise<void> {
 export function generateIdeation(projectId: string): void {
 	const store = useIdeationStore.getState();
 	const config = store.config;
-
-	if (window.DEBUG) {
-		// noop
-	}
 
 	clearGenerationTimeout(projectId);
 
@@ -472,11 +470,6 @@ export function generateIdeation(projectId: string): void {
 export async function stopIdeation(projectId: string): Promise<boolean> {
 	const store = useIdeationStore.getState();
 
-	// Debug logging
-	if (window.DEBUG) {
-		// noop
-	}
-
 	store.setIsGenerating(false);
 	store.addLog("Stopping ideation generation...");
 	store.setGenerationStatus({
@@ -486,11 +479,6 @@ export async function stopIdeation(projectId: string): Promise<boolean> {
 	});
 
 	const result = await window.electronAPI.stopIdeation(projectId);
-
-	// Debug logging
-	if (window.DEBUG) {
-		// noop
-	}
 
 	if (!result.success) {
 		// Backend couldn't find/stop the process (likely already finished/crashed)
@@ -603,11 +591,11 @@ export function appendIdeation(
 	store.clearLogs();
 	store.setIsGenerating(true);
 
-	const newTypeStates = { ...store.typeStates };
-	typesToAdd.forEach((type) => {
-		newTypeStates[type] = "generating";
-	});
-	store.initializeTypeStates(typesToAdd);
+	// Only the added types start generating: the types already generated keep
+	// their state (initializeTypeStates would turn them back to pending).
+	for (const type of typesToAdd) {
+		store.setTypeState(type, "generating");
+	}
 
 	store.addLog(`Adding ${typesToAdd.length} new ideation types...`);
 	store.setGenerationStatus({
@@ -714,16 +702,9 @@ export function setupIdeationListeners(): () => void {
 		(projectId, status) => {
 			// Only process events for the current project
 			if (!isCurrentProject(projectId)) {
-				if (window.DEBUG) {
-					// noop
-				}
 				return;
 			}
 
-			// Debug logging
-			if (window.DEBUG) {
-				// noop
-			}
 			store().setGenerationStatus(status);
 		},
 	);
@@ -739,15 +720,7 @@ export function setupIdeationListeners(): () => void {
 		(projectId, ideationType, ideas) => {
 			// Only process events for the current project
 			if (!isCurrentProject(projectId)) {
-				if (window.DEBUG) {
-					// noop
-				}
 				return;
-			}
-
-			// Debug logging
-			if (window.DEBUG) {
-				// noop
 			}
 
 			store().addIdeasForType(ideationType, ideas);
@@ -799,14 +772,7 @@ export function setupIdeationListeners(): () => void {
 		(projectId, session) => {
 			// Only process events for the current project
 			if (!isCurrentProject(projectId)) {
-				if (window.DEBUG) {
-					// noop
-				}
 				return;
-			}
-
-			if (window.DEBUG) {
-				// noop
 			}
 
 			clearGenerationTimeout(projectId);
@@ -847,10 +813,6 @@ export function setupIdeationListeners(): () => void {
 	const unsubStopped = window.electronAPI.onIdeationStopped((projectId) => {
 		// Only process events for the current project
 		if (!isCurrentProject(projectId)) return;
-
-		if (window.DEBUG) {
-			// noop
-		}
 
 		clearGenerationTimeout(projectId);
 

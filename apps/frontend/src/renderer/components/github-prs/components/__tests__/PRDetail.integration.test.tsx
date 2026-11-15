@@ -36,6 +36,11 @@ Object.defineProperty(globalThis, "electronAPI", {
 			checkMergeReadiness: vi.fn().mockResolvedValue({
 				blockers: [],
 			}),
+			getReviewFindingFeedback: vi.fn().mockResolvedValue({
+				success: true,
+				feedback: {},
+			}),
+			setReviewFindingFeedback: vi.fn(),
 		},
 	},
 });
