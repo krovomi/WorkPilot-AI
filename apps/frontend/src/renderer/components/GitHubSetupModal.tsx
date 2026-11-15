@@ -54,8 +54,7 @@ type SetupStep =
 	| "claude-auth"
 	| "repo-confirm"
 	| "repo"
-	| "branch"
-	| "complete";
+	| "branch";
 
 /**
  * Setup Modal - Required setup flow after WorkPilot AI initialization
@@ -147,7 +146,7 @@ export function GitHubSetupModal({
 			}
 		} catch (err) {
 			setError(
-				err instanceof Error ? err.message : "Failed to detect repository",
+				err instanceof Error ? err.message : t("dialogs:githubSetup.errors.detectFailed"),
 			);
 			await loadUserAndOrgs();
 			setStep("repo");
@@ -225,8 +224,11 @@ export function GitHubSetupModal({
 
 			checkExistingAuth();
 		}
+		// Only on open: `detectRepository` is a new function each render, and as
+		// a dependency it re-ran this reset after every render, a loop React
+		// stops with "Maximum update depth exceeded".
 		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [open, detectRepository, project.name.replaceAll]);
+	}, [open]);
 
 	// Load branches from GitHub
 	const loadBranches = async (repo: string) => {
@@ -247,10 +249,10 @@ export function GitHubSetupModal({
 				setRecommendedBranch(recommended);
 				setSelectedBranch(recommended);
 			} else {
-				setError(result.error || "Failed to load branches");
+				setError(result.error || t("dialogs:githubSetup.errors.branchesFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load branches");
+			setError(err instanceof Error ? err.message : t("dialogs:githubSetup.errors.branchesFailed"));
 		} finally {
 			setIsLoadingBranches(false);
 		}
@@ -305,14 +307,10 @@ export function GitHubSetupModal({
 	};
 
 	// Handle creating a new GitHub repository
+	// The Create button stays disabled until a name is typed.
 	const handleCreateRepo = async () => {
-		if (!newRepoName.trim()) {
-			setError("Please enter a repository name");
-			return;
-		}
-
 		if (!selectedOwner) {
-			setError("Please select an owner for the repository");
+			setError(t("dialogs:githubSetup.errors.ownerRequired"));
 			return;
 		}
 
@@ -336,11 +334,11 @@ export function GitHubSetupModal({
 				setStep("branch");
 				await loadBranches(result.data.fullName);
 			} else {
-				setError(result.error || "Failed to create repository");
+				setError(result.error || t("dialogs:githubSetup.errors.createFailed"));
 			}
 		} catch (err) {
 			setError(
-				err instanceof Error ? err.message : "Failed to create repository",
+				err instanceof Error ? err.message : t("dialogs:githubSetup.errors.createFailed"),
 			);
 		} finally {
 			setIsCreatingRepo(false);
@@ -362,15 +360,11 @@ export function GitHubSetupModal({
 	};
 
 	// Handle linking to an existing GitHub repository
+	// The Link button stays disabled until a repository is typed.
 	const handleLinkRepo = async () => {
-		if (!existingRepoName.trim()) {
-			setError("Please enter a repository name (owner/repo format)");
-			return;
-		}
-
 		// Validate format
 		if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(existingRepoName.trim())) {
-			setError("Invalid format. Use owner/repo (e.g., username/my-project)");
+			setError(t("dialogs:githubSetup.errors.repoPathInvalid"));
 			return;
 		}
 
@@ -389,10 +383,10 @@ export function GitHubSetupModal({
 				setStep("branch");
 				await loadBranches(existingRepoName.trim());
 			} else {
-				setError(result.error || "Failed to add remote");
+				setError(result.error || t("dialogs:githubSetup.errors.linkFailed"));
 			}
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to add remote");
+			setError(err instanceof Error ? err.message : t("dialogs:githubSetup.errors.linkFailed"));
 		} finally {
 			setIsCreatingRepo(false);
 		}
@@ -421,8 +415,9 @@ export function GitHubSetupModal({
 		return authSteps.includes(currentStep) ? 0 : 1;
 	};
 
-	// Step content components
-	const GitHubAuthStep = () => (
+	// Step content, called as functions: as <Components /> defined inside this one, each
+	// render made them new types, so React remounted them and the inputs lost focus.
+	const renderGitHubAuthStep = () => (
 		<>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
@@ -443,7 +438,7 @@ export function GitHubSetupModal({
 		</>
 	);
 
-	const ClaudeAuthStep = () => (
+	const renderClaudeAuthStep = () => (
 		<>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
@@ -464,7 +459,7 @@ export function GitHubSetupModal({
 		</>
 	);
 
-	const RepoConfirmStep = () => (
+	const renderRepoConfirmStep = () => (
 		<>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
@@ -512,7 +507,7 @@ export function GitHubSetupModal({
 		</>
 	);
 
-	const RepoStep = () => (
+	const renderRepoStep = () => (
 		<>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
@@ -556,10 +551,10 @@ export function GitHubSetupModal({
 				)}
 
 				{/* Create new repo form */}
-				{repoAction === "create" && <CreateRepoForm />}
+				{repoAction === "create" && renderCreateRepoForm()}
 
 				{/* Link existing repo form */}
-				{repoAction === "link" && <LinkRepoForm />}
+				{repoAction === "link" && renderLinkRepoForm()}
 
 				{error && (
 					<div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
@@ -630,7 +625,7 @@ export function GitHubSetupModal({
 		</>
 	);
 
-	const CreateRepoForm = () => (
+	const renderCreateRepoForm = () => (
 		<div className="space-y-4">
 			<div className="flex items-center gap-2 text-sm text-muted-foreground">
 				<button
@@ -645,7 +640,7 @@ export function GitHubSetupModal({
 			</div>
 
 			{/* Owner selection */}
-			<OwnerSelection />
+			{renderOwnerSelection()}
 
 			<div className="space-y-2">
 				<Label htmlFor="repo-name">{t("dialogs:githubSetup.repoName")}</Label>
@@ -664,11 +659,11 @@ export function GitHubSetupModal({
 				</div>
 			</div>
 
-			<VisibilitySelection />
+			{renderVisibilitySelection()}
 		</div>
 	);
 
-	const OwnerSelection = () => (
+	const renderOwnerSelection = () => (
 		<div className="space-y-2">
 			<Label>{t("dialogs:githubSetup.owner")}</Label>
 			{isLoadingOrgs ? (
@@ -737,7 +732,7 @@ export function GitHubSetupModal({
 		</div>
 	);
 
-	const VisibilitySelection = () => (
+	const renderVisibilitySelection = () => (
 		<div className="space-y-2">
 			<Label>{t("dialogs:githubSetup.visibility")}</Label>
 			<div
@@ -758,7 +753,7 @@ export function GitHubSetupModal({
 					role="radio"
 					aria-checked={isPrivateRepo}
 					aria-label={t("githubSetup.selectVisibilityAriaLabel", {
-						visibility: "private",
+						visibility: t("dialogs:githubSetup.private"),
 					})}
 				>
 					<Lock className="h-4 w-4" />
@@ -777,7 +772,7 @@ export function GitHubSetupModal({
 					role="radio"
 					aria-checked={!isPrivateRepo}
 					aria-label={t("githubSetup.selectVisibilityAriaLabel", {
-						visibility: "public",
+						visibility: t("dialogs:githubSetup.public"),
 					})}
 				>
 					<Globe className="h-4 w-4" />
@@ -787,7 +782,7 @@ export function GitHubSetupModal({
 		</div>
 	);
 
-	const LinkRepoForm = () => (
+	const renderLinkRepoForm = () => (
 		<div className="space-y-4">
 			<div className="flex items-center gap-2 text-sm text-muted-foreground">
 				<button
@@ -817,7 +812,7 @@ export function GitHubSetupModal({
 		</div>
 	);
 
-	const BranchStep = () => (
+	const renderBranchStep = () => (
 		<>
 			<DialogHeader>
 				<DialogTitle className="flex items-center gap-2">
@@ -843,7 +838,7 @@ export function GitHubSetupModal({
 				)}
 
 				{/* Branch selector */}
-				<BranchSelector />
+				{renderBranchSelector()}
 
 				{/* Info about branch selection */}
 				<div className="rounded-lg border border-info/30 bg-info/5 p-3">
@@ -884,7 +879,7 @@ export function GitHubSetupModal({
 		</>
 	);
 
-	const BranchSelector = () => (
+	const renderBranchSelector = () => (
 		<div className="space-y-2">
 			<Label>{t("dialogs:githubSetup.baseBranch")}</Label>
 			<Select
@@ -932,44 +927,19 @@ export function GitHubSetupModal({
 		</div>
 	);
 
-	const CompleteStep = () => (
-		<>
-			<DialogHeader>
-				<DialogTitle className="flex items-center gap-2">
-					<CheckCircle2 className="h-5 w-5 text-success" />
-					{t("dialogs:githubSetup.setupComplete")}
-				</DialogTitle>
-			</DialogHeader>
-
-			<div className="py-8 flex flex-col items-center justify-center">
-				<div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mb-4">
-					<CheckCircle2 className="h-8 w-8 text-success" />
-				</div>
-				<p className="text-sm text-muted-foreground text-center">
-					{t("dialogs:githubSetup.readyBefore")}{" "}
-					<code className="px-1 bg-muted rounded">{selectedBranch}</code>.
-				</p>
-			</div>
-		</>
-	);
-
 	// Render step content
 	const renderStepContent = () => {
 		switch (step) {
 			case "github-auth":
-				return <GitHubAuthStep />;
+				return renderGitHubAuthStep();
 			case "claude-auth":
-				return <ClaudeAuthStep />;
+				return renderClaudeAuthStep();
 			case "repo-confirm":
-				return <RepoConfirmStep />;
+				return renderRepoConfirmStep();
 			case "repo":
-				return <RepoStep />;
+				return renderRepoStep();
 			case "branch":
-				return <BranchStep />;
-			case "complete":
-				return <CompleteStep />;
-			default:
-				return null;
+				return renderBranchStep();
 		}
 	};
 
@@ -990,12 +960,9 @@ export function GitHubSetupModal({
 
 	const renderProgress = () => {
 		const steps: { label: string }[] = [
-			{ label: "Authenticate" },
-			{ label: "Configure" },
+			{ label: t("dialogs:githubSetup.progressAuthenticate") },
+			{ label: t("dialogs:githubSetup.progressConfigure") },
 		];
-
-		// Don't show progress on complete step
-		if (step === "complete") return null;
 
 		// Map steps to progress indices
 		// Auth steps (github-auth, claude-auth, repo-confirm, repo) = 0

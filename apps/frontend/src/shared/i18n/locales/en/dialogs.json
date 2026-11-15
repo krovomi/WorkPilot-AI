@@ -85,7 +85,6 @@
 		"branchDescription": "Choose which branch WorkPilot AI should use as the base for creating task branches.",
 		"whyBranch": "Why select a branch?",
 		"branchExplanation": "WorkPilot AI creates isolated workspaces for each task. Selecting the right base branch ensures your tasks start with the latest code from your main development line.",
-		"ready": "WorkPilot AI is ready to use! You can now create tasks that will be automatically based on the {{branchName}} branch.",
 		"createRepoAriaLabel": "Create new repository on GitHub",
 		"linkRepoAriaLabel": "Link to existing repository",
 		"goBackAriaLabel": "Go back to repository selection",
@@ -126,9 +125,17 @@
 		"recommended": "Recommended",
 		"branchHintBefore": "All tasks will be created from branches like",
 		"branchHintBasedOn": "based on",
-		"setupComplete": "Setup Complete",
-		"readyBefore": "WorkPilot AI is ready to use! You can now create tasks that will be automatically based on",
-		"retryDetection": "Retry Detection"
+		"retryDetection": "Retry Detection",
+		"progressAuthenticate": "Authenticate",
+		"progressConfigure": "Configure",
+		"errors": {
+			"detectFailed": "Could not detect the repository.",
+			"branchesFailed": "Could not load the branches.",
+			"ownerRequired": "Choose who owns the repository.",
+			"createFailed": "Could not create the repository.",
+			"repoPathInvalid": "Use the owner/repo form, for example username/my-project.",
+			"linkFailed": "Could not add the remote."
+		}
 	},
 	"repoProvider": {
 		"title": "Remote Provider",

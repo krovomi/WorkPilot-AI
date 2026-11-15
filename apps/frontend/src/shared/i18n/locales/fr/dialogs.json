@@ -85,7 +85,6 @@
 		"branchDescription": "Choisissez quelle branche WorkPilot AI doit utiliser comme base pour créer les branches de tâches.",
 		"whyBranch": "Pourquoi sélectionner une branche ?",
 		"branchExplanation": "WorkPilot AI crée des espaces de travail isolés pour chaque tâche. Sélectionner la bonne branche de base garantit que vos tâches démarrent avec le code le plus récent de votre ligne de développement principale.",
-		"ready": "WorkPilot AI est prêt à l'emploi ! Vous pouvez maintenant créer des tâches qui seront automatiquement basées sur la branche {{branchName}}.",
 		"createRepoAriaLabel": "Créer un nouveau dépôt sur GitHub",
 		"linkRepoAriaLabel": "Lier à un dépôt existant",
 		"goBackAriaLabel": "Retourner à la sélection du dépôt",
@@ -126,9 +125,17 @@
 		"recommended": "Recommandée",
 		"branchHintBefore": "Toutes les tâches seront créées depuis des branches comme",
 		"branchHintBasedOn": "basées sur",
-		"setupComplete": "Configuration terminée",
-		"readyBefore": "WorkPilot AI est prêt ! Vous pouvez maintenant créer des tâches qui partiront automatiquement de",
-		"retryDetection": "Relancer la détection"
+		"retryDetection": "Relancer la détection",
+		"progressAuthenticate": "Authentification",
+		"progressConfigure": "Configuration",
+		"errors": {
+			"detectFailed": "Impossible de détecter le dépôt.",
+			"branchesFailed": "Impossible de charger les branches.",
+			"ownerRequired": "Choisissez le propriétaire du dépôt.",
+			"createFailed": "Impossible de créer le dépôt.",
+			"repoPathInvalid": "Utilisez la forme propriétaire/dépôt, par exemple utilisateur/mon-projet.",
+			"linkFailed": "Impossible d'ajouter le dépôt distant."
+		}
 	},
 	"repoProvider": {
 		"title": "Choisir le fournisseur distant",
