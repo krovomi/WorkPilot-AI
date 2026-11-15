@@ -12,7 +12,10 @@ The server is ``stack.py``'s (migrations, streaming server, API under uvicorn,
 a fake agent in place of the model) on a SQLite database in a temporary
 directory, unless ``WORKPILOT_E2E_DATABASE_URL`` names another one. Two
 organizations: in the first, Alice (its administrator, who registers the
-project) and Bob (a member of the project); in the second, Carol. Their
+projects) and Bob (a member of each); in the second, Carol. "Team Board" is
+cloned from a local repository; "Team Site" from GitHub and "Team Docs" from
+GitLab, both served by the fake forges of ``fake_forge.py``, whose address
+(``forgeUrl``) gives the spec what they were asked. Their
 passwords stay with the spec that drew them; the platform administrator's is
 drawn here, and neither is ever written out.
 
@@ -35,8 +38,14 @@ from cryptography.fernet import Fernet
 
 from tests.server_e2e import stack as e2e
 from tests.server_e2e.fake_backend.fake_agent import RELEASE_FILE, REPORT_FILE
+from tests.server_e2e.fake_forge import GITHUB_CLONE_URL, GITLAB_CLONE_URL, FakeForge
 
 PROJECT_NAME = "Team Board"
+#: The same team's projects on GitHub and on GitLab, served by the fake forges
+#: (``fake_forge.py``): their issues, pull and merge requests go through the
+#: server's relay with each person's own token.
+GITHUB_PROJECT = "Team Site"
+GITLAB_PROJECT = "Team Docs"
 
 #: A guide that cites a function the code does not have: the documentation
 #: drift the team's analysis finds (``docs-drift`` scenario of the app's spec).
@@ -47,7 +56,7 @@ DRIFTED_GUIDE = (
 
 def _seed(
     st: e2e.Stack, people: dict[str, e2e.Person], run: str, repo_url: str
-) -> None:
+) -> dict[str, str]:
     platform = people["platform"]
     st.login(platform)
     orgs = {
@@ -73,15 +82,23 @@ def _seed(
         org=orgs["a"],
         json={"role_slug": "admin"},
     )
-    project = st.ok(
-        alice, "POST", "/projects", json={"name": PROJECT_NAME, "repo_url": repo_url}
-    )["id"]
-    st.ok(
-        alice,
-        "POST",
-        f"/projects/{project}/members",
-        json={"user_id": bob.user_id, "role": "member"},
-    )
+    projects = {}
+    for name, url in (
+        (PROJECT_NAME, repo_url),
+        (GITHUB_PROJECT, GITHUB_CLONE_URL),
+        (GITLAB_PROJECT, GITLAB_CLONE_URL),
+    ):
+        project = st.ok(
+            alice, "POST", "/projects", json={"name": name, "repo_url": url}
+        )["id"]
+        st.ok(
+            alice,
+            "POST",
+            f"/projects/{project}/members",
+            json={"user_id": bob.user_id, "role": "member"},
+        )
+        projects[name] = project
+    return projects
 
 
 PEOPLE = ("alice", "bob", "carol")
@@ -150,14 +167,24 @@ def main() -> int:
         for key in PEOPLE:
             people[key].password = passwords[key]
         e2e.create_platform_admin(env, people["platform"])
-        with e2e.serve_directory(forge) as forge_url, runs_released(root / "repos"):
+        with (
+            e2e.serve_directory(forge) as forge_url,
+            FakeForge(root / "forge-certs") as forges,
+            runs_released(root / "repos"),
+        ):
+            origin = f"{forge_url}/origin.git"
+            env.update(forges.env(origin))
             st = e2e.Stack(env, root)
             try:
                 st.start()
-                _seed(st, people, run, f"{forge_url}/origin.git")
+                _seed(st, people, run, origin)
                 world = {
                     "serverUrl": st.base_url,
                     "project": PROJECT_NAME,
+                    "githubProject": GITHUB_PROJECT,
+                    "gitlabProject": GITLAB_PROJECT,
+                    # What the fake forges were asked (``GET /calls``).
+                    "forgeUrl": forges.url,
                     "emails": {key: people[key].email for key in PEOPLE},
                 }
                 print(json.dumps(world), flush=True)

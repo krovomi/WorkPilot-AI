@@ -1,8 +1,7 @@
 // React
 
 // Types
-import type { GitStatus, Project } from "@shared/types";
-import { providerFromRemoteUrl } from "@shared/utils/git-remote-provider";
+import type { GitStatus } from "@shared/types";
 // Drag and drop (dnd-kit)
 import {
 	type CollisionDetection,
@@ -56,15 +55,12 @@ import {
 import { saveSettings, useSettingsStore } from "@/stores/settings-store";
 import { useSetupHubStore } from "@/stores/setup-hub-store";
 // Modals & Components
-import { AddProjectModal } from "./AddProjectModal";
-import { AzureDevOpsSetupModal } from "./AzureDevOpsSetupModal";
 import { AppEmulatorDialog } from "./app-emulator/AppEmulatorDialog";
 import { ArenaDialog } from "./arena/ArenaDialog";
 import { CodePlaygroundDialog } from "./code-playground/CodePlaygroundDialog";
 import { ConflictPredictorDialog } from "./conflict-predictor/ConflictPredictorDialog";
 import { ContextAwareSnippetsDialog } from "./context-aware-snippets/ContextAwareSnippetsDialog";
 import { DependencySentinelDialog } from "./dependency-sentinel/DependencySentinelDialog";
-import { GitHubSetupModal } from "./GitHubSetupModal";
 import { GitSetupModal } from "./GitSetupModal";
 import { LearningLoopDialog } from "./learning-loop/LearningLoopDialog";
 import { NaturalLanguageGitDialog } from "./natural-language-git/NaturalLanguageGitDialog";
@@ -269,11 +265,9 @@ export function Sidebar({
 		[activities, selectedProjectId],
 	);
 
-	const [showAddProjectModal, setShowAddProjectModal] = useState(false);
 	const [showGitSetupModal, setShowGitSetupModal] = useState(false);
 	const gitSetupSkippedForProjectRef = useRef<string | null>(null);
 	const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
-	const [_pendingProject, setPendingProject] = useState<Project | null>(null);
 	const {
 		prefs: sidebarPrefs,
 		toggleItemPin,
@@ -301,14 +295,6 @@ export function Sidebar({
 	const [activeDragId, setActiveDragId] = useState<string | null>(null);
 	const shortcutBufferRef = useRef<string>("");
 	const shortcutBufferTimeRef = useRef<number>(0);
-
-	const [showGitHubSetup, setShowGitHubSetup] = useState(false);
-	const [gitHubSetupProject, setGitHubSetupProject] = useState<Project | null>(
-		null,
-	);
-	const [showAzureDevOpsSetup, setShowAzureDevOpsSetup] = useState(false);
-	const [azureDevOpsSetupProject, setAzureDevOpsSetupProject] =
-		useState<Project | null>(null);
 
 	const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
@@ -425,7 +411,7 @@ export function Sidebar({
 
 		// Apply custom per-group item order, without the experimental views
 		// when the user hid them
-		const gates = { serverProject, hideExperimental: sidebarPrefs.hideExperimental === true };
+		const gates = { serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true };
 		return orderedGroups
 			.map((group) => {
 				const actualItemIds = group.items.map((i) => i.id);
@@ -445,6 +431,7 @@ export function Sidebar({
 		gitlabEnabled,
 		canAdminister,
 		serverProject,
+		forge,
 		sidebarPrefs.groupOrder,
 		sidebarPrefs.itemOrder,
 		mergeOrder,
@@ -493,8 +480,8 @@ export function Sidebar({
 
 	// The tabs a hub's entry leads to, under the same gates as the entries
 	const hubGates = useMemo<HubTabGates>(
-		() => ({ serverProject, hideExperimental: sidebarPrefs.hideExperimental === true }),
-		[serverProject, sidebarPrefs.hideExperimental],
+		() => ({ serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true }),
+		[serverProject, forge, sidebarPrefs.hideExperimental],
 	);
 
 	// Get all visible items for keyboard shortcuts; a hub's tabs keep theirs
@@ -596,15 +583,9 @@ export function Sidebar({
 				e.preventDefault();
 				shortcutBufferRef.current = key;
 				shortcutBufferTimeRef.current = now;
-				return;
 			}
-
-			// Legacy single-char shortcut support (none remain, but kept defensively)
-			const matchedItem = visibleNavItems.find((item) => item.shortcut === key);
-			if (matchedItem) {
-				e.preventDefault();
-				onViewChange?.(matchedItem.id);
-			}
+			// Every shortcut has two letters (Sidebar.test.tsx checks it): a
+			// letter that starts none does nothing.
 		};
 
 		globalThis.addEventListener("keydown", handleKeyDown);
@@ -643,63 +624,6 @@ export function Sidebar({
 		checkGit();
 	}, [selectedProject]);
 
-	const inferProviderFromRemote = (
-		provider: "github" | "azure_devops" | "unknown",
-		remoteUrl?: string,
-	) => {
-		if (provider !== "unknown" || !remoteUrl) return provider;
-		return providerFromRemoteUrl(remoteUrl);
-	};
-
-	const handleProjectAdded = async (project: Project, needsInit: boolean) => {
-		if (needsInit) {
-			setPendingProject(project);
-			return;
-		}
-
-		try {
-			const envResult = await globalThis.electronAPI.getProjectEnv(project.id);
-			const envConfig = envResult.success ? envResult.data : null;
-			const hasProvider = !!(
-				envConfig?.githubEnabled || envConfig?.azureDevOpsEnabled
-			);
-			if (!hasProvider) {
-				const detectionResult = await globalThis.electronAPI.detectRepoProvider(
-					project.path,
-				);
-				const rawProvider = detectionResult.success
-					? (detectionResult.data?.provider ?? "unknown")
-					: "unknown";
-				const provider = inferProviderFromRemote(
-					rawProvider,
-					detectionResult.data?.remoteUrl,
-				);
-
-				setShowGitHubSetup(false);
-				setGitHubSetupProject(null);
-				setShowAzureDevOpsSetup(false);
-				setAzureDevOpsSetupProject(null);
-
-				if (provider === "github") {
-					setGitHubSetupProject(project);
-					setShowGitHubSetup(true);
-					return;
-				}
-
-				if (provider === "azure_devops") {
-					setAzureDevOpsSetupProject(project);
-					setShowAzureDevOpsSetup(true);
-					return;
-				}
-			}
-		} catch {
-			setShowGitHubSetup(false);
-			setGitHubSetupProject(null);
-			setShowAzureDevOpsSetup(false);
-			setAzureDevOpsSetupProject(null);
-		}
-	};
-
 	const handleGitInitialized = async () => {
 		// Refresh git status after initialization
 		if (selectedProject) {
@@ -714,52 +638,6 @@ export function Sidebar({
 				console.error("Failed to refresh git status:", error);
 			}
 		}
-	};
-
-	const handleGitHubSetupComplete = async (settings: {
-		githubToken: string;
-		githubRepo: string;
-		mainBranch: string;
-		githubAuthMethod?: "oauth" | "pat";
-	}) => {
-		if (!gitHubSetupProject) return;
-
-		try {
-			await globalThis.electronAPI.updateProjectEnv(gitHubSetupProject.id, {
-				githubEnabled: true,
-				githubToken: settings.githubToken,
-				githubRepo: settings.githubRepo,
-				githubAuthMethod: settings.githubAuthMethod,
-				azureDevOpsEnabled: false,
-			});
-
-			await globalThis.electronAPI.updateProjectSettings(
-				gitHubSetupProject.id,
-				{
-					mainBranch: settings.mainBranch,
-				},
-			);
-		} catch (error) {
-			console.error("Failed to save GitHub settings:", error);
-		}
-
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-	};
-
-	const handleGitHubSetupSkip = () => {
-		setShowGitHubSetup(false);
-		setGitHubSetupProject(null);
-	};
-
-	const handleAzureDevOpsSetupComplete = async () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
-	};
-
-	const handleAzureDevOpsSetupSkip = () => {
-		setShowAzureDevOpsSetup(false);
-		setAzureDevOpsSetupProject(null);
 	};
 
 	const handleNavClick = (view: SidebarView) => openNavView(view, onViewChange);
@@ -927,6 +805,7 @@ export function Sidebar({
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					aria-current={isActive ? "page" : undefined}
+					data-nav-item={item.id}
 					className={cn(
 						// pl-5 leaves room for the drag grip shown on hover
 						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
@@ -1377,35 +1256,6 @@ export function Sidebar({
 					) : null}
 				</DragOverlay>
 			</DndContext>
-
-			{/* Add Project Modal */}
-			<AddProjectModal
-				open={showAddProjectModal}
-				onOpenChange={setShowAddProjectModal}
-				onProjectAdded={handleProjectAdded}
-			/>
-
-			{/* Azure DevOps Setup Modal - configure Azure DevOps */}
-			{azureDevOpsSetupProject && (
-				<AzureDevOpsSetupModal
-					open={showAzureDevOpsSetup}
-					onOpenChange={setShowAzureDevOpsSetup}
-					project={azureDevOpsSetupProject}
-					onComplete={handleAzureDevOpsSetupComplete}
-					onSkip={handleAzureDevOpsSetupSkip}
-				/>
-			)}
-
-			{/* GitHub Setup Modal - configure GitHub */}
-			{gitHubSetupProject && !showAzureDevOpsSetup && (
-				<GitHubSetupModal
-					open={showGitHubSetup}
-					onOpenChange={setShowGitHubSetup}
-					project={gitHubSetupProject}
-					onComplete={handleGitHubSetupComplete}
-					onSkip={handleGitHubSetupSkip}
-				/>
-			)}
 
 			{/* Git Setup Modal */}
 			<GitSetupModal

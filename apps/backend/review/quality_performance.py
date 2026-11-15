@@ -88,7 +88,16 @@ class PerformanceAnalyzer:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.For, ast.While)):
                 child_depth = self._count_nested_loops(child, depth + 1)
-                max_depth = max(max_depth, child_depth)
+            elif isinstance(
+                child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                # Une fonction définie dans la boucle a sa propre profondeur.
+                continue
+            else:
+                # Une boucle sous un if, un with ou un try de la boucle est
+                # imbriquée tout autant.
+                child_depth = self._count_nested_loops(child, depth)
+            max_depth = max(max_depth, child_depth)
 
         return max_depth
 
