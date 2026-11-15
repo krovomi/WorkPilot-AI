@@ -142,17 +142,19 @@ class FrameworkAnalyzer(BaseAnalyzer):
         deps_lower = {k.lower(): k for k in deps.keys()}
 
         # Frontend frameworks
+        # Meta-frameworks first: a SvelteKit app also depends on "svelte" and
+        # an Astro site with React islands on "react", and the first match wins.
         frontend_frameworks = {
             "next": {"name": "Next.js", "type": "frontend", "port": 3000},
             "nuxt": {"name": "Nuxt", "type": "frontend", "port": 3000},
+            "@sveltejs/kit": {"name": "SvelteKit", "type": "frontend", "port": 5173},
+            "astro": {"name": "Astro", "type": "frontend", "port": 4321},
             "react": {"name": "React", "type": "frontend", "port": 3000},
             "vue": {"name": "Vue", "type": "frontend", "port": 5173},
             "svelte": {"name": "Svelte", "type": "frontend", "port": 5173},
-            "@sveltejs/kit": {"name": "SvelteKit", "type": "frontend", "port": 5173},
             "angular": {"name": "Angular", "type": "frontend", "port": 4200},
             "@angular/core": {"name": "Angular", "type": "frontend", "port": 4200},
             "solid-js": {"name": "SolidJS", "type": "frontend", "port": 3000},
-            "astro": {"name": "Astro", "type": "frontend", "port": 4321},
         }
 
         # Backend frameworks

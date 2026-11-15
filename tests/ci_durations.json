@@ -124,7 +124,6 @@
   "tests/test_sdk_options_factories.py": 16.4,
   "tests/test_security.py": 2.3,
   "tests/test_security_cache.py": 2.1,
-  "tests/test_security_scanner.py": 5.1,
   "tests/test_skills_registry_agents.py": 4.6,
   "tests/test_skills_registry_build.py": 3.1,
   "tests/test_skills_registry_injection_gate.py": 1.3,
