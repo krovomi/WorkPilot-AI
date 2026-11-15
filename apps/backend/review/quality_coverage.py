@@ -47,7 +47,10 @@ class TestCoverageAnalyzer:
                 # Exclure les tests et patterns exclus
                 if any(file.match(excl) for excl in exclude_patterns):
                     continue
-                if "test" in str(file).lower() and "test" not in file.name:
+                # Le chemin relatif au projet : un projet rangé sous un dossier
+                # nommé « contest » ou « pytest-… » perdait toutes ses sources.
+                relative = file.relative_to(self.project_dir).as_posix().lower()
+                if "test" in relative and "test" not in file.name:
                     continue
                 source_files.append(file)
 
@@ -63,7 +66,9 @@ class TestCoverageAnalyzer:
         test_entities = self._extract_test_references(test_files)
 
         # Calculer couverture
-        coverage_stats = self._calculate_coverage(source_entities, test_entities)
+        coverage_stats = self._calculate_coverage(
+            source_entities, test_entities, len(set(test_files))
+        )
 
         return coverage_stats
 
@@ -122,7 +127,9 @@ class TestCoverageAnalyzer:
                 content = file.read_text(encoding="utf-8")
 
                 # Rechercher imports
-                import_pattern = r"from\s+[\w.]+\s+import\s+([\w,\s]+)"
+                # Les noms importés sur la ligne seulement : « \s » avalait
+                # aussi les lignes suivantes (« checkout\ndef test_x »).
+                import_pattern = r"from[ \t]+[\w.]+[ \t]+import[ \t]+([\w, \t]+)"
                 for match in re.finditer(import_pattern, content):
                     imports = match.group(1).split(",")
                     for imp in imports:
@@ -154,7 +161,10 @@ class TestCoverageAnalyzer:
         return tested
 
     def _calculate_coverage(
-        self, source_entities: dict[str, list[dict]], tested: set[str]
+        self,
+        source_entities: dict[str, list[dict]],
+        tested: set[str],
+        test_files_count: int = 0,
     ) -> dict[str, Any]:
         """Calcule les statistiques de couverture."""
         total_entities = 0
@@ -190,7 +200,7 @@ class TestCoverageAnalyzer:
             "tested_entities": tested_entities,
             "untested_entities": untested_entities,
             "coverage_percentage": coverage_pct,
-            "test_files_found": len(tested),
+            "test_files_found": test_files_count,
         }
 
     def generate_issues(self, coverage_stats: dict[str, Any]) -> list[QualityIssue]:
