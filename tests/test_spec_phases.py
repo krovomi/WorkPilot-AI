@@ -461,7 +461,7 @@ class TestPhaseContext:
         assert result.retries == 0
 
     @pytest.mark.asyncio
-    async def test_context_discovery_success(
+    async def test_context_is_written_from_the_task_alone(
         self,
         temp_dir: Path,
         spec_dir: Path,
@@ -470,59 +470,30 @@ class TestPhaseContext:
         mock_ui_module,
         mock_spec_validator,
     ):
-        """Context phase calls discovery script and succeeds."""
+        """The context file comes from the task; nothing in the project is run."""
+        scripts = temp_dir / ".workpilot"
+        scripts.mkdir(exist_ok=True)
+        marker = temp_dir / "ran.txt"
+        (scripts / "context.py").write_text(
+            f"open({str(marker)!r}, 'w').write('ran')\n", encoding="utf-8"
+        )
         executor = PhaseExecutor(
             project_dir=temp_dir,
             spec_dir=spec_dir,
-            task_description="Test task",
+            task_description="Fix the login button in app/login.tsx",
             spec_validator=mock_spec_validator(),
             run_agent_fn=mock_run_agent_fn(),
             task_logger=mock_task_logger,
             ui_module=mock_ui_module,
         )
 
-        with patch(
-            "spec.context.run_context_discovery", return_value=(True, "Success")
-        ):
-            with patch(
-                "spec.context.get_context_stats", return_value={"files_to_modify": 5}
-            ):
-                result = await executor.phase_context()
+        result = await executor.phase_context()
 
         assert result.success is True
-
-    @pytest.mark.asyncio
-    async def test_context_creates_minimal_on_failure(
-        self,
-        temp_dir: Path,
-        spec_dir: Path,
-        mock_run_agent_fn,
-        mock_task_logger,
-        mock_ui_module,
-        mock_spec_validator,
-    ):
-        """Context phase creates minimal context when script fails."""
-        executor = PhaseExecutor(
-            project_dir=temp_dir,
-            spec_dir=spec_dir,
-            task_description="Test task",
-            spec_validator=mock_spec_validator(),
-            run_agent_fn=mock_run_agent_fn(),
-            task_logger=mock_task_logger,
-            ui_module=mock_ui_module,
-        )
-
-        with patch(
-            "apps.backend.spec.context.run_context_discovery",
-            return_value=(False, "Failed"),
-        ):
-            with patch(
-                "apps.backend.spec.context.create_minimal_context"
-            ) as mock_minimal:
-                result = await executor.phase_context()
-
-        mock_minimal.assert_called_once()
-        assert result.success is True  # Creates minimal context as fallback
+        assert result.errors == []
+        context = json.loads((spec_dir / "context.json").read_text(encoding="utf-8"))
+        assert context["task_description"] == "Fix the login button in app/login.tsx"
+        assert not marker.exists()
 
 
 class TestPhaseQuickSpec:
@@ -948,6 +919,49 @@ class TestPhasePlanning:
         assert result.phase == "planning"
         assert result.retries == 0
 
+    @pytest.mark.asyncio
+    async def test_planning_goes_to_the_planner_agent(
+        self,
+        temp_dir: Path,
+        spec_dir: Path,
+        mock_task_logger,
+        mock_ui_module,
+        mock_spec_validator,
+    ):
+        """The plan comes from the planner agent; nothing in the project is run."""
+        scripts = temp_dir / ".workpilot"
+        scripts.mkdir(exist_ok=True)
+        marker = temp_dir / "ran.txt"
+        (scripts / "planner.py").write_text(
+            f"open({str(marker)!r}, 'w').write('ran')\n", encoding="utf-8"
+        )
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        prompts = []
+
+        async def planner(prompt_file, *args, **kwargs):
+            prompts.append(prompt_file)
+            (spec_dir / "implementation_plan.json").write_text(
+                json.dumps({"phases": [{"phase": 1, "subtasks": [{"id": "1"}]}]}),
+                encoding="utf-8",
+            )
+            return True, "done"
+
+        executor = PhaseExecutor(
+            project_dir=temp_dir,
+            spec_dir=spec_dir,
+            task_description="Test task",
+            spec_validator=mock_spec_validator(plan_valid=True),
+            run_agent_fn=planner,
+            task_logger=mock_task_logger,
+            ui_module=mock_ui_module,
+        )
+
+        result = await executor.phase_planning()
+
+        assert result.success is True
+        assert prompts == ["planner.md"]
+        assert not marker.exists()
+
 
 class TestPhaseValidation:
     """Tests for phase_validation method."""
@@ -1013,35 +1027,6 @@ class TestPhaseValidation:
 
         assert result.success is False
         assert result.retries == MAX_RETRIES
-
-
-class TestRunScript:
-    """Tests for _run_script helper method."""
-
-    def test_run_script_not_found(
-        self,
-        temp_dir: Path,
-        spec_dir: Path,
-        mock_run_agent_fn,
-        mock_task_logger,
-        mock_ui_module,
-        mock_spec_validator,
-    ):
-        """_run_script returns False when script not found."""
-        executor = PhaseExecutor(
-            project_dir=temp_dir,
-            spec_dir=spec_dir,
-            task_description="Test task",
-            spec_validator=mock_spec_validator(),
-            run_agent_fn=mock_run_agent_fn(),
-            task_logger=mock_task_logger,
-            ui_module=mock_ui_module,
-        )
-
-        success, output = executor._run_script("nonexistent.py", [])
-
-        assert success is False
-        assert "not found" in output.lower()
 
 
 class TestMaxRetriesConstant:

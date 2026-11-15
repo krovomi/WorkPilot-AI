@@ -6,8 +6,6 @@ Discovers relevant files and context for the task.
 """
 
 import json
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -141,20 +139,3 @@ def create_minimal_context(
         json.dump(minimal_context, f, indent=2)
 
     return context_file
-
-
-def get_context_stats(spec_dir: Path) -> dict:
-    """Get statistics from context file if available."""
-    context_file = spec_dir / "context.json"
-    if not context_file.exists():
-        return {}
-
-    try:
-        with open(context_file, encoding="utf-8") as f:
-            ctx = json.load(f)
-        return {
-            "files_to_modify": len(ctx.get("files_to_modify", [])),
-            "files_to_reference": len(ctx.get("files_to_reference", [])),
-        }
-    except Exception:
-        return {}

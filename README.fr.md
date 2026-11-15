@@ -203,11 +203,13 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - **Garde-fous en code** : une politique versionnée, par couches, que les agents ne contournent pas, appliquée aussi dans les worktrees des tâches ; chaque résultat d'outil est analysé contre l'injection de prompt avant que l'agent ne le lise.
 
 **Agents et orchestration**
+- **Vagues d'exécution** (Mission Control) : les specs en attente sont regroupées en vagues qui ne partagent aucun fichier, d'après leurs plans et leurs worktrees, puis lancées vague après vague dans l'ordre de merge, avec le parallélisme du projet ; aucun modèle n'est appelé.
 - **Mission Control** pour lancer plusieurs agents sur un même objectif, **terminaux d'agents**, **Arène** et **Bounty Board** pour comparer les moteurs, **Repo bench** pour les mesurer sur vos propres tâches passées.
 - Agents spécialisés : générateur de tests, détective de tests instables (avec la cause et une carte de correction), refactoreur, docs et dérive, accessibilité (score WCAG 2.2 et corrections), i18n, veille des contrats d'API, preuves de conformité, notebooks (dépendances entre cellules, exécution en noyau neuf), migration, auto-guérison sur échec de CI, suivi de la dette technique ; leurs corrections vont sur une branche de revue, jamais directement dans votre dossier.
 - Le **Release Train** livre lui-même vos services, dans l'ordre des dépendances, avec contrôles de santé et smoke tests et un clic par service de production ; le **chirurgien de l'historique Git** nettoie les commits d'une branche sur une nouvelle branche, au code identique.
 - **Coach personnel** : il apprend votre style de code par langage à partir de votre historique git et de la config du lint, et donne vos préférences nettes au codeur et au correcteur QA.
 - **Mémoire partagée** : un coffre Obsidian et un graphe que tous les agents lisent et écrivent, entre sessions et providers ; la boucle d'apprentissage analyse chaque build avec un modèle du provider choisi, et ses leçons atteignent la spec, le plan, le code et la QA ; des packs de **skills** indépendants du provider.
+- **Une mémoire qu'on peut auditer** : chaque décision sur la mémoire d'un projet est journalisée en clair (qui, quand, pourquoi), une mémoire oubliée reste restaurable 30 jours, une mémoire épinglée échappe à toute suppression automatique, et quand une synchronisation d'équipe apporte une note contradictoire, les cas sûrs se règlent seuls et les autres sont présentés côte à côte pour que tu tranches.
 
 **Comprendre et planifier**
 - **Insights**, **Idéation**, **Feuille de route**, visualiseur d'architecture, règles de revue de code et code smells pour chaque grande stack, classificateur de risque.
@@ -225,6 +227,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 
 **Coûts et suivi**
 - Budgets de coût appliqués pendant l'exécution : un budget du projet par période et un plafond par tâche, vérifiés avant chaque session d'agent sur tous les fournisseurs ; la tâche se met en pause à son plafond, peut passer à un modèle plus léger du même fournisseur, et une tâche qui dépense sans avancer est mise en pause elle aussi.
+- Coupe-circuit et arrêt d'urgence : un agent qui répète le même appel d'outil avec le même résultat est mis en pause sur tous les fournisseurs, et « Arrêter tous les agents » (bouton de la barre latérale, Ctrl+Maj+.) met en pause chaque tâche en cours, à reprendre depuis sa carte.
 - Tableau de bord analytique, estimateur de coûts, Formula Lab (estimation du coût et de la réussite par provider, modèle et effort), moniteur de limites de débit avec bascule de compte, profileur carbone avec un budget mensuel et un export ESG, traces OpenTelemetry GenAI pour chaque provider.
 
 **Apparence**
