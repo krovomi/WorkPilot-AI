@@ -174,24 +174,6 @@ class AgentSlot:
         self.completed_at = time.time()
         self.error_message = error
 
-    def reset(self):
-        """Reset agent to idle state."""
-        self.status = AgentStatus.IDLE
-        self.current_task = ""
-        self.current_step = ""
-        self.progress = 0.0
-        self.tokens = TokenUsage()
-        self.active_files = []
-        self.current_thinking = ""
-        self.last_tool_call = ""
-        self.last_tool_input = ""
-        self.decision_path = []
-        self.started_at = None
-        self.completed_at = None
-        self.paused_at = None
-        self.output = ""
-        self.error_message = ""
-
     @property
     def elapsed_seconds(self) -> float:
         """Elapsed time since agent started."""

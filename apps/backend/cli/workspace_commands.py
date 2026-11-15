@@ -7,13 +7,7 @@ CLI commands for workspace management (merge, review, discard, list, cleanup)
 
 import json
 import subprocess
-import sys
 from pathlib import Path
-
-# Ensure parent directory is in path for imports (before other imports)
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
 
 from core.workspace import (
     cleanup_all_worktrees,
@@ -33,7 +27,14 @@ from core.workspace.git_utils import (
 )
 from core.worktree import PushAndCreatePRResult as CreatePRResult
 from core.worktree import WorktreeManager
-from foundation.debug import debug_warning
+from foundation.debug import (
+    debug,
+    debug_error,
+    debug_section,
+    debug_success,
+    debug_verbose,
+    debug_warning,
+)
 from ui import (
     Icons,
     icon,
@@ -335,48 +336,6 @@ def _detect_parallel_task_conflicts(
             f"Parallel task conflict detection failed: {e}",
         )
         return []
-
-
-# Import debug utilities
-try:
-    from foundation.debug import (
-        debug,
-        debug_detailed,
-        debug_error,
-        debug_section,
-        debug_success,
-        debug_verbose,
-        is_debug_enabled,
-    )
-except ImportError:
-
-    def debug(*args, **kwargs):
-        """Fallback debug function when debug module is not available."""
-        pass
-
-    def debug_detailed(*args, **kwargs):
-        """Fallback debug_detailed function when debug module is not available."""
-        pass
-
-    def debug_verbose(*args, **kwargs):
-        """Fallback debug_verbose function when debug module is not available."""
-        pass
-
-    def debug_success(*args, **kwargs):
-        """Fallback debug_success function when debug module is not available."""
-        pass
-
-    def debug_error(*args, **kwargs):
-        """Fallback debug_error function when debug module is not available."""
-        pass
-
-    def debug_section(*args, **kwargs):
-        """Fallback debug_section function when debug module is not available."""
-        pass
-
-    def is_debug_enabled():
-        """Fallback is_debug_enabled function when debug module is not available."""
-        return False
 
 
 MODULE = "cli.workspace_commands"
@@ -1287,6 +1246,8 @@ def handle_create_pr_command(
             "success": False,
             "error": "No build found for this spec",
         }
+        # The review modal reads the last JSON line, as on every other outcome.
+        print(json.dumps(error_result))
         return error_result
 
     # Create worktree manager
@@ -1454,109 +1415,3 @@ def handle_analyze_impact_command(
     }
     print(json.dumps(result))
     return result
-
-
-def cleanup_old_worktrees_command(
-    project_dir: Path, days: int = 30, dry_run: bool = False
-) -> dict:
-    """
-    Clean up old worktrees that haven't been modified in the specified number of days.
-
-    Args:
-        project_dir: Project root directory
-        days: Number of days threshold (default: 30)
-        dry_run: If True, only show what would be removed (default: False)
-
-    Returns:
-        Dictionary with cleanup results
-    """
-    try:
-        manager = WorktreeManager(project_dir)
-
-        removed, failed = manager.cleanup_old_worktrees(
-            days_threshold=days, dry_run=dry_run
-        )
-
-        return {
-            "success": True,
-            "removed": removed,
-            "failed": failed,
-            "dry_run": dry_run,
-            "days_threshold": days,
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "removed": [],
-            "failed": [],
-        }
-
-
-def worktree_summary_command(project_dir: Path) -> dict:
-    """
-    Get a summary of all worktrees with age information.
-
-    Args:
-        project_dir: Project root directory
-
-    Returns:
-        Dictionary with worktree summary data
-    """
-    try:
-        manager = WorktreeManager(project_dir)
-
-        # Print to console for CLI usage
-        manager.print_worktree_summary()
-
-        # Also return data for programmatic access
-        worktrees = manager.list_all_worktrees()
-        warning = manager.get_worktree_count_warning()
-
-        # Categorize by age
-        recent = []
-        week_old = []
-        month_old = []
-        very_old = []
-        unknown_age = []
-
-        for info in worktrees:
-            data = {
-                "spec_name": info.spec_name,
-                "days_since_last_commit": info.days_since_last_commit,
-                "commit_count": info.commit_count,
-            }
-
-            if info.days_since_last_commit is None:
-                unknown_age.append(data)
-            elif info.days_since_last_commit < 7:
-                recent.append(data)
-            elif info.days_since_last_commit < 30:
-                week_old.append(data)
-            elif info.days_since_last_commit < 90:
-                month_old.append(data)
-            else:
-                very_old.append(data)
-
-        return {
-            "success": True,
-            "total_worktrees": len(worktrees),
-            "categories": {
-                "recent": recent,
-                "week_old": week_old,
-                "month_old": month_old,
-                "very_old": very_old,
-                "unknown_age": unknown_age,
-            },
-            "warning": warning,
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "total_worktrees": 0,
-            "categories": {},
-            "warning": None,
-        }

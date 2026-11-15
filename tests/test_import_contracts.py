@@ -187,7 +187,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "phase_config",
         "server",
     },
-    "analysis": {"agent_runtime", "foundation", "project", "security"},
+    "analysis": {"agent_runtime", "foundation"},
     # The subagent registry, out of agents (it never imported it): read by
     # core, the skills emitter and the learning loop.
     "subagents": {"mobile", "project", "skills_registry"},

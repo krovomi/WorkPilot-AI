@@ -57,6 +57,28 @@ class TestResolveCandidates:
         assert accepted == []
         assert [r.reason for r in refused] == ["outside", "outside"]
 
+    def test_a_sibling_sharing_the_root_prefix_is_outside(
+        self, project: Path, tmp_path: Path
+    ) -> None:
+        sibling = _write(tmp_path / "project-other" / "secret.txt", "not yours\n")
+        accepted, refused = resolve_candidates(
+            project, [str(sibling), "../project-other/secret.txt"]
+        )
+        assert accepted == []
+        assert [r.reason for r in refused] == ["outside", "outside"]
+
+    def test_home_is_not_expanded_and_a_null_byte_is_refused(
+        self, project: Path
+    ) -> None:
+        accepted, refused = resolve_candidates(project, ["~/.bashrc", "a\0b.py"])
+        assert accepted == []
+        assert [r.reason for r in refused] == ["missing", "missing"]
+
+    def test_the_root_itself_is_not_a_file(self, project: Path) -> None:
+        accepted, refused = resolve_candidates(project, [".", str(project)])
+        assert accepted == []
+        assert [r.reason for r in refused] == ["missing", "missing"]
+
     @pytest.mark.skipif(is_windows(), reason="symlinks need privileges on Windows")
     def test_a_symlink_leading_out_is_refused(
         self, project: Path, tmp_path: Path

@@ -183,15 +183,7 @@ export function droppableColumnPropsAreEqual(
 		}
 	}
 
-	// Deep compare tasks
-	const tasksEqual = tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
-
-	// Only log when re-rendering (reduces noise)
-	if (globalThis.DEBUG && !tasksEqual) {
-		// noop
-	}
-
-	return tasksEqual;
+	return tasksAreEquivalent(prevProps.tasks, nextProps.tasks);
 }
 
 // Empty state content for each column
@@ -582,6 +574,8 @@ export const DroppableColumn = memo(function DroppableColumn({
 				return "column-ai-review";
 			case "human_review":
 				return "column-human-review";
+			case "build_failed":
+				return "column-build-failed";
 			case "pr_created":
 				return "column-pr-open";
 			case "done":

@@ -24,6 +24,12 @@ _BASES = (
 )
 
 
+#: How much of the untracked files a fingerprint reads: enough for the code a
+#: task adds, bounded for a tree that forgot its build output in .gitignore.
+_UNTRACKED_FILES = 2000
+_UNTRACKED_BYTES = 1_000_000
+
+
 def _git(project_dir: Path, *args: str) -> tuple[int, str]:
     try:
         completed = subprocess.run(  # noqa: S603 - fixed argv
@@ -70,16 +76,24 @@ def head_sha(project_dir: Path | str) -> str:
 
 def fingerprint(project_dir: Path | str) -> str:
     """A hash of the working tree's code: HEAD, the uncommitted diff, the
-    untracked files. Equal fingerprints mean nothing a replay could catch
-    changed — whether QA committed its fixes or left them in the tree."""
+    untracked files and what they hold. Equal fingerprints mean nothing a
+    replay could catch changed — whether QA committed its fixes or left them
+    in the tree. ``""`` outside a git work tree, where nothing can say so."""
     import hashlib
 
     root = Path(project_dir)
-    digest = hashlib.sha256(head_sha(root).encode())
-    _code, diff = _git(
-        root, "diff", "HEAD", "--no-color", "--", ".", ":(exclude).workpilot"
-    )
-    digest.update(diff.encode("utf-8", errors="replace"))
+    code, inside = _git(root, "rev-parse", "--is-inside-work-tree")
+    if code != 0 or inside.strip() != "true":
+        return ""
+    head = head_sha(root)
+    digest = hashlib.sha256(head.encode())
+    # Without a first commit there is no HEAD to diff against: what is staged
+    # and what is not stand for it.
+    for diff_args in (("HEAD",),) if head else (("--cached",), ()):
+        _code, diff = _git(
+            root, "diff", *diff_args, "--no-color", "--", ".", ":(exclude).workpilot"
+        )
+        digest.update(diff.encode("utf-8", errors="replace"))
     _code, untracked = _git(
         root,
         "ls-files",
@@ -90,7 +104,14 @@ def fingerprint(project_dir: Path | str) -> str:
         ".",
         ":(exclude).workpilot",
     )
-    digest.update(untracked.encode("utf-8", errors="replace"))
+    # The names alone would miss a fix QA made inside a file it created.
+    for name in sorted(n for n in untracked.split("\0") if n)[:_UNTRACKED_FILES]:
+        digest.update(name.encode("utf-8", errors="replace") + b"\0")
+        try:
+            with (root / name).open("rb") as handle:
+                digest.update(handle.read(_UNTRACKED_BYTES))
+        except OSError:
+            digest.update(b"<unreadable>")
     return digest.hexdigest()
 
 

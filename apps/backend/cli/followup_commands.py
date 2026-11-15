@@ -10,11 +10,6 @@ import json
 import sys
 from pathlib import Path
 
-# Ensure parent directory is in path for imports (before other imports)
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
-
 from core.progress import count_subtasks, is_build_complete
 from ui import (
     Icons,
@@ -147,7 +142,7 @@ def collect_followup_task(spec_dir: Path, max_retries: int = 3) -> str | None:
                 print(muted("  Check file permissions and try again."))
                 retry_count += 1
                 continue
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 print_status(f"Error reading file: {e}", "error")
                 retry_count += 1
                 continue
@@ -166,17 +161,12 @@ def collect_followup_task(spec_dir: Path, max_retries: int = 3) -> str | None:
             print()
 
             lines = []
-            empty_count = 0
             while True:
                 try:
                     line = input()
-                    if line == "":
-                        empty_count += 1
-                        if empty_count >= 1:  # Stop on first empty line
-                            break
-                    else:
-                        empty_count = 0
-                        lines.append(line)
+                    if line == "":  # an empty line ends the description
+                        break
+                    lines.append(line)
                 except KeyboardInterrupt:
                     print()
                     print_status("Cancelled.", "warning")
@@ -283,19 +273,15 @@ def handle_followup_command(
         print(box(content, width=70, style="light"))
         sys.exit(1)
 
-    # Check for prior follow-ups (for sequential follow-up context)
-    prior_followup_count = 0
-    try:
-        with open(plan_file, encoding="utf-8") as f:
-            plan_data = json.load(f)
-        phases = plan_data.get("phases", [])
-        # Count phases that look like follow-up phases (name contains "Follow" or high phase number)
-        for phase in phases:
-            phase_name = phase.get("name", "")
-            if "follow" in phase_name.lower() or "followup" in phase_name.lower():
-                prior_followup_count += 1
-    except (json.JSONDecodeError, KeyError):
-        pass  # If plan parsing fails, just continue without prior count
+    # Prior follow-ups, for the message below. The plan was read once already:
+    # an unreadable plan has no completed subtask and stopped the command above.
+    plan_data = json.loads(plan_file.read_text(encoding="utf-8"))
+    # A follow-up phase is named as one ("Follow-up: …").
+    prior_followup_count = sum(
+        1
+        for phase in plan_data.get("phases", [])
+        if "follow" in phase.get("name", "").lower()
+    )
 
     # Build is complete - proceed to follow-up workflow
     print()
