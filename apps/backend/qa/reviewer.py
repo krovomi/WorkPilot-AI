@@ -421,7 +421,9 @@ async def run_qa_agent_session(
         from learning_loop.prompt_injection import get_learning_context
 
         learning_context = (
-            "" if scoped else get_learning_context(project_dir, "qa_review")
+            ""
+            if scoped
+            else get_learning_context(project_dir, "qa_review", spec_dir=spec_dir)
         )
         if learning_context:
             prompt += "\n\n" + learning_context

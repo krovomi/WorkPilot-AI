@@ -1,6 +1,11 @@
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitHubAPIComment } from "../../../main/ipc-handlers/github/types";
 import type {
+	LearnedSuppression,
+	ReviewFeedbackInput,
+	ReviewFeedbackResult,
+} from "../../../shared/types/review-feedback";
+import type {
 	GitHubImportResult,
 	GitHubInvestigationResult,
 	GitHubInvestigationStatus,
@@ -421,6 +426,16 @@ export interface GitHubAPI {
 		username: string,
 	) => Promise<boolean>;
 	markReviewPosted: (projectId: string, prNumber: number) => Promise<boolean>;
+	/** Accept / reject / not applicable on one finding of a saved review (#361). */
+	setReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+		input: ReviewFeedbackInput,
+	) => Promise<ReviewFeedbackResult>;
+	getReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+	) => Promise<ReviewFeedbackResult>;
 	getPRReview: (
 		projectId: string,
 		prNumber: number,
@@ -526,6 +541,8 @@ export interface PRReviewFinding {
 	endLine?: number;
 	suggestedFix?: string;
 	fixable: boolean;
+	/** Set when the project's feedback downgraded it: how often its kind was rejected. */
+	learnedRejections?: number;
 }
 
 /**
@@ -554,6 +571,7 @@ export interface PRReviewResult {
 	hasPostedFindings?: boolean;
 	postedFindingIds?: string[];
 	postedAt?: string;
+	learnedSuppressions?: LearnedSuppression[];
 	// Deep codebase context metadata
 	deepContext?: {
 		projectPatterns: Record<string, string>;
@@ -1025,6 +1043,24 @@ export const createGitHubAPI = (): GitHubAPI => ({
 
 	markReviewPosted: (projectId: string, prNumber: number): Promise<boolean> =>
 		invokeIpc(IPC_CHANNELS.GITHUB_PR_MARK_REVIEW_POSTED, projectId, prNumber),
+
+	setReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+		input: ReviewFeedbackInput,
+	): Promise<ReviewFeedbackResult> =>
+		invokeIpc(
+			IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_SET,
+			projectId,
+			prNumber,
+			input,
+		),
+
+	getReviewFindingFeedback: (
+		projectId: string,
+		prNumber: number,
+	): Promise<ReviewFeedbackResult> =>
+		invokeIpc(IPC_CHANNELS.GITHUB_PR_REVIEW_FEEDBACK_GET, projectId, prNumber),
 
 	getPRReview: (
 		projectId: string,

@@ -37,7 +37,8 @@ def progress_bar(
         filled = 0
     else:
         percent = current / total
-        filled = int(width * percent)
+        # More done than planned (or a negative count) still draws `width` cells.
+        filled = max(0, min(width, int(width * percent)))
 
     full = icon(Icons.BAR_FULL)
     empty = icon(Icons.BAR_EMPTY)
