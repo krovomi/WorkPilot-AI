@@ -213,7 +213,17 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The shared brain and what sits on it: with docintel, a cycle of five of
     # their own below the agents' one; none of them imports core, agents or a
     # phase.
-    "brain": {"docintel", "foundation", "learning_loop", "skills_registry"},
+    # agent_runtime (a leaf) and security (clean_untrusted): the model's
+    # opinion on a queued memory conflict, asked by a person
+    # (brain/lifecycle/advisor.py); neither reaches back to brain.
+    "brain": {
+        "agent_runtime",
+        "docintel",
+        "foundation",
+        "learning_loop",
+        "security",
+        "skills_registry",
+    },
     # The model analysis (F178) asks the agent_runtime port, never core.
     "learning_loop": {
         "agent_runtime",

@@ -114,6 +114,7 @@ import {
 } from "./sidebar/spaces";
 import { useViewUsageStore } from "@/stores/view-usage-store";
 import { CliToolsChip } from "./sidebar/CliToolsChip";
+import { StopAllAgentsButton } from "./sidebar/StopAllAgentsButton";
 import { openNavView } from "./sidebar/nav-actions";
 import { buildNavIndex, useNavIndexStore } from "./sidebar/nav-index";
 import {
@@ -1078,6 +1079,7 @@ export function Sidebar({
 				railIconButton(t("actions.newTask"), () => {
 					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
 				}, <Plus className="h-4 w-4" />)}
+			<StopAllAgentsButton />
 			<CliToolsChip
 				isCollapsed
 				onNavigateToTerminals={() => onViewChange?.("terminals", true)}
