@@ -410,7 +410,11 @@
 		"create": "Ajouter au serveur",
 		"creating": "Clonage sur le serveur…",
 		"failed": "Le serveur n'a pas pu ajouter le projet",
-		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur"
+		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur",
+		"existingTitle": "Les projets de votre équipe",
+		"openExisting": "Ouvrir",
+		"openExistingNamed": "Ouvrir {{name}}",
+		"orAddNew": "Ou ajoutez un autre dépôt au serveur :"
 	},
 	"envConfig": {
 		"accountsCount_one": "Vous avez {{count}} compte Claude authentifié. Choisissez celui à utiliser :",
