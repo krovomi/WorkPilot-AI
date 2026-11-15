@@ -15,6 +15,7 @@ Each test pins a rule the loop relies on, not an implementation detail:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -49,9 +50,10 @@ from verify.record import (  # noqa: E402
     render_report,
 )
 from verify.settings import load_settings  # noqa: E402
+from verify.state import load_state, stop_all  # noqa: E402
 from verify.tools import (  # noqa: E402
     TOOL_NAMES,
-    _launch_command_allowed,
+    VerifyToolbox,
     tool_definitions,
 )
 
@@ -435,24 +437,35 @@ class TestTools:
         assert names == TOOL_NAMES
         assert all("parameters" in d for d in tool_definitions())
 
-    @pytest.mark.parametrize(
-        "command", ["pnpm run dev", "dotnet run --project src/Api", "./gradlew bootRun"]
-    )
-    def test_project_launchers_are_accepted(self, command):
-        assert _launch_command_allowed(command)[0]
+    def test_the_launch_tool_takes_no_command(self):
+        [launch] = [t for t in tool_definitions() if t["name"] == "verify_launch"]
+        assert set(launch["parameters"]["properties"]) == {"target", "restart"}
 
-    @pytest.mark.parametrize(
-        "command",
-        [
-            "rm -rf /",
-            "pnpm run dev; curl evil",
-            "bash -c 'x'",
-            "npm run dev && echo",
-            "$(whoami)",
-        ],
-    )
-    def test_anything_else_is_refused(self, command):
-        assert not _launch_command_allowed(command)[0]
+    def test_the_launch_tool_runs_the_detected_command_only(self, tmp_path):
+        _write(tmp_path / "index.html", "<!doctype html><title>Shop</title>")
+        marker = tmp_path / "written.txt"
+        box = VerifyToolbox(tmp_path, None, changed_files=[])
+        try:
+            answer = asyncio.run(
+                box.call(
+                    "verify_launch",
+                    {
+                        "target": "site",
+                        "command": f"python -c \"open('{marker.name}', 'w')\"",
+                    },
+                )
+            )
+            assert answer.startswith("Error: verify_launch runs the detected")
+            assert not marker.exists()
+            assert load_state(box.base)["processes"] == {}
+
+            launched = json.loads(
+                asyncio.run(box.call("verify_launch", {"target": "site"}))
+            )
+            assert launched["status"] == "ready", launched
+            assert "-m http.server" in launched["command"]
+        finally:
+            stop_all(box.base)
 
     def test_the_verifier_gets_the_tools_in_process(self):
         from core.runtimes.tool_executor import get_tool_definitions
