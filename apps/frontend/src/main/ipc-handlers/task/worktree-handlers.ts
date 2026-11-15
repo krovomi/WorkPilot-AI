@@ -918,7 +918,7 @@ export function registerWorktreeHandlers(
 				const ghCliPath = getToolPath("gh");
 				const [pythonCommand, pythonBaseArgs] = parsePythonCommand(pythonPath);
 
-				return new Promise<
+				return await new Promise<
 					IPCResult<
 						import("../../../shared/types").WorktreeAnalyzeImpactResult
 					>
@@ -947,8 +947,8 @@ export function registerWorktreeHandlers(
 					let resolved = false;
 
 					// LLM analysis can take a while; give it 60s.
+					// Cleared as soon as the process answers, so it only fires unanswered.
 					const timeoutId = setTimeout(() => {
-						if (resolved) return;
 						resolved = true;
 						killProcessGracefully(proc, {
 							debugPrefix: "[ANALYZE_IMPACT]",
@@ -1081,17 +1081,15 @@ export function registerWorktreeHandlers(
 				const git = getToolPath("git");
 				const isolatedEnv = getIsolatedGitEnv();
 
-				// Fetch latest refs in the main project so the branch ref is up-to-date
-				try {
-					spawnSync(git, ["fetch", "--prune"], {
-						cwd: project.path,
-						encoding: "utf-8",
-						env: isolatedEnv,
-						timeout: 30000,
-					});
-				} catch {
-					// Fetch failure is non-fatal (e.g. offline) — continue with local refs
-				}
+				// Fetch latest refs in the main project so the branch ref is up-to-date.
+				// spawnSync reports a failure in its result instead of throwing, and a
+				// failed fetch (offline, no remote) is ignored: local refs are used.
+				spawnSync(git, ["fetch", "--prune"], {
+					cwd: project.path,
+					encoding: "utf-8",
+					env: isolatedEnv,
+					timeout: 30000,
+				});
 
 				// Run merge or rebase in the worktree
 				const gitArgs =
@@ -1128,20 +1126,12 @@ export function registerWorktreeHandlers(
 					.filter(Boolean);
 
 				// Abort the failed operation to restore the worktree to a clean state
-				try {
-					const abortArgs =
-						strategy === "rebase"
-							? ["rebase", "--abort"]
-							: ["merge", "--abort"];
-					spawnSync(git, abortArgs, {
-						cwd: worktreePath,
-						encoding: "utf-8",
-						env: isolatedEnv,
-						timeout: 15000,
-					});
-				} catch {
-					// Abort failure is non-fatal
-				}
+				// (a failed abort is reported in the result, never thrown, and ignored).
+				spawnSync(
+					git,
+					strategy === "rebase" ? ["rebase", "--abort"] : ["merge", "--abort"],
+					{ cwd: worktreePath, encoding: "utf-8", env: isolatedEnv, timeout: 15000 },
+				);
 
 				if (conflictLines.length > 0) {
 					return {

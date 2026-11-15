@@ -672,16 +672,23 @@ describe("IPC Handlers", { timeout: 30000 }, () => {
 			});
 
 			fs.readdirSync.mockImplementation(
-				(path: string, _options?: { withFileTypes?: boolean }) => {
+				(path: string, options?: { withFileTypes?: boolean }) => {
+					let names: string[] = [];
 					if (path.includes(".workpilot/specs")) {
-						// Return our spec directory as a simple string array
-						return ["001-test-feature"];
+						// Our spec directory
+						names = ["001-test-feature"];
+					} else if (path.includes("001-test-feature")) {
+						// The implementation plan file
+						names = ["implementation_plan.json"];
 					}
-					if (path.includes("001-test-feature")) {
-						// Return the implementation plan file
-						return ["implementation_plan.json"];
-					}
-					return [];
+					// Like Node: entries, not names, when asked withFileTypes.
+					return options?.withFileTypes
+						? names.map((name) => ({
+								name,
+								isDirectory: () => !name.includes("."),
+								isFile: () => name.includes("."),
+							}))
+						: names;
 				},
 			);
 
