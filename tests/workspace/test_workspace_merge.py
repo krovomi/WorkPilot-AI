@@ -211,13 +211,13 @@ class TestMergeExistingBuild:
         assert "There was a conflict merging the changes." in capsys.readouterr().out
 
     def test_side_by_side_work_is_combined(self, project):
-        project.main(readme_dot_md="# Shop\n")
+        project.main(notes_dot_md="# Shop\n")
         project.work(cart_dot_py="CART = []\n")
 
         assert merge_existing_build(project.repo, SPEC) is True
 
         assert project.read("cart.py") == "CART = []\n"
-        assert project.read("readme.md") == "# Shop\n"
+        assert project.read("notes.md") == "# Shop\n"
 
     def test_a_conflict_is_resolved_by_the_model(self, project, model):
         project.main(app_dot_py=MAIN_APP)
