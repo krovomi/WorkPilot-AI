@@ -1420,11 +1420,7 @@ export function AgentTools() {
 
 	// Check health of all custom MCP servers
 	const checkAllServersHealth = useCallback(async () => {
-		const servers = envConfig?.customMcpServers || [];
-		if (servers.length === 0) return;
-
-		for (const server of servers) {
-			// Set checking status
+		for (const server of envConfig?.customMcpServers ?? []) {
 			setServerHealthStatus((prev) => ({
 				...prev,
 				[server.id]: {
@@ -1463,10 +1459,8 @@ export function AgentTools() {
 
 	// Check health when custom servers change
 	useEffect(() => {
-		if (envConfig?.customMcpServers && envConfig.customMcpServers.length > 0) {
-			checkAllServersHealth();
-		}
-	}, [envConfig?.customMcpServers, checkAllServersHealth]);
+		checkAllServersHealth();
+	}, [checkAllServersHealth]);
 
 	// Test a single server connection (full test)
 	const handleTestConnection = useCallback(async (server: CustomMcpServer) => {
@@ -1478,7 +1472,6 @@ export function AgentTools() {
 				selectedProjectId ?? undefined,
 			);
 			if (result.success && result.data) {
-				// Update health status based on test result
 				setServerHealthStatus((prev) => ({
 					...prev,
 					[server.id]: {
