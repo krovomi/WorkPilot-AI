@@ -23,7 +23,7 @@
   "apps/frontend/src/main/claude-code-settings/__tests__/env-sanitizer.test.ts": 2,
   "apps/frontend/src/main/claude-profile-manager.ts": 1,
   "apps/frontend/src/main/claude-profile/usage-monitor.test.ts": 6,
-  "apps/frontend/src/main/claude-profile/usage-monitor.ts": 15,
+  "apps/frontend/src/main/claude-profile/usage-monitor.ts": 14,
   "apps/frontend/src/main/claude-profile/velocity-tracker.ts": 1,
   "apps/frontend/src/main/colored-logs.ts": 1,
   "apps/frontend/src/main/context-mesh-service.ts": 1,
