@@ -160,6 +160,16 @@ describe("RELEASE_SUGGEST_VERSION", () => {
 		expect((await suggest()).data?.suggestedVersion).toBe("2.1.10");
 	});
 
+	it("counts a package version that is not one from 0.0.0", async () => {
+		pkg("workspace");
+		commit("feat: x");
+		state.suggest.mockResolvedValueOnce({ version: "1.0.0", reason: "Invalid current version, resetting to 1.0.0" });
+		expect((await suggest()).data).toMatchObject({ suggestedVersion: "1.0.0", bumpType: "major" });
+
+		state.suggest.mockRejectedValueOnce(new Error("no provider"));
+		expect((await suggest()).data).toMatchObject({ suggestedVersion: "0.0.1", currentVersion: "workspace" });
+	});
+
 	it("answers an unknown project, and a folder that is not a repository", async () => {
 		state.project = undefined;
 		expect(await suggest("nope")).toEqual({ success: false, error: "Project not found" });
