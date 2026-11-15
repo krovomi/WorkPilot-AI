@@ -211,7 +211,6 @@
   "apps/frontend/src/renderer/components/task-detail/TaskVerify.tsx": 2,
   "apps/frontend/src/renderer/components/task-detail/task-review/ConflictDetailsDialog.tsx": 1,
   "apps/frontend/src/renderer/components/task-detail/task-review/DiffViewDialog.tsx": 10,
-  "apps/frontend/src/renderer/components/task-detail/task-review/MergePreviewSummary.tsx": 1,
   "apps/frontend/src/renderer/components/task-detail/task-review/WorkspaceStatus.tsx": 1,
   "apps/frontend/src/renderer/components/task-form/RichTextEditor.tsx": 1,
   "apps/frontend/src/renderer/components/task-form/TaskDictation.tsx": 1,

@@ -196,6 +196,15 @@ describe("merge preview", () => {
 		expect(screen.queryByRole("button", { name: "Check for Conflicts" })).toBeNull();
 	});
 
+	it("counts no file when nothing is reported", () => {
+		renderStatus({
+			worktreeStatus: { ...STATUS, filesChanged: 0 },
+			mergePreview: preview({}, { summary: { totalFiles: 0, conflictFiles: 0, totalConflicts: 0, autoMergeable: 0 } }),
+		});
+		expect(screen.getByText("Ready to merge").nextSibling).toHaveTextContent("0 files");
+		expect(screen.getAllByText(/^0$/).length).toBeGreaterThan(0);
+	});
+
 	it("a clean preview is ready to merge, refreshes, and stages on request", async () => {
 		const { props, update } = renderStatus({ mergePreview: preview() });
 		expect(screen.getByText("Ready to merge")).toBeInTheDocument();

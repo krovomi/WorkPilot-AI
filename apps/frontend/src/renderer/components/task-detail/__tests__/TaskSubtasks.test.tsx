@@ -140,6 +140,25 @@ describe("TaskSubtasks", () => {
 		expect(screen.queryByTestId("stub-TaskCodeEditor")).toBeNull();
 	});
 
+	it("without a way to save, offers no plan editing and keeps the file editor open", async () => {
+		renderSubtasks(makeTask([subtask("b", { files: ["src/one.ts"] })]));
+		expect(screen.queryByRole("button", { name: "Edit Plan" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Edit files" }));
+		await act(async () => {
+			await callStub("TaskCodeEditor", "onUpdate", subtask("b"));
+		});
+		expect(screen.getByTestId("stub-TaskCodeEditor")).toBeInTheDocument();
+	});
+
+	it("edits a subtask that came without a file list", async () => {
+		const onUpdatePlan = vi.fn(async () => true);
+		const bare = { ...subtask("b"), files: undefined } as unknown as Subtask;
+		renderSubtasks(makeTask([bare]), onUpdatePlan);
+		await userEvent.click(screen.getByRole("button", { name: "Edit Plan" }));
+		await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+		expect(onUpdatePlan).toHaveBeenCalledWith([{ name: "Implementation", subtasks: [{ ...bare, files: [] }] }]);
+	});
+
 	it("rewords, removes and adds pending subtasks, without touching the task", async () => {
 		const task = makeTask(PLAN);
 		const before = structuredClone(task.subtasks);

@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import type { ReviewComment } from "../../../../shared/types/review-comments";
 import { OpenCommentsSummary } from "./ReviewLineComments";
 import {
+	type ALLOWED_IMAGE_TYPES,
 	ALLOWED_IMAGE_TYPES_DISPLAY,
 	MAX_IMAGES_PER_TASK,
 } from "../../../../shared/constants";
@@ -31,10 +32,11 @@ import {
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 
-// MIME types whose extension is not their subtype (svg+xml -> svg).
-const MIME_EXTENSIONS: Record<string, string> = {
+// The file extension of each image type that can be attached (svg+xml -> svg).
+const MIME_EXTENSIONS: Record<(typeof ALLOWED_IMAGE_TYPES)[number], string> = {
 	"image/svg+xml": "svg",
 	"image/jpeg": "jpg",
+	"image/jpg": "jpg",
 	"image/png": "png",
 	"image/gif": "gif",
 	"image/webp": "webp",
@@ -112,7 +114,7 @@ export function QAFeedbackSection({
 					const dataUrl = await blobToBase64(file);
 					const thumbnail = await createThumbnail(dataUrl);
 					const extension =
-						MIME_EXTENSIONS[file.type] || file.type.split("/")[1] || "png";
+						MIME_EXTENSIONS[file.type as (typeof ALLOWED_IMAGE_TYPES)[number]];
 					const resolvedFilename = resolveFilename(nameFor(file, extension), [
 						...existingFilenames,
 						...newImages.map((img) => img.filename),
@@ -150,7 +152,7 @@ export function QAFeedbackSection({
 			// Skip image handling if feature is not enabled
 			if (!onImagesChange) return;
 
-			const items = Array.from(e.clipboardData?.items ?? []).filter((item) =>
+			const items = Array.from(e.clipboardData.items).filter((item) =>
 				item.type.startsWith("image/"),
 			);
 			// If no images, allow normal paste behavior
@@ -199,7 +201,7 @@ export function QAFeedbackSection({
 			setIsDragOverTextarea(false);
 			if (isSubmitting) return;
 
-			const files = Array.from(e.dataTransfer?.files ?? []).filter((file) =>
+			const files = Array.from(e.dataTransfer.files).filter((file) =>
 				file.type.startsWith("image/"),
 			);
 			await addImageFiles(
