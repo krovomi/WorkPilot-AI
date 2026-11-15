@@ -1435,7 +1435,10 @@ export function AgentTools() {
 			}));
 
 			try {
-				const result = await globalThis.electronAPI.checkMcpHealth(server);
+				const result = await globalThis.electronAPI.checkMcpHealth(
+					server,
+					selectedProjectId ?? undefined,
+				);
 				if (result.success && result.data) {
 					setServerHealthStatus((prev) => ({
 						...prev,
@@ -1456,7 +1459,7 @@ export function AgentTools() {
 				}));
 			}
 		}
-	}, [envConfig?.customMcpServers]);
+	}, [envConfig?.customMcpServers, selectedProjectId]);
 
 	// Check health when custom servers change
 	useEffect(() => {
@@ -1470,7 +1473,10 @@ export function AgentTools() {
 		setTestingServers((prev) => new Set(prev).add(server.id));
 
 		try {
-			const result = await globalThis.electronAPI.testMcpConnection(server);
+			const result = await globalThis.electronAPI.testMcpConnection(
+				server,
+				selectedProjectId ?? undefined,
+			);
 			if (result.success && result.data) {
 				// Update health status based on test result
 				setServerHealthStatus((prev) => ({
@@ -1505,7 +1511,7 @@ export function AgentTools() {
 				return next;
 			});
 		}
-	}, []);
+	}, [selectedProjectId]);
 
 	// Resolve agent settings using the centralized utility
 	// Resolution order: custom overrides -> selected profile's config -> global defaults
