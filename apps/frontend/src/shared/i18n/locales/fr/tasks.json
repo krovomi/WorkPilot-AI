@@ -2590,6 +2590,7 @@
 		"enable": "Réactiver",
 		"disabledHint": "Les prochains prompts de cette tâche la laissent de côté ; les autres tâches la gardent.",
 		"error": "Impossible de modifier la leçon : {{error}}"
+	},
 	"breakerPause": {
 		"chip": "Coupe-circuit : {{tool}}",
 		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
