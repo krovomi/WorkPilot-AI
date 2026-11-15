@@ -46,10 +46,13 @@ export function isWorkpilotArtifact(p: string): boolean {
  * the build writes it there after each session. Null when there is none.
  */
 async function readTraceSummary(
+	worktreePath: string,
 	...located: Parameters<typeof getSpecPaths>
 ): Promise<TraceSummary | null> {
-	const { worktreeSpecDir, mainSpecDir } = getSpecPaths(...located);
-	for (const dir of [worktreeSpecDir ?? mainSpecDir, mainSpecDir]) {
+	const [task] = located;
+	const { specsBaseDir, mainSpecDir } = getSpecPaths(...located);
+	const worktreeSpecDir = path.join(worktreePath, specsBaseDir, task.specId);
+	for (const dir of [worktreeSpecDir, mainSpecDir]) {
 		try {
 			return parseTraceSummary(
 				await fsPromises.readFile(path.join(dir, TRACE_SUMMARY_FILE), "utf-8"),
@@ -187,7 +190,7 @@ export function registerWorktreeDiffHandlers(): void {
 				// Who wrote the added lines (Agent Trace, F3), when the build recorded it.
 				const traced = applyTraceSummary(
 					filteredFiles,
-					await readTraceSummary(task, project),
+					await readTraceSummary(worktreePath, task, project),
 				);
 				return {
 					success: true,
@@ -303,8 +306,9 @@ export function registerWorktreeDiffHandlers(): void {
 				const parseNumstat = (
 					numstat: string,
 				): { additions: number; deletions: number } => {
-					// A binary file reads "-\t-": counted as 0, like a missing line.
-					const [adds, dels] = (numstat.split("\n")[0] ?? "").split("\t");
+					// One path, so one line: "<adds>\t<dels>\t<path>". A binary file
+					// reads "-\t-" and no output at all: both count as 0.
+					const [adds, dels] = numstat.split("\t");
 					return {
 						additions: Number.parseInt(adds, 10) || 0,
 						deletions: Number.parseInt(dels, 10) || 0,

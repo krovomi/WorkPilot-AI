@@ -48,6 +48,8 @@ beforeEach(() => {
 	wt = path.join(base, "worktree");
 	mkdirSync(wt);
 	git(wt, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(wt, "config", "core.autocrlf", "false");
 	git(wt, "config", "user.email", "test@example.invalid");
 	git(wt, "config", "user.name", "Test");
 	git(wt, "config", "commit.gpgsign", "false");

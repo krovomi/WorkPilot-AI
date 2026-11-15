@@ -79,6 +79,8 @@ beforeEach(() => {
 	state.root = path.join(base, "repo");
 	mkdirSync(state.root);
 	git(state.root, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(state.root, "config", "core.autocrlf", "false");
 	git(state.root, "config", "user.email", "test@example.invalid");
 	git(state.root, "config", "user.name", "Test");
 	git(state.root, "config", "commit.gpgsign", "false");
@@ -205,6 +207,8 @@ describe("TASK_WORKTREE_DIFF", () => {
 	});
 
 	it("reports git failing as an error, never as an empty list", async () => {
+		// Windows refuses to overwrite the hidden .git file: replace it.
+		rmSync(path.join(worktreeDir(), ".git"), { force: true });
 		writeFileSync(path.join(worktreeDir(), ".git"), "gitdir: /nonexistent\n", "utf-8");
 		const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
 		const result = await invoke(IPC_CHANNELS.TASK_WORKTREE_DIFF, "task-1");
@@ -299,6 +303,8 @@ describe("TASK_FILE_DIFF", () => {
 			deletions: 0,
 			patch: undefined,
 		});
+		// Windows refuses to overwrite the hidden .git file: replace it.
+		rmSync(path.join(worktreeDir(), ".git"), { force: true });
 		writeFileSync(path.join(worktreeDir(), ".git"), "gitdir: /nonexistent\n", "utf-8");
 		expect((await fileDiff("keep.txt")).data).toMatchObject({ patch: undefined });
 	});

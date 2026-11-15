@@ -141,6 +141,8 @@ beforeEach(() => {
 	state.root = path.join(state.base, "repo");
 	mkdirSync(state.root);
 	git(state.root, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(state.root, "config", "core.autocrlf", "false");
 	git(state.root, "config", "user.email", "test@example.invalid");
 	git(state.root, "config", "user.name", "Test");
 	git(state.root, "config", "commit.gpgsign", "false");
@@ -494,13 +496,13 @@ describe("TASK_WORKTREE_CREATE_PR", () => {
 	});
 
 	it("returns an unexpected error as a failed result", async () => {
-		// The spec "directory" is a file inside a file: stat fails with ENOTDIR.
-		writeFileSync(path.join(state.root, ".workpilot", "specs-file"), "", "utf-8");
-		state.project = { ...state.project, autoBuildPath: ".workpilot/specs-file" };
+		// A NUL byte in a stored path: stat refuses it on every OS, and not
+		// with ENOENT (a file inside a file is ENOTDIR on POSIX, ENOENT on Windows).
+		state.project = { ...state.project, autoBuildPath: ".workpilot\0bad" };
 		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 		const result = await createPR();
 		expect(result.success).toBe(false);
-		expect(result.error).toMatch(/ENOTDIR/);
+		expect(result.error).toMatch(/null bytes/);
 		error.mockRestore();
 	});
 });

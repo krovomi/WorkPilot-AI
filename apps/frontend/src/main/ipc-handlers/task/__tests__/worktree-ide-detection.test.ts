@@ -157,7 +157,11 @@ describe("app discovery", () => {
 
 	it("Linux: reads .desktop files and their Name=, and the binary folders", async () => {
 		sys.files.set("/usr/share/applications", ["code.desktop", "kitty.desktop", "README"]);
-		sys.files.set("/usr/share/applications/code.desktop", "[Desktop Entry]\nName=Visual Studio Code\n");
+		// Joined the way the code joins it, so the key matches on Windows too.
+		sys.files.set(
+			path.join("/usr/share/applications", "code.desktop"),
+			"[Desktop Entry]\nName=Visual Studio Code\n",
+		);
 		sys.files.set("/home/tester/.local/share/applications", "broken");
 		sys.files.set("/usr/bin", ["Zed", "git"]);
 		sys.files.set("/snap/bin", "broken");
@@ -199,6 +203,9 @@ describe("isAppInstalled", () => {
 		else process.env.USERNAME = saved;
 		expect(isPathSafe("../etc")).toBe(false);
 		expect(isPathSafe("/usr/bin")).toBe(true);
+		expect(isPathSafe("/home/../etc")).toBe(false);
+		expect(isPathSafe("C:\\Users\\..\\x")).toBe(false);
+		expect(isPathSafe("/opt/..vendor/bin")).toBe(true);
 		warn.mockRestore();
 	});
 });

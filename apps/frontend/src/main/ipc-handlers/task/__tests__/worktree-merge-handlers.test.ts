@@ -165,6 +165,8 @@ beforeEach(() => {
 	state.root = path.join(state.base, "repo");
 	mkdirSync(state.root);
 	git(state.root, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(state.root, "config", "core.autocrlf", "false");
 	git(state.root, "config", "user.email", "test@example.invalid");
 	git(state.root, "config", "user.name", "Test");
 	git(state.root, "config", "commit.gpgsign", "false");

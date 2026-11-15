@@ -156,6 +156,8 @@ beforeEach(() => {
 	state.root = path.join(state.base, "repo");
 	mkdirSync(state.root);
 	git(state.root, "init", "-q", "-b", "main");
+	// Windows runners check out CRLF otherwise, and the tests compare bytes.
+	git(state.root, "config", "core.autocrlf", "false");
 	git(state.root, "config", "user.email", "test@example.invalid");
 	git(state.root, "config", "user.name", "Test");
 	git(state.root, "config", "commit.gpgsign", "false");
@@ -265,6 +267,8 @@ describe("TASK_WORKTREE_STATUS", () => {
 		expect(error.mock.calls.some((c) => String(c[0]).includes("discard list"))).toBe(true);
 
 		// A worktree whose git directory is gone: status falls back to its path.
+		// Windows refuses to overwrite the hidden .git file: replace it.
+		rmSync(path.join(wt, ".git"), { force: true });
 		writeFileSync(path.join(wt, ".git"), "gitdir: /nonexistent/gitdir\n", "utf-8");
 		const broken = await invoke(IPC_CHANNELS.TASK_WORKTREE_STATUS, "task-1");
 		expect(broken).toEqual({
@@ -447,6 +451,8 @@ describe("TASK_LIST_WORKTREES", () => {
 		addWorktree("002-orphan");
 		// A broken worktree folder, and a stray file next to the worktrees.
 		mkdirSync(worktreeDir("003-broken"));
+		// Windows refuses to overwrite the hidden .git file: replace it.
+		rmSync(path.join(worktreeDir("003-broken"), ".git"), { force: true });
 		writeFileSync(path.join(worktreeDir("003-broken"), ".git"), "gitdir: /nonexistent\n", "utf-8");
 		writeFileSync(path.join(state.root, ".workpilot", "worktrees", "tasks", "notes.txt"), "", "utf-8");
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
