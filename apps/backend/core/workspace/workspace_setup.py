@@ -33,7 +33,7 @@ from ui import (
 from .git_utils import has_uncommitted_changes
 from .models import WorkspaceMode
 
-# Track if we've already tried to install the git hook this session
+# Track if we've already looked for the old git hook this session
 _git_hook_check_done = False
 
 MODULE = "workspace.setup"
@@ -380,8 +380,8 @@ def setup_workspace(
     print()
     print_status("Setting up separate workspace...", "progress")
 
-    # Ensure timeline tracking hook is installed (once per session)
-    ensure_timeline_hook_installed(project_dir)
+    # Earlier versions installed a post-commit hook that never worked
+    remove_timeline_hook(project_dir)
 
     manager = WorktreeManager(
         project_dir, base_branch=base_branch, use_local_branch=use_local_branch
@@ -494,49 +494,64 @@ def setup_workspace(
     return worktree_info.path, manager, localized_spec_dir
 
 
-def ensure_timeline_hook_installed(project_dir: Path) -> None:
-    """
-    Ensure the FileTimelineTracker git post-commit hook is installed.
+# The post-commit hook earlier versions installed: written whole, or appended
+# after this marker to a hook the project already had.
+_TIMELINE_HOOK_HEADER = "# Git post-commit hook for FileTimelineTracker"
+_TIMELINE_HOOK_APPENDED = "\n\n# FileTimelineTracker integration\n"
 
-    This enables tracking human commits to main branch for drift detection.
-    Called once per session during first workspace setup.
+
+def _git_hooks_dir(project_dir: Path) -> Path | None:
+    git_dir = project_dir / ".git"
+    if git_dir.is_file():
+        content = git_dir.read_text(encoding="utf-8").strip()
+        if not content.startswith("gitdir:"):
+            return None
+        target = Path(content.split(":", 1)[1].strip())
+        git_dir = target if target.is_absolute() else project_dir / target
+    return git_dir / "hooks" if git_dir.is_dir() else None
+
+
+def remove_timeline_hook(project_dir: Path) -> bool:
+    """Take the timeline post-commit hook back out of the project.
+
+    It called a module that does not exist, so it never recorded anything.
+    A hook that was entirely WorkPilot's is deleted; one that WorkPilot
+    appended to keeps the project's own part, and the backup taken at the
+    time goes once it says the same. Anything else is left alone.
+    Returns True when a hook was changed. Called once per session.
     """
     global _git_hook_check_done
     if _git_hook_check_done:
-        return
-
+        return False
     _git_hook_check_done = True
 
     try:
-        git_dir = project_dir / ".git"
-        if not git_dir.exists():
-            return  # Not a git repo
-
-        # Handle worktrees (where .git is a file, not directory)
-        if git_dir.is_file():
-            content = git_dir.read_text(encoding="utf-8").strip()
-            if content.startswith("gitdir:"):
-                git_dir = Path(content.split(":", 1)[1].strip())
-            else:
-                return
-
-        hook_path = git_dir / "hooks" / "post-commit"
-
-        # Check if hook already installed
-        if hook_path.exists():
-            if "FileTimelineTracker" in hook_path.read_text(encoding="utf-8"):
-                debug(MODULE, "FileTimelineTracker hook already installed")
-                return
-
-        # Auto-install the hook (silent, non-intrusive)
-        from merge.install_hook import install_hook
-
-        install_hook(project_dir)
-        debug(MODULE, "Auto-installed FileTimelineTracker git hook")
-
-    except Exception as e:
-        # Non-fatal - hook installation is optional
-        debug_warning(MODULE, f"Could not auto-install timeline hook: {e}")
+        hooks_dir = _git_hooks_dir(project_dir)
+        if hooks_dir is None:
+            return False
+        hook_path = hooks_dir / "post-commit"
+        if not hook_path.is_file() or hook_path.is_symlink():
+            return False
+        content = hook_path.read_text(encoding="utf-8")
+        if _TIMELINE_HOOK_APPENDED in content:
+            original = content.split(_TIMELINE_HOOK_APPENDED, 1)[0]
+            hook_path.write_text(original, encoding="utf-8")
+            backup = hooks_dir / "post-commit.backup"
+            if (
+                backup.is_file()
+                and not backup.is_symlink()
+                and backup.read_text(encoding="utf-8") == original
+            ):
+                backup.unlink()
+        elif _TIMELINE_HOOK_HEADER in content.split("\n", 4)[2:3]:
+            hook_path.unlink()
+        else:
+            return False
+        debug(MODULE, "Removed the timeline post-commit hook")
+        return True
+    except (OSError, UnicodeDecodeError) as e:
+        debug_warning(MODULE, f"Could not remove the timeline hook: {e}")
+        return False
 
 
 def initialize_timeline_tracking(
@@ -611,5 +626,4 @@ def initialize_timeline_tracking(
 
 
 # Export private functions for backward compatibility
-_ensure_timeline_hook_installed = ensure_timeline_hook_installed
 _initialize_timeline_tracking = initialize_timeline_tracking

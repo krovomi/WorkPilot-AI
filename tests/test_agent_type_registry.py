@@ -105,14 +105,13 @@ def test_every_coder_default_factory_call_names_its_agent_type():
     [
         "impact_analyzer",
         "architecture_reviewer",
-        "migration",
         "insight_extractor",
         "learning_analyzer",
         "context_mesh_analyzer",
         "live_companion_analyzer",
     ],
 )
-def test_the_seven_silent_features_are_registered_read_only(agent_type: str):
+def test_the_silent_features_are_registered_read_only(agent_type: str):
     config = get_agent_config(agent_type)
     assert "Edit" not in config["tools"], f"{agent_type} must not edit code"
 

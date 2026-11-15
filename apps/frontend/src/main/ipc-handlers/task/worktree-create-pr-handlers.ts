@@ -191,7 +191,7 @@ export function registerWorktreeCreatePRHandlers(
 				// API call returns HTTP 401 ("authentication failed").
 				const projectEnv = loadProjectEnvForSubprocess(project);
 
-				return new Promise<IPCResult<WorktreeCreatePRResult>>((resolve) => {
+				return await new Promise<IPCResult<WorktreeCreatePRResult>>((resolve) => {
 					let timeoutId: NodeJS.Timeout | null = null;
 					let resolved = false;
 

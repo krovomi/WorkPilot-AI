@@ -192,8 +192,8 @@ class TestSetupWorkspace:
         assert local_spec == path / ".workpilot" / "specs" / SPEC
         assert (local_spec / "spec.md").exists()
         assert ".workpilot/" in (path / ".gitignore").read_text(encoding="utf-8")
-        hook = repo / ".git" / "hooks" / "post-commit"
-        assert "FileTimelineTracker" in hook.read_text(encoding="utf-8")
+        # Setting up a task no longer installs a post-commit hook.
+        assert not (repo / ".git" / "hooks" / "post-commit").exists()
 
     def test_an_existing_env_file_is_kept(self, repo, tmp_path):
         worktree = tmp_path / "wt"
@@ -294,46 +294,6 @@ class TestNodeModulesLinks:
             "node_modules"
         ]
         assert calls[0][:4] == ["cmd", "/c", "mklink", "/J"]
-
-
-class TestTimelineHook:
-    def test_installed_once_per_session(self, repo, monkeypatch):
-        monkeypatch.setattr(workspace_setup, "_git_hook_check_done", False)
-        hook = repo / ".git" / "hooks" / "post-commit"
-
-        workspace_setup.ensure_timeline_hook_installed(repo)
-        first = hook.read_text(encoding="utf-8")
-        hook.write_text("#!/bin/sh\n", encoding="utf-8")
-        workspace_setup.ensure_timeline_hook_installed(repo)
-
-        assert "FileTimelineTracker" in first
-        assert hook.read_text(encoding="utf-8") == "#!/bin/sh\n"
-
-    def test_an_installed_hook_is_left_alone(self, repo, monkeypatch):
-        monkeypatch.setattr(workspace_setup, "_git_hook_check_done", False)
-        hook = repo / ".git" / "hooks" / "post-commit"
-        hook.parent.mkdir(exist_ok=True)
-        hook.write_text("# FileTimelineTracker (mine)\n", encoding="utf-8")
-
-        workspace_setup.ensure_timeline_hook_installed(repo)
-
-        assert hook.read_text(encoding="utf-8") == "# FileTimelineTracker (mine)\n"
-
-    @pytest.mark.parametrize("dot_git", [None, "gitdir: {gitdir}\n", "garbage\n"])
-    def test_not_a_repository_or_a_worktree(self, tmp_path, monkeypatch, dot_git):
-        monkeypatch.setattr(workspace_setup, "_git_hook_check_done", False)
-        project = tmp_path / "project"
-        project.mkdir()
-        gitdir = tmp_path / "real-gitdir"
-        (gitdir / "hooks").mkdir(parents=True)
-        if dot_git:
-            (project / ".git").write_text(
-                dot_git.format(gitdir=gitdir), encoding="utf-8"
-            )
-
-        workspace_setup.ensure_timeline_hook_installed(project)
-
-        assert not (project / ".git" / "hooks").exists()
 
 
 class TestTimelineTracking:
