@@ -52,10 +52,7 @@ class CodeMigrationRunner:
         print(f"🎯 Migration: {self.migration_description}")
         if self.dry_run:
             print("⚠️  Dry run mode — no files will be modified")
-        self.orchestrator = MigrationOrchestrator(
-            str(self.project_dir),
-            enable_llm=True,
-        )
+        self.orchestrator = MigrationOrchestrator(str(self.project_dir))
         print("✅ Migration orchestrator initialized")
 
     def run_migration(self) -> dict:
