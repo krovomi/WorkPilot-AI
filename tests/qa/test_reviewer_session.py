@@ -254,7 +254,7 @@ class TestPrompt:
     ):
         monkeypatch.setattr(
             "learning_loop.prompt_injection.get_learning_context",
-            lambda project, phase: f"## Patterns for {phase}",
+            lambda project, phase, **kwargs: f"## Patterns for {phase}",
         )
 
         prompt = await self._prompt(qa_kit, qa_spec, jev_advice="## Judge advice")
@@ -265,7 +265,7 @@ class TestPrompt:
     async def test_a_failing_pattern_lookup_leaves_the_prompt_valid(
         self, qa_kit, qa_spec, replays, monkeypatch
     ):
-        def broken(project, phase):
+        def broken(project, phase, **kwargs):
             raise RuntimeError("no index")
 
         monkeypatch.setattr(

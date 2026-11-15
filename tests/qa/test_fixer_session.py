@@ -78,7 +78,9 @@ async def test_a_fix_is_reported_saved_and_audited(
 async def test_a_fixer_that_forgot_the_status_still_counts_as_fixed(
     qa_kit, qa_spec, fix_request, replays, memory
 ):
-    client = qa_kit.Client([qa_kit.say("Done.")], on_stream=lambda: _ready(qa_spec, False))
+    client = qa_kit.Client(
+        [qa_kit.say("Done.")], on_stream=lambda: _ready(qa_spec, False)
+    )
 
     status, _ = await _fix(client, qa_spec, project_dir=qa_spec.parents[2])
 
@@ -86,7 +88,9 @@ async def test_a_fixer_that_forgot_the_status_still_counts_as_fixed(
     assert "ready_for_revalidation=False" in _audit(qa_spec.parents[2])
 
 
-async def test_without_a_fix_request_nothing_is_sent(qa_kit, qa_spec, replays, read_replays):
+async def test_without_a_fix_request_nothing_is_sent(
+    qa_kit, qa_spec, replays, read_replays
+):
     client = qa_kit.Client([qa_kit.say("never")])
 
     assert await _fix(client, qa_spec) == ("error", "QA_FIX_REQUEST.md not found")
@@ -144,7 +148,7 @@ class TestThePrompt:
         monkeypatch.setattr(fixer, "get_memory_context", get_memory_context)
         monkeypatch.setattr(
             "learning_loop.prompt_injection.get_learning_context",
-            lambda project, phase: f"## Patterns for {phase}",
+            lambda project, phase, **kwargs: f"## Patterns for {phase}",
         )
         monkeypatch.setattr(
             "agent_coach.profile_injector.profile_block", lambda project: "## Style"
@@ -159,7 +163,7 @@ class TestThePrompt:
     async def test_a_failing_pattern_lookup_leaves_the_prompt_valid(
         self, qa_kit, qa_spec, fix_request, replays, memory, monkeypatch
     ):
-        def broken(project, phase):
+        def broken(project, phase, **kwargs):
             raise RuntimeError("no index")
 
         monkeypatch.setattr(
@@ -172,7 +176,9 @@ class TestThePrompt:
         self, qa_kit, qa_spec, fix_request, replays, memory
     ):
         add_message("Keep the old field name.", qa_spec, source="desktop")
-        add_message("Only for subtask 2.", qa_spec, source="desktop", target_subtask_id="s-2")
+        add_message(
+            "Only for subtask 2.", qa_spec, source="desktop", target_subtask_id="s-2"
+        )
         # A message pointing at an element of the preview, read from the page.
         with (qa_spec / STEERING_FILE).open("a", encoding="utf-8") as queue:
             queue.write(
