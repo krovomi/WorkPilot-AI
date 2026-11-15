@@ -1326,6 +1326,7 @@
 			"rejecting": "Rejet en cours...",
 			"rejectionReason": "Raison des modifications (optionnel)",
 			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan...",
+			"sendRejection": "Envoyer la demande",
 			"conflictsChecking": "Vérification des chevauchements de fichiers avec les tâches parallèles...",
 			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
 			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
