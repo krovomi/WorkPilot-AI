@@ -409,7 +409,15 @@
 		"noWorkspaceTitle": "No Workspace Found",
 		"humanReviewDescription": "Human review required prior to coding. Review your spec.md for any necessary changes.",
 		"noWorkspaceDescription": "No isolated workspace was found for this task. The changes may have been made directly in your project.",
-		"commitsCount": "{{count}} commits"
+		"commitsCount": "{{count}} commits",
+		"loadParts": {
+			"mergePreview": "Merge preview",
+			"status": "Worktree status",
+			"diff": "Worktree changes"
+		},
+		"loadError": "{{part}}: {{error}}",
+		"loadFailed": "Could not load: {{part}}",
+		"loadUnexpected": "An unexpected error occurred while loading the workspace information"
 	},
 	"guided": {
 		"button": "Guided review",

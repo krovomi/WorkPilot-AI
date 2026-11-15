@@ -409,7 +409,15 @@
 		"noWorkspaceTitle": "Aucun espace de travail trouvé",
 		"humanReviewDescription": "Une revue humaine est requise avant le code. Relisez votre spec.md pour y apporter les modifications nécessaires.",
 		"noWorkspaceDescription": "Aucun espace de travail isolé n'a été trouvé pour cette tâche. Les modifications ont peut-être été faites directement dans votre projet.",
-		"commitsCount": "{{count}} commits"
+		"commitsCount": "{{count}} commits",
+		"loadParts": {
+			"mergePreview": "Aperçu de la fusion",
+			"status": "État du worktree",
+			"diff": "Modifications du worktree"
+		},
+		"loadError": "{{part}} : {{error}}",
+		"loadFailed": "Impossible de charger : {{part}}",
+		"loadUnexpected": "Une erreur inattendue est survenue pendant le chargement de l'espace de travail"
 	},
 	"guided": {
 		"button": "Revue guidée",
