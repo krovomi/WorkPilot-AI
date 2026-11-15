@@ -17,6 +17,8 @@ const store = vi.hoisted(() => ({
 	settings: undefined as Record<string, unknown> | undefined,
 	profiles: { profiles: [], activeProfileId: null, version: 1 } as unknown,
 	failClose: false,
+	/** Handles opened through the fake better-sqlite3 and not closed yet. */
+	openHandles: 0,
 }));
 
 vi.mock("../../settings-utils", () => ({
@@ -44,6 +46,7 @@ vi.mock("../windsurf-sqlite", async () => {
 		private readonly db: InstanceType<typeof DatabaseSync>;
 		constructor(file: string, options?: { readonly?: boolean }) {
 			this.db = new DatabaseSync(file, { readOnly: options?.readonly ?? false });
+			store.openHandles++;
 		}
 		prepare(sql: string) {
 			const statement = this.db.prepare(sql);
@@ -54,7 +57,10 @@ vi.mock("../windsurf-sqlite", async () => {
 			};
 		}
 		close() {
-			if (this.db.isOpen) this.db.close();
+			if (this.db.isOpen) {
+				this.db.close();
+				store.openHandles--;
+			}
 			if (store.failClose) throw new Error("database is busy");
 		}
 	}
@@ -206,6 +212,7 @@ beforeEach(() => {
 	store.settings = undefined;
 	store.profiles = { profiles: [], activeProfileId: null, version: 1 };
 	store.failClose = false;
+	store.openHandles = 0;
 	fetchCalls = [];
 	answer = () => json({}, 404);
 	vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
@@ -391,6 +398,9 @@ describe("detectWindsurfLocalToken", () => {
 			success: false,
 			error: "No API key found in Windsurf auth data. Sign in to Windsurf IDE first.",
 		});
+		// The listing query failed: its handle used to stay open, which Windows
+		// turns into a locked file (EBUSY) for the IDE and for the next writer.
+		expect(store.openHandles).toBe(0);
 	});
 
 	it("reports a database it cannot open", async () => {

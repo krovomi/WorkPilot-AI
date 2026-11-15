@@ -1793,6 +1793,9 @@ function readWindsurfKey(
 	}
 }
 
+const WINDSURF_KEY_LISTING =
+	"SELECT key FROM ItemTable WHERE key LIKE '%windsurf%' OR key LIKE '%codeium%' OR key LIKE '%auth%' ORDER BY key";
+
 /**
  * Detect Windsurf API key from local IDE installation.
  * Uses better-sqlite3 (pure Node.js) to read the state.vscdb SQLite database
@@ -1943,32 +1946,24 @@ export async function detectWindsurfLocalToken(): Promise<{
 			}
 		}
 
-		db.close();
-
 		if (apiKey) {
+			db.close();
 			return { success: true, apiKey, userName: userName || undefined };
 		}
 
-		// If we found nothing, list available keys for debugging (SSO troubleshooting)
+		// If we found nothing, list available keys for debugging (SSO troubleshooting),
+		// on the handle still open: a second one, left open when its query failed,
+		// kept the file locked on Windows.
 		let debugInfo = "";
 		try {
-			const reopenedDb = new Database(dbPath, {
-				readonly: true,
-				fileMustExist: true,
-			});
-			const rows = reopenedDb
-				.prepare(
-					"SELECT key FROM ItemTable WHERE key LIKE '%windsurf%' OR key LIKE '%codeium%' OR key LIKE '%auth%' ORDER BY key",
-				)
-				.all() as { key: string }[];
-			reopenedDb.close();
-
+			const rows = db.prepare(WINDSURF_KEY_LISTING).all() as { key: string }[];
 			if (rows.length > 0) {
 				debugInfo = ` Found ${rows.length} related keys: ${rows.map((r) => r.key).join(", ")}`;
 			}
 		} catch {
 			/* ignore debug errors */
 		}
+		db.close();
 
 		return {
 			success: false,
