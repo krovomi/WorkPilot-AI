@@ -51,6 +51,34 @@ describe("FindingFeedback", () => {
 		);
 	});
 
+	it("sends a bare rejection, and keeps the form when it fails", async () => {
+		const onSubmit = vi.fn().mockResolvedValue(false);
+		render(<FindingFeedback findingId="f-1" onSubmit={onSubmit} />);
+		fireEvent.click(screen.getByText(t("prReview.feedback.notApplicable")));
+		fireEvent.change(screen.getByLabelText(t("prReview.feedback.noteLabel")), {
+			target: { value: "   " },
+		});
+		fireEvent.click(screen.getByText(t("prReview.feedback.save")));
+		await waitFor(() =>
+			expect(onSubmit).toHaveBeenCalledWith({
+				findingId: "f-1",
+				verdict: "not_applicable",
+				reason: null,
+				note: undefined,
+			}),
+		);
+		expect(screen.getByText(t("prReview.feedback.save"))).toBeInTheDocument();
+	});
+
+	it("closes the form on cancel without sending", () => {
+		const onSubmit = vi.fn();
+		render(<FindingFeedback findingId="f-1" onSubmit={onSubmit} />);
+		fireEvent.click(screen.getByText(t("prReview.feedback.reject")));
+		fireEvent.click(screen.getByText(t("prReview.feedback.cancel")));
+		expect(screen.queryByText(t("prReview.feedback.save"))).toBeNull();
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
+
 	it("shows the recorded verdict as pressed", () => {
 		render(
 			<FindingFeedback findingId="f-1" verdict="not_applicable" onSubmit={vi.fn()} />,

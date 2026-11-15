@@ -157,6 +157,41 @@ describe("recordFeedback", () => {
 		});
 	});
 
+	it.each([
+		["no saved review", null],
+		["a review that is not JSON", "{not json"],
+		["a review without findings", JSON.stringify({ findings: "none" })],
+		["a review that is null", "null"],
+	])("refuses a finding when there is %s", (_label, content) => {
+		if (content !== null) {
+			const dir = path.join(project, ".workpilot", "github", "pr");
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(path.join(dir, "review_7.json"), content);
+		}
+		const valid = validateFeedback(7, { findingId: "f-1", verdict: "rejected" });
+		expect(recordFeedback(project, must(valid))).toEqual({
+			success: false,
+			error: "not_found",
+		});
+	});
+
+	it("skips entries that are not findings", () => {
+		writeReview(7, [null, "f-1", 3, FINDING]);
+		const valid = validateFeedback(7, { findingId: "f-1", verdict: "accepted" });
+		expect(recordFeedback(project, must(valid)).success).toBe(true);
+	});
+
+	it("answers write_failed when the dataset cannot be appended to", () => {
+		writeReview(7, [FINDING]);
+		// A folder where the file should be: the append fails.
+		mkdirSync(path.join(project, FEEDBACK_RELATIVE_PATH), { recursive: true });
+		const valid = validateFeedback(7, { findingId: "f-1", verdict: "rejected" });
+		expect(recordFeedback(project, must(valid))).toEqual({
+			success: false,
+			error: "write_failed",
+		});
+	});
+
 	it("refuses a saved finding whose kind is malformed", () => {
 		writeReview(7, [{ ...FINDING, category: "Style; DROP TABLE" }]);
 		const valid = validateFeedback(7, { findingId: "f-1", verdict: "rejected" });
@@ -213,6 +248,32 @@ describe("recordFeedback", () => {
 });
 
 describe("readFeedback", () => {
+	it("is empty without a dataset, and through a link", () => {
+		expect(readFeedback(project, 3)).toEqual({});
+		const target = path.join(project, "elsewhere.jsonl");
+		writeFileSync(
+			target,
+			`${JSON.stringify({ v: 1, pr: 3, finding_id: "a", verdict: "rejected" })}\n`,
+		);
+		mkdirSync(path.join(project, ".workpilot"), { recursive: true });
+		try {
+			symlinkSync(target, path.join(project, FEEDBACK_RELATIVE_PATH));
+		} catch {
+			return;
+		}
+		expect(readFeedback(project, 3)).toEqual({});
+	});
+
+	it("turns control characters of a note into spaces", () => {
+		expect(
+			validateFeedback(1, {
+				findingId: "f",
+				verdict: "rejected",
+				note: "a\u0000b\u007fc\u{1F600}",
+			})?.note,
+		).toBe("a b c\u{1F600}");
+	});
+
 	it("gives the latest verdict per finding of the PR, skipping junk", () => {
 		const file = path.join(project, FEEDBACK_RELATIVE_PATH);
 		mkdirSync(path.dirname(file), { recursive: true });

@@ -73,11 +73,10 @@ export function FindingFeedback({
 		setDraft(choice);
 	};
 
-	const save = async () => {
-		if (!draft) return;
+	const save = async (choice: ReviewFeedbackVerdict) => {
 		const ok = await onSubmit({
 			findingId,
-			verdict: draft,
+			verdict: choice,
 			reason: reason || null,
 			note: note.trim() || undefined,
 		});
@@ -160,7 +159,7 @@ export function FindingFeedback({
 						size="sm"
 						className="h-8 text-xs"
 						disabled={pending}
-						onClick={() => void save()}
+						onClick={() => void save(draft)}
 					>
 						{t("prReview.feedback.save")}
 					</Button>

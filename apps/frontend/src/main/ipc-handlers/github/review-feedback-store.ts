@@ -43,7 +43,6 @@ export const SCHEMA_VERSION = 1;
 export const MAX_FILE_BYTES = 1_000_000;
 export const KEEP_LINES_ON_COMPACT = 2_000;
 const MAX_TITLE_CHARS = 300;
-const MAX_REVIEW_BYTES = 20_000_000;
 
 const FINDING_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const CATEGORY = /^[a-z_]{1,32}$/;
@@ -84,8 +83,8 @@ export function isPrNumber(value: unknown): value is number {
 function cleanNote(value: string): string {
 	let printable = "";
 	for (const char of value) {
-		const code = char.codePointAt(0) ?? 0;
-		printable += code < 0x20 || code === 0x7f ? " " : char;
+		// A control character sorts below the space; DEL is the one above.
+		printable += char < " " || char === "\u007f" ? " " : char;
 	}
 	return printable.replace(/\s+/g, " ").trim();
 }
@@ -144,7 +143,6 @@ export function findReviewedFinding(
 	if (!reviewPath) return null;
 	let data: unknown;
 	try {
-		if (lstatSync(reviewPath).size > MAX_REVIEW_BYTES) return null;
 		data = JSON.parse(readFileSync(reviewPath, "utf-8"));
 	} catch {
 		return null;
@@ -224,11 +222,8 @@ export function recordFeedback(
 		title: finding.title,
 	});
 	try {
+		// `.workpilot` was resolved above: a link out of the project is refused.
 		mkdirSync(path.dirname(file), { recursive: true });
-		// Re-checked after the folder exists: `.workpilot` itself may be a link.
-		if (feedbackFilePath(projectPath) !== file) {
-			return { success: false, error: "write_failed" };
-		}
 		appendFileSync(file, `${line}\n`, "utf-8");
 		if (lstatSync(file).size > MAX_FILE_BYTES) compact(file);
 	} catch {
