@@ -5,6 +5,7 @@ import {
 	type DesignStack,
 	type DesignStackDetection,
 	type DesignStyle,
+	type DesignLoopProgress,
 	type DesignToCodeProgress,
 	type DesignToCodeResult,
 	type DesignWriteOutcome,
@@ -29,6 +30,7 @@ export type PipelinePhase =
 	| "design_token_integration"
 	| "visual_test_generation"
 	| "figma_sync"
+	| "render_loop"
 	| "complete"
 	| "error";
 
@@ -48,6 +50,8 @@ export interface DesignLiveState {
 	tokensSkipped: boolean;
 	files: string[];
 	testsSupported: boolean | null;
+	/** The render loop's latest step, while it runs. */
+	loop: DesignLoopProgress | null;
 }
 
 const EMPTY_LIVE: DesignLiveState = {
@@ -56,6 +60,7 @@ const EMPTY_LIVE: DesignLiveState = {
 	tokensSkipped: false,
 	files: [],
 	testsSupported: null,
+	loop: null,
 };
 
 const NOTES_STORAGE_KEY = "design-import-notes";
@@ -104,6 +109,10 @@ interface DesignToCodeState {
 	generateTests: boolean;
 	useDesignTokens: boolean;
 	customInstructions: string;
+	/** Render, compare and correct the code after its generation. */
+	renderLoop: boolean;
+	/** The iteration shown in the iterations panel (null: the best one). */
+	selectedIteration: number | null;
 
 	// Image state
 	imageData: string | null;
@@ -129,6 +138,8 @@ interface DesignToCodeActions {
 	setGenerateTests: (generate: boolean) => void;
 	setUseDesignTokens: (use: boolean) => void;
 	setCustomInstructions: (instructions: string) => void;
+	setRenderLoop: (on: boolean) => void;
+	selectIteration: (index: number | null) => void;
 
 	setImageData: (
 		data: string | null,
@@ -171,6 +182,8 @@ const initialState: DesignToCodeState = {
 	generateTests: true,
 	useDesignTokens: true,
 	customInstructions: "",
+	renderLoop: true,
+	selectedIteration: null,
 	imageData: null,
 	imagePreview: null,
 	imageName: null,
@@ -214,6 +227,8 @@ export const useDesignToCodeStore = create<
 	setUseDesignTokens: (use) => set({ useDesignTokens: use }),
 	setCustomInstructions: (instructions) =>
 		set({ customInstructions: instructions }),
+	setRenderLoop: (on) => set({ renderLoop: on }),
+	selectIteration: (index) => set({ selectedIteration: index }),
 
 	setImageData: (data, preview, name) =>
 		set({ imageData: data, imagePreview: preview, imageName: name }),
@@ -232,6 +247,7 @@ export const useDesignToCodeStore = create<
 			startedAt: Date.now(),
 			selectedStep: null,
 			selectedFilePath: null,
+			selectedIteration: null,
 			writeOutcome: null,
 		}),
 	applyProgress: (progress) =>
@@ -248,6 +264,7 @@ export const useDesignToCodeStore = create<
 			if (typeof detail.tests_supported === "boolean") {
 				live.testsSupported = detail.tests_supported;
 			}
+			if (detail.loop) live.loop = detail.loop;
 			const phase = progress.phase as PipelinePhase;
 			const journal =
 				s.journal.at(-1)?.phase === phase
@@ -294,6 +311,7 @@ export const useDesignToCodeStore = create<
 			startedAt: null,
 			selectedStep: null,
 			selectedFilePath: null,
+			selectedIteration: null,
 			writeOutcome: null,
 		}),
 
@@ -356,6 +374,7 @@ export async function runDesignToCodePipeline(): Promise<void> {
 			generateTests: state.generateTests,
 			useDesignTokens: state.useDesignTokens,
 			customInstructions: state.customInstructions,
+			renderLoop: state.renderLoop,
 		});
 
 		useDesignToCodeStore.getState().setPipelineResult(result);

@@ -105,6 +105,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The board as an MCP server: the spec numbering lock and the MCP layer,
     # nothing that runs an agent (docs/architecture/board-mcp.md).
     "board_mcp": {"core", "mcp_tasks"},
+    # Import Design's render loop (docs/architecture/design-render-loop.md):
+    # the model catalogue (does this model read images?), nothing else. Its
+    # model call and its browser binary are handed in by the runner's glue
+    # (services), so it stays out of the agents' cycle. A leaf.
+    "design_to_code": {"models_registry"},
     # The changelog's prompts, git history and done cards, shared by its
     # runner and the server's routes: the board, git and the untrusted-content
     # fence, nothing that runs an agent (its model call is the runner's,
