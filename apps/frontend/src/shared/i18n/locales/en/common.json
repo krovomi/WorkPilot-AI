@@ -381,13 +381,14 @@
 		},
 		"category": {
 			"security": "Security",
-			"logic": "Logic",
 			"quality": "Quality",
-			"performance": "Performance",
 			"style": "Style",
-			"documentation": "Documentation",
-			"testing": "Testing",
-			"other": "Other"
+			"test": "Testing",
+			"docs": "Documentation",
+			"pattern": "Pattern",
+			"performance": "Performance",
+			"verification_failed": "Not verified",
+			"redundancy": "Redundancy"
 		},
 		"state": {
 			"open": "Open",
@@ -396,6 +397,7 @@
 		},
 		"selectCriticalHigh": "Select Blocker/Required ({{count}})",
 		"selectAll": "Select All",
+		"selectSeverityGroup": "Select every {{severity}} finding",
 		"clear": "Clear",
 		"noIssuesFound": "No issues found! The code looks good.",
 		"allFindingsPosted": "All findings posted to GitHub",

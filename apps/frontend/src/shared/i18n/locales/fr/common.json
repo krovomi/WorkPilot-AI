@@ -381,13 +381,14 @@
 		},
 		"category": {
 			"security": "Sécurité",
-			"logic": "Logique",
 			"quality": "Qualité",
-			"performance": "Performance",
 			"style": "Style",
-			"documentation": "Documentation",
-			"testing": "Tests",
-			"other": "Autre"
+			"test": "Tests",
+			"docs": "Documentation",
+			"pattern": "Motif",
+			"performance": "Performance",
+			"verification_failed": "Non vérifié",
+			"redundancy": "Redondance"
 		},
 		"state": {
 			"open": "Ouvert",
@@ -396,6 +397,7 @@
 		},
 		"selectCriticalHigh": "Sélectionner Bloquant/Obligatoire ({{count}})",
 		"selectAll": "Tout sélectionner",
+		"selectSeverityGroup": "Sélectionner tous les résultats : {{severity}}",
 		"clear": "Effacer",
 		"noIssuesFound": "Aucun problème trouvé ! Le code semble bon.",
 		"allFindingsPosted": "Tous les résultats publiés sur GitHub",

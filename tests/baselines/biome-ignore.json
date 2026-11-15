@@ -141,7 +141,6 @@
   "apps/frontend/src/renderer/components/github-prs/components/PRDetail.tsx": 1,
   "apps/frontend/src/renderer/components/github-prs/components/PRFilterBar.tsx": 1,
   "apps/frontend/src/renderer/components/github-prs/components/PRLogs.tsx": 1,
-  "apps/frontend/src/renderer/components/github-prs/components/SeverityGroupHeader.tsx": 3,
   "apps/frontend/src/renderer/components/github-prs/hooks/__tests__/useGitHubPRs.test.ts": 5,
   "apps/frontend/src/renderer/components/gitlab-issues/components/IssueDetail.tsx": 1,
   "apps/frontend/src/renderer/components/gitlab-issues/components/IssueListItem.tsx": 1,
