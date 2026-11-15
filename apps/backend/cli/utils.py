@@ -9,13 +9,8 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure parent directory is in path for imports (before other imports)
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
-
 # Ensure project root is in path for src.connectors imports (e.g. src.connectors.llm_config)
-_PROJECT_ROOT = _PARENT_DIR.parent.parent
+_PROJECT_ROOT = Path(__file__).parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
@@ -65,7 +60,6 @@ def import_dotenv():
 
 # Load .env with helpful error if dependencies not installed
 load_dotenv = import_dotenv()
-from integrations.linear.integration import LinearManager
 from integrations.linear.updater import is_linear_enabled
 from spec.pipeline import get_specs_dir
 from ui import (
@@ -248,17 +242,6 @@ def validate_environment(spec_dir: Path, problems: list[str] | None = None) -> b
     # Check Linear integration (optional but show status)
     if is_linear_enabled():
         print("Linear integration: ENABLED")
-        # Show Linear project status if initialized
-        project_dir = spec_dir.parent.parent  # workpilot/specs/001-name -> project root
-        linear_manager = LinearManager(spec_dir, project_dir)
-        if linear_manager.is_initialized:
-            summary = linear_manager.get_progress_summary()
-            print(f"  Project: {summary.get('project_name', 'Unknown')}")
-            print(
-                f"  Issues: {summary.get('mapped_subtasks', 0)}/{summary.get('total_subtasks', 0)} mapped"
-            )
-        else:
-            print("  Status: Will be initialized during planner session")
     else:
         print("Linear integration: DISABLED (set LINEAR_API_KEY to enable)")
 
@@ -299,19 +282,3 @@ def get_project_dir(provided_dir: Path | None) -> Path:
         project_dir = project_dir.parent.parent
 
     return project_dir
-
-
-def find_specs_dir(project_dir: Path) -> Path:
-    """
-    Find the specs directory for a project.
-
-    Returns the '.workpilot/specs' directory path.
-    The directory is guaranteed to exist (get_specs_dir calls init_workpilot_dir).
-
-    Args:
-        project_dir: Project root directory
-
-    Returns:
-        Path to specs directory (always returns a valid Path)
-    """
-    return get_specs_dir(project_dir)
