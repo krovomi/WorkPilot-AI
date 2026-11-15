@@ -7,16 +7,32 @@ Interactive and automated requirements collection from users.
 
 import json
 import os
-import shlex
 import subprocess
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from foundation.platform import find_executable, is_windows, split_command
+
 
 def open_editor_for_input(field_name: str) -> str:
-    """Open the user's editor for long-form text input."""
-    editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "nano"))
+    """Open the user's editor for long-form text input.
+
+    $EDITOR, then $VISUAL, then the first editor found on the PATH. The
+    fallback used to be "nano" unconditionally: on Windows, or anywhere
+    without nano, starting it raised FileNotFoundError and ended the CLI.
+    """
+    editor = (
+        os.environ.get("EDITOR", "").strip() or os.environ.get("VISUAL", "").strip()
+    )
+    if not editor:
+        candidates = ["notepad"] if is_windows() else ["nano", "vim", "vi"]
+        editor = next((c for c in candidates if find_executable(c)), "")
+    # "code --wait" or a quoted Windows path: split the way the platform does
+    # (shlex.split read the backslashes of a Windows path as escapes).
+    editor_cmd = split_command(editor) if editor else []
+    if not editor_cmd or not editor_cmd[0]:
+        return ""
 
     # Create temp file with helpful instructions
     with tempfile.NamedTemporaryFile(
@@ -28,19 +44,21 @@ def open_editor_for_input(field_name: str) -> str:
         temp_path = f.name
 
     try:
-        # Parse editor command (handles "code --wait" etc.)
-        editor_cmd = shlex.split(editor)
-        editor_cmd.append(temp_path)
-
-        # Open editor
-        result = subprocess.run(editor_cmd)
+        try:
+            result = subprocess.run([*editor_cmd, temp_path])
+        except OSError:
+            # The editor named in $EDITOR is not installed
+            return ""
 
         if result.returncode != 0:
             return ""
 
-        # Read the content
-        with open(temp_path, encoding="utf-8") as f:
-            lines = f.readlines()
+        # Read the content. An editor that removed the file left nothing typed.
+        try:
+            with open(temp_path, encoding="utf-8") as f:
+                lines = f.readlines()
+        except OSError:
+            return ""
 
         # Filter out comment lines and join
         content_lines = [
@@ -164,60 +182,6 @@ def create_requirements_from_task(task_description: str) -> dict:
         "services_involved": [],  # AI will discover during planning and context fetching
         "created_at": datetime.now().isoformat(),
     }
-
-
-def apply_template_to_requirements(
-    requirements: dict,
-    template_id: str,
-    project_dir: Path,
-    substitutions: dict | None = None,
-) -> dict:
-    """
-    Apply a spec template to a requirements dict, enriching it with
-    pre-filled content, keywords, and QA criteria hints.
-
-    Args:
-        requirements: Existing requirements dict to enrich
-        template_id: ID of the template to apply (e.g. "crud-api")
-        project_dir: Project root (for loading custom templates)
-        substitutions: Optional {placeholder: value} replacements
-
-    Returns:
-        Enriched requirements dict (original is not mutated)
-    """
-    from spec.templates.library import TemplateLibrary
-
-    library = TemplateLibrary(project_dir)
-    patch = library.apply_template(template_id, substitutions)
-    if not patch:
-        return requirements
-
-    merged = dict(requirements)
-    # Only overwrite task_description if it's the default placeholder
-    if merged.get("task_description") in (None, "", "No task description provided"):
-        if "task_description" in patch:
-            merged["task_description"] = patch["task_description"]
-
-    # Merge non-overwriting fields
-    for key in (
-        "workflow_type",
-        "additional_context",
-        "template_id",
-        "template_name",
-        "template_keywords",
-        "qa_criteria_hints",
-    ):
-        if key in patch and key not in merged:
-            merged[key] = patch[key]
-
-    # Merge services_involved (additive)
-    if "services_involved" in patch:
-        existing = merged.get("services_involved") or []
-        new_services = [s for s in patch["services_involved"] if s not in existing]
-        if new_services:
-            merged["services_involved"] = existing + new_services
-
-    return merged
 
 
 def save_requirements(spec_dir: Path, requirements: dict) -> Path:

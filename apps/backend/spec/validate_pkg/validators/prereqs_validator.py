@@ -34,23 +34,24 @@ class PrereqsValidator:
         # Check spec directory exists
         if not self.spec_dir.exists():
             errors.append(f"Spec directory does not exist: {self.spec_dir}")
-            fixes.append(f"Create directory: mkdir -p {self.spec_dir}")
+            fixes.append(f"Create the directory {self.spec_dir}")
             return ValidationResult(False, "prereqs", errors, warnings, fixes)
 
         # Check project_index.json
         project_index = self.spec_dir / "project_index.json"
         if not project_index.exists():
-            # Check if it exists at auto-claude level
+            # The project's own index, .workpilot/project_index.json
             auto_build_index = self.spec_dir.parent.parent / "project_index.json"
             if auto_build_index.exists():
                 warnings.append(
-                    "project_index.json exists at auto-claude/ but not in spec folder"
+                    "project_index.json exists in .workpilot/ but not in the spec folder"
                 )
-                fixes.append(f"Copy: cp {auto_build_index} {project_index}")
+                fixes.append(f"Copy {auto_build_index} to {project_index}")
             else:
                 errors.append("project_index.json not found")
                 fixes.append(
-                    "Run: python auto-claude/analyzer.py --output auto-claude/project_index.json"
+                    "Run spec creation again: its discovery phase writes "
+                    "project_index.json"
                 )
 
         return ValidationResult(

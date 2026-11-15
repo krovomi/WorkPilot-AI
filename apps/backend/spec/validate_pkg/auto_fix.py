@@ -73,7 +73,10 @@ def _repair_json_syntax(content: str) -> str | None:
         repaired = re.sub(
             r':\s*"(?:[^"\\]|\\.)*$', ': ""', repaired
         )  # Incomplete string value
-        repaired = re.sub(r":\s*[0-9.]+$", ": 0", repaired)  # Incomplete number
+        # A number cut after its dot ("1.") loses the dot. Any other number
+        # at the end is kept: it used to become 0, so a plan truncated after
+        # `"phase": 2` came back as phase 0.
+        repaired = re.sub(r"(:\s*-?[0-9]+)\.$", r"\1", repaired)
 
         # Close remaining open brackets in reverse order (stack-based)
         repaired = repaired.rstrip()
@@ -135,6 +138,13 @@ def _has_subtasks(plan: dict) -> bool:
     return any(isinstance(phase, dict) and phase.get("subtasks") for phase in phases)
 
 
+def _is_plan(document: object) -> bool:
+    """Does this document carry a subtask, in the schema's shape or another?"""
+    if isinstance(document, dict) and _has_subtasks(document):
+        return True
+    return normalize_plan_shape(document) is not None
+
+
 def auto_fix_plan(spec_dir: Path) -> bool:
     """Attempt to auto-fix common implementation_plan.json issues.
 
@@ -168,19 +178,23 @@ def auto_fix_plan(spec_dir: Path) -> bool:
         # either side of it, has written a perfectly good plan into a file that
         # `json.loads` refuses. That is a different failure from a truncated
         # document, and it is the more common one, so it is tried first.
+        #
+        # Extraction returns the *first* complete document, and a plan with a
+        # syntax error inside still holds complete fragments: a trailing comma
+        # after the last subtask made it return the `"depends_on": []` before
+        # it, the repair was never tried, and the plan stayed broken. So an
+        # extracted document only wins when it is a plan.
         plan = extract_json_document(content)
-        if plan is not None:
+        if plan is not None and _is_plan(plan):
             json_repaired = True
             logging.info(f"JSON extracted from surrounding text: {plan_file}")
         else:
-            try:
-                repaired = _repair_json_syntax(content)
-                if repaired:
-                    plan = json.loads(repaired)
-                    json_repaired = True
-                    logging.info(f"JSON syntax repaired: {plan_file}")
-            except Exception as e:
-                logging.warning(f"JSON repair attempt failed for {plan_file}: {e}")
+            # _repair_json_syntax returns only a string json.loads accepts.
+            repaired = _repair_json_syntax(content)
+            if repaired:
+                plan = json.loads(repaired)
+                json_repaired = True
+                logging.info(f"JSON syntax repaired: {plan_file}")
 
     if plan is None:
         return False

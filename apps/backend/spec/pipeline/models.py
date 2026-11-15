@@ -101,20 +101,9 @@ def create_spec_dir(specs_dir: Path, lock: SpecNumberLock | None = None) -> Path
         next_num = lock.get_next_spec_number()
     else:
         # Legacy local scan (fallback for cases without lock)
-        existing = list(specs_dir.glob("[0-9][0-9][0-9]-*"))
-
-        if existing:
-            # Find the HIGHEST folder number
-            numbers = []
-            for folder in existing:
-                try:
-                    num = int(folder.name[:3])
-                    numbers.append(num)
-                except ValueError:
-                    pass
-            next_num = max(numbers) + 1 if numbers else 1
-        else:
-            next_num = 1
+        # The glob guarantees three digits: each name's prefix is a number.
+        numbers = [int(f.name[:3]) for f in specs_dir.glob("[0-9][0-9][0-9]-*")]
+        next_num = max(numbers, default=0) + 1
 
     # Start with placeholder - will be renamed after requirements gathering
     name = "pending"
@@ -212,19 +201,22 @@ def generate_spec_name(task_description: str) -> str:
     return "-".join(name_parts) if name_parts else "spec"
 
 
-def rename_spec_dir_from_requirements(spec_dir: Path) -> bool:
-    """Rename spec directory based on requirements.json task description.
+def rename_spec_dir_from_requirements(spec_dir: Path) -> Path | None:
+    """Rename a ``NNN-pending`` spec directory after its task description.
 
     Args:
         spec_dir: The current spec directory
 
     Returns:
-        Tuple of (success, new_spec_dir). If success is False, new_spec_dir is the original.
+        The directory that holds the spec after the call: the new one when it
+        was renamed, ``spec_dir`` itself when it keeps its name (already named,
+        or the target exists). None when there is nothing to name it after
+        (no requirements.json, no task description) or the rename failed.
     """
     requirements_file = spec_dir / "requirements.json"
 
     if not requirements_file.exists():
-        return False
+        return None
 
     try:
         with open(requirements_file, encoding="utf-8") as f:
@@ -232,41 +224,33 @@ def rename_spec_dir_from_requirements(spec_dir: Path) -> bool:
 
         task_desc = req.get("task_description", "")
         if not task_desc:
-            return False
-
-        # Generate new name
-        new_name = generate_spec_name(task_desc)
-
-        # Extract the number prefix from current dir
-        current_name = spec_dir.name
-        if current_name[:3].isdigit():
-            prefix = current_name[:4]  # "001-"
-        else:
-            prefix = ""
-
-        new_dir_name = f"{prefix}{new_name}"
-        new_spec_dir = spec_dir.parent / new_dir_name
+            return None
 
         # Don't rename if it's already a good name (not "pending")
+        current_name = spec_dir.name
         if "pending" not in current_name:
-            return True
+            return spec_dir
+
+        # Keep the number prefix of the current dir ("001-")
+        prefix = current_name[:4] if current_name[:3].isdigit() else ""
+        new_dir_name = f"{prefix}{generate_spec_name(task_desc)}"
+        new_spec_dir = spec_dir.parent / new_dir_name
 
         # Don't rename if target already exists
         if new_spec_dir.exists():
-            return True
+            return spec_dir
 
-        # Rename the directory
         shutil.move(str(spec_dir), str(new_spec_dir))
 
         # Update the global task logger to use the new path
         update_task_logger_path(new_spec_dir)
 
         print_status(f"Spec folder: {highlight(new_dir_name)}", "success")
-        return True
+        return new_spec_dir
 
     except (json.JSONDecodeError, OSError) as e:
         print_status(f"Could not rename spec folder: {e}", "warning")
-        return False
+        return None
 
 
 # Phase display configuration

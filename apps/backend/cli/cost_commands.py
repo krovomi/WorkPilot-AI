@@ -199,12 +199,12 @@ def handle_cost_budget_command(
         estimator.save_to_file(data_path)
         print(f"Budget set: ${limit:.2f} ({period})")
     else:
-        budget = estimator.get_budget(project_id)
+        # The spend of the budget's own period (this month for a monthly
+        # budget), as the report and the budget alerts count it.
+        budget = estimator.get_project_report(project_id)["budget"]
         if budget:
-            total_cost = estimator.get_total_cost(project_id=project_id)
-            pct = (total_cost / budget.limit * 100) if budget.limit > 0 else 0
-            print(f"Budget: ${budget.limit:.2f} ({budget.period})")
-            print(f"Spent:  ${total_cost:.4f} ({pct:.1f}%)")
-            print(f"Remaining: ${max(0, budget.limit - total_cost):.4f}")
+            print(f"Budget: ${budget['limit']:.2f} ({budget['period']})")
+            print(f"Spent:  ${budget['spent']:.4f} ({budget['percentage']:.1f}%)")
+            print(f"Remaining: ${budget['remaining']:.4f}")
         else:
             print("No budget set. Use --cost-budget <amount> to set one.")

@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Ajoutez un autre abonnement Claude pour basculer automatiquement quand vous atteignez la limite.",
 			"willOpenClaudeLogin": "La connexion Claude va s'ouvrir pour authentifier le nouveau compte.",
 			"switchClaudeRetry": "Passez à un autre compte Claude et relancez l'opération :",
-			"connectClaude": "Connectez un compte Claude :"
+			"connectClaude": "Connectez un compte Claude :",
+			"yourAccount": "votre compte",
+			"defaultAccount": "Par défaut"
 		},
 		"recommendedAria": "Recommandé"
 	},
@@ -666,10 +668,6 @@
 			"text": "Vérifiez que votre clé API OpenAI est liée à une organisation activée pour la facturation.",
 			"link": "Afficher le tableau de bord OpenAI"
 		},
-		"debugProfiles": "Profils détectés par débogage :",
-		"noProfileDetected": "Aucun profil détecté",
-		"selectedProvider": "Fournisseur sélectionné : {{provider}}",
-		"openaiError": "Erreur OpenAI :",
 		"openaiDetailTitle": "Détail OpenAI",
 		"completionsLabel": "Complétions (tokens par modèle) :",
 		"costByModelLabel": "Coût par modèle :",
@@ -706,7 +704,6 @@
 		"lensAutoWith": "Automatique ({{provider}})",
 		"lensRunning": "{{provider}} — en cours",
 		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche.",
-		"debugProvider": "fournisseur :",
 		"needsReauthTitle": "Nouvelle authentification nécessaire",
 		"sessionUsage": "Utilisation de la session",
 		"weeklyUsage": "Utilisation hebdomadaire",

@@ -5,18 +5,30 @@ import {
 } from "../app-emulator-service";
 import { IPC_CHANNELS } from "../../shared/constants/ipc";
 
+/** Refusal when a start names a configuration this process did not detect. */
+export const NOT_DETECTED =
+	"Detect the project before starting it: this configuration was not detected here";
+
 /**
  * Register App Emulator IPC handlers and event forwarding.
+ *
+ * A start runs a command in a shell. The renderer only names which detected
+ * project to start (its `projectDir`); the command, ports and services are
+ * the ones this process detected, never the ones the renderer sends back.
  */
 export function registerAppEmulatorHandlers(
 	getMainWindow: () => BrowserWindow | null,
 ): void {
+	/** Each detection result, by the folder it runs in. */
+	const detected = new Map<string, AppEmulatorConfig>();
+
 	// Detect project type
 	ipcMain.handle(
 		IPC_CHANNELS.APP_EMULATOR_DETECT,
 		async (_event, { projectDir }: { projectDir: string }) => {
 			try {
 				const config = await appEmulatorService.detectProject(projectDir);
+				if (config.projectDir) detected.set(config.projectDir, structuredClone(config));
 				return { success: true, data: config };
 			} catch (error: unknown) {
 				return {
@@ -31,7 +43,11 @@ export function registerAppEmulatorHandlers(
 	let startLock = false;
 	ipcMain.handle(
 		IPC_CHANNELS.APP_EMULATOR_START,
-		async (_event, { config }: { config: AppEmulatorConfig }) => {
+		async (_event, request: { config?: { projectDir?: unknown } }) => {
+			const projectDir = request?.config?.projectDir;
+			const known = typeof projectDir === "string" ? detected.get(projectDir) : undefined;
+			if (!known) return { success: false, error: NOT_DETECTED };
+			const config = structuredClone(known);
 			if (startLock) {
 				return {
 					success: false,

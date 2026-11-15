@@ -28,6 +28,7 @@ import { getPageFeatureSettings } from "../../services/page-llm-config";
 import { getRunnerEnv } from "../github/utils/runner-env";
 import {
 	buildRunnerArgs,
+	findAppBackendPath,
 	getPythonPath,
 	runPythonSubprocess,
 } from "../github/utils/subprocess-runner";
@@ -239,23 +240,18 @@ function getGitLabMRSettings(): { model: string; thinkingLevel: string } {
 }
 
 /**
- * Validate GitLab module is properly set up
+ * Validate GitLab module is properly set up: the runner lives in the app's
+ * backend (`runners/gitlab/runner.py`), wherever the app runs from.
  */
-async function validateGitLabModule(
-	project: Project,
-): Promise<{ valid: boolean; backendPath?: string; error?: string }> {
-	if (!project.autoBuildPath) {
-		return {
-			valid: false,
-			error: "Auto Build path not configured for this project",
-		};
-	}
-
-	const backendPath = path.join(project.path, project.autoBuildPath);
-
-	// Check if the runners directory exists
-	const runnersPath = path.join(backendPath, "runners", "gitlab");
-	if (!fs.existsSync(runnersPath)) {
+async function validateGitLabModule(): Promise<{
+	valid: boolean;
+	backendPath?: string;
+	error?: string;
+}> {
+	const backendPath = findAppBackendPath(
+		path.join("runners", "gitlab", "runner.py"),
+	);
+	if (!backendPath) {
 		return {
 			valid: false,
 			error:
@@ -274,7 +270,7 @@ async function runMRReview(
 	mrIid: number,
 	mainWindow: BrowserWindow,
 ): Promise<MRReviewResult> {
-	const validation = await validateGitLabModule(project);
+	const validation = await validateGitLabModule();
 
 	if (!validation.valid) {
 		throw new Error(validation.error);
@@ -943,7 +939,7 @@ export function registerMRReviewHandlers(
 							projectId,
 						);
 
-					const validation = await validateGitLabModule(project);
+					const validation = await validateGitLabModule();
 					if (!validation.valid) {
 						sendError({
 							mrIid,
