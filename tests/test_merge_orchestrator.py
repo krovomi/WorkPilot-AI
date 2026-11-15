@@ -25,7 +25,7 @@ import pytest
 # Add auto-claude directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "apps" / "backend"))
 # Add tests directory to path for test_fixtures
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent))
 
 from merge import MergeOrchestrator
 from merge.orchestrator import TaskMergeRequest

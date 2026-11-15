@@ -2,19 +2,30 @@
  * FindingItem - Individual finding display with checkbox and details
  */
 
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, History } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../../lib/utils";
 import { Badge } from "../../ui/badge";
 import { Checkbox } from "../../ui/checkbox";
 import { getCategoryIcon } from "../constants/severity-config";
+import type {
+	ReviewFeedbackInput,
+	ReviewFeedbackVerdict,
+} from "../../../../shared/types/review-feedback";
 import type { PRReviewFinding } from "../hooks/useGitHubPRs";
+import { FindingFeedback } from "./FindingFeedback";
 
 interface FindingItemProps {
 	finding: PRReviewFinding;
 	selected: boolean;
 	posted?: boolean;
 	onToggle: () => void;
+	/** Feedback controls (#361): shown when the review's project takes feedback. */
+	feedback?: {
+		verdict?: ReviewFeedbackVerdict;
+		pending: boolean;
+		onSubmit: (input: ReviewFeedbackInput) => Promise<boolean>;
+	};
 }
 
 // Helper to translate category names
@@ -38,6 +49,7 @@ export function FindingItem({
 	selected,
 	posted = false,
 	onToggle,
+	feedback,
 }: FindingItemProps) {
 	const { t } = useTranslation("common");
 	const CategoryIcon = getCategoryIcon(finding.category);
@@ -80,6 +92,18 @@ export function FindingItem({
 								{t("prReview.posted")}
 							</Badge>
 						)}
+						{finding.learnedRejections ? (
+							<Badge
+								variant="outline"
+								className="text-xs shrink-0 text-muted-foreground"
+								title={t("prReview.feedback.learnedHint")}
+							>
+								<History className="h-3 w-3 mr-1" />
+								{t("prReview.feedback.learnedBadge", {
+									count: finding.learnedRejections,
+								})}
+							</Badge>
+						) : null}
 						<span className="font-medium text-sm break-words">
 							{finding.title}
 						</span>
@@ -108,6 +132,15 @@ export function FindingItem({
 						{finding.suggestedFix}
 					</pre>
 				</div>
+			)}
+
+			{feedback && !posted && (
+				<FindingFeedback
+					findingId={finding.id}
+					verdict={feedback.verdict}
+					pending={feedback.pending}
+					onSubmit={feedback.onSubmit}
+				/>
 			)}
 		</div>
 	);
