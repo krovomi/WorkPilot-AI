@@ -190,6 +190,41 @@ class RunManagerError(RuntimeError):
     pass
 
 
+#: How to read and keep a spec's approval around a build: installed by the
+#: board (``shared_board.review``), since the server imports no feature unit
+#: (``tests/test_import_contracts.py``) and the approval lives in ``review``.
+_approval_holds: Callable[[Path], bool] | None = None
+_carry_approval: Callable[[Path], None] | None = None
+
+
+def set_approval_carry(
+    holds: Callable[[Path], bool] | None, carry: Callable[[Path], None] | None
+) -> None:
+    """Install the approval check a build starts with, and the carry-over
+    that keeps that approval over the plan the build wrote.
+
+    Without the carry-over every build left the approval stale (it covers the
+    plan, and a build writes its progress there), so a retry, a resume or the
+    build a request for changes starts stopped at "review required"."""
+    global _approval_holds, _carry_approval
+    _approval_holds, _carry_approval = holds, carry
+
+
+def _approved_before_build(phase: str, spec_dir: Path) -> bool:
+    return (
+        phase == "build" and _approval_holds is not None and _approval_holds(spec_dir)
+    )
+
+
+def _keep_approval(spec_dir: Path) -> None:
+    if _carry_approval is None:
+        return
+    try:
+        _carry_approval(spec_dir)
+    except OSError as exc:
+        logger.warning("Approval of %s not carried over: %s", spec_dir.name, exc)
+
+
 def _mint_ws_token(run_id: str, hours: int = 12) -> str:
     """Service token for the agent's streaming connection.
 
@@ -494,6 +529,8 @@ class RunManager:
                     project_id, spec_id, spec_name, run_id, phase, user_id, "running"
                 )
 
+                spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
+                approved = _approved_before_build(phase, spec_dir)
                 with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
                     cmd = build_command(
                         phase, spec_name, server_path, model, Path(scratch), pr
@@ -518,6 +555,8 @@ class RunManager:
                         # Stop arrived while the environment was being built.
                         proc.terminate()
                     _, stderr = await proc.communicate()
+                if approved:
+                    _keep_approval(spec_dir)
 
                 if run_id in self._cancelled:
                     # terminate() makes the process exit non-zero; that is a
