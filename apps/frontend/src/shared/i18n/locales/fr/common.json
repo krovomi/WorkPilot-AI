@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Ajoutez un autre abonnement Claude pour basculer automatiquement quand vous atteignez la limite.",
 			"willOpenClaudeLogin": "La connexion Claude va s'ouvrir pour authentifier le nouveau compte.",
 			"switchClaudeRetry": "Passez à un autre compte Claude et relancez l'opération :",
-			"connectClaude": "Connectez un compte Claude :"
+			"connectClaude": "Connectez un compte Claude :",
+			"yourAccount": "votre compte",
+			"defaultAccount": "Par défaut"
 		},
 		"recommendedAria": "Recommandé"
 	},
@@ -480,7 +482,42 @@
 		"deepContextSections_one": "{{count}} section",
 		"deepContextSections_other": "{{count}} sections",
 		"verdictOutdated": "Le verdict de l'IA est peut-être dépassé",
-		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés."
+		"rerunReviewSuggestion": "Pensez à relancer la revue une fois ces problèmes corrigés.",
+		"feedback": {
+			"groupLabel": "Avis sur ce résultat",
+			"accept": "Accepter",
+			"reject": "Rejeter",
+			"notApplicable": "Non applicable",
+			"reasonLabel": "Raison (facultatif)",
+			"noReason": "Sans raison",
+			"reasons": {
+				"too_pedantic": "Trop pointilleux",
+				"project_convention": "La convention du projet diffère",
+				"false_positive": "Faux positif",
+				"legacy_exception": "Exception de code hérité",
+				"other": "Autre"
+			},
+			"noteLabel": "Précisions (facultatif)",
+			"notePlaceholder": "Pourquoi cela ne s'applique pas ici",
+			"save": "Enregistrer",
+			"cancel": "Annuler",
+			"show": "Afficher",
+			"hide": "Masquer",
+			"learnedBadge_one": "Rejeté {{count}} fois sur ce projet",
+			"learnedBadge_other": "Rejeté {{count}} fois sur ce projet",
+			"learnedHint": "Ce type de résultat a souvent été rejeté sur ce projet : sa gravité a été abaissée.",
+			"suppressed_one": "{{count}} résultat masqué d'après ce que ce projet a rejeté",
+			"suppressed_other": "{{count}} résultats masqués d'après ce que ce projet a rejeté",
+			"suppressedHint": "Les types de résultat rejetés assez souvent ne sont plus remontés. Les résultats de sécurité et critiques ne sont jamais masqués.",
+			"rejectedCount_one": "(rejeté {{count}} fois)",
+			"rejectedCount_other": "(rejeté {{count}} fois)",
+			"errors": {
+				"invalid": "Cet avis n'a pas pu être lu.",
+				"not_found": "Ce résultat n'est plus dans la revue enregistrée.",
+				"server_project": "L'avis sur les résultats n'est pas encore disponible pour les projets du serveur.",
+				"write_failed": "L'avis n'a pas pu être enregistré."
+			}
+		}
 	},
 	"downloads": {
 		"toggleExpand": "Basculer les détails de téléchargement",
@@ -631,10 +668,6 @@
 			"text": "Vérifiez que votre clé API OpenAI est liée à une organisation activée pour la facturation.",
 			"link": "Afficher le tableau de bord OpenAI"
 		},
-		"debugProfiles": "Profils détectés par débogage :",
-		"noProfileDetected": "Aucun profil détecté",
-		"selectedProvider": "Fournisseur sélectionné : {{provider}}",
-		"openaiError": "Erreur OpenAI :",
 		"openaiDetailTitle": "Détail OpenAI",
 		"completionsLabel": "Complétions (tokens par modèle) :",
 		"costByModelLabel": "Coût par modèle :",
@@ -671,7 +704,6 @@
 		"lensAutoWith": "Automatique ({{provider}})",
 		"lensRunning": "{{provider}} — en cours",
 		"lensTooltip": "La consommation de quel fournisseur les badges affichent. Automatique suit les tâches en cours. Cela ne change rien au moteur d'une tâche.",
-		"debugProvider": "fournisseur :",
 		"needsReauthTitle": "Nouvelle authentification nécessaire",
 		"sessionUsage": "Utilisation de la session",
 		"weeklyUsage": "Utilisation hebdomadaire",

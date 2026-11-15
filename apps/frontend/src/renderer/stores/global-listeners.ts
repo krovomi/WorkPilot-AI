@@ -30,6 +30,7 @@ import { setupDocDriftListeners } from "./doc-drift-store";
 import { setupDocumentationListeners } from "./documentation-store";
 import { setupExecutionWavesListeners } from "./execution-waves-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
+import { setupMRReviewListeners } from "./gitlab/mr-review-store";
 import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
 import { setupInjectionGuardListeners } from "./injection-guard-store";
@@ -112,6 +113,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// when the task list changes, whichever page is open.
 	["ExecutionWaves", setupExecutionWavesListeners],
 	["FlakyTests", setupFlakyTestsListeners],
+	// A GitLab MR review finishing while the merge-request page is closed.
+	["GitLabMRReview", setupMRReviewListeners],
 	["GitSurgeon", setupGitSurgeonListeners],
 	["Ideation", setupIdeationListeners],
 	["InjectionGuard", setupInjectionGuardListeners],

@@ -68,7 +68,7 @@ class AuthDetector(BaseAnalyzer):
         auth_info["middleware"] = self._find_auth_middleware()
 
         # Remove duplicates from strategies
-        auth_info["strategies"] = list(set(auth_info["strategies"]))
+        auth_info["strategies"] = sorted(set(auth_info["strategies"]))
 
         if auth_info["strategies"] or auth_info["libraries"]:
             self.analysis["auth"] = auth_info
@@ -77,9 +77,7 @@ class AuthDetector(BaseAnalyzer):
         """Extract all dependencies from Python and Node.js projects."""
         all_deps = set()
 
-        if self._exists("requirements.txt"):
-            content = self._read_file("requirements.txt")
-            all_deps.update(re.findall(r"^([a-zA-Z0-9_-]+)", content, re.MULTILINE))
+        all_deps.update(self._python_requirements())
 
         pkg = self._read_json("package.json")
         if pkg:
@@ -121,7 +119,7 @@ class AuthDetector(BaseAnalyzer):
     def _find_auth_middleware(self) -> list[str]:
         """Detect auth middleware and decorators from Python files."""
         # Limit to first 20 files for performance
-        all_py_files = list(self.path.glob("**/*.py"))[:20]
+        all_py_files = self._project_files("**/*.py")[:20]
         auth_decorators = set()
 
         for py_file in all_py_files:
@@ -138,4 +136,4 @@ class AuthDetector(BaseAnalyzer):
             except (OSError, UnicodeDecodeError):
                 continue
 
-        return list(auth_decorators) if auth_decorators else []
+        return sorted(auth_decorators)

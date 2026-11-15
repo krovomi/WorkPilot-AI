@@ -44,19 +44,18 @@ class ExtendedQualityScorer(QualityScorer):
             # Erreur de lecture, skip
             return
 
-        # Détection sécurité (tous langages)
-        self._analyze_security_patterns(file_path, content)
-
-        # Analyse par langage
+        # Analyse par langage. Les analyseurs hérités prennent (contenu, chemin) :
+        # appelés dans l'autre ordre, ils analysaient le chemin comme du code.
+        # La sécurité est vérifiée par chaque analyseur de langage.
         suffix = path.suffix.lower()
 
         # Python
         if suffix == ".py":
-            self._analyze_python_file(file_path, content)
+            self._analyze_python_file(content, file_path)
 
         # JavaScript/TypeScript
         elif suffix in [".js", ".jsx", ".ts", ".tsx"]:
-            self._analyze_javascript_file(file_path, content)
+            self._analyze_javascript_file(content, file_path)
 
         # Multi-language support (Java, Kotlin, C#, Go, Rust)
         else:

@@ -492,6 +492,12 @@
 		"noCredentials": "REA tourne sans vos identifiants, depuis un dossier à lui, et ne fait que lire des fichiers.",
 		"docsFailed": "Le lien ne s'est pas ouvert : {{error}}"
 	},
+	"cliStatus": {
+		"installFailed": "Échec de l'installation",
+		"terminalUnavailable": "Impossible d'ouvrir un terminal.",
+		"pathSwitchUnavailable": "Le changement d'installation du CLI n'est pas disponible.",
+		"pathSwitchFailed": "Impossible de changer d'installation du CLI."
+	},
 	"stopAll": {
 		"label": "Arrêter tous les agents",
 		"tooltip": "Arrêter tous les agents (Ctrl+Maj+.) : chaque tâche en cours est mise en pause, à reprendre depuis sa carte",

@@ -30,6 +30,7 @@ export function LaboPanel({ items, activeView, disabled, onOpen }: LaboPanelProp
 								onClick={() => onOpen(item)}
 								disabled={disabled}
 								aria-current={item.id === activeView ? "page" : undefined}
+								data-nav-item={item.id}
 								className={cn(
 									"flex w-full items-start gap-3 rounded-lg border border-border bg-card/40 p-2.5 text-left transition-colors",
 									"hover:border-primary/40 hover:bg-accent hover:text-accent-foreground",

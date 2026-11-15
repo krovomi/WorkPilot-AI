@@ -5,3 +5,9 @@
 # tests that matter start it the same way. Measuring those child processes
 # counts what they ran instead of leaving every entry point at 0 %.
 patch = subprocess
+# The server's database calls go through SQLAlchemy's asyncio layer, which
+# runs each one in a greenlet: without `greenlet` here the tracer loses every
+# line after the first `await` on the database (a route's body, a job's end),
+# and those lines read as never run although tests run them. `thread` keeps
+# the default for the threads the suite starts.
+concurrency = thread,greenlet

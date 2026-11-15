@@ -8,6 +8,7 @@ Provides common constants, utilities, and base functionality shared across all a
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 # Directories to skip during analysis
@@ -91,6 +92,33 @@ class BaseAnalyzer:
 
     def __init__(self, path: Path):
         self.path = path.resolve()
+
+    def _project_files(self, pattern: str) -> list[Path]:
+        """Files of the project matching ``pattern``, outside SKIP_DIRS.
+
+        A bare glob walked into ``.venv`` and ``node_modules``: the installed
+        ``prometheus_client`` made every Python project "monitored", and
+        Django's own migrations were listed as the project's. Only the parts
+        under the project count, so a project kept in a folder named ``build``
+        keeps its files.
+        """
+        files = []
+        for file_path in sorted(self.path.glob(pattern)):
+            parts = file_path.relative_to(self.path).parts[:-1]
+            if any(part in SKIP_DIRS or part.endswith(".egg-info") for part in parts):
+                continue
+            files.append(file_path)
+        return files
+
+    def _python_requirements(self) -> set[str]:
+        """Names in requirements.txt, normalised as pip compares them (PEP 503).
+
+        ``PyJWT`` and ``SQLAlchemy`` are the usual spellings, and the
+        detectors look for ``pyjwt`` and ``sqlalchemy``.
+        """
+        content = self._read_file("requirements.txt")
+        names = re.findall(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)", content, re.MULTILINE)
+        return {re.sub(r"[-_.]+", "-", name).lower() for name in names}
 
     def _exists(self, path: str) -> bool:
         """Check if a file exists relative to the analyzer's path."""

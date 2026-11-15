@@ -8,8 +8,11 @@ All data is persisted as JSON in ~/.workpilot/context_mesh/.
 
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
+
+from foundation.file_utils import write_json_atomic
 
 from .types import (
     ContextMeshConfig,
@@ -22,6 +25,8 @@ from .types import (
 )
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 DEFAULT_MESH_DIR = "~/.workpilot/context_mesh"
 
@@ -71,21 +76,40 @@ class ContextMeshStorage:
             return default if default is not None else {}
 
     def _write_json(self, path: Path, data: Any) -> bool:
+        """Write ``data`` atomically: a crash mid-write leaves the old file."""
         try:
-            path.write_text(
-                json.dumps(data, indent=2, default=str, ensure_ascii=False),
-                encoding="utf-8",
-            )
+            write_json_atomic(path, json.loads(json.dumps(data, default=str)))
             return True
         except OSError as e:
             logger.warning(f"Failed to write {path}: {e}")
             return False
 
+    def _read_list(
+        self, path: Path, key: str, build: Callable[[dict[str, Any]], T]
+    ) -> list[T]:
+        """The records under ``key``; a record that no longer loads is skipped.
+
+        One hand-edited or older-format record must not hide all the others.
+        """
+        data = self._read_json(path, {key: []})
+        records = data.get(key) if isinstance(data, dict) else None
+        if not isinstance(records, list):
+            return []
+        loaded: list[T] = []
+        for record in records:
+            try:
+                loaded.append(build(record))
+            except (TypeError, ValueError, AttributeError) as e:
+                logger.warning(f"Skipped an unreadable record in {path}: {e}")
+        return loaded
+
     # ── Config ──────────────────────────────────────────────────
 
     def load_config(self) -> ContextMeshConfig:
         data = self._read_json(self._config_file, {})
-        return ContextMeshConfig.from_dict(data) if data else ContextMeshConfig()
+        if not isinstance(data, dict) or not data:
+            return ContextMeshConfig()
+        return ContextMeshConfig.from_dict(data)
 
     def save_config(self, config: ContextMeshConfig) -> bool:
         return self._write_json(self._config_file, config.to_dict())
@@ -93,8 +117,9 @@ class ContextMeshStorage:
     # ── Projects ────────────────────────────────────────────────
 
     def get_projects(self) -> list[ProjectSummary]:
-        data = self._read_json(self._projects_file, {"projects": []})
-        return [ProjectSummary.from_dict(p) for p in data.get("projects", [])]
+        return self._read_list(
+            self._projects_file, "projects", ProjectSummary.from_dict
+        )
 
     def save_project(self, project: ProjectSummary) -> bool:
         projects = self.get_projects()
@@ -120,8 +145,9 @@ class ContextMeshStorage:
     # ── Patterns ────────────────────────────────────────────────
 
     def get_patterns(self) -> list[CrossProjectPattern]:
-        data = self._read_json(self._patterns_file, {"patterns": []})
-        return [CrossProjectPattern.from_dict(p) for p in data.get("patterns", [])]
+        return self._read_list(
+            self._patterns_file, "patterns", CrossProjectPattern.from_dict
+        )
 
     def save_patterns(self, patterns: list[CrossProjectPattern]) -> bool:
         return self._write_json(
@@ -148,8 +174,7 @@ class ContextMeshStorage:
     # ── Handbook ─────────────────────────────────────────────────
 
     def get_handbook_entries(self) -> list[HandbookEntry]:
-        data = self._read_json(self._handbook_file, {"entries": []})
-        return [HandbookEntry.from_dict(e) for e in data.get("entries", [])]
+        return self._read_list(self._handbook_file, "entries", HandbookEntry.from_dict)
 
     def save_handbook_entries(self, entries: list[HandbookEntry]) -> bool:
         return self._write_json(
@@ -174,8 +199,9 @@ class ContextMeshStorage:
     # ── Skill Transfers ──────────────────────────────────────────
 
     def get_skill_transfers(self) -> list[SkillTransfer]:
-        data = self._read_json(self._transfers_file, {"transfers": []})
-        return [SkillTransfer.from_dict(s) for s in data.get("transfers", [])]
+        return self._read_list(
+            self._transfers_file, "transfers", SkillTransfer.from_dict
+        )
 
     def save_skill_transfers(self, transfers: list[SkillTransfer]) -> bool:
         return self._write_json(
@@ -195,11 +221,11 @@ class ContextMeshStorage:
     def get_recommendations(
         self, target_project: str | None = None
     ) -> list[ContextualRecommendation]:
-        data = self._read_json(self._recommendations_file, {"recommendations": []})
-        recs = [
-            ContextualRecommendation.from_dict(r)
-            for r in data.get("recommendations", [])
-        ]
+        recs = self._read_list(
+            self._recommendations_file,
+            "recommendations",
+            ContextualRecommendation.from_dict,
+        )
         if target_project:
             recs = [r for r in recs if r.target_project == target_project]
         return recs
@@ -227,9 +253,13 @@ class ContextMeshStorage:
 
     def get_last_report(self) -> MeshAnalysisReport | None:
         data = self._read_json(self.mesh_dir / "last_report.json", None)
-        if data:
+        if not isinstance(data, dict) or not data:
+            return None
+        try:
             return MeshAnalysisReport.from_dict(data)
-        return None
+        except (TypeError, ValueError, AttributeError) as e:
+            logger.warning(f"Unreadable last report: {e}")
+            return None
 
     # ── Summary ──────────────────────────────────────────────────
 

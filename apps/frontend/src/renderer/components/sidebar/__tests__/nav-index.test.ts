@@ -3,7 +3,7 @@ import enNavigation from "@shared/i18n/locales/en/navigation.json";
 import frNavigation from "@shared/i18n/locales/fr/navigation.json";
 import { EXPERIMENTAL_VIEWS } from "../experimental-views";
 import { buildNavIndex } from "../nav-index";
-import { githubNavItems, navGroups } from "../nav-model";
+import { githubNavItems, gitlabNavItems, itemShown, navGroups } from "../nav-model";
 
 const ITEM_KEYS = Object.keys(enNavigation.items);
 
@@ -29,6 +29,18 @@ describe("the pages the command palette offers", () => {
 			{ serverProject: false },
 		);
 		expect(withForge.some((e) => e.view === "github-prs")).toBe(true);
+	});
+
+	it("lists a server project's forge entries on its own forge, and only there", () => {
+		const shown = (forge: "github" | "gitlab" | null) =>
+			[...githubNavItems, ...gitlabNavItems]
+				.filter((item) => itemShown(item, { serverProject: true, forge }))
+				.map((item) => item.id);
+		// The sidebar adds GitHub's entries for a server project on GitHub:
+		// the gate must not take them away again.
+		expect(shown("github")).toEqual(["github-issues", "github-prs"]);
+		expect(shown("gitlab")).toEqual(["gitlab-issues", "gitlab-merge-requests"]);
+		expect(shown(null)).toEqual([]);
 	});
 
 	it("has search keywords in English and French for the same pages", () => {
