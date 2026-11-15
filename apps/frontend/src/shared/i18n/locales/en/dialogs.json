@@ -149,17 +149,6 @@
 		"skip": "Skip for now",
 		"skipDescription": "Don't connect a remote provider now."
 	},
-	"azureDevOpsSetup": {
-		"title": "Connect to Azure DevOps",
-		"description": "Add your Azure DevOps credentials to import and sync work items.",
-		"loading": "Loading settings...",
-		"save": "Save Settings",
-		"saving": "Saving...",
-		"skip": "Skip for now",
-		"orgUrlRequired": "Organization URL is required",
-		"patRequired": "Personal Access Token is required",
-		"repositoryNote": "You can select the repository in the project settings after this step."
-	},
 	"worktrees": {
 		"count": "{{count}} worktrees",
 		"title": "Worktrees",
@@ -421,7 +410,11 @@
 		"create": "Add to the server",
 		"creating": "Cloning on the server…",
 		"failed": "The server could not add the project",
-		"useLocalFolder": "Use a folder on this computer instead"
+		"useLocalFolder": "Use a folder on this computer instead",
+		"existingTitle": "Your team's projects",
+		"openExisting": "Open",
+		"openExistingNamed": "Open {{name}}",
+		"orAddNew": "Or add another repository to the server:"
 	},
 	"envConfig": {
 		"accountsCount_one": "You have {{count}} authenticated Claude account. Select one to use:",
