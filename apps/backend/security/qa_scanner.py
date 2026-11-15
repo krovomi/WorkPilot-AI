@@ -27,7 +27,6 @@ from .finding_priority import (
     EvidenceProvider,
     PriorityContext,
     RankedFinding,
-    Section,
     rank,
 )
 from .vulnerability_scanner import (
@@ -264,22 +263,22 @@ class SecurityScanSummary:
         return lines
 
     def _priority_sections(self, ranking: list[RankedFinding]) -> list[str]:
-        counts = dict.fromkeys(Section, 0)
+        counts = dict.fromkeys(SECTION_TITLES, 0)
         for ranked in ranking:
             counts[ranked.section] += 1
         lines = [
             "**Priority:** "
-            + " | ".join(f"{SECTION_TITLES[s]}: {counts[s]}" for s in Section)
+            + " | ".join(f"{title}: {counts[s]}" for s, title in SECTION_TITLES.items())
             + "\n",
             "Priority = base CVSS × reach × production use. It orders the "
             "findings; what blocks the build still follows severity.\n",
         ]
         lines.extend(f"> ℹ️ {note}\n" for note in self.priority_notes)
-        for section in Section:
+        for section, title in SECTION_TITLES.items():
             group = [r for r in ranking if r.section == section]
             if not group:
                 continue
-            lines.append(f"\n### {SECTION_TITLES[section]} ({len(group)})\n")
+            lines.append(f"\n### {title} ({len(group)})\n")
             for ranked in group:
                 finding = self._finding_lines(ranked.vulnerability)
                 finding.insert(

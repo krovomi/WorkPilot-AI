@@ -33,6 +33,7 @@ __all__ = [
     "Evidence",
     "EvidenceProvider",
     "PriorityContext",
+    "SECTION_TITLES",
     "RankedFinding",
     "Reach",
     "Section",
@@ -60,6 +61,7 @@ class Section(str, Enum):
     INFORMATIONAL = "informational"
 
 
+#: Each section's title, in the order the report lists them.
 SECTION_TITLES = {
     Section.CRITICAL_EXPOSED: "🔴 Critical & exposed",
     Section.CRITICAL_DORMANT: "🟠 Critical but dormant",
