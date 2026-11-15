@@ -54,6 +54,16 @@ CLAUDE_ENV = (
     "TMPDIR",
     "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_API_KEY",
+    # Windows: no process starts without SYSTEMROOT, a .cmd shim needs COMSPEC
+    # and PATHEXT, and the CLI keeps its settings under the user's profile.
+    "SYSTEMROOT",
+    "COMSPEC",
+    "PATHEXT",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
 )
 SECRET_ENV = (
     "PAT_TOKEN",
@@ -245,10 +255,13 @@ def clone_wiki(repo: str, into: Path) -> Path | None:
 
 
 def run_claude(prompt: str, cwd: Path, wiki: Path | None) -> bool:
-    if not shutil.which("claude"):
+    # The path found on PATH, not the bare name: on Windows the CLI is a
+    # claude.cmd shim, which a bare "claude" (claude.exe) would not start.
+    claude = shutil.which("claude")
+    if not claude:
         return False
     cmd = [
-        "claude",
+        claude,
         "-p",
         "--permission-mode",
         "acceptEdits",
