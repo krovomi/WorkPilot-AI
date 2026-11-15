@@ -2,13 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const store = vi.hoisted(() => ({
+	projects: [] as Array<{ id: string; name: string; remote?: { role: string } }>,
+	openProjectIds: [] as string[],
 	addProject: vi.fn(),
 	selectProject: vi.fn(),
 	openProjectTab: vi.fn(),
 }));
 
 vi.mock("@/stores/project-store", () => ({
-	useProjectStore: { getState: () => store },
+	useProjectStore: Object.assign(
+		(selector: (state: typeof store) => unknown) => selector(store),
+		{ getState: () => store },
+	),
 }));
 
 import { repoNameFromUrl, ServerProjectDialog } from "./ServerProjectDialog";
@@ -17,6 +22,8 @@ const createServerProject = vi.fn();
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	store.projects = [];
+	store.openProjectIds = [];
 	(
 		globalThis as unknown as { electronAPI: Record<string, unknown> }
 	).electronAPI = { createServerProject };
@@ -69,5 +76,34 @@ describe("ServerProjectDialog", () => {
 		expect(await screen.findByRole("alert")).toHaveTextContent("Project quota reached");
 		expect(onOpenChange).not.toHaveBeenCalled();
 		expect(store.addProject).not.toHaveBeenCalled();
+	});
+
+	it("opens a team project the app has no tab for, without adding one", () => {
+		store.projects = [
+			{ id: "p-board", name: "Team Board", remote: { role: "member" } },
+			{ id: "p-site", name: "Team Site", remote: { role: "member" } },
+			{ id: "p-local", name: "My scripts" },
+		];
+		store.openProjectIds = ["p-board"];
+		const onOpenChange = vi.fn();
+		render(
+			<ServerProjectDialog open onOpenChange={onOpenChange} onChooseLocal={vi.fn()} />,
+		);
+
+		// Only the server's projects that are not open yet are offered.
+		expect(screen.getAllByRole("button", { name: /^(open|ouvrir) /i })).toHaveLength(1);
+		fireEvent.click(screen.getByRole("button", { name: /^(open|ouvrir) team site$/i }));
+
+		expect(store.selectProject).toHaveBeenCalledWith("p-site");
+		expect(store.openProjectTab).toHaveBeenCalledWith("p-site");
+		expect(onOpenChange).toHaveBeenCalledWith(false);
+		expect(createServerProject).not.toHaveBeenCalled();
+	});
+
+	it("offers no list when every team project is already open", () => {
+		store.projects = [{ id: "p-board", name: "Team Board", remote: { role: "member" } }];
+		store.openProjectIds = ["p-board"];
+		render(<ServerProjectDialog open onOpenChange={vi.fn()} onChooseLocal={vi.fn()} />);
+		expect(screen.queryByRole("button", { name: /^(open|ouvrir) /i })).toBeNull();
 	});
 });

@@ -6,11 +6,15 @@ Commands for creating and managing multiple tasks from batch files.
 """
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
+from qa.criteria import is_qa_approved
 from ui import highlight, print_status
+
+_SPEC_NUMBER = re.compile(r"^(\d+)-")
 
 
 def handle_batch_create_command(batch_file: str, project_dir: str) -> bool:
@@ -48,18 +52,23 @@ def handle_batch_create_command(batch_file: str, project_dir: str) -> bool:
     specs_dir = Path(project_dir) / ".workpilot" / "specs"
     specs_dir.mkdir(parents=True, exist_ok=True)
 
+    from board_mcp.server import slugify
+
     # Find next spec ID
-    existing_specs = [d.name for d in specs_dir.iterdir() if d.is_dir()]
-    next_id = (
-        max([int(s.split("-")[0]) for s in existing_specs if s[0].isdigit()] or [0]) + 1
-    )
+    numbers = [
+        int(match.group(1))
+        for d in specs_dir.iterdir()
+        if d.is_dir() and (match := _SPEC_NUMBER.match(d.name))
+    ]
+    next_id = max(numbers, default=0) + 1
 
     created_specs = []
 
     for idx, task in enumerate(tasks, 1):
         spec_id = f"{next_id:03d}"
         task_title = task.get("title", f"Task {idx}")
-        task_slug = task_title.lower().replace(" ", "-")[:50]
+        # The title names a folder: letters and digits only, as the board does.
+        task_slug = slugify(task_title)
         spec_name = f"{spec_id}-{task_slug}"
         spec_dir = specs_dir / spec_name
         spec_dir.mkdir(exist_ok=True)
@@ -140,7 +149,6 @@ def handle_batch_status_command(project_dir: str) -> bool:
         spec_name = spec_dir.name
         req_file = spec_dir / "requirements.json"
 
-        status = "unknown"
         title = spec_name
 
         if req_file.exists():
@@ -151,13 +159,14 @@ def handle_batch_status_command(project_dir: str) -> bool:
             except json.JSONDecodeError:
                 pass
 
-        # Determine status
-        if (spec_dir / "spec.md").exists():
-            status = "spec_created"
+        # The furthest step the spec reached: a built spec still has its
+        # spec.md, so the later steps are looked at first.
+        if is_qa_approved(spec_dir):
+            status = "qa_approved"
         elif (spec_dir / "implementation_plan.json").exists():
             status = "building"
-        elif (spec_dir / "qa_report.md").exists():
-            status = "qa_approved"
+        elif (spec_dir / "spec.md").exists():
+            status = "spec_created"
         else:
             status = "pending_spec"
 
@@ -166,8 +175,7 @@ def handle_batch_status_command(project_dir: str) -> bool:
             "spec_created": "📋",
             "building": "⚙️",
             "qa_approved": "✅",
-            "unknown": "❓",
-        }.get(status, "❓")
+        }[status]
 
         print(f"{status_icon} {spec_name:<40} {title}")
 
@@ -192,11 +200,13 @@ def handle_batch_cleanup_command(project_dir: str, dry_run: bool = True) -> bool
         print_status("No specs directory found", "info")
         return True
 
-    # Find completed specs
-    completed = []
-    for spec_dir in specs_dir.iterdir():
-        if spec_dir.is_dir() and (spec_dir / "qa_report.md").exists():
-            completed.append(spec_dir.name)
+    # Completed: QA signed the build off. A QA report alone is also written
+    # when QA rejects the build, and that work is not done.
+    completed = sorted(
+        spec_dir.name
+        for spec_dir in specs_dir.iterdir()
+        if spec_dir.is_dir() and is_qa_approved(spec_dir)
+    )
 
     if not completed:
         print_status("No completed specs to clean up", "info")
@@ -246,7 +256,7 @@ def handle_batch_cleanup_command(project_dir: str, dry_run: bool = True) -> bool
                         f"Worktree removal timed out, removed directory: {spec_name}",
                         "warning",
                     )
-                except Exception as e:
+                except OSError as e:
                     print_status(
                         f"Failed to remove worktree {spec_name}: {e}", "warning"
                     )
@@ -257,7 +267,7 @@ def handle_batch_cleanup_command(project_dir: str, dry_run: bool = True) -> bool
                     shutil.rmtree(spec_path)
                     print_status(f"Removed spec: {spec_name}", "success")
                     deleted_count += 1
-                except Exception as e:
+                except OSError as e:
                     print_status(f"Failed to remove spec {spec_name}: {e}", "error")
 
         print()

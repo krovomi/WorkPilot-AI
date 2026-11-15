@@ -34,18 +34,31 @@ templated routes that could shadow them.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+import logging
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Body, HTTPException, Path, Query
+from foundation.api_safety import safe_error
 
-try:
-    from provider_api import HOOK_NOT_FOUND, TEMPLATE_NOT_FOUND, _safe_error_message
-except ImportError:
-    from apps.backend.provider_api import (  # type: ignore[no-redef]
-        HOOK_NOT_FOUND,
-        TEMPLATE_NOT_FOUND,
-        _safe_error_message,
-    )
+if TYPE_CHECKING:
+    from services.hooks.hook_service import HookService
+
+logger = logging.getLogger(__name__)
+
+HOOK_NOT_FOUND = "Hook not found"
+TEMPLATE_NOT_FOUND = "Template not found"
+
+
+def _safe_error_message(e: Exception) -> str:
+    """What the caller sees of a failure: its kind, never its text."""
+    return safe_error(e, logger, "Hooks")
+
+
+def _service() -> HookService:
+    from services.hooks.hook_service import HookService
+
+    return HookService.get_instance()
+
 
 router = APIRouter()
 
@@ -57,9 +70,7 @@ router = APIRouter()
 def list_hooks(project_id: Annotated[str | None, Query()] = None):
     """List all hooks, optionally filtered by project."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hooks = svc.list_hooks(project_id)
         return {"success": True, "hooks": hooks}
     except Exception as e:
@@ -70,9 +81,7 @@ def list_hooks(project_id: Annotated[str | None, Query()] = None):
 def get_hooks_stats():
     """Get overall hook system statistics."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         stats = svc.get_stats()
         return {"success": True, "stats": stats}
     except Exception as e:
@@ -83,9 +92,7 @@ def get_hooks_stats():
 def get_hook_templates():
     """Get all available hook templates."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         templates = svc.get_templates()
         return {"success": True, "templates": templates}
     except Exception as e:
@@ -99,9 +106,7 @@ def get_hook_executions(
 ):
     """Get execution history for hooks."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         executions = svc.get_executions(hook_id, limit)
         return {"success": True, "executions": executions}
     except Exception as e:
@@ -115,9 +120,7 @@ def get_hook_executions(
 def create_hook(body: Annotated[dict[str, Any], Body(...)]):
     """Create a new hook."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hook = svc.create_hook(body)
         return {"success": True, "hook": hook}
     except Exception as e:
@@ -128,10 +131,9 @@ def create_hook(body: Annotated[dict[str, Any], Body(...)]):
 async def emit_hook_event(body: Annotated[dict[str, Any], Body(...)]):
     """Emit an event to trigger matching hooks."""
     try:
-        from services.hooks.hook_service import HookService
         from services.hooks.models import HookEvent, TriggerType
 
-        svc = HookService.get_instance()
+        svc = _service()
         event = HookEvent(
             type=TriggerType(body.get("type", "manual")),
             data=body.get("data", {}),
@@ -155,9 +157,7 @@ async def emit_hook_event(body: Annotated[dict[str, Any], Body(...)]):
 def create_hook_from_template(body: Annotated[dict[str, Any], Body(...)]):
     """Create a hook from a template."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         template_id = body.get("template_id", "")
         project_id = body.get("project_id")
         hook = svc.create_from_template(template_id, project_id)
@@ -180,9 +180,7 @@ def create_hook_from_template(body: Annotated[dict[str, Any], Body(...)]):
 def get_hook(hook_id: Annotated[str, Path(...)]):
     """Get a single hook by ID."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hook = svc.get_hook(hook_id)
         if not hook:
             raise HTTPException(status_code=404, detail=HOOK_NOT_FOUND)
@@ -203,9 +201,7 @@ def update_hook(
 ):
     """Update an existing hook."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hook = svc.update_hook(hook_id, body)
         if not hook:
             raise HTTPException(status_code=404, detail=HOOK_NOT_FOUND)
@@ -223,9 +219,7 @@ def update_hook(
 def delete_hook(hook_id: Annotated[str, Path(...)]):
     """Delete a hook."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         deleted = svc.delete_hook(hook_id)
         if not deleted:
             raise HTTPException(status_code=404, detail=HOOK_NOT_FOUND)
@@ -243,9 +237,7 @@ def delete_hook(hook_id: Annotated[str, Path(...)]):
 def toggle_hook(hook_id: Annotated[str, Path(...)]):
     """Toggle a hook between active and paused."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hook = svc.toggle_hook(hook_id)
         if not hook:
             raise HTTPException(status_code=404, detail=HOOK_NOT_FOUND)
@@ -263,9 +255,7 @@ def toggle_hook(hook_id: Annotated[str, Path(...)]):
 def duplicate_hook(hook_id: Annotated[str, Path(...)]):
     """Duplicate an existing hook."""
     try:
-        from services.hooks.hook_service import HookService
-
-        svc = HookService.get_instance()
+        svc = _service()
         hook = svc.duplicate_hook(hook_id)
         if not hook:
             raise HTTPException(status_code=404, detail=HOOK_NOT_FOUND)

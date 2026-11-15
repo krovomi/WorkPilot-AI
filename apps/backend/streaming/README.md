@@ -85,14 +85,16 @@ The system supports 17 event types:
 
 ### StreamingManager
 
-Core component that manages streaming sessions and broadcasts events to connected clients.
+Core component of the WebSocket server: it holds the sessions, their viewers and
+their pause state, and broadcasts each event to a session's viewers. Agents do
+not call it: they publish through `StreamingAgentWrapper`.
 
 ```python
 from streaming import get_streaming_manager
 
 manager = get_streaming_manager()
 await manager.start_session("session-id", metadata)
-await manager.emit_code_change("session-id", "file.py", "update", content)
+await manager.emit_chat_message("session-id", "Looks good", author="Ann")
 await manager.end_session("session-id")
 ```
 
@@ -117,7 +119,7 @@ from streaming import SessionRecorder
 
 recorder = SessionRecorder()
 recorder.start_recording("session-id", metadata)
-# ... events are recorded automatically ...
+# ... StreamingAgentWrapper records each event it emits, secrets masked ...
 recording = recorder.stop_recording("session-id")
 
 # Replay later

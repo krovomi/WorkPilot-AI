@@ -101,9 +101,16 @@ export function isItemExperimental(item: NavItem): boolean {
 	return item.hub ? isHubExperimental(getHub(item.hub)) : EXPERIMENTAL_VIEWS.has(item.id);
 }
 
+/**
+ * Whether the menu lists an entry: a server project's GitHub or GitLab
+ * views only on its forge (`gates.forge`), as its hubs' tabs.
+ */
 export function itemShown(item: NavItem, gates: HubTabGates): boolean {
 	if (item.hub) return shownHubTabs(getHub(item.hub), gates).length > 0;
-	return !(gates.hideExperimental && isItemExperimental(item)) && showsView(item.id, gates.serverProject);
+	return (
+		!(gates.hideExperimental && isItemExperimental(item)) &&
+		showsView(item.id, gates.serverProject, gates.forge ?? null)
+	);
 }
 
 export interface NavGroup {

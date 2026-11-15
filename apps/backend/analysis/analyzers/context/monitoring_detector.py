@@ -68,12 +68,15 @@ class MonitoringDetector(BaseAnalyzer):
         """Detect Prometheus metrics endpoint."""
         # Look for actual Prometheus imports/usage, not just keywords
         all_files = (
-            list(self.path.glob("**/*.py"))[:30] + list(self.path.glob("**/*.js"))[:30]
+            self._project_files("**/*.py")[:30] + self._project_files("**/*.js")[:30]
         )
 
         for file_path in all_files:
-            # Skip analyzer files to avoid self-detection
-            if "analyzers" in str(file_path) or "analyzer.py" in str(file_path):
+            # Skip analyzer files to avoid self-detection (inside the project:
+            # the absolute path skipped every file of a project kept under a
+            # folder named "analyzers")
+            relative = file_path.relative_to(self.path).as_posix()
+            if "analyzers" in relative or file_path.name == "analyzer.py":
                 continue
 
             try:

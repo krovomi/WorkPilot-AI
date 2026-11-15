@@ -192,6 +192,7 @@ export async function uninstallPlugin(
 	pluginId: string,
 ): Promise<boolean> {
 	const store = usePluginMarketplaceStore.getState();
+	store.setError(null);
 	try {
 		const result = await globalThis.electronAPI?.invoke(
 			"pluginMarketplace:uninstall",
@@ -203,7 +204,8 @@ export async function uninstallPlugin(
 		}
 		store.setError(result?.error || "Uninstall failed");
 		return false;
-	} catch {
+	} catch (err) {
+		store.setError(err instanceof Error ? err.message : "Uninstall failed");
 		return false;
 	}
 }
