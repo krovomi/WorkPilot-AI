@@ -86,7 +86,7 @@
   "apps/backend/core/mcp_extensions.py": {"blind": 2, "silent": 0},
   "apps/backend/core/mcp_tools.py": {"blind": 2, "silent": 0},
   "apps/backend/core/merge_event.py": {"blind": 1, "silent": 0},
-  "apps/backend/core/model_info.py": {"blind": 2, "silent": 0},
+  "apps/backend/core/model_info.py": {"blind": 1, "silent": 0},
   "apps/backend/core/oneshot.py": {"blind": 6, "silent": 0},
   "apps/backend/core/project_brief.py": {"blind": 1, "silent": 0},
   "apps/backend/core/prompt_preview.py": {"blind": 4, "silent": 0},
