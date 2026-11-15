@@ -18,8 +18,10 @@ from typing import Any
 # package » dès qu'on l'importait depuis le backend lui-même.
 try:
     from core.auth import get_auth_token
+    from foundation.platform import is_windows
 except ImportError:  # pragma: no cover - dépend du sys.path de l'appelant
     from apps.backend.core.auth import get_auth_token
+    from apps.backend.foundation.platform import is_windows
 
 #: Modèle Claude par défaut d'une configuration de provider — le repli quand
 #: l'utilisateur n'en a pas choisi. Il vivait dans ``llm_base.py``, retiré avec
@@ -27,17 +29,6 @@ except ImportError:  # pragma: no cover - dépend du sys.path de l'appelant
 DEFAULT_CLAUDE_MODEL = "claude-opus-5"
 
 logger = logging.getLogger(__name__)
-
-
-def _mask_secret(value: str) -> str:
-    """Renvoie un placeholder pour une clé API dans les logs.
-
-    On n'écho aucun caractère du secret : même un préfixe de 8 caractères réduit
-    significativement l'entropie pour un attaquant qui aurait accès aux logs.
-    """
-    if not value:
-        return "***"
-    return f"<redacted, {len(value)} chars>"
 
 
 CONFIG_FILE = Path.home() / ".work_pilot_ai_llm_providers.json"
@@ -170,7 +161,7 @@ def _ensure_owner_only(path: Path) -> None:
     repaired on the next write, which may never happen — so repair on read too.
     No-op on Windows, where the mode bits do not carry group/other permissions.
     """
-    if os.name == "nt":
+    if is_windows():
         return
     try:
         current = os.stat(path).st_mode & 0o777
@@ -222,23 +213,9 @@ def delete_provider_config(name: str) -> None:
 
 
 def list_provider_configs() -> list[str]:
+    # Files written before 1.5 may hold an ``__active_provider__`` marker: it
+    # is not a provider.
     return [k for k in load_all_provider_configs() if not k.startswith("__")]
-
-
-_ACTIVE_PROVIDER_KEY = "__active_provider__"
-
-
-def set_active_provider(name: str) -> None:
-    """Persist the currently selected provider in the config file."""
-    with _CONFIG_LOCK:
-        all_configs = load_all_provider_configs()
-        all_configs[_ACTIVE_PROVIDER_KEY] = name
-        _write_all_provider_configs(all_configs)
-
-
-def get_active_provider() -> str | None:
-    """Return the name of the provider previously selected, or None."""
-    return load_all_provider_configs().get(_ACTIVE_PROVIDER_KEY)
 
 
 def get_claude_token_from_system() -> str | None:

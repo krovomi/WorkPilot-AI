@@ -446,36 +446,3 @@ export function useIpcListeners(): void {
 		};
 	}, [appendLog, setError]);
 }
-
-/**
- * Hook to manage app settings
- */
-export function useAppSettings() {
-	const getSettings = async () => {
-		const result = await window.electronAPI.getSettings();
-		if (result.success && result.data) {
-			return result.data;
-		}
-		return null;
-	};
-
-	const saveSettings = async (
-		settings: Parameters<typeof window.electronAPI.saveSettings>[0],
-	) => {
-		const result = await window.electronAPI.saveSettings(settings);
-		return result.success;
-	};
-
-	return { getSettings, saveSettings };
-}
-
-/**
- * Hook to get the app version
- */
-export function useAppVersion() {
-	const getVersion = async () => {
-		return window.electronAPI.getAppVersion();
-	};
-
-	return { getVersion };
-}

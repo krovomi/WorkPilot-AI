@@ -594,7 +594,9 @@ Before marking complete, verify:
     try:
         from learning_loop.prompt_injection import get_learning_context
 
-        learning_context = get_learning_context(project_dir, "coding")
+        learning_context = get_learning_context(
+            project_dir, "coding", spec_dir=spec_dir
+        )
         if learning_context:
             sections.append(learning_context)
     except Exception:
@@ -680,7 +682,9 @@ not in the spec directory.
     try:
         from learning_loop.prompt_injection import get_learning_context
 
-        learning_context = get_learning_context(project_dir, "planning")
+        learning_context = get_learning_context(
+            project_dir, "planning", spec_dir=spec_dir
+        )
         if learning_context:
             prompt += "\n" + learning_context
     except Exception:

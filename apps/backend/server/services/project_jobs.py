@@ -334,9 +334,14 @@ class ProjectJobs:
                 if on_finish is not None:
                     await on_finish(status, collected)
             finally:
-                self._running.pop(key, None)
-                await _set_status(job_id, status, error)
-                _notify(project_id, feature, job_id, status, user_id)
+                # Stored before the job stops being tracked: a request that
+                # settles orphans in between would otherwise read it still
+                # running, untracked, and record it failed over its result.
+                try:
+                    await _set_status(job_id, status, error)
+                    _notify(project_id, feature, job_id, status, user_id)
+                finally:
+                    self._running.pop(key, None)
 
 
 async def _set_status(job_id: str, status: str, error: str | None = None) -> None:
