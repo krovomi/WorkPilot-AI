@@ -61,9 +61,9 @@ class TestCoreInstallsTheRuntime:
 
 class TestWithoutARuntime:
     def test_the_merge_resolver_has_no_ai(self, no_runtime):
-        from merge.ai_resolver.claude_client import create_claude_resolver
+        from merge.ai_resolver import create_ai_resolver
 
-        assert create_claude_resolver().ai_call_fn is None
+        assert create_ai_resolver().ai_call_fn is None
 
     def test_the_linear_client_is_refused(self, no_runtime, monkeypatch):
         from integrations.linear import updater
@@ -99,18 +99,6 @@ class TestWithoutARuntime:
 
         with pytest.raises(DetailedError, match="No agent runtime"):
             asyncio.run(TestGeneratorAgent()._call_llm("PROMPT"))
-
-
-class TestWithoutAToken:
-    def test_the_merge_resolver_has_no_ai(self, monkeypatch):
-        class _Port:
-            def get_auth_token(self):
-                return None
-
-        monkeypatch.setattr(agent_runtime, "_runtime", _Port())
-        from merge.ai_resolver.claude_client import create_claude_resolver
-
-        assert create_claude_resolver().ai_call_fn is None
 
 
 def test_the_architecture_reviewer_prompt_is_filled(tmp_path, monkeypatch):

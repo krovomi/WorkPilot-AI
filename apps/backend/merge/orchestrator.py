@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .ai_resolver import AIResolver, create_claude_resolver
+from .ai_resolver import AIResolver, create_ai_resolver
 from .auto_merger import AutoMerger
 from .conflict_detector import ConflictDetector
 from .conflict_resolver import ConflictResolver
@@ -177,7 +177,7 @@ class MergeOrchestrator:
         """Get the AI resolver, initializing if needed."""
         if not self._ai_resolver_initialized:
             if self.enable_ai:
-                self._ai_resolver = create_claude_resolver()
+                self._ai_resolver = create_ai_resolver(self.project_dir)
             else:
                 self._ai_resolver = AIResolver()  # No AI function
             self._ai_resolver_initialized = True

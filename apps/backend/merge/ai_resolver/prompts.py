@@ -40,22 +40,6 @@ merged code here
 
 Merge the code now:"""
 
-# Batch merge prompt template for multiple conflicts in the same file
-BATCH_MERGE_PROMPT_TEMPLATE = """You are a code merge assistant. Your task is to merge changes from multiple development tasks.
-
-There are {num_conflicts} conflict regions in {file_path}. Resolve each one.
-
-{combined_context}
-
-For each conflict region, output the merged code in a separate code block labeled with the location:
-
-## Location: <location>
-```{language}
-merged code
-```
-
-Resolve all conflicts now:"""
-
 
 def format_merge_prompt(context: str, language: str) -> str:
     """
@@ -69,29 +53,3 @@ def format_merge_prompt(context: str, language: str) -> str:
         Formatted prompt string
     """
     return MERGE_PROMPT_TEMPLATE.format(context=context, language=language)
-
-
-def format_batch_merge_prompt(
-    file_path: str,
-    num_conflicts: int,
-    combined_context: str,
-    language: str,
-) -> str:
-    """
-    Format the batch merge prompt for multiple conflicts.
-
-    Args:
-        file_path: Path to the file with conflicts
-        num_conflicts: Number of conflicts to resolve
-        combined_context: Combined context from all conflicts
-        language: Programming language for code block formatting
-
-    Returns:
-        Formatted batch prompt string
-    """
-    return BATCH_MERGE_PROMPT_TEMPLATE.format(
-        file_path=file_path,
-        num_conflicts=num_conflicts,
-        combined_context=combined_context,
-        language=language,
-    )

@@ -9,8 +9,6 @@ Covers:
 - Resolver with and without AI function
 - Context building for AI prompts
 - Conflict resolution attempts
-- Statistics tracking (AI calls, token estimates)
-- can_resolve filtering logic
 """
 
 from datetime import datetime
@@ -119,93 +117,6 @@ class TestContextBuilding:
         assert "function:App" in prompt
         assert "task-001" in prompt
         assert "Add authentication hook" in prompt
-
-
-class TestCanResolveFiltering:
-    """Tests for can_resolve filtering logic."""
-
-    def test_can_resolve_filters_correctly(self, ai_resolver, mock_ai_resolver):
-        """can_resolve correctly filters conflicts."""
-        ai_conflict = ConflictRegion(
-            file_path="test.py",
-            location="func",
-            tasks_involved=["t1"],
-            change_types=[ChangeType.MODIFY_FUNCTION],
-            severity=ConflictSeverity.MEDIUM,
-            can_auto_merge=False,
-            merge_strategy=MergeStrategy.AI_REQUIRED,
-        )
-        auto_conflict = ConflictRegion(
-            file_path="test.py",
-            location="func",
-            tasks_involved=["t1"],
-            change_types=[ChangeType.ADD_IMPORT],
-            severity=ConflictSeverity.NONE,
-            can_auto_merge=True,
-            merge_strategy=MergeStrategy.COMBINE_IMPORTS,
-        )
-
-        # Without AI function, can't resolve
-        assert ai_resolver.can_resolve(ai_conflict) is False
-
-        # With AI function, can resolve AI conflicts but not auto-mergeable ones
-        assert mock_ai_resolver.can_resolve(ai_conflict) is True
-        assert mock_ai_resolver.can_resolve(auto_conflict) is False
-
-
-class TestStatsTracking:
-    """Tests for statistics tracking."""
-
-    def test_stats_tracking(self, mock_ai_resolver):
-        """Resolver tracks call statistics."""
-        mock_ai_resolver.reset_stats()
-
-        snapshot = TaskSnapshot(
-            task_id="task-001",
-            task_intent="Test",
-            started_at=datetime.now(),
-            semantic_changes=[],
-        )
-        conflict = ConflictRegion(
-            file_path="test.py",
-            location="func",
-            tasks_involved=["task-001"],
-            change_types=[ChangeType.MODIFY_FUNCTION],
-            severity=ConflictSeverity.MEDIUM,
-            can_auto_merge=False,
-        )
-
-        mock_ai_resolver.resolve_conflict(conflict, "code", [snapshot])
-
-        stats = mock_ai_resolver.stats
-        assert stats["calls_made"] == 1
-        assert stats["estimated_tokens_used"] > 0
-
-    def test_stats_accumulation(self, mock_ai_resolver):
-        """Stats accumulate across multiple calls."""
-        mock_ai_resolver.reset_stats()
-
-        snapshot = TaskSnapshot(
-            task_id="task-001",
-            task_intent="Test",
-            started_at=datetime.now(),
-            semantic_changes=[],
-        )
-        conflict = ConflictRegion(
-            file_path="test.py",
-            location="func",
-            tasks_involved=["task-001"],
-            change_types=[ChangeType.MODIFY_FUNCTION],
-            severity=ConflictSeverity.MEDIUM,
-            can_auto_merge=False,
-        )
-
-        # Multiple resolutions
-        for _ in range(3):
-            mock_ai_resolver.resolve_conflict(conflict, "code", [snapshot])
-
-        stats = mock_ai_resolver.stats
-        assert stats["calls_made"] == 3
 
 
 class TestAIMergeRetryMechanism:

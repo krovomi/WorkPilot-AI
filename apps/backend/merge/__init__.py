@@ -23,7 +23,7 @@ Usage:
     result = orchestrator.merge_task("task-001-feature")
 """
 
-from .ai_resolver import AIResolver, create_claude_resolver
+from .ai_resolver import AIResolver, create_ai_resolver
 from .auto_merger import AutoMerger
 from .compatibility_rules import CompatibilityRule
 from .conflict_detector import ConflictDetector
@@ -91,7 +91,7 @@ __all__ = [
     "AutoMerger",
     "FileEvolutionTracker",
     "AIResolver",
-    "create_claude_resolver",
+    "create_ai_resolver",
     "ConflictResolver",
     "MergePipeline",
     "MergeOrchestrator",
