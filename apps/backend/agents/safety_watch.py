@@ -268,8 +268,8 @@ class SafetyWatch:
         self._write_pause()
 
     def _write_pause(self) -> None:
-        if self.reason is None:
-            return
+        # Only after a trip, which names the reason.
+        assert self.reason is not None
         pause_task(
             self.spec_dir,
             phase=self.phase,
@@ -288,8 +288,8 @@ class SafetyWatch:
         self._report()
 
     def _rollback(self) -> None:
-        if not (self.worktree and self.task and self.snapshot_id):
-            return
+        # Due only when a snapshot was taken, so in a task worktree.
+        assert self.worktree and self.task and self.snapshot_id
         try:
             self.rolled_back = rollback(self.worktree, self.task, self.snapshot_id)
         except (SnapshotError, OSError) as exc:

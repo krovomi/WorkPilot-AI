@@ -173,10 +173,8 @@ def list_snapshots(worktree: Path, task: str) -> list[Snapshot]:
     )
     snapshots: list[Snapshot] = []
     for line in out.splitlines():
-        fields = line.split("\0")
-        if len(fields) != 4:
-            continue
-        ref, commit, parent, created = fields
+        # A ref name holds no NUL: four fields, always.
+        ref, commit, parent, created = line.split("\0")
         snapshot_id = ref.rsplit("/", 1)[-1]
         if not valid_snapshot_id(snapshot_id) or not parent:
             continue
