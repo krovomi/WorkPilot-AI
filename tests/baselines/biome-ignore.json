@@ -59,7 +59,7 @@
   "apps/frontend/src/main/python-env-manager.ts": 5,
   "apps/frontend/src/main/security/ipc-sender-policy.test.ts": 1,
   "apps/frontend/src/main/services/credential-integration.ts": 4,
-  "apps/frontend/src/main/services/credential-manager.ts": 16,
+  "apps/frontend/src/main/services/credential-manager.ts": 14,
   "apps/frontend/src/main/services/hf-mcp-client.ts": 2,
   "apps/frontend/src/main/services/profile/profile-service.ts": 1,
   "apps/frontend/src/main/terminal/__tests__/claude-integration-handler.test.ts": 5,
