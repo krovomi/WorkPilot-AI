@@ -926,6 +926,7 @@ export function Sidebar({
 					disabled={!selectedProjectId && item.id !== "administration"}
 					aria-keyshortcuts={item.shortcut}
 					aria-current={isActive ? "page" : undefined}
+					data-nav-item={item.id}
 					className={cn(
 						// pl-5 leaves room for the drag grip shown on hover
 						"flex w-full min-w-0 items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-sm transition-colors",
