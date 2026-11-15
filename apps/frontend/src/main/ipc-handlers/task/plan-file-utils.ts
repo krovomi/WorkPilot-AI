@@ -26,6 +26,7 @@ import type { TaskEventPayload } from "../../agent/task-event-schema";
 import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { projectStore } from "../../project-store";
 import type { VisualProofRun } from "../../../shared/types";
+import { applyPlanEdit, type SubtaskEdit } from "./plan-edit";
 
 // In-memory locks for plan file operations
 // Key: plan file path, Value: Promise chain for serializing operations
@@ -496,23 +497,21 @@ export async function createPlanIfNotExists(
 }
 
 /**
- * Update plan phases and subtasks.
- * This allows adding, modifying, or removing pending subtasks from the implementation plan.
+ * Apply the Subtasks tab's edits to the plan: reword, trim or remove pending
+ * subtasks and add new ones, keeping the phases and every other subtask as
+ * they are (see `plan-edit.ts`).
  *
  * @param planPath - Path to the implementation_plan.json file
- * @param phases - The updated phases array with potentially modified subtasks
+ * @param edits - The pending-subtask edits, from `parsePlanEdit`
  * @param projectId - Optional project ID to invalidate cache
  * @returns The updated plan, or null if the file doesn't exist
  */
 export async function updatePlanSubtasks(
 	planPath: string,
-	phases: Array<Record<string, unknown>>,
+	edits: SubtaskEdit[],
 	projectId?: string,
 ): Promise<Record<string, unknown> | null> {
-	return updatePlanFile(planPath, (plan) => {
-		plan.phases = phases;
-		return plan;
-	}).then((updatedPlan) => {
+	return updatePlanFile(planPath, (plan) => applyPlanEdit(plan, edits)).then((updatedPlan) => {
 		// Invalidate cache after successful update
 		if (updatedPlan && projectId) {
 			projectStore.invalidateTasksCache(projectId);

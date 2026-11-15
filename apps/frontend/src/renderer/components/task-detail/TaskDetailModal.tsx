@@ -476,6 +476,7 @@ function useTaskDetailHandlers(
 				duration: 5000,
 			});
 		}
+		return success;
 	};
 
 	const handleToggleTdd = async () => {

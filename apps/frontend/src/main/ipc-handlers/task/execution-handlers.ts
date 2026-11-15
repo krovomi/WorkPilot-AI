@@ -19,6 +19,7 @@ import { appLog } from "../../app-logger";
 import { fileWatcher } from "../../file-watcher";
 import { projectStore } from "../../project-store";
 import { taskStateManager } from "../../task-state-manager";
+import { parsePlanEdit } from "./plan-edit";
 import { getPlanPath, updatePlanSubtasks } from "./plan-file-utils";
 import {
 	clearPauseState,
@@ -454,17 +455,22 @@ export function registerTaskExecutionHandlers(
 		async (
 			_,
 			taskId: string,
-			phases: Array<Record<string, unknown>>,
+			phases: unknown,
 		): Promise<IPCResult> => {
 			const { task, project } = findTaskAndProject(taskId);
 			if (!task || !project) {
 				return { success: false, error: "Task not found" };
 			}
 
+			const edits = parsePlanEdit(phases);
+			if (!edits) {
+				return { success: false, error: "Invalid plan edit" };
+			}
+
 			const planPath = getPlanPath(project, task);
 			const updatedPlan = await updatePlanSubtasks(
 				planPath,
-				phases,
+				edits,
 				project.id,
 			);
 
