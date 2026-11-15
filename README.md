@@ -199,6 +199,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 - **PR follow-through**: a red check or a review thread on the task's PR goes back to the fixer, never forced, never merged.
 - **Provenance**: which lines the AI wrote and with which model, an SBOM of the packages added, requirement-to-test traceability.
 - **Guardrails as code**: a versioned policy, in layers, that agents cannot get around, enforced in task worktrees too; every tool result is scanned for prompt injection before the agent reads it.
+- **Security findings ranked by what runs**: the QA security scan sorts its findings into critical & exposed, critical but dormant, medium and informational, from what your entry points reach (any language) and from the production incidents of the last 30 days in `.workpilot/incidents/` (Sentry, Datadog, CloudWatch, New Relic…); the fixer sees the exposed ones first, and what blocks a build still follows severity.
 
 **Agents and orchestration**
 - **Execution waves** (Mission Control): the specs waiting in the backlog are grouped into waves that share no file, from their plans and worktrees, then run wave after wave in merge order with the project's parallelism; no model is called.

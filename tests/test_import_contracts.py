@@ -127,6 +127,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
     "security": {"injection_guard", "project", "rtk"},
+    # The evidence that ranks a security scan (docs/architecture/
+    # security-priority.md): the scanner's types, and the APM inbox parser of
+    # Regression Guardian. The QA loop hands it to the scanner, which never
+    # imports it back.
+    "security_reach": {"regression_guardian", "security"},
     # Server mode is mounted by provider_api; it reaches nothing back.
     "server": set(),
     # Model and provider per phase: the catalogue, the provider chosen in the
