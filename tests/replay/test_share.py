@@ -520,17 +520,20 @@ class TestRoutes:
         )
         assert busy.status_code == 409
         path = f"/replay/sessions/local-1/bookmarks/{added['id']}"
-        assert client.delete(path).status_code == 200
-        assert client.delete(path).status_code == 404
+        removed = client.delete(path)
+        assert removed.status_code == 200
+        again = client.delete(path)
+        assert again.status_code == 404
         assert (
             client.get("/replay/sessions/local-1").json()["session"]["bookmarks"] == []
         )
 
     def test_a_negative_step_or_a_long_note_is_refused(self, client):
         url = "/replay/sessions/local-1/bookmarks"
-        assert client.post(url, json={"step_index": -1}).status_code == 422
-        long_note = {"step_index": 0, "note": "x" * 4001}
-        assert client.post(url, json=long_note).status_code == 422
+        negative = client.post(url, json={"step_index": -1})
+        assert negative.status_code == 422
+        long_note = client.post(url, json={"step_index": 0, "note": "x" * 4001})
+        assert long_note.status_code == 422
 
 
 def test_breakpoints_and_diffs_survive_the_round_trip():
