@@ -52,7 +52,7 @@ import {
 	isWindows,
 	joinPaths,
 } from "./platform";
-import { findHomebrewPython as findHomebrewPythonUtil } from "./utils/homebrew-python";
+import { homebrewPythonCandidates } from "./utils/homebrew-python";
 
 const execFileAsync = promisify(execFile);
 
@@ -229,9 +229,10 @@ export function sortNvmVersionDirs(
 			// Parse version numbers: v20.0.0 -> [20, 0, 0]
 			const vA = a.name.slice(1).split(".").map(Number);
 			const vB = b.name.slice(1).split(".").map(Number);
-			// Compare major, minor, patch in order (descending)
+			// Compare major, minor, patch in order (descending); the regex
+			// above guarantees all three parts.
 			for (let i = 0; i < 3; i++) {
-				const diff = (vB[i] ?? 0) - (vA[i] ?? 0);
+				const diff = vB[i] - vA[i];
 				if (diff !== 0) return diff;
 			}
 			return 0;
@@ -494,10 +495,10 @@ class CLIToolManager {
 			}
 		}
 
-		// 3. Homebrew Python (macOS)
+		// 3. Homebrew Python (macOS), newest version first
 		if (isMacOS()) {
-			const homebrewPath = this.findHomebrewPython();
-			if (homebrewPath) {
+			for (const homebrewPath of homebrewPythonCandidates()) {
+				if (!existsSync(homebrewPath)) continue;
 				const validation = this.validatePython(homebrewPath);
 				if (validation.valid) {
 					return {
@@ -884,20 +885,6 @@ class CLIToolManager {
 			message:
 				"GitLab CLI (glab) not found. Install from https://gitlab.com/gitlab-org/cli",
 		};
-	}
-
-	/**
-	 * Detect Claude CLI with multi-level priority
-	 *
-	 * Priority order:
-	 * 1. User configuration (if valid for current platform)
-	 * 2. Homebrew claude (macOS)
-	 * 3. System PATH
-	 * 4. Windows where.exe (Windows only - finds executables via PATH + Registry)
-	 * 5. NVM paths (Unix only - checks Node.js version managers)
-	 * 6. Platform-specific standard locations
-	 *
-	 * @returns Detection result for Claude CLI
 	}
 
 	/**
@@ -1755,17 +1742,16 @@ class CLIToolManager {
 	}
 
 	/**
-	 * Detect Claude CLI asynchronously (non-blocking)
+	 * Detect Claude CLI (detectClaudeAsync is the same, without blocking).
 	 *
 	 * Priority order:
-	 * 1. User configuration (if valid for current platform)
-	 * 2. Homebrew claude (macOS)
-	 * 3. System PATH
-	 * 4. Windows where.exe (Windows only - finds executables via PATH + Registry)
-	 * 5. NVM paths (Unix only - checks Node.js version managers)
-	 * 6. Platform-specific standard locations
+	 * 1. User configuration (if valid for current platform; on Windows, also secure)
+	 * 2. NVM paths (Unix only - Node.js version managers, newest version first)
+	 * 3. Platform-specific standard locations (~/.local/bin, npm, Program Files)
+	 * 4. Homebrew claude (macOS)
+	 * 5. Windows where.exe (Windows only - finds executables via PATH + Registry)
 	 *
-	 * @returns Promise resolving to detection result
+	 * @returns Detection result for Claude CLI
 	 */
 	private detectClaude(): ToolDetectionResult {
 		const homeDir = os.homedir();
@@ -1858,40 +1844,6 @@ class CLIToolManager {
 					);
 					if (result) return result;
 				}
-			}
-		}
-
-		// 4. NVM paths (Unix/Linux/macOS only - checks Node.js version managers)
-		if (!isWindows() && existsSync(paths.nvmVersionsDir)) {
-			try {
-				const versionDirs = readdirSync(paths.nvmVersionsDir, {
-					withFileTypes: true,
-				});
-				const sortedVersions = sortNvmVersionDirs(versionDirs);
-
-				for (const version of sortedVersions) {
-					const claudePath = joinPaths(
-						paths.nvmVersionsDir,
-						version,
-						"bin",
-						"claude",
-					);
-					if (existsSync(claudePath)) {
-						const validation = this.validateClaude(claudePath);
-						const result = buildClaudeDetectionResult(
-							claudePath,
-							validation,
-							"nvm",
-							"Using NVM Claude CLI",
-						);
-						if (result) return result;
-					}
-				}
-			} catch (error) {
-				// NVM directory exists but can't be read - continue to next detection method
-				console.warn(
-					`[Claude CLI] Failed to read NVM versions directory: ${error instanceof Error ? error.message : String(error)}`,
-				);
 			}
 		}
 
@@ -2015,40 +1967,6 @@ class CLIToolManager {
 					);
 					if (result) return result;
 				}
-			}
-		}
-
-		// 4. NVM paths (Unix/Linux/macOS only - checks Node.js version managers)
-		if (!isWindows() && await existsAsync(paths.nvmVersionsDir)) {
-			try {
-				const versionDirs = await fsPromises.readdir(paths.nvmVersionsDir, {
-					withFileTypes: true,
-				});
-				const sortedVersions = sortNvmVersionDirs(versionDirs);
-
-				for (const version of sortedVersions) {
-					const claudePath = joinPaths(
-						paths.nvmVersionsDir,
-						version,
-						"bin",
-						"claude",
-					);
-					if (await existsAsync(claudePath)) {
-						const validation = await this.validateClaudeAsync(claudePath);
-						const result = buildClaudeDetectionResult(
-							claudePath,
-							validation,
-							"nvm",
-							"Using NVM Claude CLI",
-						);
-						if (result) return result;
-					}
-				}
-			} catch (error) {
-				// NVM directory exists but can't be read - continue to next detection method
-				console.warn(
-					`[Claude CLI] Failed to read NVM versions directory: ${error instanceof Error ? error.message : String(error)}`,
-				);
 			}
 		}
 
@@ -2224,16 +2142,9 @@ class CLIToolManager {
 			}
 		}
 
-		// 3. Homebrew Python (macOS) - simplified async version
+		// 3. Homebrew Python (macOS), newest version first
 		if (isMacOS()) {
-			const homebrewPaths = [
-				"/opt/homebrew/bin/python3",
-				"/opt/homebrew/bin/python3.14",
-				"/opt/homebrew/bin/python3.13",
-				"/opt/homebrew/bin/python3.12",
-				"/usr/local/bin/python3",
-			];
-			for (const pythonPath of homebrewPaths) {
+			for (const pythonPath of homebrewPythonCandidates()) {
 				if (await existsAsync(pythonPath)) {
 					const validation = await this.validatePythonAsync(pythonPath);
 					if (validation.valid) {
@@ -2609,29 +2520,12 @@ class CLIToolManager {
 	 * @returns Path to bundled Python or null if not found
 	 */
 	private getBundledPythonPath(): string | null {
-		if (!app.isPackaged) {
-			return null;
-		}
-
 		const resourcesPath = process.resourcesPath;
 		const pythonPath = isWindows()
 			? path.join(resourcesPath, "python", "python.exe")
 			: path.join(resourcesPath, "python", "bin", "python3");
 
 		return existsSync(pythonPath) ? pythonPath : null;
-	}
-
-	/**
-	 * Find Homebrew Python on macOS
-	 * Delegates to shared utility function.
-	 *
-	 * @returns Path to Homebrew Python or null if not found
-	 */
-	private findHomebrewPython(): string | null {
-		return findHomebrewPythonUtil(
-			(pythonPath) => this.validatePython(pythonPath),
-			"[CLI Tools]",
-		);
 	}
 
 	/** Clear the cache, to force re-detection (a settings change does it too). */

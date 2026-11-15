@@ -272,7 +272,9 @@ It's OK to make reasonable assumptions to create a complete spec. The goal is to
             except Exception:
                 pass
 
-        # Create a basic but complete spec
+        # A basic but complete spec, in no particular stack: it used to
+        # prescribe Python ("python -m src.main", a "Backend Service" on port
+        # 8000) to every project, whatever it was written in.
         fallback_spec = f"""# Specification: {task_desc[:50]}{"..." if len(task_desc) > 50 else ""}
 
 ## Overview
@@ -288,7 +290,7 @@ This task addresses: {task_desc}
 ## Task Scope
 
 ### Services Involved
-- **Backend Service** (primary) - Main implementation service
+- To be determined from project_index.json
 
 ### This Task Will:
 - [ ] Implement the requirements described in the task
@@ -301,23 +303,15 @@ This task addresses: {task_desc}
 
 ## Service Context
 
-### Backend Service
+**Tech Stack:** the languages and frameworks listed in project_index.json.
 
-**Tech Stack:**
-- Language: Python
-- Framework: Based on project structure
-
-**How to Run:**
-```bash
-# Standard Python run commands
-python -m src.main
-```
+**How to Run:** the project's own run commands (project_index.json, README).
 
 ## Files to Modify
 
 | File | Service | What to Change |
 |------|---------|---------------|
-| *To be determined* | Backend | Implementation based on task requirements |
+| *To be determined* | *To be determined* | Implementation based on task requirements |
 
 ## Files to Reference
 
@@ -365,13 +359,7 @@ Follow existing codebase patterns for:
 
 ### Start Services
 
-```bash
-# Start the application as per project conventions
-python -m src.main
-```
-
-### Service URLs
-- Backend: http://localhost:8000 (typical)
+Start the application with the project's own commands (project_index.json, README).
 
 ## Success Criteria
 
@@ -395,7 +383,7 @@ The task is complete when:
 ### Integration Tests
 | Test | Services | What to Verify |
 |------|----------|----------------|
-| Integration test | Backend | Component interaction |
+| Integration test | *To be determined* | Component interaction |
 
 ### QA Sign-off Requirements
 - [ ] All unit tests pass
@@ -424,11 +412,10 @@ The task is complete when:
                 "self_critique", False, [], ["spec.md does not exist"], 0
             )
 
+        # is_placeholder reads the file and answers True for one that is
+        # unreadable, not JSON or not an object: past it, this one is all three.
         if critique_file.exists() and not validator.is_placeholder(critique_file):
-            try:
-                critique = json.loads(critique_file.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                critique = {}
+            critique = json.loads(critique_file.read_text(encoding="utf-8"))
             if critique.get("issues_fixed", False) or critique.get(
                 "no_issues_found", False
             ):
