@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from foundation.pause_state import write_pause_state
+from foundation.pause_state import pause_task, task_spec_dirs
 
 from . import config as budget_config
 from .spend import Spend, project_root, project_spend, task_rows, task_spend
@@ -101,7 +101,7 @@ def evaluate(spec_dir: Path) -> Evaluation | None:
     if root is None:
         return None
     cfg = budget_config.load(root)
-    override = max(budget_config.task_override(d) for d in spec_dirs(spec_dir))
+    override = max(budget_config.task_override(d) for d in task_spec_dirs(spec_dir))
     if not cfg.active and not override:
         return None
     task_limit = override or cfg.task_limit
@@ -242,24 +242,8 @@ def _stalled(
     }
 
 
-def spec_dirs(spec_dir: Path) -> list[Path]:
-    """The task's spec directory and, for a worktree build, the main project's copy.
-
-    The card reads the pause from the main copy and the build from its own:
-    both get it, as the Pause button writes both.
-    """
-    found = [Path(spec_dir)]
-    root = project_root(spec_dir)
-    if root is not None:
-        main = root / ".workpilot" / "specs" / Path(spec_dir).name
-        if main.is_dir() and main.resolve() != Path(spec_dir).resolve():
-            found.append(main)
-    return found
-
-
 def _pause(spec_dir: Path, phase: str, reason: str, detail: dict[str, Any]) -> None:
-    for folder in spec_dirs(spec_dir):
-        write_pause_state(folder, phase=phase, reason=reason, detail={"budget": detail})
+    pause_task(spec_dir, phase=phase, reason=reason, detail={"budget": detail})
 
 
 def check_before_session(
