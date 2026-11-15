@@ -23,6 +23,7 @@ import { registerGoalHandlers } from "./goal-handlers";
 import { registerTaskLogsHandlers } from "./logs-handlers";
 import { registerMcpAppHandlers } from "./mcp-app-handlers";
 import { registerPrFollowupHandlers } from "./pr-followup-handlers";
+import { registerStopAllHandlers } from "./stop-all-handlers";
 import { registerWorktreeHandlers } from "./worktree-handlers";
 
 /**
@@ -38,6 +39,9 @@ export function registerTaskHandlers(
 
 	// Register execution handlers (start, stop, review, status management, recovery)
 	registerTaskExecutionHandlers(agentManager, getMainWindow);
+
+	// "Stop all agents": the kill switch
+	registerStopAllHandlers(agentManager);
 
 	// Register context-window handlers (manual compact/clear, live policy edit)
 	registerTaskContextHandlers(agentManager);

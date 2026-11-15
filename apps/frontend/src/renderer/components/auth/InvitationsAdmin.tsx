@@ -12,11 +12,15 @@ import { useTranslation } from "react-i18next";
 import { Button, Input, Label } from "@/components/ui";
 import type { InvitationPublic } from "../../../preload/api/modules/server-auth-api";
 import { formatAppDateTime } from "@/lib/date-format";
+import { usePermissionsStore } from "@/stores/permissions-store";
 
 import { NativeSelect } from "../ui/native-select";
 import { SettingsSection } from "../settings/SettingsSection";
 export function InvitationsAdmin() {
 	const { t } = useTranslation("settings");
+	// A server administrator reaches every organization: only a platform
+	// administrator may invite one, and the server refuses anyone else.
+	const isPlatformAdmin = usePermissionsStore((s) => s.isPlatformAdmin);
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState("member");
 	const [pending, setPending] = useState<InvitationPublic[]>([]);
@@ -113,9 +117,11 @@ export function InvitationsAdmin() {
 							<option value="viewer">
 								{t("invitationsAdmin.roleViewer", "Lecteur")}
 							</option>
-							<option value="admin">
-								{t("invitationsAdmin.roleAdmin", "Administrateur")}
-							</option>
+							{isPlatformAdmin && (
+								<option value="admin">
+									{t("invitationsAdmin.roleAdmin", "Administrateur du serveur")}
+								</option>
+							)}
 						</NativeSelect>
 					</div>
 					<Button onClick={handleCreate} disabled={!email.trim() || busy}>
