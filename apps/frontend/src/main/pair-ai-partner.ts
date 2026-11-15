@@ -72,12 +72,13 @@ export function readProjectFile(projectDir: string, relPath: string): string | n
 		const root = realpathSync(projectDir);
 		const resolved = realpathSync(path.resolve(root, relPath));
 		if (resolved === root || !isPathWithinBase(resolved, root)) return null;
-		fd = openSync(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+		// O_NOFOLLOW is undefined on Windows, and `| undefined` adds nothing.
+		fd = openSync(resolved, constants.O_RDONLY | constants.O_NOFOLLOW);
 		const info = fstatSync(fd);
 		const named = lstatSync(resolved);
 		if (!info.isFile() || !named.isFile() || named.ino !== info.ino || named.dev !== info.dev) return null;
-		if (info.size > MAX_FILE_BYTES) return null;
-		// One byte more than the limit tells a file that grew since fstat.
+		// Size is read, not trusted from fstat: one byte more than the limit
+		// tells a file too large, even one that grew since the check.
 		const buffer = Buffer.alloc(MAX_FILE_BYTES + 1);
 		const read = readSync(fd, buffer, 0, buffer.length, 0);
 		if (read > MAX_FILE_BYTES) return null;

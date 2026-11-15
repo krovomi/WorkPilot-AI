@@ -78,6 +78,10 @@ describe("readProjectFile", () => {
 		expect(readProjectFile(project, "logo.png")).toBeNull();
 	});
 
+	it("refuses a file that does not exist", () => {
+		expect(readProjectFile(project, "src/Missing.cs")).toBeNull();
+	});
+
 	it("refuses a file over the size limit and a folder", () => {
 		writeFileSync(path.join(project, "dump.sql"), "x".repeat(64_001));
 		expect(readProjectFile(project, "dump.sql")).toBeNull();
