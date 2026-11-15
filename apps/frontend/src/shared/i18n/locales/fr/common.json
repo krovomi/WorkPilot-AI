@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Ajoutez un autre abonnement Claude pour basculer automatiquement quand vous atteignez la limite.",
 			"willOpenClaudeLogin": "La connexion Claude va s'ouvrir pour authentifier le nouveau compte.",
 			"switchClaudeRetry": "Passez à un autre compte Claude et relancez l'opération :",
-			"connectClaude": "Connectez un compte Claude :"
+			"connectClaude": "Connectez un compte Claude :",
+			"yourAccount": "votre compte",
+			"defaultAccount": "Par défaut"
 		},
 		"recommendedAria": "Recommandé"
 	},

@@ -271,7 +271,9 @@
 			"addClaudeSubscription": "Add another Claude subscription to automatically switch when you hit rate limits.",
 			"willOpenClaudeLogin": "This will open Claude login to authenticate the new account.",
 			"switchClaudeRetry": "Switch to another Claude account and retry the operation:",
-			"connectClaude": "Connect a Claude account:"
+			"connectClaude": "Connect a Claude account:",
+			"yourAccount": "your account",
+			"defaultAccount": "Default"
 		},
 		"recommendedAria": "Recommended"
 	},
