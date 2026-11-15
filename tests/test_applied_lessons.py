@@ -162,6 +162,77 @@ class TestWhatAPromptCarriedIsRecorded:
         assert applied.applied(tmp_path) == []
 
 
+class TestTheRecordNeverFailsABuild:
+    def _lesson(self) -> applied.Lesson:
+        return applied.Lesson(id="r1", kind="rule", text="x", agent="coder")
+
+    def test_a_missing_or_linked_spec_directory_gets_nothing(self, tmp_path):
+        applied.record(tmp_path / "gone", [self._lesson()])
+        real = tmp_path / "real"
+        real.mkdir()
+        link = tmp_path / "link"
+        try:
+            link.symlink_to(real, target_is_directory=True)
+        except OSError:
+            pytest.skip("this system cannot create a symbolic link")
+        applied.record(link, [self._lesson()])
+        assert not (real / applied.APPLIED_FILE).exists()
+        assert not (tmp_path / "gone").exists()
+
+    def test_a_temp_file_that_cannot_be_made_is_dropped(self, tmp_path, monkeypatch):
+        def refuse(**_kwargs):
+            raise OSError("read-only")
+
+        monkeypatch.setattr(applied.tempfile, "mkstemp", refuse)
+        applied.record(tmp_path, [self._lesson()])
+        assert list(tmp_path.iterdir()) == []
+
+    def test_a_replace_that_fails_leaves_no_temp_file(self, tmp_path, monkeypatch):
+        def refuse(_src, _dst):
+            raise OSError("locked")
+
+        monkeypatch.setattr(applied.os, "replace", refuse)
+        applied.record(tmp_path, [self._lesson()])
+        assert list(tmp_path.iterdir()) == []
+
+
+class TestTheQaFixerCarriesTheTasksLessons:
+    """The fixer's prompt goes through the same entry point, with its spec dir."""
+
+    async def _fixer_prompt(self, project: Path, spec: Path) -> str:
+        from qa.fixer import run_qa_fixer_session
+
+        class _Stop(Exception):
+            pass
+
+        class _Client:
+            prompt = ""
+
+            async def query(self, prompt: str) -> None:
+                _Client.prompt = prompt
+                raise _Stop  # the prompt is all this test needs
+
+        (spec / "QA_FIX_REQUEST.md").write_text("fix it", encoding="utf-8")
+        status, _ = await run_qa_fixer_session(_Client(), spec, 1, project_dir=project)
+        assert status == "error"
+        return _Client.prompt
+
+    @pytest.mark.asyncio
+    async def test_the_fixer_records_and_honours_a_turned_off_rule(
+        self, vault, project
+    ):
+        rule_id = _adopt_rule(project)
+        spec = _spec(project, "002-refunds")
+
+        assert f"- {RULE}" in await self._fixer_prompt(project, spec)
+        assert [(r["id"], r["agent"]) for r in applied.applied(spec)] == [
+            (rule_id, "qa_fixer")
+        ]
+
+        _disable(spec, rule_id)
+        assert f"- {RULE}" not in await self._fixer_prompt(project, spec)
+
+
 class TestATurnedOffLessonLeavesTheTask:
     def test_a_disabled_rule_and_pattern_leave_later_prompts(self, vault, project):
         rule_id = _adopt_rule(project)
@@ -283,6 +354,27 @@ class TestKindHistory:
         for kind, texts in kind_checkpoints.CHECKPOINTS.items():
             for index in range(1, len(texts) + 1):
                 assert applied.LESSON_ID.match(f"checkpoint-{kind}-{index}")
+
+
+class TestKindHistoryReadsOnlyWhatItCan:
+    def test_an_unreadable_metadata_file_is_not_a_task_of_the_kind(self, project):
+        spec = _spec(project, "001-fix", runs=["rejected", "approved"])
+        (spec / "task_metadata.json").write_text("{not json", encoding="utf-8")
+        assert kind_checkpoints.history(project, "bug_fix").tasks == 0
+
+    def test_a_project_without_specs_has_no_history(self, tmp_path):
+        assert kind_checkpoints.history(tmp_path, "bug_fix").tasks == 0
+
+    def test_a_specs_folder_it_cannot_list_has_no_history(self, project, monkeypatch):
+        _spec(project, "001-fix", kind="bug_fix", runs=["rejected"])
+
+        def refuse(_self):
+            raise PermissionError("denied")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "iterdir", refuse)
+            seen = kind_checkpoints.history(project, "bug_fix")
+        assert seen.tasks == 0
 
 
 class TestTheSpecGetsItsKindsCheckpoints:
