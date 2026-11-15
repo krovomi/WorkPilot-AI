@@ -202,14 +202,17 @@ export async function loadMarketplaceCatalog(): Promise<void> {
 	}
 }
 
-/** Reads the project's custom MCP servers and agent overrides. */
+/**
+ * Reads the project's custom MCP servers and agent overrides; false when they
+ * could not be read, the store then still holding what it held before.
+ */
 export async function loadInstalledServers(
 	projectId: string | null | undefined,
-): Promise<void> {
+): Promise<boolean> {
 	const store = useMcpMarketplaceStore.getState();
 	if (!projectId) {
 		store.setProjectServers(null, [], {});
-		return;
+		return true;
 	}
 	store.setInstalledLoading(true);
 	try {
@@ -223,8 +226,10 @@ export async function loadInstalledServers(
 		} else {
 			store.setProjectServers(projectId, [], {});
 		}
+		return true;
 	} catch (err) {
 		console.error("[MCP Marketplace] Failed to load project servers:", err);
+		return false;
 	} finally {
 		store.setInstalledLoading(false);
 	}
@@ -274,8 +279,13 @@ export async function installMarketplaceServer(
 	}
 	store.setIsInstalling(serverId);
 	try {
-		// Read the file again: the Agent Tools panel may have changed it.
-		await loadInstalledServers(projectId);
+		// Read the file again: the Agent Tools panel may have changed it. After
+		// a failed read the store still holds an older (or another project's)
+		// list, and writing it would replace this project's servers.
+		if (!(await loadInstalledServers(projectId))) {
+			store.setError("Failed to read the project settings");
+			return false;
+		}
 		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
 		if (installed.some((s) => s.id === serverId)) {
 			store.setError(`${entry.name} is already installed in this project`);
@@ -300,7 +310,7 @@ export async function uninstallMarketplaceServer(
 	serverId: string,
 ): Promise<boolean> {
 	try {
-		await loadInstalledServers(projectId);
+		if (!(await loadInstalledServers(projectId))) return false;
 		const { installed, agentOverrides } = useMcpMarketplaceStore.getState();
 		return await saveProjectServers(
 			projectId,
