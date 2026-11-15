@@ -509,6 +509,8 @@ def test_git_that_cannot_start_is_none(tmp_path):
 def test_triggers_need_commit_ids(repo):
     root = repo["root"]
     assert evaluate_triggers(root, "HEAD", FAILING).changed_lines is None
+    # The first commit has no parent to diff against.
+    assert evaluate_triggers(root, repo["shas"][0], FAILING).changed_lines is None
     assert not evaluate_triggers(root, repo["shas"][-1], FAILING, good="main").fired
     assert failing_test_files(root, ["test_add", ""]) == []
 
