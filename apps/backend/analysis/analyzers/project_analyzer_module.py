@@ -150,14 +150,19 @@ class ProjectAnalyzer:
             if dockerfiles:
                 infra["docker_directory"] = "docker/"
                 infra["dockerfiles"] = [
-                    str(f.relative_to(self.project_dir)) for f in dockerfiles
+                    f.relative_to(self.project_dir).as_posix() for f in dockerfiles
                 ]
 
         # CI/CD
         if (self.project_dir / ".github" / "workflows").exists():
             infra["ci"] = "GitHub Actions"
-            workflows = list((self.project_dir / ".github" / "workflows").glob("*.yml"))
-            infra["ci_workflows"] = [f.name for f in workflows]
+            workflows_dir = self.project_dir / ".github" / "workflows"
+            # GitHub reads both extensions; only *.yml was listed.
+            infra["ci_workflows"] = sorted(
+                f.name
+                for pattern in ("*.yml", "*.yaml")
+                for f in workflows_dir.glob(pattern)
+            )
         elif (self.project_dir / ".gitlab-ci.yml").exists():
             infra["ci"] = "GitLab CI"
         elif (self.project_dir / ".circleci").exists():
@@ -186,21 +191,24 @@ class ProjectAnalyzer:
         """Extract service names from docker-compose content."""
         services = []
         in_services = False
+        service_indent: int | None = None
         for line in content.split("\n"):
-            if line.strip() == "services:":
+            stripped = line.strip()
+            if stripped == "services:":
                 in_services = True
                 continue
-            if in_services:
-                # Service names are at 2-space indent
-                if (
-                    line.startswith("  ")
-                    and not line.startswith("    ")
-                    and line.strip().endswith(":")
-                ):
-                    service_name = line.strip().rstrip(":")
-                    services.append(service_name)
-                elif line and not line.startswith(" "):
-                    break  # End of services section
+            if not in_services or not stripped or stripped.startswith("#"):
+                continue
+            indent = len(line) - len(line.lstrip())
+            if indent == 0:
+                break  # End of services section
+            # Service names sit at the indentation of the first key under
+            # "services:" (two spaces was assumed: a four-space file listed
+            # nothing, and a comment line ended the section).
+            if service_indent is None:
+                service_indent = indent
+            if indent == service_indent and stripped.endswith(":"):
+                services.append(stripped.rstrip(":").strip("'\""))
         return services
 
     def _detect_conventions(self) -> None:
@@ -272,7 +280,12 @@ class ProjectAnalyzer:
             if service_info.get("dependencies"):
                 deps = service_info["dependencies"]
                 for other_name in services.keys():
-                    if other_name in deps or f"@{other_name}" in str(deps):
+                    # A package of the workspace: "web" or "@acme/web". A bare
+                    # substring test made "@web" match "@webassemblyjs/ast".
+                    if other_name != service_name and any(
+                        dep == other_name or dep.endswith(f"/{other_name}")
+                        for dep in deps
+                    ):
                         consumes.append(other_name)
 
             if consumes:

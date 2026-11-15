@@ -24,7 +24,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import threading
@@ -33,6 +32,27 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Test runners of the stacks a CI step may call, besides pytest and the
+# JavaScript ones (only Go and Rust were read).
+_UNIT_RUNNERS = (
+    "go test",
+    "cargo test",
+    "dotnet test",
+    "mvn test",
+    "mvn verify",
+    "gradle test",
+    "gradlew test",
+    "rspec",
+    "rake test",
+    "phpunit",
+    "swift test",
+    "xcodebuild test",
+    "flutter test",
+    "dart test",
+    "mix test",
+    "ctest",
+)
 
 # Try to import yaml, fall back gracefully
 try:
@@ -157,13 +177,13 @@ class CIDiscovery:
         """Parse GitHub Actions workflow files."""
         result = CIConfig(ci_system="github_actions")
 
-        workflow_files = list(workflows_dir.glob("*.yml")) + list(
-            workflows_dir.glob("*.yaml")
+        workflow_files = sorted(
+            [*workflows_dir.glob("*.yml"), *workflows_dir.glob("*.yaml")]
         )
 
         for wf_file in workflow_files:
             result.config_files.append(
-                str(wf_file.relative_to(workflows_dir.parent.parent))
+                wf_file.relative_to(workflows_dir.parent.parent).as_posix()
             )
 
             try:
@@ -178,7 +198,9 @@ class CIDiscovery:
 
                 # Get triggers
                 triggers = []
-                on_trigger = workflow_data.get("on", {})
+                # YAML 1.1 reads the bare key `on` as the boolean True, so
+                # PyYAML never had an "on" key and every trigger was lost.
+                on_trigger = workflow_data.get("on", workflow_data.get(True, {}))
                 if isinstance(on_trigger, str):
                     triggers = [on_trigger]
                 elif isinstance(on_trigger, list):
@@ -440,7 +462,9 @@ class CIDiscovery:
 
         # Python pytest
         if "pytest" in cmd_lower:
-            if "pytest" not in result.test_commands:
+            # The first test command is the unit one ("pytest" was looked
+            # up among the test types, so each pytest line replaced it).
+            if "unit" not in result.test_commands:
                 result.test_commands["unit"] = cmd.strip()
             if "--cov" in cmd_lower:
                 result.coverage_command = cmd.strip()
@@ -471,13 +495,8 @@ class CIDiscovery:
         if "integration" in cmd_lower:
             result.test_commands["integration"] = cmd.strip()
 
-        # Go tests
-        if "go test" in cmd_lower:
-            if "unit" not in result.test_commands:
-                result.test_commands["unit"] = cmd.strip()
-
-        # Rust tests
-        if "cargo test" in cmd_lower:
+        # Go, Rust and the other stacks' runners
+        if any(runner in cmd_lower for runner in _UNIT_RUNNERS):
             if "unit" not in result.test_commands:
                 result.test_commands["unit"] = cmd.strip()
 
@@ -567,49 +586,3 @@ def get_ci_system(project_dir: Path) -> str | None:
     """
     result = _get_ci_discovery().discover(project_dir)
     return result.ci_system if result else None
-
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-
-def main() -> None:
-    """CLI entry point for testing."""
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Discover CI configuration")
-    parser.add_argument("project_dir", type=Path, help="Path to project root")
-    parser.add_argument("--json", action="store_true", help="Output as JSON")
-
-    args = parser.parse_args()
-
-    discovery = CIDiscovery()
-    result = discovery.discover(args.project_dir)
-
-    if not result:
-        print("No CI configuration found")
-        return
-
-    if args.json:
-        print(json.dumps(discovery.to_dict(result), indent=2))
-    else:
-        print(f"CI System: {result.ci_system}")
-        print(f"Config Files: {', '.join(result.config_files)}")
-        print("\nTest Commands:")
-        for test_type, cmd in result.test_commands.items():
-            print(f"  {test_type}: {cmd}")
-        if result.coverage_command:
-            print(f"\nCoverage Command: {result.coverage_command}")
-        print(f"\nWorkflows ({len(result.workflows)}):")
-        for w in result.workflows:
-            marker = "[TEST]" if w.test_related else ""
-            print(f"  - {w.name} {marker}")
-            if w.trigger:
-                print(f"    Triggers: {', '.join(str(t) for t in w.trigger)}")
-        if result.environment_variables:
-            print(f"\nEnvironment Variables: {', '.join(result.environment_variables)}")
-
-
-if __name__ == "__main__":
-    main()

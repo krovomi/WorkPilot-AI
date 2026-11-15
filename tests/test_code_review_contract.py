@@ -25,7 +25,8 @@ class CodeReviewContractTests(unittest.TestCase):
             "@@ -1,1 +8,2 @@\n---old\n+++counter;\n+done();\n"
         )
         self.assertEqual(files[0].added_lines, {8: "++counter;", 9: "done();"})
-        self.assertEqual(files[0].removed_lines, {8: "--old"})
+        # A removed line is numbered in the old file (hunk "-1,1").
+        self.assertEqual(files[0].removed_lines, {1: "--old"})
 
     def test_rejects_empty_or_excessive_input(self):
         for diff in ["", None, "x" * (2 * 1024 * 1024 + 1)]:

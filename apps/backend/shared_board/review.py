@@ -29,6 +29,7 @@ from server.authz.scope import ProjectScope, resolve_project_scope
 from server.db.engine import get_db
 from server.db.models import Project
 from server.services.events import emit_board_event
+from server.services.run_manager import set_approval_carry
 from shared_board.attachments import (
     MAX_IMAGES,
     ImageUpload,
@@ -139,6 +140,20 @@ async def card_changes(
     return await asyncio.to_thread(_changes, scope.path, base, card_id)
 
 
+def _approve_next_build(directory: Path, approved_by: str) -> None:
+    """Sending the work back is this person's approval of the build it starts.
+
+    The approval the build checks (``review_state.json``) covers ``spec.md``
+    and the plan; the last build moved the plan on and the request just added
+    its subtask, so the build started next stopped at "review required" until
+    someone approved the spec again. The route's permission is the one the
+    approval takes (``review.approve``).
+    """
+    from review.state import ReviewState
+
+    ReviewState.load(directory).approve(directory, approved_by=approved_by)
+
+
 def _reopen_plan(plan_path: Path, subtask: dict[str, Any]) -> None:
     """As the app does on a request for changes: a traced subtask, failed
     subtasks retried, completed ones kept, QA to run again."""
@@ -185,7 +200,8 @@ async def request_changes(
     """Send the card's work back with what to change.
 
     Writes the request where the build reads it (``QA_FIX_REQUEST.md`` in the
-    workspace) and reopens the plan; the app then starts a ``build`` run. The
+    workspace), reopens the plan and approves it as this person's, as Start
+    does; the app then starts a ``build`` run. The
     feedback is a person's text, written to a file, never to argv.
     """
     from server.services.run_manager import get_run_manager
@@ -234,7 +250,24 @@ async def request_changes(
         plan = spec_dir / "implementation_plan.json"
         if plan.is_file():
             _reopen_plan(plan, dict(subtask))
+    _approve_next_build(directory, principal.email or principal.id)
     emit_board_event(
         scope.project_id, "spec_updated", {"spec": card_id, "by": principal.id}
     )
     return {"requested": True}
+
+
+def _approval_valid(spec_dir: Path) -> bool:
+    from review.state import ReviewState
+
+    return ReviewState.load(spec_dir).is_approval_valid(spec_dir)
+
+
+def _carry_approval(spec_dir: Path) -> None:
+    from review.state import ReviewState
+
+    ReviewState.load(spec_dir).carry_over(spec_dir)
+
+
+# A build that started approved keeps its approval over the plan it wrote.
+set_approval_carry(_approval_valid, _carry_approval)

@@ -109,6 +109,12 @@ class CustomRuleEngine:
         for pattern in patterns:
             if file_path.match(pattern):
                 return True
+            # Path.match ne lit pas « **/ » comme « zéro dossier ou plus » :
+            # « **/*.py » refusait un `app.py` à la racine du projet.
+            while pattern.startswith("**/"):
+                pattern = pattern[3:]
+                if pattern and file_path.match(pattern):
+                    return True
         return False
 
     def _apply_rule(
