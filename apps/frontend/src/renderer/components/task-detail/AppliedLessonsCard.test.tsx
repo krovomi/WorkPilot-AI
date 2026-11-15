@@ -98,4 +98,54 @@ describe("AppliedLessonsCard", () => {
 		await waitFor(() => expect(api.getAppliedLessons).toHaveBeenCalledWith("task-1"));
 		expect(container).toBeEmptyDOMElement();
 	});
+
+	it("says a refusal that gives no reason", async () => {
+		api.setLessonDisabled.mockResolvedValue({ success: false });
+		render(<AppliedLessonsCard task={task} />);
+		fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+		fireEvent.click(screen.getAllByRole("button", { name: "Turn off for this task" })[0]);
+		expect(await screen.findByText(/^Could not update the lesson/)).toBeInTheDocument();
+	});
+
+	it("reads the record again each time the list opens, not when it closes", async () => {
+		render(<AppliedLessonsCard task={task} />);
+		fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+		fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+		expect(screen.queryByText("Keep EF out of Domain.")).not.toBeInTheDocument();
+		await waitFor(() => expect(api.getAppliedLessons).toHaveBeenCalledTimes(2));
+	});
+
+	it.each([
+		[{ success: false, error: "Task not found" }],
+		[{ success: true }],
+	])("shows nothing when the record cannot be read (%j)", async (answer) => {
+		api.getAppliedLessons.mockResolvedValue(answer);
+		const { container } = render(<AppliedLessonsCard task={task} />);
+		await waitFor(() => expect(api.getAppliedLessons).toHaveBeenCalled());
+		expect(container).toBeEmptyDOMElement();
+	});
+
+	it("drops an answer that arrives after the card is gone", async () => {
+		let answer: (value: unknown) => void = () => undefined;
+		api.getAppliedLessons.mockReturnValue(
+			new Promise((resolve) => {
+				answer = resolve;
+			}),
+		);
+		const { unmount } = render(<AppliedLessonsCard task={task} />);
+		unmount();
+		answer({ success: true, data: LESSONS });
+		await Promise.resolve();
+		expect(api.getAppliedLessons).toHaveBeenCalledTimes(1);
+	});
 });
+
+describe("task mock", () => {
+	it("answers with an empty record in the browser", async () => {
+		const { taskMock } = await import("../../lib/mocks/task-mock");
+		const empty = { success: true, data: { lessons: [], disabled: [] } };
+		expect(await taskMock.getAppliedLessons()).toEqual(empty);
+		expect(await taskMock.setLessonDisabled()).toEqual(empty);
+	});
+});
+

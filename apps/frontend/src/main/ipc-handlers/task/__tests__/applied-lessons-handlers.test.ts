@@ -160,6 +160,41 @@ describe("applied lessons handlers", () => {
 	it("says when the task is unknown", async () => {
 		state.found = false;
 		expect((await call(IPC_CHANNELS.TASK_LESSONS_GET, "t1")).success).toBe(false);
+		expect((await call(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, "t1", RULE.id, true)).error).toBe(
+			"Task not found",
+		);
+	});
+
+	it.each([[""], [42], [null]])("refuses a task id that is not one (%j)", async (taskId) => {
+		expect(await call(IPC_CHANNELS.TASK_LESSONS_GET, taskId)).toEqual({
+			success: false,
+			error: "taskId is required",
+		});
+		expect((await call(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, taskId, RULE.id, true)).success).toBe(false);
+	});
+
+	it.each([[null], [[RULE]], [7]])("reads a file that is not an object (%j) as empty", async (content) => {
+		write(state.dirs.main, content);
+		expect((await call(IPC_CHANNELS.TASK_LESSONS_GET, "t1")).data).toEqual({ lessons: [], disabled: [] });
+	});
+
+	it("refuses to turn off more lessons than a task can hold", async () => {
+		const many = Array.from({ length: 200 }, (_, i) => `lp-${i}`);
+		write(state.dirs.main, { lessons: [RULE], disabled: many });
+		const result = await call(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, "t1", RULE.id, true);
+		expect(result).toEqual({ success: false, error: "Too many lessons turned off for one task" });
+		expect(read(state.dirs.main).disabled).toHaveLength(200);
+	});
+
+	it("says which copy it could not update, since that copy would still hand the lesson out", async () => {
+		write(state.dirs.main, { lessons: [RULE], disabled: [] });
+		// A directory where the file goes: the rename over it fails.
+		const blocked = file(state.dirs.worktree as string);
+		mkdirSync(blocked);
+		writeFileSync(path.join(blocked, "keep"), "x");
+		const result = await call(IPC_CHANNELS.TASK_LESSONS_SET_DISABLED, "t1", RULE.id, true);
+		expect(result.success).toBe(false);
+		expect(result.error).toContain(state.dirs.worktree as string);
 	});
 });
 
@@ -184,5 +219,28 @@ describe("mergeApplied", () => {
 			[PATTERN.id, ["coder"]],
 		]);
 		expect(merged.disabled).toEqual(["ok-1"]);
+	});
+
+	it("keeps the newest text of a lesson seen twice, and each agent once", () => {
+		const merged = mergeApplied([
+			{ lessons: [RULE, { ...RULE, text: "Older.", at: "2026-11-13T00:00:00Z" }] },
+			{ lessons: [{ ...RULE, agent: undefined, text: "Newest.", at: "2026-11-15T00:00:00Z" }] },
+			{ lessons: [{ ...RULE, at: undefined, text: "Undated." }] },
+			{ lessons: [{ ...RULE, id: "r-2", text: 3 }] },
+		]);
+		expect(merged.lessons).toEqual([
+			{ id: RULE.id, kind: "rule", text: "Newest.", agents: ["spec_writer"], at: "2026-11-15T00:00:00Z" },
+		]);
+	});
+
+	it("keeps a lesson without a date when the first one had none either", () => {
+		const undated = { id: "r-3", kind: "rule", text: "First.", agent: "coder" };
+		const merged = mergeApplied([{ lessons: [undated, { ...undated, text: "Later.", at: "2026-11-15T00:00:00Z" }] }]);
+		expect(merged.lessons[0]).toMatchObject({ text: "Later.", at: "2026-11-15T00:00:00Z" });
+	});
+
+	it("holds at most 120 lessons", () => {
+		const rows = Array.from({ length: 130 }, (_, i) => ({ id: `r-${i}`, kind: "rule", text: "x", agent: "coder" }));
+		expect(mergeApplied([{ lessons: rows }]).lessons).toHaveLength(120);
 	});
 });
