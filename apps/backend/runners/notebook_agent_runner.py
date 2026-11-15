@@ -19,7 +19,7 @@ Output protocol (one JSON object per line, prefixed):
     NOTEBOOK_EXECUTION:{...}                   (execute)
     NOTEBOOK_APPLY:{...}                       (apply)
     NOTEBOOK_METRICS:{"months": [...]}         (metrics)
-    NOTEBOOK_ERROR:<message>
+    NOTEBOOK_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

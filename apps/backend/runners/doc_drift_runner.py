@@ -9,7 +9,7 @@ Output protocol (one JSON object per line, prefixed):
     DOC_DRIFT_EVENT:{"type": "progress", "data": {"status": "..."}}
     DOC_DRIFT_RESULT:{...full report dict...}
     DOC_DRIFT_FIX:{"applied": [...], "missing": [...]}
-    DOC_DRIFT_ERROR:<message>
+    DOC_DRIFT_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

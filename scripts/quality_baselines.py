@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Per-file ceilings that can only go down: blind excepts, biome-ignore, file size.
+"""Per-file ceilings that can only go down: blind excepts, biome-ignore, file size,
+native paths.
 
 The backend had 1 533 ``except Exception`` (or bare ``except:``), 413 of them
 with a body that only passes; the frontend had 766 ``biome-ignore`` comments.
@@ -11,6 +12,12 @@ fails when a file goes above it.
 
     python scripts/quality_baselines.py check    exit 1 if a file is above its ceiling or below it
     python scripts/quality_baselines.py update   lower the ceilings to the current counts
+
+A native path is ``str(p.relative_to(root))``, ``str(Path(...))`` or
+``os.path.relpath(...)``: on Windows it holds ``\\``, and a path that reaches a
+report, an event, a prompt or a test reads ``src\\a.cs`` there and ``src/a.cs``
+elsewhere (the cognitive context of 14 November, red on Windows only). Write
+``.as_posix()``; Linux CI cannot see the difference, this count can.
 
 ``update`` never raises a ceiling nor adds a file: a new blind except in a file
 is refused, and raising a ceiling is a hand edit of the JSON that review sees.
@@ -30,6 +37,7 @@ BASELINES = ROOT / "tests" / "baselines"
 EXCEPT_BASELINE = BASELINES / "blind-except.json"
 BIOME_BASELINE = BASELINES / "biome-ignore.json"
 SIZE_BASELINE = BASELINES / "file-size.json"
+NATIVE_PATH_BASELINE = BASELINES / "native-path.json"
 
 BLIND_TYPES = frozenset({"Exception", "BaseException"})
 FRONTEND_SUFFIXES = (".ts", ".tsx", ".js", ".cjs", ".mjs")
@@ -104,6 +112,65 @@ def size_counts() -> dict[str, int]:
     return counts
 
 
+def _is_native_path(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if (
+        isinstance(func, ast.Attribute)
+        and func.attr == "relpath"
+        and isinstance(func.value, ast.Attribute)
+        and func.value.attr == "path"
+    ):
+        return True
+    if not (isinstance(func, ast.Name) and func.id == "str" and len(node.args) == 1):
+        return False
+    inner = node.args[0]
+    if not isinstance(inner, ast.Call):
+        return False
+    target = inner.func
+    if isinstance(target, ast.Attribute):
+        return target.attr == "relative_to"
+    return isinstance(target, ast.Name) and target.id in ("Path", "PurePath")
+
+
+def _normalized(parents: dict[ast.AST, ast.AST], node: ast.AST) -> bool:
+    """``native.replace("\\", "/")``: already made POSIX."""
+    attribute = parents.get(node)
+    call = parents.get(attribute) if attribute is not None else None
+    return (
+        isinstance(attribute, ast.Attribute)
+        and attribute.attr == "replace"
+        and isinstance(call, ast.Call)
+        and bool(call.args)
+        and isinstance(call.args[0], ast.Constant)
+        and call.args[0].value == "\\"
+    )
+
+
+def count_native_paths(source: str) -> int:
+    tree = ast.parse(source)
+    parents = {
+        child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
+    }
+    return sum(
+        1
+        for node in ast.walk(tree)
+        if _is_native_path(node) and not _normalized(parents, node)
+    )
+
+
+def native_path_counts() -> dict[str, int]:
+    counts = {}
+    for path in _tracked("apps/backend/*.py", "src/*.py"):
+        if "/vendor/" in path:
+            continue
+        n = count_native_paths((ROOT / path).read_text(encoding="utf-8"))
+        if n:
+            counts[path] = n
+    return counts
+
+
 def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
@@ -160,6 +227,7 @@ CHECKS: tuple[tuple[Path, Callable[[], dict], str], ...] = (
     (EXCEPT_BASELINE, except_counts, "except"),
     (BIOME_BASELINE, biome_counts, "biome-ignore"),
     (SIZE_BASELINE, size_counts, "lines"),
+    (NATIVE_PATH_BASELINE, native_path_counts, "native path"),
 )
 
 

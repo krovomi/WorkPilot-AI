@@ -9,7 +9,7 @@ Output protocol (one JSON object per line, prefixed):
     I18N_EVENT:{"type": "progress", "data": {"status": "..."}}
     I18N_RESULT:{...full report dict...}
     I18N_TRANSLATE:{written, added, rejected, skipped, answered, notWritable}
-    I18N_ERROR:<message>
+    I18N_ERROR:"<message>"   (a JSON string)
 """
 
 from __future__ import annotations

@@ -256,7 +256,10 @@ class IdeationOrchestrator:
         # Summary
         self._print_summary()
 
-        return True
+        # One type that produced ideas is a result; none is a failure. It used
+        # to answer True whatever happened, so a run whose every agent failed
+        # was shown as complete, with nothing in it.
+        return any(r.phase == "ideation" and r.success for r in results)
 
     def _print_summary(self) -> None:
         """Print summary of ideation generation results."""
