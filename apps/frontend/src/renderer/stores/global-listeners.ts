@@ -32,6 +32,8 @@ import { setupGitSurgeonListeners } from "./git-surgeon-store";
 import { setupIdeationListeners } from "./ideation-store";
 import { setupInjectionGuardListeners } from "./injection-guard-store";
 import { setupInsightsListeners } from "./insights-store";
+import { setupGitHubInvestigationListeners } from "./github";
+import { setupGitLabInvestigationListeners } from "./gitlab-store";
 import { setupLearningLoopListeners } from "./learning-loop-store";
 import { setupMobileListeners } from "./mobile-store";
 import { setupNaturalLanguageGitListeners } from "./natural-language-git-store";
@@ -109,6 +111,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	["Ideation", setupIdeationListeners],
 	["InjectionGuard", setupInjectionGuardListeners],
 	["Insights", setupInsightsListeners],
+	["GitHubInvestigation", setupGitHubInvestigationListeners],
+	["GitLabInvestigation", setupGitLabInvestigationListeners],
 	["LearningLoop", setupLearningLoopListeners],
 	["Mobile", setupMobileListeners],
 	// A multi-repo run goes on in the main process with the dialog closed.
