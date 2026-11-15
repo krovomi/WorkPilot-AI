@@ -250,8 +250,9 @@ through QA.
 
 **Guardrails.** Calls go to loopback only, without a proxy, and only to the app
 this verification launched; mutating methods can be switched off
-(`VERIFY_ALLOW_MUTATIONS`). A launch command proposed by a model must be a
-project launcher with no shell metacharacter. Response bodies go through
+(`VERIFY_ALLOW_MUTATIONS`). `verify_launch` runs the detected command or the
+learned recipe and takes no command of its own: text a model writes never
+becomes a process there. Response bodies go through
 `docintel.redact` and `injection_guard` before they are written or shown to a
 model. Every launched process group is killed in a `finally`.
 

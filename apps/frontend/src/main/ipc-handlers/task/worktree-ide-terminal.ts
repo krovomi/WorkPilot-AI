@@ -889,7 +889,10 @@ export function resolveCustomLauncher(customPath: unknown): string | null {
  * Validate a detection path doesn't contain traversal after variable expansion
  */
 export function isPathSafe(expandedPath: string): boolean {
-	return !path.normalize(expandedPath).includes("..");
+	// Read as written: normalizing first folds `C:\Users\..\x` into `C:\x`,
+	// and the climb this check is for was never seen (on Windows, or after an
+	// absolute POSIX prefix).
+	return !expandedPath.split(/[\\/]/).includes("..");
 }
 
 

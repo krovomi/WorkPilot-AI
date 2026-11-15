@@ -55,5 +55,81 @@
 	"errors": {
 		"noProject": "Please select a project",
 		"generic": "An error occurred during analysis"
+	},
+	"waves": {
+		"kicker": "Conflict Predictor",
+		"title": "Execution waves",
+		"description": "Groups the specs waiting in the backlog or queue into waves that share no file, from their plans and what their worktrees already changed. No model is called.",
+		"actions": {
+			"plan": "Compute the waves",
+			"replan": "Replan",
+			"execute": "Execute in optimal order",
+			"stop": "Stop the run"
+		},
+		"options": {
+			"tolerance": "Tolerance",
+			"toleranceHint": "Pairs whose score is at or below this value may share a wave.",
+			"toleranceValue_0": "Strict (0)",
+			"toleranceValue_1": "1 shared file",
+			"toleranceValue_2": "Score 2",
+			"toleranceValue_4": "Score 4",
+			"unplanned": "Specs with no plan yet",
+			"unplannedIsolate": "Run them alone",
+			"unplannedIndependent": "Assume independent",
+			"advance": "Next wave starts",
+			"advanceMerged": "once the wave is merged",
+			"advanceReview": "once the wave is in review"
+		},
+		"empty": {
+			"noProject": "Select a project to plan its waves.",
+			"noPlan": "Compute the waves to see which specs can run side by side.",
+			"noTasks": "No spec is waiting in the backlog or queue."
+		},
+		"stats": {
+			"specs": "Specs planned",
+			"waves": "Waves",
+			"parallel": "Max parallel tasks",
+			"avoided": "Risk avoided",
+			"avoidedValue": "{{avoided}} of {{total}}"
+		},
+		"waveLabel": "Wave {{index}}",
+		"residual": "Residual risk {{value}}",
+		"files": "{{count}} files",
+		"unplannedChip": "no plan",
+		"gantt": {
+			"title": "Plan",
+			"kicker": "Order",
+			"task": "Spec",
+			"legend": "Each bar is a spec in its wave; the waves run one after the other, the specs of a wave side by side. No duration is estimated."
+		},
+		"list": {
+			"title": "Waves",
+			"kicker": "Merge order",
+			"mergeHint": "Merge in this order: the first spec shares the most with the next waves."
+		},
+		"pairs": {
+			"title": "Riskiest pairs",
+			"kicker": "Scores",
+			"shared": "{{count}} shared files",
+			"unknown": "unknown footprint",
+			"together": "may share a wave"
+		},
+		"run": {
+			"running": "Running wave {{current}} of {{total}}.",
+			"done": "Every wave has run.",
+			"stopped": "Run stopped at wave {{current}} of {{total}}. Running tasks keep going.",
+			"current": "running",
+			"finished": "done",
+			"blocked": "Waiting on an unfinished dependency: {{tasks}}",
+			"startFailed": "Could not start {{task}}: {{error}}"
+		},
+		"notices": {
+			"cycle": "Dependency cycle, cannot be planned without you: {{tasks}}",
+			"blockedByCycle": "Waiting on a spec of a cycle: {{tasks}}",
+			"drift": "{{task}} touched {{count}} files outside its plan. Replan?",
+			"runningConflict": "{{task}} shares files with {{running}}, already running.",
+			"unplanned": "{{count}} specs have no plan yet: their footprint is unknown.",
+			"error": "Could not compute the waves: {{error}}"
+		}
 	}
 }
