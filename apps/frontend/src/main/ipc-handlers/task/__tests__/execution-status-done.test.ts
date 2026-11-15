@@ -20,7 +20,7 @@ const state = vi.hoisted(() => ({
 	task: null as Record<string, unknown> | null,
 	project: null as Record<string, unknown> | null,
 	getPythonPath: vi.fn((): string | null => null),
-	manualChange: vi.fn(() => true),
+	manualChange: vi.fn((..._args: unknown[]) => true),
 }));
 
 vi.mock("electron", () => ({
