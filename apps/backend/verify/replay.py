@@ -138,7 +138,8 @@ async def replay_scenario(toolbox, record: dict) -> list[str]:
     target = toolbox.target(None, ("web-frontend", "desktop"))
     browser = await toolbox.browser(target)
     if not browser.available:
-        return ["no browser to replay the scenario with"]
+        # What the window half found still stands.
+        return [*problems, "no browser to replay the scenario with"]
     base_url = toolbox.url_of(target)
     for step in steps[:60]:
         action = step.get("action")

@@ -149,17 +149,6 @@
 		"skip": "Ignorer pour le moment",
 		"skipDescription": "Ne pas connecter de fournisseur distant maintenant."
 	},
-	"azureDevOpsSetup": {
-		"title": "Connecter ? Azure DevOps",
-		"description": "Ajoutez vos identifiants Azure DevOps pour importer et synchroniser les work items.",
-		"loading": "Chargement des param?tres...",
-		"save": "Enregistrer",
-		"saving": "Enregistrement...",
-		"skip": "Ignorer pour le moment",
-		"orgUrlRequired": "L'URL d'organisation est requise",
-		"patRequired": "Le jeton d'accès personnel est requis",
-		"repositoryNote": "Vous pourrez sélectionner le repository dans les paramètres du projet après cette étape."
-	},
 	"worktrees": {
 		"count": "{{count}} worktrees",
 		"title": "Arbres de travail",
@@ -421,7 +410,11 @@
 		"create": "Ajouter au serveur",
 		"creating": "Clonage sur le serveur…",
 		"failed": "Le serveur n'a pas pu ajouter le projet",
-		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur"
+		"useLocalFolder": "Utiliser plutôt un dossier de cet ordinateur",
+		"existingTitle": "Les projets de votre équipe",
+		"openExisting": "Ouvrir",
+		"openExistingNamed": "Ouvrir {{name}}",
+		"orAddNew": "Ou ajoutez un autre dépôt au serveur :"
 	},
 	"envConfig": {
 		"accountsCount_one": "Vous avez {{count}} compte Claude authentifié. Choisissez celui à utiliser :",

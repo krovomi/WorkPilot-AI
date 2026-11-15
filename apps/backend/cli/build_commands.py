@@ -9,11 +9,6 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Ensure parent directory is in path for imports (before other imports)
-_PARENT_DIR = Path(__file__).parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
-
 # Import only what we need at module level
 # Heavy imports are lazy-loaded in functions to avoid import errors
 from core.progress import print_paused_banner
@@ -599,9 +594,7 @@ def _run_observe_phase(
     failure is swallowed: a build that produced working code must not be
     reported as failed because the bookkeeping afterwards did not work.
     """
-    if profile is not None and not profile.will_run("observe"):
-        return
-    if profile is None:
+    if profile is None or not profile.will_run("observe"):
         return
     try:
         from learning_loop.observe import BuildOutcome, run_observe
@@ -939,13 +932,9 @@ def handle_build_command(
             debug("run.py", "Auto-continue mode: continuing with existing build")
             print("Auto-continue: Resuming existing build...")
         else:
-            continue_existing = check_existing_build(project_dir, spec_dir.name)
-            if continue_existing:
-                # Continue with existing worktree
-                pass
-            else:
-                # User chose to start fresh or merged existing
-                pass
+            # The menu acts on its own (continue, merge, start fresh); either
+            # way the build goes on to choose its workspace below.
+            check_existing_build(project_dir, spec_dir.name)
 
     # Choose workspace (skip for parallel mode - it always uses worktrees)
     working_dir = project_dir
@@ -1368,6 +1357,7 @@ def handle_build_command(
             verbose=verbose,
             profile=_profile,
             jev_run=jev_run,
+            streaming_session_id=streaming_session_id,
         )
     except Exception as e:
         import traceback
@@ -1389,6 +1379,7 @@ def _handle_build_interrupt(
     profile=None,
     jev_run=None,
     source_spec_dir: Path | None = None,
+    streaming_session_id: str | None = None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -1408,6 +1399,8 @@ def _handle_build_interrupt(
             exists to remove.
         source_spec_dir: The project's copy of the spec in isolated mode, which
             the resumed build copies over the worktree's; ``None`` otherwise.
+        streaming_session_id: The live session the interrupted build streamed
+            to, kept by the resumed one.
     """
     from core.agent import run_autonomous_agent
 
@@ -1509,7 +1502,7 @@ def _handle_build_interrupt(
         if choice == "skip":
             print()
             print_status("Resuming build...", "info")
-            status_manager.update(state=BuildState.RUNNING)
+            status_manager.update(state=BuildState.BUILDING)
             asyncio.run(
                 run_autonomous_agent(
                     project_dir=working_dir,
@@ -1518,7 +1511,7 @@ def _handle_build_interrupt(
                     max_iterations=max_iterations,
                     verbose=verbose,
                     source_spec_dir=source_spec_dir,
-                    streaming_session_id=streaming_session_id,  # noqa: F821
+                    streaming_session_id=streaming_session_id,
                     profile=profile,
                     jev_run=jev_run,
                 )

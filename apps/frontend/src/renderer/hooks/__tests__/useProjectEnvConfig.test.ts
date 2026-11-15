@@ -109,6 +109,30 @@ describe("useProjectEnvConfig", () => {
 		await waitFor(() => expect(result.current.envConfig).toEqual(CONFIG_A));
 	});
 
+	it("lets a setter kept from an earlier project leave the current one alone", async () => {
+		getProjectEnv.mockResolvedValue({ success: true, data: CONFIG_A });
+		const { result, rerender } = renderHook(
+			({ id }: { id: string }) => useProjectEnvConfig(id, ".workpilot"),
+			{ initialProps: { id: "a" } },
+		);
+		await waitFor(() => expect(result.current.envConfig).toEqual(CONFIG_A));
+		const setForA = result.current.setEnvConfig;
+
+		getProjectEnv.mockResolvedValue({ success: true, data: CONFIG_B });
+		rerender({ id: "b" });
+		await waitFor(() => expect(result.current.envConfig).toEqual(CONFIG_B));
+
+		// A save made on A fails now and puts A's values back.
+		const updater = vi.fn((previous: ProjectEnvConfig | null) =>
+			previous ? { ...previous, githubEnabled: true } : null,
+		);
+		act(() => setForA(updater));
+		act(() => setForA(CONFIG_A));
+
+		expect(updater).not.toHaveBeenCalled();
+		expect(result.current.envConfig).toEqual(CONFIG_B);
+	});
+
 	it("drops a response that arrives after the project changed", async () => {
 		const first = deferred<{ success: boolean; data: ProjectEnvConfig }>();
 		getProjectEnv.mockReturnValue(first.promise);

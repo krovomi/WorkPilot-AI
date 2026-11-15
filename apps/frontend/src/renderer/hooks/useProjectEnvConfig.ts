@@ -85,10 +85,12 @@ export function useProjectEnvConfig(
 		(next) => {
 			setLoaded((prev) => {
 				if (!projectId) return null;
-				// An updater sees the *bound* configuration: null when what is
-				// loaded belongs to another project, never that project's values.
-				const base = prev && prev.projectId === projectId ? prev.config : null;
-				const value = typeof next === "function" ? next(base) : next;
+				// What is loaded belongs to another project: an update meant for
+				// this one never sees it nor replaces it. A setter from an earlier
+				// render (a save that fails after the switch, putting its values
+				// back) used to blank the configuration now on screen.
+				if (prev && prev.projectId !== projectId) return prev;
+				const value = typeof next === "function" ? next(prev?.config ?? null) : next;
 				return value ? { projectId, config: value } : null;
 			});
 		},
