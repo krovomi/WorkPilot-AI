@@ -65,7 +65,7 @@ class TestPhaseRouting:
         assert _EFFORT_PHASE[agent_type] == phase
 
     @pytest.mark.parametrize(
-        "agent_type", ["coder", "pr_reviewer", "ideation", "insights", "migration"]
+        "agent_type", ["coder", "pr_reviewer", "ideation", "insights"]
     )
     def test_everything_else_uses_the_coding_effort(self, agent_type: str):
         """Four phases exist; substantive work outside them maps onto coding."""

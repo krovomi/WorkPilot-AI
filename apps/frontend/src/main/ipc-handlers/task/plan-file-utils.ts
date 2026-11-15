@@ -18,12 +18,10 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { AUTO_BUILD_PATHS, getSpecsDir } from "../../../shared/constants";
 import type { Project, Task, TaskStatus } from "../../../shared/types";
 import type { TaskEventPayload } from "../../agent/task-event-schema";
-import { getIsolatedGitEnv } from "../../utils/git-isolation";
 import { projectStore } from "../../project-store";
 import type { VisualProofRun } from "../../../shared/types";
 
@@ -480,16 +478,9 @@ export async function createPlanIfNotExists(
 			plan.xstateState = xstateState;
 		}
 
-		// Ensure directory exists - use try/catch pattern
-		const planDir = path.dirname(planPath);
-		try {
-			mkdirSync(planDir, { recursive: true });
-		} catch (err) {
-			// Directory might already exist or be created concurrently - that's fine
-			if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
-				throw err;
-			}
-		}
+		// A recursive mkdir is quiet when the folder exists, even if another
+		// call created it a moment ago; anything else in the way throws.
+		mkdirSync(path.dirname(planPath), { recursive: true });
 
 		writeFileSync(planPath, JSON.stringify(plan, null, 2), "utf-8");
 	});
@@ -600,59 +591,6 @@ export function updateTaskMetadataField(
 	} catch (err) {
 		console.warn(`[plan-file-utils] Could not update ${field} at ${metadataPath}:`, err);
 		return false;
-	}
-}
-
-/**
- * Get modified files from a git worktree compared to the main branch.
- * Detects files changed, added, or deleted.
- *
- * @param worktreePath - Path to the git worktree
- * @param mainBranch - The main branch to compare against (default: "main")
- * @returns Array of modified file paths
- */
-export function getModifiedFilesFromWorktree(
-	worktreePath: string,
-	mainBranch: string = "main",
-): string[] {
-	try {
-		// Get diff between main branch and current branch
-		// Shows files that are: modified (M), added (A), or deleted (D)
-		// execFileSync (no shell): `mainBranch` is caller-supplied and a branch
-		// name may legally contain characters the shell would interpret.
-		const output = execFileSync(
-			"git",
-			["diff", "--name-status", `${mainBranch}...HEAD`],
-			{
-				cwd: worktreePath,
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-				env: getIsolatedGitEnv(),
-			},
-		);
-
-		if (!output.trim()) {
-			return [];
-		}
-
-		// Parse the diff output
-		// Format: STATUS\tFILEPATH
-		const files = output
-			.trim()
-			.split("\n")
-			.map((line) => {
-				const parts = line.split("\t");
-				return parts[1] || "";
-			})
-			.filter((file) => file.length > 0);
-
-		return files;
-	} catch (error) {
-		console.warn(
-			`[plan-file-utils] Could not get modified files from ${worktreePath}:`,
-			error,
-		);
-		return [];
 	}
 }
 
