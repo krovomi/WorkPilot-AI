@@ -58,7 +58,6 @@ Workspace setup and initialization:
 - `copy_spec_to_worktree()` - Copy spec files to worktree
 - `setup_workspace()` - Set up isolated or direct workspace
 - `ensure_timeline_hook_installed()` - Install git post-commit hook
-- `initialize_timeline_tracking()` - Register task for timeline tracking
 
 ### display.py
 UI display functions:

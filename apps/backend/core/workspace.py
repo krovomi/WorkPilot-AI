@@ -118,10 +118,7 @@ from core.workspace.models import (
     ParallelMergeResult,
     ParallelMergeTask,
 )
-from merge import (
-    FileTimelineTracker,
-    MergeOrchestrator,
-)
+from merge import MergePreview
 from merge.progress import MergeProgressCallback, MergeProgressStage, emit_progress
 
 MODULE = "workspace"
@@ -176,12 +173,10 @@ def merge_existing_build(
 
     Called when user runs: python workpilot/run.py --spec X --merge
 
-    This uses the MergeOrchestrator to:
-    1. Analyze semantic changes from the task
-    2. Detect potential conflicts with main branch
-    3. Auto-merge compatible changes
-    4. Use AI for ambiguous conflicts (if enabled)
-    5. Fall back to git merge for remaining changes
+    It reads what the task changed (``MergePreview``) and:
+    1. Merges with git when the branches do not conflict
+    2. Asks the user's provider for each file both sides changed
+    3. Shows the conflicts the preview found before merging otherwise
 
     Args:
         project_dir: The project directory
@@ -436,26 +431,8 @@ def _try_smart_merge_inner(
                 "Starting merge analysis",
             )
 
-        # Capture worktree state in FileTimelineTracker before merge
-        try:
-            timeline_tracker = FileTimelineTracker(project_dir)
-            timeline_tracker.capture_worktree_state(spec_name, worktree_path)
-            debug(MODULE, "Captured worktree state for timeline tracking")
-        except Exception as e:
-            debug_warning(MODULE, f"Could not capture worktree state: {e}")
-
-        # Initialize the orchestrator
-        debug(
-            MODULE,
-            "Initializing MergeOrchestrator",
-            project_dir=str(project_dir),
-            enable_ai=True,
-        )
-        orchestrator = MergeOrchestrator(
-            project_dir,
-            enable_ai=True,  # Enable AI for ambiguous conflicts
-            dry_run=False,
-        )
+        debug(MODULE, "Initializing MergePreview", project_dir=str(project_dir))
+        preview_engine = MergePreview(project_dir)
 
         # Refresh evolution data from the worktree
         # Use task_source_branch (where task branched from) for comparing what files changed
@@ -466,7 +443,7 @@ def _try_smart_merge_inner(
             spec_name=spec_name,
             task_source_branch=task_source_branch,
         )
-        orchestrator.evolution_tracker.refresh_from_git(
+        preview_engine.evolution_tracker.refresh_from_git(
             spec_name, worktree_path, target_branch=task_source_branch
         )
 
@@ -573,7 +550,6 @@ def _try_smart_merge_inner(
                 spec_name,
                 worktree_path,
                 git_conflicts,
-                orchestrator,
                 no_commit=no_commit,
             )
 
@@ -759,7 +735,6 @@ def _try_smart_merge_inner(
                         spec_name,
                         worktree_path,
                         git_conflicts,
-                        orchestrator,
                         no_commit=no_commit,
                     )
 
@@ -808,7 +783,7 @@ def _try_smart_merge_inner(
 
         # No git conflicts - proceed with semantic analysis
         debug(MODULE, "No git conflicts, proceeding with semantic analysis")
-        preview = orchestrator.preview_merge([spec_name])
+        preview = preview_engine.preview_merge([spec_name])
 
         files_to_merge = len(preview.get("files_to_merge", []))
         conflicts = preview.get("conflicts", [])
@@ -1237,7 +1212,6 @@ def _resolve_git_conflicts_with_ai(
     spec_name: str,
     worktree_path: Path,
     git_conflicts: dict,
-    orchestrator: MergeOrchestrator,
     no_commit: bool = False,
 ) -> dict:
     """

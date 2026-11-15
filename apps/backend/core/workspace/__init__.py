@@ -100,11 +100,9 @@ from .models import (
 from .workspace_setup import (
     # Export private names for backward compatibility
     _ensure_timeline_hook_installed,
-    _initialize_timeline_tracking,
     choose_workspace,
     copy_spec_to_worktree,
     ensure_timeline_hook_installed,
-    initialize_timeline_tracking,
     setup_workspace,
 )
 
@@ -140,7 +138,6 @@ __all__ = [
     "copy_spec_to_worktree",
     "setup_workspace",
     "ensure_timeline_hook_installed",
-    "initialize_timeline_tracking",
     # Display
     "show_build_summary",
     "show_changed_files",

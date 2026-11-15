@@ -66,7 +66,10 @@ def test_each_changed_file_is_recorded_with_its_content_before(repo):
     }
     app = tracker.get_file_evolution("app.py").get_task_snapshot("001-task")
     assert "+import os" in app.raw_diff
-    assert [c.change_type.value for c in app.semantic_changes] == ["add_import"]
+    assert [c.change_type.value for c in app.semantic_changes] == [
+        "add_import",
+        "modify_function",
+    ]
 
 
 def test_a_file_name_git_would_quote_is_read(repo):

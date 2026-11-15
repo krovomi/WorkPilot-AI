@@ -1,6 +1,6 @@
 """The agent_runtime port: core installs it, the units below core go through it.
 
-``merge``, ``integrations``, ``analysis``, ``architecture`` and the test
+``integrations``, ``analysis``, ``architecture`` and the test
 generator used to import
 ``core`` (or ``agents``) to start one utility session, which put them in the
 agents' import cycle. They now ask ``agent_runtime.current()``; these tests
@@ -60,11 +60,6 @@ class TestCoreInstallsTheRuntime:
 
 
 class TestWithoutARuntime:
-    def test_the_merge_resolver_has_no_ai(self, no_runtime):
-        from merge.ai_resolver import create_ai_resolver
-
-        assert create_ai_resolver().ai_call_fn is None
-
     def test_the_linear_client_is_refused(self, no_runtime, monkeypatch):
         from integrations.linear import updater
 

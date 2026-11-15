@@ -279,7 +279,8 @@ def _detect_parallel_task_conflicts(
     Detect potential conflicts between this task and other active tasks.
 
     Uses existing evolution data to check if any of this task's files
-    have been modified by other active tasks. This is a lightweight check
+    have been modified by other active tasks: recorded, not merged since,
+    and with their worktree still there. This is a lightweight check
     that doesn't require re-processing all files.
 
     Args:
@@ -291,20 +292,20 @@ def _detect_parallel_task_conflicts(
         List of conflict dictionaries with 'file' and 'tasks' keys
     """
     try:
-        from merge import MergeOrchestrator
+        from merge import MergePreview
 
-        # Initialize orchestrator just to access evolution data
-        orchestrator = MergeOrchestrator(
-            project_dir,
-            enable_ai=False,
-            dry_run=True,
-        )
+        # Only to read the recorded evolution data
+        orchestrator = MergePreview(project_dir)
 
         # Get all active tasks from evolution data
         active_tasks = orchestrator.evolution_tracker.get_active_tasks()
 
-        # Remove current task from active tasks
-        other_active_tasks = active_tasks - {current_task_id}
+        # Other tasks whose worktree is still there (one deleted is abandoned)
+        other_active_tasks = {
+            task
+            for task in active_tasks - {current_task_id}
+            if get_existing_build_worktree(project_dir, task)
+        }
 
         if not other_active_tasks:
             return []
@@ -322,7 +323,7 @@ def _detect_parallel_task_conflicts(
         for file_path, tasks in other_task_files.items():
             if file_path in current_files_set:
                 # This file was modified by both current task and other task(s)
-                all_tasks = [current_task_id] + tasks
+                all_tasks = [current_task_id] + sorted(tasks)
                 conflicts.append({"file": file_path, "tasks": all_tasks})
 
         return conflicts
