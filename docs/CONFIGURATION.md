@@ -751,8 +751,8 @@ uses no network.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([foundation/model_config.py](../apps/backend/foundation/model_config.py)) | Model of the utility calls: the AI merge resolver and, when a pull request is created, the template filler and the impact analysis. The desktop app sets it for merges from the utility model in Settings. |
-| `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. The desktop app sets it for merges. |
+| `UTILITY_MODEL_ID` | `DEFAULT_UTILITY_MODEL` ([foundation/model_config.py](../apps/backend/foundation/model_config.py)) | Model of the utility calls made when a pull request is created: the template filler and the impact analysis. The AI merge does not read it: it asks the user's provider, with a quick then a capable Claude model on Claude and the provider's own model elsewhere. |
+| `UTILITY_THINKING_BUDGET` | off | Thinking budget, in tokens, of the same calls; empty or `0` turns it off. |
 | `INSIGHT_EXTRACTION_ENABLED` | `true` | After each coder session, an LLM pass extracts insights into the project memory. Only `true`, `1` or `yes` keep it on (`on` turns it off). It also needs a Claude token. |
 | `INSIGHT_EXTRACTOR_MODEL` | `DEFAULT_EXTRACTION_MODEL` ([analysis/insight_extractor.py](../apps/backend/analysis/insight_extractor.py)) | Model of that pass. It always runs on Claude: give a Claude model id. |
 
