@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import threading
+import types
 from pathlib import Path
 
 import pytest
@@ -169,13 +170,25 @@ def test_a_file_whose_mode_cannot_be_changed_is_still_loaded(
     _isolated_config, monkeypatch
 ):
     _isolated_config.write_text(json.dumps({"x": {}}), encoding="utf-8")
-    os.chmod(_isolated_config, 0o600)  # owner-only
     monkeypatch.setattr(llm_config, "is_windows", lambda: False)
+    real_os = llm_config.os
 
-    def no_chmod(*_a, **_k):
-        raise PermissionError("chmod refused")
+    class GroupReadableOs:
+        """The loader's view of `os`: the file looks group-readable, chmod fails."""
 
-    monkeypatch.setattr(llm_config.os, "chmod", no_chmod)
+        def __getattr__(self, name):
+            return getattr(real_os, name)
+
+        @staticmethod
+        def stat(path, *args, **kwargs):
+            mode = real_os.stat(path, *args, **kwargs).st_mode
+            return types.SimpleNamespace(st_mode=(mode & ~0o777) | 0o640)
+
+        @staticmethod
+        def chmod(*_a, **_k):
+            raise PermissionError("chmod refused")
+
+    monkeypatch.setattr(llm_config, "os", GroupReadableOs())
 
     assert llm_config.load_all_provider_configs() == {"x": {}}
 
