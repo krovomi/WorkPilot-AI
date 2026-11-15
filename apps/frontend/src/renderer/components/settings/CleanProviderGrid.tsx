@@ -36,7 +36,6 @@ interface CleanProviderGridProps {
 	) => void;
 	onTest?: (providerId: string) => void;
 	onToggle?: (providerId: string, enabled: boolean) => void;
-	onRemove?: (providerId: string) => void;
 	onAddProvider?: () => void;
 	onRefreshProviders?: () => void;
 	isAutoSwitchingOpen?: boolean;
@@ -57,7 +56,6 @@ export function CleanProviderGrid({
 	onConfigure,
 	onTest,
 	onToggle,
-	onRemove,
 	onAddProvider,
 	onRefreshProviders,
 	isLoading = false,
@@ -358,7 +356,6 @@ export function CleanProviderGrid({
 								onConfigure={onConfigure}
 								onTest={onTest}
 								onToggle={onToggle}
-								onRemove={onRemove}
 								className={viewMode === "list" ? "max-w-2xl" : ""}
 								isAutoSwitchingOpen={isAutoSwitchingOpen}
 								isTesting={testingProviders.has(provider.id)}

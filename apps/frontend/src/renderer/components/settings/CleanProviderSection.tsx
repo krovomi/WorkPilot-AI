@@ -13,7 +13,7 @@ import {
 } from "@shared/utils/providers";
 import { Activity, AlertCircle, Info, Loader2, X } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -349,13 +349,21 @@ export function CleanProviderSection({
 		}
 	};
 
+	// Providers being tested in the background: every render that changes the
+	// list starts this again, and a provider must not be tested twice meanwhile.
+	const autoTesting = useRef(new Set<string>());
+
 	// Silently test all configured providers that have never been tested
 	const autoTestConfiguredProviders = async (
 		providerList: { id: string; isConfigured: boolean }[],
 	) => {
 		const untested = providerList.filter(
-			(p) => p.isConfigured && !providerTestResults.has(p.id),
+			(p) =>
+				p.isConfigured &&
+				!providerTestResults.has(p.id) &&
+				!autoTesting.current.has(p.id),
 		);
+		for (const provider of untested) autoTesting.current.add(provider.id);
 		for (const provider of untested) {
 			try {
 				const result = await ProviderService.testProvider(provider.id);
@@ -376,6 +384,8 @@ export function CleanProviderSection({
 				}
 			} catch {
 				// Silent failure — don't block loading
+			} finally {
+				autoTesting.current.delete(provider.id);
 			}
 		}
 	};
@@ -470,21 +480,6 @@ export function CleanProviderSection({
 					return false;
 				}
 			};
-
-			// Special handling for OAuth providers like Windsurf that don't need profiles
-			if (isOAuthOrCLI && providerId === "windsurf") {
-				// Check if Windsurf OAuth token is available via backend status
-				const isConfigured = providerStatus[providerId] || false;
-				if (isConfigured) {
-					return {
-						hasKey: true,
-						keyPreview: undefined,
-						provider: "Windsurf OAuth",
-						isOAuth: true,
-						authMethod: "oauth",
-					};
-				}
-			}
 
 			// Check profiles for API keys
 			const profile = profiles.find((p) => {
@@ -641,9 +636,9 @@ export function CleanProviderSection({
 				id: provider.name,
 				name: provider.label,
 				category: providerCategories[provider.name] || "independent",
-				description:
-					t(`sections.accounts.providers.${provider.name}`) ||
-					provider.description,
+				description: t(`sections.accounts.providers.${provider.name}`, {
+					defaultValue: provider.description,
+				}),
 				isConfigured: providerStatus[provider.name] || false,
 				isWorking: providerIsWorking(providerStatus[provider.name], isEnabled),
 				// Use real data instead of dummy data
@@ -746,6 +741,10 @@ export function CleanProviderSection({
 		return onProviderReauthRequest(answerPendingRequest);
 	}, [providers]);
 
+	// The name a person reads, for messages about a provider.
+	const nameOf = (providerId: string) =>
+		providers.find((p) => p.id === providerId)?.name ?? providerId;
+
 	const handleTest = async (providerId: string) => {
 		setTestingProviders((prev) => new Set(prev).add(providerId));
 
@@ -779,7 +778,7 @@ export function CleanProviderSection({
 
 		// Save to settings for persistence
 		onSettingsChange({
-			...settings,
+			...useSettingsStore.getState().settings,
 			[`testResult_${providerId}`]: testResult,
 		});
 
@@ -799,7 +798,7 @@ export function CleanProviderSection({
 		let description = t(
 			"sections.accounts.providerCard.testSuccessDescription",
 			{
-				providerName: providerId,
+				providerName: nameOf(providerId),
 			},
 		);
 
@@ -822,7 +821,7 @@ export function CleanProviderSection({
 			variant: "destructive",
 			title: t("sections.accounts.providerCard.testError"),
 			description: t("sections.accounts.providerCard.testErrorDescription", {
-				providerName: providerId,
+				providerName: nameOf(providerId),
 				error: result.message,
 			}),
 		});
@@ -837,7 +836,7 @@ export function CleanProviderSection({
 			variant: "destructive",
 			title: t("sections.accounts.providerCard.testError"),
 			description: t("sections.accounts.providerCard.testErrorDescription", {
-				providerName: providerId,
+				providerName: nameOf(providerId),
 				error: t("sections.accounts.providerCard.errors.unknownError"),
 			}),
 		});
@@ -859,15 +858,6 @@ export function CleanProviderSection({
 			// Save the updated configuration
 			await ProviderService.saveUserProviderConfig(providerId, updatedConfig);
 
-			// Update the local providers state to reflect the change
-			setProvidersState((prevProviders: Provider[]) =>
-				prevProviders.map((provider: Provider) =>
-					provider.id === providerId
-						? { ...provider, isWorking: !!enabled }
-						: provider,
-				),
-			);
-
 			// Update disabledAutoSwitchProviders setting
 			// Note: providerPriorityOrder is now managed solely by ClaudeProfileManager
 			const updatedSettings = { ...settings };
@@ -885,8 +875,19 @@ export function CleanProviderSection({
 				];
 			}
 
-			// Single atomic settings update
-			onSettingsChange(updatedSettings);
+			// Single atomic settings update; a switch that was not saved has not moved.
+			if (!(await onSettingsChange(updatedSettings))) {
+				throw new Error("Settings not saved");
+			}
+
+			// Update the local providers state to reflect the change
+			setProvidersState((prevProviders: Provider[]) =>
+				prevProviders.map((provider: Provider) =>
+					provider.id === providerId
+						? { ...provider, isWorking: !!enabled }
+						: provider,
+				),
+			);
 
 			// Show toast notification
 			toast({
@@ -894,7 +895,7 @@ export function CleanProviderSection({
 					? t("sections.accounts.providerToggle.enabled")
 					: t("sections.accounts.providerToggle.disabled"),
 				description: t("sections.accounts.providerToggle.description", {
-					providerId: providerId,
+					providerId: nameOf(providerId),
 					action: enabled
 						? tCommon("actions.enabled")
 						: tCommon("actions.disabled"),
@@ -906,22 +907,13 @@ export function CleanProviderSection({
 				variant: "destructive",
 				title: t("sections.accounts.providerToggle.error"),
 				description: t("sections.accounts.providerToggle.errorDescription", {
-					providerId: providerId,
+					providerId: nameOf(providerId),
 					action: enabled
 						? tCommon("actions.enable")
 						: tCommon("actions.disable"),
 				}),
 			});
 		}
-	};
-
-	const handleRemove = () => {
-		// Pour l'instant, on ne fait rien car on utilise les profiles
-		// Remove provider
-	};
-
-	const handleRefresh = () => {
-		globalThis.location.reload();
 	};
 
 	if (isLoading) {
@@ -953,7 +945,7 @@ export function CleanProviderSection({
 							{error}
 						</AlertDescription>
 					</Alert>
-					<Button onClick={handleRefresh} variant="outline" size="sm">
+					<Button onClick={() => loadConnectors()} variant="outline" size="sm">
 						{t("common.retry")}
 					</Button>
 				</div>
@@ -999,7 +991,6 @@ export function CleanProviderSection({
 							onConfigure={handleConfigure}
 							onTest={handleTest}
 							onToggle={handleToggle}
-							onRemove={handleRemove}
 							isLoading={isLoading}
 							isAutoSwitchingOpen={autoSwitchingOpen}
 							testingProviders={testingProviders}
@@ -1024,6 +1015,7 @@ export function CleanProviderSection({
 									</div>
 									<Button
 										onClick={() => setAutoSwitchingOpen(false)}
+										aria-label={tCommon("buttons.close")}
 										variant="ghost"
 										size="sm"
 										className="h-6 w-6 p-0"

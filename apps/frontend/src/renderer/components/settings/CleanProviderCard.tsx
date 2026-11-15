@@ -52,7 +52,6 @@ interface CleanProviderCardProps {
 	) => void;
 	onTest?: (providerId: string) => void;
 	onToggle?: (providerId: string, enabled: boolean) => void;
-	onRemove?: (providerId: string) => void;
 	className?: string;
 	isAutoSwitchingOpen?: boolean; // Nouvelle prop pour détecter l'état de l'auto-switching
 	isTesting?: boolean; // Nouvelle prop pour l'état de test
@@ -315,8 +314,6 @@ export function CleanProviderCard({
 	onConfigure,
 	onTest,
 	onToggle,
-	// biome-ignore lint/correctness/noUnusedFunctionParameters: parameter kept for API compatibility
-	onRemove,
 	className,
 	isAutoSwitchingOpen = false,
 	isTesting = false,
