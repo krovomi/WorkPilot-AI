@@ -253,7 +253,11 @@ describe("lancer une commande", () => {
 		expect(
 			await screen.findByText("/review · Slash command failed"),
 		).toBeInTheDocument();
-		expect(screen.getByText(/still in \/tmp\/wt/)).toBeInTheDocument();
+		// Radix toast also copies the text into its aria-live announcer, which
+		// shows up first on a slow runner: look at the toast's own paragraph.
+		expect(
+			screen.getByText(/still in \/tmp\/wt/, { selector: "p" }),
+		).toBeInTheDocument();
 	});
 
 	it("une commande sans sortie ni note n'a pas de description", async () => {
@@ -299,7 +303,9 @@ describe("lancer une commande", () => {
 		await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 		await userEvent.type(input(), "/help{Enter}");
 		expect(await screen.findByText("Available commands")).toBeInTheDocument();
-		expect(screen.getByText(/\/review — Review the diff/)).toBeInTheDocument();
+		expect(
+			screen.getByText(/\/review — Review the diff/, { selector: "pre" }),
+		).toBeInTheDocument();
 		expect(api.fn("runQuickCommand")).not.toHaveBeenCalled();
 	});
 
