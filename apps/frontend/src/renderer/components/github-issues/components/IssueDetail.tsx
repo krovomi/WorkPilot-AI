@@ -13,7 +13,6 @@ import remarkGfm from "remark-gfm";
 import {
 	GITHUB_COMPLEXITY_COLORS,
 	GITHUB_ISSUE_STATE_COLORS,
-	GITHUB_ISSUE_STATE_LABELS,
 } from "../../../../shared/constants";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
@@ -57,7 +56,7 @@ export function IssueDetail({
 								variant="outline"
 								className={`${GITHUB_ISSUE_STATE_COLORS[issue.state]}`}
 							>
-								{GITHUB_ISSUE_STATE_LABELS[issue.state]}
+								{t(`common:githubIssues.state.${issue.state}`)}
 							</Badge>
 							<span className="text-sm text-muted-foreground">
 								#{issue.number}
@@ -168,7 +167,9 @@ export function IssueDetail({
 												]
 											}
 										>
-											{investigationResult.analysis.estimatedComplexity}
+											{t(
+												`common:githubIssues.complexity.${investigationResult.analysis.estimatedComplexity}`,
+											)}
 										</Badge>
 										<span className="text-xs text-muted-foreground">
 											{t("common:githubIssues.taskId", { id: taskId })}

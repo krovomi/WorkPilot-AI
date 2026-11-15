@@ -13,7 +13,6 @@
 export {
 	type IssueFilterState,
 	importGitHubIssues,
-	loadAllGitHubIssues,
 	loadGitHubIssues,
 	loadMoreGitHubIssues,
 	useIssuesStore,

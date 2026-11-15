@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { create } from "zustand";
 import type { GitHubIssue } from "../../../shared/types";
 
@@ -155,10 +156,16 @@ export async function loadGitHubIssues(
 			store.setHasMore(result.data.hasMore);
 			store.setCurrentPage(1);
 		} else {
-			store.setError(result.error || "Failed to load GitHub issues");
+			store.setError(
+				result.error || i18n.t("common:githubIssues.loadFailed"),
+			);
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		store.setError(
+			error instanceof Error
+				? error.message
+				: i18n.t("common:githubIssues.unknownError"),
+		);
 	} finally {
 		store.setLoading(false);
 	}
@@ -205,24 +212,19 @@ export async function loadMoreGitHubIssues(
 			store.setHasMore(result.data.hasMore);
 			store.setCurrentPage(nextPage);
 		} else {
-			store.setError(result.error || "Failed to load more issues");
+			store.setError(
+				result.error || i18n.t("common:githubIssues.loadMoreFailed"),
+			);
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		store.setError(
+			error instanceof Error
+				? error.message
+				: i18n.t("common:githubIssues.unknownError"),
+		);
 	} finally {
 		store.setLoadingMore(false);
 	}
-}
-
-/**
- * Load ALL issues (for search functionality)
- * This fetches all pages so search can work across all issues
- */
-export async function loadAllGitHubIssues(
-	projectId: string,
-	state?: IssueFilterState,
-): Promise<void> {
-	return loadGitHubIssues(projectId, state, true);
 }
 
 export async function importGitHubIssues(
@@ -240,11 +242,17 @@ export async function importGitHubIssues(
 		if (result.success) {
 			return true;
 		} else {
-			store.setError(result.error || "Failed to import GitHub issues");
+			store.setError(
+				result.error || i18n.t("common:githubIssues.importFailed"),
+			);
 			return false;
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		store.setError(
+			error instanceof Error
+				? error.message
+				: i18n.t("common:githubIssues.unknownError"),
+		);
 		return false;
 	} finally {
 		store.setLoading(false);
