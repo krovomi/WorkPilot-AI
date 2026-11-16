@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({ ipcMain: { handle: vi.fn() } }));
+vi.mock("../../project-store", () => ({ projectStore: { getProject: vi.fn() } }));
 
 import { isMcpEnvSafe } from "../mcp-handlers";
 

@@ -258,21 +258,6 @@ class GuardrailDecision:
     #: What the semantic conditions found, per rule id (tests removed, deps added).
     details: dict[str, list[str]] = field(default_factory=dict)
 
-    def should_block(self) -> bool:
-        return self.action in (GuardrailAction.DENY, GuardrailAction.REQUIRE_APPROVAL)
-
-
-# ---------------------------------------------------------------------------
-# Loader (kept for callers that only want the rules)
-# ---------------------------------------------------------------------------
-
-
-def load_guardrails(project_root: Path) -> list[GuardrailRule]:
-    """The rules that apply to ``project_root`` (a project or one of its worktrees)."""
-    from .guardrail_policy import load_policy
-
-    return load_policy(Path(project_root)).rules
-
 
 # ---------------------------------------------------------------------------
 # Evaluator

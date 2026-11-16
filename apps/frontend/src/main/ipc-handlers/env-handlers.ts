@@ -9,10 +9,16 @@ import {
 import type {
 	AppSettings,
 	ClaudeAuthResult,
+	CustomMcpServer,
 	IPCResult,
 	ProjectEnvConfig,
 } from "../../shared/types";
 import { debugError } from "../../shared/utils/debug-logger";
+import {
+	maskCustomMcpServers,
+	parseCustomMcpServers,
+	unmaskCustomMcpServers,
+} from "../custom-mcp-secrets";
 import { unmaskSecret } from "../utils/masked-secret";
 import {
 	getClaudeCliInvocation,
@@ -142,12 +148,21 @@ export function maskProjectEnvSecrets(
 			context7ApiKey: MASKED_SECRET,
 		};
 	}
+	if (masked.customMcpServers) {
+		masked.customMcpServers = maskCustomMcpServers(masked.customMcpServers);
+	}
 	return masked;
 }
 
-/** `config` from the renderer with masked secrets dropped, so they keep their stored value. */
+/**
+ * `config` from the renderer with masked secrets dropped, so they keep their
+ * stored value. The header and environment values of custom MCP servers come
+ * back whole, so a masked one is taken from `storedServers` (the servers the
+ * file holds now).
+ */
 export function unmaskProjectEnvUpdate(
 	config: Partial<ProjectEnvConfig>,
+	storedServers: CustomMcpServer[] = [],
 ): Partial<ProjectEnvConfig> {
 	const result: Partial<ProjectEnvConfig> = { ...config };
 	for (const field of PROJECT_ENV_SECRET_FIELDS) {
@@ -162,6 +177,12 @@ export function unmaskProjectEnvUpdate(
 		if (value === undefined) delete mcpServers.context7ApiKey;
 		else mcpServers.context7ApiKey = value;
 		result.mcpServers = mcpServers;
+	}
+	if (result.customMcpServers) {
+		result.customMcpServers = unmaskCustomMcpServers(
+			result.customMcpServers,
+			storedServers,
+		);
 	}
 	return result;
 }
@@ -1108,12 +1129,7 @@ ${otherLines.join("\n")}
 
 			// Parse custom MCP servers (user-defined)
 			if (vars.CUSTOM_MCP_SERVERS) {
-				try {
-					config.customMcpServers = JSON.parse(vars.CUSTOM_MCP_SERVERS);
-				} catch {
-					// Invalid JSON, ignore
-					config.customMcpServers = [];
-				}
+				config.customMcpServers = parseCustomMcpServers(vars.CUSTOM_MCP_SERVERS);
 			}
 
 			// Secrets stay in the main process: the renderer learns which are set.
@@ -1169,7 +1185,14 @@ ${otherLines.join("\n")}
 				// Generate new content
 				// A secret sent back as the mask ENV_GET showed keeps its stored value.
 				const newContent = generateEnvContent(
-					unmaskProjectEnvUpdate(config),
+					unmaskProjectEnvUpdate(
+						config,
+						parseCustomMcpServers(
+							existingContent
+								? parseEnvFile(existingContent).CUSTOM_MCP_SERVERS
+								: undefined,
+						),
+					),
 					existingContent,
 				);
 
