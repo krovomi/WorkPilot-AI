@@ -40,9 +40,9 @@ export function FindingItem({
 					<CheckCircle className="h-4 w-4 mt-0.5 text-success shrink-0" />
 				) : (
 					<Checkbox
-						id={finding.id}
 						checked={selected}
 						onCheckedChange={onToggle}
+						aria-label={finding.title}
 						className="mt-0.5"
 					/>
 				)}
@@ -50,7 +50,9 @@ export function FindingItem({
 					<div className="flex items-center gap-2 flex-wrap">
 						<Badge variant="outline" className="text-xs shrink-0">
 							<CategoryIcon className="h-3 w-3 mr-1" />
-							{finding.category}
+							{t(`gitlab:findings.category.${finding.category}`, {
+								defaultValue: finding.category,
+							})}
 						</Badge>
 						{posted && (
 							<Badge

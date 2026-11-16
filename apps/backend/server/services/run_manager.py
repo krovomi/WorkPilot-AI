@@ -127,8 +127,14 @@ def build_command(
     model: str | None,
     scratch: Path,
     pr: dict | None = None,
+    may_skip_review: bool = False,
 ) -> list[str]:
-    """The argv of one run. `scratch` is a private directory the run may use."""
+    """The argv of one run. `scratch` is a private directory the run may use.
+
+    ``may_skip_review`` is whether the person who starts the run holds the
+    approval right (``review.approve``): only then does a card that asks for
+    no review go on to its build.
+    """
     if phase == SPEC_PHASE:
         spec_dir = Path(server_path) / ".workpilot" / "specs" / spec_name
         requirements = _json_file(spec_dir / "requirements.json")
@@ -154,10 +160,18 @@ def build_command(
             str(spec_dir),
         ]
         # As in the app: a card that asks for no review goes on to its build
-        # once its spec is written; one that does waits for a member's approval.
-        if metadata.get("requireReviewBeforeCoding", True) is False:
+        # once its spec is written, when the person starting it may approve;
+        # otherwise it waits for a member's approval.
+        skip_review = metadata.get("requireReviewBeforeCoding", True) is False
+        if skip_review and may_skip_review:
             cmd.append("--auto-approve")
         else:
+            target = spec_dir / "task_metadata.json"
+            if skip_review and not target.is_symlink():
+                # The card now waits for a review: say so where the board and
+                # the notifications read it (never through a link).
+                metadata["requireReviewBeforeCoding"] = True
+                target.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             cmd.append("--no-build")
     else:
         cmd = [
@@ -341,6 +355,7 @@ class RunManager:
         model: str | None = None,
         org_id: str | None = None,
         pr: dict | None = None,
+        may_skip_review: bool = False,
     ) -> AgentRun:
         """Queue a run and return its DB row immediately (status=queued).
 
@@ -396,6 +411,7 @@ class RunManager:
                 user_id=user_id,
                 model=model,
                 pr=pr,
+                may_skip_review=may_skip_review,
             )
         )
         return run
@@ -508,6 +524,7 @@ class RunManager:
         user_id: str,
         model: str | None,
         pr: dict | None = None,
+        may_skip_review: bool = False,
     ) -> None:
         try:
             async with self._get_semaphore():
@@ -533,7 +550,13 @@ class RunManager:
                 approved = _approved_before_build(phase, spec_dir)
                 with tempfile.TemporaryDirectory(prefix="workpilot-run-") as scratch:
                     cmd = build_command(
-                        phase, spec_name, server_path, model, Path(scratch), pr
+                        phase,
+                        spec_name,
+                        server_path,
+                        model,
+                        Path(scratch),
+                        pr,
+                        may_skip_review,
                     )
                     env = await self._build_env(user_id, run_id)
                     # Always set, empty for "every platform": the server's own

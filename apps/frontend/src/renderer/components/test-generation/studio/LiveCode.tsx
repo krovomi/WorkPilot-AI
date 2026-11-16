@@ -19,8 +19,12 @@ interface Tok {
 	c: string;
 }
 
+// `#[...]` is a Rust attribute, not a comment; `--` is a decrement in every
+// language the generator writes, never a comment. A run of punctuation stops
+// before a quote, `[`, `@`, `#` or `/`, so `("a")` keeps its string and
+// `{[Fact]` its attribute; a lone one is punctuation.
 const TOKEN_RE =
-	/(\/\/[^\n]*|#[^\n]*|--[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\[[A-Za-z@][\w.]*\]?|@[A-Za-z_]\w*|#\[[^\]]*\])|([A-Za-z_$]\w*)|(\d[\d._]*)|(\s+)|([^\w\s]+)/g;
+	/(\/\/[^\n]*|#(?!\[)[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\[[A-Za-z@][\w.]*\]?|@[A-Za-z_]\w*|#\[[^\]]*\])|([A-Za-z_$]\w*)|(\d[\d._]*)|(\s+)|([^\w\s"'`[@#/]+|[^\w\s])/g;
 
 export function tokenize(line: string): Tok[] {
 	if (line.length > 2000) return [{ t: line, c: "tg-tok-text" }];
