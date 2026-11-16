@@ -226,7 +226,7 @@ describe("project references", () => {
 });
 
 describe("REST calls", () => {
-	function stubFetch(response: Partial<Response> & { body?: unknown }) {
+	function stubFetch(response: Partial<Omit<Response, "body">> & { body?: unknown }) {
 		const fetchMock = vi.fn(async () => ({
 			ok: true,
 			status: 200,
@@ -285,7 +285,7 @@ describe("REST calls", () => {
 			"Invalid GitLab token",
 		);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
-		expect(fetchMock.mock.calls[0][0]).toBe("https://gitlab.com/api/v4//evil.dev/x");
+		expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("https://gitlab.com/api/v4//evil.dev/x");
 	});
 
 	it("say what GitLab answered on an error", async () => {
