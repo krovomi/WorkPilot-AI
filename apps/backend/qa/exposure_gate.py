@@ -121,15 +121,13 @@ def render_fix_request(report: ExposureReport, spec_dir: Path | None = None) -> 
         )
         for artifact, check in report.blocking
     )
-    if details:
-        lines += [
-            "",
-            "## What REA says about each, as it wrote it",
-            "",
-            quote_untrusted(
-                details, kind="tool_output", source="rea", spec_dir=spec_dir
-            ),
-        ]
+    # Written only for a failing report: each blocking check is a line here.
+    lines += [
+        "",
+        "## What REA says about each, as it wrote it",
+        "",
+        quote_untrusted(details, kind="tool_output", source="rea", spec_dir=spec_dir),
+    ]
     lines += [
         "",
         "Fix the build configuration that produces this output (do not ship",

@@ -44,6 +44,7 @@ import { CopilotUsageContent } from "./usage/CopilotUsageContent";
 import { DefaultUsageContent } from "./usage/DefaultUsageContent";
 import { OpenAIUsageContent } from "./usage/OpenAIUsageContent";
 import { ProfileRenderer } from "./usage/ProfileRenderer";
+import { UsagePlanBadge } from "./usage/UsagePlanBadge";
 import { ReauthContent } from "./usage/ReauthContent";
 import { THRESHOLD_ELEVATED, THRESHOLD_WARNING } from "./usage/usageConstants";
 import { useContextUsage } from "../hooks/useContextUsage";
@@ -1123,8 +1124,8 @@ export function UsageIndicator() {
 
 						{/* Account Info */}
 						<div className="flex-1 min-w-0 text-left">
-							<div className="flex items-center gap-1.5">
-								<span className="text-3xs text-muted-foreground font-medium">
+							<div className="flex items-center gap-1.5 min-w-0">
+								<span className="text-3xs text-muted-foreground font-medium shrink-0">
 									{t("common:usage.activeAccount")}
 								</span>
 								{usage.needsReauthentication && (
@@ -1132,6 +1133,7 @@ export function UsageIndicator() {
 										{t("common:usage.needsReauth")}
 									</span>
 								)}
+								<UsagePlanBadge plan={usage.plan} className="min-w-0" />
 							</div>
 							<div
 								className={`font-medium text-xs truncate ${
@@ -1183,6 +1185,7 @@ export function UsageIndicator() {
 											rateLimitEvents: [],
 										}}
 										isActive={false}
+										plan={profile.plan}
 										onClick={(e) => handleSwapProfile(e, profile)}
 									/>
 								);

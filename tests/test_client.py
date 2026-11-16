@@ -56,13 +56,6 @@ class TestClientTokenValidation:
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
 
-        # Mock decrypt_token to raise ValueError (simulates decryption failure)
-        # This ensures the encrypted token flows through to validate_token_not_encrypted
-        def _raise_decrypt_error(t):
-            raise ValueError("Decryption not supported")
-
-        monkeypatch.setattr("core.auth.decrypt_token", _raise_decrypt_error)
-
         with pytest.raises(ValueError, match="encrypted format"):
             create_client(tmp_path, tmp_path, "claude-sonnet-4", "coder")
 
@@ -75,12 +68,6 @@ class TestClientTokenValidation:
         monkeypatch.setattr(
             "core.auth.get_token_from_keychain", lambda _config_dir=None: None
         )
-
-        # Mock decrypt_token to raise ValueError (simulates decryption failure)
-        def _raise_decrypt_error(t):
-            raise ValueError("Decryption not supported")
-
-        monkeypatch.setattr("core.auth.decrypt_token", _raise_decrypt_error)
 
         with pytest.raises(ValueError, match="encrypted format"):
             create_simple_client(agent_type="merge_resolver")
