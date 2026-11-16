@@ -45,7 +45,6 @@ export interface AutoFixConfig {
 	enabled: boolean;
 	labels: string[];
 	requireHumanApproval: boolean;
-	botToken?: string;
 	model: string;
 	thinkingLevel: string;
 }
@@ -537,7 +536,9 @@ export interface PRReviewFinding {
 		| "test"
 		| "docs"
 		| "pattern"
-		| "performance";
+		| "performance"
+		| "verification_failed"
+		| "redundancy";
 	title: string;
 	description: string;
 	file: string;

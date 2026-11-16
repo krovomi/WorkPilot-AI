@@ -109,6 +109,10 @@ const STATUS_OPTIONS: Array<{
 	},
 ];
 
+const STATUS_OPTION = Object.fromEntries(
+	STATUS_OPTIONS.map((option) => [option.value, option]),
+) as Record<PRStatusFilter, (typeof STATUS_OPTIONS)[number]>;
+
 // Sort options
 const SORT_OPTIONS: Array<{
 	value: PRSortOption;
@@ -142,7 +146,7 @@ function FilterDropdown<T extends string>({
 	readonly items: T[];
 	readonly selected: T[];
 	readonly onChange: (selected: T[]) => void;
-	readonly renderItem?: (item: T) => React.ReactNode;
+	readonly renderItem: (item: T) => React.ReactNode;
 	readonly renderTrigger?: (selected: T[]) => React.ReactNode;
 	readonly searchable?: boolean;
 	readonly searchPlaceholder?: string;
@@ -328,7 +332,9 @@ function FilterDropdown<T extends string>({
 									}}
 									onKeyDown={(e) => {
 										if (e.key === "Enter" || e.key === " ") {
+											// The list would toggle its focused option as well.
 											e.preventDefault();
+											e.stopPropagation();
 											toggleItem(item);
 										}
 									}}
@@ -344,7 +350,7 @@ function FilterDropdown<T extends string>({
 									>
 										<Check className={cn("h-3 w-3")} />
 									</div>
-									{renderItem ? renderItem(item) : item}
+									{renderItem(item)}
 								</div>
 							);
 						})
@@ -374,45 +380,41 @@ function FilterDropdown<T extends string>({
 interface SortDropdownProps {
 	readonly value: PRSortOption;
 	readonly onChange: (value: PRSortOption) => void;
-	readonly options: typeof SORT_OPTIONS;
 	readonly title: string;
 }
 
-function SortDropdown({ value, onChange, options, title }: SortDropdownProps) {
+function SortDropdown({ value, onChange, title }: SortDropdownProps) {
 	const { t } = useTranslation("common");
 	const [isOpen, setIsOpen] = useState(false);
 	const [focusedIndex, setFocusedIndex] = useState(-1);
 
-	const currentOption =
-		options.find((opt) => opt.value === value) || options[0];
+	const currentIndex = SORT_OPTIONS.findIndex((opt) => opt.value === value);
+	const currentOption = SORT_OPTIONS[currentIndex];
 
+	// The menu opens on the current order, so one is always focused.
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
-			if (options.length === 0) return;
-
 			switch (e.key) {
 				case "ArrowDown":
 					e.preventDefault();
-					setFocusedIndex((prev) => (prev < options.length - 1 ? prev + 1 : 0));
+					setFocusedIndex((prev) => (prev < SORT_OPTIONS.length - 1 ? prev + 1 : 0));
 					break;
 				case "ArrowUp":
 					e.preventDefault();
-					setFocusedIndex((prev) => (prev > 0 ? prev - 1 : options.length - 1));
+					setFocusedIndex((prev) => (prev > 0 ? prev - 1 : SORT_OPTIONS.length - 1));
 					break;
 				case "Enter":
 				case " ":
 					e.preventDefault();
-					if (focusedIndex >= 0 && focusedIndex < options.length) {
-						onChange(options[focusedIndex].value);
-						setIsOpen(false);
-					}
+					onChange(SORT_OPTIONS[focusedIndex].value);
+					setIsOpen(false);
 					break;
 				case "Escape":
 					setIsOpen(false);
 					break;
 			}
 		},
-		[options, focusedIndex, onChange],
+		[focusedIndex, onChange],
 	);
 
 	return (
@@ -422,7 +424,7 @@ function SortDropdown({ value, onChange, options, title }: SortDropdownProps) {
 				setIsOpen(open);
 				if (open) {
 					// Focus current selection on open for better keyboard UX
-					setFocusedIndex(options.findIndex((o) => o.value === value));
+					setFocusedIndex(currentIndex);
 				} else {
 					setFocusedIndex(-1);
 				}
@@ -454,7 +456,7 @@ function SortDropdown({ value, onChange, options, title }: SortDropdownProps) {
 					tabIndex={0}
 					onKeyDown={handleKeyDown}
 				>
-					{options.map((option, index) => {
+					{SORT_OPTIONS.map((option, index) => {
 						const isSelected = value === option.value;
 						const isFocused = focusedIndex === index;
 						const Icon = option.icon;
@@ -507,10 +509,6 @@ export function PRFilterBar({
 	onClearFilters,
 }: PRFilterBarProps) {
 	const { t } = useTranslation("common");
-
-	// Get status option by value
-	const getStatusOption = (value: PRStatusFilter) =>
-		STATUS_OPTIONS.find((opt) => opt.value === value);
 
 	return (
 		<div className="px-4 py-2 border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -580,8 +578,7 @@ export function PRFilterBar({
 						noResultsLabel={t("prReview.noResultsFound")}
 						clearLabel={t("prReview.clearFilters")}
 						renderItem={(status) => {
-							const option = getStatusOption(status);
-							if (!option) return null;
+							const option = STATUS_OPTION[status];
 							const Icon = option.icon;
 							return (
 								<div className="flex items-center gap-2">
@@ -594,8 +591,7 @@ export function PRFilterBar({
 						}}
 						renderTrigger={(selected) =>
 							selected.map((status) => {
-								const option = getStatusOption(status);
-								if (!option) return null;
+								const option = STATUS_OPTION[status];
 								const Icon = option.icon;
 								return (
 									<Badge
@@ -623,7 +619,6 @@ export function PRFilterBar({
 					<SortDropdown
 						value={filters.sortBy}
 						onChange={onSortChange}
-						options={SORT_OPTIONS}
 						title={t("prReview.sort.label")}
 					/>
 				</div>
@@ -634,6 +629,7 @@ export function PRFilterBar({
 						variant="ghost"
 						size="sm"
 						onClick={onClearFilters}
+						aria-label={t("prReview.reset")}
 						className="h-8 px-2 lg:px-3 text-muted-foreground hover:text-foreground ml-auto"
 					>
 						<span className="hidden lg:inline mr-2">{t("prReview.reset")}</span>

@@ -25,6 +25,11 @@ import {
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
 import { Switch } from "../ui/switch";
+import { DeployMonitorSettings } from "./DeployMonitorSettings";
+import { DeployWatchPanel, isWatchRunning } from "./DeployWatchPanel";
+
+/** How often the page reads the runs again while a deployment is watched. */
+const WATCH_REFRESH_MS = 30_000;
 const PROVIDERS: Exclude<CICDProvider, "">[] = [
 	"github",
 	"gitlab",
@@ -55,6 +60,8 @@ export function CICDTriggersDashboard(): React.ReactElement {
 		setConfig,
 		loadRuns,
 		triggerPipeline,
+		rollback,
+		rollingBack,
 		clearError,
 	} = useCICDTriggersStore();
 
@@ -68,6 +75,13 @@ export function CICDTriggersDashboard(): React.ReactElement {
 	}, [projectPath, loadConfig, loadRuns]);
 
 	const provider = config?.provider ?? "";
+	const watching = runs.some((run) => isWatchRunning(run.watch));
+
+	useEffect(() => {
+		if (!projectPath || !watching) return;
+		const timer = setInterval(() => loadRuns(projectPath), WATCH_REFRESH_MS);
+		return () => clearInterval(timer);
+	}, [projectPath, watching, loadRuns]);
 
 	function handleTrigger() {
 		if (!projectPath || !provider) return;
@@ -159,6 +173,10 @@ export function CICDTriggersDashboard(): React.ReactElement {
 										/>
 									</label>
 								))}
+								<DeployMonitorSettings
+									config={config}
+									onSave={(update) => projectPath && setConfig(projectPath, update)}
+								/>
 							</Panel>
 						</Column>
 
@@ -214,6 +232,13 @@ export function CICDTriggersDashboard(): React.ReactElement {
 											)}
 											{run.error && (
 												<div className="mt-1 text-xs text-destructive">{run.error}</div>
+											)}
+											{run.watch && (
+												<DeployWatchPanel
+													watch={run.watch}
+													busy={rollingBack === run.id}
+													onRollback={() => projectPath && rollback(projectPath, run.id)}
+												/>
 											)}
 										</Panel>
 									))}

@@ -506,5 +506,11 @@
 		"resumeHint": "Every agent has stopped. Resume each task from its card when you are ready.",
 		"nothing": "No agent was running",
 		"failed": "The agents could not be stopped"
+	},
+	"resize": {
+		"label": "Resize the menu",
+		"hint": "Drag to resize the menu, double-click to restore its default width",
+		"width": "{{width}} pixels wide",
+		"folded": "Folded"
 	}
 }
