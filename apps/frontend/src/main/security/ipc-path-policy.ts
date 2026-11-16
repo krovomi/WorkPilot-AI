@@ -77,8 +77,6 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"git:setRemote": [0],
 	"github:addRemote": [0],
 	"github:detectRepo": [0],
-	"gitlab:addRemote": [0],
-	"gitlab:detectProject": [0],
 	"learningLoop:deletePattern": [0],
 	"learningLoop:getPatterns": [0],
 	"learningLoop:getSummary": [0],

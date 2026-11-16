@@ -94,6 +94,15 @@ Toute autre valeur, un champ en trop ou manquant est refusé (422). L'app de bur
 connexion et l'écrit quand le thème change (`main/server-ui-preferences.ts`), le téléphone de
 même ([mobile-app.md](mobile-app.md#les-thèmes)).
 
+**Le menu qu'elle a arrangé la suit de même** (table `user_menu_layouts`, révision `0015`).
+`GET /users/me/preferences/menu` rend `{"layout": …}` (`null` tant qu'elle n'en a enregistré
+aucun) : l'ordre des espaces et de leurs pages, les pages déplacées vers un autre espace, les
+épingles et les pages masquées, sous les noms des réglages du bureau. `PUT` le remplace. Seuls
+des identifiants du menu (minuscules, chiffres, tirets, 64 caractères au plus) dans des listes
+bornées passent (`MenuLayout`, `server/services/preferences.py`), le reste est refusé (422).
+Le bureau le lit à la connexion, où il remplace le sien, donne le sien à un serveur qui n'en a
+pas, et l'envoie quand la personne réarrange le menu (`main/server-menu-layout.ts`).
+
 ## Ce qu'un run voit sur le disque
 
 Tous les runs de toutes les organisations tournent sous le même utilisateur de l'OS, à côté des
@@ -149,7 +158,10 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
 l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit et enchaîne le build, comme dans
-l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Le serveur ne
+l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Se passer de
+revue revient à approuver, donc demande `review.approve` : une carte créée sans ce droit demande
+une revue, et la phase `spec` n'enchaîne le build que si la personne qui la lance a ce droit
+(`may_skip_review` de `run_manager.build_command`) ; sinon elle s'arrête à la spec. Le serveur ne
 passe jamais `--force` : l'approbation est une décision d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
 attendrait une réponse bloquerait le run sans fin.
 
