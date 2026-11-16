@@ -197,7 +197,7 @@ describe("TaskCard — content", () => {
 			"title",
 			"openai / gpt — Missing test",
 		);
-		expect(screen.getByText(/high/)).toBeInTheDocument();
+		expect(screen.getByText("High severity")).toBeInTheDocument();
 		expect(screen.getByText("Android")).toBeInTheDocument();
 	});
 
