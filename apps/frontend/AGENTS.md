@@ -21,7 +21,7 @@ modules de handlers IPC. Ce fichier donne les points d'entrée.
 | Fichier | Lignes | Voisins / index |
 |---|---|---|
 | `src/main/claude-profile/usage-monitor.ts` | ~4 400 | une seule classe ; tests sur une machine simulée : `__tests__/usage-monitor-world.ts` |
-| `src/main/app-emulator-service.ts` | ~3 250 | — |
+| `src/main/app-emulator-service.ts` | ~3 230 | tests sur de vrais dossiers et de vrais ports : `src/main/__tests__/app-emulator-world.ts` |
 | `src/renderer/components/KanbanBoard.tsx` | ~3 250 | [`kanban/AGENTS.md`](src/renderer/components/kanban/AGENTS.md) ; colonnes dans `kanban/KanbanColumn.tsx` |
 | `src/renderer/stores/task-store.ts` | ~1 850 | — |
 
