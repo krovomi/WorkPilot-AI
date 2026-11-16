@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
 	posts: [] as { endpoint: string; body: { body: string; event: string } }[],
 	refusals: [] as unknown[],
+	answer: undefined as unknown,
 }));
 
 vi.mock("../utils", () => ({
@@ -19,7 +20,7 @@ vi.mock("../utils", () => ({
 		state.posts.push({ endpoint, body });
 		const refusal = state.refusals.shift();
 		if (refusal !== undefined) throw refusal;
-		return { id: 900 + state.posts.length };
+		return state.answer ?? { id: 900 + state.posts.length };
 	},
 }));
 
@@ -44,6 +45,7 @@ const result = (findings: PRReviewFinding[], overallStatus: PRReviewResult["over
 beforeEach(() => {
 	state.posts = [];
 	state.refusals = [];
+	state.answer = undefined;
 });
 
 describe("postReviewToGitHub", () => {
@@ -138,5 +140,14 @@ describe("postReviewToGitHub", () => {
 
 		await expect(postReviewToGitHub(config, 7, result([]))).rejects.toThrow("HTTP 422");
 		expect(state.posts).toHaveLength(1);
+	});
+
+	it("fails when GitHub answers without the review's id, so nothing records a review that is not there", async () => {
+		for (const answer of [{}, { id: "901" }, { id: 0 }, { id: 1.5 }, { id: null }]) {
+			state.answer = answer;
+			await expect(postReviewToGitHub(config, 7, result([]))).rejects.toThrow(
+				"GitHub did not return the review's id",
+			);
+		}
 	});
 });
