@@ -373,9 +373,7 @@ class SwarmOrchestrator:
     def _open_worktrees(self, wave: Wave, nodes: dict[str, SubtaskNode]) -> None:
         """Give each subtask of ``wave`` its worktree, from the task's branch."""
         for subtask_id in wave.subtask_ids:
-            node = nodes.get(subtask_id)
-            if node is None:
-                continue
+            node = nodes[subtask_id]
             worktree = subtask_worktree.create(
                 self.project_dir, self.spec_dir, subtask_id
             )

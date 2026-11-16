@@ -255,6 +255,53 @@ def test_fail_fast_removes_the_worktrees_of_the_stopped_wave(
     assert leftovers(shop["project"]) == ([f"worktree {shop['project']}"], [])
 
 
+def test_a_commit_the_task_s_hooks_refuse_is_not_merged(
+    shop: dict[str, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    project = shop["project"]
+    hook = project / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/bin/sh\necho refused >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    plan(shop, ["a", "b"])
+    steps(shop, a={"write": {"a.py": "a\n"}}, b={"write": {"b.py": "b\n"}})
+    start = git(project, "rev-parse", "HEAD")
+
+    status = asyncio.run(swarm(shop).run())
+
+    # The worktrees share the task's hooks: what they refuse stays out.
+    assert (status.completed_subtasks, status.failed_subtasks) == (0, 2)
+    assert git(project, "rev-parse", "HEAD") == start
+    assert statuses(shop) == {"a": ("pending", None), "b": ("pending", None)}
+    [merged] = [
+        e for e in events(capsys.readouterr().out) if e["type"] == "wave_merged"
+    ]
+    assert (merged["merged"], merged["conflicted"]) == ([], ["a", "b"])
+
+
+def test_a_worktree_that_cannot_be_made_fails_the_swarm(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A checkout with no commit yet: there is no branch to start from.
+    project = tmp_path / "empty"
+    project.mkdir()
+    git(project, "init", "-q", "-b", "main")
+    world = {"project": project, "spec": project / ".workpilot" / "specs" / SPEC}
+    world["spec"].mkdir(parents=True)
+    world["source"] = tmp_path / "backend"
+    world["source"].mkdir()
+    plan(world, ["a", "b"])
+
+    status = asyncio.run(swarm(world).run())
+
+    assert status.phase is SwarmPhase.FAILED
+    assert (status.error or "").startswith("Could not create the worktree of subtask a")
+    [failed] = [
+        e for e in events(capsys.readouterr().out) if e["type"] == "swarm_failed"
+    ]
+    assert failed["error"] == status.error
+    assert git(project, "branch", "--list", "workpilot/*") == ""
+
+
 # -- one worktree ---------------------------------------------------------------
 
 
@@ -287,6 +334,23 @@ def test_the_task_s_env_and_security_files_reach_the_worktree(
     assert (worktree.path / ".workpilot-allowlist").read_text(encoding="utf-8") == (
         "make\n"
     )
+    subtask_worktree.remove(project, worktree.path, worktree.branch)
+
+
+def test_workpilot_s_own_repository_links_its_dependencies(
+    shop: dict[str, Path],
+) -> None:
+    project = shop["project"]
+    (project / "package.json").write_text('{"name": "workpilot-ai"}', encoding="utf-8")
+    (project / "node_modules" / "left-pad").mkdir(parents=True)
+    plan(shop, ["a"])
+
+    worktree = subtask_worktree.create(project, shop["spec"], "a")
+
+    # As for a task's worktree: the main checkout's node_modules, not a copy.
+    linked = worktree.path / "node_modules"
+    assert (linked / "left-pad").is_dir()
+    assert linked.resolve() == (project / "node_modules").resolve()
     subtask_worktree.remove(project, worktree.path, worktree.branch)
 
 

@@ -104,21 +104,16 @@ def create(task_dir: Path, spec_dir: Path, subtask_id: str) -> SubtaskWorktree:
             f"{(result.stderr or result.stdout).strip()}"
         )
 
-    from core.workspace.recipe_run import prepare_worktree
     from core.workspace.workspace_setup import (
         copy_env_files_to_worktree,
-        is_workpilot_repo,
-        symlink_node_modules_to_worktree,
+        prepare_worktree_dependencies,
     )
     from init import ensure_gitignore_entry
 
     # Prepared like the task's own worktree (core.workspace.setup_workspace),
     # with the security files the task's worktree already holds.
     copy_env_files_to_worktree(main, path)
-    if is_workpilot_repo(main):
-        symlink_node_modules_to_worktree(main, path)
-    else:
-        prepare_worktree(main, path, spec_name)
+    prepare_worktree_dependencies(main, path, spec_name)
     for name in (ALLOWLIST_FILENAME, PROFILE_FILENAME):
         if (task_dir / name).is_file():
             shutil.copy2(task_dir / name, path / name)
