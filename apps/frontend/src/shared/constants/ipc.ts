@@ -352,11 +352,6 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
 	AZURE_DEVOPS_HYDRATE_TASK_DISPLAY: "azureDevOps:hydrateTaskDisplay",
 
-	// Azure DevOps PR Review
-	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",
-	AZURE_DEVOPS_PR_GET_REVIEW: "azureDevOps:prGetReview",
-	AZURE_DEVOPS_PR_REVIEW_CANCEL: "azureDevOps:prReviewCancel",
-	AZURE_DEVOPS_PR_POST_COMMENT: "azureDevOps:prPostComment",
 
 	// Jira integration
 	JIRA_GET_ISSUES: "jira:getIssues",
@@ -775,6 +770,10 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
+	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
+	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
+	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",

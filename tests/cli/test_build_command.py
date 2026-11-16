@@ -260,6 +260,9 @@ def test_an_unapproved_spec_is_blocked(build, capsys):
     out = capsys.readouterr().out
     assert "BUILD BLOCKED - REVIEW REQUIRED" in out
     assert "modified since approval" not in out
+    # The way out it gives is a command that exists, for this spec.
+    assert f"spec_runner.py --continue {build.spec.name}" in out
+    assert "review.py" not in out
     assert build.agent is None
 
 
