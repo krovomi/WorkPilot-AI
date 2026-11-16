@@ -41,7 +41,7 @@ def _process(spec_dir: Path, response: str, **kwargs) -> tuple[str, str]:
     with (
         patch.object(reviewer, "audit_event"),
         patch.object(reviewer, "save_session_memory", AsyncMock()),
-        patch.object(reviewer, "_ut_record_qa", None),
+        patch.object(reviewer, "_ut_record_qa", lambda *args, **kwargs: None),
     ):
         return asyncio.run(
             _process_qa_result(spec_dir, spec_dir, 3, response, 5, 5, **kwargs)

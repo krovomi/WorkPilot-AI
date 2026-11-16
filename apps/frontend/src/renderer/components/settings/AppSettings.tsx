@@ -431,11 +431,13 @@ export function AppSettingsDialog(props: AppSettingsDialogProps) {
 			case "debug":
 				return <DebugSettings />;
 			case "sandbox":
-				return <SandboxSettings />;
+				return <SandboxSettings settings={settings} onSettingsChange={setSettings} />;
 			case "guardrails":
 				return <GuardrailsSettings />;
 			case "anomaly-detection":
-				return <AnomalyDetectionSettings />;
+				return (
+					<AnomalyDetectionSettings settings={settings} onSettingsChange={setSettings} />
+				);
 			case "scheduler":
 				return <SchedulerSettings />;
 			case "swarm-mode":

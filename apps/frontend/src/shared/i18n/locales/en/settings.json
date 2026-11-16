@@ -351,101 +351,82 @@
 		},
 		"sandbox": {
 			"title": "Sandbox",
-			"description": "Agent execution isolation & rollback",
-			"defaultMode": {
-				"title": "Default Sandbox Mode",
-				"description": "Choose the default isolation mode for agent execution.",
+			"description": "Snapshots before each agent session, and the limits a session works within",
+			"snapshots": {
+				"title": "Snapshots & rollback",
+				"description": "Before each agent session (planning, coding, QA), the task's worktree is saved as a hidden git commit. It works for every language and stack: ignored files (node_modules, bin, obj, .venv…) are not copied. Restore one from the card of a paused task.",
+				"enable": "Snapshot before each session",
+				"enableHint": "Only in task worktrees; the project's main checkout is never touched.",
+				"autoRollback": "Restore automatically when a session is stopped",
+				"autoRollbackHint": "When the anomaly watch stops a session, or the agent writes outside the sandbox's rules. The replaced state is kept as a snapshot too.",
+				"keep": "Snapshots kept per task",
+				"keepHint": "Older ones are removed."
+			},
+			"mode": {
+				"title": "Write mode",
+				"description": "Inside the project. Writes outside it are always refused.",
 				"normal": {
 					"label": "Normal",
-					"description": "Whitelist + resource limits"
+					"description": "The agent writes anywhere in its worktree."
 				},
 				"restricted": {
 					"label": "Restricted",
-					"description": "Strict whitelist, reduced limits"
-				},
-				"dryRun": {
-					"label": "Dry-run",
-					"description": "Plan only, no file changes"
-				},
-				"docker": {
-					"label": "Docker",
-					"description": "Full container isolation"
+					"description": "Only the paths listed below are writable (the task's own files stay writable)."
 				}
 			},
-			"fileAccess": {
-				"title": "File Access Whitelist",
-				"description": "Paths agents are allowed to access. Sensitive paths (.git/, .env, .ssh/) are always blocked.",
-				"placeholder": "e.g. lib/ or config/app.json",
-				"read": "Read",
-				"write": "Write",
-				"readWrite": "Read/Write",
-				"readOnly": "Read Only",
-				"add": "Add"
+			"paths": {
+				"title": "Writable paths (restricted mode)",
+				"description": "Relative to the project, folders or files. Refused before the write where the provider goes through WorkPilot's hooks; for CLI agents that write with their own tools, the write is detected, the session stopped and the snapshot restored.",
+				"placeholder": "e.g. src/ or tests/unit",
+				"add": "Add",
+				"remove": "Remove {{path}}",
+				"invalid": "A path inside the project, without .. and not absolute.",
+				"emptyRestricted": "Restricted mode with no path: the agent can only write the task's own files."
 			},
-			"resourceLimits": {
-				"title": "Resource Limits",
-				"description": "Maximum resources an agent can consume per execution.",
-				"cpu": "CPU (%)",
-				"ram": "RAM (MB)",
-				"maxTime": "Max Time (s)",
-				"maxFiles": "Max Files",
-				"maxFileSize": "Max File Size (MB)"
+			"limits": {
+				"title": "Limits per session",
+				"description": "Counted for every provider. 0 means no limit.",
+				"none": "no limit",
+				"maxFiles": "Files written",
+				"maxFilesHint": "Distinct files; over it, the task is paused.",
+				"maxFileSize": "Largest file",
+				"maxFileSizeHint": "A larger write is refused (or stops the session).",
+				"maxSession": "Longest session",
+				"maxSessionHint": "Over it, the task is paused."
 			},
-			"snapshots": {
-				"title": "Snapshots & Rollback",
-				"description": "A file snapshot is automatically created before each agent execution. If the agent fails, files are restored automatically.",
-				"warning": "Snapshots are created per-sandbox and stored in memory. Auto-rollback triggers when an agent execution fails or is terminated by the anomaly detector. Manual rollback is available in the task detail view."
-			},
-			"blockedCommands": {
-				"title": "Blocked Commands (default)",
-				"description": "These commands are always blocked inside the sandbox."
-			}
+			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
-			"description": "Agent behavior monitoring & alerts",
+			"description": "The trust score of each agent session, and what pauses or stops it",
 			"enable": {
-				"title": "Enable Anomaly Detection",
-				"description": "Monitor all agent sessions for suspicious behavior"
+				"title": "Enable anomaly detection",
+				"description": "Watch every agent session, whatever the provider"
 			},
 			"trustScore": {
-				"title": "Trust Score Thresholds",
-				"description": "Each agent session starts at 100. Anomalies reduce the score. Actions trigger at these thresholds.",
-				"pauseThreshold": "Pause threshold",
-				"pauseDescription": "Agent is paused and a notification is sent",
-				"terminateThreshold": "Terminate threshold",
-				"terminateDescription": "Agent is terminated immediately"
+				"title": "Trust score thresholds",
+				"description": "Each agent session starts at 100; each anomaly lowers it.",
+				"pauseThreshold": "Pause at or below",
+				"pauseDescription": "The task is paused and a notification is sent; its files stay as they are.",
+				"stopThreshold": "Stop at or below",
+				"stopDescription": "The session is stopped and, if enabled in Sandbox, its files are restored to the snapshot taken before it."
 			},
 			"detectionLimits": {
-				"title": "Detection Limits",
-				"description": "Fine-tune when specific anomaly types trigger.",
-				"massDeletionCount": "Mass deletion count",
-				"massDeletionDesc": "File deletions before alert",
-				"maxRepetitiveErrors": "Max repetitive errors",
-				"maxRepetitiveDesc": "Errors before alert",
-				"rapidChangeWindow": "Rapid change window (s)",
-				"rapidChangeDesc": "Time window for rapid changes",
-				"tokenUsageMultiplier": "Token usage multiplier",
-				"tokenUsageDesc": "× baseline before alert"
+				"title": "Detection limits",
+				"description": "When some anomalies count.",
+				"massDeletionCount": "Mass deletion",
+				"massDeletionDesc": "Files deleted in one session before it counts",
+				"maxRepetitiveErrors": "Repeated errors",
+				"maxRepetitiveDesc": "Failed tool calls in one session before it counts",
+				"rapidChangeWindow": "Rapid changes window (s)",
+				"rapidChangeDesc": "20 writes within this window count as rapid changes"
 			},
 			"anomalyTypes": {
-				"title": "Anomaly Types",
-				"description": "10 anomaly types are monitored. Each reduces the trust score by a fixed amount.",
+				"title": "What lowers the score",
+				"description": "Commands are judged on the programs they run, paths on whole file names: rsync is not nc, .env.example is not .env.",
 				"anomaly": "Anomaly",
 				"severity": "Severity",
-				"scoreImpact": "Score Impact",
-				"types": {
-					"massFileDeletion": "Mass file deletion",
-					"sensitiveFileAccess": "Sensitive file access",
-					"dangerousCommand": "Dangerous command",
-					"unexpectedNetworkAccess": "Unexpected network access",
-					"pathTraversalAttempt": "Path traversal attempt",
-					"rapidFileChanges": "Rapid file changes",
-					"excessiveTokenUsage": "Excessive token usage",
-					"systemConfigModification": "System config modification",
-					"repetitiveErrors": "Repetitive errors",
-					"longRunningSession": "Long running session"
-				},
+				"scoreImpact": "Score",
 				"severityLevels": {
 					"critical": "critical",
 					"high": "high",
@@ -454,8 +435,8 @@
 				}
 			},
 			"sensitivePaths": {
-				"title": "Sensitive Paths (always monitored)",
-				"description": "These paths are always monitored for suspicious activity."
+				"title": "Sensitive paths",
+				"description": "Reading or writing one of these lowers the score, once per file."
 			}
 		}
 	},
