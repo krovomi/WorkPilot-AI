@@ -1,124 +1,107 @@
-import {
-	AlertTriangle,
-	FolderOpen,
-	Lock,
-	Plus,
-	RotateCcw,
-	Shield,
-	Trash2,
-} from "lucide-react";
+import { FolderOpen, Info, Lock, Plus, RotateCcw, Shield, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { SandboxMode } from "../../../shared/types";
+import { MAX_ALLOWED_PATHS, normalizeAllowedPath } from "../../../shared/utils/agent-safety";
 import { cn } from "@/lib/utils";
+import { Input } from "../ui/input";
+import {
+	type AgentSafetyPageProps,
+	RangeRow,
+	SwitchRow,
+	useAgentSafety,
+} from "./agent-safety-controls";
 import { SettingsSection } from "./SettingsSection";
 
-import { Input } from "../ui/input";
-import { NativeSelect } from "../ui/native-select";
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const K = "sections.sandbox";
 
-type SandboxMode = "normal" | "restricted" | "dry_run" | "docker";
-
-interface PathRule {
-	path: string;
-	access: "read" | "write";
-}
-
-interface ResourceLimits {
-	cpu_percent: number;
-	memory_mb: number;
-	execution_time_s: number;
-	max_files_written: number;
-	max_file_size_mb: number;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export function SandboxSettings() {
+/**
+ * Settings, Sandbox: the snapshot taken before each agent session and the
+ * limits a session works within. Saved with the other settings and sent to
+ * every agent process (`main/agent/agent-safety-env.ts`); applied by
+ * `apps/backend/security/sandbox.py` and `agents/safety_watch.py`.
+ */
+export function SandboxSettings(props: AgentSafetyPageProps) {
 	const { t } = useTranslation("settings");
-
-	const [mode, setMode] = useState<SandboxMode>("normal");
-	const [allowedPaths, setAllowedPaths] = useState<PathRule[]>([
-		{ path: "src/", access: "write" },
-		{ path: "tests/", access: "write" },
-	]);
+	const { safety, update } = useAgentSafety(props);
+	const { snapshots, sandbox } = safety;
 	const [newPath, setNewPath] = useState("");
-	const [newAccess, setNewAccess] = useState<"read" | "write">("write");
-	const [limits, setLimits] = useState<ResourceLimits>({
-		cpu_percent: 80,
-		memory_mb: 2048,
-		execution_time_s: 300,
-		max_files_written: 100,
-		max_file_size_mb: 10,
-	});
+	const candidate = normalizeAllowedPath(newPath);
+	const canAdd =
+		candidate !== null &&
+		!sandbox.allowedPaths.includes(candidate) &&
+		sandbox.allowedPaths.length < MAX_ALLOWED_PATHS;
 
-	const handleAddPath = () => {
-		if (!newPath.trim()) return;
-		setAllowedPaths((prev) => [
-			...prev,
-			{ path: newPath.trim(), access: newAccess },
-		]);
+	const addPath = () => {
+		if (!canAdd || candidate === null) return;
+		update("sandbox", { allowedPaths: [...sandbox.allowedPaths, candidate] });
 		setNewPath("");
 	};
-
-	const handleRemovePath = (index: number) => {
-		setAllowedPaths((prev) => prev.filter((_, i) => i !== index));
-	};
-
-	const handleLimitChange = (key: keyof ResourceLimits, value: number) => {
-		setLimits((prev) => ({ ...prev, [key]: value }));
-	};
+	const noLimit = (value: number, unit = "") =>
+		value === 0 ? t(`${K}.limits.none`) : `${value}${unit}`;
 
 	const modes: { id: SandboxMode; label: string; desc: string }[] = [
-		{
-			id: "normal",
-			label: t("sections.sandbox.defaultMode.normal.label"),
-			desc: t("sections.sandbox.defaultMode.normal.description"),
-		},
+		{ id: "normal", label: t(`${K}.mode.normal.label`), desc: t(`${K}.mode.normal.description`) },
 		{
 			id: "restricted",
-			label: t("sections.sandbox.defaultMode.restricted.label"),
-			desc: t("sections.sandbox.defaultMode.restricted.description"),
-		},
-		{
-			id: "dry_run",
-			label: t("sections.sandbox.defaultMode.dryRun.label"),
-			desc: t("sections.sandbox.defaultMode.dryRun.description"),
-		},
-		{
-			id: "docker",
-			label: t("sections.sandbox.defaultMode.docker.label"),
-			desc: t("sections.sandbox.defaultMode.docker.description"),
+			label: t(`${K}.mode.restricted.label`),
+			desc: t(`${K}.mode.restricted.description`),
 		},
 	];
 
 	return (
-		<SettingsSection
-			title={t("sections.sandbox.title")}
-			description={t("sections.sandbox.description")}
-		>
+		<SettingsSection title={t(`${K}.title`)} description={t(`${K}.description`)}>
 			<div className="space-y-8">
-				{/* Sandbox Mode */}
+				<div className="space-y-3">
+					<h4 className="text-sm font-semibold flex items-center gap-2">
+						<RotateCcw className="h-4 w-4 text-primary" />
+						{t(`${K}.snapshots.title`)}
+					</h4>
+					<p className="text-xs text-muted-foreground">{t(`${K}.snapshots.description`)}</p>
+					<SwitchRow
+						id="sandbox-snapshots"
+						icon={<RotateCcw className="h-5 w-5 text-primary" />}
+						title={t(`${K}.snapshots.enable`)}
+						description={t(`${K}.snapshots.enableHint`)}
+						checked={snapshots.enabled}
+						onChange={(enabled) => update("snapshots", { enabled })}
+					/>
+					<SwitchRow
+						id="sandbox-auto-rollback"
+						icon={<Shield className="h-5 w-5 text-primary" />}
+						title={t(`${K}.snapshots.autoRollback`)}
+						description={t(`${K}.snapshots.autoRollbackHint`)}
+						checked={snapshots.autoRollback}
+						onChange={(autoRollback) => update("snapshots", { autoRollback })}
+					/>
+					<RangeRow
+						id="sandbox-snapshots-keep"
+						label={t(`${K}.snapshots.keep`)}
+						hint={t(`${K}.snapshots.keepHint`)}
+						value={snapshots.keep}
+						min={1}
+						max={50}
+						step={1}
+						onChange={(keep) => update("snapshots", { keep })}
+					/>
+				</div>
+
 				<div>
 					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
 						<Shield className="h-4 w-4 text-primary" />
-						{t("sections.sandbox.defaultMode.title")}
+						{t(`${K}.mode.title`)}
 					</h4>
-					<p className="text-xs text-muted-foreground mb-3">
-						{t("sections.sandbox.defaultMode.description")}
-					</p>
+					<p className="text-xs text-muted-foreground mb-3">{t(`${K}.mode.description`)}</p>
 					<div className="grid grid-cols-2 gap-3">
 						{modes.map((m) => (
 							<button
 								type="button"
 								key={m.id}
-								onClick={() => setMode(m.id)}
+								onClick={() => update("sandbox", { mode: m.id })}
+								aria-pressed={sandbox.mode === m.id}
 								className={cn(
 									"flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
-									mode === m.id
+									sandbox.mode === m.id
 										? "border-primary bg-primary/5 ring-1 ring-primary"
 										: "border-border hover:bg-accent/50",
 								)}
@@ -130,203 +113,109 @@ export function SandboxSettings() {
 					</div>
 				</div>
 
-				{/* File Access Whitelist */}
 				<div>
 					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
 						<FolderOpen className="h-4 w-4 text-primary" />
-						{t("sections.sandbox.fileAccess.title")}
+						{t(`${K}.paths.title`)}
 					</h4>
-					<p className="text-xs text-muted-foreground mb-3">
-						{t("sections.sandbox.fileAccess.description")}
-					</p>
+					<p className="text-xs text-muted-foreground mb-3">{t(`${K}.paths.description`)}</p>
 					<div className="space-y-2">
-						{allowedPaths.map((rule, i) => (
+						{sandbox.allowedPaths.map((entry) => (
 							<div
-								key={`${rule.path}-${rule.access}`}
+								key={entry}
 								className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
 							>
 								<FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-								<span className="flex-1 font-mono text-xs">{rule.path}</span>
-								<span
-									className={cn(
-										"rounded-full px-2 py-0.5 text-3xs font-medium",
-										rule.access === "write"
-											? "bg-warning/15 text-warning"
-											: "bg-info/15 text-info",
-									)}
-								>
-									{rule.access === "write"
-										? t("sections.sandbox.fileAccess.readWrite")
-										: t("sections.sandbox.fileAccess.readOnly")}
-								</span>
+								<code className="flex-1 font-mono text-xs">{entry}</code>
 								<button
 									type="button"
-									onClick={() => handleRemovePath(i)}
+									onClick={() =>
+										update("sandbox", {
+											allowedPaths: sandbox.allowedPaths.filter((p) => p !== entry),
+										})
+									}
+									aria-label={t(`${K}.paths.remove`, { path: entry })}
 									className="text-muted-foreground hover:text-destructive"
 								>
 									<Trash2 className="h-3.5 w-3.5" />
 								</button>
 							</div>
 						))}
+						{sandbox.mode === "restricted" && sandbox.allowedPaths.length === 0 && (
+							<p className="text-xs text-warning">{t(`${K}.paths.emptyRestricted`)}</p>
+						)}
 						<div className="flex items-center gap-2">
 							<Input
 								value={newPath}
 								onChange={(e) => setNewPath(e.target.value)}
-								onKeyDown={(e) => e.key === "Enter" && handleAddPath()}
-								placeholder={t("sections.sandbox.fileAccess.placeholder")}
+								onKeyDown={(e) => e.key === "Enter" && addPath()}
+								placeholder={t(`${K}.paths.placeholder`)}
+								aria-label={t(`${K}.paths.placeholder`)}
 								className="flex-1 px-3 py-1.5 text-sm h-auto"
 							/>
-							<NativeSelect
-								value={newAccess}
-								onChange={(e) =>
-									setNewAccess(e.target.value as "read" | "write")
-								}
-								className="px-2 py-1.5 text-sm h-auto"
-							>
-								<option value="read">
-									{t("sections.sandbox.fileAccess.read")}
-								</option>
-								<option value="write">
-									{t("sections.sandbox.fileAccess.write")}
-								</option>
-							</NativeSelect>
 							<button
 								type="button"
-								onClick={handleAddPath}
-								disabled={!newPath.trim()}
+								onClick={addPath}
+								disabled={!canAdd}
 								className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
 							>
 								<Plus className="h-3.5 w-3.5" />
-								{t("sections.sandbox.fileAccess.add")}
+								{t(`${K}.paths.add`)}
 							</button>
 						</div>
+						{newPath.trim() !== "" && candidate === null && (
+							<p className="text-xs text-destructive">{t(`${K}.paths.invalid`)}</p>
+						)}
 					</div>
 				</div>
 
-				{/* Resource Limits */}
 				<div>
 					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
 						<Lock className="h-4 w-4 text-primary" />
-						{t("sections.sandbox.resourceLimits.title")}
+						{t(`${K}.limits.title`)}
 					</h4>
-					<p className="text-xs text-muted-foreground mb-3">
-						{t("sections.sandbox.resourceLimits.description")}
-					</p>
+					<p className="text-xs text-muted-foreground mb-3">{t(`${K}.limits.description`)}</p>
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						{[
-							{
-								key: "cpu_percent" as const,
-								label: t("sections.sandbox.resourceLimits.cpu"),
-								min: 10,
-								max: 100,
-								step: 5,
-							},
-							{
-								key: "memory_mb" as const,
-								label: t("sections.sandbox.resourceLimits.ram"),
-								min: 256,
-								max: 8192,
-								step: 256,
-							},
-							{
-								key: "execution_time_s" as const,
-								label: t("sections.sandbox.resourceLimits.maxTime"),
-								min: 30,
-								max: 3600,
-								step: 30,
-							},
-							{
-								key: "max_files_written" as const,
-								label: t("sections.sandbox.resourceLimits.maxFiles"),
-								min: 1,
-								max: 500,
-								step: 10,
-							},
-							{
-								key: "max_file_size_mb" as const,
-								label: t("sections.sandbox.resourceLimits.maxFileSize"),
-								min: 1,
-								max: 100,
-								step: 1,
-							},
-						].map(({ key, label, min, max, step }) => (
-							<div key={key} className="space-y-1">
-								<div className="flex items-center justify-between">
-									<label
-										htmlFor={`sandbox-limit-${key}`}
-										className="text-xs font-medium text-muted-foreground"
-									>
-										{label}
-									</label>
-									<span className="text-xs font-mono tabular-nums text-foreground">
-										{limits[key]}
-									</span>
-								</div>
-								<input
-									id={`sandbox-limit-${key}`}
-									type="range"
-									min={min}
-									max={max}
-									step={step}
-									value={limits[key]}
-									onChange={(e) =>
-										handleLimitChange(key, Number(e.target.value))
-									}
-									className="w-full accent-primary"
-								/>
-							</div>
-						))}
+						<RangeRow
+							id="sandbox-max-files"
+							label={t(`${K}.limits.maxFiles`)}
+							hint={t(`${K}.limits.maxFilesHint`)}
+							value={sandbox.maxFilesWritten}
+							display={noLimit(sandbox.maxFilesWritten)}
+							min={0}
+							max={1000}
+							step={10}
+							onChange={(maxFilesWritten) => update("sandbox", { maxFilesWritten })}
+						/>
+						<RangeRow
+							id="sandbox-max-file-size"
+							label={t(`${K}.limits.maxFileSize`)}
+							hint={t(`${K}.limits.maxFileSizeHint`)}
+							value={sandbox.maxFileSizeMb}
+							display={noLimit(sandbox.maxFileSizeMb, " MB")}
+							min={0}
+							max={100}
+							step={1}
+							onChange={(maxFileSizeMb) => update("sandbox", { maxFileSizeMb })}
+						/>
+						<RangeRow
+							id="sandbox-max-session"
+							label={t(`${K}.limits.maxSession`)}
+							hint={t(`${K}.limits.maxSessionHint`)}
+							value={sandbox.maxSessionMinutes}
+							display={noLimit(sandbox.maxSessionMinutes, " min")}
+							min={0}
+							max={240}
+							step={10}
+							onChange={(maxSessionMinutes) => update("sandbox", { maxSessionMinutes })}
+						/>
 					</div>
 				</div>
 
-				{/* Snapshots & Rollback */}
-				<div>
-					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
-						<RotateCcw className="h-4 w-4 text-primary" />
-						{t("sections.sandbox.snapshots.title")}
-					</h4>
-					<p className="text-xs text-muted-foreground mb-3">
-						{t("sections.sandbox.snapshots.description")}
-					</p>
-					<div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-						<div className="flex items-start gap-2">
-							<AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-							<span>{t("sections.sandbox.snapshots.warning")}</span>
-						</div>
-					</div>
-				</div>
-
-				{/* Blocked Commands */}
-				<div>
-					<h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
-						<Shield className="h-4 w-4 text-destructive" />
-						{t("sections.sandbox.blockedCommands.title")}
-					</h4>
-					<p className="text-xs text-muted-foreground mb-3">
-						{t("sections.sandbox.blockedCommands.description")}
-					</p>
-					<div className="flex flex-wrap gap-1.5">
-						{[
-							"rm -rf",
-							"sudo",
-							"curl",
-							"wget",
-							"ssh",
-							"scp",
-							"eval",
-							"exec",
-							"chmod 777",
-							"mkfs",
-							"dd",
-							"nc",
-						].map((cmd) => (
-							<span
-								key={cmd}
-								className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-mono text-destructive"
-							>
-								{cmd}
-							</span>
-						))}
+				<div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+					<div className="flex items-start gap-2">
+						<Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+						<span>{t(`${K}.always`)}</span>
 					</div>
 				</div>
 			</div>

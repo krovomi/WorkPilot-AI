@@ -45,7 +45,6 @@ export interface AutoFixConfig {
 	enabled: boolean;
 	labels: string[];
 	requireHumanApproval: boolean;
-	botToken?: string;
 	model: string;
 	thinkingLevel: string;
 }

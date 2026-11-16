@@ -1,67 +1,24 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import type { GitHubIssue } from "../../../../shared/types";
 import {
 	investigateGitHubIssue,
 	useInvestigationStore,
-	useIssuesStore,
 } from "../../../stores/github";
-import { loadTasks } from "../../../stores/task-store";
 
+/**
+ * The investigation shown on the issues page. Its events are followed by
+ * setupGitHubInvestigationListeners for the life of the window, not here.
+ */
 export function useGitHubInvestigation(projectId: string | undefined) {
-	const {
-		investigationStatus,
-		lastInvestigationResult,
-		setInvestigationStatus,
-		setInvestigationResult,
-	} = useInvestigationStore();
-
-	const { setError } = useIssuesStore();
-
-	// Set up event listeners for investigation progress
-	useEffect(() => {
-		if (!projectId) return;
-
-		const cleanupProgress = window.electronAPI.onGitHubInvestigationProgress(
-			(eventProjectId, status) => {
-				if (eventProjectId === projectId) {
-					setInvestigationStatus(status);
-				}
-			},
-		);
-
-		const cleanupComplete = window.electronAPI.onGitHubInvestigationComplete(
-			(eventProjectId, result) => {
-				if (eventProjectId === projectId) {
-					setInvestigationResult(result);
-					// Refresh the task store so the new task appears on the Kanban board
-					if (result.success && result.taskId) {
-						loadTasks(projectId);
-					}
-				}
-			},
-		);
-
-		const cleanupError = window.electronAPI.onGitHubInvestigationError(
-			(eventProjectId, error) => {
-				if (eventProjectId === projectId) {
-					setError(error);
-					// `error` is what the dialog's red box shows.
-					setInvestigationStatus({
-						phase: "error",
-						progress: 0,
-						message: error,
-						error,
-					});
-				}
-			},
-		);
-
-		return () => {
-			cleanupProgress();
-			cleanupComplete();
-			cleanupError();
-		};
-	}, [projectId, setInvestigationStatus, setInvestigationResult, setError]);
+	const investigationStatus = useInvestigationStore(
+		(state) => state.investigationStatus,
+	);
+	const lastInvestigationResult = useInvestigationStore(
+		(state) => state.lastInvestigationResult,
+	);
+	const setInvestigationStatus = useInvestigationStore(
+		(state) => state.setInvestigationStatus,
+	);
 
 	const startInvestigation = useCallback(
 		(issue: GitHubIssue, selectedCommentIds: number[]) => {
