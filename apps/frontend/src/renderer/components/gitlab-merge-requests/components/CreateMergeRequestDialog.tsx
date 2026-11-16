@@ -1,5 +1,5 @@
 import { GitPullRequest, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "../../ui/button";
 import {
 	Dialog,
@@ -38,10 +38,12 @@ export function CreateMergeRequestDialog({
 	const [targetBranch, setTargetBranch] = useState(defaultTargetBranch);
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// Ids of its own: "title" and "description" are taken by other views.
+	const ids = `create-mr-${useId()}`;
 
 	const handleCreate = async () => {
 		if (!title.trim() || !sourceBranch.trim() || !targetBranch.trim()) {
-			setError("Title, source branch, and target branch are required");
+			setError(t("gitlab:mergeRequests.create.required"));
 			return;
 		}
 
@@ -68,11 +70,13 @@ export function CreateMergeRequestDialog({
 				setSourceBranch(defaultSourceBranch);
 				setTargetBranch(defaultTargetBranch);
 			} else {
-				setError(result.error || "Failed to create merge request");
+				setError(result.error || t("gitlab:mergeRequests.create.failed"));
 			}
 		} catch (err) {
 			setError(
-				err instanceof Error ? err.message : "Failed to create merge request",
+				err instanceof Error
+					? err.message
+					: t("gitlab:mergeRequests.create.failed"),
 			);
 		} finally {
 			setIsCreating(false);
@@ -94,9 +98,9 @@ export function CreateMergeRequestDialog({
 
 				<div className="space-y-4 py-4">
 					<div className="space-y-2">
-						<Label htmlFor="title">{t("gitlab:mergeRequests.create.titleLabel")}</Label>
+						<Label htmlFor={`${ids}-title`}>{t("gitlab:mergeRequests.create.titleLabel")}</Label>
 						<Input
-							id="title"
+							id={`${ids}-title`}
 							placeholder={t("gitlab:mergeRequests.create.titlePlaceholder")}
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
@@ -105,18 +109,18 @@ export function CreateMergeRequestDialog({
 
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">
-							<Label htmlFor="source">{t("gitlab:mergeRequests.create.sourceBranch")}</Label>
+							<Label htmlFor={`${ids}-source`}>{t("gitlab:mergeRequests.create.sourceBranch")}</Label>
 							<Input
-								id="source"
+								id={`${ids}-source`}
 								placeholder="feature/my-feature"
 								value={sourceBranch}
 								onChange={(e) => setSourceBranch(e.target.value)}
 							/>
 						</div>
 						<div className="space-y-2">
-							<Label htmlFor="target">{t("gitlab:mergeRequests.create.targetBranch")}</Label>
+							<Label htmlFor={`${ids}-target`}>{t("gitlab:mergeRequests.create.targetBranch")}</Label>
 							<Input
-								id="target"
+								id={`${ids}-target`}
 								placeholder="main"
 								value={targetBranch}
 								onChange={(e) => setTargetBranch(e.target.value)}
@@ -125,9 +129,9 @@ export function CreateMergeRequestDialog({
 					</div>
 
 					<div className="space-y-2">
-						<Label htmlFor="description">{t("gitlab:mergeRequests.create.descriptionLabel")}</Label>
+						<Label htmlFor={`${ids}-description`}>{t("gitlab:mergeRequests.create.descriptionLabel")}</Label>
 						<Textarea
-							id="description"
+							id={`${ids}-description`}
 							placeholder={t("gitlab:mergeRequests.create.descriptionPlaceholder")}
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}

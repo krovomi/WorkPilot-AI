@@ -20,7 +20,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .types import SubtaskNode, SubtaskState, SwarmConfig, Wave
 
@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 # Marker for swarm-specific events emitted to stdout
 SWARM_EVENT_PREFIX = "__SWARM_EVENT__:"
+
+# Bytes read from a subtask's pipe at a time.
+_READ_CHUNK = 64 * 1024
 
 
 @dataclass
@@ -58,6 +61,22 @@ def emit_swarm_event(event_type: str, payload: dict[str, Any] | None = None) -> 
         print(f"{SWARM_EVENT_PREFIX}{json.dumps(event, default=str)}", flush=True)
     except (OSError, UnicodeEncodeError):
         pass
+
+
+async def _read_lines(stream: asyncio.StreamReader):
+    """Yield the lines of ``stream``, however long each one is.
+
+    ``StreamReader``'s own line iteration raises once a line outgrows its
+    64KB buffer, which a subtask's JSON event or minified output can do.
+    """
+    pending = b""
+    while chunk := await stream.read(_READ_CHUNK):
+        pending += chunk
+        *lines, pending = pending.split(b"\n")
+        for line in lines:
+            yield line
+    if pending:
+        yield pending
 
 
 class WaveExecutor:
@@ -147,7 +166,7 @@ class WaveExecutor:
 
         # Collect results — pair each result with its scheduled subtask_id so
         # retry logic in `_retry_failed_subtasks` can locate the failed node
-        # via `nodes.get(sr.subtask_id)` instead of silently dropping.
+        # via `nodes[sr.subtask_id]` instead of silently dropping.
         wave_result = WaveResult(wave_index=wave.index)
         for subtask_id, result in zip(scheduled_ids, results, strict=True):
             if isinstance(result, Exception):
@@ -298,20 +317,22 @@ class WaveExecutor:
             # than the OS pipe buffer (~64KB on Linux) to stderr — the kernel
             # blocks the write, the child can't progress, stdout never closes,
             # we wait forever. Spawn a background task that consumes stderr
-            # in parallel.
+            # in parallel, in chunks: a traceback or a progress bar has no
+            # line end to wait for.
             stderr_chunks: list[bytes] = []
 
+            # Both are pipes: create_subprocess_exec was given PIPE for each.
+            stdout = cast(asyncio.StreamReader, process.stdout)
+            stderr = cast(asyncio.StreamReader, process.stderr)
+
             async def _drain_stderr() -> None:
-                if process.stderr is None:
-                    return
-                async for line in process.stderr:
-                    stderr_chunks.append(line)
+                while chunk := await stderr.read(_READ_CHUNK):
+                    stderr_chunks.append(chunk)
 
             stderr_task = asyncio.create_task(_drain_stderr())
 
-            # Stream stdout
-            if process.stdout:
-                async for line_bytes in process.stdout:
+            async def _stream_until_exit() -> None:
+                async for line_bytes in _read_lines(stdout):
                     line = line_bytes.decode("utf-8", errors="replace").rstrip()
                     if on_log:
                         on_log(subtask_id, line)
@@ -324,11 +345,14 @@ class WaveExecutor:
                                 "line": line,
                             },
                         )
+                await process.wait()
 
-            # Bound the wait so a wedged child cannot stall the entire swarm.
+            # The timeout bounds the whole run, output included: a wedged
+            # child keeps its stdout open, so waiting for the end of the
+            # output first would wait for it forever.
             try:
                 await asyncio.wait_for(
-                    process.wait(), timeout=self.config.subtask_timeout_seconds
+                    _stream_until_exit(), timeout=self.config.subtask_timeout_seconds
                 )
             except TimeoutError:
                 process.kill()

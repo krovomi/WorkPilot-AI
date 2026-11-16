@@ -35,6 +35,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerDeviceMatrixHandlers } from "./device-matrix-handlers";
 import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
@@ -135,6 +136,7 @@ import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
+import { registerSmartEstimationCalibrationHandlers } from "./smart-estimation-calibration-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
 import { registerOnboardingAgentHandlers } from "./onboarding-agent-handlers";
 import { registerSandboxHandlers } from "./sandbox-handlers";
@@ -441,6 +443,7 @@ export function setupIpcHandlers(
 
 	// Smart Estimation handlers
 	setupSmartEstimationHandlers();
+	registerSmartEstimationCalibrationHandlers();
 
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
@@ -456,6 +459,8 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	// Device matrix: presets rendered and captured by the main (#383)
+	registerDeviceMatrixHandlers();
 	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
