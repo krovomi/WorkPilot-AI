@@ -10,6 +10,7 @@ import {
 	stepStates,
 } from "../../../lib/design-import-steps";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
+import { percent } from "./IterationPanel";
 
 const ACCENT: Record<DesignStep, string> = {
 	vision: "var(--di-vision)",
@@ -102,6 +103,8 @@ export function PipelineGraph() {
 	const generateTests = useDesignToCodeStore((s) => s.generateTests);
 	const setUseDesignTokens = useDesignToCodeStore((s) => s.setUseDesignTokens);
 	const setGenerateTests = useDesignToCodeStore((s) => s.setGenerateTests);
+	const renderLoop = useDesignToCodeStore((s) => s.renderLoop);
+	const setRenderLoop = useDesignToCodeStore((s) => s.setRenderLoop);
 	const selectedStep = useDesignToCodeStore((s) => s.selectedStep);
 	const selectStep = useDesignToCodeStore((s) => s.selectStep);
 	const live = useDesignToCodeStore((s) => s.live);
@@ -143,6 +146,19 @@ export function PipelineGraph() {
 					? t("pipeline.meta.specDone", { count: specCount })
 					: t("pipeline.meta.spec");
 			case "code": {
+				const loop = result?.render_loop;
+				if (state === "running" && live.loop) {
+					return t("pipeline.meta.codeLoop", {
+						iteration: live.loop.iteration,
+						max: live.loop.max_iterations,
+					});
+				}
+				if (state === "done" && loop && loop.status !== "skipped") {
+					return t("pipeline.meta.codeLoopDone", {
+						score: percent(loop.iterations[loop.best_iteration]?.score),
+						count: Math.max(0, loop.iterations.length - 1),
+					});
+				}
 				const n = result?.generated_files.length ?? (live.files.length || undefined);
 				return n !== undefined && state === "done"
 					? t("pipeline.meta.codeDone", { count: n })
@@ -243,9 +259,11 @@ export function PipelineGraph() {
 					const toggle =
 						s === "tokens"
 							? { on: useDesignTokens, set: setUseDesignTokens }
-							: s === "tests" && testsSupported
-								? { on: generateTests, set: setGenerateTests }
-								: null;
+							: s === "code"
+								? { on: renderLoop, set: setRenderLoop }
+								: s === "tests" && testsSupported
+									? { on: generateTests, set: setGenerateTests }
+									: null;
 					return (
 						<div
 							key={s}

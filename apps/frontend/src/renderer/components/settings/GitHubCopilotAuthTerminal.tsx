@@ -52,6 +52,9 @@ export function GitHubCopilotAuthTerminal({
 	const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track setTimeout for cleanup
 	const successTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track success auto-close timeout for cleanup
 	const authCompletedRef = useRef(false); // Track if auth has already completed to prevent race conditions
+	// Closed before the terminal was created: the terminal created afterwards is
+	// destroyed at once instead of being left running.
+	const unmountedRef = useRef(false);
 
 	const [status, setStatus] = useState<
 		"connecting" | "ready" | "authenticating" | "success" | "error"
@@ -168,6 +171,10 @@ export function GitHubCopilotAuthTerminal({
 					return;
 				}
 
+				if (unmountedRef.current) {
+					window.electronAPI.destroyTerminal(terminalId).catch(console.error);
+					return;
+				}
 				isCreatedRef.current = true;
 				setStatus("ready");
 
@@ -275,7 +282,10 @@ export function GitHubCopilotAuthTerminal({
 				debugLog("Terminal output received:", data);
 
 				// Check for authentication success indicators
+				// `gh auth login` ends on "Logged in as <user>"; `gh auth status`
+				// says "Logged in to github.com account <user>".
 				if (
+					data.includes("Logged in as") ||
 					data.includes("Logged in to") ||
 					data.includes("Authentication complete") ||
 					data.includes("Authentication successful")
@@ -284,10 +294,8 @@ export function GitHubCopilotAuthTerminal({
 						authCompletedRef.current = true;
 						debugLog("Authentication success detected", { terminalId });
 
-						// Extract username if available
-						const usernameMatch =
-							data.match(/as\s+(\S+)/) || data.match(/(\S+)@github\.com/);
-						const username = usernameMatch ? usernameMatch[1] : undefined;
+						// "Logged in as octocat" or "Logged in to github.com account octocat"
+						const username = /\b(?:as|account)\s+([\w-]+)/.exec(data)?.[1];
 						setAuthUsername(username);
 
 						setStatus("success");
@@ -306,30 +314,30 @@ export function GitHubCopilotAuthTerminal({
 					}
 				}
 
-				// Check for authentication failure indicators
+				// Check for authentication failure indicators. A failure does not end
+				// the session: the person can run the login again in this terminal.
 				if (
 					data.includes("Authentication failed") ||
 					data.includes("Error:") ||
 					data.includes("Failed to authenticate")
 				) {
 					if (!authCompletedRef.current) {
-						authCompletedRef.current = true;
 						debugLog("Authentication failure detected", { terminalId });
 						setStatus("error");
-						const errorMsg = data.includes("Error:")
-							? data.split("Error:")[1]?.trim()
-							: t("githubCopilot.authTerminal.authFailed");
+						const errorMsg =
+							data.split("Error:")[1]?.trim() ||
+							t("githubCopilot.authTerminal.authFailed");
 						setErrorMessage(errorMsg);
 						onAuthError?.(errorMsg);
 					}
 				}
 
-				// Update status when authentication process starts
+				// Update status when authentication process starts (again)
 				if (
 					data.includes("gh auth login") ||
 					data.includes("What is your preferred protocol")
 				) {
-					if (statusRef.current === "ready") {
+					if (statusRef.current === "ready" || statusRef.current === "error") {
 						setStatus("authenticating");
 					}
 				}
@@ -438,7 +446,9 @@ export function GitHubCopilotAuthTerminal({
 
 	// Cleanup terminal on unmount
 	useEffect(() => {
+		unmountedRef.current = false;
 		return () => {
+			unmountedRef.current = true;
 			debugLog("Component unmounting", {
 				terminalId,
 				isCreated: isCreatedRef.current,
@@ -513,6 +523,7 @@ export function GitHubCopilotAuthTerminal({
 					variant="ghost"
 					size="icon"
 					onClick={handleClose}
+					aria-label={t("buttons.close")}
 					className="h-6 w-6"
 				>
 					<X className="h-4 w-4" />
