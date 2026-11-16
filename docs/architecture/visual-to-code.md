@@ -241,7 +241,9 @@ raison, pas ignoré en silence.
 client SDK de l'agent `commit_message` (sans outil) reçoit l'image comme bloc
 de contenu. Un agent qui lirait l'image avec l'outil `Read` pourrait suivre un
 texte injecté dans la maquette ; sans outil, ce texte reste une donnée. Sans
-aucun modèle, le résultat porte `simulated: true` et la page l'annonce.
+aucun modèle ni fournisseur choisi, le résultat porte `simulated: true` et la
+page l'annonce ; un fournisseur choisi mais non configuré est une erreur qui le
+nomme, jamais la clé d'un autre fournisseur.
 
 **Toutes les stacks, pas seulement React.** La cible se choisit dans le
 composer, et la stack détectée est proposée sans écraser un choix déjà fait.
