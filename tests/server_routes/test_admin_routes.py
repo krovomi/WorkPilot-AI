@@ -20,6 +20,25 @@ async def audit_actions(world) -> list[str]:
     return [row["action"] for row in await world.ok("admin_a", "GET", "/admin/audit")]
 
 
+async def also_in(world, who: str, side: str, role: str = "contributor") -> None:
+    """Make ``who`` a member of the organization ``side`` as well."""
+    from server.db.engine import get_session_factory
+    from server.db.models import OrgMember
+
+    async with get_session_factory()() as db:
+        db.add(
+            OrgMember(
+                org_id=world.orgs[side],
+                user_id=world.users[who],
+                role_id=world.roles[role],
+            )
+        )
+        await db.commit()
+
+
+MANAGED = "This account is managed by the platform administrator"
+
+
 class TestOrganizations:
     async def test_the_platform_lists_creates_renames_and_deletes_them(self, world):
         listed = {o["slug"] for o in await world.ok("platform", "GET", "/admin/orgs")}
@@ -284,6 +303,43 @@ class TestAccounts:
         )
         assert answer.status_code == 400
         assert answer.json()["detail"] == "You cannot deactivate yourself"
+
+    @pytest.mark.parametrize(
+        ("method", "action"),
+        [("POST", "deactivate"), ("POST", "activate"), ("DELETE", "sessions")],
+    )
+    async def test_an_account_shared_with_another_organization_is_the_platform_s(
+        self, world, method, action
+    ):
+        await also_in(world, "member_b", "a")
+        target = world.users["member_b"]
+        path = (
+            f"/admin/sessions/{target}"
+            if action == "sessions"
+            else f"/admin/users/{target}/{action}"
+        )
+        answer = await world.call("admin_a", method, path)
+        assert answer.status_code == 403
+        assert answer.json()["detail"] == MANAGED
+        assert (await world.call("member_b", "GET", "/projects")).status_code == 200
+        done = await world.call(
+            "platform", method, path, headers={"X-WorkPilot-Org": world.orgs["a"]}
+        )
+        assert done.status_code == 200, done.text
+
+    async def test_a_platform_administrator_in_the_organization_is_the_platform_s(
+        self, world
+    ):
+        await also_in(world, "platform", "a")
+        target = world.users["platform"]
+        for method, path in (
+            ("POST", f"/admin/users/{target}/deactivate"),
+            ("DELETE", f"/admin/sessions/{target}"),
+        ):
+            answer = await world.call("admin_a", method, path)
+            assert answer.status_code == 403, path
+            assert answer.json()["detail"] == MANAGED
+        assert (await world.call("platform", "GET", "/admin/orgs")).status_code == 200
 
     async def test_signing_someone_out_everywhere(self, world):
         password = await world.give_password("viewer_a")
