@@ -2486,7 +2486,7 @@ async def run_autonomous_agent(
             if (
                 status == "continue"
                 and response
-                and "should I mark" in response.lower()
+                and "should i mark" in response.lower()
                 and "blocked" in response.lower()
             ):
                 print_status(

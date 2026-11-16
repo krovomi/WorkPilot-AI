@@ -202,4 +202,30 @@ describe("HubMain", () => {
 		);
 		expect(mounts).toHaveBeenCalledTimes(1);
 	});
+
+	it("shows an error card for a page that throws, and clears it on another page", () => {
+		const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		function Broken(): never {
+			throw new Error("page broke");
+		}
+		const page = (view: SidebarView) =>
+			view === "insights" ? <Broken /> : <div data-testid="view">{view}</div>;
+		const { rerender } = render(
+			<HubMain activeView="insights" onSelectView={vi.fn()}>
+				{page("insights")}
+			</HubMain>,
+		);
+		const card = screen.getByRole("alert");
+		expect(card.textContent).toContain("boundary.pageDescription");
+		expect(card.textContent).toContain("page broke");
+
+		rerender(
+			<HubMain activeView="kanban" onSelectView={vi.fn()}>
+				{page("kanban")}
+			</HubMain>,
+		);
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.getByTestId("view").textContent).toBe("kanban");
+		spy.mockRestore();
+	});
 });

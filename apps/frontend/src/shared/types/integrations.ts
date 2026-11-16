@@ -316,15 +316,6 @@ export interface GitLabNote {
 	system: boolean; // System-generated notes (status changes, etc.)
 }
 
-export interface GitLabGroup {
-	id: number;
-	name: string;
-	path: string;
-	fullPath: string;
-	description?: string;
-	avatarUrl?: string;
-}
-
 export interface GitLabSyncStatus {
 	connected: boolean;
 	instanceUrl?: string; // GitLab-specific: base URL of instance

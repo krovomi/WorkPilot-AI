@@ -3,8 +3,9 @@
  * reader meet it (#391).
  *
  * The page (the App Emulator's URL, or one the person typed, always on this
- * computer: `validateScanUrl`) is loaded in a hidden window with no preload,
- * no Node, a sandbox and an in-memory session, and may not navigate to
+ * computer and never on the port of a WorkPilot service: `validateScanUrl`)
+ * is loaded in a hidden window with no preload, no Node, a sandbox and an
+ * in-memory session, and may not navigate to
  * another origin or open windows. Through the Chrome DevTools Protocol the
  * scan reads the accessibility tree, presses Tab and notes where the focus
  * lands, and measures the rendered colours. Everything the page answers is
@@ -12,7 +13,9 @@
  */
 import { BrowserWindow, session } from "electron";
 import type { A11yViolation, WcagLevel } from "../../shared/types/accessibility";
-import { analyseTrace, sanitizeTrace, validateScanUrl } from "./dynamic-checks";
+import { getBackendUrl } from "../ipc-handlers/_backend-fetch";
+import { DEFAULT_STREAM_PORT } from "../server-project-stream";
+import { analyseTrace, loopbackPorts, sanitizeTrace, validateScanUrl } from "./dynamic-checks";
 
 const LOAD_TIMEOUT_MS = 20_000;
 const MAX_TABS = 60;
@@ -147,10 +150,19 @@ async function collect(send: Send): Promise<Record<string, unknown>> {
 	return { ...page, ax, focus, dialogs };
 }
 
+/** The ports of WorkPilot's own services on this computer: the backend and its WebSocket. */
+export function workpilotServicePorts(): Set<number> {
+	return new Set([...loopbackPorts([getBackendUrl()]), DEFAULT_STREAM_PORT]);
+}
+
 /** Scan the page at `rawUrl`; throws a short, person-readable error. */
 export async function runDynamicScan(rawUrl: unknown, level: WcagLevel): Promise<DynamicScanResult> {
-	const url = validateScanUrl(rawUrl);
-	if (!url) throw new Error("Only an app running on this computer (localhost) can be scanned.");
+	const url = validateScanUrl(rawUrl, workpilotServicePorts());
+	if (!url) {
+		throw new Error(
+			"Only an app running on this computer (localhost), other than WorkPilot's own services, can be scanned.",
+		);
+	}
 	const origin = new URL(url).origin;
 	const scanSession = session.fromPartition(PARTITION, { cache: false });
 	scanSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));

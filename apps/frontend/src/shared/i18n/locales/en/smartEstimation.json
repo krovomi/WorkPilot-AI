@@ -35,5 +35,58 @@
 	},
 	"confidencePercent": "{{percent}}% confidence",
 	"scoreLabel": "Score: {{score}}",
-	"similarPercent": "{{percent}}% similar"
+	"similarPercent": "{{percent}}% similar",
+	"calibration": {
+		"title": "Calibration for this repository",
+		"rangesLabel": "Calibrated estimates",
+		"insufficient": "Not enough history to calibrate yet: {{samples}} merged specs, {{min}} needed. Showing the generic estimate for {{category}}.",
+		"calibrated": "Calibrated on {{samples}} merged specs of this repository ({{category}}).",
+		"range": "range {{low}} – {{high}} (confidence {{percent}}%)",
+		"metrics": {
+			"cost_usd": "Cost",
+			"tokens": "Tokens",
+			"qa_iterations": "QA iterations",
+			"files": "Files changed"
+		},
+		"scope": {
+			"category": "this category",
+			"repo": "whole repository",
+			"none": "generic"
+		},
+		"categories": {
+			"bug_fix": "bug fixes",
+			"infra": "infrastructure",
+			"frontend": "frontend",
+			"backend": "backend",
+			"feature": "features"
+		},
+		"redFlagOver": "{{metric}}: past specs ({{scope}}) used more than estimated, ×{{factor}} applied.",
+		"redFlagUnder": "{{metric}}: past specs ({{scope}}) used less than estimated, ×{{factor}} applied.",
+		"dimensionsTitle": "Breakdown by dimension",
+		"dimensions": {
+			"algorithmic": "Algorithmic complexity",
+			"integration": "Integration complexity",
+			"conflict_risk": "Conflict risk",
+			"test_effort": "Test effort"
+		},
+		"levels": {
+			"low": "low",
+			"medium": "medium",
+			"high": "high"
+		},
+		"uncertain": "uncertain",
+		"providersTitle": "By provider on this repository",
+		"provider": "{{provider}}: cost ×{{cost}}, tokens ×{{tokens}} of the estimate ({{samples}} specs)",
+		"qualityTitle": "Accuracy of past estimates",
+		"mape": "{{metric}}: {{percent}}% mean error",
+		"acceptance": "{{percent}}% of estimates kept without adjustment",
+		"intervalWidth": "Ranges span {{percent}}% of the estimate on average",
+		"adjustLabel": "Your complexity score (1-13)",
+		"adjust": "Adjust estimate",
+		"reset": "Reset calibration",
+		"confirmReset": "Confirm reset",
+		"cancel": "Cancel",
+		"saved": "Score {{score}} kept: future estimates of this repository take it into account.",
+		"resetDone": "Calibration reset: estimates start again from the generic figures."
+	}
 }
