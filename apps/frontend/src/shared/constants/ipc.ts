@@ -356,11 +356,6 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
 	AZURE_DEVOPS_HYDRATE_TASK_DISPLAY: "azureDevOps:hydrateTaskDisplay",
 
-	// Azure DevOps PR Review
-	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",
-	AZURE_DEVOPS_PR_GET_REVIEW: "azureDevOps:prGetReview",
-	AZURE_DEVOPS_PR_REVIEW_CANCEL: "azureDevOps:prReviewCancel",
-	AZURE_DEVOPS_PR_POST_COMMENT: "azureDevOps:prPostComment",
 
 	// Jira integration
 	JIRA_GET_ISSUES: "jira:getIssues",
