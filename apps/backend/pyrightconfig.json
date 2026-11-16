@@ -3,6 +3,7 @@
     "agent_snapshots",
     "best_of_n",
     "bench",
+    "deploy_watch",
     "dotnet_upgrade",
     "genai_trace",
     "goal",

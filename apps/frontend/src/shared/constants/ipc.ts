@@ -1163,6 +1163,7 @@ export const IPC_CHANNELS = {
 	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",
 	CICD_TRIGGERS_GET_RUN_STATUS: "cicdTriggers:getRunStatus",
 	CICD_TRIGGERS_LIST_RUNS: "cicdTriggers:listRuns",
+	CICD_TRIGGERS_ROLLBACK: "cicdTriggers:rollback",
 	CICD_TRIGGERS_SET_CONFIG: "cicdTriggers:setConfig",
 	CICD_TRIGGERS_TRIGGER: "cicdTriggers:trigger",
 	CLAUDE_PROFILE_CREATE_DIR: "claude:profileCreateDir",

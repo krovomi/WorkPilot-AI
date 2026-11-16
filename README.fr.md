@@ -219,7 +219,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Intégrations**
 - GitHub, GitLab, Azure DevOps, Jira et Linear : importer des tickets, les investiguer, relire des pull requests.
 - **Revue de PR par l'IA qui apprend** : accepter, rejeter ou marquer non applicable chaque résultat, avec une raison ; un type de remarque que le projet rejette sans cesse est rétrogradé, puis n'est plus remonté, sur tous les providers ; jamais un résultat de sécurité ou critique ([retours de revue](docs/architecture/review-feedback.md)).
-- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée, un incident de production venu de Sentry) en carte brouillon ; les **déclencheurs CI/CD** lancent votre pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la PR d'une tâche ou quand elle est fusionnée.
+- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée, un incident de production venu de Sentry) en carte brouillon ; les **déclencheurs CI/CD** lancent votre pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la PR d'une tâche ou quand elle est fusionnée, puis **surveillent le déploiement** (health check et métriques Prometheus comparés à leur niveau d'avant) et proposent, ou lancent, un **rollback** vers la dernière exécution réussie.
 - Marketplace MCP et serveurs MCP personnalisés avec descriptions d'outils épinglées ; le serveur MCP **workpilot-board** donne votre Kanban à Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres.
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 

@@ -48,6 +48,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"cicdTriggers:getConfig": [0],
 	"cicdTriggers:getRunStatus": [0],
 	"cicdTriggers:listRuns": [0],
+	"cicdTriggers:rollback": [0],
 	"cicdTriggers:setConfig": [0],
 	"cicdTriggers:trigger": [0],
 	"contextMesh:registerProject": [0],
