@@ -115,6 +115,17 @@ describe("getGitHubConfig", () => {
 		expect(getGitHubConfig(project)).toBeNull();
 	});
 
+	it("names the repository owner/repo when it was saved as a clone URL", () => {
+		for (const saved of [
+			"https://github.com/acme/shop.git",
+			"git@github.com:acme/shop.git",
+			"https://github.com/acme/shop",
+		]) {
+			writeEnv(`GITHUB_TOKEN=pat-test-0000\nGITHUB_REPO=${saved}\n`);
+			expect(getGitHubConfig(project)).toEqual({ token: "pat-test-0000", repo: "acme/shop" });
+		}
+	});
+
 	it("asks the server for a server project", () => {
 		const remote = { ...project, remote: { serverUrl: "https://s.invalid" } } as unknown as Project;
 

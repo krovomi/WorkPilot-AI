@@ -126,7 +126,7 @@ existantes, sans nouveau démon : la boucle des automatisations (G6) et la revue
 IA de GitHub PRs (G1). Il ne crée pas de carte.
 
 - **La même revue que le bouton, sans ses effets de bord.** `startDraftPRReview`
-  (`pr-handlers.ts`) lance le runner `review-pr` avec le moteur de la page
+  (`pr-review-run.ts`) lance le runner `review-pr` avec le moteur de la page
   GitHub PRs. Contrairement au bouton, il n'assigne personne et n'attend pas la
   CI. Comme lui, le résultat est enregistré dans le projet et n'est jamais
   publié : le runner tourne sans `--auto-post`. Publier, corriger ou écarter la

@@ -13,6 +13,26 @@ import { createContextLogger } from "./utils/logger";
 
 const { debug: debugLog } = createContextLogger("GitHub PR");
 
+const SEVERITY_EMOJI: Record<string, string> = {
+	critical: "🔴",
+	high: "🟠",
+	medium: "🟡",
+	low: "🔵",
+};
+
+/** One finding in the review body, its suggested fix only when it has one. */
+function renderFinding(f: PRReviewFinding): string {
+	const emoji = SEVERITY_EMOJI[f.severity] ?? "⚪";
+	let text = `#### ${emoji} [${f.id}] [${f.severity.toUpperCase()}] ${f.title}\n`;
+	text += `📁 \`${f.file}:${f.line}\`\n\n`;
+	text += `${f.description}\n\n`;
+	const suggestedFix = f.suggestedFix?.trim();
+	if (suggestedFix) {
+		text += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
+	}
+	return text;
+}
+
 /**
  * Post `result` as a review of PR `prNumber`, with the findings selected
  * (all when none is given); the id of the review GitHub made and the
@@ -52,19 +72,7 @@ export async function postReviewToGitHub(
 			body += `### 💡 Suggestions (${findings.length})\n\n`;
 			body += `*These are non-blocking suggestions for consideration:*\n\n`;
 
-			for (const f of findings) {
-				const emoji =
-					{ critical: "🔴", high: "🟠", medium: "🟡", low: "🔵" }[
-						f.severity
-					] || "⚪";
-				body += `#### ${emoji} [${f.id}] [${f.severity.toUpperCase()}] ${f.title}\n`;
-				body += `📁 \`${f.file}:${f.line}\`\n\n`;
-				body += `${f.description}\n\n`;
-				const suggestedFix = f.suggestedFix?.trim();
-				if (suggestedFix) {
-					body += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
-				}
-			}
+			body += findings.map(renderFinding).join("");
 		}
 
 		body += `---\n*This automated review found no blocking issues. The PR can be safely merged.*\n\n`;
@@ -80,20 +88,7 @@ export async function postReviewToGitHub(
 				: `${findings.length} total`;
 			body += `### Findings (${countText})\n\n`;
 
-			for (const f of findings) {
-				const emoji =
-					{ critical: "🔴", high: "🟠", medium: "🟡", low: "🔵" }[
-						f.severity
-					] || "⚪";
-				body += `#### ${emoji} [${f.id}] [${f.severity.toUpperCase()}] ${f.title}\n`;
-				body += `📁 \`${f.file}:${f.line}\`\n\n`;
-				body += `${f.description}\n\n`;
-				// Only show suggested fix if it has actual content
-				const suggestedFix = f.suggestedFix?.trim();
-				if (suggestedFix) {
-					body += `**Suggested fix:**\n\`\`\`\n${suggestedFix}\n\`\`\`\n\n`;
-				}
-			}
+			body += findings.map(renderFinding).join("");
 		} else {
 			body += `*No findings selected for this review.*\n\n`;
 		}
