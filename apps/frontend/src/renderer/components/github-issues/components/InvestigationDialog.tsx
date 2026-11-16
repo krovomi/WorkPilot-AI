@@ -36,7 +36,7 @@ const CommentsErrorState = ({ error }: { error: string }) => {
 			<p className="text-sm text-destructive font-medium">
 				{t("common:githubIssues.investigation.loadCommentsFailed")}
 			</p>
-			<p className="text-xs text-destructive/80 mt-1">{error}</p>
+			{error && <p className="text-xs text-destructive/80 mt-1">{error}</p>}
 		</div>
 	);
 };
@@ -81,32 +81,27 @@ const CommentsList = ({
 		>
 			<div className="p-2 space-y-2">
 				{comments.map((comment) => (
-					<>
-						{/* biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional */}
-						{/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere */}
-						{/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: selectable comment row */}
-						<div
-							key={comment.id}
-							className="flex gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-							onClick={() => toggleComment(comment.id)}
-						>
-							<Checkbox
-								checked={selectedCommentIds.includes(comment.id)}
-								onCheckedChange={() => toggleComment(comment.id)}
-								onClick={(e) => e.stopPropagation()}
-							/>
-							<div className="flex-1 space-y-1 min-w-0">
-								<div className="flex items-center gap-2 text-xs text-muted-foreground">
-									<span className="font-medium">{comment.user.login}</span>
-									<span>·</span>
-									<span>{formatDate(comment.created_at)}</span>
-								</div>
-								<p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word line-clamp-3">
-									{comment.body}
-								</p>
+					<label
+						key={comment.id}
+						htmlFor={`investigation-comment-${comment.id}`}
+						className="flex gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+					>
+						<Checkbox
+							id={`investigation-comment-${comment.id}`}
+							checked={selectedCommentIds.includes(comment.id)}
+							onCheckedChange={() => toggleComment(comment.id)}
+						/>
+						<div className="flex-1 space-y-1 min-w-0">
+							<div className="flex items-center gap-2 text-xs text-muted-foreground">
+								<span className="font-medium">{comment.user.login}</span>
+								<span>·</span>
+								<span>{formatDate(comment.created_at)}</span>
 							</div>
+							<p className="text-sm text-foreground whitespace-pre-wrap wrap-break-word line-clamp-3">
+								{comment.body}
+							</p>
 						</div>
-					</>
+					</label>
 				))}
 			</div>
 		</ScrollArea>
@@ -165,14 +160,15 @@ export function InvestigationDialog({
 						setComments(result.data);
 						// By default, select all comments
 						setSelectedCommentIds(result.data.map((c: GitHubComment) => c.id));
+					} else {
+						// Not "no comments": the task would leave out what they say.
+						setFetchCommentsError(result.error ?? "");
 					}
 				})
 				.catch((err: unknown) => {
 					if (!isMounted) return;
 					console.error("Failed to fetch comments:", err);
-					setFetchCommentsError(
-						err instanceof Error ? err.message : "Failed to load comments",
-					);
+					setFetchCommentsError(err instanceof Error ? err.message : "");
 				})
 				.finally(() => {
 					if (isMounted) {
@@ -238,7 +234,7 @@ export function InvestigationDialog({
 								return <CommentsLoadingState />;
 							}
 
-							if (fetchCommentsError) {
+							if (fetchCommentsError !== null) {
 								return <CommentsErrorState error={fetchCommentsError} />;
 							}
 
