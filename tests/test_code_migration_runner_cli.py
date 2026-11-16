@@ -229,6 +229,9 @@ def test_a_pair_the_planner_does_not_know_is_unsupported_not_failed(
         ("Convert JavaScript files to TypeScript", "typescript", "typescript"),
         ("Move to Python 3.12", "python3.12", "python"),
         ("Move from MySQL to Postgres", "postgresql", None),
+        # Brackets give a detail; they name the target only when nothing else does.
+        ("Upgrade Spring Boot 2 to 3 (javax to jakarta)", "spring-boot", None),
+        ("Upgrade the app (to Vue 3)", "vue", None),
     ],
 )
 def test_the_target_is_read_from_the_description(

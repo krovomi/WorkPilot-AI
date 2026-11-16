@@ -228,8 +228,15 @@ class CodeMigrationRunner:
 
         # The target is the last stack named ("from React to Vue" is Vue);
         # at the same place the longer name wins ("ASP.NET" over ".NET").
-        framework = _last_named(desc, framework_keywords)
-        language = _last_named(desc, language_keywords)
+        # A detail in brackets does not name it: "Spring Boot 2 to 3 (javax to
+        # jakarta)" targets Spring Boot, unless only the brackets name a stack.
+        main = re.sub(r"\([^)]*\)", " ", desc)
+        framework = _last_named(main, framework_keywords) or _last_named(
+            desc, framework_keywords
+        )
+        language = _last_named(main, language_keywords) or _last_named(
+            desc, language_keywords
+        )
 
         return framework, language
 
