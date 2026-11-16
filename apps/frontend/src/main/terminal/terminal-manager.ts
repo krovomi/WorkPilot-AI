@@ -309,13 +309,6 @@ export class TerminalManager {
 	}
 
 	/**
-	 * Clear saved sessions for a project
-	 */
-	clearSavedSessions(projectPath: string): void {
-		SessionHandler.clearSavedSessions(projectPath);
-	}
-
-	/**
 	 * Get available session dates
 	 */
 	getAvailableSessionDates(

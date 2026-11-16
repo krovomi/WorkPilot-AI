@@ -65,8 +65,11 @@ describe("ACCOUNT_PRIORITY_SET", () => {
 		expect(mocks.manager.setAccountPriorityOrder).toHaveBeenCalledWith(["oauth-a", "provider-copilot"]);
 	});
 
-	it("refuses an order that is not a list of text", async () => {
-		expect(await call(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, { 0: "oauth-a" })).toEqual({
+	it("refuses an order that is not a list of text, or one longer than the chain holds", async () => {
+		// The terminal guard (terminal-ipc-guard.ts) refuses what is not a list of ids before the handler.
+		expect(() => call(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, { 0: "oauth-a" })).toThrow("Invalid terminal arguments");
+		const tooLong = Array.from({ length: 65 }, (_, i) => `oauth-${i}`);
+		expect(await call(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, tooLong)).toEqual({
 			success: false,
 			error: "Invalid account priority order",
 		});

@@ -41,6 +41,13 @@ class BrowserController:
         # leaked unbounded memory across long sessions.
         self._console_errors: deque[str] = deque(maxlen=_MAX_CONSOLE_ERRORS)
 
+    @property
+    def page(self) -> Any:
+        """The launched page, for a caller that drives it (the recorder)."""
+        if not self._page:
+            raise RuntimeError("Browser not launched. Call launch() first.")
+        return self._page
+
     async def launch(self) -> None:
         """Launch a headless Chromium browser.
 

@@ -4,8 +4,17 @@
  * ApiExplorer.tsx (audit lot L11, F36).
  */
 
-import { Loader2, Plus, ScanSearch, Settings, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import {
+	Eye,
+	EyeOff,
+	Loader2,
+	Plus,
+	ScanSearch,
+	Settings,
+	Trash2,
+	X,
+} from "lucide-react";
+import { useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui";
@@ -83,15 +92,29 @@ export function pickBestUrl(vars: Record<string, string>): string | null {
 	return null;
 }
 
-/** Derive a human-readable env name from a filename */
-export function envNameFromFile(filename: string): string {
+/** Derive a human-readable env name from a filename; a bare `.env` gets the
+ * caller's (translated) default name. */
+export function envNameFromFile(filename: string, defaultName: string): string {
 	const base = filename.replace(/^\.env\.?/, "").replace(/^\./, "");
-	if (!base) return "Default";
+	if (!base) return defaultName;
 	return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+/** `Name: value` lines into headers; a line without a name is skipped. */
+export function parseHeaderLines(text: string): Record<string, string> {
+	const headers: Record<string, string> = {};
+	for (const line of text.split("\n")) {
+		const idx = line.indexOf(":");
+		if (idx > 0) {
+			headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+		}
+	}
+	return headers;
 }
 
 export async function detectEnvironmentsFromProject(
 	projectPath: string,
+	defaultName: string,
 ): Promise<DetectedEnvironment[]> {
 	const filesToScan = [
 		".env",
@@ -122,9 +145,9 @@ export async function detectEnvironmentsFromProject(
 			if (!url || seenUrls.has(url)) continue;
 
 			seenUrls.add(url);
-			const filename = relPath.split("/").pop() ?? relPath;
+			const filename = relPath.slice(relPath.lastIndexOf("/") + 1);
 			detected.push({
-				name: envNameFromFile(filename),
+				name: envNameFromFile(filename, defaultName),
 				baseUrl: url,
 				headers: {},
 				source: relPath,
@@ -170,6 +193,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 	const [newHeaders, setNewHeaders] = useState("");
 	const [newToken, setNewToken] = useState("");
 	const [newTokenVisible, setNewTokenVisible] = useState(false);
+	const titleId = useId();
 
 	// Auto-detection state
 	const [isDetecting, setIsDetecting] = useState(false);
@@ -178,12 +202,14 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 		new Set(),
 	);
 
-	async function runDetection() {
-		if (!activeProject?.path) return;
+	async function runDetection(projectPath: string) {
 		setIsDetecting(true);
 		setDetectedEnvs([]);
 		try {
-			const results = await detectEnvironmentsFromProject(activeProject.path);
+			const results = await detectEnvironmentsFromProject(
+				projectPath,
+				t("apiExplorer:environments.defaultName"),
+			);
 			// Filter out URLs already in the list
 			const existingUrls = new Set(environments.map((e) => e.baseUrl));
 			const fresh = results.filter((r) => !existingUrls.has(r.baseUrl));
@@ -195,15 +221,15 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 	}
 
 	function importDetected() {
-		for (const idx of selectedDetected) {
-			const env = detectedEnvs[idx];
-			if (env)
+		// In the order they were found, not the order they were ticked.
+		detectedEnvs.forEach((env, idx) => {
+			if (selectedDetected.has(idx))
 				addEnvironment({
 					name: env.name,
 					baseUrl: env.baseUrl,
 					headers: env.headers,
 				});
-		}
+		});
 		setDetectedEnvs([]);
 		setSelectedDetected(new Set());
 	}
@@ -229,36 +255,21 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 		);
 	}
 
-	function saveEdit() {
-		if (!editId) return;
-		const headers: Record<string, string> = {};
-		for (const line of editHeaders.split("\n")) {
-			const idx = line.indexOf(":");
-			if (idx > 0) {
-				headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-			}
-		}
-		updateEnvironment(editId, {
+	function saveEdit(id: string) {
+		updateEnvironment(id, {
 			name: editName,
 			baseUrl: editUrl,
-			headers,
+			headers: parseHeaderLines(editHeaders),
 			token: editToken || undefined,
 		});
 		setEditId(null);
 	}
 
 	function addNew() {
-		const headers: Record<string, string> = {};
-		for (const line of newHeaders.split("\n")) {
-			const idx = line.indexOf(":");
-			if (idx > 0) {
-				headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-			}
-		}
 		addEnvironment({
 			name: newName,
 			baseUrl: newUrl,
-			headers,
+			headers: parseHeaderLines(newHeaders),
 			token: newToken || undefined,
 		});
 		setIsAdding(false);
@@ -270,14 +281,20 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 
 	return createPortal(
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-			<div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-xl p-6">
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby={titleId}
+				className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-xl p-6"
+			>
 				<div className="flex items-center justify-between mb-5">
-					<h2 className="text-base font-semibold text-foreground">
+					<h2 id={titleId} className="text-base font-semibold text-foreground">
 						{t("apiExplorer:environments.title")}
 					</h2>
 					<button
 						type="button"
 						onClick={onClose}
+						aria-label={t("apiExplorer:aria.close")}
 						className="text-muted-foreground hover:text-foreground transition-colors"
 					>
 						<X size={18} />
@@ -322,9 +339,11 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<button
 												type="button"
 												onClick={() => setEditTokenVisible((v) => !v)}
+												aria-label={t("apiExplorer:aria.showToken")}
+												aria-pressed={editTokenVisible}
 												className="px-2 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded bg-card transition-colors"
 											>
-												{editTokenVisible ? "🙈" : "👁"}
+												{editTokenVisible ? <EyeOff size={12} /> : <Eye size={12} />}
 											</button>
 										</div>
 									</div>
@@ -347,7 +366,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										>
 											{t("apiExplorer:actions.cancel")}
 										</Button>
-										<Button size="sm" onClick={saveEdit}>
+										<Button size="sm" onClick={() => saveEdit(env.id)}>
 											{t("apiExplorer:actions.save")}
 										</Button>
 									</div>
@@ -373,6 +392,9 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 										<button
 											type="button"
 											onClick={() => startEdit(env)}
+											aria-label={t("apiExplorer:aria.editEnvironment", {
+												name: env.name,
+											})}
 											className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
 										>
 											<Settings size={14} />
@@ -381,6 +403,9 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 											<button
 												type="button"
 												onClick={() => removeEnvironment(env.id)}
+												aria-label={t("apiExplorer:aria.removeEnvironment", {
+													name: env.name,
+												})}
 												className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
 											>
 												<Trash2 size={14} />
@@ -479,9 +504,11 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 								<button
 									type="button"
 									onClick={() => setNewTokenVisible((v) => !v)}
+									aria-label={t("apiExplorer:aria.showToken")}
+									aria-pressed={newTokenVisible}
 									className="px-2 text-muted-foreground hover:text-foreground border border-[var(--color-border)] rounded bg-card transition-colors"
 								>
-									{newTokenVisible ? "🙈" : "👁"}
+									{newTokenVisible ? <EyeOff size={12} /> : <Eye size={12} />}
 								</button>
 							</div>
 						</div>
@@ -516,7 +543,7 @@ export function EnvironmentManager({ onClose }: EnvironmentManagerProps) {
 						{activeProject && (
 							<button
 								type="button"
-								onClick={runDetection}
+								onClick={() => runDetection(activeProject.path)}
 								disabled={isDetecting}
 								className="flex-1 border border-dashed border-success/30 rounded-lg py-2 text-sm text-success/70 hover:text-success hover:border-success/50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
 							>
