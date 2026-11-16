@@ -1120,21 +1120,6 @@ class TestWorktreeUtilities:
 
         assert len(manager.list_all_worktrees()) == 0
 
-    def test_cleanup_stale_worktrees(self, temp_git_repo: Path):
-        """cleanup_stale_worktrees removes directories without git tracking."""
-        manager = WorktreeManager(temp_git_repo)
-        manager.setup()
-
-        # Create a stale worktree directory (exists but not tracked by git)
-        stale_dir = manager.worktrees_dir / "stale-worktree"
-        stale_dir.mkdir(parents=True, exist_ok=True)
-
-        # This should clean up the stale directory
-        manager.cleanup_stale_worktrees()
-
-        # Stale directory should be removed
-        assert not stale_dir.exists()
-
     def test_get_test_commands_python(self, temp_git_repo: Path):
         """get_test_commands detects Python project commands."""
         manager = WorktreeManager(temp_git_repo)

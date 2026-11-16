@@ -4,7 +4,6 @@ import type {
 	GitLabAutoFixConfig,
 	GitLabAutoFixProgress,
 	GitLabAutoFixQueueItem,
-	GitLabGroup,
 	GitLabImportResult,
 	GitLabInvestigationResult,
 	GitLabInvestigationStatus,
@@ -271,32 +270,6 @@ export interface GitLabAPI {
 		}>
 	>;
 
-	// Project detection and management
-	detectGitLabProject: (
-		projectPath: string,
-	) => Promise<IPCResult<{ project: string; instanceUrl: string }>>;
-	getGitLabBranches: (
-		project: string,
-		instanceUrl: string,
-	) => Promise<IPCResult<string[]>>;
-	createGitLabProject: (
-		projectName: string,
-		options: {
-			description?: string;
-			visibility?: string;
-			projectPath: string;
-			namespace?: string;
-			instanceUrl?: string;
-		},
-	) => Promise<IPCResult<{ pathWithNamespace: string; webUrl: string }>>;
-	addGitLabRemote: (
-		projectPath: string,
-		projectFullPath: string,
-		instanceUrl?: string,
-	) => Promise<IPCResult<{ remoteUrl: string }>>;
-	listGitLabGroups: (
-		instanceUrl?: string,
-	) => Promise<IPCResult<{ groups: GitLabGroup[] }>>;
 
 	// Event Listeners
 	onGitLabInvestigationProgress: (
@@ -694,46 +667,6 @@ export const createGitLabAPI = (): GitLabAPI => ({
 		}>
 	> => invokeIpc(IPC_CHANNELS.GITLAB_LIST_USER_PROJECTS, instanceUrl),
 
-	// Project detection and management
-	detectGitLabProject: (
-		projectPath: string,
-	): Promise<IPCResult<{ project: string; instanceUrl: string }>> =>
-		invokeIpc(IPC_CHANNELS.GITLAB_DETECT_PROJECT, projectPath),
-
-	getGitLabBranches: (
-		project: string,
-		instanceUrl: string,
-	): Promise<IPCResult<string[]>> =>
-		invokeIpc(IPC_CHANNELS.GITLAB_GET_BRANCHES, project, instanceUrl),
-
-	createGitLabProject: (
-		projectName: string,
-		options: {
-			description?: string;
-			visibility?: string;
-			projectPath: string;
-			namespace?: string;
-			instanceUrl?: string;
-		},
-	): Promise<IPCResult<{ pathWithNamespace: string; webUrl: string }>> =>
-		invokeIpc(IPC_CHANNELS.GITLAB_CREATE_PROJECT, projectName, options),
-
-	addGitLabRemote: (
-		projectPath: string,
-		projectFullPath: string,
-		instanceUrl?: string,
-	): Promise<IPCResult<{ remoteUrl: string }>> =>
-		invokeIpc(
-			IPC_CHANNELS.GITLAB_ADD_REMOTE,
-			projectPath,
-			projectFullPath,
-			instanceUrl,
-		),
-
-	listGitLabGroups: (
-		instanceUrl?: string,
-	): Promise<IPCResult<{ groups: GitLabGroup[] }>> =>
-		invokeIpc(IPC_CHANNELS.GITLAB_LIST_GROUPS, instanceUrl),
 
 	// Event Listeners
 	onGitLabInvestigationProgress: (
