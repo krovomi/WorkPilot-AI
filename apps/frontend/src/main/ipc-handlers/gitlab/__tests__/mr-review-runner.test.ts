@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
 	project: undefined as unknown,
 	run: vi.fn(),
+	config: null as null | { token: string; instanceUrl: string; project: string },
+	env: undefined as unknown,
 }));
 vi.mock("../../../project-store", () => ({ projectStore: { getProject: () => state.project } }));
 vi.mock("../../server-review-jobs", async (importOriginal) => ({
@@ -24,10 +26,15 @@ vi.mock("../../server-review-jobs", async (importOriginal) => ({
 vi.mock("../../../services/page-llm-config", () => ({
 	getPageFeatureSettings: () => ({ model: "sonnet", thinkingLevel: "medium" }),
 }));
-vi.mock("../../github/utils/runner-env", () => ({ getRunnerEnv: async () => ({}) }));
+vi.mock("../../github/utils/runner-env", () => ({
+	getRunnerEnv: async (extra: unknown) => {
+		state.env = extra;
+		return {};
+	},
+}));
 vi.mock("../utils", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../utils")>()),
-	getGitLabConfig: async () => null,
+	getGitLabConfig: async () => state.config,
 }));
 vi.mock("../../github/utils/subprocess-runner", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../github/utils/subprocess-runner")>()),
@@ -65,6 +72,8 @@ beforeEach(() => {
 	vi.spyOn(process, "cwd").mockReturnValue(appRoot);
 	state.project = { id: "p", path: projectDir, autoBuildPath: ".workpilot" };
 	state.run.mockReset();
+	state.config = null;
+	state.env = undefined;
 	state.run.mockReturnValue({
 		process: { pid: 1, kill: () => true },
 		promise: Promise.resolve({ success: false, error: "stopped by the test" }),
@@ -130,6 +139,38 @@ describe("GITLAB_MR_REVIEW", () => {
 		]);
 		expect(options.args.slice(-2)).toEqual(["review-mr", "3"]);
 		await vi.waitFor(() => expect(sent(IPC_CHANNELS.GITLAB_MR_REVIEW_ERROR)).toHaveLength(1));
+	});
+
+	it("passes the project's GitLab project, instance and token in the runner's environment", async () => {
+		installRunner("gitlab");
+		state.config = {
+			token: "glpat-test-0000", // pragma: allowlist secret
+			instanceUrl: "https://gitlab.example.com",
+			project: "shop/web",
+		};
+
+		review();
+		await vi.waitFor(() => expect(state.run).toHaveBeenCalled());
+
+		// `--project` is the runner's GitLab project: the folder goes in `--project-dir`.
+		expect(state.env).toEqual({
+			GITLAB_TOKEN: "glpat-test-0000", // pragma: allowlist secret
+			GITLAB_INSTANCE_URL: "https://gitlab.example.com",
+			GITLAB_PROJECT: "shop/web",
+		});
+		const [options] = state.run.mock.calls[0] as [{ args: string[] }];
+		expect(options.args).not.toContain("--project");
+	});
+
+	it("runs the follow-up review on the project's folder too", async () => {
+		installRunner("gitlab");
+
+		review(IPC_CHANNELS.GITLAB_MR_FOLLOWUP_REVIEW);
+		await vi.waitFor(() => expect(state.run).toHaveBeenCalled());
+
+		const [options] = state.run.mock.calls[0] as [{ args: string[] }];
+		expect(options.args.slice(1, 3)).toEqual(["--project-dir", projectDir]);
+		expect(options.args.slice(-2)).toEqual(["followup-review-mr", "3"]);
 	});
 
 	it.each([[IPC_CHANNELS.GITLAB_MR_REVIEW], [IPC_CHANNELS.GITLAB_MR_FOLLOWUP_REVIEW]])(
