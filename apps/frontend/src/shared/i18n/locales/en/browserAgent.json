@@ -4,7 +4,8 @@
 	"tabs": {
 		"browser": "Browser",
 		"visualRegression": "Visual Regression",
-		"testRunner": "Test Runner"
+		"testRunner": "Test Runner",
+		"recorder": "Recorder"
 	},
 	"stats": {
 		"totalTests": "Tests",
@@ -73,5 +74,44 @@
 		"compareFailed": "Visual comparison failed",
 		"testsFailed": "Test execution failed",
 		"noProject": "Select a project to use the Browser Agent"
+	},
+	"recorder": {
+		"title": "Record a test",
+		"description": "Open a page in a browser window, do what the test should do, then export the steps as a Playwright or Cypress test. Alt+click an element to check its visible text.",
+		"urlLabel": "Address to record from",
+		"start": "Record",
+		"stop": "Stop",
+		"starting": "Opening the browser window…",
+		"recording": "Recording: act in the browser window",
+		"stopping": "Closing the browser window…",
+		"truncated": "The recording reached its limit of 300 steps; later actions were not recorded.",
+		"stepsTitle": "Steps",
+		"noSteps": "No step yet. Start a recording and act in the browser window.",
+		"removeStep": "Remove this step",
+		"secretValue": "secret, read from {{name}}",
+		"kinds": {
+			"navigate": "Open",
+			"click": "Click",
+			"fill": "Type",
+			"select": "Choose",
+			"press": "Press",
+			"assert_text": "Check text"
+		},
+		"exportTitle": "Export",
+		"nameLabel": "Test name",
+		"namePlaceholder": "recorded flow",
+		"formatLabel": "Test format",
+		"formats": {
+			"playwright-ts": "Playwright (TypeScript)",
+			"playwright-python": "Playwright (Python)",
+			"cypress": "Cypress"
+		},
+		"preview": "Preview",
+		"review": "Propose on a review card",
+		"file": "Save as a file…",
+		"reviewHint": "A review card puts the test on its own branch, never in the project folder; a file is saved outside the project.",
+		"savedTo": "Saved to {{path}}",
+		"envVars": "Set these environment variables before running the test: {{names}}",
+		"skipped": "{{count}} step(s) have no selector this framework can express and were left as comments."
 	}
 }

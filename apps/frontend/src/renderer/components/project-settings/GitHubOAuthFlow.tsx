@@ -20,12 +20,6 @@ interface GitHubOAuthFlowProps {
 	readonly onCancel?: () => void;
 }
 
-// Debug logging — disabled (kept as a no-op so call sites stay valid).
-function debugLog(_message: string, _data?: unknown) {
-	// Intentionally does nothing: the call sites are kept as breadcrumbs so the
-	// logging can be switched back on in one place.
-}
-
 // Authentication timeout in milliseconds (5 minutes)
 // GitHub device codes typically expire after 15 minutes, but 5 minutes is a reasonable UX timeout
 const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
@@ -55,6 +49,8 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 	const [codeCopied, setCodeCopied] = useState<boolean>(false);
 	const [urlCopied, setUrlCopied] = useState<boolean>(false);
 	const [isTimeout, setIsTimeout] = useState<boolean>(false);
+	// What Retry runs again: the step that failed, the CLI check or the sign-in.
+	const [failedStep, setFailedStep] = useState<"check" | "auth">("check");
 
 	// Ref to track authentication timeout
 	const authTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,15 +65,16 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 	// Clear the authentication timeout
 	const clearAuthTimeout = useCallback(() => {
 		if (authTimeoutRef.current) {
-			debugLog("Clearing auth timeout");
 			clearTimeout(authTimeoutRef.current);
 			authTimeoutRef.current = null;
 		}
 	}, []);
 
-	// Cleanup copy feedback timeouts on unmount
+	// Cleanup the timeouts on unmount, and only then: a cleanup that ran on
+	// every render cleared the authentication timeout as soon as it was set.
 	useEffect(() => {
 		return () => {
+			clearAuthTimeout();
 			if (codeCopyTimeoutRef.current) {
 				clearTimeout(codeCopyTimeoutRef.current);
 			}
@@ -85,114 +82,77 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 				clearTimeout(urlCopyTimeoutRef.current);
 			}
 		};
-	}, []);
+	}, [clearAuthTimeout]);
 
 	// Handle authentication timeout
 	const handleAuthTimeout = useCallback(() => {
-		debugLog("Authentication timeout triggered after 5 minutes");
 		setIsTimeout(true);
-		setError(
-			"Authentication timed out. The authentication window was open for too long. Please try again.",
-		);
+		setError(t("settings:githubOAuth.timedOutDescription"));
 		setStatus("error");
 		authTimeoutRef.current = null;
-	}, []);
+	}, [t]);
+
+	/** The account name is passed along: the state set just before is not read yet. */
+	const fetchAndNotifyToken = async (account?: string) => {
+		try {
+			const tokenResult = await globalThis.electronAPI.getGitHubToken();
+			if (tokenResult.success && tokenResult.data?.token) {
+				setStatus("success");
+				onSuccess(tokenResult.data.token, account);
+			} else {
+				setError(tokenResult.error || t("settings:githubOAuth.tokenFailed"));
+				setStatus("error");
+			}
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : t("settings:githubOAuth.tokenFailed"),
+			);
+			setStatus("error");
+		}
+	};
 
 	const checkGitHubStatus = async () => {
-		debugLog("checkGitHubStatus() called");
+		setFailedStep("check");
 		setStatus("checking");
 		setError(null);
 
 		try {
-			// Check if gh CLI is installed
-			debugLog("Calling checkGitHubCli...");
 			const cliResult = await globalThis.electronAPI.checkGitHubCli();
-			debugLog("checkGitHubCli result:", cliResult);
-
 			if (!cliResult.success) {
-				debugLog("checkGitHubCli failed:", cliResult.error);
-				setError(cliResult.error || "Failed to check GitHub CLI");
+				setError(cliResult.error || t("settings:githubOAuth.cliCheckFailed"));
 				setStatus("error");
 				return;
 			}
 
 			if (!cliResult.data?.installed) {
-				debugLog("GitHub CLI not installed");
 				setStatus("need-install");
 				return;
 			}
 
 			setCliVersion(cliResult.data.version);
-			debugLog("GitHub CLI installed, version:", cliResult.data.version);
 
-			// Check if already authenticated
-			debugLog("Calling checkGitHubAuth...");
 			const authResult = await globalThis.electronAPI.checkGitHubAuth();
-			debugLog("checkGitHubAuth result:", authResult);
-
 			if (authResult.success && authResult.data?.authenticated) {
-				debugLog("Already authenticated as:", authResult.data.username);
 				setUsername(authResult.data.username);
-				// Get the token and notify parent
-				await fetchAndNotifyToken();
+				await fetchAndNotifyToken(authResult.data.username);
 			} else {
-				debugLog("Not authenticated, showing auth prompt");
 				setStatus("need-auth");
 			}
 		} catch (err) {
-			debugLog("Error in checkGitHubStatus:", err);
-			setError(err instanceof Error ? err.message : "Unknown error");
+			setError(
+				err instanceof Error ? err.message : t("settings:githubOAuth.cliCheckFailed"),
+			);
 			setStatus("error");
 		}
 	};
 
-	const fetchAndNotifyToken = async () => {
-		debugLog("fetchAndNotifyToken() called");
-		try {
-			debugLog("Calling getGitHubToken...");
-			const tokenResult = await globalThis.electronAPI.getGitHubToken();
-			debugLog("getGitHubToken result:", {
-				success: tokenResult.success,
-				hasToken: !!tokenResult.data?.token,
-				tokenLength: tokenResult.data?.token?.length,
-				error: tokenResult.error,
-			});
-
-			if (tokenResult.success && tokenResult.data?.token) {
-				debugLog(
-					"Token retrieved successfully, calling onSuccess with username:",
-					username,
-				);
-				setStatus("success");
-				onSuccess(tokenResult.data.token, username);
-			} else {
-				debugLog("Failed to get token:", tokenResult.error);
-				setError(tokenResult.error || "Failed to get token");
-				setStatus("error");
-			}
-		} catch (err) {
-			debugLog("Error in fetchAndNotifyToken:", err);
-			setError(err instanceof Error ? err.message : "Failed to get token");
-			setStatus("error");
-		}
-	};
-
+	const checkRef = useRef(checkGitHubStatus);
+	checkRef.current = checkGitHubStatus;
 	useEffect(() => {
-		if (hasCheckedRef.current) {
-			debugLog("Skipping duplicate check (Strict Mode)");
-			return;
-		}
+		if (hasCheckedRef.current) return;
 		hasCheckedRef.current = true;
-		debugLog("Component mounted, checking GitHub status...");
-		checkGitHubStatus();
-
-		// Cleanup timeout on unmount
-		return () => {
-			clearAuthTimeout();
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- Only run once on mount, checkGitHubStatus is intentionally excluded
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [clearAuthTimeout, checkGitHubStatus]);
+		void checkRef.current();
+	}, []);
 
 	// Listen for device code events from the main process
 	// This allows us to display the code IMMEDIATELY when extracted, not after the auth completes
@@ -201,16 +161,7 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 			return;
 		}
 
-		debugLog("Setting up device code event listener");
-
-		// Listen for device code from main process (sent immediately when extracted)
 		const cleanup = globalThis.electronAPI.onGitHubAuthDeviceCode((data) => {
-			debugLog("Received device code from main process:", {
-				hasCode: !!data.deviceCode,
-				authUrl: data.authUrl,
-				browserOpened: data.browserOpened,
-			});
-
 			if (data.deviceCode) {
 				setDeviceCode(data.deviceCode);
 			}
@@ -220,14 +171,11 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 			setBrowserOpened(data.browserOpened);
 		});
 
-		return () => {
-			debugLog("Cleaning up device code event listener");
-			cleanup();
-		};
+		return cleanup;
 	}, [status]);
 
 	const handleStartAuth = async () => {
-		debugLog("handleStartAuth() called");
+		setFailedStep("auth");
 		setStatus("authenticating");
 		setError(null);
 
@@ -241,40 +189,29 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 
 		// Clear any existing timeout and start a new one
 		clearAuthTimeout();
-		debugLog(`Starting auth timeout (${AUTH_TIMEOUT_MS / 1000 / 60} minutes)`);
 		authTimeoutRef.current = setTimeout(handleAuthTimeout, AUTH_TIMEOUT_MS);
 
 		try {
-			debugLog("Calling startGitHubAuth...");
 			const result = await globalThis.electronAPI.startGitHubAuth();
-			debugLog("startGitHubAuth result:", result);
 
 			// Clear timeout since we got a response
 			clearAuthTimeout();
 
 			// Capture device flow info if available
 			if (result.data?.deviceCode) {
-				debugLog("Device code received:", result.data.deviceCode);
 				setDeviceCode(result.data.deviceCode);
 			}
 			if (result.data?.authUrl) {
-				debugLog("Auth URL received:", result.data.authUrl);
 				setAuthUrl(result.data.authUrl);
 			}
 			if (result.data?.browserOpened !== undefined) {
-				debugLog("Browser opened status:", result.data.browserOpened);
 				setBrowserOpened(result.data.browserOpened);
 			}
 
 			if (result.success && result.data?.success) {
-				debugLog("Auth successful, fetching token...");
-				// Fetch the token and notify parent
-				await fetchAndNotifyToken();
+				await fetchAndNotifyToken(username);
 			} else {
-				debugLog("Auth failed:", result.error);
-				// Include fallback URL info in error message if available
-				const errorMessage = result.error || "Authentication failed";
-				setError(errorMessage);
+				setError(result.error || t("settings:githubOAuth.failed"));
 				// Keep authUrl from response for fallback display
 				if (result.data?.fallbackUrl) {
 					setAuthUrl(result.data.fallbackUrl);
@@ -282,29 +219,23 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 				setStatus("error");
 			}
 		} catch (err) {
-			// Clear timeout on error
 			clearAuthTimeout();
-			debugLog("Error in handleStartAuth:", err);
-			setError(err instanceof Error ? err.message : "Authentication failed");
+			setError(err instanceof Error ? err.message : t("settings:githubOAuth.failed"));
 			setStatus("error");
 		}
 	};
 
 	const handleOpenGhInstall = () => {
-		debugLog("Opening gh CLI install page");
 		window.open("https://cli.github.com/", "_blank");
 	};
 
 	const handleRetry = () => {
-		debugLog("Retry clicked");
-		checkGitHubStatus();
+		void checkGitHubStatus();
 	};
 
-	const handleCopyDeviceCode = async () => {
-		if (!deviceCode) return;
-		debugLog("Copying device code to clipboard");
+	const handleCopyDeviceCode = async (code: string) => {
 		try {
-			await navigator.clipboard.writeText(deviceCode);
+			await navigator.clipboard.writeText(code);
 			setCodeCopied(true);
 			// Clear any existing timeout before setting a new one
 			if (codeCopyTimeoutRef.current) {
@@ -312,19 +243,15 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 			}
 			// Reset the copied state after 2 seconds
 			codeCopyTimeoutRef.current = setTimeout(() => setCodeCopied(false), 2000);
-		} catch (err) {
-			debugLog("Failed to copy device code:", err);
+		} catch {
+			// The code stays on screen to be typed.
 		}
 	};
 
-	const handleOpenAuthUrl = () => {
-		if (authUrl) {
-			debugLog("Opening auth URL manually:", authUrl);
-			window.open(authUrl, "_blank");
-		}
+	const handleOpenAuthUrl = (url: string) => {
+		window.open(url, "_blank");
 	};
 
-	debugLog("Rendering with status:", status);
 
 	return (
 		<div className="space-y-4">
@@ -473,7 +400,7 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 											<Button
 												variant="outline"
 												size="sm"
-												onClick={handleCopyDeviceCode}
+												onClick={() => void handleCopyDeviceCode(deviceCode)}
 												className="shrink-0"
 											>
 												{codeCopied ? (
@@ -500,7 +427,7 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 										{!browserOpened && authUrl && (
 											<Button
 												variant="link"
-												onClick={handleOpenAuthUrl}
+												onClick={() => handleOpenAuthUrl(authUrl)}
 												className="text-info hover:text-info/80 p-0 h-auto gap-1"
 											>
 												<ExternalLink className="h-4 w-4" />
@@ -604,8 +531,8 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 															() => setUrlCopied(false),
 															2000,
 														);
-													} catch (err) {
-														debugLog("Failed to copy URL:", err);
+													} catch {
+														// The URL stays on screen to be copied by hand.
 													}
 												}}
 												className="shrink-0"
@@ -626,7 +553,7 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 
 										<Button
 											variant="secondary"
-											onClick={handleOpenAuthUrl}
+											onClick={() => handleOpenAuthUrl(authUrl)}
 											className="gap-2"
 										>
 											<ExternalLink className="h-4 w-4" />
@@ -651,7 +578,10 @@ export function GitHubOAuthFlow({ onSuccess, onCancel }: GitHubOAuthFlowProps) {
 					)}
 
 					<div className="flex justify-center gap-3">
-						<Button onClick={handleStartAuth} variant="outline">
+						<Button
+							onClick={failedStep === "auth" ? handleStartAuth : handleRetry}
+							variant="outline"
+						>
 							{t("common:buttons.retry")}
 						</Button>
 						{onCancel && (

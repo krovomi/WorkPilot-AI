@@ -4,7 +4,8 @@ Swarm Mode Runner — Multi-Agent Parallel Execution
 
 Entry point for the Electron frontend to launch swarm execution.
 Analyzes subtask dependencies, schedules waves, and orchestrates
-parallel agent execution with semantic merge between waves.
+parallel agent execution, each subtask in its own worktree, merged into the
+task's branch after each wave.
 
 Usage (CLI):
     python swarm_runner.py --spec 001-feature --project-dir /path/to/project
@@ -214,16 +215,6 @@ def main() -> None:
         action="store_true",
         help="Only analyze dependencies, don't execute",
     )
-    parser.add_argument(
-        "--no-merge",
-        action="store_true",
-        help="Skip semantic merge between waves",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Dry run — don't write any files during merge",
-    )
 
     args = parser.parse_args()
     project_dir = Path(args.project_dir).resolve()
@@ -239,8 +230,6 @@ def main() -> None:
     config = SwarmConfig(
         max_parallel_agents=args.max_parallel,
         fail_fast=args.fail_fast,
-        merge_after_each_wave=not args.no_merge,
-        dry_run=args.dry_run,
     )
 
     result = asyncio.run(

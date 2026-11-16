@@ -28,6 +28,7 @@ with the same library ids.
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass, field
 
@@ -87,7 +88,10 @@ class Library:
 
     @classmethod
     def from_payload(cls, payload: dict) -> Library:
-        versions = payload.get("versions") or []
+        versions = payload.get("versions")
+        if not isinstance(versions, list):
+            # A bare string would otherwise come back one character per version.
+            versions = []
         return cls(
             id=str(payload.get("id", "")),
             title=str(payload.get("title", "")),
@@ -101,9 +105,12 @@ class Library:
 
 def _as_float(value: object) -> float:
     try:
-        return float(value)  # type: ignore[arg-type]
+        number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0.0
+    # "Infinity" parses, and `int()` of it raises: an index entry is a ranking
+    # input, not something allowed to take the whole search down.
+    return number if math.isfinite(number) else 0.0
 
 
 def api_key_from_env(env: dict | None = None) -> str:

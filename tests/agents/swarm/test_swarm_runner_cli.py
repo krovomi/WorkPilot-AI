@@ -91,8 +91,6 @@ def test_the_analysis_groups_independent_subtasks_into_waves(project: Path):
         "--max-parallel",
         "2",
         "--fail-fast",
-        "--no-merge",
-        "--dry-run",
     )
     assert code == 0
     started, analysis = events
@@ -100,8 +98,6 @@ def test_the_analysis_groups_independent_subtasks_into_waves(project: Path):
     assert started["spec_dir"].endswith("007-login")
     assert started["config"]["max_parallel_agents"] == 2
     assert started["config"]["fail_fast"] is True
-    assert started["config"]["merge_after_each_wave"] is False
-    assert started["config"]["dry_run"] is True
     assert analysis["type"] == "analysis_complete"
     assert [w["subtask_ids"] for w in analysis["waves"]] == [["s1", "s3"], ["s2"]]
     assert analysis["parallelism_stats"]["speedup_estimate"] == 1.5
