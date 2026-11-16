@@ -30,6 +30,8 @@ export function PlanApprovalSection({
 	const { t } = useTranslation(["tasks"]);
 	const [isApproving, setIsApproving] = useState(false);
 	const [isRejecting, setIsRejecting] = useState(false);
+	// The first "Request changes" opens the reason field, the second sends it.
+	const [showReason, setShowReason] = useState(false);
 	const [rejectionReason, setRejectionReason] = useState("");
 
 	const isPlanReview =
@@ -57,6 +59,10 @@ export function PlanApprovalSection({
 	};
 
 	const handleReject = async () => {
+		if (!showReason) {
+			setShowReason(true);
+			return;
+		}
 		setIsRejecting(true);
 		try {
 			// Reject the plan with optional feedback
@@ -68,6 +74,7 @@ export function PlanApprovalSection({
 			if (success) {
 				onRejected?.();
 				setRejectionReason("");
+				setShowReason(false);
 			}
 		} catch (err) {
 			console.error("Error rejecting plan:", err);
@@ -95,7 +102,7 @@ export function PlanApprovalSection({
 				</div>
 
 				{/* Rejection reason textarea - shown when user wants to reject */}
-				{isRejecting && (
+				{showReason && (
 					<div className="mb-4">
 						<label
 							htmlFor="plan-rejection-reason"
@@ -110,7 +117,7 @@ export function PlanApprovalSection({
 							placeholder={t("tasks:modal.plan.rejectionPlaceholder")}
 							className="w-full px-3 py-2 text-sm placeholder-muted-foreground min-h-0"
 							rows={3}
-							disabled={isSubmitting}
+							disabled={isSubmitting || isRejecting}
 						/>
 					</div>
 				)}
@@ -152,10 +159,22 @@ export function PlanApprovalSection({
 						) : (
 							<>
 								<XCircle className="h-4 w-4 mr-2" />
-								{t("tasks:modal.plan.rejectPlan")}
+								{showReason
+									? t("tasks:modal.plan.sendRejection")
+									: t("tasks:modal.plan.rejectPlan")}
 							</>
 						)}
 					</Button>
+					{showReason && (
+						<Button
+							onClick={() => setShowReason(false)}
+							disabled={isRejecting}
+							size="sm"
+							variant="ghost"
+						>
+							{t("tasks:modal.plan.cancel")}
+						</Button>
+					)}
 				</div>
 
 				{/* Last resort: the proposed subtasks are not worth fixing — wipe

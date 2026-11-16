@@ -1,5 +1,6 @@
 {
   "include": [
+    "agent_snapshots",
     "best_of_n",
     "bench",
     "deploy_watch",

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	checkGitHubConnection,
-	loadAllGitHubIssues,
 	loadGitHubIssues,
 	loadMoreGitHubIssues,
 	useIssuesStore,
@@ -22,40 +22,42 @@ export function useGitHubIssues(projectId: string | undefined) {
 		setFilterState,
 		getFilteredIssues,
 		getOpenIssuesCount,
-	} = useIssuesStore();
+	} = useIssuesStore(
+		useShallow((state) => ({
+			issues: state.issues,
+			isLoading: state.isLoading,
+			isLoadingMore: state.isLoadingMore,
+			error: state.error,
+			selectedIssueNumber: state.selectedIssueNumber,
+			filterState: state.filterState,
+			hasMore: state.hasMore,
+			selectIssue: state.selectIssue,
+			setFilterState: state.setFilterState,
+			getFilteredIssues: state.getFilteredIssues,
+			getOpenIssuesCount: state.getOpenIssuesCount,
+		})),
+	);
 
-	const { syncStatus } = useSyncStatusStore();
-
-	// Track if we've checked connection for this mount
-	const hasCheckedRef = useRef(false);
+	const syncStatus = useSyncStatusStore((state) => state.syncStatus);
 
 	// Track if search is active (need to load all issues for search)
 	const [isSearchActive, setIsSearchActive] = useState(false);
 
-	// Reset search state when projectId changes to prevent incorrect fetchAll mode
+	// Check the connection (settings may have changed) and leave search mode
+	// whenever the project changes.
 	useEffect(() => {
 		setIsSearchActive(false);
-	}, []);
-
-	// Always check connection when component mounts or projectId changes
-	useEffect(() => {
 		if (projectId) {
-			// Always check connection on mount (in case settings changed)
 			checkGitHubConnection(projectId);
-			hasCheckedRef.current = true;
 		}
 	}, [projectId]);
 
-	// Load issues when filter changes or after connection is established
-	// Note: isSearchActive is NOT in deps because handleSearchStart/handleSearchClear
-	// already handle loading issues when search state changes. Including it would cause
-	// duplicate API calls.
+	// The one place issues load: on connection, and whenever the filter or the
+	// search mode changes (a search needs every issue, not one page).
 	useEffect(() => {
 		if (projectId && syncStatus?.connected) {
-			// If search is active, load all issues for complete search
 			loadGitHubIssues(projectId, filterState, isSearchActive);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [projectId, filterState, syncStatus?.connected, isSearchActive]);
 
 	const handleRefresh = useCallback(() => {
@@ -81,23 +83,10 @@ export function useGitHubIssues(projectId: string | undefined) {
 		}
 	}, [projectId, filterState, isSearchActive]);
 
-	// When user starts searching, load all issues
-	const handleSearchStart = useCallback(() => {
-		if (!isSearchActive && projectId) {
-			setIsSearchActive(true);
-			// Load all issues for search
-			loadAllGitHubIssues(projectId, filterState);
-		}
-	}, [isSearchActive, projectId, filterState]);
-
-	// When user clears search, reset to paginated mode
-	const handleSearchClear = useCallback(() => {
-		if (isSearchActive && projectId) {
-			setIsSearchActive(false);
-			// Reset to paginated loading
-			loadGitHubIssues(projectId, filterState, false);
-		}
-	}, [isSearchActive, projectId, filterState]);
+	// Searching loads every issue, clearing the search goes back to pages:
+	// the loading effect above does both when the mode changes.
+	const handleSearchStart = useCallback(() => setIsSearchActive(true), []);
+	const handleSearchClear = useCallback(() => setIsSearchActive(false), []);
 
 	// Compute selectedIssue from issues array
 	const selectedIssue = useMemo(() => {

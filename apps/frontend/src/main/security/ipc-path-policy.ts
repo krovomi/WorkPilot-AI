@@ -90,6 +90,7 @@ export const DIRECTORY_ARGS: Readonly<Record<string, readonly number[]>> = {
 	"liveCompanion:getSuggestions": [0],
 	"liveCompanion:getTakeovers": [0],
 	"liveCompanion:start": [0],
+	"selfHealing:bisect": [0],
 	"selfHealing:cancelOperation": [0],
 	"selfHealing:cicd:config": [0],
 	"selfHealing:cicd:disable": [0],
