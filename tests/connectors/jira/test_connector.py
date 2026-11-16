@@ -17,7 +17,6 @@ import pytest
 
 from src.connectors.jira.connector import JiraConnector
 from src.connectors.jira.models import (
-    JiraComment,
     JiraIssue,
     JiraProject,
     JiraStatus,
