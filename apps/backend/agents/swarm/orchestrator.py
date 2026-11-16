@@ -370,70 +370,10 @@ class SwarmOrchestrator:
             },
         )
 
-        completed_ids = [r.subtask_id for r in result.results if r.success]
-        if not completed_ids:
-            wave.merge_success = True
-            return
-
-        try:
-            from merge.models import TaskMergeRequest
-            from merge.orchestrator import MergeOrchestrator
-
-            merge_requests = []
-            for subtask_id in completed_ids:
-                node = nodes.get(subtask_id)
-                if node and node.worktree_path:
-                    merge_requests.append(
-                        TaskMergeRequest(
-                            task_id=subtask_id,
-                            worktree_path=node.worktree_path,
-                            intent=node.description,
-                            priority=node.wave_index,
-                        )
-                    )
-
-            if not merge_requests:
-                wave.merge_success = True
-                return
-
-            orchestrator = MergeOrchestrator(
-                project_dir=self.project_dir,
-                enable_ai=self.config.enable_ai_merge,
-                dry_run=self.config.dry_run,
-            )
-            report = orchestrator.merge_tasks(
-                merge_requests,
-                target_branch="HEAD",
-            )
-
-            wave.merge_success = report.success
-
-            emit_swarm_event(
-                "wave_merged",
-                {
-                    "wave_index": wave.index,
-                    "success": report.success,
-                    "stats": report.stats.to_dict(),
-                },
-            )
-
-            if not report.success:
-                logger.warning(
-                    "Wave %d merge had issues: %d files need review",
-                    wave.index,
-                    report.stats.files_need_review,
-                )
-
-        except Exception as e:
-            logger.error("Wave %d merge failed: %s", wave.index, e, exc_info=True)
-            wave.merge_success = False
-            emit_swarm_event(
-                "wave_merge_failed",
-                {
-                    "wave_index": wave.index,
-                    "error": str(e),
-                },
-            )
+        # A swarm's subtasks all run in the task's own worktree (the executor
+        # starts them in the project directory), so their work is already in
+        # one place: there is nothing to merge between them.
+        wave.merge_success = True
 
     async def _final_merge(
         self,

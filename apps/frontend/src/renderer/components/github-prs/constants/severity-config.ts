@@ -71,7 +71,6 @@ export const CATEGORY_ICONS: Record<string, typeof Shield> = {
 	performance: Zap,
 	style: Code,
 	pattern: Code,
-	logic: AlertCircle,
 };
 
 export function getCategoryIcon(category: string) {

@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
-import { ipcMain } from "electron";
+import { prIpcMain as ipcMain } from "./pr-ipc-guard";
 import { IPC_CHANNELS, MODEL_ID_MAP } from "../../../shared/constants";
 import type { Project } from "../../../shared/types";
 import type { AuthFailureInfo } from "../../../shared/types/terminal";

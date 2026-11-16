@@ -607,6 +607,39 @@ describe("UsageIndicator popover and accounts", () => {
 		expect(screen.getByRole("button", { name: /Active Account/ })).toHaveTextContent("UN");
 	});
 
+	it("shows the plan of the active account and of the other accounts", async () => {
+		api.requestUsageUpdate.mockResolvedValue({
+			success: true,
+			data: snapshot({ plan: { billing: "subscription", name: "Claude Max 20x" } }),
+		});
+		api.requestAllProfilesUsage.mockResolvedValue(
+			allProfiles([profile({ plan: { billing: "subscription", name: "Claude Pro" } })]),
+		);
+		render(<UsageIndicator />);
+		await openPopover();
+		const active = screen.getByRole("button", { name: /Active Account/ });
+		expect(active).toHaveTextContent("Claude Max 20x");
+		const other = await screen.findByRole("button", { name: /Grace Hopper/ });
+		expect(other).toHaveTextContent("Claude Pro");
+	});
+
+	it("says an API key is billed per use, and shows no plan when none is known", async () => {
+		api.requestUsageUpdate.mockResolvedValueOnce({
+			success: true,
+			data: snapshot({ plan: { billing: "api" } }),
+		});
+		const first = render(<UsageIndicator />);
+		await openPopover();
+		expect(screen.getByRole("button", { name: /Active Account/ })).toHaveTextContent(
+			"API key · pay as you go",
+		);
+		first.unmount();
+		api.requestUsageUpdate.mockResolvedValue({ success: true, data: snapshot() });
+		render(<UsageIndicator />);
+		await openPopover();
+		expect(screen.queryByTestId("usage-plan-badge")).toBeNull();
+	});
+
 	it("does not look up Claude accounts for another provider", async () => {
 		state.provider = "copilot";
 		api.requestUsageUpdate.mockResolvedValue({
