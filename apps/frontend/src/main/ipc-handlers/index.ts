@@ -35,6 +35,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerDeviceMatrixHandlers } from "./device-matrix-handlers";
 import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
@@ -46,6 +47,7 @@ import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+import { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -135,6 +137,7 @@ import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
+import { registerSmartEstimationCalibrationHandlers } from "./smart-estimation-calibration-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
 import { registerOnboardingAgentHandlers } from "./onboarding-agent-handlers";
 import { registerSandboxHandlers } from "./sandbox-handlers";
@@ -180,6 +183,7 @@ export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+export { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
 export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -441,6 +445,7 @@ export function setupIpcHandlers(
 
 	// Smart Estimation handlers
 	setupSmartEstimationHandlers();
+	registerSmartEstimationCalibrationHandlers();
 
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
@@ -456,6 +461,8 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	// Device matrix: presets rendered and captured by the main (#383)
+	registerDeviceMatrixHandlers();
 	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
@@ -474,6 +481,8 @@ export function setupIpcHandlers(
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
 	registerBrowserAgentHandlers();
+	// Its recorder: a session the person drives, exported as a test (#387)
+	registerBrowserRecorderHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
