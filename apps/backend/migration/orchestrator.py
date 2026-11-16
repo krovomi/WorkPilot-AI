@@ -18,6 +18,23 @@ from .models import MigrationContext, MigrationState, StackInfo
 from .planner import MigrationPlanner
 
 
+def known_pair(source: StackInfo, target: StackInfo) -> tuple[str, str] | None:
+    """The planner's pair for this migration, frameworks first, then languages.
+
+    A framework pair is the closest match (React to Vue); a language pair
+    covers a project whose framework stays (a React app moved from JavaScript
+    to TypeScript, a Spring service from Java to Kotlin).
+    """
+    for key in (
+        (source.framework, target.framework),
+        (source.language, target.framework),
+        (source.language, target.language),
+    ):
+        if key in SUPPORTED_MIGRATIONS:
+            return key
+    return None
+
+
 class MigrationOrchestrator:
     """Detects the source stack and plans a migration to a target."""
 
@@ -42,9 +59,8 @@ class MigrationOrchestrator:
             version="latest",
         )
 
-        if (source_stack.framework, target_stack.framework) not in (
-            SUPPORTED_MIGRATIONS
-        ):
+        key = known_pair(source_stack, target_stack)
+        if key is None:
             raise ValueError(
                 f"Migration from {source_stack.framework} to {target_stack.framework} "
                 "is not supported"
@@ -56,7 +72,7 @@ class MigrationOrchestrator:
             target_stack=target_stack,
             project_dir=str(self.project_dir),
             state=MigrationState.PLANNING,
-            plan=MigrationPlanner(source_stack, target_stack).create_plan(),
+            plan=MigrationPlanner(source_stack, target_stack, key).create_plan(),
         )
         self._save_context(self.context)
         return self.context
