@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useProjectStore } from "./project-store";
+import { loadTasks } from "./task-store";
 import type {
 	GitLabInvestigationResult,
 	GitLabInvestigationStatus,
@@ -23,8 +25,6 @@ interface GitLabState {
 
 	// Actions
 	setIssues: (issues: GitLabIssue[]) => void;
-	addIssue: (issue: GitLabIssue) => void;
-	updateIssue: (issueIid: number, updates: Partial<GitLabIssue>) => void;
 	setSyncStatus: (status: GitLabSyncStatus | null) => void;
 	setLoading: (loading: boolean) => void;
 	setError: (error: string | null) => void;
@@ -32,10 +32,8 @@ interface GitLabState {
 	setFilterState: (state: "opened" | "closed" | "all") => void;
 	setInvestigationStatus: (status: GitLabInvestigationStatus) => void;
 	setInvestigationResult: (result: GitLabInvestigationResult | null) => void;
-	clearIssues: () => void;
 
 	// Selectors
-	getSelectedIssue: () => GitLabIssue | null;
 	getFilteredIssues: () => GitLabIssue[];
 	getOpenIssuesCount: () => number;
 }
@@ -58,18 +56,6 @@ export const useGitLabStore = create<GitLabState>((set, get) => ({
 	// Actions
 	setIssues: (issues) => set({ issues, error: null }),
 
-	addIssue: (issue) =>
-		set((state) => ({
-			issues: [issue, ...state.issues.filter((i) => i.iid !== issue.iid)],
-		})),
-
-	updateIssue: (issueIid, updates) =>
-		set((state) => ({
-			issues: state.issues.map((issue) =>
-				issue.iid === issueIid ? { ...issue, ...updates } : issue,
-			),
-		})),
-
 	setSyncStatus: (syncStatus) => set({ syncStatus }),
 
 	setLoading: (isLoading) => set({ isLoading }),
@@ -85,22 +71,7 @@ export const useGitLabStore = create<GitLabState>((set, get) => ({
 	setInvestigationResult: (lastInvestigationResult) =>
 		set({ lastInvestigationResult }),
 
-	clearIssues: () =>
-		set({
-			issues: [],
-			syncStatus: null,
-			selectedIssueIid: null,
-			error: null,
-			investigationStatus: { phase: "idle", progress: 0, message: "" },
-			lastInvestigationResult: null,
-		}),
-
 	// Selectors
-	getSelectedIssue: () => {
-		const { issues, selectedIssueIid } = get();
-		return issues.find((i) => i.iid === selectedIssueIid) || null;
-	},
-
 	getFilteredIssues: () => {
 		const { issues, filterState } = get();
 		if (filterState === "all") return issues;
@@ -119,8 +90,9 @@ export async function loadGitLabIssues(
 	state?: "opened" | "closed" | "all",
 ): Promise<void> {
 	const store = useGitLabStore.getState();
-	store.setLoading(true);
+	// setError also clears the loading flag, so it goes first.
 	store.setError(null);
+	store.setLoading(true);
 
 	// Sync filterState with the requested state
 	if (state) {
@@ -182,28 +154,45 @@ export function investigateGitLabIssue(
 	);
 }
 
-export async function importGitLabIssues(
-	projectId: string,
-	issueIids: number[],
-): Promise<boolean> {
-	const store = useGitLabStore.getState();
-	store.setLoading(true);
+/**
+ * Follow GitLab issue investigations for the life of the window (registered by
+ * global-listeners.ts): the issues page unmounts when it is left, and an
+ * investigation that ended meanwhile used to stay "investigating" forever.
+ * Only the project on screen is followed, read when the event arrives.
+ */
+export function setupGitLabInvestigationListeners(): () => void {
+	const isShown = (projectId: string) =>
+		useProjectStore.getState().selectedProjectId === projectId;
+	const store = () => useGitLabStore.getState();
 
-	try {
-		const result = await window.electronAPI.importGitLabIssues(
-			projectId,
-			issueIids,
-		);
-		if (result.success) {
-			return true;
-		} else {
-			store.setError(result.error || "Failed to import GitLab issues");
-			return false;
-		}
-	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
-		return false;
-	} finally {
-		store.setLoading(false);
-	}
+	const cleanupProgress = window.electronAPI.onGitLabInvestigationProgress(
+		(projectId, status) => {
+			if (isShown(projectId)) store().setInvestigationStatus(status);
+		},
+	);
+	const cleanupComplete = window.electronAPI.onGitLabInvestigationComplete(
+		(projectId, result) => {
+			if (!isShown(projectId)) return;
+			store().setInvestigationResult(result);
+			// The new task appears on the Kanban board.
+			if (result.success && result.taskId) loadTasks(projectId);
+		},
+	);
+	const cleanupError = window.electronAPI.onGitLabInvestigationError(
+		(projectId, error) => {
+			if (!isShown(projectId)) return;
+			store().setError(error);
+			store().setInvestigationStatus({
+				phase: "error",
+				progress: 0,
+				message: error,
+			});
+		},
+	);
+
+	return () => {
+		cleanupProgress();
+		cleanupComplete();
+		cleanupError();
+	};
 }
