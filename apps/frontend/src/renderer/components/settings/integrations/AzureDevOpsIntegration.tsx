@@ -9,7 +9,7 @@ import {
 	Radio,
 	RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
 	AzureDevOpsRepository,
@@ -61,7 +61,7 @@ function RepositorySelect({
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const fetchRepositories = async () => {
+	const fetchRepositories = useCallback(async () => {
 		setIsLoading(true);
 		setError(null);
 		try {
@@ -79,30 +79,39 @@ function RepositorySelect({
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [projectId, t]);
 
 	useEffect(() => {
 		fetchRepositories();
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
 	}, [fetchRepositories]);
 
-	// Auto-detect and select repository on first load
+	// With no repository set, the one of the project's git remote is picked, once per project.
+	const onChangeRef = useRef(onChange);
+	onChangeRef.current = onChange;
+	const hasValue = Boolean(value);
+	// The project shown now: a detection that answers for another one is dropped.
+	const shownProject = useRef<string | null>(null);
 	useEffect(() => {
-		const autoDetectRepository = async () => {
-			if (value) {
-				return;
-			}
-
-			const result =
-				await globalThis.electronAPI.detectAzureDevOpsRepository(projectId);
-
-			if (result.success && result.data?.repository) {
-				onChange(result.data.repository);
-			}
+		shownProject.current = projectId;
+		return () => {
+			shownProject.current = null;
 		};
-
-		autoDetectRepository();
-	}, [projectId, value, onChange]);
+	}, [projectId]);
+	const detectedFor = useRef<string | null>(null);
+	useEffect(() => {
+		if (hasValue || detectedFor.current === projectId) return;
+		detectedFor.current = projectId;
+		globalThis.electronAPI
+			.detectAzureDevOpsRepository(projectId)
+			.then((result) => {
+				if (shownProject.current === projectId && result.success && result.data?.repository) {
+					onChangeRef.current(result.data.repository);
+				}
+			})
+			.catch(() => {
+				// No remote to read: the person picks the repository from the list.
+			});
+	}, [projectId, hasValue]);
 
 	if (error) {
 		return (
@@ -135,10 +144,14 @@ function RepositorySelect({
 
 	return (
 		<Select value={value || ""} onValueChange={onChange} disabled={disabled}>
-			<SelectTrigger>
+			<SelectTrigger id="azure-devops-repository">
 				<SelectValue placeholder={t("azureDevOps.repositoryPlaceholder")} />
 			</SelectTrigger>
 			<SelectContent>
+				{/* A saved repository missing from the list is still shown as chosen. */}
+				{value && !repositories.some((repo) => repo.name === value) && (
+					<SelectItem value={value}>{value}</SelectItem>
+				)}
 				{repositories.map((repo) => (
 					<SelectItem key={repo.id} value={repo.name}>
 						{repo.name}
@@ -185,8 +198,8 @@ export function AzureDevOpsIntegration({
 				// Format: https://organization.visualstudio.com/
 				return hostname.replace(".visualstudio.com", "");
 			}
-		} catch (error) {
-			console.error("Invalid Azure DevOps URL:", error);
+		} catch {
+			// An address still being typed: the generic token page is linked.
 		}
 
 		return null;
@@ -207,7 +220,7 @@ export function AzureDevOpsIntegration({
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<div className="space-y-0.5">
-					<Label className="font-normal text-foreground">
+					<Label htmlFor="azure-devops-enabled" className="font-normal text-foreground">
 						{t("azureDevOps.enableSyncLabel")}
 					</Label>
 					<p className="text-xs text-muted-foreground">
@@ -215,6 +228,7 @@ export function AzureDevOpsIntegration({
 					</p>
 				</div>
 				<Switch
+					id="azure-devops-enabled"
 					data-guide={GUIDE_ANCHORS.azureDevOps.enable}
 					checked={envConfig.azureDevOpsEnabled}
 					onCheckedChange={(checked) =>
@@ -227,13 +241,14 @@ export function AzureDevOpsIntegration({
 				<>
 					{/* Organization URL */}
 					<div className="space-y-2">
-						<Label className="text-sm font-medium text-foreground">
+						<Label htmlFor="azure-devops-org-url" className="text-sm font-medium text-foreground">
 							{t("azureDevOps.orgUrlLabel")}
 						</Label>
 						<p className="text-xs text-muted-foreground">
 							{t("azureDevOps.orgUrlDescription")}
 						</p>
 						<Input
+							id="azure-devops-org-url"
 							data-guide={GUIDE_ANCHORS.azureDevOps.orgUrl}
 							type="url"
 							placeholder={t("azureDevOps.orgUrlPlaceholder")}
@@ -246,7 +261,7 @@ export function AzureDevOpsIntegration({
 
 					{/* Personal Access Token */}
 					<div className="space-y-2">
-						<Label className="text-sm font-medium text-foreground">
+						<Label htmlFor="azure-devops-pat" className="text-sm font-medium text-foreground">
 							{t("azureDevOps.patLabel")}
 						</Label>
 						<p className="text-xs text-muted-foreground">
@@ -263,6 +278,7 @@ export function AzureDevOpsIntegration({
 						</p>
 						<div className="relative">
 							<Input
+								id="azure-devops-pat"
 								data-guide={GUIDE_ANCHORS.azureDevOps.pat}
 								type={showAzureDevOpsPat ? "text" : "password"}
 								placeholder={t("azureDevOps.patPlaceholder")}
@@ -291,6 +307,7 @@ export function AzureDevOpsIntegration({
 								<button
 									type="button"
 									onClick={() => setShowAzureDevOpsPat(!showAzureDevOpsPat)}
+									aria-label={t(showAzureDevOpsPat ? "azureDevOps.patHide" : "azureDevOps.patShow")}
 									className="text-muted-foreground hover:text-foreground"
 								>
 									{showAzureDevOpsPat ? (
@@ -308,7 +325,7 @@ export function AzureDevOpsIntegration({
 						className="space-y-2"
 						data-guide={GUIDE_ANCHORS.azureDevOps.repository}
 					>
-						<Label className="text-sm font-medium text-foreground">
+						<Label htmlFor="azure-devops-repository" className="text-sm font-medium text-foreground">
 							{t("azureDevOps.repositoryLabel")}
 						</Label>
 						<p className="text-xs text-muted-foreground">
@@ -467,14 +484,14 @@ function AutoSyncToggle({ enabled, onToggle, t }: AutoSyncToggleProps) {
 	return (
 		<div className="flex items-center justify-between">
 			<div className="space-y-0.5">
-				<Label className="font-normal text-foreground">
+				<Label htmlFor="azure-devops-auto-sync" className="font-normal text-foreground">
 					{t("azureDevOps.autoSyncLabel")}
 				</Label>
 				<p className="text-xs text-muted-foreground">
 					{t("azureDevOps.autoSyncDescription")}
 				</p>
 			</div>
-			<Switch checked={enabled} onCheckedChange={onToggle} />
+			<Switch id="azure-devops-auto-sync" checked={enabled} onCheckedChange={onToggle} />
 		</div>
 	);
 }
