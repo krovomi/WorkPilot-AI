@@ -35,6 +35,7 @@ import { registerTeamBotHandlers } from "./team-bot-handlers";
 import { registerApiExplorerHandlers } from "./api-explorer-handlers";
 import { registerApiWatcherHandlers } from "./api-watcher-handlers";
 import { registerAppEmulatorHandlers } from "./app-emulator-handlers";
+import { registerDeviceMatrixHandlers } from "./device-matrix-handlers";
 import { registerMobileHandlers } from "./mobile-handlers";
 import { registerAppUpdateHandlers } from "./app-update-handlers";
 import {
@@ -46,6 +47,7 @@ import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+import { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -87,7 +89,7 @@ import { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
-import { registerGitlabHandlers } from "./gitlab-handlers";
+import { registerGitlabHandlers } from "./gitlab";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -124,6 +126,7 @@ import { registerReleaseCoordinatorHandlers } from "./release-coordinator-handle
 import { setupQualityHandlers } from "./quality-handlers";
 import { registerRoadmapHandlers } from "./roadmap-handlers";
 import { registerScreenshotHandlers } from "./screenshot-handlers";
+import { registerSelfHealingBisectHandlers } from "./self-healing-bisect-handlers";
 import { registerSelfHealingHandlers } from "./self-healing-handlers";
 import { registerServerAdminHandlers } from "./server-admin-handlers";
 import { registerServerAuthHandlers } from "./server-auth-handlers";
@@ -134,6 +137,7 @@ import { registerJevHandlers } from "./jev-handlers";
 import { registerSecureStorageHandlers } from "./secure-storage-handlers";
 import { registerSettingsHandlers } from "./settings-handlers";
 import { setupSmartEstimationHandlers } from "./smart-estimation-handlers";
+import { registerSmartEstimationCalibrationHandlers } from "./smart-estimation-calibration-handlers";
 import { registerAgentCoachHandlers } from "./agent-coach-handlers";
 import { registerOnboardingAgentHandlers } from "./onboarding-agent-handlers";
 import { registerSandboxHandlers } from "./sandbox-handlers";
@@ -152,6 +156,7 @@ import { setupTestGenerationHandlers } from "./test-generation-handlers";
 import { registerTimeTravelHandlers } from "./time-travel-handlers";
 import { registerLocalBackendHandlers } from "./local-backend-handlers";
 import { registerReplayHandlers } from "./replay-handlers";
+import { registerReplayShareHandlers } from "./replay-share-handlers";
 import {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -178,6 +183,7 @@ export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+export { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
 export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -215,7 +221,7 @@ export { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
-export { registerGitlabHandlers } from "./gitlab-handlers";
+export { registerGitlabHandlers } from "./gitlab";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -267,6 +273,7 @@ export { registerTerminalHandlers } from "./terminal-handlers";
 export { setupTestGenerationHandlers } from "./test-generation-handlers";
 export { registerTimeTravelHandlers } from "./time-travel-handlers";
 export { registerReplayHandlers } from "./replay-handlers";
+export { registerReplayShareHandlers } from "./replay-share-handlers";
 export {
 	registerVisualProgrammingHandlers,
 	setupVisualProgrammingEventForwarding,
@@ -374,7 +381,7 @@ export function setupIpcHandlers(
 	registerGithubHandlers(agentManager, getMainWindow);
 
 	// GitLab integration handlers
-	registerGitlabHandlers(agentManager, getMainWindow);
+	registerGitlabHandlers(getMainWindow);
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
@@ -438,6 +445,7 @@ export function setupIpcHandlers(
 
 	// Smart Estimation handlers
 	setupSmartEstimationHandlers();
+	registerSmartEstimationCalibrationHandlers();
 
 	// Conflict Predictor handlers
 	setupConflictPredictorHandlers();
@@ -453,6 +461,8 @@ export function setupIpcHandlers(
 
 	// App Emulator handlers
 	registerAppEmulatorHandlers(getMainWindow);
+	// Device matrix: presets rendered and captured by the main (#383)
+	registerDeviceMatrixHandlers();
 	registerMobileHandlers(getMainWindow);
 
 	// Learning Loop handlers (Autonomous Agent Learning Loop)
@@ -467,9 +477,12 @@ export function setupIpcHandlers(
 
 	// Self-Healing Codebase + Incident Responder handlers
 	registerSelfHealingHandlers(getMainWindow);
+	registerSelfHealingBisectHandlers(getMainWindow);
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
 	registerBrowserAgentHandlers();
+	// Its recorder: a session the person drives, exported as a test (#387)
+	registerBrowserRecorderHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();
@@ -549,6 +562,7 @@ export function setupIpcHandlers(
 
 	// Agent Replay + Session History (recorded sessions, via the local backend)
 	registerReplayHandlers();
+	registerReplayShareHandlers();
 
 	// Phase 3-5 backend feature modules (#3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12)
 	registerPhase35FeatureHandlers(getMainWindow);

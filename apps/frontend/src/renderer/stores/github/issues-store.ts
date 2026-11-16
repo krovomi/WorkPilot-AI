@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { create } from "zustand";
 import type { GitHubIssue } from "../../../shared/types";
 
@@ -21,8 +22,6 @@ interface IssuesState {
 	// Actions
 	setIssues: (issues: GitHubIssue[]) => void;
 	appendIssues: (issues: GitHubIssue[]) => void;
-	addIssue: (issue: GitHubIssue) => void;
-	updateIssue: (issueNumber: number, updates: Partial<GitHubIssue>) => void;
 	setLoading: (loading: boolean) => void;
 	setLoadingMore: (loading: boolean) => void;
 	setError: (error: string | null) => void;
@@ -30,11 +29,9 @@ interface IssuesState {
 	setFilterState: (state: IssueFilterState) => void;
 	setHasMore: (hasMore: boolean) => void;
 	setCurrentPage: (page: number) => void;
-	clearIssues: () => void;
 	resetPagination: () => void;
 
 	// Selectors
-	getSelectedIssue: () => GitHubIssue | null;
 	getFilteredIssues: () => GitHubIssue[];
 	getOpenIssuesCount: () => number;
 }
@@ -63,18 +60,6 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
 			return { issues: [...state.issues, ...uniqueNewIssues] };
 		}),
 
-	addIssue: (issue) =>
-		set((state) => ({
-			issues: [issue, ...state.issues.filter((i) => i.number !== issue.number)],
-		})),
-
-	updateIssue: (issueNumber, updates) =>
-		set((state) => ({
-			issues: state.issues.map((issue) =>
-				issue.number === issueNumber ? { ...issue, ...updates } : issue,
-			),
-		})),
-
 	setLoading: (isLoading) => set({ isLoading }),
 
 	setLoadingMore: (isLoadingMore) => set({ isLoadingMore }),
@@ -89,15 +74,6 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
 
 	setCurrentPage: (currentPage) => set({ currentPage }),
 
-	clearIssues: () =>
-		set({
-			issues: [],
-			selectedIssueNumber: null,
-			error: null,
-			currentPage: 1,
-			hasMore: true,
-		}),
-
 	resetPagination: () =>
 		set({
 			currentPage: 1,
@@ -108,11 +84,6 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
 		}),
 
 	// Selectors
-	getSelectedIssue: () => {
-		const { issues, selectedIssueNumber } = get();
-		return issues.find((i) => i.number === selectedIssueNumber) || null;
-	},
-
 	getFilteredIssues: () => {
 		const { issues, filterState } = get();
 		if (filterState === "all") return issues;
@@ -139,8 +110,9 @@ export async function loadGitHubIssues(
 	fetchAll: boolean = false,
 ): Promise<void> {
 	const store = useIssuesStore.getState();
-	store.setLoading(true);
+	// setError also clears the loading flag, so it goes first.
 	store.setError(null);
+	store.setLoading(true);
 	store.resetPagination();
 
 	try {
@@ -155,10 +127,16 @@ export async function loadGitHubIssues(
 			store.setHasMore(result.data.hasMore);
 			store.setCurrentPage(1);
 		} else {
-			store.setError(result.error || "Failed to load GitHub issues");
+			store.setError(
+				result.error || i18n.t("common:githubIssues.loadFailed"),
+			);
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		store.setError(
+			error instanceof Error
+				? error.message
+				: i18n.t("common:githubIssues.unknownError"),
+		);
 	} finally {
 		store.setLoading(false);
 	}
@@ -205,48 +183,17 @@ export async function loadMoreGitHubIssues(
 			store.setHasMore(result.data.hasMore);
 			store.setCurrentPage(nextPage);
 		} else {
-			store.setError(result.error || "Failed to load more issues");
+			store.setError(
+				result.error || i18n.t("common:githubIssues.loadMoreFailed"),
+			);
 		}
 	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
+		store.setError(
+			error instanceof Error
+				? error.message
+				: i18n.t("common:githubIssues.unknownError"),
+		);
 	} finally {
 		store.setLoadingMore(false);
-	}
-}
-
-/**
- * Load ALL issues (for search functionality)
- * This fetches all pages so search can work across all issues
- */
-export async function loadAllGitHubIssues(
-	projectId: string,
-	state?: IssueFilterState,
-): Promise<void> {
-	return loadGitHubIssues(projectId, state, true);
-}
-
-export async function importGitHubIssues(
-	projectId: string,
-	issueNumbers: number[],
-): Promise<boolean> {
-	const store = useIssuesStore.getState();
-	store.setLoading(true);
-
-	try {
-		const result = await window.electronAPI.importGitHubIssues(
-			projectId,
-			issueNumbers,
-		);
-		if (result.success) {
-			return true;
-		} else {
-			store.setError(result.error || "Failed to import GitHub issues");
-			return false;
-		}
-	} catch (error) {
-		store.setError(error instanceof Error ? error.message : "Unknown error");
-		return false;
-	} finally {
-		store.setLoading(false);
 	}
 }

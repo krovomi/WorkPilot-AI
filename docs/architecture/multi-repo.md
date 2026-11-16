@@ -35,7 +35,8 @@ apps/frontend/src/main/multi-repo/
   host.ts              ce que le déroulé utilise de l'app : runner, projets, cartes, renderer
   service.ts           au plus un déroulé par orchestration
 apps/frontend/src/main/ipc-handlers/multi-repo-handlers.ts
-apps/frontend/src/renderer/components/multi-repo/  bouton « Multi-dépôts » de la barre du Kanban, dialogue
+apps/frontend/src/renderer/components/multi-repo/  dialogue (ouvert par « Multi-dépôts » du menu « ⋯ » du Kanban,
+                                                    kanban/KanbanMoreMenu.tsx)
 ```
 
 ## Le déroulé

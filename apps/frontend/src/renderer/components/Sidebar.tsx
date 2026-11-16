@@ -7,18 +7,11 @@ import {
 	type CollisionDetection,
 	closestCenter,
 	DndContext,
-	type DragEndEvent,
 	DragOverlay,
-	type DragStartEvent,
-	KeyboardSensor,
-	PointerSensor,
 	pointerWithin,
-	useSensor,
-	useSensors,
 } from "@dnd-kit/core";
 import {
 	SortableContext,
-	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 // Icons
@@ -79,12 +72,19 @@ import {
 	TooltipTrigger,
 } from "./ui/tooltip";
 import {
-	decodeSortableId,
 	encodeSortableId,
-	FAV_DROP_ID,
 	SortableWrapper,
-	type SortableKind,
 } from "./sidebar/sortable-primitives";
+import {
+	applyMenuLayout,
+	hasCustomOrder,
+	moveGroupBy,
+	moveItemBy,
+	moveItemToGroup,
+	movePinBy,
+} from "./sidebar/menu-layout";
+import { CustomizeBar, CustomizeMenuButton, RowMoveControls } from "./sidebar/MenuCustomizer";
+import { useMenuDnd } from "./sidebar/use-menu-dnd";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { NavIcon, navLabelTitle } from "./sidebar/ExperimentalMarker";
 import { EXPERIMENTAL_VIEWS } from "./sidebar/experimental-views";
@@ -97,8 +97,10 @@ import {
 import { serverForge, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { MenuModeCard } from "./sidebar/MenuModeCard";
+import { SidebarResizeHandle } from "./sidebar/SidebarResizeHandle";
 import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
-import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
+import { useSidebarResize } from "./sidebar/use-sidebar-resize";
+import { HiddenList, HideSuggestion, SIDEBAR_FOOTER_LINK } from "./sidebar/HiddenPages";
 import { LaboPanel } from "./sidebar/LaboPanel";
 import {
 	ESSENTIAL_VIEWS,
@@ -230,6 +232,9 @@ export { navItemLabelKey } from "./sidebar/nav-model";
  * The star of the rail is small: the pointer over it wins, then the nearest
  * sortable row, so a page dragged onto the star pins it.
  */
+/** The panel beside the rail, sized by the handle on its right edge. */
+const SIDEBAR_PANEL_ID = "sidebar-panel";
+
 const pointerFirst: CollisionDetection = (args) => {
 	const within = pointerWithin(args);
 	return within.length > 0 ? within : closestCenter(args);
@@ -273,8 +278,8 @@ export function Sidebar({
 		toggleItemPin,
 		unpinItems,
 		toggleGroupPin,
-		reorderGroups,
-		reorderItems,
+		arrange,
+		resetOrder,
 		setHideExperimental,
 		setActiveSpace,
 		chooseMenuMode,
@@ -282,7 +287,6 @@ export function Sidebar({
 		unhideItem,
 		snoozeHideSuggestions,
 		reset: resetSidebarPrefs,
-		mergeOrder,
 	} = useSidebarPrefs();
 	const pinnedItemsSet = useMemo(
 		() => new Set(sidebarPrefs.pinnedItems),
@@ -292,7 +296,9 @@ export function Sidebar({
 		() => new Set(sidebarPrefs.pinnedGroups),
 		[sidebarPrefs.pinnedGroups],
 	);
-	const [activeDragId, setActiveDragId] = useState<string | null>(null);
+	// « Personnaliser le menu »: grips always shown, and the same moves as
+	// the drag offered as buttons (`sidebar/MenuCustomizer.tsx`).
+	const [customizing, setCustomizing] = useState(false);
 	const shortcutBufferRef = useRef<string>("");
 	const shortcutBufferTimeRef = useRef<number>(0);
 
@@ -301,61 +307,12 @@ export function Sidebar({
 	// Sidebar collapsed state from settings
 	const isCollapsed = settings.sidebarCollapsed ?? false;
 
-	// Sidebar resizable width
-	// The whole menu, rail and panel; folded, only the rail stays.
-	const SIDEBAR_MIN_WIDTH = 240;
-	const SIDEBAR_MAX_WIDTH = 480;
-	const SIDEBAR_DEFAULT_WIDTH = 296;
-	const SIDEBAR_RAIL_WIDTH = 52; // w-13 of the rail
-
-	const sidebarWidth = settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH;
-	const [isResizing, setIsResizing] = useState(false);
-	const [resizeWidth, setResizeWidth] = useState(sidebarWidth);
-	const resizingRef = useRef(false);
-
-	// Sync resizeWidth when settings change externally
-	useEffect(() => {
-		if (!resizingRef.current) {
-			setResizeWidth(settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH);
-		}
-	}, [settings.sidebarWidth]);
-
-	const handleResizeStart = useCallback(
-		(e: React.MouseEvent) => {
-			e.preventDefault();
-			resizingRef.current = true;
-			setIsResizing(true);
-			const startX = e.clientX;
-			const startWidth = resizeWidth;
-
-			const handleMouseMove = (moveEvent: MouseEvent) => {
-				const newWidth = Math.min(
-					SIDEBAR_MAX_WIDTH,
-					Math.max(
-						SIDEBAR_MIN_WIDTH,
-						startWidth + (moveEvent.clientX - startX),
-					),
-				);
-				setResizeWidth(newWidth);
-			};
-
-			const handleMouseUp = () => {
-				resizingRef.current = false;
-				setIsResizing(false);
-				document.removeEventListener("mousemove", handleMouseMove);
-				document.removeEventListener("mouseup", handleMouseUp);
-				// Persist final width
-				setResizeWidth((prev) => {
-					saveSettings({ sidebarWidth: prev });
-					return prev;
-				});
-			};
-
-			document.addEventListener("mousemove", handleMouseMove);
-			document.addEventListener("mouseup", handleMouseUp);
-		},
-		[resizeWidth],
-	);
+	// Width of the menu: dragged or moved with the keyboard on its right edge.
+	const resize = useSidebarResize({
+		storedWidth: settings.sidebarWidth,
+		isCollapsed,
+		onCommit: saveSettings,
+	});
 
 	const toggleSidebar = () => {
 		saveSettings({ sidebarCollapsed: !isCollapsed });
@@ -379,12 +336,10 @@ export function Sidebar({
 	// Track the last loaded project ID to avoid redundant loads
 	const lastLoadedProjectIdRef = useRef<string | null>(null);
 
-	// Compute visible nav groups based on GitHub/GitLab enabled state from store,
-	// then apply the user's custom group + per-group item ordering from sidebarPrefs.
-	// Order merging is permissive: unknown ids in prefs are dropped, new ids fall
-	// through to their default code position — so shipping new menu items doesn't
-	// require a settings migration.
-	const visibleNavGroups = useMemo(() => {
+	// The groups the code ships, with the forge's entries and the
+	// administration when they apply, without the entries the gates hide
+	// (experimental views the user hid, views a server project lacks)…
+	const shippedNavGroups = useMemo(() => {
 		const groups = navGroups.map((g) => ({ ...g, items: [...g.items] }));
 
 		const integrationGroup = groups.find((g) => g.id === "git-integrations");
@@ -401,29 +356,9 @@ export function Sidebar({
 			groups.push({ ...administrationNavGroup, items: [...administrationNavGroup.items] });
 		}
 
-		// Apply custom group order
-		const actualGroupIds = groups.map((g) => g.id);
-		const orderedGroupIds = mergeOrder(sidebarPrefs.groupOrder, actualGroupIds);
-		const byId = new Map(groups.map((g) => [g.id, g]));
-		const orderedGroups = orderedGroupIds
-			.map((id) => byId.get(id))
-			.filter((g): g is NavGroup => Boolean(g));
-
-		// Apply custom per-group item order, without the experimental views
-		// when the user hid them
 		const gates = { serverProject, forge, hideExperimental: sidebarPrefs.hideExperimental === true };
-		return orderedGroups
-			.map((group) => {
-				const actualItemIds = group.items.map((i) => i.id);
-				const preferredOrder = sidebarPrefs.itemOrder[group.id] ?? [];
-				const orderedItemIds = mergeOrder(preferredOrder, actualItemIds);
-				const itemById = new Map(group.items.map((i) => [i.id, i]));
-				const items = orderedItemIds
-					.map((id) => itemById.get(id as SidebarView))
-					.filter((i): i is NavItem => Boolean(i))
-					.filter((i) => itemShown(i, gates));
-				return { ...group, items };
-			})
+		return groups
+			.map((group) => ({ ...group, items: group.items.filter((i) => itemShown(i, gates)) }))
 			.filter((group) => group.items.length > 0);
 	}, [
 		sidebarPrefs.hideExperimental,
@@ -432,10 +367,21 @@ export function Sidebar({
 		canAdminister,
 		serverProject,
 		forge,
-		sidebarPrefs.groupOrder,
-		sidebarPrefs.itemOrder,
-		mergeOrder,
 	]);
+
+	// …then arranged as the user arranged them (`sidebar/menu-layout.ts`):
+	// pages moved to another space, spaces and pages in their order. An id the
+	// code no longer ships is dropped, a new one keeps its shipped place, so a
+	// new menu entry needs no settings migration.
+	const visibleNavGroups = useMemo(
+		() =>
+			applyMenuLayout(shippedNavGroups, {
+				groupOrder: sidebarPrefs.groupOrder,
+				itemOrder: sidebarPrefs.itemOrder,
+				itemGroups: sidebarPrefs.itemGroups,
+			}),
+		[shippedNavGroups, sidebarPrefs.groupOrder, sidebarPrefs.itemOrder, sidebarPrefs.itemGroups],
+	);
 
 	// Build the synthetic "Favorites" group from pinned items and pinned groups.
 	// Pinned groups contribute all their items; pinned standalone items are added
@@ -648,109 +594,56 @@ export function Sidebar({
 		if (target) onViewChange?.(target);
 	};
 
-	// Require 6px of pointer movement before starting a drag so regular clicks on
-	// menu items (the most common interaction by far) never get swallowed by dnd-kit.
-	const dndSensors = useSensors(
-		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
-	);
-
-	interface SortableInfo {
-		kind: SortableKind;
-		id: string;
-	}
-
-	const handleDragStart = useCallback((event: DragStartEvent) => {
-		setActiveDragId(String(event.active.id));
-	}, []);
-
-	// Helper function to handle dropping on favorites
-	const handleFavoritesDrop = useCallback((activeInfo: SortableInfo) => {
-		if (activeInfo.kind === "item" && !pinnedItemsSet.has(activeInfo.id)) {
-			toggleItemPin(activeInfo.id);
-			return true;
-		}
-		if (activeInfo.kind === "group" && !pinnedGroupsSet.has(activeInfo.id)) {
-			toggleGroupPin(activeInfo.id);
-			return true;
-		}
-		return false;
-	}, [pinnedItemsSet, pinnedGroupsSet, toggleItemPin, toggleGroupPin]);
-
-	// Helper function to handle group reordering
-	const handleGroupReorder = useCallback((activeInfo: SortableInfo, overInfo: SortableInfo) => {
-		if (activeInfo.id === overInfo.id) return true;
-		const actualOrder = visibleNavGroups.map((g) => g.id);
-		reorderGroups(activeInfo.id, overInfo.id, actualOrder);
-		return true;
-	}, [visibleNavGroups, reorderGroups]);
-
-	// Helper function to handle item reordering within groups
-	const handleItemReorder = useCallback((activeInfo: SortableInfo, overInfo: SortableInfo) => {
-		if (activeInfo.id === overInfo.id) return true;
-		const group = visibleNavGroups.find(
-			(g) =>
-				g.items.some((i) => i.id === activeInfo.id) &&
-				g.items.some((i) => i.id === overInfo.id),
-		);
-		if (!group) return false;
-		const actualOrder = group.items.map((i) => i.id);
-		reorderItems(group.id, activeInfo.id, overInfo.id, actualOrder);
-		return true;
-	}, [visibleNavGroups, reorderItems]);
-
-	// Drag-end router. A drop's effect depends on the decoded "kind" of both
-	// active and over ids — group-onto-group reorders, item-onto-item reorders
-	// within the same group (cross-group drops are ignored to keep the mental
-	// model simple), and dropping an item onto the favorites zone pins it.
-	const handleDragEnd = useCallback(
-		(event: DragEndEvent) => {
-			setActiveDragId(null);
-			const { active, over } = event;
-			if (!over) return;
-
-			const activeInfo = decodeSortableId(String(active.id));
-			if (!activeInfo) return;
-
-			// Dropped on the star of the rail -> pin the page or the group. Its
-			// id has no kind, so it is checked before decoding (it never pinned
-			// while the decoding came first).
-			if (over.id === FAV_DROP_ID) {
-				handleFavoritesDrop(activeInfo);
-				return;
-			}
-			const overInfo = decodeSortableId(String(over.id));
-			if (!overInfo) return;
-
-			// Reorder groups (same kind, both "group")
-			if (activeInfo.kind === "group" && overInfo.kind === "group") {
-				handleGroupReorder(activeInfo, overInfo);
-				return;
-			}
-
-			// Reorder items within the same group
-			if (activeInfo.kind === "item" && overInfo.kind === "item") {
-				handleItemReorder(activeInfo, overInfo);
-			}
+	const entryOfPin = useCallback((pin: string) => entryIdOfView(pin as SidebarView), []);
+	const dnd = useMenuDnd({
+		shipped: shippedNavGroups,
+		arranged: visibleNavGroups,
+		arrange,
+		pinItem: (id) => {
+			if (!pinnedItemsSet.has(id)) toggleItemPin(id);
 		},
-		[
-			handleFavoritesDrop,
-			handleGroupReorder,
-			handleItemReorder,
-		],
-	);
+		pinGroup: (id) => {
+			if (!pinnedGroupsSet.has(id)) toggleGroupPin(id);
+		},
+		entryOfPin,
+	});
 
-	const dragLabel = (dragId: string) => {
-		const info = decodeSortableId(dragId);
-		if (!info) return null;
-		if (info.kind === "group") {
-			const group = visibleNavGroups.find((g) => g.id === info.id);
-			return group ? t(group.labelKey) : null;
-		}
-		const item = visibleNavGroups.flatMap((g) => g.items).find((i) => i.id === info.id);
-		return item ? t(item.labelKey) : null;
+	// Where a page can be moved while customizing: every other space.
+	const moveTargets = useMemo(
+		() => shippedNavGroups.map((group) => ({ id: group.id, labelKey: group.labelKey })),
+		[shippedNavGroups],
+	);
+	const ownPin = (item: NavItem) =>
+		sidebarPrefs.pinnedItems.some((pin) => entryOfPin(pin) === item.id);
+
+	// A row's controls while customizing, for a page of a space (`groupId`)
+	// or a pin of « Mon menu » (no group); `shown` is the list on screen.
+	const rowControls = (item: NavItem, shown: readonly string[], groupId: string | null) => {
+		if (!customizing) return undefined;
+		const at = shown.indexOf(item.id);
+		if (at === -1) return undefined;
+		const onMove = (delta: -1 | 1) =>
+			arrange((current) => {
+				if (groupId) return moveItemBy(current, visibleNavGroups, groupId, item.id, delta, shown);
+				return movePinBy(current, entryOfPin, item.id, delta, shown);
+			});
+		return (
+			<RowMoveControls
+				name={t(item.labelKey)}
+				canMoveUp={at > 0}
+				canMoveDown={at < shown.length - 1}
+				onMove={onMove}
+				targets={groupId ? moveTargets.filter((target) => target.id !== groupId) : []}
+				onMoveTo={
+					groupId
+						? (target) =>
+								arrange((current) =>
+									moveItemToGroup(current, shippedNavGroups, visibleNavGroups, item.id, target),
+								)
+						: undefined
+				}
+			/>
+		);
 	};
 
 	// The two-letter shortcut lives in the hover title, not on every row
@@ -762,6 +655,7 @@ export function Sidebar({
 	const renderNavItem = (
 		item: NavItem,
 		context: "default" | "favorites" = "default",
+		controls?: ReactNode,
 	) => {
 		const isActive = isOn(item, activeView);
 		const Icon = item.icon;
@@ -773,7 +667,7 @@ export function Sidebar({
 		// It is an absolute overlay so the nav button keeps the full row width,
 		// and only appears on hover/focus.
 		const starButton =
-			context === "favorites" ? null : (
+			context === "favorites" || controls ? null : (
 				<button
 					type="button"
 					onClick={(e) => {
@@ -820,6 +714,7 @@ export function Sidebar({
 					</span>
 					<ActivityBadge badge={badge} attention={hasAttention} />
 				</button>
+				{controls}
 				{starButton}
 			</div>
 		);
@@ -856,29 +751,22 @@ export function Sidebar({
 
 	const renderTooltipItems = (items: NavItem[]) => items.map(renderTooltipItem);
 
+	// A row of a space (`item:<id>`) or a pin of « Mon menu » (`pin:<id>`),
+	// both sortable. A page « Mon menu » shows because its whole group is
+	// pinned follows that group, so it has no grip of its own.
 	const renderPanelRow = (
 		item: NavItem,
 		delay: number,
-		context: "default" | "favorites" = "default",
+		context: "default" | "favorites",
+		controls?: ReactNode,
 	) => {
-		// Items inside the favorites group are mirrors of the originals — they are
-		// not independently sortable, so we skip the SortableWrapper there. This
-		// keeps dnd-kit ids unique (only "item:<id>" exists, not "fav-item:<id>").
-		if (context === "favorites") {
-			return (
-				<div
-					key={item.id}
-					className="animate-in slide-in-from-left-2 duration-200 ease-out"
-					style={{ animationDelay: `${delay}ms` }}
-				>
-					{renderNavItem(item, context)}
-				</div>
-			);
-		}
+		const sortable = context === "default" || ownPin(item);
 		return (
 			<SortableWrapper
 				key={item.id}
-				sortableId={encodeSortableId("item", item.id)}
+				sortableId={encodeSortableId(context === "favorites" ? "pin" : "item", item.id)}
+				disabled={!sortable}
+				revealed={customizing}
 			>
 				{({ setNodeRef, style, isDragging, dragHandle }) => (
 					<div
@@ -886,15 +774,17 @@ export function Sidebar({
 						style={{ ...style, animationDelay: `${delay}ms` }}
 						className={cn(
 							"relative group animate-in slide-in-from-left-2 duration-200 ease-out",
-							DRAG_SLOT_REVEAL,
+							!customizing && DRAG_SLOT_REVEAL,
 							isDragging &&
 								"ring-1 ring-primary/50 rounded-lg bg-background/80 backdrop-blur",
 						)}
 					>
-						<div data-drag-slot className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
-							{dragHandle}
-						</div>
-						{renderNavItem(item, context)}
+						{sortable && (
+							<div data-drag-slot className="absolute left-1 top-1/2 -translate-y-1/2 z-10">
+								{dragHandle}
+							</div>
+						)}
+						{renderNavItem(item, context, controls)}
 					</div>
 				)}
 			</SortableWrapper>
@@ -911,21 +801,23 @@ export function Sidebar({
 	const renderExpandedItems = (
 		items: NavItem[],
 		context: "default" | "favorites" = "default",
+		groupId: string | null = null,
 	) => {
-		const sortableIds = items.map((i) => encodeSortableId("item", i.id));
-		const content = (
-			<div className="space-y-0.5">
-				{items.map((item, index) => renderPanelRow(item, index * 50, context))}
-			</div>
-		);
-
-		if (context === "favorites") return content;
+		const kind = context === "favorites" ? "pin" : "item";
+		const sortableIds = items.map((i) => encodeSortableId(kind, i.id));
+		// The list the up and down buttons move through: a space's pages, or
+		// the pins that are the user's own (a pinned group's pages follow it).
+		const shown = (context === "favorites" ? items.filter(ownPin) : items).map((i) => i.id);
 		return (
 			<SortableContext
 				items={sortableIds}
 				strategy={verticalListSortingStrategy}
 			>
-				{content}
+				<div className="space-y-0.5">
+					{items.map((item, index) =>
+						renderPanelRow(item, index * 50, context, rowControls(item, shown, groupId)),
+					)}
+				</div>
 			</SortableContext>
 		);
 	};
@@ -1023,6 +915,8 @@ export function Sidebar({
 			? unusedEntries(spaceGroup.items, viewUsage, usageSince, now, pinnedItemsSet)
 			: [];
 	const hiddenHere = groupOfSpace?.items.filter((item) => hiddenSet.has(item.id)) ?? [];
+	// The space's place in the rail, when it is a group the rail can reorder
+	const spaceIndex = railGroups.findIndex((group) => group.id === space);
 	const spaceTitle =
 		space === MINE_SPACE ? t("navigation:spaces.mine") : spaceGroup ? t(spaceGroup.labelKey) : "";
 
@@ -1061,6 +955,7 @@ export function Sidebar({
 		sidebarPrefs.pinnedGroups.length > 0 ||
 		sidebarPrefs.groupOrder.length > 0 ||
 		Object.keys(sidebarPrefs.itemOrder).length > 0 ||
+		Object.keys(sidebarPrefs.itemGroups ?? {}).length > 0 ||
 		Boolean(sidebarPrefs.menuMode) ||
 		(sidebarPrefs.hiddenItems?.length ?? 0) > 0;
 
@@ -1077,7 +972,7 @@ export function Sidebar({
 
 	const railFooter = (
 		<>
-			{isCollapsed &&
+			{resize.folded &&
 				railIconButton(t("actions.newTask"), () => {
 					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
 				}, <Plus className="h-4 w-4" />)}
@@ -1094,9 +989,9 @@ export function Sidebar({
 			)}
 			{railIconButton(t("tooltips.settings"), onSettingsClick, <Settings className="h-4 w-4" />)}
 			{railIconButton(
-				isCollapsed ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
+				resize.folded ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
 				toggleSidebar,
-				isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
+				resize.folded ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
 			)}
 		</>
 	);
@@ -1104,31 +999,36 @@ export function Sidebar({
 	return (
 		<TooltipProvider>
 			<DndContext
-				sensors={dndSensors}
+				sensors={dnd.sensors}
+				accessibility={dnd.accessibility}
 				collisionDetection={pointerFirst}
-				onDragStart={handleDragStart}
-				onDragEnd={handleDragEnd}
-				onDragCancel={() => setActiveDragId(null)}
+				onDragStart={dnd.onDragStart}
+				onDragEnd={dnd.onDragEnd}
+				onDragCancel={dnd.onDragCancel}
 			>
 				<div
 					className={cn(
 						"relative flex h-full bg-sidebar border-r border-border",
-						!isResizing && "transition-[width] duration-300",
+						!resize.isResizing && "transition-[width] duration-300",
 					)}
-					style={{ width: isCollapsed ? SIDEBAR_RAIL_WIDTH : resizeWidth }}
+					style={{ width: resize.width }}
 				>
 					<SidebarRail
 						mine={mineSpace}
 						groups={railGroups.map(spaceOf)}
 						extras={laboItems.length > 0 ? [laboSpace] : []}
 						activeSpace={space}
-						isCollapsed={isCollapsed}
+						isCollapsed={resize.folded}
 						onSelect={selectSpace}
 						footer={railFooter}
 					/>
 
-					{!isCollapsed && (
-						<div className="flex min-w-0 flex-1 flex-col" data-testid="sidebar-panel">
+					{!resize.folded && (
+						<div
+							id={SIDEBAR_PANEL_ID}
+							className="flex min-w-0 flex-1 flex-col"
+							data-testid="sidebar-panel"
+						>
 							{/* Header with drag area - extra top padding for macOS traffic lights */}
 							<div className="electron-drag flex h-14 shrink-0 items-end px-4 pb-1.5">
 								<h2 className="electron-no-drag truncate text-base font-semibold text-foreground">
@@ -1155,6 +1055,21 @@ export function Sidebar({
 
 							<ScrollArea className="flex-1">
 								<div className="px-2 pb-4">
+									{customizing && (
+										<CustomizeBar
+											spaceName={spaceIndex === -1 ? null : spaceTitle}
+											canMoveSpaceUp={spaceIndex > 0}
+											canMoveSpaceDown={spaceIndex !== -1 && spaceIndex < railGroups.length - 1}
+											onMoveSpace={(delta) =>
+												arrange((current) =>
+													moveGroupBy(current, visibleNavGroups, space, delta, railGroups.map((g) => g.id)),
+												)
+											}
+											orderChanged={hasCustomOrder(sidebarPrefs)}
+											onResetOrder={resetOrder}
+											onDone={() => setCustomizing(false)}
+										/>
+									)}
 									{space === MINE_SPACE
 										? renderMine()
 										: space === LABO_SPACE
@@ -1166,7 +1081,7 @@ export function Sidebar({
 													onOpen={openNavItem}
 												/>
 											)
-											: spaceGroup && renderExpandedItems(spaceGroup.items)}
+											: spaceGroup && renderExpandedItems(spaceGroup.items, "default", spaceGroup.id)}
 									{unused.length > 0 && (
 										<div className="mt-4">
 											<HideSuggestion
@@ -1176,15 +1091,16 @@ export function Sidebar({
 											/>
 										</div>
 									)}
-									<div className="mt-4 space-y-1">
+									<div className="mt-4 space-y-0.5 border-t border-border/60 pt-3">
 										<HiddenList hidden={hiddenHere} onShow={unhideItem} />
+										{!customizing && <CustomizeMenuButton onStart={() => setCustomizing(true)} />}
 										{layoutChanged && (
 											<button
 												type="button"
 												onClick={resetSidebarPrefs}
-												className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+												className={SIDEBAR_FOOTER_LINK}
 											>
-												<RefreshCcw className="h-3 w-3" />
+												<RefreshCcw className="h-4 w-4 shrink-0" aria-hidden="true" />
 												{t("navigation:actions.resetLayout")}
 											</button>
 										)}
@@ -1192,8 +1108,9 @@ export function Sidebar({
 											type="button"
 											onClick={() => setHideExperimental(sidebarPrefs.hideExperimental !== true)}
 											aria-pressed={sidebarPrefs.hideExperimental === true}
-											className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+											className={SIDEBAR_FOOTER_LINK}
 										>
+											<FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
 											{sidebarPrefs.hideExperimental === true
 												? t("navigation:experimental.show", { count: EXPERIMENTAL_VIEWS.size })
 												: t("navigation:experimental.hide")}
@@ -1234,24 +1151,20 @@ export function Sidebar({
 						</div>
 					)}
 
-					{/* Resize handle */}
-					{!isCollapsed && (
-						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — mouse drag interaction
-						<div
-							onMouseDown={handleResizeStart}
-							className={cn(
-								"absolute top-0 right-0 w-1 h-full cursor-col-resize z-50 transition-colors",
-								"hover:bg-primary/40",
-								isResizing && "bg-primary/60",
-							)}
-						/>
-					)}
+					<SidebarResizeHandle
+						controls={SIDEBAR_PANEL_ID}
+						width={resize.width}
+						maxWidth={resize.maxWidth}
+						folded={resize.folded}
+						isResizing={resize.isResizing}
+						isDragging={resize.isDragging}
+						{...resize.handlers}
+					/>
 				</div>
 				<DragOverlay dropAnimation={null}>
-					{activeDragId ? (
+					{dnd.activeDragId ? (
 						<div className="rounded-lg bg-accent/80 backdrop-blur border border-primary/40 shadow-2xl px-3 py-2 text-sm">
-							{dragLabel(activeDragId)}
+							{dnd.dragLabel(dnd.activeDragId)}
 						</div>
 					) : null}
 				</DragOverlay>

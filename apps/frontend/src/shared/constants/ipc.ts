@@ -72,6 +72,8 @@ export const IPC_CHANNELS = {
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
 	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
 	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
+	TASK_SNAPSHOTS_LIST: "task:snapshotsList", // The git snapshots of a task's worktree taken before each agent session (runners/snapshot_runner.py)
+	TASK_SNAPSHOT_RESTORE: "task:snapshotRestore", // Put the task's worktree back on one snapshot; refused while an agent runs on it
 	TASK_LESSONS_GET: "task:lessonsGet", // The lessons the task's prompts carried, from every spec dir copy
 	TASK_LESSONS_SET_DISABLED: "task:lessonsSetDisabled", // Turn one lesson off (or back on) for this task, in every spec dir copy
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
@@ -169,8 +171,6 @@ export const IPC_CHANNELS = {
 	// Terminal session management
 	TERMINAL_GET_SESSIONS: "terminal:getSessions",
 	TERMINAL_RESTORE_SESSION: "terminal:restoreSession",
-	TERMINAL_CLEAR_SESSIONS: "terminal:clearSessions",
-	TERMINAL_RESUME_CLAUDE: "terminal:resumeClaude",
 	TERMINAL_ACTIVATE_DEFERRED_RESUME: "terminal:activateDeferredResume", // Trigger deferred Claude resume when terminal becomes active
 	TERMINAL_GET_SESSION_DATES: "terminal:getSessionDates",
 	TERMINAL_GET_SESSIONS_FOR_DATE: "terminal:getSessionsForDate",
@@ -210,8 +210,6 @@ export const IPC_CHANNELS = {
 	CLAUDE_PROFILE_VERIFY_AUTH: "claude:profileVerifyAuth", // Check if profile has been authenticated
 	CLAUDE_PROFILE_AUTO_SWITCH_SETTINGS: "claude:autoSwitchSettings",
 	CLAUDE_PROFILE_UPDATE_AUTO_SWITCH: "claude:updateAutoSwitch",
-	CLAUDE_PROFILE_FETCH_USAGE: "claude:fetchUsage",
-	CLAUDE_PROFILE_GET_BEST_PROFILE: "claude:getBestProfile",
 
 	// Account priority order (unified OAuth + API profile ordering)
 	ACCOUNT_PRIORITY_GET: "account:priorityGet",
@@ -354,11 +352,6 @@ export const IPC_CHANNELS = {
 	AZURE_DEVOPS_SYNC_TASK_AC: "azureDevOps:syncTaskAC",
 	AZURE_DEVOPS_HYDRATE_TASK_DISPLAY: "azureDevOps:hydrateTaskDisplay",
 
-	// Azure DevOps PR Review
-	AZURE_DEVOPS_PR_REVIEW: "azureDevOps:prReview",
-	AZURE_DEVOPS_PR_GET_REVIEW: "azureDevOps:prGetReview",
-	AZURE_DEVOPS_PR_REVIEW_CANCEL: "azureDevOps:prReviewCancel",
-	AZURE_DEVOPS_PR_POST_COMMENT: "azureDevOps:prPostComment",
 
 	// Jira integration
 	JIRA_GET_ISSUES: "jira:getIssues",
@@ -404,20 +397,15 @@ export const IPC_CHANNELS = {
 	GITHUB_INVESTIGATION_ERROR: "github:investigationError",
 
 	// GitLab integration
-	GITLAB_GET_PROJECTS: "gitlab:getProjects",
 	GITLAB_GET_ISSUES: "gitlab:getIssues",
-	GITLAB_GET_ISSUE: "gitlab:getIssue",
 	GITLAB_GET_ISSUE_NOTES: "gitlab:getIssueNotes",
 	GITLAB_CHECK_CONNECTION: "gitlab:checkConnection",
 	GITLAB_INVESTIGATE_ISSUE: "gitlab:investigateIssue",
 	GITLAB_IMPORT_ISSUES: "gitlab:importIssues",
-	GITLAB_CREATE_RELEASE: "gitlab:createRelease",
 
 	// GitLab Merge Requests (equivalent to GitHub PRs)
 	GITLAB_GET_MERGE_REQUESTS: "gitlab:getMergeRequests",
-	GITLAB_GET_MERGE_REQUEST: "gitlab:getMergeRequest",
 	GITLAB_CREATE_MERGE_REQUEST: "gitlab:createMergeRequest",
-	GITLAB_UPDATE_MERGE_REQUEST: "gitlab:updateMergeRequest",
 
 	// GitLab OAuth (glab CLI authentication)
 	GITLAB_CHECK_CLI: "gitlab:checkCli",
@@ -427,11 +415,6 @@ export const IPC_CHANNELS = {
 	GITLAB_GET_TOKEN: "gitlab:getToken",
 	GITLAB_GET_USER: "gitlab:getUser",
 	GITLAB_LIST_USER_PROJECTS: "gitlab:listUserProjects",
-	GITLAB_DETECT_PROJECT: "gitlab:detectProject",
-	GITLAB_GET_BRANCHES: "gitlab:getBranches",
-	GITLAB_CREATE_PROJECT: "gitlab:createProject",
-	GITLAB_ADD_REMOTE: "gitlab:addRemote",
-	GITLAB_LIST_GROUPS: "gitlab:listGroups",
 
 	// GitLab events (main -> renderer)
 	GITLAB_INVESTIGATION_PROGRESS: "gitlab:investigationProgress",
@@ -439,7 +422,6 @@ export const IPC_CHANNELS = {
 	GITLAB_INVESTIGATION_ERROR: "gitlab:investigationError",
 
 	// GitLab MR Review operations
-	GITLAB_MR_GET_DIFF: "gitlab:mr:getDiff",
 	GITLAB_MR_REVIEW: "gitlab:mr:review",
 	GITLAB_MR_REVIEW_CANCEL: "gitlab:mr:reviewCancel",
 	GITLAB_MR_GET_REVIEW: "gitlab:mr:getReview",
@@ -455,41 +437,6 @@ export const IPC_CHANNELS = {
 	GITLAB_MR_REVIEW_PROGRESS: "gitlab:mr:reviewProgress",
 	GITLAB_MR_REVIEW_COMPLETE: "gitlab:mr:reviewComplete",
 	GITLAB_MR_REVIEW_ERROR: "gitlab:mr:reviewError",
-
-	// GitLab Auto-Fix operations
-	GITLAB_AUTOFIX_START: "gitlab:autofix:start",
-	GITLAB_AUTOFIX_GET_QUEUE: "gitlab:autofix:getQueue",
-	GITLAB_AUTOFIX_CHECK_LABELS: "gitlab:autofix:checkLabels",
-	GITLAB_AUTOFIX_CHECK_NEW: "gitlab:autofix:checkNew",
-	GITLAB_AUTOFIX_GET_CONFIG: "gitlab:autofix:getConfig",
-	GITLAB_AUTOFIX_SAVE_CONFIG: "gitlab:autofix:saveConfig",
-	GITLAB_AUTOFIX_GET_BATCHES: "gitlab:autofix:getBatches",
-
-	// GitLab Auto-Fix events (main -> renderer)
-	GITLAB_AUTOFIX_PROGRESS: "gitlab:autofix:progress",
-	GITLAB_AUTOFIX_COMPLETE: "gitlab:autofix:complete",
-	GITLAB_AUTOFIX_ERROR: "gitlab:autofix:error",
-
-	// GitLab Issue Analysis Preview (proactive batch workflow)
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW: "gitlab:autofix:analyzePreview",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_PROGRESS:
-		"gitlab:autofix:analyzePreviewProgress",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_COMPLETE:
-		"gitlab:autofix:analyzePreviewComplete",
-	GITLAB_AUTOFIX_ANALYZE_PREVIEW_ERROR: "gitlab:autofix:analyzePreviewError",
-	GITLAB_AUTOFIX_APPROVE_BATCHES: "gitlab:autofix:approveBatches",
-
-	// GitLab Issue Triage operations
-	GITLAB_TRIAGE_RUN: "gitlab:triage:run",
-	GITLAB_TRIAGE_GET_RESULTS: "gitlab:triage:getResults",
-	GITLAB_TRIAGE_APPLY_LABELS: "gitlab:triage:applyLabels",
-	GITLAB_TRIAGE_GET_CONFIG: "gitlab:triage:getConfig",
-	GITLAB_TRIAGE_SAVE_CONFIG: "gitlab:triage:saveConfig",
-
-	// GitLab Issue Triage events (main -> renderer)
-	GITLAB_TRIAGE_PROGRESS: "gitlab:triage:progress",
-	GITLAB_TRIAGE_COMPLETE: "gitlab:triage:complete",
-	GITLAB_TRIAGE_ERROR: "gitlab:triage:error",
 
 	// GitHub Auto-Fix operations
 	GITHUB_AUTOFIX_START: "github:autofix:start",
@@ -710,6 +657,7 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
+	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
@@ -805,6 +753,9 @@ export const IPC_CHANNELS = {
 	SELF_HEALING_CANCEL_OPERATION: "selfHealing:cancelOperation",
 	SELF_HEALING_DISMISS_INCIDENT: "selfHealing:dismissIncident",
 	SELF_HEALING_RETRY_INCIDENT: "selfHealing:retryIncident",
+	/** Find the first bad commit of a CI/CD incident (#375); one event per tested commit. */
+	SELF_HEALING_BISECT: "selfHealing:bisect",
+	SELF_HEALING_BISECT_PROGRESS: "selfHealing:bisectProgress",
 	// Events (main -> renderer)
 	SELF_HEALING_OPERATION_PROGRESS: "selfHealing:operationProgress",
 	SELF_HEALING_OPERATION_COMPLETE: "selfHealing:operationComplete",
@@ -819,6 +770,10 @@ export const IPC_CHANNELS = {
 	BROWSER_AGENT_COMPARE: "browserAgent:compare",
 	BROWSER_AGENT_DELETE_BASELINE: "browserAgent:deleteBaseline",
 	BROWSER_AGENT_RUN_TESTS: "browserAgent:runTests",
+	BROWSER_AGENT_RECORD_START: "browserAgent:recordStart", // A session in a browser window the person drives (#387)
+	BROWSER_AGENT_RECORD_STOP: "browserAgent:recordStop",
+	BROWSER_AGENT_RECORD_EXPORT: "browserAgent:recordExport", // Steps → Playwright / Cypress test: preview, review card or file
+	BROWSER_AGENT_RECORD_EVENT: "browserAgent:recordEvent", // main → renderer: step, started, stopped, error
 
 	// Architecture Visualizer
 	ARCHITECTURE_VISUALIZER_GENERATE: "architectureVisualizer:generate",
@@ -943,6 +898,10 @@ export const IPC_CHANNELS = {
 	REPLAY_COMPARE: "replay:compare",
 	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
 	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	REPLAY_EXPORT_SESSION: "replay:exportSession",
+	REPLAY_IMPORT_SESSION: "replay:importSession",
+	REPLAY_ADD_BOOKMARK: "replay:addBookmark",
+	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 
@@ -1105,6 +1064,8 @@ export const IPC_CHANNELS = {
 	API_WATCHER_EVENT: "api-watcher-event",
 	API_WATCHER_RESULT: "api-watcher-result",
 	API_WATCHER_RUN: "apiWatcher:run",
+	// Device matrix: one preset rendered, captured and read by the main (#383)
+	APP_EMULATOR_CAPTURE_DEVICE: "app-emulator:capture-device",
 	APP_EMULATOR_CONFIG: "app-emulator:config",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
 	APP_EMULATOR_ERROR: "app-emulator:error",
@@ -1158,6 +1119,7 @@ export const IPC_CHANNELS = {
 	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",
 	CICD_TRIGGERS_GET_RUN_STATUS: "cicdTriggers:getRunStatus",
 	CICD_TRIGGERS_LIST_RUNS: "cicdTriggers:listRuns",
+	CICD_TRIGGERS_ROLLBACK: "cicdTriggers:rollback",
 	CICD_TRIGGERS_SET_CONFIG: "cicdTriggers:setConfig",
 	CICD_TRIGGERS_TRIGGER: "cicdTriggers:trigger",
 	CLAUDE_PROFILE_CREATE_DIR: "claude:profileCreateDir",
@@ -1423,9 +1385,11 @@ export const IPC_CHANNELS = {
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
+	SMART_ESTIMATION_ADJUST: "smartEstimation:adjust",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
+	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",

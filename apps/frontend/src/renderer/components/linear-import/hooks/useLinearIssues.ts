@@ -20,9 +20,12 @@ export function useLinearIssues(
 	onIssuesChangeRef.current = onIssuesChange;
 
 	useEffect(() => {
+		// A slower answer for an earlier choice must not replace this one.
+		let stale = false;
 		const loadIssues = async () => {
 			if (!selectedTeamId) {
 				setIssues([]);
+				setIsLoadingIssues(false);
 				return;
 			}
 
@@ -35,6 +38,7 @@ export function useLinearIssues(
 					selectedTeamId,
 					selectedProjectId || undefined,
 				);
+				if (stale) return;
 				if (result.success && result.data) {
 					setIssues(result.data);
 					onIssuesChangeRef.current?.();
@@ -42,13 +46,16 @@ export function useLinearIssues(
 					setError(result.error || "Failed to load issues");
 				}
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Unknown error");
+				if (!stale) setError(err instanceof Error ? err.message : "Unknown error");
 			} finally {
-				setIsLoadingIssues(false);
+				if (!stale) setIsLoadingIssues(false);
 			}
 		};
 
 		loadIssues();
+		return () => {
+			stale = true;
+		};
 	}, [projectId, selectedTeamId, selectedProjectId]);
 
 	return { issues, isLoadingIssues, error, setError };

@@ -159,6 +159,7 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <td valign="top">
 
 **Import Design** : une maquette, une capture ou un export Figma devient des composants de la stack du projet, en six étapes visibles.
+Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ressembler, avec le score de chaque itération et les écarts restants ([boucle de rendu](docs/architecture/design-render-loop.md)).
 
 ![Import Design : les six étapes d'une image aux composants du projet](.github/assets/showcase/import-design.png)
 
@@ -198,14 +199,19 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 - L'**essai à blanc** rejoue le plan d'une spec sur la branche de base avant le build ; après la QA, un agent **red team** essaie de casser ce que la tâche a construit, et la **garde des migrations** dit ce que les migrations de la tâche feraient à une base en production, pour toutes les stacks.
 - **Mode objectif** (terminé quand une commande le dit, par exemple `dotnet test` qui sort en 0), **revue croisée** par un second moteur, **spec par l'exemple** pour les Web API ASP.NET Core, **montées de version .NET** une version à la fois jusqu'à .NET 11.
 - **Vérification à l'exécution** avec vidéos de preuve et comparaison avec la branche de base ; **portes strictes** contre les paquets inventés, les tests sans mordant et pour les preuves formelles.
+- **Matrice d'appareils** dans l'émulateur : la page affichée, rendue sur plusieurs téléphones, tablettes, ordinateurs et un téléviseur à la fois (fenêtre, densité, user agent, tactile), côte à côte, avec les bugs responsive classiques signalés sur chacun : défilement de côté, médias trop larges, cibles tactiles de moins de 44 px, texte de moins de 12 px ([matrice d'appareils](docs/architecture/device-matrix.md)).
+- **Enregistreur du Browser Agent** : pilotez une page à la main et obtenez un test Playwright (TypeScript ou Python) ou Cypress, avec des sélecteurs robustes et les secrets lus dans des variables d'environnement, proposé sur une branche de revue.
 - **Suivi des PR** : un check rouge ou un fil de revue sur la PR de la tâche repart vers le fixer, jamais forcé, jamais fusionné.
 - **Provenance** : quelles lignes l'IA a écrites et avec quel modèle, un SBOM des paquets ajoutés, la traçabilité exigence-test.
 - **Garde-fous en code** : une politique versionnée, par couches, que les agents ne contournent pas, appliquée aussi dans les worktrees des tâches ; chaque résultat d'outil est analysé contre l'injection de prompt avant que l'agent ne le lise.
+- **Failles de sécurité classées par ce qui tourne** : le scan de sécurité de la QA range ses trouvailles en critiques et exposées, critiques mais dormantes, moyennes et informatives, d'après ce que vos points d'entrée atteignent (tout langage) et les incidents de production des 30 derniers jours dans `.workpilot/incidents/` (Sentry, Datadog, CloudWatch, New Relic…) ; le fixer voit d'abord les exposées, et ce qui bloque un build suit toujours la gravité.
 
 **Agents et orchestration**
 - **Vagues d'exécution** (Mission Control) : les specs en attente sont regroupées en vagues qui ne partagent aucun fichier, d'après leurs plans et leurs worktrees, puis lancées vague après vague dans l'ordre de merge, avec le parallélisme du projet ; aucun modèle n'est appelé.
 - **Mission Control** pour lancer plusieurs agents sur un même objectif, **terminaux d'agents**, **Arène** et **Bounty Board** pour comparer les moteurs, **Repo bench** pour les mesurer sur vos propres tâches passées.
+- **Rejeu d'agent** partage une session enregistrée : un fichier `.wpreplay` qu'un collègue importe, ou une page HTML que chacun ouvre sans WorkPilot, secrets et dossiers locaux masqués et, sur demande, sans le raisonnement, les tokens ou le contenu des fichiers ; des signets annotés marquent les étapes qui comptent.
 - Agents spécialisés : générateur de tests, détective de tests instables (avec la cause et une carte de correction), refactoreur, docs et dérive, accessibilité (score WCAG 2.2 et corrections), i18n, veille des contrats d'API, preuves de conformité, notebooks (dépendances entre cellules, exécution en noyau neuf), migration, auto-guérison sur échec de CI, suivi de la dette technique ; leurs corrections vont sur une branche de revue, jamais directement dans votre dossier.
+- **Une auto-guérison qui regarde plus loin que le dernier commit** : tendances de risque par fichier d'un scan à l'autre (liste des fichiers qui chauffent vite, dossiers qui se dégradent ensemble), erreurs de production de plusieurs outils de supervision groupées en un incident par bug avec ses commits suspects, et bisect d'un échec de CI dans un worktree temporaire qui nomme au correcteur le premier commit fautif.
 - Le **Release Train** livre lui-même vos services, dans l'ordre des dépendances, avec contrôles de santé et smoke tests et un clic par service de production ; le **chirurgien de l'historique Git** nettoie les commits d'une branche sur une nouvelle branche, au code identique.
 - **Coach personnel** : il apprend votre style de code par langage à partir de votre historique git et de la config du lint, et donne vos préférences nettes au codeur et au correcteur QA.
 - **Mémoire partagée** : un coffre Obsidian et un graphe que tous les agents lisent et écrivent, entre sessions et providers ; la boucle d'apprentissage analyse chaque build avec un modèle du provider choisi, et ses leçons atteignent la spec, le plan, le code et la QA ; des packs de **skills** indépendants du provider.
@@ -218,8 +224,8 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Intégrations**
 - GitHub, GitLab, Azure DevOps, Jira et Linear : importer des tickets, les investiguer, relire des pull requests.
 - **Revue de PR par l'IA qui apprend** : accepter, rejeter ou marquer non applicable chaque résultat, avec une raison ; un type de remarque que le projet rejette sans cesse est rétrogradé, puis n'est plus remonté, sur tous les providers ; jamais un résultat de sécurité ou critique ([retours de revue](docs/architecture/review-feedback.md)).
-- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée, un incident de production venu de Sentry) en carte brouillon ; les **déclencheurs CI/CD** lancent votre pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la PR d'une tâche ou quand elle est fusionnée.
-- Marketplace MCP et serveurs MCP personnalisés avec descriptions d'outils épinglées ; le serveur MCP **workpilot-board** donne votre Kanban à Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres.
+- Les **automatisations** transforment un événement (un ticket étiqueté, une CI rouge, une heure de la journée, un incident de production venu de Sentry) en carte brouillon ; les **déclencheurs CI/CD** lancent votre pipeline (GitHub Actions, GitLab CI, Azure Pipelines, Jenkins) quand un agent ouvre la PR d'une tâche ou quand elle est fusionnée, puis **surveillent le déploiement** (health check et métriques Prometheus comparés à leur niveau d'avant) et proposent, ou lancent, un **rollback** vers la dernière exécution réussie.
+- Marketplace MCP et serveurs MCP personnalisés avec descriptions d'outils épinglées ; chaque serveur du catalogue affiche un **score de sécurité** sur 100 (éditeur, permissions des outils, version épinglée, date de version, vulnérabilités connues via OSV, changement de mainteneurs) ; le serveur MCP **workpilot-board** donne votre Kanban à Claude Code, Codex, Gemini CLI, Copilot, Cursor et d'autres.
 - Notifications sur Slack, Teams, Discord, Google Chat, webhooks, ntfy et Telegram.
 
 **Équipe**
@@ -229,6 +235,7 @@ La liste complète, avec chaque détail, est dans **[docs/FEATURES.md](docs/FEAT
 **Coûts et suivi**
 - Budgets de coût appliqués pendant l'exécution : un budget du projet par période et un plafond par tâche, vérifiés avant chaque session d'agent sur tous les fournisseurs ; la tâche se met en pause à son plafond, peut passer à un modèle plus léger du même fournisseur, et une tâche qui dépense sans avancer est mise en pause elle aussi.
 - Coupe-circuit et arrêt d'urgence : un agent qui répète le même appel d'outil avec le même résultat est mis en pause sur tous les fournisseurs, et « Arrêter tous les agents » (bouton de la barre latérale, Ctrl+Maj+.) met en pause chaque tâche en cours, à reprendre depuis sa carte.
+- Smart Estimation qui apprend chaque dépôt : l'estimation d'une tâche est corrigée par ce qu'ont réellement consommé ses specs fusionnées (coût, tokens, itérations de QA, fichiers modifiés), affichée en fourchette avec sa confiance et un détail par dimension, avec votre propre ajustement et une remise à zéro ; tous les providers alimentent le même historique.
 - Tableau de bord analytique, estimateur de coûts, Formula Lab (estimation du coût et de la réussite par provider, modèle et effort), moniteur de limites de débit avec bascule de compte, profileur carbone avec un budget mensuel et un export ESG, traces OpenTelemetry GenAI pour chaque provider.
 
 **Apparence**
@@ -303,6 +310,7 @@ Référence complète : [docs/CLI-USAGE.md](docs/CLI-USAGE.md) (en anglais).
 1. **Bac à sable du système** : les commandes des agents tournent sous bubblewrap (Linux) ou Seatbelt (macOS) ; Windows n'est pas encore couvert, et la carte indique quand une tâche tourne sans bac à sable.
 2. **Restrictions du système de fichiers** : les opérations restent dans le dossier du projet.
 3. **Liste blanche dynamique de commandes** : seules les commandes de la stack détectée sont autorisées.
+4. **Instantanés et score de confiance** : avant chaque session d'agent, le worktree de la tâche est enregistré comme un commit git caché ; chaque session démarre avec un score de confiance de 100 que les anomalies font baisser, et sous un seuil la tâche se met en pause, ou la session s'arrête et son instantané est restauré. Le mode restreint et les limites par session sont dans Paramètres > Sandbox ; un instantané se restaure depuis la carte.
 
 Les clés d'API et les jetons sont chiffrés au repos avec le trousseau du système ; Paramètres > Comptes indique depuis quand chaque clé d'API a été enregistrée et suggère de la renouveler après 90 jours. Chaque version fournit les sommes de contrôle SHA256, un SBOM CycloneDX et une attestation de provenance de build par fichier.
 

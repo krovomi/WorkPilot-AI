@@ -341,16 +341,32 @@ describe("rail footer and new task", () => {
 
 describe("resize", () => {
 	it("drags the width within its bounds and saves it on release", async () => {
-		const { container } = renderSidebar();
-		const handle = container.querySelector(".cursor-col-resize") as HTMLElement;
-		fireEvent.mouseDown(handle, { clientX: 296 });
-		fireEvent.mouseMove(document, { clientX: 1000 });
-		fireEvent.mouseUp(document);
+		// The widest menu leaves the main view its room: a wide window here.
+		const innerWidth = window.innerWidth;
+		Object.defineProperty(window, "innerWidth", { configurable: true, value: 1920 });
+		renderSidebar();
+		const handle = screen.getByRole("separator", { name: "Resize the menu" });
+		expect(handle).toHaveAttribute("aria-controls", panel().id);
+		fireEvent.pointerDown(handle, { button: 0, clientX: 296 });
+		fireEvent.pointerMove(window, { clientX: 1000 });
+		fireEvent.pointerUp(window);
 		await waitFor(() => expect(settings().sidebarWidth).toBe(480));
-		fireEvent.mouseDown(handle, { clientX: 480 });
-		fireEvent.mouseMove(document, { clientX: 0 });
-		fireEvent.mouseUp(document);
-		await waitFor(() => expect(settings().sidebarWidth).toBe(240));
+		fireEvent.pointerDown(handle, { button: 0, clientX: 480 });
+		fireEvent.pointerMove(window, { clientX: 400 });
+		fireEvent.pointerUp(window);
+		await waitFor(() => expect(settings().sidebarWidth).toBe(400));
+		Object.defineProperty(window, "innerWidth", { configurable: true, value: innerWidth });
+	});
+
+	it("folds the menu when its edge is dragged onto the rail", async () => {
+		renderSidebar();
+		const handle = screen.getByRole("separator", { name: "Resize the menu" });
+		fireEvent.pointerDown(handle, { button: 0, clientX: 296 });
+		fireEvent.pointerMove(window, { clientX: 40 });
+		fireEvent.pointerUp(window);
+		await waitFor(() => expect(settings().sidebarCollapsed).toBe(true));
+		expect(screen.queryByTestId("sidebar-panel")).toBeNull();
+		expect(settings().sidebarWidth).toBe(296);
 	});
 });
 
@@ -382,11 +398,100 @@ describe("drag and drop", () => {
 			dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "item:kanban" } });
 			dnd.onDragEnd?.({ active: { id: "group:agents" }, over: { id: "group:agents" } });
 			dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "item:terminals" } });
-			dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "group:agents" } });
+			dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "group:workspace" } });
+			dnd.onDragEnd?.({ active: { id: "pin:kanban" }, over: { id: "pin:terminals" } });
+			dnd.onDragEnd?.({ active: { id: "pin:kanban" }, over: { id: "__fav_drop__" } });
+			dnd.onDragEnd?.({ active: { id: "group:agents" }, over: { id: "item:kanban" } });
 			dnd.onDragCancel?.();
 		});
 		await act(() => Promise.resolve());
 		expect(JSON.stringify(prefs())).toBe(before);
+	});
+});
+
+describe("a menu arranged by each person", () => {
+	const shownPages = () =>
+		within(panel())
+			.getAllByRole("button")
+			.map((button) => button.dataset.navItem)
+			.filter((id): id is string => id !== undefined);
+
+	it("a page dropped on a space of the rail moves to that space", async () => {
+		renderSidebar({ activeView: "dashboard" });
+		expect(shownPages()).toContain("kanban");
+		act(() => dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "group:agents" } }));
+		await waitFor(() => expect(prefs().itemGroups).toEqual({ kanban: "agents" }));
+		expect(shownPages()).not.toContain("kanban");
+		await userEvent.click(railButton("Agents"));
+		expect(shownPages().at(-1)).toBe("kanban");
+		// Back home: the move is forgotten, nothing else is kept for it.
+		act(() => dnd.onDragEnd?.({ active: { id: "item:kanban" }, over: { id: "group:workspace" } }));
+		await waitFor(() => expect(prefs().itemGroups).toEqual({}));
+	});
+
+	it("pins keep the order they are dragged to in « Mon menu »", async () => {
+		setPrefs({ menuMode: "full", pinnedItems: ["kanban", "terminals", "insights"] } as Partial<SidebarPrefs>);
+		// « Mon menu » is the space shown when it has pins.
+		renderSidebar();
+		act(() => dnd.onDragEnd?.({ active: { id: "pin:insights" }, over: { id: "pin:kanban" } }));
+		await waitFor(() => expect(prefs().pinnedItems).toEqual(["insights", "kanban", "terminals"]));
+	});
+
+	it("customizing moves pages with buttons, keeps pins, and restores the shipped order", async () => {
+		setPrefs({ menuMode: "full", pinnedItems: ["terminals"] } as Partial<SidebarPrefs>);
+		renderSidebar({ activeView: "kanban" });
+		await userEvent.click(railButton("Workspace"));
+		expect(screen.queryByTestId("customize-bar")).toBeNull();
+		await userEvent.click(screen.getByTestId("customize-menu"));
+		expect(screen.getByTestId("customize-bar")).toBeInTheDocument();
+		const [first, second] = shownPages();
+		expect(first).toBe("kanban");
+		expect(screen.getByRole("button", { name: "Move Kanban board up" })).toBeDisabled();
+		await userEvent.click(screen.getByRole("button", { name: "Move Kanban board down" }));
+		await waitFor(() => expect(shownPages().slice(0, 2)).toEqual([second, first]));
+
+		await userEvent.click(screen.getByRole("button", { name: "Move Kanban board to another space" }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Planning" }));
+		await waitFor(() => expect(prefs().itemGroups).toEqual({ kanban: "planning" }));
+		expect(shownPages()).not.toContain("kanban");
+
+		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace down" }));
+		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["agents", "workspace"]));
+		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace up" }));
+		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["workspace", "agents"]));
+		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace down" }));
+		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["agents", "workspace"]));
+
+		await userEvent.click(screen.getByRole("button", { name: "Restore the original order" }));
+		await waitFor(() => expect(prefs().itemGroups).toEqual({}));
+		expect(prefs().groupOrder).toEqual([]);
+		expect(prefs().itemOrder).toEqual({});
+		expect(prefs().pinnedItems).toEqual(["terminals"]);
+		expect(shownPages()[0]).toBe(first);
+		expect(screen.getByRole("button", { name: "Restore the original order" })).toBeDisabled();
+
+		expect(screen.queryByTestId("customize-menu")).toBeNull();
+		await userEvent.click(within(screen.getByTestId("customize-bar")).getByRole("button", { name: "Done" }));
+		expect(screen.queryByTestId("customize-bar")).toBeNull();
+		expect(screen.getByTestId("customize-menu")).toBeInTheDocument();
+	});
+
+	it("customizing « Mon menu » moves the user's own pins, not a pinned group's pages", async () => {
+		setPrefs({ menuMode: "full", pinnedItems: ["kanban", "terminals"], pinnedGroups: ["planning"] } as Partial<SidebarPrefs>);
+		// « Mon menu » is the space shown when it has pins.
+		renderSidebar();
+		await userEvent.click(screen.getByTestId("customize-menu"));
+		expect(screen.queryByRole("button", { name: "Move Kanban board to another space" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Move Agent terminals up" }));
+		await waitFor(() => expect(prefs().pinnedItems).toEqual(["terminals", "kanban"]));
+		expect(screen.getByRole("button", { name: "Move Agent terminals up" })).toBeDisabled();
+		const rows = within(panel()).getAllByTestId("row-move-controls");
+		expect(rows).toHaveLength(2);
+	});
+
+	it("tells a screen reader what a drag does, in the app's language", () => {
+		renderSidebar();
+		expect(document.body.textContent).toContain("To pick up a menu entry, press Space or Enter.");
 	});
 });
 

@@ -14,6 +14,7 @@
 import i18n from "i18next";
 import { create } from "zustand";
 import type { ReplayResult } from "../../preload/api/modules/replay-api";
+import type { ReplayBookmark } from "../../shared/types/replay-share";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +91,8 @@ export interface ReplaySessionFull extends ReplaySessionSummary {
 	project_path: string;
 	steps: ReplayStep[];
 	breakpoints: Breakpoint[];
+	/** Markers people left on steps (#347); absent from older sessions. */
+	bookmarks?: ReplayBookmark[];
 	files_touched: string[];
 	file_heatmap: Record<string, number>;
 	tool_usage_stats: Record<string, number>;

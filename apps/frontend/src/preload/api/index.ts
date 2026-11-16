@@ -94,6 +94,10 @@ import {
 	createNotebookAgentAPI,
 } from "./modules/notebook-agent-api";
 import {
+	type BrowserRecorderAPI,
+	createBrowserRecorderAPI,
+} from "./modules/browser-recorder-api";
+import {
 	type AgentCoachAPI,
 	createAgentCoachAPI,
 } from "./modules/agent-coach-api";
@@ -121,6 +125,7 @@ import {
 import type { AppEmulatorAPI } from "./modules/app-emulator-api";
 import type { MobileAPI } from "./modules/mobile-api";
 import { createAppEmulatorAPI } from "./modules/app-emulator-api";
+import { type DeviceMatrixAPI, createDeviceMatrixAPI } from "./modules/device-matrix-api";
 import { createMobileAPI } from "./modules/mobile-api";
 import type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
@@ -178,6 +183,7 @@ import {
 } from "./modules/formula-matrix-api";
 import { type BenchAPI, createBenchAPI } from "./modules/bench-api";
 import { type BoardMcpAPI, createBoardMcpAPI } from "./modules/board-mcp-api";
+import { type CicdTriggersAPI, createCicdTriggersAPI } from "./modules/cicd-triggers-api";
 import { createDebugAPI, type DebugAPI } from "./modules/debug-api";
 import { createGitHubAPI, type GitHubAPI } from "./modules/github-api";
 import {
@@ -302,6 +308,7 @@ export interface ElectronAPI
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
+		DeviceMatrixAPI,
 		MobileAPI,
 		LearningLoopAPI,
 		MemoryLifecycleAPI,
@@ -322,6 +329,7 @@ export interface ElectronAPI
 		FormulaMatrixAPI,
 		BenchAPI,
 		BoardMcpAPI,
+		CicdTriggersAPI,
 		AccessibilityAPI,
 		SharedAnalysisAPI,
 		I18nAgentAPI,
@@ -335,6 +343,7 @@ export interface ElectronAPI
 		GitSurgeonAPI,
 		ReleaseCoordinatorAPI,
 		NotebookAgentAPI,
+		BrowserRecorderAPI,
 		AgentCoachAPI,
 		OnboardingAgentAPI,
 		SandboxAPI,
@@ -461,6 +470,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
+		...createDeviceMatrixAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
 		...createMemoryLifecycleAPI(),
@@ -481,6 +491,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createFormulaMatrixAPI(),
 		...createBenchAPI(),
 		...createBoardMcpAPI(),
+		...createCicdTriggersAPI(),
 		...createAccessibilityAPI(),
 		...createSharedAnalysisAPI(),
 		...createI18nAgentAPI(),
@@ -494,6 +505,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createGitSurgeonAPI(),
 		...createReleaseCoordinatorAPI(),
 		...createNotebookAgentAPI(),
+		...createBrowserRecorderAPI(),
 		...createAgentCoachAPI(),
 		...createOnboardingAgentAPI(),
 		...createSandboxAPI(),
@@ -601,6 +613,8 @@ export { createApiExplorerAPI } from "./modules/api-explorer-api";
 export type { AppEmulatorAPI } from "./modules/app-emulator-api";
 export type { MobileAPI } from "./modules/mobile-api";
 export { createAppEmulatorAPI } from "./modules/app-emulator-api";
+export type { DeviceMatrixAPI } from "./modules/device-matrix-api";
+export { createDeviceMatrixAPI } from "./modules/device-matrix-api";
 export { createMobileAPI } from "./modules/mobile-api";
 export type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";

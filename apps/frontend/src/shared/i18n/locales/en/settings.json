@@ -38,8 +38,6 @@
 			"title": "Accounts",
 			"description": "Accounts & API endpoints",
 			"alerts": {
-				"noProviders": "No provider configured. Configure your API keys to get started.",
-				"providerErrors": "{{count}} provider(s) with errors",
 				"sophisticated": {
 					"noProvidersTitle": "Get started with your first provider",
 					"noProvidersDescription": "Configure at least one provider to start using the application.",
@@ -64,7 +62,6 @@
 			"autoSwitching": {
 				"globalTitle": "Automatic Account Switching",
 				"globalDescription": "Automatically switch between your accounts based on usage and rate limits.",
-				"title": "Auto-switching",
 				"providerAdded": "Provider added to auto-switching",
 				"providerRemoved": "Provider removed from auto-switching",
 				"providerDescription": "{{providerName}} has been {{action}} to auto-switching list",
@@ -144,40 +141,8 @@
 				}
 			},
 			"providerCard": {
-				"configure": "Configure",
-				"test": "Test",
-				"edit": "Edit",
-				"apiKey": "API Key",
 				"authentication": "Authentication",
-				"authCli": "CLI Auth",
-				"authOauth": "OAuth",
-				"authLocal": "Local",
-				"cliAuthenticated": "CLI authenticated",
-				"oauthConnected": "OAuth connected",
-				"localRunning": "Local instance",
 				"oauthCli": "OAuth (CLI)",
-				"notConfigured": "Not configured",
-				"lastTest": "Last test",
-				"neverTested": "Never tested",
-				"usage": "Usage",
-				"usageThisMonth": "Usage this month",
-				"week": "week",
-				"notAvailable": "Not available",
-				"source": "Source",
-				"statusLabel": "Status",
-				"status": {
-					"notConfigured": "Not configured",
-					"error": "Error",
-					"active": "Active"
-				},
-				"rateLimited": "Rate limited",
-				"needsReauth": "Needs re-authentication",
-				"toggleDetails": "Show details",
-				"keySaved": "Key saved",
-				"keySavedToday": "today",
-				"keySavedDaysAgo_one": "{{count}} day ago",
-				"keySavedDaysAgo_other": "{{count}} days ago",
-				"keySavedUnknown": "date unknown",
 				"keyRenewal_one": "Key saved {{count}} day ago: consider renewing it (over {{threshold}} days)",
 				"keyRenewal_other": "Key saved {{count}} days ago: consider renewing it (over {{threshold}} days)",
 				"statusNested": {
@@ -189,14 +154,7 @@
 				"testSuccessDescription": "The {{providerName}} provider is working correctly",
 				"testError": "Test failed",
 				"testErrorDescription": "The {{providerName}} provider failed: {{error}}",
-				"deleteConfirm": "Are you sure you want to delete this provider configuration?",
-				"testDetails": {
-					"modelsAvailable": "{{count}} models available",
-					"modelUsed": "Model used: {{model}}"
-				},
-				"errors": {
-					"unknownError": "Unknown error"
-				}
+				"deleteConfirm": "Are you sure you want to delete this provider configuration?"
 			},
 			"providers": {
 				"meta": "Official Meta AI models",
@@ -216,13 +174,6 @@
 				"antigravity": "Google's coding agent, driven through the agy CLI",
 				"pi": "Minimal coding agent, driven through the pi CLI",
 				"gemini-cli": "Google's open-source Gemini CLI, driven over the Agent Client Protocol"
-			},
-			"providerToggle": {
-				"enabled": "Provider enabled",
-				"disabled": "Provider disabled",
-				"description": "{{providerId}} has been {{action}} successfully",
-				"error": "Error",
-				"errorDescription": "Failed to {{action}} provider {{providerId}}"
 			},
 			"localModels": {
 				"title": "Locally installed models",
@@ -351,101 +302,82 @@
 		},
 		"sandbox": {
 			"title": "Sandbox",
-			"description": "Agent execution isolation & rollback",
-			"defaultMode": {
-				"title": "Default Sandbox Mode",
-				"description": "Choose the default isolation mode for agent execution.",
+			"description": "Snapshots before each agent session, and the limits a session works within",
+			"snapshots": {
+				"title": "Snapshots & rollback",
+				"description": "Before each agent session (planning, coding, QA), the task's worktree is saved as a hidden git commit. It works for every language and stack: ignored files (node_modules, bin, obj, .venv…) are not copied. Restore one from the card of a paused task.",
+				"enable": "Snapshot before each session",
+				"enableHint": "Only in task worktrees; the project's main checkout is never touched.",
+				"autoRollback": "Restore automatically when a session is stopped",
+				"autoRollbackHint": "When the anomaly watch stops a session, or the agent writes outside the sandbox's rules. The replaced state is kept as a snapshot too.",
+				"keep": "Snapshots kept per task",
+				"keepHint": "Older ones are removed."
+			},
+			"mode": {
+				"title": "Write mode",
+				"description": "Inside the project. Writes outside it are always refused.",
 				"normal": {
 					"label": "Normal",
-					"description": "Whitelist + resource limits"
+					"description": "The agent writes anywhere in its worktree."
 				},
 				"restricted": {
 					"label": "Restricted",
-					"description": "Strict whitelist, reduced limits"
-				},
-				"dryRun": {
-					"label": "Dry-run",
-					"description": "Plan only, no file changes"
-				},
-				"docker": {
-					"label": "Docker",
-					"description": "Full container isolation"
+					"description": "Only the paths listed below are writable (the task's own files stay writable)."
 				}
 			},
-			"fileAccess": {
-				"title": "File Access Whitelist",
-				"description": "Paths agents are allowed to access. Sensitive paths (.git/, .env, .ssh/) are always blocked.",
-				"placeholder": "e.g. lib/ or config/app.json",
-				"read": "Read",
-				"write": "Write",
-				"readWrite": "Read/Write",
-				"readOnly": "Read Only",
-				"add": "Add"
+			"paths": {
+				"title": "Writable paths (restricted mode)",
+				"description": "Relative to the project, folders or files. Refused before the write where the provider goes through WorkPilot's hooks; for CLI agents that write with their own tools, the write is detected, the session stopped and the snapshot restored.",
+				"placeholder": "e.g. src/ or tests/unit",
+				"add": "Add",
+				"remove": "Remove {{path}}",
+				"invalid": "A path inside the project, without .. and not absolute.",
+				"emptyRestricted": "Restricted mode with no path: the agent can only write the task's own files."
 			},
-			"resourceLimits": {
-				"title": "Resource Limits",
-				"description": "Maximum resources an agent can consume per execution.",
-				"cpu": "CPU (%)",
-				"ram": "RAM (MB)",
-				"maxTime": "Max Time (s)",
-				"maxFiles": "Max Files",
-				"maxFileSize": "Max File Size (MB)"
+			"limits": {
+				"title": "Limits per session",
+				"description": "Counted for every provider. 0 means no limit.",
+				"none": "no limit",
+				"maxFiles": "Files written",
+				"maxFilesHint": "Distinct files; over it, the task is paused.",
+				"maxFileSize": "Largest file",
+				"maxFileSizeHint": "A larger write is refused (or stops the session).",
+				"maxSession": "Longest session",
+				"maxSessionHint": "Over it, the task is paused."
 			},
-			"snapshots": {
-				"title": "Snapshots & Rollback",
-				"description": "A file snapshot is automatically created before each agent execution. If the agent fails, files are restored automatically.",
-				"warning": "Snapshots are created per-sandbox and stored in memory. Auto-rollback triggers when an agent execution fails or is terminated by the anomaly detector. Manual rollback is available in the task detail view."
-			},
-			"blockedCommands": {
-				"title": "Blocked Commands (default)",
-				"description": "These commands are always blocked inside the sandbox."
-			}
+			"always": "Always on, whatever these settings: the command allowlist, writes confined to the build's folders, protected security files, and the OS sandbox around commands where the system has one."
 		},
 		"anomaly-detection": {
 			"title": "Anomaly Detection",
-			"description": "Agent behavior monitoring & alerts",
+			"description": "The trust score of each agent session, and what pauses or stops it",
 			"enable": {
-				"title": "Enable Anomaly Detection",
-				"description": "Monitor all agent sessions for suspicious behavior"
+				"title": "Enable anomaly detection",
+				"description": "Watch every agent session, whatever the provider"
 			},
 			"trustScore": {
-				"title": "Trust Score Thresholds",
-				"description": "Each agent session starts at 100. Anomalies reduce the score. Actions trigger at these thresholds.",
-				"pauseThreshold": "Pause threshold",
-				"pauseDescription": "Agent is paused and a notification is sent",
-				"terminateThreshold": "Terminate threshold",
-				"terminateDescription": "Agent is terminated immediately"
+				"title": "Trust score thresholds",
+				"description": "Each agent session starts at 100; each anomaly lowers it.",
+				"pauseThreshold": "Pause at or below",
+				"pauseDescription": "The task is paused and a notification is sent; its files stay as they are.",
+				"stopThreshold": "Stop at or below",
+				"stopDescription": "The session is stopped and, if enabled in Sandbox, its files are restored to the snapshot taken before it."
 			},
 			"detectionLimits": {
-				"title": "Detection Limits",
-				"description": "Fine-tune when specific anomaly types trigger.",
-				"massDeletionCount": "Mass deletion count",
-				"massDeletionDesc": "File deletions before alert",
-				"maxRepetitiveErrors": "Max repetitive errors",
-				"maxRepetitiveDesc": "Errors before alert",
-				"rapidChangeWindow": "Rapid change window (s)",
-				"rapidChangeDesc": "Time window for rapid changes",
-				"tokenUsageMultiplier": "Token usage multiplier",
-				"tokenUsageDesc": "× baseline before alert"
+				"title": "Detection limits",
+				"description": "When some anomalies count.",
+				"massDeletionCount": "Mass deletion",
+				"massDeletionDesc": "Files deleted in one session before it counts",
+				"maxRepetitiveErrors": "Repeated errors",
+				"maxRepetitiveDesc": "Failed tool calls in one session before it counts",
+				"rapidChangeWindow": "Rapid changes window (s)",
+				"rapidChangeDesc": "20 writes within this window count as rapid changes"
 			},
 			"anomalyTypes": {
-				"title": "Anomaly Types",
-				"description": "10 anomaly types are monitored. Each reduces the trust score by a fixed amount.",
+				"title": "What lowers the score",
+				"description": "Commands are judged on the programs they run, paths on whole file names: rsync is not nc, .env.example is not .env.",
 				"anomaly": "Anomaly",
 				"severity": "Severity",
-				"scoreImpact": "Score Impact",
-				"types": {
-					"massFileDeletion": "Mass file deletion",
-					"sensitiveFileAccess": "Sensitive file access",
-					"dangerousCommand": "Dangerous command",
-					"unexpectedNetworkAccess": "Unexpected network access",
-					"pathTraversalAttempt": "Path traversal attempt",
-					"rapidFileChanges": "Rapid file changes",
-					"excessiveTokenUsage": "Excessive token usage",
-					"systemConfigModification": "System config modification",
-					"repetitiveErrors": "Repetitive errors",
-					"longRunningSession": "Long running session"
-				},
+				"scoreImpact": "Score",
 				"severityLevels": {
 					"critical": "critical",
 					"high": "high",
@@ -454,8 +386,8 @@
 				}
 			},
 			"sensitivePaths": {
-				"title": "Sensitive Paths (always monitored)",
-				"description": "These paths are always monitored for suspicious activity."
+				"title": "Sensitive paths",
+				"description": "Reading or writing one of these lowers the score, once per file."
 			}
 		}
 	},
@@ -1206,11 +1138,6 @@
 		}
 	},
 	"accounts": {
-		"multiConnector": {
-			"title": "AI Provider Management",
-			"description": "Connect and manage multiple AI providers (Claude, OpenAI, Mistral, etc.).",
-			"loadingProviders": "Loading providers..."
-		},
 		"tabs": {
 			"aiProvider": "AI Authentication",
 			"llmProviders": "LLM Providers"
@@ -1278,36 +1205,18 @@
 		},
 		"priority": {
 			"title": "Account Priority Order",
-			"description": "Drag to reorder. System will switch to the next available account in order.",
-			"noAccounts": "No accounts configured. Add accounts above to set priority.",
-			"noEmail": "No email",
 			"active": "Active",
-			"inUse": "In Use",
-			"next": "Next",
 			"unlimited": "Unlimited",
 			"unavailable": "Unavailable",
-			"typeOAuth": "OAuth",
-			"typeAPI": "API",
-			"payPerUse": "Pay-per-use",
-			"needsAuth": "Not authenticated",
-			"duplicateUsage": "Duplicate usage detected",
-			"duplicateUsageHint": "This profile has identical usage to another profile, suggesting they may be authenticated to the same Anthropic account. Re-authenticate with a different account to fix.",
-			"needsReauth": "Needs re-auth",
-			"needsReauthHint": "This profile's refresh token is invalid. Click to re-authenticate.",
-			"sessionUsage": "Session usage (5-hour window)",
-			"weeklyUsage": "Weekly usage (7-day window)",
 			"oauthSection": "Claude Accounts (cycle through first)",
 			"apiSection": "Fallback Endpoints (when all accounts exhausted)",
-			"tipTitle": "How priority works",
-			"tipDescription": "Claude accounts are included in your subscription and will be cycled through first. API endpoints charge per request and are used as fallbacks when all Claude accounts hit their limits.",
 			"status": {
 				"healthy": "Healthy",
 				"moderate": "Moderate",
 				"highUsage": "High usage",
 				"nearLimit": "Near limit",
 				"rateLimited": "Rate limited"
-			},
-			"providerAuth": "Authenticated via API key"
+			}
 		},
 		"priorityOrder": {
 			"title": "Provider priority order",
@@ -1882,6 +1791,8 @@
 		"patDescriptionSuffix": "Requires scope: Work Items (Read & Write).",
 		"patLinkLabel": "Azure DevOps User Settings",
 		"patPlaceholder": "Enter your PAT",
+		"patShow": "Show the token",
+		"patHide": "Hide the token",
 		"repositoryLabel": "Repository",
 		"repositoryDescription": "Select the Azure DevOps repository to use for this project",
 		"repositoryPlaceholder": "Select a repository...",
@@ -1933,30 +1844,11 @@
 	},
 	"autoSwitching": {
 		"title": "Auto-switching",
-		"enableLabel": "Enable auto-switching",
-		"enableDescription": "Automatically switch between accounts based on usage",
-		"enabled": "Auto-switching enabled",
-		"disabled": "Auto-switching disabled",
-		"enabledDescription": "Accounts will switch automatically",
-		"disabledDescription": "Accounts will no longer switch automatically",
-		"proactiveMonitoring": "Proactive Monitoring",
-		"proactiveDescription": "Switch before reaching limits",
-		"sessionThreshold": "Session Threshold",
-		"sessionThresholdDescription": "Switch when usage reaches this percentage",
-		"rateLimitSwitching": "Switch on Rate Limit",
-		"rateLimitDescription": "Change account when rate limit is reached",
-		"authFailureSwitching": "Switch on Auth Failure",
-		"authFailureDescription": "Change account if authentication fails",
 		"priorityOrder": {
-			"title": "Account Priority Order",
 			"description": "Define the order in which accounts will be used for auto-switching"
 		},
 		"debug": {
 			"accountsFound": "Debug: {{count}} account(s) found"
-		},
-		"toast": {
-			"error": "Error",
-			"errorDescription": "Unable to update settings"
 		}
 	},
 	"jira": {
@@ -2318,41 +2210,6 @@
 			}
 		}
 	},
-	"providerGrid": {
-		"search": {
-			"placeholder": "Search for a provider...",
-			"results_one": "{{count}} result for \"{{query}}\"",
-			"results_other": "{{count}} results for \"{{query}}\"",
-			"noResults": "No providers found",
-			"noProviders": "No providers available",
-			"adjustCriteria": "Try adjusting your search criteria.",
-			"addFirst": "Start by adding your first provider.",
-			"addFirstButton": "Add your first provider"
-		},
-		"filters": {
-			"placeholder": "Filter",
-			"all": "All",
-			"configured": "Configured",
-			"unconfigured": "Unconfigured",
-			"errors": "With errors"
-		},
-		"sort": {
-			"placeholder": "Sort by",
-			"name": "Name",
-			"category": "Category",
-			"status": "Status",
-			"usage": "Usage"
-		},
-		"stats": {
-			"total": "{{count}} total",
-			"configured": "{{count}} configured",
-			"errors": "{{count}} errors"
-		},
-		"actions": {
-			"refresh": "Refresh",
-			"add": "Add"
-		}
-	},
 	"collaboration": {
 		"title": "Collaboration",
 		"description": "Multi-user collaboration settings"
@@ -2438,20 +2295,6 @@
 			"pending": "Pending",
 			"complete": "Complete",
 			"failed": "Failed"
-		}
-	},
-	"llmRouter": {
-		"routingStrategy": {
-			"title": "Default Routing Strategy",
-			"description": "How the router selects a provider when multiple are available.",
-			"bestPerformance": "Best Performance",
-			"bestPerformanceDescription": "Prioritize quality score",
-			"cheapest": "Cheapest",
-			"cheapestDescription": "Minimize cost per task",
-			"lowestLatency": "Lowest Latency",
-			"lowestLatencyDescription": "Fastest response time",
-			"roundRobin": "Round Robin",
-			"roundRobinDescription": "Distribute evenly"
 		}
 	},
 	"specApproval": {
@@ -3085,6 +2928,103 @@
 			"debug": "Debug",
 			"scheduler": "Scheduling",
 			"updates": "Updates"
+		}
+	},
+	"aiAccounts": {
+		"title": "AI accounts",
+		"description": "Every provider WorkPilot can run on: how it signs in, whether it answers, and which one takes over when a task hits a limit.",
+		"loading": "Loading providers…",
+		"tabs": {
+			"label": "AI accounts views",
+			"providers": "Providers",
+			"failover": "Auto failover"
+		},
+		"stats": {
+			"connected": "Connected",
+			"connectedValue": "{{connected}} / {{total}}",
+			"default": "Default provider",
+			"failover": "Auto failover",
+			"failoverOn_one": "On · {{count}} account",
+			"failoverOn_other": "On · {{count}} accounts",
+			"failoverOff": "Off",
+			"attention": "Need attention",
+			"none": "None"
+		},
+		"filters": {
+			"label": "Filter providers",
+			"all": "All",
+			"connected": "Connected",
+			"available": "To connect",
+			"attention": "Attention"
+		},
+		"search": "Search a provider",
+		"groups": {
+			"connected": "Connected",
+			"available": "To connect"
+		},
+		"empty": {
+			"title": "No provider matches",
+			"body": "Change the search or the filter."
+		},
+		"noneConnected": "No provider is connected yet. Connect one to run tasks.",
+		"toast": {
+			"testOkModels": "{{name}} answers ({{count}} models available)."
+		},
+		"card": {
+			"status": {
+				"connected": "Connected",
+				"reauth": "Sign in again",
+				"failing": "Not answering",
+				"off": "Not connected"
+			},
+			"auth": {
+				"oauth": "Sign-in",
+				"api-key": "API key",
+				"cli": "CLI",
+				"local": "Local"
+			},
+			"default": "Default",
+			"setDefault": "Make default",
+			"test": "Test",
+			"testing": "Testing…",
+			"edit": "Edit",
+			"connect": "Connect",
+			"reconnect": "Reconnect",
+			"lastTest": "Tested {{date}}",
+			"neverTested": "Never tested",
+			"keyToday": "Key set today",
+			"keyAge_one": "Key set {{count}} day ago",
+			"keyAge_other": "Key set {{count}} days ago",
+			"usage": "Session {{session}} %",
+			"usageWeekly": "Session {{session}} % · week {{weekly}} %"
+		},
+		"failover": {
+			"masterTitle": "Auto failover",
+			"masterOn": "A task stopped by a limit or a lost sign-in resumes on the next account of the chain, from the phase it stopped in.",
+			"masterOff": "Off: a task stopped by a limit waits for you.",
+			"triggersTitle": "When to switch",
+			"rateLimit": "On a usage limit",
+			"rateLimitHint": "The provider refuses requests until its limit resets.",
+			"authFailure": "On a lost sign-in",
+			"authFailureHint": "The account's sign-in or key no longer works.",
+			"proactive": "Before the limit (Claude accounts)",
+			"proactiveHint": "Moves to another Claude account when usage passes these thresholds.",
+			"session": "Session threshold",
+			"weekly": "Weekly threshold",
+			"chainTitle": "Failover chain",
+			"chainDescription": "Accounts are tried from top to bottom. Drag to reorder; the switch takes an account out of the chain.",
+			"chainEmpty": "No connected account yet.",
+			"chainSingle": "Only one account is in the chain: connect or include another one so a stopped task has somewhere to go.",
+			"kind": {
+				"oauth": "Claude account",
+				"api": "API profile",
+				"provider": "Provider"
+			},
+			"active": "In use",
+			"include": "Include {{name}} in the chain",
+			"dragHandle": "Move {{name}}",
+			"saveError": "The failover settings could not be saved.",
+			"orderError": "The chain order could not be saved."
 		}
 	}
 }

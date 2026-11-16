@@ -5,12 +5,26 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { ALLOWED_IMAGE_TYPES_DISPLAY } from "../../../../shared/constants";
 import {
 	blobToBase64,
 	isValidImageMimeType,
-	resolveFilename,
-} from "../../ImageUpload";
+} from "../../../lib/image-attachments";
+
+/**
+ * The saved name's extension, from the MIME type already checked: the main
+ * process only takes these, and a file's own name may have none
+ * ("image") or a different one ("svg+xml").
+ */
+const EXTENSIONS: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/jpg": "jpg",
+	"image/gif": "gif",
+	"image/webp": "webp",
+	"image/svg+xml": "svg",
+};
 
 interface UseImageUploadOptions {
 	projectId: string | null;
@@ -23,6 +37,7 @@ export function useImageUpload({
 	content,
 	onContentChange,
 }: UseImageUploadOptions) {
+	const { t } = useTranslation("changelog");
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [imageError, setImageError] = useState<string | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -54,18 +69,14 @@ export function useImageUpload({
 
 			if (!isValidImageMimeType(file.type)) {
 				setImageError(
-					`Invalid image type. Allowed: ${ALLOWED_IMAGE_TYPES_DISPLAY}`,
+					t("errors.imageInvalidType", { types: ALLOWED_IMAGE_TYPES_DISPLAY }),
 				);
 				return;
 			}
 
 			try {
 				const dataUrl = await blobToBase64(file);
-				const extension =
-					file.name.split(".").pop() || file.type.split("/")[1] || "png";
-				const timestamp = Date.now();
-				const baseFilename = `changelog-${timestamp}.${extension}`;
-				const filename = resolveFilename(baseFilename, []);
+				const filename = `changelog-${Date.now()}.${EXTENSIONS[file.type]}`;
 
 				const result = await window.electronAPI.saveChangelogImage(
 					projectId,
@@ -77,13 +88,13 @@ export function useImageUpload({
 					const imageMarkdown = `\n![${filename}](${result.data.relativePath})\n`;
 					insertImageAtCursor(imageMarkdown);
 				} else {
-					setImageError(result.error || "Failed to save image");
+					setImageError(result.error || t("errors.imageSaveFailed"));
 				}
 			} catch (_err) {
-				setImageError("Failed to process image");
+				setImageError(t("errors.imageProcessFailed"));
 			}
 		},
-		[projectId, insertImageAtCursor],
+		[projectId, insertImageAtCursor, t],
 	);
 
 	const handlePaste = useCallback(

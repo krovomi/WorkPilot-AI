@@ -14,15 +14,14 @@ import sys
 from pathlib import Path
 
 from core.worktree import WorktreeManager
-from foundation.git_executable import run_git
-from merge import FileTimelineTracker
+from foundation.debug import debug, debug_warning
+from foundation.platform import is_windows
 from security.constants import ALLOWLIST_FILENAME, PROFILE_FILENAME
 from ui import (
     Icons,
     MenuOption,
     box,
     icon,
-    muted,
     print_status,
     select_menu,
     success,
@@ -30,18 +29,6 @@ from ui import (
 
 from .git_utils import has_uncommitted_changes
 from .models import WorkspaceMode
-
-# Import debug utilities
-try:
-    from foundation.debug import debug, debug_warning
-except ImportError:
-
-    def debug(*args, **kwargs):
-        pass
-
-    def debug_warning(*args, **kwargs):
-        pass
-
 
 # Track if we've already looked for the old git hook this session
 _git_hook_check_done = False
@@ -192,6 +179,25 @@ def is_workpilot_repo(project_dir: Path) -> bool:
     return isinstance(data, dict) and data.get("name") == "workpilot-ai"
 
 
+def prepare_worktree_dependencies(
+    project_dir: Path, worktree: Path, spec_name: str
+) -> None:
+    """Give a new worktree what it needs to build, as for a task's worktree.
+
+    WorkPilot's own monorepo links its two node_modules (its pre-commit hooks
+    typecheck in the worktree). Any other project gets its recipe:
+    `.workpilot/worktree.toml`, or what its stack implies
+    (`core/workspace/recipe.py`); linking dependencies into a worktree can
+    break the main checkout, so it is never the default elsewhere.
+    """
+    if is_workpilot_repo(project_dir):
+        linked = symlink_node_modules_to_worktree(project_dir, worktree)
+        if linked:
+            print_status(f"Dependencies linked: {', '.join(linked)}", "success")
+    else:
+        _prepare(project_dir, worktree, spec_name)
+
+
 def _prepare(project_dir: Path, worktree: Path, spec_name: str) -> None:
     """Run the worktree's recipe and say how it went. Never stops the build."""
     from .recipe_run import prepare_worktree
@@ -284,7 +290,7 @@ def symlink_node_modules_to_worktree(
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            if sys.platform == "win32":
+            if is_windows():
                 # On Windows, use junctions instead of symlinks (no admin rights required)
                 # Junctions require absolute paths
                 result = subprocess.run(
@@ -412,21 +418,7 @@ def setup_workspace(
             f"Environment files copied: {', '.join(copied_env_files)}", "success"
         )
 
-    # WorkPilot's own monorepo links its two node_modules (its pre-commit
-    # hooks typecheck in the worktree). Any other project gets its recipe:
-    # `.workpilot/worktree.toml`, or what its stack implies
-    # (`core/workspace/recipe.py`); linking dependencies into a worktree can
-    # break the main checkout, so it is never the default elsewhere.
-    if is_workpilot_repo(project_dir):
-        symlinked_modules = symlink_node_modules_to_worktree(
-            project_dir, worktree_info.path
-        )
-        if symlinked_modules:
-            print_status(
-                f"Dependencies linked: {', '.join(symlinked_modules)}", "success"
-            )
-    else:
-        _prepare(project_dir, worktree_info.path, spec_name)
+    prepare_worktree_dependencies(project_dir, worktree_info.path, spec_name)
 
     # Copy security configuration files if they exist
     # Note: Unlike env files, security files always overwrite to ensure
@@ -493,14 +485,6 @@ def setup_workspace(
     print_status(f"Workspace ready: {worktree_info.path.name}", "success")
     print()
 
-    # Initialize FileTimelineTracker for this task
-    initialize_timeline_tracking(
-        project_dir=project_dir,
-        spec_name=spec_name,
-        worktree_path=worktree_info.path,
-        source_spec_dir=localized_spec_dir or source_spec_dir,
-    )
-
     return worktree_info.path, manager, localized_spec_dir
 
 
@@ -562,78 +546,3 @@ def remove_timeline_hook(project_dir: Path) -> bool:
     except (OSError, UnicodeDecodeError) as e:
         debug_warning(MODULE, f"Could not remove the timeline hook: {e}")
         return False
-
-
-def initialize_timeline_tracking(
-    project_dir: Path,
-    spec_name: str,
-    worktree_path: Path,
-    source_spec_dir: Path | None = None,
-) -> None:
-    """
-    Initialize FileTimelineTracker for a new task.
-
-    This registers the task's branch point and the files it intends to modify,
-    enabling intent-aware merge conflict resolution later.
-    """
-    try:
-        tracker = FileTimelineTracker(project_dir)
-
-        # Get task intent from implementation plan
-        task_intent = ""
-        task_title = spec_name
-        files_to_modify = []
-
-        if source_spec_dir:
-            plan_path = source_spec_dir / "implementation_plan.json"
-            if plan_path.exists():
-                with open(plan_path, encoding="utf-8") as f:
-                    plan = json.load(f)
-                task_title = plan.get("title", spec_name)
-                task_intent = plan.get("description", "")
-
-                # Extract files from phases/subtasks
-                for phase in plan.get("phases", []):
-                    for subtask in phase.get("subtasks", []):
-                        files_to_modify.extend(subtask.get("files", []))
-
-        # Get the current branch point commit
-        # Note: run_git() already handles capture_output and encoding internally
-        result = run_git(
-            ["rev-parse", "HEAD"],
-            cwd=project_dir,
-        )
-        branch_point = result.stdout.strip() if result.returncode == 0 else None
-
-        if files_to_modify and branch_point:
-            # Register the task with known files
-            tracker.on_task_start(
-                task_id=spec_name,
-                files_to_modify=list(set(files_to_modify)),  # Dedupe
-                branch_point_commit=branch_point,
-                task_intent=task_intent,
-                task_title=task_title,
-            )
-            debug(
-                MODULE,
-                f"Timeline tracking initialized for {spec_name}",
-                files_tracked=len(files_to_modify),
-                branch_point=branch_point[:8] if branch_point else None,
-            )
-        else:
-            # Initialize retroactively from worktree if no plan
-            tracker.initialize_from_worktree(
-                task_id=spec_name,
-                worktree_path=worktree_path,
-                task_intent=task_intent,
-                task_title=task_title,
-            )
-
-    except Exception as e:
-        # Non-fatal - timeline tracking is supplementary
-        debug_warning(MODULE, f"Could not initialize timeline tracking: {e}")
-        print(muted(f"  Note: Timeline tracking could not be initialized: {e}"))
-
-
-# Export private functions for backward compatibility
-_initialize_timeline_tracking = initialize_timeline_tracking

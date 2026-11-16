@@ -21,12 +21,28 @@ _backend_dir = Path(__file__).parent.parent / "apps" / "backend"
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
+from agents.impact_analyzer import fallback_analysis
 from core.worktree import PullRequestResult, WorktreeInfo, WorktreeManager
 from foundation.git_provider import detect_git_provider
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _impact_block_without_a_model(monkeypatch):
+    """The impact block of a PR body comes from a model call; these tests
+    check the `gh` call, so the analyzer answers its fallback. On a machine
+    where the Claude CLI is found and signed in, the real analyzer started it.
+    """
+    from agents.impact_analyzer import fallback_analysis
+
+    monkeypatch.setattr(
+        WorktreeManager,
+        "_run_impact_analysis",
+        lambda self, spec_name, diff_summary, commit_log: fallback_analysis(),
+    )
 
 
 @pytest.fixture
@@ -263,6 +279,10 @@ class TestGitHubCLIInvocation:
                 worktree_module.subprocess, "run", return_value=mock_subprocess_result
             ) as mock_run,
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",
@@ -333,6 +353,10 @@ class TestGitHubCLIInvocation:
                 worktree_module.subprocess, "run", return_value=mock_subprocess_result
             ) as mock_run,
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",
@@ -446,6 +470,10 @@ class TestGitHubErrorHandling:
                 return_value="https://github.com/user/repo/pull/123",
             ),
             patch.object(manager, "_extract_spec_summary", return_value="Test PR body"),
+            # The impact block calls a model: the arguments of `gh` are the test.
+            patch.object(
+                manager, "_run_impact_analysis", return_value=fallback_analysis()
+            ),
         ):
             result = manager.create_pull_request(
                 spec_name="001-test-spec",

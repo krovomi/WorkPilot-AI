@@ -1,5 +1,5 @@
 import type { BrowserAgentTab } from "@shared/types/browser-agent";
-import { AlertTriangle, FlaskConical, Globe, MonitorX, ScanEye } from "lucide-react";
+import { AlertTriangle, CircleDot, FlaskConical, Globe, MonitorX, ScanEye } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserAgentStore } from "@/stores/browser-agent-store";
@@ -16,6 +16,7 @@ import {
 	Tabs,
 } from "../charter";
 import { BrowserTab } from "./BrowserTab";
+import { RecorderTab } from "./RecorderTab";
 import { TestRunnerTab } from "./TestRunnerTab";
 import { VisualRegressionTab } from "./VisualRegressionTab";
 
@@ -82,6 +83,7 @@ export function BrowserAgentDashboard() {
 						{ id: "browser", label: t("browserAgent:tabs.browser"), icon: Globe },
 						{ id: "visual-regression", label: t("browserAgent:tabs.visualRegression"), icon: ScanEye },
 						{ id: "test-runner", label: t("browserAgent:tabs.testRunner"), icon: FlaskConical },
+						{ id: "recorder", label: t("browserAgent:tabs.recorder"), icon: CircleDot },
 					]}
 				/>
 
@@ -98,6 +100,7 @@ export function BrowserAgentDashboard() {
 						{activeTab === "browser" && <BrowserTab projectPath={projectPath} />}
 						{activeTab === "visual-regression" && <VisualRegressionTab projectPath={projectPath} />}
 						{activeTab === "test-runner" && <TestRunnerTab projectPath={projectPath} />}
+						{activeTab === "recorder" && <RecorderTab projectPath={projectPath} />}
 					</div>
 				)}
 			</Page>

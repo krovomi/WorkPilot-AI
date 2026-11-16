@@ -28,7 +28,7 @@ def project(tmp_path, monkeypatch):
 @pytest.fixture
 def calls(monkeypatch):
     """Every command `main` routes to, replaced by a recorder."""
-    from cli import steer_command, verify_commands, workspace_commands
+    from cli import steer_command, subtask_command, verify_commands, workspace_commands
 
     seen = _Calls()
 
@@ -47,6 +47,7 @@ def calls(monkeypatch):
         (workspace_commands, "handle_analyze_impact_command"),
         (workspace_commands, "handle_find_pr_command"),
         (steer_command, "handle_steer_command"),
+        (subtask_command, "handle_subtask_command"),
         (verify_commands, "handle_verify_command"),
     ]:
         monkeypatch.setattr(module, name, recorder(name))
@@ -204,6 +205,22 @@ def test_steer(project, calls, ok):
         with pytest.raises(SystemExit):
             _run(project, *argv)
     assert calls[0][1] == (project, _spec_dir(project), "use redis", "1.2")
+
+
+@pytest.mark.parametrize("ok", [True, False])
+def test_subtask(project, calls, ok, monkeypatch):
+    monkeypatch.setenv("AUTO_BUILD_MODEL", "sonnet")
+    calls.result = ok
+    argv = ["--spec", "001", "--subtask", "2.1", "--verbose"]
+    if ok:
+        _run(project, *argv)
+    else:
+        with pytest.raises(SystemExit):
+            _run(project, *argv)
+    [(name, args, kwargs)] = calls
+    assert name == "handle_subtask_command"
+    assert args == (project, _spec_dir(project), "sonnet", "2.1")
+    assert kwargs == {"verbose": True}
 
 
 @pytest.mark.parametrize("flag", ["--analyze-impact", "--find-pr"])

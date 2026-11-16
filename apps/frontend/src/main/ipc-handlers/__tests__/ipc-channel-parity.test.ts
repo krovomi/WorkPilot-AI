@@ -60,6 +60,11 @@ const DYNAMIC_FORWARDERS = new Set([
 	// will find their channel reported missing here, and must teach this test to
 	// read that call rather than add the channel to an allowlist.
 	"main/electron-utils.ts",
+	// `guardedIpcMain`: registers on the channel it is given, after checking the
+	// arguments. Each registration on a guarded `ipcMain` (`prIpcMain`,
+	// `mrIpcMain`, or one imported as `ipcMain`) is read where it is made,
+	// with its constant.
+	"main/ipc-handlers/github/ipc-arg-guard.ts",
 ]);
 
 const PRELOAD_CALL =
@@ -71,7 +76,7 @@ const PRELOAD_CALL =
  */
 const RENDERER_CALL = /(?<![\w$])electronAPI\s*\??\.\s*(?:invoke|send)\b/g;
 const MAIN_REGISTRATION =
-	/(?<![\w$])ipcMain\s*\.\s*(?:handle|handleOnce|on|once)\b/g;
+	/(?<![\w$])(?:ipcMain|[a-z][\w$]*IpcMain)\s*\.\s*(?:handle|handleOnce|on|once)\b/g;
 
 interface ChannelUse {
 	channel: string;

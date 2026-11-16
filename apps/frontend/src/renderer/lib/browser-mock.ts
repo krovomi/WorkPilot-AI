@@ -17,6 +17,7 @@ import {
 	memoryLifecycleMock,
 	phase35Mock,
 	projectMock,
+	selfHealingMock,
 	settingsMock,
 	taskMock,
 	terminalMock,
@@ -62,6 +63,9 @@ const browserMockAPI: Partial<ElectronAPI> = {
 
 	// Settings
 	...settingsMock,
+
+	// Self-healing (the desktop app scans, groups and bisects)
+	...selfHealingMock,
 
 	// Roadmap Operations
 	getRoadmap: async () => ({
@@ -789,6 +793,13 @@ const browserMockAPI: Partial<ElectronAPI> = {
 		throw new Error("Smart estimation is unavailable in the browser preview");
 	},
 	cancelSmartEstimation: async () => false,
+	// La calibration vit dans le depot : sans backend, rien a ecrire.
+	adjustSmartEstimate: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
+	resetEstimationCalibration: async () => {
+		throw new Error("Smart estimation is unavailable in the browser preview");
+	},
 	onSmartEstimationEvent: () => () => {
 		/* noop */
 	},
