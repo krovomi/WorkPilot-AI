@@ -1,6 +1,7 @@
 /**
  * The `ipcMain` the terminal and Claude profile handlers
- * (`terminal-handlers.ts`) register on: each argument the renderer sends is
+ * (`terminal-handlers.ts`) and the terminal worktree handlers
+ * (`worktree-handlers.ts`) register on: each argument the renderer sends is
  * checked before the handler runs, as `github/ipc-arg-guard.ts` does for the
  * forges. These channels take no project id first, so the checks read every
  * argument. Ids, names and paths are bounded text, sizes positive integers, a
@@ -99,6 +100,16 @@ const isOrders = (value: unknown) =>
 			order.displayOrder >= 0,
 	);
 
+const isWorktreeRequest = isShaped({
+	terminalId: isId,
+	name: isId,
+	taskId: optional(isId),
+	createGitBranch: isBoolean,
+	projectPath: isName,
+	baseBranch: optional(isName),
+	useLocalBranch: optional(isBoolean),
+});
+
 const CHECKS: ArgChecks = {
 	[IPC_CHANNELS.TERMINAL_CREATE]: ([options]) => isCreateOptions(options),
 	[IPC_CHANNELS.TERMINAL_DESTROY]: ([id]) => isId(id),
@@ -136,6 +147,11 @@ const CHECKS: ArgChecks = {
 		isDay(date) && isName(projectPath) && optional(isSize)(cols) && optional(isSize)(rows),
 	[IPC_CHANNELS.TERMINAL_CHECK_PTY_ALIVE]: ([id]) => isId(id),
 	[IPC_CHANNELS.TERMINAL_UPDATE_DISPLAY_ORDERS]: ([projectPath, orders]) => isName(projectPath) && isOrders(orders),
+	[IPC_CHANNELS.TERMINAL_WORKTREE_CREATE]: ([request]) => isWorktreeRequest(request),
+	[IPC_CHANNELS.TERMINAL_WORKTREE_LIST]: ([projectPath]) => isName(projectPath),
+	[IPC_CHANNELS.TERMINAL_WORKTREE_LIST_OTHER]: ([projectPath]) => isName(projectPath),
+	[IPC_CHANNELS.TERMINAL_WORKTREE_REMOVE]: ([projectPath, name, deleteBranch]) =>
+		isName(projectPath) && isId(name) && optional(isBoolean)(deleteBranch),
 };
 
 export const terminalIpcMain = guardedIpcMain(CHECKS, "Invalid terminal arguments", 0);
