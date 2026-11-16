@@ -175,9 +175,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),
+    # The merge preview reads git and asks no model; the AI merge of a file
+    # lives in core.workspace.
+    "merge": {"foundation"},
     # Taken out of the agents' cycle by the port (plan of 29 October, A1):
     # each starts its session through agent_runtime, never core or agents.
-    "merge": {"agent_runtime", "foundation"},
     "integrations": {
         "agent_runtime",
         "foundation",
