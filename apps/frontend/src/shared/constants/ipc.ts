@@ -712,6 +712,7 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
+	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project

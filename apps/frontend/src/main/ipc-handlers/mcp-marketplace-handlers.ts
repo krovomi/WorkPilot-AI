@@ -18,7 +18,14 @@ import type {
 	McpBuilderProject,
 } from "../../shared/types/mcp-marketplace";
 import { appLog } from "../app-logger";
+import { RegistryFactsStore } from "../mcp-security/registry-facts";
+import {
+	McpSecurityRequestError,
+	serverSecurity,
+} from "../mcp-security/server-security";
+import { projectStore } from "../project-store";
 import { searchHuggingFaceModels } from "../services/hf-mcp-client";
+import { offlineStrict } from "./task/split-merge-watch";
 
 // ============================================
 // Storage paths
@@ -61,6 +68,16 @@ function saveBuilderToDisk(projects: McpBuilderProject[]): void {
 	} catch (err) {
 		appLog.error("[MCP Marketplace] Failed to save builder projects:", err);
 	}
+}
+
+let securityStore: RegistryFactsStore | null = null;
+
+/** The registry facts of the catalog's packages, cached in the app's data. */
+function getSecurityStore(): RegistryFactsStore {
+	securityStore ??= new RegistryFactsStore(
+		path.join(getMarketplaceDataDir(), "security-facts.json"),
+	);
+	return securityStore;
 }
 
 // ============================================
@@ -144,6 +161,28 @@ export function registerMcpMarketplaceHandlers(): void {
 			} catch (error) {
 				appLog.error("[MCP Marketplace] deleteBuilder error:", error);
 				return { success: false, error: "Delete failed" };
+			}
+		},
+	);
+
+	// Security score of a catalog server (#369): the renderer names a server
+	// id and the project it installs into, both checked in serverSecurity.
+	ipcMain.handle(
+		IPC_CHANNELS.MCP_MARKETPLACE_GET_SECURITY,
+		async (_event, request: unknown) => {
+			try {
+				const data = await serverSecurity(request, {
+					store: getSecurityStore(),
+					projectPath: (id) => projectStore.getProject(id)?.path,
+					offline: offlineStrict,
+				});
+				return { success: true, data };
+			} catch (error) {
+				if (error instanceof McpSecurityRequestError) {
+					return { success: false, error: error.message };
+				}
+				appLog.error("[MCP Marketplace] security error:", error);
+				return { success: false, error: "Failed to score the server" };
 			}
 		},
 	);

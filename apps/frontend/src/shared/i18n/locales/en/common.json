@@ -1077,6 +1077,63 @@
 			"coder": "Coder",
 			"qa_reviewer": "QA reviewer",
 			"analyzer": "Investigator"
+		},
+		"security": {
+			"badge": "Security {{score}}",
+			"badgeTitle": "Security score {{score}}/100: {{level}}",
+			"level": {
+				"high": "high",
+				"medium": "medium",
+				"low": "low"
+			},
+			"title": "Security",
+			"checking": "Reading the registry and known vulnerabilities…",
+			"recheck": "Check again",
+			"checkedAt": "Registry read {{date}}",
+			"unchecked": {
+				"remote": "Runs on its vendor's servers: nothing of it runs on this machine, and there is no package to check.",
+				"offline": "This project is in strict offline mode: the score uses the catalog and the last registry read only.",
+				"unreachable": "The registry could not be reached: the score uses the catalog and the last registry read only.",
+				"notYet": "From the catalog only; open the details to read the registry and known vulnerabilities."
+			},
+			"lowScore": "Low score: install it only on projects you trust, and review its tools before approving them.",
+			"dimensions": {
+				"publisher": "Publisher",
+				"permissions": "Permissions",
+				"execution": "Where it runs",
+				"freshness": "Freshness",
+				"supplyChain": "Known vulnerabilities",
+				"maintainers": "Maintainers"
+			},
+			"reasons": {
+				"official": "Maintained by {{author}}, the vendor of the product.",
+				"community": "Community server ({{author}}), not the product's vendor.",
+				"readsOnly": "Its tools only read.",
+				"writes": "Some of its tools change data.",
+				"executes": "Tools that run commands: {{tools}}.",
+				"readOnlyFlag": "Started in read-only mode.",
+				"remote": "Runs remotely, not on this machine.",
+				"localPinned": "Runs on this machine with your rights, at a pinned version.",
+				"localUnpinned": "Runs on this machine with your rights; its latest version is fetched at each start.",
+				"unknown": "Not checked yet.",
+				"recent": "Latest release {{days}} days ago.",
+				"stale": "No release for {{days}} days: possibly abandoned.",
+				"deprecated": "Deprecated by its publisher.",
+				"vulnerable": "{{count}} known vulnerabilities for this version.",
+				"noKnownVulnerability": "No known vulnerability for version {{version}}.",
+				"changed": "New maintainers since the first check: {{names}}.",
+				"noSource": "The package names no source repository.",
+				"stable": "Same {{count}} maintainers as at the first check."
+			},
+			"alerts": {
+				"maintainerChanged": "Maintainers changed: {{names}}. A new maintainer can publish anything under this name; check before updating.",
+				"vulnerability": "{{id}}: {{summary}}",
+				"abandoned": "No release for {{days}} days: it may be abandoned.",
+				"deprecated": "The publisher deprecated this package.",
+				"noSource": "Source code unavailable: it cannot be audited.",
+				"unpinned": "Not pinned: each start runs the newest release, whatever it contains.",
+				"executesCommands": "It can run commands ({{tools}}): give it only to the agents that need it."
+			}
 		}
 	},
 	"terminalGrid": {
