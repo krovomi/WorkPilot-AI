@@ -431,6 +431,8 @@ class CopilotUsageConnector:
             "scope": "personal-quotas",
             "available": True,
             "plan": data.get("copilot_plan"),
+            # Tells Copilot Pro+ apart from Pro inside the "individual" plan.
+            "sku": data.get("access_type_sku"),
             "login": data.get("login"),
             "organization": org_name,
             "premium_requests": {

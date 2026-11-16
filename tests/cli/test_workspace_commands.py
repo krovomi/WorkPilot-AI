@@ -261,11 +261,13 @@ def test_parallel_detection_reads_the_other_tasks(repo, monkeypatch):
             assert tasks == ["002-x"]
             return {"app.py": ["002-x"], "other.py": ["002-x"]}
 
-    class Orchestrator:
-        def __init__(self, project_dir, enable_ai, dry_run):
+    class Preview:
+        def __init__(self, project_dir):
             self.evolution_tracker = Tracker()
 
-    monkeypatch.setattr(merge, "MergeOrchestrator", Orchestrator)
+    monkeypatch.setattr(merge, "MergePreview", Preview)
+    # Another task counts while its worktree is there
+    (repo / ".workpilot" / "worktrees" / "tasks" / "002-x").mkdir(parents=True)
 
     assert wc._detect_parallel_task_conflicts(repo, SPEC, ["app.py"]) == [
         {"file": "app.py", "tasks": [SPEC, "002-x"]}

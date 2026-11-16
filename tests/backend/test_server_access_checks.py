@@ -41,11 +41,19 @@ def _bearer(user_id: str, role: str = "member") -> dict[str, str]:
 
 
 def _app_with(router, org_id: str | None) -> AsyncClient:
-    """`router` behind a middleware that sets the active organization."""
+    """`router` behind a middleware that sets the active organization, and the
+    caller's permissions in it as the server's middleware resolves them."""
+    from server.auth.jwt_tokens import decode_access_token
+    from server.integration import _attach_principal
+
     app = FastAPI()
 
     @app.middleware("http")
     async def _org(request, call_next):
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            claims = decode_access_token(auth[len("Bearer ") :])
+            await _attach_principal(request, {**claims, "org": org_id})
         request.state.org_id = org_id
         return await call_next(request)
 

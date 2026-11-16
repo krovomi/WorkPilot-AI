@@ -74,3 +74,34 @@ def test_a_missing_dotnet_cli_is_unavailable(dotnet_project, monkeypatch):
     run = asyncio.run(qa_loop._run_dotnet_tests(dotnet_project))
 
     assert run.status == "unavailable"
+
+
+def test_only_projects_that_reference_a_test_framework_are_run(
+    dotnet_project, monkeypatch
+):
+    (dotnet_project / "App").mkdir()
+    (dotnet_project / "App" / "App.csproj").write_text("<Project/>", encoding="utf-8")
+    (dotnet_project / "Odd.csproj").mkdir()  # matches the glob, cannot be read
+    calls = _fake_dotnet(monkeypatch, 0)
+
+    run = asyncio.run(qa_loop._run_dotnet_tests(dotnet_project))
+
+    assert run.status == "passed"
+    assert [c[2] for c in calls] == [
+        str(dotnet_project / "App.Tests" / "App.Tests.csproj")
+    ]
+
+
+def test_a_suite_that_hangs_is_killed_and_fails(dotnet_project, monkeypatch):
+    async def hanging(program, *args, **kwargs):
+        return await _real_exec(
+            sys.executable, "-c", "import time; time.sleep(30)", **kwargs
+        )
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", hanging)
+    monkeypatch.setattr(qa_loop, "DOTNET_TEST_TIMEOUT_SECONDS", 0.2)
+
+    run = asyncio.run(qa_loop._run_dotnet_tests(dotnet_project))
+
+    assert run.status == "failed"
+    assert "App.Tests" in run.detail and "timed out after 0.2 seconds" in run.detail
