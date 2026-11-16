@@ -8,3 +8,5 @@ section: 🐛 Corrections
 - **Applications mobiles** : un `package.json` d'une autre forme (liste, dépendances écrites
   comme une liste) ne fait plus manquer la détection d'une application Capacitor voisine, et une
   liste de simulateurs iOS d'une autre forme donne « aucun simulateur » au lieu d'une erreur.
+- **Bac à sable de l'OS** : un port au-delà de 65535 passé à la porte loopback est refusé
+  proprement (code 126) au lieu d'une trace d'erreur.
