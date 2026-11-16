@@ -171,7 +171,7 @@ async def test_a_session_records_main_frame_reports_until_stopped() -> None:
     recording, reason = await record_session(
         page, "http://localhost:5173", stop, emitted.append
     )
-    await driver
+    await asyncio.wait_for(driver, timeout=5)
     assert reason == "stopped"
     assert page.visited == [("http://localhost:5173", "domcontentloaded")]
     assert page.script == SCRIPT.read_text(encoding="utf-8")
@@ -191,7 +191,7 @@ async def test_a_session_ends_when_the_window_closes() -> None:
     recording, reason = await record_session(
         page, "http://localhost:5173", never, lambda _s: None, Recorder()
     )
-    await closer
+    await asyncio.wait_for(closer, timeout=5)
     assert reason == "closed" and len(recording.steps) == 1
     assert never.cancelled()
 
