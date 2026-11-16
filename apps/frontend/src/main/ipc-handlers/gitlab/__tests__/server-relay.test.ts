@@ -90,6 +90,12 @@ describe("a server project's GitLab", () => {
 		});
 		expect(gitlabProjectOf("https://gitlab.com/acme/../shop")).toBeNull();
 		expect(gitlabProjectOf("https://gitlab.com/shop")).toBeNull();
+		expect(gitlabProjectOf(undefined)).toBeNull();
+		expect(gitlabProjectOf("ssh://git@Git.Acme.test:2222/team/shop.git")).toEqual({
+			instanceUrl: "https://git.acme.test",
+			project: "team/shop",
+		});
+		expect(serverGitLabConfig(serverProject("not a clone URL"))).toBeNull();
 
 		const config = await getGitLabConfig(serverProject());
 		expect(config).toEqual(serverGitLabConfig(serverProject()));
@@ -117,6 +123,18 @@ describe("a server project's GitLab", () => {
 			{ method: "GET", endpoint },
 		);
 		expect(mocks.fetch).not.toHaveBeenCalled();
+	});
+
+	it("answers null and counts nothing when the server's answer has no body", async () => {
+		const config = await getGitLabConfig(serverProject());
+		const token = config?.token ?? "";
+		answered({ status: 204 });
+		await expect(gitlabFetch(token, "", "/projects/team%2Fweb%2Fshop/issues/4")).resolves.toBeNull();
+		answered({ status: 204 });
+		await expect(gitlabFetchWithCount(token, "", "/projects/team%2Fweb%2Fshop/issues")).resolves.toEqual({
+			data: null,
+			totalCount: 0,
+		});
 	});
 
 	it("changes through the write route, and shows the server's refusal", async () => {
@@ -181,8 +199,7 @@ describe("a server project's GitLab", () => {
 
 	it("refuses an issue number that is not one before any call", async () => {
 		registerImportIssues();
-		const result = await importIssues("p-1", ["12/../../user", -1]);
-		expect(result.data).toMatchObject({ imported: 0, failed: 2 });
+		await expect(async () => importIssues("p-1", ["12/../../user", -1])).rejects.toThrow("Invalid GitLab arguments");
 		expect(mocks.authedFetch).not.toHaveBeenCalled();
 		expect(mocks.createServerCard).not.toHaveBeenCalled();
 	});

@@ -89,7 +89,7 @@ import { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
-import { registerGitlabHandlers } from "./gitlab-handlers";
+import { registerGitlabHandlers } from "./gitlab";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -221,7 +221,7 @@ export { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
-export { registerGitlabHandlers } from "./gitlab-handlers";
+export { registerGitlabHandlers } from "./gitlab";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -381,7 +381,7 @@ export function setupIpcHandlers(
 	registerGithubHandlers(agentManager, getMainWindow);
 
 	// GitLab integration handlers
-	registerGitlabHandlers(agentManager, getMainWindow);
+	registerGitlabHandlers(getMainWindow);
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
