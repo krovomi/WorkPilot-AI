@@ -87,10 +87,8 @@ class SessionRecording:
     def _start_replay(
         self, spec_dir: Path, role: str, provider: str, model: str
     ) -> None:
-        try:
-            from replay.recorder import get_replay_recorder
-        except ImportError:
-            return
+        from replay.recorder import get_replay_recorder
+
         try:
             recorder = get_replay_recorder()
             replay_id = uuid.uuid4().hex[:16]

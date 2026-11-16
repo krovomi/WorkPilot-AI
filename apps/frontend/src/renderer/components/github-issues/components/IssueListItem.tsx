@@ -1,8 +1,6 @@
 import { MessageCircle, Sparkles, Tag, User } from "lucide-react";
-import {
-	GITHUB_ISSUE_STATE_COLORS,
-	GITHUB_ISSUE_STATE_LABELS,
-} from "../../../../shared/constants";
+import { useTranslation } from "react-i18next";
+import { GITHUB_ISSUE_STATE_COLORS } from "../../../../shared/constants";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import type { IssueListItemProps } from "../types";
@@ -13,6 +11,7 @@ export function IssueListItem({
 	onClick,
 	onInvestigate,
 }: IssueListItemProps) {
+	const { t } = useTranslation("common");
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
 		// biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events handled elsewhere
@@ -32,7 +31,7 @@ export function IssueListItem({
 							variant="outline"
 							className={`text-xs ${GITHUB_ISSUE_STATE_COLORS[issue.state]}`}
 						>
-							{GITHUB_ISSUE_STATE_LABELS[issue.state]}
+							{t(`common:githubIssues.state.${issue.state}`)}
 						</Badge>
 						<span className="text-xs text-muted-foreground">
 							#{issue.number}
@@ -64,6 +63,7 @@ export function IssueListItem({
 					variant="ghost"
 					size="icon"
 					className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+					aria-label={t("common:githubIssues.createTask")}
 					onClick={(e) => {
 						e.stopPropagation();
 						onInvestigate();
