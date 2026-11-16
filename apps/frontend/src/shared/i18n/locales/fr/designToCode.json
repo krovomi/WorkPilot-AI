@@ -59,7 +59,10 @@
 			"projectReady_one": "prêt · {{count}} fichier à écrire",
 			"projectReady_other": "prêt · {{count}} fichiers à écrire",
 			"projectWritten_one": "{{count}} fichier en revue",
-			"projectWritten_other": "{{count}} fichiers en revue"
+			"projectWritten_other": "{{count}} fichiers en revue",
+			"codeLoop": "itération {{iteration}}/{{max}}",
+			"codeLoopDone_one": "{{score}} % de correspondance · {{count}} itération",
+			"codeLoopDone_other": "{{score}} % de correspondance · {{count}} itérations"
 		}
 	},
 	"steps": {
@@ -78,7 +81,8 @@
 		},
 		"code": {
 			"kicker": "Code",
-			"title": "Générer les composants"
+			"title": "Générer les composants",
+			"toggle": "Rendre, comparer et corriger le code"
 		},
 		"tests": {
 			"kicker": "Tests visuels",
@@ -190,7 +194,8 @@
 		"visual_test_generation": "Tests visuels",
 		"figma_sync": "Synchronisation Figma",
 		"complete": "Terminé",
-		"error": "Erreur"
+		"error": "Erreur",
+		"render_loop": "Boucle de rendu"
 	},
 	"errors": {
 		"missingInput": "Ajoutez une image ou un lien Figma."
@@ -233,5 +238,68 @@
 		"components": "Composants reconnus",
 		"palette": "Palette",
 		"files": "Fichiers générés"
+	},
+	"loop": {
+		"title": "Boucle de rendu",
+		"kicker": "Rendre · comparer · corriger",
+		"status": {
+			"converged": "Convergé : {{score}} % de correspondance",
+			"max_iterations": "Arrêté au nombre maximal d'itérations : {{score}} % de correspondance",
+			"budget": "Budget de temps épuisé : {{score}} % de correspondance",
+			"stalled": "Plus de progrès : {{score}} % de correspondance",
+			"failed": "Arrêté sur une erreur : {{score}} % de correspondance",
+			"skipped": "La boucle de rendu n'a pas tourné"
+		},
+		"reason": {
+			"no_model": "Aucun modèle n'a répondu à la génération : il n'y a rien de réel à corriger.",
+			"no_files": "Aucun fichier n'a été généré.",
+			"unsupported_target": "Le design ne se compare pas pixel par pixel (SVG ou image illisible).",
+			"no_vision_route": "Le fournisseur {{provider}} n'a pas de modèle vision ici. Choisissez Claude, OpenAI, Copilot, Gemini ou un modèle vision local d'Ollama.",
+			"no_credentials": "Le fournisseur {{provider}} n'a ni clé ni connexion dans cette exécution.",
+			"model_without_vision": "{{model}} ne lit pas les images (catalogue des modèles). Choisissez un modèle vision.",
+			"local_unavailable": "Le modèle vision local {{model}} n'est pas disponible : {{detail}}.",
+			"no_preview": "Le modèle n'a pas fourni de miroir HTML statique à rendre.",
+			"no_browser": "Aucun navigateur headless n'a pu démarrer ici : installez le Chromium de Playwright.",
+			"no_playwright": "Playwright n'est pas installé dans l'environnement du backend.",
+			"load_failed": "La page générée ne s'est pas chargée dans le navigateur."
+		},
+		"mirror": "Rendu à partir d'un miroir HTML statique des fichiers générés, que le modèle tient à jour avec le code ; les composants eux-mêmes ne sont pas rendus.",
+		"target": "Cible",
+		"render": "Rendu",
+		"diff": "Carte des écarts",
+		"iteration": "v{{index}}",
+		"generated": "généré",
+		"kept": "retenu",
+		"score": "{{score}} %",
+		"iterationsLabel": "Itérations",
+		"issues": "Écarts",
+		"noIssues": "Aucun écart trouvé.",
+		"issueStatus": {
+			"resolved": "résolu",
+			"open": "en cours",
+			"abandoned": "abandonné"
+		},
+		"issue": {
+			"color": "{{region}} : fond {{render}} au lieu de {{target}}",
+			"offset": "{{region}} : contenu décalé de {{px}} px ({{axis}})",
+			"size": "{{region}} : {{axis}} décalé de {{px}} px",
+			"structure": "{{region}} : la mise en page ou les formes diffèrent"
+		},
+		"edits_one": "{{count}} modification appliquée",
+		"edits_other": "{{count}} modifications appliquées",
+		"noEdits": "aucune modification applicable",
+		"missingFonts": "Polices absentes sur cette machine, remplacées dans le rendu : {{fonts}}",
+		"masked": "Zones ignorées (contenu dynamique) : {{zones}}",
+		"live": "Itération {{iteration}}/{{max}} : {{stage}}",
+		"stage": {
+			"render": "rendu",
+			"correct": "correction"
+		},
+		"axis": {
+			"x": "horizontal",
+			"y": "vertical",
+			"width": "largeur",
+			"height": "hauteur"
+		}
 	}
 }

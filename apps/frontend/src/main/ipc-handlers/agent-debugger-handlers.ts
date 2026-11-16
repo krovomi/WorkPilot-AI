@@ -1,8 +1,8 @@
 /**
  * Agent Debugger IPC Handlers
  *
- * Provider-agnostic: the debugger state lives in the Python runner's
- * DebuggerRegistry (process-memory). The UI can attach, list/add/remove
+ * Provider-agnostic: the debugger state lives in the file of
+ * apps/backend/agents/debugger_store.py. The UI can attach, list/add/remove
  * breakpoints, list paused frames, and resume. Each IPC call spawns
  * agent_debugger_runner.py as a one-shot. A future iteration may keep a
  * long-running debugger daemon; the MVP is sufficient to wire the UI.

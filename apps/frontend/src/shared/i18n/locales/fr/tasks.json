@@ -183,6 +183,9 @@
 		"error": "Erreur"
 	},
 	"kanban": {
+		"more": {
+			"label": "Autres actions du tableau"
+		},
 		"abandoned": {
 			"chip": "{{count}} abandonnée",
 			"chip_other": "{{count}} abandonnées",
@@ -574,7 +577,12 @@
 		"otherProjectWarning": "Un émulateur semble déjà actif pour un autre projet. Redémarrez pour basculer vers cette tâche."
 	},
 	"metadata": {
-		"severity": "sévérité",
+		"securitySeverity": {
+			"low": "Gravité faible",
+			"medium": "Gravité moyenne",
+			"high": "Gravité élevée",
+			"critical": "Gravité critique"
+		},
 		"pullRequest": "Pull Request",
 		"showMore": "Afficher plus",
 		"showLess": "Afficher moins",
@@ -588,6 +596,8 @@
 		"acEmpty": "Aucun critère défini. Cliquez pour en ajouter.",
 		"acSyncFromAdo": "Synchroniser depuis Azure DevOps",
 		"acSyncing": "Synchronisation…",
+		"acSyncErrorTitle": "Synchronisation impossible",
+		"acSyncErrorDesc": "Les critères d'acceptation n'ont pas pu être lus depuis Azure DevOps.",
 		"acPlaceholder": "Un critère par ligne…",
 		"acEdit": "Modifier",
 		"acSave": "Enregistrer",
@@ -611,6 +621,8 @@
 		"extraNotePlaceholder": "Ajoutez des précisions, contraintes ou indices. Ces notes sont transmises à toutes les phases du pipeline (plan, code, QA, review).",
 		"extraNoteHelp": "Enregistré dans requirements.json comme additional_context.",
 		"extraNoteSaved": "Enregistré.",
+		"extraNoteSaveErrorTitle": "Enregistrement impossible",
+		"extraNoteSaveErrorDesc": "La note n'a pas pu être enregistrée.",
 		"extraNoteSave": "Enregistrer la note",
 		"extraNoteSaving": "Enregistrement…",
 		"blockedBy": {
@@ -1344,9 +1356,10 @@
 		"saveError": "Impossible d'enregistrer le plan"
 	},
 	"codeEditor": {
-		"deleteFile": "Supprimer le fichier",
-		"contentPlaceholder": "Contenu du fichier...",
-		"selectFile": "Sélectionnez un fichier à modifier"
+		"hint": "Retirez les fichiers que cette sous-tâche ne doit pas toucher. Les fichiers eux-mêmes ne changent pas.",
+		"removeFile": "Retirer {{name}} de cette sous-tâche",
+		"filesRemoved_one": "{{count}} fichier retiré du plan",
+		"filesRemoved_other": "{{count}} fichiers retirés du plan"
 	},
 	"failure": {
 		"title": "Cette tâche a échoué",

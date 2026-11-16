@@ -429,11 +429,6 @@ export const IPC_CHANNELS = {
 	GITLAB_GET_TOKEN: "gitlab:getToken",
 	GITLAB_GET_USER: "gitlab:getUser",
 	GITLAB_LIST_USER_PROJECTS: "gitlab:listUserProjects",
-	GITLAB_DETECT_PROJECT: "gitlab:detectProject",
-	GITLAB_GET_BRANCHES: "gitlab:getBranches",
-	GITLAB_CREATE_PROJECT: "gitlab:createProject",
-	GITLAB_ADD_REMOTE: "gitlab:addRemote",
-	GITLAB_LIST_GROUPS: "gitlab:listGroups",
 
 	// GitLab events (main -> renderer)
 	GITLAB_INVESTIGATION_PROGRESS: "gitlab:investigationProgress",
@@ -712,6 +707,7 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
+	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
@@ -1114,6 +1110,8 @@ export const IPC_CHANNELS = {
 	API_WATCHER_EVENT: "api-watcher-event",
 	API_WATCHER_RESULT: "api-watcher-result",
 	API_WATCHER_RUN: "apiWatcher:run",
+	// Device matrix: one preset rendered, captured and read by the main (#383)
+	APP_EMULATOR_CAPTURE_DEVICE: "app-emulator:capture-device",
 	APP_EMULATOR_CONFIG: "app-emulator:config",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
 	APP_EMULATOR_ERROR: "app-emulator:error",
@@ -1433,9 +1431,11 @@ export const IPC_CHANNELS = {
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
+	SMART_ESTIMATION_ADJUST: "smartEstimation:adjust",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
+	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
