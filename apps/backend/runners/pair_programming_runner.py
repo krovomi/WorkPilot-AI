@@ -13,15 +13,14 @@ Usage:
         --ai-scope "Backend auth API + integration tests" \\
         --messages-file /tmp/pair_session_messages.json
 
-The runner reads --messages-file periodically for new user messages and
-injects them into the AI context between steps.
+The runner reads --messages-file for the developer's messages while the AI
+works, and gives them to the AI as the next turn once its current step ends.
 
 Output (one JSON object per line):
     {"type": "status", "status": "planning", "message": "..."}
     {"type": "stream", "content": "..."}
     {"type": "action", "action_type": "file_created", "file_path": "...", "description": "..."}
     {"type": "action", "action_type": "file_modified", "file_path": "...", "description": "..."}
-    {"type": "question", "content": "...", "message_id": "..."}
     {"type": "conflict", "file_path": "...", "message": "..."}
     {"type": "done", "summary": "..."}
     {"type": "error", "message": "..."}
@@ -31,7 +30,6 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -69,16 +67,6 @@ def emit_action(action_type: str, description: str, file_path: str = "") -> None
     )
 
 
-def emit_question(content: str) -> None:
-    emit(
-        {
-            "type": "question",
-            "content": content,
-            "message_id": f"q_{int(time.time())}",
-        }
-    )
-
-
 def emit_conflict(file_path: str, message: str) -> None:
     emit({"type": "conflict", "file_path": file_path, "message": message})
 
@@ -97,25 +85,67 @@ def emit_error(message: str) -> None:
 
 
 def read_pending_messages(messages_file: str) -> list[dict]:
-    """Read and clear pending messages from the messages file."""
+    """Read and clear the developer's pending messages (the app appends them)."""
     try:
-        if not os.path.exists(messages_file):
-            return []
         with open(messages_file, encoding="utf-8") as f:
             data = json.load(f)
-        messages = data.get("pending", [])
-        if messages:
-            # Clear processed messages
-            with open(messages_file, "w", encoding="utf-8") as f:
-                json.dump({"pending": []}, f)
-        return messages
-    except Exception:
+    except (OSError, ValueError):
         return []
+    messages = data.get("pending") if isinstance(data, dict) else None
+    if not isinstance(messages, list) or not messages:
+        return []
+    try:
+        with open(messages_file, "w", encoding="utf-8") as f:
+            json.dump({"pending": []}, f)
+    except OSError:
+        return []  # left in the file, read again next time
+    return [m for m in messages if isinstance(m, dict) and m.get("content")]
 
 
-# ---------------------------------------------------------------------------
-# Main runner
-# ---------------------------------------------------------------------------
+#: The tool names each provider gives a file write, an edit and a command:
+#: the Claude SDK's, `ToolExecutor`'s, and the older editor names.
+_CREATE_TOOLS = frozenset({"Write", "write_file", "create_file"})
+_EDIT_TOOLS = frozenset({"Edit", "MultiEdit", "edit_file", "str_replace_editor"})
+_COMMAND_TOOLS = frozenset({"Bash", "run_command", "bash"})
+
+#: How often the messages file is read while the AI is working, in seconds.
+MESSAGE_POLL_SECONDS = 5.0
+
+
+def _report_tool_use(tool_name: str, tool_input: dict) -> str | None:
+    """Emit what a tool call does to the project; the path it touched, if any."""
+    file_path = str(tool_input.get("file_path") or tool_input.get("path") or "")
+    if tool_name in _CREATE_TOOLS:
+        emit_action("file_created", f"Created {file_path}", file_path)
+        return file_path
+    if tool_name in _EDIT_TOOLS:
+        emit_action("file_modified", f"Modified {file_path}", file_path)
+        return file_path
+    if tool_name in _COMMAND_TOOLS:
+        command = str(tool_input.get("command") or tool_input.get("cmd") or "")
+        emit_action("command_run", f"Running: {command[:80]}")
+    return None
+
+
+def _developer_turn(messages: list[dict]) -> str:
+    said = "\n".join(f"- {m['content']}" for m in messages)
+    return (
+        "The developer you are pairing with sent you this while you worked:\n"
+        f"{said}\n\n"
+        "Take it into account, continue your part of the work, and summarise "
+        "what you changed."
+    )
+
+
+def _scope_conflicts(touched: list[str], dev_scope: str) -> list[str]:
+    """Files the AI touched whose path names a word of the developer's scope."""
+    words = {w.strip(".,;:()").lower() for w in dev_scope.split()}
+    words = {w for w in words if len(w) > 4}
+    return [
+        path
+        for path in dict.fromkeys(touched)
+        if any(word in path.lower() for word in words)
+    ]
 
 
 async def run_pair_programming_session(
@@ -127,26 +157,15 @@ async def run_pair_programming_session(
     ai_scope: str,
     messages_file: str,
 ) -> None:
-    """Run the AI pair programming session using Claude SDK."""
+    """Run the AI's half of a pair programming session."""
+    from core.agent_client import ContentBlockType
+    from core.client import create_agent_client
+    from core.workflow_logger import workflow_logger
+    from phase_config import get_phase_model, get_phase_thinking_budget
 
     emit_status("planning", "Analyzing project structure and planning AI scope...")
 
-    # Add project backend to path
-    backend_dir = Path(__file__).parent.parent
-    if str(backend_dir) not in sys.path:
-        sys.path.insert(0, str(backend_dir))
-
-    try:
-        from core.agent_client import ContentBlockType
-        from core.client import create_agent_client
-        from core.workflow_logger import workflow_logger
-        from phase_config import get_phase_model, get_phase_thinking_budget
-    except ImportError as e:
-        emit_error(f"Failed to import backend modules: {e}")
-        return
-
-    # Build the initial prompt
-    system_context = f"""You are working as an AI pair programmer on a real codebase.
+    prompt = f"""You are working as an AI pair programmer on a real codebase.
 
 PROJECT DIRECTORY: {project_dir}
 SESSION GOAL: {goal}
@@ -162,19 +181,6 @@ IMPORTANT RULES:
 4. If you need clarification from the developer, ask a concise question and continue with your best assumption
 5. Work systematically: analyze → plan → implement → verify
 
-Start by analyzing the existing codebase structure relevant to your scope, then implement your portion.
-Be concrete and actually write/modify files. Show your work step by step.
-"""
-
-    prompt = f"""{system_context}
-
-Please implement the following as part of our pair programming session:
-
-GOAL: {goal}
-YOUR SCOPE: {ai_scope}
-
-The developer is simultaneously working on: {dev_scope}
-
 Steps:
 1. First, briefly analyze the project structure relevant to your scope (list key files)
 2. Plan your implementation (3-5 bullet points)
@@ -186,172 +192,67 @@ Begin now. Be systematic and thorough."""
     trace_id = workflow_logger.log_agent_start(
         "PairProgrammingAgent", "pair_programming", {"session_id": session_id}
     )
-
     emit_status("active", f"Starting AI implementation: {ai_scope}")
 
     try:
         # Resolved from the user's settings like every other coding session.
-        # `model=None` sent whatever the provider defaulted to, and no thinking
-        # budget meant the effort selector did not reach pair programming at
-        # all — the one mode where the user is watching the agent work.
-        _pp_spec_dir = Path(project_dir)
+        spec_dir = Path(project_dir)
         client = create_agent_client(
             project_dir=project_dir,
-            spec_dir=_pp_spec_dir,
-            model=get_phase_model(_pp_spec_dir, "coding"),
+            spec_dir=spec_dir,
+            model=get_phase_model(spec_dir, "coding"),
             agent_type="coder",
-            max_thinking_tokens=get_phase_thinking_budget(_pp_spec_dir, "coding"),
+            max_thinking_tokens=get_phase_thinking_budget(spec_dir, "coding"),
         )
-
-        accumulated_response = []
-        last_message_check = time.time()
-
+        touched: list[str] = []
+        waiting: list[dict] = []
         async with client:
-            await client.query(prompt)
-
-            async for msg in client.receive_response():
-                # Check for user messages periodically
-                if time.time() - last_message_check > 5:
-                    last_message_check = time.time()
-                    pending = read_pending_messages(messages_file)
-                    for pending_msg in pending:
-                        emit_stream(
-                            f"\n\n[Developer says: {pending_msg.get('content', '')}]\n\n"
-                        )
-
-                for block in msg.content:
-                    if block.type == ContentBlockType.TEXT and block.text:
-                        accumulated_response.append(block.text)
-                        emit_stream(block.text)
-
-                        # Detect file operations in the stream
-                        lower = block.text.lower()
-                        if (
-                            "creating file" in lower
-                            or "writing file" in lower
-                            or "create file" in lower
-                        ):
-                            emit_action("file_created", block.text[:120].strip())
-                        elif (
-                            "modifying" in lower
-                            or "updating" in lower
-                            or "editing" in lower
-                        ):
-                            emit_action("file_modified", block.text[:120].strip())
-
-                    elif block.type == ContentBlockType.TOOL_USE:
-                        tool_name = block.tool_name or ""
-                        inp = block.tool_input or {}
-
-                        if tool_name in ("create_file", "write_file"):
-                            file_path = inp.get("path", inp.get("file_path", ""))
-                            emit_action(
-                                "file_created", f"Created {file_path}", file_path
+            turn: str | None = prompt
+            while turn is not None:
+                await client.query(turn)
+                last_check = time.monotonic()
+                async for msg in client.receive_response():
+                    if time.monotonic() - last_check >= MESSAGE_POLL_SECONDS:
+                        last_check = time.monotonic()
+                        arrived = read_pending_messages(messages_file)
+                        if arrived:
+                            waiting.extend(arrived)
+                            emit_status(
+                                "active",
+                                "Message received: the AI reads it when its "
+                                "current step ends.",
                             )
-                        elif tool_name in ("edit_file", "str_replace_editor"):
-                            file_path = inp.get("path", inp.get("file_path", ""))
-                            emit_action(
-                                "file_modified", f"Modified {file_path}", file_path
+                    for block in msg.content:
+                        if block.type == ContentBlockType.TEXT and block.text:
+                            emit_stream(block.text)
+                        elif block.type == ContentBlockType.TOOL_USE:
+                            path = _report_tool_use(
+                                block.tool_name or "", block.tool_input or {}
                             )
-                        elif tool_name == "bash":
-                            cmd = str(inp.get("command", ""))[:80]
-                            emit_action("command_run", f"Running: {cmd}")
+                            if path:
+                                touched.append(path)
+                waiting.extend(read_pending_messages(messages_file))
+                turn = _developer_turn(waiting) if waiting else None
+                waiting = []
 
-        # Check for any dev scope conflicts (simple heuristic)
-        full_response = "".join(accumulated_response)
-        dev_scope_keywords = [
-            kw.strip().lower() for kw in dev_scope.split() if len(kw) > 4
-        ]
-        for keyword in dev_scope_keywords[:3]:  # Check first 3 keywords
-            if (
-                keyword in full_response.lower()
-                and "avoid" not in full_response.lower()
-            ):
-                emit_conflict(
-                    keyword,
-                    f"AI output may touch developer's scope area: '{keyword}'. Review recommended.",
-                )
-                break
-
-        summary = (
-            f"Completed AI scope: {ai_scope}. See chat for implementation details."
-        )
+        for path in _scope_conflicts(touched, dev_scope):
+            emit_conflict(
+                path,
+                f"The AI changed {path}, which looks like part of your scope. "
+                "Review recommended.",
+            )
         workflow_logger.log_agent_end(
             "PairProgrammingAgent", "pair_programming", "success", trace_id=trace_id
         )
-        emit_done(summary)
-
-    except ImportError:
-        # Fallback demo mode when Claude SDK is not configured
-        emit_status("active", f"[Demo Mode] Simulating AI work on: {ai_scope}")
-        _run_demo_session(goal, dev_scope, ai_scope, messages_file)
-
-    except Exception as e:
-        import traceback
-
-        traceback.print_exc()
+        emit_done(
+            f"Completed AI scope: {ai_scope}. See chat for implementation details."
+        )
+    except Exception as e:  # noqa: BLE001 - the session's only report is its stream
+        logger.exception("pair programming session failed")
         workflow_logger.log_agent_end(
             "PairProgrammingAgent", "pair_programming", "error", trace_id=trace_id
         )
         emit_error(f"Session failed: {e}")
-
-
-def _run_demo_session(
-    goal: str, dev_scope: str, ai_scope: str, messages_file: str
-) -> None:
-    """Demo mode when the SDK is not available — streams a simulated response."""
-    steps = [
-        ("planning", f"Analyzing requirements for: {ai_scope}"),
-        ("active", f"Starting implementation of {ai_scope}..."),
-    ]
-    for status, msg in steps:
-        emit_status(status, msg)
-        time.sleep(0.5)
-
-    demo_plan = f"""## AI Pair Programming — Demo Mode
-
-**Goal:** {goal}
-
-**Developer's scope:** {dev_scope}
-**My scope:** {ai_scope}
-
-### My Implementation Plan
-
-1. Analyze the existing codebase structure
-2. Identify files to create/modify for {ai_scope}
-3. Implement the core logic
-4. Write tests
-5. Validate integration points
-
-*Note: This is running in demo mode. Connect the Claude SDK to enable real implementation.*
-
-### Simulated Steps
-
-"""
-    for char in demo_plan:
-        emit_stream(char)
-        time.sleep(0.01)
-
-    time.sleep(0.5)
-
-    # Simulate some actions
-    emit_action("file_created", "Created implementation file", "src/api/auth.py")
-    time.sleep(0.3)
-    emit_action("file_created", "Created test file", "tests/test_auth.py")
-    time.sleep(0.3)
-    emit_action("file_modified", "Updated configuration", "config/settings.py")
-
-    # Check for any user messages
-    pending = read_pending_messages(messages_file)
-    for msg in pending:
-        emit_stream(f"\n\n[Responding to your message: {msg.get('content', '')}]\n")
-        emit_stream("Got it! I'll incorporate that into my implementation.\n")
-
-    emit_stream(
-        "\n### Summary\n\nDemo session complete. "
-        "Configure the Claude SDK to enable real pair programming.\n"
-    )
-    emit_done(f"Demo completed for scope: {ai_scope}")
 
 
 # ---------------------------------------------------------------------------

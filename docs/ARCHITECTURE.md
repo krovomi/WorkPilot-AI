@@ -124,7 +124,7 @@ apps/backend/
 ├── services/            # Services d'intégration externes
 ├── integrations/        # Connecteurs (Azure DevOps, Linear, JEV, Windsurf) ; Jira et grepai dans src/connectors/
 ├── project/             # Analyse et détection de projets
-├── merge/               # Système de fusion sémantique
+├── merge/               # Aperçu des conflits entre tâches (le merge IA : core/workspace.py)
 ├── verify/              # Boucle de vérification : lancer l'app, lire les erreurs, prouver (web, mobile, API, UI Automation, scénario Playwright)
 ├── pr_followup/         # La carte suit sa PR : checks rouges et fils de revue → QA fixer
 ├── goal/                # Mode objectif : une commande dit « fini »
