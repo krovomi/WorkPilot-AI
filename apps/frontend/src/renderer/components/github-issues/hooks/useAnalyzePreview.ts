@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import { useCallback, useEffect, useState } from "react";
 import type {
 	AnalyzePreviewProgress,
@@ -112,13 +113,16 @@ export function useAnalyzePreview({
 			if (!projectId || batches.length === 0) return;
 
 			setIsApproving(true);
+			setAnalysisError(null);
 			try {
 				const result = await window.electronAPI.github.approveBatches(
 					projectId,
 					batches,
 				);
 				if (!result.success) {
-					throw new Error(result.error || "Failed to approve batches");
+					throw new Error(
+						result.error || i18n.t("common:githubIssues.batch.approveFailed"),
+					);
 				}
 
 				// Create tasks for each approved batch
@@ -155,7 +159,9 @@ export function useAnalyzePreview({
 				}
 			} catch (error) {
 				setAnalysisError(
-					error instanceof Error ? error.message : "Failed to approve batches",
+					error instanceof Error
+						? error.message
+						: i18n.t("common:githubIssues.batch.approveFailed"),
 				);
 				throw error;
 			} finally {

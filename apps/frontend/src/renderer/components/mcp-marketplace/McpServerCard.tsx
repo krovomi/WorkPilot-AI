@@ -48,6 +48,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { McpSecurityBadge, McpSecurityDetails, useMcpServerSecurity } from "./McpSecurityScore";
 
 interface McpServerCardProps {
 	readonly server: McpMarketplaceServer;
@@ -57,6 +58,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 	const { t, i18n } = useTranslation(["common"]);
 	const { isServerInstalled, isInstalling } = useMcpMarketplaceStore();
 	const projectId = useProjectStore((state) => state.selectedProjectId);
+	const security = useMcpServerSecurity(server, projectId);
 	const projectName = useProjectStore(
 		(state) => state.projects.find((p) => p.id === state.selectedProjectId)?.name,
 	);
@@ -221,6 +223,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 								? t("mcpMarketplace.official")
 								: t("mcpMarketplace.community")}
 						</Badge>
+						<McpSecurityBadge score={security.score} />
 						<span className="ml-auto text-3xs opacity-60 truncate max-w-[45%]">
 							{server.package}
 						</span>
@@ -263,6 +266,7 @@ export function McpServerCard({ server }: McpServerCardProps) {
 					{showDetails && (
 						<div className="text-xs text-muted-foreground mb-3 space-y-2">
 							<p>{localized(server.description, language)}</p>
+							<McpSecurityDetails security={security} />
 							{server.requires && (
 								<p className="flex items-center gap-1 text-warning ">
 									<Info className="h-3 w-3 shrink-0" />

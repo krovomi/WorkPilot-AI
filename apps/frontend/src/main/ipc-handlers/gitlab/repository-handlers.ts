@@ -1,169 +1,62 @@
 /**
- * GitLab repository handlers
- * Handles connection status and project management
+ * Whether a project reaches its GitLab project: its path, description and
+ * open issue count, or why not. A failure is an answer (`connected: false`),
+ * not an error, so the view can say it.
  */
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type { GitLabSyncStatus, IPCResult } from "../../../shared/types";
-import { projectStore } from "../../project-store";
 import { featureProject } from "../server-feature-files";
 import type { GitLabAPIProject } from "./types";
-import {
-	encodeProjectPath,
-	getGitLabConfig,
-	gitlabFetch,
-	gitlabFetchWithCount,
-} from "./utils";
+import { encodeProjectPath, getGitLabConfig, gitlabFetch, gitlabFetchWithCount } from "./utils";
 
-// Debug logging helper
-const DEBUG =
-	process.env.DEBUG === "true";
-
-function debugLog(_message: string, data?: unknown): void {
-	if (DEBUG) {
-		if (data !== undefined) {
-			/* intentionally empty */
-		} else {
-			// noop
-		}
-	}
-}
-
-/**
- * Check GitLab connection status for a project
- */
-export function registerCheckConnection(): void {
+export function registerRepositoryHandlers(): void {
 	ipcMain.handle(
 		IPC_CHANNELS.GITLAB_CHECK_CONNECTION,
 		async (_event, projectId: string): Promise<IPCResult<GitLabSyncStatus>> => {
-			debugLog("checkGitLabConnection handler called", { projectId });
-
 			const project = featureProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
+			if (!project) return { success: false, error: "Project not found" };
 
 			const config = await getGitLabConfig(project);
 			if (!config) {
-				debugLog("No GitLab config found");
 				return {
 					success: true,
 					data: {
 						connected: false,
-						error:
-							"GitLab not configured. Please add GITLAB_TOKEN and GITLAB_PROJECT to your .env file.",
+						error: "GitLab not configured. Please add GITLAB_TOKEN and GITLAB_PROJECT to your .env file.",
 					},
 				};
 			}
 
 			try {
-				const encodedProject = encodeProjectPath(config.project);
-
-				// Fetch project info
-				const projectInfo = (await gitlabFetch(
-					config.token,
-					config.instanceUrl,
-					`/projects/${encodedProject}`,
-				)) as GitLabAPIProject;
-
-				debugLog("Project info retrieved:", { name: projectInfo.name });
-
-				// Get issue count from X-Total header
+				const path = `/projects/${encodeProjectPath(config.project)}`;
+				const info = (await gitlabFetch(config.token, config.instanceUrl, path)) as GitLabAPIProject;
 				const { totalCount: issueCount } = await gitlabFetchWithCount(
 					config.token,
 					config.instanceUrl,
-					`/projects/${encodedProject}/issues?state=opened&per_page=1`,
+					`${path}/issues?state=opened&per_page=1`,
 				);
-
 				return {
 					success: true,
 					data: {
 						connected: true,
 						instanceUrl: config.instanceUrl,
-						projectPathWithNamespace: projectInfo.path_with_namespace,
-						projectDescription: projectInfo.description,
+						projectPathWithNamespace: info.path_with_namespace,
+						projectDescription: info.description,
 						issueCount,
 						lastSyncedAt: new Date().toISOString(),
 					},
 				};
 			} catch (error) {
-				const errorMessage =
-					error instanceof Error
-						? error.message
-						: "Failed to connect to GitLab";
-				debugLog("Connection check failed:", errorMessage);
 				return {
 					success: true,
 					data: {
 						connected: false,
-						error: errorMessage,
+						error: error instanceof Error ? error.message : "Failed to connect to GitLab",
 					},
 				};
 			}
 		},
 	);
-}
-
-/**
- * Get list of GitLab projects accessible to the user
- */
-export function registerGetProjects(): void {
-	ipcMain.handle(
-		IPC_CHANNELS.GITLAB_GET_PROJECTS,
-		async (
-			_event,
-			projectId: string,
-		): Promise<IPCResult<GitLabAPIProject[]>> => {
-			debugLog("getGitLabProjects handler called");
-
-			const project = projectStore.getProject(projectId);
-			if (!project) {
-				return { success: false, error: "Project not found" };
-			}
-
-			const config = await getGitLabConfig(project);
-			if (!config) {
-				return {
-					success: false,
-					error: "GitLab not configured",
-				};
-			}
-
-			try {
-				const projects = (await gitlabFetch(
-					config.token,
-					config.instanceUrl,
-					"/projects?membership=true&per_page=100",
-				)) as GitLabAPIProject[];
-
-				debugLog("Found projects:", projects.length);
-
-				return {
-					success: true,
-					data: projects,
-				};
-			} catch (error) {
-				debugLog(
-					"Failed to get projects:",
-					error instanceof Error ? error.message : error,
-				);
-				return {
-					success: false,
-					error:
-						error instanceof Error ? error.message : "Failed to get projects",
-				};
-			}
-		},
-	);
-}
-
-/**
- * Register all repository handlers
- */
-export function registerRepositoryHandlers(): void {
-	debugLog("Registering GitLab repository handlers");
-	registerCheckConnection();
-	registerGetProjects();
-	debugLog("GitLab repository handlers registered");
 }

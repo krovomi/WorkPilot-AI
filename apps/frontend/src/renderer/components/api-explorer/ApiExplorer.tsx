@@ -28,7 +28,7 @@ import {
 	useAppEmulatorStore,
 } from "../../stores/app-emulator-store";
 import { useProjectStore } from "../../stores/project-store";
-import { MethodBadge } from "./api-explorer-shared";
+import { isHttpMethod, MethodBadge } from "./api-explorer-shared";
 import { EnvironmentManager } from "./EnvironmentManager";
 import { ExportDialog } from "./ExportDialog";
 import { RequestPanel, CustomSelect } from "./RequestPanel";
@@ -104,12 +104,7 @@ function buildGroups(spec: OpenApiSpec, search: string): EndpointGroup[] {
 
 	for (const [path, methods] of Object.entries(spec.paths ?? {})) {
 		for (const [method, op] of Object.entries(methods)) {
-			if (
-				!["get", "post", "put", "delete", "patch", "head", "options"].includes(
-					method,
-				)
-			)
-				continue;
+			if (!isHttpMethod(method)) continue;
 
 			const searchLower = search.toLowerCase();
 			if (
@@ -281,7 +276,7 @@ export function ApiExplorer() {
 					projectState.activeProjectId ?? projectState.selectedProjectId,
 				);
 			} catch (err) {
-				setSpecError(String(err));
+				setSpecError(err instanceof Error ? err.message : String(err));
 				if (useApiExplorerStore.getState().specSource !== "scan") {
 					setSpec(null);
 				}
@@ -322,7 +317,7 @@ export function ApiExplorer() {
 		const path = pathParts.join(":");
 		const op = spec.paths?.[path]?.[method.toLowerCase()];
 		if (!op) return null;
-		return { method, path, op };
+		return { method, path, op, spec };
 	}, [selectedEndpointKey, spec]);
 
 	function selectEndpoint(method: string, path: string) {
@@ -383,6 +378,7 @@ export function ApiExplorer() {
 						variant="outline"
 						onClick={applySpecUrl}
 						disabled={isLoadingSpec}
+						aria-label={t("apiExplorer:aria.loadSpec")}
 						className="shrink-0"
 					>
 						{isLoadingSpec ? (
@@ -449,6 +445,7 @@ export function ApiExplorer() {
 						onClick={() => setShowEnvManager(true)}
 						className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-card rounded-md transition-colors"
 						title={t("apiExplorer:environments.manage")}
+						aria-label={t("apiExplorer:environments.manage")}
 					>
 						<Settings size={14} />
 					</button>
@@ -545,6 +542,7 @@ export function ApiExplorer() {
 								<button
 									type="button"
 									onClick={() => setSearchQuery("")}
+									aria-label={t("apiExplorer:aria.clearSearch")}
 									className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 								>
 									<X size={11} />
@@ -594,6 +592,7 @@ export function ApiExplorer() {
 									<button
 										type="button"
 										onClick={() => toggleTag(group.tag)}
+										aria-expanded={!isCollapsed}
 										className="w-full flex items-center justify-between px-3 py-2 hover:bg-card transition-colors group"
 									>
 										<div className="flex items-center gap-1.5 min-w-0">
@@ -630,6 +629,7 @@ export function ApiExplorer() {
 														type="button"
 														key={key}
 														onClick={() => selectEndpoint(method, path)}
+														aria-current={isSelected ? "true" : undefined}
 														className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors group ${
 															isSelected
 																? "bg-[var(--color-accent)]/10 border-r-2 border-[var(--color-accent)]"
@@ -677,8 +677,7 @@ export function ApiExplorer() {
 							method={selectedEndpoint.method}
 							path={selectedEndpoint.path}
 							operation={selectedEndpoint.op}
-							// biome-ignore lint/style/noNonNullAssertion: value is guaranteed by context
-							spec={spec!}
+							spec={selectedEndpoint.spec}
 							onOpenEnvManager={() => setShowEnvManager(true)}
 						/>
 					) : (

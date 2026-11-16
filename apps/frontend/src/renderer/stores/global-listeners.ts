@@ -11,6 +11,7 @@ import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
 import { setupBenchListeners } from "./bench-store";
+import { setupBrowserRecorderListeners } from "./browser-recorder-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
@@ -27,6 +28,7 @@ import { setupLiveCompanionListeners } from "./live-companion-store";
 import { setupContextUsageListeners } from "./context-usage-store";
 import { setupTaskPermissionListeners } from "./task-permission-store";
 import { setupDocDriftListeners } from "./doc-drift-store";
+import { setupDocumentationListeners } from "./documentation-store";
 import { setupExecutionWavesListeners } from "./execution-waves-store";
 import { setupFlakyTestsListeners } from "./flaky-tests-store";
 import { setupMRReviewListeners } from "./gitlab/mr-review-store";
@@ -93,6 +95,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Cards an automation rule created appear on the board without a reload.
 	["Automations", setupAutomationsListeners],
 	["Bench", setupBenchListeners],
+	// A recording's steps arrive while the Browser Agent page may be closed.
+	["BrowserRecorder", setupBrowserRecorderListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
@@ -109,6 +113,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Import Design: each step of a run reaches the page as it happens.
 	["DesignToCode", setupDesignToCodeListeners],
 	["DocDrift", setupDocDriftListeners],
+	// Documentation tab: the runner's progress line while the tab is closed.
+	["Documentation", setupDocumentationListeners],
 	// Not an IPC listener: "Execute in optimal order" starts the next wave
 	// when the task list changes, whichever page is open.
 	["ExecutionWaves", setupExecutionWavesListeners],
