@@ -25,7 +25,7 @@ pages écrivaient, elles, directement dans le checkout, donc sur la branche cour
 | Barre « Commande rapide » du Kanban | tout ce que l'agent de la commande écrit ([F182](../audit/findings/F182.md)) | 5 |
 
 Passent déjà par une carte (donc un worktree et une PR) : Visuel vers Code, Migration de code,
-Dette technique, Plateformes mobiles, migration .NET, autofix GitHub et GitLab, les fonctions
+Dette technique, Plateformes mobiles, migration .NET, autofix GitHub, les fonctions
 et le nettoyage des notebooks ([notebook-agent.md](notebook-agent.md)). N'écrivent rien
 dans le projet : la traduction inter-langages (dossier temporaire), les extraits contextuels
 (copie), le playground, le compagnon, les analyses (accessibilité, i18n, dérive de doc,
@@ -135,7 +135,7 @@ fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
   GitLab, Azure DevOps). Fusionnée, la carte passe « Terminé » avec `prMergedAt`, puis son worktree
   et sa branche locale `workpilot/<spec>` sont supprimés, sans demander. Les parties d'un
   découpage sont suivies par `split-merge-watch.ts` et purgées ici une fois terminées.
-- **« Purger »** (barre du Kanban) : liste les worktrees des cartes à PR fusionnée, terminées,
+- **« Purger »** (menu « ⋯ » de la barre du Kanban) : liste les worktrees des cartes à PR fusionnée, terminées,
   archivées ou abandonnées, avec la place occupée, et supprime ceux que la personne coche.
 - **Jamais purgé** : un worktree avec des modifications non commitées (affiché, case grisée),
   une carte sur laquelle une autre est encore empilée, une carte en cours, un lien à la place du
@@ -145,4 +145,4 @@ fois le travail fini, il occupe le disque pour rien (`main/worktree-purge/`).
 
 Vérification : `pytest tests/test_review_worktree_runner.py -q` ;
 `pytest tests/test_slash_command_runner.py -q` ;
-`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeButton quick-command-run`.
+`cd apps/frontend && pnpm test -- generated-review test-generation-service-errors design-to-code-write changelog-review pair-programming-review worktree-purge WorktreePurgeDialog quick-command-run`.

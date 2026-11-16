@@ -38,7 +38,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PixelAgent } from "../../stores/pixel-office-store";
+import type {
+	AgentActivity,
+	PixelAgent,
+} from "../../stores/pixel-office-store";
 import type { Terminal } from "../../stores/terminal-store";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -66,7 +69,7 @@ const PHASE_ICONS: Record<string, LucideIcon> = {
 	failed: CircleX,
 };
 
-const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+const ACTIVITY_ICONS: Record<AgentActivity, LucideIcon> = {
 	typing: PenLine,
 	running: Cog,
 	reading: BookOpen,
@@ -76,7 +79,10 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 	pending: Hourglass,
 };
 
-const ACTIVITY_COLORS: Record<string, { color: string; bgColor: string }> = {
+const ACTIVITY_COLORS: Record<
+	AgentActivity,
+	{ color: string; bgColor: string }
+> = {
 	typing: { color: "#4A90D9", bgColor: "rgba(74,144,217,0.12)" },
 	running: { color: "#1ABC9C", bgColor: "rgba(26,188,156,0.12)" },
 	reading: { color: "#27AE60", bgColor: "rgba(39,174,96,0.12)" },
@@ -102,7 +108,7 @@ function getAgentColor(agent: PixelAgent): string {
 	if (agent.activity === "pending") return "#8B5CF6";
 	if (agent.type === "task")
 		return PHASE_COLOR[agent.phase ?? "idle"] ?? "#6B7280";
-	return ACTIVITY_COLORS[agent.activity]?.color ?? "#6B7280";
+	return ACTIVITY_COLORS[agent.activity].color;
 }
 
 // ── Syntax-highlighted inline code chip ──────────────────────
@@ -168,33 +174,55 @@ function logLineColor(line: string): string {
 	return "rgba(255,255,255,0.42)";
 }
 
+const COPY_TONES = {
+	idle: {
+		color: "rgba(255,255,255,0.35)",
+		background: "rgba(255,255,255,0.06)",
+		border: "rgba(255,255,255,0.08)",
+	},
+	copied: {
+		color: "#6EE7B7",
+		background: "rgba(110,231,183,0.12)",
+		border: "rgba(110,231,183,0.3)",
+	},
+	failed: {
+		color: "#F87171",
+		background: "rgba(248,113,113,0.12)",
+		border: "rgba(248,113,113,0.3)",
+	},
+} as const;
+
 function LogStream({ taskId }: { readonly taskId: string }) {
 	const { t } = useTranslation(["pixelOffice"]);
 	const { lines: visibleLines, running, loading } = useAgentLogLines(taskId);
 	const [open, setOpen] = useState(true);
-	const [copied, setCopied] = useState(false);
+	const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const atBottomRef = useRef(true);
 
-	const handleScroll = () => {
-		const el = scrollRef.current;
-		if (!el) return;
+	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const el = e.currentTarget;
 		atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
 	};
 
-	// Follow the tail as lines arrive, unless the person scrolled up to read.
+	// Follow the tail as lines arrive, and when the stream is opened again,
+	// unless the person scrolled up to read.
 	const lineCount = visibleLines.length;
 	useEffect(() => {
-		if (open && lineCount > 0 && atBottomRef.current && scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-		}
+		if (!open || lineCount === 0 || !atBottomRef.current) return;
+		// The log area is rendered whenever the stream is open.
+		const el = scrollRef.current as HTMLDivElement;
+		el.scrollTop = el.scrollHeight;
 	}, [open, lineCount]);
 
-	const copyLogs = useCallback(() => {
-		navigator.clipboard.writeText(visibleLines.join("\n")).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		});
+	const copyLogs = useCallback(async () => {
+		try {
+			await navigator.clipboard.writeText(visibleLines.join("\n"));
+			setCopied("copied");
+		} catch {
+			setCopied("failed");
+		}
+		setTimeout(() => setCopied(null), 2000);
 	}, [visibleLines]);
 
 	const lastLine = visibleLines.at(-1);
@@ -210,6 +238,7 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 					type="button"
 					className="flex items-center gap-1.5 text-2xs text-white/50 hover:text-white/80 transition-colors font-mono"
 					onClick={() => setOpen((v) => !v)}
+					aria-expanded={open}
 				>
 					<TerminalIcon className="h-3.5 w-3.5" />
 					<span>{t("pixelOffice:bubble.logs")}</span>
@@ -230,19 +259,23 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 						onClick={copyLogs}
 						className="flex items-center gap-1 text-3xs font-mono px-2 py-1 rounded transition-all"
 						style={{
-							color: copied ? "#6EE7B7" : "rgba(255,255,255,0.35)",
-							background: copied
-								? "rgba(110,231,183,0.12)"
-								: "rgba(255,255,255,0.06)",
-							border: `1px solid ${copied ? "rgba(110,231,183,0.3)" : "rgba(255,255,255,0.08)"}`,
+							color: COPY_TONES[copied ?? "idle"].color,
+							background: COPY_TONES[copied ?? "idle"].background,
+							border: `1px solid ${COPY_TONES[copied ?? "idle"].border}`,
 						}}
 						title={t("pixelOffice:bubble.copyAll")}
 					>
-						{copied ? (
+						{copied === "copied" && (
 							<>
 								<Check className="h-3 w-3" /> {t("pixelOffice:bubble.copied")}
 							</>
-						) : (
+						)}
+						{copied === "failed" && (
+							<>
+								<X className="h-3 w-3" /> {t("pixelOffice:bubble.copyFailed")}
+							</>
+						)}
+						{copied === null && (
 							<>
 								<Copy className="h-3 w-3" /> {t("pixelOffice:bubble.copy")}
 							</>
@@ -308,10 +341,12 @@ function LogStream({ taskId }: { readonly taskId: string }) {
 // ── Pending task panel (planning/queued) ──────────────────────
 
 function PendingTaskPanel({
+	taskId,
 	onGoToTask,
 	onClose,
 }: {
-	readonly onGoToTask: () => void;
+	readonly taskId: string;
+	readonly onGoToTask: (taskId: string) => void;
 	readonly onClose: () => void;
 }) {
 	const { t } = useTranslation(["pixelOffice"]);
@@ -345,7 +380,7 @@ function PendingTaskPanel({
 					size="sm"
 					variant="ghost"
 					className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
-					onClick={onGoToTask}
+					onClick={() => onGoToTask(taskId)}
 				>
 					<LayoutDashboard className="h-3 w-3 mr-1" />
 					{t("pixelOffice:bubble.goToKanban")}
@@ -368,27 +403,32 @@ function PendingTaskPanel({
 
 function TaskPanel({
 	agent,
+	taskId,
 	color,
 	onGoToTask,
 	onStopTask,
 	onClose,
 }: {
 	readonly agent: PixelAgent;
+	readonly taskId: string;
 	readonly color: string;
-	readonly onGoToTask: () => void;
-	readonly onStopTask: () => void;
+	readonly onGoToTask: (taskId: string) => void;
+	readonly onStopTask: (taskId: string) => void;
 	readonly onClose: () => void;
 }) {
 	const { t } = useTranslation(["pixelOffice"]);
-	const taskId = agent.taskId ?? "";
 	const phase = agent.phase ?? "idle";
 	// Only a task that is executing can be stopped. "waiting" covers a paused
 	// task and a task in human review (done, waiting for the person): offering
 	// "Stop" there was offering to stop something that had already finished.
-	const isRunning =
-		agent.activity === "typing" ||
-		agent.activity === "reading" ||
-		agent.activity === "running";
+	// A swarm subtask has no card of its own: nothing to open, nothing to stop
+	// from here — it belongs to the run its parent task is driving.
+	const hasCard = taskId !== "";
+	const canStop =
+		hasCard &&
+		(agent.activity === "typing" ||
+			agent.activity === "reading" ||
+			agent.activity === "running");
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
@@ -422,7 +462,7 @@ function TaskPanel({
 			)}
 
 			{/* Live log stream — expands to fill remaining space */}
-			{taskId && <LogStream taskId={taskId} />}
+			{hasCard && <LogStream taskId={taskId} />}
 
 			{/* Actions — fixed */}
 			<div
@@ -433,29 +473,31 @@ function TaskPanel({
 					marginTop: "2px",
 				}}
 			>
-				<Button
-					size="sm"
-					variant="ghost"
-					className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
-					onClick={onGoToTask}
-				>
-					<LayoutDashboard className="h-3 w-3 mr-1" />
-					{t("pixelOffice:bubble.goToKanban")}
-				</Button>
+				{hasCard && (
+					<Button
+						size="sm"
+						variant="ghost"
+						className="h-7 px-2.5 text-2xs text-white/60 hover:text-white hover:bg-white/10"
+						onClick={() => onGoToTask(taskId)}
+					>
+						<LayoutDashboard className="h-3 w-3 mr-1" />
+						{t("pixelOffice:bubble.goToKanban")}
+					</Button>
+				)}
 
-				{isRunning && (
+				{canStop && (
 					<Button
 						size="sm"
 						variant="ghost"
 						className="h-7 px-2.5 text-2xs text-destructive/70 hover:text-destructive hover:bg-destructive/10 ml-auto"
-						onClick={onStopTask}
+						onClick={() => onStopTask(taskId)}
 					>
 						<Square className="h-3 w-3 mr-1" />
 						{t("pixelOffice:bubble.stopTask")}
 					</Button>
 				)}
 
-				{!isRunning && (
+				{!canStop && (
 					<Button
 						size="sm"
 						variant="ghost"
@@ -493,7 +535,7 @@ function TerminalPanel({
 	const { t } = useTranslation(["pixelOffice"]);
 	const [command, setCommand] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
-	const palette = ACTIVITY_COLORS[agent.activity] ?? ACTIVITY_COLORS.idle;
+	const palette = ACTIVITY_COLORS[agent.activity];
 	const isExited = agent.activity === "exited";
 	const isBusy = agent.activity === "typing" || agent.activity === "running";
 	const isWaiting = agent.activity === "waiting";
@@ -507,13 +549,12 @@ function TerminalPanel({
 		? t(`pixelOffice:activityDescription.${agent.activity}WithTask`, {
 				task: agent.taskName,
 			})
-		: t([
-				`pixelOffice:activityDescription.${agent.activity}`,
-				"pixelOffice:activityDescription.idle",
-			]);
+		: t(`pixelOffice:activityDescription.${agent.activity}`);
 
 	useEffect(() => {
-		if (!isExited) setTimeout(() => inputRef.current?.focus(), 50);
+		if (isExited) return;
+		const timer = setTimeout(() => inputRef.current?.focus(), 50);
+		return () => clearTimeout(timer);
 	}, [isExited]);
 
 	const handleSend = () => {
@@ -592,6 +633,7 @@ function TerminalPanel({
 							onClick={handleSend}
 							disabled={!command.trim()}
 							title={t("pixelOffice:bubble.send")}
+							aria-label={t("pixelOffice:bubble.send")}
 						>
 							<Send className="h-3 w-3" />
 						</Button>
@@ -672,12 +714,13 @@ export interface AgentBubbleProps {
 	readonly anchorY: number;
 	readonly onClose: () => void;
 	readonly onGoToTerminal: () => void;
-	readonly onGoToTask: () => void;
+	/** Receives the card's id; only offered when the agent has a card. */
+	readonly onGoToTask: (taskId: string) => void;
 	readonly onKill: () => void;
 	readonly onInterrupt: () => void;
 	readonly onResumeClaude: () => void;
 	readonly onSendCommand: (cmd: string) => void;
-	readonly onStopTask: () => void;
+	readonly onStopTask: (taskId: string) => void;
 }
 
 export function AgentBubble({
@@ -695,7 +738,6 @@ export function AgentBubble({
 	onStopTask,
 }: AgentBubbleProps) {
 	const { t } = useTranslation(["pixelOffice"]);
-	const bubbleRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
@@ -710,7 +752,7 @@ export function AgentBubble({
 	// Arrow points up to the agent: clamp so it stays within the bubble bounds
 	const arrowLeft = Math.max(
 		20,
-		Math.min(anchorX - 16, (globalThis.innerWidth ?? 1200) - 32 - 20),
+		Math.min(anchorX - 16, globalThis.innerWidth - 32 - 20),
 	);
 
 	const isTaskAgent = agent.type === "task";
@@ -729,17 +771,23 @@ export function AgentBubble({
 		HeaderIcon = PHASE_ICONS[phase] ?? PHASE_ICONS.idle;
 		headerLabel = t([`pixelOffice:phase.${phase}`, "pixelOffice:phase.idle"]);
 	} else {
-		HeaderIcon = ACTIVITY_ICONS[agent.activity] ?? ACTIVITY_ICONS.idle;
-		headerLabel = t([
-			`pixelOffice:activity.${agent.activity}`,
-			"pixelOffice:activity.idle",
-		]);
+		HeaderIcon = ACTIVITY_ICONS[agent.activity];
+		headerLabel = t(`pixelOffice:activity.${agent.activity}`);
 	}
+
+	// A swarm subtask has no card: its taskId is empty.
+	const taskId = agent.taskId ?? "";
 
 	// Determine which panel to render based on agent state
 	const bodyPanel = (() => {
 		if (isPending) {
-			return <PendingTaskPanel onGoToTask={onGoToTask} onClose={onClose} />;
+			return (
+				<PendingTaskPanel
+					taskId={taskId}
+					onGoToTask={onGoToTask}
+					onClose={onClose}
+				/>
+			);
 		}
 
 		// A swarm subtask has progress and logs like a task, but no Kanban card of
@@ -748,6 +796,7 @@ export function AgentBubble({
 			return (
 				<TaskPanel
 					agent={agent}
+					taskId={taskId}
 					color={color}
 					onGoToTask={onGoToTask}
 					onStopTask={onStopTask}
@@ -770,16 +819,13 @@ export function AgentBubble({
 	})();
 
 	return (
-		// biome-ignore lint/a11y/noNoninteractiveElementInteractions: stop-propagation on dialog container
+		// Escape is handled once, by the window listener above.
 		<div
-			ref={bubbleRef}
 			role="dialog"
 			aria-modal="false"
 			aria-label={agent.fullName}
 			className="absolute z-50 select-none flex flex-col"
 			style={{ left: 16, right: 16, top, bottom: 16 }}
-			onClick={(e) => e.stopPropagation()}
-			onKeyDown={(e) => e.key === "Escape" && onClose()}
 		>
 			{/* Arrow pointing up to the clicked agent */}
 			<div style={{ paddingLeft: arrowLeft, lineHeight: 0 }}>

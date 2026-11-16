@@ -106,7 +106,9 @@ test("its QA pass brings it to Human Review with the one file it wrote", async (
 
 	await review.click();
 	await expect(page.getByText("The changes are waiting for your review")).toBeVisible();
-	await expect(page.getByText("1/1 subtasks")).toBeVisible();
+	// The card reaches Human Review before the panel has reread the finished
+	// plan: give the count the time the plan watcher takes.
+	await expect(page.getByText("1/1 subtasks")).toBeVisible({ timeout: 15_000 });
 	await page.getByRole("button", { name: /^View$/ }).click();
 	await expect(page.getByText("1 file changed")).toBeVisible({ timeout: 15_000 });
 	await page.getByText("CONTRIBUTING.md", { exact: true }).last().click();

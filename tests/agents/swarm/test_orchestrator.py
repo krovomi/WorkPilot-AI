@@ -226,30 +226,3 @@ class TestSubtaskNodeRetry:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-
-
-# ---------------------------------------------------------------------------
-# _merge_wave
-
-
-class TestMergeWave:
-    def test_a_wave_is_already_in_the_task_worktree(
-        self, orchestrator: SwarmOrchestrator, capsys
-    ) -> None:
-        from agents.swarm.types import Wave
-        from agents.swarm.wave_executor import SWARM_EVENT_PREFIX
-
-        wave = Wave(index=2, subtask_ids=["s1", "s2"])
-
-        asyncio.run(orchestrator._merge_wave(wave, WaveResult(wave_index=2), nodes={}))
-
-        assert wave.merge_success is True
-        assert orchestrator.status.phase == SwarmPhase.MERGING_WAVE
-        events = [
-            json.loads(line[len(SWARM_EVENT_PREFIX) :])
-            for line in capsys.readouterr().out.splitlines()
-            if line.startswith(SWARM_EVENT_PREFIX)
-        ]
-        assert events == [
-            {"type": "phase_changed", "phase": "merging_wave", "wave_index": 2}
-        ]

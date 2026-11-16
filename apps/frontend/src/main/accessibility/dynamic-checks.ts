@@ -383,12 +383,45 @@ export function analyseTrace(trace: PageTrace, level: WcagLevel): A11yViolation[
 	});
 }
 
+function isLoopbackHost(hostname: string): boolean {
+	const host = hostname.toLowerCase();
+	return (
+		host === "localhost" ||
+		host.endsWith(".localhost") ||
+		host === "[::1]" ||
+		/^127(?:\.\d{1,3}){3}$/.test(host)
+	);
+}
+
+function portOf(url: URL): number {
+	if (url.port) return Number(url.port);
+	return url.protocol === "https:" ? 443 : 80;
+}
+
+/** The ports of those addresses that are on this computer, the implicit one included. */
+export function loopbackPorts(addresses: readonly string[]): number[] {
+	const ports: number[] = [];
+	for (const address of addresses) {
+		try {
+			const url = new URL(address);
+			if (isLoopbackHost(url.hostname)) ports.push(portOf(url));
+		} catch {
+			// not an address: no port to hold back
+		}
+	}
+	return ports;
+}
+
 /**
  * The address the scan may open: the app running on this computer, never a
  * site on the internet (the page is loaded with the project's own code, and
- * nothing it does should reach further than the computer it runs on).
+ * nothing it does should reach further than the computer it runs on), and
+ * never one of WorkPilot's own services there (`refusedPorts`).
  */
-export function validateScanUrl(raw: unknown): string | null {
+export function validateScanUrl(
+	raw: unknown,
+	refusedPorts: ReadonlySet<number> = new Set(),
+): string | null {
 	if (typeof raw !== "string" || raw.length > 2000) return null;
 	let url: URL;
 	try {
@@ -398,11 +431,6 @@ export function validateScanUrl(raw: unknown): string | null {
 	}
 	if (url.protocol !== "http:" && url.protocol !== "https:") return null;
 	if (url.username || url.password) return null;
-	const host = url.hostname.toLowerCase();
-	const local =
-		host === "localhost" ||
-		host.endsWith(".localhost") ||
-		host === "[::1]" ||
-		/^127(?:\.\d{1,3}){3}$/.test(host);
-	return local ? url.toString() : null;
+	if (!isLoopbackHost(url.hostname)) return null;
+	return refusedPorts.has(portOf(url)) ? null : url.toString();
 }
