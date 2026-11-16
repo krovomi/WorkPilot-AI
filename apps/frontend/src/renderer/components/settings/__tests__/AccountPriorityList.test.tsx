@@ -26,6 +26,19 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 	};
 });
 
+// A row being dragged is lifted above the others.
+const sortable = vi.hoisted(() => ({ dragging: "" }));
+vi.mock("@dnd-kit/sortable", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@dnd-kit/sortable")>();
+	return {
+		...actual,
+		useSortable: (args: Parameters<typeof actual.useSortable>[0]) => ({
+			...actual.useSortable(args),
+			isDragging: args.id === sortable.dragging,
+		}),
+	};
+});
+
 const t = (key: string, options?: Record<string, unknown>) => i18n.t(`settings:${key}`, options);
 
 const ACCOUNTS: FailoverAccount[] = [
@@ -86,6 +99,13 @@ describe("AccountPriorityList", () => {
 		drop("oauth-me", "oauth-me");
 		drop("oauth-me", null);
 		expect(onReorder.mock.calls).toEqual([[["provider-copilot", "oauth-me", "api-proxy"]]]);
+	});
+
+	it("lifts the row being dragged", () => {
+		sortable.dragging = "api-proxy";
+		renderList();
+		expect(screen.getAllByRole("listitem")[1].className).toContain("shadow-lg");
+		sortable.dragging = "";
 	});
 
 	it("locks the list when disabled", () => {

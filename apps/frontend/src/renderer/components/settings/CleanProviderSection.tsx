@@ -197,6 +197,7 @@ export function CleanProviderSection({
 	const runTest = useCallback(
 		async (providerId: string, quiet: boolean) => {
 			setTestingProviders((prev) => new Set(prev).add(providerId));
+			// ProviderService answers a failed call; saving answers false.
 			try {
 				const result = await ProviderService.testProvider(providerId);
 				const success = result.success === true;
@@ -224,18 +225,6 @@ export function CleanProviderSection({
 								}),
 							},
 				);
-			} catch (err) {
-				console.error("[AiAccounts] Test failed:", providerId, err);
-				if (!quiet) {
-					toast({
-						variant: "destructive",
-						title: t("sections.accounts.providerCard.testError"),
-						description: t("sections.accounts.providerCard.testErrorDescription", {
-							providerName: nameOf(providerId),
-							error: t("sections.accounts.providerCard.errors.unknownError"),
-						}),
-					});
-				}
 			} finally {
 				setTestingProviders((prev) => {
 					const next = new Set(prev);

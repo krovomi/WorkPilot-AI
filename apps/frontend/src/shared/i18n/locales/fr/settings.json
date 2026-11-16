@@ -46,9 +46,6 @@
 			"providerCard": {
 				"authentication": "Authentification",
 				"deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette configuration de fournisseur ?",
-				"errors": {
-					"unknownError": "Erreur inconnue"
-				},
 				"keyRenewal_one": "Clé enregistrée il y a {{count}} jour : pensez à la renouveler (plus de {{threshold}} jours)",
 				"keyRenewal_other": "Clé enregistrée il y a {{count}} jours : pensez à la renouveler (plus de {{threshold}} jours)",
 				"oauthCli": "OAuth (CLI)",

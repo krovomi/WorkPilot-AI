@@ -369,10 +369,24 @@ describe("CleanProviderSection", () => {
 		expect(screen.getByText(i18n.t("settings:aiAccounts.stats.failoverOff"))).toBeInTheDocument();
 	});
 
+	it("does not acknowledge a change the main did not save", async () => {
+		useApi({ saveSettings: vi.fn(async () => ({ success: false })) });
+		const { onSettingsChange } = renderSection();
+		await waitFor(() => expect(tests()).toHaveLength(2));
+		await waitFor(() => expect(api.fn("saveSettings")).toHaveBeenCalled());
+		expect(onSettingsChange).not.toHaveBeenCalled();
+	});
+
 	it("keeps the page when the failover settings are not readable", async () => {
-		useApi({ getAutoSwitchSettings: vi.fn(async () => ({ success: false })) });
+		useApi({
+			getAutoSwitchSettings: vi.fn(async () => ({ success: false })),
+			checkCopilotAuth: vi.fn(async () => ({ success: true, data: { authenticated: false } })),
+			invoke: vi.fn(async (channel: string) =>
+				channel === "usage:getAllData" ? { windsurf: { usage: { weeklyPercent: 12 } } } : { success: true },
+			),
+		});
 		renderSection();
-		await settle();
+		await waitFor(() => expect(card("windsurf")?.realUsageData).toMatchObject({ sessionPercent: 0, weeklyPercent: 12 }));
 		expect(screen.getByText(i18n.t("settings:aiAccounts.stats.failoverOff"))).toBeInTheDocument();
 	});
 

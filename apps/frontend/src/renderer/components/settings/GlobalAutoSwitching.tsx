@@ -176,23 +176,6 @@ export function GlobalAutoSwitching({
 		if (settings) onSummaryChange?.({ enabled: settings.enabled, chainLength });
 	}, [settings, chainLength, onSummaryChange]);
 
-	const update = async (patch: Partial<ClaudeAutoSwitchSettings>) => {
-		if (!settings) return;
-		const previous = settings;
-		setSettings({ ...settings, ...patch });
-		setSaving(true);
-		try {
-			const result = await globalThis.electronAPI.updateAutoSwitchSettings(patch);
-			if (!result.success) throw new Error(result.error);
-		} catch (error) {
-			console.error("[GlobalAutoSwitching] Failed to save:", error);
-			setSettings(previous);
-			toast({ variant: "destructive", title: t("aiAccounts.failover.saveError") });
-		} finally {
-			setSaving(false);
-		}
-	};
-
 	const reorder = async (ids: string[]) => {
 		const previous = savedOrder;
 		setSavedOrder(ids);
@@ -217,6 +200,22 @@ export function GlobalAutoSwitching({
 
 	if (!settings) return null;
 	const off = !settings.enabled;
+
+	const update = async (patch: Partial<ClaudeAutoSwitchSettings>) => {
+		const previous = settings;
+		setSettings({ ...settings, ...patch });
+		setSaving(true);
+		try {
+			const result = await globalThis.electronAPI.updateAutoSwitchSettings(patch);
+			if (!result.success) throw new Error(result.error);
+		} catch (error) {
+			console.error("[GlobalAutoSwitching] Failed to save:", error);
+			setSettings(previous);
+			toast({ variant: "destructive", title: t("aiAccounts.failover.saveError") });
+		} finally {
+			setSaving(false);
+		}
+	};
 
 	return (
 		<div className="flex flex-col gap-4">

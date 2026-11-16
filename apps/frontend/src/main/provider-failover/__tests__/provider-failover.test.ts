@@ -150,6 +150,11 @@ describe("failTaskOver", () => {
 		expect(resume).toHaveBeenCalledWith(expect.anything(), "t1", "openai", { keepClaudeSession: false });
 	});
 
+	it("falls back to the Claude accounts when the stored order is broken", async () => {
+		manager.getAccountPriorityOrder.mockReturnValue("oauth-work");
+		expect((await failTaskOver(agent().emitter, "t1", "rate_limit", undefined, NOW))?.id).toBe("oauth-work");
+	});
+
 	it("says so in the task log when no account is left", async () => {
 		manager.getAccountPriorityOrder.mockReturnValue(["oauth-perso"]);
 		const { emitter, logs } = agent();

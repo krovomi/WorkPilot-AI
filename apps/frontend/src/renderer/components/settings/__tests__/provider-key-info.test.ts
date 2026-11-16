@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// No provider of the registry signs in by OAuth alone today; one that does would.
+vi.mock("@shared/services/providerRegistry", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@shared/services/providerRegistry")>();
+	return {
+		...actual,
+		getProvider: (id: string) =>
+			id === "oauth-only" ? { requiresOAuth: true, requiresApiKey: false } : actual.getProvider(id),
+	};
+});
 import type { APIProfile } from "../../../../shared/types/profile";
 import { providerAuthMethod, providerKeyInfo } from "../provider-key-info";
 
@@ -11,6 +21,7 @@ describe("providerAuthMethod", () => {
 		expect(providerAuthMethod("ollama")).toBe("local");
 		expect(providerAuthMethod("openai")).toBe("api-key");
 		expect(providerAuthMethod("not-a-provider")).toBe("api-key");
+		expect(providerAuthMethod("oauth-only")).toBe("oauth");
 	});
 });
 
@@ -30,6 +41,7 @@ describe("providerKeyInfo", () => {
 		});
 		expect(providerKeyInfo("google", profiles, {}, false)).toMatchObject({ provider: "Gemini" });
 		expect(providerKeyInfo("gemini", profiles, {}, false)).toMatchObject({ provider: "Gemini" });
+		expect(providerKeyInfo("gemini", [profile("Bad url", "not a url", "k")], {}, false)).toMatchObject({ hasKey: false });
 	});
 
 	it("then the key saved in Settings, with its date", () => {

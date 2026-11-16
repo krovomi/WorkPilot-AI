@@ -225,6 +225,13 @@ describe("TASK_RESUME_WITH_PROVIDER", () => {
 		expect(state.resume).toHaveBeenCalledWith(agent, "t1", "p1", { keepSession: false });
 	});
 
+	it("fills an empty metadata copy", async () => {
+		setTask();
+		write(path.join(specDir, "task_metadata.json"), "");
+		expect((await resume("ollama")).success).toBe(true);
+		expect(read(path.join(specDir, "task_metadata.json")).engineLocked).toBe(true);
+	});
+
 	it("keeps a formula that still describes every phase", async () => {
 		const formula = { provider: "ollama", model: "qwen3:32b", effort: "low" };
 		const task = setTask({

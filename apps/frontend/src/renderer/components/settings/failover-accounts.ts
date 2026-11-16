@@ -49,8 +49,6 @@ const CLAUDE = "anthropic";
 export function buildFailoverAccounts(sources: FailoverSources): FailoverAccount[] {
 	const accounts: FailoverAccount[] = [];
 	const covered = new Set<string>();
-	const label = (name: string) =>
-		sources.providers.find((p) => p.name === name)?.label ?? name;
 
 	for (const profile of sources.claudeProfiles) {
 		if (!profile.isAuthenticated) continue;
@@ -80,13 +78,13 @@ export function buildFailoverAccounts(sources: FailoverSources): FailoverAccount
 		});
 		covered.add(provider);
 	}
-	for (const { name } of sources.providers) {
+	for (const { name, label } of sources.providers) {
 		if (!sources.connected[name] || covered.has(name)) continue;
 		accounts.push({
 			id: failoverEntryId("provider", name),
 			kind: "provider",
 			provider: name,
-			label: label(name),
+			label,
 			detail: name === "copilot" && sources.copilotLogin ? `@${sources.copilotLogin}` : undefined,
 			isActive: false,
 		});

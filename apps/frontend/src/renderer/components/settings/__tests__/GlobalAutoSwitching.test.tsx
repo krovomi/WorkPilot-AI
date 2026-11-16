@@ -87,6 +87,8 @@ describe("GlobalAutoSwitching", () => {
 		await waitFor(() => expect(toggle("authFailure")).not.toBeDisabled());
 		await user.click(toggle("authFailure"));
 		expect(api.fn("updateAutoSwitchSettings")).toHaveBeenCalledWith({ autoSwitchOnAuthFailure: true });
+		await user.click(toggle("rateLimit"));
+		expect(api.fn("updateAutoSwitchSettings")).toHaveBeenCalledWith({ autoSwitchOnRateLimit: false });
 		await waitFor(() => expect(toggle("authFailure")).toBeChecked());
 
 		const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -190,8 +192,11 @@ describe("GlobalAutoSwitching", () => {
 		error.mockRestore();
 	});
 
-	it("reads defaults when the main answers without settings", async () => {
-		useApi({ getAutoSwitchSettings: vi.fn(async () => ({ success: false })) });
+	it("reads defaults when the main answers without settings or with a broken order", async () => {
+		useApi({
+			getAutoSwitchSettings: vi.fn(async () => ({ success: false })),
+			getAccountPriorityOrder: vi.fn(async () => ({ success: true, data: "oauth-a" })),
+		});
 		const { unmount } = renderSwitching();
 		await waitFor(() => expect(toggle("rateLimit")).toBeChecked());
 		unmount();
