@@ -427,6 +427,18 @@ def _github(method: str, path: str, body: Any, query: str = "") -> _Answer:
                 }
             },
         )
+    if method == "GET" and path == "/search/issues":
+        # The connection check counts the open issues by a search.
+        wanted = f"repo:{GITHUB_REPO} is:issue is:open"
+        found = parse_qs(query).get("q", [""])[0] == wanted
+        return _Answer(
+            200,
+            {
+                "total_count": len(GITHUB_ISSUES) if found else 0,
+                "incomplete_results": False,
+                "items": [],
+            },
+        )
     if not path.lower().startswith(prefix):
         return _NOT_FOUND
     rest = [part for part in path[len(prefix) :].split("/") if part]
