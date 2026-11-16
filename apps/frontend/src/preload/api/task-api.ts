@@ -24,6 +24,8 @@ import type {
 	TaskContextEvent,
 	TaskGoal,
 	TaskGoalState,
+	TaskSnapshot,
+	TaskSnapshotRestore,
 	AppliedLessonsState,
 	TaskLogStreamChunk,
 	TaskLogs,
@@ -135,6 +137,13 @@ export interface TaskAPI {
 		taskId: string,
 		policy: Partial<ContextPolicy>,
 	) => Promise<IPCResult<{ contextPolicy: ContextPolicy }>>;
+	/** The git snapshots of the task's worktree, newest first. */
+	listTaskSnapshots: (taskId: string) => Promise<IPCResult<TaskSnapshot[]>>;
+	/** Put the task's worktree back on a snapshot (a snapshot of the state replaced is taken first). */
+	restoreTaskSnapshot: (
+		taskId: string,
+		snapshotId: string,
+	) => Promise<IPCResult<TaskSnapshotRestore>>;
 	/** The task's goal (goal mode): the command whose exit code says "done". */
 	getTaskGoal: (taskId: string) => Promise<IPCResult<TaskGoalState>>;
 	/** Write the goal in every spec dir copy, or remove it with null. */
@@ -609,6 +618,15 @@ export const createTaskAPI = (): TaskAPI => ({
 		policy: Partial<ContextPolicy>,
 	): Promise<IPCResult<{ contextPolicy: ContextPolicy }>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_CONTEXT_POLICY_UPDATE, taskId, policy),
+
+	listTaskSnapshots: (taskId: string): Promise<IPCResult<TaskSnapshot[]>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_SNAPSHOTS_LIST, taskId),
+
+	restoreTaskSnapshot: (
+		taskId: string,
+		snapshotId: string,
+	): Promise<IPCResult<TaskSnapshotRestore>> =>
+		ipcRenderer.invoke(IPC_CHANNELS.TASK_SNAPSHOT_RESTORE, taskId, snapshotId),
 
 	getTaskGoal: (taskId: string): Promise<IPCResult<TaskGoalState>> =>
 		ipcRenderer.invoke(IPC_CHANNELS.TASK_GOAL_GET, taskId),

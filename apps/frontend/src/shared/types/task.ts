@@ -15,6 +15,7 @@ import type {
 	PhaseThinkingConfig,
 	ThinkingLevel,
 } from "./settings";
+import type { AnomalyPauseDetail, SandboxPauseDetail } from "./agent-safety";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
@@ -680,10 +681,14 @@ export interface TaskMetadata {
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
 		 * when the person stopped every agent at once, "voice_stop" when they
 		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
+		anomaly?: AnomalyPauseDetail;
+		sandbox?: SandboxPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -821,10 +826,14 @@ export interface ImplementationPlan {
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
 		 * when the person stopped every agent at once, "voice_stop" when they
 		 * said « stop » to the voice assistant (after the current step).
+		 * "anomaly" / "sandbox" when the session watch stopped an agent
+		 * (`agents/safety_watch.py`), with `anomaly` / `sandbox`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
+		anomaly?: AnomalyPauseDetail;
+		sandbox?: SandboxPauseDetail;
 	};
 }
 

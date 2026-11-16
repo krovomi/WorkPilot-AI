@@ -1,529 +1,133 @@
-"""Tests for Feature 7.2 — Sandbox renforcé pour l'exécution d'agents.
+"""The reinforced sandbox's write rules, and the barriers that apply them.
 
-Tests: ResourceLimits (3), PathRule (3), SecurityViolation (2), Snapshot (2),
-       SandboxConfig (6), SandboxManager — lifecycle (5), path validation (6),
-       command validation (3), resource limits (3), snapshots (4),
-       execution (6), dry-run (3), stats (2) = 48 tests.
+``security.sandbox`` decides; ``path_guard``'s SDK hook and the non-SDK
+executor refuse before the write happens. Each refusal has its test.
 """
 
-import os
-import tempfile
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
 
 import pytest
-
-from apps.backend.security.sandbox import (
-    DEFAULT_BLOCKED_COMMANDS,
-    DEFAULT_BLOCKED_PATHS,
-    ExecutionResult,
-    FileAccessLevel,
-    FileSnapshot,
-    PathRule,
-    ResourceLimits,
-    SandboxConfig,
-    SandboxManager,
-    SandboxMode,
-    SandboxStatus,
-    SecurityViolation,
-    Snapshot,
-    ViolationType,
+from security.agent_safety_settings import ENV_VAR, SandboxSettings
+from security.path_guard import make_write_path_hook
+from security.sandbox import (
+    SandboxPolicy,
+    current_policy,
+    path_allowed,
+    project_relative,
+    write_refusal,
 )
 
-# ---------------------------------------------------------------------------
-# ResourceLimits tests
-# ---------------------------------------------------------------------------
+RESTRICTED = SandboxPolicy(mode="restricted", allowed_paths=("src", "tests/unit"))
 
 
-class TestResourceLimits:
-    def test_defaults(self):
-        limits = ResourceLimits()
-        assert limits.cpu_percent == 80.0
-        assert limits.memory_mb == 2048
-        assert limits.execution_time_s == 300
-
-    def test_is_within_limits(self):
-        limits = ResourceLimits(memory_mb=1024)
-        assert limits.is_within_limits("memory_mb", 512)
-        assert not limits.is_within_limits("memory_mb", 2048)
-
-    def test_to_dict(self):
-        limits = ResourceLimits(cpu_percent=50.0)
-        d = limits.to_dict()
-        assert d["cpu_percent"] == 50.0
+@pytest.fixture
+def project(tmp_path: Path) -> Path:
+    root = tmp_path / "project"
+    (root / "src").mkdir(parents=True)
+    (root / ".workpilot" / "specs" / "001").mkdir(parents=True)
+    return root
 
 
-# ---------------------------------------------------------------------------
-# PathRule tests
-# ---------------------------------------------------------------------------
+def test_normal_mode_refuses_nothing_inside_the_project(project: Path):
+    assert write_refusal(SandboxPolicy(), "package.json", project) is None
 
 
-class TestPathRule:
-    def test_exact_match(self):
-        rule = PathRule(path="src/main.py")
-        assert rule.matches("src/main.py")
-        assert not rule.matches("src/other.py")
-
-    def test_recursive_match(self):
-        rule = PathRule(path="src/", recursive=True)
-        assert rule.matches("src/main.py")
-        assert rule.matches("src/utils/helper.py")
-        assert not rule.matches("tests/test_main.py")
-
-    def test_non_recursive(self):
-        rule = PathRule(path="src/", recursive=False)
-        assert rule.matches("src/")
-        assert not rule.matches("src/main.py")
+@pytest.mark.parametrize(
+    "target", ["src/app.py", "src/deep/x.ts", "tests/unit/a_test.go"]
+)
+def test_restricted_mode_allows_the_listed_paths(project: Path, target: str):
+    assert write_refusal(RESTRICTED, target, project) is None
 
 
-# ---------------------------------------------------------------------------
-# SecurityViolation tests
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "target", ["package.json", "srcx/app.py", "tests/e2e/a.spec.ts", "src/../setup.py"]
+)
+def test_restricted_mode_refuses_the_rest_of_the_project(project: Path, target: str):
+    refusal = write_refusal(RESTRICTED, target, project)
+    assert refusal is not None and "restricted mode" in refusal
 
 
-class TestSecurityViolation:
-    def test_create_violation(self):
-        v = SecurityViolation(
-            violation_id="vio-1",
-            violation_type=ViolationType.PATH_VIOLATION,
-            description="Access denied",
-            path="/etc/passwd",
+def test_restricted_mode_keeps_the_build_state_writable(project: Path):
+    spec = project / ".workpilot" / "specs" / "001"
+    assert (
+        write_refusal(RESTRICTED, str(spec / "implementation_plan.json"), project, spec)
+        is None
+    )
+    # The project's own .workpilot folder is the build's state too.
+    assert write_refusal(RESTRICTED, ".workpilot/notes.md", project) is None
+
+
+def test_outside_the_project_is_left_to_the_write_roots(project: Path, tmp_path: Path):
+    assert write_refusal(RESTRICTED, str(tmp_path / "elsewhere.txt"), project) is None
+
+
+def test_a_file_over_the_size_limit_is_refused(project: Path):
+    policy = SandboxPolicy(max_file_bytes=10)
+    assert write_refusal(policy, "src/a.py", project, content_bytes=11) is not None
+    assert write_refusal(policy, "src/a.py", project, content_bytes=10) is None
+    # An edit's size is not known before it runs: left to the session watch.
+    assert write_refusal(policy, "src/a.py", project, content_bytes=None) is None
+
+
+def test_relative_paths_are_resolved_inside_the_project(project: Path):
+    assert project_relative("src/./a/../b.py", project) == "src/b.py"
+    assert project_relative("../x", project) is None
+    assert path_allowed("src", ("src",)) and not path_allowed("srcx", ("src",))
+
+
+def test_the_policy_comes_from_the_settings(monkeypatch):
+    monkeypatch.setenv(
+        ENV_VAR,
+        json.dumps({"sandbox": {"mode": "restricted", "allowedPaths": ["lib/"]}}),
+    )
+    policy = current_policy()
+    assert policy.restricted and policy.allowed_paths == ("lib",)
+    settings = SandboxSettings(max_file_size_mb=1, max_session_minutes=2)
+    policy = SandboxPolicy.from_settings(settings)
+    assert policy.max_file_bytes == 1024 * 1024 and policy.max_session_seconds == 120
+
+
+def _decision(hook, tool: str, tool_input: dict) -> str | None:
+    out = asyncio.run(hook({"tool_name": tool, "tool_input": tool_input}))
+    return out.get("hookSpecificOutput", {}).get("permissionDecision")
+
+
+def test_the_sdk_hook_refuses_a_write_outside_the_restricted_paths(
+    project, monkeypatch
+):
+    monkeypatch.setenv(
+        ENV_VAR,
+        json.dumps({"sandbox": {"mode": "restricted", "allowedPaths": ["src"]}}),
+    )
+    hook = make_write_path_hook(project)
+    assert (
+        _decision(
+            hook, "Write", {"file_path": str(project / "setup.py"), "content": ""}
         )
-        assert v.blocked
-        assert v.timestamp != ""
-
-    def test_to_dict(self):
-        v = SecurityViolation(
-            violation_id="vio-1",
-            violation_type="resource_exceeded",
-            description="RAM exceeded",
-            resource="memory_mb",
-            value=3000,
-            limit=2048,
-        )
-        d = v.to_dict()
-        assert d["violation_type"] == "resource_exceeded"
-
-
-# ---------------------------------------------------------------------------
-# Snapshot tests
-# ---------------------------------------------------------------------------
-
-
-class TestSnapshot:
-    def test_create_snapshot(self):
-        snap = Snapshot(
-            snapshot_id="snap-1",
-            sandbox_id="sbx-1",
-            files=[FileSnapshot(path="a.py", content_hash="abc", exists=True)],
-        )
-        assert snap.file_count == 1
-        assert snap.created_at != ""
-
-    def test_to_dict(self):
-        snap = Snapshot(snapshot_id="snap-1", sandbox_id="sbx-1")
-        d = snap.to_dict()
-        assert d["file_count"] == 0
-
-
-# ---------------------------------------------------------------------------
-# SandboxConfig tests
-# ---------------------------------------------------------------------------
-
-
-class TestSandboxConfig:
-    def test_create_config(self):
-        config = SandboxConfig(
-            sandbox_id="sbx-1",
-            task_id="task-1",
-            agent_type="coder",
-        )
-        assert config.status == SandboxStatus.CREATED
-        assert config.mode == SandboxMode.NORMAL
-        assert not config.is_dry_run
-
-    def test_dry_run_mode(self):
-        config = SandboxConfig(
-            sandbox_id="sbx-1",
-            task_id="task-1",
-            agent_type="coder",
-            mode="dry_run",
-        )
-        assert config.is_dry_run
-
-    def test_add_allowed_path(self):
-        config = SandboxConfig(sandbox_id="sbx-1", task_id="t-1", agent_type="coder")
-        config.add_allowed_path("src/")
-        assert len(config.allowed_paths) == 1
-        assert config.allowed_paths[0].path == "src/"
-
-    def test_check_path_access_allowed(self):
-        config = SandboxConfig(sandbox_id="sbx-1", task_id="t-1", agent_type="coder")
-        config.add_allowed_path("src/", access="write")
-        assert config.check_path_access("src/main.py", "write")
-        assert config.check_path_access("src/main.py", "read")
-
-    def test_check_path_access_blocked(self):
-        config = SandboxConfig(
-            sandbox_id="sbx-1",
-            task_id="t-1",
-            agent_type="coder",
-            blocked_paths=[".env"],
-        )
-        config.add_allowed_path("src/")
-        assert not config.check_path_access(".env", "read")
-
-    def test_to_dict(self):
-        config = SandboxConfig(
-            sandbox_id="sbx-1",
-            task_id="t-1",
-            agent_type="coder",
-        )
-        d = config.to_dict()
-        assert d["sandbox_id"] == "sbx-1"
-        assert d["status"] == "created"
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Lifecycle
-# ---------------------------------------------------------------------------
-
-
-class TestManagerLifecycle:
-    def test_create_sandbox(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("task-1", "coder")
-        assert sandbox.sandbox_id.startswith("sbx-")
-        assert sandbox.task_id == "task-1"
-        assert sandbox.agent_type == "coder"
-
-    def test_create_sandbox_with_options(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox(
-            "task-1",
-            "coder",
-            mode="dry_run",
-            resource_limits={"memory_mb": 512},
-            allowed_paths=["src/"],
-            blocked_paths=["dist/"],
-        )
-        assert sandbox.is_dry_run
-        assert sandbox.resource_limits.memory_mb == 512
-        assert len(sandbox.allowed_paths) == 1
-        assert "dist/" in sandbox.blocked_paths
-
-    def test_get_sandbox(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("task-1", "coder")
-        found = manager.get_sandbox(sandbox.sandbox_id)
-        assert found is sandbox
-
-    def test_list_sandboxes(self):
-        manager = SandboxManager()
-        manager.create_sandbox("task-1", "coder")
-        manager.create_sandbox("task-2", "qa")
-        assert len(manager.list_sandboxes()) == 2
-
-    def test_destroy_sandbox(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("task-1", "coder")
-        assert manager.destroy_sandbox(sandbox.sandbox_id)
-        assert manager.get_sandbox(sandbox.sandbox_id) is None
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Path validation
-# ---------------------------------------------------------------------------
-
-
-class TestManagerPathValidation:
-    def test_validate_allowed_path(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["src/"])
-        assert manager.validate_path_access(sandbox.sandbox_id, "src/main.py", "write")
-
-    def test_validate_blocked_path(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["src/"])
-        assert not manager.validate_path_access(
-            sandbox.sandbox_id, "tests/secret.py", "write"
-        )
-
-    def test_validate_default_blocked_paths(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["src/"])
-        # .env is in default blocked paths
-        assert not manager.validate_path_access(sandbox.sandbox_id, ".env", "read")
-
-    def test_violation_recorded_on_blocked(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["src/"])
-        manager.validate_path_access(sandbox.sandbox_id, "tests/x.py", "write")
-        violations = manager.get_violations(sandbox.sandbox_id)
-        assert len(violations) == 1
-        assert violations[0].violation_type == ViolationType.PATH_VIOLATION
-
-    def test_no_whitelist_allows_all(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        # No allowed_paths = permissive (but blocked paths still apply)
-        assert manager.validate_path_access(
-            sandbox.sandbox_id, "random/file.py", "write"
-        )
-
-    def test_nonexistent_sandbox_denied(self):
-        manager = SandboxManager()
-        assert not manager.validate_path_access("sbx-9999", "any.py", "read")
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Command validation
-# ---------------------------------------------------------------------------
-
-
-class TestManagerCommandValidation:
-    def test_allowed_command(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        assert manager.validate_command(sandbox.sandbox_id, "python test.py")
-
-    def test_blocked_command(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        assert not manager.validate_command(sandbox.sandbox_id, "sudo rm -rf /")
-
-    def test_blocked_curl(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        assert not manager.validate_command(sandbox.sandbox_id, "curl http://evil.com")
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Resource limits
-# ---------------------------------------------------------------------------
-
-
-class TestManagerResourceLimits:
-    def test_within_limits(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox(
-            "t-1", "coder", resource_limits={"memory_mb": 1024}
-        )
-        assert manager.check_resource_limit(sandbox.sandbox_id, "memory_mb", 512)
-
-    def test_exceeded_limits(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox(
-            "t-1", "coder", resource_limits={"memory_mb": 1024}
-        )
-        assert not manager.check_resource_limit(sandbox.sandbox_id, "memory_mb", 2048)
-
-    def test_violation_on_exceed(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox(
-            "t-1", "coder", resource_limits={"max_files_written": 5}
-        )
-        manager.check_resource_limit(sandbox.sandbox_id, "max_files_written", 10)
-        violations = manager.get_violations(sandbox.sandbox_id)
-        assert any(
-            v.violation_type == ViolationType.RESOURCE_EXCEEDED for v in violations
-        )
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Snapshots
-# ---------------------------------------------------------------------------
-
-
-class TestManagerSnapshots:
-    def test_create_snapshot_nonexistent_paths(self):
-        manager = SandboxManager(project_root=tempfile.gettempdir())
-        sandbox = manager.create_sandbox(
-            "t-1", "coder", allowed_paths=["nonexistent_dir/"]
-        )
-        snap_id = manager.create_snapshot(sandbox.sandbox_id)
-        assert snap_id is not None
-        snapshots = manager.get_snapshots(sandbox.sandbox_id)
-        assert len(snapshots) == 1
-
-    def test_create_snapshot_with_real_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a test file
-            test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("hello world")
-
-            manager = SandboxManager(project_root=tmpdir)
-            sandbox = manager.create_sandbox("t-1", "coder")
-            manager.create_snapshot(sandbox.sandbox_id, paths=["test.txt"])
-            snapshots = manager.get_snapshots(sandbox.sandbox_id)
-            assert snapshots[0].file_count == 1
-            assert snapshots[0].files[0].exists
-
-    def test_rollback_snapshot(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("original content")
-
-            manager = SandboxManager(project_root=tmpdir)
-            sandbox = manager.create_sandbox("t-1", "coder")
-            snap_id = manager.create_snapshot(sandbox.sandbox_id, paths=["test.txt"])
-
-            # Modify file
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("modified content")
-
-            # Rollback
-            assert manager.rollback_snapshot(sandbox.sandbox_id, snap_id)
-
-            with open(test_file, encoding="utf-8") as f:
-                assert f.read() == "original content"
-
-    def test_rollback_nonexistent_snapshot(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        assert not manager.rollback_snapshot(sandbox.sandbox_id, "snap-9999")
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Execution
-# ---------------------------------------------------------------------------
-
-
-class TestManagerExecution:
-    def test_execute_success(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: "hello",
-            auto_snapshot=False,
-        )
-        assert result.success
-        assert result.output == "hello"
-        assert sandbox.status == SandboxStatus.COMPLETED
-
-    def test_execute_failure_with_auto_rollback(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_file = os.path.join(tmpdir, "test.txt")
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("original")
-
-            manager = SandboxManager(project_root=tmpdir)
-            sandbox = manager.create_sandbox("t-1", "coder", allowed_paths=["test.txt"])
-
-            def failing_func():
-                with open(test_file, "w", encoding="utf-8") as f:
-                    f.write("corrupted")
-                raise RuntimeError("Agent crashed")
-
-            result = manager.execute_in_sandbox(sandbox.sandbox_id, failing_func)
-            assert not result.success
-            assert "Agent crashed" in result.error
-            assert result.rolled_back
-
-            # File should be restored
-            with open(test_file, encoding="utf-8") as f:
-                assert f.read() == "original"
-
-    def test_execute_nonexistent_sandbox(self):
-        manager = SandboxManager()
-        result = manager.execute_in_sandbox("sbx-9999", lambda: None)
-        assert not result.success
-        assert "not found" in result.error
-
-    def test_execute_with_args(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda x, y: x + y,
-            args=(3, 4),
-            auto_snapshot=False,
-        )
-        assert result.success
-        assert result.output == 7
-
-    def test_execute_records_duration(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: "done",
-            auto_snapshot=False,
-        )
-        assert result.duration_s >= 0
-
-    def test_execute_stores_result_on_sandbox(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder")
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: 42,
-            auto_snapshot=False,
-        )
-        assert sandbox.execution_result is result
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Dry-run mode
-# ---------------------------------------------------------------------------
-
-
-class TestManagerDryRun:
-    def test_dry_run_produces_plan(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox(
-            "t-1", "coder", mode="dry_run", allowed_paths=["src/"]
-        )
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: "should not run",
-        )
-        assert result.success
-        assert len(result.dry_run_plan) > 0
-        assert any("DRY RUN" in line for line in result.dry_run_plan)
-
-    def test_dry_run_no_side_effects(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("t-1", "coder", mode="dry_run")
-        side_effect_marker = []
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: side_effect_marker.append("executed"),
-        )
-        assert result.success
-        assert len(side_effect_marker) == 0  # Function was NOT called
-
-    def test_dry_run_includes_task_info(self):
-        manager = SandboxManager()
-        sandbox = manager.create_sandbox("task-42", "qa", mode="dry_run")
-        result = manager.execute_in_sandbox(
-            sandbox.sandbox_id,
-            lambda: None,
-        )
-        plan_text = "\n".join(result.dry_run_plan)
-        assert "task-42" in plan_text
-        assert "qa" in plan_text
-
-
-# ---------------------------------------------------------------------------
-# SandboxManager — Stats
-# ---------------------------------------------------------------------------
-
-
-class TestManagerStats:
-    def test_get_stats_empty(self):
-        manager = SandboxManager()
-        stats = manager.get_stats()
-        assert stats["total_sandboxes"] == 0
-
-    def test_get_stats_with_data(self):
-        manager = SandboxManager()
-        s1 = manager.create_sandbox("t-1", "coder")
-        s2 = manager.create_sandbox("t-2", "qa", mode="dry_run")
-        manager.execute_in_sandbox(s1.sandbox_id, lambda: "ok", auto_snapshot=False)
-        manager.execute_in_sandbox(s2.sandbox_id, lambda: "plan", auto_snapshot=False)
-        stats = manager.get_stats()
-        assert stats["total_sandboxes"] == 2
-        assert stats["completed_sandboxes"] == 2
-        assert stats["dry_run_sandboxes"] == 1
+        == "deny"
+    )
+    assert _decision(hook, "Edit", {"file_path": str(project / "src" / "a.py")}) is None
+
+
+def test_the_sdk_hook_refuses_a_file_over_the_size_limit(project, monkeypatch):
+    monkeypatch.setenv(ENV_VAR, json.dumps({"sandbox": {"maxFileSizeMb": 0.000001}}))
+    hook = make_write_path_hook(project)
+    big = {"file_path": str(project / "src" / "a.py"), "content": "x" * 64}
+    assert _decision(hook, "Write", big) == "deny"
+
+
+def test_the_non_sdk_executor_refuses_the_same_writes(project, monkeypatch):
+    from core.runtimes.tool_executor import ToolExecutor
+
+    monkeypatch.setenv(
+        ENV_VAR,
+        json.dumps({"sandbox": {"mode": "restricted", "allowedPaths": ["src"]}}),
+    )
+    executor = ToolExecutor(project_dir=project, agent_type="coder")
+    with pytest.raises(ValueError, match="restricted mode"):
+        executor._resolve_within_project("setup.py", for_write=True)
+    assert executor._resolve_within_project("src/ok.py", for_write=True).name == "ok.py"
