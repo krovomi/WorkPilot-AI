@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { GitHubIssue } from "../../shared/types";
 import { useProjectStore } from "../stores/project-store";
 import { useTaskStore } from "../stores/task-store";
@@ -26,6 +27,7 @@ export function GitHubIssues({
 	onOpenSettings,
 	onNavigateToTask,
 }: Readonly<GitHubIssuesProps>) {
+	const { t } = useTranslation("common");
 	const projects = useProjectStore((state) => state.projects);
 	const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
 	const selectedProject = projects.find((p) => p.id === selectedProjectId);
@@ -37,6 +39,7 @@ export function GitHubIssues({
 
 	const {
 		syncStatus,
+		connectionError,
 		isLoading,
 		isLoadingMore,
 		error,
@@ -70,8 +73,6 @@ export function GitHubIssues({
 	const {
 		config: autoFixConfig,
 		getQueueItem: getAutoFixQueueItem,
-		isBatchRunning,
-		batchProgress,
 		toggleAutoFix,
 		checkForNewIssues,
 	} = useAutoFix(selectedProject?.id);
@@ -156,7 +157,7 @@ export function GitHubIssues({
 	if (!syncStatus?.connected) {
 		return (
 			<NotConnectedState
-				error={syncStatus?.error || null}
+				error={syncStatus?.error || connectionError}
 				onOpenSettings={onOpenSettings}
 			/>
 		);
@@ -175,8 +176,6 @@ export function GitHubIssues({
 				onFilterChange={handleFilterChange}
 				onRefresh={handleRefreshWithAutoFix}
 				autoFixEnabled={autoFixConfig?.enabled}
-				autoFixRunning={isBatchRunning}
-				autoFixProcessing={batchProgress?.totalIssues}
 				onAutoFixToggle={serverProject ? undefined : toggleAutoFix}
 				onAnalyzeAndGroup={serverProject ? undefined : openWizard}
 				isAnalyzing={isAnalyzing}
@@ -217,7 +216,7 @@ export function GitHubIssues({
 							autoFixQueueItem={getAutoFixQueueItem(selectedIssue.number)}
 						/>
 					) : (
-						<EmptyState message="Select an issue to view details" />
+						<EmptyState message={t("common:githubIssues.selectIssue")} />
 					)}
 				</div>
 			</div>

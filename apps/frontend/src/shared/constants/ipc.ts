@@ -712,6 +712,7 @@ export const IPC_CHANNELS = {
 	// MCP Marketplace operations
 	MCP_MARKETPLACE_GET_CATALOG: "mcpMarketplace:getCatalog", // Get full server catalog
 	MCP_MARKETPLACE_GET_SERVER: "mcpMarketplace:getServer", // Get single server details
+	MCP_MARKETPLACE_GET_SECURITY: "mcpMarketplace:getSecurity", // Security score of a catalog server (#369)
 	MCP_MARKETPLACE_SAVE_BUILDER: "mcpMarketplace:saveBuilder", // Save builder project
 	MCP_MARKETPLACE_GET_BUILDER_PROJECTS: "mcpMarketplace:getBuilderProjects", // List builder projects
 	MCP_MARKETPLACE_DELETE_BUILDER: "mcpMarketplace:deleteBuilder", // Delete builder project
@@ -1435,9 +1436,11 @@ export const IPC_CHANNELS = {
 	SERVER_WORKSPACE_COSTS: "server-workspace:costs",
 	SERVER_WORKSPACE_DASHBOARD: "server-workspace:dashboard",
 	SERVER_WORKSPACE_SESSIONS: "server-workspace:sessions",
+	SMART_ESTIMATION_ADJUST: "smartEstimation:adjust",
 	SMART_ESTIMATION_COMPLETE: "smart-estimation-complete",
 	SMART_ESTIMATION_ERROR: "smart-estimation-error",
 	SMART_ESTIMATION_EVENT: "smart-estimation-event",
+	SMART_ESTIMATION_RESET_CALIBRATION: "smartEstimation:resetCalibration",
 	SPEC_APPROVAL_GET_SPEC: "specApproval:getSpec",
 	SWARM_ANALYZE: "swarm:analyze",
 	SWARM_CANCEL: "swarm:cancel",
