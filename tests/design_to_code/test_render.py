@@ -6,6 +6,8 @@ import asyncio
 import sys
 import types
 from pathlib import Path
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 import pytest
 from design_to_code import render as render_module
@@ -41,7 +43,8 @@ class FakePage:
         self.world["goto"] = (url, options)
         if self.world.get("goto_error"):
             raise PlaywrightError("net::ERR_FAILED\nmore")
-        root = Path(url.removeprefix("file://")).parent
+        # url2pathname turns file:///C:/x into C:\x on Windows, /x elsewhere.
+        root = Path(url2pathname(urlsplit(url).path)).parent
         for url_seen in (
             url,
             (root / "s.css").as_uri(),
