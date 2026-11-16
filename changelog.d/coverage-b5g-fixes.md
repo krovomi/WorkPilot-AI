@@ -23,3 +23,6 @@ section: 🐛 Corrections
 - **Mémoire partagée** : une file de conflits retouchée à la main (un côté qui n'est pas un objet)
   ne fait plus échouer son affichage ni sa résolution, et une note dont `agents` ou `tasks` est
   écrit comme un seul texte n'est plus lue lettre par lettre.
+- **Journal de la mémoire** : une ligne fusionnée d'un autre poste dont `related` est un texte ne
+  le lit plus lettre par lettre, et plusieurs lignes sans identifiant ne se réduisent plus à la
+  première.
