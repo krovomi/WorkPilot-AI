@@ -6,7 +6,7 @@
 
 // ── Enums ──────────────────────────────────────────────────
 
-export type BrowserAgentTab = "browser" | "visual-regression" | "test-runner";
+export type BrowserAgentTab = "browser" | "visual-regression" | "test-runner" | "recorder";
 
 export type TestStatus = "passed" | "failed" | "skipped" | "error";
 
