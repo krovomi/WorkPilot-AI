@@ -74,16 +74,21 @@ try {
 const [EXPECTED_PYTHON_COMMAND, EXPECTED_PYTHON_BASE_ARGS] =
 	parsePythonCommand(DETECTED_PYTHON_CMD);
 
-// The saved app settings, read for real unless a test sets what they hold.
+// The saved app settings, read for real unless a test sets what they hold
+// or says there is no settings file.
 const savedSettings = vi.hoisted(() => ({
 	value: undefined as Record<string, unknown> | undefined,
+	missing: false,
 }));
 vi.mock("../../main/settings-utils", async (importOriginal) => {
 	const actual =
 		await importOriginal<typeof import("../../main/settings-utils")>();
 	return {
 		...actual,
-		readSettingsFile: () => savedSettings.value ?? actual.readSettingsFile(),
+		readSettingsFile: () =>
+			savedSettings.missing
+				? undefined
+				: (savedSettings.value ?? actual.readSettingsFile()),
 	};
 });
 
@@ -460,6 +465,7 @@ describe("Subprocess Spawn Integration", () => {
 	describe("AgentManager · swarm mode", () => {
 		afterEach(() => {
 			savedSettings.value = undefined;
+			savedSettings.missing = false;
 		});
 
 		async function buildEnv(): Promise<Record<string, string>> {
@@ -513,6 +519,15 @@ describe("Subprocess Spawn Integration", () => {
 
 			expect(env.WORKPILOT_SWARM_MAX_PARALLEL).toBeUndefined();
 			expect(env.WORKPILOT_SWARM_FAIL_FAST).toBeUndefined();
+		}, 30000);
+
+		it("sends nothing before any setting was saved", async () => {
+			savedSettings.missing = true;
+
+			const env = await buildEnv();
+
+			expect(env.WORKPILOT_SWARM_MAX_PARALLEL).toBeUndefined();
+			expect(env.WORKPILOT_SWARM_MAX_RETRIES).toBeUndefined();
 		}, 30000);
 	});
 
