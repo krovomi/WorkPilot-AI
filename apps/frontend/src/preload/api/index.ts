@@ -125,6 +125,7 @@ import {
 import type { AppEmulatorAPI } from "./modules/app-emulator-api";
 import type { MobileAPI } from "./modules/mobile-api";
 import { createAppEmulatorAPI } from "./modules/app-emulator-api";
+import { type DeviceMatrixAPI, createDeviceMatrixAPI } from "./modules/device-matrix-api";
 import { createMobileAPI } from "./modules/mobile-api";
 import type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 import { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
@@ -307,6 +308,7 @@ export interface ElectronAPI
 		SmartEstimationAPI,
 		ContextAwareSnippetsAPI,
 		AppEmulatorAPI,
+		DeviceMatrixAPI,
 		MobileAPI,
 		LearningLoopAPI,
 		MemoryLifecycleAPI,
@@ -468,6 +470,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createSmartEstimationAPI(),
 		...createContextAwareSnippetsAPI(),
 		...createAppEmulatorAPI(),
+		...createDeviceMatrixAPI(),
 		...createMobileAPI(),
 		...createLearningLoopAPI(),
 		...createMemoryLifecycleAPI(),
@@ -610,6 +613,8 @@ export { createApiExplorerAPI } from "./modules/api-explorer-api";
 export type { AppEmulatorAPI } from "./modules/app-emulator-api";
 export type { MobileAPI } from "./modules/mobile-api";
 export { createAppEmulatorAPI } from "./modules/app-emulator-api";
+export type { DeviceMatrixAPI } from "./modules/device-matrix-api";
+export { createDeviceMatrixAPI } from "./modules/device-matrix-api";
 export { createMobileAPI } from "./modules/mobile-api";
 export type { ArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
 export { createArchitectureVisualizerAPI } from "./modules/architecture-visualizer-api";
