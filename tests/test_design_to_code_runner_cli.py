@@ -369,6 +369,8 @@ def test_strict_offline_makes_no_figma_export(
     assert _line(capsys.readouterr().out, ERROR) == STRICT_OFFLINE_REFUSAL
     assert figma["sent"] == []
     assert model["vision"] == []
+
+
 def test_the_render_loop_refines_the_files_and_reports_each_iteration(
     runner, model, tmp_path, monkeypatch, capsys
 ) -> None:
