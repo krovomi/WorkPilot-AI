@@ -62,7 +62,8 @@ export async function getGitHubTokenForSubprocess(): Promise<string | null> {
 }
 
 /**
- * Get GitHub configuration from project environment file
+ * Get GitHub configuration from project environment file, the repository as
+ * `owner/repo` whatever form it was saved in.
  * Falls back to gh CLI token if GITHUB_TOKEN not in .env.
  * A server project's calls go through the server (`server-relay.ts`).
  */
@@ -73,7 +74,8 @@ export function getGitHubConfig(project: Project): GitHubConfig | null {
 
 	// Neither reading the file nor asking gh throws: each answers "nothing".
 	const vars = readProjectEnvFile(envPath);
-	const repo = vars.GITHUB_REPO;
+	// Saved as typed: a clone URL becomes the `owner/repo` of every API path.
+	const repo = normalizeRepoReference(vars.GITHUB_REPO ?? "");
 	// If no token in .env, try to get it from gh CLI (sync version for sync function)
 	const token = vars.GITHUB_TOKEN || getTokenFromGhCliSync();
 	if (!token || !repo) return null;

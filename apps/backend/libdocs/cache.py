@@ -184,15 +184,25 @@ class DocsCache:
 
     def _materialise(self, record: dict) -> CachedDoc | None:
         filename = record.get("file")
-        if not filename:
+        # A page is a bare file name inside the cache folder, as `put` writes
+        # it; a record naming anything else is not one of ours.
+        if not isinstance(filename, str) or Path(filename).name != filename:
             return None
+        if filename in ("", ".", "..") or "\\" in filename:
+            return None
+        path = self.root / filename
+        try:  # a link out of the cache folder is not a page either
+            path.resolve().relative_to(self.root.resolve())
+        except (OSError, ValueError):
+            return None
+        size = record.get("size", 0)
         return CachedDoc(
             library_id=str(record.get("library_id", "")),
             library_name=str(record.get("library_name", "")),
             query=str(record.get("query", "")),
-            path=self.root / str(filename),
+            path=path,
             fetched_at=str(record.get("fetched_at", "")),
-            size=int(record.get("size", 0) or 0),
+            size=size if isinstance(size, int) else 0,
         )
 
     def _expired(self, fetched_at: str) -> bool:

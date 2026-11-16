@@ -72,8 +72,8 @@
 		"coding": "Le code est en cours d'écriture. Les sous-tâches s'enchaînent automatiquement.",
 		"qa_review": "Un agent vérifie la qualité du code produit : tests, cohérence, bonnes pratiques.",
 		"qa_fixing": "Des problèmes ont été détectés. L'agent les corrige avant livraison.",
-		"rate_limit_paused": "L'API Claude a atteint sa limite. Reprise automatique dans quelques instants.",
-		"auth_failure_paused": "Problème d'authentification. Vérifie tes profils Claude dans les paramètres.",
+		"rate_limit_paused": "Le provider a atteint sa limite d'usage. La tâche reprend seule dans quelques instants.",
+		"auth_failure_paused": "Problème d'authentification. Vérifie le compte du provider dans les paramètres.",
 		"complete": "La tâche est complète et prête pour ta revue.",
 		"failed": "La tâche a échoué. Consulte les logs pour comprendre ce qui s'est passé."
 	},
@@ -90,6 +90,7 @@
 		"logs": "Logs de l'agent",
 		"copy": "Copier",
 		"copied": "Copié",
+		"copyFailed": "Non copié",
 		"copyAll": "Copier tous les logs",
 		"waitingForLogs": "En attente de logs…",
 		"noLogs": "Aucun log n'a été enregistré pour cette tâche.",
@@ -100,7 +101,7 @@
 		"viewTerminal": "Voir terminal",
 		"interrupt": "Interrompre",
 		"resumeClaude": "Reprendre Claude",
-		"kill": "Fermer",
+		"kill": "Fermer le terminal",
 		"goToKanban": "Voir dans Kanban",
 		"stopTask": "Arrêter"
 	},
