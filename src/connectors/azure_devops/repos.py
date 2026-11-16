@@ -531,13 +531,7 @@ class AzureReposClient:
 
         try:
             git_client = self._get_git_client()
-            api_changes = git_client.get_pull_request_commits(
-                repository_id=repository_id,
-                project=project,
-                pull_request_id=pull_request_id,
-            )
-
-            # Get the iteration changes to see file differences
+            # The iterations hold the file differences
             api_iterations = git_client.get_pull_request_iterations(
                 repository_id=repository_id,
                 project=project,
@@ -618,7 +612,6 @@ class AzureReposClient:
         # Calculate statistics
         additions = sum(file.additions for file in files)
         deletions = sum(file.deletions for file in files)
-        sum(file.changes for file in files)
 
         return {
             "id": pr.pull_request_id,

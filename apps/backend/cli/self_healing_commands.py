@@ -46,13 +46,14 @@ def handle_self_healing_command(
             sys.exit(1)
 
     elif mode == "proactive":
-        print("🔍 Running proactive fragility scan...")
         success = asyncio.run(runner.run_proactive())
         if not success:
             sys.exit(1)
 
     elif mode == "dashboard":
-        asyncio.run(runner.run_dashboard())
+        # Synchronous: it reads the incident store, it awaits nothing.
+        if not runner.run_dashboard():
+            sys.exit(1)
 
     else:
         print(f"❌ Unknown self-healing mode: {mode}")

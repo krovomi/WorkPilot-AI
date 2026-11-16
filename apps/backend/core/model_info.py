@@ -96,125 +96,49 @@ def _detect_provider_from_env() -> str | None:
 
 
 def _is_copilot_available() -> bool:
-    """Check if GitHub Copilot is available via gh CLI."""
-    try:
-        from security.secure_subprocess import run_secure
+    """Check if GitHub Copilot is available via gh CLI.
 
-        result = run_secure(["gh", "auth", "status"], timeout=10)
-        return "Logged in to github.com" in result.output
-    except Exception:
-        return False
+    `run_gh` starts the gh that `get_gh_executable` found (`GITHUB_CLI_PATH`,
+    the PATH with its Windows extensions, the usual install folders): a bare
+    `gh` never starts a `gh.cmd` on Windows nor one only `GITHUB_CLI_PATH`
+    names. It reports a missing gh or a timeout in its result rather than
+    raising, so a machine without gh simply reads as "not logged in".
+    """
+    from core.gh_executable import run_gh
+
+    result = run_gh(["auth", "status"], timeout=10)
+    return "Logged in to github.com" in result.stdout + result.stderr
+
+
+def _saved_model(*names: str) -> str | None:
+    """The model saved for the first of `names` that has one in the provider
+    config file, or None (also when `src.connectors` is not importable)."""
+    try:
+        from src.connectors.llm_config import load_provider_config
+    except ImportError:
+        return None
+    for name in names:
+        config = load_provider_config(name)
+        if config and "model" in config:
+            return config["model"]
+    return None
+
+
+def _ollama_label(model: str) -> str:
+    return f"Ollama: {model}"
 
 
 def _get_model_info_for_provider(provider: str) -> dict[str, str]:
-    """Get model information for a specific provider."""
-
-    if provider == "anthropic":
-        # Try to get from provider config first
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("anthropic") or load_provider_config("claude")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": _format_anthropic_model_label(config["model"]),
-                }
-        except ImportError:
-            pass
-
-        # Fallback to environment or defaults. Keep this on the current flagship
-        # so an unresolved model never mislabels the activity feed as a stale
-        # version (it used to hardcode "claude-opus-4-6", which surfaced as
-        # "Claude Opus 4.6" on every phase whose real model couldn't be read).
-        model = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
-        return {"model": model, "model_label": _format_anthropic_model_label(model)}
-
-    elif provider == "openai":
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("openai")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": _format_openai_model_label(config["model"]),
-                }
-        except ImportError:
-            pass
-
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-        return {"model": model, "model_label": _format_openai_model_label(model)}
-
-    elif provider == "google":
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("google")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": _format_google_model_label(config["model"]),
-                }
-        except ImportError:
-            pass
-
-        model = os.getenv("GOOGLE_MODEL", "gemini-3.0")
-        return {"model": model, "model_label": _format_google_model_label(model)}
-
-    elif provider == "grok":
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("grok")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": _format_grok_model_label(config["model"]),
-                }
-        except ImportError:
-            pass
-
-        model = os.getenv("GROK_MODEL", "grok-2")
-        return {"model": model, "model_label": _format_grok_model_label(model)}
-
-    elif provider == "ollama":
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("ollama")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": f"Ollama: {config['model']}",
-                }
-        except ImportError:
-            pass
-
-        model = os.getenv("OLLAMA_MODEL", "llama3")
-        return {"model": model, "model_label": f"Ollama: {model}"}
-
-    elif provider == "copilot":
+    """The model of `provider`: saved in its config, else its env var, else a
+    default; with the label the logs show for it."""
+    if provider == "copilot":
         return {"model": "copilot", "model_label": "GitHub Copilot"}
-
-    elif provider == "windsurf":
-        try:
-            from src.connectors.llm_config import load_provider_config
-
-            config = load_provider_config("windsurf")
-            if config and "model" in config:
-                return {
-                    "model": config["model"],
-                    "model_label": _format_windsurf_model_label(config["model"]),
-                }
-        except ImportError:
-            pass
-
-        model = os.getenv("WINDSURF_MODEL", "claude-4-sonnet")
-        return {"model": model, "model_label": _format_windsurf_model_label(model)}
-
-    # Default fallback
-    return {"model": "unknown", "model_label": "Unknown Model"}
+    known = _PROVIDER_MODELS.get(provider)
+    if known is None:
+        return {"model": "unknown", "model_label": "Unknown Model"}
+    names, env_var, default, label = known
+    model = _saved_model(*names) or os.getenv(env_var, default)
+    return {"model": model, "model_label": label(model)}
 
 
 def _format_anthropic_model_label(model: str) -> str:
@@ -319,15 +243,29 @@ def _format_windsurf_model_label(model: str) -> str:
     return model_labels.get(model, f"Windsurf: {model}")
 
 
-def get_model_info_string() -> str:
-    """
-    Get model/provider info as a formatted string for logging.
-
-    Returns:
-        String in format [provider:model_label]
-    """
-    model_info = get_current_model_info()
-    return f"[{model_info['provider']}:{model_info['model_label']}]"
+# provider -> (names in the config file, env var, default model, label).
+# The Anthropic default stays on the current flagship so an unresolved model
+# never mislabels the activity feed as a stale version (it used to hardcode
+# "claude-opus-4-6", which surfaced as "Claude Opus 4.6" on every phase whose
+# real model couldn't be read).
+_PROVIDER_MODELS = {
+    "anthropic": (
+        ("anthropic", "claude"),
+        "ANTHROPIC_MODEL",
+        "claude-opus-4-8",
+        _format_anthropic_model_label,
+    ),
+    "openai": (("openai",), "OPENAI_MODEL", "gpt-4o", _format_openai_model_label),
+    "google": (("google",), "GOOGLE_MODEL", "gemini-3.0", _format_google_model_label),
+    "grok": (("grok",), "GROK_MODEL", "grok-2", _format_grok_model_label),
+    "ollama": (("ollama",), "OLLAMA_MODEL", "llama3", _ollama_label),
+    "windsurf": (
+        ("windsurf",),
+        "WINDSURF_MODEL",
+        "claude-4-sonnet",
+        _format_windsurf_model_label,
+    ),
+}
 
 
 def get_model_info_for_logs() -> dict[str, str]:

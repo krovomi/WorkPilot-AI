@@ -64,8 +64,6 @@ except ImportError:  # pragma: no cover - alternate package layout
 PROVIDER_CONFIG_NOT_FOUND = "Provider config not found"
 API_KEY_VALIDATION_FAILED_INVALID = "API key validation failed: invalid key"
 API_KEY_VALIDATION_FAILED_ERROR = "API key validation failed: {e}"
-HOOK_NOT_FOUND = "Hook not found"
-TEMPLATE_NOT_FOUND = "Template not found"
 GITHUB_CLI_AUTH_SUCCESS = "Logged in to github.com"
 API_MODELS_ENDPOINT = "/v1/models"
 
@@ -1537,7 +1535,7 @@ async def get_provider_usage(provider: str):
                     "fetched_at": usage_data.get("fetched_at"),
                     "copilotUsageDetails": {
                         "scope": "personal-quotas",
-                        "plan": usage_data.get("plan"),
+                        **{key: usage_data.get(key) for key in ("plan", "sku")},
                         "organization": usage_data.get("organization"),
                         "premiumRequestsUsed": premium.get("used", 0),
                         "premiumRequestsEntitlement": premium.get("entitlement", 0),
@@ -1590,31 +1588,6 @@ async def get_provider_usage(provider: str):
         except Exception as e:
             return {
                 "error": f"Erreur lors de la récupération des métriques Copilot: {_safe_error_message(e)}"
-            }
-    elif provider == "anthropic" or provider == "claude":
-        try:
-            from core.anthropic_usage import get_anthropic_usage_metrics
-
-            usage_data = get_anthropic_usage_metrics()
-
-            # Formater les données pour le frontend
-            if "error" in usage_data:
-                return usage_data
-
-            return {
-                "provider": "anthropic",
-                "available": True,
-                "usage": usage_data.get("usage", {}),
-                "fetched_at": usage_data.get("fetched_at"),
-                "providerName": "anthropic",
-            }
-        except ImportError as e:
-            return {
-                "error": f"Module Anthropic usage non disponible: {_safe_error_message(e)}"
-            }
-        except Exception as e:
-            return {
-                "error": f"Erreur lors de la récupération des métriques Anthropic: {_safe_error_message(e)}"
             }
     elif provider == "windsurf":
         # Windsurf (Codeium) — multi-strategy auth for GetTeamCreditBalance

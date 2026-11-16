@@ -574,7 +574,12 @@
 		"otherProjectWarning": "Un émulateur semble déjà actif pour un autre projet. Redémarrez pour basculer vers cette tâche."
 	},
 	"metadata": {
-		"severity": "sévérité",
+		"securitySeverity": {
+			"low": "Gravité faible",
+			"medium": "Gravité moyenne",
+			"high": "Gravité élevée",
+			"critical": "Gravité critique"
+		},
 		"pullRequest": "Pull Request",
 		"showMore": "Afficher plus",
 		"showLess": "Afficher moins",
@@ -588,6 +593,8 @@
 		"acEmpty": "Aucun critère défini. Cliquez pour en ajouter.",
 		"acSyncFromAdo": "Synchroniser depuis Azure DevOps",
 		"acSyncing": "Synchronisation…",
+		"acSyncErrorTitle": "Synchronisation impossible",
+		"acSyncErrorDesc": "Les critères d'acceptation n'ont pas pu être lus depuis Azure DevOps.",
 		"acPlaceholder": "Un critère par ligne…",
 		"acEdit": "Modifier",
 		"acSave": "Enregistrer",
@@ -611,6 +618,8 @@
 		"extraNotePlaceholder": "Ajoutez des précisions, contraintes ou indices. Ces notes sont transmises à toutes les phases du pipeline (plan, code, QA, review).",
 		"extraNoteHelp": "Enregistré dans requirements.json comme additional_context.",
 		"extraNoteSaved": "Enregistré.",
+		"extraNoteSaveErrorTitle": "Enregistrement impossible",
+		"extraNoteSaveErrorDesc": "La note n'a pas pu être enregistrée.",
 		"extraNoteSave": "Enregistrer la note",
 		"extraNoteSaving": "Enregistrement…",
 		"blockedBy": {
@@ -842,7 +851,11 @@
 					"bug_fix": "Correction de bug",
 					"refactoring": "Refactoring",
 					"documentation": "Documentation",
-					"security": "Sécurité"
+					"security": "Sécurité",
+					"performance": "Performance",
+					"ui_ux": "UI/UX",
+					"infrastructure": "Infrastructure",
+					"testing": "Tests"
 				},
 				"priority": {
 					"low": "Basse",
@@ -1214,6 +1227,7 @@
 			"stopTask": "Arrêter la tâche",
 			"startTask": "Démarrer la tâche",
 			"deleteTask": "Supprimer la tâche",
+			"edit": "Modifier la tâche",
 			"close": "Fermer",
 			"watchLive": "Regarder en direct",
 			"activating": "Activation...",
@@ -1321,6 +1335,7 @@
 			"rejecting": "Rejet en cours...",
 			"rejectionReason": "Raison des modifications (optionnel)",
 			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan...",
+			"sendRejection": "Envoyer la demande",
 			"conflictsChecking": "Vérification des chevauchements de fichiers avec les tâches parallèles...",
 			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
 			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
@@ -1338,9 +1353,10 @@
 		"saveError": "Impossible d'enregistrer le plan"
 	},
 	"codeEditor": {
-		"deleteFile": "Supprimer le fichier",
-		"contentPlaceholder": "Contenu du fichier...",
-		"selectFile": "Sélectionnez un fichier à modifier"
+		"hint": "Retirez les fichiers que cette sous-tâche ne doit pas toucher. Les fichiers eux-mêmes ne changent pas.",
+		"removeFile": "Retirer {{name}} de cette sous-tâche",
+		"filesRemoved_one": "{{count}} fichier retiré du plan",
+		"filesRemoved_other": "{{count}} fichiers retirés du plan"
 	},
 	"failure": {
 		"title": "Cette tâche a échoué",
@@ -2566,10 +2582,85 @@
 		"saveFailed": "Le plafond n'a pas pu être enregistré",
 		"resumed": "Plafond relevé à {{limit}}, la tâche reprend"
 	},
+	"appliedLessons": {
+		"title_one": "{{count}} leçon appliquée à cette tâche",
+		"title_other": "{{count}} leçons appliquées à cette tâche",
+		"description": "Ce que la boucle d'apprentissage a donné aux agents de cette tâche : les règles adoptées en revue, les motifs appris des builds précédents, et les points de contrôle du type de tâche quand l'historique QA de ce dépôt les demande.",
+		"disabledCount": "{{count}} désactivée(s)",
+		"show": "Afficher",
+		"hide": "Masquer",
+		"kind": {
+			"rule": "Règle",
+			"pattern": "Motif",
+			"checkpoint": "Point de contrôle"
+		},
+		"patternType": {
+			"success": "à appliquer",
+			"failure": "à éviter",
+			"optimization": "astuce"
+		},
+		"confidence": "confiance {{value}}",
+		"agents": "Donnée à",
+		"off": "Désactivée pour cette tâche",
+		"disable": "Désactiver pour cette tâche",
+		"enable": "Réactiver",
+		"disabledHint": "Les prochains prompts de cette tâche la laissent de côté ; les autres tâches la gardent.",
+		"error": "Impossible de modifier la leçon : {{error}}"
+	},
 	"breakerPause": {
 		"chip": "Coupe-circuit : {{tool}}",
 		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
 		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
 		"killSwitch": "Arrêtée par « Arrêter tous les agents »"
+	},
+	"safetyPause": {
+		"anomalyChip": "Score de confiance : {{score}}/100",
+		"anomalyBody": "Le score de confiance de l'agent est tombé à {{score}}/100 (pause à {{pause}}). La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+		"anomalyStopped": "Le score de confiance de l'agent est tombé à {{score}}/100, au seuil d'arrêt ({{stop}}) ou en dessous. La session a été arrêtée.",
+		"types": {
+			"mass_file_deletion": "Suppression massive de fichiers",
+			"unexpected_network_access": "Accès réseau vers une autre machine",
+			"system_config_modification": "Écriture dans la configuration de sécurité",
+			"excessive_token_usage": "Consommation de jetons excessive",
+			"rapid_file_changes": "Changements de fichiers très rapides",
+			"sensitive_file_access": "Accès à un secret ou à l'historique git",
+			"unusual_command_execution": "Commande dangereuse",
+			"long_running_session": "Session très longue",
+			"repetitive_errors": "Erreurs répétées",
+			"path_traversal_attempt": "Chemin hors du projet ou vers le système"
+		},
+		"sandboxChip": {
+			"restricted_path": "Bac à sable : écriture hors des chemins permis",
+			"file_size": "Bac à sable : fichier trop gros",
+			"files_written": "Bac à sable : trop de fichiers",
+			"session_time": "Bac à sable : session trop longue"
+		},
+		"sandboxBody": {
+			"restricted_path": "L'agent a écrit {{path}}, hors des chemins que permet le bac à sable restreint. La session a été arrêtée.",
+			"file_size": "L'agent a écrit {{path}} ({{value}} octets), au-delà de la limite du bac à sable de {{limit}} octets par fichier. La session a été arrêtée.",
+			"files_written": "L'agent a écrit {{value}} fichiers en une session, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+			"session_time": "La session a duré {{value}} secondes, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés."
+		},
+		"rolledBack": "Ses fichiers ont été ramenés à l'instantané pris avant cette session. L'état qu'ils remplaçaient est gardé lui aussi en instantané.",
+		"rollbackFailed": "La restauration de l'instantané a échoué : les fichiers sont tels que l'agent les a laissés. Restaurez-en un ci-dessous.",
+		"hint": "Lisez ses journaux avant de reprendre. Limites et seuils : Réglages, Bac à sable et Détection d'anomalies.",
+		"snapshots": {
+			"open": "Instantanés…",
+			"none": "Aucun instantané pour cette tâche.",
+			"restore": "Restaurer",
+			"confirm": "Confirmer la restauration",
+			"restored": "Instantané restauré.",
+			"failed": "Restauration impossible : {{error}}",
+			"listFailed": "Impossible de lire les instantanés : {{error}}",
+			"hint": "Restaurer réécrit le worktree de la tâche ; l'état actuel est d'abord gardé en instantané, la restauration peut donc être annulée.",
+			"labels": {
+				"planning": "avant la planification",
+				"coding": "avant le code",
+				"qa_review": "avant la QA",
+				"before_rollback": "avant une restauration"
+			}
+		},
+		"anomalyLine_one": "{{label}}",
+		"anomalyLine_other": "{{label}} (×{{count}})"
 	}
 }

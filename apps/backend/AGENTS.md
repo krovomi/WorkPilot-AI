@@ -33,7 +33,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 `offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
 `project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
 `test_generation`). `agent_runtime/` est le port par lequel une unité que `core` importe lance
-une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture,
+une session sans importer `core` ni `agents` (intégrations, analyse, architecture,
 génération de tests ;
 [justification](../../docs/architecture/agent-runtime.md)) ; `core/agent_runtime.py` l'installe.
 `tests/test_import_contracts.py` tient ces frontières.
@@ -79,6 +79,7 @@ génération de tests ;
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
+| `agent_snapshots/`, `agents/safety_watch.py`, `runners/snapshot_runner.py` | instantanés git du worktree d'une tâche avant chaque session et retour arrière ; score de confiance et limites du sandbox sur le flux des appels ([conception](../../docs/architecture/agent-safety.md)) |
 | `foundation/landlock.py`, `server/services/run_isolation.py`, `runners/confined_run.py` | mode serveur : chaque run confiné par Landlock à son clone, au home de son projet et à son dossier temporaire ([conception](../../docs/architecture/server-mode.md#ce-quun-run-voit-sur-le-disque)) |
 | `foundation/log_redaction.py` | filtre de redaction des logs |
 
@@ -91,7 +92,7 @@ génération de tests ;
 | `brain/lifecycle/` | le cycle de vie de cette mémoire : journal dans le vault (`journal.py`), corbeille, restauration et épingles (`store.py`), contradictions après une synchronisation (`contradictions.py`, `arbitration.py`), avis d'un modèle demandé par une personne (`advisor.py`) ; [justification](../../docs/architecture/memory-lifecycle.md) |
 | `mem_search/` | lecture de la mémoire par paliers (index → timeline → détail) |
 | `cross_review/` | verdict de la revue croisée : lecture, enregistrement, `blocking_verdict` qui retient la PR d'un code avec lequel le second fournisseur est en désaccord ; feuille sur `foundation`. La phase `cross-review` elle-même (choix du moteur, session) est `workflows/cross_review_phase.py` |
-| `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne |
+| `learning_loop/` | patterns des builds, phase `observe` (`skills/_proposed/`), replay A/B ; `review_lessons.py` : règles candidates des revues, adoptées par une personne ; `applied.py` : leçons reçues par les prompts d'une tâche et désactivées pour elle ; `kind_checkpoints.py` : points de contrôle du type de tâche selon l'historique QA |
 | `agent_coach/` | conseils tirés des runs ; profil de style personnel par langage (`profile_builder.py`), donné au codeur et au fixer en phrases fixes (`profile_injector.py`) ; [justification](../../docs/architecture/agent-coach.md) |
 | `hermes/` | hermes-agent : doctor, persona `SOUL.md`, cycle d'apprentissage |
 | `core/merge_event.py` | un merge publié une fois ; mémoire, apprentissage et `uiux` s'y abonnent |
@@ -116,6 +117,7 @@ génération de tests ;
 | `mcp_tasks/` | MCP 2026-07-28 pour les serveurs de WorkPilot : `ToolServer` (deux ères), `TaskStore` (extension Tasks) ; feuille. Côté client : `core/mcp_extensions.py` ([conception](../../docs/architecture/mcp-2026.md)) |
 | `board_mcp/` | serveur MCP `workpilot-board` : le Kanban d'un projet pour un agent en terminal (lister, lire, créer au backlog, attendre une colonne) ; ni lancement, ni approbation, ni merge ; runner `runners/board_mcp.py` ([conception](../../docs/architecture/board-mcp.md)) |
 | `pr_followup/` | la PR d'une tâche suivie jusqu'au merge : `policy.decide` (pure), gardes du diff de correctif, GitHub par `gh`, `run_round` ; runner `runners/pr_followup_runner.py` ([justification](../../docs/architecture/pr-followup.md)) |
+| `deploy_watch/` | après un pipeline lancé par les déclencheurs CI/CD : health check et métriques Prometheus comparés à leur référence (`evaluate.py`, sans modèle), rollback vers la dernière exécution réussie (GitHub, Azure ; GitLab et Jenkins guidés), bloqué par une migration (`migrations.py`, toutes les piles) ; runner `runners/deploy_watch_runner.py` ([conception](../../docs/architecture/deploy-watch.md)) |
 | `best_of_n/` | best-of-N : variantes d'une tâche (une par moteur), classement chiffré, adoption de la variante choisie ([best-of-n.md](../../docs/architecture/best-of-n.md)) |
 | `goal/` | mode objectif : une commande et son code de sortie disent « fini » ; chemins protégés, plafond de dépense ([goal-mode.md](../../docs/architecture/goal-mode.md)) |
 | `architecture_visualizer/` | carte archify du projet et delta par tâche |

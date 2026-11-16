@@ -118,10 +118,7 @@ from core.workspace.models import (
     ParallelMergeResult,
     ParallelMergeTask,
 )
-from merge import (
-    FileTimelineTracker,
-    MergeOrchestrator,
-)
+from merge import MergePreview
 from merge.progress import MergeProgressCallback, MergeProgressStage, emit_progress
 
 MODULE = "workspace"
@@ -136,8 +133,6 @@ MODULE = "workspace"
 # - _try_smart_merge_inner
 # - _check_git_conflicts
 # - _resolve_git_conflicts_with_ai
-# - _create_async_claude_client
-# - _async_ai_call
 # - _merge_file_with_ai_async
 # - _run_parallel_merges
 # - _get_task_intent
@@ -178,12 +173,10 @@ def merge_existing_build(
 
     Called when user runs: python workpilot/run.py --spec X --merge
 
-    This uses the MergeOrchestrator to:
-    1. Analyze semantic changes from the task
-    2. Detect potential conflicts with main branch
-    3. Auto-merge compatible changes
-    4. Use AI for ambiguous conflicts (if enabled)
-    5. Fall back to git merge for remaining changes
+    It reads what the task changed (``MergePreview``) and:
+    1. Merges with git when the branches do not conflict
+    2. Asks the user's provider for each file both sides changed
+    3. Shows the conflicts the preview found before merging otherwise
 
     Args:
         project_dir: The project directory
@@ -438,26 +431,8 @@ def _try_smart_merge_inner(
                 "Starting merge analysis",
             )
 
-        # Capture worktree state in FileTimelineTracker before merge
-        try:
-            timeline_tracker = FileTimelineTracker(project_dir)
-            timeline_tracker.capture_worktree_state(spec_name, worktree_path)
-            debug(MODULE, "Captured worktree state for timeline tracking")
-        except Exception as e:
-            debug_warning(MODULE, f"Could not capture worktree state: {e}")
-
-        # Initialize the orchestrator
-        debug(
-            MODULE,
-            "Initializing MergeOrchestrator",
-            project_dir=str(project_dir),
-            enable_ai=True,
-        )
-        orchestrator = MergeOrchestrator(
-            project_dir,
-            enable_ai=True,  # Enable AI for ambiguous conflicts
-            dry_run=False,
-        )
+        debug(MODULE, "Initializing MergePreview", project_dir=str(project_dir))
+        preview_engine = MergePreview(project_dir)
 
         # Refresh evolution data from the worktree
         # Use task_source_branch (where task branched from) for comparing what files changed
@@ -468,7 +443,7 @@ def _try_smart_merge_inner(
             spec_name=spec_name,
             task_source_branch=task_source_branch,
         )
-        orchestrator.evolution_tracker.refresh_from_git(
+        preview_engine.evolution_tracker.refresh_from_git(
             spec_name, worktree_path, target_branch=task_source_branch
         )
 
@@ -575,7 +550,6 @@ def _try_smart_merge_inner(
                 spec_name,
                 worktree_path,
                 git_conflicts,
-                orchestrator,
                 no_commit=no_commit,
             )
 
@@ -761,7 +735,6 @@ def _try_smart_merge_inner(
                         spec_name,
                         worktree_path,
                         git_conflicts,
-                        orchestrator,
                         no_commit=no_commit,
                     )
 
@@ -810,7 +783,7 @@ def _try_smart_merge_inner(
 
         # No git conflicts - proceed with semantic analysis
         debug(MODULE, "No git conflicts, proceeding with semantic analysis")
-        preview = orchestrator.preview_merge([spec_name])
+        preview = preview_engine.preview_merge([spec_name])
 
         files_to_merge = len(preview.get("files_to_merge", []))
         conflicts = preview.get("conflicts", [])
@@ -1239,7 +1212,6 @@ def _resolve_git_conflicts_with_ai(
     spec_name: str,
     worktree_path: Path,
     git_conflicts: dict,
-    orchestrator: MergeOrchestrator,
     no_commit: bool = False,
 ) -> dict:
     """
@@ -1826,11 +1798,25 @@ CRITICAL RULES:
 - Never output error messages like "I need more context" - always provide a best-effort merge
 - Ensure the output is complete and syntactically valid code"""
 
-# Model constants for AI merge two-tier strategy (ACS-194)
-MERGE_FAST_MODEL = "claude-haiku-4-5-20251001"  # Fast model for simple merges
-MERGE_CAPABLE_MODEL = "claude-sonnet-4-5-20250929"  # Capable model for complex merges
-MERGE_FAST_THINKING = 1024  # Lower thinking for fast/simple merges
-MERGE_COMPLEX_THINKING = 16000  # Higher thinking for complex merges
+
+def _merge_attempts(provider: str) -> list[tuple[str | None, str | None]]:
+    """``(model, thinking level)`` of each AI merge attempt, for ``provider``.
+
+    On Claude a quick model first, then a capable one with more thinking
+    (ACS-194). Any other provider merges with its own model: ``None`` lets the
+    one-shot completion pick it, so no Claude model is sent to another vendor.
+    """
+    if provider in ("claude", "anthropic"):
+        from phase_config import MODEL_ID_MAP
+
+        return [(MODEL_ID_MAP["haiku"], "low"), (MODEL_ID_MAP["sonnet"], "high")]
+    return [(None, None)]
+
+
+def _merge_spec_dir(task: "ParallelMergeTask") -> Path | None:
+    """The task's spec directory, which names its provider, when it exists."""
+    spec_dir = Path(task.project_dir) / ".workpilot" / "specs" / task.spec_name
+    return spec_dir if spec_dir.is_dir() else None
 
 
 def _infer_language_from_path(file_path: str) -> str:
@@ -1967,44 +1953,36 @@ def _strip_code_fences(content: str) -> str:
 async def _attempt_ai_merge(
     task: "ParallelMergeTask",
     prompt: str,
-    model: str = MERGE_FAST_MODEL,
-    max_thinking_tokens: int = MERGE_FAST_THINKING,
+    model: str | None = None,
+    thinking_level: str | None = None,
 ) -> tuple[bool, str | None, str]:
     """
-    Attempt an AI merge with a specific model.
+    Attempt an AI merge with the user's provider.
 
     Args:
         task: The merge task with file contents
         prompt: The merge prompt
-        model: Model to use for merge
-        max_thinking_tokens: Max thinking tokens for the model
+        model: Model to use, or None for the provider's own
+        thinking_level: Thinking level (Claude only), or None for the default
 
     Returns:
         Tuple of (success, merged_content, error_message)
     """
-    try:
-        from core.simple_client import create_simple_client
-    except ImportError:
-        return False, None, "core.simple_client not available"
+    from core.oneshot import oneshot_completion
 
-    client = create_simple_client(
-        agent_type="merge_resolver",
-        model=model,
+    spec_dir = _merge_spec_dir(task)
+    failure: dict = {}
+    response_text = await oneshot_completion(
+        prompt,
         system_prompt=AI_MERGE_SYSTEM_PROMPT,
-        max_thinking_tokens=max_thinking_tokens,
+        model=model,
+        project_dir=str(task.project_dir),
+        spec_dir=str(spec_dir) if spec_dir else None,
+        thinking_level=thinking_level,
+        on_error=failure.update,
     )
-
-    response_text = ""
-    async with client:
-        await client.query(prompt)
-
-        async for msg in client.receive_response():
-            msg_type = type(msg).__name__
-            if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                for block in msg.content:
-                    block_type = type(block).__name__
-                    if block_type == "TextBlock" and hasattr(block, "text"):
-                        response_text += block.text
+    if failure and not response_text:
+        return False, None, failure.get("message") or "AI merge call failed"
 
     if response_text:
         merged_content = _strip_code_fences(response_text.strip())
@@ -2105,19 +2083,6 @@ async def _merge_file_with_ai_async(
             # Need AI merge
             debug(MODULE, f"Using AI to merge {task.file_path}")
 
-            # Import auth utilities
-            from core.auth import ensure_claude_code_oauth_token, get_auth_token
-
-            if not get_auth_token():
-                return ParallelMergeResult(
-                    file_path=task.file_path,
-                    merged_content=None,
-                    success=False,
-                    error="No authentication token available",
-                )
-
-            ensure_claude_code_oauth_token()
-
             # Build prompt
             prompt = _build_merge_prompt(
                 task.file_path,
@@ -2127,60 +2092,41 @@ async def _merge_file_with_ai_async(
                 task.spec_name,
             )
 
-            # Call Claude Haiku for fast merge first, then fallback to Sonnet if it fails
-            # This two-tier approach matches the chat agent's success rate
-            # - Tier 1: Haiku (fast, handles simple merges)
-            # - Tier 2: Sonnet (more capable, handles complex merges)
-            debug(MODULE, f"Attempting AI merge for {task.file_path} with Haiku (fast)")
-            success, merged_content, error = await _attempt_ai_merge(
-                task,
-                prompt,
-                model=MERGE_FAST_MODEL,
-                max_thinking_tokens=MERGE_FAST_THINKING,
-            )
+            # The user's provider: on Claude a quick model, then a capable one
+            # if the first answer is not usable; elsewhere the provider's own.
+            from core.client import peek_active_provider
 
-            if success and merged_content:
-                debug(MODULE, f"Haiku merged {task.file_path} successfully")
-                return ParallelMergeResult(
-                    file_path=task.file_path,
-                    merged_content=merged_content,
-                    success=True,
-                    was_auto_merged=False,
+            error = "AI merge was not attempted"
+            attempts = _merge_attempts(peek_active_provider(_merge_spec_dir(task)))
+            for number, (model, thinking_level) in enumerate(attempts, start=1):
+                debug(MODULE, f"Attempting AI merge for {task.file_path}", model=model)
+                success, merged_content, error = await _attempt_ai_merge(
+                    task, prompt, model=model, thinking_level=thinking_level
                 )
+                if success and merged_content:
+                    return ParallelMergeResult(
+                        file_path=task.file_path,
+                        merged_content=merged_content,
+                        success=True,
+                        was_auto_merged=False,
+                    )
+                debug_warning(
+                    MODULE, f"AI merge attempt failed for {task.file_path}: {error}"
+                )
+                if number < len(attempts):
+                    print(
+                        muted(
+                            f"    Retrying {task.file_path} with more capable AI model..."
+                        )
+                    )
 
-            # Haiku failed, retry with Sonnet (more capable model)
-            debug_warning(
-                MODULE,
-                f"Haiku merge failed for {task.file_path}: {error}, retrying with Sonnet...",
+            debug_error(MODULE, f"AI merge failed for {task.file_path}: {error}")
+            return ParallelMergeResult(
+                file_path=task.file_path,
+                merged_content=None,
+                success=False,
+                error=f"AI merge failed: {error}",
             )
-            print(muted(f"    Retrying {task.file_path} with more capable AI model..."))
-            success, merged_content, error = await _attempt_ai_merge(
-                task,
-                prompt,
-                model=MERGE_CAPABLE_MODEL,
-                max_thinking_tokens=MERGE_COMPLEX_THINKING,
-            )
-
-            if success and merged_content:
-                debug(MODULE, f"Sonnet merged {task.file_path} successfully")
-                return ParallelMergeResult(
-                    file_path=task.file_path,
-                    merged_content=merged_content,
-                    success=True,
-                    was_auto_merged=False,
-                )
-            else:
-                # Both models failed
-                debug_error(
-                    MODULE,
-                    f"Both AI models failed to merge {task.file_path}: {error}",
-                )
-                return ParallelMergeResult(
-                    file_path=task.file_path,
-                    merged_content=None,
-                    success=False,
-                    error=f"AI merge failed: {error}",
-                )
 
         except Exception as e:
             _merge_logger.error(f"Failed to merge {task.file_path}: {e}")

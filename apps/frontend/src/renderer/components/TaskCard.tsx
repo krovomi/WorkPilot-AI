@@ -49,13 +49,9 @@ import {
 	JSON_ERROR_PREFIX,
 	JSON_ERROR_TITLE_SUFFIX,
 	TASK_CATEGORY_COLORS,
-	TASK_CATEGORY_LABELS,
 	TASK_COMPLEXITY_COLORS,
-	TASK_COMPLEXITY_LABELS,
 	TASK_IMPACT_COLORS,
-	TASK_IMPACT_LABELS,
 	TASK_PRIORITY_COLORS,
-	TASK_PRIORITY_LABELS,
 	TASK_STATUS_LABELS,
 } from "../../shared/constants";
 import type {
@@ -347,13 +343,22 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 		statusBadgeLabel = getStatusLabel(task.status, t);
 	}
 
+	// A verdict or a blocker is worth a badge even on a card without metadata.
+	const hasVerdict =
+		task.verification?.status === "pass" ||
+		task.verification?.status === "fail" ||
+		!!task.crossReview;
+	const hasBlockers =
+		!!blockers && (blockers.pending.length > 0 || blockers.missing.length > 0);
 	if (
 		!task.metadata &&
 		!isStuck &&
 		!isIncomplete &&
 		!hasActiveExecution &&
 		!reviewReasonInfo &&
-		!conflict
+		!conflict &&
+		!hasVerdict &&
+		!hasBlockers
 	) {
 		return null;
 	}
@@ -442,8 +447,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 
 			{/* Task dependencies - unfinished blockers keep this ticket out of the
 			    auto-promotion loop while it sits in `queue`. */}
-			{blockers &&
-				(blockers.pending.length > 0 || blockers.missing.length > 0) && (
+			{blockers && hasBlockers && (
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Badge
@@ -673,7 +677,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							const Icon = CategoryIcon[task.metadata.category];
 							return <Icon className="h-2.5 w-2.5 mr-0.5" />;
 						})()}
-					{TASK_CATEGORY_LABELS[task.metadata.category]}
+					{t(`tasks:form.classification.values.category.${task.metadata.category}`)}
 				</Badge>
 			)}
 
@@ -688,7 +692,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							TASK_IMPACT_COLORS[task.metadata.impact],
 						)}
 					>
-						{TASK_IMPACT_LABELS[task.metadata.impact]}
+						{t(`tasks:form.classification.values.impact.${task.metadata.impact}`, {
+							defaultValue: task.metadata.impact,
+						})}
 					</Badge>
 				)}
 
@@ -701,7 +707,9 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_COMPLEXITY_COLORS[task.metadata.complexity],
 					)}
 				>
-					{TASK_COMPLEXITY_LABELS[task.metadata.complexity]}
+					{t(`tasks:form.classification.values.complexity.${task.metadata.complexity}`, {
+							defaultValue: task.metadata.complexity,
+						})}
 				</Badge>
 			)}
 
@@ -716,7 +724,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 							TASK_PRIORITY_COLORS[task.metadata.priority],
 						)}
 					>
-						{TASK_PRIORITY_LABELS[task.metadata.priority]}
+						{t(`tasks:form.classification.values.priority.${task.metadata.priority}`)}
 					</Badge>
 				)}
 
@@ -729,7 +737,7 @@ const MetadataBadges: React.FC<MetadataBadgesProps> = ({
 						TASK_IMPACT_COLORS[task.metadata.securitySeverity],
 					)}
 				>
-					{task.metadata.securitySeverity} {t("metadata.severity")}
+					{t(`metadata.securitySeverity.${task.metadata.securitySeverity}`)}
 				</Badge>
 			)}
 		</div>
@@ -1059,10 +1067,10 @@ const getStatusBadgeVariant = (
 };
 
 const getReviewReasonLabel = (
-	reason?: ReviewReason,
-	t?: TFunction,
+	reason: ReviewReason | undefined,
+	t: TFunction,
 ): { label: string; variant: "success" | "destructive" | "warning" } | null => {
-	if (!reason || !t) return null;
+	if (!reason) return null;
 	switch (reason) {
 		case "completed":
 			return { label: t("reviewReason.completed"), variant: "success" };
@@ -1082,8 +1090,7 @@ const getReviewReasonLabel = (
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-const getStatusLabel = (status: string, t?: any): string => {
-	if (!t) return status;
+const getStatusLabel = (status: string, t: any): string => {
 	switch (status) {
 		case "in_progress":
 			return t("labels.running");
@@ -1195,6 +1202,8 @@ function taskCardPropsAreEqual(
 		prevTask.metadata?.complexity === nextTask.metadata?.complexity &&
 		prevTask.metadata?.archivedAt === nextTask.metadata?.archivedAt &&
 		prevTask.metadata?.prUrl === nextTask.metadata?.prUrl &&
+		// Pause / Reprendre on the card and in its menu.
+		prevTask.metadata?.paused?.enabled === nextTask.metadata?.paused?.enabled &&
 		// The engine chip: a resume on another LLM changes only these.
 		sameEngineFields(prevTask.metadata, nextTask.metadata) &&
 		prevTask.verification?.status === nextTask.verification?.status &&
@@ -1205,30 +1214,6 @@ function taskCardPropsAreEqual(
 		prevTask.subtasks.every(
 			(s, i) => s.status === nextTask.subtasks[i]?.status,
 		);
-
-	// Only log when actually re-rendering (reduces noise significantly)
-	// biome-ignore lint/suspicious/noExplicitAny: TODO: type this properly
-	if ((globalThis as any).DEBUG && !isEqual) {
-		const changes: string[] = [];
-		if (prevTask.status !== nextTask.status)
-			changes.push(`status: ${prevTask.status} -> ${nextTask.status}`);
-		if (
-			prevTask.executionProgress?.phase !== nextTask.executionProgress?.phase
-		) {
-			changes.push(
-				`phase: ${prevTask.executionProgress?.phase} -> ${nextTask.executionProgress?.phase}`,
-			);
-		}
-		if (prevTask.subtasks.length !== nextTask.subtasks.length) {
-			changes.push(
-				`subtasks: ${prevTask.subtasks.length} -> ${nextTask.subtasks.length}`,
-			);
-		}
-
-		if (changes.length > 0) {
-			/* intentionally empty */
-		}
-	}
 
 	return isEqual;
 }
@@ -1271,12 +1256,16 @@ export const TaskCard = memo(function TaskCard({
 			setIsSpotlit(true);
 			clearJump();
 		}, 120);
-		const clearTimer = setTimeout(() => setIsSpotlit(false), 120 + 2200); // 3 × 0.7s animation
-		return () => {
-			clearTimeout(scrollTimer);
-			clearTimeout(clearTimer);
-		};
+		return () => clearTimeout(scrollTimer);
 	}, [jumpToTaskId, task.id, clearJump]);
+
+	// The spotlight fades on its own clock: clearJump() above re-runs the jump
+	// effect, whose cleanup used to cancel this timer and leave the card lit.
+	useEffect(() => {
+		if (!isSpotlit) return;
+		const clearTimer = setTimeout(() => setIsSpotlit(false), 2200); // 3 × 0.7s animation
+		return () => clearTimeout(clearTimer);
+	}, [isSpotlit]);
 
 	// Get project details from store to access projectPath
 	const projects = useProjectStore((state) => state.projects);

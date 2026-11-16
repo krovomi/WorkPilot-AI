@@ -33,7 +33,14 @@ export const taskMock = {
 
 	deleteTask: async () => ({ success: true }),
 
+	listTaskSnapshots: async () => ({ success: true as const, data: [] }),
+	restoreTaskSnapshot: async () => ({
+		success: false as const,
+		error: "Snapshots are not available in browser mode",
+	}),
 	getTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
+	getAppliedLessons: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
+	setLessonDisabled: async () => ({ success: true as const, data: { lessons: [], disabled: [] } }),
 	setTaskGoal: async () => ({ success: true as const, data: { goal: null } }),
 
 	updateTask: async (

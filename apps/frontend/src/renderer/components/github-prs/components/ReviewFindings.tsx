@@ -22,26 +22,41 @@ import { cn } from "../../../lib/utils";
 import { Button } from "../../ui/button";
 import type { SeverityGroup } from "../constants/severity-config";
 import { SEVERITY_CONFIG, SEVERITY_ORDER } from "../constants/severity-config";
+import type { LearnedSuppression } from "../../../../shared/types/review-feedback";
+import { useFindingFeedback } from "../hooks/useFindingFeedback";
 import { useFindingSelection } from "../hooks/useFindingSelection";
 import type { PRReviewFinding } from "../hooks/useGitHubPRs";
 import { FindingItem } from "./FindingItem";
 import { FindingsSummary } from "./FindingsSummary";
+import { LearnedSuppressionsNote } from "./LearnedSuppressionsNote";
 import { SeverityGroupHeader } from "./SeverityGroupHeader";
 
 interface ReviewFindingsProps {
 	findings: PRReviewFinding[];
 	selectedIds: Set<string>;
-	postedIds?: Set<string>;
+	postedIds?: ReadonlySet<string>;
 	onSelectionChange: (selectedIds: Set<string>) => void;
+	/** With both, each finding offers Accept / Reject / Not applicable (#361). */
+	projectId?: string;
+	prNumber?: number;
+	learnedSuppressions?: LearnedSuppression[];
 }
+
+/** One empty set: a new default on every render would redo the memos below. */
+const NONE_POSTED: ReadonlySet<string> = new Set();
 
 export function ReviewFindings({
 	findings,
 	selectedIds,
-	postedIds = new Set(),
+	postedIds = NONE_POSTED,
 	onSelectionChange,
+	projectId,
+	prNumber,
+	learnedSuppressions = [],
 }: ReviewFindingsProps) {
 	const { t } = useTranslation("common");
+	const findingFeedback = useFindingFeedback(projectId, prNumber);
+	const feedbackEnabled = Boolean(projectId && prNumber);
 
 	// Track which sections are expanded
 	const [expandedSections, setExpandedSections] = useState<Set<SeverityGroup>>(
@@ -68,10 +83,7 @@ export function ReviewFindings({
 		};
 
 		for (const finding of unpostedFindings) {
-			const severity = finding.severity as SeverityGroup;
-			if (groups[severity]) {
-				groups[severity].push(finding);
-			}
+			groups[finding.severity].push(finding);
 		}
 
 		return groups;
@@ -143,6 +155,14 @@ export function ReviewFindings({
 				selectedCount={selectedIds.size}
 			/>
 
+			<LearnedSuppressionsNote suppressions={learnedSuppressions} />
+
+			{findingFeedback.error && (
+				<p className="text-xs text-destructive" role="alert">
+					{t(`prReview.feedback.errors.${findingFeedback.error}`)}
+				</p>
+			)}
+
 			{/* Quick Select Actions */}
 			<div className="flex items-center gap-2 flex-wrap">
 				<Button
@@ -200,10 +220,7 @@ export function ReviewFindings({
 								selectedCount={selectedInGroup}
 								expanded={isExpanded}
 								onToggle={() => toggleSection(severity)}
-								onSelectAll={(e) => {
-									e.stopPropagation();
-									toggleSeverityGroup(severity);
-								}}
+								onSelectAll={() => toggleSeverityGroup(severity)}
 							/>
 
 							{/* Group Content */}
@@ -216,6 +233,15 @@ export function ReviewFindings({
 											selected={selectedIds.has(finding.id)}
 											posted={false}
 											onToggle={() => toggleFinding(finding.id)}
+											feedback={
+												feedbackEnabled
+													? {
+															verdict: findingFeedback.feedback[finding.id],
+															pending: findingFeedback.pendingId === finding.id,
+															onSubmit: findingFeedback.submit,
+														}
+													: undefined
+											}
 										/>
 									))}
 								</div>

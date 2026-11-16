@@ -5,6 +5,10 @@
 
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type {
+	BisectProgressEvent,
+	BisectRequestResult,
+} from "../../../shared/types/self-healing";
 
 
 export interface SelfHealingAPIObject {
@@ -71,8 +75,16 @@ export interface SelfHealingAPIObject {
 		incidentId: string,
 	): Promise<{ success: boolean; error?: string }>;
 
+	/** First bad commit of a CI/CD incident; `goodSha` is a hex commit id. */
+	bisectIncident(
+		projectPath: string,
+		incidentId: string,
+		goodSha?: string,
+	): Promise<BisectRequestResult>;
+
 	onOperationProgress(callback: (data: unknown) => void): () => void;
 	onOperationComplete(callback: (data: unknown) => void): () => void;
+	onBisectProgress(callback: (data: BisectProgressEvent) => void): () => void;
 }
 
 export const createSelfHealingAPI = (): SelfHealingAPIObject => ({
@@ -110,6 +122,15 @@ export const createSelfHealingAPI = (): SelfHealingAPIObject => ({
 	retryIncident: (projectPath, incidentId) =>
 		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_RETRY_INCIDENT, projectPath, incidentId),
 
+	bisectIncident: (projectPath, incidentId, goodSha) =>
+		ipcRenderer.invoke(IPC_CHANNELS.SELF_HEALING_BISECT, projectPath, incidentId, goodSha),
+
+	onBisectProgress: (callback) => {
+		const handler = (_event: Electron.IpcRendererEvent, data: BisectProgressEvent) =>
+			callback(data);
+		ipcRenderer.on(IPC_CHANNELS.SELF_HEALING_BISECT_PROGRESS, handler);
+		return () => ipcRenderer.removeListener(IPC_CHANNELS.SELF_HEALING_BISECT_PROGRESS, handler);
+	},
 	onOperationProgress: (callback) => {
 		const handler = (_event: Electron.IpcRendererEvent, data: unknown) =>
 			callback(data);

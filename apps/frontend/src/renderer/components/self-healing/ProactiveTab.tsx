@@ -4,6 +4,7 @@ import { CharterButton, Panel } from "../charter";
 import { useSelfHealingStore } from "@/stores/self-healing-store";
 import { FragilityChart } from "./FragilityChart";
 import { IncidentCard } from "./IncidentCard";
+import { ProactiveHotlist } from "./ProactiveHotlist";
 
 import { Input } from "../ui/input";
 import { NativeSelect } from "../ui/native-select";
@@ -16,6 +17,7 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 	const {
 		incidents,
 		fragilityReports,
+		riskTrends,
 		proactiveConfig,
 		setProactiveConfig,
 		isScanning,
@@ -104,6 +106,8 @@ export function ProactiveTab({ projectPath }: ProactiveTabProps) {
 					</div>
 				</div>
 			</Panel>
+
+			<ProactiveHotlist report={riskTrends} />
 
 			{/* Fragility chart */}
 			<FragilityChart reports={fragilityReports} />
