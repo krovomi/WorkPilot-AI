@@ -296,14 +296,6 @@ export function getSavedSessions(projectPath: string): TerminalSession[] {
 }
 
 /**
- * Clear all saved sessions for a project
- */
-export function clearSavedSessions(projectPath: string): void {
-	const store = getTerminalSessionStore();
-	store.clearProjectSessions(projectPath);
-}
-
-/**
  * Get available session dates
  */
 export function getAvailableSessionDates(

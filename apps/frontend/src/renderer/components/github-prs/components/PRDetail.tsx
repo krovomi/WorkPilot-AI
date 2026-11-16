@@ -5,8 +5,6 @@ import {
 	Bot,
 	CheckCheck,
 	CheckCircle,
-	ChevronDown,
-	ChevronUp,
 	Clock,
 	ExternalLink,
 	FileText,
@@ -22,7 +20,6 @@ import {
 import {
 	useCallback,
 	useEffect,
-	useId,
 	useMemo,
 	useRef,
 	useState,
@@ -53,6 +50,12 @@ import { PRHeader } from "./PRHeader";
 import { PRLogs } from "./PRLogs";
 import { ReviewFindings } from "./ReviewFindings";
 import { ReviewStatusTree } from "./ReviewStatusTree";
+import {
+	getPRDetailStatus,
+	isCleanReview,
+	isReadyToMerge,
+} from "../utils/pr-detail-status";
+import { withUniqueKeys } from "../utils/unique-keys";
 
 interface PRDetailProps {
 	pr: PRData;
@@ -63,7 +66,6 @@ interface PRDetailProps {
 	startedAt: string | null;
 	isReviewing: boolean;
 	initialNewCommitsCheck?: NewCommitsCheck | null;
-	isActive?: boolean;
 	isLoadingFiles?: boolean;
 	onRunReview: () => void;
 	onRunFollowupReview: () => void;
@@ -75,23 +77,58 @@ interface PRDetailProps {
 	) => Promise<boolean>;
 	onPostComment: (body: string) => Promise<boolean>;
 	onMergePR: (mergeMethod?: "merge" | "squash" | "rebase") => void;
-	onAssignPR: (username: string) => void;
 	onGetLogs: () => Promise<PRLogsType | null>;
 	onMarkReviewPosted?: (prNumber: number) => Promise<void>;
 }
 
-function getStatusColor(status: PRReviewResult["overallStatus"]): string {
-	switch (status) {
-		case "approve":
-			return "bg-success/20 text-success border-success/50";
-		case "request_changes":
-			return "bg-destructive/20 text-destructive border-destructive/50";
-		default:
-			return "bg-muted";
-	}
+/** The badge of the review's verdict. */
+const VERDICT_LOOK: Record<
+	PRReviewResult["overallStatus"],
+	{ className: string; label: string }
+> = {
+	approve: {
+		className: "bg-success/20 text-success border-success/50",
+		label: "prReview.approve",
+	},
+	request_changes: {
+		className: "bg-destructive/20 text-destructive border-destructive/50",
+		label: "prReview.changesRequested",
+	},
+	comment: { className: "bg-muted", label: "prReview.commented" },
+};
+
+/** What a follow-up review did with the previous findings. */
+const FOLLOWUP_BADGES = [
+	{
+		field: "resolvedFindings",
+		label: "prReview.resolved",
+		Icon: CheckCircle,
+		className: "bg-success/10 text-success border-success/30",
+	},
+	{
+		field: "unresolvedFindings",
+		label: "prReview.stillOpen",
+		Icon: AlertCircle,
+		className: "bg-warning/10 text-warning border-warning/30",
+	},
+	{
+		field: "newFindingsSinceLastReview",
+		label: "prReview.newIssue",
+		Icon: XCircle,
+		className: "bg-destructive/10 text-destructive border-destructive/30",
+	},
+] as const;
+
+/**
+ * One page per PR: opening another PR starts a fresh page, so nothing posted,
+ * loaded or failed on one PR shows on the next, and a post still running for
+ * the previous PR cannot write into this one.
+ */
+export function PRDetail(props: PRDetailProps) {
+	return <PRDetailPage key={`${props.projectId}:${props.pr.number}`} {...props} />;
 }
 
-export function PRDetail({
+function PRDetailPage({
 	pr,
 	projectId,
 	reviewResult,
@@ -100,7 +137,6 @@ export function PRDetail({
 	startedAt,
 	isReviewing,
 	initialNewCommitsCheck,
-	isActive: _isActive = false,
 	isLoadingFiles = false,
 	onRunReview,
 	onRunFollowupReview,
@@ -109,7 +145,6 @@ export function PRDetail({
 	onPostReview,
 	onPostComment,
 	onMergePR,
-	onAssignPR: _onAssignPR,
 	onGetLogs,
 	onMarkReviewPosted,
 }: PRDetailProps) {
@@ -133,15 +168,11 @@ export function PRDetail({
 	const [isPosting, setIsPosting] = useState(false);
 	const [isPostingCleanReview, setIsPostingCleanReview] = useState(false);
 	const [cleanReviewPosted, setCleanReviewPosted] = useState(false);
-	const [cleanReviewError, setCleanReviewError] = useState<string | null>(null);
-	const [showCleanReviewErrorDetails, setShowCleanReviewErrorDetails] =
-		useState(false);
+	const [cleanReviewFailed, setCleanReviewFailed] = useState(false);
 	// Blocked status posting state (for BLOCKED/NEEDS_REVISION verdicts with no findings)
 	const [isPostingBlockedStatus, setIsPostingBlockedStatus] = useState(false);
 	const [blockedStatusPosted, setBlockedStatusPosted] = useState(false);
-	const [blockedStatusError, setBlockedStatusError] = useState<string | null>(
-		null,
-	);
+	const [blockedStatusFailed, setBlockedStatusFailed] = useState(false);
 	const [isMerging, setIsMerging] = useState(false);
 	// Initialize with store value, then sync and update via local checks
 	const [newCommitsCheck, setNewCommitsCheck] =
@@ -168,7 +199,6 @@ export function PRDetail({
 		null,
 	);
 	const [branchUpdateSuccess, setBranchUpdateSuccess] = useState(false);
-	const [_mergeReadinessRefreshKey, setMergeReadinessRefreshKey] = useState(0);
 
 	// Workflows awaiting approval state (for fork PRs)
 	const [workflowsAwaiting, setWorkflowsAwaiting] =
@@ -177,9 +207,6 @@ export function PRDetail({
 		null,
 	);
 	const [workflowsExpanded, setWorkflowsExpanded] = useState(true);
-
-	// Generate stable IDs for accessibility
-	const cleanReviewErrorDetailsId = useId();
 
 	// Sync with store's newCommitsCheck when it changes (e.g., when switching PRs or after refresh)
 	// Always sync to keep local state in sync with store, including null values
@@ -242,10 +269,8 @@ export function PRDetail({
 			return;
 		}
 
-		// Cancel any pending check
-		if (checkNewCommitsAbortRef.current) {
-			checkNewCommitsAbortRef.current.abort();
-		}
+		// No check is running here (see the ref above); the effect's cleanup
+		// aborts this one if the page closes or the review changes.
 		checkNewCommitsAbortRef.current = new AbortController();
 
 		isCheckingNewCommitsRef.current = true;
@@ -362,201 +387,110 @@ export function PRDetail({
 		return () => clearInterval(interval);
 	}, [isReviewing, onGetLogs]);
 
-	// Reset logs state when PR changes
-	useEffect(() => {
-		logsLoadedRef.current = false;
-		setPrLogs(null);
-		setLogsExpanded(false);
-		setCleanReviewPosted(false);
-		setCleanReviewError(null);
-		setIsPostingCleanReview(false);
-		setShowCleanReviewErrorDetails(false);
-		// Reset blocked status state as well
-		setBlockedStatusPosted(false);
-		setBlockedStatusError(null);
-		setIsPostingBlockedStatus(false);
-		// Reset branch update state as well
-		setBranchUpdateError(null);
-		setBranchUpdateSuccess(false);
-		setIsUpdatingBranch(false);
-	}, []);
-
-	// Check for workflows awaiting approval (fork PRs) when PR changes or review completes
-	useEffect(() => {
-		const checkWorkflows = async () => {
-			try {
-				const result =
-					await window.electronAPI.github.getWorkflowsAwaitingApproval(
-						"", // projectId will be resolved from active project
-						pr.number,
-					);
-				setWorkflowsAwaiting(result);
-			} catch {
-				setWorkflowsAwaiting(null);
-			}
-		};
-
-		checkWorkflows();
-		// Re-check when a review is completed (CI status might have changed)
-	}, [pr.number]);
-
-	// Check merge readiness (real-time validation) when PR is selected
-	// This runs on every PR selection to catch stale verdicts
-	useEffect(() => {
-		// Cancel any pending check
-		if (mergeReadinessAbortRef.current) {
-			mergeReadinessAbortRef.current.abort();
-		}
-		mergeReadinessAbortRef.current = new AbortController();
-
-		const checkMergeReadiness = async () => {
-			if (!projectId) {
-				setMergeReadiness(null);
-				return;
-			}
-
-			try {
-				const result = await window.electronAPI.github.checkMergeReadiness(
+	// Fork PRs: the runs GitHub holds until a maintainer approves them.
+	const loadWorkflowsAwaiting = useCallback(async () => {
+		try {
+			setWorkflowsAwaiting(
+				await window.electronAPI.github.getWorkflowsAwaitingApproval(
 					projectId,
 					pr.number,
-				);
-				// Only update if not aborted
-				if (!mergeReadinessAbortRef.current?.signal.aborted) {
-					setMergeReadiness(result);
-				}
-			} catch {
-				if (!mergeReadinessAbortRef.current?.signal.aborted) {
-					setMergeReadiness(null);
-				}
-			}
-		};
+				),
+			);
+		} catch {
+			setWorkflowsAwaiting(null);
+		}
+	}, [projectId, pr.number]);
 
-		checkMergeReadiness();
+	useEffect(() => {
+		void loadWorkflowsAwaiting();
+	}, [loadWorkflowsAwaiting]);
 
-		return () => {
-			if (mergeReadinessAbortRef.current) {
-				mergeReadinessAbortRef.current.abort();
-			}
-		};
+	// Merge readiness: GitHub's live view of the PR, which can contradict an
+	// older AI verdict. Read when the page opens and after a branch update.
+	const checkMergeReadiness = useCallback(async () => {
+		mergeReadinessAbortRef.current?.abort();
+		const controller = new AbortController();
+		mergeReadinessAbortRef.current = controller;
+		if (!projectId) {
+			setMergeReadiness(null);
+			return;
+		}
+		let result: MergeReadiness | null = null;
+		try {
+			result = await window.electronAPI.github.checkMergeReadiness(
+				projectId,
+				pr.number,
+			);
+		} catch {
+			result = null;
+		}
+		if (!controller.signal.aborted) setMergeReadiness(result);
 	}, [pr.number, projectId]);
 
-	// Handler to approve a workflow
+	useEffect(() => {
+		void checkMergeReadiness();
+		return () => mergeReadinessAbortRef.current?.abort();
+	}, [checkMergeReadiness]);
+
 	const handleApproveWorkflow = useCallback(
 		async (runId: number) => {
 			setIsApprovingWorkflow(runId);
 			try {
-				const success = await window.electronAPI.github.approveWorkflow(
-					"",
-					runId,
-				);
-				if (success) {
-					// Refresh the workflows list after approval
-					const result =
-						await window.electronAPI.github.getWorkflowsAwaitingApproval(
-							"",
-							pr.number,
-						);
-					setWorkflowsAwaiting(result);
+				if (await window.electronAPI.github.approveWorkflow(projectId, runId)) {
+					await loadWorkflowsAwaiting();
 				}
 			} finally {
 				setIsApprovingWorkflow(null);
 			}
 		},
-		[pr.number],
+		[projectId, loadWorkflowsAwaiting],
 	);
 
-	// Handler to approve all workflows at once
-	const handleApproveAllWorkflows = useCallback(async () => {
-		if (!workflowsAwaiting?.workflow_runs.length) return;
-
-		for (const workflow of workflowsAwaiting.workflow_runs) {
+	const handleApproveAllWorkflows = useCallback(
+		async (runs: readonly { id: number }[]) => {
+		for (const workflow of runs) {
 			setIsApprovingWorkflow(workflow.id);
 			try {
-				await window.electronAPI.github.approveWorkflow("", workflow.id);
+				await window.electronAPI.github.approveWorkflow(projectId, workflow.id);
 			} catch {
-				// Continue with other workflows even if one fails
+				// One refused run does not stop the others.
 			}
 		}
 		setIsApprovingWorkflow(null);
+		await loadWorkflowsAwaiting();
+		},
+		[projectId, loadWorkflowsAwaiting],
+	);
 
-		// Refresh the workflows list
-		const result = await window.electronAPI.github.getWorkflowsAwaitingApproval(
-			"",
-			pr.number,
-		);
-		setWorkflowsAwaiting(result);
-	}, [pr.number, workflowsAwaiting]);
-
-	// Handler to update PR branch when behind base
 	const handleUpdateBranch = useCallback(async () => {
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
 		setIsUpdatingBranch(true);
 		setBranchUpdateError(null);
 		setBranchUpdateSuccess(false);
-
 		try {
 			const result = await window.electronAPI.github.updatePRBranch(
 				projectId,
 				pr.number,
 			);
-
-			// Only update state if PR hasn't changed
-			if (pr.number === currentPr) {
-				if (result.success) {
-					setBranchUpdateSuccess(true);
-					// Trigger merge readiness refresh to update the UI
-					setMergeReadinessRefreshKey((prev) => prev + 1);
-				} else {
-					setBranchUpdateError(
-						result.error || t("prReview.branchUpdateFailed"),
-					);
-				}
+			if (result.success) {
+				setBranchUpdateSuccess(true);
+				// The warning was about this branch: read GitHub's view again.
+				void checkMergeReadiness();
+			} else {
+				setBranchUpdateError(result.error || t("prReview.branchUpdateFailed"));
 			}
 		} catch (err) {
-			if (pr.number === currentPr) {
-				const errorMessage = err instanceof Error ? err.message : String(err);
-				setBranchUpdateError(errorMessage);
-			}
+			setBranchUpdateError(err instanceof Error ? err.message : String(err));
 		} finally {
-			if (pr.number === currentPr) {
-				setIsUpdatingBranch(false);
-			}
+			setIsUpdatingBranch(false);
 		}
-	}, [pr.number, projectId, t]);
+	}, [pr.number, projectId, t, checkMergeReadiness]);
 
 	// Count selected findings by type for the button label
 	const selectedCount = selectedFindingIds.size;
 
-	// Check if PR is ready to merge based on review
-	const isReadyToMerge = useMemo(() => {
-		if (!reviewResult?.success) return false;
-		// Check if the summary contains "READY TO MERGE"
-		return (
-			reviewResult.summary?.includes("READY TO MERGE") ||
-			reviewResult.overallStatus === "approve"
-		);
-	}, [reviewResult]);
+	const readyToMerge = isReadyToMerge(reviewResult);
 
-	// Check if review is "clean" - only LOW severity findings (no MEDIUM, HIGH, or CRITICAL)
-	// Requires at least having a successful review to be considered clean
-	const isCleanReview = useMemo(() => {
-		if (!reviewResult?.success) return false;
-		// Only LOW findings allowed - no medium, high, or critical
-		// A review with zero findings is also considered clean
-		return !reviewResult.findings.some(
-			(f) =>
-				f.severity === "critical" ||
-				f.severity === "high" ||
-				f.severity === "medium",
-		);
-	}, [reviewResult]);
-
-	// Check if there are any findings at all (for auto-approve button label)
-	const hasFindings = useMemo(() => {
-		return reviewResult?.findings && reviewResult.findings.length > 0;
-	}, [reviewResult]);
+	const cleanReview = isCleanReview(reviewResult);
 
 	// Get LOW severity findings for auto-posting
 	const lowSeverityFindings = useMemo(() => {
@@ -564,394 +498,96 @@ export function PRDetail({
 		return reviewResult.findings.filter((f) => f.severity === "low");
 	}, [reviewResult]);
 
-	// Compute the overall PR review status for visual display
-	type PRStatus =
-		| "not_reviewed"
-		| "reviewed_pending_post"
-		| "waiting_for_changes"
-		| "ready_to_merge"
-		| "needs_attention"
-		| "ready_for_followup"
-		| "followup_issues_remain"
-		| "reviewing";
-	const prStatus: {
-		status: PRStatus;
-		label: string;
-		description: string;
-		icon: React.ReactNode;
-		color: string;
-	} = useMemo(() => {
-		// Check for in-progress review FIRST (before checking result)
-		// This ensures the running review state is visible when switching back to a PR
-		if (isReviewing) {
-			return {
-				status: "reviewing",
-				label: t("prReview.aiReviewInProgress"),
-				description:
-					reviewProgress?.message || t("prReview.analysisInProgress"),
-				icon: <Bot className="h-5 w-5 animate-pulse" />,
-				color: "bg-blue-500/10 text-blue-500 border-blue-500/30",
-			};
-		}
-
-		if (!reviewResult?.success) {
-			return {
-				status: "not_reviewed",
-				label: t("prReview.notReviewed"),
-				description: t("prReview.runAIReviewDesc"),
-				icon: <Bot className="h-5 w-5" />,
-				color: "bg-muted text-muted-foreground border-muted",
-			};
-		}
-
-		// Use a merged Set to avoid double-counting (local state may overlap with backend state)
-		const allPostedIds = new Set([
-			...postedFindingIds,
-			...(reviewResult.postedFindingIds ?? []),
-		]);
-		const totalPosted = allPostedIds.size;
-		const hasPosted = totalPosted > 0 || reviewResult.hasPostedFindings;
-		const hasBlockers = reviewResult.findings.some(
-			(f) => f.severity === "critical" || f.severity === "high",
-		);
-		const unpostedFindings = reviewResult.findings.filter(
-			(f) => !allPostedIds.has(f.id),
-		);
-		const hasUnpostedBlockers = unpostedFindings.some(
-			(f) => f.severity === "critical" || f.severity === "high",
-		);
-		const hasNewCommits = newCommitsCheck?.hasNewCommits ?? false;
-		const newCommitCount = newCommitsCheck?.newCommitCount ?? 0;
-		// Only consider commits that happened AFTER findings were posted for "Ready for Follow-up"
-		const hasCommitsAfterPosting =
-			newCommitsCheck?.hasCommitsAfterPosting ?? false;
-
-		// Follow-up review specific statuses
-		if (reviewResult.isFollowupReview) {
-			const resolvedCount = reviewResult.resolvedFindings?.length ?? 0;
-			const unresolvedCount = reviewResult.unresolvedFindings?.length ?? 0;
-			const newIssuesCount =
-				reviewResult.newFindingsSinceLastReview?.length ?? 0;
-
-			// Check if any remaining issues are blockers (HIGH/CRITICAL)
-			const hasBlockingIssuesRemaining = reviewResult.findings.some(
-				(f) => f.severity === "critical" || f.severity === "high",
-			);
-
-			// Check if ready for another follow-up (new commits AFTER this follow-up was posted)
-			if (hasNewCommits && hasCommitsAfterPosting) {
-				return {
-					status: "ready_for_followup",
-					label: t("prReview.readyForFollowup"),
-					description: t("prReview.newCommitsSinceFollowup", {
-						count: newCommitCount,
-					}),
-					icon: <RefreshCw className="h-5 w-5" />,
-					color: "bg-info/20 text-info border-info/50",
-				};
-			}
-
-			// All issues resolved - ready to merge
-			if (unresolvedCount === 0 && newIssuesCount === 0) {
-				return {
-					status: "ready_to_merge",
-					label: t("prReview.readyToMerge"),
-					description: t("prReview.allIssuesResolved", {
-						count: resolvedCount,
-					}),
-					icon: <CheckCheck className="h-5 w-5" />,
-					color: "bg-success/20 text-success border-success/50",
-				};
-			}
-
-			// No blocking issues (only MEDIUM/LOW) - can merge with suggestions
-			if (!hasBlockingIssuesRemaining) {
-				const suggestionsCount = unresolvedCount + newIssuesCount;
-				return {
-					status: "ready_to_merge",
-					label: t("prReview.readyToMerge"),
-					description: t("prReview.nonBlockingSuggestions", {
-						resolved: resolvedCount,
-						// `count` et pas `suggestions` : c'est la variable sur laquelle
-						// i18next choisit entre `_one` et `_other`. Nommée autrement,
-						// elle s'interpolait mais la phrase restait au singulier.
-						count: suggestionsCount,
-					}),
-					icon: <CheckCheck className="h-5 w-5" />,
-					color: "bg-success/20 text-success border-success/50",
-				};
-			}
-
-			// Blocking issues still remain after follow-up
-			return {
-				status: "followup_issues_remain",
-				label: t("prReview.blockingIssues"),
-				description: t("prReview.blockingIssuesDesc", {
-					resolved: resolvedCount,
-					count: unresolvedCount,
-				}),
-				icon: <AlertTriangle className="h-5 w-5" />,
-				color: "bg-warning/20 text-warning border-warning/50",
-			};
-		}
-
-		// Initial review statuses (non-follow-up)
-
-		// Priority 1: Ready for follow-up review (posted findings + new commits AFTER posting)
-		if (hasPosted && hasNewCommits && hasCommitsAfterPosting) {
-			return {
-				status: "ready_for_followup",
-				label: t("prReview.readyForFollowup"),
-				description: t("prReview.newCommitsSinceReview", {
-					count: newCommitCount,
-				}),
-				icon: <RefreshCw className="h-5 w-5" />,
-				color: "bg-info/20 text-info border-info/50",
-			};
-		}
-
-		// Priority 2: Ready to merge (no blockers)
-		if (isReadyToMerge && hasPosted) {
-			return {
-				status: "ready_to_merge",
-				label: t("prReview.readyToMerge"),
-				description: t("prReview.noBlockingIssues"),
-				icon: <CheckCheck className="h-5 w-5" />,
-				color: "bg-success/20 text-success border-success/50",
-			};
-		}
-
-		// Priority 3: Waiting for changes (posted but has blockers, no new commits yet)
-		if (hasPosted && hasBlockers) {
-			return {
-				status: "waiting_for_changes",
-				label: t("prReview.waitingForChanges"),
-				description: t("prReview.findingsPostedWaiting", {
-					count: totalPosted,
-				}),
-				icon: <AlertTriangle className="h-5 w-5" />,
-				color: "bg-warning/20 text-warning border-warning/50",
-			};
-		}
-
-		// Priority 4: Ready to merge (posted, no blockers)
-		if (hasPosted && !hasBlockers) {
-			return {
-				status: "ready_to_merge",
-				label: t("prReview.readyToMerge"),
-				description: t("prReview.findingsPostedNoBlockers", {
-					count: totalPosted,
-				}),
-				icon: <CheckCheck className="h-5 w-5" />,
-				color: "bg-success/20 text-success border-success/50",
-			};
-		}
-
-		// Priority 5: Needs attention (unposted blockers)
-		if (hasUnpostedBlockers) {
-			return {
-				status: "needs_attention",
-				label: t("prReview.needsAttention"),
-				description: t("prReview.findingsNeedPosting", {
-					count: unpostedFindings.length,
-				}),
-				icon: <AlertCircle className="h-5 w-5" />,
-				color: "bg-destructive/20 text-destructive border-destructive/50",
-			};
-		}
-
-		// Default: Review complete, pending post
-		return {
-			status: "reviewed_pending_post",
-			label: t("prReview.reviewComplete"),
-			description: t("prReview.findingsFoundSelectPost", {
-				count: reviewResult.findings.length,
-			}),
-			icon: <MessageSquare className="h-5 w-5" />,
-			color: "bg-primary/20 text-primary border-primary/50",
-		};
-	}, [
+	const prStatus = getPRDetailStatus({
 		isReviewing,
-		reviewProgress,
-		reviewResult,
-		postedFindingIds,
-		isReadyToMerge,
+		result: reviewResult,
+		postedIds: postedFindingIds,
 		newCommitsCheck,
-		t,
-	]);
+	});
 
+	// The page belongs to one PR (see PRDetail), so a post that ends after
+	// another PR was opened only updates a page no longer shown.
 	const handlePostReview = async () => {
 		const idsToPost = Array.from(selectedFindingIds);
-		if (idsToPost.length === 0) return;
-
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
 		setIsPostingFindings(true);
 		try {
-			const success = await onPostReview(idsToPost);
-			if (success && pr.number === currentPr) {
-				// Mark these findings as posted only if PR hasn't changed
+			if (await onPostReview(idsToPost)) {
 				setPostedFindingIds((prev) => new Set([...prev, ...idsToPost]));
-				// Clear selection
 				setSelectedFindingIds(new Set());
-				// Show success message
 				setPostSuccess({ count: idsToPost.length, timestamp: Date.now() });
-				// After posting, check for new commits (follow-up review now available)
-				// Use a small delay to allow the backend to save the posted state
+				// Posting opens the follow-up: give the backend a moment to save
+				// the posted state, then look for new commits.
 				setTimeout(() => checkForNewCommits(), 500);
 			}
 		} finally {
-			// Clear loading state if PR hasn't changed
-			if (pr.number === currentPr) {
-				setIsPostingFindings(false);
-			}
+			setIsPostingFindings(false);
 		}
 	};
 
-	const handleApprove = async () => {
-		if (!reviewResult) return;
-
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
+	// Comments posted on GitHub are in English, the common language of code
+	// review there; the app's own text follows the app's language.
+	const handleApprove = async (summary: string) => {
 		setIsPosting(true);
 		try {
-			// Auto-assign current user (you can get from GitHub config)
-			// For now, we'll just post the comment
-			const approvalMessage = `## âœ… WorkPilot AI PR Review - APPROVED\n\n${reviewResult.summary}\n\n---\n*This approval was generated by WorkPilot AI.*`;
-			await Promise.resolve(onPostComment(approvalMessage));
+			await onPostComment(
+				`## ✅ WorkPilot AI PR Review - APPROVED\n\n${summary}\n\n---\n*This approval was generated by WorkPilot AI.*`,
+			);
 		} finally {
-			// Clear loading state if PR hasn't changed
-			if (pr.number === currentPr) {
-				setIsPosting(false);
-			}
+			setIsPosting(false);
 		}
 	};
 
-	// Auto-approval for clean PRs - posts approval with LOW findings as suggestions in a SINGLE comment
-	// NOTE: GitHub PR comments are intentionally in English as it's the lingua franca
-	// for code reviews and GitHub's international developer community. The comment
-	// content is meant to be read by contributors who may have different locales.
+	// Approves a clean PR, its LOW findings attached as suggestions, in one review.
 	const handleAutoApprove = async () => {
-		if (!reviewResult) return;
-
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
+		const lowFindingIds = lowSeverityFindings.map((f) => f.id);
 		setIsPosting(true);
 		try {
-			// Post approval with suggestions in a single review comment
-			// This uses forceApprove to set APPROVE status even with LOW findings
-			const lowFindingIds = lowSeverityFindings.map((f) => f.id);
-
-			const success = await onPostReview(lowFindingIds, { forceApprove: true });
-			if (success && lowFindingIds.length > 0 && pr.number === currentPr) {
-				// Mark findings as posted locally only if PR hasn't changed
+			if (await onPostReview(lowFindingIds, { forceApprove: true })) {
 				setPostedFindingIds((prev) => new Set([...prev, ...lowFindingIds]));
 			}
 		} finally {
-			// Clear loading state if PR hasn't changed
-			if (pr.number === currentPr) {
-				setIsPosting(false);
-			}
+			setIsPosting(false);
 		}
 	};
 
-	// Post clean review as a comment (does not change PR review status)
-	// This is for when a review has no findings or only LOW severity findings
-	// NOTE: GitHub PR comments are intentionally in English as it's the lingua franca
-	// for code reviews and GitHub's international developer community.
-	const handlePostCleanReview = async () => {
-		if (!reviewResult) return;
-
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
+	// A comment that says the review found nothing to change; the PR's review
+	// status on GitHub stays as it is.
+	const handlePostCleanReview = async (summary: string) => {
 		setIsPostingCleanReview(true);
-		setCleanReviewError(null); // Clear previous error
-		setShowCleanReviewErrorDetails(false); // Reset error details visibility
-		try {
-			// Format the clean review comment using i18n translations
-			const cleanReviewMessage = `${t("prReview.cleanReviewMessageTitle")}
-
-${t("prReview.cleanReviewMessageStatus")}
-
-${reviewResult.summary}
-
----
-
-${t("prReview.cleanReviewMessageFooter")}`;
-
-			// Use Promise.resolve to handle both Promise and non-Promise implementations
-			await Promise.resolve(onPostComment(cleanReviewMessage));
-
-			// Only mark as posted on success if PR hasn't changed
-			if (pr.number === currentPr) {
-				setCleanReviewPosted(true);
-				setCleanReviewError(null);
-			}
-		} catch (err) {
-			// Log full error to console for debugging before rendering
-			console.error("Failed to post clean review comment:", err);
-
-			// Set user-friendly error message using translation key
-			const fullError = err instanceof Error ? err.message : String(err);
-			if (pr.number === currentPr) {
-				setCleanReviewError(fullError);
-			}
-			// Do NOT set cleanReviewPosted on failure
-		} finally {
-			// Clear loading state if PR hasn't changed
-			if (pr.number === currentPr) {
-				setIsPostingCleanReview(false);
-			}
-		}
+		setCleanReviewFailed(false);
+		const posted = await onPostComment(
+			[
+				t("prReview.cleanReviewMessageTitle"),
+				t("prReview.cleanReviewMessageStatus"),
+				summary,
+				"---",
+				t("prReview.cleanReviewMessageFooter"),
+			].join("\n\n"),
+		).catch(() => false);
+		// A comment GitHub refused used to be reported as posted.
+		setCleanReviewPosted(posted);
+		setCleanReviewFailed(!posted);
+		setIsPostingCleanReview(false);
 	};
 
-	// Post blocked status comment when verdict is BLOCKED/NEEDS_REVISION but no findings
-	// This handles the edge case where structured output parsing fails but we still have a verdict
-	const handlePostBlockedStatus = async () => {
-		if (!reviewResult) return;
-
-		// Capture current PR number to prevent state leaks across PR switches
-		const currentPr = pr.number;
-
+	// A request-changes verdict with no finding to post (the findings could not
+	// be read): the summary, which names the blockers, goes out as a comment.
+	const handlePostBlockedStatus = async (summary: string) => {
 		setIsPostingBlockedStatus(true);
-		setBlockedStatusError(null);
-		try {
-			// Format the blocked status comment - post the summary which contains blockers
-			const blockedStatusMessage = `${t("prReview.blockedStatusMessageTitle")}
-
-${reviewResult.summary}
-
----
-
-${t("prReview.blockedStatusMessageFooter")}`;
-
-			const success = await onPostComment(blockedStatusMessage);
-
-			// Only mark as posted on success if PR hasn't changed AND comment was posted successfully
-			if (success && pr.number === currentPr) {
-				setBlockedStatusPosted(true);
-				setBlockedStatusError(null);
-				// Update the store to mark review as posted so PR list reflects the change
-				// Pass prNumber explicitly to avoid race conditions with PR selection changes
-				await onMarkReviewPosted?.(currentPr);
-			} else if (!success && pr.number === currentPr) {
-				setBlockedStatusError("Failed to post comment");
-			}
-		} catch (err) {
-			console.error("Failed to post blocked status comment:", err);
-			const fullError = err instanceof Error ? err.message : String(err);
-			if (pr.number === currentPr) {
-				setBlockedStatusError(fullError);
-			}
-		} finally {
-			if (pr.number === currentPr) {
-				setIsPostingBlockedStatus(false);
-			}
-		}
+		setBlockedStatusFailed(false);
+		const posted = await onPostComment(
+			[
+				t("prReview.blockedStatusMessageTitle"),
+				summary,
+				"---",
+				t("prReview.blockedStatusMessageFooter"),
+			].join("\n\n"),
+		).catch(() => false);
+		setBlockedStatusPosted(posted);
+		setBlockedStatusFailed(!posted);
+		setIsPostingBlockedStatus(false);
+		// The PR list shows the review as posted.
+		if (posted) await onMarkReviewPosted?.(pr.number);
 	};
 
 	const handleMerge = async () => {
@@ -978,8 +614,8 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 				{mergeReadiness &&
 					mergeReadiness.blockers.length > 0 &&
 					reviewResult?.success &&
-					(prStatus.status === "ready_to_merge" ||
-						prStatus.status === "reviewed_pending_post") && (
+					(prStatus === "ready_to_merge" ||
+						prStatus === "reviewed_pending_post") && (
 						<Card className="border-warning/50 bg-warning/10 animate-in fade-in slide-in-from-top-2 duration-300">
 							<CardContent className="py-4">
 								<div className="flex items-start gap-3">
@@ -992,13 +628,14 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 											)}
 										</p>
 										<ul className="text-sm text-warning/90 space-y-1">
-											{mergeReadiness.blockers.map((blocker, idx) => (
-												// biome-ignore lint/suspicious/noArrayIndexKey: no stable key available
-												<li key={idx} className="flex items-center gap-2">
-													<span className="h-1.5 w-1.5 rounded-full bg-warning/70" />
-													{blocker}
-												</li>
-											))}
+											{withUniqueKeys(mergeReadiness.blockers, (b) => b).map(
+												({ key, item: blocker }) => (
+													<li key={key} className="flex items-center gap-2">
+														<span className="h-1.5 w-1.5 rounded-full bg-warning/70" />
+														{blocker}
+													</li>
+												),
+											)}
 										</ul>
 										{mergeReadiness.isBehind && (
 											<div className="flex items-center gap-3 mt-3">
@@ -1059,7 +696,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 
 				{/* Review Status & Actions */}
 				<ReviewStatusTree
-					status={prStatus.status}
+					status={prStatus}
 					isReviewing={isReviewing}
 					startedAt={startedAt}
 					reviewResult={reviewResult}
@@ -1108,12 +745,12 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 
 						{/* Post Clean Review button - shows when review is clean and no findings are selected */}
 						{selectedCount === 0 &&
-							isCleanReview &&
+							cleanReview &&
 							!hasPostedFindings &&
 							!cleanReviewPosted &&
 							reviewResult?.overallStatus !== "request_changes" && (
 								<Button
-									onClick={handlePostCleanReview}
+									onClick={() => handlePostCleanReview(reviewResult.summary)}
 									disabled={isPostingCleanReview || isPosting}
 									variant="secondary"
 									className="flex-1 sm:flex-none"
@@ -1139,7 +776,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 							!blockedStatusPosted &&
 							reviewResult?.overallStatus === "request_changes" && (
 								<Button
-									onClick={handlePostBlockedStatus}
+									onClick={() => handlePostBlockedStatus(reviewResult.summary)}
 									disabled={isPostingBlockedStatus || isPosting}
 									variant="secondary"
 									className="flex-1 sm:flex-none"
@@ -1160,7 +797,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 
 						{/* Approve button - consolidated logic to avoid duplicate buttons */}
 						{/* Don't show when overallStatus is 'request_changes' (e.g., workflows blocked, or other issues) */}
-						{isCleanReview &&
+						{cleanReview &&
 							!hasPostedFindings &&
 							reviewResult?.overallStatus !== "request_changes" && (
 								<Button
@@ -1178,7 +815,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 										<>
 											<CheckCheck className="h-4 w-4 mr-2" />
 											{t("prReview.autoApprovePR")}
-											{hasFindings && lowSeverityFindings.length > 0 && (
+											{lowSeverityFindings.length > 0 && (
 												<span className="ml-1 text-xs opacity-80">
 													{t("prReview.suggestions", {
 														count: lowSeverityFindings.length,
@@ -1191,10 +828,9 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 							)}
 
 						{/* Manual approve button - only show for non-clean reviews that are ready to merge */}
-						{/* isReadyToMerge already checks for 'approve' status, so no need for additional check */}
-						{isReadyToMerge && !isCleanReview && !hasPostedFindings && (
+						{readyToMerge && !cleanReview && !hasPostedFindings && (
 							<Button
-								onClick={handleApprove}
+								onClick={() => handleApprove(reviewResult.summary)}
 								disabled={isPosting}
 								variant="default"
 								className="flex-1 sm:flex-none bg-success hover:bg-success/90 text-success-foreground"
@@ -1243,45 +879,10 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 							</div>
 						)}
 
-						{/* Clean review error display - inline pattern for action bar context */}
-						{/* Note: Uses inline layout (not Card) to match other action bar status messages.
-                 Separate Card-based error at line 972 handles review result errors. */}
-						{cleanReviewError && (
-							<div className="ml-auto flex items-center gap-2">
-								<div className="flex items-center gap-2 text-destructive text-sm font-medium">
-									<XCircle className="h-4 w-4" />
-									{t("prReview.failedPostCleanReview")}
-								</div>
-								<button
-									type="button"
-									onClick={() =>
-										setShowCleanReviewErrorDetails(!showCleanReviewErrorDetails)
-									}
-									aria-expanded={showCleanReviewErrorDetails}
-									aria-controls={cleanReviewErrorDetailsId}
-									className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-								>
-									{showCleanReviewErrorDetails ? (
-										<>
-											{t("prReview.hideErrorDetails")}
-											<ChevronUp className="h-3 w-3" />
-										</>
-									) : (
-										<>
-											{t("prReview.viewErrorDetails")}
-											<ChevronDown className="h-3 w-3" />
-										</>
-									)}
-								</button>
-							</div>
-						)}
-						{cleanReviewError && showCleanReviewErrorDetails && (
-							<div
-								id={cleanReviewErrorDetailsId}
-								className="ml-auto text-xs text-muted-foreground max-w-md truncate"
-								title={cleanReviewError}
-							>
-								{cleanReviewError}
+						{cleanReviewFailed && (
+							<div className="ml-auto flex items-center gap-2 text-destructive text-sm font-medium">
+								<XCircle className="h-4 w-4" />
+								{t("prReview.failedPostCleanReview")}
 							</div>
 						)}
 
@@ -1294,7 +895,7 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 						)}
 
 						{/* Blocked status error display */}
-						{blockedStatusError && (
+						{blockedStatusFailed && (
 							<div className="ml-auto flex items-center gap-2 text-destructive text-sm font-medium">
 								<XCircle className="h-4 w-4" />
 								{t("prReview.failedPostBlockedStatus")}
@@ -1334,14 +935,9 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 						badge={
 							<Badge
 								variant="outline"
-								className={getStatusColor(reviewResult.overallStatus)}
+								className={VERDICT_LOOK[reviewResult.overallStatus].className}
 							>
-								{reviewResult.overallStatus === "approve" &&
-									t("prReview.approve")}
-								{reviewResult.overallStatus === "request_changes" &&
-									t("prReview.changesRequested")}
-								{reviewResult.overallStatus === "comment" &&
-									t("prReview.commented")}
+								{t(VERDICT_LOOK[reviewResult.overallStatus].label)}
 							</Badge>
 						}
 						open={analysisExpanded}
@@ -1351,41 +947,21 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 							{/* Follow-up Review Resolution Status */}
 							{reviewResult.isFollowupReview && (
 								<div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border/50">
-									{(reviewResult.resolvedFindings?.length ?? 0) > 0 && (
-										<Badge
-											variant="outline"
-											className="bg-success/10 text-success border-success/30 px-3 py-1"
-										>
-											<CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-											{t("prReview.resolved", {
-												count: reviewResult.resolvedFindings?.length ?? 0,
-											})}
-										</Badge>
-									)}
-									{(reviewResult.unresolvedFindings?.length ?? 0) > 0 && (
-										<Badge
-											variant="outline"
-											className="bg-warning/10 text-warning border-warning/30 px-3 py-1"
-										>
-											<AlertCircle className="h-3.5 w-3.5 mr-1.5" />
-											{t("prReview.stillOpen", {
-												count: reviewResult.unresolvedFindings?.length ?? 0,
-											})}
-										</Badge>
-									)}
-									{(reviewResult.newFindingsSinceLastReview?.length ?? 0) >
-										0 && (
-										<Badge
-											variant="outline"
-											className="bg-destructive/10 text-destructive border-destructive/30 px-3 py-1"
-										>
-											<XCircle className="h-3.5 w-3.5 mr-1.5" />
-											{t("prReview.newIssue", {
-												count:
-													reviewResult.newFindingsSinceLastReview?.length ?? 0,
-											})}
-										</Badge>
-									)}
+									{FOLLOWUP_BADGES.map(({ field, label, Icon, className }) => {
+										const count = reviewResult[field]?.length ?? 0;
+										return (
+											count > 0 && (
+												<Badge
+													key={field}
+													variant="outline"
+													className={`${className} px-3 py-1`}
+												>
+													<Icon className="h-3.5 w-3.5 mr-1.5" />
+													{t(label, { count })}
+												</Badge>
+											)
+										);
+									})}
 									{/* Re-run follow-up review button */}
 									<Button
 										variant="ghost"
@@ -1520,7 +1096,9 @@ ${t("prReview.blockedStatusMessageFooter")}`;
 									<Button
 										size="sm"
 										variant="default"
-										onClick={handleApproveAllWorkflows}
+										onClick={() =>
+											handleApproveAllWorkflows(workflowsAwaiting.workflow_runs)
+										}
 										disabled={isApprovingWorkflow !== null}
 									>
 										{isApprovingWorkflow !== null ? (

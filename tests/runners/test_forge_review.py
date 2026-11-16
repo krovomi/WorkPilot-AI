@@ -13,12 +13,12 @@ import asyncio
 import importlib
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import runners.azure_devops.services.pr_review_engine as azdo_engine
 import runners.forge_review_prompt as forge_prompt
 import security.untrusted as untrusted
+from core.agent_client import ContentBlockType
 from runners.azure_devops.azdo_client import AzDOClient
 from runners.azure_devops.models import AzDOPRContext, AzureDevOpsRunnerConfig
 from runners.azure_devops.services.pr_review_engine import PRReviewEngine
@@ -143,7 +143,7 @@ class TestChangeContext:
 
 
 class _StreamingClient:
-    """The GitLab engine's client: query, then a stream of messages."""
+    """The reviewers' client: query, then a stream of messages."""
 
     def __init__(self, sink: dict, **kwargs):
         sink.update(kwargs)
@@ -159,27 +159,13 @@ class _StreamingClient:
         self._sink["prompt"] = prompt
 
     async def receive_response(self):
-        block = type("TextBlock", (), {"text": '```json\n{"summary": "ok"}\n```'})()
+        block = type(
+            "TextBlock",
+            (),
+            {"type": ContentBlockType.TEXT, "text": '```json\n{"summary": "ok"}\n```'},
+        )()
         message = type("AssistantMessage", (), {"content": [block]})()
         yield message
-
-
-class _OneShotClient:
-    """The Azure DevOps engine's client: one prompt, one answer."""
-
-    def __init__(self, sink: dict, **kwargs):
-        sink.update(kwargs)
-        self._sink = sink
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_exc):
-        return False
-
-    async def process_prompt(self, prompt):
-        self._sink["prompt"] = prompt
-        return SimpleNamespace(response="[]")
 
 
 def _patch_factory(monkeypatch, client_cls) -> dict:
@@ -265,7 +251,7 @@ class TestAzureDevOpsEngine:
     def test_a_project_named_backend_is_the_agent_project_dir(
         self, tmp_path, monkeypatch
     ):
-        sink = _patch_factory(monkeypatch, _OneShotClient)
+        sink = _patch_factory(monkeypatch, _StreamingClient)
         project = _backend_named_project(tmp_path)
         engine = PRReviewEngine(
             project, tmp_path / "azdo", AzureDevOpsRunnerConfig("p", "u", "x")

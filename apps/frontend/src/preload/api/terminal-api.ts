@@ -58,8 +58,6 @@ export interface TerminalAPI {
 		cols?: number,
 		rows?: number,
 	) => Promise<IPCResult<import("../../shared/types").TerminalRestoreResult>>;
-	clearTerminalSessions: (projectPath: string) => Promise<IPCResult>;
-	resumeClaudeInTerminal: (id: string, sessionId?: string) => void;
 	activateDeferredClaudeResume: (id: string) => void;
 	getTerminalSessionDates: (
 		projectPath?: string,
@@ -180,10 +178,6 @@ export interface TerminalAPI {
 	) => Promise<IPCResult>;
 	getAccountPriorityOrder: () => Promise<IPCResult<string[]>>;
 	setAccountPriorityOrder: (order: string[]) => Promise<IPCResult>;
-	fetchClaudeUsage: (terminalId: string) => Promise<IPCResult>;
-	getBestAvailableProfile: (
-		excludeProfileId?: string,
-	) => Promise<IPCResult<import("../../shared/types").ClaudeProfile | null>>;
 	onSDKRateLimit: (
 		callback: (info: import("../../shared/types").SDKRateLimitInfo) => void,
 	) => () => void;
@@ -267,12 +261,6 @@ export const createTerminalAPI = (): TerminalAPI => ({
 			cols,
 			rows,
 		),
-
-	clearTerminalSessions: (projectPath: string): Promise<IPCResult> =>
-		ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_CLEAR_SESSIONS, projectPath),
-
-	resumeClaudeInTerminal: (id: string, sessionId?: string): void =>
-		ipcRenderer.send(IPC_CHANNELS.TERMINAL_RESUME_CLAUDE, id, sessionId),
 
 	activateDeferredClaudeResume: (id: string): void =>
 		ipcRenderer.send(IPC_CHANNELS.TERMINAL_ACTIVATE_DEFERRED_RESUME, id),
@@ -631,17 +619,6 @@ export const createTerminalAPI = (): TerminalAPI => ({
 
 	setAccountPriorityOrder: (order: string[]): Promise<IPCResult> =>
 		ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, order),
-
-	fetchClaudeUsage: (terminalId: string): Promise<IPCResult> =>
-		ipcRenderer.invoke(IPC_CHANNELS.CLAUDE_PROFILE_FETCH_USAGE, terminalId),
-
-	getBestAvailableProfile: (
-		excludeProfileId?: string,
-	): Promise<IPCResult<import("../../shared/types").ClaudeProfile | null>> =>
-		ipcRenderer.invoke(
-			IPC_CHANNELS.CLAUDE_PROFILE_GET_BEST_PROFILE,
-			excludeProfileId,
-		),
 
 	onSDKRateLimit: (
 		callback: (info: import("../../shared/types").SDKRateLimitInfo) => void,

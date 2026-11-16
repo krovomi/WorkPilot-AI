@@ -177,7 +177,7 @@ function FileTreeNode({
 	readonly depth: number;
 	readonly defaultExpanded: boolean;
 	readonly expandSignal?: { version: number; value: boolean };
-	readonly t: (key: string) => string;
+	readonly t: (key: string, options?: Record<string, unknown>) => string;
 	readonly onFileClick?: (file: WorktreeDiffFile) => void;
 	readonly onEditFile?: (file: WorktreeDiffFile) => void;
 	readonly canEdit?: boolean;
@@ -277,6 +277,7 @@ function FileTreeNode({
 					{canSelect && (
 						<Checkbox
 							checked={isSelected}
+							aria-label={t("taskReview:diff.selectFile", { path: file.path })}
 							onCheckedChange={() => onToggleSelect?.(file.path)}
 							onClick={(e) => e.stopPropagation()}
 						/>
@@ -386,12 +387,16 @@ export function DiffViewDialog({
 	// the "expand all" toolbar action opens every diff at once.
 	const [openPaths, setOpenPaths] = useState<ReadonlySet<string>>(new Set());
 	const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
-	const [editingFile, setEditingFile] = useState<WorktreeDiffFile | null>(null);
+	// The file being edited, with the worktree it is read from and saved to.
+	const [editing, setEditing] = useState<{ file: WorktreeDiffFile; root: string } | null>(null);
+	const editingFile = editing?.file ?? null;
 	const [editContent, setEditContent] = useState<string>("");
 	const [isLoadingEdit, setIsLoadingEdit] = useState(false);
 	const [isSavingEdit, setIsSavingEdit] = useState(false);
 	const [isDeletingSelected, setIsDeletingSelected] = useState(false);
-	const [showAddFile, setShowAddFile] = useState(false);
+	// The worktree a new file is being added to, while the form is open.
+	const [addRoot, setAddRoot] = useState<string | null>(null);
+	const showAddFile = addRoot !== null;
 	const [newFilePath, setNewFilePath] = useState("");
 	const [newFileContent, setNewFileContent] = useState("");
 	const [isSavingNewFile, setIsSavingNewFile] = useState(false);
@@ -476,172 +481,122 @@ export function DiffViewDialog({
 		setOpenPaths(new Set());
 	}, [viewMode]);
 
+	const failed = useCallback(
+		(description: string) =>
+			toast({ title: t("taskReview:diff.error"), description, variant: "destructive" }),
+		[toast, t],
+	);
+
 	const handleEditFile = useCallback(
-		async (file: WorktreeDiffFile) => {
-			if (!worktreePath) {
-				console.error("[DiffViewDialog] No worktreePath provided to edit file");
-				return;
-			}
-			const api = globalThis.electronAPI;
-			if (!api?.worktreeReadFile) {
-				console.error("[DiffViewDialog] electron.worktreeReadFile not available");
-				return;
-			}
-			setEditingFile(file);
+		async (root: string, file: WorktreeDiffFile) => {
+			// A file that cannot be read must not open an empty editor: saving it
+			// would write nothing over the file.
+			const readFailed = () => {
+				setEditing(null);
+				failed(t("taskReview:diff.readError", { path: file.path }));
+			};
+			setEditing({ file, root });
+			setEditContent("");
 			setIsLoadingEdit(true);
 			try {
-				const result = await api.worktreeReadFile(
-					worktreePath,
-					file.path,
-				);
+				const result = await globalThis.electronAPI.worktreeReadFile(root, file.path);
 				if (result.success) {
 					setEditContent(result.data ?? "");
 				} else {
-					console.error("[DiffViewDialog] Failed to read file:", result);
+					readFailed();
 				}
 			} catch (error) {
 				console.error("[DiffViewDialog] Error reading file:", error);
+				readFailed();
 			} finally {
 				setIsLoadingEdit(false);
 			}
 		},
-		[worktreePath],
+		[failed, t],
 	);
 
-	const handleSaveEdit = useCallback(async () => {
-		if (!editingFile || !worktreePath || !onRefresh) {
-			console.error("[DiffViewDialog] Missing required params for save:", {
-				hasEditingFile: !!editingFile,
-				hasWorktreePath: !!worktreePath,
-				hasOnRefresh: !!onRefresh,
-			});
-			return;
-		}
-
-		const api = globalThis.electronAPI;
-		if (!api?.worktreeWriteFile) {
-			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
-			return;
-		}
-
+	const handleSaveEdit = useCallback(async ({ file, root }: { file: WorktreeDiffFile; root: string }) => {
 		setIsSavingEdit(true);
 		try {
-			const result = await api.worktreeWriteFile(
-				worktreePath,
-				editingFile.path,
-				editContent,
-			);
-			if (result.success) {
-				setEditingFile(null);
-				setEditContent("");
-				onRefresh();
-			} else {
-				console.error("[DiffViewDialog] Failed to save file:", result);
-			}
+			const result = await globalThis.electronAPI.worktreeWriteFile(root, file.path, editContent);
+			if (!result.success) throw new Error(result.error);
+			setEditing(null);
+			setEditContent("");
+			onRefresh?.();
 		} catch (error) {
 			console.error("[DiffViewDialog] Error saving file:", error);
+			failed(t("taskReview:diff.saveError", { path: file.path }));
 		} finally {
 			setIsSavingEdit(false);
 		}
-	}, [editingFile, worktreePath, editContent, onRefresh]);
+	}, [editContent, onRefresh, failed, t]);
 
 	const handleCancelEdit = useCallback(() => {
-		setEditingFile(null);
+		setEditing(null);
 		setEditContent("");
 	}, []);
 
-	const handleDeleteSelected = useCallback(async () => {
-		if (selectedPaths.size === 0 || !worktreePath || !onRefresh) {
-			toast({
-				title: t("taskReview:diff.error"),
-				description: "Missing required information to delete files",
-				variant: "destructive",
-			});
+	// Discarding puts the files back as they are on the base branch and deletes
+	// the new ones, which cannot be undone: the first click asks, the second
+	// discards. A changed selection asks again.
+	const selectionKey = useMemo(() => [...selectedPaths].sort().join("\n"), [selectedPaths]);
+	const [armedSelection, setArmedSelection] = useState<string | null>(null);
+	const isDiscardArmed = armedSelection === selectionKey;
+
+	const handleDeleteSelected = useCallback(async (root: string) => {
+		if (!isDiscardArmed) {
+			setArmedSelection(selectionKey);
 			return;
 		}
-
-		const api = globalThis.electronAPI;
-		if (!api?.worktreeDeleteFiles) {
-			toast({
-				title: t("taskReview:diff.error"),
-				description: "File operations not available",
-				variant: "destructive",
-			});
-			return;
-		}
-
+		setArmedSelection(null);
 		setIsDeletingSelected(true);
 		try {
-			const filesToDelete = Array.from(selectedPaths);
-			const result = await api.worktreeDeleteFiles(
-				worktreePath,
-				filesToDelete,
+			const result = await globalThis.electronAPI.worktreeDeleteFiles(
+				root,
+				Array.from(selectedPaths),
 			);
-
-			if (result.success) {
+			if (!result.success || !result.data) throw new Error(result.error);
+			const { deleted, failed: notDiscarded } = result.data;
+			if (deleted.length > 0) {
 				toast({
-					title: "Success",
-					description: `${result.data?.deleted.length ?? 0} file(s) discarded`,
-				});
-				setSelectedPaths(new Set());
-				// Force refresh to update the list with filtered files
-				await onRefresh();
-			} else {
-				toast({
-					title: t("taskReview:diff.error"),
-					description: `Failed to delete files: ${result.data?.failed?.join(", ") || "Unknown error"}`,
-					variant: "destructive",
+					title: t("taskReview:diff.discardedTitle"),
+					description: t("taskReview:diff.discarded", { count: deleted.length }),
 				});
 			}
+			if (notDiscarded.length > 0) {
+				failed(t("taskReview:diff.discardFailed", { files: notDiscarded.join(", ") }));
+			}
+			// What could not be discarded stays selected.
+			setSelectedPaths(new Set(notDiscarded));
+			onRefresh?.();
 		} catch (error) {
 			console.error("[DiffViewDialog] Error deleting files:", error);
-			toast({
-				title: t("taskReview:diff.error"),
-				description: error instanceof Error ? error.message : "Unknown error",
-				variant: "destructive",
-			});
+			failed(t("taskReview:diff.discardFailed", { files: Array.from(selectedPaths).join(", ") }));
 		} finally {
 			setIsDeletingSelected(false);
 		}
-	}, [selectedPaths, worktreePath, onRefresh, toast, t]);
+	}, [selectedPaths, selectionKey, isDiscardArmed, onRefresh, toast, failed, t]);
 
-	const handleAddFile = useCallback(async () => {
-		if (!newFilePath || !worktreePath || !onRefresh) {
-			console.error("[DiffViewDialog] Missing required params for add file:", {
-				hasNewFilePath: !!newFilePath,
-				hasWorktreePath: !!worktreePath,
-				hasOnRefresh: !!onRefresh,
-			});
-			return;
-		}
-
-		const api = globalThis.electronAPI;
-		if (!api?.worktreeWriteFile) {
-			console.error("[DiffViewDialog] electron.worktreeWriteFile not available");
-			return;
-		}
-
+	const handleAddFile = useCallback(async (root: string) => {
 		setIsSavingNewFile(true);
 		try {
-			const result = await api.worktreeWriteFile(
-				worktreePath,
+			const result = await globalThis.electronAPI.worktreeWriteFile(
+				root,
 				newFilePath,
 				newFileContent,
 			);
-			if (result.success) {
-				setShowAddFile(false);
-				setNewFilePath("");
-				setNewFileContent("");
-				onRefresh();
-			} else {
-				console.error("[DiffViewDialog] Failed to add file:", result);
-			}
+			if (!result.success) throw new Error(result.error);
+			setAddRoot(null);
+			setNewFilePath("");
+			setNewFileContent("");
+			onRefresh?.();
 		} catch (error) {
 			console.error("[DiffViewDialog] Error adding file:", error);
+			failed(t("taskReview:diff.createError", { path: newFilePath }));
 		} finally {
 			setIsSavingNewFile(false);
 		}
-	}, [newFilePath, newFileContent, worktreePath, onRefresh]);
+	}, [newFilePath, newFileContent, onRefresh, failed, t]);
 
 	// Helper function to render the appropriate content based on selection and view mode
 	const renderContent = () => {
@@ -717,6 +672,7 @@ export function DiffViewDialog({
 							<Checkbox
 								checked={selectedPaths.size === filteredFiles.length}
 								onCheckedChange={handleSelectAll}
+								aria-label={t("taskReview:diff.selectAll")}
 							/>
 							<span className="text-sm font-medium">
 								{t("taskReview:diff.selectAll")}
@@ -745,6 +701,7 @@ export function DiffViewDialog({
 										{worktreePath && (
 											<Checkbox
 												checked={isSelected}
+												aria-label={t("taskReview:diff.selectFile", { path: file.path })}
 												onCheckedChange={() =>
 													handleToggleSelect(file.path)
 												}
@@ -796,7 +753,7 @@ export function DiffViewDialog({
 												className={selectedPaths.size > 0 ? "invisible" : ""}
 												onClick={(e) => {
 													e.stopPropagation();
-													handleEditFile(file);
+													handleEditFile(worktreePath, file);
 												}}
 											>
 												{t("taskReview:diff.edit")}
@@ -831,7 +788,9 @@ export function DiffViewDialog({
 						expandSignal={expandSignal}
 						t={t}
 						onFileClick={handleFileClick}
-						onEditFile={handleEditFile}
+						onEditFile={
+							worktreePath ? (file) => handleEditFile(worktreePath, file) : undefined
+						}
 						canEdit={!!worktreePath}
 						selectedPaths={selectedPaths}
 						onToggleSelect={handleToggleSelect}
@@ -867,7 +826,7 @@ export function DiffViewDialog({
 								<>
 									<button
 										type="button"
-										onClick={() => setShowAddFile(false)}
+										onClick={() => setAddRoot(null)}
 										className="mr-2 p-1 hover:bg-muted rounded transition-colors"
 										title={t("taskReview:diff.cancel")}
 									>
@@ -888,7 +847,7 @@ export function DiffViewDialog({
 							<div className="flex items-center gap-2">
 								{selectedPaths.size > 0 && (
 									<span className="text-sm text-muted-foreground">
-										{selectedPaths.size} {t("taskReview:diff.filesSelected")}
+										{t("taskReview:diff.filesSelectedCount", { count: selectedPaths.size })}
 									</span>
 								)}
 								{selectedPaths.size === 0 && (
@@ -982,27 +941,36 @@ export function DiffViewDialog({
 					{renderContent()}
 				</div>
 
-				{selectedPaths.size > 0 && (
+				{worktreePath && selectedPaths.size > 0 && (
 					<div className="border-t pt-4 flex items-center justify-between bg-secondary/50 -mx-6 px-6 py-4 rounded-b-lg">
-						<span className="text-sm font-medium">
-							{selectedPaths.size} {t("taskReview:diff.filesSelected")}
-						</span>
+						<div className="flex flex-col gap-0.5">
+							<span className="text-sm font-medium">
+								{t("taskReview:diff.filesSelectedCount", { count: selectedPaths.size })}
+							</span>
+							{isDiscardArmed && (
+								<span role="status" className="text-xs text-muted-foreground">
+									{t("taskReview:diff.discardHint")}
+								</span>
+							)}
+						</div>
 						<Button
 							variant="destructive"
 							size="sm"
-							onClick={handleDeleteSelected}
+							onClick={() => handleDeleteSelected(worktreePath)}
 							disabled={isDeletingSelected}
 						>
 							<Trash2 className="h-4 w-4 mr-2" />
 							{isDeletingSelected
 								? t("taskReview:diff.deleting")
-								: t("taskReview:diff.deleteSelected")}
+								: isDiscardArmed
+									? t("taskReview:diff.confirmDiscard", { count: selectedPaths.size })
+									: t("taskReview:diff.deleteSelected")}
 						</Button>
 					</div>
 				)}
 
 				<AlertDialogFooter className="mt-4">
-					{editingFile && (
+					{editing && (
 						<>
 							<Button
 								variant="outline"
@@ -1012,8 +980,8 @@ export function DiffViewDialog({
 								{t("taskReview:diff.cancel")}
 							</Button>
 							<Button
-								onClick={handleSaveEdit}
-								disabled={isSavingEdit}
+								onClick={() => handleSaveEdit(editing)}
+								disabled={isSavingEdit || isLoadingEdit}
 							>
 								<Save className="h-4 w-4 mr-2" />
 								{isSavingEdit
@@ -1022,18 +990,18 @@ export function DiffViewDialog({
 							</Button>
 						</>
 					)}
-					{showAddFile && (
+					{addRoot !== null && (
 						<>
 							<Button
 								variant="outline"
-								onClick={() => setShowAddFile(false)}
+								onClick={() => setAddRoot(null)}
 								disabled={isSavingNewFile}
 							>
 								{t("taskReview:diff.cancel")}
 							</Button>
 							<Button
-								onClick={handleAddFile}
-								disabled={isSavingNewFile || !newFilePath}
+								onClick={() => handleAddFile(addRoot)}
+								disabled={isSavingNewFile || !newFilePath.trim()}
 							>
 								<Plus className="h-4 w-4 mr-2" />
 								{isSavingNewFile
@@ -1048,7 +1016,7 @@ export function DiffViewDialog({
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => setShowAddFile(true)}
+									onClick={() => setAddRoot(worktreePath)}
 								>
 									<Plus className="h-4 w-4 mr-2" />
 									{t("taskReview:diff.addFile")}

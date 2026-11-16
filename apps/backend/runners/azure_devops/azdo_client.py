@@ -8,15 +8,9 @@ for PR review operations.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-# Import safe_print
-try:
-    from core.io_utils import safe_print
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from core.io_utils import safe_print
+from core.io_utils import safe_print
 
 
 class AzDOClient:
@@ -110,19 +104,16 @@ class AzDOClient:
             pull_request_id=pr_id,
         )
 
-        # Source / target branch refs from the PR metadata.
+        # Source / target branch refs from the PR metadata (the connector's
+        # dict, with the API's own key names).
         try:
             pr_details = repos.get_pull_request_details(
                 project=self.project,
                 repository_id=self.repository_id,
                 pull_request_id=pr_id,
             )
-            source_branch = self._strip_ref(
-                self._read_attr(pr_details, "source_ref_name")
-            )
-            target_branch = self._strip_ref(
-                self._read_attr(pr_details, "target_ref_name")
-            )
+            source_branch = self._strip_ref(pr_details.get("sourceRefName"))
+            target_branch = self._strip_ref(pr_details.get("targetRefName"))
         except Exception as e:
             safe_print(
                 f"[AzDO] Could not load PR refs, falling back to pseudo-diff: {e}"
@@ -143,46 +134,42 @@ class AzDOClient:
                 diff_parts.append(self._pseudo_diff_for(file))
                 continue
 
-            try:
-                target_content = self._safe_get_content(
-                    repos,
-                    project=self.project,
-                    repository_id=self.repository_id,
-                    path=path,
-                    branch=target_branch,
-                    change_type=change_type,
-                    side="target",
-                )
-                source_content = self._safe_get_content(
-                    repos,
-                    project=self.project,
-                    repository_id=self.repository_id,
-                    path=path,
-                    branch=source_branch,
-                    change_type=change_type,
-                    side="source",
-                )
+            target_content = self._safe_get_content(
+                repos,
+                project=self.project,
+                repository_id=self.repository_id,
+                path=path,
+                branch=target_branch,
+                change_type=change_type,
+                side="target",
+            )
+            source_content = self._safe_get_content(
+                repos,
+                project=self.project,
+                repository_id=self.repository_id,
+                path=path,
+                branch=source_branch,
+                change_type=change_type,
+                side="source",
+            )
 
-                if (
-                    target_content is None
-                    or source_content is None
-                    or len(target_content) > max_file_bytes
-                    or len(source_content) > max_file_bytes
-                ):
-                    diff_parts.append(self._pseudo_diff_for(file))
-                    continue
-
-                udiff = difflib.unified_diff(
-                    target_content.splitlines(keepends=True),
-                    source_content.splitlines(keepends=True),
-                    fromfile=f"a/{path}",
-                    tofile=f"b/{path}",
-                    n=3,
-                )
-                diff_parts.append("".join(udiff))
-            except Exception as e:
-                safe_print(f"[AzDO] diff failed for {path}: {e}")
+            if (
+                target_content is None
+                or source_content is None
+                or len(target_content) > max_file_bytes
+                or len(source_content) > max_file_bytes
+            ):
                 diff_parts.append(self._pseudo_diff_for(file))
+                continue
+
+            udiff = difflib.unified_diff(
+                target_content.splitlines(keepends=True),
+                source_content.splitlines(keepends=True),
+                fromfile=f"a/{path}",
+                tofile=f"b/{path}",
+                n=3,
+            )
+            diff_parts.append("".join(udiff))
 
         return "\n".join(p for p in diff_parts if p)
 
@@ -195,17 +182,6 @@ class AzDOClient:
             if ref_name.startswith(prefix):
                 return ref_name[len(prefix) :]
         return ref_name
-
-    @staticmethod
-    def _read_attr(obj, attr: str):
-        """Read `attr` from obj whether it's a dataclass-like object or a dict."""
-        if obj is None:
-            return None
-        if hasattr(obj, attr):
-            return getattr(obj, attr)
-        if isinstance(obj, dict):
-            return obj.get(attr)
-        return None
 
     @staticmethod
     def _safe_get_content(

@@ -6,11 +6,9 @@
  * (`server-relay.ts`). Split out of pr-handlers.ts, at its size cap.
  */
 
-import { execFile, execFileSync } from "node:child_process";
-import { unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import { execFile } from "node:child_process";
 import type { Project } from "../../../shared/types";
+import { getToolPath } from "../../cli-tool-manager";
 import { getAugmentedEnv } from "../../env-utils";
 import { relayGitHubDiff } from "./server-relay";
 import { getGitHubConfig, githubFetch } from "./utils";
@@ -23,6 +21,26 @@ function checkNumber(prNumber: number): void {
 	if (!Number.isInteger(prNumber) || prNumber <= 0) {
 		throw new Error("Invalid PR number");
 	}
+}
+
+/** Room for the diff of a large PR (execFile keeps 1 MB by default). */
+const MAX_OUTPUT = 64 * 1024 * 1024;
+
+/**
+ * Runs `gh` in the project's clone, by its path and an argument list (no
+ * shell), without blocking the main process; `input` goes to its stdin.
+ * Rejects with gh's error, its stderr included.
+ */
+function runGh(project: Project, args: string[], input?: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const child = execFile(
+			getToolPath("gh"),
+			args,
+			{ cwd: project.path, env: getAugmentedEnv(), encoding: "utf-8", maxBuffer: MAX_OUTPUT },
+			(error, stdout) => (error ? reject(error) : resolve(stdout)),
+		);
+		child.stdin?.end(input);
+	});
 }
 
 /** The repository and handle of a server project on GitHub. */
@@ -38,12 +56,7 @@ export async function prDiff(project: Project, prNumber: number): Promise<string
 		const config = serverConfig(project);
 		return relayGitHubDiff(config.token, config.repo, prNumber);
 	}
-	// Arguments array, no shell: nothing in it is interpreted
-	return execFileSync("gh", ["pr", "diff", String(prNumber)], {
-		cwd: project.path,
-		encoding: "utf-8",
-		env: getAugmentedEnv(),
-	});
+	return runGh(project, ["pr", "diff", String(prNumber)]);
 }
 
 export async function prComment(
@@ -60,21 +73,8 @@ export async function prComment(
 		});
 		return;
 	}
-	// A temp file avoids any escaping of the body
-	const tmpFile = join(project.path, ".workpilot", "tmp_comment_body.txt");
-	try {
-		writeFileSync(tmpFile, body, "utf-8");
-		execFileSync("gh", ["pr", "comment", String(prNumber), "--body-file", tmpFile], {
-			cwd: project.path,
-			env: getAugmentedEnv(),
-		});
-	} finally {
-		try {
-			unlinkSync(tmpFile);
-		} catch {
-			// Already gone, or never written
-		}
-	}
+	// The body on stdin: no escaping, and no file a second comment would share
+	await runGh(project, ["pr", "comment", String(prNumber), "--body-file", "-"], body);
 }
 
 export async function prMerge(
@@ -94,10 +94,7 @@ export async function prMerge(
 		});
 		return;
 	}
-	execFileSync("gh", ["pr", "merge", String(prNumber), `--${mergeMethod}`], {
-		cwd: project.path,
-		env: getAugmentedEnv(),
-	});
+	await runGh(project, ["pr", "merge", String(prNumber), `--${mergeMethod}`]);
 }
 
 /** Merge the base branch into the PR's branch (never a rebase, so no force push). */
@@ -112,8 +109,5 @@ export async function prUpdateBranch(project: Project, prNumber: number): Promis
 		);
 		return;
 	}
-	await promisify(execFile)("gh", ["pr", "update-branch", String(prNumber)], {
-		cwd: project.path,
-		env: getAugmentedEnv(),
-	});
+	await runGh(project, ["pr", "update-branch", String(prNumber)]);
 }

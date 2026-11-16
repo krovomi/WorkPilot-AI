@@ -15,34 +15,24 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-try:
-    from ..models import (
-        AzDOPRContext,
-        AzureDevOpsRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        ReviewCategory,
-        ReviewSeverity,
-    )
-except ImportError:
-    from models import (
-        AzDOPRContext,
-        AzureDevOpsRunnerConfig,
-        MergeVerdict,
-        PRReviewFinding,
-        ReviewCategory,
-        ReviewSeverity,
-    )
+from core.io_utils import safe_print
 
-# Import safe_print
-try:
-    from core.io_utils import safe_print
-except ImportError:
-    import sys
-    from pathlib import Path as PathLib
+from ..models import (
+    AzDOPRContext,
+    AzureDevOpsRunnerConfig,
+    MergeVerdict,
+    PRReviewFinding,
+    ReviewCategory,
+    ReviewSeverity,
+)
 
-    sys.path.insert(0, str(PathLib(__file__).parent.parent.parent.parent))
-    from core.io_utils import safe_print
+# From least to most strict: a verdict is never relaxed by another signal.
+_VERDICT_ORDER = (
+    MergeVerdict.READY_TO_MERGE,
+    MergeVerdict.MERGE_WITH_CHANGES,
+    MergeVerdict.NEEDS_REVISION,
+    MergeVerdict.BLOCKED,
+)
 
 from runners.forge_review_prompt import change_context
 
@@ -157,14 +147,11 @@ Also provide:
 
         # Inject deep codebase context if available
         deep_context_section = ""
-        if hasattr(context, "deep_context") and context.deep_context:
-            try:
-                from ..github.services.deep_context_provider import DeepContext
+        if context.deep_context:
+            from ...github.services.deep_context_provider import DeepContext
 
-                dc = DeepContext.from_dict(context.deep_context)
-                deep_context_section = dc.to_prompt_section()
-            except Exception:
-                pass
+            dc = DeepContext.from_dict(context.deep_context)
+            deep_context_section = dc.to_prompt_section()
 
         prompt = self._get_review_prompt() + "\n\n---\n\n"
         if deep_context_section:
@@ -183,16 +170,20 @@ Also provide:
             agent_type="pr_reviewer",
         )
 
+        from core.agent_client import ContentBlockType
+
         result_text = ""
         try:
             async with client:
-                result = await client.process_prompt(prompt)
-                result_text = (
-                    result.response if hasattr(result, "response") else str(result)
-                )
+                await client.query(prompt)
+                async for msg in client.receive_response():
+                    for block in msg.content:
+                        if block.type == ContentBlockType.TEXT and block.text:
+                            result_text += block.text
         except Exception as e:
+            # A review that did not run must not read as an approval.
             safe_print(f"[AzDO] Review failed: {e}")
-            return [], MergeVerdict.READY_TO_MERGE, f"Review failed: {e}", []
+            raise RuntimeError(f"Review failed: {e}") from e
 
         # Parse the response
         return self._parse_review_response(result_text)
@@ -214,6 +205,8 @@ Also provide:
                 parsed = json.loads(block.strip())
                 if isinstance(parsed, list):
                     for item in parsed:
+                        if not isinstance(item, dict):
+                            continue
                         try:
                             finding = PRReviewFinding(
                                 id=f"azdo-{uuid.uuid4().hex[:8]}",
@@ -244,16 +237,16 @@ Also provide:
             except json.JSONDecodeError:
                 continue
 
-        # Determine verdict from findings if not explicitly set
-        if findings:
-            critical = sum(1 for f in findings if f.severity == ReviewSeverity.CRITICAL)
-            high = sum(1 for f in findings if f.severity == ReviewSeverity.HIGH)
-            medium = sum(1 for f in findings if f.severity == ReviewSeverity.MEDIUM)
-
-            if critical > 0:
-                verdict = MergeVerdict.BLOCKED
-            elif high > 0 or medium > 0:
-                verdict = MergeVerdict.NEEDS_REVISION
+        # The findings set a floor: the stricter of the stated verdict and
+        # the one their severities call for wins.
+        severities = {f.severity for f in findings}
+        if ReviewSeverity.CRITICAL in severities:
+            floor = MergeVerdict.BLOCKED
+        elif severities & {ReviewSeverity.HIGH, ReviewSeverity.MEDIUM}:
+            floor = MergeVerdict.NEEDS_REVISION
+        else:
+            floor = MergeVerdict.READY_TO_MERGE
+        verdict = max(verdict, floor, key=_VERDICT_ORDER.index)
 
         # Extract summary from non-JSON part of response
         if not summary:
