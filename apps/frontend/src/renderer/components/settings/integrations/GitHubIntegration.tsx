@@ -70,9 +70,15 @@ export function GitHubIntegration({
 	setSettings,
 }: GitHubIntegrationProps) {
 	const { t } = useTranslation(["settings", "common"]);
+	// A token saved from the GitHub login reopens on its repository list, not
+	// on the manual token field.
 	const [authMode, setAuthMode] = useState<
 		"manual" | "oauth" | "oauth-success"
-	>("manual");
+	>(() =>
+		envConfig?.githubAuthMethod === "oauth" && envConfig.githubToken
+			? "oauth-success"
+			: "manual",
+	);
 	const [oauthUsername, setOauthUsername] = useState<string | null>(null);
 	const [repos, setRepos] = useState<GitHubRepo[]>([]);
 	const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -270,7 +276,7 @@ export function GitHubIntegration({
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
 				<div className="space-y-0.5">
-					<Label className="font-normal text-foreground">
+					<Label htmlFor="github-enabled" className="font-normal text-foreground">
 						{t("projectSections.github.enableGitHubIssues", { ns: "settings" })}
 					</Label>
 					<p className="text-xs text-muted-foreground">
@@ -281,6 +287,7 @@ export function GitHubIntegration({
 					</p>
 				</div>
 				<Switch
+					id="github-enabled"
 					data-guide={GUIDE_ANCHORS.github.enable}
 					checked={envConfig.githubEnabled}
 					onCheckedChange={(checked) =>
@@ -368,7 +375,7 @@ export function GitHubIntegration({
 						<>
 							<div className="space-y-2">
 								<div className="flex items-center justify-between">
-									<Label className="text-sm font-medium text-foreground">
+									<Label htmlFor="github-token" className="text-sm font-medium text-foreground">
 										{t("projectSections.github.patLabel")}
 									</Label>
 									<Button
@@ -395,6 +402,7 @@ export function GitHubIntegration({
 									</a>
 								</p>
 								<PasswordInput
+									id="github-token"
 									data-guide={GUIDE_ANCHORS.github.token}
 									value={envConfig.githubToken || ""}
 									onChange={(value) => updateEnvConfig({ githubToken: value })}
@@ -442,6 +450,7 @@ export function GitHubIntegration({
 									size="sm"
 									onClick={fetchBranches}
 									disabled={isLoadingBranches}
+									aria-label={t("common:buttons.refresh")}
 									className="h-7 px-2"
 								>
 									<RefreshCw
@@ -574,6 +583,7 @@ function RepositoryDropdown({
 						size="sm"
 						onClick={onRefresh}
 						disabled={isLoading}
+						aria-label={t("common:buttons.refresh")}
 						className="h-7 px-2"
 					>
 						<RefreshCw
@@ -689,7 +699,7 @@ function RepositoryInput({ value, onChange }: RepositoryInputProps) {
 
 	return (
 		<div className="space-y-2">
-			<Label className="text-sm font-medium text-foreground">
+			<Label htmlFor="github-repo" className="text-sm font-medium text-foreground">
 				{t("projectSections.github.repository")}
 			</Label>
 			<p className="text-xs text-muted-foreground">
@@ -698,6 +708,7 @@ function RepositoryInput({ value, onChange }: RepositoryInputProps) {
 				{t("projectSections.github.repositoryFormatExample")}
 			</p>
 			<Input
+				id="github-repo"
 				data-guide={GUIDE_ANCHORS.github.repo}
 				placeholder={t("projectSections.github.repositoryPlaceholder")}
 				value={value}
@@ -801,7 +812,7 @@ function AutoSyncToggle({ enabled, onToggle }: AutoSyncToggleProps) {
 			<div className="space-y-0.5">
 				<div className="flex items-center gap-2">
 					<RefreshCw className="h-4 w-4 text-info" />
-					<Label className="font-normal text-foreground">
+					<Label htmlFor="github-auto-sync" className="font-normal text-foreground">
 						{t("projectSections.github.autoSyncOnLoad")}
 					</Label>
 				</div>
@@ -809,7 +820,7 @@ function AutoSyncToggle({ enabled, onToggle }: AutoSyncToggleProps) {
 					{t("projectSections.github.autoSyncDescription")}
 				</p>
 			</div>
-			<Switch checked={enabled} onCheckedChange={onToggle} />
+			<Switch id="github-auto-sync" checked={enabled} onCheckedChange={onToggle} />
 		</div>
 	);
 }

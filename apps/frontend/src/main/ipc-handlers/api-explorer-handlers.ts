@@ -22,9 +22,11 @@ import type {
 	RouteParameter,
 } from "../api-explorer/types";
 import {
-	ApiExplorerSecretStore,
-	type ApiExplorerSecretValues,
-} from "../api-explorer-secret-store";
+	readProxyRequest,
+	readSecretScope,
+	readSecretValues,
+} from "../api-explorer/ipc-args";
+import { ApiExplorerSecretStore } from "../api-explorer-secret-store";
 
 // ── OpenAPI spec builder ──────────────────────────────────────────────────────
 
@@ -196,13 +198,6 @@ const fetchSpecBody = async (
 
 // ── IPC handler registration ──────────────────────────────────────────────────
 
-interface ProxyRequestPayload {
-	url: string;
-	method: string;
-	headers: Record<string, string>;
-	body?: string;
-}
-
 interface ProxyResponse {
 	success: boolean;
 	status?: number;
@@ -220,9 +215,9 @@ export function registerApiExplorerHandlers(): void {
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.API_EXPLORER_LOAD_SECRETS,
-		(_event, scope: string) => {
+		(_event, scope: unknown) => {
 			try {
-				return { success: true, data: secretStore.load(scope) };
+				return { success: true, data: secretStore.load(readSecretScope(scope)) };
 			} catch (err) {
 				return { success: false, error: String(err) };
 			}
@@ -230,9 +225,9 @@ export function registerApiExplorerHandlers(): void {
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.API_EXPLORER_SAVE_SECRETS,
-		(_event, scope: string, values: ApiExplorerSecretValues) => {
+		(_event, scope: unknown, values: unknown) => {
 			try {
-				secretStore.save(scope, values);
+				secretStore.save(readSecretScope(scope), readSecretValues(values));
 				return { success: true };
 			} catch (err) {
 				return { success: false, error: String(err) };
@@ -337,9 +332,10 @@ export function registerApiExplorerHandlers(): void {
 	// HTTP proxy — makes requests from main process to bypass renderer CSP
 	ipcMain.handle(
 		IPC_CHANNELS.API_EXPLORER_PROXY_REQUEST,
-		async (_event, payload: ProxyRequestPayload): Promise<ProxyResponse> => {
+		async (_event, raw: unknown): Promise<ProxyResponse> => {
 			const start = Date.now();
 			try {
+				const payload = readProxyRequest(raw);
 				const res = await net.fetch(payload.url, {
 					method: payload.method,
 					headers: payload.headers,
