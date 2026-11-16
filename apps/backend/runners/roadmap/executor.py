@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from core.agent_client import ContentBlockType
 from foundation.debug import debug, debug_detailed, debug_error, debug_success
 
 # Which AGENT_CONFIGS entry each roadmap prompt runs under. Without a name the
@@ -50,6 +51,8 @@ class ScriptExecutor:
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=300,
             )
 
@@ -68,7 +71,7 @@ class ScriptExecutor:
         except subprocess.TimeoutExpired:
             debug_error("roadmap_executor", f"Script timed out: {script}")
             return False, "Script timed out"
-        except Exception as e:
+        except OSError as e:
             debug_error("roadmap_executor", f"Script exception: {script}", error=str(e))
             return False, str(e)
 
@@ -152,42 +155,21 @@ class AgentExecutor:
 
                 response_text = ""
                 async for msg in client.receive_response():
-                    msg_type = type(msg).__name__
-
-                    # Support both raw SDK messages (AssistantMessage/TextBlock/ToolUseBlock)
-                    # and wrapped AgentMessage objects from ClaudeAgentClient
-                    if msg_type == "AgentMessage":
-                        # AgentMessage from ClaudeAgentClient — content is list[ContentBlock]
-                        role_val = str(getattr(getattr(msg, "role", None), "value", ""))
-                        if role_val == "assistant" and hasattr(msg, "content"):
-                            for block in msg.content:
-                                block_type_str = str(getattr(block, "type", ""))
-                                if "text" in block_type_str and getattr(
-                                    block, "text", None
-                                ):
-                                    response_text += block.text
-                                    print(block.text, end="", flush=True)
-                                elif "tool_use" in block_type_str and getattr(
-                                    block, "tool_name", None
-                                ):
-                                    debug_detailed(
-                                        "roadmap_executor",
-                                        f"Tool called: {block.tool_name}",
-                                    )
-                                    print(f"\n[Tool: {block.tool_name}]", flush=True)
-                    elif msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                        for block in msg.content:
-                            block_type = type(block).__name__
-                            if block_type == "TextBlock" and hasattr(block, "text"):
-                                response_text += block.text
-                                print(block.text, end="", flush=True)
-                            elif block_type == "ToolUseBlock" and hasattr(
-                                block, "name"
-                            ):
-                                debug_detailed(
-                                    "roadmap_executor", f"Tool called: {block.name}"
-                                )
-                                print(f"\n[Tool: {block.name}]", flush=True)
+                    # Every provider's client streams AgentMessage objects.
+                    for block in getattr(msg, "content", None) or []:
+                        btype = getattr(block, "type", None)
+                        if btype == ContentBlockType.TEXT and getattr(
+                            block, "text", None
+                        ):
+                            response_text += block.text
+                            print(block.text, end="", flush=True)
+                        elif btype == ContentBlockType.TOOL_USE and getattr(
+                            block, "tool_name", None
+                        ):
+                            debug_detailed(
+                                "roadmap_executor", f"Tool called: {block.tool_name}"
+                            )
+                            print(f"\n[Tool: {block.tool_name}]", flush=True)
 
                 print()
                 debug_success(
