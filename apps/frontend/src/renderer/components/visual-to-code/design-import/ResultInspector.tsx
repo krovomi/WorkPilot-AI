@@ -49,7 +49,8 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 	const { t } = useTranslation("designToCode");
 	const selected = useDesignToCodeStore((s) => s.selectedFilePath);
 	const selectFile = useDesignToCodeStore((s) => s.selectFile);
-	const [copied, setCopied] = useState<string | null>(null);
+	// The last copy: its file and whether the clipboard took it.
+	const [copied, setCopied] = useState<{ path: string; ok: boolean } | null>(null);
 	const current = files.find((f) => f.path === selected) ?? files[0];
 
 	const groups = new Map<string, FileEntry[]>();
@@ -59,14 +60,16 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 	}
 
 	const copy = async (file: FileEntry) => {
+		let ok = true;
 		try {
 			await navigator.clipboard.writeText(file.content);
-			setCopied(file.path);
-			setTimeout(() => setCopied(null), 1600);
 		} catch {
-			/* clipboard refused: nothing to show */
+			ok = false;
 		}
+		setCopied({ path: file.path, ok });
+		setTimeout(() => setCopied(null), 1600);
 	};
+	const copyState = copied?.path === current?.path ? copied : null;
 
 	return (
 		<div className="di-card di-files" style={{ ["--di-accent" as string]: accent }}>
@@ -105,12 +108,8 @@ function FilesView({ files, accent }: { files: FileEntry[]; accent: string }) {
 							{current.path}
 						</span>
 						<button type="button" className="di-btn ml-auto" onClick={() => copy(current)}>
-							{copied === current.path ? (
-								<Check className="h-3 w-3" />
-							) : (
-								<Copy className="h-3 w-3" />
-							)}
-							{t(copied === current.path ? "code.copied" : "code.copy")}
+							{copyState?.ok ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+							{t(copyState ? (copyState.ok ? "code.copied" : "code.copyFailed") : "code.copy")}
 						</button>
 					</div>
 					<pre data-testid="design-code-view">{current.content}</pre>

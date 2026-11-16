@@ -271,9 +271,8 @@ export function useProjectSettings(
 		};
 	}, [open, project.id, project.autoBuildPath]);
 
-	// Each connection is checked while its settings are complete, again when
-	// they change, and forgotten when they are not: a disabled integration
-	// kept showing the last "connected" badge.
+	// Check each integration only while its configuration is complete.
+	// The hook also discards stale responses and clears status when disabled.
 	const [linearConnectionStatus, isCheckingLinear] = useConnectionCheck(
 		Boolean(envConfig?.linearEnabled && envConfig.linearApiKey),
 		[project.id, envConfig?.linearApiKey],
@@ -286,8 +285,8 @@ export function useProjectSettings(
 	const [azureDevOpsConnectionStatus, isCheckingAzureDevOps] = useConnectionCheck(
 		Boolean(
 			envConfig?.azureDevOpsEnabled &&
-				envConfig.azureDevOpsPat &&
-				envConfig.azureDevOpsOrgUrl,
+			envConfig.azureDevOpsPat &&
+			envConfig.azureDevOpsOrgUrl,
 		),
 		[project.id, envConfig?.azureDevOpsPat, envConfig?.azureDevOpsOrgUrl],
 		async (projectId) => {
@@ -296,8 +295,7 @@ export function useProjectSettings(
 		},
 	);
 
-	// The global store action makes the call AND updates the global store, so
-	// the GitHub Issues page sees the new status too.
+	// Use the global action so the GitHub Issues page receives the same status.
 	const [gitHubConnectionStatus, isCheckingGitHub] = useConnectionCheck(
 		Boolean(envConfig?.githubEnabled && envConfig.githubToken && envConfig.githubRepo),
 		[project.id, envConfig?.githubToken, envConfig?.githubRepo],
@@ -312,6 +310,8 @@ export function useProjectSettings(
 			return result.success ? result.data : undefined;
 		},
 	);
+
+	
 
 	const toggleSection = (section: string) => {
 		setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));

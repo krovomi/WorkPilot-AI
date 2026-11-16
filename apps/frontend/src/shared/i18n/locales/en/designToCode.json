@@ -202,7 +202,8 @@
 	},
 	"code": {
 		"copy": "Copy",
-		"copied": "Copied"
+		"copied": "Copied",
+		"copyFailed": "Clipboard refused"
 	},
 	"composer": {
 		"target": "Target",
@@ -220,6 +221,7 @@
 		"taskCreated": "Task created",
 		"creatingTask": "Creating…",
 		"createTask": "Create a Kanban task",
+		"taskFailed": "The task could not be created. Try again.",
 		"regenerate": "Regenerate",
 		"written_one": "{{count}} file in review",
 		"written_other": "{{count}} files in review",
