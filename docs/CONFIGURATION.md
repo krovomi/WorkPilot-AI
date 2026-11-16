@@ -123,7 +123,10 @@ Implemented in [apps/backend/core/auth.py](../apps/backend/core/auth.py)
 | 3 | `config_dir` argument | Explicitly passed by the caller. |
 | 4 | `CLAUDE_CONFIG_DIR` env var | Profile-specific config directory. |
 | 5 | `.credentials.json` in (3) or (4) | File-based storage. |
-| 6 | System credential store | macOS Keychain, Windows Credential Manager, Linux Secret Service (via `secretstorage`). |
+| 6 | System credential store | macOS Keychain; on Windows the credential files Claude Code writes (`%USERPROFILE%\.claude\.credentials.json`…); on Linux the Secret Service (via `secretstorage`), then `~/.claude/.credentials.json`. A profile (3 or 4) reads only its own entry, never the default one. |
+
+A token in Claude Code's encrypted form (`enc:…`) is not decrypted: the build stops
+and says to run `claude setup-token` or to set a plaintext `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ### API profile mode (`ANTHROPIC_BASE_URL`)
 
