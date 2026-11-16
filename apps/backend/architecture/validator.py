@@ -13,6 +13,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from foundation.base_branch import detect_base_branch
 from foundation.debug import (
     debug,
     debug_error,
@@ -211,55 +212,8 @@ def _get_changed_files(project_dir: Path, spec_dir: Path) -> list[str] | None:
 
 
 def _detect_base_branch(spec_dir: Path, project_dir: Path) -> str:
-    """Detect the base branch for git diff (``foundation.base_branch``).
-
-    Hard-coded `main` fallback was wrong for repos using `master`/`develop`
-    (this very repo's main branch is `develop`!). When the import fails we
-    now probe `git symbolic-ref refs/remotes/origin/HEAD` to discover the
-    real default branch; if even that fails we fall back to `main` to keep
-    the previous behavior on totally fresh repos.
-    """
-    try:
-        from foundation.base_branch import detect_base_branch as _detect
-
-        return _detect(spec_dir, project_dir)
-    except ImportError:
-        pass
-
-    try:
-        result = subprocess.run(
-            ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-            cwd=str(project_dir),
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            ref = result.stdout.strip()
-            # Strip the `origin/` prefix if present.
-            if "/" in ref:
-                ref = ref.split("/", 1)[1]
-            if ref:
-                return ref
-    except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-        pass
-
-    # Try common defaults that exist locally.
-    for candidate in ("develop", "main", "master"):
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", candidate],
-                cwd=str(project_dir),
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return candidate
-        except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
-            continue
-
-    return "main"
+    """The task's base branch, as every reader of a task's diff sees it."""
+    return detect_base_branch(spec_dir, project_dir)
 
 
 def write_architecture_fix_request(spec_dir: Path, report_dict: dict) -> None:
@@ -314,5 +268,5 @@ def write_architecture_fix_request(spec_dir: Path, report_dict: dict) -> None:
 
         content = existing + "\n".join(lines)
         fix_request_path.write_text(content, encoding="utf-8")
-    except OSError:
-        pass
+    except (OSError, ValueError) as e:
+        debug_warning("architecture", f"Could not write {fix_request_path}: {e}")

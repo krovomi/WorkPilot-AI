@@ -66,19 +66,6 @@ class SwarmConfig:
             "subtask_timeout_seconds": self.subtask_timeout_seconds,
         }
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> SwarmConfig:
-        return cls(
-            max_parallel_agents=data.get("max_parallel_agents", 4),
-            fail_fast=data.get("fail_fast", False),
-            max_retries_per_subtask=data.get("max_retries_per_subtask", 2),
-            merge_after_each_wave=data.get("merge_after_each_wave", True),
-            profile_distribution=data.get("profile_distribution", "round_robin"),
-            enable_ai_merge=data.get("enable_ai_merge", True),
-            dry_run=data.get("dry_run", False),
-            subtask_timeout_seconds=data.get("subtask_timeout_seconds", 30 * 60.0),
-        )
-
 
 @dataclass
 class SubtaskNode:
@@ -98,11 +85,6 @@ class SubtaskNode:
     started_at: float | None = None
     completed_at: float | None = None
     process_pid: int | None = None
-
-    @property
-    def all_files(self) -> set[str]:
-        """All files this subtask touches (modify + create)."""
-        return set(self.files_to_modify) | set(self.files_to_create)
 
     @property
     def duration_seconds(self) -> float | None:

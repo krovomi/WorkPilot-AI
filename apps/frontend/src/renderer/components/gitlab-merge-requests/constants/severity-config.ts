@@ -34,32 +34,32 @@ export const SEVERITY_CONFIG: Record<
 	}
 > = {
 	critical: {
-		labelKey: "mrReview.severity.critical",
+		labelKey: "findings.severity.critical",
 		color: "text-destructive",
 		bgColor: "bg-destructive/10 border-destructive/30",
 		icon: XCircle,
-		descriptionKey: "mrReview.severity.criticalDesc",
+		descriptionKey: "findings.severity.criticalDesc",
 	},
 	high: {
-		labelKey: "mrReview.severity.high",
+		labelKey: "findings.severity.high",
 		color: "text-orange-500",
 		bgColor: "bg-orange-500/10 border-orange-500/30",
 		icon: AlertTriangle,
-		descriptionKey: "mrReview.severity.highDesc",
+		descriptionKey: "findings.severity.highDesc",
 	},
 	medium: {
-		labelKey: "mrReview.severity.medium",
+		labelKey: "findings.severity.medium",
 		color: "text-warning",
 		bgColor: "bg-warning/10 border-warning/30",
 		icon: AlertCircle,
-		descriptionKey: "mrReview.severity.mediumDesc",
+		descriptionKey: "findings.severity.mediumDesc",
 	},
 	low: {
-		labelKey: "mrReview.severity.low",
+		labelKey: "findings.severity.low",
 		color: "text-blue-500",
 		bgColor: "bg-blue-500/10 border-blue-500/30",
 		icon: CheckCircle,
-		descriptionKey: "mrReview.severity.lowDesc",
+		descriptionKey: "findings.severity.lowDesc",
 	},
 };
 
@@ -71,9 +71,8 @@ export const CATEGORY_ICONS: Record<string, typeof Shield> = {
 	performance: Zap,
 	style: Code,
 	pattern: Code,
-	logic: AlertCircle,
 };
 
 export function getCategoryIcon(category: string) {
-	return CATEGORY_ICONS[category] || Code;
+	return CATEGORY_ICONS[category] ?? Code;
 }

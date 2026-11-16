@@ -100,3 +100,32 @@ describe("prIpcMain", () => {
 		expect(listener).toHaveBeenCalledWith({}, "p", 5);
 	});
 });
+
+describe("the review post and the memory view", () => {
+	it("posts a review with the ids of the chosen findings and only the approve option", () => {
+		const post = IPC_CHANNELS.GITHUB_PR_POST_REVIEW;
+		expect(prArgsAllowed(post, ["p", 7])).toBe(true);
+		expect(prArgsAllowed(post, ["p", 7, ["f-1", "f-2"], { forceApprove: true }])).toBe(true);
+		expect(prArgsAllowed(post, ["p", 7, undefined, {}])).toBe(true);
+		expect(prArgsAllowed(post, ["p", "7"])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, "f-1"])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, [1]])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, Array.from({ length: 501 }, (_, i) => `f-${i}`)])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, [], { forceApprove: "yes" }])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, [], { event: "APPROVE" }])).toBe(false);
+		expect(prArgsAllowed(post, ["p", 7, [], null])).toBe(false);
+	});
+
+	it("reads memories with an optional positive limit, and searches them with a text", () => {
+		const get = IPC_CHANNELS.GITHUB_PR_MEMORY_GET;
+		const search = IPC_CHANNELS.GITHUB_PR_MEMORY_SEARCH;
+		expect(prArgsAllowed(get, ["p"])).toBe(true);
+		expect(prArgsAllowed(get, ["p", 20])).toBe(true);
+		expect(prArgsAllowed(get, ["p", -1])).toBe(false);
+		expect(prArgsAllowed(get, ["p", "20"])).toBe(false);
+		expect(prArgsAllowed(search, ["p", "auth", 5])).toBe(true);
+		expect(prArgsAllowed(search, ["p", "auth"])).toBe(true);
+		expect(prArgsAllowed(search, ["p", 5])).toBe(false);
+		expect(prArgsAllowed(search, ["p", "auth", 0])).toBe(false);
+	});
+});
