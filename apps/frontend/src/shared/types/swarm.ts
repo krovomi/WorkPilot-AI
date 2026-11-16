@@ -30,20 +30,34 @@ export interface SwarmConfig {
 	maxParallelAgents: number;
 	failFast: boolean;
 	maxRetriesPerSubtask: number;
-	mergeAfterEachWave: boolean;
 	profileDistribution: "round_robin" | "least_loaded" | "dedicated";
-	enableAiMerge: boolean;
-	dryRun: boolean;
 }
 
 export const DEFAULT_SWARM_CONFIG: SwarmConfig = {
 	maxParallelAgents: 4,
 	failFast: false,
 	maxRetriesPerSubtask: 2,
-	mergeAfterEachWave: true,
 	profileDistribution: "round_robin",
-	enableAiMerge: true,
-	dryRun: false,
+};
+
+/**
+ * The person's swarm setting (Settings, Swarm Mode), saved with the app's
+ * settings. When it is on, a task's build runs the subtasks its plan lets
+ * run side by side in parallel, each in its own worktree, and merges them
+ * wave after wave (`apps/backend/agents/swarm/build_phase.py`).
+ */
+export interface SwarmSettings {
+	enabled: boolean;
+	maxParallelAgents: number;
+	failFast: boolean;
+	maxRetriesPerSubtask: number;
+}
+
+export const DEFAULT_SWARM_SETTINGS: SwarmSettings = {
+	enabled: false,
+	maxParallelAgents: DEFAULT_SWARM_CONFIG.maxParallelAgents,
+	failFast: DEFAULT_SWARM_CONFIG.failFast,
+	maxRetriesPerSubtask: DEFAULT_SWARM_CONFIG.maxRetriesPerSubtask,
 };
 
 // ─── Data Models ────────────────────────────────────────────────────────────

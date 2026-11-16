@@ -16,6 +16,7 @@ from foundation.debug import (
 )
 from ui import print_status
 
+from .files import read_object, snapshot, written_since
 from .models import RoadmapPhaseResult
 
 if TYPE_CHECKING:
@@ -130,12 +131,13 @@ class DiscoveryPhase:
             )
 
             context = self._build_context()
+            before = snapshot(self.discovery_file)
             success, output = await self.agent_executor.run_agent(
                 "roadmap_discovery.md",
                 additional_context=context,
             )
 
-            if success and self.discovery_file.exists():
+            if success and written_since(self.discovery_file, before):
                 validation_result = self._validate_discovery(attempt)
                 if validation_result is not None:
                     return validation_result
@@ -176,30 +178,26 @@ Do NOT ask questions. Make educated inferences and create the file.
 
         Returns RoadmapPhaseResult if validation succeeds, None otherwise.
         """
-        try:
-            with open(self.discovery_file, encoding="utf-8") as f:
-                data = json.load(f)
-
-            required = ["project_name", "target_audience", "product_vision"]
-            missing = [k for k in required if k not in data]
-
-            if not missing:
-                debug_success(
-                    "roadmap_phase",
-                    "Created valid roadmap_discovery.json",
-                    attempt=attempt + 1,
-                )
-                print_status("Created valid roadmap_discovery.json", "success")
-                return RoadmapPhaseResult(
-                    "discovery", True, [str(self.discovery_file)], [], attempt
-                )
-            else:
-                debug_warning("roadmap_phase", f"Missing required fields: {missing}")
-                return None
-
-        except json.JSONDecodeError as e:
-            debug_error("roadmap_phase", "Invalid JSON in discovery file", error=str(e))
+        data = read_object(self.discovery_file)
+        if data is None:
+            debug_error("roadmap_phase", "The discovery file is not a JSON object")
             return None
+
+        required = ["project_name", "target_audience", "product_vision"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            debug_warning("roadmap_phase", f"Missing required fields: {missing}")
+            return None
+
+        debug_success(
+            "roadmap_phase",
+            "Created valid roadmap_discovery.json",
+            attempt=attempt + 1,
+        )
+        print_status("Created valid roadmap_discovery.json", "success")
+        return RoadmapPhaseResult(
+            "discovery", True, [str(self.discovery_file)], [], attempt
+        )
 
 
 class FeaturesPhase:
@@ -236,65 +234,38 @@ class FeaturesPhase:
             debug("roadmap_phase", "No existing roadmap.json to load features from")
             return []
 
-        try:
-            with open(self.roadmap_file, encoding="utf-8") as f:
-                data = json.load(f)
+        data = read_object(self.roadmap_file)
+        features = data.get("features") if data is not None else None
+        if not isinstance(features, list):
+            debug_error(
+                "roadmap_phase", "The existing roadmap.json has no feature list"
+            )
+            return []
 
-            features = data.get("features", [])
-            preserved = []
-
-            for feature in features:
-                # Check if feature should be preserved
-                status = feature.get("status")
-                has_linked_spec = bool(feature.get("linked_spec_id"))
-                source = feature.get("source", {})
-                is_internal = (
-                    isinstance(source, dict) and source.get("provider") == "internal"
+        preserved = []
+        for feature in features:
+            if not isinstance(feature, dict):
+                continue
+            source = feature.get("source")
+            if (
+                feature.get("status") in ("planned", "in_progress", "done")
+                or feature.get("linked_spec_id")
+                or (isinstance(source, dict) and source.get("provider") == "internal")
+            ):
+                preserved.append(feature)
+                debug_detailed(
+                    "roadmap_phase",
+                    "Preserving feature",
+                    feature_id=feature.get("id"),
+                    status=feature.get("status"),
+                    linked_spec_id=feature.get("linked_spec_id"),
                 )
 
-                if status in ("planned", "in_progress", "done"):
-                    preserved.append(feature)
-                    debug_detailed(
-                        "roadmap_phase",
-                        f"Preserving feature due to status: {status}",
-                        feature_id=feature.get("id"),
-                    )
-                elif has_linked_spec:
-                    preserved.append(feature)
-                    debug_detailed(
-                        "roadmap_phase",
-                        "Preserving feature due to linked_spec_id",
-                        feature_id=feature.get("id"),
-                        linked_spec_id=feature.get("linked_spec_id"),
-                    )
-                elif is_internal:
-                    preserved.append(feature)
-                    debug_detailed(
-                        "roadmap_phase",
-                        "Preserving feature due to internal source",
-                        feature_id=feature.get("id"),
-                    )
-
-            debug(
-                "roadmap_phase",
-                f"Loaded {len(preserved)} features to preserve from existing roadmap",
-            )
-            return preserved
-
-        except json.JSONDecodeError as e:
-            debug_error(
-                "roadmap_phase",
-                "Failed to parse existing roadmap.json",
-                error=str(e),
-            )
-            return []
-        except (KeyError, TypeError) as e:
-            debug_error(
-                "roadmap_phase",
-                "Error reading features from roadmap.json",
-                error=str(e),
-            )
-            return []
+        debug(
+            "roadmap_phase",
+            f"Loaded {len(preserved)} features to preserve from existing roadmap",
+        )
+        return preserved
 
     def _merge_features(
         self, new_features: list[dict], preserved: list[dict]
@@ -312,15 +283,9 @@ class FeaturesPhase:
         Returns:
             Merged list with preserved features first, then non-conflicting new features
         """
-        if not preserved:
-            debug("roadmap_phase", "No preserved features, returning new features only")
-            return new_features
-
         preserved_ids = {f.get("id") for f in preserved if f.get("id")}
         # Build normalized title set for fallback deduplication
-        preserved_titles = {
-            f.get("title", "").strip().lower() for f in preserved if f.get("title")
-        }
+        preserved_titles = {_title(f).lower() for f in preserved if _title(f)}
 
         # Start with all preserved features
         merged = list(preserved)
@@ -329,8 +294,10 @@ class FeaturesPhase:
 
         # Add new features that don't conflict with preserved ones
         for feature in new_features:
+            if not isinstance(feature, dict):
+                continue
             feature_id = feature.get("id")
-            feature_title = feature.get("title", "").strip()
+            feature_title = _title(feature)
             normalized_title = feature_title.lower()
 
             if feature_id and feature_id in preserved_ids:
@@ -393,12 +360,13 @@ class FeaturesPhase:
             print_status("Generating features...", "progress")
 
             context = self._build_context()
+            before = snapshot(self.roadmap_file)
             success, output = await self.agent_executor.run_agent(
                 "roadmap_features.md",
                 additional_context=context,
             )
 
-            if success and self.roadmap_file.exists():
+            if success and written_since(self.roadmap_file, before):
                 print_status("Prioritizing features...", "progress")
                 print_status("Creating roadmap file...", "progress")
                 validation_result = self._validate_features(attempt)
@@ -473,93 +441,96 @@ Output the complete roadmap to roadmap.json.
 
         Returns RoadmapPhaseResult if validation succeeds, None otherwise.
         """
-        try:
-            with open(self.roadmap_file, encoding="utf-8") as f:
-                data = json.load(f)
+        data = read_object(self.roadmap_file)
+        if data is None:
+            debug_error("roadmap_phase", "The roadmap file is not a JSON object")
+            return None
 
-            required = ["phases", "features", "vision", "target_audience"]
-            missing = [k for k in required if k not in data]
-            feature_count = len(data.get("features", []))
+        required = ["phases", "features", "vision", "target_audience"]
+        missing = [k for k in required if k not in data]
+        features = data.get("features")
+        if not isinstance(features, list):
+            features = []
+            missing.append("features (not a list)")
+        feature_count = len(features)
 
-            # Validate target_audience structure with type checking
-            target_audience = data.get("target_audience", {})
-            if not isinstance(target_audience, dict):
-                debug_warning(
-                    "roadmap_phase",
-                    f"Invalid target_audience type: expected dict, got {type(target_audience).__name__}",
-                )
-                missing.append("target_audience (invalid type)")
-            elif not target_audience.get("primary"):
-                missing.append("target_audience.primary")
-
-            debug_detailed(
+        # Validate target_audience structure with type checking
+        target_audience = data.get("target_audience", {})
+        if not isinstance(target_audience, dict):
+            debug_warning(
                 "roadmap_phase",
-                "Validating roadmap.json",
-                missing_fields=missing,
-                feature_count=feature_count,
+                f"Invalid target_audience type: expected dict, got {type(target_audience).__name__}",
             )
+            missing.append("target_audience (invalid type)")
+        elif not target_audience.get("primary"):
+            missing.append("target_audience.primary")
 
-            if not missing and feature_count >= 3:
-                # Merge preserved features into the roadmap
-                # Use the pre-loaded preserved features (loaded before agent ran)
-                if self._preserved_features:
-                    new_features = data.get("features", [])
-                    merged_features = self._merge_features(
-                        new_features, self._preserved_features
-                    )
-                    data["features"] = merged_features
+        debug_detailed(
+            "roadmap_phase",
+            "Validating roadmap.json",
+            missing_fields=missing,
+            feature_count=feature_count,
+        )
 
-                    # Write back the merged roadmap
-                    try:
-                        with open(self.roadmap_file, "w", encoding="utf-8") as f:
-                            json.dump(data, f, indent=2)
-                        debug_success(
-                            "roadmap_phase",
-                            "Merged preserved features into roadmap.json",
-                            preserved_count=len(self._preserved_features),
-                            final_count=len(merged_features),
-                        )
-                        print_status(
-                            f"Merged {len(self._preserved_features)} preserved features",
-                            "success",
-                        )
-                    except OSError as e:
-                        # Write failed but the original AI-generated roadmap is still valid
-                        # Don't fail the whole phase - succeed without the merge
-                        preserved_count = len(self._preserved_features)
-                        debug_warning(
-                            "roadmap_phase",
-                            "Failed to write merged roadmap - proceeding with AI-generated version",
-                            error=str(e),
-                            preserved_features_lost=preserved_count,
-                        )
-                        print_status(
-                            f"Warning: {preserved_count} preserved features could not be saved (disk error: {e})",
-                            "warning",
-                        )
+        if missing:
+            debug_warning("roadmap_phase", f"Missing required fields: {missing}")
+            return None
+        if feature_count < 3:
+            debug_warning(
+                "roadmap_phase",
+                f"Roadmap has only {feature_count} features (min 3)",
+            )
+            return None
 
+        # Merge preserved features into the roadmap
+        # Use the pre-loaded preserved features (loaded before agent ran)
+        if self._preserved_features:
+            merged_features = self._merge_features(features, self._preserved_features)
+            data["features"] = merged_features
+
+            # Write back the merged roadmap
+            try:
+                self.roadmap_file.write_text(
+                    json.dumps(data, indent=2), encoding="utf-8"
+                )
                 debug_success(
                     "roadmap_phase",
-                    "Created valid roadmap.json",
-                    attempt=attempt + 1,
-                    feature_count=len(data.get("features", [])),
+                    "Merged preserved features into roadmap.json",
+                    preserved_count=len(self._preserved_features),
+                    final_count=len(merged_features),
                 )
-                print_status("Created valid roadmap.json", "success")
-                return RoadmapPhaseResult(
-                    "features", True, [str(self.roadmap_file)], [], attempt
+                print_status(
+                    f"Merged {len(self._preserved_features)} preserved features",
+                    "success",
                 )
-            else:
-                if missing:
-                    debug_warning(
-                        "roadmap_phase", f"Missing required fields: {missing}"
-                    )
-                else:
-                    debug_warning(
-                        "roadmap_phase",
-                        f"Roadmap has only {feature_count} features (min 3)",
-                    )
-                return None
+            except OSError as e:
+                # Write failed but the original AI-generated roadmap is still valid
+                # Don't fail the whole phase - succeed without the merge
+                preserved_count = len(self._preserved_features)
+                debug_warning(
+                    "roadmap_phase",
+                    "Failed to write merged roadmap - proceeding with AI-generated version",
+                    error=str(e),
+                    preserved_features_lost=preserved_count,
+                )
+                print_status(
+                    f"Warning: {preserved_count} preserved features could not be saved (disk error: {e})",
+                    "warning",
+                )
 
-        except json.JSONDecodeError as e:
-            debug_error("roadmap_phase", "Invalid JSON in roadmap file", error=str(e))
-            return None
+        debug_success(
+            "roadmap_phase",
+            "Created valid roadmap.json",
+            attempt=attempt + 1,
+            feature_count=len(data["features"]),
+        )
+        print_status("Created valid roadmap.json", "success")
+        return RoadmapPhaseResult(
+            "features", True, [str(self.roadmap_file)], [], attempt
+        )
+
+
+def _title(feature: dict) -> str:
+    """A feature's title, trimmed; empty when it has none (or not a text one)."""
+    title = feature.get("title")
+    return title.strip() if isinstance(title, str) else ""

@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 # Maximum diff size (in characters) before truncating to file-level summaries
 MAX_DIFF_CHARS = 30_000
 
+#: Where GitHub looks for a pull request template, relative to the repository.
+SINGLE_TEMPLATE = Path(".github", "PULL_REQUEST_TEMPLATE.md")
+TEMPLATE_DIR = Path(".github", "PULL_REQUEST_TEMPLATE")
+
 
 def detect_pr_template(project_dir: Path | str) -> str | None:
     """
@@ -36,7 +40,7 @@ def detect_pr_template(project_dir: Path | str) -> str | None:
     """
     project_dir = Path(project_dir)
     # Check for single template file
-    single_template = project_dir / ".github" / "PULL_REQUEST_TEMPLATE.md"
+    single_template = project_dir / SINGLE_TEMPLATE
     if single_template.is_file():
         try:
             content = single_template.read_text(encoding="utf-8")
@@ -47,7 +51,7 @@ def detect_pr_template(project_dir: Path | str) -> str | None:
             logger.warning(f"Failed to read PR template {single_template}: {e}")
 
     # Check for template directory (pick first .md file alphabetically)
-    template_dir = project_dir / ".github" / "PULL_REQUEST_TEMPLATE"
+    template_dir = project_dir / TEMPLATE_DIR
     if template_dir.is_dir():
         try:
             md_files = sorted(template_dir.glob("*.md"))
