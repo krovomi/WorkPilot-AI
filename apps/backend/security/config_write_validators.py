@@ -33,11 +33,18 @@ are a short one, and a false refusal costs an agent one rephrasing.
 on them. A `cd` earlier in the line is followed, so
 `cd .workpilot && echo … > guardrails.yaml` is judged as the path it writes.
 
+A file name is read in every spelling the shell gives it: with its escapes
+taken off (`.workpilot-allow\\list` is the allowlist), and, when the shell
+computes it (`$f`, `$(…)`, backticks), against what the line around it says:
+a computed write target is refused when the line names a protected file or
+holds a piece of one.
+
 What it does not see
 --------------------
 A name that is not on the command line: a script the agent wrote and then
-runs, a name assembled from variables, a patch, an archive, a branch checked
-out. A validator reads text, and those write through content it is not shown.
+runs, a name decoded or read from a file, a patch, an archive, a branch
+checked out. A validator reads text, and those write through content it is
+not shown.
 """
 
 from __future__ import annotations
@@ -153,6 +160,45 @@ _MENTIONS: tuple[str, ...] = tuple(
 def _mentioned(text: str) -> str | None:
     folded = re.sub(r"[\\/]+", "/", text.casefold())
     return next((marker for marker in _MENTIONS if marker in folded), None)
+
+
+#: What the shell expands before it opens a file.
+_EXPANSION = re.compile(r"\$\{[^}]*\}?|\$\([^)]*\)?|\$[A-Za-z_0-9@*#?$!-]*|`[^`]*`?")
+
+#: What a line is cut into to find the pieces a name could be put together
+#: from: its words, and the literal parts between the shell's expansions.
+_PIECE_BREAKS = re.compile(r"[\s'\"=;|&(){}<>,]+")
+
+#: The shortest piece taken as part of a protected name: `.claude`, `mcp-pins`
+#: are longer, `log`, `json` and `list` are everybody's.
+_MIN_PIECE = 5
+
+
+def _unescaped(text: str) -> str:
+    """``text`` as the shell reads it once its backslash escapes are taken off."""
+    return re.sub(r"\\(.)", r"\1", text)
+
+
+def _computed_target(token: str, line: str) -> str | None:
+    """The protected file a shell-computed name could be, or ``None``.
+
+    `$f`, `$(printf …)`, `` `…` ``: the name exists only once the shell has
+    run. What is left is the line: the name spelled whole somewhere in it
+    (`f=.workpilot-allowlist`), or pieces of one (`.workpilot-allow$(echo
+    list)`, `a=.workpilot-; b=allowlist`). A computed write next to neither
+    (`> "$OUT"`, `cp a "$DEST/b.txt"`) goes through.
+    """
+    if not _EXPANSION.search(token):
+        return None
+    text = _unescaped(line).casefold()
+    if (target := _mentioned(text)) is not None:
+        return target
+    for word in _PIECE_BREAKS.split(text):
+        for piece in _EXPANSION.split(word):
+            piece = re.sub(r"[\\/]+", "/", piece).strip("/")
+            if len(piece) >= _MIN_PIECE and any(piece in m for m in _MENTIONS):
+                return token
+    return None
 
 
 def _split_operators(token: str) -> list[str]:
@@ -300,11 +346,21 @@ def _under(cwd: str, path: str) -> str:
     return f"{cwd}/{path}"
 
 
-def _named_target(path: str, cwd: str) -> str | None:
-    return _protected_target(_under(cwd, _unquote(path)), glob=True)
+def _spellings(token: str) -> list[str]:
+    """``token`` as written, and as the shell opens it once unescaped."""
+    plain = _unquote(token)
+    unescaped = _unescaped(plain)
+    return [plain] if unescaped == plain else [plain, unescaped]
 
 
-def _argument_target(token: str, cwd: str) -> str | None:
+def _named_target(path: str, cwd: str, line: str = "") -> str | None:
+    for spelling in _spellings(path):
+        if (target := _protected_target(_under(cwd, spelling), glob=True)) is not None:
+            return target
+    return _computed_target(path, line)
+
+
+def _argument_target(token: str, cwd: str, line: str = "") -> str | None:
     """The protected file an argument names or mentions, or ``None``."""
     candidates = [token]
     if "=" in token:
@@ -312,12 +368,17 @@ def _argument_target(token: str, cwd: str) -> str | None:
     if token.startswith("-") and not token.startswith("--") and len(token) > 2:
         candidates.append(token[2:])  # `-o.workpilot-allowlist`
     for candidate in candidates:
-        target = _protected_target(
-            _under(cwd, _unquote(candidate)), glob=True, directories=True
-        )
-        if target is not None:
-            return target
-    return _mentioned(token)
+        for spelling in _spellings(candidate):
+            target = _protected_target(
+                _under(cwd, spelling), glob=True, directories=True
+            )
+            if target is not None:
+                return target
+    return (
+        _mentioned(token)
+        or _mentioned(_unescaped(token))
+        or _computed_target(token, line)
+    )
 
 
 def _next_cwd(cwd: str, name: str, arguments: list[str]) -> str:
@@ -365,7 +426,7 @@ def _judge(line: str, depth: int) -> ValidationResult:
             if token in _WRITE_REDIRECTS or token in _READ_REDIRECTS:
                 operand = command[index + 1] if index + 1 < len(command) else ""
                 if token in _WRITE_REDIRECTS and operand:
-                    if (target := _named_target(operand, cwd)) is not None:
+                    if (target := _named_target(operand, cwd, line)) is not None:
                         return _refusal(target)
                 index += 2
                 continue
@@ -384,7 +445,7 @@ def _judge(line: str, depth: int) -> ValidationResult:
 
         if not _only_reads(name, arguments):
             for argument in arguments:
-                if (target := _argument_target(argument, cwd)) is not None:
+                if (target := _argument_target(argument, cwd, line)) is not None:
                     return _refusal(target)
 
         if name in ("cd", "pushd", "popd"):
