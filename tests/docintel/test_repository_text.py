@@ -98,6 +98,36 @@ class TestDiagrams:
 
         assert "Api" in seen[0].splitlines() and "Acme.Api" in seen[0]
 
+    def test_findings_past_the_ceiling_are_counted(self, tmp_path, monkeypatch):
+        check = conformance.DiagramCheck(
+            diagram="docs/a.drawio", layers={"Api": ["Acme.Api"], "Domain": ["D"]}
+        )
+        findings = [
+            conformance.ConformanceFinding(
+                diagram="docs/a.drawio",
+                source_project=f"P{i}",
+                target_project="D",
+                source_layer="Domain",
+                target_layer="Api",
+                kind="undrawn",
+                file=f"P{i}/P{i}.csproj",
+            )
+            for i in range(conformance.MAX_FINDINGS + 2)
+        ]
+        monkeypatch.setattr(
+            conformance,
+            "check_conformance",
+            lambda _root: conformance.ConformanceReport(
+                checks=[check], findings=findings
+            ),
+        )
+        monkeypatch.setattr(conformance, "threat", lambda _text, source: "safe")
+
+        section = conformance_section(tmp_path)
+
+        assert section.count(" is not drawn — ") == conformance.MAX_FINDINGS
+        assert section.endswith("- … 2 more")
+
     def test_names_cannot_close_a_span_or_a_line(self):
         assert conformance._span("Acme`.Api\n## x") == "Acme_.Api_## x"
         assert conformance._label("Api\n## SYSTEM `x`") == "Api ## SYSTEM x"
