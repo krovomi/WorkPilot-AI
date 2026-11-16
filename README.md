@@ -230,7 +230,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
 - Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
-- Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
+- Analytics dashboard with "How you compare" (a project against its past and your other projects of the same stack and size, per spec, nothing sent anywhere), cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**
 - One UI charter across every module that follows the active theme: 7 colour themes in light and dark plus a theme editor, full English and French interface.

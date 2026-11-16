@@ -37,7 +37,8 @@
 		"costs": "Coûts",
 		"performance": "Performance",
 		"builds": "Builds",
-		"errors": "Erreurs"
+		"errors": "Erreurs",
+		"compare": "Où vous en êtes"
 	},
 	"sections": {
 		"tasksByStatus": "Tâches par Statut",
@@ -98,5 +99,51 @@
 		"pending": "En attente",
 		"failed": "Échouées",
 		"cancelled": "Annulées"
+	},
+	"compare": {
+		"title": "Où vous en êtes",
+		"loading": "Lecture de vos projets...",
+		"error": "Impossible de comparer ce projet",
+		"privacyLocal": "Comparé à vos autres projets sur cet ordinateur, lus dans leurs dossiers. Rien ne quitte votre ordinateur.",
+		"privacyServer_one": "Comparé aux projets de votre organisation que vous pouvez lire, en médianes seulement, jamais par leur nom, et pour des groupes d'au moins {{count}} projet. Rien ne quitte le serveur.",
+		"privacyServer_other": "Comparé aux projets de votre organisation que vous pouvez lire, en médianes seulement, jamais par leur nom, et pour des groupes d'au moins {{count}} projets. Rien ne quitte le serveur.",
+		"window_one": "Médianes par spec sur les {{days}} derniers jours ({{count}} spec), contre les {{days}} jours d'avant ({{previous}}).",
+		"window_other": "Médianes par spec sur les {{days}} derniers jours ({{count}} specs), contre les {{days}} jours d'avant ({{previous}}).",
+		"columns": {
+			"metric": "Par spec",
+			"recent": "Ce projet",
+			"previous": "Avant",
+			"trend": "Tendance",
+			"project": "Projet",
+			"segment": "Pile et taille",
+			"specs": "Specs"
+		},
+		"groups": {
+			"segment": "Même pile et taille",
+			"stack": "Même pile",
+			"all": "Tous les projets"
+		},
+		"projectCount_one": "{{count}} projet",
+		"projectCount_other": "{{count}} projets",
+		"metrics": {
+			"minutes": "Durée du build",
+			"cost": "Coût (USD)",
+			"qaIterations": "Itérations de QA",
+			"agents": "Agents"
+		},
+		"sizes": {
+			"small": "Petit dépôt",
+			"medium": "Dépôt moyen",
+			"large": "Grand dépôt",
+			"monorepo": "Monorepo",
+			"unknown": "Taille inconnue"
+		},
+		"otherStack": "Autre pile",
+		"smallGroup_one": "La médiane d'un groupe s'affiche à partir de {{count}} projet actif.",
+		"smallGroup_other": "La médiane d'un groupe s'affiche à partir de {{count}} projets actifs : en dessous, seul leur nombre.",
+		"lowerIsBetter": "Plus bas, c'est mieux, pour chaque chiffre. La durée d'un build va de la première session d'agent de la spec à la dernière.",
+		"yourProjects": "Vos autres projets",
+		"noOtherProjects": "Aucun de vos autres projets n'a construit de spec sur cette période.",
+		"ciPending": "Le taux de CI vert du premier coup n'est pas encore enregistré : il n'est pas comparé."
 	}
 }
