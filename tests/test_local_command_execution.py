@@ -4,14 +4,15 @@ import asyncio
 import os
 import shlex
 import subprocess
-import sys
 
 import pytest
 from core.runtimes.tool_executor import ToolExecutor
 
+from tests.allowlisted_python import allowlisted_python
+
 
 def command(script):
-    args = [sys.executable, "-c", script]
+    args = [allowlisted_python(), "-c", script]
     return subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
 
 

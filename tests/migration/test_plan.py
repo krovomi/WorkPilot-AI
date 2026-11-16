@@ -213,6 +213,47 @@ class TestOrchestrator:
         assert orchestrator.context is None
         assert not (project / ".workpilot").exists()
 
+    def test_a_framework_that_stays_is_planned_on_its_languages(self, tmp_path):
+        # A React app moved from JavaScript to TypeScript: no (react, typescript)
+        # pair, but the planner knows (javascript, typescript).
+        project = tmp_path / "shop"
+        (project / "src").mkdir(parents=True)
+        (project / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "18.2.0"}}), encoding="utf-8"
+        )
+        (project / "src" / "App.jsx").write_text("export const A = 1;\n", "utf-8")
+
+        context = MigrationOrchestrator(str(project)).start_migration(
+            target_framework="typescript", target_language="typescript"
+        )
+
+        assert context.source_stack.framework == "react"  # as detected
+        assert "typescript_migration" in _ids(context.plan)
+
+    def test_a_language_pair_is_found_when_no_framework_is_named(self, tmp_path):
+        project = tmp_path / "svc"
+        (project / "src").mkdir(parents=True)
+        (project / "pom.xml").write_text("<project/>", encoding="utf-8")
+        (project / "src" / "App.java").write_text("class App {}\n", "utf-8")
+
+        context = MigrationOrchestrator(str(project)).start_migration(
+            target_framework="modern", target_language="kotlin"
+        )
+
+        assert context.plan.estimated_duration_hours == float(
+            SUPPORTED_MIGRATIONS[("java", "kotlin")]["estimated_effort_hours"]
+        )
+
+    def test_the_framework_pair_wins_over_the_languages(self):
+        from migration.orchestrator import known_pair
+
+        source = StackInfo(framework="react", language="javascript", version="18")
+        target = StackInfo(framework="vue", language="typescript", version="3")
+
+        assert known_pair(source, target) == ("react", "vue")
+        target = StackInfo(framework="cobol", language="cobol", version="1")
+        assert known_pair(source, target) is None
+
     def test_a_context_without_a_plan_serialises(self, tmp_path):
         from migration.models import MigrationContext
 

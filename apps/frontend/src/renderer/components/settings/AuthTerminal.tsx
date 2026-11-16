@@ -64,6 +64,9 @@ export function AuthTerminal({
 	const loginTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track setTimeout for cleanup
 	const successTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Track success auto-close timeout for cleanup
 	const authCompletedRef = useRef(false); // Track if auth has already completed to prevent race conditions
+	// Closed before the terminal was created: the terminal created afterwards is
+	// destroyed at once instead of being left running.
+	const unmountedRef = useRef(false);
 
 	const [status, setStatus] = useState<
 		"connecting" | "ready" | "onboarding" | "success" | "error"
@@ -177,6 +180,10 @@ export function AuthTerminal({
 					return;
 				}
 
+				if (unmountedRef.current) {
+					globalThis.electronAPI.destroyTerminal(terminalId).catch(console.error);
+					return;
+				}
 				isCreatedRef.current = true;
 				setStatus("ready");
 
@@ -329,8 +336,8 @@ export function AuthTerminal({
 
 					// Additional check for email/user info extraction
 					const emailRegex = /(?:email|user|account):\s*([^\s\r\n]+)/i;
-					const emailMatch = emailRegex.exec(data);
-					const extractedEmail = emailMatch ? emailMatch[1] : "Codex CLI User";
+					// No address shown: the header says « Authenticated » without one.
+					const extractedEmail = emailRegex.exec(data)?.[1];
 
 					if (hasSuccessIndicator) {
 						debugLog(
@@ -469,9 +476,8 @@ export function AuthTerminal({
 						{ terminalId },
 					);
 					authCompletedRef.current = true;
-					setAuthEmail("Codex CLI User");
 					setStatus("success");
-					onAuthSuccess?.("Codex CLI User");
+					onAuthSuccess?.(undefined);
 				}
 				// Don't close automatically - let user see any error messages
 			}
@@ -550,7 +556,9 @@ export function AuthTerminal({
 
 	// Cleanup terminal on unmount
 	useEffect(() => {
+		unmountedRef.current = false;
 		return () => {
+			unmountedRef.current = true;
 			debugLog("Component unmounting", {
 				terminalId,
 				isCreated: isCreatedRef.current,
@@ -622,6 +630,7 @@ export function AuthTerminal({
 					variant="ghost"
 					size="icon"
 					onClick={handleClose}
+					aria-label={t("buttons.close")}
 					className="h-6 w-6"
 				>
 					<X className="h-4 w-4" />
