@@ -40,7 +40,7 @@ WorkPilot AI is a desktop application (+ CLI) where users describe a goal and AI
 - **Microsoft Teams Notifications** — Webhook-based notifications for task completion and PR creation
 - **Changelog** — Generate release notes from completed tasks
 - **Memory System** — one Obsidian vault (the shared brain) keeps what every build learns, read by every agent
-- **Isolated Workspaces** — Git worktree isolation for every build; AI-powered semantic merge
+- **Isolated Workspaces** — Git worktree isolation for every build; a git merge where the user's own AI provider merges each file both sides changed, after a preview of the changes two tasks made to the same function
 - **Self-Healing** — Incident response system with CI/CD failure analysis, proactive monitoring, and production responder
 - **Pixel Office** — Multi-agent coordination visualization with task queue UI
 - **Learning Loop** — Analytics and learning system for continuous improvement
