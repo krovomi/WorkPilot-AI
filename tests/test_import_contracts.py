@@ -211,8 +211,15 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Test generation, the generator included; its model call goes through
     # the agent_runtime port.
     "test_generation": {"agent_runtime", "foundation", "project"},
-    # The QA loop's architecture gate; its reviewer's prompt is built here.
-    "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
+    # The QA loop's architecture gate; its reviewer's prompt is built here,
+    # with the project's rules quoted as data (security.untrusted, rule S2).
+    "architecture": {
+        "agent_runtime",
+        "foundation",
+        "phase_config",
+        "security",
+        "task_logger",
+    },
     # Out of the agents' cycle since A1's third step. The archify map builds its
     # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
     "architecture_visualizer": {"foundation"},

@@ -1,5 +1,4 @@
 {
-  "apps/backend/architecture_visualizer/analyzer.py": 7,
   "apps/backend/codex_models.py": 1,
   "apps/backend/core/agent_clients/cli_subprocess.py": 1,
   "apps/backend/core/codex_cli_client.py": 1,
