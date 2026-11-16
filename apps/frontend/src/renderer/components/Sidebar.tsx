@@ -100,7 +100,7 @@ import { MenuModeCard } from "./sidebar/MenuModeCard";
 import { SidebarResizeHandle } from "./sidebar/SidebarResizeHandle";
 import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
 import { useSidebarResize } from "./sidebar/use-sidebar-resize";
-import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
+import { HiddenList, HideSuggestion, SIDEBAR_FOOTER_LINK } from "./sidebar/HiddenPages";
 import { LaboPanel } from "./sidebar/LaboPanel";
 import {
 	ESSENTIAL_VIEWS,
@@ -1091,16 +1091,16 @@ export function Sidebar({
 											/>
 										</div>
 									)}
-									<div className="mt-4 space-y-1">
+									<div className="mt-4 space-y-0.5 border-t border-border/60 pt-3">
 										<HiddenList hidden={hiddenHere} onShow={unhideItem} />
 										{!customizing && <CustomizeMenuButton onStart={() => setCustomizing(true)} />}
 										{layoutChanged && (
 											<button
 												type="button"
 												onClick={resetSidebarPrefs}
-												className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+												className={SIDEBAR_FOOTER_LINK}
 											>
-												<RefreshCcw className="h-3 w-3" />
+												<RefreshCcw className="h-4 w-4 shrink-0" aria-hidden="true" />
 												{t("navigation:actions.resetLayout")}
 											</button>
 										)}
@@ -1108,8 +1108,9 @@ export function Sidebar({
 											type="button"
 											onClick={() => setHideExperimental(sidebarPrefs.hideExperimental !== true)}
 											aria-pressed={sidebarPrefs.hideExperimental === true}
-											className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+											className={SIDEBAR_FOOTER_LINK}
 										>
+											<FlaskConical className="h-4 w-4 shrink-0" aria-hidden="true" />
 											{sidebarPrefs.hideExperimental === true
 												? t("navigation:experimental.show", { count: EXPERIMENTAL_VIEWS.size })
 												: t("navigation:experimental.hide")}

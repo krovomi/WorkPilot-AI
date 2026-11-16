@@ -9,14 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-try:
-    from claude_agent_sdk import ToolAnnotations, tool
-
-    SDK_TOOLS_AVAILABLE = True
-except ImportError:
-    SDK_TOOLS_AVAILABLE = False
-    tool = None
-    ToolAnnotations = None  # type: ignore[assignment,misc]
+from claude_agent_sdk import ToolAnnotations, tool
 
 
 def create_progress_tools(spec_dir: Path, project_dir: Path) -> list:
@@ -30,9 +23,6 @@ def create_progress_tools(spec_dir: Path, project_dir: Path) -> list:
     Returns:
         List of progress tool functions
     """
-    if not SDK_TOOLS_AVAILABLE:
-        return []
-
     tools = []
 
     # -------------------------------------------------------------------------
