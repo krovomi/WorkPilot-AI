@@ -231,6 +231,7 @@ The full list, with every detail, is in **[docs/FEATURES.md](docs/FEATURES.md)**
 **Cost and monitoring**
 - Cost budgets enforced while tasks run: a project budget per period and a limit per task, checked before every agent session on every provider; the task pauses at its limit, can step down to a lighter model of the same provider, and a task that spends without progress is paused too.
 - Circuit breaker and kill switch: an agent that repeats the same tool call with the same result is paused on every provider, and "Stop all agents" (sidebar button, Ctrl+Shift+.) pauses every running task, each resumed from its card.
+- Smart Estimation that learns each repository: the estimate of a task is corrected by what its merged specs actually cost (cost, tokens, QA iterations, files changed), shown as a range with its confidence and a breakdown by dimension, with your own adjustment and a reset; every provider feeds the same history.
 - Analytics dashboard, cost estimator, Formula Lab (cost and success estimate per provider, model and effort), rate-limit monitor with account switching, carbon profiler with a monthly budget and an ESG export, OpenTelemetry GenAI traces for every provider.
 
 **Look and feel**

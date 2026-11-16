@@ -35,5 +35,58 @@
 	},
 	"confidencePercent": "{{percent}} % de confiance",
 	"scoreLabel": "Score : {{score}}",
-	"similarPercent": "{{percent}} % similaire"
+	"similarPercent": "{{percent}} % similaire",
+	"calibration": {
+		"title": "Calibration pour ce dépôt",
+		"rangesLabel": "Estimations calibrées",
+		"insufficient": "Pas encore assez d'historique pour calibrer : {{samples}} specs fusionnées, {{min}} nécessaires. Estimation générique affichée pour {{category}}.",
+		"calibrated": "Calibré sur {{samples}} specs fusionnées de ce dépôt ({{category}}).",
+		"range": "fourchette {{low}} – {{high}} (confiance {{percent}} %)",
+		"metrics": {
+			"cost_usd": "Coût",
+			"tokens": "Tokens",
+			"qa_iterations": "Itérations de QA",
+			"files": "Fichiers modifiés"
+		},
+		"scope": {
+			"category": "cette catégorie",
+			"repo": "tout le dépôt",
+			"none": "générique"
+		},
+		"categories": {
+			"bug_fix": "les corrections de bug",
+			"infra": "l'infrastructure",
+			"frontend": "le frontend",
+			"backend": "le backend",
+			"feature": "les fonctionnalités"
+		},
+		"redFlagOver": "{{metric}} : les specs passées ({{scope}}) ont consommé plus que prévu, ×{{factor}} appliqué.",
+		"redFlagUnder": "{{metric}} : les specs passées ({{scope}}) ont consommé moins que prévu, ×{{factor}} appliqué.",
+		"dimensionsTitle": "Détail par dimension",
+		"dimensions": {
+			"algorithmic": "Complexité algorithmique",
+			"integration": "Complexité d'intégration",
+			"conflict_risk": "Risque de conflit",
+			"test_effort": "Effort de test"
+		},
+		"levels": {
+			"low": "faible",
+			"medium": "moyen",
+			"high": "élevé"
+		},
+		"uncertain": "incertain",
+		"providersTitle": "Par provider sur ce dépôt",
+		"provider": "{{provider}} : coût ×{{cost}}, tokens ×{{tokens}} de l'estimation ({{samples}} specs)",
+		"qualityTitle": "Précision des estimations passées",
+		"mape": "{{metric}} : {{percent}} % d'erreur moyenne",
+		"acceptance": "{{percent}} % des estimations gardées sans ajustement",
+		"intervalWidth": "Les fourchettes couvrent en moyenne {{percent}} % de l'estimation",
+		"adjustLabel": "Votre score de complexité (1-13)",
+		"adjust": "Ajuster l'estimation",
+		"reset": "Réinitialiser la calibration",
+		"confirmReset": "Confirmer la réinitialisation",
+		"cancel": "Annuler",
+		"saved": "Score {{score}} retenu : les prochaines estimations de ce dépôt en tiennent compte.",
+		"resetDone": "Calibration réinitialisée : les estimations repartent des chiffres génériques."
+	}
 }
