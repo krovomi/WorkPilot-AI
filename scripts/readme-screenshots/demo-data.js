@@ -987,7 +987,7 @@
 		},
 		__wrap: {
 			getSettings: (r) => {
-				if (!r || !r.data) return r;
+				if (!r?.data) return r;
 				const tested = { date: ago(20 * min).toISOString(), success: true };
 				return {
 					...r,
