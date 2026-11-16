@@ -22,6 +22,11 @@ export function WorktreeRecipeSection({
 }: {
 	readonly projectPath?: string;
 }) {
+	if (!projectPath) return null;
+	return <RecipePanel projectPath={projectPath} />;
+}
+
+function RecipePanel({ projectPath }: { readonly projectPath: string }) {
 	const { t } = useTranslation(["settings"]);
 	const [state, setState] = useState<WorktreeRecipeState | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -33,14 +38,13 @@ export function WorktreeRecipeSection({
 				setState(result.data);
 				setError(null);
 			} else {
-				setError(result.error ?? null);
+				setError(result.error || t("settings:worktreeRecipe.failed"));
 			}
 		},
-		[],
+		[t],
 	);
 
 	const load = useCallback(async () => {
-		if (!projectPath) return;
 		apply(await globalThis.electronAPI.getWorktreeRecipe(projectPath));
 	}, [projectPath, apply]);
 
@@ -55,13 +59,11 @@ export function WorktreeRecipeSection({
 			error?: string;
 		}>,
 	) => {
-		if (!projectPath) return;
 		setBusy(true);
 		apply(await action(projectPath));
 		setBusy(false);
 	};
 
-	if (!projectPath) return null;
 	const recipe: WorktreeRecipe | undefined = state?.recipe;
 
 	return (
@@ -120,13 +122,13 @@ export function WorktreeRecipeSection({
 							})}
 						</p>
 					)}
-					{(recipe.proofs?.length ?? 0) > 0 && (
+					{recipe.proofs?.length ? (
 						<p className="text-xs text-muted-foreground">
 							{t("settings:worktreeRecipe.proofs", {
-								commands: (recipe.proofs ?? []).map((c) => c.join(" ")).join(" ; "),
+								commands: recipe.proofs.map((c) => c.join(" ")).join(" ; "),
 							})}
 						</p>
-					)}
+					) : null}
 					{recipe.errors.length > 0 && (
 						<div className="flex items-start gap-2 text-xs text-destructive" role="alert">
 							<AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden />

@@ -314,8 +314,9 @@ class FilteringProxy:
 
     def close(self) -> None:
         def stop() -> None:
-            if self._server is not None:
-                self._server.close()
+            # A proxy exists only once its listener is up (see __init__).
+            assert self._server is not None
+            self._server.close()
             self._loop.stop()
 
         with contextlib.suppress(RuntimeError):

@@ -28,15 +28,16 @@ function StackPicker({ onClose }: { onClose: () => void }) {
 	const setFramework = useDesignToCodeStore((s) => s.setFramework);
 	const setStyle = useDesignToCodeStore((s) => s.setStyle);
 	const webStyles = DESIGN_STACK_INFO[framework].webStyles;
+	const detectedStack = detection?.stack;
 
 	return (
 		<div className="di-stackpop" role="dialog" aria-label={t("composer.target")}>
-			{detection?.stack && (
+			{detection && detectedStack && (
 				<button
 					type="button"
 					className="di-detected"
 					onClick={() => {
-						if (detection.stack) setFramework(detection.stack);
+						setFramework(detectedStack);
 						setStyle(detection.style);
 						onClose();
 					}}
@@ -44,7 +45,7 @@ function StackPicker({ onClose }: { onClose: () => void }) {
 					<div className="min-w-0">
 						<div className="font-semibold">
 							{t("composer.detected", {
-								stack: t(`stacks.${detection.stack}`),
+								stack: t(`stacks.${detectedStack}`),
 								style: detection.style ? ` + ${t(`styles.${detection.style}`)}` : "",
 							})}
 						</div>
@@ -104,7 +105,7 @@ function StackPicker({ onClose }: { onClose: () => void }) {
 export function DesignComposer() {
 	const { t } = useTranslation("designToCode");
 	const [pickerOpen, setPickerOpen] = useState(false);
-	const [taskState, setTaskState] = useState<"idle" | "creating" | "created">("idle");
+	const [taskState, setTaskState] = useState<"idle" | "creating" | "created" | "failed">("idle");
 	const pickerRef = useRef<HTMLDivElement>(null);
 
 	const phase = useDesignToCodeStore((s) => s.phase);
@@ -147,16 +148,15 @@ export function DesignComposer() {
 		if (canRun) void runDesignToCodePipeline();
 	};
 
-	const createKanbanTask = async () => {
+	const createKanbanTask = async (targetProjectId: string) => {
 		const state = useDesignToCodeStore.getState();
-		if (!projectId || !state.result) return;
 		setTaskState("creating");
 		const task = await createTask(
-			projectId,
+			targetProjectId,
 			t("kanban.title", { name: state.imageName ?? t("kanban.untitled") }),
 			buildDesignTaskDescription(state, t),
 		);
-		setTaskState(task ? "created" : "idle");
+		setTaskState(task ? "created" : "failed");
 	};
 
 	return (
@@ -191,8 +191,8 @@ export function DesignComposer() {
 						<button
 							type="button"
 							className="di-btn"
-							disabled={taskState !== "idle"}
-							onClick={createKanbanTask}
+							disabled={taskState === "creating" || taskState === "created"}
+							onClick={() => void createKanbanTask(projectId)}
 						>
 							{t(
 								taskState === "created"
@@ -240,6 +240,11 @@ export function DesignComposer() {
 					)}
 				</div>
 				</div>
+				{taskState === "failed" && (
+					<div className="di-banner mt-2" data-kind="error" role="alert">
+						{t("footer.taskFailed")}
+					</div>
+				)}
 				<div className="di-box-row">
 					<label className="di-pick">
 						{t("composer.source")}
