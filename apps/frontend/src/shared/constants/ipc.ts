@@ -1115,6 +1115,8 @@ export const IPC_CHANNELS = {
 	API_WATCHER_EVENT: "api-watcher-event",
 	API_WATCHER_RESULT: "api-watcher-result",
 	API_WATCHER_RUN: "apiWatcher:run",
+	// Device matrix: one preset rendered, captured and read by the main (#383)
+	APP_EMULATOR_CAPTURE_DEVICE: "app-emulator:capture-device",
 	APP_EMULATOR_CONFIG: "app-emulator:config",
 	APP_EMULATOR_DETECT: "app-emulator:detect",
 	APP_EMULATOR_ERROR: "app-emulator:error",
