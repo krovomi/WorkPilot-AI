@@ -68,12 +68,8 @@ type AudioContextCtor = new () => AudioContext;
 
 function getAudioContext(): AudioContext | null {
 	if (context) return context;
-	const Ctor = (
-		globalThis as unknown as {
-			AudioContext?: AudioContextCtor;
-			webkitAudioContext?: AudioContextCtor;
-		}
-	).AudioContext;
+	const Ctor = (globalThis as unknown as { AudioContext?: AudioContextCtor })
+		.AudioContext;
 	if (!Ctor) return null;
 	try {
 		context = new Ctor();

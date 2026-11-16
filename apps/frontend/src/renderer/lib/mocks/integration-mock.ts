@@ -246,19 +246,9 @@ export const integrationMock = {
 	}),
 
 	// GitLab Integration Operations
-	getGitLabProjects: async () => ({
-		success: true,
-		data: [],
-	}),
-
 	getGitLabIssues: async () => ({
 		success: true,
 		data: [],
-	}),
-
-	getGitLabIssue: async () => ({
-		success: false,
-		error: "Not available in browser mock",
 	}),
 
 	getGitLabIssueNotes: async () => ({
@@ -283,22 +273,10 @@ export const integrationMock = {
 		error: "Not available in browser mock",
 	}),
 
-	createGitLabRelease: async () => ({
-		success: true,
-		data: {
-			url: "https://gitlab.com/example/repo/-/releases/v1.0.0",
-		},
-	}),
-
 	// GitLab Merge Request Operations
 	getGitLabMergeRequests: async () => ({
 		success: true,
 		data: [],
-	}),
-
-	getGitLabMergeRequest: async () => ({
-		success: false,
-		error: "Not available in browser mock",
 	}),
 
 	createGitLabMergeRequest: async (
@@ -314,11 +292,6 @@ export const integrationMock = {
 			squash?: boolean;
 		},
 	) => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	updateGitLabMergeRequest: async () => ({
 		success: false,
 		error: "Not available in browser mock",
 	}),

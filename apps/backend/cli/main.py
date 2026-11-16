@@ -176,6 +176,15 @@ Environment Variables:
         default=None,
         help="Send a message to the task while it runs: the next session receives it",
     )
+    build_group.add_argument(
+        "--subtask",
+        metavar="SUBTASK_ID",
+        default=None,
+        help=(
+            "Build only this subtask of the plan, in --project-dir, without QA: "
+            "what a swarm wave runs in each subtask's worktree"
+        ),
+    )
     # Outside the exclusive group: it goes with --steer.
     parser.add_argument(
         "--steer-subtask",
@@ -809,6 +818,15 @@ def _run_cli(argv=None, jev_run=None) -> None:
 
     if args.discard:
         handle_discard_command(project_dir, spec_dir.name)
+        return
+
+    if args.subtask is not None:
+        from .subtask_command import handle_subtask_command
+
+        if not handle_subtask_command(
+            project_dir, spec_dir, model, args.subtask, verbose=args.verbose
+        ):
+            sys.exit(1)
         return
 
     if args.steer is not None:

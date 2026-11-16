@@ -142,10 +142,10 @@ describe("approving batches", () => {
 
 		github.approveBatches.mockResolvedValueOnce({ success: false });
 		await act(() => expect(result.current.approveBatches([batch([issue(1, "a")])])).rejects.toThrow());
-		expect(result.current.analysisError).toBe("Failed to approve batches");
+		expect(result.current.analysisError).toBe("Could not create the tasks of these batches");
 
 		github.approveBatches.mockRejectedValueOnce("x");
 		await act(() => expect(result.current.approveBatches([batch([issue(1, "a")])])).rejects.toBe("x"));
-		expect(result.current.analysisError).toBe("Failed to approve batches");
+		expect(result.current.analysisError).toBe("Could not create the tasks of these batches");
 	});
 });
