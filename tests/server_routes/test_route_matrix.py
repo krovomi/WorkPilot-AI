@@ -428,6 +428,19 @@ async def test_every_permission_is_asked_by_name(world):
     assert not wrong, _fails(wrong)
 
 
+async def test_a_project_route_takes_the_organization_s_read_permission(world):
+    """A role on the project opens it within what the organization grants: a
+    member whose organization role grants nothing reads none of it."""
+    wrong = {}
+    for method, path, _ in _routes("project"):
+        answer = await ask(world, "nobody_a", method, path)
+        expected = (403, "Missing permission: task.read")
+        got = (answer.status_code, detail_of(answer))
+        if got != expected:
+            wrong[f"{method} {path}"] = f"{got} instead of {expected}"
+    assert not wrong, _fails(wrong)
+
+
 async def test_a_permission_comes_from_the_role_not_from_the_project(world):
     """A viewer of the project holds the reads and none of the writes."""
     from server.authz.roles import system_role
