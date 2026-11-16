@@ -138,8 +138,13 @@ function CodeTools({
 			<button
 				type="button"
 				className="tg-btn tg-btn-sm"
-				onClick={() => {
-					void navigator.clipboard?.writeText(content);
+				onClick={async () => {
+					// "Copied" only once the clipboard took it.
+					try {
+						await navigator.clipboard.writeText(content);
+					} catch {
+						return;
+					}
 					setCopied(true);
 					setTimeout(() => setCopied(false), 2000);
 				}}
@@ -258,8 +263,12 @@ function CodePanel({ mode, code }: { readonly mode: StudioMode; readonly code: s
 					<button
 						type="button"
 						className="tg-btn tg-btn-sm"
-						onClick={() => {
-							void copyPath(path);
+						onClick={async () => {
+							try {
+								await copyPath(path);
+							} catch {
+								return;
+							}
 							setPathCopied(true);
 							setTimeout(() => setPathCopied(false), 2000);
 						}}

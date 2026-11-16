@@ -134,5 +134,65 @@
 			"message_too_long": "Un message est trop long.",
 			"queue_unwritable": "Le dossier de la tâche n'a pas pu être écrit."
 		}
+	},
+	"devices": {
+		"iphone-15": "iPhone 15",
+		"iphone-15-pro-max": "iPhone 15 Pro Max",
+		"pixel-8": "Pixel 8",
+		"pixel-9": "Pixel 9",
+		"galaxy-z-fold-5": "Galaxy Z Fold 5 (plié)",
+		"ipad-mini": "iPad Mini",
+		"ipad-pro": "iPad Pro",
+		"desktop-1080p": "Ordinateur Full HD",
+		"desktop-4k": "Ordinateur 4K (mise à l’échelle 150 %)",
+		"tv-1080p": "Téléviseur connecté 16:9"
+	},
+	"matrix": {
+		"toggle": "Matrice d’appareils",
+		"intro": "Chaque appareil coché rend {{path}} depuis le serveur de l’émulateur, l’un après l’autre, puis la page est lue pour y trouver les bugs responsive.",
+		"introRoot": "La page affichée n’est pas sur le serveur de l’émulateur : la matrice rend la racine du serveur.",
+		"category": {
+			"phone": "Téléphones",
+			"tablet": "Tablettes",
+			"desktop": "Ordinateurs",
+			"tv": "Téléviseur"
+		},
+		"dimensions": "{{width}} × {{height}} @{{dpr}}x",
+		"capture_one": "Capturer {{count}} appareil",
+		"capture_other": "Capturer {{count}} appareils",
+		"stop": "Arrêter après cet appareil",
+		"selectAll": "Tous",
+		"selectNone": "Aucun",
+		"clear": "Effacer les captures",
+		"empty": "Cochez des appareils, puis capturez : chacun s’affiche ici, côte à côte.",
+		"pending": "En attente…",
+		"capturing": "Rendu sur cet appareil…",
+		"imageAlt": "La page rendue sur {{device}}",
+		"keep": "Garder pour la revue visuelle",
+		"errors": {
+			"invalid-request": "La demande a été refusée.",
+			"unknown-device": "Cet appareil n’est pas dans le catalogue.",
+			"not-running": "Le serveur de l’émulateur ne tourne pas : lancez-le, puis capturez de nouveau.",
+			"invalid-path": "Cette adresse n’est pas une page du serveur de l’émulateur.",
+			"busy": "Une autre capture est en cours : attendez qu’elle se termine.",
+			"load-failed": "La page ne s’est pas chargée à temps sur cet appareil.",
+			"capture-failed": "La page n’a pas pu être capturée sur cet appareil."
+		},
+		"report": {
+			"unavailable": "La page n’a pas pu être lue pour y chercher les bugs responsive.",
+			"clean": "Aucun bug responsive détecté.",
+			"pageOverflow": "La page est plus large que l’écran de {{px}} px : elle défile de côté.",
+			"truncated": "Lecture partielle : les {{count}} premiers éléments seulement."
+		},
+		"issues": {
+			"horizontalOverflow_one": "{{count}} élément dépasse le bord de l’écran",
+			"horizontalOverflow_other": "{{count}} éléments dépassent le bord de l’écran",
+			"overflowingMedia_one": "{{count}} image ou média est plus large que l’écran",
+			"overflowingMedia_other": "{{count}} images ou médias sont plus larges que l’écran",
+			"smallTouchTarget_one": "{{count}} cible tactile de moins de 44 × 44 px",
+			"smallTouchTarget_other": "{{count}} cibles tactiles de moins de 44 × 44 px",
+			"smallText_one": "{{count}} texte de moins de 12 px",
+			"smallText_other": "{{count}} textes de moins de 12 px"
+		}
 	}
 }

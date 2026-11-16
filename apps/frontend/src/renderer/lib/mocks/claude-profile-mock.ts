@@ -62,13 +62,6 @@ export const claudeProfileMock = {
 
 	setAccountPriorityOrder: async () => ({ success: true }),
 
-	fetchClaudeUsage: async () => ({ success: true }),
-
-	getBestAvailableProfile: async () => ({
-		success: true,
-		data: null,
-	}),
-
 	onSDKRateLimit: () => () => {
 		/* noop */
 	},
