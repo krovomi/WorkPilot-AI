@@ -78,8 +78,10 @@ async def test_a_wave_runs_every_subtask_and_reports_each(
     # "gone" is not in the plan's nodes: it is not run.
     assert sorted(by_id) == ["s1", "s2", "s3"]
     assert by_id["s1"].success and by_id["s1"].error is None
-    # The error is the start of stderr, read to the end without blocking.
-    assert by_id["s2"].error == "E" * 500
+    # The error is the end of stderr, read to the end without blocking.
+    s2_error = by_id["s2"].error or ""
+    assert len(s2_error) == 500
+    assert s2_error.endswith("E\nboom: the real error")
     assert by_id["s3"].error == "Exit code 3"
     assert not result.all_succeeded
     assert wave.state is SubtaskState.FAILED
@@ -93,7 +95,7 @@ async def test_a_wave_runs_every_subtask_and_reports_each(
     assert all(n.process_pid is None for n in nodes.values())
     assert sorted(seen["started"]) == ["s1", "s2", "s3"]
     assert seen["completed"] == ["s1"]
-    assert sorted(seen["failed"]) == [("s2", "E" * 500), ("s3", "Exit code 3")]
+    assert sorted(seen["failed"]) == [("s2", s2_error), ("s3", "Exit code 3")]
     assert ("s1", "working on s1") in seen["log"]
     # Each process was told which subtask it is, in which wave, of which spec.
     env = json.loads(
@@ -107,12 +109,14 @@ async def test_a_wave_runs_every_subtask_and_reports_each(
     assert events[0]["parallelism"] == 4
     assert kinds.count("subtask_started") == 3
     assert kinds.count("subtask_completed") == 3
-    # Only the phase markers of a subtask are forwarded, not its plain output.
+    # Only the phase markers of a subtask are forwarded, not its plain output,
+    # and without the marker: the app would take them for the task's own.
     [forwarded] = [e for e in events if e["type"] == "subtask_log"]
     assert forwarded == {
         "type": "subtask_log",
         "subtask_id": "s1",
-        "line": '__EXEC_PHASE__:{"phase": "coding"}',
+        "kind": "phase",
+        "data": '{"phase": "coding"}',
     }
     assert events[-1] == {
         "type": "wave_completed",
@@ -155,7 +159,9 @@ async def test_long_lines_and_a_last_line_without_its_end_are_read_whole(
     [forwarded] = [
         e for e in _events(capsys.readouterr().out) if e["type"] == "subtask_log"
     ]
-    assert len(forwarded["line"]) == len(lines[0])
+    assert forwarded["kind"] == "task"
+    assert forwarded["data"] == '{"diff": "' + "d" * 100_000 + '"}'
+    assert "__TASK_EVENT__" not in forwarded["data"]
 
 
 @pytest.mark.asyncio
