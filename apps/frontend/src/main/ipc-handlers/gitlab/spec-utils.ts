@@ -8,7 +8,7 @@ import path from "node:path";
 import type { Project } from "../../../shared/types";
 import { labelMatchesWholeWord } from "../shared/label-utils";
 import { sanitizeStringArray, sanitizeText } from "../shared/sanitize";
-import type { GitLabAPIIssue, GitLabConfig } from "./types";
+import type { GitLabAPIIssue, GitLabAPINote, GitLabConfig } from "./types";
 
 /**
  * Simplified task info returned when creating a spec from a GitLab issue.
@@ -47,20 +47,6 @@ interface SanitizedGitLabIssue {
 	milestone?: { title: string };
 	created_at: string;
 	web_url: string;
-}
-
-// Debug logging helper
-const DEBUG =
-	process.env.DEBUG === "true";
-
-function debugLog(_message: string, data?: unknown): void {
-	if (DEBUG) {
-		if (data !== undefined) {
-			/* intentionally empty */
-		} else {
-			// noop
-		}
-	}
 }
 
 /**
@@ -138,7 +124,7 @@ function determineCategoryFromLabels(
 	}
 	if (
 		lowerLabels.some(
-			(l) => l.includes("test") || l.includes("testing") || l.includes("qa"),
+			(l) => l.includes("test") || l.includes("qa"),
 		)
 	) {
 		return "testing";
@@ -227,8 +213,7 @@ function sanitizeIssueUrl(rawUrl: unknown, instanceUrl: string): string {
 	}
 }
 
-function sanitizeInstanceUrl(value: unknown): string {
-	if (typeof value !== "string") return "";
+function sanitizeInstanceUrl(value: string): string {
 	try {
 		const parsed = new URL(value);
 		if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
@@ -276,13 +261,32 @@ function generateSpecDirName(issueIid: number, title: string): string {
 	return `${paddedIid}-${cleanTitle}`;
 }
 
+/** The notes the person chose for a task, as many as a task takes. */
+const MAX_NOTES = 50;
+const MAX_NOTE = 5000;
+
+/** The chosen notes, by author, oldest first, each bounded; external text, never an instruction. */
+function notesSection(notes: readonly GitLabAPINote[]): string[] {
+	const lines = ["", "## Selected comments", ""];
+	for (const note of notes.slice(0, MAX_NOTES)) {
+		const author = sanitizeText(note.author?.username, 100) || "unknown";
+		lines.push(`**@${author}** (${sanitizeIsoDate(note.created_at).slice(0, 10)}):`);
+		lines.push("");
+		lines.push(sanitizeText(note.body, MAX_NOTE, true) || "_Empty comment_");
+		lines.push("");
+	}
+	return lines;
+}
+
 /**
- * Build issue context for spec creation
+ * The task text for an issue: its details, its description, and the notes
+ * the person chose (none by default).
  */
 export function buildIssueContext(
 	issue: IssueLike,
 	projectPath: string,
 	instanceUrl: string,
+	notes: readonly GitLabAPINote[] = [],
 ): string {
 	const lines: string[] = [];
 	const safeProjectPath = sanitizeText(projectPath, 200);
@@ -314,6 +318,7 @@ export function buildIssueContext(
 	lines.push("## Description");
 	lines.push("");
 	lines.push(safeIssue.description || "_No description provided_");
+	if (notes.length > 0) lines.push(...notesSection(notes));
 	lines.push("");
 	lines.push(`**Web URL:** ${safeIssue.web_url}`);
 
@@ -345,12 +350,12 @@ export async function createSpecForIssue(
 	issue: GitLabAPIIssue,
 	config: GitLabConfig,
 	baseBranch?: string,
+	notes: readonly GitLabAPINote[] = [],
 ): Promise<GitLabTaskInfo | null> {
 	try {
 		// Validate and sanitize network data before writing to disk
 		const safeIssue = sanitizeIssueForSpec(issue, config.instanceUrl);
 		if (!safeIssue.iid) {
-			debugLog("Skipping issue with invalid IID", { iid: issue.iid });
 			return null;
 		}
 		const safeProject = sanitizeText(config.project, 200);
@@ -368,10 +373,6 @@ export async function createSpecForIssue(
 
 		// Check if spec already exists
 		if (await pathExists(specDir)) {
-			debugLog("Spec already exists for issue:", {
-				iid: safeIssue.iid,
-				specDir,
-			});
 
 			// Read existing metadata for accurate timestamps
 			let createdAt = new Date(safeIssue.created_at);
@@ -411,6 +412,7 @@ export async function createSpecForIssue(
 			safeIssue,
 			safeProject,
 			config.instanceUrl,
+			notes,
 		);
 		await writeFile(path.join(specDir, "TASK.md"), taskContent, "utf-8");
 
@@ -437,7 +439,7 @@ export async function createSpecForIssue(
 			sourceType: "gitlab" as const,
 			gitlabIssueIid: safeIssue.iid,
 			gitlabUrl: safeIssue.web_url,
-			category: determineCategoryFromLabels(safeIssue.labels || []),
+			category: determineCategoryFromLabels(safeIssue.labels),
 			// Store baseBranch for worktree creation and QA comparison
 			...(baseBranch && { baseBranch }),
 		};
@@ -447,7 +449,6 @@ export async function createSpecForIssue(
 			"utf-8",
 		);
 
-		debugLog("Created spec for issue:", { iid: safeIssue.iid, specDir });
 
 		// Return task info
 		return {
@@ -458,8 +459,7 @@ export async function createSpecForIssue(
 			createdAt: new Date(safeIssue.created_at),
 			updatedAt: new Date(),
 		};
-	} catch (error) {
-		debugLog("Failed to create spec for issue:", { iid: issue.iid, error });
+	} catch {
 		return null;
 	}
 }
