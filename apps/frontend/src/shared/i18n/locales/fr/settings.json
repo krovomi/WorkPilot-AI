@@ -12,8 +12,6 @@
 	"sections": {
 		"accounts": {
 			"alerts": {
-				"noProviders": "Aucun fournisseur configuré. Configurez vos clés API pour commencer.",
-				"providerErrors": "{{count}} fournisseur(s) avec erreurs",
 				"sophisticated": {
 					"noProvidersTitle": "Commencez avec votre premier provider",
 					"noProvidersDescription": "Configurez au moins un provider pour commencer à utiliser l'application.",
@@ -28,8 +26,7 @@
 				"providerDescription": "{{providerName}} a été {{action}} à la liste de basculement auto",
 				"providerRemoved": "Fournisseur retiré du basculement auto",
 				"syncError": "Erreur de synchronisation",
-				"syncErrorDescription": "Échec de la synchronisation du fournisseur avec le basculement auto",
-				"title": "Basculement auto"
+				"syncErrorDescription": "Échec de la synchronisation du fournisseur avec le basculement auto"
 			},
 			"description": "Comptes & endpoints API",
 			"form": {
@@ -47,59 +44,20 @@
 				"save": "Enregistrer"
 			},
 			"providerCard": {
-				"apiKey": "Clé API",
-				"authCli": "Auth CLI",
-				"authLocal": "Local",
-				"authOauth": "OAuth",
 				"authentication": "Authentification",
-				"cliAuthenticated": "CLI authentifié",
-				"configure": "Configurer",
 				"deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette configuration de fournisseur ?",
-				"edit": "Modifier",
-				"errors": {
-					"unknownError": "Erreur inconnue"
-				},
-				"lastTest": "Dernier test",
-				"localRunning": "Instance locale",
-				"needsReauth": "Ré-authentification requise",
-				"toggleDetails": "Afficher les détails",
-				"keySaved": "Clé enregistrée",
-				"keySavedToday": "aujourd'hui",
-				"keySavedDaysAgo_one": "il y a {{count}} jour",
-				"keySavedDaysAgo_other": "il y a {{count}} jours",
-				"keySavedUnknown": "date inconnue",
 				"keyRenewal_one": "Clé enregistrée il y a {{count}} jour : pensez à la renouveler (plus de {{threshold}} jours)",
 				"keyRenewal_other": "Clé enregistrée il y a {{count}} jours : pensez à la renouveler (plus de {{threshold}} jours)",
-				"neverTested": "Jamais testé",
-				"notAvailable": "Non disponible",
-				"notConfigured": "Non configuré",
 				"oauthCli": "OAuth (CLI)",
-				"oauthConnected": "OAuth connecté",
-				"rateLimited": "Limite de débit atteinte",
-				"source": "Source",
-				"statusLabel": "Statut",
-				"status": {
-					"active": "Actif",
-					"error": "Erreur",
-					"notConfigured": "Non configuré"
-				},
 				"statusNested": {
 					"active": "Actif",
 					"error": "Erreur",
 					"notConfigured": "Non configuré"
 				},
-				"test": "Tester",
-				"testDetails": {
-					"modelUsed": "Modèle utilisé : {{model}}",
-					"modelsAvailable": "{{count}} modèles disponibles"
-				},
 				"testError": "Échec du test",
 				"testErrorDescription": "Le fournisseur {{providerName}} a échoué : {{error}}",
 				"testSuccess": "Test réussi",
-				"testSuccessDescription": "Le fournisseur {{providerName}} fonctionne correctement",
-				"usage": "Utilisation",
-				"usageThisMonth": "Utilisation ce mois",
-				"week": "semaine"
+				"testSuccessDescription": "Le fournisseur {{providerName}} fonctionne correctement"
 			},
 			"providerConfig": {
 				"title": "Configuration",
@@ -172,13 +130,6 @@
 					"terminalStep2": "Suivez les étapes de connexion du CLI",
 					"terminalStep3": "Fermez ce terminal une fois connecté"
 				}
-			},
-			"providerToggle": {
-				"description": "{{providerId}} a été {{action}} avec succès",
-				"disabled": "Fournisseur désactivé",
-				"enabled": "Fournisseur activé",
-				"error": "Erreur",
-				"errorDescription": "Échec de {{action}} du fournisseur {{providerId}}"
 			},
 			"localModels": {
 				"title": "Modèles installés localement",
@@ -376,7 +327,6 @@
 			"description": "Choisir votre langue préférée",
 			"title": "Langue"
 		},
-		"llm-router": {},
 		"notifications": {
 			"description": "Préférences d'alertes",
 			"title": "Notifications"
@@ -432,7 +382,6 @@
 			},
 			"always": "Toujours actifs, quels que soient ces réglages : la liste des commandes autorisées, les écritures confinées aux dossiers du build, les fichiers de sécurité protégés, et le bac à sable de l'OS autour des commandes quand le système en a un."
 		},
-		"scheduler": {},
 		"terminal-fonts": {
 			"description": "Personnaliser l'apparence des polices du terminal",
 			"title": "Polices de terminal"
@@ -584,28 +533,10 @@
 			"oauthToken": "Jeton OAuth",
 			"oauthTokenPlaceholder": "Jeton OAuth (si requis)"
 		},
-		"multiConnector": {
-			"title": "Gestion des fournisseurs IA",
-			"description": "Connectez et gérez plusieurs fournisseurs IA (Claude, OpenAI, Mistral, etc...).",
-			"loadingProviders": "Chargement des fournisseurs..."
-		},
 		"priority": {
 			"active": "Actif",
 			"apiSection": "Endpoints de secours (quand tous les comptes sont épuisés)",
-			"description": "Glissez pour réordonner. Le système basculera vers le prochain compte disponible dans l'ordre.",
-			"duplicateUsage": "Utilisation dupliquée détectée",
-			"duplicateUsageHint": "Ce profil a une utilisation identique à un autre profil, suggérant qu'ils sont peut-être authentifiés au même compte Anthropic. Ré-authentifiez avec un compte différent pour corriger.",
-			"inUse": "En cours d'utilisation",
-			"needsAuth": "Non authentifié",
-			"needsReauth": "Ré-authentification requise",
-			"needsReauthHint": "Le jeton de rafraîchissement de ce profil est invalide. Cliquez pour ré-authentifier.",
-			"next": "Suivant",
-			"noAccounts": "Aucun compte configuré. Ajoutez des comptes ci-dessus pour définir la priorité.",
-			"noEmail": "Pas d'e-mail",
 			"oauthSection": "Comptes Claude (utilisés en premier)",
-			"payPerUse": "Paiement à l'usage",
-			"providerAuth": "Authentifié via clé API",
-			"sessionUsage": "Utilisation de session (fenêtre de 5 heures)",
 			"status": {
 				"healthy": "Sain",
 				"highUsage": "Utilisation élevée",
@@ -613,14 +544,9 @@
 				"nearLimit": "Proche de la limite",
 				"rateLimited": "Limite de débit atteinte"
 			},
-			"tipDescription": "Les comptes Claude sont inclus dans votre abonnement et seront utilisés en premier. Les endpoints API facturent par requête et servent de secours lorsque tous les comptes Claude atteignent leurs limites.",
-			"tipTitle": "Comment fonctionne la priorité",
 			"title": "Ordre de priorité des comptes",
-			"typeAPI": "API",
-			"typeOAuth": "OAuth",
 			"unavailable": "Indisponible",
-			"unlimited": "Illimité",
-			"weeklyUsage": "Utilisation hebdomadaire (fenêtre de 7 jours)"
+			"unlimited": "Illimité"
 		},
 		"priorityOrder": {
 			"down": "Descendre",
@@ -851,32 +777,13 @@
 		}
 	},
 	"autoSwitching": {
-		"authFailureDescription": "Changer de compte en cas d'échec d'authentification",
-		"authFailureSwitching": "Basculer en cas d'échec d'auth",
 		"debug": {
 			"accountsFound": "Debug : {{count}} compte(s) trouvé(s)"
 		},
-		"disabled": "Basculement auto désactivé",
-		"disabledDescription": "Les comptes ne basculeront plus automatiquement",
-		"enableDescription": "Basculer automatiquement entre les comptes selon l'utilisation",
-		"enableLabel": "Activer le basculement auto",
-		"enabled": "Basculement auto activé",
-		"enabledDescription": "Les comptes basculeront automatiquement",
 		"priorityOrder": {
-			"description": "Définir l'ordre dans lequel les comptes seront utilisés pour le basculement auto",
-			"title": "Ordre de priorité des comptes"
+			"description": "Définir l'ordre dans lequel les comptes seront utilisés pour le basculement auto"
 		},
-		"proactiveDescription": "Basculer avant d'atteindre les limites",
-		"proactiveMonitoring": "Surveillance proactive",
-		"rateLimitDescription": "Changer de compte lorsque la limite de débit est atteinte",
-		"rateLimitSwitching": "Basculer en cas de limite de débit",
-		"sessionThreshold": "Seuil de session",
-		"sessionThresholdDescription": "Basculer lorsque l'utilisation atteint ce pourcentage",
-		"title": "Basculement auto",
-		"toast": {
-			"error": "Erreur",
-			"errorDescription": "Impossible de mettre à jour les paramètres"
-		}
+		"title": "Basculement auto"
 	},
 	"azureDevOps": {
 		"addModel": "Ajouter",
@@ -925,6 +832,8 @@
 		"patLabel": "Jeton d'accès personnel (PAT)",
 		"patLinkLabel": "Paramètres utilisateur Azure DevOps",
 		"patPlaceholder": "Entrez votre PAT",
+		"patShow": "Afficher le jeton",
+		"patHide": "Masquer le jeton",
 		"repositoryDescription": "Sélectionnez le dépôt Azure DevOps à utiliser pour ce projet",
 		"repositoryError": "Erreur de chargement des dépôts",
 		"repositoryLabel": "Dépôt",
@@ -2015,7 +1924,6 @@
 			"syncDescription": "Synchroniser avec les issues GitLab",
 			"title": "GitLab"
 		},
-		"jira": {},
 		"linear": {
 			"apiKey": "YOUR_LINEAR_API_KEY",
 			"checking": "Vérification...",
@@ -2094,41 +2002,6 @@
 		"noProjectSelected": {
 			"description": "Sélectionnez un projet dans la barre latérale pour configurer ses paramètres.",
 			"title": "Aucun projet sélectionné"
-		}
-	},
-	"providerGrid": {
-		"actions": {
-			"add": "Ajouter",
-			"refresh": "Actualiser"
-		},
-		"filters": {
-			"all": "Tous",
-			"configured": "Configurés",
-			"errors": "Avec erreurs",
-			"placeholder": "Filtrer",
-			"unconfigured": "Non configurés"
-		},
-		"search": {
-			"addFirst": "Commencez par ajouter votre premier fournisseur.",
-			"addFirstButton": "Ajouter votre premier fournisseur",
-			"adjustCriteria": "Essayez d'ajuster vos critères de recherche.",
-			"noProviders": "Aucun fournisseur disponible",
-			"noResults": "Aucun fournisseur trouvé",
-			"placeholder": "Rechercher un fournisseur...",
-			"results_one": "{{count}} résultat pour « {{query}} »",
-			"results_other": "{{count}} résultats pour « {{query}} »"
-		},
-		"sort": {
-			"category": "Catégorie",
-			"name": "Nom",
-			"placeholder": "Trier par",
-			"status": "Statut",
-			"usage": "Utilisation"
-		},
-		"stats": {
-			"configured": "{{count}} configuré(s)",
-			"errors": "{{count}} erreur(s)",
-			"total": "{{count}} au total"
 		}
 	},
 	"scale": {
@@ -2445,20 +2318,6 @@
 			"authFailed": "Échec de l'authentification",
 			"logoutFailed": "Échec de la déconnexion",
 			"unknownError": "Une erreur inconnue est survenue."
-		}
-	},
-	"llmRouter": {
-		"routingStrategy": {
-			"title": "Stratégie de Routage par Défaut",
-			"description": "Comment le routeur sélectionne un fournisseur lorsque plusieurs sont disponibles.",
-			"bestPerformance": "Meilleure Performance",
-			"bestPerformanceDescription": "Priorité au score de qualité",
-			"cheapest": "Le Moins Cher",
-			"cheapestDescription": "Minimiser le coût par tâche",
-			"lowestLatency": "Plus Faible Latence",
-			"lowestLatencyDescription": "Temps de réponse le plus rapide",
-			"roundRobin": "Round Robin",
-			"roundRobinDescription": "Distribution équitable"
 		}
 	},
 	"cicdTriggers": {
@@ -3069,6 +2928,103 @@
 			"debug": "Debug",
 			"scheduler": "Planification",
 			"updates": "Mises à jour"
+		}
+	},
+	"aiAccounts": {
+		"title": "Comptes IA",
+		"description": "Chaque provider sur lequel WorkPilot peut tourner : comment il se connecte, s'il répond, et lequel prend le relais quand une tâche atteint une limite.",
+		"loading": "Chargement des providers…",
+		"tabs": {
+			"label": "Vues des comptes IA",
+			"providers": "Providers",
+			"failover": "Basculement auto"
+		},
+		"stats": {
+			"connected": "Connectés",
+			"connectedValue": "{{connected}} / {{total}}",
+			"default": "Provider par défaut",
+			"failover": "Basculement auto",
+			"failoverOn_one": "Actif · {{count}} compte",
+			"failoverOn_other": "Actif · {{count}} comptes",
+			"failoverOff": "Désactivé",
+			"attention": "À vérifier",
+			"none": "Aucun"
+		},
+		"filters": {
+			"label": "Filtrer les providers",
+			"all": "Tous",
+			"connected": "Connectés",
+			"available": "À connecter",
+			"attention": "À vérifier"
+		},
+		"search": "Rechercher un provider",
+		"groups": {
+			"connected": "Connectés",
+			"available": "À connecter"
+		},
+		"empty": {
+			"title": "Aucun provider ne correspond",
+			"body": "Modifiez la recherche ou le filtre."
+		},
+		"noneConnected": "Aucun provider n'est encore connecté. Connectez-en un pour lancer des tâches.",
+		"toast": {
+			"testOkModels": "{{name}} répond ({{count}} modèles disponibles)."
+		},
+		"card": {
+			"status": {
+				"connected": "Connecté",
+				"reauth": "Reconnexion requise",
+				"failing": "Ne répond pas",
+				"off": "Non connecté"
+			},
+			"auth": {
+				"oauth": "Connexion",
+				"api-key": "Clé API",
+				"cli": "CLI",
+				"local": "Local"
+			},
+			"default": "Par défaut",
+			"setDefault": "Utiliser par défaut",
+			"test": "Tester",
+			"testing": "Test…",
+			"edit": "Modifier",
+			"connect": "Connecter",
+			"reconnect": "Reconnecter",
+			"lastTest": "Testé le {{date}}",
+			"neverTested": "Jamais testé",
+			"keyToday": "Clé posée aujourd'hui",
+			"keyAge_one": "Clé posée il y a {{count}} jour",
+			"keyAge_other": "Clé posée il y a {{count}} jours",
+			"usage": "Session {{session}} %",
+			"usageWeekly": "Session {{session}} % · semaine {{weekly}} %"
+		},
+		"failover": {
+			"masterTitle": "Basculement auto",
+			"masterOn": "Une tâche arrêtée par une limite ou une connexion perdue reprend sur le compte suivant de la chaîne, à la phase où elle s'est arrêtée.",
+			"masterOff": "Désactivé : une tâche arrêtée par une limite vous attend.",
+			"triggersTitle": "Quand basculer",
+			"rateLimit": "Sur une limite d'usage",
+			"rateLimitHint": "Le provider refuse les requêtes jusqu'à la remise à zéro de sa limite.",
+			"authFailure": "Sur une connexion perdue",
+			"authFailureHint": "La connexion ou la clé du compte ne fonctionne plus.",
+			"proactive": "Avant la limite (comptes Claude)",
+			"proactiveHint": "Passe à un autre compte Claude quand l'usage dépasse ces seuils.",
+			"session": "Seuil de session",
+			"weekly": "Seuil hebdomadaire",
+			"chainTitle": "Chaîne de basculement",
+			"chainDescription": "Les comptes sont essayés de haut en bas. Glissez pour réordonner ; l'interrupteur retire un compte de la chaîne.",
+			"chainEmpty": "Aucun compte connecté pour l'instant.",
+			"chainSingle": "Un seul compte est dans la chaîne : connectez ou incluez-en un autre pour qu'une tâche arrêtée puisse continuer.",
+			"kind": {
+				"oauth": "Compte Claude",
+				"api": "Profil API",
+				"provider": "Provider"
+			},
+			"active": "En cours",
+			"include": "Inclure {{name}} dans la chaîne",
+			"dragHandle": "Déplacer {{name}}",
+			"saveError": "Les réglages du basculement n'ont pas pu être enregistrés.",
+			"orderError": "L'ordre de la chaîne n'a pas pu être enregistré."
 		}
 	}
 }
