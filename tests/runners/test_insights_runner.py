@@ -9,17 +9,20 @@ that streams what a provider would; the project files and stdout are real.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
 from pathlib import Path
 
+import cli.utils
 import core.client
 import pytest
 from core.agent_client import AgentMessage, ContentBlock, ContentBlockType, MessageRole
 from runners import insights_runner as runner
 
 BACKEND = Path(__file__).resolve().parents[2] / "apps" / "backend"
+RUNNER = BACKEND / "runners" / "insights_runner.py"
 
 
 def text(value: str) -> ContentBlock:
@@ -384,3 +387,17 @@ class TestTheCommandLine:
 
         assert runner.main() == 0
         assert seen == [[]]
+
+    def test_the_repository_env_file_is_loaded_when_there_is_one(self, monkeypatch):
+        env_file = BACKEND.parent.parent / ".env-files" / ".env"
+        real_exists = Path.exists
+        loaded: list[Path] = []
+        monkeypatch.setattr(
+            Path, "exists", lambda self: self == env_file or real_exists(self)
+        )
+        monkeypatch.setattr(cli.utils, "import_dotenv", lambda: loaded.append)
+
+        spec = importlib.util.spec_from_file_location("insights_runner_env_t", RUNNER)
+        spec.loader.exec_module(importlib.util.module_from_spec(spec))
+
+        assert loaded == [env_file]
