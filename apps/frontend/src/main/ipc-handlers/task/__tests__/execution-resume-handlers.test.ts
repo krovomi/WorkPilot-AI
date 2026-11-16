@@ -43,6 +43,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../../shared/constants";
 import type { Task } from "../../../../shared/types";
 import { registerTaskResumeHandlers } from "../execution-resume-handlers";
+import { resumeTaskWithProvider } from "../resume-with-provider";
 
 type Result = { success: boolean; error?: string };
 const invoke = (channel: string, ...args: unknown[]): Promise<Result> =>
@@ -214,6 +215,21 @@ describe("TASK_RESUME_WITH_PROVIDER", () => {
 		const meta = read(path.join(specDir, "task_metadata.json"));
 		expect(meta.phaseProviders).toMatchObject({ planning: "claude", coding: "anthropic" });
 		expect(state.resume).toHaveBeenCalledWith(agent, "t1", "p1", { keepSession: true });
+	});
+
+	it("drops the Claude session when the failover changed the account", async () => {
+		setTask({ metadata: { provider: "anthropic", paused: { enabled: true, paused_phase: "coding" } } as Task["metadata"] });
+		expect(await resumeTaskWithProvider(agent as never, "t1", "anthropic", { keepClaudeSession: false })).toEqual({
+			success: true,
+		});
+		expect(state.resume).toHaveBeenCalledWith(agent, "t1", "p1", { keepSession: false });
+	});
+
+	it("fills an empty metadata copy", async () => {
+		setTask();
+		write(path.join(specDir, "task_metadata.json"), "");
+		expect((await resume("ollama")).success).toBe(true);
+		expect(read(path.join(specDir, "task_metadata.json")).engineLocked).toBe(true);
 	});
 
 	it("keeps a formula that still describes every phase", async () => {
