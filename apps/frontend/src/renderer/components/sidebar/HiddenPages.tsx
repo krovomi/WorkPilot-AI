@@ -80,6 +80,13 @@ interface HiddenListProps {
 	readonly onShow: (id: string) => void;
 }
 
+/**
+ * The look of the links under a space's pages (hidden pages, reset the layout,
+ * beta views): left-aligned with an icon, aligned on the pages above them (icon and label).
+ */
+export const SIDEBAR_FOOTER_LINK =
+	"flex w-full items-center gap-3 rounded-md py-1.5 pr-3 pl-5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground";
+
 /** The pages hidden from a space, folded under one line, each to show again. */
 export function HiddenList({ hidden, onShow }: HiddenListProps) {
 	const { t } = useTranslation("navigation");
@@ -93,8 +100,9 @@ export function HiddenList({ hidden, onShow }: HiddenListProps) {
 				aria-expanded={open}
 				aria-controls={listId}
 				onClick={() => setOpen((value) => !value)}
-				className="w-full rounded-md px-3 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				className={SIDEBAR_FOOTER_LINK}
 			>
+				<EyeOff className="h-4 w-4 shrink-0" aria-hidden="true" />
 				{t("hidden.count", { count: hidden.length })}
 			</button>
 			<ul id={listId} hidden={!open} className="space-y-0.5 px-1">

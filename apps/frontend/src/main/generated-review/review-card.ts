@@ -78,6 +78,7 @@ const TITLE_PREFIX: Record<GeneratedReviewSource, { en: string; fr: string }> = 
 	accessibility: { en: "Accessibility fixes", fr: "Corrections d'accessibilité" },
 	"doc-drift": { en: "Documentation fixes", fr: "Corrections de documentation" },
 	"notebook-agent": { en: "Notebook refactor", fr: "Refactor de notebook" },
+	"browser-recorder": { en: "Recorded E2E test", fr: "Test E2E enregistré" },
 };
 
 const DESCRIPTION: { en: string; fr: string } = {
