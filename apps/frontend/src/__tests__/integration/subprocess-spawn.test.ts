@@ -468,7 +468,9 @@ describe("Subprocess Spawn Integration", () => {
 			savedSettings.missing = false;
 		});
 
-		async function buildEnv(): Promise<Record<string, string>> {
+		async function buildEnv(
+			options: { resumeSessionId?: string } = {},
+		): Promise<Record<string, string>> {
 			const { spawn } = await import("node:child_process");
 			const { AgentManager } = await import("../../main/agent");
 			const manager = new AgentManager();
@@ -477,6 +479,7 @@ describe("Subprocess Spawn Integration", () => {
 				"task-1",
 				TEST_PROJECT_PATH,
 				"spec-001",
+				options,
 			);
 			await new Promise((resolve) => setImmediate(resolve));
 			mockProcess.emit("exit", 0);
@@ -519,6 +522,14 @@ describe("Subprocess Spawn Integration", () => {
 
 			expect(env.WORKPILOT_SWARM_MAX_PARALLEL).toBeUndefined();
 			expect(env.WORKPILOT_SWARM_FAIL_FAST).toBeUndefined();
+		}, 30000);
+
+		it("keeps the session a resumed build picks up", async () => {
+			savedSettings.missing = true;
+
+			const env = await buildEnv({ resumeSessionId: "session-42" });
+
+			expect(env.AUTO_CLAUDE_RESUME_SESSION_ID).toBe("session-42");
 		}, 30000);
 
 		it("sends nothing before any setting was saved", async () => {
