@@ -194,4 +194,8 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    sys.path.append(str(BACKEND_DIR))
+    from foundation.log_redaction import install_global_redaction
+
+    install_global_redaction()
     sys.exit(main(sys.argv[1:]))
