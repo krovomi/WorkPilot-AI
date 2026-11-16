@@ -71,6 +71,7 @@ describe("stepStates", () => {
 	it("maps every runner phase to a step", () => {
 		expect(stepOfPhase("analyzing")).toBe("vision");
 		expect(stepOfPhase("code_generation")).toBe("code");
+		expect(stepOfPhase("render_loop")).toBe("code");
 		expect(stepOfPhase("figma_sync")).toBe("project");
 		expect(stepOfPhase("unknown")).toBeNull();
 	});
@@ -130,6 +131,24 @@ describe("design-to-code store", () => {
 		]);
 	});
 
+	it("keeps the loop's latest step and forgets the picked iteration on a new run", () => {
+		const store = useDesignToCodeStore.getState();
+		store.setRenderLoop(false);
+		store.selectIteration(2);
+		expect(useDesignToCodeStore.getState()).toMatchObject({ renderLoop: false, selectedIteration: 2 });
+
+		store.startPipeline();
+		expect(useDesignToCodeStore.getState().selectedIteration).toBeNull();
+		const loop = { stage: "correct" as const, iteration: 1, max_iterations: 5, score: 0.8, best: 0 };
+		store.applyProgress({ phase: "render_loop", status: "", detail: { loop } });
+		store.applyProgress({ phase: "render_loop", status: "", detail: {} });
+		expect(useDesignToCodeStore.getState()).toMatchObject({ phase: "render_loop", live: { loop } });
+
+		store.selectIteration(1);
+		store.resetPipeline();
+		expect(useDesignToCodeStore.getState()).toMatchObject({ selectedIteration: null, live: { loop: null } });
+	});
+
 	it("keeps an edited sentence and restores the default when cleared", () => {
 		useDesignToCodeStore.getState().setNote(1, "  reuse our tokens  ");
 		expect(useDesignToCodeStore.getState().notes).toEqual({ 1: "reuse our tokens" });
@@ -148,7 +167,7 @@ describe("design-to-code store", () => {
 		api.runDesignToCodePipeline.mockResolvedValue(result());
 		await runDesignToCodePipeline();
 		expect(api.runDesignToCodePipeline).toHaveBeenCalledWith(
-			expect.objectContaining({ projectId: "p1", framework: "maui" }),
+			expect.objectContaining({ projectId: "p1", framework: "maui", renderLoop: true }),
 		);
 		expect(useDesignToCodeStore.getState()).toMatchObject({
 			phase: "complete",
