@@ -126,6 +126,7 @@ id changes.
 | the command palette lists a hub's tabs, matched by their own name or the hub's | "replay" finds Agent Replay, not a hub whose name says nothing about it |
 | `HubTabList` follows the WAI-ARIA tabs pattern: one tab in the tab order, arrows, Home and End move, Enter or Space opens; activation is manual | a tab is a whole page: moving the focus does not load one |
 | `HubMain` has the same tree with or without a hub | entering a hub does not remount what the main area keeps alive (the terminals) |
+| `HubMain` wraps the view on screen in one `ErrorBoundary` whose `resetKey` is the active view | a page that throws shows an error card in the main area instead of blanking the window; choosing another page clears it without remounting the views kept alive (a caught error does replace them until then) |
 
 Formula Lab stays outside the costs hub: it chooses the engine of one card
 and needs that card, so it opens from the card. Change Preview (`sandbox`),
