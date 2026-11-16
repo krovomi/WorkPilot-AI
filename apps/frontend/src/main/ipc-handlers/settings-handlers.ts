@@ -1,5 +1,6 @@
 import { debugLog } from "../../shared/utils/debug-logger";
 import { parseJevSettings } from "../../shared/utils/jev-settings";
+import { parseSwarmSettings } from "../../shared/utils/swarm-settings";
 import { normalizeAgentSafety } from "../../shared/utils/agent-safety";
 import { execFileSync, spawn } from "node:child_process";
 import {
@@ -60,6 +61,7 @@ import {
 	maskSettingsSecrets,
 	unmaskSettingsUpdate,
 } from "../settings-secrets";
+import { pushMenuLayoutIfChanged } from "../server-menu-layout";
 import { pushThemeIfChanged } from "../server-ui-preferences";
 import {
 	isSecretSettingsKey,
@@ -742,6 +744,8 @@ export function registerSettingsHandlers(
 				const newSettings = { ...currentSettings, ...settings };
 				if (settings.jev !== undefined)
 					newSettings.jev = parseJevSettings(settings.jev);
+				if (settings.swarm !== undefined)
+					newSettings.swarm = parseSwarmSettings(settings.swarm);
 				// Sent to every agent process: bounded here, and again by the backend.
 				if (settings.agentSafety !== undefined)
 					newSettings.agentSafety = normalizeAgentSafety(settings.agentSafety);
@@ -760,8 +764,10 @@ export function registerSettingsHandlers(
 					secretFieldValues(newSettings, isSecretSettingsKey),
 				);
 				const credentialsSetAt = writeSettingsFile(newSettings);
-				// Server mode: the theme follows the person to their other devices.
+				// Server mode: the theme and the menu as arranged follow the
+				// person to their other devices.
 				pushThemeIfChanged(settings, newSettings);
+				pushMenuLayoutIfChanged(settings, currentSettings, newSettings);
 
 				// Apply Python path if changed
 				if (settings.pythonPath || settings.autoBuildPath) {

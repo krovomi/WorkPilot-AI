@@ -102,6 +102,8 @@ RULES: dict[tuple[str, str], Rule] = {
     ("DELETE", "/users/me/devices"): signed_in(),
     ("GET", "/users/me/preferences"): signed_in(),
     ("PUT", "/users/me/preferences"): signed_in(),
+    ("GET", "/users/me/preferences/menu"): signed_in(),
+    ("PUT", "/users/me/preferences/menu"): signed_in(),
     ("GET", "/users/me/access-tokens"): signed_in(),
     ("POST", "/users/me/access-tokens"): signed_in(),
     ("DELETE", "/users/me/access-tokens/{token_id}"): signed_in(),

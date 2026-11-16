@@ -39,6 +39,7 @@ export function useGitHubIssues(projectId: string | undefined) {
 	);
 
 	const syncStatus = useSyncStatusStore((state) => state.syncStatus);
+	const connectionError = useSyncStatusStore((s) => s.connectionError);
 
 	// Track if search is active (need to load all issues for search)
 	const [isSearchActive, setIsSearchActive] = useState(false);
@@ -96,6 +97,7 @@ export function useGitHubIssues(projectId: string | undefined) {
 	return {
 		issues,
 		syncStatus,
+		connectionError,
 		isLoading,
 		isLoadingMore,
 		error,

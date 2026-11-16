@@ -15,12 +15,13 @@ Output:
 """
 
 import argparse
+import http.client
 import json
 import re
 import sys
 import urllib.error
 import urllib.request
-from typing import Any
+from typing import Any, NoReturn
 
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
@@ -198,8 +199,8 @@ def model_meta(base_url: str, model_name: str) -> dict[str, Any]:
         param_b = _parse_param_billions(
             (info.get("details") or {}).get("parameter_size")
         )
-    except Exception:
-        pass
+    except (OSError, ValueError, AttributeError, TypeError):
+        pass  # no /api/show (older Ollama, LM Studio): judged by the name below
     tools_known = supports is not None or is_embedding_model(model_name)
     name_lower = model_name.lower()
     if supports is None:
@@ -236,7 +237,7 @@ def version_gte(version: str | None, min_version: str | None) -> bool:
     return parse_version(version) >= parse_version(min_version)
 
 
-def output_json(success: bool, data: Any = None, error: str | None = None) -> None:
+def output_json(success: bool, data: Any = None, error: str | None = None) -> NoReturn:
     """Output JSON result to stdout and exit."""
     result = {"success": success}
     if data is not None:
@@ -247,26 +248,28 @@ def output_json(success: bool, data: Any = None, error: str | None = None) -> No
     sys.exit(0 if success else 1)
 
 
-def output_error(message: str) -> None:
+def output_error(message: str) -> NoReturn:
     """Output error JSON and exit with failure."""
     output_json(False, error=message)
 
 
 def fetch_ollama_api(base_url: str, endpoint: str, timeout: int = 5) -> dict | None:
-    """Fetch data from Ollama API."""
+    """Fetch data from Ollama API: its JSON object, or None.
+
+    Anything else (no server, an error page, a JSON array from a server that
+    is not Ollama) is None, so a reader never calls ``.get`` on a list.
+    """
     url = f"{base_url.rstrip('/')}/{endpoint}"
     try:
         req = urllib.request.Request(url)
         req.add_header("Content-Type", "application/json")
 
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            return json.loads(response.read().decode())
-    except urllib.error.URLError:
+            answer = json.loads(response.read().decode())
+    # URLError and timeouts are OSError; a garbled reply is an HTTPException.
+    except (OSError, ValueError, http.client.HTTPException):
         return None
-    except json.JSONDecodeError:
-        return None
-    except Exception:
-        return None
+    return answer if isinstance(answer, dict) else None
 
 
 def get_ollama_version(base_url: str) -> str | None:
@@ -412,7 +415,6 @@ def cmd_list_models(args) -> None:
 
     if not result:
         output_error(f"Could not connect to Ollama at {base_url}")
-        return
 
     model_list = []
     for model in installed_models(result):
@@ -455,7 +457,6 @@ def cmd_list_embedding_models(args) -> None:
 
     if not result:
         output_error(f"Could not connect to Ollama at {base_url}")
-        return
 
     embedding_models = []
     for model in installed_models(result):
@@ -620,7 +621,7 @@ def classify_pull_error(model_name: str, error_msg: str, version: str | None) ->
 
 def _fail_pull_unless_installed(
     base_url: str, model_name: str, error_msg: str, version: str | None
-) -> None:
+) -> NoReturn:
     """Report a pull failure — unless the model is on the server regardless.
 
     Every terminal path of a pull funnels through here so that a transport
@@ -639,7 +640,6 @@ def _fail_pull_unless_installed(
                 ],
             },
         )
-        return
     output_error(classify_pull_error(model_name, error_msg, version))
 
 
@@ -650,7 +650,6 @@ def cmd_pull_model(args) -> None:
 
     if not model_name:
         output_error("Model name is required")
-        return
 
     # Check Ollama version compatibility before attempting pull
     ollama_version = get_ollama_version(base_url)
@@ -663,7 +662,6 @@ def cmd_pull_model(args) -> None:
                 f"Your version is {ollama_version}. "
                 f"Please upgrade Ollama: https://ollama.com/download"
             )
-            return
 
     try:
         url = f"{base_url.rstrip('/')}/api/pull"
@@ -678,38 +676,14 @@ def cmd_pull_model(args) -> None:
                 try:
                     progress = json.loads(line.decode("utf-8"))
 
-                    # Check for error in the streaming response
-                    # This handles cases like "requires newer version of Ollama"
+                    if not isinstance(progress, dict):
+                        continue
+                    # An error in the stream (e.g. "requires newer version of
+                    # Ollama") ends the pull, unless the model is usable anyway.
                     if "error" in progress:
-                        # The only question that matters is whether the model is
-                        # usable now. Ollama reports housekeeping failures the
-                        # same way it reports real ones — a pull that downloaded
-                        # every layer and then failed to unlink a `-partial`
-                        # blob ends with "no such file or directory" — and
-                        # calling that a failed download tells the user to redo
-                        # gigabytes of work that already landed.
-                        if model_is_installed(base_url, model_name):
-                            output_json(
-                                True,
-                                data={
-                                    "model": model_name,
-                                    "status": "completed",
-                                    "output": [
-                                        "Download completed successfully",
-                                        (
-                                            "Ollama reported a non-fatal error "
-                                            f"while finishing up: {progress['error']}"
-                                        ),
-                                    ],
-                                },
-                            )
-                            return
-                        output_error(
-                            classify_pull_error(
-                                model_name, progress["error"], ollama_version
-                            )
+                        _fail_pull_unless_installed(
+                            base_url, model_name, str(progress["error"]), ollama_version
                         )
-                        return
 
                     # Emit progress as NDJSON to stderr for main process to parse
                     if "completed" in progress and "total" in progress:
@@ -724,10 +698,7 @@ def cmd_pull_model(args) -> None:
                             file=sys.stderr,
                             flush=True,
                         )
-                    elif progress.get("status") == "success":
-                        # Download complete
-                        pass
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
 
         output_json(
@@ -813,7 +784,6 @@ def main():
     if not args.command:
         parser.print_help()
         output_error("No command specified")
-        return
 
     commands = {
         "check-status": cmd_check_status,

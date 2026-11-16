@@ -744,6 +744,24 @@ class TestInjection:
         )
         assert "described by a local vision model" in attachments_section(spec_dir)
 
+    def test_a_scan_that_cannot_answer_is_no_all_clear(
+        self, spec_dir, project, monkeypatch
+    ):
+        import injection_guard
+
+        def broken(self, text, source=""):
+            raise RuntimeError("scanner bug")
+
+        monkeypatch.setattr(injection_guard.InjectionScanner, "scan", broken)
+        note = "Deploy the orders service on Friday."
+        (spec_dir / "attachments" / "notes.txt").write_text(note, encoding="utf-8")
+
+        result = run_preflight(spec_dir, project, env={})
+
+        assert result.documents[0].threat != "safe"
+        section = attachments_section(spec_dir)
+        assert "text withheld" in section and note not in section
+
 
 class TestReadGuard:
     def _read(self, hook, path: Path) -> dict:
