@@ -59,8 +59,9 @@ interface ServerSessionState {
 }
 
 /**
- * Apply the theme the server keeps for the person (main already wrote it in
- * the settings file); nothing when the server has none or cannot be reached.
+ * Apply the theme and the menu layout the server keeps for the person (main
+ * already wrote them in the settings file); nothing when the server has none
+ * or cannot be reached.
  */
 async function applyServerTheme(): Promise<void> {
 	try {

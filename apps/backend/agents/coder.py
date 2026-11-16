@@ -121,6 +121,7 @@ from .session import (
     post_session_processing,
     run_agent_session,
 )
+from .swarm.build_phase import run_swarm_phase
 from .utils import (
     find_phase_for_subtask,
     find_subtask_in_plan,
@@ -2083,6 +2084,11 @@ async def run_autonomous_agent(
             print("To continue, run the script again without --max-iterations")
             break
 
+        # The swarm first builds the subtasks that can run side by side, if on.
+        if not first_run and await run_swarm_phase(
+            project_dir, spec_dir, source_spec_dir
+        ):
+            break
         # Get the next subtask to work on (planner sessions shouldn't bind to a subtask)
         next_subtask = None if first_run else get_next_subtask(spec_dir)
         subtask_id = next_subtask.get("id") if next_subtask else None
@@ -2101,7 +2107,6 @@ async def run_autonomous_agent(
                 )
         status_manager.update_subtasks(in_progress=1)
 
-        # Print session header
         print_session_header(
             session_num=iteration,
             is_planner=first_run,
@@ -2113,19 +2118,14 @@ async def run_autonomous_agent(
             else 1,
         )
 
-        # Capture state before session for post-processing
         commit_before = session_start(spec_dir, project_dir, subtask_id, iteration)
         commit_count_before = get_commit_count(project_dir)
 
-        # Get the phase-specific model and thinking level (respects task_metadata.json configuration)
         # first_run means we're in planning phase, otherwise coding phase
         current_phase = "planning" if first_run else "coding"
 
-        # Hot LLM swap: apply any pending live provider/model/effort change for
-        # this phase BEFORE building the client, so the new turn uses it (the
-        # frontend also wrote it to task_metadata.json; consuming the marker makes
-        # the switch explicit + logged and covers the marker-only path). No marker
-        # → no-op.
+        # Hot LLM swap: a pending live provider/model/effort change for this
+        # phase is applied BEFORE the client is built (no marker → no-op).
         try:
             from agents.hot_swap import (
                 apply_hot_swap_to_metadata,
@@ -2486,7 +2486,7 @@ async def run_autonomous_agent(
             if (
                 status == "continue"
                 and response
-                and "should I mark" in response.lower()
+                and "should i mark" in response.lower()
                 and "blocked" in response.lower()
             ):
                 print_status(

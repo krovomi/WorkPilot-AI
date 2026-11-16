@@ -249,7 +249,14 @@ class DependencyAnalyzer:
     def get_parallelism_stats(self, waves: list[Wave]) -> dict:
         """Get statistics about the parallelism achieved."""
         if not waves:
-            return {"total_waves": 0, "max_parallelism": 0, "avg_parallelism": 0.0}
+            return {
+                "total_waves": 0,
+                "max_parallelism": 0,
+                "avg_parallelism": 0.0,
+                "wave_sizes": [],
+                "total_subtasks": 0,
+                "speedup_estimate": 1.0,
+            }
 
         sizes = [len(w.subtask_ids) for w in waves]
         return {
@@ -258,5 +265,5 @@ class DependencyAnalyzer:
             "avg_parallelism": sum(sizes) / len(sizes),
             "wave_sizes": sizes,
             "total_subtasks": sum(sizes),
-            "speedup_estimate": sum(sizes) / len(waves) if waves else 1.0,
+            "speedup_estimate": sum(sizes) / len(waves),
         }

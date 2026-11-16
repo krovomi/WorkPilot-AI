@@ -904,12 +904,15 @@ def handle_build_command(
                 [
                     "",
                     highlight("To review and approve:"),
-                    f"  python workpilot/review.py --spec-dir {spec_dir}",
+                    "  open the task's review in the app and approve the spec,",
+                    "  or review it in this terminal with the command below.",
                     "",
                     muted("Or use --force to bypass this check (not recommended)."),
                 ]
             )
             print(box(content, width=70, style="heavy"))
+            print()
+            print(f"  python runners/spec_runner.py --continue {spec_dir.name}")
             print()
             sys.exit(1)
     else:
