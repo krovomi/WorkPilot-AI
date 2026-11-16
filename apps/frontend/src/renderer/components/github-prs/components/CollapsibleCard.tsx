@@ -47,25 +47,30 @@ export function CollapsibleCard({
 				className,
 			)}
 		>
-			<CollapsibleTrigger asChild>
-				<div className="p-4 flex items-center justify-between gap-3 bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
-					<div className="flex items-center gap-3 min-w-0">
-						<div className="shrink-0">
-							{isOpen ? (
-								<ChevronDown className="h-4 w-4 text-muted-foreground" />
-							) : (
-								<ChevronRight className="h-4 w-4 text-muted-foreground" />
-							)}
+			{/* The header is a real button, so the keyboard opens the card; an
+			    action of the header sits beside it, never inside. */}
+			<div className="flex items-center gap-2 pr-4 bg-muted/30 hover:bg-muted/40 transition-colors">
+				<CollapsibleTrigger asChild>
+					<button
+						type="button"
+						className="flex-1 min-w-0 p-4 pr-0 flex items-center justify-between gap-3 text-left cursor-pointer"
+					>
+						<div className="flex items-center gap-3 min-w-0">
+							<div className="shrink-0">
+								{isOpen ? (
+									<ChevronDown className="h-4 w-4 text-muted-foreground" />
+								) : (
+									<ChevronRight className="h-4 w-4 text-muted-foreground" />
+								)}
+							</div>
+							{icon && <div className="shrink-0">{icon}</div>}
+							<span className="font-medium truncate">{title}</span>
 						</div>
-						{icon && <div className="shrink-0">{icon}</div>}
-						<span className="font-medium truncate">{title}</span>
-					</div>
-					<div className="flex items-center gap-2 shrink-0">
-						{headerAction}
-						{badge}
-					</div>
-				</div>
-			</CollapsibleTrigger>
+						{badge && <div className="flex items-center shrink-0">{badge}</div>}
+					</button>
+				</CollapsibleTrigger>
+				{headerAction}
+			</div>
 			<CollapsibleContent>{children}</CollapsibleContent>
 		</Collapsible>
 	);

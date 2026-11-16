@@ -69,6 +69,9 @@ _mocked_module_names = [
 # the file only collected when an earlier test file had imported them.
 importlib.import_module("foundation.build_signals")
 importlib.import_module("foundation.pause_state")
+# Same for `security.child_env`, which `qa/loop.py` reaches through the goal
+# gate (`goal/check.py`) and which `security` being mocked would hide.
+importlib.import_module("security.child_env")
 
 for name in _mocked_module_names:
     if name in sys.modules:
@@ -121,6 +124,22 @@ def cleanup_mocked_modules():
             sys.modules[name] = _original_modules[name]
         elif name in sys.modules:
             del sys.modules[name]
+
+
+@pytest.fixture(autouse=True)
+def _criteria_reads_the_mocked_progress(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point `qa.criteria` at `mock_progress`, whoever imported it first.
+
+    The module mocks above only reach `qa.criteria` when this file is the
+    first to import it. In a CI shard an earlier file has already imported
+    it with the real `core.progress`, and `should_run_qa` then read the real
+    build state instead of the value a test sets.
+    """
+    monkeypatch.setitem(
+        should_run_qa.__globals__,
+        "is_build_complete",
+        mock_progress.is_build_complete,
+    )
 
 
 @pytest.fixture
