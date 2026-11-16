@@ -299,7 +299,9 @@ describe("lancer une commande", () => {
 		await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 		await userEvent.type(input(), "/help{Enter}");
 		expect(await screen.findByText("Available commands")).toBeInTheDocument();
-		expect(screen.getByText(/\/review — Review the diff/)).toBeInTheDocument();
+		// The toast shows the list in a <pre>; a moment later Radix also reads it to
+		// screen readers through a hidden live region, which a slow runner reaches.
+		expect(screen.getByText(/\/review — Review the diff/, { selector: "pre" })).toBeInTheDocument();
 		expect(api.fn("runQuickCommand")).not.toHaveBeenCalled();
 	});
 

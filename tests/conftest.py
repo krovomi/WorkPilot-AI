@@ -217,8 +217,26 @@ def _clean_mock_modules() -> None:
             # in test files always patch the same object that imported functions
             # reference (function.__globals__ points to M1's dict, not M2's).
             sys.modules[key] = _real_modules[key]
+        elif (real := _module_the_package_holds(key)) is not None:
+            # A mock put over a module already imported: its package still
+            # holds the real one. Deleting the key would leave that attribute
+            # behind, so `monkeypatch.setattr("core.client.x")` patched it
+            # while `from core.client import x` imported a fresh copy.
+            sys.modules[key] = real
         else:
             del sys.modules[key]
+
+
+def _module_the_package_holds(key: str) -> _types.ModuleType | None:
+    """The real module the parent package names ``key``, if it holds one."""
+    parent_name, dot, child = key.rpartition(".")
+    parent = sys.modules.get(parent_name) if dot else None
+    if not isinstance(parent, _types.ModuleType):
+        return None
+    held = parent.__dict__.get(child)
+    if isinstance(held, _types.ModuleType) and held.__name__ == key:
+        return held
+    return None
 
 
 def pytest_collectstart(collector) -> None:
