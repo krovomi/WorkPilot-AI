@@ -74,3 +74,96 @@ describe("api explorer project request drafts", () => {
 		expect(serialized).not.toContain("environment-secret");
 	});
 });
+
+describe("api explorer environments, tags and responses", () => {
+	const initial = useApiExplorerStore.getState();
+	beforeEach(() => {
+		localStorage.clear();
+		useApiExplorerStore.setState(initial, true);
+		useApiExplorerStore.setState({
+			environments: [
+				{ id: "local", name: "Local", baseUrl: "http://localhost:3000", headers: {} },
+			],
+			activeEnvironmentId: "local",
+		});
+	});
+
+	it("gives environments added together different ids", () => {
+		const store = useApiExplorerStore.getState();
+		store.addEnvironment({ name: "A", baseUrl: "http://a", headers: {} });
+		store.addEnvironment({ name: "B", baseUrl: "http://b", headers: {} });
+		const ids = useApiExplorerStore.getState().environments.map((e) => e.id);
+		expect(new Set(ids).size).toBe(3);
+	});
+
+	it("moves to an environment that remains when the active one is removed", () => {
+		const store = useApiExplorerStore.getState();
+		store.addEnvironment({ name: "Prod", baseUrl: "http://p", headers: {} });
+		const prod = useApiExplorerStore.getState().environments[1].id;
+
+		store.removeEnvironment("local");
+		expect(useApiExplorerStore.getState().activeEnvironmentId).toBe(prod);
+
+		store.setActiveEnvironment(prod);
+		store.addEnvironment({ name: "QA", baseUrl: "http://q", headers: {} });
+		const qa = useApiExplorerStore.getState().environments[1].id;
+		store.removeEnvironment(qa);
+		expect(useApiExplorerStore.getState().activeEnvironmentId).toBe(prod);
+
+		store.removeEnvironment(prod);
+		expect(useApiExplorerStore.getState()).toMatchObject({
+			environments: [],
+			activeEnvironmentId: "local",
+		});
+	});
+
+	it("folds a tag and unfolds it", () => {
+		const store = useApiExplorerStore.getState();
+		store.toggleTag("users");
+		store.toggleTag("orders");
+		expect(useApiExplorerStore.getState().collapsedTags).toEqual(["users", "orders"]);
+		store.toggleTag("users");
+		expect(useApiExplorerStore.getState().collapsedTags).toEqual(["orders"]);
+	});
+
+	it("keeps no draft outside a project, but still shows the headers typed", () => {
+		useApiExplorerStore.setState({ activeProjectId: null, selectedEndpointKey: makeEndpointKey("GET", "/a") });
+		useApiExplorerStore.getState().setRequestHeaders({ "X-A": "1" });
+		expect(useApiExplorerStore.getState()).toMatchObject({
+			requestHeaders: { "X-A": "1" },
+			requestDrafts: {},
+		});
+	});
+
+	it("leaves a project with nothing selected and no contract address", () => {
+		useApiExplorerStore.setState({ specUrlsByProject: { p1: "http://a/openapi.json" } });
+		const store = useApiExplorerStore.getState();
+		store.setActiveProjectContext("p1");
+		expect(useApiExplorerStore.getState().specUrl).toBe("http://a/openapi.json");
+		store.setActiveProjectContext(null);
+		expect(useApiExplorerStore.getState()).toMatchObject({ specUrl: "", selectedEndpointKey: null });
+	});
+
+	it("records a response, which ends the sending, and clears it", () => {
+		const store = useApiExplorerStore.getState();
+		store.setIsSendingRequest(true);
+		store.setResponse({ status: 201, statusText: "Created", headers: { a: "1" }, body: "{}", time: 12 });
+		expect(useApiExplorerStore.getState()).toMatchObject({
+			responseStatus: 201,
+			responseStatusText: "Created",
+			responseHeaders: { a: "1" },
+			responseBody: "{}",
+			responseTime: 12,
+			isSendingRequest: false,
+		});
+
+		store.clearResponse();
+		expect(useApiExplorerStore.getState()).toMatchObject({
+			responseStatus: null,
+			responseStatusText: "",
+			responseHeaders: {},
+			responseBody: "",
+			responseTime: null,
+		});
+	});
+});
