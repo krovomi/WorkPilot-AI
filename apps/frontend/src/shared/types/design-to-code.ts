@@ -78,6 +78,8 @@ export interface DesignToCodeRequest {
 	generateTests?: boolean;
 	useDesignTokens?: boolean;
 	customInstructions?: string;
+	/** Render the generated code, compare it with the design and correct it (#379). */
+	renderLoop?: boolean;
 }
 
 /** Where a component sits on the design, as fractions of the image. */
@@ -140,6 +142,8 @@ export interface DesignToCodeResult {
 	tokens_used: number;
 	/** No model answered: the result is a canned example, not an analysis. */
 	simulated?: boolean;
+	/** The render → diff → correct loop that refined the files, when it was asked for. */
+	render_loop?: DesignRenderLoop;
 	/** The generated markup scored with the Accessibility page's rules (#391). */
 	accessibility?: {
 		score: number;
@@ -168,7 +172,75 @@ export interface DesignToCodeProgress {
 		tokens_skipped?: boolean;
 		files?: string[];
 		tests_supported?: boolean;
+		loop?: DesignLoopProgress;
 	};
+}
+
+/** A step of the render loop, as the runner reports it live. */
+export interface DesignLoopProgress {
+	stage: "render" | "correct";
+	iteration: number;
+	max_iterations: number;
+	score: number | null;
+	best: number | null;
+}
+
+/** A difference the loop measured, tracked across its iterations. */
+export interface DesignLoopIssue {
+	id: string;
+	region: string;
+	kind: "color" | "offset" | "size" | "structure";
+	axis?: "x" | "y" | "width" | "height";
+	px?: number;
+	target?: string;
+	render?: string;
+	status: "resolved" | "open" | "abandoned";
+	first_seen: number;
+	last_seen: number;
+	resolved_at?: number;
+}
+
+export interface DesignLoopIteration {
+	/** 0 is the code as generated; each next one follows a correction. */
+	index: number;
+	score: number;
+	pixel_match: number;
+	ssim: number;
+	/** PNG data URLs, made by the runner. */
+	render_image: string;
+	diff_image: string;
+	regions: { name: string; score: number; issues: Omit<DesignLoopIssue, "id" | "region" | "status" | "first_seen" | "last_seen">[] }[];
+	applied_edits: number;
+	refused_edits: { path: string; reason: string }[];
+	notes: string[];
+	duration_seconds: number;
+}
+
+export type DesignLoopStatus =
+	| "converged"
+	| "max_iterations"
+	| "budget"
+	| "stalled"
+	| "failed"
+	| "skipped";
+
+/** The loop's report (`design_to_code.loop.serialize`, or a skip with its reason). */
+export interface DesignRenderLoop {
+	status: DesignLoopStatus;
+	/** Why it did not run, when `status` is `skipped`. */
+	reason?: string;
+	detail?: string;
+	threshold: number;
+	/** The rendering is a static HTML mirror of the stack's files. */
+	mirror: boolean;
+	best_iteration: number;
+	iterations: DesignLoopIteration[];
+	issues: DesignLoopIssue[];
+	provider?: string;
+	route?: string | null;
+	model?: string;
+	masked?: string[];
+	missing_fonts?: string[];
 }
 
 export interface DesignStackDetection {
