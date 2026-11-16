@@ -20,6 +20,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ..proactive import RiskHistoryStore, build_trend_report
 from .fragility_analyzer import FragilityAnalyzer
 from .models import (
     FragilityReport,
@@ -50,6 +51,7 @@ class ProactiveMode:
             project_dir=project_dir,
             churn_days=churn_days,
         )
+        self.history = RiskHistoryStore(project_dir)
         self._last_reports: list[FragilityReport] = []
 
     async def scan_fragility(self) -> list[FragilityReport]:
@@ -64,10 +66,14 @@ class ProactiveMode:
             f"(threshold={self.risk_threshold}, max_files={self.max_files})"
         )
 
-        reports = await self.analyzer.analyze(
+        # Every measured file goes into the history (#370): a file below the
+        # threshold today is the one whose climb the trend has to see.
+        measured = await self.analyzer.analyze(
             max_files=self.max_files,
-            risk_threshold=self.risk_threshold,
+            risk_threshold=0.0,
         )
+        self.history.record(measured)
+        reports = [r for r in measured if r.risk_score >= self.risk_threshold]
 
         self._last_reports = reports
         logger.info(f"Fragility scan complete: {len(reports)} files above threshold")
@@ -142,6 +148,12 @@ class ProactiveMode:
             template = template.replace(key, value)
 
         return template
+
+    def trend_report(self) -> dict[str, Any]:
+        """Trajectories, hot list and degrading directories from the history."""
+        return build_trend_report(
+            self.history.series(), snapshots=len(self.history.days())
+        )
 
     @property
     def last_reports(self) -> list[FragilityReport]:
