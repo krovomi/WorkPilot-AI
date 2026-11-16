@@ -42,13 +42,18 @@ export function TaskBlockers({ task }: TaskBlockersProps) {
 	const state = useMemo(() => resolveBlockers(task, byId), [task, byId]);
 	const options = useMemo(
 		() =>
-			eligibleBlockers(task, tasks).map((candidate) => ({
-				value: candidate.id,
-				label: candidate.title,
-				description: t(
-					`tasks:${TASK_STATUS_LABELS[candidate.status] ?? "columns.backlog"}`,
-				),
-			})),
+			eligibleBlockers(task, tasks).map((candidate) => {
+				// The column the task is in, shown next to it and searchable.
+				const column = t(
+					`tasks:${TASK_STATUS_LABELS[candidate.status as keyof typeof TASK_STATUS_LABELS] ?? "columns.backlog"}`,
+				);
+				return {
+					value: candidate.id,
+					label: candidate.title,
+					description: column,
+					badge: <span className="text-xs text-muted-foreground">{column}</span>,
+				};
+			}),
 		[task, tasks, t],
 	);
 

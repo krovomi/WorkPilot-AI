@@ -300,23 +300,31 @@ function capitalize(str: string) {
 }
 
 interface ProviderSelectorProps {
-	selected?: string;
-	setSelected?: (provider: string) => void;
 	onOpenAccountsSettings?: () => void;
 }
 
-// Ce composant synchronise le provider sélectionné via ProviderContext pour un usage temps réel dans UsageIndicator et AuthStatusIndicator
+/** Remembered for ProviderContext, which reads it on the next launch. */
+function persistProvider(provider: string): void {
+	try {
+		localStorage.setItem("selectedProvider", provider);
+	} catch {
+		/* storage unavailable: the choice lasts for this session */
+	}
+}
+
+/**
+ * The default provider (Settings → Agent). The choice lives in
+ * ProviderContext, read in real time by UsageIndicator and
+ * AuthStatusIndicator; this picker only changes it.
+ */
 export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
-	selected: selectedProp = "",
-	setSelected: setSelectedProp = () => {
-		/* noop */
-	},
 	onOpenAccountsSettings = () => {
 		/* noop */
 	},
 }) => {
 	const { t } = useTranslation();
-	const { selectedProvider, setSelectedProvider } = useProviderContext();
+	const { selectedProvider: selected, setSelectedProvider } =
+		useProviderContext();
 	const { profiles, setActiveProfile, settings } = useSettingsStore(
 		useShallow((s) => ({
 			profiles: s.profiles,
@@ -327,31 +335,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 	const { toast } = useToast();
 	const [showAuthDialog, setShowAuthDialog] = useState(false);
 	const [pendingProvider, setPendingProvider] = useState<string>("");
-
-	// Utilise le contexte si pas de props
-	const selected = selectedProp || selectedProvider;
-	const setSelected = (provider: string) => {
-		setSelectedProvider(provider);
-		if (typeof setSelectedProp === "function") {
-			setSelectedProp(provider);
-		}
-	};
-
-	// Sync the effective selection into ProviderContext when the context hasn't been
-	// populated yet. This handles the case where App.tsx resolves the provider via its
-	// own local state (e.g., backend auto-detection) before ProviderContext is updated,
-	// which would leave UsageIndicator stuck on "Chargement..." indefinitely.
-	useEffect(() => {
-		if (selected && !selectedProvider) {
-			setSelectedProvider(selected);
-			// Also persist so ProviderContext reads it immediately on the next launch.
-			try {
-				localStorage.setItem("selectedProvider", selected);
-			} catch {
-				/* ignore */
-			}
-		}
-	}, [selected, selectedProvider, setSelectedProvider]);
 
 	const [providersData, setProvidersData] = useState<ProvidersResponse>({
 		providers: [],
@@ -382,40 +365,19 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
 	const { providers, status } = providersData;
 
-	// Set default provider on mount if none selected
+	// No provider chosen yet on this machine: Anthropic, or the first one.
 	useEffect(() => {
 		if (!selected && providers.length > 0) {
 			const defaultProvider =
 				providers.find((p: CanonicalProvider) => p.name === "anthropic") ??
 				providers[0];
-			setSelected(defaultProvider.name);
-			// Persist default selection so ProviderContext can restore it on next mount
-			// (without this, the default is lost on every page reload until the user explicitly selects)
-			localStorage.setItem("selectedProvider", defaultProvider.name);
+			setSelectedProvider(defaultProvider.name);
+			persistProvider(defaultProvider.name);
 		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [providers, selected, setSelected]);
-
-	// Restore persisted provider selection from localStorage on mount
-	useEffect(() => {
-		const storedProvider = localStorage.getItem("selectedProvider");
-		if (storedProvider && storedProvider !== selected) {
-			setSelected(storedProvider);
-			const providerProfile = profiles.find(
-				(profile) => detectProvider(profile.baseUrl) === storedProvider,
-			);
-			if (providerProfile) {
-				setActiveProfile(providerProfile.id);
-			} else {
-				setActiveProfile(null);
-			}
-		}
-		// biome-ignore lint/correctness/useExhaustiveDependencies: intentional dependency omission
-	}, [profiles, selected, setSelected, setActiveProfile]);
+	}, [providers, selected, setSelectedProvider]);
 
 	const handleSelect = async (value: string) => {
 		if (!status[value]) {
-			// Trouver le provider pour afficher son nom dans le dialog
 			const provider = providers.find(
 				(p: CanonicalProvider) => p.name === value,
 			);
@@ -423,27 +385,19 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 			setShowAuthDialog(true);
 			return;
 		}
-		if (isApplying) return;
 		setIsApplying(true);
 
 		// Communicate the provider selection to the backend
 		try {
-			if (globalThis.electronAPI?.selectProvider) {
-				const result = await globalThis.electronAPI.selectProvider(value);
-				if (!result.success)
-					throw new Error(result.error || "Provider selection failed");
-			}
+			const result = await globalThis.electronAPI.selectProvider(value);
+			if (!result.success) throw new Error(result.error);
 
-			setSelected(value);
-			localStorage.setItem("selectedProvider", value);
+			setSelectedProvider(value);
+			persistProvider(value);
 			const providerProfile = profiles.find(
 				(profile) => detectProvider(profile.baseUrl) === value,
 			);
-			if (providerProfile) {
-				setActiveProfile(providerProfile.id);
-			} else {
-				setActiveProfile(null);
-			}
+			setActiveProfile(providerProfile?.id ?? null);
 
 			useSettingsStore.getState().updateSettings({ selectedProvider: value });
 			// The default provider seeds new tasks only. A task owns its engine
@@ -475,14 +429,10 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
 		// Afficher un toast pour informer l'utilisateur
 		toast({
-			title: t(
-				"dialogs:providerSelector.authRedirect.title",
-				"Redirection vers les comptes",
-			),
-			description: t(
-				"dialogs:providerSelector.authRedirect.description",
-				`Configuration de ${pendingProvider} requise`,
-			),
+			title: t("dialogs:providerSelector.authRedirect.title"),
+			description: t("dialogs:providerSelector.authRedirect.description", {
+				provider: pendingProvider,
+			}),
 			duration: 3000,
 		});
 	};
@@ -603,7 +553,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 							{t("dialogs:providerSelector.authDialog.title")}
 						</AlertDialogTitle>
 						<AlertDialogDescription>
-							{t("dialogs:providerSelector.authDialog.description")}{" "}
+							{t("dialogs:providerSelector.authDialog.description", {
+								provider: pendingProvider,
+							})}{" "}
 							{t("dialogs:providerSelector.authDialog.subDescription")}
 						</AlertDialogDescription>
 					</AlertDialogHeader>

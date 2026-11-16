@@ -405,51 +405,6 @@ export const integrationMock = {
 		},
 	}),
 
-	detectGitLabProject: async () => ({
-		success: true,
-		data: {
-			project: "user/example-project",
-			instanceUrl: "https://gitlab.com",
-		},
-	}),
-
-	getGitLabBranches: async () => ({
-		success: true,
-		data: ["main", "develop", "feature/example"],
-	}),
-
-	createGitLabProject: async () => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	addGitLabRemote: async () => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	listGitLabGroups: async () => ({
-		success: true,
-		data: {
-			groups: [
-				{
-					id: 1,
-					name: "Example Group",
-					path: "example-group",
-					fullPath: "example-group",
-					description: "An example group",
-				},
-				{
-					id: 2,
-					name: "Another Group",
-					path: "another-group",
-					fullPath: "another-group",
-					description: "Another group",
-				},
-			],
-		},
-	}),
-
 	// GitLab Event Listeners
 	onGitLabInvestigationProgress: () => () => {
 		/* noop */

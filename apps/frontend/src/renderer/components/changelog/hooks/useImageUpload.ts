@@ -7,7 +7,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { ALLOWED_IMAGE_TYPES_DISPLAY } from "../../../../shared/constants";
-import { blobToBase64, isValidImageMimeType } from "../../ImageUpload";
+import {
+	blobToBase64,
+	isValidImageMimeType,
+} from "../../../lib/image-attachments";
 
 /**
  * The saved name's extension, from the MIME type already checked: the main
