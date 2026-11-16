@@ -155,18 +155,24 @@ class BatchValidator:
 
     def _format_issues(self, issues: list[dict[str, Any]]) -> str:
         """Format issues for the prompt."""
+        # Issue text is quoted with the shared helper (rule S2).
+        from security.untrusted import quote_untrusted
+
         formatted = []
         for issue in issues:
             labels = ", ".join(issue.get("labels", [])) or "none"
             body = issue.get("body", "")[:500]  # Truncate long bodies
             if len(issue.get("body", "")) > 500:
                 body += "..."
+            text = f"Title: {issue['title']}\nLabels: {labels}\nBody: {body}"
+            quoted = quote_untrusted(
+                text, kind="issue_body", source=f"github:issue#{issue['issue_number']}"
+            )
 
             formatted.append(f"""
-**Issue #{issue["issue_number"]}**: {issue["title"]}
-- Labels: {labels}
+**Issue #{int(issue["issue_number"])}**
 - Similarity to primary: {issue.get("similarity_to_primary", 1.0):.0%}
-- Body: {body}
+{quoted}
 """)
         return "\n---\n".join(formatted)
 

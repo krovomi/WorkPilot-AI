@@ -175,7 +175,7 @@ def test_check_labels_lists_an_issue_a_maintainer_labelled(project, gh):
     gh.answer(
         {
             **ANSWERS,
-            "api /repos/own/repo/issues/5/events": {
+            "api /repos/own/repo/issues/5/events?per_page=100&page=1": {
                 "stdout": json.dumps(
                     [
                         {

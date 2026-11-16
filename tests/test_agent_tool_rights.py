@@ -63,6 +63,20 @@ class TestTheDeclarationIsTheRight:
         assert WEB_TOOLS <= set(undeclared_builtin_tools(agent_type))
         assert not set(config["tools"]) & (WRITE_FAMILY | {"Bash"})
 
+    @pytest.mark.parametrize(
+        "agent_type",
+        [
+            "pr_reviewer",
+            "pr_orchestrator_parallel",
+            "pr_followup_parallel",
+            "issue_triage",
+        ],
+    )
+    def test_the_forge_sessions_run_in_plan_mode(self, agent_type):
+        from core.client import READ_ONLY_AGENT_TYPES
+
+        assert agent_type in READ_ONLY_AGENT_TYPES
+
     def test_the_review_types_keep_the_docs_server(self):
         for agent_type in ("pr_reviewer", "pr_orchestrator_parallel"):
             assert "context7" in AGENT_CONFIGS[agent_type]["mcp_servers"]

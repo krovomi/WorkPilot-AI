@@ -123,7 +123,9 @@ async def test_check_label_adder_success(permission_checker, mock_gh_client):
 
     assert username == "alice"
     assert role == "COLLABORATOR"
-    mock_gh_client.api_get.assert_any_call("/repos/owner/test-repo/issues/123/events")
+    mock_gh_client.api_get.assert_any_call(
+        "/repos/owner/test-repo/issues/123/events?per_page=100&page=1"
+    )
 
 
 @pytest.mark.asyncio
@@ -139,6 +141,64 @@ async def test_check_label_adder_not_found(permission_checker, mock_gh_client):
 
     with pytest.raises(PermissionError, match="Label 'auto-fix' not found"):
         await permission_checker.check_label_adder(123, "auto-fix")
+
+
+def _events(count: int, **labeled: str) -> list[dict]:
+    """`count` comment events, then one `labeled` event per label=actor pair."""
+    events = [{"event": "commented", "actor": {"login": "bob"}}] * count
+    for name, actor in labeled.items():
+        events.append(
+            {"event": "labeled", "label": {"name": name}, "actor": {"login": actor}}
+        )
+    return events
+
+
+@pytest.mark.asyncio
+async def test_check_label_adder_reads_every_page_of_events(
+    permission_checker, mock_gh_client
+):
+    """The label was added again on the second page: that adder is the one."""
+    import permissions
+
+    full = permissions.EVENTS_PER_PAGE
+    mock_gh_client.api_get.side_effect = [
+        _events(full - 1, autofix="mallory"),
+        _events(3, autofix="alice"),
+        {"permission": "write"},
+    ]
+
+    username, role = await permission_checker.check_label_adder(123, "autofix")
+
+    assert (username, role) == ("alice", "COLLABORATOR")
+    mock_gh_client.api_get.assert_any_call(
+        f"/repos/owner/test-repo/issues/123/events?per_page={full}&page=2"
+    )
+
+
+@pytest.mark.asyncio
+async def test_check_label_adder_refuses_past_the_page_cap(
+    permission_checker, mock_gh_client
+):
+    """Unread events may hold the latest label change: no answer from older ones."""
+    import permissions
+
+    mock_gh_client.api_get.return_value = _events(
+        permissions.EVENTS_PER_PAGE - 1, autofix="alice"
+    )
+
+    with pytest.raises(PermissionError, match="pages of events"):
+        await permission_checker.check_label_adder(123, "autofix")
+    assert mock_gh_client.api_get.await_count == permissions.MAX_EVENT_PAGES
+
+
+@pytest.mark.asyncio
+async def test_check_label_adder_reads_an_empty_page_as_the_end(
+    permission_checker, mock_gh_client
+):
+    mock_gh_client.api_get.return_value = None
+
+    with pytest.raises(PermissionError, match="not found"):
+        await permission_checker.check_label_adder(123, "autofix")
 
 
 @pytest.mark.asyncio
