@@ -217,8 +217,26 @@ def _clean_mock_modules() -> None:
             # in test files always patch the same object that imported functions
             # reference (function.__globals__ points to M1's dict, not M2's).
             sys.modules[key] = _real_modules[key]
+        elif (real := _module_the_package_holds(key)) is not None:
+            # A mock put over a module already imported: its package still
+            # holds the real one. Deleting the key would leave that attribute
+            # behind, so `monkeypatch.setattr("core.client.x")` patched it
+            # while `from core.client import x` imported a fresh copy.
+            sys.modules[key] = real
         else:
             del sys.modules[key]
+
+
+def _module_the_package_holds(key: str) -> _types.ModuleType | None:
+    """The real module the parent package names ``key``, if it holds one."""
+    parent_name, dot, child = key.rpartition(".")
+    parent = sys.modules.get(parent_name) if dot else None
+    if not isinstance(parent, _types.ModuleType):
+        return None
+    held = parent.__dict__.get(child)
+    if isinstance(held, _types.ModuleType) and held.__name__ == key:
+        return held
+    return None
 
 
 def pytest_collectstart(collector) -> None:
@@ -833,18 +851,6 @@ def pytest_configure(config):
 
 
 @pytest.fixture
-def semantic_analyzer():
-    """Create a SemanticAnalyzer instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.semantic_analyzer import SemanticAnalyzer
-
-    return SemanticAnalyzer()
-
-
-@pytest.fixture
 def temp_project(tmp_path):
     """Create a temporary project directory with a git repo and sample files.
 
@@ -913,18 +919,6 @@ def temp_project(tmp_path):
 
 
 @pytest.fixture
-def file_tracker(temp_project):
-    """Create a FileEvolutionTracker instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.file_evolution import FileEvolutionTracker
-
-    return FileEvolutionTracker(project_dir=temp_project)
-
-
-@pytest.fixture
 def conflict_detector():
     """Create a ConflictDetector instance for testing."""
     import sys
@@ -934,46 +928,6 @@ def conflict_detector():
     from merge.conflict_detector import ConflictDetector
 
     return ConflictDetector()
-
-
-@pytest.fixture
-def auto_merger():
-    """Create an AutoMerger instance for testing."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.auto_merger import AutoMerger
-
-    return AutoMerger()
-
-
-@pytest.fixture
-def ai_resolver():
-    """Create an AIResolver instance without AI function (for testing fallback behaviour)."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.ai_resolver import AIResolver
-
-    return AIResolver(ai_call_fn=None)
-
-
-@pytest.fixture
-def mock_ai_resolver():
-    """Create an AIResolver instance with a mock AI function."""
-    import sys
-    from pathlib import Path as _Path
-
-    sys.path.insert(0, str(_Path(__file__).parent.parent / "apps" / "backend"))
-    from merge.ai_resolver import AIResolver
-
-    def _mock_ai_fn(system_prompt: str, user_prompt: str) -> str:
-        # Return a simple merged code block that the resolver can parse
-        return "```python\n# AI merged result\nmerged_code = True\n```"
-
-    return AIResolver(ai_call_fn=_mock_ai_fn)
 
 
 # ---------------------------------------------------------------------------
