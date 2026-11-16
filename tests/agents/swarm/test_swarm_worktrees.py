@@ -237,7 +237,8 @@ def test_a_subtask_that_fails_is_not_merged_and_its_worktree_goes(
     status = asyncio.run(swarm(shop, max_retries_per_subtask=1).run())
 
     assert (status.completed_subtasks, status.failed_subtasks) == (1, 1)
-    assert status.nodes["bad"].error == "could not build bad"
+    # What the worker said last, after whatever its interpreter warned about.
+    assert (status.nodes["bad"].error or "").endswith("could not build bad")
     assert statuses(shop)["bad"] == ("pending", None)
     assert git(shop["project"], "ls-files").split()[-1] == "good.py"
     assert leftovers(shop["project"]) == ([shop["project"].resolve()], [])
