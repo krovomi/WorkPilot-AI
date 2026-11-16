@@ -19,12 +19,16 @@ Example:
 
 import logging
 import posixpath
+import re
+import shlex
 import statistics
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
+
+from .parser import extract_commands, split_command_segments
 
 logger = logging.getLogger(__name__)
 
@@ -235,38 +239,147 @@ DEFAULT_THRESHOLDS = {
     "trust_score_terminate_threshold": 20.0,
 }
 
-SENSITIVE_PATHS = [
-    ".env",
-    ".git/",
-    ".ssh/",
-    ".aws/",
-    ".gnupg/",
-    "id_rsa",
-    "id_ed25519",
-    "credentials",
-    "secrets",
-    "/etc/passwd",
-    "/etc/shadow",
-    "node_modules/.cache",
-]
+#: Path segments (directories) whose content is a credential or the history.
+SENSITIVE_DIRS = frozenset({".git", ".ssh", ".aws", ".gnupg", ".kube", ".docker"})
 
-DANGEROUS_COMMANDS = [
-    "rm -rf /",
-    "sudo",
-    "curl",
-    "wget",
-    "ssh",
-    "scp",
-    "nc ",
-    "netcat",
-    "eval",
-    "exec",
-    "mkfs",
-    "dd if=",
-    "chmod 777",
-    "> /dev/",
-    "base64 -d",
-]
+#: File names that hold a secret, compared case-insensitively.
+SENSITIVE_NAMES = frozenset(
+    {
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "credentials",
+        "credentials.json",
+        ".netrc",
+        ".pgpass",
+        ".npmrc",
+        ".pypirc",
+        "passwd",
+        "shadow",
+    }
+)
+
+#: ``.env`` files that are templates, not secrets.
+_ENV_TEMPLATES = (".example", ".sample", ".template", ".dist", ".defaults")
+
+
+def sensitive_path_match(path: str) -> str | None:
+    """The part of ``path`` that makes it sensitive, or None.
+
+    Judged on whole segments and file names: ``.env.example`` is a template,
+    ``src/secrets_view.py`` is source code, ``.git/config`` is the history.
+    """
+    if not path:
+        return None
+    segments = [part for part in path.replace("\\", "/").split("/") if part]
+    if not segments:
+        return None
+    for segment in segments[:-1]:
+        if segment.lower() in SENSITIVE_DIRS:
+            return segment + "/"
+    name = segments[-1].lower()
+    if name in SENSITIVE_DIRS:
+        return name + "/"
+    if name == ".env" or (
+        name.startswith(".env.") and not name.endswith(_ENV_TEMPLATES)
+    ):
+        return ".env"
+    if name in SENSITIVE_NAMES:
+        if name in ("passwd", "shadow") and "etc" not in (
+            part.lower() for part in segments
+        ):
+            return None
+        return name
+    return None
+
+
+#: Commands an agent has no business running, by name.
+DANGEROUS_COMMAND_NAMES = frozenset(
+    {
+        "sudo",
+        "su",
+        "doas",
+        "ssh",
+        "scp",
+        "sftp",
+        "nc",
+        "ncat",
+        "netcat",
+        "telnet",
+        "shred",
+        "eval",
+    }
+)
+
+#: Commands that reach the network, judged by their target.
+NETWORK_COMMAND_NAMES = frozenset({"curl", "wget", "invoke-webrequest", "iwr"})
+
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1")
+_URL = re.compile(r"(?i)\b(?:https?|ftp)://([^/\s:'\"]+)")
+
+
+def remote_urls(command: str) -> list[str]:
+    """The URLs of ``command`` that point at another machine."""
+    found = []
+    for match in _URL.finditer(command or ""):
+        host = match.group(1).lower()
+        if not host.startswith(_LOCAL_HOSTS):
+            found.append(match.group(0))
+    return found
+
+
+def _segment_tokens(segment: str) -> list[str]:
+    try:
+        return shlex.split(segment)
+    except ValueError:
+        return segment.split()
+
+
+def dangerous_command_match(command: str) -> str | None:
+    """What makes a shell command dangerous, or None.
+
+    Matched on the commands it runs (``security.parser``), not on substrings:
+    ``rsync`` is not ``nc``, ``npm exec`` is not ``exec``, ``evaluate.py`` is
+    not ``eval``.
+    """
+    if not command:
+        return None
+    for name in extract_commands(command):
+        lowered = name.lower()
+        if lowered in DANGEROUS_COMMAND_NAMES or lowered.startswith("mkfs"):
+            return lowered
+    for segment in split_command_segments(command):
+        for piece in segment.split("|"):
+            tokens = _segment_tokens(piece.strip())
+            if not tokens:
+                continue
+            head = tokens[0].rsplit("/", 1)[-1].lower()
+            args = tokens[1:]
+            if head == "rm" and any(
+                a.startswith("-") and "r" in a.lower() for a in args
+            ):
+                if any(a in ("/", "/*", "~", "~/", "$HOME", "${HOME}") for a in args):
+                    return "rm -r /"
+            if head == "dd" and any(a.startswith("of=/dev/") for a in args):
+                return "dd of=/dev/"
+            if head == "chmod" and any(a in ("777", "a+rwx", "-R777") for a in args):
+                return "chmod 777"
+    lowered = command.lower()
+    if re.search(r"base64\s+(-d|--decode)\b[^|]*\|\s*(ba|z)?sh\b", lowered):
+        return "base64 -d | sh"
+    if re.search(r"\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b", lowered):
+        return "curl | sh"
+    if re.search(r">\s*/dev/(sd|nvme|hd|disk)", lowered):
+        return "> /dev/"
+    return None
+
+
+# Kept for callers that list them; detection uses the matchers above.
+SENSITIVE_PATHS = sorted(SENSITIVE_DIRS | SENSITIVE_NAMES | {".env"})
+DANGEROUS_COMMANDS = sorted(
+    DANGEROUS_COMMAND_NAMES | {"mkfs", "rm -r /", "dd of=/dev/"}
+)
 
 ANOMALY_SCORE_IMPACT = {
     AnomalyType.MASS_FILE_DELETION.value: 25.0,
@@ -590,20 +703,23 @@ class AnomalyDetector:
         ):
             return
         path = event.metadata.get("path", "")
-        for sensitive in SENSITIVE_PATHS:
-            if sensitive in path:
-                self._register_anomaly(
-                    session,
-                    AnomalyType.SENSITIVE_FILE_ACCESS.value,
-                    "high",
-                    f"Access to sensitive path detected: {path}",
-                    {
-                        "path": path,
-                        "matched_pattern": sensitive,
-                        "event_type": event.event_type,
-                    },
-                )
+        matched = sensitive_path_match(path)
+        if matched is None:
+            return
+        # Once per path: reading the same file again says nothing new.
+        for previous in session.anomalies:
+            if (
+                previous.anomaly_type == AnomalyType.SENSITIVE_FILE_ACCESS.value
+                and previous.evidence.get("path") == path
+            ):
                 return
+        self._register_anomaly(
+            session,
+            AnomalyType.SENSITIVE_FILE_ACCESS.value,
+            "high",
+            f"Access to sensitive path detected: {path}",
+            {"path": path, "matched_pattern": matched, "event_type": event.event_type},
+        )
 
     def _check_dangerous_command(
         self, session: MonitoredSession, event: AgentEvent
@@ -611,16 +727,16 @@ class AnomalyDetector:
         if event.event_type != EventType.COMMAND_EXEC.value:
             return
         command = event.metadata.get("command", "")
-        for dangerous in DANGEROUS_COMMANDS:
-            if dangerous in command:
-                self._register_anomaly(
-                    session,
-                    AnomalyType.UNUSUAL_COMMAND_EXECUTION.value,
-                    "critical",
-                    f"Dangerous command detected: {command}",
-                    {"command": command, "matched_pattern": dangerous},
-                )
-                return
+        matched = dangerous_command_match(command)
+        if matched is None:
+            return
+        self._register_anomaly(
+            session,
+            AnomalyType.UNUSUAL_COMMAND_EXECUTION.value,
+            "critical",
+            f"Dangerous command detected: {command[:300]}",
+            {"command": command[:500], "matched_pattern": matched},
+        )
 
     def _check_network_access(
         self, session: MonitoredSession, event: AgentEvent

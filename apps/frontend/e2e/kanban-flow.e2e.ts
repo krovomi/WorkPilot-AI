@@ -88,8 +88,11 @@ test("Start runs the agent: the card codes In Progress, in its own worktree", as
 		"tasks",
 		path.basename(spec),
 	);
-	expect(existsSync(worktree)).toBe(true);
-	expect(git("branch", "--list", "workpilot/*")).toContain(path.basename(spec));
+	// "Coding" can show a moment before the worktree is on disk: wait for it.
+	await expect.poll(() => existsSync(worktree), { timeout: 30_000 }).toBe(true);
+	await expect
+		.poll(() => git("branch", "--list", "workpilot/*"), { timeout: 30_000 })
+		.toContain(path.basename(spec));
 	// Nothing lands on main while the agent works.
 	expect(existsSync(path.join(projectDir, "CONTRIBUTING.md"))).toBe(false);
 });
@@ -117,15 +120,15 @@ test("Merge to main puts the agent's commit on main", async () => {
 	await page.getByRole("button", { name: "Check for Conflicts" }).click();
 	await expect(page.getByText("Ready to merge")).toBeVisible({ timeout: 60_000 });
 	await page.getByRole("button", { name: "Merge to main" }).click();
+	// The merge writes the files, then commits them: wait for the commit, not
+	// for the file, which is there a moment before it.
 	await expect
-		.poll(() => existsSync(path.join(projectDir, "CONTRIBUTING.md")), {
-			timeout: 60_000,
-		})
-		.toBe(true);
+		.poll(() => git("log", "--format=%s", "main"), { timeout: 60_000 })
+		.toContain("Add CONTRIBUTING.md");
+	expect(existsSync(path.join(projectDir, "CONTRIBUTING.md"))).toBe(true);
 	expect(readFileSync(path.join(projectDir, "CONTRIBUTING.md"), "utf-8")).toContain(
 		WRITTEN,
 	);
-	expect(git("log", "--format=%s", "main")).toContain("Add CONTRIBUTING.md");
 	expect(git("status", "--porcelain")).toBe("");
 	// A merge is reviewed before the card is closed: it waits in Human Review.
 	await expect(cardIn("human_review")).toBeVisible({ timeout: 15_000 });

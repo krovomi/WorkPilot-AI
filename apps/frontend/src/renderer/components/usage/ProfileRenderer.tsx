@@ -1,16 +1,20 @@
-import type { ClaudeProfile } from "@shared/types";
+import type { ClaudeProfile, UsagePlan } from "@shared/types";
 import type React from "react";
 import { useTranslation } from "react-i18next";
+import { UsagePlanBadge } from "./UsagePlanBadge";
 
 interface ProfileRendererProps {
 	readonly account: ClaudeProfile;
 	readonly isActive: boolean;
+	/** Plan of the account, when its credentials say which */
+	readonly plan?: UsagePlan;
 	readonly onClick: (e: React.MouseEvent) => void;
 }
 
 export function ProfileRenderer({
 	account,
 	isActive,
+	plan,
 	onClick,
 }: ProfileRendererProps) {
 	const { t } = useTranslation(["common"]);
@@ -39,6 +43,7 @@ export function ProfileRenderer({
 						)}
 					</div>
 					<div className="text-xs opacity-70 truncate">{account.email}</div>
+					<UsagePlanBadge plan={plan} className="mt-0.5" />
 				</div>
 			</div>
 			{!isActive && (

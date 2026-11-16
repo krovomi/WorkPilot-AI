@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Add apps/backend directory to path for imports
 _backend_dir = Path(__file__).parent.parent / "apps" / "backend"
 if str(_backend_dir) not in sys.path:
@@ -19,6 +21,22 @@ from core.worktree import (
     PullRequestResult,
     WorktreeInfo,
 )
+
+
+@pytest.fixture(autouse=True)
+def _impact_analyzer_without_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Creating an MR runs the impact analyzer, which asks a model.
+
+    Without a double the outcome depended on the machine: no Claude login
+    and the analyzer gave up, a login (or an earlier test's token) and it
+    started the CLI. The analyzer answering nothing is its documented
+    failure, so the MR body gets the "not evaluated" block.
+    """
+    import agents.impact_analyzer as impact_analyzer
+
+    monkeypatch.setattr(
+        impact_analyzer, "run_impact_analyzer_sync", lambda **_kwargs: None
+    )
 
 
 class TestCreateMergeRequest:

@@ -9,13 +9,28 @@ Provides endpoints for:
 - A/B session comparison
 """
 
+import base64
+import binascii
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from . import bookmarks as bookmark_store
+from .bundle import (
+    MAX_BUNDLE_BYTES,
+    BundleError,
+    ExportOptions,
+    build_bundle,
+    decode,
+    encode,
+    file_name,
+    session_from_bundle,
+)
 from .recorder import get_replay_recorder
 from .time_travel import get_time_travel_engine
+from .viewer import render_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +59,25 @@ class CompareSessionsRequest(BaseModel):
 
 class DeleteSessionsRequest(BaseModel):
     session_ids: list[str]
+
+
+class ExportSessionRequest(BaseModel):
+    format: Literal["wpreplay", "html"] = "wpreplay"
+    strip_reasoning: bool = False
+    strip_tokens: bool = False
+    include_file_contents: bool = False
+    language: Literal["en", "fr"] = "en"
+
+
+class ImportSessionRequest(BaseModel):
+    # base64 of the file: 4 characters for every 3 bytes, plus padding
+    content_base64: str = Field(max_length=(MAX_BUNDLE_BYTES // 3 + 1) * 4)
+
+
+class AddBookmarkRequest(BaseModel):
+    step_index: int = Field(ge=0)
+    note: str = Field(default="", max_length=4000)
+    author: str = Field(default="", max_length=100)
 
 
 class AddCheckpointRequest(BaseModel):
@@ -300,6 +334,89 @@ async def remove_breakpoint(session_id: str, breakpoint_id: str):
     removed = recorder.remove_breakpoint(session_id, breakpoint_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Session or breakpoint not found")
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Sharing: export, import, bookmarks (#347)
+# ---------------------------------------------------------------------------
+
+_BOOKMARK_REFUSALS = {
+    "recording": (409, "The session is still recording"),
+    "not_found": (404, SESSION_NOT_FOUND),
+    "no_such_step": (422, "The session has no such step"),
+    "too_many": (422, "The session has too many bookmarks"),
+}
+
+
+@router.post(
+    "/sessions/{session_id}/export",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def export_session(session_id: str, req: ExportSessionRequest):
+    """The session as a `.wpreplay` bundle or a standalone page, masked."""
+    session = get_replay_recorder().load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=SESSION_NOT_FOUND)
+    options = ExportOptions(
+        strip_reasoning=req.strip_reasoning,
+        strip_tokens=req.strip_tokens,
+        include_file_contents=req.include_file_contents,
+    )
+    bundle = build_bundle(session, options)
+    if req.format == "html":
+        content = render_viewer(bundle, req.language).encode("utf-8")
+        name = file_name(session, ".html")
+    else:
+        content = encode(bundle)
+        name = file_name(session)
+    return {
+        "success": True,
+        "file_name": name,
+        "content_base64": base64.b64encode(content).decode("ascii"),
+    }
+
+
+@router.post("/import", responses={422: {"description": "Not a readable bundle"}})
+async def import_session(req: ImportSessionRequest):
+    """Store the session of a `.wpreplay` bundle as a new local session."""
+    try:
+        data = base64.b64decode(req.content_base64, validate=True)
+        session = session_from_bundle(decode(data))
+    except (binascii.Error, BundleError) as error:
+        code = error.args[0] if isinstance(error, BundleError) else "unreadable"
+        raise HTTPException(status_code=422, detail=code) from error
+    recorder = get_replay_recorder()
+    recorder.save_session(session)
+    return {"success": True, "session": session.to_summary()}
+
+
+@router.post(
+    "/sessions/{session_id}/bookmarks",
+    responses={404: {"description": SESSION_NOT_FOUND}},
+)
+async def add_bookmark(session_id: str, req: AddBookmarkRequest):
+    """Mark a step of a saved session with a note."""
+    try:
+        bookmark = bookmark_store.add_bookmark(
+            get_replay_recorder(), session_id, req.step_index, req.note, req.author
+        )
+    except bookmark_store.BookmarkError as error:
+        status, detail = _BOOKMARK_REFUSALS[error.code]
+        raise HTTPException(status_code=status, detail=detail) from error
+    return {"success": True, "bookmark": bookmark.to_dict()}
+
+
+@router.delete(
+    "/sessions/{session_id}/bookmarks/{bookmark_id}",
+    responses={404: {"description": "Bookmark not found"}},
+)
+async def remove_bookmark(session_id: str, bookmark_id: str):
+    """Remove a bookmark from a saved session."""
+    if not bookmark_store.remove_bookmark(
+        get_replay_recorder(), session_id, bookmark_id
+    ):
+        raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"success": True}
 
 
