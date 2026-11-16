@@ -13,6 +13,6 @@
   "apps/frontend/src/main/terminal/claude-integration-handler.ts": 2079,
   "apps/frontend/src/main/visual-proof-service.ts": 2695,
   "apps/frontend/src/renderer/App.tsx": 2120,
-  "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3139,
+  "apps/frontend/src/renderer/components/KanbanBoard.tsx": 3120,
   "apps/frontend/src/renderer/components/task-detail/TaskLogs.tsx": 2167
 }
