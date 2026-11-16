@@ -104,9 +104,9 @@ function msbuild(answer: (args: string[]) => string | Error = () => "Build succe
 /** Launching the app opens its window beside those already on screen. */
 function windowOpensOnLaunch(): void {
 	world.sources = [
-		{ id: "window:1", name: "Shop notes.txt" },
-		{ id: "window:2", name: "WorkPilot" },
-		{ id: "screen:0", name: "Entire screen" },
+		{ id: "window:1", name: "Shop notes.txt", width: 640, height: 480 },
+		{ id: "window:2", name: "WorkPilot", width: 1280, height: 800 },
+		{ id: "screen:0", name: "Entire screen", width: 1920, height: 1080 },
 	];
 	world.onSpawn = () => {
 		world.sources.push({ id: "window:42", name: "Shop - Invoices", width: 1024, height: 768 });
@@ -256,7 +256,7 @@ describe("a .NET Framework desktop client through Mono", () => {
 		const sln = solution();
 		msbuild();
 		world.onPath.set("mono", "/usr/bin/mono");
-		world.sources = [{ id: "window:2", name: "WorkPilot" }];
+		world.sources = [{ id: "window:2", name: "WorkPilot", width: 1280, height: 800 }];
 
 		const run = await new VisualProofService().run(options({ projectPath: sln.root }));
 

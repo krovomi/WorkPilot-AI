@@ -49,8 +49,8 @@ export interface SpawnCall {
 export interface CaptureSource {
 	id: string;
 	name: string;
-	width?: number;
-	height?: number;
+	width: number;
+	height: number;
 }
 
 interface World {
@@ -309,14 +309,11 @@ export const browserWindows = FakeBrowserWindow.opened;
 export async function electronModule() {
 	const actual = await vi.importActual<Record<string, unknown>>("electron");
 	const desktopCapturer = {
-		getSources: async (options: { types: string[]; thumbnailSize: { width: number } }) =>
+		getSources: async () =>
 			world.sources.map((source) => ({
 				...source,
 				thumbnail: {
-					getSize: () => ({
-						width: source.width ?? options.thumbnailSize.width,
-						height: source.height ?? 0,
-					}),
+					getSize: () => ({ width: source.width, height: source.height }),
 					toPNG: () => Buffer.from(`PNG ${source.name}`),
 				},
 			})),

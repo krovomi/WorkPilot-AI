@@ -256,7 +256,6 @@ interface ApiExplorerState {
 	setRequestHeaders: (headers: Record<string, string>) => void;
 	setRequestBody: (body: string) => void;
 	setRequestAuth: (auth: Partial<RequestAuth>) => void;
-	clearRequestState: () => void;
 
 	setResponse: (payload: {
 		status: number;
@@ -372,7 +371,9 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 				set((state) => ({
 					environments: [
 						...state.environments,
-						{ ...env, id: `env-${Date.now()}` },
+						// Several detected environments are added in the same
+						// millisecond: a time alone gave them one id.
+						{ ...env, id: `env-${crypto.randomUUID()}` },
 					],
 				})),
 			updateEnvironment: (id, updates) =>
@@ -382,13 +383,18 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 					),
 				})),
 			removeEnvironment: (id) =>
-				set((state) => ({
-					environments: state.environments.filter((e) => e.id !== id),
-					activeEnvironmentId:
-						state.activeEnvironmentId === id
-							? (state.environments[0]?.id ?? "local")
-							: state.activeEnvironmentId,
-				})),
+				set((state) => {
+					// The fallback comes from what remains, not from the list that
+					// still held the removed environment.
+					const environments = state.environments.filter((e) => e.id !== id);
+					return {
+						environments,
+						activeEnvironmentId:
+							state.activeEnvironmentId === id
+								? (environments[0]?.id ?? "local")
+								: state.activeEnvironmentId,
+					};
+				}),
 			setActiveEnvironment: (activeEnvironmentId) =>
 				set({ activeEnvironmentId }),
 
@@ -488,14 +494,6 @@ export const useApiExplorerStore = create<ApiExplorerState>()(
 						requestAuth,
 						requestDrafts: updateCurrentDraft(state, { auth: requestAuth }),
 					};
-				}),
-			clearRequestState: () =>
-				set({
-					requestPathParams: {},
-					requestQueryParams: {},
-					requestHeaders: {},
-					requestBody: "",
-					requestAuth: { ...DEFAULT_REQUEST_AUTH },
 				}),
 
 			// Response actions

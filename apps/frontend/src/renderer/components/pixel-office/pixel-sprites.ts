@@ -149,212 +149,178 @@ function getCharacterPixels(
 
 const spriteCache = new Map<string, HTMLCanvasElement>();
 
+/**
+ * Draw a sprite once and keep it: every sprite is a pure function of its key,
+ * so the render loop never paints the same pixels twice.
+ */
+function cachedSprite(
+	key: string,
+	width: number,
+	height: number,
+	paint: (ctx: CanvasRenderingContext2D) => void,
+): HTMLCanvasElement {
+	const cached = spriteCache.get(key);
+	if (cached) return cached;
+
+	const canvas = document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) throw new Error("Could not get 2D context");
+	paint(ctx);
+
+	spriteCache.set(key, canvas);
+	return canvas;
+}
+
 export function getCharacterSprite(
 	characterIndex: number,
 	direction: Direction,
 	frame: number,
 ): HTMLCanvasElement {
-	const key = `char-${characterIndex}-${direction}-${frame}`;
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
-
-	const canvas = document.createElement("canvas");
-	canvas.width = SPRITE_W;
-	canvas.height = SPRITE_H;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
-
-	const palette =
-		CHARACTER_PALETTES[characterIndex % CHARACTER_PALETTES.length];
-	const pixels = getCharacterPixels(palette, direction, frame);
-
-	for (const { x, y, color } of pixels) {
-		ctx.fillStyle = color;
-		ctx.fillRect(x, y, 1, 1);
-	}
-
-	spriteCache.set(key, canvas);
-	return canvas;
+	return cachedSprite(
+		`char-${characterIndex}-${direction}-${frame}`,
+		SPRITE_W,
+		SPRITE_H,
+		(ctx) => {
+			const palette =
+				CHARACTER_PALETTES[characterIndex % CHARACTER_PALETTES.length];
+			for (const { x, y, color } of getCharacterPixels(
+				palette,
+				direction,
+				frame,
+			)) {
+				ctx.fillStyle = color;
+				ctx.fillRect(x, y, 1, 1);
+			}
+		},
+	);
 }
 
 // ── Desk sprite (compact top-view, no tall legs) ─────────────
 
 export function getDeskSprite(): HTMLCanvasElement {
-	const key = "desk-v2";
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
+	return cachedSprite("desk-v2", 32, DESK_H, (ctx) => {
+		// Table top surface (seen from slight angle)
+		ctx.fillStyle = "#C4922E"; // top highlight
+		ctx.fillRect(0, 0, 32, 1);
+		ctx.fillStyle = "#A07828"; // main surface
+		ctx.fillRect(0, 1, 32, 5);
+		// Front face of table (depth illusion)
+		ctx.fillStyle = "#7A5A10";
+		ctx.fillRect(0, 6, 32, 4);
+		// Bottom shadow
+		ctx.fillStyle = "#5A4208";
+		ctx.fillRect(0, 10, 32, 2);
+		// Short side supports (visible below table)
+		ctx.fillStyle = "#6B5310";
+		ctx.fillRect(2, 10, 2, 4);
+		ctx.fillRect(28, 10, 2, 4);
 
-	const canvas = document.createElement("canvas");
-	canvas.width = 32;
-	canvas.height = DESK_H; // 14px
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
+		// Monitor body
+		ctx.fillStyle = "#1E1E30";
+		ctx.fillRect(11, 0, 10, 5);
+		// Screen glow
+		ctx.fillStyle = "#1A5FD4";
+		ctx.fillRect(12, 0, 8, 4);
+		// Screen content lines
+		ctx.fillStyle = "#5DB8FF";
+		ctx.fillRect(13, 1, 5, 1);
+		ctx.fillStyle = "#4488CC";
+		ctx.fillRect(13, 3, 3, 1);
 
-	// Table top surface (seen from slight angle)
-	ctx.fillStyle = "#C4922E"; // top highlight
-	ctx.fillRect(0, 0, 32, 1);
-	ctx.fillStyle = "#A07828"; // main surface
-	ctx.fillRect(0, 1, 32, 5);
-	// Front face of table (depth illusion)
-	ctx.fillStyle = "#7A5A10";
-	ctx.fillRect(0, 6, 32, 4);
-	// Bottom shadow
-	ctx.fillStyle = "#5A4208";
-	ctx.fillRect(0, 10, 32, 2);
-	// Short side supports (visible below table)
-	ctx.fillStyle = "#6B5310";
-	ctx.fillRect(2, 10, 2, 4);
-	ctx.fillRect(28, 10, 2, 4);
+		// Keyboard on surface
+		ctx.fillStyle = "#484848";
+		ctx.fillRect(5, 2, 9, 2);
+		ctx.fillStyle = "#666";
+		for (let i = 0; i < 4; i++) {
+			ctx.fillRect(6 + i * 2, 2, 1, 1);
+		}
 
-	// Monitor body
-	ctx.fillStyle = "#1E1E30";
-	ctx.fillRect(11, 0, 10, 5);
-	// Screen glow
-	ctx.fillStyle = "#1A5FD4";
-	ctx.fillRect(12, 0, 8, 4);
-	// Screen content lines
-	ctx.fillStyle = "#5DB8FF";
-	ctx.fillRect(13, 1, 5, 1);
-	ctx.fillStyle = "#4488CC";
-	ctx.fillRect(13, 3, 3, 1);
-
-	// Keyboard on surface
-	ctx.fillStyle = "#484848";
-	ctx.fillRect(5, 2, 9, 2);
-	ctx.fillStyle = "#666";
-	for (let i = 0; i < 4; i++) {
-		ctx.fillRect(6 + i * 2, 2, 1, 1);
-	}
-
-	// Mouse
-	ctx.fillStyle = "#888";
-	ctx.fillRect(16, 2, 3, 2);
-	ctx.fillStyle = "#AAA";
-	ctx.fillRect(17, 2, 1, 1);
-
-	spriteCache.set(key, canvas);
-	return canvas;
+		// Mouse
+		ctx.fillStyle = "#888";
+		ctx.fillRect(16, 2, 3, 2);
+		ctx.fillStyle = "#AAA";
+		ctx.fillRect(17, 2, 1, 1);
+	});
 }
 
 // ── Chair sprite ──────────────────────────────────────────────
 
 export function getChairSprite(): HTMLCanvasElement {
-	const key = "chair";
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
-
-	const canvas = document.createElement("canvas");
-	canvas.width = 32;
-	canvas.height = CHAIR_H; // 6px
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
-
-	// Chair seat
-	ctx.fillStyle = "#2A2A4E";
-	ctx.fillRect(7, 0, 18, 4);
-	// Seat highlight
-	ctx.fillStyle = "#3A3A6E";
-	ctx.fillRect(7, 0, 18, 1);
-	// Seat front edge
-	ctx.fillStyle = "#1A1A3A";
-	ctx.fillRect(7, 4, 18, 2);
-	// Chair legs (tiny)
-	ctx.fillStyle = "#555";
-	ctx.fillRect(8, 4, 2, 2);
-	ctx.fillRect(22, 4, 2, 2);
-
-	spriteCache.set(key, canvas);
-	return canvas;
+	return cachedSprite("chair", 32, CHAIR_H, (ctx) => {
+		// Chair seat
+		ctx.fillStyle = "#2A2A4E";
+		ctx.fillRect(7, 0, 18, 4);
+		// Seat highlight
+		ctx.fillStyle = "#3A3A6E";
+		ctx.fillRect(7, 0, 18, 1);
+		// Seat front edge
+		ctx.fillStyle = "#1A1A3A";
+		ctx.fillRect(7, 4, 18, 2);
+		// Chair legs (tiny)
+		ctx.fillStyle = "#555";
+		ctx.fillRect(8, 4, 2, 2);
+		ctx.fillRect(22, 4, 2, 2);
+	});
 }
 
 // ── Floor tile sprite ────────────────────────────────────────
 
 export function getFloorTile(): HTMLCanvasElement {
-	const key = "floor";
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
+	return cachedSprite("floor", TILE_SIZE, TILE_SIZE, (ctx) => {
+		ctx.fillStyle = "#2A2A3A";
+		ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-	const canvas = document.createElement("canvas");
-	canvas.width = TILE_SIZE;
-	canvas.height = TILE_SIZE;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
+		// Subtle tile pattern
+		ctx.fillStyle = "#252535";
+		ctx.fillRect(0, 0, 8, 8);
+		ctx.fillRect(8, 8, 8, 8);
 
-	ctx.fillStyle = "#2A2A3A";
-	ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-	// Subtle tile pattern
-	ctx.fillStyle = "#252535";
-	ctx.fillRect(0, 0, 8, 8);
-	ctx.fillRect(8, 8, 8, 8);
-
-	// Grid line
-	ctx.strokeStyle = "rgba(255,255,255,0.04)";
-	ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-
-	spriteCache.set(key, canvas);
-	return canvas;
+		// Grid line
+		ctx.strokeStyle = "rgba(255,255,255,0.04)";
+		ctx.strokeRect(0.5, 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+	});
 }
 
 // ── Wall tile sprite ─────────────────────────────────────────
 
 export function getWallTile(): HTMLCanvasElement {
-	const key = "wall";
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
+	return cachedSprite("wall", TILE_SIZE, TILE_SIZE, (ctx) => {
+		ctx.fillStyle = "#3D3D50";
+		ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-	const canvas = document.createElement("canvas");
-	canvas.width = TILE_SIZE;
-	canvas.height = TILE_SIZE;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
-
-	ctx.fillStyle = "#3D3D50";
-	ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-	// Brick pattern
-	ctx.strokeStyle = "#35354A";
-	ctx.lineWidth = 1;
-	ctx.strokeRect(0, 0, TILE_SIZE, 8);
-	ctx.beginPath();
-	ctx.moveTo(8, 0);
-	ctx.lineTo(8, 8);
-	ctx.stroke();
-	ctx.strokeRect(0, 8, TILE_SIZE, 8);
-	ctx.beginPath();
-	ctx.moveTo(0, 8);
-	ctx.lineTo(0, 16);
-	ctx.moveTo(TILE_SIZE, 8);
-	ctx.lineTo(TILE_SIZE, 16);
-	ctx.stroke();
-
-	spriteCache.set(key, canvas);
-	return canvas;
+		// Brick pattern
+		ctx.strokeStyle = "#35354A";
+		ctx.lineWidth = 1;
+		ctx.strokeRect(0, 0, TILE_SIZE, 8);
+		ctx.beginPath();
+		ctx.moveTo(8, 0);
+		ctx.lineTo(8, 8);
+		ctx.stroke();
+		ctx.strokeRect(0, 8, TILE_SIZE, 8);
+		ctx.beginPath();
+		ctx.moveTo(0, 8);
+		ctx.lineTo(0, 16);
+		ctx.moveTo(TILE_SIZE, 8);
+		ctx.lineTo(TILE_SIZE, 16);
+		ctx.stroke();
+	});
 }
 
 // ── Activity indicator sprites ───────────────────────────────
 
-export type ActivityIcon =
-	| "typing"
-	| "reading"
-	| "running"
-	| "waiting"
-	| "idle";
+/**
+ * The icon drawn above a busy agent's head. An idle or ghost agent has none:
+ * the canvas dims it instead, so there is no idle icon to draw.
+ */
+export type ActivityIcon = "typing" | "reading" | "running" | "waiting";
 
-export function getActivityIcon(
+function paintActivityIcon(
+	ctx: CanvasRenderingContext2D,
 	activity: ActivityIcon,
 	frame: number,
-): HTMLCanvasElement {
-	const key = `activity-${activity}-${frame % 2}`;
-	const cached = spriteCache.get(key);
-	if (cached) return cached;
-
-	const canvas = document.createElement("canvas");
-	canvas.width = 12;
-	canvas.height = 12;
-	const ctx = canvas.getContext("2d");
-	if (!ctx) throw new Error("Could not get 2D context");
-
+): void {
 	switch (activity) {
 		case "typing": {
 			// Keyboard icon with blinking cursor
@@ -366,11 +332,11 @@ export function getActivityIcon(
 					ctx.fillRect(2 + j * 2, 5 + i * 2, 1, 1);
 				}
 			}
-			if (frame % 2 === 0) {
+			if (frame === 0) {
 				ctx.fillStyle = "#FFD700";
 				ctx.fillRect(9, 2, 2, 2);
 			}
-			break;
+			return;
 		}
 		case "reading": {
 			// Book icon
@@ -380,7 +346,7 @@ export function getActivityIcon(
 			ctx.fillRect(3, 3, 6, 1);
 			ctx.fillRect(3, 5, 4, 1);
 			ctx.fillRect(3, 7, 5, 1);
-			break;
+			return;
 		}
 		case "running": {
 			// Terminal/command icon
@@ -390,76 +356,26 @@ export function getActivityIcon(
 			ctx.fillRect(2, 3, 8, 6);
 			ctx.fillStyle = "#27AE60";
 			ctx.fillRect(3, 4, 1, 1);
-			ctx.fillRect(4, 5, 3 + (frame % 2), 1);
-			break;
+			ctx.fillRect(4, 5, 3 + frame, 1);
+			return;
 		}
 		case "waiting": {
-			// Hourglass / thinking dots
+			// Thinking dots
 			ctx.fillStyle = "#F39C12";
-			const dotOffset = frame % 2;
-			ctx.fillRect(3, 5 + dotOffset, 2, 2);
-			ctx.fillRect(6, 5 - dotOffset, 2, 2);
-			ctx.fillRect(9, 5 + dotOffset, 2, 2);
-			break;
-		}
-		default: {
-			// Zzz for idle
-			ctx.fillStyle = "rgba(255,255,255,0.5)";
-			ctx.font = "8px monospace";
-			ctx.fillText("z", 3, 8);
-			if (frame % 2 === 0) {
-				ctx.fillText("z", 7, 5);
-			}
-			break;
+			ctx.fillRect(3, 5 + frame, 2, 2);
+			ctx.fillRect(6, 5 - frame, 2, 2);
+			ctx.fillRect(9, 5 + frame, 2, 2);
+			return;
 		}
 	}
-
-	spriteCache.set(key, canvas);
-	return canvas;
 }
 
-// ── Speech bubble drawing ────────────────────────────────────
-
-export function drawSpeechBubble(
-	ctx: CanvasRenderingContext2D,
-	x: number,
-	y: number,
-	text: string,
-	zoom: number,
-) {
-	const fontSize = Math.max(8, Math.round(10 / zoom));
-	ctx.font = `${fontSize}px "Courier New", monospace`;
-	const metrics = ctx.measureText(text);
-	const padding = 4;
-	const w = metrics.width + padding * 2;
-	const h = fontSize + padding * 2;
-	const bx = x - w / 2;
-	const by = y - h - 6;
-
-	// Bubble background
-	ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-	ctx.beginPath();
-	ctx.roundRect(bx, by, w, h, 3);
-	ctx.fill();
-
-	// Bubble border
-	ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
-	ctx.lineWidth = 1;
-	ctx.stroke();
-
-	// Pointer triangle
-	ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-	ctx.beginPath();
-	ctx.moveTo(x - 3, by + h);
-	ctx.lineTo(x, by + h + 4);
-	ctx.lineTo(x + 3, by + h);
-	ctx.fill();
-
-	// Text
-	ctx.fillStyle = "#1A1A2E";
-	ctx.textAlign = "center";
-	ctx.textBaseline = "middle";
-	ctx.fillText(text, x, by + h / 2);
-	ctx.textAlign = "start";
-	ctx.textBaseline = "alphabetic";
+export function getActivityIcon(
+	activity: ActivityIcon,
+	frame: number,
+): HTMLCanvasElement {
+	const phase = frame % 2;
+	return cachedSprite(`activity-${activity}-${phase}`, 12, 12, (ctx) =>
+		paintActivityIcon(ctx, activity, phase),
+	);
 }
