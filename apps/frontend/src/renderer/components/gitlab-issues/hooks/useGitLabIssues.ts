@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
 	checkGitLabConnection,
 	loadGitLabIssues,
@@ -18,7 +19,20 @@ export function useGitLabIssues(projectId: string | undefined) {
 		setFilterState,
 		getFilteredIssues,
 		getOpenIssuesCount,
-	} = useGitLabStore();
+	} = useGitLabStore(
+		useShallow((state) => ({
+			issues: state.issues,
+			syncStatus: state.syncStatus,
+			isLoading: state.isLoading,
+			error: state.error,
+			selectedIssueIid: state.selectedIssueIid,
+			filterState: state.filterState,
+			selectIssue: state.selectIssue,
+			setFilterState: state.setFilterState,
+			getFilteredIssues: state.getFilteredIssues,
+			getOpenIssuesCount: state.getOpenIssuesCount,
+		})),
+	);
 
 	// Always check connection when component mounts or projectId changes
 	useEffect(() => {
@@ -43,14 +57,11 @@ export function useGitLabIssues(projectId: string | undefined) {
 		}
 	}, [projectId, filterState]);
 
+	// The loading effect above reloads on the new filter: loading here too
+	// sent every request twice.
 	const handleFilterChange = useCallback(
-		(state: FilterState) => {
-			setFilterState(state);
-			if (projectId) {
-				loadGitLabIssues(projectId, state);
-			}
-		},
-		[projectId, setFilterState],
+		(state: FilterState) => setFilterState(state),
+		[setFilterState],
 	);
 
 	// Compute selectedIssue from issues array

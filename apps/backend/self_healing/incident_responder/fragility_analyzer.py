@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 
@@ -30,6 +31,33 @@ WEIGHT_COVERAGE = 0.3
 # Normalization constants
 MAX_COMPLEXITY = 50  # Complexity above this maps to 100
 MAX_CHURN = 30  # Commits in 30 days above this maps to 100
+
+# Every language the heuristic complexity can read (Python gets its AST).
+SOURCE_EXTENSIONS = frozenset(
+    {
+        ".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
+        ".java", ".kt", ".kts", ".scala", ".groovy", ".go", ".rs", ".rb", ".php",
+        ".cs", ".fs", ".vb", ".swift", ".m", ".mm", ".c", ".h", ".cc", ".cpp",
+        ".hpp", ".dart", ".ex", ".exs", ".erl", ".lua", ".pl", ".r", ".jl",
+    }
+)  # fmt: skip
+
+TEST_SUFFIXES = (
+    "_test.py",
+    ".test.ts",
+    ".test.tsx",
+    ".test.js",
+    ".test.jsx",
+    ".spec.ts",
+    ".spec.tsx",
+    ".spec.js",
+    ".spec.jsx",
+    "_test.go",
+    "_spec.rb",
+    "_test.rb",
+    "_test.dart",
+    "_test.exs",
+)
 
 # Default excluded directories
 DEFAULT_EXCLUDED = {
@@ -84,10 +112,12 @@ class FragilityAnalyzer:
 
         reports: list[FragilityReport] = []
         for file_path in source_files:
-            rel_path = str(file_path.relative_to(self.project_dir))
+            relative = file_path.relative_to(self.project_dir)
+            # git names files with "/" on every OS; the history keys on it too.
+            rel_path = relative.as_posix()
             complexity = self._compute_cyclomatic_complexity(file_path)
             churn = churn_map.get(rel_path, 0)
-            coverage = coverage_map.get(rel_path, 0.0)
+            coverage = coverage_map.get(rel_path, coverage_map.get(str(relative), 0.0))
 
             # Normalize to 0-100
             norm_complexity = min(complexity / MAX_COMPLEXITY * 100, 100)
@@ -116,33 +146,26 @@ class FragilityAnalyzer:
         return reports
 
     def _find_source_files(self, max_files: int) -> list[Path]:
-        """Find analyzable source files in the project."""
-        extensions = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb"}
-        files: list[Path] = []
+        """Find analyzable source files in the project, in a stable order.
 
-        for ext in extensions:
-            for f in self.project_dir.rglob(f"*{ext}"):
-                if any(part in self.excluded_dirs for part in f.parts):
+        Sorted, so that two scans of the same tree measure the same files: the
+        risk history (#370) compares a file with itself from one scan to the
+        next, and a set's iteration order changes with every process.
+        """
+        files: list[Path] = []
+        # os.walk, pruned: a dependency folder is never walked at all.
+        for root, dirs, names in os.walk(self.project_dir):
+            dirs[:] = sorted(d for d in dirs if d not in self.excluded_dirs)
+            for name in sorted(names):
+                if Path(name).suffix.lower() not in SOURCE_EXTENSIONS:
                     continue
                 # Skip test files for fragility analysis
-                name_lower = f.name.lower()
-                if name_lower.startswith("test_") or name_lower.endswith(
-                    (
-                        "_test.py",
-                        ".test.ts",
-                        ".test.tsx",
-                        ".test.js",
-                        ".test.jsx",
-                        ".spec.ts",
-                        ".spec.tsx",
-                        ".spec.js",
-                    )
-                ):
+                name_lower = name.lower()
+                if name_lower.startswith("test_") or name_lower.endswith(TEST_SUFFIXES):
                     continue
-                files.append(f)
+                files.append(Path(root) / name)
                 if len(files) >= max_files:
                     return files
-
         return files
 
     def _compute_cyclomatic_complexity(self, file_path: Path) -> float:

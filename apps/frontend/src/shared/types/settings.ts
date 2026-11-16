@@ -286,6 +286,8 @@ export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
 	jev?: import("./jev").JevSettings;
+	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
+	agentSafety?: import("./agent-safety").AgentSafetySettings;
 	theme: "light" | "dark" | "system";
 	colorTheme?: ColorTheme;
 	defaultModel: string;
