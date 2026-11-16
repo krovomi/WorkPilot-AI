@@ -296,7 +296,7 @@ class TestClaudeSubscriptionVision:
 
         with (
             _no_provider_env(),
-            patch.object(service, "_resolve_active_provider", return_value="claude"),
+            patch.object(service, "_selected_provider", return_value=("claude", True)),
             patch(
                 "services.design_to_code_service._claude_signed_in", return_value=True
             ),

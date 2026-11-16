@@ -341,16 +341,32 @@ describe("rail footer and new task", () => {
 
 describe("resize", () => {
 	it("drags the width within its bounds and saves it on release", async () => {
-		const { container } = renderSidebar();
-		const handle = container.querySelector(".cursor-col-resize") as HTMLElement;
-		fireEvent.mouseDown(handle, { clientX: 296 });
-		fireEvent.mouseMove(document, { clientX: 1000 });
-		fireEvent.mouseUp(document);
+		// The widest menu leaves the main view its room: a wide window here.
+		const innerWidth = window.innerWidth;
+		Object.defineProperty(window, "innerWidth", { configurable: true, value: 1920 });
+		renderSidebar();
+		const handle = screen.getByRole("separator", { name: "Resize the menu" });
+		expect(handle).toHaveAttribute("aria-controls", panel().id);
+		fireEvent.pointerDown(handle, { button: 0, clientX: 296 });
+		fireEvent.pointerMove(window, { clientX: 1000 });
+		fireEvent.pointerUp(window);
 		await waitFor(() => expect(settings().sidebarWidth).toBe(480));
-		fireEvent.mouseDown(handle, { clientX: 480 });
-		fireEvent.mouseMove(document, { clientX: 0 });
-		fireEvent.mouseUp(document);
-		await waitFor(() => expect(settings().sidebarWidth).toBe(240));
+		fireEvent.pointerDown(handle, { button: 0, clientX: 480 });
+		fireEvent.pointerMove(window, { clientX: 400 });
+		fireEvent.pointerUp(window);
+		await waitFor(() => expect(settings().sidebarWidth).toBe(400));
+		Object.defineProperty(window, "innerWidth", { configurable: true, value: innerWidth });
+	});
+
+	it("folds the menu when its edge is dragged onto the rail", async () => {
+		renderSidebar();
+		const handle = screen.getByRole("separator", { name: "Resize the menu" });
+		fireEvent.pointerDown(handle, { button: 0, clientX: 296 });
+		fireEvent.pointerMove(window, { clientX: 40 });
+		fireEvent.pointerUp(window);
+		await waitFor(() => expect(settings().sidebarCollapsed).toBe(true));
+		expect(screen.queryByTestId("sidebar-panel")).toBeNull();
+		expect(settings().sidebarWidth).toBe(296);
 	});
 });
 
