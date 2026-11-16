@@ -82,7 +82,9 @@ def test_a_turned_off_verification_is_not_compared(shop, monkeypatch):
 def test_a_spec_name_that_cannot_be_a_folder_is_refused(shop, tmp_path):
     root, _spec = shop
     _task_adds_a_route(root)
-    odd = root / ".workpilot" / "specs" / "001 orders?"
+    # A folder every OS can hold (no `?`, which Windows refuses), whose name
+    # is still not one a spec gets.
+    odd = root / ".workpilot" / "specs" / "001 orders+"
     odd.mkdir(parents=True)
     save_record(work_dir(root, odd), {"status": "pass", "endpoints": [{"path": "/"}]})
     entry = asyncio.run(run_base_comparison(root, odd))
