@@ -183,6 +183,9 @@
 		"error": "Erreur"
 	},
 	"kanban": {
+		"more": {
+			"label": "Autres actions du tableau"
+		},
 		"abandoned": {
 			"chip": "{{count}} abandonnée",
 			"chip_other": "{{count}} abandonnées",

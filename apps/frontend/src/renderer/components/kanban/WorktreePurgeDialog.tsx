@@ -1,10 +1,9 @@
-import { HardDrive, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PurgeCandidate, PurgeOutcome } from "../../../shared/types/worktree-purge";
 import { loadTasks } from "../../stores/task-store";
 import { CharterButton, Chip, Notice } from "../charter";
-import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import {
 	Dialog,
@@ -43,17 +42,22 @@ type Phase =
  * done, archived or abandoned), the room they take, and their removal with
  * their local branch. A worktree with changes that are not committed is
  * shown and kept. Merged PRs are purged without asking
- * (main/worktree-purge/merged-watch.ts); this is for the rest.
+ * (main/worktree-purge/merged-watch.ts); this is for the rest. Opened from
+ * the board's "more actions" menu, it lists the candidates as it mounts.
  */
-export function WorktreePurgeButton({ projectId }: { readonly projectId: string }) {
+export function WorktreePurgeDialog({
+	projectId,
+	onClose,
+}: {
+	readonly projectId: string;
+	readonly onClose: () => void;
+}) {
 	const { t, i18n } = useTranslation(["tasks"]);
-	const [open, setOpen] = useState(false);
 	const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const size = (bytes: number) => formatBytes(bytes, i18n.language);
 
-	const load = async () => {
-		setPhase({ kind: "loading" });
+	const load = useCallback(async () => {
 		const result = await globalThis.electronAPI.listPurgeableWorktrees(projectId);
 		if (!result.success || !result.data) {
 			setPhase({ kind: "failed", message: result.error || t("tasks:purge.failed") });
@@ -61,7 +65,11 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 		}
 		setSelected(new Set(result.data.filter((c) => !c.dirty).map((c) => c.specId)));
 		setPhase({ kind: "ready", candidates: result.data });
-	};
+	}, [projectId, t]);
+
+	useEffect(() => {
+		void load();
+	}, [load]);
 
 	const purge = async (candidates: PurgeCandidate[]) => {
 		setPhase({ kind: "purging", candidates });
@@ -75,9 +83,9 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 
 	// The board reloads once the dialog is closed: a reload while it is open
 	// can show the board's skeleton, which unmounts the dialog and its result.
-	const onOpenChange = (next: boolean) => {
-		setOpen(next);
-		if (!next && phase.kind === "done") void loadTasks(projectId, { forceRefresh: true });
+	const close = () => {
+		if (phase.kind === "done") void loadTasks(projectId, { forceRefresh: true });
+		onClose();
 	};
 
 	const toggle = (specId: string) =>
@@ -94,22 +102,7 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 		.reduce((sum, c) => sum + c.bytes, 0);
 
 	return (
-		<>
-			<Button
-				variant="ghost"
-				size="sm"
-				className="h-8 gap-2 rounded-full text-muted-foreground transition-colors hover:text-foreground"
-				title={t("tasks:purge.buttonTitle")}
-				onClick={() => {
-					setOpen(true);
-					void load();
-				}}
-				data-testid="worktree-purge-button"
-			>
-				<HardDrive className="h-4 w-4" aria-hidden="true" />
-				{t("tasks:purge.button")}
-			</Button>
-			<Dialog open={open} onOpenChange={onOpenChange}>
+			<Dialog open onOpenChange={close}>
 				<DialogContent className="max-w-2xl" data-testid="worktree-purge-dialog">
 					<DialogHeader>
 						<DialogTitle>{t("tasks:purge.title")}</DialogTitle>
@@ -175,6 +168,5 @@ export function WorktreePurgeButton({ projectId }: { readonly projectId: string 
 					)}
 				</DialogContent>
 			</Dialog>
-		</>
 	);
 }
