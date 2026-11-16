@@ -87,7 +87,10 @@ def start(runner, project, monkeypatch, capsys):
         raise SystemExit(0)
 
     monkeypatch.setattr(runner.os, "execv", execv)
-    monkeypatch.delenv("SELECTED_LLM_PROVIDER", raising=False)
+    # main() writes the provider into os.environ: setting it first makes
+    # monkeypatch restore the variable (or its absence) after the test.
+    monkeypatch.setenv("SELECTED_LLM_PROVIDER", "")
+    monkeypatch.delenv("SELECTED_LLM_PROVIDER")
 
     def go(*args: str, pipeline: Pipeline | None = None):
         pipeline = pipeline or Pipeline(project)
