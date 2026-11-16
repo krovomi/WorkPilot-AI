@@ -11,27 +11,36 @@ export function useLinearTeams(projectId: string, open: boolean) {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
+		// A slower answer for an earlier choice must not replace this one.
+		let stale = false;
 		const loadTeams = async () => {
-			if (!open) return;
+			if (!open) {
+				setIsLoadingTeams(false);
+				return;
+			}
 
 			setIsLoadingTeams(true);
 			setError(null);
 
 			try {
 				const result = await window.electronAPI.getLinearTeams(projectId);
+				if (stale) return;
 				if (result.success && result.data) {
 					setTeams(result.data);
 				} else {
 					setError(result.error || "Failed to load teams");
 				}
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Unknown error");
+				if (!stale) setError(err instanceof Error ? err.message : "Unknown error");
 			} finally {
-				setIsLoadingTeams(false);
+				if (!stale) setIsLoadingTeams(false);
 			}
 		};
 
 		loadTeams();
+		return () => {
+			stale = true;
+		};
 	}, [open, projectId]);
 
 	return { teams, isLoadingTeams, error, setError };

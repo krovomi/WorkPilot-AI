@@ -1218,6 +1218,7 @@
 			"stopTask": "Arrêter la tâche",
 			"startTask": "Démarrer la tâche",
 			"deleteTask": "Supprimer la tâche",
+			"edit": "Modifier la tâche",
 			"close": "Fermer",
 			"watchLive": "Regarder en direct",
 			"activating": "Activation...",
@@ -1325,6 +1326,7 @@
 			"rejecting": "Rejet en cours...",
 			"rejectionReason": "Raison des modifications (optionnel)",
 			"rejectionPlaceholder": "Décrivez ce qui doit être modifié dans le plan...",
+			"sendRejection": "Envoyer la demande",
 			"conflictsChecking": "Vérification des chevauchements de fichiers avec les tâches parallèles...",
 			"conflictsNone": "Aucun chevauchement de fichiers avec les autres tâches actives",
 			"conflictsTitle": "Conflits potentiels avec des tâches parallèles",
@@ -2600,5 +2602,55 @@
 		"body": "L'agent a appelé {{tool}} {{repeats}} fois avec les mêmes arguments et a reçu chaque fois le même résultat, sans modifier de fichier entre-temps. La tâche s'est mise en pause plutôt que de payer une boucle.",
 		"hint": "Lisez ses journaux. Reprendre relance la phase avec la même conversation ; si elle boucle encore, changez de modèle ou précisez la tâche.",
 		"killSwitch": "Arrêtée par « Arrêter tous les agents »"
+	},
+	"safetyPause": {
+		"anomalyChip": "Score de confiance : {{score}}/100",
+		"anomalyBody": "Le score de confiance de l'agent est tombé à {{score}}/100 (pause à {{pause}}). La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+		"anomalyStopped": "Le score de confiance de l'agent est tombé à {{score}}/100, au seuil d'arrêt ({{stop}}) ou en dessous. La session a été arrêtée.",
+		"types": {
+			"mass_file_deletion": "Suppression massive de fichiers",
+			"unexpected_network_access": "Accès réseau vers une autre machine",
+			"system_config_modification": "Écriture dans la configuration de sécurité",
+			"excessive_token_usage": "Consommation de jetons excessive",
+			"rapid_file_changes": "Changements de fichiers très rapides",
+			"sensitive_file_access": "Accès à un secret ou à l'historique git",
+			"unusual_command_execution": "Commande dangereuse",
+			"long_running_session": "Session très longue",
+			"repetitive_errors": "Erreurs répétées",
+			"path_traversal_attempt": "Chemin hors du projet ou vers le système"
+		},
+		"sandboxChip": {
+			"restricted_path": "Bac à sable : écriture hors des chemins permis",
+			"file_size": "Bac à sable : fichier trop gros",
+			"files_written": "Bac à sable : trop de fichiers",
+			"session_time": "Bac à sable : session trop longue"
+		},
+		"sandboxBody": {
+			"restricted_path": "L'agent a écrit {{path}}, hors des chemins que permet le bac à sable restreint. La session a été arrêtée.",
+			"file_size": "L'agent a écrit {{path}} ({{value}} octets), au-delà de la limite du bac à sable de {{limit}} octets par fichier. La session a été arrêtée.",
+			"files_written": "L'agent a écrit {{value}} fichiers en une session, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés.",
+			"session_time": "La session a duré {{value}} secondes, au-delà de la limite du bac à sable de {{limit}}. La tâche s'est mise en pause ; ses fichiers sont tels que l'agent les a laissés."
+		},
+		"rolledBack": "Ses fichiers ont été ramenés à l'instantané pris avant cette session. L'état qu'ils remplaçaient est gardé lui aussi en instantané.",
+		"rollbackFailed": "La restauration de l'instantané a échoué : les fichiers sont tels que l'agent les a laissés. Restaurez-en un ci-dessous.",
+		"hint": "Lisez ses journaux avant de reprendre. Limites et seuils : Réglages, Bac à sable et Détection d'anomalies.",
+		"snapshots": {
+			"open": "Instantanés…",
+			"none": "Aucun instantané pour cette tâche.",
+			"restore": "Restaurer",
+			"confirm": "Confirmer la restauration",
+			"restored": "Instantané restauré.",
+			"failed": "Restauration impossible : {{error}}",
+			"listFailed": "Impossible de lire les instantanés : {{error}}",
+			"hint": "Restaurer réécrit le worktree de la tâche ; l'état actuel est d'abord gardé en instantané, la restauration peut donc être annulée.",
+			"labels": {
+				"planning": "avant la planification",
+				"coding": "avant le code",
+				"qa_review": "avant la QA",
+				"before_rollback": "avant une restauration"
+			}
+		},
+		"anomalyLine_one": "{{label}}",
+		"anomalyLine_other": "{{label}} (×{{count}})"
 	}
 }

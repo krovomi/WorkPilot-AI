@@ -22,6 +22,8 @@ from workflows.spec import load_workflow
 
 from workflows import evaluate_hard_gates
 
+_REAL_DECLARED = gate_module._declared
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ReaLauncher(
     argv=("node", "rea.mjs"),
@@ -242,3 +244,53 @@ def test_an_unreadable_offline_policy_does_not_download(tmp_path, monkeypatch):
 
     monkeypatch.setattr(gate_module, "airgap_status", broken)
     assert gate_module._offline(tmp_path) is True
+
+
+def test_an_unreadable_workflow_declares_nothing(tmp_path, monkeypatch):
+    from workflows.spec import WorkflowError
+
+    def broken(spec_dir):
+        raise WorkflowError("bad yaml")
+
+    monkeypatch.setattr("workflows.registry.load_workflow_for_spec", broken)
+
+    assert _REAL_DECLARED(tmp_path) is False
+
+
+@pytest.fixture
+def strict(task, monkeypatch):
+    monkeypatch.setenv(EXPOSURE_ENV, "strict")
+    monkeypatch.setattr(gate_module, "_offline", lambda project_dir: False)
+    return task
+
+
+def _strict_gate(project, spec, **kwargs):
+    return exposure_gate(
+        spec, project, 1, locator=_locator([]), auditor=_auditor(EXPOSED), **kwargs
+    )
+
+
+def test_without_a_plan_the_rejection_still_stands(strict):
+    project, spec = strict
+    (spec / "implementation_plan.json").unlink()
+
+    assert _strict_gate(project, spec) is not None
+    assert (spec / "QA_FIX_REQUEST.md").exists()
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(strict):
+    project, spec = strict
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    issues, verdict = _strict_gate(project, spec)
+
+    assert issues and "rejected" in verdict
+
+
+def test_a_record_that_cannot_be_written_skips_the_gate(strict):
+    from rea.exposure import RECORD
+
+    project, spec = strict
+    (spec / RECORD).mkdir()
+
+    assert _strict_gate(project, spec) is None
