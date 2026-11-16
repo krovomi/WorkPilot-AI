@@ -8,10 +8,15 @@ Workflow:
 1. Load the implementation plan and analyze subtask dependencies
 2. Build waves of parallelizable subtasks
 3. For each wave:
-   a. Execute subtasks in parallel (each in its own subprocess + worktree)
-   b. Collect results
-   c. Semantic merge of completed subtasks into the main worktree
+   a. Give each subtask its own git worktree, from the task's branch
+   b. Execute the subtasks in parallel (``run.py --subtask`` in each worktree)
+   c. Merge the branch of each finished subtask into the task's branch, and
+      its entry into the task's plan (``subtask_worktree``); a subtask whose
+      merge conflicts stays pending for the task's own coder
 4. Report final status
+
+Outside a git checkout (the standalone runner's dry runs, tests) the
+subtasks run in the project itself and nothing is merged.
 
 The orchestrator emits structured events to stdout for the Electron
 frontend to parse and display in the Pixel Office / Kanban board.
@@ -28,6 +33,7 @@ from typing import Any
 from core.workflow_logger import workflow_logger
 from foundation.phase_event import ExecutionPhase, emit_phase
 
+from . import subtask_worktree
 from .dependency_analyzer import DependencyAnalyzer
 from .types import (
     SubtaskNode,
@@ -81,6 +87,8 @@ class SwarmOrchestrator:
             source_path=source_path,
         )
         self._trace_id: str | None = None
+        self._worktrees: dict[str, subtask_worktree.SubtaskWorktree] = {}
+        self._isolated = False
 
     async def run(self) -> SwarmStatus:
         """
@@ -101,6 +109,12 @@ class SwarmOrchestrator:
 
         try:
             return await self._run_pipeline()
+        except subtask_worktree.SubtaskWorktreeError as e:
+            self.status.phase = SwarmPhase.FAILED
+            self.status.error = str(e)
+            self.status.completed_at = time.time()
+            emit_swarm_event("swarm_failed", {"error": str(e)})
+            return self.status
         except Exception as e:
             self.status.phase = SwarmPhase.FAILED
             self.status.error = str(e)
@@ -109,6 +123,7 @@ class SwarmOrchestrator:
             emit_swarm_event("swarm_failed", {"error": str(e)})
             return self.status
         finally:
+            self._close_worktrees()
             workflow_logger.log_agent_end(
                 AGENT_NAME,
                 "success" if self.status.phase == SwarmPhase.COMPLETE else "failed",
@@ -127,8 +142,9 @@ class SwarmOrchestrator:
 
         # ── Phase 1: Load plan and analyze dependencies ──────────────
         self.status.phase = SwarmPhase.ANALYZING_DEPENDENCIES
+        # The swarm is how the coding phase runs: the card stays in coding.
         emit_phase(
-            ExecutionPhase.PLANNING,
+            ExecutionPhase.CODING,
             "Analyzing subtask dependencies for parallel execution",
         )
         emit_swarm_event("phase_changed", {"phase": "analyzing_dependencies"})
@@ -141,6 +157,7 @@ class SwarmOrchestrator:
 
         waves, nodes = self._analyzer.analyze(plan)
         stats = self._analyzer.get_parallelism_stats(waves)
+        self._isolated = subtask_worktree.is_checkout(self.project_dir)
 
         self.status.waves = waves
         self.status.nodes = nodes
@@ -197,6 +214,9 @@ class SwarmOrchestrator:
                 },
             )
 
+            if self._isolated:
+                self._open_worktrees(wave, nodes)
+
             # Execute the wave
             wave_result = await self._executor.execute_wave(
                 wave=wave,
@@ -233,24 +253,20 @@ class SwarmOrchestrator:
                 await self._retry_failed_subtasks(wave, wave_result, nodes)
 
             # ── Phase 2b: Merge wave results ─────────────────────────
-            if self.config.merge_after_each_wave and wave_idx < len(waves) - 1:
-                await self._merge_wave(wave, wave_result, nodes)
-
-        # ── Phase 3: Final merge ─────────────────────────────────────
-        if len(waves) > 1:
-            self.status.phase = SwarmPhase.MERGING_WAVE
-            emit_phase(ExecutionPhase.CODING, "Final merge: combining all wave results")
-            emit_swarm_event("phase_changed", {"phase": "final_merge"})
-            await self._final_merge(waves, nodes)
+            # The next wave starts from the task's branch: it has to hold
+            # this one's work first.
+            if self._isolated:
+                self._merge_wave(wave, wave_result)
 
         # ── Complete ─────────────────────────────────────────────────
         self.status.phase = SwarmPhase.COMPLETE
         self.status.completed_at = time.time()
 
+        # Not the build's completion: QA and the review still follow.
         emit_phase(
-            ExecutionPhase.COMPLETE,
+            ExecutionPhase.CODING,
             f"Swarm complete: {self.status.completed_subtasks}/{self.status.total_subtasks} subtasks",
-            progress=100,
+            progress=90,
         )
 
         emit_swarm_event(
@@ -354,48 +370,63 @@ class SwarmOrchestrator:
         if result.all_succeeded:
             wave.state = SubtaskState.COMPLETED
 
-    async def _merge_wave(
-        self,
-        wave: Wave,
-        result: WaveResult,
-        nodes: dict[str, SubtaskNode],
-    ) -> None:
-        """Merge completed subtasks from a wave into the main worktree."""
+    def _open_worktrees(self, wave: Wave, nodes: dict[str, SubtaskNode]) -> None:
+        """Give each subtask of ``wave`` its worktree, from the task's branch."""
+        for subtask_id in wave.subtask_ids:
+            node = nodes[subtask_id]
+            worktree = subtask_worktree.create(
+                self.project_dir, self.spec_dir, subtask_id
+            )
+            self._worktrees[subtask_id] = worktree
+            node.worktree_path = worktree.path
+
+    def _merge_wave(self, wave: Wave, result: WaveResult) -> None:
+        """Merge the finished subtasks of ``wave`` into the task, in plan order.
+
+        A subtask whose merge conflicts is counted as failed and stays pending
+        in the task's plan; its worktree goes with the others.
+        """
         self.status.phase = SwarmPhase.MERGING_WAVE
         emit_swarm_event(
-            "phase_changed",
+            "phase_changed", {"phase": "merging_wave", "wave_index": wave.index}
+        )
+        succeeded = {r.subtask_id for r in result.results if r.success}
+        merged: list[str] = []
+        conflicted: list[str] = []
+        for subtask_id in wave.subtask_ids:
+            worktree = self._worktrees.get(subtask_id)
+            if worktree is None or subtask_id not in succeeded:
+                continue
+            if subtask_worktree.finished(worktree) and subtask_worktree.merge(
+                self.project_dir, self.spec_dir, worktree
+            ):
+                merged.append(subtask_id)
+            else:
+                conflicted.append(subtask_id)
+                self.status.completed_subtasks -= 1
+                self.status.failed_subtasks += 1
+        for subtask_id in wave.subtask_ids:
+            self._close_worktree(subtask_id)
+        wave.merge_success = not conflicted
+        emit_swarm_event(
+            "wave_merged",
             {
-                "phase": "merging_wave",
                 "wave_index": wave.index,
+                "success": not conflicted,
+                "merged": merged,
+                "conflicted": conflicted,
             },
         )
 
-        # A swarm's subtasks all run in the task's own worktree (the executor
-        # starts them in the project directory), so their work is already in
-        # one place: there is nothing to merge between them.
-        wave.merge_success = True
+    def _close_worktree(self, subtask_id: str) -> None:
+        worktree = self._worktrees.pop(subtask_id, None)
+        if worktree is not None:
+            subtask_worktree.remove(self.project_dir, worktree.path, worktree.branch)
 
-    async def _final_merge(
-        self,
-        waves: list[Wave],
-        nodes: dict[str, SubtaskNode],
-    ) -> None:
-        """Perform final merge of all completed subtasks."""
-        # The individual wave merges should have handled most conflicts.
-        # This final merge is a validation pass.
-        emit_swarm_event(
-            "final_merge_started",
-            {
-                "completed_subtasks": self.status.completed_subtasks,
-            },
-        )
-
-        emit_swarm_event(
-            "final_merge_complete",
-            {
-                "success": True,
-            },
-        )
+    def _close_worktrees(self) -> None:
+        """Remove the worktrees a stopped swarm left (fail fast, an error)."""
+        for subtask_id in list(self._worktrees):
+            self._close_worktree(subtask_id)
 
     # ── Callbacks ────────────────────────────────────────────────────
 
