@@ -12,8 +12,6 @@
 // Issues Store
 export {
 	type IssueFilterState,
-	importGitHubIssues,
-	loadAllGitHubIssues,
 	loadGitHubIssues,
 	loadMoreGitHubIssues,
 	useIssuesStore,
@@ -32,6 +30,7 @@ import { initializePRReviewListeners as _initPRReviewListeners } from "./pr-revi
 // Investigation Store
 export {
 	investigateGitHubIssue,
+	setupGitHubInvestigationListeners,
 	useInvestigationStore,
 } from "./investigation-store";
 

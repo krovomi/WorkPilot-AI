@@ -203,3 +203,95 @@ def test_the_fix_request_lists_warnings_apart(task):
     text = render_fix_request(report)
     blocking, rest = text.split("## Also worth fixing (not blocking)")
     assert "drops a column" in blocking and "CONCURRENTLY" in rest
+
+
+@pytest.fixture
+def strict(task, monkeypatch):
+    monkeypatch.setenv(SCHEMA_GUARD_ENV, "strict")
+    return task
+
+
+def test_a_workflow_that_declares_the_gate_makes_it_strict(task, tmp_path, monkeypatch):
+    source = REPO_ROOT / "workflows" / "feature-build" / "workflow.yaml"
+    target = tmp_path / "wf" / "workflow.yaml"
+    target.parent.mkdir()
+    target.write_text(
+        source.read_text(encoding="utf-8").replace(
+            "deps-exist,proof-checks", "deps-exist,proof-checks,migration-safe"
+        ),
+        encoding="utf-8",
+    )
+    declared = load_workflow(target)
+    monkeypatch.setattr(
+        "workflows.registry.load_workflow_for_spec", lambda spec_dir: declared
+    )
+    repo, spec, scope = task
+
+    assert schema_gate(spec, repo, 1, scope) is not None
+
+
+def test_an_unreadable_workflow_declares_nothing(task, monkeypatch):
+    from workflows.spec import WorkflowError
+
+    def broken(spec_dir):
+        raise WorkflowError("bad yaml")
+
+    monkeypatch.setattr("workflows.registry.load_workflow_for_spec", broken)
+    repo, spec, scope = task
+
+    assert schema_gate(spec, repo, 1, scope) is None  # warn
+
+
+def test_a_finding_without_its_statement_quotes_nothing():
+    from schema_guard.guard import SchemaReport
+    from schema_guard.rules import Finding
+
+    report = SchemaReport(
+        engine="prisma",
+        findings=[Finding("edit", "error", OLD, 1, "", "was edited", "Add a new one.")],
+    )
+
+    text = render_fix_request(report)
+
+    assert "was edited" in text and "as written in the migrations" not in text
+
+
+def test_without_a_plan_the_rejection_still_stands(strict):
+    repo, spec, scope = strict
+    (spec / "implementation_plan.json").unlink()
+
+    assert schema_gate(spec, repo, 1, scope) is not None
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(strict):
+    repo, spec, scope = strict
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    issues, verdict = schema_gate(spec, repo, 1, scope)
+
+    assert issues and "rejected" in verdict
+
+
+def test_a_record_that_cannot_be_written_skips_the_guard(strict):
+    from schema_guard.guard import RECORD
+
+    repo, spec, scope = strict
+    (spec / RECORD).mkdir()
+
+    assert schema_gate(spec, repo, 1, scope) is None
+
+
+def test_the_findings_go_to_the_task_log(strict, monkeypatch):
+    repo, spec, scope = strict
+    logged: list[str] = []
+
+    class Log:
+        def log(self, message, kind, phase):
+            logged.append(kind.value)
+
+    schema_gate(spec, repo, 1, scope, task_logger=Log())
+    _write(repo, NEW, 'CREATE INDEX "i" ON "User"("id");\n')
+    only_new = ChangeScope("full", "test", files=(NEW,), base=scope.base)
+    schema_gate(spec, repo, 2, only_new, task_logger=Log())
+
+    assert logged == ["error", "warning"]
