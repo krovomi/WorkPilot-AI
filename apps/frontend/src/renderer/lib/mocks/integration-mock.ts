@@ -246,19 +246,9 @@ export const integrationMock = {
 	}),
 
 	// GitLab Integration Operations
-	getGitLabProjects: async () => ({
-		success: true,
-		data: [],
-	}),
-
 	getGitLabIssues: async () => ({
 		success: true,
 		data: [],
-	}),
-
-	getGitLabIssue: async () => ({
-		success: false,
-		error: "Not available in browser mock",
 	}),
 
 	getGitLabIssueNotes: async () => ({
@@ -283,22 +273,10 @@ export const integrationMock = {
 		error: "Not available in browser mock",
 	}),
 
-	createGitLabRelease: async () => ({
-		success: true,
-		data: {
-			url: "https://gitlab.com/example/repo/-/releases/v1.0.0",
-		},
-	}),
-
 	// GitLab Merge Request Operations
 	getGitLabMergeRequests: async () => ({
 		success: true,
 		data: [],
-	}),
-
-	getGitLabMergeRequest: async () => ({
-		success: false,
-		error: "Not available in browser mock",
 	}),
 
 	createGitLabMergeRequest: async (
@@ -314,11 +292,6 @@ export const integrationMock = {
 			squash?: boolean;
 		},
 	) => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	updateGitLabMergeRequest: async () => ({
 		success: false,
 		error: "Not available in browser mock",
 	}),
@@ -400,51 +373,6 @@ export const integrationMock = {
 					pathWithNamespace: "user/private-project",
 					description: "A private project",
 					visibility: "private",
-				},
-			],
-		},
-	}),
-
-	detectGitLabProject: async () => ({
-		success: true,
-		data: {
-			project: "user/example-project",
-			instanceUrl: "https://gitlab.com",
-		},
-	}),
-
-	getGitLabBranches: async () => ({
-		success: true,
-		data: ["main", "develop", "feature/example"],
-	}),
-
-	createGitLabProject: async () => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	addGitLabRemote: async () => ({
-		success: false,
-		error: "Not available in browser mock",
-	}),
-
-	listGitLabGroups: async () => ({
-		success: true,
-		data: {
-			groups: [
-				{
-					id: 1,
-					name: "Example Group",
-					path: "example-group",
-					fullPath: "example-group",
-					description: "An example group",
-				},
-				{
-					id: 2,
-					name: "Another Group",
-					path: "another-group",
-					fullPath: "another-group",
-					description: "Another group",
 				},
 			],
 		},

@@ -262,19 +262,15 @@ def maybe_optimize_context(
 
     Only files inside ``project_dir`` are read. Returns the optimizer's
     structured output (a dict) when it ran, ``None`` when it was skipped
-    (env flag off, module missing, or no readable candidate).
+    (env flag off or no readable candidate).
     """
     if not cognitive_context_enabled():
         return None
     if not candidate_files:
         return None
 
-    try:
-        from cognitive_context import CognitiveContextOptimizer
-        from cognitive_context.project_files import resolve_candidates
-    except ImportError:
-        logger.debug("cognitive_context module missing — skipping optimization")
-        return None
+    from cognitive_context import CognitiveContextOptimizer
+    from cognitive_context.project_files import resolve_candidates
 
     root = Path(project_dir).resolve()
     candidates, _refused = resolve_candidates(root, candidate_files)
@@ -359,20 +355,16 @@ def _read_spec_domain(spec_dir: Path) -> str | None:
     domain = data.get("domain") if isinstance(data, dict) else None
     if isinstance(domain, str) and domain.strip():
         return domain.strip()
-    try:
-        from domain_agents.project_domain import project_root_of, read_project_domain
-    except ImportError:
-        return None
+    from domain_agents.project_domain import project_root_of, read_project_domain
+
     root = project_root_of(spec_dir)
     return read_project_domain(root) if root else None
 
 
 def _spec_languages(spec_dir: Path) -> list[str]:
     """The stacks of the code the task works on, for stack-specific advice."""
-    try:
-        from project.stack import detect_languages
-    except ImportError:
-        return []
+    from project.stack import detect_languages
+
     # <worktree or project>/.workpilot/specs/<spec>
     return detect_languages(Path(spec_dir).parent.parent.parent)
 
@@ -393,10 +385,7 @@ def load_domain_addendum(
     if not domain:
         return ""
 
-    try:
-        from domain_agents import AgentRole, DomainAgentFactory, DomainTag
-    except ImportError:
-        return ""
+    from domain_agents import AgentRole, DomainAgentFactory, DomainTag
 
     try:
         # Normalise to enums; reject silently if they don't match the catalog.

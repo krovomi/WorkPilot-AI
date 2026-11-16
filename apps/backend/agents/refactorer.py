@@ -473,9 +473,7 @@ class SmellDetector:
 
         for i in range(len(stripped) - min_dup + 1):
             block = "\n".join(stripped[i : i + min_dup])
-            if not block.strip() or all(
-                line == "" for line in stripped[i : i + min_dup]
-            ):
+            if not block.strip():
                 continue
             if block in seen_blocks:
                 smells.append(

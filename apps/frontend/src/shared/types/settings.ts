@@ -255,6 +255,9 @@ export interface SidebarPrefs {
 	pinnedGroups: string[];
 	groupOrder: string[];
 	itemOrder: Record<string, string[]>;
+	// Pages the user moved to another space: page id → group id
+	// (renderer/components/sidebar/menu-layout.ts). Unset = shipped place.
+	itemGroups?: Record<string, string>;
 	expandedGroups: string[];
 	favoritesExpanded: boolean;
 	// Hides the views EXPERIMENTAL_VIEWS lists (renderer/components/sidebar).
@@ -286,6 +289,8 @@ export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
 	jev?: import("./jev").JevSettings;
+	/** Swarm Mode: parallel subtasks in a task's build (off when absent). */
+	swarm?: import("./swarm").SwarmSettings;
 	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
 	agentSafety?: import("./agent-safety").AgentSafetySettings;
 	theme: "light" | "dark" | "system";

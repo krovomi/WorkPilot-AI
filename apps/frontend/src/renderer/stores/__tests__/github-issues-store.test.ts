@@ -60,7 +60,7 @@ describe("loadGitHubIssues", () => {
 
 		api.getGitHubIssues.mockResolvedValueOnce({ success: false });
 		await loadGitHubIssues("p1");
-		expect(store().error).toBe("Failed to load GitHub issues");
+		expect(store().error).toBe("Could not load the issues");
 
 		api.getGitHubIssues.mockRejectedValueOnce(new Error("offline"));
 		await loadGitHubIssues("p1");
@@ -114,7 +114,7 @@ describe("loadMoreGitHubIssues", () => {
 	it("shows why a page could not be read", async () => {
 		api.getGitHubIssues.mockResolvedValueOnce({ success: false });
 		await loadMoreGitHubIssues("p1");
-		expect(store()).toMatchObject({ error: "Failed to load more issues", isLoadingMore: false });
+		expect(store()).toMatchObject({ error: "Could not load more issues", isLoadingMore: false });
 
 		api.getGitHubIssues.mockResolvedValueOnce({ success: false, error: "502" });
 		await loadMoreGitHubIssues("p1");

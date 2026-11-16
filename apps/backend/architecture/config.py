@@ -37,6 +37,8 @@ def load_architecture_config(project_dir: Path) -> ArchitectureConfig | None:
             data = json.load(f)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
+    if not isinstance(data, dict):
+        return None
 
     return _parse_config(data)
 
@@ -188,9 +190,10 @@ def _load_project_index(project_dir: Path) -> dict:
         return {}
     try:
         with open(index_path, encoding="utf-8") as f:
-            return json.load(f)
+            index = json.load(f)
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
+    return index if isinstance(index, dict) else {}
 
 
 def _get_frameworks(project_index: dict) -> list[str]:

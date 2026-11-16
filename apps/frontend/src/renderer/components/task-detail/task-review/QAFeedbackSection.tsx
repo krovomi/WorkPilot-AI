@@ -28,7 +28,7 @@ import {
 	generateImageId,
 	isValidImageMimeType,
 	resolveFilename,
-} from "../../ImageUpload";
+} from "../../../lib/image-attachments";
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 
