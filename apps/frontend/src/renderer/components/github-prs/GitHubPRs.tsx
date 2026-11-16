@@ -58,12 +58,10 @@ type PRReview = ReturnType<typeof useGitHubPRs>;
 function SelectedPRDetail({
 	pr,
 	projectId,
-	isActive,
 	review,
 }: {
 	readonly pr: PRData;
 	readonly projectId: string;
-	readonly isActive: boolean;
 	readonly review: PRReview;
 }) {
 	const prNumber = pr.number;
@@ -75,7 +73,6 @@ function SelectedPRDetail({
 		postReview,
 		postComment,
 		mergePR,
-		assignPR,
 		markReviewPosted,
 	} = review;
 
@@ -105,10 +102,6 @@ function SelectedPRDetail({
 		(method?: "merge" | "squash" | "rebase") => mergePR(prNumber, method),
 		[prNumber, mergePR],
 	);
-	const onAssignPR = useCallback(
-		(username: string) => assignPR(prNumber, username),
-		[prNumber, assignPR],
-	);
 	const onGetLogs = useCallback(
 		() => window.electronAPI.github.getPRLogs(projectId, prNumber),
 		[projectId, prNumber],
@@ -126,7 +119,6 @@ function SelectedPRDetail({
 			initialNewCommitsCheck={
 				review.getReviewStateForPR(prNumber)?.newCommitsCheck ?? null
 			}
-			isActive={isActive}
 			isLoadingFiles={review.isLoadingPRDetails}
 			onRunReview={onRunReview}
 			onRunFollowupReview={onRunFollowupReview}
@@ -135,7 +127,6 @@ function SelectedPRDetail({
 			onPostReview={onPostReview}
 			onPostComment={onPostComment}
 			onMergePR={onMergePR}
-			onAssignPR={onAssignPR}
 			onGetLogs={onGetLogs}
 			onMarkReviewPosted={markReviewPosted}
 		/>
@@ -260,7 +251,6 @@ export function GitHubPRs({
 						<SelectedPRDetail
 							pr={selectedPR}
 							projectId={selectedProject.id}
-							isActive={isActive}
 							review={review}
 						/>
 					) : (

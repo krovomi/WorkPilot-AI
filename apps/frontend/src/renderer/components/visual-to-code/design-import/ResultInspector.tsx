@@ -5,6 +5,7 @@ import type { DesignStep } from "../../../lib/design-import-steps";
 import { useDesignToCodeStore } from "../../../stores/design-to-code-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { GeneratedReviewBanner } from "../../generated-review/GeneratedReviewBanner";
+import { IterationPanel, percent } from "./IterationPanel";
 
 const ACCENT: Record<DesignStep, string> = {
 	vision: "var(--di-vision)",
@@ -192,6 +193,18 @@ export function ResultInspector() {
 					<div className="di-kicker mt-5 mb-2" style={{ ["--di-accent" as string]: "var(--di-faint)" }}>
 						{t("inspector.journal")}
 					</div>
+					{live.loop && (
+						<div className="di-muted mt-3 text-xs" data-testid="design-loop-live">
+							{t("loop.live", {
+								iteration: live.loop.iteration,
+								max: live.loop.max_iterations,
+								stage: t(`loop.stage.${live.loop.stage}`),
+							})}
+							{live.loop.score !== null && (
+								<span className="di-faint ml-2">{t("loop.score", { score: percent(live.loop.score) })}</span>
+							)}
+						</div>
+					)}
 					<ul className="di-journal">
 						{journal.map((entry) => (
 							<li key={`${entry.phase}-${entry.at}`}>
@@ -358,7 +371,12 @@ export function ResultInspector() {
 			break;
 		default:
 			title = t("inspector.codeTitle", { count: codeFiles.length });
-			body = <FilesView files={codeFiles} accent="var(--di-code)" />;
+			body = (
+				<>
+					{result.render_loop && <IterationPanel loop={result.render_loop} />}
+					<FilesView files={codeFiles} accent="var(--di-code)" />
+				</>
+			);
 	}
 
 	return (
