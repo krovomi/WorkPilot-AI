@@ -14,7 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@shared/types/settings";
-import type { UseProjectSettingsReturn } from "@/components/project-settings";
+import type { UseProjectSettingsReturn } from "@/components/project-settings/hooks/useProjectSettings";
 import { TerminalFontSettings } from "@/components/settings/terminal-font-settings";
 import { ScrollArea } from "@/components/ui";
 import { cn } from "@/lib/utils";

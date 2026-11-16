@@ -1073,7 +1073,13 @@
 			"remoteSaveFailed": "Could not save the remote.",
 			"mainBranchPlaceholder": "main",
 			"mainBranchDetect": "Auto-detect",
-			"mainBranchHint": "Base branch for task worktrees. Saved with this dialog."
+			"mainBranchHint": "Base branch for task worktrees. Saved with this dialog.",
+			"copyPathAria": "Copy the repository path",
+			"copyRemoteAria": "Copy the remote URL",
+			"copyWorkpilotAria": "Copy the WorkPilot folder path",
+			"repathFailed": "Could not change the folder.",
+			"openTerminalFailed": "Could not open a terminal.",
+			"mainBranchDetectFailed": "No main branch found: type one."
 		}
 	},
 	"workspace": {
@@ -2896,7 +2902,10 @@
 		"copyThenOpen": "Copy this code, then open the link below to authenticate.",
 		"accountConnected": "Your GitHub account is now connected",
 		"timedOut": "Authentication Timed Out",
-		"failed": "Authentication Failed"
+		"failed": "Authentication Failed",
+		"timedOutDescription": "The sign-in window stayed open too long. Please try again.",
+		"tokenFailed": "Could not read the GitHub CLI sign-in",
+		"cliCheckFailed": "Could not check the GitHub CLI"
 	},
 	"apiKeyConfig": {
 		"apiUrl": "API URL",
@@ -3041,7 +3050,8 @@
 		"awaiting": "This recipe runs commands on your machine. It runs only once you approve it as it is now.",
 		"approve": "Approve",
 		"saveHint": "Save it as .workpilot/worktree.toml to edit it (copy files, ports, teardown).",
-		"saveDetected": "Save as worktree.toml"
+		"saveDetected": "Save as worktree.toml",
+		"failed": "The worktree recipe could not be read or saved."
 	},
 	"kicker": "WorkPilot · Configuration",
 	"headerDescription": "Application and project settings, grouped by theme.",
