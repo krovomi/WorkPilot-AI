@@ -53,6 +53,10 @@ class EstimationResult:
     estimated_qa_iterations: float | None
     token_cost_estimate: float | None
     recommendations: list[str]
+    # Generic figures the calibration loop corrects per repository
+    # (estimation_calibration); both are compared with the actuals at merge.
+    estimated_files_impacted: int = 0
+    estimated_tokens: float | None = None
 
 
 class SmartEstimationService:
@@ -97,6 +101,7 @@ class SmartEstimationService:
             similar_tasks, complexity_score
         )
         cost_estimate = self._estimate_token_cost(similar_tasks, complexity_score)
+        tokens_estimate = self._estimate_tokens(similar_tasks, complexity_score)
 
         # Generate recommendations
         recommendations = self._generate_recommendations(
@@ -113,6 +118,8 @@ class SmartEstimationService:
             estimated_qa_iterations=qa_iterations_estimate,
             token_cost_estimate=cost_estimate,
             recommendations=recommendations,
+            estimated_files_impacted=factors.estimated_files_impacted,
+            estimated_tokens=tokens_estimate,
         )
 
     def _extract_complexity_factors(
@@ -554,6 +561,21 @@ class SmartEstimationService:
 
         # Fallback to complexity-based estimation
         return complexity_score * 0.5  # Rough estimation: $0.50 per complexity point
+
+    def _estimate_tokens(
+        self, similar_tasks: list[dict[str, Any]], complexity_score: int
+    ) -> float:
+        """Estimate tokens from similar tasks, else a prior per complexity point.
+
+        The prior is deliberately rough: the calibration loop learns the
+        repository's own factor against it from the merged specs.
+        """
+        tokens = [
+            task["tokens_used"] for task in similar_tasks[:5] if task["tokens_used"]
+        ]
+        if tokens:
+            return sum(tokens) / len(tokens)
+        return complexity_score * 25_000.0
 
     def _generate_recommendations(
         self,
