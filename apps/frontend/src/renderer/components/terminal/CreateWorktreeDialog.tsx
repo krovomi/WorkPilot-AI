@@ -38,16 +38,13 @@ const PROJECT_DEFAULT_BRANCH = "__project_default__";
  * - Converts to lowercase
  * - Replaces spaces and invalid characters with hyphens
  * - Collapses consecutive hyphens
- * - Trims leading hyphens (but allows trailing during input)
- * - Ensures name ends with alphanumeric (matching backend WORKTREE_NAME_REGEX)
+ * - Trims leading and trailing hyphens/underscores, after the length cut, so the
+ *   name starts and ends with a letter or digit (backend WORKTREE_NAME_REGEX)
  *
- * @param trimTrailing - If true, trims trailing hyphens/underscores (for final validation)
+ * The field itself keeps what is typed (lowercased, spaces as hyphens): this
+ * runs on it for the preview and the request.
  */
-function sanitizeWorktreeName(
-	value: string,
-	maxLength?: number,
-	trimTrailing = false,
-): string {
+function sanitizeWorktreeName(value: string, maxLength?: number): string {
 	let sanitized = value
 		.toLowerCase()
 		.replace(/\s+/g, "-") // Replace spaces with hyphens
@@ -60,13 +57,7 @@ function sanitizeWorktreeName(
 		sanitized = sanitized.slice(0, maxLength);
 	}
 
-	// Only trim trailing hyphens/underscores when explicitly requested (final validation)
-	// Applied once at the end after all other transformations including maxLength slice
-	if (trimTrailing) {
-		sanitized = sanitized.replace(/[-_]+$/, "");
-	}
-
-	return sanitized;
+	return sanitized.replace(/[-_]+$/, "");
 }
 
 interface CreateWorktreeDialogProps {
@@ -76,7 +67,7 @@ interface CreateWorktreeDialogProps {
 	onOpenChange: (open: boolean) => void;
 	/** Terminal ID to associate with the worktree */
 	terminalId: string;
-	/** Project path for worktree creation */
+	/** Project path for worktree creation (the dialog is only mounted with one) */
 	projectPath: string;
 	/** Available backlog tasks for linking */
 	backlogTasks: Task[];
@@ -113,7 +104,7 @@ export function CreateWorktreeDialog({
 
 	// Sanitized name for validation (without display fallback)
 	const sanitizedName = useMemo(
-		() => sanitizeWorktreeName(name, undefined, true),
+		() => sanitizeWorktreeName(name),
 		[name],
 	);
 
@@ -122,7 +113,7 @@ export function CreateWorktreeDialog({
 
 	// Fetch branches when dialog opens
 	useEffect(() => {
-		if (!open || !projectPath) return;
+		if (!open) return;
 
 		let isMounted = true;
 
@@ -187,13 +178,10 @@ export function CreateWorktreeDialog({
 			}
 			setSelectedTaskId(taskId);
 			// Auto-fill name from task if empty
+			// The options are built from backlogTasks, so the task is there.
 			if (!name) {
-				const task = backlogTasks.find((t) => t.id === taskId);
-				if (task) {
-					// Trim trailing when auto-filling from task title (complete value)
-					const autoName = sanitizeWorktreeName(task.title, 40, true);
-					setName(autoName);
-				}
+				const task = backlogTasks.find((t) => t.id === taskId) as Task;
+				setName(sanitizeWorktreeName(task.title, 40));
 			}
 		},
 		[backlogTasks, name],
@@ -206,32 +194,26 @@ export function CreateWorktreeDialog({
 		return selectedGitBranchDetail?.type === "local";
 	}, [baseBranch, branches]);
 
+	const resetForm = () => {
+		setName("");
+		setSelectedTaskId(undefined);
+		setCreateGitBranch(true);
+		setBaseBranch(PROJECT_DEFAULT_BRANCH);
+		setError(null);
+	};
+
 	const handleCreate = async () => {
-		// Final sanitization: trim trailing hyphens/underscores for submission
-		const finalName = sanitizeWorktreeName(name, undefined, true);
-
-		if (!finalName) {
-			setError(t("terminal:worktree.nameRequired"));
-			return;
-		}
-
-		// Validate name format - allow letters, numbers, dashes, and underscores
-		// Must start and end with letter or number (matching backend WORKTREE_NAME_REGEX)
-		if (
-			!/^[a-z0-9][a-z0-9_-]*[a-z0-9]$/.test(finalName) &&
-			!/^[a-z0-9]$/.test(finalName)
-		) {
-			setError(t("terminal:worktree.nameInvalid"));
-			return;
-		}
-
+		// The button is only enabled for a non-empty sanitized name, and the
+		// sanitizer only keeps [a-z0-9_-] with letters or digits at both ends:
+		// exactly what the main process accepts (WORKTREE_NAME_REGEX), which
+		// checks it again.
 		setIsCreating(true);
 		setError(null);
 
 		try {
 			const result = await window.electronAPI.createTerminalWorktree({
 				terminalId,
-				name: finalName,
+				name: sanitizedName,
 				taskId: selectedTaskId,
 				createGitBranch,
 				projectPath,
@@ -246,17 +228,13 @@ export function CreateWorktreeDialog({
 			if (result.success && result.config) {
 				onWorktreeCreated(result.config);
 				onOpenChange(false);
-				// Reset form
-				setName("");
-				setSelectedTaskId(undefined);
-				setCreateGitBranch(true);
-				// Notify user if remote tracking could not be set up
+				resetForm();
+				// The worktree is usable; say that tracking was not set up. git's own
+				// message stays in the main process log: it is untranslated.
 				if (result.warning) {
 					toast({
 						title: t("terminal:worktree.remotePushFailed"),
-						description:
-							result.warning ||
-							t("terminal:worktree.remotePushFailedDescription"),
+						description: t("terminal:worktree.remotePushFailedDescription"),
 						variant: "destructive",
 					});
 				}
@@ -270,16 +248,11 @@ export function CreateWorktreeDialog({
 		}
 	};
 
-	const handleOpenChange = (newOpen: boolean) => {
-		if (!newOpen) {
-			// Reset form on close
-			setName("");
-			setSelectedTaskId(undefined);
-			setCreateGitBranch(true);
-			setBaseBranch(PROJECT_DEFAULT_BRANCH);
-			setError(null);
-		}
-		onOpenChange(newOpen);
+	// Only the terminal opens the dialog (it has no trigger of its own), so
+	// every change Radix reports here is a close: Escape, the overlay, the X.
+	const handleClose = () => {
+		resetForm();
+		onOpenChange(false);
 	};
 
 	// Build branch options using shared utility - groups by local/remote with type indicators
@@ -295,7 +268,7 @@ export function CreateWorktreeDialog({
 	}, [branches, projectDefaultBranch, t]);
 
 	return (
-		<Dialog open={open} onOpenChange={handleOpenChange}>
+		<Dialog open={open} onOpenChange={handleClose}>
 			<DialogContent className="sm:max-w-[425px]">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
@@ -326,7 +299,7 @@ export function CreateWorktreeDialog({
 
 					{/* Task Association (Optional) */}
 					<div className="space-y-2">
-						<Label className="flex items-center gap-2">
+						<Label htmlFor="worktree-task" className="flex items-center gap-2">
 							<ListTodo className="h-4 w-4" />
 							{t("terminal:worktree.associateTask")}
 							<span className="text-muted-foreground text-xs">
@@ -337,7 +310,7 @@ export function CreateWorktreeDialog({
 							value={selectedTaskId || "none"}
 							onValueChange={handleTaskSelect}
 						>
-							<SelectTrigger>
+							<SelectTrigger id="worktree-task">
 								<SelectValue placeholder={t("terminal:worktree.selectTask")} />
 							</SelectTrigger>
 							<SelectContent>
@@ -404,7 +377,7 @@ export function CreateWorktreeDialog({
 				<DialogFooter>
 					<Button
 						variant="outline"
-						onClick={() => onOpenChange(false)}
+						onClick={handleClose}
 						disabled={isCreating}
 					>
 						{t("common:buttons.cancel")}

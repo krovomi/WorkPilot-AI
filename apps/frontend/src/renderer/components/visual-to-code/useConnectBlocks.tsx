@@ -130,9 +130,10 @@ export function useConnectBlocks(
 								eds,
 							),
 				);
-			const via = (verdict.via ?? [])
-				.map((type) => t(type))
-				.join(lang === "fr" ? " ou " : " or ");
+			// "A, B or C" in the canvas' language, not a conjunction hardcoded per language.
+			const via = new Intl.ListFormat(lang, { type: "disjunction" }).format(
+				(verdict.via ?? []).map((type) => t(type)),
+			);
 			const forceLabel = t("forceConnection", "Relier quand même");
 			const flipLabel = t("flipConnection", "Inverser le sens");
 			toast({

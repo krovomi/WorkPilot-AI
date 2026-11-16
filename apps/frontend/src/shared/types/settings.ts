@@ -289,6 +289,8 @@ export type OpenAIAuthMode = "api-key" | "codex-cli";
 
 export interface AppSettings {
 	jev?: import("./jev").JevSettings;
+	/** Swarm Mode: parallel subtasks in a task's build (off when absent). */
+	swarm?: import("./swarm").SwarmSettings;
 	/** Settings, Sandbox and Anomaly detection: sent to every agent process. */
 	agentSafety?: import("./agent-safety").AgentSafetySettings;
 	theme: "light" | "dark" | "system";

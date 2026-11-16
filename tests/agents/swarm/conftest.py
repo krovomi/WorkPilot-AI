@@ -39,7 +39,8 @@ if step == "ok":
     sys.exit(0)
 if step == "fail":
     # More than a pipe buffer on stderr: the executor must keep reading it.
-    sys.stderr.write("E" * 100_000)
+    # A warning comes first and the error last, as an interpreter writes them.
+    sys.stderr.write("a warning\n" + "E" * 100_000 + "\nboom: the real error")
     sys.exit(1)
 if step == "silent":
     sys.exit(3)

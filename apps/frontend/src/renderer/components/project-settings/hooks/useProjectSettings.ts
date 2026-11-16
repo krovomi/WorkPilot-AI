@@ -262,11 +262,6 @@ export function useProjectSettings(
 	// Check Linear connection when API key changes
 	useEffect(() => {
 		const checkLinearConnection = async () => {
-			if (!envConfig?.linearEnabled || !envConfig.linearApiKey) {
-				setLinearConnectionStatus(null);
-				return;
-			}
-
 			setIsCheckingLinear(true);
 			try {
 				const result = await window.electronAPI.checkLinearConnection(
@@ -287,21 +282,14 @@ export function useProjectSettings(
 
 		if (envConfig?.linearEnabled && envConfig.linearApiKey) {
 			checkLinearConnection();
+		} else {
+			setLinearConnectionStatus(null);
 		}
 	}, [envConfig?.linearEnabled, envConfig?.linearApiKey, project.id]);
 
 	// Check Azure DevOps connection when credentials change
 	useEffect(() => {
 		const checkAzureDevOpsConnection = async () => {
-			if (
-				!envConfig?.azureDevOpsEnabled ||
-				!envConfig.azureDevOpsPat ||
-				!envConfig.azureDevOpsOrgUrl
-			) {
-				setAzureDevOpsConnectionStatus(null);
-				return;
-			}
-
 			setIsCheckingAzureDevOps(true);
 			try {
 				const result = await window.electronAPI.checkAzureDevOpsConnection(
@@ -326,6 +314,8 @@ export function useProjectSettings(
 			envConfig.azureDevOpsOrgUrl
 		) {
 			checkAzureDevOpsConnection();
+		} else {
+			setAzureDevOpsConnectionStatus(null);
 		}
 	}, [
 		envConfig?.azureDevOpsEnabled,
@@ -338,15 +328,6 @@ export function useProjectSettings(
 	// Also updates the global GitHub store so other components (like GitHub Issues) see the change
 	useEffect(() => {
 		const checkGitHubConnection = async () => {
-			if (
-				!envConfig?.githubEnabled ||
-				!envConfig.githubToken ||
-				!envConfig.githubRepo
-			) {
-				setGitHubConnectionStatus(null);
-				return;
-			}
-
 			setIsCheckingGitHub(true);
 			try {
 				// Use the global store action - it makes the API call AND updates the global store
@@ -371,6 +352,8 @@ export function useProjectSettings(
 			envConfig.githubRepo
 		) {
 			checkGitHubConnection();
+		} else {
+			setGitHubConnectionStatus(null);
 		}
 	}, [
 		envConfig?.githubEnabled,
@@ -382,15 +365,6 @@ export function useProjectSettings(
 	// Check GitLab connection when token/project changes
 	useEffect(() => {
 		const checkGitLabConnection = async () => {
-			if (
-				!envConfig?.gitlabEnabled ||
-				!envConfig.gitlabToken ||
-				!envConfig.gitlabProject
-			) {
-				setGitLabConnectionStatus(null);
-				return;
-			}
-
 			setIsCheckingGitLab(true);
 			try {
 				const status = await window.electronAPI.checkGitLabConnection(
@@ -415,6 +389,8 @@ export function useProjectSettings(
 			envConfig.gitlabProject
 		) {
 			checkGitLabConnection();
+		} else {
+			setGitLabConnectionStatus(null);
 		}
 	}, [
 		envConfig?.gitlabEnabled,
@@ -588,14 +564,6 @@ export function useProjectSettings(
 
 		const newConfig = { ...baseConfig, ...updates };
 
-		// Debug: log Azure DevOps-specific updates
-		const azureKeys = Object.keys(updates).filter((k) =>
-			k.startsWith("azureDevOps"),
-		);
-		if (azureKeys.length > 0) {
-			// noop
-		}
-
 		// OPTIMISTIC UPDATES: Update local state IMMEDIATELY for responsive UI
 		// This ensures the user sees their changes reflected instantly
 		setEnvConfig(newConfig);
@@ -622,9 +590,6 @@ export function useProjectSettings(
 				// Note: We don't rollback the optimistic update because another concurrent call may have
 				// already updated it. The error is shown to the user who can retry.
 				return;
-			}
-			if (azureKeys.length > 0) {
-				// noop
 			}
 		} catch (err) {
 			console.error("[useProjectSettings] Error auto-saving env config:", err);

@@ -53,12 +53,6 @@ export const terminalMock = {
 		},
 	}),
 
-	clearTerminalSessions: async () => ({ success: true }),
-
-	resumeClaudeInTerminal: () => {
-		console.warn("[Browser Mock] resumeClaudeInTerminal called");
-	},
-
 	activateDeferredClaudeResume: () => {
 		console.warn("[Browser Mock] activateDeferredClaudeResume called");
 	},
