@@ -585,6 +585,27 @@ class UserPreference(Base):
     )
 
 
+class UserMenuLayout(Base):
+    """How a person arranged the desktop's left menu, the same on every desktop.
+
+    ``layout`` is the JSON object the desktop keeps in its sidebar preferences
+    (``apps/frontend/src/shared/utils/menu-layout.ts``): the order of the
+    spaces and of their pages, the pages moved to another space, the pins and
+    the pages hidden. ``server.services.preferences`` checks it. One row per
+    person, created on the first save.
+    """
+
+    __tablename__ = "user_menu_layouts"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    layout: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
 class NeedsYouChannel(Base):
     """Where a person is told a card needs them: ntfy, Telegram or Teams.
 

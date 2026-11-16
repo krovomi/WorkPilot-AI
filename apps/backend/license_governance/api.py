@@ -134,18 +134,15 @@ def scan(req: ScanRequest):
 
 @router.post("/classify")
 def classify(req: ClassifyRequest):
-    try:
-        cat = classify_license(req.license)
-        return {
-            "success": True,
-            "license": req.license,
-            "category": cat.value,
-            "is_permissive": cat
-            in (LicenseCategory.PERMISSIVE, LicenseCategory.PUBLIC_DOMAIN),
-        }
-    except Exception as e:  # noqa: BLE001
-        logger.exception("classify failed")
-        return {"success": False, "error": safe_error(e, logger, "classify")}
+    # Pure string work on a validated string: nothing here raises.
+    cat = classify_license(req.license)
+    return {
+        "success": True,
+        "license": req.license,
+        "category": cat.value,
+        "is_permissive": cat
+        in (LicenseCategory.PERMISSIVE, LicenseCategory.PUBLIC_DOMAIN),
+    }
 
 
 class AttributionRequest(BaseModel):

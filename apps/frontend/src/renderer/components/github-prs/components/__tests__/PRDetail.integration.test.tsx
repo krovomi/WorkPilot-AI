@@ -23,7 +23,6 @@ const mockOnRunFollowupReview = vi.fn();
 const mockOnCheckNewCommits = vi.fn();
 const mockOnCancelReview = vi.fn();
 const mockOnMergePR = vi.fn();
-const mockOnAssignPR = vi.fn();
 const mockOnGetLogs = vi.fn();
 
 Object.defineProperty(globalThis, "electronAPI", {
@@ -151,7 +150,6 @@ describe("PRDetail - Clean Review State Reset Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={overrides.onPostComment ?? mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
@@ -219,22 +217,16 @@ describe("PRDetail - Clean Review State Reset Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
 		);
 
-		// After PR change, just verify the component renders without crashing
-		// The button visibility depends on component internal state which is acceptable
-		const postCleanReviewButtonAfterChange = screen.queryByRole("button", {
-			name: /post clean review/i,
-		});
-		// Either the button exists or it doesn't - both are valid states
+		// The other PR has its own page: nothing was posted on it yet.
 		expect(
-			postCleanReviewButtonAfterChange === null ||
-				postCleanReviewButtonAfterChange,
-		).toBeTruthy();
+			screen.getByRole("button", { name: /post clean review/i }),
+		).toBeInTheDocument();
+		expect(screen.queryByText(/clean review posted/i)).not.toBeInTheDocument();
 		unmount();
 	}, 15000); // Increased timeout for slower CI environments (Windows)
 
@@ -359,7 +351,6 @@ describe("PRDetail - Clean Review State Reset Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
@@ -371,6 +362,21 @@ describe("PRDetail - Clean Review State Reset Integration", () => {
 		});
 		expect(postCleanReviewButtonDirty).not.toBeInTheDocument();
 
+		unmount();
+	});
+
+	it("does not call a refused clean review posted", async () => {
+		// The page's own hook reports a GitHub refusal as false, not as an error.
+		mockOnPostComment.mockResolvedValue(false);
+		const { unmount } = renderPRDetail({ onPostComment: mockOnPostComment });
+		fireEvent.click(screen.getByRole("button", { name: /post clean review/i }));
+		await waitFor(() => {
+			expect(screen.getByText(/Failed to post clean review/i)).toBeInTheDocument();
+		});
+		expect(screen.queryByText(/clean review posted/i)).not.toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: /post clean review/i }),
+		).toBeInTheDocument();
 		unmount();
 	});
 
@@ -397,11 +403,6 @@ describe("PRDetail - Clean Review State Reset Integration", () => {
 			expect(
 				screen.getByText(/Failed to post clean review/i),
 			).toBeInTheDocument();
-		});
-
-		// "View details" button should be available
-		await waitFor(() => {
-			expect(screen.getByText(/View details/i)).toBeInTheDocument();
 		});
 
 		// Button should still be visible for retry after error
@@ -458,7 +459,6 @@ describe("PRDetail - Follow-up Review Trigger Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
@@ -703,7 +703,6 @@ describe("PRDetail - Follow-up Review Trigger Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
@@ -868,7 +867,6 @@ describe("PRDetail - Follow-up Review Trigger Integration", () => {
 					onPostReview={mockOnPostReview}
 					onPostComment={mockOnPostComment}
 					onMergePR={mockOnMergePR}
-					onAssignPR={mockOnAssignPR}
 					onGetLogs={mockOnGetLogs}
 				/>
 			</I18nWrapper>,
