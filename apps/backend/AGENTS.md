@@ -33,7 +33,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 `offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
 `project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
 `test_generation`). `agent_runtime/` est le port par lequel une unité que `core` importe lance
-une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture,
+une session sans importer `core` ni `agents` (intégrations, analyse, architecture,
 génération de tests ;
 [justification](../../docs/architecture/agent-runtime.md)) ; `core/agent_runtime.py` l'installe.
 `tests/test_import_contracts.py` tient ces frontières.
@@ -79,6 +79,7 @@ génération de tests ;
 | `foundation/api_safety.py` | chemins acceptés par l'API locale |
 | `offline_policy/` | hors-ligne strict (`airgapStrict`) |
 | `os_sandbox/` | bac à sable de l'OS autour des commandes d'agent : bubblewrap, Seatbelt, proxy filtrant ([conception](../../docs/architecture/os-sandbox.md)) |
+| `agent_snapshots/`, `agents/safety_watch.py`, `runners/snapshot_runner.py` | instantanés git du worktree d'une tâche avant chaque session et retour arrière ; score de confiance et limites du sandbox sur le flux des appels ([conception](../../docs/architecture/agent-safety.md)) |
 | `foundation/landlock.py`, `server/services/run_isolation.py`, `runners/confined_run.py` | mode serveur : chaque run confiné par Landlock à son clone, au home de son projet et à son dossier temporaire ([conception](../../docs/architecture/server-mode.md#ce-quun-run-voit-sur-le-disque)) |
 | `foundation/log_redaction.py` | filtre de redaction des logs |
 

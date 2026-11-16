@@ -97,7 +97,9 @@ import {
 import { serverForge, useServerNavGates } from "./sidebar/server-gates";
 import { useSidebarPrefs } from "./sidebar/use-sidebar-prefs";
 import { MenuModeCard } from "./sidebar/MenuModeCard";
+import { SidebarResizeHandle } from "./sidebar/SidebarResizeHandle";
 import { type RailSpace, SidebarRail } from "./sidebar/SidebarRail";
+import { useSidebarResize } from "./sidebar/use-sidebar-resize";
 import { HiddenList, HideSuggestion } from "./sidebar/HiddenPages";
 import { LaboPanel } from "./sidebar/LaboPanel";
 import {
@@ -230,6 +232,9 @@ export { navItemLabelKey } from "./sidebar/nav-model";
  * The star of the rail is small: the pointer over it wins, then the nearest
  * sortable row, so a page dragged onto the star pins it.
  */
+/** The panel beside the rail, sized by the handle on its right edge. */
+const SIDEBAR_PANEL_ID = "sidebar-panel";
+
 const pointerFirst: CollisionDetection = (args) => {
 	const within = pointerWithin(args);
 	return within.length > 0 ? within : closestCenter(args);
@@ -301,61 +306,12 @@ export function Sidebar({
 	// Sidebar collapsed state from settings
 	const isCollapsed = settings.sidebarCollapsed ?? false;
 
-	// Sidebar resizable width
-	// The whole menu, rail and panel; folded, only the rail stays.
-	const SIDEBAR_MIN_WIDTH = 240;
-	const SIDEBAR_MAX_WIDTH = 480;
-	const SIDEBAR_DEFAULT_WIDTH = 296;
-	const SIDEBAR_RAIL_WIDTH = 52; // w-13 of the rail
-
-	const sidebarWidth = settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH;
-	const [isResizing, setIsResizing] = useState(false);
-	const [resizeWidth, setResizeWidth] = useState(sidebarWidth);
-	const resizingRef = useRef(false);
-
-	// Sync resizeWidth when settings change externally
-	useEffect(() => {
-		if (!resizingRef.current) {
-			setResizeWidth(settings.sidebarWidth ?? SIDEBAR_DEFAULT_WIDTH);
-		}
-	}, [settings.sidebarWidth]);
-
-	const handleResizeStart = useCallback(
-		(e: React.MouseEvent) => {
-			e.preventDefault();
-			resizingRef.current = true;
-			setIsResizing(true);
-			const startX = e.clientX;
-			const startWidth = resizeWidth;
-
-			const handleMouseMove = (moveEvent: MouseEvent) => {
-				const newWidth = Math.min(
-					SIDEBAR_MAX_WIDTH,
-					Math.max(
-						SIDEBAR_MIN_WIDTH,
-						startWidth + (moveEvent.clientX - startX),
-					),
-				);
-				setResizeWidth(newWidth);
-			};
-
-			const handleMouseUp = () => {
-				resizingRef.current = false;
-				setIsResizing(false);
-				document.removeEventListener("mousemove", handleMouseMove);
-				document.removeEventListener("mouseup", handleMouseUp);
-				// Persist final width
-				setResizeWidth((prev) => {
-					saveSettings({ sidebarWidth: prev });
-					return prev;
-				});
-			};
-
-			document.addEventListener("mousemove", handleMouseMove);
-			document.addEventListener("mouseup", handleMouseUp);
-		},
-		[resizeWidth],
-	);
+	// Width of the menu: dragged or moved with the keyboard on its right edge.
+	const resize = useSidebarResize({
+		storedWidth: settings.sidebarWidth,
+		isCollapsed,
+		onCommit: saveSettings,
+	});
 
 	const toggleSidebar = () => {
 		saveSettings({ sidebarCollapsed: !isCollapsed });
@@ -1077,7 +1033,7 @@ export function Sidebar({
 
 	const railFooter = (
 		<>
-			{isCollapsed &&
+			{resize.folded &&
 				railIconButton(t("actions.newTask"), () => {
 					if (selectedProjectId && selectedProject?.autoBuildPath) onNewTaskClick();
 				}, <Plus className="h-4 w-4" />)}
@@ -1094,9 +1050,9 @@ export function Sidebar({
 			)}
 			{railIconButton(t("tooltips.settings"), onSettingsClick, <Settings className="h-4 w-4" />)}
 			{railIconButton(
-				isCollapsed ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
+				resize.folded ? t("actions.expandSidebar") : t("actions.collapseSidebar"),
 				toggleSidebar,
-				isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
+				resize.folded ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />,
 			)}
 		</>
 	);
@@ -1113,22 +1069,26 @@ export function Sidebar({
 				<div
 					className={cn(
 						"relative flex h-full bg-sidebar border-r border-border",
-						!isResizing && "transition-[width] duration-300",
+						!resize.isResizing && "transition-[width] duration-300",
 					)}
-					style={{ width: isCollapsed ? SIDEBAR_RAIL_WIDTH : resizeWidth }}
+					style={{ width: resize.width }}
 				>
 					<SidebarRail
 						mine={mineSpace}
 						groups={railGroups.map(spaceOf)}
 						extras={laboItems.length > 0 ? [laboSpace] : []}
 						activeSpace={space}
-						isCollapsed={isCollapsed}
+						isCollapsed={resize.folded}
 						onSelect={selectSpace}
 						footer={railFooter}
 					/>
 
-					{!isCollapsed && (
-						<div className="flex min-w-0 flex-1 flex-col" data-testid="sidebar-panel">
+					{!resize.folded && (
+						<div
+							id={SIDEBAR_PANEL_ID}
+							className="flex min-w-0 flex-1 flex-col"
+							data-testid="sidebar-panel"
+						>
 							{/* Header with drag area - extra top padding for macOS traffic lights */}
 							<div className="electron-drag flex h-14 shrink-0 items-end px-4 pb-1.5">
 								<h2 className="electron-no-drag truncate text-base font-semibold text-foreground">
@@ -1234,19 +1194,15 @@ export function Sidebar({
 						</div>
 					)}
 
-					{/* Resize handle */}
-					{!isCollapsed && (
-						// biome-ignore lint/a11y/noStaticElementInteractions: interactive handler is intentional
-						// biome-ignore lint/a11y/noNoninteractiveElementInteractions: resize handle — mouse drag interaction
-						<div
-							onMouseDown={handleResizeStart}
-							className={cn(
-								"absolute top-0 right-0 w-1 h-full cursor-col-resize z-50 transition-colors",
-								"hover:bg-primary/40",
-								isResizing && "bg-primary/60",
-							)}
-						/>
-					)}
+					<SidebarResizeHandle
+						controls={SIDEBAR_PANEL_ID}
+						width={resize.width}
+						maxWidth={resize.maxWidth}
+						folded={resize.folded}
+						isResizing={resize.isResizing}
+						isDragging={resize.isDragging}
+						{...resize.handlers}
+					/>
 				</div>
 				<DragOverlay dropAnimation={null}>
 					{activeDragId ? (

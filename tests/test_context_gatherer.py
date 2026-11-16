@@ -19,8 +19,10 @@ import pytest
 # Add the backend directory to path
 _backend_dir = Path(__file__).parent.parent / "apps" / "backend"
 _github_dir = _backend_dir / "runners" / "github"
+# Appended, not prepended: its ``services/`` package would otherwise shadow
+# apps/backend/services for every test collected after this one.
 if str(_github_dir) not in sys.path:
-    sys.path.insert(0, str(_github_dir))
+    sys.path.append(str(_github_dir))
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
