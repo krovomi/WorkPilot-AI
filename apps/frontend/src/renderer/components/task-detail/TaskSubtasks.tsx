@@ -29,28 +29,23 @@ import { BlockedSubtaskHelp, HumanResolutionNote } from "./BlockedSubtaskHelp";
 import { TaskSteeringPanel } from "./TaskSteeringPanel";
 import { formatAppDateTime } from "@/lib/date-format";
 
-import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+type PlanSubtaskEdit = Pick<Subtask, "id" | "title" | "description" | "status" | "files">;
+
 interface Phase {
 	name: string;
-	subtasks: Array<{
-		id: string;
-		title?: string;
-		description?: string;
-		status: "pending" | "in_progress" | "completed" | "blocked" | "failed";
-		files?: string[];
-		blockedReason?: string;
-		verification?: {
-			type: "command" | "browser";
-			run?: string;
-			scenario?: string;
-		};
-	}>;
+	subtasks: PlanSubtaskEdit[];
 }
 
 interface TaskSubtasksProps {
 	readonly task: Task;
-	readonly onUpdatePlan?: (phases: Phase[]) => Promise<void>;
+	/** Saves the plan; resolves false when the save was refused. */
+	readonly onUpdatePlan?: (phases: Phase[]) => Promise<boolean>;
+}
+
+/** The main process reads these as edits and merges them into the plan's own phases. */
+function asPhases(subtasks: PlanSubtaskEdit[]): Phase[] {
+	return [{ name: "Implementation", subtasks }];
 }
 
 function getSubtaskStatusIcon(status: string) {
@@ -93,16 +88,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 		useState<Subtask | null>(null);
 	const [selectedSubtaskForFilesView, setSelectedSubtaskForFilesView] =
 		useState<Subtask | null>(null);
-	const [editedPhases, setEditedPhases] = useState<Phase[]>(
-		task.subtasks.length > 0
-			? [
-					{
-						name: "Implementation",
-						subtasks: task.subtasks,
-					},
-				]
-			: [],
-	);
+	const [editedSubtasks, setEditedSubtasks] = useState<PlanSubtaskEdit[]>([]);
 
 	const progress = calculateProgress(task.subtasks);
 	const completedCount = task.subtasks.filter(
@@ -112,23 +98,23 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 		(s) => s.status === "blocked",
 	).length;
 	const failedCount = task.subtasks.filter((s) => s.status === "failed").length;
+	const hasEmptySubtask = editedSubtasks.some(
+		(s) => s.status === "pending" && !s.description.trim(),
+	);
+
+	// Edits start from the plan as it is now, on copies: the task's subtasks
+	// belong to the store and must not change before the save succeeds.
+	function startEditing() {
+		setEditedSubtasks(task.subtasks.map((s) => ({ ...s, files: [...(s.files ?? [])] })));
+		setIsEditing(true);
+	}
 
 	const handleCodeEditorUpdate = async (updatedSubtask: Subtask) => {
-		// Update the subtask in editedPhases
-		const newPhases = editedPhases.map((phase) => ({
-			...phase,
-			subtasks: phase.subtasks.map((s) =>
-				s.id === updatedSubtask.id ? updatedSubtask : s,
-			),
-		}));
-		setEditedPhases(newPhases);
-
-		// Call onUpdatePlan to save
-		if (onUpdatePlan) {
-			await onUpdatePlan(newPhases);
-		}
-
-		setSelectedSubtaskForCodeEdit(null);
+		if (!onUpdatePlan) return;
+		const saved = await onUpdatePlan(
+			asPhases(task.subtasks.map((s) => (s.id === updatedSubtask.id ? updatedSubtask : s))),
+		);
+		if (saved) setSelectedSubtaskForCodeEdit(null);
 	};
 
 	async function handleSaveChanges() {
@@ -136,13 +122,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 
 		setIsSaving(true);
 		try {
-			const phases = editedPhases.map((phase) => ({
-				name: phase.name,
-				subtasks: phase.subtasks,
-			}));
-
-			await onUpdatePlan(phases);
-			setIsEditing(false);
+			if (await onUpdatePlan(asPhases(editedSubtasks))) setIsEditing(false);
 		} catch (error) {
 			console.error("Failed to save changes:", error);
 		} finally {
@@ -150,37 +130,21 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 		}
 	}
 
-	function handleDeleteSubtask(phaseIndex: number, subtaskIndex: number) {
-		const newPhases = [...editedPhases];
-		newPhases[phaseIndex].subtasks.splice(subtaskIndex, 1);
-
-		// Remove empty phases
-		setEditedPhases(newPhases.filter((phase) => phase.subtasks.length > 0));
+	function handleDeleteSubtask(id: string) {
+		setEditedSubtasks((subtasks) => subtasks.filter((s) => s.id !== id));
 	}
 
-	function handleAddSubtask(phaseIndex: number) {
-		const newPhases = [...editedPhases];
-		newPhases[phaseIndex].subtasks.push({
-			id: `new-${Date.now()}`,
-			title: "",
-			description: "",
-			status: "pending",
-			files: [],
-		});
-		setEditedPhases(newPhases);
+	function handleAddSubtask() {
+		setEditedSubtasks((subtasks) => [
+			...subtasks,
+			{ id: `new-${Date.now()}`, title: "", description: "", status: "pending", files: [] },
+		]);
 	}
 
-	function handleUpdateSubtask(
-		phaseIndex: number,
-		subtaskIndex: number,
-		field: string,
-		value: string,
-	) {
-		const newPhases = [...editedPhases];
-		(newPhases[phaseIndex].subtasks[subtaskIndex] as Record<string, unknown>)[
-			field
-		] = value;
-		setEditedPhases(newPhases);
+	function handleUpdateSubtask(id: string, description: string) {
+		setEditedSubtasks((subtasks) =>
+			subtasks.map((s) => (s.id === id ? { ...s, title: description, description } : s)),
+		);
 	}
 
 	if (selectedSubtaskForFilesView) {
@@ -285,7 +249,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 						<Button
 							size="sm"
 							variant="ghost"
-							onClick={() => setIsEditing(true)}
+							onClick={startEditing}
 							className="ml-2 h-7 w-7 p-0"
 							title={t("tasks:modal.plan.edit")}
 						>
@@ -295,81 +259,70 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 				</div>
 
 				{isEditing ? (
-					// Edit mode
-					<div className="space-y-4">
-						{editedPhases.map((phase, phaseIndex) => (
-							<div key={`phase-${phase.name}`} className="border rounded-lg p-3 space-y-2">
-								<h3 className="font-medium text-sm text-foreground">
-									{phase.name}
-								</h3>
-
-								{phase.subtasks.map((subtask, subtaskIndex) => (
-									<div
-										key={subtask.id}
-										className="flex gap-2 items-start bg-secondary/30 p-2 rounded"
-									>
-										<div className="flex-1 space-y-1">
-											<Input
-												type="text"
-												value={subtask.title || ""}
-												onChange={(e) =>
-													handleUpdateSubtask(
-														phaseIndex,
-														subtaskIndex,
-														"title",
-														e.target.value,
-													)
-												}
-												placeholder={t("tasks:modal.plan.subtaskTitle")}
-												className="w-full text-sm font-medium px-2 py-1 h-auto"
-											/>
-											<Textarea
-												value={subtask.description || ""}
-												onChange={(e) =>
-													handleUpdateSubtask(
-														phaseIndex,
-														subtaskIndex,
-														"description",
-														e.target.value,
-													)
-												}
-												placeholder={t("tasks:modal.plan.subtaskDescription")}
-												className="w-full text-xs px-2 py-1 resize-none min-h-0"
-												rows={2}
-											/>
-										</div>
-										{subtask.status === "pending" && (
-											<Button
-												size="sm"
-												variant="ghost"
-												onClick={() =>
-													handleDeleteSubtask(phaseIndex, subtaskIndex)
-												}
-												className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-											>
-												<Trash2 className="h-3.5 w-3.5" />
-											</Button>
-										)}
-									</div>
-								))}
-
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => handleAddSubtask(phaseIndex)}
-									className="w-full text-xs h-7"
+					// Edit mode: only a pending subtask can change; the others are
+					// shown for context.
+					<div className="space-y-2">
+						{editedSubtasks.some((s) => s.status !== "pending") && (
+							<p className="text-xs text-muted-foreground">
+								{t("tasks:modal.plan.pendingOnly")}
+							</p>
+						)}
+						{editedSubtasks.map((subtask) =>
+							subtask.status === "pending" ? (
+								<div
+									key={subtask.id}
+									className="flex gap-2 items-start bg-secondary/30 p-2 rounded"
 								>
-									<Plus className="h-3 w-3 mr-1" />
-									{t("tasks:modal.plan.addSubtask")}
-								</Button>
-							</div>
-						))}
+									<Textarea
+										value={subtask.description}
+										onChange={(e) => handleUpdateSubtask(subtask.id, e.target.value)}
+										aria-label={t("tasks:modal.plan.subtaskDescription")}
+										placeholder={t("tasks:modal.plan.subtaskDescription")}
+										className="flex-1 text-xs px-2 py-1 resize-none min-h-0"
+										rows={2}
+									/>
+									<Button
+										size="sm"
+										variant="ghost"
+										onClick={() => handleDeleteSubtask(subtask.id)}
+										aria-label={t("tasks:modal.plan.deleteSubtask")}
+										className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+									>
+										<Trash2 className="h-3.5 w-3.5" />
+									</Button>
+								</div>
+							) : (
+								<div
+									key={subtask.id}
+									className="flex gap-2 items-start rounded border border-border/50 p-2 text-xs text-muted-foreground"
+								>
+									{getSubtaskStatusIcon(subtask.status)}
+									<span className="flex-1">
+										{subtask.description || t("tasks:subtasks.untitled")}
+									</span>
+								</div>
+							),
+						)}
+
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={handleAddSubtask}
+							className="w-full text-xs h-7"
+						>
+							<Plus className="h-3 w-3 mr-1" />
+							{t("tasks:modal.plan.addSubtask")}
+						</Button>
+
+						{hasEmptySubtask && (
+							<p className="text-xs text-destructive">{t("tasks:modal.plan.emptyTitle")}</p>
+						)}
 
 						<div className="flex gap-2 pt-2 border-t border-border/50">
 							<Button
 								size="sm"
 								onClick={handleSaveChanges}
-								disabled={isSaving}
+								disabled={isSaving || hasEmptySubtask}
 								className="flex-1"
 							>
 								{isSaving ? (
@@ -384,19 +337,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 							<Button
 								size="sm"
 								variant="outline"
-								onClick={() => {
-									setIsEditing(false);
-									setEditedPhases(
-										task.subtasks.length > 0
-											? [
-													{
-														name: "Implementation",
-														subtasks: task.subtasks,
-													},
-												]
-											: [],
-									);
-								}}
+								onClick={() => setIsEditing(false)}
 								disabled={isSaving}
 								className="flex-1"
 							>
@@ -536,6 +477,7 @@ export function TaskSubtasks({ task, onUpdatePlan }: TaskSubtasksProps) {
 																	e.stopPropagation();
 																	setSelectedSubtaskForCodeEdit(subtask);
 																}}
+																aria-label={t("taskReview:taskPanel.editFiles")}
 																className="h-6 w-6 p-0 ml-1"
 															>
 																<Edit3 className="h-3 w-3" />
