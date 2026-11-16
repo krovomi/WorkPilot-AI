@@ -13,11 +13,14 @@ from pathlib import Path
 
 from foundation.base_branch import detect_base_branch
 from foundation.debug import debug, debug_error, debug_warning
+from security.untrusted import quote_untrusted
 
 from .models import ArchitectureConfig, ArchitectureReport, ArchitectureViolation
 
 # apps/backend/prompts, where every agent's system prompt lives.
 _PROMPT_FILE = Path(__file__).parent.parent / "prompts" / "architecture_reviewer.md"
+# Where the reviewer writes its findings, in the spec directory.
+REPORT_FILE = "architecture_report.json"
 
 
 def architecture_reviewer_prompt(
@@ -37,8 +40,18 @@ def architecture_reviewer_prompt(
         "{{BASE_BRANCH}}", detect_base_branch(spec_dir, project_dir)
     )
     prompt = prompt.replace("{{PROJECT_DIR}}", str(project_dir))
-    prompt = prompt.replace("{{ARCHITECTURE_RULES}}", architecture_rules)
-    return prompt.replace("{{DETERMINISTIC_REPORT}}", deterministic_report)
+    # Both come from the project (its rules file, its paths): data to the reviewer.
+    rules = quote_untrusted(
+        architecture_rules, kind="file", source="architecture rules", spec_dir=spec_dir
+    )
+    report = quote_untrusted(
+        deterministic_report,
+        kind="file",
+        source="static architecture report",
+        spec_dir=spec_dir,
+    )
+    prompt = prompt.replace("{{ARCHITECTURE_RULES}}", rules)
+    return prompt.replace("{{DETERMINISTIC_REPORT}}", report)
 
 
 async def run_architecture_ai_review(
@@ -103,6 +116,9 @@ async def run_architecture_ai_review(
         )
         return []
 
+    # A report left by an earlier QA round must not stand in for this one.
+    (spec_dir / REPORT_FILE).unlink(missing_ok=True)
+
     # Run the review session
     debug("architecture_ai", "Starting AI architecture review session...")
     try:
@@ -136,7 +152,7 @@ def _parse_ai_report(spec_dir: Path) -> list[ArchitectureViolation]:
 
     Returns violations found by the AI.
     """
-    report_path = spec_dir / "architecture_report.json"
+    report_path = spec_dir / REPORT_FILE
     if not report_path.exists():
         return []
 
@@ -146,13 +162,19 @@ def _parse_ai_report(spec_dir: Path) -> list[ArchitectureViolation]:
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return []
 
+    found = data.get("ai_violations", []) if isinstance(data, dict) else []
     violations = []
 
-    for v_data in data.get("ai_violations", []):
+    for v_data in found if isinstance(found, list) else []:
+        if not isinstance(v_data, dict):
+            continue
+        # Only "error" blocks; anything else the reviewer wrote is a warning,
+        # instead of a finding that neither blocks nor shows.
+        severity = "error" if v_data.get("severity") == "error" else "warning"
         violations.append(
             ArchitectureViolation(
                 type=v_data.get("type", "ai_finding"),
-                severity=v_data.get("severity", "warning"),
+                severity=severity,
                 file=v_data.get("file", ""),
                 line=v_data.get("line"),
                 import_target=v_data.get("import_target", ""),
