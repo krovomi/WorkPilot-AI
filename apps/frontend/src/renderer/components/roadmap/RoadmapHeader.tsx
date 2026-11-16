@@ -58,11 +58,11 @@ export function RoadmapHeader({
 				}
 			/>
 			<div className="wp-chips relative z-[2] px-5 pb-3">
-				<Chip tone="green">{roadmap.status}</Chip>
+				<Chip tone="green">{t(`roadmap:roadmapStatus.${roadmap.status}`, { defaultValue: roadmap.status })}</Chip>
 				{roadmap.targetAudience?.primary && (
 					<Chip tone="muted" dot={false}>
 						<Users className="h-3 w-3" aria-hidden="true" />
-						{t("roadmap:header.target")} : {roadmap.targetAudience.primary}
+						{t("roadmap:header.targetAudience", { audience: roadmap.targetAudience.primary })}
 					</Chip>
 				)}
 				{secondary.length > 0 && (
@@ -85,10 +85,10 @@ export function RoadmapHeader({
 					</Tooltip>
 				)}
 				<Chip tone="muted" dot={false}>
-					{stats.total} {t("roadmap:header.features")}
+					{t("roadmap:header.featureCount", { count: stats.total })}
 				</Chip>
 				<Chip tone="muted" dot={false}>
-					{roadmap.phases.length} {t("roadmap:header.phases")}
+					{t("roadmap:header.phaseCount", { count: roadmap.phases.length })}
 				</Chip>
 				{Object.entries(stats.byPriority).map(([priority, count]) => (
 					<Chip key={priority} tone={ROADMAP_PRIORITY_TONES[priority] ?? "muted"}>
