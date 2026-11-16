@@ -159,6 +159,20 @@ def cleanup_mocked_modules():
             del sys.modules[name]
 
 
+@pytest.fixture(autouse=True)
+def _criteria_reads_the_mocked_progress(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point `qa.criteria` at `mock_is_build_complete`, whoever imported it first.
+
+    The module mocks above only reach `qa.criteria` when this file is the
+    first to import it. In a CI shard another file had already imported it
+    with its own `core.progress` (`test_qa_criteria.py`'s mock answers True),
+    and an unfinished build was reported complete.
+    """
+    monkeypatch.setitem(
+        should_run_qa.__globals__, "is_build_complete", mock_is_build_complete
+    )
+
+
 class TestImplementationPlanIO:
     """Tests for implementation plan loading/saving."""
 
