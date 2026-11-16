@@ -499,6 +499,10 @@ class ReplayRecorder:
                 logger.warning(f"Failed to load {filepath}: {e}")
         return sorted(sessions, key=lambda x: x["start_time"], reverse=True)
 
+    def is_recording(self, session_id: str) -> bool:
+        """Whether ``session_id`` is still being recorded (not yet saved for good)."""
+        return session_id in self._active_sessions
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a saved replay session."""
         filepath = record_file(self._storage_dir, session_id)

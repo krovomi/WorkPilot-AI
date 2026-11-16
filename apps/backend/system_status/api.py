@@ -69,30 +69,9 @@ def get_cost_budget(project_id: str):
         return {"success": False, "error": _safe_error_message(e)}
 
 
-# --- 7.2 Sandbox ---
-@router.get("/api/sandbox/status")
-def get_sandbox_status():
-    try:
-        from security.sandbox import SandboxManager
-
-        mgr = SandboxManager()
-        status = mgr.get_status()
-        return {"success": True, "status": status}
-    except Exception as e:
-        return {"success": False, "error": _safe_error_message(e)}
-
-
-# --- 7.3 Anomaly Detector ---
-@router.get("/api/anomaly/status")
-def get_anomaly_status():
-    try:
-        from security.anomaly_detector import AnomalyDetector
-
-        detector = AnomalyDetector()
-        status = detector.get_status()
-        return {"success": True, "status": status}
-    except Exception as e:
-        return {"success": False, "error": _safe_error_message(e)}
+# --- 7.2 Sandbox, 7.3 Anomaly detection ---
+# No status route: both run inside each agent process (``agents.safety_watch``),
+# and what they saw is on the task (``pause_state.json``, ``agent_safety.json``).
 
 
 # --- 8.1 Scheduler ---

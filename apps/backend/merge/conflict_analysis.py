@@ -72,8 +72,9 @@ def detect_conflicts(
 
     conflicts: list[ConflictRegion] = []
 
-    # Group changes by location
-    location_changes: dict[str, list[tuple[str, SemanticChange]]] = defaultdict(list)
+    # Changes meet when they touch the same thing at the same place: a task
+    # that adds one import does not meet a task that removes another.
+    groups: dict[tuple[str, str], list[tuple[str, SemanticChange]]] = defaultdict(list)
 
     for task_id, analysis in task_analyses.items():
         debug_detailed(
@@ -83,14 +84,16 @@ def detect_conflicts(
             file=analysis.file_path,
         )
         for change in analysis.changes:
-            location_changes[change.location].append((task_id, change))
+            groups[(change.location, change.target)].append((task_id, change))
 
-    debug_detailed(MODULE, f"Grouped changes into {len(location_changes)} locations")
+    debug_detailed(MODULE, f"Grouped changes into {len(groups)} targets")
 
-    # Analyze each location for conflicts
-    for location, task_changes in location_changes.items():
-        if len(task_changes) <= 1:
-            continue  # No conflict at this location
+    file_path = next(iter(task_analyses.values())).file_path
+    for (location, _target), task_changes in groups.items():
+        # One task moving its own line (a removal and an addition of the same
+        # import) is not a conflict: a conflict takes two tasks.
+        if len({task_id for task_id, _ in task_changes}) <= 1:
+            continue
 
         debug_verbose(
             MODULE,
@@ -98,7 +101,6 @@ def detect_conflicts(
             task_changes_count=len(task_changes),
         )
 
-        file_path = next(iter(task_analyses.values())).file_path
         conflict = analyze_location_conflict(
             file_path, location, task_changes, rule_index
         )
@@ -111,12 +113,6 @@ def detect_conflicts(
                 tasks=conflict.tasks_involved,
             )
             conflicts.append(conflict)
-
-    # Also check for implicit conflicts (e.g., changes to related code)
-    implicit_conflicts = detect_implicit_conflicts(task_analyses)
-    if implicit_conflicts:
-        debug_detailed(MODULE, f"Found {len(implicit_conflicts)} implicit conflicts")
-    conflicts.extend(implicit_conflicts)
 
     return conflicts
 
@@ -139,24 +135,20 @@ def analyze_location_conflict(
     Returns:
         ConflictRegion if conflicts exist, None otherwise
     """
-    tasks = [tc[0] for tc in task_changes]
+    tasks = list(dict.fromkeys(tc[0] for tc in task_changes))
     changes = [tc[1] for tc in task_changes]
     change_types = [c.change_type for c in changes]
 
-    # Check if all changes target the same thing
-    targets = {c.target for c in changes}
-    if len(targets) > 1:
-        # Different targets at same location - likely compatible
-        # (e.g., adding two different functions)
-        return None
-
-    # Check pairwise compatibility
+    # Check pairwise compatibility, between changes of different tasks
     all_compatible = True
     final_strategy: MergeStrategy | None = None
     reasons = []
 
-    for i, (type_a, change_a) in enumerate(zip(change_types, changes)):
-        for type_b, change_b in zip(change_types[i + 1 :], changes[i + 1 :]):
+    for i, (task_a, change_a) in enumerate(task_changes):
+        for task_b, change_b in task_changes[i + 1 :]:
+            if task_a == task_b:
+                continue
+            type_a, type_b = change_a.change_type, change_b.change_type
             rule = rule_index.get((type_a, type_b))
 
             if rule:
@@ -249,59 +241,3 @@ def ranges_overlap(ranges: list[tuple[int, int]]) -> bool:
         if sorted_ranges[i][1] >= sorted_ranges[i + 1][0]:
             return True
     return False
-
-
-def detect_implicit_conflicts(
-    task_analyses: dict[str, FileAnalysis],
-) -> list[ConflictRegion]:
-    """
-    Detect implicit conflicts not caught by location analysis.
-
-    This includes conflicts like:
-    - Function rename + function call changes
-    - Import removal + usage
-    - Variable rename + references
-
-    Args:
-        task_analyses: Map of task_id -> FileAnalysis
-
-    Returns:
-        List of implicit conflict regions
-
-    Note:
-        Only a subset of semantic conflict detection is implemented here.
-        The main location-based detection (see ``conflict_analysis_location``)
-        already handles the common cases; the patterns below are reserved
-        slots for future additions — they intentionally return no conflicts
-        rather than pretending to check them.
-    """
-    conflicts: list = []
-
-    # Reserved for: function rename in task A + call to the old name in task B.
-    # Reserved for: import removal in task A + usage of that import in task B.
-
-    return conflicts
-
-
-def analyze_compatibility(
-    change_a: SemanticChange,
-    change_b: SemanticChange,
-    rule_index: dict[tuple[ChangeType, ChangeType], CompatibilityRule],
-) -> tuple[bool, MergeStrategy | None, str]:
-    """
-    Analyze compatibility between two specific changes.
-
-    Args:
-        change_a: First semantic change
-        change_b: Second semantic change
-        rule_index: Indexed compatibility rules
-
-    Returns:
-        Tuple of (compatible, strategy, reason)
-    """
-    rule = rule_index.get((change_a.change_type, change_b.change_type))
-
-    if rule:
-        return (rule.compatible, rule.strategy, rule.reason)
-    else:
-        return (False, MergeStrategy.AI_REQUIRED, "No compatibility rule defined")
