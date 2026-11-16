@@ -1,7 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { quotePowerShellSingle } from "../shared/utils/powershell-quote";
 import { isUnix, isWindows } from "./platform";
+
+export { quotePowerShellSingle };
 
 export const MSBUILD_ENV = "WORKPILOT_MSBUILD_PATH";
 
@@ -42,10 +45,6 @@ export interface MsBuildInvocation {
 
 export interface MsBuildSearchOptions {
 	allowDotnetMsBuild?: boolean;
-}
-
-export function quotePowerShellSingle(value: string): string {
-	return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function findCommandInPath(command: string): string | null {
