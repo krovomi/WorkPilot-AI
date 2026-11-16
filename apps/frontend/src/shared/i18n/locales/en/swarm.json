@@ -9,21 +9,16 @@
 	"analyzing": "Analyzing dependencies...",
 	"executing": "Executing swarm...",
 
-	"infoBanner": "Swarm Mode uses your active AI profile. It works with any LLM provider configured in your account settings (Anthropic, OpenAI, z.ai, etc.).",
+	"infoBanner": "Every task you start then builds the subtasks its plan lets run side by side at the same time, each in its own worktree, and merges them into the task's branch after each wave. A subtask whose merge conflicts is left to the task's coder, who builds it afterwards. Works with any LLM provider configured in your account settings.",
+	"saveFailed": "The swarm setting could not be saved.",
 
 	"config": {
 		"title": "Swarm Configuration",
 		"maxParallel": "Max Parallel Agents",
 		"maxParallelDesc": "Maximum number of agents running simultaneously per wave",
 		"failFast": "Fail Fast",
-		"failFastDesc": "Stop the entire swarm on the first subtask failure",
-		"maxRetries": "Max Retries Per Subtask",
-		"mergeAfterWave": "Merge After Each Wave",
-		"mergeAfterWaveDesc": "Semantically merge results between waves",
-		"aiMerge": "AI-Assisted Merge",
-		"aiMergeDesc": "Use AI to resolve ambiguous merge conflicts",
-		"dryRun": "Dry Run",
-		"dryRunDesc": "Analyze and execute without writing merged files"
+		"failFastDesc": "Stop the swarm at the first wave where a subtask fails; the task's coder then builds the rest one subtask after the other",
+		"maxRetries": "Max Retries Per Subtask"
 	},
 
 	"analysis": {
