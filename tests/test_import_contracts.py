@@ -139,6 +139,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
     "security": {"injection_guard", "project", "rtk"},
+    # The evidence that ranks a security scan (docs/architecture/
+    # security-priority.md): the scanner's types, and the APM inbox parser of
+    # Regression Guardian. The QA loop hands it to the scanner, which never
+    # imports it back.
+    "security_reach": {"regression_guardian", "security"},
     # Server mode is mounted by provider_api; it reaches nothing back.
     "server": set(),
     # Model and provider per phase: the catalogue, the provider chosen in the
@@ -206,8 +211,15 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # Test generation, the generator included; its model call goes through
     # the agent_runtime port.
     "test_generation": {"agent_runtime", "foundation", "project"},
-    # The QA loop's architecture gate; its reviewer's prompt is built here.
-    "architecture": {"agent_runtime", "foundation", "phase_config", "task_logger"},
+    # The QA loop's architecture gate; its reviewer's prompt is built here,
+    # with the project's rules quoted as data (security.untrusted, rule S2).
+    "architecture": {
+        "agent_runtime",
+        "foundation",
+        "phase_config",
+        "security",
+        "task_logger",
+    },
     # Out of the agents' cycle since A1's third step. The archify map builds its
     # own prompts; its workflow phase lives in workflows/architecture_map_phase.py.
     "architecture_visualizer": {"foundation"},

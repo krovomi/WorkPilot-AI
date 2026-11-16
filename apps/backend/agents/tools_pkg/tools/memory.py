@@ -14,15 +14,7 @@ connected to the brain.
 from pathlib import Path
 from typing import Any
 
-try:
-    from claude_agent_sdk import ToolAnnotations, tool
-
-    SDK_TOOLS_AVAILABLE = True
-except ImportError:
-    SDK_TOOLS_AVAILABLE = False
-    tool = None
-    ToolAnnotations = None  # type: ignore[assignment,misc]
-
+from claude_agent_sdk import ToolAnnotations, tool
 from memory.store import get_project_memory
 
 _OFF = "Memory is turned off (BRAIN_ENABLED=false): nothing was recorded."
@@ -43,9 +35,6 @@ def create_memory_tools(spec_dir: Path, project_dir: Path) -> list:
     Returns:
         List of memory tool functions
     """
-    if not SDK_TOOLS_AVAILABLE:
-        return []
-
     tools = []
 
     # -------------------------------------------------------------------------

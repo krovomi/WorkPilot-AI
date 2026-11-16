@@ -14,6 +14,7 @@ import {
 import i18n from "../../../shared/i18n";
 import type { Project } from "../../../shared/types";
 import { useKanbanFilterStore } from "../../stores/kanban-filter-store";
+import { useMultiRepoStore } from "../../stores/multi-repo-store";
 import { useProjectStore } from "../../stores/project-store";
 import { TooltipProvider } from "../ui/tooltip";
 import { KanbanToolbar } from "./KanbanToolbar";
@@ -216,5 +217,36 @@ describe("local and server boards", () => {
 		});
 		renderToolbar();
 		expect(screen.queryByRole("textbox", { name: /Quick command/ })).toBeNull();
+		expect(screen.queryByRole("button", { name: "More board actions" })).toBeNull();
+	});
+
+	it("a local board keeps its occasional actions in the more menu", async () => {
+		renderToolbar();
+		expect(screen.queryByRole("button", { name: /Multi-repo/ })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "More board actions" }));
+		const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
+		expect(items).toEqual([
+			expect.stringContaining("Multi-repo"),
+			expect.stringContaining("Purge"),
+		]);
+	});
+
+	it("the more menu opens the multi-repo dialog for the board's project", async () => {
+		useMultiRepoStore.setState({ isDialogOpen: false });
+		renderToolbar();
+		await userEvent.click(screen.getByRole("button", { name: "More board actions" }));
+		await userEvent.click(screen.getByRole("menuitem", { name: /Multi-repo/ }));
+		expect(useMultiRepoStore.getState()).toMatchObject({ isDialogOpen: true, projectId: "p1" });
+		useMultiRepoStore.setState({ isDialogOpen: false });
+	});
+
+	it("the more menu opens the purge, which lists the board's worktrees and closes", async () => {
+		renderToolbar();
+		await userEvent.click(screen.getByRole("button", { name: "More board actions" }));
+		await userEvent.click(screen.getByRole("menuitem", { name: /Purge/ }));
+		expect(await screen.findByRole("dialog", { name: "Purge finished worktrees" })).toBeInTheDocument();
+		expect(api.fn("listPurgeableWorktrees")).toHaveBeenCalledWith("p1");
+		await userEvent.keyboard("{Escape}");
+		expect(screen.queryByRole("dialog", { name: "Purge finished worktrees" })).toBeNull();
 	});
 });
