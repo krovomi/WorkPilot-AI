@@ -369,3 +369,91 @@ def test_strict_offline_makes_no_figma_export(
     assert _line(capsys.readouterr().out, ERROR) == STRICT_OFFLINE_REFUSAL
     assert figma["sent"] == []
     assert model["vision"] == []
+def test_the_render_loop_refines_the_files_and_reports_each_iteration(
+    runner, model, tmp_path, monkeypatch, capsys
+) -> None:
+    seen: dict = {}
+
+    async def fake_loop(service, result, *, image_data, framework, config, on_progress):
+        seen.update(image=image_data, framework=framework, config=config)
+        on_progress({"stage": "correct", "iteration": 1, "max_iterations": 3})
+        result.generated_files[0].content = "corrected\n"
+        return {"status": "converged", "iterations": []}
+
+    monkeypatch.setattr(
+        "services.design_to_code_render_loop.run_render_loop", fake_loop
+    )
+    code = _main(
+        runner,
+        monkeypatch,
+        "--project-dir",
+        str(tmp_path),
+        "--image-data",
+        "data:image/png;base64,AAAA",
+        "--no-write",
+        "--render-loop",
+        "--loop-max-iterations",
+        "3",
+        "--loop-threshold",
+        "0.9",
+        "--loop-budget-seconds",
+        "120",
+    )
+    out = capsys.readouterr().out
+    result = _line(out, RESULT)
+    assert code == 0 and result["render_loop"] == {
+        "status": "converged",
+        "iterations": [],
+    }
+    assert result["generated_files"][0]["content"] == "corrected\n"
+    assert (seen["config"].max_iterations, seen["config"].threshold) == (3, 0.9)
+    assert seen["config"].budget_seconds == 120 and seen["framework"] == "react"
+    loop_lines = [
+        json.loads(line[len(PHASE) :])
+        for line in out.splitlines()
+        if line.startswith(PHASE) and '"render_loop"' in line
+    ]
+    assert loop_lines == [
+        {
+            "phase": "render_loop",
+            "status": "",
+            "detail": {
+                "loop": {"stage": "correct", "iteration": 1, "max_iterations": 3}
+            },
+        }
+    ]
+
+
+def test_without_the_flag_no_loop_runs(
+    runner, model, tmp_path, monkeypatch, capsys
+) -> None:
+    async def fail(*args, **kwargs):
+        raise AssertionError("the loop must not run")
+
+    monkeypatch.setattr("services.design_to_code_render_loop.run_render_loop", fail)
+    code = _main(
+        runner,
+        monkeypatch,
+        "--project-dir",
+        str(tmp_path),
+        "--image-data",
+        "data:image/png;base64,AAAA",
+        "--no-write",
+    )
+    assert code == 0 and "render_loop" not in _line(capsys.readouterr().out, RESULT)
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--loop-max-iterations", "0"),
+        ("--loop-max-iterations", "11"),
+        ("--loop-threshold", "1.5"),
+        ("--loop-budget-seconds", "5"),
+    ],
+)
+def test_loop_bounds_are_refused_outside_their_range(
+    runner, tmp_path, monkeypatch, capsys, flag, value
+) -> None:
+    code = _main(runner, monkeypatch, "--project-dir", str(tmp_path), flag, value)
+    assert code == 2 and "expected" in capsys.readouterr().err
