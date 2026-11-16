@@ -109,13 +109,11 @@ class Forge:
 
 
 @pytest.fixture
-def forge(temp_git_repo, tmp_path, monkeypatch):
+def forge(isolated_repo, tmp_path, monkeypatch):
     # No global or system git configuration (credential helpers, hooks) and
     # never a prompt: the test's repository is all git sees.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-gitconfig"))
     monkeypatch.setenv("GIT_TERMINAL_PROMPT", "0")
     monkeypatch.delenv("GIT_ASKPASS", raising=False)
     monkeypatch.delenv("SSH_ASKPASS", raising=False)
@@ -126,10 +124,10 @@ def forge(temp_git_repo, tmp_path, monkeypatch):
 
     bare = tmp_path / "origin.git"
     git(tmp_path, "init", "--bare", "-b", "main", str(bare))
-    git(temp_git_repo, "remote", "add", "origin", GITHUB_URL)
-    git(temp_git_repo, "config", "remote.origin.pushurl", str(bare))
-    git(temp_git_repo, "push", "origin", "main")
-    git(temp_git_repo, "update-ref", "refs/remotes/origin/main", "main")
+    git(isolated_repo, "remote", "add", "origin", GITHUB_URL)
+    git(isolated_repo, "config", "remote.origin.pushurl", str(bare))
+    git(isolated_repo, "push", "origin", "main")
+    git(isolated_repo, "update-ref", "refs/remotes/origin/main", "main")
 
     sleeps: list[float] = []
     # The retry backoff only: `subprocess` polls with the real `time.sleep`.
@@ -149,7 +147,7 @@ def forge(temp_git_repo, tmp_path, monkeypatch):
         "run_impact_analyzer_sync",
         no_model_impact,
     )
-    f = Forge(temp_git_repo, bare, tmp_path, monkeypatch)
+    f = Forge(isolated_repo, bare, tmp_path, monkeypatch)
     f.sleeps = sleeps
     f.impact_calls = impact_calls
     return f
