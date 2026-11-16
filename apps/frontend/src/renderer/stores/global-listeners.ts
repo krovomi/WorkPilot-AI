@@ -12,6 +12,7 @@ import {
 	setupArchitectureVisualizerListeners,
 } from "./architecture-visualizer-store";
 import { setupBenchListeners } from "./bench-store";
+import { setupBrowserRecorderListeners } from "./browser-recorder-store";
 import { setupCarbonProfilerListeners } from "./carbon-profiler-store";
 import { setupCodeMigrationListeners } from "./code-migration-store";
 import { setupCodePlaygroundListeners } from "./code-playground-store";
@@ -96,6 +97,8 @@ const SETUPS: ReadonlyArray<readonly [string, ListenerSetup]> = [
 	// Cards an automation rule created appear on the board without a reload.
 	["Automations", setupAutomationsListeners],
 	["Bench", setupBenchListeners],
+	// A recording's steps arrive while the Browser Agent page may be closed.
+	["BrowserRecorder", setupBrowserRecorderListeners],
 	["CarbonProfiler", setupCarbonProfilerListeners],
 	["CodeMigration", setupCodeMigrationListeners],
 	["CodePlayground", setupCodePlaygroundListeners],
