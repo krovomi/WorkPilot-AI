@@ -518,7 +518,7 @@
 		"done": "Terminé",
 		"title": "Personnalisez votre menu",
 		"hint": "Glissez une page par sa poignée jusqu'à sa nouvelle place, ou sur un espace du rail pour l'y déplacer. Les flèches font de même au clavier. Seul votre menu change.",
-		"spacePlace": "Place de « {{name}} » dans le rail",
+		"spacePlace": "Sa place dans le rail",
 		"spaceUp": "Monter l'espace {{name}}",
 		"spaceDown": "Descendre l'espace {{name}}",
 		"resetOrder": "Rétablir l'ordre d'origine",

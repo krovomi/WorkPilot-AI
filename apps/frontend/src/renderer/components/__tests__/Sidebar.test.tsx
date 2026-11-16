@@ -470,8 +470,10 @@ describe("a menu arranged by each person", () => {
 		expect(shownPages()[0]).toBe(first);
 		expect(screen.getByRole("button", { name: "Restore the original order" })).toBeDisabled();
 
+		expect(screen.queryByTestId("customize-menu")).toBeNull();
 		await userEvent.click(within(screen.getByTestId("customize-bar")).getByRole("button", { name: "Done" }));
 		expect(screen.queryByTestId("customize-bar")).toBeNull();
+		expect(screen.getByTestId("customize-menu")).toBeInTheDocument();
 	});
 
 	it("customizing « Mon menu » moves the user's own pins, not a pinned group's pages", async () => {

@@ -83,7 +83,7 @@ import {
 	moveItemToGroup,
 	movePinBy,
 } from "./sidebar/menu-layout";
-import { CustomizeBar, CustomizeMenuToggle, RowMoveControls } from "./sidebar/MenuCustomizer";
+import { CustomizeBar, CustomizeMenuButton, RowMoveControls } from "./sidebar/MenuCustomizer";
 import { useMenuDnd } from "./sidebar/use-menu-dnd";
 import { ActivityBadge } from "./sidebar/ActivityBadge";
 import { NavIcon, navLabelTitle } from "./sidebar/ExperimentalMarker";
@@ -1093,10 +1093,7 @@ export function Sidebar({
 									)}
 									<div className="mt-4 space-y-1">
 										<HiddenList hidden={hiddenHere} onShow={unhideItem} />
-										<CustomizeMenuToggle
-											customizing={customizing}
-											onToggle={() => setCustomizing((value) => !value)}
-										/>
+										{!customizing && <CustomizeMenuButton onStart={() => setCustomizing(true)} />}
 										{layoutChanged && (
 											<button
 												type="button"

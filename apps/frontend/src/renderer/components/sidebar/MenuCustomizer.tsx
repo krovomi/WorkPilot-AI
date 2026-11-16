@@ -22,25 +22,13 @@ import {
 const FOOTER_BUTTON =
 	"w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors";
 
-/** The panel's entry into the customizing, and its way out. */
-export function CustomizeMenuToggle({
-	customizing,
-	onToggle,
-}: {
-	readonly customizing: boolean;
-	readonly onToggle: () => void;
-}) {
+/** The panel's entry into the customizing; the bar above the pages is the way out. */
+export function CustomizeMenuButton({ onStart }: { readonly onStart: () => void }) {
 	const { t } = useTranslation("navigation");
 	return (
-		<button
-			type="button"
-			onClick={onToggle}
-			aria-pressed={customizing}
-			data-testid="customize-menu"
-			className={FOOTER_BUTTON}
-		>
+		<button type="button" onClick={onStart} data-testid="customize-menu" className={FOOTER_BUTTON}>
 			<SlidersHorizontal className="h-3 w-3" />
-			{customizing ? t("customize.done") : t("customize.start")}
+			{t("customize.start")}
 		</button>
 	);
 }
@@ -77,7 +65,7 @@ export function CustomizeBar({
 			<p className="mt-1">{t("customize.hint")}</p>
 			{spaceName && (
 				<div className="mt-2 flex items-center gap-1">
-					<span className="min-w-0 flex-1 truncate">{t("customize.spacePlace", { name: spaceName })}</span>
+					<span className="min-w-0 flex-1 truncate">{t("customize.spacePlace")}</span>
 					<IconButton
 						label={t("customize.spaceUp", { name: spaceName })}
 						disabled={!canMoveSpaceUp}
