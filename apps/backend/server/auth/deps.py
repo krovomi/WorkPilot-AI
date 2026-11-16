@@ -56,6 +56,9 @@ async def require_admin(
     return user
 
 
+#: What any project route takes from the organization, whatever the project role.
+PROJECT_READ_PERMISSION = "task.read"
+
 # Project-role hierarchy for membership checks.
 _PROJECT_ROLE_RANK = {
     ProjectRole.VIEWER.value: 0,
@@ -151,6 +154,15 @@ def require_project_role(minimum: str = ProjectRole.VIEWER.value):
                 # not a member.
                 raise HTTPException(status_code=404, detail="Project not found")
         request.state.project_role = role
+        # A role on the project opens it within what the organization grants:
+        # reading its tasks is the least of it, as for the shared features.
+        from server.authz.principal import get_principal
+
+        if not get_principal(request).has(PROJECT_READ_PERMISSION):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Missing permission: {PROJECT_READ_PERMISSION}",
+            )
         if _PROJECT_ROLE_RANK.get(role, -1) < _PROJECT_ROLE_RANK[minimum]:
             raise HTTPException(
                 status_code=403, detail=f"Requires project role '{minimum}' or higher"

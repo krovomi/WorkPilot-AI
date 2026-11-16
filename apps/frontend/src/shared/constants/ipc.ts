@@ -72,6 +72,8 @@ export const IPC_CHANNELS = {
 	TASK_SANDBOX_LIST: "task:sandboxList", // The sandbox statuses main holds, for a reloaded renderer
 	TASK_GOAL_GET: "task:goalGet", // The task's goal (goal mode), read from <spec>/.workpilot-goal.json
 	TASK_GOAL_SET: "task:goalSet", // Write or remove the goal in every spec dir copy; agents cannot write that file
+	TASK_SNAPSHOTS_LIST: "task:snapshotsList", // The git snapshots of a task's worktree taken before each agent session (runners/snapshot_runner.py)
+	TASK_SNAPSHOT_RESTORE: "task:snapshotRestore", // Put the task's worktree back on one snapshot; refused while an agent runs on it
 	TASK_LESSONS_GET: "task:lessonsGet", // The lessons the task's prompts carried, from every spec dir copy
 	TASK_LESSONS_SET_DISABLED: "task:lessonsSetDisabled", // Turn one lesson off (or back on) for this task, in every spec dir copy
 	TASK_CONTEXT_USAGE: "task:contextUsage", // Event (main -> renderer): CONTEXT_USAGE / CONTEXT_ACTION_APPLIED task events, forwarded untouched
@@ -946,6 +948,10 @@ export const IPC_CHANNELS = {
 	REPLAY_COMPARE: "replay:compare",
 	REPLAY_ADD_BREAKPOINT: "replay:addBreakpoint",
 	REPLAY_REMOVE_BREAKPOINT: "replay:removeBreakpoint",
+	REPLAY_EXPORT_SESSION: "replay:exportSession",
+	REPLAY_IMPORT_SESSION: "replay:importSession",
+	REPLAY_ADD_BOOKMARK: "replay:addBookmark",
+	REPLAY_REMOVE_BOOKMARK: "replay:removeBookmark",
 	// Session History — the same records, as history cards
 	SESSION_HISTORY_LIST: "sessionHistory:list",
 
@@ -1161,6 +1167,7 @@ export const IPC_CHANNELS = {
 	CICD_TRIGGERS_GET_CONFIG: "cicdTriggers:getConfig",
 	CICD_TRIGGERS_GET_RUN_STATUS: "cicdTriggers:getRunStatus",
 	CICD_TRIGGERS_LIST_RUNS: "cicdTriggers:listRuns",
+	CICD_TRIGGERS_ROLLBACK: "cicdTriggers:rollback",
 	CICD_TRIGGERS_SET_CONFIG: "cicdTriggers:setConfig",
 	CICD_TRIGGERS_TRIGGER: "cicdTriggers:trigger",
 	CLAUDE_PROFILE_CREATE_DIR: "claude:profileCreateDir",

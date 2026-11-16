@@ -1,7 +1,7 @@
 ---
 feature: Moteur d'agents comme port
 summary: >-
-  `agent_runtime` : un Protocol que `core` installe à l'import ; merge, intégrations, analyse et
+  `agent_runtime` : un Protocol que `core` installe à l'import ; intégrations, analyse et
   architecture lancent leur session par lui au lieu d'importer `core` ou `agents` ; aucun client
   en plus, chaque appel va à la fabrique de `core`.
 ---
@@ -18,7 +18,9 @@ summary: >-
 seule session utilitaire importait l'un ou l'autre, donc entrait dans le cycle d'imports des
 agents : `core` et `agents` importent la moitié du backend, et la moitié du backend les importait
 en retour. Le résolveur de conflits de `merge`, le client Linear d'`integrations`, l'extracteur
-d'insights d'`analysis` et le relecteur d'`architecture` n'y étaient que pour cela.
+d'insights d'`analysis` et le relecteur d'`architecture` n'y étaient que pour cela. (`merge` n'a
+plus de résolveur : rien ne l'atteignait, et le merge IA d'un fichier, dans `core/workspace.py`,
+demande le provider de l'utilisateur ; `merge` n'importe plus que `foundation`.)
 
 Un import paresseux ne change rien : `tests/test_import_contracts.py` compte chaque `import`, y
 compris dans une fonction, parce qu'il reste une dépendance qui casse à l'exécution au lieu de
@@ -29,8 +31,8 @@ l'import.
 ```
 agent_runtime/            le port : un Protocol, install(), current() ; n'importe rien du backend
 core/agent_runtime.py     l'implémentation, installée quand core est importé (core/__init__.py)
-merge, integrations,      demandent agent_runtime.current() au lieu d'importer core ou agents
-analysis, architecture,
+integrations, analysis,   demandent agent_runtime.current() au lieu d'importer core ou agents
+architecture,
 test_generation
 ```
 
@@ -45,9 +47,8 @@ test_generation
 - **`current()` vaut `None` tant que `core` n'est pas importé.** Tout processus qui lance un
   agent importe `core` avant d'atteindre ces unités ; pour les runners, `tests/test_agent_runtime_port.py`
   le vérifie (le runner du studio de tests ne le faisait pas, F179). Une unité qui reçoit `None` prend le
-  chemin qu'elle avait déjà pour « pas de SDK, pas de jeton » : le résolveur de merge sans IA,
-  l'extraction d'insights désactivée, la revue d'architecture sans violation ajoutée, le client
-  Linear refusé par `ImportError` (que son appelant traitait déjà), le générateur de tests en
+  chemin qu'elle avait déjà pour « pas de SDK, pas de jeton » : l'extraction d'insights
+  désactivée, la revue d'architecture sans violation ajoutée, le client Linear refusé par `ImportError` (que son appelant traitait déjà), le générateur de tests en
   `DetailedError` que le runner transmet à l'UI.
 - **Le prompt du relecteur d'architecture** est construit dans `architecture/ai_reviewer.py`
   (`architecture_reviewer_prompt`), plus dans `prompts_pkg`, que la boucle de QA importe : il
