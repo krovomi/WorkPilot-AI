@@ -25,7 +25,7 @@ function DecisionLine({ event }: { readonly event: PolicyAuditEvent }): React.Re
 	const { t } = useTranslation("settings");
 	return (
 		<li className="flex flex-wrap items-baseline gap-2 text-xs">
-			<Chip tone={DECISION_TONES[event.decision] ?? "muted"}>{t(`governance.decisions.${event.decision}`)}</Chip>
+			<Chip tone={DECISION_TONES[event.decision]}>{t(`governance.decisions.${event.decision}`)}</Chip>
 			{event.rules.length > 0 && <span className="font-mono">{event.rules.join(", ")}</span>}
 			{event.target && (
 				<span className="wp-meta break-all font-mono">
@@ -99,6 +99,7 @@ export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: s
 	const schedule = governance?.schedule ?? null;
 	const budget = governance?.budget ?? null;
 	const events = report?.events ?? [];
+	const tokensLastHour = report?.tokensLastHour ?? 0;
 
 	return (
 		<Section
@@ -171,7 +172,7 @@ export function GovernancePolicyPanel({ projectPath }: { readonly projectPath: s
 							<p className="text-xs">
 								{budget
 									? t("governance.budgetLine", {
-											spent: (report?.tokensLastHour ?? 0).toLocaleString(i18n.language),
+											spent: tokensLastHour.toLocaleString(i18n.language),
 											limit: budget.maxTokensPerHour.toLocaleString(i18n.language),
 										})
 									: t("governance.noBudget")}

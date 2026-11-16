@@ -4,18 +4,24 @@ import type { PolicyPauseDetail, Task } from "../../../shared/types";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
+export type PolicyPause =
+	| { kind: "hours"; hours: string; timezone: string }
+	| { kind: "budget"; spent: number; limit: number };
+
 /** What the policy watch recorded when it paused the task (`agents/policy_watch.py`), or null. */
-export function policyPause(task: Task): PolicyPauseDetail | null {
+export function policyPause(task: Task): PolicyPause | null {
 	const paused = task.metadata?.paused;
 	if (!paused?.enabled || (paused.reason !== "policy_hours" && paused.reason !== "policy_budget")) return null;
-	const detail = paused.policy;
-	if (detail?.reason === "policy_hours" && Array.isArray(detail.allowedHours)) return detail;
+	const detail: PolicyPauseDetail | undefined = paused.policy;
+	if (detail?.reason === "policy_hours" && Array.isArray(detail.allowedHours)) {
+		return { kind: "hours", hours: detail.allowedHours.join(", "), timezone: detail.timezone ?? "" };
+	}
 	if (
 		detail?.reason === "policy_budget" &&
 		typeof detail.tokensLastHour === "number" &&
 		typeof detail.maxTokensPerHour === "number"
 	) {
-		return detail;
+		return { kind: "budget", spent: detail.tokensLastHour, limit: detail.maxTokensPerHour };
 	}
 	return null;
 }
@@ -27,9 +33,9 @@ export function policyPause(task: Task): PolicyPauseDetail | null {
  */
 export function TaskPolicyPause({ task }: { readonly task: Task }) {
 	const { t, i18n } = useTranslation(["tasks"]);
-	const detail = policyPause(task);
-	if (!detail) return null;
-	const hours = detail.reason === "policy_hours";
+	const pause = policyPause(task);
+	if (!pause) return null;
+	const hours = pause.kind === "hours";
 	return (
 		<Popover>
 			<PopoverTrigger asChild>
@@ -40,14 +46,11 @@ export function TaskPolicyPause({ task }: { readonly task: Task }) {
 			</PopoverTrigger>
 			<PopoverContent className="w-80 space-y-3 text-sm">
 				<p>
-					{hours
-						? t("tasks:policyPause.hoursBody", {
-								hours: (detail.allowedHours ?? []).join(", "),
-								timezone: detail.timezone ?? "",
-							})
+					{pause.kind === "hours"
+						? t("tasks:policyPause.hoursBody", { hours: pause.hours, timezone: pause.timezone })
 						: t("tasks:policyPause.budgetBody", {
-								spent: (detail.tokensLastHour ?? 0).toLocaleString(i18n.language),
-								limit: (detail.maxTokensPerHour ?? 0).toLocaleString(i18n.language),
+								spent: pause.spent.toLocaleString(i18n.language),
+								limit: pause.limit.toLocaleString(i18n.language),
 							})}
 				</p>
 				<p className="text-xs text-muted-foreground">{t("tasks:policyPause.hint")}</p>
