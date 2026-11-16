@@ -18,8 +18,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from gh_fake import write_fake_gh  # noqa: E402
+from tests.gh_fake import write_fake_gh
 
 RUNNER = (
     Path(__file__).resolve().parents[3]
@@ -417,3 +416,112 @@ def test_a_gh_that_vanished_is_the_same_as_no_gh(runner, monkeypatch, tmp_path, 
         runner.get_config(_args(tmp_path, token=None, repo=None))
     assert stop.value.code == 1
     assert "Error: No GitHub token found" in capsys.readouterr().out
+
+
+class Unbuffered:
+    """A stdout without `reconfigure`, like a pipe some hosts hand the runner."""
+
+    def __init__(self):
+        self.text = ""
+
+    def write(self, data):
+        self.text += data
+        return len(data)
+
+    def flush(self):
+        pass
+
+
+def test_a_windows_console_is_switched_to_utf8(runner, monkeypatch):
+    import io
+
+    console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    errors = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(runner, "is_windows", lambda: True)
+    monkeypatch.setattr(sys, "stdout", console)
+    monkeypatch.setattr(sys, "stderr", errors)
+    runner.use_utf8_console()
+    assert (console.encoding, errors.encoding) == ("utf-8", "utf-8")
+    assert console.errors == "replace"
+
+
+def test_other_consoles_and_bare_streams_are_left_as_they_are(runner, monkeypatch):
+    import io
+
+    console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", console)
+    monkeypatch.setattr(runner, "is_windows", lambda: False)
+    runner.use_utf8_console()
+    assert console.encoding == "cp1252"
+
+    bare = Unbuffered()
+    monkeypatch.setattr(sys, "stdout", bare)
+    monkeypatch.setattr(sys, "stderr", bare)
+    monkeypatch.setattr(runner, "is_windows", lambda: True)
+    runner.use_utf8_console()  # nothing to reconfigure, nothing raised
+
+
+def test_a_clean_review_on_a_bare_stream_prints_no_findings(
+    runner, models, orchestrator, tmp_path, monkeypatch
+):
+    lines = []
+    monkeypatch.setattr(runner, "safe_print", lambda *a, **k: lines.append(a[0]))
+    monkeypatch.setattr(sys, "stdout", Unbuffered())
+    monkeypatch.setattr(sys, "stderr", Unbuffered())
+    orchestrator.answers["review_pr"] = models.PRReviewResult(
+        pr_number=2, repo="own/repo", success=True, summary="Clean"
+    )
+    assert asyncio.run(runner.cmd_review_pr(_args(tmp_path, pr_number=2))) == 0
+    assert "Findings: 0" in lines
+    assert not any("Findings by severity" in line for line in lines)
+
+    lines.clear()
+    orchestrator.answers["followup_review_pr"] = models.PRReviewResult(
+        pr_number=2, repo="own/repo", success=True, summary="Nothing new"
+    )
+    assert asyncio.run(runner.cmd_followup_review_pr(_args(tmp_path, pr_number=2))) == 0
+    assert not any(
+        line.startswith(("Resolved:", "Still Open:", "New Issues:")) for line in lines
+    )
+    assert not any("Remaining Findings" in line for line in lines)
+
+
+def test_an_auto_fix_without_spec_pr_or_error_prints_only_its_status(
+    runner, models, orchestrator, tmp_path, capsys
+):
+    orchestrator.answers["auto_fix_issue"] = models.AutoFixState(
+        issue_number=8, issue_url="u", repo="own/repo"
+    )
+    assert asyncio.run(runner.cmd_auto_fix(_args(tmp_path, issue_number=8))) == 0
+    out = capsys.readouterr().out
+    assert "Status: pending" in out
+    assert "Spec ID" not in out and "PR: #" not in out and "Error:" not in out
+
+
+def test_a_batch_without_a_spec_yet_and_a_bare_preview(
+    runner, models, batches, orchestrator, tmp_path, capsys
+):
+    orchestrator.answers["batch_and_fix_issues"] = [_batch(batches, models)]
+    asyncio.run(runner.cmd_batch_issues(_args(tmp_path, issues=[1, 2])))
+    assert "Spec:" not in capsys.readouterr().out
+
+    orchestrator.answers["analyze_issues_preview"] = {
+        "success": True,
+        "proposed_batches": [],
+    }
+    assert asyncio.run(runner.cmd_analyze_preview(_args(tmp_path, issues=[]))) == 0
+    out = capsys.readouterr().out
+    assert "Proposed batches: 0" in out
+    assert "Proposed Batches (for human review)" not in out
+    assert "JSON Output" not in out
+
+
+def test_approving_batches_that_create_nothing(runner, orchestrator, tmp_path, capsys):
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(PREVIEW["proposed_batches"]), encoding="utf-8")
+    orchestrator.answers["approve_and_execute_batches"] = []
+    assert (
+        asyncio.run(runner.cmd_approve_batches(_args(tmp_path, batch_file=approved)))
+        == 0
+    )
+    assert "Created 0 batches" in capsys.readouterr().out

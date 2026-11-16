@@ -9,6 +9,11 @@ The fake is a small Python program, launched by a shebang script on POSIX and
 by a `.cmd` file on Windows (no `#!` there, see `rtk_fake.py`). Its answers are
 a JSON file: the longest key that prefixes the joined arguments wins.
 
+It runs isolated (`-I -S`): no site hooks, so a suite measured with coverage
+(`patch = subprocess` loads coverage in every child through a `.pth`) does not
+make the fake print coverage's warnings on its stderr, which the runners
+relay as gh's own error text.
+
     gh = write_fake_gh(tmp_path, {"auth token": {"stdout": "t0k"},
                                   "issue list": {"stdout": "[]"}})
     env["GITHUB_CLI_PATH"] = str(gh.path)
@@ -78,11 +83,12 @@ def write_fake_gh(directory: Path, answers: dict[str, dict]) -> FakeGh:
     fake.answer(answers)
     if os.name == "nt":
         fake.path.write_text(
-            f'@"{sys.executable}" "{program}" %*\r\n', encoding="utf-8"
+            f'@"{sys.executable}" -I -S "{program}" %*\r\n', encoding="utf-8"
         )
     else:
         fake.path.write_text(
-            f'#!/bin/sh\nexec "{sys.executable}" "{program}" "$@"\n', encoding="utf-8"
+            f'#!/bin/sh\nexec "{sys.executable}" -I -S "{program}" "$@"\n',
+            encoding="utf-8",
         )
         fake.path.chmod(fake.path.stat().st_mode | stat.S_IEXEC)
     return fake
