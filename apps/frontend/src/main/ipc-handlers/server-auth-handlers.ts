@@ -40,7 +40,7 @@ import {
 	listServerSecrets,
 	setServerSecret,
 } from "../server-user-secrets";
-import { pullServerUiPreferences } from "../server-ui-preferences";
+import { pullServerInterface } from "../server-menu-layout";
 import {
 	deleteServerNeedsYouChannel,
 	getServerNeedsYou,
@@ -280,9 +280,7 @@ export function registerServerAuthHandlers(
 		deleteServerSecret(kind),
 	);
 	// No argument from the renderer: main reads the server and the settings file.
-	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES, () =>
-		pullServerUiPreferences().catch(() => null),
-	);
+	ipcMain.handle(IPC_CHANNELS.SERVER_AUTH_PULL_UI_PREFERENCES, () => pullServerInterface());
 
 	ipcMain.handle(IPC_CHANNELS.SERVER_NEEDS_YOU_GET, () => getServerNeedsYou());
 	ipcMain.handle(

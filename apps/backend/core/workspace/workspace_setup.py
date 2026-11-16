@@ -16,7 +16,6 @@ from pathlib import Path
 from core.worktree import WorktreeManager
 from foundation.debug import debug, debug_warning
 from foundation.platform import is_windows
-from merge import FileTimelineTracker
 from security.constants import ALLOWLIST_FILENAME, PROFILE_FILENAME
 from ui import (
     Icons,
@@ -178,6 +177,25 @@ def is_workpilot_repo(project_dir: Path) -> bool:
     except (OSError, ValueError):
         return False
     return isinstance(data, dict) and data.get("name") == "workpilot-ai"
+
+
+def prepare_worktree_dependencies(
+    project_dir: Path, worktree: Path, spec_name: str
+) -> None:
+    """Give a new worktree what it needs to build, as for a task's worktree.
+
+    WorkPilot's own monorepo links its two node_modules (its pre-commit hooks
+    typecheck in the worktree). Any other project gets its recipe:
+    `.workpilot/worktree.toml`, or what its stack implies
+    (`core/workspace/recipe.py`); linking dependencies into a worktree can
+    break the main checkout, so it is never the default elsewhere.
+    """
+    if is_workpilot_repo(project_dir):
+        linked = symlink_node_modules_to_worktree(project_dir, worktree)
+        if linked:
+            print_status(f"Dependencies linked: {', '.join(linked)}", "success")
+    else:
+        _prepare(project_dir, worktree, spec_name)
 
 
 def _prepare(project_dir: Path, worktree: Path, spec_name: str) -> None:
@@ -400,21 +418,7 @@ def setup_workspace(
             f"Environment files copied: {', '.join(copied_env_files)}", "success"
         )
 
-    # WorkPilot's own monorepo links its two node_modules (its pre-commit
-    # hooks typecheck in the worktree). Any other project gets its recipe:
-    # `.workpilot/worktree.toml`, or what its stack implies
-    # (`core/workspace/recipe.py`); linking dependencies into a worktree can
-    # break the main checkout, so it is never the default elsewhere.
-    if is_workpilot_repo(project_dir):
-        symlinked_modules = symlink_node_modules_to_worktree(
-            project_dir, worktree_info.path
-        )
-        if symlinked_modules:
-            print_status(
-                f"Dependencies linked: {', '.join(symlinked_modules)}", "success"
-            )
-    else:
-        _prepare(project_dir, worktree_info.path, spec_name)
+    prepare_worktree_dependencies(project_dir, worktree_info.path, spec_name)
 
     # Copy security configuration files if they exist
     # Note: Unlike env files, security files always overwrite to ensure

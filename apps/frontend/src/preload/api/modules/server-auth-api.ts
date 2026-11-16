@@ -10,7 +10,7 @@ import type {
 	ServerAccessToken,
 	ServerAccessTokenCreated,
 } from "../../../shared/types";
-import type { ColorTheme } from "../../../shared/types/settings";
+import type { ColorTheme, SidebarPrefs } from "../../../shared/types/settings";
 import type {
 	NeedsYouChannelKind,
 	NeedsYouEventKind,
@@ -145,13 +145,18 @@ export interface ServerAuthAPI {
 	logout: () => Promise<ServerAuthState>;
 	restore: () => Promise<ServerAuthState>;
 	onStateChanged: (callback: (state: ServerAuthState) => void) => () => void;
-	/** The person's theme from the server, already kept in the settings; null when none. */
+	/**
+	 * The person's theme and menu layout from the server, already kept in the
+	 * settings; null when the server has neither.
+	 */
 	pullUiPreferences: () => Promise<ServerUiPreferences | null>;
 }
 
 export interface ServerUiPreferences {
-	theme: "light" | "dark" | "system";
-	colorTheme: ColorTheme;
+	theme?: "light" | "dark" | "system";
+	colorTheme?: ColorTheme;
+	/** The sidebar preferences with the layout the person saved on the server. */
+	sidebarPrefs?: SidebarPrefs;
 }
 
 export const createServerAuthAPI = (): ServerAuthAPI => ({

@@ -47,6 +47,7 @@ import { registerMissionControlHandlers } from "./mission-control-handlers";
 import { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 import { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 import { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+import { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 import { registerCarbonProfilerHandlers, startCarbonBudgetSchedule } from "./carbon-profiler-handlers";
 import { registerChangelogHandlers } from "./changelog-handlers";
 import { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -88,7 +89,7 @@ import { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 import { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 import { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 import { registerGithubHandlers } from "./github-handlers";
-import { registerGitlabHandlers } from "./gitlab-handlers";
+import { registerGitlabHandlers } from "./gitlab";
 import { registerGuardrailsHandlers } from "./guardrails-handlers";
 import { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 import { registerIdeationHandlers } from "./ideation-handlers";
@@ -183,6 +184,7 @@ export { registerMissionControlHandlers } from "./mission-control-handlers";
 export { registerConflictWavesHandlers } from "./conflict-waves-handlers";
 export { registerAzureDevOpsHandlers } from "./azure-devops-handlers";
 export { registerBrowserAgentHandlers } from "./browser-agent-handlers";
+export { registerBrowserRecorderHandlers } from "./browser-recorder-handlers";
 export { registerCarbonProfilerHandlers } from "./carbon-profiler-handlers";
 export { registerChangelogHandlers } from "./changelog-handlers";
 export { registerCICDTriggersHandlers } from "./cicd-triggers-handlers";
@@ -220,7 +222,7 @@ export { registerFlakyTestsHandlers } from "./flaky-tests-handlers";
 export { registerGitHubCopilotHandlers } from "./github-copilot-handlers";
 export { registerGitSurgeonHandlers } from "./git-surgeon-handlers";
 export { registerGithubHandlers } from "./github-handlers";
-export { registerGitlabHandlers } from "./gitlab-handlers";
+export { registerGitlabHandlers } from "./gitlab";
 export { registerGuardrailsHandlers } from "./guardrails-handlers";
 export { registerI18nAgentHandlers } from "./i18n-agent-handlers";
 export { registerIdeationHandlers } from "./ideation-handlers";
@@ -381,7 +383,7 @@ export function setupIpcHandlers(
 	registerGithubHandlers(agentManager, getMainWindow);
 
 	// GitLab integration handlers
-	registerGitlabHandlers(agentManager, getMainWindow);
+	registerGitlabHandlers(getMainWindow);
 
 	// Ideation handlers
 	registerIdeationHandlers(agentManager, getMainWindow);
@@ -481,6 +483,8 @@ export function setupIpcHandlers(
 
 	// Browser Agent handlers (built-in browser for testing and visual validation)
 	registerBrowserAgentHandlers();
+	// Its recorder: a session the person drives, exported as a test (#387)
+	registerBrowserRecorderHandlers();
 
 	// Architecture Visualizer handlers
 	registerArchitectureVisualizerHandlers();

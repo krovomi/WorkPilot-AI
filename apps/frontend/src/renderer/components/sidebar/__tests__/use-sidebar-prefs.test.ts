@@ -118,3 +118,45 @@ describe("useSidebarPrefs", () => {
 		});
 	});
 });
+
+describe("arranging the menu", () => {
+	beforeEach(() => {
+		stored = {};
+		saveSettings.mockClear();
+	});
+
+	it("builds each change from the preferences as saved, and saves nothing for null", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() => result.current.arrange(() => ({ groupOrder: ["agents"] })));
+		act(() => result.current.arrange((current) => ({ groupOrder: [...current.groupOrder, "workspace"] })));
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({ groupOrder: ["agents", "workspace"] }),
+		});
+		saveSettings.mockClear();
+		act(() => result.current.arrange(() => null));
+		expect(saveSettings).not.toHaveBeenCalled();
+	});
+
+	it("restores the shipped order and keeps the pins and the hidden pages", () => {
+		const { result } = renderHook(() => useSidebarPrefs());
+		act(() =>
+			result.current.arrange(() => ({
+				groupOrder: ["agents"],
+				itemOrder: { agents: ["kanban"] },
+				itemGroups: { kanban: "agents" },
+				pinnedItems: ["insights"],
+				hiddenItems: ["arena"],
+			})),
+		);
+		act(() => result.current.resetOrder());
+		expect(saveSettings).toHaveBeenLastCalledWith({
+			sidebarPrefs: expect.objectContaining({
+				groupOrder: [],
+				itemOrder: {},
+				itemGroups: {},
+				pinnedItems: ["insights"],
+				hiddenItems: ["arena"],
+			}),
+		});
+	});
+});
