@@ -164,6 +164,9 @@
 		"viewChangelog": "View CHANGELOG.md"
 	},
 	"errors": {
+		"imageInvalidType": "Invalid image type. Allowed: {{types}}",
+		"imageSaveFailed": "Failed to save image",
+		"imageProcessFailed": "Failed to process image",
 		"noTasks": "No completed tasks available",
 		"noTasksSelected": "Please select at least one task",
 		"noCommits": "No commits found",

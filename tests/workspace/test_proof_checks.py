@@ -211,3 +211,52 @@ def test_no_record_is_unknown(tmp_path):
     assert result.held is None and "did not run" in result.detail
     write_proof_record(tmp_path, run_proofs(tmp_path, tmp_path, "t"))
     assert _gate(tmp_path) == []
+
+
+_REJECTED = [PY, "-c", "import sys; print('postcondition might not hold'); sys.exit(4)"]
+
+
+def test_a_rejection_without_a_plan_still_stands(task):
+    project, worktree, spec = task
+    declare(project, _toml(_REJECTED))
+    (spec / "implementation_plan.json").unlink()
+
+    assert proof_gate(spec, worktree, 1) is not None
+    assert (spec / "QA_FIX_REQUEST.md").exists()
+
+
+def test_an_unwritable_fix_request_does_not_lose_the_rejection(task):
+    project, worktree, spec = task
+    declare(project, _toml(_REJECTED))
+    (spec / "QA_FIX_REQUEST.md").mkdir()
+
+    issues, verdict = proof_gate(spec, worktree, 1)
+
+    assert issues and "rejected" in verdict
+
+
+def test_a_record_that_cannot_be_written_skips_the_checks(task):
+    from core.workspace.proofs import PROOF_RECORD
+
+    project, worktree, spec = task
+    declare(project, _toml(_REJECTED))
+    (spec / PROOF_RECORD).mkdir()
+
+    assert proof_gate(spec, worktree, 1) is None
+
+
+def test_the_verdict_goes_to_the_task_log(task):
+    project, worktree, spec = task
+    declare(project, _toml(_REJECTED))
+    logged: list[tuple[str, str]] = []
+
+    class Log:
+        def log(self, message, kind, phase):
+            logged.append((message, kind.value))
+
+    proof_gate(spec, worktree, 1, task_logger=Log())
+    declare(project, _toml(["workpilot-no-such-verifier", "check"]))
+    proof_gate(spec, worktree, 2, task_logger=Log())
+
+    assert [kind for _, kind in logged] == ["error", "warning"]
+    assert "✗" in logged[0][0] and "postcondition might not hold" in logged[0][0]
