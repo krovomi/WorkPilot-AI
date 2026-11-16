@@ -18,7 +18,10 @@ from verify.detect import Target
 from verify.launch import _log_path, launch, probe, read_log
 from verify.state import live_process, load_state, stop_all, work_dir
 
-SERVE = """import http.server, os, sys
+# The apps serve through socketserver.TCPServer, not http.server.HTTPServer:
+# HTTPServer resolves the host's full name between bind and listen, and on a
+# macOS runner that lookup can outlast the launch's whole wait.
+SERVE = """import http.server, os, socketserver, sys
 port = int(sys.argv[1])
 status = int(os.environ.get("ANSWER", "200"))
 class H(http.server.BaseHTTPRequestHandler):
@@ -29,20 +32,20 @@ class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 print("port env", os.environ.get("APP_PORT"), "extra", os.environ.get("EXTRA"), flush=True)
-http.server.HTTPServer(("127.0.0.1", port), H).serve_forever()
+socketserver.TCPServer(("127.0.0.1", port), H).serve_forever()
 """
 
 # Binds a port of its own choosing and says so, the way Vite does when its
 # default port is taken.
-ANNOUNCE = """import http.server
+ANNOUNCE = """import http.server, socketserver
 class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(404)
         self.end_headers()
     def log_message(self, *a):
         pass
-server = http.server.HTTPServer(("127.0.0.1", 0), H)
-print(f"  Local:   http://localhost:{server.server_port}/", flush=True)
+server = socketserver.TCPServer(("127.0.0.1", 0), H)
+print(f"  Local:   http://localhost:{server.server_address[1]}/", flush=True)
 server.serve_forever()
 """
 
