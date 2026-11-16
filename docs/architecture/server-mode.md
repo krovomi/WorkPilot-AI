@@ -149,7 +149,10 @@ du backend. Après chaque écriture, l'index du serveur est relu et un événeme
 
 Une carte peut demander une revue avant le code (`require_review`, vrai par défaut, comme dans
 l'app). Sans revue, la phase `spec` approuve ce qu'elle écrit et enchaîne le build, comme dans
-l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Le serveur ne
+l'app ; avec, elle s'arrête à la spec et le build attend l'approbation d'un membre. Se passer de
+revue revient à approuver, donc demande `review.approve` : une carte créée sans ce droit demande
+une revue, et la phase `spec` n'enchaîne le build que si la personne qui la lance a ce droit
+(`may_skip_review` de `run_manager.build_command`) ; sinon elle s'arrête à la spec. Le serveur ne
 passe jamais `--force` : l'approbation est une décision d'une personne, pas un drapeau. Une phase ne lit jamais l'entrée standard : une question qui
 attendrait une réponse bloquerait le run sans fin.
 

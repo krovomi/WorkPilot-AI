@@ -11,7 +11,7 @@ import type { PurgeCandidate } from "../../../shared/types/worktree-purge";
 const { loadTasksMock } = vi.hoisted(() => ({ loadTasksMock: vi.fn() }));
 vi.mock("../../stores/task-store", () => ({ loadTasks: loadTasksMock }));
 
-import { formatBytes, WorktreePurgeButton } from "./WorktreePurgeButton";
+import { formatBytes, WorktreePurgeDialog } from "./WorktreePurgeDialog";
 
 const MB = 1024 * 1024;
 const candidates: PurgeCandidate[] = [
@@ -20,10 +20,12 @@ const candidates: PurgeCandidate[] = [
 	{ taskId: "003", specId: "003", title: "Half done", reason: "done", path: "/p/003", bytes: 50 * MB, dirty: true },
 ];
 const list = vi.fn();
+const onClose = vi.fn();
 const purge = vi.fn();
 
 beforeEach(() => {
 	loadTasksMock.mockReset();
+	onClose.mockReset();
 	list.mockReset().mockResolvedValue({ success: true, data: candidates });
 	purge.mockReset().mockResolvedValue({
 		success: true,
@@ -38,10 +40,9 @@ beforeEach(() => {
 	};
 });
 
-describe("WorktreePurgeButton", () => {
+describe("WorktreePurgeDialog", () => {
 	it("lists the finished worktrees with the room they take, uncommitted ones kept", async () => {
-		render(<WorktreePurgeButton projectId="p1" />);
-		fireEvent.click(screen.getByTestId("worktree-purge-button"));
+		render(<WorktreePurgeDialog projectId="p1" onClose={onClose} />);
 
 		await screen.findByText("Login page");
 		expect(list).toHaveBeenCalledWith("p1");
@@ -53,8 +54,7 @@ describe("WorktreePurgeButton", () => {
 	});
 
 	it("purges the chosen ones and says how much room was freed", async () => {
-		render(<WorktreePurgeButton projectId="p1" />);
-		fireEvent.click(screen.getByTestId("worktree-purge-button"));
+		render(<WorktreePurgeDialog projectId="p1" onClose={onClose} />);
 		await screen.findByText("Login page");
 
 		fireEvent.click(screen.getByRole("checkbox", { name: "Old spike" }));
@@ -66,13 +66,22 @@ describe("WorktreePurgeButton", () => {
 		expect(loadTasksMock).not.toHaveBeenCalled();
 		fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
 		await waitFor(() => expect(loadTasksMock).toHaveBeenCalledWith("p1", { forceRefresh: true }));
+		expect(onClose).toHaveBeenCalledOnce();
 	});
 
 	it("says when there is nothing to purge", async () => {
 		list.mockResolvedValueOnce({ success: true, data: [] });
-		render(<WorktreePurgeButton projectId="p1" />);
-		fireEvent.click(screen.getByTestId("worktree-purge-button"));
+		render(<WorktreePurgeDialog projectId="p1" onClose={onClose} />);
 		expect(await screen.findByText(/No worktree to purge/)).toBeInTheDocument();
+	});
+
+	it("says when the list cannot be read, and closes without reloading the board", async () => {
+		list.mockResolvedValueOnce({ success: false, error: "disk unreadable" });
+		render(<WorktreePurgeDialog projectId="p1" onClose={onClose} />);
+		expect(await screen.findByRole("alert")).toHaveTextContent("disk unreadable");
+		fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+		expect(loadTasksMock).not.toHaveBeenCalled();
 	});
 });
 
