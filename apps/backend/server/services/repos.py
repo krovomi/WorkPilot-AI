@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
+import stat
 from pathlib import Path
 
 from server.config import get_settings
@@ -86,14 +88,43 @@ async def fetch_project(server_path: str) -> None:
     await _run_git(["fetch", "--all", "--prune"], cwd=Path(server_path), timeout=300)
 
 
+def _make_writable_and_retry(function, path: str, _error: BaseException) -> None:
+    # Git writes its objects read-only, and Windows refuses to delete a
+    # read-only file: lift the flag and try once more.
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def remove_tree(path: Path) -> None:
+    """Delete ``path`` and everything under it, a git checkout included.
+
+    A link is removed, not followed. Raises if something still cannot be
+    deleted, so a caller never takes a folder for gone that is still there.
+    """
+    if path.is_symlink():
+        path.unlink()
+        return
+    if not path.exists():
+        return
+    shutil.rmtree(path, onexc=_make_writable_and_retry)
+
+
 def delete_clone(project_id: str) -> None:
     """Delete the clone and the home its runs kept (build memory, caches)."""
     from server.services.run_isolation import project_home
 
-    dest = project_clone_path(project_id)
-    if dest.exists():
-        shutil.rmtree(dest, ignore_errors=True)
-        logger.info("Deleted server clone %s", dest)
-    home = project_home(get_settings().repos_root, project_id)
-    if home.exists():
-        shutil.rmtree(home, ignore_errors=True)
+    # Not `rmtree(ignore_errors=True)`: on Windows that left the whole clone
+    # behind, because git's objects are read-only there. The project's rows
+    # are already gone, so what still cannot be deleted is logged, not raised.
+    for folder in (
+        project_clone_path(project_id),
+        project_home(get_settings().repos_root, project_id),
+    ):
+        if not folder.exists() and not folder.is_symlink():
+            continue
+        try:
+            remove_tree(folder)
+        except OSError as exc:
+            logger.warning("Could not delete %s: %s", folder, exc)
+        else:
+            logger.info("Deleted %s", folder)
