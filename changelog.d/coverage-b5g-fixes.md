@@ -20,3 +20,6 @@ section: 🐛 Corrections
 - **Mémoire partagée** : l'avis d'un modèle sur deux notes en conflit est lu même quand le modèle
   ajoute des accolades après sa réponse, et une entrée de la file d'une autre forme est refusée
   proprement.
+- **Mémoire partagée** : une file de conflits retouchée à la main (un côté qui n'est pas un objet)
+  ne fait plus échouer son affichage ni sa résolution, et une note dont `agents` ou `tasks` est
+  écrit comme un seul texte n'est plus lue lettre par lettre.
