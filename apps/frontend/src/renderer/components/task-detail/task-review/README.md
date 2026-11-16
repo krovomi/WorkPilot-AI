@@ -45,11 +45,12 @@ Full-screen dialog showing detailed merge conflict information:
 - Location, reason, and strategy for each conflict
 - Action buttons to proceed with merge or close
 
-#### `DiffViewDialog.tsx` (90 lines)
-Displays list of changed files:
-- File status (added, modified, deleted, renamed)
-- Color-coded indicators
-- Line addition/deletion counts
+#### `DiffViewDialog.tsx`
+Displays the changed files, as a tree or a flat list:
+- File status (added, modified, deleted, renamed) and line addition/deletion counts
+- One diff open at a time under its row (expand all opens every diff in the flat list)
+- With a worktree: edit a file (a file that cannot be read never opens an empty editor), add a
+  file, and discard the selected files back to the base branch, which asks for a second click
 
 #### `DiscardDialog.tsx` (93 lines)
 Confirmation dialog for discarding workspace changes:
