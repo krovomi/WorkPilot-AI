@@ -30,6 +30,21 @@ from foundation.git_provider import detect_git_provider
 # ============================================================================
 
 
+@pytest.fixture(autouse=True)
+def _impact_block_without_a_model(monkeypatch):
+    """The impact block of a PR body comes from a model call; these tests
+    check the `gh` call, so the analyzer answers its fallback. On a machine
+    where the Claude CLI is found and signed in, the real analyzer started it.
+    """
+    from agents.impact_analyzer import fallback_analysis
+
+    monkeypatch.setattr(
+        WorktreeManager,
+        "_run_impact_analysis",
+        lambda self, spec_name, diff_summary, commit_log: fallback_analysis(),
+    )
+
+
 @pytest.fixture
 def temp_project_dir(tmp_path):
     """Create a temporary project directory with .workpilot structure."""
