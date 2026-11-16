@@ -215,22 +215,25 @@ function isValidProjectPath(projectPath: string): boolean {
 // No limit on terminal worktrees - users can create as many as needed
 
 /**
- * Get the default branch from project settings OR env config
+ * Get the default branch from project settings OR env config. A configured
+ * name that is not a branch name is passed over, as a base branch typed in
+ * the dialog is: it becomes an argument of git.
  */
 function getDefaultBranch(projectPath: string): string {
 	const project = projectStore
 		.getProjects()
 		.find((p) => p.path === projectPath);
-	if (project?.settings?.mainBranch) {
+	const mainBranch = project?.settings?.mainBranch;
+	if (mainBranch && GIT_BRANCH_REGEX.test(mainBranch)) {
 		debugLog(
 			"[TerminalWorktree] Using mainBranch from project settings:",
-			project.settings.mainBranch,
+			mainBranch,
 		);
-		return project.settings.mainBranch;
+		return mainBranch;
 	}
 
 	const vars = readProjectEnvFile(path.join(projectPath, ".workpilot", ".env"));
-	if (vars.DEFAULT_BRANCH) {
+	if (vars.DEFAULT_BRANCH && GIT_BRANCH_REGEX.test(vars.DEFAULT_BRANCH)) {
 		debugLog(
 			"[TerminalWorktree] Using DEFAULT_BRANCH from env config:",
 			vars.DEFAULT_BRANCH,
