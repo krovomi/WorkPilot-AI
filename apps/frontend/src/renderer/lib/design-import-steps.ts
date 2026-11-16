@@ -32,6 +32,8 @@ const PHASE_STEP: Record<string, DesignStep> = {
 	design_token_integration: "tokens",
 	spec_generation: "spec",
 	code_generation: "code",
+	// The render loop refines the code the previous phase wrote (#379).
+	render_loop: "code",
 	visual_test_generation: "tests",
 	figma_sync: "project",
 };

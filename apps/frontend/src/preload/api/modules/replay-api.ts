@@ -6,6 +6,13 @@
  */
 
 import { IPC_CHANNELS } from "../../../shared/constants/ipc";
+import type {
+	ReplayBookmark,
+	ReplayBookmarkRequest,
+	ReplayExportOptions,
+	ReplayFileResult,
+	ReplayImportResult,
+} from "../../../shared/types/replay-share";
 import { invokeIpc } from "./ipc-utils";
 
 /** A backend answer: its JSON body, or why there is none. */
@@ -37,6 +44,21 @@ export interface ReplayAPI {
 		breakpointId: string,
 	) => Promise<ReplayResult<object>>;
 	listSessionHistory: <T>(projectId: string) => Promise<ReplayResult<T>>;
+	/** Masked by the backend, written where the person chooses (#347). */
+	exportReplaySession: (
+		sessionId: string,
+		options: ReplayExportOptions,
+	) => Promise<ReplayFileResult>;
+	/** A `.wpreplay` the person picks, stored as a new session. */
+	importReplaySession: () => Promise<ReplayImportResult>;
+	addReplayBookmark: (
+		sessionId: string,
+		bookmark: ReplayBookmarkRequest,
+	) => Promise<ReplayResult<{ bookmark: ReplayBookmark }>>;
+	removeReplayBookmark: (
+		sessionId: string,
+		bookmarkId: string,
+	) => Promise<ReplayResult<object>>;
 }
 
 export const createReplayAPI = (): ReplayAPI => ({
@@ -55,4 +77,11 @@ export const createReplayAPI = (): ReplayAPI => ({
 		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BREAKPOINT, sessionId, breakpointId),
 	listSessionHistory: (projectId) =>
 		invokeIpc(IPC_CHANNELS.SESSION_HISTORY_LIST, projectId),
+	exportReplaySession: (sessionId, options) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_EXPORT_SESSION, sessionId, options),
+	importReplaySession: () => invokeIpc(IPC_CHANNELS.REPLAY_IMPORT_SESSION),
+	addReplayBookmark: (sessionId, bookmark) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_ADD_BOOKMARK, sessionId, bookmark),
+	removeReplayBookmark: (sessionId, bookmarkId) =>
+		invokeIpc(IPC_CHANNELS.REPLAY_REMOVE_BOOKMARK, sessionId, bookmarkId),
 });

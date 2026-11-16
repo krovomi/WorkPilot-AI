@@ -68,3 +68,98 @@ def test_a_spec_id_that_is_a_path_is_refused(tmp_path):
         json={"project_dir": str(project), "spec_id": "../../etc"},
     ).json()
     assert answer["success"] is False and answer["reason"] == "spec_id"
+
+
+def _client() -> TestClient:
+    client = TestClient(FastAPI())
+    client.app.include_router(router)  # type: ignore[attr-defined]
+    return client
+
+
+def test_the_task_worktree_is_checked_and_its_record_read(tmp_path):
+    project = _project(tmp_path)
+    _git(project, "add", "-A")
+    _git(project, "commit", "-q", "-m", "migration on main")
+    worktree = project / ".workpilot" / "worktrees" / "tasks" / "001-role"
+    _git(project, "worktree", "add", "-q", "-b", "task", str(worktree))
+    (worktree / ".workpilot" / "specs" / "001-role").mkdir(parents=True)
+    (worktree / "db" / "migrate" / "20261110_drop.rb").write_text(
+        "class Drop < ActiveRecord::Migration[7.1]\n"
+        "  def change\n    remove_column :users, :role\n  end\nend\n",
+        encoding="utf-8",
+    )
+    address = {"project_dir": str(project), "spec_id": "001-role"}
+
+    checked = _client().post("/api/schema-guard/check", json=address).json()
+
+    assert checked["success"] is True
+    assert (
+        worktree / ".workpilot" / "specs" / "001-role" / "schema_guard.json"
+    ).exists()
+    assert (
+        _client().get("/api/schema-guard/", params=address).json()["record"]
+        == (checked["record"])
+    )
+
+
+def test_a_spec_outside_a_project_has_no_task_code(tmp_path):
+    loose = tmp_path / "loose-spec"
+    loose.mkdir()
+
+    answer = _client().post("/api/schema-guard/check", json={"spec_dir": str(loose)})
+
+    assert answer.json() == {
+        "success": False,
+        "error": "the spec is not inside a project",
+    }
+    assert _client().get(
+        "/api/schema-guard/", params={"spec_dir": str(loose)}
+    ).json() == {
+        "success": True,
+        "record": None,
+    }
+
+
+def test_a_bad_address_is_refused_on_read(tmp_path):
+    project = _project(tmp_path)
+
+    answer = _client().get(
+        "/api/schema-guard/", params={"project_dir": str(project), "spec_id": "../x"}
+    )
+
+    assert answer.json()["success"] is False
+
+
+def test_a_record_that_cannot_be_written_is_an_internal_error(tmp_path):
+    project = _project(tmp_path)
+    (project / ".workpilot" / "specs" / "001-role" / "schema_guard.json").mkdir()
+
+    answer = _client().post(
+        "/api/schema-guard/check",
+        json={"project_dir": str(project), "spec_id": "001-role"},
+    )
+
+    assert answer.json() == {
+        "success": False,
+        "error": "An internal error has occurred.",
+    }
+
+
+def test_a_record_that_cannot_be_read_is_an_internal_error(tmp_path, monkeypatch):
+    import qa.schema_guard_api as api
+
+    def unreadable(spec_dir):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(api, "load_record", unreadable)
+    project = _project(tmp_path)
+
+    answer = _client().get(
+        "/api/schema-guard/",
+        params={"project_dir": str(project), "spec_id": "001-role"},
+    )
+
+    assert answer.json() == {
+        "success": False,
+        "error": "An internal error has occurred.",
+    }

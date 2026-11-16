@@ -1,180 +1,78 @@
 import { Clock, FileDiff, GitPullRequest, Loader2, User } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import type { NewCommitsCheck } from "../../../../preload/api/modules/github-api";
 import { cn } from "../../../lib/utils";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { ScrollArea } from "../../ui/scroll-area";
-import type {
-	PRData,
-	PRReviewProgress,
-	PRReviewResult,
-} from "../hooks/useGitHubPRs";
+import type { PRData } from "../hooks/useGitHubPRs";
+import {
+	getPRReviewStatus,
+	type PRReviewInfo,
+	type PRReviewStatus,
+} from "../utils/pr-review-status";
 import { formatAppDate } from "@/lib/date-format";
 
 /**
  * Status Flow Dots Component
  * Shows 3-dot progression with status label: ● ● ● Ready to Merge
  *
- * States:
  * - Not started: ○ ○ ○ (gray, no label)
  * - Reviewing: ● ○ ○ Reviewing (amber, animated)
  * - Reviewed (pending post): ● ● ○ Pending Post (blue)
  * - Posted: ● ● ● [Status] (final status color + label)
  */
-interface PRStatusFlowProps {
-	isReviewing: boolean;
-	hasResult: boolean;
-	hasPosted: boolean;
-	hasBlockingFindings: boolean;
-	hasNewCommits: boolean;
-	/** Whether commits happened AFTER findings were posted - for "Ready for Follow-up" status */
-	hasCommitsAfterPosting: boolean;
-	t: (key: string) => string;
-}
+const DOT = "h-2 w-2 rounded-full transition-all duration-300";
+const IDLE = "bg-muted-foreground/30";
+const POSTED = ["bg-warning", "bg-blue-400"] as const;
 
-type FlowState = "not_started" | "reviewing" | "reviewed" | "posted";
-type FinalStatus = "success" | "warning" | "followup";
+const STATUS_FLOW: Record<
+	PRReviewStatus,
+	{ dots: readonly [string, string, string]; label?: string; text?: string }
+> = {
+	not_reviewed: { dots: [IDLE, IDLE, IDLE] },
+	reviewing: {
+		dots: ["bg-warning animate-pulse", IDLE, IDLE],
+		label: "prReview.reviewing",
+		text: "text-warning",
+	},
+	reviewed: {
+		dots: ["bg-warning", "bg-blue-400", IDLE],
+		label: "prReview.pendingPost",
+		text: "text-blue-400",
+	},
+	ready_to_merge: {
+		dots: [...POSTED, "bg-success"],
+		label: "prReview.readyToMerge",
+		text: "text-success",
+	},
+	changes_requested: {
+		dots: [...POSTED, "bg-destructive"],
+		label: "prReview.changesRequested",
+		text: "text-destructive",
+	},
+	ready_for_followup: {
+		dots: [...POSTED, "bg-cyan-400"],
+		label: "prReview.readyForFollowup",
+		text: "text-cyan-400",
+	},
+};
 
-function PRStatusFlow({
-	isReviewing,
-	hasResult,
-	hasPosted,
-	hasBlockingFindings,
-	hasNewCommits,
-	hasCommitsAfterPosting,
-	t,
-}: PRStatusFlowProps) {
-	// Determine flow state - prioritize more advanced states first
-	let flowState: FlowState = "not_started";
-	if (hasPosted) {
-		// Posted is the most advanced state
-		flowState = "posted";
-	} else if (hasResult) {
-		// Has result but not posted yet
-		flowState = "reviewed";
-	} else if (isReviewing) {
-		// Currently reviewing (only if no result yet)
-		flowState = "reviewing";
-	}
-
-	// Determine final status color for posted state
-	let finalStatus: FinalStatus = "success";
-	// Only show "Ready for Follow-up" if there are commits AFTER findings were posted
-	// This prevents showing follow-up status for commits that happened during/before the review
-	// hasNewCommits tells us the commits are different, hasCommitsAfterPosting tells us if they're newer
-	if (hasNewCommits && hasCommitsAfterPosting) {
-		finalStatus = "followup";
-	} else if (hasBlockingFindings) {
-		finalStatus = "warning";
-	}
-
-	// Dot styles based on state
-	const getDotStyle = (dotIndex: 0 | 1 | 2) => {
-		const baseClasses = "h-2 w-2 rounded-full transition-all duration-300";
-
-		// Not started - all gray
-		if (flowState === "not_started") {
-			return cn(baseClasses, "bg-muted-foreground/30");
-		}
-
-		// Reviewing - first dot amber and animated
-		if (flowState === "reviewing") {
-			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-warning animate-pulse");
-			}
-			return cn(baseClasses, "bg-muted-foreground/30");
-		}
-
-		// Reviewed - first two dots filled
-		if (flowState === "reviewed") {
-			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-warning");
-			}
-			if (dotIndex === 1) {
-				return cn(baseClasses, "bg-blue-400");
-			}
-			return cn(baseClasses, "bg-muted-foreground/30");
-		}
-
-		// Posted - all dots filled with final status color
-		if (flowState === "posted") {
-			const statusColors = {
-				success: "bg-success",
-				warning: "bg-destructive",
-				followup: "bg-cyan-400",
-			};
-			// First two dots stay with their process colors
-			if (dotIndex === 0) {
-				return cn(baseClasses, "bg-warning");
-			}
-			if (dotIndex === 1) {
-				return cn(baseClasses, "bg-blue-400");
-			}
-			// Third dot shows final status
-			return cn(baseClasses, statusColors[finalStatus]);
-		}
-
-		return cn(baseClasses, "bg-muted-foreground/30");
-	};
-
-	// Get status label and styling
-	const getStatusDisplay = (): { label: string; textColor: string } | null => {
-		if (flowState === "not_started") {
-			return null; // No label for not started
-		}
-		if (flowState === "reviewing") {
-			return { label: t("prReview.reviewing"), textColor: "text-warning" };
-		}
-		if (flowState === "reviewed") {
-			return { label: t("prReview.pendingPost"), textColor: "text-blue-400" };
-		}
-		if (flowState === "posted") {
-			const statusConfig = {
-				success: {
-					label: t("prReview.readyToMerge"),
-					textColor: "text-success",
-				},
-				warning: {
-					label: t("prReview.changesRequested"),
-					textColor: "text-destructive",
-				},
-				followup: {
-					label: t("prReview.readyForFollowup"),
-					textColor: "text-cyan-400",
-				},
-			};
-			return statusConfig[finalStatus];
-		}
-		return null;
-	};
-
-	const statusDisplay = getStatusDisplay();
-
+function PRStatusFlow({ status }: { readonly status: PRReviewStatus }) {
+	const { t } = useTranslation("common");
+	const { dots, label, text } = STATUS_FLOW[status];
 	return (
 		<div className="flex items-center gap-1.5">
-			{/* Dots */}
 			<div className="flex items-center gap-1">
-				<div className={getDotStyle(0)} />
-				<div className={getDotStyle(1)} />
-				<div className={getDotStyle(2)} />
+				<div className={cn(DOT, dots[0])} />
+				<div className={cn(DOT, dots[1])} />
+				<div className={cn(DOT, dots[2])} />
 			</div>
-			{/* Label */}
-			{statusDisplay && (
-				<span className={cn("text-xs font-medium", statusDisplay.textColor)}>
-					{statusDisplay.label}
-				</span>
+			{label && (
+				<span className={cn("text-xs font-medium", text)}>{t(label)}</span>
 			)}
 		</div>
 	);
-}
-
-interface PRReviewInfo {
-	isReviewing: boolean;
-	progress: PRReviewProgress | null;
-	result: PRReviewResult | null;
-	error: string | null;
-	newCommitsCheck?: NewCommitsCheck | null;
 }
 
 interface PRListProps {
@@ -186,28 +84,34 @@ interface PRListProps {
 	getReviewStateForPR: (prNumber: number) => PRReviewInfo | null;
 	onSelectPR: (prNumber: number) => void;
 	/** Callback to load more PRs when hasMore is true */
-	onLoadMore?: () => void;
+	onLoadMore: () => void;
 	/** Whether additional PRs are currently being loaded */
-	isLoadingMore?: boolean;
+	isLoadingMore: boolean;
+	/** The list is narrowed by a search or a filter. */
+	isFiltered: boolean;
 }
 
-function formatDate(dateString: string): string {
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** When the PR last moved, in the app's language. */
+function formatUpdated(dateString: string, t: TFunction): string {
 	const date = new Date(dateString);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+	// A clock slightly ahead of this one must not read "-2m ago".
+	const diffMs = Math.max(0, Date.now() - date.getTime());
+	const diffDays = Math.floor(diffMs / DAY);
 
 	if (diffDays === 0) {
-		const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+		const diffHours = Math.floor(diffMs / HOUR);
 		if (diffHours === 0) {
-			const diffMins = Math.floor(diffMs / (1000 * 60));
-			return `${diffMins}m ago`;
+			return t("time.minutesAgo", { count: Math.floor(diffMs / MINUTE) });
 		}
-		return `${diffHours}h ago`;
+		return t("time.hoursAgo", { count: diffHours });
 	}
-	if (diffDays === 1) return "yesterday";
-	if (diffDays < 7) return `${diffDays}d ago`;
-	if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+	if (diffDays === 1) return t("time.yesterday");
+	if (diffDays < 7) return t("time.daysAgo", { count: diffDays });
+	if (diffDays < 30) return t("time.weeksAgo", { count: Math.floor(diffDays / 7) });
 	return formatAppDate(date);
 }
 
@@ -221,6 +125,7 @@ export function PRList({
 	onSelectPR,
 	onLoadMore,
 	isLoadingMore,
+	isFiltered,
 }: PRListProps) {
 	const { t } = useTranslation("common");
 
@@ -250,7 +155,11 @@ export function PRList({
 			<div className="flex-1 flex items-center justify-center">
 				<div className="text-center text-muted-foreground">
 					<GitPullRequest className="h-8 w-8 mx-auto mb-2 opacity-50" />
-					<p>{t("prReview.noOpenPRs")}</p>
+					<p>
+						{isFiltered
+							? t("prReview.noResultsFound")
+							: t("prReview.noOpenPRs")}
+					</p>
 				</div>
 			</div>
 		);
@@ -260,10 +169,7 @@ export function PRList({
 		<ScrollArea className="flex-1">
 			<div className="divide-y divide-border">
 				{prs.map((pr) => {
-					const reviewState = getReviewStateForPR(pr.number);
-					const isReviewingPR = reviewState?.isReviewing ?? false;
-					const hasReviewResult =
-						reviewState?.result !== null && reviewState?.result !== undefined;
+					const status = getPRReviewStatus(getReviewStateForPR(pr.number));
 
 					return (
 						<button
@@ -286,41 +192,7 @@ export function PRList({
 											{pr.headRefName}
 										</Badge>
 										{/* Review status flow dots + label */}
-										<PRStatusFlow
-											isReviewing={isReviewingPR}
-											hasResult={hasReviewResult}
-											hasPosted={
-												Boolean(reviewState?.result?.reviewId) ||
-												Boolean(reviewState?.result?.hasPostedFindings) ||
-												Boolean(
-													reviewState?.result?.postedFindingIds?.length,
-												) ||
-												// Follow-up review with no new findings to post is effectively "posted"
-												(Boolean(reviewState?.result?.isFollowupReview) &&
-													reviewState?.result?.findings?.length === 0)
-											}
-											hasBlockingFindings={
-												// Use overallStatus from review result as source of truth
-												reviewState?.result?.overallStatus ===
-													"request_changes" ||
-												// Fallback to checking findings severity
-												Boolean(
-													reviewState?.result?.findings?.some(
-														(f) =>
-															f.severity === "critical" ||
-															f.severity === "high",
-													),
-												)
-											}
-											hasNewCommits={Boolean(
-												reviewState?.newCommitsCheck?.hasNewCommits,
-											)}
-											hasCommitsAfterPosting={
-												reviewState?.newCommitsCheck?.hasCommitsAfterPosting ??
-												false
-											}
-											t={t}
-										/>
+										<PRStatusFlow status={status} />
 									</div>
 									<h3 className="font-medium text-sm truncate">{pr.title}</h3>
 									<div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
@@ -330,7 +202,7 @@ export function PRList({
 										</span>
 										<span className="flex items-center gap-1">
 											<Clock className="h-3 w-3" />
-											{formatDate(pr.updatedAt)}
+											{formatUpdated(pr.updatedAt, t)}
 										</span>
 										<span className="flex items-center gap-1">
 											<FileDiff className="h-3 w-3" />
@@ -345,31 +217,29 @@ export function PRList({
 				})}
 
 				{/* Status indicator / Load More button */}
-				{prs.length > 0 && (
-					<div className="py-4 flex justify-center">
-						{hasMore && onLoadMore ? (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={onLoadMore}
-								disabled={isLoadingMore}
-							>
-								{isLoadingMore ? (
-									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										{t("prReview.loadingMore")}
-									</>
-								) : (
-									t("prReview.loadMore")
-								)}
-							</Button>
-						) : (
-							<span className="text-xs text-muted-foreground opacity-50">
-								{t("prReview.allPRsLoaded")}
-							</span>
-						)}
-					</div>
-				)}
+				<div className="py-4 flex justify-center">
+					{hasMore ? (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={onLoadMore}
+							disabled={isLoadingMore}
+						>
+							{isLoadingMore ? (
+								<>
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									{t("prReview.loadingMore")}
+								</>
+							) : (
+								t("prReview.loadMore")
+							)}
+						</Button>
+					) : (
+						<span className="text-xs text-muted-foreground opacity-50">
+							{t("prReview.allPRsLoaded")}
+						</span>
+					)}
+				</div>
 			</div>
 		</ScrollArea>
 	);
