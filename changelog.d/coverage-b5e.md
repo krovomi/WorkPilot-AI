@@ -9,3 +9,4 @@ section: 🧪 Filets de test
   commandes bubblewrap et Seatbelt, politique d'accès, liste des hôtes, proxy filtrant, porte
   loopback) à 100 %, proxy compris sur chaque chemin d'une requête et à travers le proxy de la
   machine.
+- **Plancher de couverture du backend** relevé de 85 à 88 %.
