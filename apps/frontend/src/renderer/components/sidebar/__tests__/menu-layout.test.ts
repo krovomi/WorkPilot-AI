@@ -83,6 +83,7 @@ describe("moving pages", () => {
 		expect(moveItemBy(prefs(), arranged, "a", "k", 1, ["k", "m"])).toEqual({ itemOrder: { a: ["d", "m", "k"] } });
 		expect(moveItemBy(prefs(), arranged, "a", "k", -1)).toBeNull();
 		expect(moveItemBy(prefs(), arranged, "a", "m", 1)).toBeNull();
+		expect(moveItemBy(prefs(), arranged, "gone", "k", 1)).toBeNull();
 	});
 
 	it("moves a page to another space, and forgets the move back home", () => {
@@ -127,8 +128,12 @@ describe("moving pins", () => {
 		expect(reorderPins(["k", "h2", "t"], entryOf, "t", "h")).toEqual(["k", "t", "h2"]);
 		expect(reorderPins(["k", "t"], entryOf, "k", "zz")).toBeNull();
 		expect(reorderPins(["k", "t"], entryOf, "k", "k")).toBeNull();
-		expect(movePinBy(["k", "h2", "t"], entryOf, "h", -1, ["k", "h", "t"])).toEqual(["h2", "k", "t"]);
-		expect(movePinBy(["k", "t"], entryOf, "k", -1, ["k", "t"])).toBeNull();
+		expect(movePinBy(prefs({ pinnedItems: ["k", "h2", "t"] }), entryOf, "h", -1, ["k", "h", "t"])).toEqual({
+			pinnedItems: ["h2", "k", "t"],
+		});
+		expect(movePinBy(prefs({ pinnedItems: ["k", "t"] }), entryOf, "k", -1, ["k", "t"])).toBeNull();
+		// Shown but no longer pinned (a pinned group's page): nothing moves.
+		expect(movePinBy(prefs({ pinnedItems: ["t"] }), entryOf, "k", 1, ["k", "t"])).toBeNull();
 	});
 });
 

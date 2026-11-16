@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { ViewBadge } from "@/stores/activity-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { ActivityBadge } from "./ActivityBadge";
-import { encodeSortableId, FAV_DROP_ID } from "./sortable-primitives";
+import { encodeSortableId, FAV_DROP_ID, pageDraggedOver } from "./sortable-primitives";
 
 export interface RailSpace {
 	readonly id: string;
@@ -185,7 +185,7 @@ function SortableRailButton(props: Omit<RailButtonProps, "buttonRef" | "buttonPr
 	const { setNodeRef, listeners, transform, transition, isDragging, isOver, active } = useSortable({
 		id: encodeSortableId("group", props.space.id),
 	});
-	const pageOver = isOver && String(active?.id ?? "").startsWith("item:");
+	const pageOver = pageDraggedOver(isOver, active?.id);
 	return (
 		<div
 			style={{

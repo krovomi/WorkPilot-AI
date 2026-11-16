@@ -30,6 +30,11 @@ export function decodeSortableId(
 	return { kind, id };
 }
 
+/** Whether a page of the panel (not a space or a pin) is dragged over this target. */
+export function pageDraggedOver(isOver: boolean, activeId: string | number | undefined): boolean {
+	return isOver && decodeSortableId(String(activeId))?.kind === "item";
+}
+
 interface SortableWrapperProps {
 	sortableId: string;
 	disabled?: boolean;

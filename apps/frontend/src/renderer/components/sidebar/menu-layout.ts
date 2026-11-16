@@ -197,14 +197,15 @@ export function reorderPins(
 
 /** Move a pin one place up (-1) or down (+1) among the entries `shown`. */
 export function movePinBy(
-	pinned: readonly string[],
+	prefs: SidebarPrefs,
 	entryOf: (pin: string) => string,
 	entryId: string,
 	delta: number,
 	shown: readonly string[],
-): string[] | null {
+): Pick<SidebarPrefs, "pinnedItems"> | null {
 	const neighbour = neighbourOf(shown, entryId, delta);
-	return neighbour ? reorderPins(pinned, entryOf, entryId, neighbour) : null;
+	const pinnedItems = neighbour ? reorderPins(prefs.pinnedItems, entryOf, entryId, neighbour) : null;
+	return pinnedItems ? { pinnedItems } : null;
 }
 
 /** Whether the person changed the order of anything (spaces, pages, moves). */

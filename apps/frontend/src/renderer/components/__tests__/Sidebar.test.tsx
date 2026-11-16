@@ -457,7 +457,10 @@ describe("a menu arranged by each person", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace down" }));
 		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["agents", "workspace"]));
-		expect(screen.getByRole("button", { name: "Move the space Workspace up" })).toBeEnabled();
+		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace up" }));
+		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["workspace", "agents"]));
+		await userEvent.click(screen.getByRole("button", { name: "Move the space Workspace down" }));
+		await waitFor(() => expect(prefs().groupOrder.slice(0, 2)).toEqual(["agents", "workspace"]));
 
 		await userEvent.click(screen.getByRole("button", { name: "Restore the original order" }));
 		await waitFor(() => expect(prefs().itemGroups).toEqual({}));

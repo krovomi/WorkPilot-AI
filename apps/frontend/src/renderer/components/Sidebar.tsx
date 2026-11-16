@@ -625,8 +625,7 @@ export function Sidebar({
 		const onMove = (delta: -1 | 1) =>
 			arrange((current) => {
 				if (groupId) return moveItemBy(current, visibleNavGroups, groupId, item.id, delta, shown);
-				const pinnedItems = movePinBy(current.pinnedItems, entryOfPin, item.id, delta, shown);
-				return pinnedItems ? { pinnedItems } : null;
+				return movePinBy(current, entryOfPin, item.id, delta, shown);
 			});
 		return (
 			<RowMoveControls
