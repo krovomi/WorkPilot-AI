@@ -807,6 +807,9 @@ export const IPC_CHANNELS = {
 	SELF_HEALING_CANCEL_OPERATION: "selfHealing:cancelOperation",
 	SELF_HEALING_DISMISS_INCIDENT: "selfHealing:dismissIncident",
 	SELF_HEALING_RETRY_INCIDENT: "selfHealing:retryIncident",
+	/** Find the first bad commit of a CI/CD incident (#375); one event per tested commit. */
+	SELF_HEALING_BISECT: "selfHealing:bisect",
+	SELF_HEALING_BISECT_PROGRESS: "selfHealing:bisectProgress",
 	// Events (main -> renderer)
 	SELF_HEALING_OPERATION_PROGRESS: "selfHealing:operationProgress",
 	SELF_HEALING_OPERATION_COMPLETE: "selfHealing:operationComplete",

@@ -33,7 +33,7 @@ composition, qui importe les agents. Les autres modules sortis de `core` par le 
 `offline_policy/` (avec `local_model_catalog.py`), `app_detection.py` (détecteur de l'aperçu),
 `project/ui_stack.py` et `project/test_stack.py` (les piles UI et de test, venues de `uiux` et de
 `test_generation`). `agent_runtime/` est le port par lequel une unité que `core` importe lance
-une session sans importer `core` ni `agents` (merge, intégrations, analyse, architecture,
+une session sans importer `core` ni `agents` (intégrations, analyse, architecture,
 génération de tests ;
 [justification](../../docs/architecture/agent-runtime.md)) ; `core/agent_runtime.py` l'installe.
 `tests/test_import_contracts.py` tient ces frontières.

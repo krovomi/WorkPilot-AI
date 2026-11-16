@@ -46,6 +46,11 @@ class AutoFixStats:
     runs: list[dict[str, Any]] | None = None
 
 
+#: What a missing, unreadable or hand-edited plan raises here: the stats are a
+#: report, never a reason to stop the loop that records them.
+_UNREADABLE = (OSError, ValueError, TypeError, AttributeError, KeyError)
+
+
 class AutoFixMetricsTracker:
     """
     Tracks auto-fix metrics in implementation_plan.json.
@@ -100,7 +105,7 @@ class AutoFixMetricsTracker:
                 runs=stats_data.get("runs", []),
             )
 
-        except Exception as e:
+        except _UNREADABLE as e:
             debug_error("auto_fix_metrics", f"Failed to load stats: {e}")
             return AutoFixStats()
 
@@ -192,7 +197,7 @@ class AutoFixMetricsTracker:
             self.plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
             debug_success("auto_fix_metrics", "Recorded auto-fix run", success=success)
 
-        except Exception as e:
+        except _UNREADABLE as e:
             debug_error("auto_fix_metrics", f"Failed to record run: {e}")
 
     def get_dashboard_data(self) -> dict[str, Any]:
@@ -278,7 +283,7 @@ class AutoFixMetricsTracker:
             self.plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
             debug_success("auto_fix_metrics", "Reset auto-fix stats")
 
-        except Exception as e:
+        except _UNREADABLE as e:
             debug_error("auto_fix_metrics", f"Failed to reset stats: {e}")
 
 
