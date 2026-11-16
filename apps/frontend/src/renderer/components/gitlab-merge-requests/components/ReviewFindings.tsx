@@ -60,18 +60,8 @@ export function ReviewFindings({
 		return groups;
 	}, [findings]);
 
-	// Count by severity
-	const counts = useMemo(
-		() => ({
-			critical: groupedFindings.critical.length,
-			high: groupedFindings.high.length,
-			medium: groupedFindings.medium.length,
-			low: groupedFindings.low.length,
-			total: findings.length,
-			important: groupedFindings.critical.length + groupedFindings.high.length,
-		}),
-		[groupedFindings, findings.length],
-	);
+	const importantCount =
+		groupedFindings.critical.length + groupedFindings.high.length;
 
 	// Selection hooks
 	const {
@@ -112,10 +102,10 @@ export function ReviewFindings({
 					size="sm"
 					onClick={selectImportant}
 					className="text-xs"
-					disabled={counts.important === 0}
+					disabled={importantCount === 0}
 				>
 					<AlertTriangle className="h-3 w-3 mr-1" />
-					{t("gitlab:findings.selectImportant", { count: counts.important })}
+					{t("gitlab:findings.selectImportant", { count: importantCount })}
 				</Button>
 				<Button
 					variant="outline"
@@ -162,10 +152,7 @@ export function ReviewFindings({
 								selectedCount={selectedInGroup}
 								expanded={isExpanded}
 								onToggle={() => toggleSection(severity)}
-								onSelectAll={(e) => {
-									e.stopPropagation();
-									toggleSeverityGroup(severity);
-								}}
+								onSelectAll={() => toggleSeverityGroup(severity)}
 							/>
 
 							{/* Group Content */}

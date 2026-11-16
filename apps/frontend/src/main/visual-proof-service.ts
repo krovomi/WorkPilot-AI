@@ -17,6 +17,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { BrowserWindow, desktopCapturer } from "electron";
 import { getSpecsDir } from "../shared/constants";
+import {
+	escapePowerShellSingleQuoted,
+	quotePowerShellSingle,
+} from "../shared/utils/powershell-quote";
 import type {
 	VisualProofApiSmoke,
 	VisualProofNavigationPlan,
@@ -54,6 +58,7 @@ import {
 	type NavUiElement,
 	visualProofNavigationService,
 } from "./visual-proof-navigation-service";
+import { navigationTargetOnOrigin } from "./visual-proof-navigation-target";
 import { copyWalkthrough, normalizePathForMarkdown, proofImageUrl, walkthroughSection } from "./visual-proof-walkthrough";
 
 const execFileAsync = promisify(execFile);
@@ -545,17 +550,17 @@ function buildFillScript(selector: string, value: string): string {
 }
 
 /**
- * Exécute une étape de navigation web dans la page chargée. Best-effort : un
- * sélecteur introuvable est journalisé sans interrompre la séquence, afin de
- * toujours produire des preuves visuelles même si l'UI a légèrement changé.
+ * Exécute une étape de navigation web, sans quitter l'origine de l'application
+ * (`navigationTargetOnOrigin`). Best-effort : un sélecteur introuvable est
+ * journalisé sans interrompre la séquence, même si l'UI a légèrement changé.
  */
 async function runWebNavigationStep(
 	webContents: WebContentsLike,
 	step: VisualProofNavigationStep,
 	baseUrl: string,
 ): Promise<void> {
-	if (step.path) {
-		const target = new URL(step.path, baseUrl).toString();
+	const target = step.path ? navigationTargetOnOrigin(step.path, baseUrl) : null;
+	if (target) {
 		await webContents.loadURL(target);
 		await delay(500);
 	}
@@ -564,9 +569,7 @@ async function runWebNavigationStep(
 			buildWaitForSelectorScript(step.waitForSelector, NAVIGATION_WAIT_TIMEOUT_MS),
 		);
 		if (found === false) {
-			logger.warn(
-				`[VisualProof] Selector never appeared: ${step.waitForSelector}`,
-			);
+			logger.warn(`[VisualProof] Selector never appeared: ${step.waitForSelector}`);
 		}
 	}
 	if (step.fill) {
@@ -719,11 +722,6 @@ function describeApiSmoke(apiSmoke: VisualProofApiSmoke | undefined): string {
 	return ` API smoke: ${apiSmoke.passed}/${apiSmoke.attempted} endpoints passed.`;
 }
 
-/** Single-quote a value for safe embedding in a PowerShell script. */
-function powerShellSingleQuote(value: string): string {
-	return `'${value.replaceAll("'", "''")}'`;
-}
-
 /**
  * Build the PowerShell script that captures a *single application window* to a
  * PNG via the Win32 PrintWindow API.
@@ -748,10 +746,10 @@ export function buildPrintWindowScript(
 		.map((name) => name.replaceAll(/[^a-z0-9 ._-]/g, "").trim())
 		.filter((name) => name.length > 0);
 	const preferredArray = preferred.length
-		? `@(${preferred.map(powerShellSingleQuote).join(",")})`
+		? `@(${preferred.map(quotePowerShellSingle).join(",")})`
 		: "@()";
 	const targetPid = Number.isInteger(pid) && pid ? pid : 0;
-	const outPath = powerShellSingleQuote(outputPath);
+	const outPath = quotePowerShellSingle(outputPath);
 
 	// NOTE: keep the here-string terminators ("@ ... "@) at column 0 and avoid
 	// any ${...} sequence (would collide with this template literal).
@@ -1452,10 +1450,6 @@ async function captureDesktopScreenshotSequence(
 	return screenshots;
 }
 
-function escapePowerShellSingleQuoted(value: string): string {
-	return value.replaceAll("'", "''");
-}
-
 /**
  * Génère un script PowerShell qui pilote la fenêtre du process cible via
  * Windows UI Automation (System.Windows.Automation). Selon l'étape, il invoque
@@ -1745,21 +1739,16 @@ async function launchDesktopApplication(
 		return spawnDirect(workpilotElevated);
 	}
 
-	const psExe = `'${runtime.command.replaceAll("'", "''")}'`;
-	const psCwd = `'${runtime.cwd.replaceAll("'", "''")}'`;
-	const psArgs =
-		runtime.args.length > 0
-			? ` -ArgumentList @(${runtime.args
-					.map((arg) => `'${arg.replaceAll("'", "''")}'`)
-					.join(",")})`
-			: "";
+	// On Windows the runtime is the executable itself, never Mono or Wine: no arguments.
+	const psExe = quotePowerShellSingle(runtime.command);
+	const psCwd = quotePowerShellSingle(runtime.cwd);
 	const { stdout } = await execFileAsync(
 		"powershell",
 		[
 			"-NoProfile",
 			"-NonInteractive",
 			"-Command",
-			`$ErrorActionPreference='Stop'; $p = Start-Process -FilePath ${psExe} -WorkingDirectory ${psCwd} -Verb RunAs -PassThru${psArgs}; [Console]::Out.Write($p.Id)`,
+			`$ErrorActionPreference='Stop'; $p = Start-Process -FilePath ${psExe} -WorkingDirectory ${psCwd} -Verb RunAs -PassThru; [Console]::Out.Write($p.Id)`,
 		],
 		{ windowsHide: true, maxBuffer: 64 * 1024 },
 	);

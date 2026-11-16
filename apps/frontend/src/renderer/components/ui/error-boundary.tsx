@@ -9,6 +9,10 @@ interface ErrorBoundaryProps {
 	readonly children: React.ReactNode;
 	readonly fallback?: React.ReactNode;
 	readonly onReset?: () => void;
+	/** A change of this value clears a caught error (the page on screen, say). */
+	readonly resetKey?: unknown;
+	/** Replaces the fallback's default description. */
+	readonly description?: string;
 }
 
 interface ErrorBoundaryState {
@@ -22,9 +26,11 @@ interface ErrorBoundaryState {
 function ErrorFallbackUI({
 	error,
 	onReset,
+	description,
 }: {
 	readonly error: Error | null;
 	readonly onReset: () => void;
+	readonly description?: string;
 }) {
 	const { t } = useTranslation("errors");
 
@@ -39,7 +45,7 @@ function ErrorFallbackUI({
 					<div className="space-y-2">
 						<h3 className="font-semibold text-lg">{t("boundary.title")}</h3>
 						<p className="text-sm text-muted-foreground">
-							{t("boundary.description")}
+							{description ?? t("boundary.description")}
 						</p>
 						{error && (
 							<p
@@ -91,6 +97,12 @@ export class ErrorBoundary extends React.Component<
 		});
 	}
 
+	componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+		if (this.state.hasError && !Object.is(prevProps.resetKey, this.props.resetKey)) {
+			this.setState({ hasError: false, error: null });
+		}
+	}
+
 	handleReset = (): void => {
 		this.setState({ hasError: false, error: null });
 		this.props.onReset?.();
@@ -103,7 +115,11 @@ export class ErrorBoundary extends React.Component<
 			}
 
 			return (
-				<ErrorFallbackUI error={this.state.error} onReset={this.handleReset} />
+				<ErrorFallbackUI
+					error={this.state.error}
+					onReset={this.handleReset}
+					description={this.props.description}
+				/>
 			);
 		}
 

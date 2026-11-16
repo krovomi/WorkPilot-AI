@@ -29,15 +29,12 @@ export function MergeRequestList({
 	const { t } = useTranslation();
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const filteredMrs = mergeRequests.filter((mr) => {
-		const matchesSearch =
-			mr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			mr.sourceBranch.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			mr.targetBranch.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			String(mr.iid).includes(searchQuery);
-
-		return matchesSearch;
-	});
+	const query = searchQuery.trim().toLowerCase();
+	const filteredMrs = mergeRequests.filter((mr) =>
+		[mr.title, mr.sourceBranch, mr.targetBranch, `!${mr.iid}`].some((field) =>
+			field.toLowerCase().includes(query),
+		),
+	);
 
 	return (
 		<div className="flex flex-col h-full">
@@ -53,6 +50,7 @@ export function MergeRequestList({
 						size="sm"
 						onClick={onRefresh}
 						disabled={isLoading}
+						aria-label={t("common:accessibility.refreshAriaLabel")}
 						className="h-7 px-2"
 					>
 						<RefreshCw
@@ -75,9 +73,10 @@ export function MergeRequestList({
 							variant={stateFilter === state ? "default" : "ghost"}
 							size="sm"
 							onClick={() => onStateFilterChange(state)}
-							className="h-7 text-xs capitalize"
+							aria-pressed={stateFilter === state}
+							className="h-7 text-xs"
 						>
-							{state}
+							{t(`gitlab:mergeRequests.filters.${state}`)}
 						</Button>
 					))}
 				</div>

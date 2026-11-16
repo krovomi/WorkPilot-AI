@@ -1,9 +1,11 @@
 /**
- * GitLab import handlers
- * Handles bulk importing issues as tasks
+ * The bulk import of GitLab issues as tasks: a local project's issue becomes
+ * a spec in its folder, with the screenshots pasted into it; a server
+ * project's becomes a card of its shared board. One issue that fails does not
+ * stop the others. The iids are checked by `ipc-guard.ts` before the handler
+ * runs.
  */
 
-import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../../shared/constants";
 import type {
 	GitLabImportResult,
@@ -19,6 +21,7 @@ import {
 	type GitLabTaskInfo,
 	gitlabSpecDir,
 } from "./spec-utils";
+import { gitlabIpcMain } from "./ipc-guard";
 import type { GitLabAPIIssue } from "./types";
 import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 
@@ -26,32 +29,17 @@ import { encodeProjectPath, getGitLabConfig, gitlabFetch } from "./utils";
 const SERVER_TITLE_MAX = 200;
 const SERVER_DESCRIPTION_MAX = 20_000;
 
-// Debug logging helper
-const DEBUG =
-	process.env.DEBUG === "true";
-
-function debugLog(_message: string, data?: unknown): void {
-	if (DEBUG) {
-		if (data !== undefined) {
-			/* intentionally empty */
-		} else {
-			// noop
-		}
-	}
-}
-
 /**
  * Import multiple GitLab issues as tasks
  */
 export function registerImportIssues(): void {
-	ipcMain.handle(
+	gitlabIpcMain.handle(
 		IPC_CHANNELS.GITLAB_IMPORT_ISSUES,
 		async (
 			_event,
 			projectId: string,
 			issueIids: number[],
 		): Promise<IPCResult<GitLabImportResult>> => {
-			debugLog("importGitLabIssues handler called", { issueIids });
 
 			const project = featureProject(projectId);
 			if (!project) {
@@ -72,12 +60,8 @@ export function registerImportIssues(): void {
 			let imported = 0;
 			let failed = 0;
 
-			for (const iid of Array.isArray(issueIids) ? issueIids : []) {
+			for (const iid of issueIids) {
 				try {
-					// From the renderer: a number, before it is put in a URL
-					if (!Number.isInteger(iid) || iid <= 0) {
-						throw new Error("Invalid issue number");
-					}
 					const encodedProject = encodeProjectPath(config.project);
 
 					// Fetch the issue
@@ -128,7 +112,6 @@ export function registerImportIssues(): void {
 						);
 						tasks.push(task);
 						imported++;
-						debugLog("Imported issue:", { iid, taskId: task.id });
 					} else {
 						failed++;
 						errors.push(`Failed to create task for issue #${iid}`);
@@ -140,7 +123,6 @@ export function registerImportIssues(): void {
 							? error.message
 							: `Unknown error for issue #${iid}`;
 					errors.push(errorMessage);
-					debugLog("Failed to import issue:", { iid, error: errorMessage });
 				}
 			}
 
@@ -161,11 +143,6 @@ export function registerImportIssues(): void {
 	);
 }
 
-/**
- * Register all import handlers
- */
 export function registerImportHandlers(): void {
-	debugLog("Registering GitLab import handlers");
 	registerImportIssues();
-	debugLog("GitLab import handlers registered");
 }
