@@ -8,6 +8,7 @@ import type {
 	Task,
 	TaskLogPhase,
 	TaskLogs,
+	WorktreeCreatePROptions,
 	WorktreeDiff,
 	WorktreeMergeResult,
 	WorktreeStatus,
@@ -18,6 +19,7 @@ import { consumePendingTaskDetailTab } from "../../../lib/task-detail-nav";
 import { retainTaskLogWatch } from "../../../lib/task-log-watch";
 import { useProjectStore } from "../../../stores/project-store";
 import { useSettingsStore } from "../../../stores/settings-store";
+import { createTaskPR } from "../create-task-pr";
 import {
 	checkTaskRunning,
 	getTaskProgress,
@@ -174,6 +176,11 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 	const [showConflictDialog, setShowConflictDialog] = useState(false);
 	const [showPRDialog, setShowPRDialog] = useState(false);
 	const [isCreatingPR, setIsCreatingPR] = useState(false);
+	// The review's "Create Pull Request" (the card keeps what main added meanwhile).
+	const handleCreatePR = useCallback(
+		(options: WorktreeCreatePROptions) => createTaskPR(task, options, setIsCreatingPR),
+		[task],
+	);
 	const [isCompleting, setIsCompleting] = useState(false);
 	const [showAbandonDialog, setShowAbandonDialog] = useState(false);
 	const [isAbandoning, setIsAbandoning] = useState(false);
@@ -840,6 +847,7 @@ export function useTaskDetail({ task }: UseTaskDetailOptions) {
 		setShowConflictDialog,
 		setShowPRDialog,
 		setIsCreatingPR,
+		handleCreatePR,
 		setIsCompleting,
 		setShowAbandonDialog,
 		setIsAbandoning,
