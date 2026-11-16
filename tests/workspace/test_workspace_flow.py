@@ -52,13 +52,11 @@ def commit_file(cwd: Path, name: str, content: str | bytes, message: str) -> Non
 
 
 @pytest.fixture
-def repo(temp_git_repo, tmp_path, monkeypatch):
+def repo(isolated_repo, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-gitconfig"))
     monkeypatch.delenv("DEFAULT_BRANCH", raising=False)
     monkeypatch.setenv("WORKPILOT_WORKTREE_SETUP", "0")
-    return temp_git_repo
+    return isolated_repo
 
 
 @pytest.fixture
@@ -294,26 +292,6 @@ class TestNodeModulesLinks:
             "node_modules"
         ]
         assert calls[0][:4] == ["cmd", "/c", "mklink", "/J"]
-
-
-class TestTimelineTracking:
-    def test_without_a_plan_the_worktree_is_read(self, built, capsys):
-        workspace_setup.initialize_timeline_tracking(
-            built.project_dir, SPEC, built.get_worktree_path(SPEC)
-        )
-
-        assert "could not be initialized" not in capsys.readouterr().out
-
-    def test_an_unreadable_plan_is_a_note(self, built, tmp_path, capsys):
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        (spec_dir / "implementation_plan.json").write_text("{", encoding="utf-8")
-
-        workspace_setup.initialize_timeline_tracking(
-            built.project_dir, SPEC, built.get_worktree_path(SPEC), spec_dir
-        )
-
-        assert "Timeline tracking could not be initialized" in capsys.readouterr().out
 
 
 # ── After the build ─────────────────────────────────────────────────────

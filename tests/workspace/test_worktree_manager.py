@@ -50,15 +50,13 @@ def hook(repo: Path, name: str, body: str) -> None:
 
 
 @pytest.fixture
-def repo(temp_git_repo, tmp_path, monkeypatch):
+def repo(isolated_repo, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "no-global-gitconfig"))
     monkeypatch.setenv("GIT_TERMINAL_PROMPT", "0")
     monkeypatch.delenv("DEFAULT_BRANCH", raising=False)
     # `git worktree add` retries back off with `time.sleep`; not here.
     monkeypatch.setattr(worktree_module, "time", SimpleNamespace(sleep=lambda _s: None))
-    return temp_git_repo
+    return isolated_repo
 
 
 @pytest.fixture
