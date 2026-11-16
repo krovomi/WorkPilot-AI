@@ -16,6 +16,10 @@ export interface CodeMigrationResult {
 		source?: string;
 		target?: string;
 		note?: string;
+		/** The rule-based plan, when the planner knows the pair. */
+		risk_level?: string;
+		total_steps?: number;
+		phases?: { name: string; steps: string[] }[];
 	};
 	execution: {
 		status: string;

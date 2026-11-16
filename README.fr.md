@@ -159,6 +159,7 @@ Installation pas à pas, configuration des providers, notes Windows et dépannag
 <td valign="top">
 
 **Import Design** : une maquette, une capture ou un export Figma devient des composants de la stack du projet, en six étapes visibles.
+Le code est ensuite rendu, comparé à la maquette et corrigé jusqu'à lui ressembler, avec le score de chaque itération et les écarts restants ([boucle de rendu](docs/architecture/design-render-loop.md)).
 
 ![Import Design : les six étapes d'une image aux composants du projet](.github/assets/showcase/import-design.png)
 
