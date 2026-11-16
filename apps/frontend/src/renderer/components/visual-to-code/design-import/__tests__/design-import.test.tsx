@@ -12,7 +12,7 @@ vi.mock("react-i18next", () => ({
 	}),
 }));
 
-import type { DesignToCodeResult } from "../../../../../shared/types/design-to-code";
+import type { DesignRenderLoop, DesignToCodeResult } from "../../../../../shared/types/design-to-code";
 import { useDesignToCodeStore } from "../../../../stores/design-to-code-store";
 import { PipelineGraph } from "../PipelineGraph";
 import { ResultInspector } from "../ResultInspector";
@@ -51,6 +51,22 @@ function result(overrides: Partial<DesignToCodeResult> = {}): DesignToCodeResult
 	};
 }
 
+function loop(overrides: Partial<DesignRenderLoop> = {}): DesignRenderLoop {
+	const shot = { pixel_match: 1, ssim: 1, render_image: "", diff_image: "", regions: [], refused_edits: [], notes: [], duration_seconds: 1 };
+	return {
+		status: "converged",
+		threshold: 0.95,
+		mirror: false,
+		best_iteration: 1,
+		iterations: [
+			{ ...shot, index: 0, score: 0.8, applied_edits: 0 },
+			{ ...shot, index: 1, score: 0.96, applied_edits: 1 },
+		],
+		issues: [],
+		...overrides,
+	};
+}
+
 beforeAll(() => {
 	globalThis.ResizeObserver = class {
 		observe = vi.fn();
@@ -70,10 +86,39 @@ describe("PipelineGraph", () => {
 		expect(useDesignToCodeStore.getState().selectedStep).toBe("spec");
 
 		const switches = screen.getAllByRole("switch");
-		expect(switches).toHaveLength(2);
+		expect(switches).toHaveLength(3);
 		fireEvent.click(switches[0]);
 		fireEvent.click(switches[1]);
-		expect(useDesignToCodeStore.getState()).toMatchObject({ useDesignTokens: false, generateTests: false });
+		fireEvent.click(switches[2]);
+		expect(useDesignToCodeStore.getState()).toMatchObject({
+			useDesignTokens: false,
+			renderLoop: false,
+			generateTests: false,
+		});
+	});
+
+	it("follows the render loop on the code step", () => {
+		useDesignToCodeStore.setState({
+			phase: "render_loop",
+			live: {
+				...useDesignToCodeStore.getInitialState().live,
+				loop: { stage: "correct", iteration: 1, max_iterations: 5, score: 0.8, best: 0 },
+			},
+		});
+		const { rerender } = render(<PipelineGraph />);
+		expect(screen.getByText("pipeline.meta.codeLoop")).toBeInTheDocument();
+
+		useDesignToCodeStore.setState({
+			phase: "complete",
+			result: result({ render_loop: loop() }),
+		});
+		rerender(<PipelineGraph />);
+		expect(screen.getByText("pipeline.meta.codeLoopDone")).toBeInTheDocument();
+
+		useDesignToCodeStore.setState({ result: result({ render_loop: loop({ status: "skipped", iterations: [] }) }) });
+		rerender(<PipelineGraph />);
+		expect(screen.queryByText("pipeline.meta.codeLoopDone")).toBeNull();
+		expect(screen.getByText("pipeline.meta.codeDone")).toBeInTheDocument();
 	});
 
 	it("lets the person rewrite the sentence between two steps", () => {
@@ -98,6 +143,28 @@ describe("ResultInspector", () => {
 		expect(screen.getByTestId("design-simulated")).toBeInTheDocument();
 		expect(screen.getByTestId("design-code-view")).toHaveTextContent("footer code");
 		expect(screen.getByText("inspector.fileExists")).toBeInTheDocument();
+	});
+
+	it("shows the loop's step while it runs, then its report above the files", () => {
+		const progress = { stage: "render" as const, iteration: 0, max_iterations: 5, score: null, best: null };
+		useDesignToCodeStore.setState({
+			phase: "render_loop",
+			live: { ...useDesignToCodeStore.getInitialState().live, loop: progress },
+		});
+		const { rerender } = render(<ResultInspector />);
+		expect(screen.getByTestId("design-loop-live")).toHaveTextContent("loop.live");
+		expect(screen.queryByText("loop.score")).toBeNull();
+
+		useDesignToCodeStore.setState({
+			live: { ...useDesignToCodeStore.getInitialState().live, loop: { ...progress, score: 0.9 } },
+		});
+		rerender(<ResultInspector />);
+		expect(screen.getByText("loop.score")).toBeInTheDocument();
+
+		useDesignToCodeStore.setState({ phase: "complete", result: result({ render_loop: loop() }) });
+		rerender(<ResultInspector />);
+		expect(screen.getByTestId("design-loop")).toBeInTheDocument();
+		expect(screen.getByTestId("design-code-view")).toBeInTheDocument();
 	});
 
 	it("explains that a stack has no visual tests", () => {
