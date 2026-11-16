@@ -912,7 +912,14 @@
 		"stopping": "Stopping...",
 		"progress": "Progress",
 		"lastActivityPrefix": "last activity",
-		"lastProgressUpdateTooltip": "Last progress update received"
+		"lastProgressUpdateTooltip": "Last progress update received",
+		"timeAgo": {
+			"justNow": "just now",
+			"seconds": "{{count}}s ago",
+			"minutes": "{{count}}m ago",
+			"hours": "{{count}}h ago",
+			"days": "{{count}}d ago"
+		}
 	},
 	"time": {
 		"justNow": "just now",

@@ -45,7 +45,7 @@ export function ExistingCompetitorAnalysisDialog({
 	};
 
 	const formatDate = (date?: Date) => {
-		if (!date) return "recently";
+		if (!date) return t("roadmap:competitorAnalysis.recently");
 		return formatAppDate(date, {
 			month: "short",
 			day: "numeric",
