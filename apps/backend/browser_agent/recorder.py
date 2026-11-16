@@ -9,10 +9,17 @@ reports into typed, bounded steps:
 
 - a report is page data, never trusted: anything outside the closed lists of
   ``recording.py`` is dropped, every string is cut to its bound;
-- only the main frame is recorded (an iframe is a later lot);
+- a report from an iframe carries the chain of ``<iframe>`` elements down to
+  it, each described by its parent frame and named by one CSS selector; a
+  report from inside open shadow roots carries their hosts the same way;
 - successive values typed into one field make one step, updated in place;
 - a navigation is a step only when no action just caused it (a link, a
-  submitted form), so replaying the actions replays the navigation;
+  submitted form), so replaying the actions replays the navigation; when an
+  action caused it, the page it led to is that action's ``wait_url``;
+- the first same-origin ``fetch`` or XHR an action started within
+  :data:`REQUEST_WINDOW_S` is that action's ``wait_request`` (method and path
+  only: never the query, never a path that holds a key); an element the page
+  inserted after the previous action is waited for (``wait_visible``);
 - at :data:`~browser_agent.recording.MAX_STEPS` the recording stops growing
   and says it was truncated;
 - a secret is never kept (``selector_builder.is_secret_field``), and a URL
@@ -29,27 +36,46 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from foundation.log_redaction import redact_text
+from playwright.async_api import Error as BrowserError
 
 from .recording import (
+    ACTION_KINDS,
+    HTTP_METHODS,
     KEYS,
+    MAX_FRAMES,
+    MAX_SHADOW,
     MAX_STEPS,
     MAX_URL,
     RecordedStep,
     Recording,
+    RequestWait,
     clean_line,
+    clean_request_path,
     clean_value,
     is_web_url,
+    page_url,
 )
-from .selector_builder import build_selectors, is_secret_field, secret_env_name
+from .selector_builder import (
+    build_selectors,
+    css_selector,
+    is_secret_field,
+    secret_env_name,
+)
 
 #: A navigation this soon after an action is that action's doing.
 NAVIGATION_WINDOW_S = 2.5
+#: A request this soon after an action is that action's doing.
+REQUEST_WINDOW_S = 1.0
+#: The parent frame's script describes an ``<iframe>`` element.
+DESCRIBE_FRAME = (
+    "el => (typeof window.__workpilotDescribe === 'function' "
+    "? window.__workpilotDescribe(el) : null)"
+)
 BINDING = "__workpilotRecord"
 SCRIPT = Path(__file__).with_name("recorder_script.js")
-
-_ACTIONS = ("click", "fill", "select", "press")
 
 
 def safe_url(raw: object) -> str:
@@ -62,6 +88,21 @@ def safe_url(raw: object) -> str:
     return url
 
 
+def _origin(url: str) -> tuple[str, str]:
+    parts = urlsplit(url)
+    return parts.scheme.lower(), parts.netloc.lower()
+
+
+def shadow_hosts(raw: object) -> list[str] | None:
+    """The CSS of each shadow host, outermost first; None when one has none."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_SHADOW:
+        return None
+    hosts = [css_selector(item) for item in raw]
+    return hosts if all(hosts) else None
+
+
 class Recorder:
     """The steps of one session, built from the page's reports."""
 
@@ -72,6 +113,7 @@ class Recorder:
         self._url = ""
         self._initial = False
         self._last_action_at = float("-inf")
+        self._last_action: RecordedStep | None = None
 
     @property
     def steps(self) -> list[RecordedStep]:
@@ -109,51 +151,94 @@ class Recorder:
             self._initial = False
             return None
         if self._clock() - self._last_action_at <= NAVIGATION_WINDOW_S:
-            return None
+            # The action led there: its replay waits for this page.
+            step, target = self._last_action, page_url(url)
+            if step is None or not target or step.wait_url == target:
+                return None
+            step.wait_url = target
+            return step
         step = self._new("navigate")
         step.url = url
         return self._add(step)
 
-    def on_page_event(self, payload: object) -> RecordedStep | None:
-        """A report from the page: the step it adds or updates, or None."""
+    def on_request(
+        self, method: object, url: object, page: object
+    ) -> RecordedStep | None:
+        """A ``fetch`` or XHR left: the action it belongs to, now waiting for it."""
+        step = self._last_action
+        if step is None or step.wait_request is not None:
+            return None
+        if self._clock() - self._last_action_at > REQUEST_WINDOW_S:
+            return None
+        if method not in HTTP_METHODS or not isinstance(url, str):
+            return None
+        if not isinstance(page, str) or _origin(url) != _origin(page):
+            return None  # another site's request (analytics, a CDN)
+        path = clean_request_path(urlsplit(url).path)
+        if not path or redact_text(path) != path:
+            return None
+        step.wait_request = RequestWait(str(method), path)
+        return step
+
+    def on_page_event(
+        self, payload: object, frames: list[str] | None = None
+    ) -> RecordedStep | None:
+        """A report from the page (inside ``frames``): the step it adds or updates."""
         if not isinstance(payload, dict):
             return None
         kind = payload.get("kind")
         target = payload.get("target")
-        if kind not in (*_ACTIONS, "assert_text") or not isinstance(target, dict):
+        if kind not in (*ACTION_KINDS, "assert_text") or not isinstance(target, dict):
             return None
         selectors = build_selectors(target)
-        if not selectors:
+        shadow = shadow_hosts(target.get("shadow"))
+        frames = list(frames or [])
+        if not selectors or shadow is None or len(frames) > MAX_FRAMES:
             return None
-        if kind in _ACTIONS:
-            self._last_action_at = self._clock()
+        appeared = target.get("appeared") is True
+
+        def located(step: RecordedStep) -> RecordedStep:
+            step.selectors, step.frames, step.shadow = selectors, frames, shadow
+            step.wait_visible = step.wait_visible or appeared
+            return step
 
         if kind in ("fill", "select"):
             value = "" if target.get("secret") is True else payload.get("value")
             value = clean_value(value)
             secret = is_secret_field(target, value)
             last = self.steps[-1] if self.steps else None
-            if last and last.kind == kind and last.selectors == selectors:
-                step = last
+            if (
+                last
+                and last.kind == kind
+                and (last.selectors, last.frames, last.shadow)
+                == (selectors, frames, shadow)
+            ):
+                step = located(last)
             else:
-                step = self._new(kind)
-                step.selectors = selectors
+                step = located(self._new(kind))
             step.secret_env = secret_env_name(target) if secret else ""
             step.value = "" if secret else value
-            return step if step is last else self._add(step)
+            return self._acted(step if step is last else self._add(step))
 
-        step = self._new(kind)
-        step.selectors = selectors
+        step = located(self._new(kind))
         if kind == "press":
             if payload.get("key") not in KEYS:
                 return None
             step.key = str(payload.get("key"))
-        elif kind == "assert_text":
+            return self._acted(self._add(step))
+        if kind == "assert_text":
             step.text = clean_line(payload.get("text"))
             # Nothing to assert, or page text holding a key: not recorded.
             if not step.text or redact_text(step.text) != step.text:
                 return None
-        return self._add(step)
+            return self._add(step)
+        return self._acted(self._add(step))
+
+    def _acted(self, step: RecordedStep | None) -> RecordedStep | None:
+        """An action happened: what follows soon after is its doing."""
+        self._last_action_at = self._clock()
+        self._last_action = step
+        return step
 
 
 Emit = Callable[[RecordedStep], None]
@@ -171,24 +256,62 @@ async def record_session(
     Returns the recording and why it ended: ``stopped`` or ``closed``.
     """
     recorder = recorder or Recorder()
+    # Reports are handled one at a time, in the order they came: describing a
+    # frame awaits the browser, and a later report must not overtake it.
+    lock = asyncio.Lock()
+    paths: dict[Any, list[str] | None] = {}
 
     def report(step: RecordedStep | None) -> None:
         if step is not None:
             emit(step)
 
-    def on_binding(source: dict[str, Any], payload: object) -> None:
-        # Only the main frame: a frame of another origin is not recorded.
-        if source.get("frame") is page.main_frame:
-            report(recorder.on_page_event(payload))
+    async def frame_path(frame: Any) -> list[str] | None:
+        """The CSS of each ``<iframe>`` from the top page down to ``frame``."""
+        chain: list[str] = []
+        while frame is not page.main_frame:
+            parent = frame.parent_frame
+            if parent is None or len(chain) == MAX_FRAMES:
+                return None
+            element = await frame.frame_element()
+            described = await element.evaluate(DESCRIBE_FRAME)
+            # An iframe inside a shadow root: WebDriver cannot name it by CSS.
+            css = css_selector(described)
+            if not css or (isinstance(described, dict) and described.get("shadow")):
+                return None
+            chain.insert(0, css)
+            frame = parent
+        return chain
+
+    async def on_binding(source: dict[str, Any], payload: object) -> None:
+        frame = source.get("frame")
+        async with lock:
+            if frame is page.main_frame:
+                report(recorder.on_page_event(payload))
+                return
+            if frame not in paths:
+                try:
+                    paths[frame] = await frame_path(frame)
+                except BrowserError:
+                    paths[frame] = None  # the frame went away meanwhile
+            if paths[frame] is not None:
+                report(recorder.on_page_event(payload, paths[frame]))
 
     def on_frame(frame: Any) -> None:
         if frame is page.main_frame:
             report(recorder.on_navigation(frame.url))
 
+    def on_request(request: Any) -> None:
+        if request.resource_type in ("fetch", "xhr"):
+            report(
+                recorder.on_request(request.method, request.url, page.main_frame.url)
+            )
+
     closed = asyncio.Event()
     await page.expose_binding(BINDING, on_binding)
     await page.add_init_script(script=SCRIPT.read_text(encoding="utf-8"))
     page.on("framenavigated", on_frame)
+    page.on("framedetached", lambda frame: paths.pop(frame, None))
+    page.on("request", on_request)
     page.on("close", lambda *_: closed.set())
 
     report(recorder.start(url))
