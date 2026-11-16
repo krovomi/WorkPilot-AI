@@ -40,7 +40,7 @@ interface SidebarRailProps {
  * The first level of the menu (F181, lot 2): one icon per space. Choosing one
  * shows its pages in the panel beside it; with the panel folded, hovering one
  * lists its pages and choosing one unfolds the panel. Dropping a page on the
- * star pins it to « Mon menu ».
+ * star pins it to « Mon menu », on a group's icon moves it to that space.
  */
 export function SidebarRail({
 	mine,
@@ -177,11 +177,15 @@ function MineButton(props: Omit<RailButtonProps, "buttonRef" | "dropTarget">) {
 	return <RailButton {...props} buttonRef={setNodeRef} dropTarget={isOver} />;
 }
 
-/** A group's icon, which the pointer can drag to reorder the spaces. */
+/**
+ * A group's icon, which the pointer can drag to reorder the spaces, and
+ * where a page dragged from the panel is dropped to move it to that space.
+ */
 function SortableRailButton(props: Omit<RailButtonProps, "buttonRef" | "buttonProps">) {
-	const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({
+	const { setNodeRef, listeners, transform, transition, isDragging, isOver, active } = useSortable({
 		id: encodeSortableId("group", props.space.id),
 	});
+	const pageOver = isOver && String(active?.id ?? "").startsWith("item:");
 	return (
 		<div
 			style={{
@@ -195,6 +199,7 @@ function SortableRailButton(props: Omit<RailButtonProps, "buttonRef" | "buttonPr
 				buttonRef={setNodeRef}
 				// Pointer only: Enter and Space keep choosing the space.
 				buttonProps={{ onPointerDown: listeners?.onPointerDown }}
+				dropTarget={pageOver}
 			/>
 		</div>
 	);

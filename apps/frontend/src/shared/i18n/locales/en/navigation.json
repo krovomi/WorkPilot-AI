@@ -512,5 +512,27 @@
 		"hint": "Drag to resize the menu, double-click to restore its default width",
 		"width": "{{width}} pixels wide",
 		"folded": "Folded"
+	},
+	"customize": {
+		"start": "Customize the menu",
+		"done": "Done",
+		"title": "Customize your menu",
+		"hint": "Drag a page by its grip to its new place, or onto a space of the rail to move it there. The arrows do the same from the keyboard. Only your menu changes.",
+		"spacePlace": "Place of {{name}} in the rail",
+		"spaceUp": "Move the space {{name}} up",
+		"spaceDown": "Move the space {{name}} down",
+		"resetOrder": "Restore the original order",
+		"up": "Move {{name}} up",
+		"down": "Move {{name}} down",
+		"moveTo": "Move {{name}} to another space",
+		"moveToTitle": "Move {{name}} to",
+		"announce": {
+			"instructions": "To pick up a menu entry, press Space or Enter. Move it with the arrow keys, press Space or Enter again to drop it, or Escape to cancel.",
+			"start": "Picked up {{name}}.",
+			"over": "{{name}} is over {{target}}.",
+			"outside": "{{name}} is no longer over a place it can go.",
+			"drop": "{{name}} was dropped on {{target}}.",
+			"cancel": "Moving {{name}} was cancelled."
+		}
 	}
 }

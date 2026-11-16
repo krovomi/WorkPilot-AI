@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils";
 
 // dnd-kit requires each sortable id to be stable AND unique within its DndContext.
 // Because items and groups share the same DndContext (needed so an item can be dragged
-// onto the star of the rail), we namespace ids — `item:kanban`, `group:agents`.
+// onto the star of the rail), we namespace ids — `item:kanban`, `group:agents`,
+// and `pin:kanban` for the same page in « Mon menu », where pins are sorted.
 // Parsing helpers below keep the rest of the codebase unaware of this.
-export type SortableKind = "group" | "item";
+export type SortableKind = "group" | "item" | "pin";
 
 /** The star of the rail (« Mon menu »): a page or a group dropped on it is pinned. */
 export const FAV_DROP_ID = "__fav_drop__";
@@ -25,13 +26,15 @@ export function decodeSortableId(
 	if (sep === -1) return null;
 	const kind = sortableId.slice(0, sep) as SortableKind;
 	const id = sortableId.slice(sep + 1);
-	if (kind !== "group" && kind !== "item") return null;
+	if (kind !== "group" && kind !== "item" && kind !== "pin") return null;
 	return { kind, id };
 }
 
 interface SortableWrapperProps {
 	sortableId: string;
 	disabled?: boolean;
+	/** Keep the grip shown (the menu is being customized), not on hover only. */
+	revealed?: boolean;
 	children: (args: {
 		dragHandle: ReactNode;
 		isDragging: boolean;
@@ -45,6 +48,7 @@ interface SortableWrapperProps {
 export function SortableWrapper({
 	sortableId,
 	disabled,
+	revealed,
 	children,
 }: SortableWrapperProps) {
 	const {
@@ -69,7 +73,7 @@ export function SortableWrapper({
 			type="button"
 			aria-label={t("actions.dragToReorder")}
 			className={cn(
-				"opacity-40 hover:opacity-100 focus-visible:opacity-100",
+				revealed ? "opacity-100" : "opacity-40 hover:opacity-100 focus-visible:opacity-100",
 				"transition-opacity duration-150",
 				"flex items-center justify-center w-4 h-4 shrink-0",
 				"text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing",
