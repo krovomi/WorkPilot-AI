@@ -48,7 +48,8 @@ def test_the_same_picture_scores_one_with_no_issue() -> None:
     assert report.score == 1.0 and report.pixel_match == 1.0
     assert all(not r.issues for r in report.regions)
     assert report.masked_ratio == 0.0
-    assert Image.open(io.BytesIO(report.diff_png)).size == (400, 300)
+    diff_size = Image.open(io.BytesIO(report.diff_png)).size
+    assert diff_size == (400, 300)
 
 
 def test_a_wrong_colour_is_reported_with_both_values() -> None:
@@ -156,7 +157,8 @@ def test_side_by_side_puts_the_pictures_at_one_height() -> None:
     png = side_by_side(
         [Image.new("RGB", (400, 300)), Image.new("RGB", (200, 300))], height=150
     )
-    assert Image.open(io.BytesIO(png)).size == (200 + 16 + 100, 150)
+    size = Image.open(io.BytesIO(png)).size
+    assert size == (200 + 16 + 100, 150)
 
 
 def test_an_empty_profile_gives_no_offset() -> None:
