@@ -74,6 +74,16 @@ it("shows the criteria the description states when none are stored, and saves th
 	);
 });
 
+it("keeps the criteria to save when saving them throws", async () => {
+	persist.mockRejectedValueOnce(new Error("IPC"));
+	setup(makeTask());
+	fireEvent.click(screen.getByRole("button", { name: "Save as criteria" }));
+	await waitFor(() => expect(screen.getByRole("button", { name: "Save as criteria" })).toBeEnabled());
+	expect(persist).toHaveBeenCalledTimes(1);
+	expect(screen.getByText("read from the description")).toBeInTheDocument();
+	expect(screen.queryByText("Saved.")).toBeNull();
+});
+
 it("prefers the stored criteria over the description", () => {
 	setup(makeTask({ metadata: { sourceType: "manual", acceptanceCriteria: ["Stocké"] } } as Partial<Task>));
 	expect(screen.queryByText("read from the description")).toBeNull();

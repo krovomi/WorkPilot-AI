@@ -269,6 +269,17 @@ vi.mock("../env-utils", () => ({
 	getAugmentedEnv: vi.fn(() => ({ ...process.env })),
 }));
 
+const failover = vi.hoisted(() => ({
+	provider: null as string | null,
+	otherProvider: false,
+}));
+vi.mock("../provider-failover/task-phase-provider", () => ({
+	FAILOVER_REQUEST_EVENT: "provider-failover-request",
+	taskPhaseProvider: () => failover.provider,
+	chainHasOtherProvider: () => failover.otherProvider,
+}));
+
+import { getClaudeProfileManager } from "../claude-profile-manager";
 import { getToolInfo } from "../cli-tool-manager";
 import { projectStore } from "../project-store";
 import { pythonEnvManager } from "../python-env-manager";
@@ -1239,4 +1250,57 @@ describe("resolveExitFailure - backend exit without terminal phase", () => {
 		expect(resolveExitFailure(1, "auth_failure_paused")).toBeNull();
 	});
 
+});
+
+describe("AgentProcessManager - cross-provider failover requests", () => {
+	type Swapper = {
+		handleRateLimitWithAutoSwap: (taskId: string, detection: unknown, type: string) => boolean;
+		handleAuthFailureWithAutoSwap: (taskId: string, detection: unknown) => boolean;
+	};
+	let manager: Swapper;
+	let requests: unknown[][];
+	const profiles = { best: null as null | { id: string; name: string; isAuthenticated: boolean } };
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		failover.provider = null;
+		failover.otherProvider = false;
+		profiles.best = null;
+		vi.mocked(getClaudeProfileManager).mockReturnValue({
+			getAutoSwitchSettings: () => ({ enabled: true, autoSwitchOnRateLimit: true, autoSwitchOnAuthFailure: true }),
+			getBestAvailableProfile: () => profiles.best,
+		} as never);
+		const emitter = new EventEmitter();
+		requests = [];
+		emitter.on("provider-failover-request", (...args: unknown[]) => requests.push(args));
+		manager = new AgentProcessManager(new AgentState(), new AgentEvents(), emitter) as unknown as Swapper;
+	});
+
+	it("hands a task running off Claude to the failover", () => {
+		failover.provider = "copilot";
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(true);
+		expect(manager.handleAuthFailureWithAutoSwap("t2", { profileId: "p" })).toBe(true);
+		expect(requests).toEqual([
+			["t1", "rate_limit"],
+			["t2", "auth_failure"],
+		]);
+	});
+
+	it("hands a Claude task over only when no Claude account is left and the chain has another provider", () => {
+		failover.provider = "anthropic";
+		failover.otherProvider = true;
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(true);
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(true);
+		expect(requests).toHaveLength(2);
+
+		failover.otherProvider = false;
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(false);
+		expect(manager.handleRateLimitWithAutoSwap("t1", { profileId: "p" }, "task-execution")).toBe(false);
+		expect(requests).toHaveLength(2);
+	});
+
+	it("leaves a task it cannot place to the Claude-only path", () => {
+		expect(manager.handleAuthFailureWithAutoSwap("t1", { profileId: "p" })).toBe(false);
+		expect(requests).toHaveLength(0);
+	});
 });
