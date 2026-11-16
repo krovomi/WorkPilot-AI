@@ -23,10 +23,12 @@ import type {
 	TerminalWorktreeConfig,
 	UsageSnapshot,
 } from "../../shared/types";
+import { normalizeFailoverOrder, sanitizeAutoSwitchUpdate } from "../../shared/utils/failover-chain";
 import { createProfileDirectory } from "../claude-profile/profile-utils";
 import { maskClaudeProfile, maskClaudeProfileSettings, unmaskClaudeProfile } from "../claude-profile/renderer-view";
 import { migrateSession } from "../claude-profile/session-utils";
 import { getUsageMonitor } from "../claude-profile/usage-monitor";
+import { withProfilesPlans, withUsagePlan } from "../claude-profile/usage-plan";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { projectStore } from "../project-store";
 import { readSettingsFileAsync } from "../settings-utils";
@@ -263,7 +265,10 @@ function registerProfileHandlers(terminalManager: TerminalManager, getMainWindow
 		IPC_CHANNELS.CLAUDE_PROFILE_UPDATE_AUTO_SWITCH,
 		(_, settings: Partial<ClaudeAutoSwitchSettings>) =>
 			answer("Failed to update auto-switch settings", () => {
-				getClaudeProfileManager().updateAutoSwitchSettings(settings);
+				// Only known switches and thresholds are kept.
+				const update = sanitizeAutoSwitchUpdate(settings);
+				if (!update) return refused("Invalid auto-switch settings");
+				getClaudeProfileManager().updateAutoSwitchSettings(update);
 				// The monitor reads the settings when it starts
 				const monitor = getUsageMonitor();
 				monitor.stop();
@@ -280,7 +285,9 @@ function registerProfileHandlers(terminalManager: TerminalManager, getMainWindow
 
 	terminalIpcMain.handle(IPC_CHANNELS.ACCOUNT_PRIORITY_SET, (_, order: string[]) =>
 		answer("Failed to set account priority order", () => {
-			getClaudeProfileManager().setAccountPriorityOrder(order);
+			const entries = normalizeFailoverOrder(order);
+			if (!entries) return refused("Invalid account priority order");
+			getClaudeProfileManager().setAccountPriorityOrder(entries);
 			return done();
 		}),
 	);
@@ -309,6 +316,7 @@ function registerUsageHandlers(): void {
 			} else {
 				usage = monitor.getCurrentUsage();
 			}
+			usage = await withUsagePlan(usage);
 			if (usage) monitor.emit("usage-updated", usage);
 			return done(usage) as IPCResult<UsageSnapshot | null>;
 		}),
@@ -317,7 +325,7 @@ function registerUsageHandlers(): void {
 	terminalIpcMain.handle(IPC_CHANNELS.ALL_PROFILES_USAGE_REQUEST, (_, forceRefresh = false) =>
 		answer<AllProfilesUsage | null>("Failed to get all profiles usage", async () => ({
 			success: true,
-			data: await getUsageMonitor().getAllProfilesUsage(forceRefresh),
+			data: await withProfilesPlans(await getUsageMonitor().getAllProfilesUsage(forceRefresh)),
 		})),
 	);
 }
@@ -341,11 +349,24 @@ export function registerTerminalHandlers(
  */
 export function initializeUsageMonitorForwarding(mainWindow: BrowserWindow): void {
 	const monitor = getUsageMonitor();
+	// Each usage event goes out with its account's plan. One queue keeps the
+	// events in the order the monitor emitted them; a window closed meanwhile
+	// makes the send throw, and that event is dropped.
+	let forwarding: Promise<void> = Promise.resolve();
+	const forward = (send: () => Promise<void>) => {
+		forwarding = forwarding.then(() => send().catch(() => undefined));
+	};
 	monitor.on("usage-updated", (usage: UsageSnapshot) => {
-		mainWindow.webContents.send(IPC_CHANNELS.USAGE_UPDATED, usage);
+		forward(async () => {
+			const withPlan = await withUsagePlan(usage).catch(() => usage);
+			mainWindow.webContents.send(IPC_CHANNELS.USAGE_UPDATED, withPlan);
+		});
 	});
 	monitor.on("all-profiles-usage-updated", (allProfilesUsage: AllProfilesUsage) => {
-		mainWindow.webContents.send(IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED, allProfilesUsage);
+		forward(async () => {
+			const withPlans = await withProfilesPlans(allProfilesUsage).catch(() => allProfilesUsage);
+			mainWindow.webContents.send(IPC_CHANNELS.ALL_PROFILES_USAGE_UPDATED, withPlans);
+		});
 	});
 	monitor.on("show-swap-notification", (notification: unknown) => {
 		mainWindow.webContents.send(IPC_CHANNELS.PROACTIVE_SWAP_NOTIFICATION, notification);

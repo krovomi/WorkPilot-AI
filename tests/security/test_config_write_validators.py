@@ -121,6 +121,42 @@ class TestWritingTheConfigurationIsRefused:
         refused('echo "unterminated > .workpilot-allowlist')
 
 
+class TestTheNameAsTheShellSpellsIt:
+    """The shell takes escapes off a word and fills in variables and
+    substitutions before the command runs: the target is judged on that
+    reading, and a computed target counts when the line spells the file."""
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "echo nc >> .workpilot-allow\\list",
+            "cp evil .workpilot-allow\\list",
+            "f=.workpilot-allowlist; echo nc >> $f",
+            "D=.workpilot; echo x > $D/guardrails.yaml",
+            "echo nc >> $(printf .workpilot-allowlist)",
+            "echo nc >> `printf .workpilot-allowlist`",
+            "echo nc >> .workpilot-allow$(echo list)",
+            "echo nc | tee -a $(printf .workpilot-allowlist)",
+        ],
+    )
+    def test_refused(self, command):
+        assert "security configuration" in refused(command)
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            'echo hi > "$OUT"',
+            'cp a "$DEST/b.txt"',
+            "echo $(date) >> build.log",
+            "echo ${HOME} > out.txt",
+            "tee $(mktemp)",
+            "echo x > out\\ file.txt",
+        ],
+    )
+    def test_a_computed_target_elsewhere_is_permitted(self, command):
+        permitted(command)
+
+
 class TestReadingAndLookalikesAreAllowed:
     @pytest.mark.parametrize(
         "command",

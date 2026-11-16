@@ -31,12 +31,8 @@
 		"commits": "commits",
 		"branchHasNewCommits": "La branche {{branch}} a {{count}} nouveau commit.",
 		"branchHasNewCommits_other": "La branche {{branch}} a {{count}} nouveaux commits.",
-		"branchHasNewCommitsSinceWorktree": "La branche {{branch}} a {{count}} nouveau commit depuis la création de cet arbre de travail.",
-		"branchHasNewCommitsSinceWorktree_other": "La branche {{branch}} a {{count}} nouveaux commits depuis la création de cet arbre de travail.",
 		"filesNeedMerging": "{{count}} fichier nécessite une fusion.",
 		"filesNeedMerging_other": "{{count}} fichiers nécessitent une fusion.",
-		"filesNeedIntelligentMerging": "{{count}} fichier nécessitera une fusion intelligente :",
-		"filesNeedIntelligentMerging_other": "{{count}} fichiers nécessiteront une fusion intelligente :",
 		"branchHasNewCommitsSinceBuild": "La branche {{branch}} a {{count}} nouveau commit depuis le début de ce build.",
 		"branchHasNewCommitsSinceBuild_other": "La branche {{branch}} a {{count}} nouveaux commits depuis le début de ce build.",
 		"filesNeedAIMergeDueToRenames": "{{count}} fichier nécessite une fusion IA en raison de {{renameCount}} renommage de fichier.",
@@ -233,9 +229,18 @@
 		"addingNewFile": "Ajout d'un nouveau fichier",
 		"filePath": "Chemin du fichier",
 		"fileContent": "Contenu du fichier",
-		"filesSelected": "fichiers sélectionnés",
+		"filesSelectedCount_one": "{{count}} fichier sélectionné",
+		"filesSelectedCount_other": "{{count}} fichiers sélectionnés",
+		"selectFile": "Sélectionner {{path}}",
 		"deleteSelected": "Abandonner les modifications",
 		"deleting": "Abandon des modifications en cours...",
+		"confirmDiscard_one": "Abandonner définitivement {{count}} fichier",
+		"confirmDiscard_other": "Abandonner définitivement {{count}} fichiers",
+		"discardHint": "Les fichiers sélectionnés reviennent à la version de la branche de base et les nouveaux fichiers sont supprimés.",
+		"discardedTitle": "Modifications abandonnées",
+		"discarded_one": "{{count}} fichier est revenu à la branche de base",
+		"discarded_other": "{{count}} fichiers sont revenus à la branche de base",
+		"discardFailed": "Abandon impossible : {{files}}",
 		"save": "Enregistrer",
 		"saving": "Enregistrement en cours...",
 		"cancel": "Annuler",
@@ -246,6 +251,9 @@
 		"expandAll": "Tout développer",
 		"collapseAll": "Tout réduire",
 		"error": "Erreur",
+		"readError": "Impossible de lire {{path}}.",
+		"saveError": "Impossible d'enregistrer {{path}}.",
+		"createError": "Impossible de créer {{path}}.",
 		"status": {
 			"added": "ajouté",
 			"deleted": "supprimé",
@@ -329,8 +337,6 @@
 		"noSubtasks": "Aucune sous-tâche définie",
 		"noSubtasksHint": "Les sous-tâches d'implémentation apparaîtront ici après la planification",
 		"editFiles": "Modifier les fichiers",
-		"filesDeleted": "{{count}} fichier(s) supprimé(s)",
-		"filesModified": "{{count}} fichier(s) modifié(s)",
 		"saveChanges": "Enregistrer les modifications",
 		"subtasksCompleted": "{{completed}}/{{total}} sous-tâches terminées",
 		"noSubtasksYet": "Aucune sous-tâche pour l'instant"
@@ -346,7 +352,14 @@
 		"strategy": "Stratégie :",
 		"none": "Aucun conflit détecté",
 		"stageWithAi": "Indexer avec fusion IA",
-		"mergeWithAi": "Fusionner avec l'IA"
+		"mergeWithAi": "Fusionner avec l'IA",
+		"severity": {
+			"none": "aucune",
+			"low": "faible",
+			"medium": "moyenne",
+			"high": "élevée",
+			"critical": "critique"
+		}
 	},
 	"discard": {
 		"title": "Abandonner le build",
@@ -355,21 +368,6 @@
 		"filesChanged": "Fichiers modifiés :",
 		"lines": "Lignes :",
 		"discarding": "Abandon en cours..."
-	},
-	"mergePreview": {
-		"conflictsFound_one": "{{count}} conflit trouvé",
-		"conflictsFound_other": "{{count}} conflits trouvés",
-		"filesToMerge": "Fichiers à fusionner : {{count}}",
-		"autoMergeable": "Fusionnables automatiquement : {{count}}",
-		"aiResolved": "Résolus par l'IA : {{count}}",
-		"manualReview": "Revue manuelle : {{count}}",
-		"divergedTitle": "Branche divergente : l'IA résoudra",
-		"noConflicts": "Aucun conflit détecté",
-		"viewDetails": "Voir le détail",
-		"diverged": "La branche a divergé : l'IA résoudra",
-		"aiWillMerge": "L'IA fusionnera automatiquement ces conflits quand vous cliquerez sur Indexer les modifications.",
-		"aiWillResolve": "L'IA résoudra les conflits",
-		"ready": "Prêt à fusionner"
 	},
 	"staged": {
 		"title": "Modifications indexées",
@@ -409,7 +407,21 @@
 		"noWorkspaceTitle": "Aucun espace de travail trouvé",
 		"humanReviewDescription": "Une revue humaine est requise avant le code. Relisez votre spec.md pour y apporter les modifications nécessaires.",
 		"noWorkspaceDescription": "Aucun espace de travail isolé n'a été trouvé pour cette tâche. Les modifications ont peut-être été faites directement dans votre projet.",
-		"commitsCount": "{{count}} commits"
+		"commitsCount_one": "{{count}} commit",
+		"commitsCount_other": "{{count}} commits",
+		"loadParts": {
+			"mergePreview": "Aperçu de la fusion",
+			"status": "État du worktree",
+			"diff": "Modifications du worktree"
+		},
+		"loadError": "{{part}} : {{error}}",
+		"loadFailed": "Impossible de charger : {{part}}",
+		"loadUnexpected": "Une erreur inattendue est survenue pendant le chargement de l'espace de travail",
+		"loadingInfo": "Chargement de l'espace de travail...",
+		"deleteWorktreeFailed": "Échec de la suppression du worktree",
+		"statusAfterDeleteFailed": "Worktree supprimé, mais le statut de la tâche n'a pas pu être mis à jour : {{error}}",
+		"markDoneFailed": "Impossible de marquer la tâche comme terminée",
+		"resetStagedFailed": "Impossible de réinitialiser l'état indexé"
 	},
 	"guided": {
 		"button": "Revue guidée",
