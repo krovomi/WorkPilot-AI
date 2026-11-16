@@ -123,6 +123,9 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The repo bench: git, files and test runners, read by Formula Lab and
     # the model router. A leaf, or the router's cycle reaches it.
     "bench": {"foundation"},
+    # Git snapshots of a task's worktree before each agent session, and the
+    # rollback (docs/architecture/agent-safety.md): git through foundation only.
+    "agent_snapshots": {"foundation"},
     # The security layer reads the project's stack (allowlist per stack), the
     # injection scanner, and rtk to see the command behind the proxy
     # (docs/architecture/rtk.md).
@@ -175,9 +178,11 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # The agent runtime as a port (docs/architecture/agent-runtime.md): core
     # installs it, the units below reach a session through it. A leaf.
     "agent_runtime": set(),
+    # The merge preview reads git and asks no model; the AI merge of a file
+    # lives in core.workspace.
+    "merge": {"foundation"},
     # Taken out of the agents' cycle by the port (plan of 29 October, A1):
     # each starts its session through agent_runtime, never core or agents.
-    "merge": {"agent_runtime", "foundation"},
     "integrations": {
         "agent_runtime",
         "foundation",

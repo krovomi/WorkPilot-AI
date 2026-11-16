@@ -322,8 +322,21 @@ def _shell_inline_command(arguments: list[str]) -> str | None:
         if token == "-c" or (
             token.startswith("-") and not token.startswith("--") and "c" in token[1:]
         ):
-            return _unquote(arguments[index + 1])
+            return _one_quote_pair_off(arguments[index + 1])
     return None
+
+
+def _one_quote_pair_off(token: str) -> str:
+    """The script of `-c`, its one pair of quotes off when it still has it.
+
+    POSIX tokenizing has already removed them; a Windows-path line is read
+    without, so its token keeps them. Stripping every quote character from
+    both ends, as `_unquote` does for a file name, cut the closing quote of a
+    nested `bash -c '… "…"'` and left a line that no longer tokenized.
+    """
+    if len(token) >= 2 and token[0] == token[-1] and token[0] in "'\"":
+        return token[1:-1]
+    return token
 
 
 def _under(cwd: str, path: str) -> str:
