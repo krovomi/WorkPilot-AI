@@ -398,8 +398,10 @@ class WaveExecutor:
             success = process.returncode == 0
             error = None
             if not success:
+                # The end of stderr: a traceback ends with its exception, and
+                # the interpreter's own warnings come first.
                 error = (
-                    stderr_output[:500]
+                    stderr_output[-500:]
                     if stderr_output
                     else f"Exit code {process.returncode}"
                 )
