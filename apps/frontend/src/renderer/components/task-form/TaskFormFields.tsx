@@ -39,7 +39,7 @@ import type {
 import { cn } from "../../lib/utils";
 import { usePromptOptimizerStore } from "../../stores/prompt-optimizer-store";
 import { AgentProfileSelector } from "../AgentProfileSelector";
-import { createThumbnail } from "../ImageUpload";
+import { createThumbnail } from "../../lib/image-attachments";
 import { ScreenshotCapture } from "../ScreenshotCapture";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
