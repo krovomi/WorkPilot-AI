@@ -42,10 +42,10 @@ export default defineConfig({
 			// 64.55 %, branches 62.29 %). CI runs coverage on Linux; raise the
 			// floor when the suite grows, never lower it to merge.
 			thresholds: {
-				statements: 69.1,
-				lines: 69.5,
-				functions: 66,
-				branches: 63.7,
+				statements: 69.3,
+				lines: 69.7,
+				functions: 66.2,
+				branches: 64,
 			},
 		},
 		// Mock Electron modules for unit tests
