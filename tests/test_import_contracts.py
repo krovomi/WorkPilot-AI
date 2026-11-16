@@ -260,6 +260,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
     # the prompt section and its staged skills, nothing that runs an agent
     # (docs/architecture/windev.md). A leaf: the stack detection imports it.
     "windev": set(),
+    # Smart Estimation's calibration loop (docs/architecture/smart-estimation.md):
+    # its ledger through foundation's JSON lock, the merge diff through
+    # foundation's git. A leaf the estimation runner and the merge event read.
+    "estimation_calibration": {"foundation"},
 }
 
 # The largest set of units that all import one another, directly or not. It
