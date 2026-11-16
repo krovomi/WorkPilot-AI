@@ -69,11 +69,15 @@ function channelValue(expression: string): string | null {
 	return literal ? literal[1] : null;
 }
 
-/** Every `ipcMain.handle/on(channel, (event, a, b) => …)` with its parameter names. */
+/**
+ * Every `ipcMain.handle/on(channel, (event, a, b) => …)` with its parameter
+ * names, a guarded one (`prIpcMain`, `terminalIpcMain`…) included: it
+ * registers on `ipcMain` underneath, so the policy applies to it too.
+ */
 function handlers(): { where: string; channel: string; params: string[] }[] {
 	const found: { where: string; channel: string; params: string[] }[] = [];
 	const pattern =
-		/ipcMain\.(?:handle|on)\(\s*([^,]+?),\s*(?:async\s*)?\(([^)]*)\)\s*(?::\s*[^=]+)?=>/gs;
+		/(?<![\w$])(?:ipcMain|[a-z][\w$]*IpcMain)\.(?:handle|on)\(\s*([^,]+?),\s*(?:async\s*)?\(([^)]*)\)\s*(?::\s*[^=]+)?=>/gs;
 	for (const file of sources(MAIN)) {
 		const text = readFileSync(file, "utf8");
 		for (const match of text.matchAll(pattern)) {

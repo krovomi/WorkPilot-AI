@@ -72,8 +72,8 @@
 		"coding": "Code is being written. Subtasks run one after another automatically.",
 		"qa_review": "An agent is checking the quality of the code produced: tests, consistency, best practices.",
 		"qa_fixing": "Problems were found. The agent is fixing them before delivery.",
-		"rate_limit_paused": "The Claude API hit its limit. It will resume automatically in a moment.",
-		"auth_failure_paused": "Authentication problem. Check your Claude profiles in the settings.",
+		"rate_limit_paused": "The provider hit its usage limit. The task resumes on its own in a moment.",
+		"auth_failure_paused": "Authentication problem. Check the provider account in the settings.",
 		"complete": "The task is complete and ready for your review.",
 		"failed": "The task failed. Check the logs to understand what happened."
 	},
@@ -90,6 +90,7 @@
 		"logs": "Agent logs",
 		"copy": "Copy",
 		"copied": "Copied",
+		"copyFailed": "Not copied",
 		"copyAll": "Copy all logs",
 		"waitingForLogs": "Waiting for logs…",
 		"noLogs": "No log was recorded for this task.",
@@ -100,7 +101,7 @@
 		"viewTerminal": "View terminal",
 		"interrupt": "Interrupt",
 		"resumeClaude": "Resume Claude",
-		"kill": "Close",
+		"kill": "Close terminal",
 		"goToKanban": "View in Kanban",
 		"stopTask": "Stop"
 	},
