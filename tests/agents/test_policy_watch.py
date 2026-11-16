@@ -169,6 +169,13 @@ def test_before_a_session_the_coder_does_not_start(project: Path, spec: Path):
     assert status.updates and read_pause_state(spec)["reason"] == HOURS_REASON
 
 
+def test_every_coder_iteration_asks_the_policy(project: Path, spec: Path):
+    _closed(project)
+    status = SimpleNamespace(update=lambda **kw: None)
+    with pytest.raises(BuildPaused):
+        iteration_guards.guard_iteration(spec, project, 1, False, status)
+
+
 def test_inside_the_hours_the_coder_goes_on(project: Path, spec: Path):
     status = SimpleNamespace(update=lambda **kw: None)
     iteration_guards._check_policy(spec, "coding", status)

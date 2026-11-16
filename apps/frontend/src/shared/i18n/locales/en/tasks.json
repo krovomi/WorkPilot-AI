@@ -2665,5 +2665,12 @@
 		},
 		"anomalyLine_one": "{{label}}",
 		"anomalyLine_other": "{{label}} (×{{count}})"
+	},
+	"policyPause": {
+		"hoursChip": "Outside allowed hours",
+		"hoursBody": "workpilot.policy.yaml lets agents work {{hours}} ({{timezone}}). The task paused itself once its current action had finished.",
+		"budgetChip": "Token budget reached",
+		"budgetBody": "The project's agents spent {{spent}} tokens in the last hour, at or past the {{limit}} workpilot.policy.yaml allows.",
+		"hint": "Resume it when the policy allows again; the decision is in the audit trail of Settings > Guardrails."
 	}
 }

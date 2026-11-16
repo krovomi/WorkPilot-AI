@@ -198,6 +198,7 @@ import {
 	type GuardrailsAPI,
 	createGuardrailsAPI,
 } from "./modules/guardrails-api";
+import { type GovernanceAPI, createGovernanceAPI } from "./modules/governance-api";
 import { invokeIpc } from "./modules/ipc-utils";
 import type { LearningLoopAPI } from "./modules/learning-loop-api";
 import { createLearningLoopAPI } from "./modules/learning-loop-api";
@@ -351,6 +352,7 @@ export interface ElectronAPI
 		ConsensusArbiterAPI,
 		InjectionGuardAPI,
 		GuardrailsAPI,
+		GovernanceAPI,
 		AgentDebuggerAPI,
 		LocalBackendAPI,
 		ReplayAPI,
@@ -513,6 +515,7 @@ export const createElectronAPI = (): ElectronAPI => {
 		...createConsensusArbiterAPI(),
 		...createInjectionGuardAPI(),
 		...createGuardrailsAPI(),
+		...createGovernanceAPI(),
 		...createAgentDebuggerAPI(),
 		...createLocalBackendAPI(),
 		...createReplayAPI(),

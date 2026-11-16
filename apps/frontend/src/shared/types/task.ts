@@ -16,6 +16,7 @@ import type {
 	ThinkingLevel,
 } from "./settings";
 import type { AnomalyPauseDetail, SandboxPauseDetail } from "./agent-safety";
+import type { PolicyPauseDetail } from "./governance";
 import type { TaskGoalSummary } from "./goal";
 import type { MobileBootstrapMark, MobilePlatform } from "./mobile";
 import type { TaskSmartEstimate } from "./smart-estimation";
@@ -673,13 +674,16 @@ export interface TaskMetadata {
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
 		 * when the person stopped every agent at once. "anomaly" / "sandbox"
 		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * with `anomaly` / `sandbox`. "policy_hours" / "policy_budget" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
 		anomaly?: AnomalyPauseDetail;
 		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 
 	// Abandon status — the task was set aside (e.g. the product owner no longer
@@ -817,13 +821,16 @@ export interface ImplementationPlan {
 		 * same call (`agents/tool_breaker.py`), with `breaker`. "kill_switch"
 		 * when the person stopped every agent at once. "anomaly" / "sandbox"
 		 * when the session watch stopped an agent (`agents/safety_watch.py`),
-		 * with `anomaly` / `sandbox`.
+		 * with `anomaly` / `sandbox`. "policy_hours" / "policy_budget" when
+		 * workpilot.policy.yaml said agents must stop (`agents/policy_watch.py`),
+		 * with `policy`.
 		 */
 		reason?: string | null;
 		budget?: BudgetPauseDetail;
 		breaker?: BreakerPauseDetail;
 		anomaly?: AnomalyPauseDetail;
 		sandbox?: SandboxPauseDetail;
+		policy?: PolicyPauseDetail;
 	};
 }
 
