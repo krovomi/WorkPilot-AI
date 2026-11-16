@@ -257,6 +257,15 @@ export function useIdeation(
 			}
 		}
 
+		// A conversion that failed used to leave no trace at all.
+		if (successCount < ideasToConvert.length) {
+			toast({
+				variant: "destructive",
+				title: t("ideation.conversionFailed"),
+				description: t("ideation.conversionFailedDescription"),
+			});
+		}
+
 		if (successCount > 0) {
 			loadTasks(projectId);
 			useIdeationStore.getState().clearSelection();

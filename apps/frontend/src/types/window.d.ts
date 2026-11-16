@@ -94,8 +94,20 @@ declare global {
 					projectPath: string,
 					incidentId: string,
 				): Promise<{ success: boolean; error?: string }>;
+				bisectIncident(
+					projectPath: string,
+					incidentId: string,
+					goodSha?: string,
+				): Promise<
+					import("../shared/types/self-healing").BisectRequestResult
+				>;
 				onOperationProgress(callback: (data: unknown) => void): () => void;
 				onOperationComplete(callback: (data: unknown) => void): () => void;
+				onBisectProgress(
+					callback: (
+						data: import("../shared/types/self-healing").BisectProgressEvent,
+					) => void,
+				): () => void;
 			};
 		};
 		DEBUG?: boolean;
